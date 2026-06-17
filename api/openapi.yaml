@@ -1,0 +1,2226 @@
+openapi: "3.0.3"
+info:
+  title: Promptsheon API
+  description: Version Control System for AI agent intelligence
+  version: "1.0.0"
+  contact:
+    name: Promptsheon
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: "API key prefixed with ps_. Send as: Authorization: Bearer ps_..."
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+    Prompt:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        content:
+          type: string
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/Variable"
+        tags:
+          type: array
+          items:
+            type: string
+        model_hint:
+          type: string
+        binding:
+          $ref: "#/components/schemas/ProviderBinding"
+        version:
+          type: integer
+        status:
+          type: string
+          enum: [draft, approved, deployed, archived]
+        cas_hash:
+          type: string
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+
+    Variable:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        required:
+          type: boolean
+        default:
+          type: string
+        description:
+          type: string
+
+    ProviderBinding:
+      type: object
+      properties:
+        provider:
+          type: string
+          description: "LLM provider name (e.g. openai, azure, anthropic)"
+        model:
+          type: string
+          description: "Model identifier (e.g. gpt-4, claude-3-opus)"
+        api_key_ref:
+          type: string
+          description: "Vault key ID for API key lookup"
+
+    Agent:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentStep"
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolRef"
+        status:
+          type: string
+        cas_hash:
+          type: string
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AgentStep:
+      type: object
+      properties:
+        id:
+          type: string
+        prompt_id:
+          type: string
+        prompt_hash:
+          type: string
+        depends_on:
+          type: array
+          items:
+            type: string
+        tool_calls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolCall"
+        output_key:
+          type: string
+
+    ToolRef:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [http, shell, json_transform, prompt_call]
+        config:
+          type: object
+
+    ToolCall:
+      type: object
+      properties:
+        tool:
+          type: string
+        input:
+          type: object
+        output:
+          type: object
+        error:
+          type: string
+        latency_ms:
+          type: integer
+
+    TestDataset:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        cases:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestCase"
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    TestCase:
+      type: object
+      properties:
+        id:
+          type: string
+        input:
+          type: object
+        expected_output:
+          type: string
+        expected_contains:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    EvalResult:
+      type: object
+      properties:
+        id:
+          type: string
+        test_case_id:
+          type: string
+        prompt_hash:
+          type: string
+        dataset_id:
+          type: string
+        model:
+          type: string
+        output:
+          type: string
+        score:
+          type: number
+        latency_ms:
+          type: integer
+        token_usage:
+          $ref: "#/components/schemas/Usage"
+        hallucination_score:
+          type: number
+        passed:
+          type: boolean
+        error:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Usage:
+      type: object
+      properties:
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        total_tokens:
+          type: integer
+
+    EvalReport:
+      type: object
+      properties:
+        prompt_hash:
+          type: string
+        dataset_id:
+          type: string
+        model:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvalResult"
+        aggregate:
+          $ref: "#/components/schemas/Aggregate"
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    Aggregate:
+      type: object
+      properties:
+        total_cases:
+          type: integer
+        passed_cases:
+          type: integer
+        pass_rate:
+          type: number
+        avg_score:
+          type: number
+        avg_latency_ms:
+          type: number
+        avg_hallucination:
+          type: number
+        total_tokens:
+          type: integer
+
+    Review:
+      type: object
+      properties:
+        id:
+          type: string
+        resource_id:
+          type: string
+        resource_type:
+          type: string
+        author:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+        created_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        action:
+          type: string
+        resource:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+        previous_hash:
+          type: string
+          description: "Hash of the previous audit entry (for chain verification)"
+        entry_hash:
+          type: string
+          description: "Hash of this entry (for chain verification)"
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, writer, reader]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    APIKey:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        name:
+          type: string
+        key_prefix:
+          type: string
+        role:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        last_used:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        revoked:
+          type: boolean
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      tags: [System]
+      security: []
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  version:
+                    type: string
+                  uptime:
+                    type: string
+
+  /ready:
+    get:
+      summary: Readiness check
+      tags: [System]
+      security: []
+      responses:
+        "200":
+          description: Ready
+
+  /api/v1/apikeys:
+    post:
+      summary: Create API key
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, name, role]
+              properties:
+                user_id:
+                  type: string
+                name:
+                  type: string
+                role:
+                  type: string
+                  enum: [admin, writer, reader]
+                expires_at:
+                  type: string
+                  format: date-time
+      responses:
+        "201":
+          description: Key created (key shown once)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  record:
+                    $ref: "#/components/schemas/APIKey"
+    get:
+      summary: List API keys for a user
+      tags: [Auth]
+      security: []
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Key list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/APIKey"
+
+  /api/v1/apikeys/{id}:
+    delete:
+      summary: Revoke API key
+      tags: [Auth]
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Revoked
+
+  /api/v1/auth/{provider}/login:
+    get:
+      summary: Initiate OAuth login
+      tags: [Auth]
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, github]
+      responses:
+        "302":
+          description: Redirect to OAuth provider
+
+  /api/v1/auth/{provider}/callback:
+    get:
+      summary: OAuth callback
+      tags: [Auth]
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, github]
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/User"
+                  key:
+                    type: string
+
+  /api/v1/users:
+    get:
+      summary: List users
+      tags: [Users]
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      summary: Create user
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, name]
+              properties:
+                email:
+                  type: string
+                name:
+                  type: string
+                role:
+                  type: string
+                  enum: [admin, writer, reader]
+                  default: reader
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /api/v1/users/{id}:
+    get:
+      summary: Get user
+      tags: [Users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    put:
+      summary: Update user
+      tags: [Users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                name:
+                  type: string
+                role:
+                  type: string
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      summary: Delete user
+      tags: [Users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /api/v1/prompts:
+    get:
+      summary: List prompts
+      tags: [Prompts]
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: tags
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Prompt list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Prompt"
+    post:
+      summary: Create prompt
+      tags: [Prompts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, content]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                content:
+                  type: string
+                variables:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Variable"
+                tags:
+                  type: array
+                  items:
+                    type: string
+                model_hint:
+                  type: string
+                metadata:
+                  type: object
+                  additionalProperties:
+                    type: string
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prompt"
+
+  /api/v1/prompts/{id}:
+    get:
+      summary: Get prompt
+      tags: [Prompts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Prompt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prompt"
+    put:
+      summary: Update prompt
+      tags: [Prompts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                content:
+                  type: string
+                variables:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Variable"
+                tags:
+                  type: array
+                  items:
+                    type: string
+                model_hint:
+                  type: string
+                status:
+                  type: string
+                metadata:
+                  type: object
+                  additionalProperties:
+                    type: string
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prompt"
+    delete:
+      summary: Delete prompt
+      tags: [Prompts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /api/v1/prompts/{id}/deploy:
+    post:
+      summary: Deploy an approved prompt
+      tags: [Prompts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deployed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prompt"
+
+  /api/v1/prompts/{id}/archive:
+    post:
+      summary: Archive a prompt
+      tags: [Prompts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Archived
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prompt"
+
+  /api/v1/prompts/{id}/run:
+    post:
+      summary: Run a prompt via LLM
+      tags: [Prompts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                variables:
+                  type: object
+                  additionalProperties:
+                    type: string
+                provider:
+                  type: string
+                model:
+                  type: string
+      responses:
+        "200":
+          description: LLM response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: string
+                  model:
+                    type: string
+                  usage:
+                    $ref: "#/components/schemas/Usage"
+                  latency_ms:
+                    type: integer
+
+  /api/v1/prompts/{id}/preview:
+    post:
+      summary: Preview a prompt without executing
+      tags: [Prompts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                variables:
+                  type: object
+                  additionalProperties:
+                    type: string
+      responses:
+        "200":
+          description: Preview result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rendered:
+                    type: string
+                    description: Prompt with variables substituted
+                  estimated_tokens:
+                    type: integer
+                  estimated_cost:
+                    type: number
+                    format: double
+                  variables_used:
+                    type: object
+                    additionalProperties:
+                      type: string
+
+  /api/v1/agents:
+    get:
+      summary: List agents
+      tags: [Agents]
+      responses:
+        "200":
+          description: Agent list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Agent"
+    post:
+      summary: Create agent
+      tags: [Agents]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                steps:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/AgentStep"
+                tools:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/ToolRef"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+
+  /api/v1/agents/{id}:
+    get:
+      summary: Get agent
+      tags: [Agents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Agent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+    put:
+      summary: Update agent
+      tags: [Agents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                steps:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/AgentStep"
+                tools:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/ToolRef"
+                status:
+                  type: string
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+    delete:
+      summary: Delete agent
+      tags: [Agents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /api/v1/agents/{id}/export:
+    get:
+      summary: Export agent
+      tags: [Agents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, yaml]
+      responses:
+        "200":
+          description: Agent in requested format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+            application/x-yaml:
+              schema:
+                type: string
+
+  /api/v1/agents/import-yaml:
+    post:
+      summary: Import agent from YAML
+      tags: [Agents]
+      requestBody:
+        required: true
+        content:
+          text/yaml:
+            schema:
+              type: string
+      responses:
+        "201":
+          description: Imported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+
+  /api/v1/datasets:
+    get:
+      summary: List datasets
+      tags: [Datasets]
+      responses:
+        "200":
+          description: Dataset list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TestDataset"
+    post:
+      summary: Create dataset
+      tags: [Datasets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                cases:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/TestCase"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestDataset"
+
+  /api/v1/datasets/{id}:
+    get:
+      summary: Get dataset
+      tags: [Datasets]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Dataset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestDataset"
+    put:
+      summary: Update dataset
+      tags: [Datasets]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                cases:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/TestCase"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestDataset"
+    delete:
+      summary: Delete dataset
+      tags: [Datasets]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /api/v1/datasets/import:
+    post:
+      summary: Import dataset
+      tags: [Datasets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                cases:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/TestCase"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestDataset"
+
+  /api/v1/datasets/{id}/import-csv:
+    post:
+      summary: Import CSV test cases
+      tags: [Datasets]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csv]
+              properties:
+                csv:
+                  type: string
+                  description: CSV string with header row
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cases_added:
+                    type: integer
+                  total_cases:
+                    type: integer
+
+  /api/v1/datasets/{id}/export:
+    get:
+      summary: Export dataset as NDJSON
+      tags: [Datasets]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: NDJSON test cases
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+
+  /api/v1/reviews:
+    get:
+      summary: List pending reviews
+      tags: [Reviews]
+      responses:
+        "200":
+          description: Review list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Review"
+    post:
+      summary: Create review
+      tags: [Reviews]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resource_id, resource_type, author]
+              properties:
+                resource_id:
+                  type: string
+                resource_type:
+                  type: string
+                author:
+                  type: string
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  /api/v1/reviews/{id}/approve:
+    put:
+      summary: Approve review
+      tags: [Reviews]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  /api/v1/reviews/{id}/reject:
+    put:
+      summary: Reject review
+      tags: [Reviews]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  /api/v1/reviews/{id}/comment:
+    post:
+      summary: Add comment to review
+      tags: [Reviews]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                user_id:
+                  type: string
+                content:
+                  type: string
+      responses:
+        "200":
+          description: Updated review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  /api/v1/audit:
+    get:
+      summary: List audit entries
+      tags: [Audit]
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: string
+        - name: resource
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: "Filter entries after this time (RFC3339)"
+        - name: until
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: "Filter entries before this time (RFC3339)"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Audit list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEntry"
+
+  /api/v1/audit/export:
+    get:
+      summary: Export audit entries
+      tags: [Audit]
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, csv]
+          description: "Export format (default: json)"
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: until
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Audit export
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEntry"
+
+  /api/v1/audit/verify:
+    get:
+      summary: Verify audit chain integrity
+      tags: [Audit]
+      responses:
+        "200":
+          description: Chain verification result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  reason:
+                    type: string
+
+  /api/v1/eval/run:
+    post:
+      summary: Run evaluation
+      tags: [Evaluations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt_hash, dataset_id]
+              properties:
+                prompt_hash:
+                  type: string
+                dataset_id:
+                  type: string
+                model:
+                  type: string
+      responses:
+        "200":
+          description: Eval report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvalReport"
+
+  /api/v1/eval/results:
+    get:
+      summary: List eval results
+      tags: [Evaluations]
+      parameters:
+        - name: prompt_hash
+          in: query
+          schema:
+            type: string
+        - name: dataset_id
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Result list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EvalResult"
+
+  /api/v1/eval/report:
+    get:
+      summary: Get eval report
+      tags: [Evaluations]
+      parameters:
+        - name: prompt_hash
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Eval report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvalReport"
+
+  /api/v1/providers:
+    get:
+      summary: List registered LLM providers
+      tags: [Providers]
+      responses:
+        "200":
+          description: Provider list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  providers:
+                    type: array
+                    items:
+                      type: string
+
+  /api/v1/providers/{name}:
+    get:
+      summary: Get provider info
+      tags: [Providers]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Provider info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  status:
+                    type: string
+
+  /api/v1/providers/{name}/test:
+    post:
+      summary: Test an LLM provider
+      tags: [Providers]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                model:
+                  type: string
+      responses:
+        "200":
+          description: Test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  provider:
+                    type: string
+                  status:
+                    type: string
+                  latency_ms:
+                    type: integer
+
+  /api/v1/vault/keys:
+    post:
+      summary: Save an encrypted provider key
+      tags: [Vault]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider_name, key_name, key]
+              properties:
+                provider_name:
+                  type: string
+                key_name:
+                  type: string
+                key:
+                  type: string
+                  description: "Plaintext API key (will be encrypted)"
+      responses:
+        "201":
+          description: Key saved
+    get:
+      summary: List stored provider keys
+      tags: [Vault]
+      responses:
+        "200":
+          description: Key list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    provider_name:
+                      type: string
+                    key_name:
+                      type: string
+                    created_at:
+                      type: string
+                      format: date-time
+
+  /api/v1/vault/keys/{id}:
+    delete:
+      summary: Delete a provider key
+      tags: [Vault]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /api/v1/metrics/summary:
+    get:
+      summary: Get metrics summary
+      tags: [Metrics]
+      responses:
+        "200":
+          description: Metrics summary
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/metrics/top-prompts:
+    get:
+      summary: Get top used prompts
+      tags: [Metrics]
+      responses:
+        "200":
+          description: Top prompts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prompts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        count:
+                          type: integer
+                        last_used:
+                          type: string
+                          format: date-time
+                        avg_tokens:
+                          type: number
+                        avg_latency_ms:
+                          type: number
+                  total:
+                    type: integer
+
+  /api/v1/metrics/top-agents:
+    get:
+      summary: Get top used agents
+      tags: [Metrics]
+      responses:
+        "200":
+          description: Top agents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agents:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        count:
+                          type: integer
+                        last_used:
+                          type: string
+                          format: date-time
+                  total:
+                    type: integer
+
+  /api/v1/logs/stream:
+    get:
+      summary: Stream logs via SSE
+      tags: [Logs]
+      responses:
+        "200":
+          description: SSE log stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /api/v1/logs/search:
+    get:
+      summary: Search trace spans
+      tags: [Logs]
+      parameters:
+        - name: operation
+          in: query
+          schema:
+            type: string
+        - name: service
+          in: query
+          schema:
+            type: string
+        - name: trace_id
+          in: query
+          schema:
+            type: string
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: until
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/traces/tree/{trace_id}:
+    get:
+      summary: Get trace tree for a trace ID
+      tags: [Tracing]
+      parameters:
+        - name: trace_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Trace tree
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/metrics/dashboard:
+    get:
+      summary: Get dashboard summary with all metrics
+      tags: [Metrics]
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/guardrails/rules:
+    get:
+      summary: List guardrail rules
+      tags: [Guardrails]
+      responses:
+        "200":
+          description: Guardrail rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+    post:
+      summary: Create guardrail rule
+      tags: [Guardrails]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type]
+              properties:
+                name:
+                  type: string
+                type:
+                  type: string
+                severity:
+                  type: string
+                config:
+                  type: object
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/guardrails/rules/{id}:
+    get:
+      summary: Get guardrail rule
+      tags: [Guardrails]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Guardrail rule
+          content:
+            application/json:
+              schema:
+                type: object
+    put:
+      summary: Update guardrail rule
+      tags: [Guardrails]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+    delete:
+      summary: Delete guardrail rule
+      tags: [Guardrails]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /api/v1/guardrails/check:
+    post:
+      summary: Check content against guardrails
+      tags: [Guardrails]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                model:
+                  type: string
+                environment:
+                  type: string
+      responses:
+        "200":
+          description: Check result
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/guardrails/violations:
+    get:
+      summary: List guardrail violations
+      tags: [Guardrails]
+      responses:
+        "200":
+          description: Violations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /api/v1/guardrails/violations/{id}/resolve:
+    put:
+      summary: Resolve a guardrail violation
+      tags: [Guardrails]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Resolved
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/alerts/rules:
+    get:
+      summary: List alert rules
+      tags: [Alerting]
+      responses:
+        "200":
+          description: Alert rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+    post:
+      summary: Create alert rule
+      tags: [Alerting]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type]
+              properties:
+                name:
+                  type: string
+                type:
+                  type: string
+                severity:
+                  type: string
+                threshold:
+                  type: number
+                duration_minutes:
+                  type: integer
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/alerts/rules/{id}:
+    get:
+      summary: Get alert rule
+      tags: [Alerting]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Alert rule
+          content:
+            application/json:
+              schema:
+                type: object
+    put:
+      summary: Update alert rule
+      tags: [Alerting]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+    delete:
+      summary: Delete alert rule
+      tags: [Alerting]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /api/v1/alerts/active:
+    get:
+      summary: List active alerts
+      tags: [Alerting]
+      responses:
+        "200":
+          description: Active alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /api/v1/alerts/active/{id}/resolve:
+    put:
+      summary: Resolve an alert
+      tags: [Alerting]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Resolved
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/alerts/notifications:
+    post:
+      summary: Create notification group
+      tags: [Alerting]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, channels]
+              properties:
+                name:
+                  type: string
+                channels:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/agents/{id}/versions:
+    get:
+      summary: List agent versions
+      tags: [Agents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Agent versions
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/agents/{id}/restore:
+    post:
+      summary: Restore agent to previous version
+      tags: [Agents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version:
+                  type: integer
+      responses:
+        "200":
+          description: Restored
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/agents/{id}/deploy:
+    post:
+      summary: Deploy agent
+      tags: [Agents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deployed
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/agents/{id}/archive:
+    post:
+      summary: Archive agent
+      tags: [Agents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Archived
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/agents/{id}/rerun:
+    post:
+      summary: Rerun agent with new input
+      tags: [Agents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                input:
+                  type: object
+      responses:
+        "200":
+          description: Rerun result
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/agents/validate:
+    post:
+      summary: Validate agent workflow steps
+      tags: [Agents]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [steps]
+              properties:
+                steps:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
