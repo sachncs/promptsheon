@@ -10,8 +10,8 @@ import (
 
 // Authenticator validates API keys and attaches user info to requests.
 type Authenticator struct {
-	store       APIKeyStore
-	authLogger  AuthLogger
+	store      APIKeyStore
+	authLogger AuthLogger
 }
 
 // AuthLogger logs authentication failures for audit purposes.
@@ -109,13 +109,6 @@ func (a *Authenticator) Authenticate(r *http.Request) (*User, error) {
 	}, nil
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // AuthenticateMiddleware returns middleware that authenticates requests and
 // attaches the user to the context.
 func (a *Authenticator) AuthenticateMiddleware(next http.Handler) http.Handler {
@@ -130,14 +123,14 @@ func (a *Authenticator) AuthenticateMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// extractAPIKey gets the API key from the Authorization header or query param.
+// extractAPIKey gets the API key from the Authorization header.
+// Query parameter support is deprecated for security reasons (key appears in logs/referer).
 func extractAPIKey(r *http.Request) string {
-	// Check Authorization header first: "Bearer ps_..."
+	// Check Authorization header: "Bearer ps_..."
 	if auth := r.Header.Get("Authorization"); auth != "" {
 		if strings.HasPrefix(auth, "Bearer ") {
 			return strings.TrimPrefix(auth, "Bearer ")
 		}
 	}
-	// Fall back to ?api_key= query parameter.
-	return r.URL.Query().Get("api_key")
+	return ""
 }

@@ -32,21 +32,21 @@ const (
 
 // Event is the payload sent to webhook endpoints.
 type Event struct {
-	ID        string                 `json:"id"`
-	Type      EventType              `json:"type"`
-	Resource  string                 `json:"resource"`
-	Data      map[string]any         `json:"data"`
-	Timestamp time.Time              `json:"timestamp"`
+	ID        string         `json:"id"`
+	Type      EventType      `json:"type"`
+	Resource  string         `json:"resource"`
+	Data      map[string]any `json:"data"`
+	Timestamp time.Time      `json:"timestamp"`
 }
 
 // Endpoint represents a configured webhook destination.
 type Endpoint struct {
-	ID        string     `json:"id"`
-	URL       string     `json:"url"`
-	Secret    string     `json:"secret,omitempty"` // for HMAC signing
+	ID        string      `json:"id"`
+	URL       string      `json:"url"`
+	Secret    string      `json:"secret,omitempty"` // for HMAC signing
 	Events    []EventType `json:"events"`
-	Active    bool       `json:"active"`
-	CreatedAt time.Time  `json:"created_at"`
+	Active    bool        `json:"active"`
+	CreatedAt time.Time   `json:"created_at"`
 }
 
 // Delivery records the outcome of a webhook delivery attempt.
@@ -63,22 +63,25 @@ type Delivery struct {
 
 // Dispatcher delivers events to registered webhook endpoints.
 type Dispatcher struct {
-	mu       sync.RWMutex
-	endpoints map[string]*Endpoint
-	client   *http.Client
-	logger   *slog.Logger
-	deliveries []Delivery
-	maxRetries int
+	mu            sync.RWMutex
+	endpoints     map[string]*Endpoint
+	client        *http.Client
+	logger        *slog.Logger
+	deliveries    []Delivery
+	maxRetries    int
+	maxDeliveries int
 }
 
 // NewDispatcher creates a webhook dispatcher.
 func NewDispatcher(logger *slog.Logger) *Dispatcher {
-	return &Dispatcher{
-		endpoints:  make(map[string]*Endpoint),
-		client:     &http.Client{Timeout: 10 * time.Second},
-		logger:     logger,
-		maxRetries: 3,
+	d := &Dispatcher{
+		endpoints:     make(map[string]*Endpoint),
+		client:        &http.Client{Timeout: 10 * time.Second},
+		logger:        logger,
+		maxRetries:    3,
+		maxDeliveries: 1000,
 	}
+	return d
 }
 
 // WithMaxRetries sets the maximum number of delivery retries.
@@ -150,6 +153,14 @@ func (d *Dispatcher) deliver(ep *Endpoint, evt Event) {
 		return
 	}
 
+	// Compute HMAC signature once before retry loop
+	var signature string
+	if ep.Secret != "" {
+		mac := hmac.New(sha256.New, []byte(ep.Secret))
+		mac.Write(body)
+		signature = "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	}
+
 	var lastErr error
 	for attempt := 0; attempt <= d.maxRetries; attempt++ {
 		req, err := http.NewRequest("POST", ep.URL, bytes.NewReader(body))
@@ -160,13 +171,8 @@ func (d *Dispatcher) deliver(ep *Endpoint, evt Event) {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Promptsheon-Event", string(evt.Type))
 		req.Header.Set("X-Promptsheon-Delivery", evt.ID)
-
-		// HMAC signature
-		if ep.Secret != "" {
-			mac := hmac.New(sha256.New, []byte(ep.Secret))
-			mac.Write(body)
-			sig := hex.EncodeToString(mac.Sum(nil))
-			req.Header.Set("X-Promptsheon-Signature", "sha256="+sig)
+		if signature != "" {
+			req.Header.Set("X-Promptsheon-Signature", signature)
 		}
 
 		resp, err := d.client.Do(req)
@@ -194,15 +200,12 @@ func (d *Dispatcher) deliver(ep *Endpoint, evt Event) {
 			continue
 		}
 
-		d.mu.Lock()
-		d.deliveries = append(d.deliveries, delivery)
-		d.mu.Unlock()
+		d.recordDelivery(delivery)
 		return
 	}
 
 	// All retries exhausted
-	d.mu.Lock()
-	d.deliveries = append(d.deliveries, Delivery{
+	d.recordDelivery(Delivery{
 		ID:         generateID(),
 		EndpointID: ep.ID,
 		EventID:    evt.ID,
@@ -211,7 +214,16 @@ func (d *Dispatcher) deliver(ep *Endpoint, evt Event) {
 		Attempts:   d.maxRetries + 1,
 		CreatedAt:  time.Now(),
 	})
-	d.mu.Unlock()
+}
+
+// recordDelivery records a delivery, capping the slice to prevent unbounded growth.
+func (d *Dispatcher) recordDelivery(delivery Delivery) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if len(d.deliveries) >= d.maxDeliveries {
+		d.deliveries = d.deliveries[1:]
+	}
+	d.deliveries = append(d.deliveries, delivery)
 }
 
 func generateID() string {

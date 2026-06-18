@@ -72,8 +72,11 @@ func (s *SQLite) StartChild(ctx context.Context, parent *Span, operation string)
 }
 
 func (s *SQLite) Finish(span *Span) error {
-	attrs, _ := json.Marshal(span.Attributes)
-	_, err := s.db.ExecContext(context.Background(),
+	attrs, err := json.Marshal(span.Attributes)
+	if err != nil {
+		attrs = []byte("{}")
+	}
+	_, err = s.db.ExecContext(context.Background(),
 		`INSERT INTO traces (id, trace_id, parent_id, operation, service, status, attributes, error, started_at, ended_at, duration_ms)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		span.ID, span.TraceID, span.ParentID, span.Operation, span.Service,

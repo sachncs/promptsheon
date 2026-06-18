@@ -1,13 +1,14 @@
 package webhook
 
 import (
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
 )
 
 func TestDispatcherEmit(t *testing.T) {
-	d := NewDispatcher(nil).WithMaxRetries(0)
+	d := NewDispatcher(slog.Default()).WithMaxRetries(0)
 
 	ep := &Endpoint{
 		ID:     "ep-1",
@@ -31,7 +32,7 @@ func TestDispatcherEmit(t *testing.T) {
 	d.Emit(evt)
 
 	// Give async delivery time to run (including retries)
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	deliveries := d.ListDeliveries()
 	if len(deliveries) != 1 {
@@ -43,7 +44,7 @@ func TestDispatcherEmit(t *testing.T) {
 }
 
 func TestDispatcherInactiveEndpoint(t *testing.T) {
-	d := NewDispatcher(nil)
+	d := NewDispatcher(slog.Default())
 
 	ep := &Endpoint{
 		ID:     "ep-inactive",
@@ -62,7 +63,7 @@ func TestDispatcherInactiveEndpoint(t *testing.T) {
 }
 
 func TestDispatcherEventFiltering(t *testing.T) {
-	d := NewDispatcher(nil)
+	d := NewDispatcher(slog.Default())
 
 	ep := &Endpoint{
 		ID:     "ep-filter",
@@ -81,7 +82,7 @@ func TestDispatcherEventFiltering(t *testing.T) {
 }
 
 func TestDispatcherRemove(t *testing.T) {
-	d := NewDispatcher(nil)
+	d := NewDispatcher(slog.Default())
 	d.Register(&Endpoint{ID: "ep-rm", URL: "http://x", Events: []EventType{EventEvalCompleted}, Active: true})
 	if len(d.ListEndpoints()) != 1 {
 		t.Fatal("expected 1")
@@ -93,7 +94,7 @@ func TestDispatcherRemove(t *testing.T) {
 }
 
 func TestDispatcherConcurrentEmit(t *testing.T) {
-	d := NewDispatcher(nil).WithMaxRetries(0)
+	d := NewDispatcher(slog.Default()).WithMaxRetries(0)
 	ep := &Endpoint{
 		ID:     "ep-concurrent",
 		URL:    "http://localhost:99999",

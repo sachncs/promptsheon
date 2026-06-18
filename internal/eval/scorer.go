@@ -69,6 +69,7 @@ type CompositeScorer struct {
 	Scorers []WeightedScorer
 }
 
+// WeightedScorer pairs a scorer with a relative weight for composite scoring.
 type WeightedScorer struct {
 	Scorer Scorer
 	Weight float64
@@ -95,5 +96,5 @@ func (cs CompositeScorer) Score(output string, tc *models.TestCase) float64 {
 // PassThruScorer always returns 1.0. Used when no scoring is needed.
 type PassThruScorer struct{}
 
-func (PassThruScorer) Name() string            { return "pass_thru" }
+func (PassThruScorer) Name() string                           { return "pass_thru" }
 func (PassThruScorer) Score(string, *models.TestCase) float64 { return 1.0 }

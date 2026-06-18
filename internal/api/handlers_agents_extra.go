@@ -44,13 +44,13 @@ func (s *Server) handleForkAgent(w http.ResponseWriter, r *http.Request) error {
 	// Deep copy steps
 	for i, step := range original.Steps {
 		forked.Steps[i] = models.AgentStep{
-			ID:        step.ID,
-			PromptID:  step.PromptID,
+			ID:         step.ID,
+			PromptID:   step.PromptID,
 			PromptHash: step.PromptHash,
-			DependsOn: append([]string{}, step.DependsOn...),
-			ToolCalls: append([]models.ToolCall{}, step.ToolCalls...),
-			OutputKey: step.OutputKey,
-			Condition: step.Condition,
+			DependsOn:  append([]string{}, step.DependsOn...),
+			ToolCalls:  append([]models.ToolCall{}, step.ToolCalls...),
+			OutputKey:  step.OutputKey,
+			Condition:  step.Condition,
 		}
 	}
 
@@ -71,7 +71,7 @@ func (s *Server) handleForkAgent(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	s.audit(r.Context(), "fork", "agent:"+forked.ID, map[string]any{
-		"parent_id": original.ID,
+		"parent_id":   original.ID,
 		"parent_name": original.Name,
 	})
 	writeJSON(w, http.StatusCreated, forked)

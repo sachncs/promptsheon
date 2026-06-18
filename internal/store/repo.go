@@ -90,6 +90,13 @@ type Repository interface {
 	GetExecutionLog(ctx context.Context, id string) (*models.ExecutionLog, error)
 	ListExecutionLogs(ctx context.Context, filter models.ExecutionLogFilter) ([]*models.ExecutionLog, error)
 
+	// Contexts
+	CreateContext(ctx context.Context, c *models.Context) error
+	GetContext(ctx context.Context, id string) (*models.Context, error)
+	ListContexts(ctx context.Context, filter models.ContextFilter) ([]*models.Context, error)
+	UpdateContext(ctx context.Context, c *models.Context) error
+	DeleteContext(ctx context.Context, id string) error
+
 	// Guardrail Rules
 	SaveGuardrailRule(ctx context.Context, r *models.GuardrailRule) error
 	GetGuardrailRule(ctx context.Context, id string) (*models.GuardrailRule, error)
@@ -101,6 +108,18 @@ type Repository interface {
 	ListGuardrailViolations(ctx context.Context, resolved bool) ([]*models.GuardrailViolationRecord, error)
 	UpdateGuardrailViolation(ctx context.Context, v *models.GuardrailViolationRecord) error
 
+	// Agent Guardrail Configs
+	SaveAgentGuardrailConfig(ctx context.Context, c *models.AgentGuardrailConfig) error
+	GetAgentGuardrailConfig(ctx context.Context, id string) (*models.AgentGuardrailConfig, error)
+	GetAgentGuardrailConfigByAgent(ctx context.Context, agentID string) (*models.AgentGuardrailConfig, error)
+	DeleteAgentGuardrailConfig(ctx context.Context, id string) error
+
+	// Agent Executions
+	SaveAgentExecution(ctx context.Context, e *models.AgentExecution) error
+	GetAgentExecution(ctx context.Context, id string) (*models.AgentExecution, error)
+	ListAgentExecutions(ctx context.Context, agentID string, limit, offset int) ([]*models.AgentExecution, error)
+
 	// Lifecycle
+	Ping(ctx context.Context) error
 	Close() error
 }

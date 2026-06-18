@@ -28,7 +28,7 @@ type BatchResult struct {
 
 // BatchReport is the aggregated output of a batch evaluation.
 type BatchReport struct {
-	Results   []*BatchResult `json:"results"`
+	Results   []*BatchResult   `json:"results"`
 	Aggregate models.Aggregate `json:"aggregate"`
 }
 
@@ -142,7 +142,7 @@ func (br *BatchRunner) RunMultiModel(ctx context.Context, promptHash, promptText
 				reports[m] = report
 			} else {
 				reports[m] = &models.EvalReport{
-					Model:  m,
+					Model:     m,
 					Aggregate: models.Aggregate{},
 				}
 			}
@@ -159,9 +159,9 @@ func (br *BatchRunner) RunMultiModel(ctx context.Context, promptHash, promptText
 
 // MultiModelReport holds comparison data across models.
 type MultiModelReport struct {
-	PromptHash string                          `json:"prompt_hash"`
-	DatasetID  string                          `json:"dataset_id"`
-	Reports    map[string]*models.EvalReport   `json:"reports"`
+	PromptHash string                        `json:"prompt_hash"`
+	DatasetID  string                        `json:"dataset_id"`
+	Reports    map[string]*models.EvalReport `json:"reports"`
 }
 
 // String returns a human-readable comparison table.

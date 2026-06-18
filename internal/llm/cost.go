@@ -4,8 +4,8 @@ import "promptsheon/internal/models"
 
 // ModelPricing defines per-token costs for a model.
 type ModelPricing struct {
-	Name            string
-	PromptPerToken  float64 // cost per prompt token in dollars
+	Name               string
+	PromptPerToken     float64 // cost per prompt token in dollars
 	CompletionPerToken float64 // cost per completion token in dollars
 }
 
@@ -19,7 +19,7 @@ var pricingTable = map[string]ModelPricing{
 	"gpt-3.5-turbo": {Name: "gpt-3.5-turbo", PromptPerToken: 0.50 / 1e6, CompletionPerToken: 1.50 / 1e6},
 
 	// Anthropic
-	"claude-sonnet-4-20250514": {Name: "claude-sonnet-4-20250514", PromptPerToken: 3.00 / 1e6, CompletionPerToken: 15.00 / 1e6},
+	"claude-sonnet-4-20250514":   {Name: "claude-sonnet-4-20250514", PromptPerToken: 3.00 / 1e6, CompletionPerToken: 15.00 / 1e6},
 	"claude-3-5-sonnet-20241022": {Name: "claude-3-5-sonnet-20241022", PromptPerToken: 3.00 / 1e6, CompletionPerToken: 15.00 / 1e6},
 	"claude-3-5-haiku-20241022":  {Name: "claude-3-5-haiku-20241022", PromptPerToken: 0.80 / 1e6, CompletionPerToken: 4.00 / 1e6},
 	"claude-3-opus-20240229":     {Name: "claude-3-opus-20240229", PromptPerToken: 15.00 / 1e6, CompletionPerToken: 75.00 / 1e6},
@@ -48,9 +48,4 @@ func GetPricing(model string) *ModelPricing {
 		return nil
 	}
 	return &p
-}
-
-// RegisterPricing adds or overrides pricing for a model.
-func RegisterPricing(p ModelPricing) {
-	pricingTable[p.Name] = p
 }

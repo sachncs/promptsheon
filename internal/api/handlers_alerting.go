@@ -26,13 +26,13 @@ func (s *Server) handleCreateAlertRule(w http.ResponseWriter, r *http.Request) e
 	}
 
 	var req struct {
-		Name      string            `json:"name"`
-		Type      string            `json:"type"`
-		Severity  string            `json:"severity"`
-		Threshold float64           `json:"threshold"`
-		Duration  int               `json:"duration_minutes"`
-		Window    int               `json:"window_minutes"`
-		Config    map[string]any    `json:"config,omitempty"`
+		Name      string         `json:"name"`
+		Type      string         `json:"type"`
+		Severity  string         `json:"severity"`
+		Threshold float64        `json:"threshold"`
+		Duration  int            `json:"duration_minutes"`
+		Window    int            `json:"window_minutes"`
+		Config    map[string]any `json:"config,omitempty"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
@@ -88,10 +88,10 @@ func (s *Server) handleUpdateAlertRule(w http.ResponseWriter, r *http.Request) e
 	}
 
 	var req struct {
-		Name      *string           `json:"name"`
-		Enabled   *bool             `json:"enabled"`
-		Threshold *float64          `json:"threshold"`
-		Config    map[string]any    `json:"config,omitempty"`
+		Name      *string        `json:"name"`
+		Enabled   *bool          `json:"enabled"`
+		Threshold *float64       `json:"threshold"`
+		Config    map[string]any `json:"config,omitempty"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest

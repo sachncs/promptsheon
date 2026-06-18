@@ -6,10 +6,10 @@ import "time"
 type ToolType string
 
 const (
-	ToolHTTP     ToolType = "http"
-	ToolShell    ToolType = "shell"
-	ToolJSON     ToolType = "json_transform"
-	ToolPrompt   ToolType = "prompt_call"
+	ToolHTTP   ToolType = "http"
+	ToolShell  ToolType = "shell"
+	ToolJSON   ToolType = "json_transform"
+	ToolPrompt ToolType = "prompt_call"
 )
 
 // ToolRef references a tool configuration for an agent step.
@@ -37,28 +37,30 @@ type Condition struct {
 
 // AgentStep defines a single unit of work within an agent workflow.
 type AgentStep struct {
-	ID        string      `json:"id"`
-	PromptID  string      `json:"prompt_id"`
-	PromptHash string    `json:"prompt_hash"` // CAS hash for immutability
-	DependsOn []string    `json:"depends_on"`
-	ToolCalls []ToolCall  `json:"tool_calls"`
-	OutputKey string      `json:"output_key"` // key for passing output to next step
-	Condition *Condition  `json:"condition,omitempty"` // optional branching condition
+	ID         string     `json:"id"`
+	PromptID   string     `json:"prompt_id"`
+	PromptHash string     `json:"prompt_hash"`          // CAS hash for immutability
+	ContextID  string     `json:"context_id,omitempty"` // optional: attach context to step
+	DependsOn  []string   `json:"depends_on"`
+	ToolCalls  []ToolCall `json:"tool_calls"`
+	OutputKey  string     `json:"output_key"`          // key for passing output to next step
+	Condition  *Condition `json:"condition,omitempty"` // optional branching condition
 }
 
 // Agent represents a multi-step agent workflow.
 type Agent struct {
-	ID          string       `json:"id"`
-	Name        string       `json:"name"`
-	Description string       `json:"description"`
-	Steps       []AgentStep  `json:"steps"`
-	Tools       []ToolRef    `json:"tools"`
-	Status      PromptStatus `json:"status"`
-	IsTemplate  bool         `json:"is_template"`  // template agents can be forked
-	ParentID    string       `json:"parent_id"`    // original agent ID if forked
-	CASHash     string       `json:"cas_hash"`
-	CreatedBy   string       `json:"created_by"`
-	Tags        []string     `json:"tags"`
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at"`
+	ID                string       `json:"id"`
+	Name              string       `json:"name"`
+	Description       string       `json:"description"`
+	Steps             []AgentStep  `json:"steps"`
+	Tools             []ToolRef    `json:"tools"`
+	Status            PromptStatus `json:"status"`
+	IsTemplate        bool         `json:"is_template"` // template agents can be forked
+	ParentID          string       `json:"parent_id"`   // original agent ID if forked
+	CASHash           string       `json:"cas_hash"`
+	GuardrailConfigID string       `json:"guardrail_config_id,omitempty"` // FK to agent_guardrail_configs
+	CreatedBy         string       `json:"created_by"`
+	Tags              []string     `json:"tags"`
+	CreatedAt         time.Time    `json:"created_at"`
+	UpdatedAt         time.Time    `json:"updated_at"`
 }

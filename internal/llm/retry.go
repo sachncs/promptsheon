@@ -2,8 +2,11 @@ package llm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
+	"net"
+	"strings"
 	"time"
 )
 
@@ -21,6 +24,53 @@ func DefaultRetryConfig() RetryConfig {
 		BaseDelay:  500 * time.Millisecond,
 		MaxDelay:   10 * time.Second,
 	}
+}
+
+// isRetryable determines if an error should be retried.
+// Returns false for permanent errors (auth, validation) and true for transient errors.
+func isRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Don't retry context cancellation
+	if errors.Is(err, context.Canceled) {
+		return false
+	}
+
+	// Don't retry context deadline exceeded (already timed out)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+
+	// Check for circuit breaker open
+	if errors.Is(err, ErrCircuitOpen) {
+		return false
+	}
+
+	// Check for net errors (connection refused, DNS, etc.)
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		// Timeout errors are retryable
+		if netErr.Timeout() {
+			return true
+		}
+		// Other net errors - check if temporary
+		if netErr.Temporary() {
+			return true
+		}
+	}
+
+	// Check for connection refused
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		if strings.Contains(opErr.Error(), "connection refused") {
+			return true
+		}
+	}
+
+	// Default: retry on error (covers 5xx, network issues, etc.)
+	return true
 }
 
 // Retrying wraps a Provider with exponential-backoff retry logic.
@@ -44,6 +94,11 @@ func (r *Retrying) Complete(ctx context.Context, req *Request) (*Response, error
 			return resp, nil
 		}
 		lastErr = err
+
+		// Don't retry if error is not retryable
+		if !isRetryable(err) {
+			return nil, err
+		}
 
 		if attempt == r.cfg.MaxRetries {
 			break

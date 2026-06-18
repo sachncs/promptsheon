@@ -18,9 +18,19 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
-	writeJSON(w, http.StatusOK, map[string]any{
+	ready := map[string]any{
 		"status": "ready",
 		"go":     runtime.Version(),
-	})
+	}
+	if s.db != nil {
+		if err := s.db.Ping(r.Context()); err != nil {
+			ready["status"] = "not_ready"
+			ready["database"] = "unreachable"
+			writeJSON(w, http.StatusServiceUnavailable, ready)
+			return nil
+		}
+		ready["database"] = "ok"
+	}
+	writeJSON(w, http.StatusOK, ready)
 	return nil
 }

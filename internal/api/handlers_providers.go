@@ -63,22 +63,22 @@ func (s *Server) handleTestProvider(w http.ResponseWriter, r *http.Request) erro
 
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
-			"provider":  name,
-			"model":     req.Model,
-			"status":    "error",
-			"error":     err.Error(),
+			"provider":   name,
+			"model":      req.Model,
+			"status":     "error",
+			"error":      err.Error(),
 			"latency_ms": latency.Milliseconds(),
 		})
 		return nil
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"provider":       name,
-		"model":          resp.Model,
-		"status":         "ok",
-		"content":        resp.Content,
-		"usage":          resp.Usage,
-		"latency_ms":     latency.Milliseconds(),
+		"provider":   name,
+		"model":      resp.Model,
+		"status":     "ok",
+		"content":    resp.Content,
+		"usage":      resp.Usage,
+		"latency_ms": latency.Milliseconds(),
 	})
 	return nil
 }

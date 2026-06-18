@@ -23,8 +23,8 @@ func newCounter(labels map[string]string) *Counter {
 	return &Counter{labels: labels}
 }
 
-func (c *Counter) Inc()          { c.Add(1) }
-func (c *Counter) Add(v float64) { c.mu.Lock(); c.value += v; c.mu.Unlock() }
+func (c *Counter) Inc()           { c.Add(1) }
+func (c *Counter) Add(v float64)  { c.mu.Lock(); c.value += v; c.mu.Unlock() }
 func (c *Counter) Value() float64 { c.mu.Lock(); defer c.mu.Unlock(); return c.value }
 
 // Histogram tracks distribution of values.
@@ -35,9 +35,11 @@ type Histogram struct {
 	buckets []float64
 	counts  []int64
 	labels  map[string]string
-	// For percentile calculation
+	// For percentile calculation (capped to prevent unbounded growth)
 	values []float64
 }
+
+const maxHistogramValues = 10000
 
 func newHistogram(labels map[string]string) *Histogram {
 	buckets := []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300}
@@ -53,6 +55,10 @@ func (h *Histogram) Observe(v float64) {
 	defer h.mu.Unlock()
 	h.count++
 	h.sum += v
+	// Cap values to prevent unbounded memory growth
+	if len(h.values) >= maxHistogramValues {
+		h.values = h.values[1:]
+	}
 	h.values = append(h.values, v)
 	for i, b := range h.buckets {
 		if v <= b {
@@ -63,9 +69,18 @@ func (h *Histogram) Observe(v float64) {
 	h.counts[len(h.buckets)]++
 }
 
-func (h *Histogram) Count() int64  { h.mu.Lock(); defer h.mu.Unlock(); return h.count }
-func (h *Histogram) Sum() float64  { h.mu.Lock(); defer h.mu.Unlock(); return h.sum }
-func (h *Histogram) Avg() float64  { h.mu.Lock(); defer h.mu.Unlock(); if h.count == 0 { return 0 }; return h.sum / float64(h.count) }
+func (h *Histogram) Count() int64 { h.mu.Lock(); defer h.mu.Unlock(); return h.count }
+func (h *Histogram) Sum() float64 { h.mu.Lock(); defer h.mu.Unlock(); return h.sum }
+
+// Avg returns the mean of all observed values.
+func (h *Histogram) Avg() float64 {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.count == 0 {
+		return 0
+	}
+	return h.sum / float64(h.count)
+}
 
 // Percentile returns the p-th percentile (0-100) of observed values.
 func (h *Histogram) Percentile(p float64) float64 {
@@ -136,6 +151,10 @@ type Collector struct {
 	GuardrailBlocks     *Counter
 	GuardrailPasses     *Counter
 
+	// Agent execution metrics
+	AgentExecutionsTotal  *Counter
+	AgentExecutionLatency *Histogram
+
 	// Hallucination score histogram
 	HallucinationScores *Histogram
 }
@@ -146,39 +165,41 @@ type Gauge struct {
 	value float64
 }
 
-func (g *Gauge) Set(v float64)   { g.mu.Lock(); g.value = v; g.mu.Unlock() }
-func (g *Gauge) Inc()            { g.mu.Lock(); g.value++; g.mu.Unlock() }
-func (g *Gauge) Dec()            { g.mu.Lock(); g.value--; g.mu.Unlock() }
-func (g *Gauge) Value() float64  { g.mu.Lock(); defer g.mu.Unlock(); return g.value }
+func (g *Gauge) Set(v float64)  { g.mu.Lock(); g.value = v; g.mu.Unlock() }
+func (g *Gauge) Inc()           { g.mu.Lock(); g.value++; g.mu.Unlock() }
+func (g *Gauge) Dec()           { g.mu.Lock(); g.value--; g.mu.Unlock() }
+func (g *Gauge) Value() float64 { g.mu.Lock(); defer g.mu.Unlock(); return g.value }
 
 // NewCollector creates a new metrics collector.
 func NewCollector() *Collector {
 	return &Collector{
-		RequestsTotal:    newCounter(nil),
-		RequestDuration:  newHistogram(nil),
-		ErrorsTotal:      newCounter(nil),
-		LLMCallsTotal:    newCounter(nil),
-		LLMLatency:       newHistogram(nil),
-		LLMTokensTotal:   newCounter(nil),
-		LLMInputTokens:   newCounter(nil),
-		LLMOutputTokens:  newCounter(nil),
-		LLMCostUSD:       newCounter(nil),
-		LLMTTFT:          newHistogram(nil),
-		EvalRunsTotal:    newCounter(nil),
-		EvalCasesTotal:   newCounter(nil),
-		EvalDuration:     newHistogram(nil),
-		WorkflowRunsTotal: newCounter(nil),
-		WorkflowDuration:  newHistogram(nil),
-		WorkflowActive:    &Gauge{},
-		ReviewPendingCount:  &Gauge{},
-		ReviewTotalCount:    newCounter(nil),
-		ReviewApprovedCount: newCounter(nil),
-		ReviewRejectedCount: newCounter(nil),
-		ReviewDuration:      newHistogram(nil),
-		GuardrailViolations: newCounter(nil),
-		GuardrailBlocks:     newCounter(nil),
-		GuardrailPasses:     newCounter(nil),
-		HallucinationScores: newHistogram(nil),
+		RequestsTotal:         newCounter(nil),
+		RequestDuration:       newHistogram(nil),
+		ErrorsTotal:           newCounter(nil),
+		LLMCallsTotal:         newCounter(nil),
+		LLMLatency:            newHistogram(nil),
+		LLMTokensTotal:        newCounter(nil),
+		LLMInputTokens:        newCounter(nil),
+		LLMOutputTokens:       newCounter(nil),
+		LLMCostUSD:            newCounter(nil),
+		LLMTTFT:               newHistogram(nil),
+		EvalRunsTotal:         newCounter(nil),
+		EvalCasesTotal:        newCounter(nil),
+		EvalDuration:          newHistogram(nil),
+		WorkflowRunsTotal:     newCounter(nil),
+		WorkflowDuration:      newHistogram(nil),
+		WorkflowActive:        &Gauge{},
+		ReviewPendingCount:    &Gauge{},
+		ReviewTotalCount:      newCounter(nil),
+		ReviewApprovedCount:   newCounter(nil),
+		ReviewRejectedCount:   newCounter(nil),
+		ReviewDuration:        newHistogram(nil),
+		GuardrailViolations:   newCounter(nil),
+		GuardrailBlocks:       newCounter(nil),
+		GuardrailPasses:       newCounter(nil),
+		AgentExecutionsTotal:  newCounter(nil),
+		AgentExecutionLatency: newHistogram(nil),
+		HallucinationScores:   newHistogram(nil),
 	}
 }
 
@@ -375,6 +396,58 @@ func DurationMs(d time.Duration) float64 {
 // DurationSec converts a time.Duration to seconds as float64.
 func DurationSec(d time.Duration) float64 {
 	return d.Seconds()
+}
+
+// LabeledCounter is a counter that supports label-based dimensions.
+type LabeledCounter struct {
+	mu       sync.Mutex
+	counters map[string]*Counter
+}
+
+// NewLabeledCounter creates a new labeled counter.
+func NewLabeledCounter() *LabeledCounter {
+	return &LabeledCounter{
+		counters: make(map[string]*Counter),
+	}
+}
+
+// With returns a counter for the given labels, creating it if necessary.
+func (lc *LabeledCounter) With(labels map[string]string) *Counter {
+	key := SortLabels(labels)
+	lc.mu.Lock()
+	defer lc.mu.Unlock()
+	if c, ok := lc.counters[key]; ok {
+		return c
+	}
+	c := newCounter(labels)
+	lc.counters[key] = c
+	return c
+}
+
+// LabeledHistogram is a histogram that supports label-based dimensions.
+type LabeledHistogram struct {
+	mu         sync.Mutex
+	histograms map[string]*Histogram
+}
+
+// NewLabeledHistogram creates a new labeled histogram.
+func NewLabeledHistogram() *LabeledHistogram {
+	return &LabeledHistogram{
+		histograms: make(map[string]*Histogram),
+	}
+}
+
+// With returns a histogram for the given labels, creating it if necessary.
+func (lh *LabeledHistogram) With(labels map[string]string) *Histogram {
+	key := SortLabels(labels)
+	lh.mu.Lock()
+	defer lh.mu.Unlock()
+	if h, ok := lh.histograms[key]; ok {
+		return h
+	}
+	h := newHistogram(labels)
+	lh.histograms[key] = h
+	return h
 }
 
 // Quantile computes the q-th quantile from a sorted slice.

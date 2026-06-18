@@ -74,16 +74,26 @@ func (h *Hub) Run() {
 			h.mu.Unlock()
 
 		case message := <-h.broadcast:
+			var disconnected []string
 			h.mu.RLock()
-			for _, client := range h.clients {
+			for id, client := range h.clients {
 				select {
 				case client.send <- message:
 				default:
-					close(client.send)
-					delete(h.clients, client.id)
+					disconnected = append(disconnected, id)
 				}
 			}
 			h.mu.RUnlock()
+			if len(disconnected) > 0 {
+				h.mu.Lock()
+				for _, id := range disconnected {
+					if c, ok := h.clients[id]; ok {
+						close(c.send)
+						delete(h.clients, id)
+					}
+				}
+				h.mu.Unlock()
+			}
 		}
 	}
 }
@@ -128,10 +138,10 @@ func (h *Hub) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	// Send initial connection event
-	fmt.Fprintf(w, "event: connected\ndata: {\"client_id\":\"%s\"}\n\n", client.id)
+	fmt.Fprintf(w, "event: connected\ndata: {\"client_id\":\"%s\"}\n\n", client.id) //nolint:errcheck
 	flusher.Flush()
 
 	// Handle client disconnect
@@ -146,7 +156,7 @@ func (h *Hub) HandleSSE(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			fmt.Fprintf(w, "event: log\ndata: %s\n\n", msg)
+			fmt.Fprintf(w, "event: log\ndata: %s\n\n", msg) //nolint:errcheck
 			flusher.Flush()
 		}
 	}

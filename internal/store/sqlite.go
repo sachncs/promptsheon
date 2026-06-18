@@ -7,7 +7,9 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -18,6 +20,27 @@ import (
 
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
+
+// ErrNotFound is returned when a requested resource does not exist.
+var ErrNotFound = errors.New("not found")
+
+func mustMarshal(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		slog.Error("failed to marshal JSON", "err", err)
+		return []byte("{}")
+	}
+	return b
+}
+
+func mustUnmarshal(data []byte, v any) {
+	if len(data) == 0 {
+		return
+	}
+	if err := json.Unmarshal(data, v); err != nil {
+		slog.Error("failed to unmarshal JSON", "err", err)
+	}
+}
 
 // SQLite implements Repository using a SQLite database.
 type SQLite struct {
@@ -48,6 +71,11 @@ func (s *SQLite) Close() error {
 	return s.db.Close()
 }
 
+// Ping verifies the database connection is alive.
+func (s *SQLite) Ping(ctx context.Context) error {
+	return s.db.PingContext(ctx)
+}
+
 // DB returns the underlying *sql.DB for use by other packages (e.g. tracing).
 func (s *SQLite) DB() *sql.DB {
 	return s.db
@@ -58,11 +86,11 @@ func (s *SQLite) DB() *sql.DB {
 // ---------------------------------------------------------------------------
 
 func (s *SQLite) CreatePrompt(ctx context.Context, p *models.Prompt) error {
-	variables, _ := json.Marshal(p.Variables)
-	tags, _ := json.Marshal(p.Tags)
-	metadata, _ := json.Marshal(p.Metadata)
-	binding, _ := json.Marshal(p.Binding)
-	generation, _ := json.Marshal(p.Generation)
+	variables := mustMarshal(p.Variables)
+	tags := mustMarshal(p.Tags)
+	metadata := mustMarshal(p.Metadata)
+	binding := mustMarshal(p.Binding)
+	generation := mustMarshal(p.Generation)
 
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO prompts (id, name, description, content, system_prompt, variables, tags, model_hint,
@@ -147,11 +175,11 @@ func (s *SQLite) ListPrompts(ctx context.Context, filter models.PromptFilter) ([
 }
 
 func (s *SQLite) UpdatePrompt(ctx context.Context, p *models.Prompt) error {
-	variables, _ := json.Marshal(p.Variables)
-	tags, _ := json.Marshal(p.Tags)
-	metadata, _ := json.Marshal(p.Metadata)
-	binding, _ := json.Marshal(p.Binding)
-	generation, _ := json.Marshal(p.Generation)
+	variables := mustMarshal(p.Variables)
+	tags := mustMarshal(p.Tags)
+	metadata := mustMarshal(p.Metadata)
+	binding := mustMarshal(p.Binding)
+	generation := mustMarshal(p.Generation)
 
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE prompts SET name=?, description=?, content=?, system_prompt=?, variables=?, tags=?,
@@ -188,8 +216,8 @@ func (s *SQLite) DeletePrompt(ctx context.Context, id string) error {
 // ---------------------------------------------------------------------------
 
 func (s *SQLite) CreateAgent(ctx context.Context, a *models.Agent) error {
-	steps, _ := json.Marshal(a.Steps)
-	tools, _ := json.Marshal(a.Tools)
+	steps := mustMarshal(a.Steps)
+	tools := mustMarshal(a.Tools)
 
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO agents (id, name, description, steps, tools, status, cas_hash, created_by, created_at, updated_at)
@@ -233,8 +261,8 @@ func (s *SQLite) ListAgents(ctx context.Context) ([]*models.Agent, error) {
 }
 
 func (s *SQLite) UpdateAgent(ctx context.Context, a *models.Agent) error {
-	steps, _ := json.Marshal(a.Steps)
-	tools, _ := json.Marshal(a.Tools)
+	steps := mustMarshal(a.Steps)
+	tools := mustMarshal(a.Tools)
 
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE agents SET name=?, description=?, steps=?, tools=?, status=?, cas_hash=?, updated_at=?
@@ -269,7 +297,7 @@ func (s *SQLite) DeleteAgent(ctx context.Context, id string) error {
 // ---------------------------------------------------------------------------
 
 func (s *SQLite) CreateDataset(ctx context.Context, d *models.TestDataset) error {
-	cases, _ := json.Marshal(d.Cases)
+	cases := mustMarshal(d.Cases)
 
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO test_datasets (id, name, cases, created_by, created_at)
@@ -324,7 +352,7 @@ func (s *SQLite) DeleteDataset(ctx context.Context, id string) error {
 }
 
 func (s *SQLite) UpdateDataset(ctx context.Context, d *models.TestDataset) error {
-	cases, _ := json.Marshal(d.Cases)
+	cases := mustMarshal(d.Cases)
 
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE test_datasets SET name=?, cases=? WHERE id=?`,
@@ -362,7 +390,7 @@ func (s *SQLite) SaveEvalResults(ctx context.Context, results []*models.EvalResu
 	defer stmt.Close()
 
 	for _, r := range results {
-		usage, _ := json.Marshal(r.TokenUsage)
+		usage := mustMarshal(r.TokenUsage)
 		passed := 0
 		if r.Passed {
 			passed = 1
@@ -511,8 +539,8 @@ func (s *SQLite) ListEvalRuns(ctx context.Context, filter models.EvalRunFilter) 
 // ---------------------------------------------------------------------------
 
 func (s *SQLite) SaveWorkflow(ctx context.Context, w *models.Workflow) error {
-	input, _ := json.Marshal(w.Input)
-	output, _ := json.Marshal(w.Output)
+	input := mustMarshal(w.Input)
+	output := mustMarshal(w.Output)
 
 	_, err := s.db.ExecContext(ctx,
 		`INSERT OR REPLACE INTO workflows
@@ -577,9 +605,9 @@ func (s *SQLite) ListWorkflows(ctx context.Context, filter models.WorkflowFilter
 }
 
 func (s *SQLite) SaveWorkflowStep(ctx context.Context, step *models.WorkflowStep) error {
-	input, _ := json.Marshal(step.Input)
-	output, _ := json.Marshal(step.Output)
-	toolCalls, _ := json.Marshal(step.ToolCalls)
+	input := mustMarshal(step.Input)
+	output := mustMarshal(step.Output)
+	toolCalls := mustMarshal(step.ToolCalls)
 
 	_, err := s.db.ExecContext(ctx,
 		`INSERT OR REPLACE INTO workflow_steps
@@ -640,8 +668,12 @@ func scanWorkflow(row scannable) (*models.Workflow, error) {
 	}
 	w.Status = models.WorkflowStatus(status)
 	w.CompletedAt = completedAt
-	json.Unmarshal([]byte(input), &w.Input)
-	json.Unmarshal([]byte(output), &w.Output)
+	if err := json.Unmarshal([]byte(input), &w.Input); err != nil {
+		return nil, fmt.Errorf("unmarshal workflow input: %w", err)
+	}
+	if err := json.Unmarshal([]byte(output), &w.Output); err != nil {
+		return nil, fmt.Errorf("unmarshal workflow output: %w", err)
+	}
 	return &w, nil
 }
 
@@ -654,18 +686,23 @@ func scanWorkflowRow(rows *sql.Rows) (*models.Workflow, error) {
 // ---------------------------------------------------------------------------
 
 func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) error {
-	details, _ := json.Marshal(entry.Details)
+	details, err := json.Marshal(entry.Details)
+	if err != nil {
+		return fmt.Errorf("marshal audit details: %w", err)
+	}
 
 	// Fetch the last entry's hash for chaining.
 	var prevHash string
-	_ = s.db.QueryRowContext(ctx,
+	if err := s.db.QueryRowContext(ctx,
 		`SELECT entry_hash FROM audit_entries ORDER BY timestamp DESC, rowid DESC LIMIT 1`,
-	).Scan(&prevHash)
+	).Scan(&prevHash); err != nil && err.Error() != "sql: no rows in result set" {
+		return fmt.Errorf("fetch previous audit hash: %w", err)
+	}
 
 	entry.PreviousHash = prevHash
 	entry.EntryHash = computeAuditHash(entry)
 
-	_, err := s.db.ExecContext(ctx,
+	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO audit_entries (id, user_id, action, resource, details, timestamp, previous_hash, entry_hash)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		entry.ID, entry.UserID, entry.Action, entry.Resource,
@@ -777,7 +814,7 @@ func (s *SQLite) ListAudit(ctx context.Context, filter models.AuditFilter) ([]*m
 // ---------------------------------------------------------------------------
 
 func (s *SQLite) CreateReview(ctx context.Context, r *models.Review) error {
-	comments, _ := json.Marshal(r.Comments)
+	comments := mustMarshal(r.Comments)
 
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO reviews (id, resource_id, resource_type, author, status, comments, created_at, resolved_at, quorum_required, approvals_count)
@@ -802,7 +839,7 @@ func (s *SQLite) GetReview(ctx context.Context, id string) (*models.Review, erro
 }
 
 func (s *SQLite) UpdateReview(ctx context.Context, r *models.Review) error {
-	comments, _ := json.Marshal(r.Comments)
+	comments := mustMarshal(r.Comments)
 
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE reviews SET status=?, comments=?, resolved_at=?, approvals_count=? WHERE id=?`,
@@ -867,11 +904,21 @@ func scanPrompt(row scannable) (*models.Prompt, error) {
 		}
 		return nil, fmt.Errorf("scan prompt: %w", err)
 	}
-	json.Unmarshal([]byte(variables), &p.Variables)
-	json.Unmarshal([]byte(tags), &p.Tags)
-	json.Unmarshal([]byte(metadata), &p.Metadata)
-	json.Unmarshal([]byte(binding), &p.Binding)
-	json.Unmarshal([]byte(generation), &p.Generation)
+	if err := json.Unmarshal([]byte(variables), &p.Variables); err != nil {
+		return nil, fmt.Errorf("unmarshal prompt variables: %w", err)
+	}
+	if err := json.Unmarshal([]byte(tags), &p.Tags); err != nil {
+		return nil, fmt.Errorf("unmarshal prompt tags: %w", err)
+	}
+	if err := json.Unmarshal([]byte(metadata), &p.Metadata); err != nil {
+		return nil, fmt.Errorf("unmarshal prompt metadata: %w", err)
+	}
+	if err := json.Unmarshal([]byte(binding), &p.Binding); err != nil {
+		return nil, fmt.Errorf("unmarshal prompt binding: %w", err)
+	}
+	if err := json.Unmarshal([]byte(generation), &p.Generation); err != nil {
+		return nil, fmt.Errorf("unmarshal prompt generation: %w", err)
+	}
 	p.Status = models.PromptStatus(status)
 	p.SystemPrompt = systemPrompt
 	return &p, nil
@@ -894,8 +941,12 @@ func scanAgent(row scannable) (*models.Agent, error) {
 		}
 		return nil, fmt.Errorf("scan agent: %w", err)
 	}
-	json.Unmarshal([]byte(steps), &a.Steps)
-	json.Unmarshal([]byte(tools), &a.Tools)
+	if err := json.Unmarshal([]byte(steps), &a.Steps); err != nil {
+		return nil, fmt.Errorf("unmarshal agent steps: %w", err)
+	}
+	if err := json.Unmarshal([]byte(tools), &a.Tools); err != nil {
+		return nil, fmt.Errorf("unmarshal agent tools: %w", err)
+	}
 	a.Status = models.PromptStatus(status)
 	return &a, nil
 }
@@ -1552,4 +1603,299 @@ func scanGuardrailViolation(row scannable) (*models.GuardrailViolationRecord, er
 	}
 	v.ResolvedAt = resolvedAt
 	return &v, nil
+}
+
+// --- Contexts ---
+
+func (s *SQLite) CreateContext(ctx context.Context, c *models.Context) error {
+	messagesJSON, _ := json.Marshal(c.Messages)
+	metadataJSON, _ := json.Marshal(c.Metadata)
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO contexts
+		(id, name, description, type, system_prompt, messages, token_budget, token_count, truncation_strategy, agent_id, version, status, metadata, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.ID, c.Name, c.Description, c.Type, c.SystemPrompt, string(messagesJSON),
+		c.TokenBudget, c.TokenCount, c.TruncationStrategy, c.AgentID, c.Version,
+		c.Status, string(metadataJSON), c.CreatedAt, c.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("create context: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLite) GetContext(ctx context.Context, id string) (*models.Context, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, name, description, type, system_prompt, messages, token_budget, token_count, truncation_strategy, agent_id, version, status, metadata, created_at, updated_at
+		 FROM contexts WHERE id = ?`, id)
+	return scanContext(row)
+}
+
+func (s *SQLite) ListContexts(ctx context.Context, filter models.ContextFilter) ([]*models.Context, error) {
+	query := `SELECT id, name, description, type, system_prompt, messages, token_budget, token_count, truncation_strategy, agent_id, version, status, metadata, created_at, updated_at FROM contexts WHERE 1=1`
+	args := []any{}
+
+	if filter.AgentID != "" {
+		query += " AND agent_id = ?"
+		args = append(args, filter.AgentID)
+	}
+	if filter.Type != "" {
+		query += " AND type = ?"
+		args = append(args, filter.Type)
+	}
+	if filter.Search != "" {
+		query += " AND (name LIKE ? OR description LIKE ?)"
+		search := "%" + filter.Search + "%"
+		args = append(args, search, search)
+	}
+	if len(filter.Status) > 0 {
+		placeholders := make([]string, len(filter.Status))
+		for i, st := range filter.Status {
+			placeholders[i] = "?"
+			args = append(args, st)
+		}
+		query += " AND status IN (" + strings.Join(placeholders, ",") + ")"
+	}
+
+	query += " ORDER BY updated_at DESC"
+
+	if filter.Limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, filter.Limit)
+	}
+	if filter.Offset > 0 {
+		query += " OFFSET ?"
+		args = append(args, filter.Offset)
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list contexts: %w", err)
+	}
+	defer rows.Close()
+
+	var contexts []*models.Context
+	for rows.Next() {
+		c, err := scanContext(rows)
+		if err != nil {
+			return nil, err
+		}
+		contexts = append(contexts, c)
+	}
+	return contexts, rows.Err()
+}
+
+func (s *SQLite) UpdateContext(ctx context.Context, c *models.Context) error {
+	messagesJSON, _ := json.Marshal(c.Messages)
+	metadataJSON, _ := json.Marshal(c.Metadata)
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE contexts SET name=?, description=?, type=?, system_prompt=?, messages=?,
+		token_budget=?, token_count=?, truncation_strategy=?, agent_id=?, version=?, status=?,
+		metadata=?, updated_at=?
+		WHERE id=?`,
+		c.Name, c.Description, c.Type, c.SystemPrompt, string(messagesJSON),
+		c.TokenBudget, c.TokenCount, c.TruncationStrategy, c.AgentID, c.Version,
+		c.Status, string(metadataJSON), c.UpdatedAt, c.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("update context: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("context not found: %s", c.ID)
+	}
+	return nil
+}
+
+func (s *SQLite) DeleteContext(ctx context.Context, id string) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM contexts WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("delete context: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("context not found: %s", id)
+	}
+	return nil
+}
+
+func scanContext(row scannable) (*models.Context, error) {
+	var c models.Context
+	var messagesJSON, metadataJSON string
+	err := row.Scan(
+		&c.ID, &c.Name, &c.Description, &c.Type, &c.SystemPrompt, &messagesJSON,
+		&c.TokenBudget, &c.TokenCount, &c.TruncationStrategy, &c.AgentID, &c.Version,
+		&c.Status, &metadataJSON, &c.CreatedAt, &c.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("context not found")
+		}
+		return nil, fmt.Errorf("scan context: %w", err)
+	}
+	if messagesJSON != "" {
+		json.Unmarshal([]byte(messagesJSON), &c.Messages)
+	}
+	if metadataJSON != "" {
+		json.Unmarshal([]byte(metadataJSON), &c.Metadata)
+	}
+	return &c, nil
+}
+
+// --- Agent Guardrail Configs ---
+
+func (s *SQLite) SaveAgentGuardrailConfig(ctx context.Context, c *models.AgentGuardrailConfig) error {
+	contentPolicyJSON, _ := json.Marshal(c.ContentPolicy)
+	restrictedTermsJSON, _ := json.Marshal(c.RestrictedTerms)
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO agent_guardrail_configs
+		(id, agent_id, name, enabled, max_cost_per_run, max_latency_ms, max_tokens_per_step, content_policy, restricted_terms, stop_on_violation, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.ID, c.AgentID, c.Name, c.Enabled, c.MaxCostPerRun, c.MaxLatencyMs,
+		c.MaxTokensPerStep, string(contentPolicyJSON), string(restrictedTermsJSON),
+		c.StopOnViolation, c.CreatedAt, c.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("save agent guardrail config: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLite) GetAgentGuardrailConfig(ctx context.Context, id string) (*models.AgentGuardrailConfig, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, agent_id, name, enabled, max_cost_per_run, max_latency_ms, max_tokens_per_step, content_policy, restricted_terms, stop_on_violation, created_at, updated_at
+		 FROM agent_guardrail_configs WHERE id = ?`, id)
+	return scanAgentGuardrailConfig(row)
+}
+
+func (s *SQLite) GetAgentGuardrailConfigByAgent(ctx context.Context, agentID string) (*models.AgentGuardrailConfig, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, agent_id, name, enabled, max_cost_per_run, max_latency_ms, max_tokens_per_step, content_policy, restricted_terms, stop_on_violation, created_at, updated_at
+		 FROM agent_guardrail_configs WHERE agent_id = ? ORDER BY updated_at DESC LIMIT 1`, agentID)
+	return scanAgentGuardrailConfig(row)
+}
+
+func (s *SQLite) DeleteAgentGuardrailConfig(ctx context.Context, id string) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM agent_guardrail_configs WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("delete agent guardrail config: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("agent guardrail config not found: %s", id)
+	}
+	return nil
+}
+
+func scanAgentGuardrailConfig(row scannable) (*models.AgentGuardrailConfig, error) {
+	var c models.AgentGuardrailConfig
+	var contentPolicyJSON, restrictedTermsJSON string
+	err := row.Scan(
+		&c.ID, &c.AgentID, &c.Name, &c.Enabled, &c.MaxCostPerRun, &c.MaxLatencyMs,
+		&c.MaxTokensPerStep, &contentPolicyJSON, &restrictedTermsJSON,
+		&c.StopOnViolation, &c.CreatedAt, &c.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("agent guardrail config not found")
+		}
+		return nil, fmt.Errorf("scan agent guardrail config: %w", err)
+	}
+	if contentPolicyJSON != "" {
+		json.Unmarshal([]byte(contentPolicyJSON), &c.ContentPolicy)
+	}
+	if restrictedTermsJSON != "" {
+		json.Unmarshal([]byte(restrictedTermsJSON), &c.RestrictedTerms)
+	}
+	return &c, nil
+}
+
+// --- Agent Executions ---
+
+func (s *SQLite) SaveAgentExecution(ctx context.Context, e *models.AgentExecution) error {
+	inputJSON, _ := json.Marshal(e.Input)
+	outputJSON, _ := json.Marshal(e.Output)
+	stepsJSON, _ := json.Marshal(e.Steps)
+	violationsJSON, _ := json.Marshal(e.GuardrailViolations)
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO agent_executions
+		(id, agent_id, workflow_id, status, input, output, steps, total_cost_usd, total_latency_ms, guardrail_violations, context_id, created_at, completed_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.ID, e.AgentID, e.WorkflowID, e.Status, string(inputJSON), string(outputJSON),
+		string(stepsJSON), e.TotalCostUSD, e.TotalLatencyMs, string(violationsJSON),
+		e.ContextID, e.CreatedAt, e.CompletedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("save agent execution: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLite) GetAgentExecution(ctx context.Context, id string) (*models.AgentExecution, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, agent_id, workflow_id, status, input, output, steps, total_cost_usd, total_latency_ms, guardrail_violations, context_id, created_at, completed_at
+		 FROM agent_executions WHERE id = ?`, id)
+	return scanAgentExecution(row)
+}
+
+func (s *SQLite) ListAgentExecutions(ctx context.Context, agentID string, limit, offset int) ([]*models.AgentExecution, error) {
+	query := `SELECT id, agent_id, workflow_id, status, input, output, steps, total_cost_usd, total_latency_ms, guardrail_violations, context_id, created_at, completed_at
+		 FROM agent_executions WHERE agent_id = ? ORDER BY created_at DESC`
+	args := []any{agentID}
+
+	if limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, limit)
+	}
+	if offset > 0 {
+		query += " OFFSET ?"
+		args = append(args, offset)
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list agent executions: %w", err)
+	}
+	defer rows.Close()
+
+	var execs []*models.AgentExecution
+	for rows.Next() {
+		e, err := scanAgentExecution(rows)
+		if err != nil {
+			return nil, err
+		}
+		execs = append(execs, e)
+	}
+	return execs, rows.Err()
+}
+
+func scanAgentExecution(row scannable) (*models.AgentExecution, error) {
+	var e models.AgentExecution
+	var inputJSON, outputJSON, stepsJSON, violationsJSON string
+	var completedAt *time.Time
+	err := row.Scan(
+		&e.ID, &e.AgentID, &e.WorkflowID, &e.Status, &inputJSON, &outputJSON,
+		&stepsJSON, &e.TotalCostUSD, &e.TotalLatencyMs, &violationsJSON,
+		&e.ContextID, &e.CreatedAt, &completedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("agent execution not found")
+		}
+		return nil, fmt.Errorf("scan agent execution: %w", err)
+	}
+	if inputJSON != "" {
+		json.Unmarshal([]byte(inputJSON), &e.Input)
+	}
+	if outputJSON != "" {
+		json.Unmarshal([]byte(outputJSON), &e.Output)
+	}
+	if stepsJSON != "" {
+		json.Unmarshal([]byte(stepsJSON), &e.Steps)
+	}
+	if violationsJSON != "" {
+		json.Unmarshal([]byte(violationsJSON), &e.GuardrailViolations)
+	}
+	e.CompletedAt = completedAt
+	return &e, nil
 }

@@ -23,8 +23,8 @@ func (s *Server) handleListAgents(w http.ResponseWriter, r *http.Request) error 
 
 func (s *Server) handleCreateAgent(w http.ResponseWriter, r *http.Request) error {
 	var req struct {
-		Name        string            `json:"name"`
-		Description string            `json:"description"`
+		Name        string             `json:"name"`
+		Description string             `json:"description"`
 		Steps       []models.AgentStep `json:"steps"`
 		Tools       []models.ToolRef   `json:"tools"`
 	}

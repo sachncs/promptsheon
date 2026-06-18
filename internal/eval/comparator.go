@@ -8,19 +8,19 @@ import (
 
 // Comparison holds a side-by-side comparison of two evaluation reports.
 type Comparison struct {
-	A            *models.EvalReport `json:"a"`
-	B            *models.EvalReport `json:"b"`
-	Diff         *DiffSummary       `json:"diff"`
+	A    *models.EvalReport `json:"a"`
+	B    *models.EvalReport `json:"b"`
+	Diff *DiffSummary       `json:"diff"`
 }
 
 // DiffSummary quantifies the differences between two reports.
 type DiffSummary struct {
-	PassRateDelta     float64 `json:"pass_rate_delta"`
-	AvgScoreDelta     float64 `json:"avg_score_delta"`
-	AvgLatencyDelta   float64 `json:"avg_latency_delta"`
-	AvgHALLucDelta    float64 `json:"avg_hallucination_delta"`
-	TotalTokensDelta  int     `json:"total_tokens_delta"`
-	TestCaseDiffs     []TestCaseDiff `json:"test_case_diffs"`
+	PassRateDelta    float64        `json:"pass_rate_delta"`
+	AvgScoreDelta    float64        `json:"avg_score_delta"`
+	AvgLatencyDelta  float64        `json:"avg_latency_delta"`
+	AvgHallucDelta   float64        `json:"avg_hallucination_delta"`
+	TotalTokensDelta int            `json:"total_tokens_delta"`
+	TestCaseDiffs    []TestCaseDiff `json:"test_case_diffs"`
 }
 
 // TestCaseDiff shows the difference for a specific test case across two runs.
@@ -39,7 +39,7 @@ func CompareReports(a, b *models.EvalReport) *Comparison {
 		PassRateDelta:    b.Aggregate.PassRate - a.Aggregate.PassRate,
 		AvgScoreDelta:    b.Aggregate.AvgScore - a.Aggregate.AvgScore,
 		AvgLatencyDelta:  b.Aggregate.AvgLatencyMs - a.Aggregate.AvgLatencyMs,
-		AvgHALLucDelta:   b.Aggregate.AvgHallucination - a.Aggregate.AvgHallucination,
+		AvgHallucDelta:   b.Aggregate.AvgHallucination - a.Aggregate.AvgHallucination,
 		TotalTokensDelta: b.Aggregate.TotalTokens - a.Aggregate.TotalTokens,
 	}
 

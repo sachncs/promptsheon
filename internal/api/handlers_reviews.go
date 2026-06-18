@@ -22,10 +22,10 @@ func (s *Server) handleListPendingReviews(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleCreateReview(w http.ResponseWriter, r *http.Request) error {
 	var req struct {
-		ResourceID      string `json:"resource_id"`
-		ResourceType    string `json:"resource_type"`
-		Author          string `json:"author"`
-		QuorumRequired  int    `json:"quorum_required,omitempty"`
+		ResourceID     string `json:"resource_id"`
+		ResourceType   string `json:"resource_type"`
+		Author         string `json:"author"`
+		QuorumRequired int    `json:"quorum_required,omitempty"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
@@ -38,15 +38,15 @@ func (s *Server) handleCreateReview(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	review := &models.Review{
-		ID:              generateID(),
-		ResourceID:      req.ResourceID,
-		ResourceType:    req.ResourceType,
-		Author:          req.Author,
-		Status:          models.ReviewPending,
-		QuorumRequired:  req.QuorumRequired,
-		ApprovalsCount:  0,
-		Comments:        []models.Comment{},
-		CreatedAt:       time.Now(),
+		ID:             generateID(),
+		ResourceID:     req.ResourceID,
+		ResourceType:   req.ResourceType,
+		Author:         req.Author,
+		Status:         models.ReviewPending,
+		QuorumRequired: req.QuorumRequired,
+		ApprovalsCount: 0,
+		Comments:       []models.Comment{},
+		CreatedAt:      time.Now(),
 	}
 
 	if err := s.db.CreateReview(r.Context(), review); err != nil {
@@ -92,7 +92,9 @@ func (s *Server) handleApproveReview(w http.ResponseWriter, r *http.Request) err
 			if prompt, err := s.db.GetPrompt(r.Context(), review.ResourceID); err == nil {
 				prompt.Status = models.StatusApproved
 				prompt.UpdatedAt = now
-				s.db.UpdatePrompt(r.Context(), prompt) //nolint:errcheck
+				if err := s.db.UpdatePrompt(r.Context(), prompt); err != nil {
+					s.logger.Error("failed to auto-approve prompt", "err", err, "prompt_id", prompt.ID)
+				}
 				s.audit(r.Context(), "auto_approve", "prompt:"+prompt.ID, map[string]any{
 					"review_id": review.ID,
 					"approvals": approvedCount,
@@ -105,7 +107,9 @@ func (s *Server) handleApproveReview(w http.ResponseWriter, r *http.Request) err
 			if agent, err := s.db.GetAgent(r.Context(), review.ResourceID); err == nil {
 				agent.Status = models.StatusApproved
 				agent.UpdatedAt = now
-				s.db.UpdateAgent(r.Context(), agent) //nolint:errcheck
+				if err := s.db.UpdateAgent(r.Context(), agent); err != nil {
+					s.logger.Error("failed to auto-approve agent", "err", err, "agent_id", agent.ID)
+				}
 				s.audit(r.Context(), "auto_approve", "agent:"+agent.ID, map[string]any{
 					"review_id": review.ID,
 					"approvals": approvedCount,

@@ -12,9 +12,9 @@ import (
 type Status string
 
 const (
-	StatusOK          Status = "ok"
-	StatusError       Status = "error"
-	StatusUnset       Status = ""
+	StatusOK    Status = "ok"
+	StatusError Status = "error"
+	StatusUnset Status = ""
 )
 
 // Span represents a single unit of work within a trace.

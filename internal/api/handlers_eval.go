@@ -11,12 +11,12 @@ import (
 
 func (s *Server) handleRunEval(w http.ResponseWriter, r *http.Request) error {
 	var req struct {
-		PromptHash  string   `json:"prompt_hash"`
-		PromptText  string   `json:"prompt_text"`
-		DatasetID   string   `json:"dataset_id"`
-		Model       string   `json:"model"`
-		Scorers     []string `json:"scorers"`
-		MaxTokens   int      `json:"max_tokens"`
+		PromptHash string   `json:"prompt_hash"`
+		PromptText string   `json:"prompt_text"`
+		DatasetID  string   `json:"dataset_id"`
+		Model      string   `json:"model"`
+		Scorers    []string `json:"scorers"`
+		MaxTokens  int      `json:"max_tokens"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
@@ -79,7 +79,9 @@ func (s *Server) handleRunEval(w http.ResponseWriter, r *http.Request) error {
 		StartedAt:        startedAt,
 		CompletedAt:      &report.CompletedAt,
 	}
-	_ = s.db.SaveEvalRun(r.Context(), run)
+	if err := s.db.SaveEvalRun(r.Context(), run); err != nil {
+		s.logger.Error("failed to save eval run", "err", err, "run_id", run.ID)
+	}
 
 	s.audit(r.Context(), "eval_run", "prompt:"+req.PromptHash, map[string]any{
 		"dataset_id": req.DatasetID,

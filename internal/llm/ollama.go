@@ -47,8 +47,8 @@ type ollamaResponse struct {
 	Message struct {
 		Content string `json:"content"`
 	} `json:"message"`
-	PromptEvalCount int `json:"prompt_eval_count"`
-	EvalCount       int `json:"eval_count"`
+	PromptEvalCount    int   `json:"prompt_eval_count"`
+	EvalCount          int   `json:"eval_count"`
 	PromptEvalDuration int64 `json:"prompt_eval_duration"`
 	EvalDuration       int64 `json:"eval_duration"`
 }
@@ -83,7 +83,7 @@ func (o *Ollama) Complete(ctx context.Context, req *Request) (*Response, error) 
 	}
 	defer resp.Body.Close()
 
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB limit
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}

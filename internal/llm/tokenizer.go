@@ -2,7 +2,6 @@ package llm
 
 import (
 	"promptsheon/internal/models"
-	"strings"
 	"unicode"
 )
 
@@ -39,15 +38,6 @@ func EstimateTokens(text string) int {
 	}
 
 	return tokens
-}
-
-// EstimatePromptTokens estimates tokens for a prompt with variable substitution.
-func EstimatePromptTokens(template string, variables map[string]string) int {
-	substituted := template
-	for k, v := range variables {
-		substituted = strings.ReplaceAll(substituted, "{{"+k+"}}", v)
-	}
-	return EstimateTokens(substituted)
 }
 
 // EstimateCost calculates estimated cost in USD for a given token count and model.

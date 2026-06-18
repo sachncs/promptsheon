@@ -19,7 +19,7 @@ func NewHallucinationDetector() *HallucinationDetector {
 
 // Score returns a hallucination score between 0.0 (no hallucination) and
 // 1.0 (highly likely hallucinated).
-func (hd *HallucinationDetector) Score(ctx context.Context, provider llm.Provider, prompt, output string, tc interface{}) float64 {
+func (hd *HallucinationDetector) Score(ctx context.Context, provider llm.Provider, prompt, output string, tc any) float64 {
 	checks := []func(context.Context, llm.Provider, string, string) float64{
 		hd.factualGrounding,
 		hd.citationCheck,
@@ -53,7 +53,7 @@ Do not explain. Just the number.`, prompt, output)
 		Messages: []llm.Message{
 			{Role: "user", Content: judgePrompt},
 		},
-		MaxTokens:  10,
+		MaxTokens:   10,
 		Temperature: 0,
 	})
 	if err != nil {
@@ -100,7 +100,7 @@ Do not explain.`, prompt, output)
 		Messages: []llm.Message{
 			{Role: "user", Content: judgePrompt},
 		},
-		MaxTokens:  15,
+		MaxTokens:   15,
 		Temperature: 0,
 	})
 	if err != nil {

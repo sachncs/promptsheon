@@ -12,6 +12,7 @@ import (
 
 	"promptsheon/internal/alerting"
 	"promptsheon/internal/auth"
+	contextpkg "promptsheon/internal/context"
 	"promptsheon/internal/eval"
 	"promptsheon/internal/guardrail"
 	"promptsheon/internal/metrics"
@@ -32,6 +33,7 @@ type Server struct {
 	mux              *http.ServeMux
 	db               store.Repository
 	logger           *slog.Logger
+	cfg              *ServerConfig
 	authn            *auth.Authenticator
 	authz            *auth.Authorizer
 	requireAuth      bool
@@ -46,6 +48,14 @@ type Server struct {
 	usageTracker     *UsageTracker
 	guardrailManager *guardrail.Manager
 	alertingManager  *alerting.Manager
+	contextManager   *contextpkg.Manager
+}
+
+// ServerConfig holds configuration for the API server.
+type ServerConfig struct {
+	CircuitBreakerFailureThreshold int
+	CircuitBreakerSuccessThreshold int
+	CircuitBreakerCooldown         int
 }
 
 // Option configures the Server.
@@ -133,12 +143,31 @@ func WithAlertingManager(m *alerting.Manager) Option {
 	}
 }
 
+// WithContextManager sets the context manager for context assembly.
+func WithContextManager(m *contextpkg.Manager) Option {
+	return func(s *Server) {
+		s.contextManager = m
+	}
+}
+
+// WithServerConfig sets the server configuration.
+func WithServerConfig(cfg *ServerConfig) Option {
+	return func(s *Server) {
+		s.cfg = cfg
+	}
+}
+
 // NewServer creates a new API server with the given dependencies.
 func NewServer(db store.Repository, logger *slog.Logger, opts ...Option) *Server {
 	s := &Server{
 		mux:    http.NewServeMux(),
 		db:     db,
 		logger: logger,
+		cfg: &ServerConfig{
+			CircuitBreakerFailureThreshold: 5,
+			CircuitBreakerSuccessThreshold: 3,
+			CircuitBreakerCooldown:         30,
+		},
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -208,6 +237,29 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/agents/{id}/archive", s.wrapHandler(s.requirePerm(auth.PermAgentUpdate)(s.handleArchiveAgent)))
 	s.mux.HandleFunc("POST /api/v1/agents/{id}/rerun", s.wrapHandler(s.requirePerm(auth.PermAgentCreate)(s.handleRerunAgent)))
 	s.mux.HandleFunc("POST /api/v1/agents/validate", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleValidateAgentWorkflow)))
+
+	// Agent Execute (full orchestration)
+	s.mux.HandleFunc("POST /api/v1/agents/{id}/execute", s.wrapHandler(s.requirePerm(auth.PermAgentCreate)(s.handleExecuteAgent)))
+
+	// Agent Guardrail Configs
+	s.mux.HandleFunc("POST /api/v1/agents/{id}/guardrail-config", s.wrapHandler(s.requirePerm(auth.PermAgentUpdate)(s.handleCreateAgentGuardrailConfig)))
+	s.mux.HandleFunc("GET /api/v1/agents/{id}/guardrail-config", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleGetAgentGuardrailConfig)))
+	s.mux.HandleFunc("PUT /api/v1/agents/{id}/guardrail-config/{config_id}", s.wrapHandler(s.requirePerm(auth.PermAgentUpdate)(s.handleUpdateAgentGuardrailConfig)))
+	s.mux.HandleFunc("DELETE /api/v1/agents/{id}/guardrail-config/{config_id}", s.wrapHandler(s.requirePerm(auth.PermAgentUpdate)(s.handleDeleteAgentGuardrailConfig)))
+
+	// Agent Executions
+	s.mux.HandleFunc("GET /api/v1/agents/{id}/executions", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleListAgentExecutions)))
+	s.mux.HandleFunc("GET /api/v1/agents/{id}/executions/{exec_id}", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleGetAgentExecution)))
+
+	// Contexts
+	s.mux.HandleFunc("POST /api/v1/contexts", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateContext)))
+	s.mux.HandleFunc("GET /api/v1/contexts", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListContexts)))
+	s.mux.HandleFunc("GET /api/v1/contexts/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetContext)))
+	s.mux.HandleFunc("PUT /api/v1/contexts/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateContext)))
+	s.mux.HandleFunc("DELETE /api/v1/contexts/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptDelete)(s.handleDeleteContext)))
+	s.mux.HandleFunc("POST /api/v1/contexts/{id}/messages", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleAppendContextMessage)))
+	s.mux.HandleFunc("DELETE /api/v1/contexts/{id}/messages", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleClearContextMessages)))
+	s.mux.HandleFunc("POST /api/v1/contexts/{id}/assemble", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleAssembleContext)))
 
 	s.mux.HandleFunc("GET /api/v1/datasets", s.wrapHandler(s.requirePerm(auth.PermDatasetRead)(s.handleListDatasets)))
 	s.mux.HandleFunc("POST /api/v1/datasets", s.wrapHandler(s.requirePerm(auth.PermDatasetCreate)(s.handleCreateDataset)))
@@ -292,6 +344,14 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/alerts/notifications", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleAddNotificationGroup)))
 	s.mux.HandleFunc("GET /api/v1/alerts/active", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListAlerts)))
 	s.mux.HandleFunc("PUT /api/v1/alerts/active/{id}/resolve", s.wrapHandler(s.requirePerm(auth.PermReviewApprove)(s.handleResolveAlert)))
+
+	// Webhooks
+	s.mux.HandleFunc("GET /api/v1/webhooks", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListWebhooks)))
+	s.mux.HandleFunc("POST /api/v1/webhooks", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleCreateWebhook)))
+	s.mux.HandleFunc("DELETE /api/v1/webhooks/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleDeleteWebhook)))
+
+	// Metrics (Prometheus format, authenticated)
+	s.mux.HandleFunc("GET /api/v1/metrics", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsPrometheus)))
 }
 
 // requirePerm returns middleware that requires a specific permission.
@@ -335,7 +395,9 @@ func (s *Server) wrapHandler(fn APIFunc) http.HandlerFunc {
 func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		slog.Error("failed to encode json response", "err", err)
+	}
 }
 
 // writeError writes a JSON error response, inferring the status code from
@@ -355,7 +417,9 @@ func writeError(w http.ResponseWriter, err error) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+	if encErr := json.NewEncoder(w).Encode(map[string]string{"error": err.Error()}); encErr != nil {
+		slog.Error("failed to encode error json response", "err", encErr)
+	}
 }
 
 // readJSON decodes the request body into target.
@@ -406,6 +470,14 @@ func (s *Server) handleLogsStream(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
+func (s *Server) handleMetricsPrometheus(w http.ResponseWriter, r *http.Request) error {
+	if s.collector == nil {
+		return badRequest("metrics not configured")
+	}
+	s.collector.Handler().ServeHTTP(w, r)
+	return nil
+}
+
 // Common API errors.
 var (
 	ErrNotFound   = errors.New("resource not found")
@@ -422,9 +494,11 @@ type HTTPError struct {
 func (e *HTTPError) Error() string { return e.Message }
 
 func badRequest(msg string) error { return &HTTPError{Status: http.StatusBadRequest, Message: msg} }
-func badRequestf(format string, args ...any) error { return &HTTPError{Status: http.StatusBadRequest, Message: fmt.Sprintf(format, args...)} }
-func notFound(msg string) error  { return &HTTPError{Status: http.StatusNotFound, Message: msg} }
-func conflict(msg string) error  { return &HTTPError{Status: http.StatusConflict, Message: msg} }
+func badRequestf(format string, args ...any) error {
+	return &HTTPError{Status: http.StatusBadRequest, Message: fmt.Sprintf(format, args...)}
+}
+func notFound(msg string) error { return &HTTPError{Status: http.StatusNotFound, Message: msg} }
+func conflict(msg string) error { return &HTTPError{Status: http.StatusConflict, Message: msg} }
 
 // --- Auth Adapter ---
 

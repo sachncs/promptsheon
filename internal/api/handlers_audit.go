@@ -101,7 +101,10 @@ func (s *Server) writeAuditCSV(w http.ResponseWriter, entries []*models.AuditEnt
 
 	// Data
 	for _, e := range entries {
-		details, _ := json.Marshal(e.Details)
+		details, err := json.Marshal(e.Details)
+		if err != nil {
+			details = []byte("{}")
+		}
 		writer.Write([]string{
 			e.ID,
 			e.UserID,

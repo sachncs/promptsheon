@@ -496,9 +496,9 @@ func TestIntegration_SimilarPrompts(t *testing.T) {
 	ts := setupServer(t)
 
 	// Create prompts with similar content
-	http.Post(ts.URL+"/api/v1/prompts", "application/json", bytes.NewBufferString(`{"name":"p1","content":"You are a helpful AI assistant. Please answer questions clearly."}`)) //nolint:errcheck
+	http.Post(ts.URL+"/api/v1/prompts", "application/json", bytes.NewBufferString(`{"name":"p1","content":"You are a helpful AI assistant. Please answer questions clearly."}`))               //nolint:errcheck
 	http.Post(ts.URL+"/api/v1/prompts", "application/json", bytes.NewBufferString(`{"name":"p2","content":"You are a helpful AI assistant. Please answer questions clearly and concisely."}`)) //nolint:errcheck
-	http.Post(ts.URL+"/api/v1/prompts", "application/json", bytes.NewBufferString(`{"name":"p3","content":"Completely unrelated content about quantum physics and wormholes."}`)) //nolint:errcheck
+	http.Post(ts.URL+"/api/v1/prompts", "application/json", bytes.NewBufferString(`{"name":"p3","content":"Completely unrelated content about quantum physics and wormholes."}`))              //nolint:errcheck
 
 	// Find similar
 	resp, err := http.Get(ts.URL + "/api/v1/prompts/similar?content=You%20are%20a%20helpful%20AI%20assistant&threshold=0.6")
@@ -784,6 +784,7 @@ func TestIntegration_PromptRun(t *testing.T) {
 	llm.Global.Register("mock", func(cfg llm.ProviderConfig) llm.Provider {
 		return llm.NewMock("test response")
 	})
+	llm.Global.Configure("mock", llm.ProviderConfig{})
 
 	// Create and approve a prompt
 	body := `{"name":"run-test","content":"Hello {{name}}","variables":[{"name":"name","type":"string","required":true,"description":"Name"}]}`

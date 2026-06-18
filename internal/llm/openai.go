@@ -71,10 +71,10 @@ func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) 
 	}
 
 	body := openaiRequest{
-		Model:       req.Model,
-		Messages:    msgs,
-		MaxTokens:   req.MaxTokens,
-		Stop:        req.Stop,
+		Model:     req.Model,
+		Messages:  msgs,
+		MaxTokens: req.MaxTokens,
+		Stop:      req.Stop,
 	}
 	if req.Temperature > 0 {
 		body.Temperature = &req.Temperature
@@ -106,7 +106,7 @@ func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) 
 		return o.handleStream(resp, req.Model, start)
 	}
 
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB limit
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}

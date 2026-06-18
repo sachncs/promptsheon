@@ -38,11 +38,11 @@ type Message struct {
 
 // Response holds the output from an LLM call.
 type Response struct {
-	Content    string         `json:"content"`
-	Usage      models.Usage   `json:"usage"`
-	Model      string         `json:"model"`
-	StopReason string         `json:"stop_reason,omitempty"`
-	Latency    time.Duration  `json:"-"`
+	Content          string        `json:"content"`
+	Usage            models.Usage  `json:"usage"`
+	Model            string        `json:"model"`
+	StopReason       string        `json:"stop_reason,omitempty"`
+	Latency          time.Duration `json:"-"`
 	TimeToFirstToken time.Duration `json:"-"` // time from request to first token (for streaming)
 }
 
