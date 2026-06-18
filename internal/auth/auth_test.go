@@ -102,9 +102,9 @@ func TestExtractAPIKey(t *testing.T) {
 			want: "ps_abc123",
 		},
 		{
-			name: "query param",
+			name: "query param ignored",
 			req:  httptest.NewRequest("GET", "/?api_key=ps_xyz789", nil),
-			want: "ps_xyz789",
+			want: "",
 		},
 		{
 			name: "no auth",

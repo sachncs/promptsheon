@@ -28,13 +28,13 @@ func (s *Server) handleCreateGuardrailRule(w http.ResponseWriter, r *http.Reques
 	}
 
 	var req struct {
-		Name         string            `json:"name"`
-		Type         string            `json:"type"`
-		Severity     string            `json:"severity"`
-		Config       map[string]any    `json:"config,omitempty"`
-		Environments []string          `json:"environments,omitempty"`
-		PromptIDs    []string          `json:"prompt_ids,omitempty"`
-		AgentIDs     []string          `json:"agent_ids,omitempty"`
+		Name         string         `json:"name"`
+		Type         string         `json:"type"`
+		Severity     string         `json:"severity"`
+		Config       map[string]any `json:"config,omitempty"`
+		Environments []string       `json:"environments,omitempty"`
+		PromptIDs    []string       `json:"prompt_ids,omitempty"`
+		AgentIDs     []string       `json:"agent_ids,omitempty"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
@@ -90,12 +90,12 @@ func (s *Server) handleUpdateGuardrailRule(w http.ResponseWriter, r *http.Reques
 	}
 
 	var req struct {
-		Name         *string           `json:"name"`
-		Enabled      *bool             `json:"enabled"`
-		Config       map[string]any    `json:"config,omitempty"`
-		Environments []string          `json:"environments,omitempty"`
-		PromptIDs    []string          `json:"prompt_ids,omitempty"`
-		AgentIDs     []string          `json:"agent_ids,omitempty"`
+		Name         *string        `json:"name"`
+		Enabled      *bool          `json:"enabled"`
+		Config       map[string]any `json:"config,omitempty"`
+		Environments []string       `json:"environments,omitempty"`
+		PromptIDs    []string       `json:"prompt_ids,omitempty"`
+		AgentIDs     []string       `json:"agent_ids,omitempty"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest

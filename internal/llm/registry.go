@@ -11,20 +11,23 @@ type Registry struct {
 	mu        sync.RWMutex
 	providers map[string]func(ProviderConfig) Provider
 	configs   map[string]ProviderConfig
+	cache     map[string]Provider // cached provider instances
 }
 
-// Global is the default registry.
+// Global is the default provider registry, pre-populated with all built-in providers.
 var Global = newRegistry()
 
 func newRegistry() *Registry {
 	r := &Registry{
 		providers: make(map[string]func(ProviderConfig) Provider),
 		configs:   make(map[string]ProviderConfig),
+		cache:     make(map[string]Provider),
 	}
 	r.Register("openai", func(cfg ProviderConfig) Provider { return NewOpenAI(cfg) })
 	r.Register("anthropic", func(cfg ProviderConfig) Provider { return NewAnthropic(cfg) })
 	r.Register("ollama", func(cfg ProviderConfig) Provider { return NewOllama(cfg) })
 	r.Register("azure", func(cfg ProviderConfig) Provider { return NewAzure(cfg) })
+	r.Register("nvidia", func(cfg ProviderConfig) Provider { return NewNvidia(cfg) })
 	return r
 }
 
@@ -33,38 +36,42 @@ func (r *Registry) Register(name string, factory func(ProviderConfig) Provider) 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.providers[name] = factory
+	// Invalidate cache when factory changes
+	delete(r.cache, name)
 }
 
-// Configure sets the config for a named provider.
+// Configure sets the config for a named provider and invalidates cache.
 func (r *Registry) Configure(name string, cfg ProviderConfig) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.configs[name] = cfg
+	// Invalidate cache when config changes
+	delete(r.cache, name)
 }
 
-// Get returns a provider by name, using the configured config.
+// Get returns a cached provider by name, or creates a new one.
 func (r *Registry) Get(name string) (Provider, error) {
 	r.mu.RLock()
+	if p, ok := r.cache[name]; ok {
+		r.mu.RUnlock()
+		return p, nil
+	}
 	factory, ok := r.providers[name]
-	cfg, _ := r.configs[name]
+	cfg, cfgOK := r.configs[name]
 	r.mu.RUnlock()
 
 	if !ok {
 		return nil, fmt.Errorf("unknown provider: %s", name)
 	}
-	return factory(cfg), nil
-}
-
-// GetWithConfig returns a provider with an explicit config override.
-func (r *Registry) GetWithConfig(name string, cfg ProviderConfig) (Provider, error) {
-	r.mu.RLock()
-	factory, ok := r.providers[name]
-	r.mu.RUnlock()
-
-	if !ok {
-		return nil, fmt.Errorf("unknown provider: %s", name)
+	if !cfgOK {
+		return nil, fmt.Errorf("provider %s not configured", name)
 	}
-	return factory(cfg), nil
+
+	p := factory(cfg)
+	r.mu.Lock()
+	r.cache[name] = p
+	r.mu.Unlock()
+	return p, nil
 }
 
 // Providers returns the names of all registered providers.
@@ -87,6 +94,8 @@ func (r *Registry) Providers() []string {
 //	PROMPTSHEON_ANTHROPIC_API_KEY — Anthropic API key
 //	PROMPTSHEON_ANTHROPIC_BASE_URL — Anthropic base URL (optional)
 //	PROMPTSHEON_OLLAMA_BASE_URL  — Ollama base URL (optional)
+//	PROMPTSHEON_NVIDIA_API_KEY   — NVIDIA NIM API key
+//	PROMPTSHEON_NVIDIA_BASE_URL  — NVIDIA NIM base URL (optional)
 func LoadFromEnv() string {
 	if v := os.Getenv("PROMPTSHEON_OPENAI_API_KEY"); v != "" {
 		Global.Configure("openai", ProviderConfig{
@@ -110,9 +119,15 @@ func LoadFromEnv() string {
 			APIKey:  v,
 			BaseURL: os.Getenv("PROMPTSHEON_AZURE_RESOURCE"),
 			Extra: map[string]string{
-				"deployment": os.Getenv("PROMPTSHEON_AZURE_DEPLOYMENT"),
+				"deployment":  os.Getenv("PROMPTSHEON_AZURE_DEPLOYMENT"),
 				"api_version": os.Getenv("PROMPTSHEON_AZURE_API_VERSION"),
 			},
+		})
+	}
+	if v := os.Getenv("PROMPTSHEON_NVIDIA_API_KEY"); v != "" {
+		Global.Configure("nvidia", ProviderConfig{
+			APIKey:  v,
+			BaseURL: os.Getenv("PROMPTSHEON_NVIDIA_BASE_URL"),
 		})
 	}
 

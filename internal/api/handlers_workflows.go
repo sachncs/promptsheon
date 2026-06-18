@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -20,7 +21,11 @@ func (s *Server) handleRunWorkflow(w http.ResponseWriter, r *http.Request) error
 		return ErrBadRequest
 	}
 
-	agent, err := s.db.GetAgent(r.Context(), req.AgentID)
+	// Add timeout to prevent indefinite execution
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
+
+	agent, err := s.db.GetAgent(ctx, req.AgentID)
 	if err != nil {
 		return ErrNotFound
 	}
@@ -28,7 +33,7 @@ func (s *Server) handleRunWorkflow(w http.ResponseWriter, r *http.Request) error
 	registry := workflow.DefaultRegistry()
 	engine := workflow.NewEngine(registry)
 
-	result, err := engine.Execute(r.Context(), agent, req.Input)
+	result, err := engine.Execute(ctx, agent, req.Input)
 	if err != nil {
 		return err
 	}
@@ -46,7 +51,8 @@ func (s *Server) handleRunWorkflow(w http.ResponseWriter, r *http.Request) error
 		CreatedAt:   result.StartedAt,
 	}
 
-	if err := s.db.SaveWorkflow(r.Context(), wf); err != nil {
+	if err := s.db.SaveWorkflow(ctx, wf); err != nil {
+		s.logger.Error("failed to save workflow", "err", err, "workflow_id", wf.ID)
 		return err
 	}
 
@@ -66,10 +72,12 @@ func (s *Server) handleRunWorkflow(w http.ResponseWriter, r *http.Request) error
 			StartedAt:  &startedAt,
 			FinishedAt: &finishedAt,
 		}
-		_ = s.db.SaveWorkflowStep(r.Context(), step)
+		if err := s.db.SaveWorkflowStep(ctx, step); err != nil {
+			s.logger.Error("failed to save workflow step", "err", err, "step_id", stepID)
+		}
 	}
 
-	s.audit(r.Context(), "workflow_run", "agent:"+agent.ID, map[string]any{
+	s.audit(ctx, "workflow_run", "agent:"+agent.ID, map[string]any{
 		"workflow_id": wf.ID,
 		"status":      string(wf.Status),
 		"steps":       len(result.Steps),

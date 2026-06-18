@@ -32,17 +32,17 @@ const (
 
 // AlertRule defines a threshold-based alert rule.
 type AlertRule struct {
-	ID          string         `json:"id"`
-	Name        string         `json:"name"`
-	Type        string         `json:"type"`
-	Severity    Severity       `json:"severity"`
-	Enabled     bool           `json:"enabled"`
-	Threshold   float64        `json:"threshold"`
-	Duration    int            `json:"duration_minutes"`
-	Window      int            `json:"window_minutes"`
-	Config      map[string]any `json:"config,omitempty"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	Type      string         `json:"type"`
+	Severity  Severity       `json:"severity"`
+	Enabled   bool           `json:"enabled"`
+	Threshold float64        `json:"threshold"`
+	Duration  int            `json:"duration_minutes"`
+	Window    int            `json:"window_minutes"`
+	Config    map[string]any `json:"config,omitempty"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
 }
 
 // Alert represents a triggered alert.
@@ -79,10 +79,10 @@ type Manager struct {
 // NewManager creates a new alerting manager.
 func NewManager(logger *slog.Logger, collector *metrics.Collector) *Manager {
 	return &Manager{
-		rules:  make(map[string]*AlertRule),
-		alerts: []*Alert{},
-		groups: make(map[string]*NotificationGroup),
-		logger: logger,
+		rules:   make(map[string]*AlertRule),
+		alerts:  []*Alert{},
+		groups:  make(map[string]*NotificationGroup),
+		logger:  logger,
 		metrics: collector,
 	}
 }
@@ -274,7 +274,7 @@ func (m *Manager) RunMonitoringChecks(collector *metrics.Collector) []*Alert {
 
 	// Check latency spike (using P95 from histogram)
 	p95 := collector.LLMLatency.P95() * 1000 // convert to ms
-	if p95 > 2000 { // > 2s
+	if p95 > 2000 {                          // > 2s
 		rule := &AlertRule{
 			ID:        "latency-spike",
 			Name:      "Execution Latency Spike",
@@ -302,7 +302,7 @@ func (m *Manager) RunMonitoringChecks(collector *metrics.Collector) []*Alert {
 				Threshold: 10,
 			}
 			alert := m.TriggerAlert(rule, fmt.Sprintf("Error rate is %.1f%% (threshold: 10%%)", errorRate), map[string]any{
-				"error_rate": errorRate,
+				"error_rate":   errorRate,
 				"total_errors": totalErrors,
 			})
 			triggered = append(triggered, alert)

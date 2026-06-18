@@ -47,8 +47,8 @@ type Variable struct {
 
 // ProviderBinding specifies which LLM provider and model to use for execution.
 type ProviderBinding struct {
-	Provider string `json:"provider"`           // e.g. "openai", "azure", "anthropic"
-	Model    string `json:"model"`              // e.g. "gpt-4", "claude-3-opus"
+	Provider  string `json:"provider"`              // e.g. "openai", "azure", "anthropic"
+	Model     string `json:"model"`                 // e.g. "gpt-4", "claude-3-opus"
 	APIKeyRef string `json:"api_key_ref,omitempty"` // vault key ID for API key lookup
 }
 
@@ -62,24 +62,24 @@ type GenerationConfig struct {
 
 // Prompt represents a versioned, named prompt asset.
 type Prompt struct {
-	ID              string            `json:"id"`
-	Name            string            `json:"name"`
-	Description     string            `json:"description"`
-	Content         string            `json:"content"`
-	SystemPrompt    string            `json:"system_prompt,omitempty"` // default system prompt for all executions
-	Variables       []Variable        `json:"variables"`
-	Tags            []string          `json:"tags"`
-	ModelHint       string            `json:"model_hint"`
-	Binding         *ProviderBinding  `json:"binding,omitempty"`          // per-prompt provider resolution
-	Generation      *GenerationConfig `json:"generation,omitempty"`       // per-prompt generation parameters
-	Version         int               `json:"version"`
-	Status          PromptStatus      `json:"status"`
-	Environment     string            `json:"environment"` // "dev", "staging", "prod"
-	CASHash         string            `json:"cas_hash"`
-	CreatedBy       string            `json:"created_by"`
-	CreatedAt       time.Time         `json:"created_at"`
-	UpdatedAt       time.Time         `json:"updated_at"`
-	Metadata        map[string]string `json:"metadata"`
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	Description  string            `json:"description"`
+	Content      string            `json:"content"`
+	SystemPrompt string            `json:"system_prompt,omitempty"` // default system prompt for all executions
+	Variables    []Variable        `json:"variables"`
+	Tags         []string          `json:"tags"`
+	ModelHint    string            `json:"model_hint"`
+	Binding      *ProviderBinding  `json:"binding,omitempty"`    // per-prompt provider resolution
+	Generation   *GenerationConfig `json:"generation,omitempty"` // per-prompt generation parameters
+	Version      int               `json:"version"`
+	Status       PromptStatus      `json:"status"`
+	Environment  string            `json:"environment"` // "dev", "staging", "prod"
+	CASHash      string            `json:"cas_hash"`
+	CreatedBy    string            `json:"created_by"`
+	CreatedAt    time.Time         `json:"created_at"`
+	UpdatedAt    time.Time         `json:"updated_at"`
+	Metadata     map[string]string `json:"metadata"`
 }
 
 // PromptFilter defines criteria for listing prompts.

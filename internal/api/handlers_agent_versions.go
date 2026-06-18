@@ -119,36 +119,60 @@ func (s *Server) handleRerunAgent(w http.ResponseWriter, r *http.Request) error 
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
-
-	// Execute the workflow
-	workflowFunc := func(agentID string, input map[string]any) (map[string]any, error) {
-		return s.executeWorkflow(r.Context(), a, input)
+	if req.Input == nil {
+		req.Input = make(map[string]any)
 	}
 
-	output, err := workflowFunc(id, req.Input)
+	// Use the real workflow engine (simple re-execution, no guardrails or context)
+	registry := workflow.DefaultRegistry()
+	engine := workflow.NewEngine(registry)
+
+	result, err := engine.Execute(r.Context(), a, req.Input)
 	if err != nil {
 		return err
 	}
 
-	s.audit(r.Context(), "rerun", "agent:"+id, map[string]any{
-		"input":  req.Input,
-		"output": output,
-	})
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"agent_id": id,
-		"output":   output,
-	})
-	return nil
-}
-
-func (s *Server) executeWorkflow(ctx interface{}, a *models.Agent, input map[string]any) (map[string]any, error) {
-	// Simplified workflow execution
-	output := make(map[string]any)
-	for _, step := range a.Steps {
-		output[step.OutputKey] = input
+	// Persist workflow record
+	wf := &models.Workflow{
+		ID:          result.WorkflowID,
+		AgentID:     a.ID,
+		Status:      models.WorkflowStatus(result.Status),
+		Input:       req.Input,
+		Output:      result.Outputs,
+		Error:       result.Error,
+		StartedAt:   result.StartedAt,
+		CompletedAt: &result.FinishedAt,
+		CreatedAt:   result.StartedAt,
 	}
-	return output, nil
+	s.db.SaveWorkflow(r.Context(), wf)
+
+	// Persist step results
+	for stepID, sr := range result.Steps {
+		startedAt := result.StartedAt
+		finishedAt := result.FinishedAt
+		step := &models.WorkflowStep{
+			ID:         generateID(),
+			WorkflowID: wf.ID,
+			StepID:     stepID,
+			Status:     string(sr.Status),
+			Output:     sr.Output,
+			Error:      sr.Error,
+			ToolCalls:  sr.ToolCalls,
+			LatencyMs:  sr.LatencyMs,
+			StartedAt:  &startedAt,
+			FinishedAt: &finishedAt,
+		}
+		s.db.SaveWorkflowStep(r.Context(), step)
+	}
+
+	s.audit(r.Context(), "rerun", "agent:"+id, map[string]any{
+		"workflow_id": wf.ID,
+		"status":      string(wf.Status),
+		"steps":       len(result.Steps),
+	})
+
+	writeJSON(w, http.StatusOK, wf)
+	return nil
 }
 
 func (s *Server) handleValidateAgentWorkflow(w http.ResponseWriter, r *http.Request) error {
@@ -161,8 +185,8 @@ func (s *Server) handleValidateAgentWorkflow(w http.ResponseWriter, r *http.Requ
 
 	validationErrors := workflow.ValidateSteps(req.Steps)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"valid":    len(validationErrors) == 0,
-		"errors":   validationErrors,
+		"valid":  len(validationErrors) == 0,
+		"errors": validationErrors,
 	})
 	return nil
 }

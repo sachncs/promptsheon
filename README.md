@@ -25,7 +25,7 @@ Promptsheon applies software engineering discipline to AI agents by providing Gi
 
 ### Prerequisites
 
-- Go 1.23 or later
+- Go 1.25 or later
 - SQLite (included via modernc.org/sqlite)
 
 ### Installation
@@ -151,7 +151,7 @@ export OLLAMA_BASE_URL="http://localhost:11434"
 
 ### Prerequisites
 
-- Go 1.23+
+- Go 1.25+
 - golangci-lint (for linting)
 
 ### Building

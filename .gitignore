@@ -1,6 +1,11 @@
+# ARC-AGI
+arc-agi/
+environment_files/
+
 # Binaries
 promptsheond
 promptsheon
+bin/
 *.exe
 *.test
 *.out
@@ -35,6 +40,16 @@ coverage.html
 
 # Dependency directories
 vendor/
+
+# Security files
+*.pem
+*.key
+*.cert
+.secret
+.credentials
+
+# Log files
+*.log
 
 # OS generated files
 .DS_Store

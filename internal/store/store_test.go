@@ -295,13 +295,13 @@ func TestEvalResults(t *testing.T) {
 			TestCaseID: "tc-1", PromptHash: "hash1", DatasetID: "ds-1", Model: "gpt-4",
 			Output: "Go is a language", Score: 0.95, LatencyMs: 200,
 			TokenUsage: models.Usage{PromptTokens: 10, CompletionTokens: 20, TotalTokens: 30},
-			Passed: true, CreatedAt: now,
+			Passed:     true, CreatedAt: now,
 		},
 		{
 			TestCaseID: "tc-2", PromptHash: "hash1", DatasetID: "ds-1", Model: "gpt-4",
 			Output: "Go is compiled", Score: 0.88, LatencyMs: 180,
 			TokenUsage: models.Usage{PromptTokens: 10, CompletionTokens: 15, TotalTokens: 25},
-			Passed: true, CreatedAt: now,
+			Passed:     true, CreatedAt: now,
 		},
 	}
 

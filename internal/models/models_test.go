@@ -208,11 +208,11 @@ func TestReviewJSON(t *testing.T) {
 
 func TestAuditEntryJSON(t *testing.T) {
 	e := AuditEntry{
-		ID:       "ae-001",
-		UserID:   "user-1",
-		Action:   "create",
-		Resource: "prompt:p-001",
-		Details:  map[string]any{"name": "test-prompt"},
+		ID:        "ae-001",
+		UserID:    "user-1",
+		Action:    "create",
+		Resource:  "prompt:p-001",
+		Details:   map[string]any{"name": "test-prompt"},
 		Timestamp: time.Now(),
 	}
 

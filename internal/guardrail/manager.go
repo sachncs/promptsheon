@@ -23,6 +23,8 @@ const (
 	SeverityCritical Severity = "critical"
 )
 
+const maxViolations = 10000
+
 // ViolationType categorizes guardrail violations.
 type ViolationType string
 
@@ -40,59 +42,59 @@ const (
 
 // Violation represents a guardrail violation record.
 type Violation struct {
-	ID             string         `json:"id"`
-	RuleID         string         `json:"rule_id"`
-	RuleName       string         `json:"rule_name"`
-	Type           ViolationType  `json:"type"`
-	Severity       Severity       `json:"severity"`
-	ResourceType   string         `json:"resource_type"`
-	ResourceID     string         `json:"resource_id"`
-	UserID         string         `json:"user_id"`
-	Message        string         `json:"message"`
-	Details        map[string]any `json:"details,omitempty"`
-	Resolved       bool           `json:"resolved"`
-	ResolvedBy     string         `json:"resolved_by,omitempty"`
-	ResolvedAt     *time.Time     `json:"resolved_at,omitempty"`
-	Timestamp      time.Time      `json:"timestamp"`
+	ID           string         `json:"id"`
+	RuleID       string         `json:"rule_id"`
+	RuleName     string         `json:"rule_name"`
+	Type         ViolationType  `json:"type"`
+	Severity     Severity       `json:"severity"`
+	ResourceType string         `json:"resource_type"`
+	ResourceID   string         `json:"resource_id"`
+	UserID       string         `json:"user_id"`
+	Message      string         `json:"message"`
+	Details      map[string]any `json:"details,omitempty"`
+	Resolved     bool           `json:"resolved"`
+	ResolvedBy   string         `json:"resolved_by,omitempty"`
+	ResolvedAt   *time.Time     `json:"resolved_at,omitempty"`
+	Timestamp    time.Time      `json:"timestamp"`
 }
 
 // Rule defines a guardrail rule.
 type Rule struct {
-	ID          string         `json:"id"`
-	Name        string         `json:"name"`
-	Type        ViolationType  `json:"type"`
-	Severity    Severity       `json:"severity"`
-	Enabled     bool           `json:"enabled"`
-	Config      map[string]any `json:"config,omitempty"`
-	Environments []string      `json:"environments,omitempty"`
-	PromptIDs   []string       `json:"prompt_ids,omitempty"`
-	AgentIDs    []string       `json:"agent_ids,omitempty"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID           string         `json:"id"`
+	Name         string         `json:"name"`
+	Type         ViolationType  `json:"type"`
+	Severity     Severity       `json:"severity"`
+	Enabled      bool           `json:"enabled"`
+	Config       map[string]any `json:"config,omitempty"`
+	Environments []string       `json:"environments,omitempty"`
+	PromptIDs    []string       `json:"prompt_ids,omitempty"`
+	AgentIDs     []string       `json:"agent_ids,omitempty"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
 }
 
 // ViolationResult is the result of a guardrail check.
 type ViolationResult struct {
-	Passed    bool           `json:"passed"`
-	Violation *Violation     `json:"violation,omitempty"`
+	Passed    bool       `json:"passed"`
+	Violation *Violation `json:"violation,omitempty"`
 }
 
 // Manager manages guardrail rules and violations.
 type Manager struct {
-	mu       sync.RWMutex
-	rules    map[string]*Rule
+	mu         sync.RWMutex
+	rules      map[string]*Rule
 	violations []*Violation
-	logger   *slog.Logger
-	metrics  *metrics.Collector
+	logger     *slog.Logger
+	metrics    *metrics.Collector
 }
 
 // NewManager creates a new guardrail manager.
 func NewManager(logger *slog.Logger, collector *metrics.Collector) *Manager {
 	return &Manager{
-		rules:    make(map[string]*Rule),
+		rules:      make(map[string]*Rule),
 		violations: []*Violation{},
-		logger:   logger,
-		metrics:  collector,
+		logger:     logger,
+		metrics:    collector,
 	}
 }
 
@@ -140,19 +142,26 @@ func (m *Manager) ListViolations() []*Violation {
 func (m *Manager) RecordViolation(v *Violation) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// Cap violations to prevent unbounded memory growth
+	if len(m.violations) >= maxViolations {
+		m.violations = m.violations[1:]
+	}
 	m.violations = append(m.violations, v)
 
 	if m.metrics != nil {
 		m.metrics.GuardrailViolations.Inc()
 	}
 
-	m.logger.Warn("guardrail violation",
-		"rule_id", v.RuleID,
-		"type", v.Type,
-		"severity", v.Severity,
-		"resource", v.ResourceType+":"+v.ResourceID,
-		"message", v.Message,
-	)
+	if m.logger != nil {
+		m.logger.Warn("guardrail violation",
+			"rule_id", v.RuleID,
+			"type", v.Type,
+			"severity", v.Severity,
+			"resource", v.ResourceType+":"+v.ResourceID,
+			"message", v.Message,
+		)
+	}
 }
 
 // RecordBlock records a guardrail block.
@@ -227,8 +236,8 @@ func (m *Manager) CheckModelAccess(model, environment string, allowedModels map[
 		return &ViolationResult{Passed: true}
 	}
 
-	for _, m := range allowed {
-		if strings.EqualFold(m, model) {
+	for _, am := range allowed {
+		if strings.EqualFold(am, model) {
 			return &ViolationResult{Passed: true}
 		}
 	}
@@ -316,8 +325,8 @@ func (m *Manager) CheckContentPolicy(content string, policies []string) *Violati
 		case "no_pii":
 			// Basic PII detection patterns
 			piiPatterns := []string{
-				`\b\d{3}-\d{2}-\d{4}\b`,     // SSN
-				`\b\d{16}\b`,                  // Credit card (basic)
+				`\b\d{3}-\d{2}-\d{4}\b`, // SSN
+				`\b\d{16}\b`,            // Credit card (basic)
 				`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b`, // Email
 			}
 			for _, pattern := range piiPatterns {
@@ -435,6 +444,38 @@ func (m *Manager) RunAllStaticChecks(ctx context.Context, content, model, enviro
 		m.RecordPass()
 	} else {
 		m.RecordBlock()
+	}
+
+	return violations
+}
+
+// RunAgentChecks runs guardrails specific to an agent's configuration.
+// It checks restricted terms and content policy against the provided content.
+func (m *Manager) RunAgentChecks(ctx context.Context, restrictedTerms []string, contentPolicy []string, content string) []*Violation {
+	var violations []*Violation
+
+	// Check restricted terms
+	for _, term := range restrictedTerms {
+		if strings.Contains(strings.ToLower(content), strings.ToLower(term)) {
+			v := &Violation{
+				ID:        fmt.Sprintf("v-%d", time.Now().UnixNano()),
+				Type:      ViolationRestrictedTerm,
+				Severity:  SeverityHigh,
+				Message:   fmt.Sprintf("restricted term found: %s", term),
+				Details:   map[string]any{"term": term},
+				Timestamp: time.Now(),
+			}
+			violations = append(violations, v)
+			m.RecordViolation(v)
+		}
+	}
+
+	// Check content policy
+	if len(contentPolicy) > 0 {
+		if result := m.CheckContentPolicy(content, contentPolicy); !result.Passed {
+			violations = append(violations, result.Violation)
+			m.RecordViolation(result.Violation)
+		}
 	}
 
 	return violations

@@ -11,17 +11,17 @@ import (
 
 // Snapshot captures an LLM input/output pair for reproducibility and debugging.
 type Snapshot struct {
-	ID              string            `json:"id"`
-	PromptHash      string            `json:"prompt_hash"`
-	PromptText      string            `json:"prompt_text"`
-	Model           string            `json:"model"`
-	ResponseText    string            `json:"response_text"`
-	Provider        string            `json:"provider"`
-	TokenUsage      TokenUsage        `json:"token_usage"`
-	LatencyMs       int64             `json:"latency_ms"`
-	Hallucination   float64           `json:"hallucination_score"`
-	Metadata        map[string]string `json:"metadata"`
-	CreatedAt       time.Time         `json:"created_at"`
+	ID            string            `json:"id"`
+	PromptHash    string            `json:"prompt_hash"`
+	PromptText    string            `json:"prompt_text"`
+	Model         string            `json:"model"`
+	ResponseText  string            `json:"response_text"`
+	Provider      string            `json:"provider"`
+	TokenUsage    TokenUsage        `json:"token_usage"`
+	LatencyMs     int64             `json:"latency_ms"`
+	Hallucination float64           `json:"hallucination_score"`
+	Metadata      map[string]string `json:"metadata"`
+	CreatedAt     time.Time         `json:"created_at"`
 }
 
 // TokenUsage records token counts for a snapshot.
@@ -72,10 +72,16 @@ func NewStore(db *sql.DB) (*Store, error) {
 
 // Save persists a snapshot.
 func (s *Store) Save(ctx context.Context, snap *Snapshot) error {
-	usageJSON, _ := json.Marshal(snap.TokenUsage)
-	metaJSON, _ := json.Marshal(snap.Metadata)
+	usageJSON, err := json.Marshal(snap.TokenUsage)
+	if err != nil {
+		usageJSON = []byte("{}")
+	}
+	metaJSON, err := json.Marshal(snap.Metadata)
+	if err != nil {
+		metaJSON = []byte("{}")
+	}
 
-	_, err := s.db.ExecContext(ctx,
+	_, err = s.db.ExecContext(ctx,
 		`INSERT OR REPLACE INTO output_snapshots
 		(id, prompt_hash, prompt_text, model, response_text, provider, token_usage, latency_ms, hallucination_score, metadata, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -128,8 +134,8 @@ func (s *Store) List(ctx context.Context, f Filter) ([]*Snapshot, error) {
 			&snap.Hallucination, &metaJSON, &snap.CreatedAt); err != nil {
 			return nil, err
 		}
-		json.Unmarshal([]byte(usageJSON), &snap.TokenUsage)  //nolint:errcheck
-		json.Unmarshal([]byte(metaJSON), &snap.Metadata)      //nolint:errcheck
+		json.Unmarshal([]byte(usageJSON), &snap.TokenUsage) //nolint:errcheck
+		json.Unmarshal([]byte(metaJSON), &snap.Metadata)    //nolint:errcheck
 		snaps = append(snaps, snap)
 	}
 	return snaps, nil
@@ -149,7 +155,7 @@ func (s *Store) Get(ctx context.Context, id string) (*Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	json.Unmarshal([]byte(usageJSON), &snap.TokenUsage)  //nolint:errcheck
-	json.Unmarshal([]byte(metaJSON), &snap.Metadata)      //nolint:errcheck
+	json.Unmarshal([]byte(usageJSON), &snap.TokenUsage) //nolint:errcheck
+	json.Unmarshal([]byte(metaJSON), &snap.Metadata)    //nolint:errcheck
 	return snap, nil
 }

@@ -21,16 +21,16 @@ func TestSnapshotStore(t *testing.T) {
 	ctx := context.Background()
 
 	snap := &Snapshot{
-		ID:         "test-snap-1",
-		PromptHash: "hash-abc",
-		PromptText: "You are a helpful assistant. Answer: {{question}}",
-		Model:      "gpt-4",
+		ID:           "test-snap-1",
+		PromptHash:   "hash-abc",
+		PromptText:   "You are a helpful assistant. Answer: {{question}}",
+		Model:        "gpt-4",
 		ResponseText: "The answer is 42.",
-		Provider:   "openai",
-		TokenUsage: TokenUsage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
-		LatencyMs:  150,
-		Metadata:   map[string]string{"user_id": "u1"},
-		CreatedAt:  time.Now(),
+		Provider:     "openai",
+		TokenUsage:   TokenUsage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
+		LatencyMs:    150,
+		Metadata:     map[string]string{"user_id": "u1"},
+		CreatedAt:    time.Now(),
 	}
 
 	// Save

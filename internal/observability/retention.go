@@ -21,10 +21,10 @@ type RetentionPolicy struct {
 // DefaultRetentionPolicy returns sensible defaults.
 func DefaultRetentionPolicy() RetentionPolicy {
 	return RetentionPolicy{
-		TraceTTL:      30 * 24 * time.Hour,   // 30 days minimum
-		SnapshotTTL:   30 * 24 * time.Hour,   // 30 days
-		AuditTTL:      90 * 24 * time.Hour,   // 90 days
-		CheckInterval: 1 * time.Hour,          // check every hour
+		TraceTTL:      30 * 24 * time.Hour, // 30 days minimum
+		SnapshotTTL:   30 * 24 * time.Hour, // 30 days
+		AuditTTL:      90 * 24 * time.Hour, // 90 days
+		CheckInterval: 1 * time.Hour,       // check every hour
 	}
 }
 

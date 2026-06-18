@@ -28,12 +28,12 @@ const (
 
 // StepResult holds the output of a single step execution.
 type StepResult struct {
-	StepID    string         `json:"step_id"`
-	Status    Status         `json:"status"`
-	Output    map[string]any `json:"output,omitempty"`
-	Error     string         `json:"error,omitempty"`
+	StepID    string            `json:"step_id"`
+	Status    Status            `json:"status"`
+	Output    map[string]any    `json:"output,omitempty"`
+	Error     string            `json:"error,omitempty"`
 	ToolCalls []models.ToolCall `json:"tool_calls,omitempty"`
-	LatencyMs int64          `json:"latency_ms"`
+	LatencyMs int64             `json:"latency_ms"`
 }
 
 // WorkflowResult holds the full output of a workflow execution.
@@ -51,16 +51,30 @@ type WorkflowResult struct {
 type Engine struct {
 	toolRegistry *Registry
 	llmProvider  LLMProvider
+	guardrailMgr any // *guardrail.Manager (avoiding circular import)
+	agentConfig  any // *models.AgentGuardrailConfig
+	contextMgr   any // *context.Manager
 }
 
 // LLMProvider is the subset of llm.Provider needed by the workflow engine.
 type LLMProvider interface {
-	Complete(ctx context.Context, req interface{}) (interface{}, error)
+	Complete(ctx context.Context, req any) (any, error)
 }
 
 // NewEngine creates a workflow engine with the given tool registry.
 func NewEngine(registry *Registry) *Engine {
 	return &Engine{toolRegistry: registry}
+}
+
+// SetGuardrails configures guardrail enforcement on the engine.
+func (e *Engine) SetGuardrails(mgr any, cfg any) {
+	e.guardrailMgr = mgr
+	e.agentConfig = cfg
+}
+
+// SetContextManager configures context assembly on the engine.
+func (e *Engine) SetContextManager(mgr any) {
+	e.contextMgr = mgr
 }
 
 // Execute runs a workflow defined by an Agent, resolving dependencies and
@@ -131,7 +145,16 @@ func (e *Engine) executeLevel(ctx context.Context, agent *models.Agent, level []
 			defer wg.Done()
 
 			step := stepMap[id]
-			stepResult := e.executeStep(ctx, agent, &step, result.Outputs)
+
+			// Snapshot outputs for this step (read under lock)
+			mu.Lock()
+			outputsCopy := make(map[string]any, len(result.Outputs))
+			for k, v := range result.Outputs {
+				outputsCopy[k] = v
+			}
+			mu.Unlock()
+
+			stepResult := e.executeStep(ctx, agent, &step, outputsCopy)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -207,12 +230,15 @@ func (e *Engine) executeStep(ctx context.Context, agent *models.Agent, step *mod
 			return result
 		}
 
+		// Resolve template variables in tool call input
+		resolvedInput := resolveTemplates(tc.Input, outputs)
+
 		// Merge step input with tool call input
 		input := make(map[string]any)
 		for k, v := range stepInput {
 			input[k] = v
 		}
-		for k, v := range tc.Input {
+		for k, v := range resolvedInput {
 			input[k] = v
 		}
 
@@ -298,6 +324,12 @@ func topologicalLevels(steps []models.AgentStep) [][]string {
 
 // validateDAG checks for cycles in the step dependency graph.
 func validateDAG(steps []models.AgentStep) error {
+	// Build step lookup map for O(1) access
+	stepMap := make(map[string]models.AgentStep, len(steps))
+	for _, s := range steps {
+		stepMap[s.ID] = s
+	}
+
 	visited := make(map[string]int) // 0=unvisited, 1=in-progress, 2=done
 
 	var visit func(id string) error
@@ -310,12 +342,10 @@ func validateDAG(steps []models.AgentStep) error {
 		}
 		visited[id] = 1
 
-		for _, s := range steps {
-			if s.ID == id {
-				for _, dep := range s.DependsOn {
-					if err := visit(dep); err != nil {
-						return err
-					}
+		if s, ok := stepMap[id]; ok {
+			for _, dep := range s.DependsOn {
+				if err := visit(dep); err != nil {
+					return err
 				}
 			}
 		}
@@ -368,4 +398,79 @@ func evaluateCondition(cond *models.Condition, outputs map[string]any) bool {
 	default:
 		return true
 	}
+}
+
+// resolveTemplates resolves {{input.xxx}} and {{step_context.yyy.zzz}} template
+// variables in a tool call input map. The outputs map contains both agent input
+// and previous step outputs. String values are interpolated; non-string values
+// are passed through unchanged.
+func resolveTemplates(input map[string]any, outputs map[string]any) map[string]any {
+	if input == nil {
+		return nil
+	}
+	resolved := make(map[string]any, len(input))
+	for k, v := range input {
+		s, ok := v.(string)
+		if !ok {
+			resolved[k] = v
+			continue
+		}
+		resolved[k] = interpolateString(s, outputs)
+	}
+	return resolved
+}
+
+// interpolateString replaces {{input.xxx}} and {{step_context.yyy.zzz}} placeholders.
+func interpolateString(s string, outputs map[string]any) string {
+	if !strings.Contains(s, "{{") {
+		return s
+	}
+
+	// Replace {{input.xxx}} — look up "input" then walk the path
+	s = replaceVar(s, "{{input.", "}}", outputs)
+
+	// Replace {{step_context.yyy.zzz}} — look up "yyy" then walk remaining path
+	s = replaceVar(s, "{{step_context.", "}}", outputs)
+
+	return s
+}
+
+// replaceVar performs a single-pass replacement of {{prefix...}} placeholders.
+func replaceVar(s, prefix, suffix string, data map[string]any) string {
+	for {
+		start := strings.Index(s, prefix)
+		if start == -1 {
+			return s
+		}
+		end := strings.Index(s[start:], suffix)
+		if end == -1 {
+			return s
+		}
+		end += start
+
+		path := s[start+len(prefix) : end]
+		val := resolvePath(data, path)
+
+		// Build replacement
+		before := s[:start]
+		after := s[end+len(suffix):]
+		s = before + fmt.Sprintf("%v", val) + after
+	}
+}
+
+// resolvePath walks a dotted path like "r.output" into a nested map.
+func resolvePath(data map[string]any, path string) any {
+	parts := strings.Split(path, ".")
+	var current any = data
+	for _, part := range parts {
+		m, ok := current.(map[string]any)
+		if !ok {
+			return ""
+		}
+		current, ok = m[part]
+		if !ok {
+			return ""
+		}
+	}
+	return current
 }

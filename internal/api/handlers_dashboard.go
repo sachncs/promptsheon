@@ -14,10 +14,10 @@ func (s *Server) handleDashboardSummary(w http.ResponseWriter, r *http.Request) 
 	if s.spans != nil {
 		spans, _ := s.spans.ListSpans(r.Context(), trace.SpanFilter{Limit: 1000})
 		summary.TraceStats = &TraceStats{
-			TotalSpans:     len(spans),
-			RecentTraces:   getRecentTraceCount(spans, 1*time.Hour),
+			TotalSpans:      len(spans),
+			RecentTraces:    getRecentTraceCount(spans, 1*time.Hour),
 			AvgSpanDuration: getAvgSpanDuration(spans),
-			ErrorSpans:     getErrorSpanCount(spans),
+			ErrorSpans:      getErrorSpanCount(spans),
 		}
 	}
 
@@ -98,9 +98,9 @@ func (s *Server) handleSearchSpans(w http.ResponseWriter, r *http.Request) error
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"spans":      spans,
+		"spans":       spans,
 		"trace_count": len(traceGroups),
-		"traces":     traceGroups,
+		"traces":      traceGroups,
 	})
 	return nil
 }

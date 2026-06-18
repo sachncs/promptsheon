@@ -22,14 +22,6 @@ type Azure struct {
 	client     *http.Client
 }
 
-// AzureConfig holds Azure-specific provider configuration.
-type AzureConfig struct {
-	APIKey     string
-	Resource   string // Azure resource endpoint
-	Deployment string // Deployment name
-	APIVersion string // API version
-}
-
 // NewAzure creates an Azure OpenAI provider.
 func NewAzure(cfg ProviderConfig) *Azure {
 	apiVersion := cfg.Extra["api_version"]
@@ -116,7 +108,7 @@ func (a *Azure) Complete(ctx context.Context, req *Request) (*Response, error) {
 	}
 	defer resp.Body.Close()
 
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB limit
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}

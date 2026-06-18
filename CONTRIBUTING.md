@@ -21,7 +21,7 @@ This project and everyone participating in it is governed by our [Code of Conduc
 
 ### Prerequisites
 
-- Go 1.23 or later
+- Go 1.25 or later
 - Git
 - golangci-lint (for linting)
 

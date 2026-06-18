@@ -59,7 +59,7 @@ func HTTPMiddleware(collector *Collector, tracer trace.Tracer, logger *slog.Logg
 // LLMMiddleware instruments LLM calls with metrics and tracing.
 func LLMMiddleware(collector *Collector, tracer trace.Tracer, logger *slog.Logger) func(next LLMMiddlewareFunc) LLMMiddlewareFunc {
 	return func(next LLMMiddlewareFunc) LLMMiddlewareFunc {
-		return func(operation string, req interface{}) (interface{}, error) {
+		return func(operation string, req any) (any, error) {
 			start := time.Now()
 
 			span := tracer.Start(context.Background(), "llm."+operation)
@@ -86,7 +86,7 @@ func LLMMiddleware(collector *Collector, tracer trace.Tracer, logger *slog.Logge
 }
 
 // LLMMiddlewareFunc is the function signature for instrumented LLM calls.
-type LLMMiddlewareFunc func(operation string, req interface{}) (interface{}, error)
+type LLMMiddlewareFunc func(operation string, req any) (any, error)
 
 // WorkflowMiddleware instruments workflow executions.
 func WorkflowMiddleware(collector *Collector, tracer trace.Tracer) func(next WorkflowFunc) WorkflowFunc {

@@ -16,12 +16,12 @@ type UsageTracker struct {
 
 // UsageCount tracks usage statistics for a resource.
 type UsageCount struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Count     int       `json:"count"`
-	LastUsed  time.Time `json:"last_used"`
-	AvgTokens float64   `json:"avg_tokens,omitempty"`
-	AvgLatency float64  `json:"avg_latency_ms,omitempty"`
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	Count      int       `json:"count"`
+	LastUsed   time.Time `json:"last_used"`
+	AvgTokens  float64   `json:"avg_tokens,omitempty"`
+	AvgLatency float64   `json:"avg_latency_ms,omitempty"`
 }
 
 // NewUsageTracker creates a new usage tracker.

@@ -46,16 +46,35 @@ func TestDecryptWrongKey(t *testing.T) {
 }
 
 func TestNewInvalidKey(t *testing.T) {
-	// Too short
-	_, err := New("0123456789abcdef")
-	if err == nil {
-		t.Fatal("expected error for short key")
+	tests := []struct {
+		name    string
+		key     string
+		wantErr bool
+	}{
+		{
+			name:    "too short",
+			key:     "0123456789abcdef",
+			wantErr: true,
+		},
+		{
+			name:    "invalid hex",
+			key:     "not-valid-hex",
+			wantErr: true,
+		},
+		{
+			name:    "valid key",
+			key:     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			wantErr: false,
+		},
 	}
 
-	// Invalid hex
-	_, err = New("not-valid-hex")
-	if err == nil {
-		t.Fatal("expected error for invalid hex")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := New(tt.key)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
 
@@ -75,5 +94,51 @@ func TestEncryptProducesDifferentCiphertext(t *testing.T) {
 	d2, _ := v.Decrypt(enc2)
 	if d1 != d2 || d1 != "same plaintext" {
 		t.Fatal("both should decrypt to same plaintext")
+	}
+}
+
+func TestEncryptDecryptEmptyString(t *testing.T) {
+	key := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	v, err := New(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plaintext := ""
+	encrypted, err := v.Encrypt(plaintext)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	decrypted, err := v.Decrypt(encrypted)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if decrypted != plaintext {
+		t.Fatalf("expected %q, got %q", plaintext, decrypted)
+	}
+}
+
+func TestEncryptDecryptLongString(t *testing.T) {
+	key := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	v, err := New(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plaintext := "This is a longer string that contains multiple words and special characters! @#$%^&*()"
+	encrypted, err := v.Encrypt(plaintext)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	decrypted, err := v.Decrypt(encrypted)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if decrypted != plaintext {
+		t.Fatalf("expected %q, got %q", plaintext, decrypted)
 	}
 }

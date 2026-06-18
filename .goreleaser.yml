@@ -1,0 +1,71 @@
+version: 2
+
+release:
+  github:
+    owner: sachn-cs
+    name: promptsheon
+  draft: false
+  prerelease: auto
+  name_template: "v{{.Version}}"
+
+builds:
+  - id: promptsheond
+    main: ./cmd/promptsheond
+    binary: promptsheond
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+  - id: promptsheon-cli
+    main: ./cmd/promptsheon
+    binary: promptsheon
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: promptsheond
+    builds:
+      - promptsheond
+    name_template: "promptsheond_{{.Version}}_{{.Os}}_{{.Arch}}"
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+
+  - id: promptsheon-cli
+    builds:
+      - promptsheon-cli
+    name_template: "promptsheon_{{.Version}}_{{.Os}}_{{.Arch}}"
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"

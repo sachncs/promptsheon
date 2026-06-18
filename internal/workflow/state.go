@@ -9,16 +9,16 @@ import (
 
 // Workflow is the persisted representation of a running/completed workflow.
 type Workflow struct {
-	ID          string            `json:"id"`
-	AgentID     string            `json:"agent_id"`
-	Status      Status            `json:"status"`
-	Input       map[string]any    `json:"input"`
-	Output      map[string]any    `json:"output"`
-	Steps       []*StepState      `json:"steps"`
-	Error       string            `json:"error,omitempty"`
-	StartedAt   time.Time         `json:"started_at"`
-	CompletedAt *time.Time        `json:"completed_at,omitempty"`
-	CreatedAt   time.Time         `json:"created_at"`
+	ID          string         `json:"id"`
+	AgentID     string         `json:"agent_id"`
+	Status      Status         `json:"status"`
+	Input       map[string]any `json:"input"`
+	Output      map[string]any `json:"output"`
+	Steps       []*StepState   `json:"steps"`
+	Error       string         `json:"error,omitempty"`
+	StartedAt   time.Time      `json:"started_at"`
+	CompletedAt *time.Time     `json:"completed_at,omitempty"`
+	CreatedAt   time.Time      `json:"created_at"`
 }
 
 // StepState tracks the state of an individual step.

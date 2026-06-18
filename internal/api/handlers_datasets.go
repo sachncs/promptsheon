@@ -24,7 +24,7 @@ func (s *Server) handleListDatasets(w http.ResponseWriter, r *http.Request) erro
 
 func (s *Server) handleCreateDataset(w http.ResponseWriter, r *http.Request) error {
 	var req struct {
-		Name  string           `json:"name"`
+		Name  string            `json:"name"`
 		Cases []models.TestCase `json:"cases"`
 	}
 	if err := readJSON(r, &req); err != nil {
@@ -68,7 +68,7 @@ func (s *Server) handleUpdateDataset(w http.ResponseWriter, r *http.Request) err
 	}
 
 	var req struct {
-		Name  *string            `json:"name"`
+		Name  *string           `json:"name"`
 		Cases []models.TestCase `json:"cases"`
 	}
 	if err := readJSON(r, &req); err != nil {
@@ -119,7 +119,7 @@ func (s *Server) handleExportDataset(w http.ResponseWriter, r *http.Request) err
 
 func (s *Server) handleImportDataset(w http.ResponseWriter, r *http.Request) error {
 	var req struct {
-		Name  string           `json:"name"`
+		Name  string            `json:"name"`
 		Cases []models.TestCase `json:"cases"`
 	}
 	if err := readJSON(r, &req); err != nil {
@@ -209,7 +209,7 @@ func (s *Server) handleImportCSVDataset(w http.ResponseWriter, r *http.Request) 
 		return err
 	}
 	s.audit(r.Context(), "import_csv", "dataset:"+d.ID, map[string]any{
-		"name":       d.Name,
+		"name":        d.Name,
 		"cases_added": len(cases),
 		"total_cases": len(d.Cases),
 	})

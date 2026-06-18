@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"promptsheon/internal/models"
@@ -35,12 +36,12 @@ func NewAnthropic(cfg ProviderConfig) *Anthropic {
 func (a *Anthropic) Name() string { return "anthropic" }
 
 type anthropicRequest struct {
-	Model       string              `json:"model"`
-	Messages    []anthropicMessage  `json:"messages"`
-	MaxTokens   int                 `json:"max_tokens"`
-	Temperature *float64            `json:"temperature,omitempty"`
-	System      string              `json:"system,omitempty"`
-	Stop        []string            `json:"stop_sequences,omitempty"`
+	Model       string             `json:"model"`
+	Messages    []anthropicMessage `json:"messages"`
+	MaxTokens   int                `json:"max_tokens"`
+	Temperature *float64           `json:"temperature,omitempty"`
+	System      string             `json:"system,omitempty"`
+	Stop        []string           `json:"stop_sequences,omitempty"`
 }
 
 type anthropicMessage struct {
@@ -102,7 +103,7 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 	}
 	defer resp.Body.Close()
 
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB limit
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
@@ -116,14 +117,14 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 		return nil, fmt.Errorf("decode anthropic response: %w", err)
 	}
 
-	content := ""
+	var sb strings.Builder
 	for _, c := range aResp.Content {
-		content += c.Text
+		sb.WriteString(c.Text)
 	}
 
 	totalTokens := aResp.Usage.InputTokens + aResp.Usage.OutputTokens
 	return &Response{
-		Content: content,
+		Content: sb.String(),
 		Usage: models.Usage{
 			PromptTokens:     aResp.Usage.InputTokens,
 			CompletionTokens: aResp.Usage.OutputTokens,

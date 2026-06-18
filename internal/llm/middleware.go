@@ -11,12 +11,12 @@ import (
 
 // CallMetrics holds the observed metrics for a single LLM call.
 type CallMetrics struct {
-	Provider   string        `json:"provider"`
-	Model      string        `json:"model"`
-	Latency    time.Duration `json:"latency"`
-	Usage      models.Usage  `json:"usage"`
-	CostUSD    float64       `json:"cost_usd"`
-	Error      string        `json:"error,omitempty"`
+	Provider string        `json:"provider"`
+	Model    string        `json:"model"`
+	Latency  time.Duration `json:"latency"`
+	Usage    models.Usage  `json:"usage"`
+	CostUSD  float64       `json:"cost_usd"`
+	Error    string        `json:"error,omitempty"`
 }
 
 // MetricsCollector is a callback invoked after every Complete call.
@@ -74,20 +74,21 @@ func (i *Instrumented) Complete(ctx context.Context, req *Request) (*Response, e
 
 // AggregateMetrics holds cumulative stats across many calls.
 type AggregateMetrics struct {
-	mu            sync.Mutex
-	TotalCalls    int            `json:"total_calls"`
-	TotalTokens   int            `json:"total_tokens"`
-	TotalCostUSD  float64        `json:"total_cost_usd"`
-	TotalLatency  time.Duration  `json:"total_latency"`
-	ByProvider    map[string]*ProviderMetrics `json:"by_provider"`
-	ByModel       map[string]*ProviderMetrics `json:"by_model"`
+	mu           sync.Mutex
+	TotalCalls   int                         `json:"total_calls"`
+	TotalTokens  int                         `json:"total_tokens"`
+	TotalCostUSD float64                     `json:"total_cost_usd"`
+	TotalLatency time.Duration               `json:"total_latency"`
+	ByProvider   map[string]*ProviderMetrics `json:"by_provider"`
+	ByModel      map[string]*ProviderMetrics `json:"by_model"`
 }
 
+// ProviderMetrics holds aggregated metrics for a single provider or model.
 type ProviderMetrics struct {
-	Calls     int            `json:"calls"`
-	Tokens    int            `json:"tokens"`
-	CostUSD   float64        `json:"cost_usd"`
-	Latency   time.Duration  `json:"latency"`
+	Calls      int           `json:"calls"`
+	Tokens     int           `json:"tokens"`
+	CostUSD    float64       `json:"cost_usd"`
+	Latency    time.Duration `json:"latency"`
 	AvgLatency time.Duration `json:"avg_latency"`
 }
 

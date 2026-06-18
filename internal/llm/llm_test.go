@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -65,6 +66,7 @@ func TestRegistry(t *testing.T) {
 	r.Register("custom", func(cfg ProviderConfig) Provider {
 		return NewMock("custom-response")
 	})
+	r.Configure("custom", ProviderConfig{})
 
 	p, err := r.Get("custom")
 	if err != nil {
@@ -266,7 +268,7 @@ type failAfterProvider struct {
 	calls     *int
 }
 
-func (f *failAfterProvider) Name() string                        { return "fail-after" }
+func (f *failAfterProvider) Name() string { return "fail-after" }
 func (f *failAfterProvider) Complete(_ context.Context, _ *Request) (*Response, error) {
 	*f.calls++
 	if *f.calls <= f.failUntil {
@@ -286,5 +288,57 @@ func (s *slowProvider) Complete(ctx context.Context, _ *Request) (*Response, err
 		return &Response{Content: "done"}, nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
+	}
+}
+
+func TestIsRetryable(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "context canceled",
+			err:      context.Canceled,
+			expected: false,
+		},
+		{
+			name:     "context deadline exceeded",
+			err:      context.DeadlineExceeded,
+			expected: false,
+		},
+		{
+			name:     "circuit breaker open",
+			err:      ErrCircuitOpen,
+			expected: false,
+		},
+		{
+			name:     "generic error",
+			err:      errors.New("something went wrong"),
+			expected: true,
+		},
+		{
+			name:     "wrapped context error",
+			err:      fmt.Errorf("wrapped: %w", context.Canceled),
+			expected: false,
+		},
+		{
+			name:     "wrapped circuit breaker error",
+			err:      fmt.Errorf("wrapped: %w", ErrCircuitOpen),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isRetryable(tt.err); got != tt.expected {
+				t.Errorf("isRetryable() = %v, want %v", got, tt.expected)
+			}
+		})
 	}
 }

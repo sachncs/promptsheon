@@ -37,15 +37,15 @@ func (s *Server) handleListPrompts(w http.ResponseWriter, r *http.Request) error
 
 func (s *Server) handleCreatePrompt(w http.ResponseWriter, r *http.Request) error {
 	var req struct {
-		Name        string                 `json:"name"`
-		Description string                 `json:"description"`
-		Content     string                 `json:"content"`
-		Variables   []models.Variable      `json:"variables"`
-		Tags        []string               `json:"tags"`
-		ModelHint   string                 `json:"model_hint"`
+		Name        string                  `json:"name"`
+		Description string                  `json:"description"`
+		Content     string                  `json:"content"`
+		Variables   []models.Variable       `json:"variables"`
+		Tags        []string                `json:"tags"`
+		ModelHint   string                  `json:"model_hint"`
 		Binding     *models.ProviderBinding `json:"binding,omitempty"`
-		Environment string                 `json:"environment"`
-		Metadata    map[string]string      `json:"metadata"`
+		Environment string                  `json:"environment"`
+		Metadata    map[string]string       `json:"metadata"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
@@ -99,15 +99,15 @@ func (s *Server) handleUpdatePrompt(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	var req struct {
-		Name        *string               `json:"name"`
-		Description *string               `json:"description"`
-		Content     *string               `json:"content"`
-		Variables   []models.Variable     `json:"variables"`
-		Tags        []string              `json:"tags"`
-		ModelHint   *string               `json:"model_hint"`
+		Name        *string                 `json:"name"`
+		Description *string                 `json:"description"`
+		Content     *string                 `json:"content"`
+		Variables   []models.Variable       `json:"variables"`
+		Tags        []string                `json:"tags"`
+		ModelHint   *string                 `json:"model_hint"`
 		Binding     *models.ProviderBinding `json:"binding,omitempty"`
-		Status      *string               `json:"status"`
-		Metadata    map[string]string     `json:"metadata"`
+		Status      *string                 `json:"status"`
+		Metadata    map[string]string       `json:"metadata"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
@@ -392,11 +392,17 @@ func (s *Server) handleRunPrompt(w http.ResponseWriter, r *http.Request) error {
 		r = r.WithContext(ctx)
 	}
 
-	// --- WRAP PROVIDER WITH RETRY + INSTRUMENTATION ---
-	instrumented := llm.NewInstrumented(provider, func(m llm.CallMetrics) {
+	// --- WRAP PROVIDER WITH CIRCUIT BREAKER + TIMEOUT + RETRY + INSTRUMENTATION ---
+	breakered := llm.NewCircuitBreakerMiddleware(provider, llm.CircuitBreakerConfig{
+		FailureThreshold: s.cfg.CircuitBreakerFailureThreshold,
+		SuccessThreshold: s.cfg.CircuitBreakerSuccessThreshold,
+		Cooldown:         time.Duration(s.cfg.CircuitBreakerCooldown) * time.Second,
+	})
+	instrumented := llm.NewInstrumented(breakered, func(m llm.CallMetrics) {
 		// Metrics are collected by the global collector in the Instrumented wrapper
 	}, s.logger)
-	retrying := llm.NewRetrying(instrumented, llm.DefaultRetryConfig())
+	timeouting := llm.NewTimeouting(instrumented, 30*time.Second)
+	retrying := llm.NewRetrying(timeouting, llm.DefaultRetryConfig())
 
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
@@ -406,6 +412,21 @@ func (s *Server) handleRunPrompt(w http.ResponseWriter, r *http.Request) error {
 	latency := time.Since(start)
 
 	if err != nil {
+		// Save failed execution log
+		if s.db != nil {
+			execLog := &models.ExecutionLog{
+				ID:         fmt.Sprintf("exec-%d", time.Now().UnixNano()),
+				PromptID:   p.ID,
+				PromptName: p.Name,
+				Provider:   providerName,
+				Model:      model,
+				Status:     "error",
+				Error:      err.Error(),
+				LatencyMs:  time.Since(start).Milliseconds(),
+				CreatedAt:  time.Now(),
+			}
+			s.db.SaveExecutionLog(r.Context(), execLog) //nolint:errcheck
+		}
 		if span != nil {
 			span.SetError(err)
 			span.Finish()
@@ -704,8 +725,14 @@ func (s *Server) handleStreamPrompt(w http.ResponseWriter, r *http.Request) erro
 		span.SetAttribute("model", model)
 	}
 
-	// Wrap provider with retry
-	retrying := llm.NewRetrying(provider, llm.DefaultRetryConfig())
+	// Wrap provider with circuit breaker, timeout and retry
+	breakered := llm.NewCircuitBreakerMiddleware(provider, llm.CircuitBreakerConfig{
+		FailureThreshold: s.cfg.CircuitBreakerFailureThreshold,
+		SuccessThreshold: s.cfg.CircuitBreakerSuccessThreshold,
+		Cooldown:         time.Duration(s.cfg.CircuitBreakerCooldown) * time.Second,
+	})
+	timeouting := llm.NewTimeouting(breakered, 60*time.Second)
+	retrying := llm.NewRetrying(timeouting, llm.DefaultRetryConfig())
 
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
@@ -729,12 +756,15 @@ func (s *Server) handleStreamPrompt(w http.ResponseWriter, r *http.Request) erro
 	flusher.Flush()
 
 	// Send done event
-	doneData, _ := json.Marshal(map[string]any{
+	doneData, err := json.Marshal(map[string]any{
 		"model":      resp.Model,
 		"usage":      resp.Usage,
 		"cost_usd":   llm.CalculateCost(model, resp.Usage),
 		"latency_ms": time.Since(start).Milliseconds(),
 	})
+	if err != nil {
+		doneData = []byte("{}")
+	}
 	fmt.Fprintf(w, "event: done\ndata: %s\n\n", string(doneData))
 	flusher.Flush()
 
@@ -796,6 +826,9 @@ func (s *Server) handleStreamPrompt(w http.ResponseWriter, r *http.Request) erro
 }
 
 func jsonEscape(s string) string {
-	b, _ := json.Marshal(s)
+	b, err := json.Marshal(s)
+	if err != nil {
+		return `"` + s + `"`
+	}
 	return string(b)
 }

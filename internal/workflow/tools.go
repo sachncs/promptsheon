@@ -125,8 +125,15 @@ func (h *HTTPTool) Execute(ctx context.Context, input map[string]any) (map[strin
 
 // --- Shell Tool ---
 
-// ShellTool executes shell commands.
+// ShellTool executes shell commands with sandboxing.
 type ShellTool struct{}
+
+// BlockedPatterns contains substrings that are always blocked in shell commands.
+var BlockedPatterns = []string{"rm -rf /", "mkfs", ":(){ :|:&", "dd if=/dev"}
+
+// AllowedCommands is the allowlist of commands permitted by ShellTool.
+// Empty means all commands are allowed (insecure default).
+var AllowedCommands = map[string]bool{}
 
 func (s *ShellTool) Name() string { return "shell" }
 
@@ -134,6 +141,22 @@ func (s *ShellTool) Execute(ctx context.Context, input map[string]any) (map[stri
 	command := toString(input["command"])
 	if command == "" {
 		return nil, fmt.Errorf("shell tool: command is required")
+	}
+
+	// Security: check blocked patterns.
+	cmdLower := strings.ToLower(command)
+	for _, pattern := range BlockedPatterns {
+		if strings.Contains(cmdLower, strings.ToLower(pattern)) {
+			return nil, fmt.Errorf("shell tool: command contains blocked pattern: %s", pattern)
+		}
+	}
+
+	// Security: check allowlist if configured.
+	if len(AllowedCommands) > 0 {
+		baseCmd := strings.Fields(command)
+		if len(baseCmd) == 0 || !AllowedCommands[baseCmd[0]] {
+			return nil, fmt.Errorf("shell tool: command %q is not in the allowlist", baseCmd[0])
+		}
 	}
 
 	timeout := 30 * time.Second
@@ -147,15 +170,21 @@ func (s *ShellTool) Execute(ctx context.Context, input map[string]any) (map[stri
 	cmd := exec.CommandContext(ctx, "sh", "-c", command)
 	output, err := cmd.CombinedOutput()
 
+	exitCode := 0
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		}
+	}
+
 	result := map[string]any{
 		"output": string(output),
-		"exit":   0,
+		"exit":   exitCode,
 	}
-	if err != nil {
-		result["error"] = err.Error()
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			result["exit"] = exitErr.ExitCode()
-		}
+
+	// Return error on non-zero exit so the engine marks step as failed
+	if exitCode != 0 {
+		return result, fmt.Errorf("shell command failed with exit code %d: %s", exitCode, strings.TrimSpace(string(output)))
 	}
 
 	return result, nil

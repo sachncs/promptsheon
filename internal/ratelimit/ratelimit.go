@@ -3,6 +3,8 @@ package ratelimit
 
 import (
 	"net/http"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -37,13 +39,57 @@ func DefaultConfig() Config {
 	}
 }
 
+// LoadConfigFromEnv reads rate limit settings from environment variables.
+// PROMPTSHEON_RATE_LIMIT=0 disables rate limiting entirely.
+// PROMPTSHEON_RATE_BURST overrides the burst size (default 10).
+func LoadConfigFromEnv() Config {
+	cfg := DefaultConfig()
+
+	if v := os.Getenv("PROMPTSHEON_RATE_LIMIT"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err == nil {
+			cfg.Rate = n
+		}
+	}
+	if v := os.Getenv("PROMPTSHEON_RATE_BURST"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err == nil && n > 0 {
+			cfg.Burst = n
+		}
+	}
+	// If rate is 0, set burst to a large value so the bucket never blocks.
+	if cfg.Rate == 0 {
+		cfg.Burst = 1_000_000
+	}
+	return cfg
+}
+
 // NewLimiter creates a rate limiter with the given config.
 func NewLimiter(cfg Config) *Limiter {
-	return &Limiter{
+	l := &Limiter{
 		buckets:  make(map[string]*bucket),
 		rate:     cfg.Rate,
 		interval: cfg.Interval,
 		burst:    cfg.Burst,
+	}
+	// Start background cleanup of stale buckets.
+	go l.cleanup()
+	return l
+}
+
+// cleanup periodically removes stale rate limit buckets to prevent memory leaks.
+func (l *Limiter) cleanup() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		l.mu.Lock()
+		cutoff := time.Now().Add(-10 * time.Minute)
+		for key, b := range l.buckets {
+			if b.lastFill.Before(cutoff) {
+				delete(l.buckets, key)
+			}
+		}
+		l.mu.Unlock()
 	}
 }
 
