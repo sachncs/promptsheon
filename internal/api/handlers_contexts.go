@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -13,6 +14,21 @@ func (s *Server) handleListContexts(w http.ResponseWriter, r *http.Request) erro
 		Type:    models.ContextType(r.URL.Query().Get("type")),
 		Search:  r.URL.Query().Get("search"),
 		Limit:   50,
+		Offset:  0,
+	}
+
+	// Parse limit parameter
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := fmt.Sscanf(v, "%d", &filter.Limit); err == nil && n == 1 && filter.Limit > 0 && filter.Limit <= 1000 {
+			// Use parsed value
+		}
+	}
+
+	// Parse offset parameter
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, err := fmt.Sscanf(v, "%d", &filter.Offset); err == nil && n == 1 && filter.Offset >= 0 {
+			// Use parsed value
+		}
 	}
 
 	contexts, err := s.db.ListContexts(r.Context(), filter)

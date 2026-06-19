@@ -1899,3 +1899,219 @@ func scanAgentExecution(row scannable) (*models.AgentExecution, error) {
 	e.CompletedAt = completedAt
 	return &e, nil
 }
+
+// Alert Rules
+
+func (s *SQLite) SaveAlertRule(ctx context.Context, r *models.AlertRuleRecord) error {
+	configJSON := mustMarshal(r.Config)
+	_, err := s.db.ExecContext(ctx, `
+		INSERT OR REPLACE INTO alert_rules (id, name, type, severity, enabled, threshold, duration, window, config, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.Name, r.Type, r.Severity, r.Enabled, r.Threshold, r.Duration, r.Window, configJSON, r.CreatedAt, r.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("save alert rule: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLite) GetAlertRule(ctx context.Context, id string) (*models.AlertRuleRecord, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, name, type, severity, enabled, threshold, duration, window, config, created_at, updated_at
+		FROM alert_rules WHERE id = ?`, id)
+	return scanAlertRule(row)
+}
+
+func (s *SQLite) DeleteAlertRule(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM alert_rules WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("delete alert rule: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLite) ListAlertRules(ctx context.Context) ([]*models.AlertRuleRecord, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, name, type, severity, enabled, threshold, duration, window, config, created_at, updated_at
+		FROM alert_rules ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("list alert rules: %w", err)
+	}
+	defer rows.Close()
+
+	var rules []*models.AlertRuleRecord
+	for rows.Next() {
+		r, err := scanAlertRule(rows)
+		if err != nil {
+			return nil, err
+		}
+		rules = append(rules, r)
+	}
+	return rules, rows.Err()
+}
+
+func scanAlertRule(row scannable) (*models.AlertRuleRecord, error) {
+	var r models.AlertRuleRecord
+	var configJSON string
+	err := row.Scan(
+		&r.ID, &r.Name, &r.Type, &r.Severity, &r.Enabled, &r.Threshold, &r.Duration, &r.Window,
+		&configJSON, &r.CreatedAt, &r.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("alert rule not found")
+		}
+		return nil, fmt.Errorf("scan alert rule: %w", err)
+	}
+	if configJSON != "" {
+		json.Unmarshal([]byte(configJSON), &r.Config)
+	}
+	return &r, nil
+}
+
+// Alerts
+
+func (s *SQLite) SaveAlert(ctx context.Context, a *models.AlertRecord) error {
+	detailsJSON := mustMarshal(a.Details)
+	_, err := s.db.ExecContext(ctx, `
+		INSERT OR REPLACE INTO alerts (id, rule_id, rule_name, severity, status, message, details, triggered_at, resolved_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.ID, a.RuleID, a.RuleName, a.Severity, a.Status, a.Message, detailsJSON, a.TriggeredAt, a.ResolvedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("save alert: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLite) GetAlert(ctx context.Context, id string) (*models.AlertRecord, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, rule_id, rule_name, severity, status, message, details, triggered_at, resolved_at
+		FROM alerts WHERE id = ?`, id)
+	return scanAlert(row)
+}
+
+func (s *SQLite) UpdateAlert(ctx context.Context, a *models.AlertRecord) error {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE alerts SET status=?, resolved_at=? WHERE id=?`,
+		a.Status, a.ResolvedAt, a.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("update alert: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("alert not found: %s", a.ID)
+	}
+	return nil
+}
+
+func (s *SQLite) ListAlerts(ctx context.Context, status string) ([]*models.AlertRecord, error) {
+	query := `SELECT id, rule_id, rule_name, severity, status, message, details, triggered_at, resolved_at FROM alerts`
+	var args []any
+	if status != "" {
+		query += ` WHERE status = ?`
+		args = append(args, status)
+	}
+	query += ` ORDER BY triggered_at DESC`
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list alerts: %w", err)
+	}
+	defer rows.Close()
+
+	var alerts []*models.AlertRecord
+	for rows.Next() {
+		a, err := scanAlert(rows)
+		if err != nil {
+			return nil, err
+		}
+		alerts = append(alerts, a)
+	}
+	return alerts, rows.Err()
+}
+
+func scanAlert(row scannable) (*models.AlertRecord, error) {
+	var a models.AlertRecord
+	var detailsJSON string
+	var resolvedAt *time.Time
+	err := row.Scan(
+		&a.ID, &a.RuleID, &a.RuleName, &a.Severity, &a.Status, &a.Message,
+		&detailsJSON, &a.TriggeredAt, &resolvedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("alert not found")
+		}
+		return nil, fmt.Errorf("scan alert: %w", err)
+	}
+	if detailsJSON != "" {
+		json.Unmarshal([]byte(detailsJSON), &a.Details)
+	}
+	a.ResolvedAt = resolvedAt
+	return &a, nil
+}
+
+// Notification Groups
+
+func (s *SQLite) SaveNotificationGroup(ctx context.Context, g *models.NotificationGroupRecord) error {
+	channelsJSON := mustMarshal(g.Channels)
+	_, err := s.db.ExecContext(ctx, `
+		INSERT OR REPLACE INTO notification_groups (id, name, channels)
+		VALUES (?, ?, ?)`,
+		g.ID, g.Name, channelsJSON,
+	)
+	if err != nil {
+		return fmt.Errorf("save notification group: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLite) GetNotificationGroup(ctx context.Context, id string) (*models.NotificationGroupRecord, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, name, channels FROM notification_groups WHERE id = ?`, id)
+	return scanNotificationGroup(row)
+}
+
+func (s *SQLite) DeleteNotificationGroup(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM notification_groups WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("delete notification group: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLite) ListNotificationGroups(ctx context.Context) ([]*models.NotificationGroupRecord, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, name, channels FROM notification_groups ORDER BY name`)
+	if err != nil {
+		return nil, fmt.Errorf("list notification groups: %w", err)
+	}
+	defer rows.Close()
+
+	var groups []*models.NotificationGroupRecord
+	for rows.Next() {
+		g, err := scanNotificationGroup(rows)
+		if err != nil {
+			return nil, err
+		}
+		groups = append(groups, g)
+	}
+	return groups, rows.Err()
+}
+
+func scanNotificationGroup(row scannable) (*models.NotificationGroupRecord, error) {
+	var g models.NotificationGroupRecord
+	var channelsJSON string
+	err := row.Scan(&g.ID, &g.Name, &channelsJSON)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("notification group not found")
+		}
+		return nil, fmt.Errorf("scan notification group: %w", err)
+	}
+	if channelsJSON != "" {
+		json.Unmarshal([]byte(channelsJSON), &g.Channels)
+	}
+	return &g, nil
+}

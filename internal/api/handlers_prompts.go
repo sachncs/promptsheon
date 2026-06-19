@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -22,6 +23,21 @@ func (s *Server) handleListPrompts(w http.ResponseWriter, r *http.Request) error
 		Search:      r.URL.Query().Get("search"),
 		Environment: r.URL.Query().Get("environment"),
 		Limit:       50,
+		Offset:      0,
+	}
+
+	// Parse limit parameter
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := fmt.Sscanf(v, "%d", &filter.Limit); err == nil && n == 1 && filter.Limit > 0 && filter.Limit <= 1000 {
+			// Use parsed value
+		}
+	}
+
+	// Parse offset parameter
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, err := fmt.Sscanf(v, "%d", &filter.Offset); err == nil && n == 1 && filter.Offset >= 0 {
+			// Use parsed value
+		}
 	}
 
 	prompts, err := s.db.ListPrompts(r.Context(), filter)
@@ -725,7 +741,151 @@ func (s *Server) handleStreamPrompt(w http.ResponseWriter, r *http.Request) erro
 		span.SetAttribute("model", model)
 	}
 
-	// Wrap provider with circuit breaker, timeout and retry
+	start := time.Now()
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+
+	// Check if provider supports streaming
+	streamProvider, canStream := provider.(llm.StreamingProvider)
+	if canStream {
+		// Use true streaming
+		streamReader, err := streamProvider.Stream(ctx, llmReq)
+		if err != nil {
+			if span != nil {
+				span.SetError(err)
+				span.Finish()
+				s.spans.Finish(span)
+			}
+			fmt.Fprintf(w, "event: error\ndata: %s\n\n", `{"error":"`+err.Error()+`"}`)
+			flusher.Flush()
+			return nil
+		}
+		defer streamReader.Close()
+
+		// Read and forward tokens
+		scanner := bufio.NewScanner(streamReader)
+		var content strings.Builder
+		var ttft time.Duration
+		firstToken := true
+		var usage models.Usage
+
+		for scanner.Scan() {
+			line := scanner.Text()
+			if !strings.HasPrefix(line, "data: ") {
+				continue
+			}
+			data := strings.TrimPrefix(line, "data: ")
+			if data == "[DONE]" {
+				break
+			}
+
+			if firstToken {
+				ttft = time.Since(start)
+				firstToken = false
+			}
+
+			var chunk struct {
+				Choices []struct {
+					Delta struct {
+						Content string `json:"content"`
+					} `json:"delta"`
+				} `json:"choices"`
+				Usage *struct {
+					PromptTokens     int `json:"prompt_tokens"`
+					CompletionTokens int `json:"completion_tokens"`
+					TotalTokens      int `json:"total_tokens"`
+				} `json:"usage"`
+			}
+			if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+				continue
+			}
+
+			if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
+				content.WriteString(chunk.Choices[0].Delta.Content)
+				// Send token event
+				tokenData, _ := json.Marshal(map[string]string{
+					"content": chunk.Choices[0].Delta.Content,
+				})
+				fmt.Fprintf(w, "event: token\ndata: %s\n\n", string(tokenData))
+				flusher.Flush()
+			}
+			if chunk.Usage != nil {
+				usage.PromptTokens = chunk.Usage.PromptTokens
+				usage.CompletionTokens = chunk.Usage.CompletionTokens
+				usage.TotalTokens = chunk.Usage.TotalTokens
+			}
+		}
+
+		// Send done event
+		doneData, _ := json.Marshal(map[string]any{
+			"model":      model,
+			"usage":      usage,
+			"cost_usd":   llm.CalculateCost(model, usage),
+			"latency_ms": time.Since(start).Milliseconds(),
+			"ttft_ms":    ttft.Milliseconds(),
+		})
+		fmt.Fprintf(w, "event: done\ndata: %s\n\n", string(doneData))
+		flusher.Flush()
+
+		// Record metrics
+		latency := time.Since(start)
+		costUSD := llm.CalculateCost(model, usage)
+
+		if s.collector != nil {
+			s.collector.LLMCallsTotal.Inc()
+			s.collector.LLMLatency.Observe(latency.Seconds())
+			s.collector.LLMTokensTotal.Add(float64(usage.TotalTokens))
+			s.collector.LLMInputTokens.Add(float64(usage.PromptTokens))
+			s.collector.LLMOutputTokens.Add(float64(usage.CompletionTokens))
+			s.collector.LLMCostUSD.Add(costUSD)
+		}
+
+		if s.usageTracker != nil {
+			s.usageTracker.RecordPromptUsage(p.ID, p.Name, usage.TotalTokens, float64(latency.Milliseconds()))
+		}
+
+		// Finish trace span
+		if span != nil {
+			span.SetAttribute("llm.latency_ms", fmt.Sprintf("%d", latency.Milliseconds()))
+			span.SetAttribute("llm.tokens", fmt.Sprintf("%d", usage.TotalTokens))
+			span.SetAttribute("llm.ttft_ms", fmt.Sprintf("%d", ttft.Milliseconds()))
+			span.Finish()
+			s.spans.Finish(span)
+		}
+
+		// Get trace ID for execution log
+		traceID := ""
+		if span != nil {
+			traceID = span.TraceID
+		}
+
+		// Persist execution log
+		execLog := &models.ExecutionLog{
+			ID:               generateID(),
+			PromptID:         p.ID,
+			PromptName:       p.Name,
+			PromptVersion:    p.Version,
+			Provider:         providerName,
+			Model:            model,
+			Status:           "success",
+			Variables:        reqBody.Variables,
+			SystemPrompt:     reqBody.SystemPrompt,
+			RequestMessages:  len(messages),
+			PromptTokens:     usage.PromptTokens,
+			CompletionTokens: usage.CompletionTokens,
+			TotalTokens:      usage.TotalTokens,
+			CostUSD:          costUSD,
+			LatencyMs:        latency.Milliseconds(),
+			TraceID:          traceID,
+			Environment:      p.Environment,
+			CreatedAt:        time.Now(),
+		}
+		s.db.SaveExecutionLog(r.Context(), execLog)
+
+		return nil
+	}
+
+	// Fallback: non-streaming provider (send complete response as single event)
 	breakered := llm.NewCircuitBreakerMiddleware(provider, llm.CircuitBreakerConfig{
 		FailureThreshold: s.cfg.CircuitBreakerFailureThreshold,
 		SuccessThreshold: s.cfg.CircuitBreakerSuccessThreshold,
@@ -734,11 +894,6 @@ func (s *Server) handleStreamPrompt(w http.ResponseWriter, r *http.Request) erro
 	timeouting := llm.NewTimeouting(breakered, 60*time.Second)
 	retrying := llm.NewRetrying(timeouting, llm.DefaultRetryConfig())
 
-	start := time.Now()
-	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
-	defer cancel()
-
-	// Make the streaming call
 	resp, err := retrying.Complete(ctx, llmReq)
 	if err != nil {
 		if span != nil {
@@ -751,7 +906,7 @@ func (s *Server) handleStreamPrompt(w http.ResponseWriter, r *http.Request) erro
 		return nil
 	}
 
-	// Send the complete response as a single event (since provider doesn't stream to us)
+	// Send the complete response as a single event
 	fmt.Fprintf(w, "event: token\ndata: %s\n\n", `{"content":`+jsonEscape(resp.Content)+`}`)
 	flusher.Flush()
 
@@ -831,4 +986,56 @@ func jsonEscape(s string) string {
 		return `"` + s + `"`
 	}
 	return string(b)
+}
+
+func (s *Server) handleClonePrompt(w http.ResponseWriter, r *http.Request) error {
+	id := r.PathValue("id")
+	existing, err := s.db.GetPrompt(r.Context(), id)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	var req struct {
+		Name string `json:"name,omitempty"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		return ErrBadRequest
+	}
+
+	// Clone the prompt
+	cloneName := req.Name
+	if cloneName == "" {
+		cloneName = existing.Name + " (clone)"
+	}
+
+	clone := &models.Prompt{
+		ID:          generateID(),
+		Name:        cloneName,
+		Description: existing.Description,
+		Content:     existing.Content,
+		Variables:   existing.Variables,
+		Tags:        append(existing.Tags, "cloned"),
+		ModelHint:   existing.ModelHint,
+		Binding:     existing.Binding,
+		Version:     1,
+		Status:      models.StatusDraft,
+		Environment: existing.Environment,
+		Metadata:    existing.Metadata,
+		CASHash:     existing.CASHash,
+		CreatedBy:   "api",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	if err := s.db.CreatePrompt(r.Context(), clone); err != nil {
+		return err
+	}
+
+	s.audit(r.Context(), "clone", "prompt:"+clone.ID, map[string]any{
+		"source_id": existing.ID,
+		"name":      cloneName,
+	})
+
+	writeJSON(w, http.StatusCreated, clone)
+	return nil
 }

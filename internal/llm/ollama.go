@@ -56,7 +56,7 @@ type ollamaResponse struct {
 func (o *Ollama) Complete(ctx context.Context, req *Request) (*Response, error) {
 	msgs := make([]ollamaMessage, len(req.Messages))
 	for i, m := range req.Messages {
-		msgs[i] = ollamaMessage{Role: m.Role, Content: m.Content}
+		msgs[i] = ollamaMessage(m)
 	}
 
 	body := ollamaRequest{

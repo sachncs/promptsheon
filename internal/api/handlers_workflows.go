@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -102,6 +103,21 @@ func (s *Server) handleListWorkflows(w http.ResponseWriter, r *http.Request) err
 		AgentID: r.URL.Query().Get("agent_id"),
 		Status:  r.URL.Query().Get("status"),
 		Limit:   50,
+		Offset:  0,
+	}
+
+	// Parse limit parameter
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := fmt.Sscanf(v, "%d", &filter.Limit); err == nil && n == 1 && filter.Limit > 0 && filter.Limit <= 1000 {
+			// Use parsed value
+		}
+	}
+
+	// Parse offset parameter
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, err := fmt.Sscanf(v, "%d", &filter.Offset); err == nil && n == 1 && filter.Offset >= 0 {
+			// Use parsed value
+		}
 	}
 
 	workflows, err := s.db.ListWorkflows(r.Context(), filter)

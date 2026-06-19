@@ -125,17 +125,21 @@ func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
 
 // CORS returns middleware that handles CORS preflight requests.
 // The allowedOrigins parameter controls Access-Control-Allow-Origin.
-// Pass "*" to allow all origins, or a specific list for production.
+// Pass specific origins for production, or "*" to allow all origins (insecure).
+// Default behavior (no origins) denies all cross-origin requests.
 func CORS(allowedOrigins ...string) func(http.Handler) http.Handler {
-	origin := "*"
+	origin := "" // Default: deny all origins
 	if len(allowedOrigins) > 0 {
 		origin = allowedOrigins[0]
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID, X-Trace-ID")
+			if origin != "" {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID, X-Trace-ID")
+				w.Header().Set("Access-Control-Max-Age", "86400")
+			}
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)
 				return
@@ -152,6 +156,8 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("X-XSS-Protection", "0")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'")
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		next.ServeHTTP(w, r)
 	})
 }

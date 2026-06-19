@@ -68,7 +68,7 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 		if m.Role == "system" {
 			systemPrompt = m.Content
 		} else {
-			msgs = append(msgs, anthropicMessage{Role: m.Role, Content: m.Content})
+			msgs = append(msgs, anthropicMessage(m))
 		}
 	}
 

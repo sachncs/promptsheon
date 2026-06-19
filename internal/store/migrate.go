@@ -11,6 +11,10 @@ import (
 // migrate runs all SQL migration files in order against the database.
 // Migrations are expected in the migrations/ directory with names like
 // "001_initial.sql", "002_add_foo.sql", etc.
+//
+// Safety features:
+//   - Each migration runs in its own transaction (rollback on failure)
+//   - Forward-only: no down migrations, migrations are idempotent
 func migrate(db *sql.DB, migrationsFS fs.FS) error {
 	// Ensure the schema_migrations table exists.
 	if _, err := db.Exec(`
@@ -71,13 +75,37 @@ func migrate(db *sql.DB, migrationsFS fs.FS) error {
 			return fmt.Errorf("read migration %s: %w", f.Name(), err)
 		}
 
-		if _, err := db.Exec(string(content)); err != nil {
+		// Apply migration in a transaction.
+		if err := applyMigration(db, version, string(content)); err != nil {
 			return fmt.Errorf("apply migration %s: %w", f.Name(), err)
 		}
+	}
 
-		if _, err := db.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
-			return fmt.Errorf("record migration %s: %w", f.Name(), err)
-		}
+	return nil
+}
+
+// applyMigration applies a single migration within a transaction.
+// If the migration fails, the transaction is rolled back.
+func applyMigration(db *sql.DB, version int, sql string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Execute the migration SQL.
+	if _, err := tx.Exec(sql); err != nil {
+		return fmt.Errorf("execute migration: %w", err)
+	}
+
+	// Record the migration version.
+	if _, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
+		return fmt.Errorf("record migration version: %w", err)
+	}
+
+	// Commit the transaction.
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
 	}
 
 	return nil

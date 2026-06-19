@@ -28,12 +28,16 @@ const (
 
 // StepResult holds the output of a single step execution.
 type StepResult struct {
-	StepID    string            `json:"step_id"`
-	Status    Status            `json:"status"`
-	Output    map[string]any    `json:"output,omitempty"`
-	Error     string            `json:"error,omitempty"`
-	ToolCalls []models.ToolCall `json:"tool_calls,omitempty"`
-	LatencyMs int64             `json:"latency_ms"`
+	StepID     string            `json:"step_id"`
+	Status     Status            `json:"status"`
+	Output     map[string]any    `json:"output,omitempty"`
+	Error      string            `json:"error,omitempty"`
+	ToolCalls  []models.ToolCall `json:"tool_calls,omitempty"`
+	LatencyMs  int64             `json:"latency_ms"`
+	CostUSD    float64           `json:"cost_usd,omitempty"`
+	TokensUsed int               `json:"tokens_used,omitempty"`
+	Model      string            `json:"model,omitempty"`
+	Provider   string            `json:"provider,omitempty"`
 }
 
 // WorkflowResult holds the full output of a workflow execution.
@@ -50,15 +54,9 @@ type WorkflowResult struct {
 // Engine resolves dependencies, schedules steps, and executes them.
 type Engine struct {
 	toolRegistry *Registry
-	llmProvider  LLMProvider
 	guardrailMgr any // *guardrail.Manager (avoiding circular import)
 	agentConfig  any // *models.AgentGuardrailConfig
 	contextMgr   any // *context.Manager
-}
-
-// LLMProvider is the subset of llm.Provider needed by the workflow engine.
-type LLMProvider interface {
-	Complete(ctx context.Context, req any) (any, error)
 }
 
 // NewEngine creates a workflow engine with the given tool registry.

@@ -113,8 +113,6 @@ func (h *Histogram) P99() float64 { return h.Percentile(99) }
 
 // Collector holds all metrics for the application.
 type Collector struct {
-	mu sync.Mutex
-
 	// API metrics
 	RequestsTotal   *Counter
 	RequestDuration *Histogram

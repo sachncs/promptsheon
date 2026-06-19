@@ -5,6 +5,7 @@ package llm
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"promptsheon/internal/models"
@@ -17,6 +18,21 @@ type Provider interface {
 
 	// Name returns the provider identifier (e.g. "openai", "anthropic").
 	Name() string
+}
+
+// StreamingProvider extends Provider with streaming support.
+type StreamingProvider interface {
+	Provider
+
+	// Stream sends a prompt to the model and returns a reader for streaming tokens.
+	Stream(ctx context.Context, req *Request) (io.ReadCloser, error)
+}
+
+// TokenStream represents a single token in a streaming response.
+type TokenStream struct {
+	Content string `json:"content"`
+	Done    bool   `json:"done"`
+	Error   string `json:"error,omitempty"`
 }
 
 // Request holds the inputs for a single LLM call.

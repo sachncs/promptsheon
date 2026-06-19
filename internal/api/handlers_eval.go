@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -194,6 +195,21 @@ func (s *Server) handleListEvalRuns(w http.ResponseWriter, r *http.Request) erro
 		Model:      r.URL.Query().Get("model"),
 		Status:     r.URL.Query().Get("status"),
 		Limit:      50,
+		Offset:     0,
+	}
+
+	// Parse limit parameter
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := fmt.Sscanf(v, "%d", &filter.Limit); err == nil && n == 1 && filter.Limit > 0 && filter.Limit <= 1000 {
+			// Use parsed value
+		}
+	}
+
+	// Parse offset parameter
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, err := fmt.Sscanf(v, "%d", &filter.Offset); err == nil && n == 1 && filter.Offset >= 0 {
+			// Use parsed value
+		}
 	}
 
 	runs, err := s.db.ListEvalRuns(r.Context(), filter)

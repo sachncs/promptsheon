@@ -119,6 +119,24 @@ type Repository interface {
 	GetAgentExecution(ctx context.Context, id string) (*models.AgentExecution, error)
 	ListAgentExecutions(ctx context.Context, agentID string, limit, offset int) ([]*models.AgentExecution, error)
 
+	// Alert Rules
+	SaveAlertRule(ctx context.Context, r *models.AlertRuleRecord) error
+	GetAlertRule(ctx context.Context, id string) (*models.AlertRuleRecord, error)
+	DeleteAlertRule(ctx context.Context, id string) error
+	ListAlertRules(ctx context.Context) ([]*models.AlertRuleRecord, error)
+
+	// Alerts
+	SaveAlert(ctx context.Context, a *models.AlertRecord) error
+	GetAlert(ctx context.Context, id string) (*models.AlertRecord, error)
+	UpdateAlert(ctx context.Context, a *models.AlertRecord) error
+	ListAlerts(ctx context.Context, status string) ([]*models.AlertRecord, error)
+
+	// Notification Groups
+	SaveNotificationGroup(ctx context.Context, g *models.NotificationGroupRecord) error
+	GetNotificationGroup(ctx context.Context, id string) (*models.NotificationGroupRecord, error)
+	DeleteNotificationGroup(ctx context.Context, id string) error
+	ListNotificationGroups(ctx context.Context) ([]*models.NotificationGroupRecord, error)
+
 	// Lifecycle
 	Ping(ctx context.Context) error
 	Close() error

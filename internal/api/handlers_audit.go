@@ -17,6 +17,7 @@ func (s *Server) handleListAudit(w http.ResponseWriter, r *http.Request) error {
 		Resource: r.URL.Query().Get("resource"),
 		Action:   r.URL.Query().Get("action"),
 		Limit:    50,
+		Offset:   0,
 	}
 
 	if v := r.URL.Query().Get("since"); v != "" {
@@ -35,8 +36,14 @@ func (s *Server) handleListAudit(w http.ResponseWriter, r *http.Request) error {
 	}
 	if v := r.URL.Query().Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
-		if err == nil && n > 0 {
+		if err == nil && n > 0 && n <= 1000 {
 			filter.Limit = n
+		}
+	}
+	if v := r.URL.Query().Get("offset"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err == nil && n >= 0 {
+			filter.Offset = n
 		}
 	}
 

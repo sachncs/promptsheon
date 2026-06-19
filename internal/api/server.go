@@ -17,6 +17,7 @@ import (
 	"promptsheon/internal/guardrail"
 	"promptsheon/internal/metrics"
 	"promptsheon/internal/models"
+	"promptsheon/internal/ratelimit"
 	"promptsheon/internal/snapshot"
 	"promptsheon/internal/store"
 	"promptsheon/internal/trace"
@@ -48,6 +49,7 @@ type Server struct {
 	usageTracker     *UsageTracker
 	guardrailManager *guardrail.Manager
 	alertingManager  *alerting.Manager
+	rateLimiter      *ratelimit.Limiter
 	contextManager   *contextpkg.Manager
 }
 
@@ -150,6 +152,13 @@ func WithContextManager(m *contextpkg.Manager) Option {
 	}
 }
 
+// WithRateLimiter sets the rate limiter for the server.
+func WithRateLimiter(l *ratelimit.Limiter) Option {
+	return func(s *Server) {
+		s.rateLimiter = l
+	}
+}
+
 // WithServerConfig sets the server configuration.
 func WithServerConfig(cfg *ServerConfig) Option {
 	return func(s *Server) {
@@ -192,7 +201,12 @@ func (s *Server) routes() {
 	}
 
 	// Auth endpoints (always unauthenticated — used to manage keys).
-	s.mux.HandleFunc("POST /api/v1/apikeys", s.wrapHandler(s.handleCreateAPIKey))
+	// Apply rate limiting to prevent brute force attacks.
+	authHandler := s.handleCreateAPIKey
+	if s.rateLimiter != nil {
+		authHandler = s.rateLimit(s.handleCreateAPIKey)
+	}
+	s.mux.HandleFunc("POST /api/v1/apikeys", s.wrapHandler(authHandler))
 	s.mux.HandleFunc("GET /api/v1/apikeys", s.wrapHandler(s.handleListAPIKeys))
 	s.mux.HandleFunc("DELETE /api/v1/apikeys/{id}", s.wrapHandler(s.handleRevokeAPIKey))
 
@@ -221,6 +235,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/prompts/{id}/run", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleRunPrompt)))
 	s.mux.HandleFunc("POST /api/v1/prompts/{id}/stream", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleStreamPrompt)))
 	s.mux.HandleFunc("POST /api/v1/prompts/{id}/preview", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handlePreviewPrompt)))
+	s.mux.HandleFunc("GET /api/v1/prompts/{id}/diff", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handlePromptDiff)))
+	s.mux.HandleFunc("POST /api/v1/prompts/{id}/clone", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleClonePrompt)))
 
 	s.mux.HandleFunc("GET /api/v1/agents", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleListAgents)))
 	s.mux.HandleFunc("POST /api/v1/agents", s.wrapHandler(s.requirePerm(auth.PermAgentCreate)(s.handleCreateAgent)))
@@ -250,6 +266,10 @@ func (s *Server) routes() {
 	// Agent Executions
 	s.mux.HandleFunc("GET /api/v1/agents/{id}/executions", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleListAgentExecutions)))
 	s.mux.HandleFunc("GET /api/v1/agents/{id}/executions/{exec_id}", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleGetAgentExecution)))
+
+	// Execution Logs
+	s.mux.HandleFunc("GET /api/v1/execution-logs", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListExecutionLogs)))
+	s.mux.HandleFunc("GET /api/v1/execution-logs/{id}", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleGetExecutionLog)))
 
 	// Contexts
 	s.mux.HandleFunc("POST /api/v1/contexts", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateContext)))
@@ -352,6 +372,34 @@ func (s *Server) routes() {
 
 	// Metrics (Prometheus format, authenticated)
 	s.mux.HandleFunc("GET /api/v1/metrics", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsPrometheus)))
+
+	// Prompt Optimization
+	s.mux.HandleFunc("POST /api/v1/prompts/{id}/optimize", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleOptimizePrompt)))
+	s.mux.HandleFunc("GET /api/v1/prompts/{id}/analyze", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleAnalyzePrompt)))
+	s.mux.HandleFunc("GET /api/v1/optimization/tips", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetOptimizationTips)))
+
+	// Prompt Playground
+	s.mux.HandleFunc("POST /api/v1/playground/run", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handlePlaygroundRun)))
+	s.mux.HandleFunc("POST /api/v1/playground/compare", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handlePlaygroundCompare)))
+	s.mux.HandleFunc("GET /api/v1/playground/templates", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handlePlaygroundTemplates)))
+
+	// A/B Testing
+	s.mux.HandleFunc("POST /api/v1/ab-tests", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateABTest)))
+	s.mux.HandleFunc("GET /api/v1/ab-tests", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListABTests)))
+	s.mux.HandleFunc("GET /api/v1/ab-tests/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetABTest)))
+	s.mux.HandleFunc("POST /api/v1/ab-tests/{id}/stop", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleStopABTest)))
+	s.mux.HandleFunc("GET /api/v1/ab-tests/{id}/results", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetABTestResults)))
+
+	// Semantic Search
+	s.mux.HandleFunc("POST /api/v1/search/semantic", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleSemanticSearch)))
+	s.mux.HandleFunc("POST /api/v1/search/index", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleIndexPrompt)))
+	s.mux.HandleFunc("GET /api/v1/search/similar/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleFindSimilar)))
+
+	// Real-time Collaboration
+	s.mux.HandleFunc("POST /api/v1/collab/sessions", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleCreateCollabSession)))
+	s.mux.HandleFunc("GET /api/v1/collab/sessions/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetCollabSession)))
+	s.mux.HandleFunc("PUT /api/v1/collab/sessions/{id}/cursor", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateCursor)))
+	s.mux.HandleFunc("GET /api/v1/collab/sessions/{id}/changes", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetChanges)))
 }
 
 // requirePerm returns middleware that requires a specific permission.
@@ -498,7 +546,22 @@ func badRequestf(format string, args ...any) error {
 	return &HTTPError{Status: http.StatusBadRequest, Message: fmt.Sprintf(format, args...)}
 }
 func notFound(msg string) error { return &HTTPError{Status: http.StatusNotFound, Message: msg} }
-func conflict(msg string) error { return &HTTPError{Status: http.StatusConflict, Message: msg} }
+
+// --- Rate Limiting ---
+
+// rateLimit wraps an APIFunc with rate limiting.
+func (s *Server) rateLimit(next APIFunc) APIFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		if s.rateLimiter != nil && !s.rateLimiter.Allow(r.RemoteAddr) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Retry-After", "60")
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte(`{"error":"rate limit exceeded"}`)) //nolint:errcheck
+			return nil
+		}
+		return next(w, r)
+	}
+}
 
 // --- Auth Adapter ---
 

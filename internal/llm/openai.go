@@ -36,6 +36,59 @@ func NewOpenAI(cfg ProviderConfig) *OpenAI {
 
 func (o *OpenAI) Name() string { return "openai" }
 
+// Stream sends a streaming request to OpenAI and returns the response body as a reader.
+func (o *OpenAI) Stream(ctx context.Context, req *Request) (io.ReadCloser, error) {
+ messages := make([]openaiMessage, len(req.Messages))
+	for i, m := range req.Messages {
+		messages[i] = openaiMessage(m)
+	}
+
+	body := openaiRequest{
+		Model:     req.Model,
+		Messages:  messages,
+		MaxTokens: req.MaxTokens,
+		Stream:    true,
+	}
+	if req.Temperature > 0 {
+		body.Temperature = &req.Temperature
+	}
+	if len(req.Stop) > 0 {
+		body.Stop = req.Stop
+	}
+
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, o.baseURL+"/chat/completions", bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
+
+	resp, err := o.client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("request: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		var errResp struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&errResp); err == nil {
+			return nil, fmt.Errorf("openai error (%d): %s", resp.StatusCode, errResp.Error.Message)
+		}
+		return nil, fmt.Errorf("openai error (%d)", resp.StatusCode)
+	}
+
+	return resp.Body, nil
+}
+
 type openaiRequest struct {
 	Model       string          `json:"model"`
 	Messages    []openaiMessage `json:"messages"`
@@ -67,7 +120,7 @@ type openaiResponse struct {
 func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) {
 	msgs := make([]openaiMessage, len(req.Messages))
 	for i, m := range req.Messages {
-		msgs[i] = openaiMessage{Role: m.Role, Content: m.Content}
+		msgs[i] = openaiMessage(m)
 	}
 
 	body := openaiRequest{

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -23,6 +24,13 @@ func (s *Server) handleListSpans(w http.ResponseWriter, r *http.Request) error {
 	if v := r.URL.Query().Get("until"); v != "" {
 		if t, err := time.Parse(time.RFC3339, v); err == nil {
 			filter.Until = &t
+		}
+	}
+
+	// Parse limit parameter
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := fmt.Sscanf(v, "%d", &filter.Limit); err == nil && n == 1 && filter.Limit > 0 && filter.Limit <= 1000 {
+			// Use parsed value
 		}
 	}
 

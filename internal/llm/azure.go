@@ -150,7 +150,7 @@ func (a *Azure) Complete(ctx context.Context, req *Request) (*Response, error) {
 func toOpenAIMessages(msgs []Message) []openaiMessage {
 	out := make([]openaiMessage, len(msgs))
 	for i, m := range msgs {
-		out[i] = openaiMessage{Role: m.Role, Content: m.Content}
+		out[i] = openaiMessage(m)
 	}
 	return out
 }

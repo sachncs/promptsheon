@@ -115,10 +115,7 @@ func (p *NvidiaProvider) Complete(ctx context.Context, req *Request) (*Response,
 	// Build messages
 	messages := make([]nvidiaMessage, len(req.Messages))
 	for i, msg := range req.Messages {
-		messages[i] = nvidiaMessage{
-			Role:    msg.Role,
-			Content: msg.Content,
-		}
+		messages[i] = nvidiaMessage(msg)
 	}
 
 	// Build request body

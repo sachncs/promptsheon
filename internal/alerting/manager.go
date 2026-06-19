@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"promptsheon/internal/metrics"
+	"promptsheon/internal/models"
+	"promptsheon/internal/store"
 )
 
 // Severity levels for alerts.
@@ -73,6 +75,7 @@ type Manager struct {
 	groups       map[string]*NotificationGroup
 	logger       *slog.Logger
 	metrics      *metrics.Collector
+	db           store.Repository
 	deliveryFunc func(alert *Alert, channels []string) error
 }
 
@@ -87,6 +90,94 @@ func NewManager(logger *slog.Logger, collector *metrics.Collector) *Manager {
 	}
 }
 
+// NewManagerWithDB creates a new alerting manager with database persistence.
+func NewManagerWithDB(logger *slog.Logger, collector *metrics.Collector, db store.Repository) *Manager {
+	m := &Manager{
+		rules:   make(map[string]*AlertRule),
+		alerts:  []*Alert{},
+		groups:  make(map[string]*NotificationGroup),
+		logger:  logger,
+		metrics: collector,
+		db:      db,
+	}
+	// Load from database
+	m.loadFromDB()
+	return m
+}
+
+// loadFromDB loads all alert rules, alerts, and notification groups from the database.
+func (m *Manager) loadFromDB() {
+	if m.db == nil {
+		return
+	}
+	ctx := context.Background()
+
+	// Load alert rules
+	dbRules, err := m.db.ListAlertRules(ctx)
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to load alert rules from db", "err", err)
+		}
+	} else {
+		for _, dr := range dbRules {
+			rule := &AlertRule{
+				ID:        dr.ID,
+				Name:      dr.Name,
+				Type:      dr.Type,
+				Severity:  Severity(dr.Severity),
+				Enabled:   dr.Enabled,
+				Threshold: dr.Threshold,
+				Duration:  dr.Duration,
+				Window:    dr.Window,
+				Config:    dr.Config,
+				CreatedAt: dr.CreatedAt,
+				UpdatedAt: dr.UpdatedAt,
+			}
+			m.rules[rule.ID] = rule
+		}
+	}
+
+	// Load alerts
+	dbAlerts, err := m.db.ListAlerts(ctx, "")
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to load alerts from db", "err", err)
+		}
+	} else {
+		for _, da := range dbAlerts {
+			alert := &Alert{
+				ID:          da.ID,
+				RuleID:      da.RuleID,
+				RuleName:    da.RuleName,
+				Severity:    Severity(da.Severity),
+				Status:      AlertStatus(da.Status),
+				Message:     da.Message,
+				Details:     da.Details,
+				TriggeredAt: da.TriggeredAt,
+				ResolvedAt:  da.ResolvedAt,
+			}
+			m.alerts = append(m.alerts, alert)
+		}
+	}
+
+	// Load notification groups
+	dbGroups, err := m.db.ListNotificationGroups(ctx)
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to load notification groups from db", "err", err)
+		}
+	} else {
+		for _, dg := range dbGroups {
+			group := &NotificationGroup{
+				ID:       dg.ID,
+				Name:     dg.Name,
+				Channels: dg.Channels,
+			}
+			m.groups[group.ID] = group
+		}
+	}
+}
+
 // SetDeliveryFunc sets the function used to deliver alerts.
 func (m *Manager) SetDeliveryFunc(fn func(alert *Alert, channels []string) error) {
 	m.deliveryFunc = fn
@@ -97,6 +188,28 @@ func (m *Manager) AddRule(rule *AlertRule) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.rules[rule.ID] = rule
+
+	// Persist to database
+	if m.db != nil {
+		dbRule := &models.AlertRuleRecord{
+			ID:        rule.ID,
+			Name:      rule.Name,
+			Type:      rule.Type,
+			Severity:  string(rule.Severity),
+			Enabled:   rule.Enabled,
+			Threshold: rule.Threshold,
+			Duration:  rule.Duration,
+			Window:    rule.Window,
+			Config:    rule.Config,
+			CreatedAt: rule.CreatedAt,
+			UpdatedAt: rule.UpdatedAt,
+		}
+		if err := m.db.SaveAlertRule(context.Background(), dbRule); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to save alert rule to db", "err", err, "rule_id", rule.ID)
+			}
+		}
+	}
 }
 
 // RemoveRule removes an alert rule.
@@ -104,6 +217,15 @@ func (m *Manager) RemoveRule(id string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.rules, id)
+
+	// Remove from database
+	if m.db != nil {
+		if err := m.db.DeleteAlertRule(context.Background(), id); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to delete alert rule from db", "err", err, "rule_id", id)
+			}
+		}
+	}
 }
 
 // GetRule returns a rule by ID.
@@ -149,6 +271,26 @@ func (m *Manager) TriggerAlert(rule *AlertRule, message string, details map[stri
 	m.alerts = append(m.alerts, alert)
 	m.mu.Unlock()
 
+	// Persist to database
+	if m.db != nil {
+		dbAlert := &models.AlertRecord{
+			ID:          alert.ID,
+			RuleID:      alert.RuleID,
+			RuleName:    alert.RuleName,
+			Severity:    string(alert.Severity),
+			Status:      string(alert.Status),
+			Message:     alert.Message,
+			Details:     alert.Details,
+			TriggeredAt: alert.TriggeredAt,
+			ResolvedAt:  alert.ResolvedAt,
+		}
+		if err := m.db.SaveAlert(context.Background(), dbAlert); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to save alert to db", "err", err, "alert_id", alert.ID)
+			}
+		}
+	}
+
 	m.logger.Warn("alert triggered",
 		"alert_id", alert.ID,
 		"rule", rule.Name,
@@ -178,6 +320,21 @@ func (m *Manager) ResolveAlert(id string) bool {
 			a.Status = StatusResolved
 			now := time.Now()
 			a.ResolvedAt = &now
+
+			// Update in database
+			if m.db != nil {
+				dbAlert := &models.AlertRecord{
+					ID:         a.ID,
+					Status:     string(a.Status),
+					ResolvedAt: a.ResolvedAt,
+				}
+				if err := m.db.UpdateAlert(context.Background(), dbAlert); err != nil {
+					if m.logger != nil {
+						m.logger.Error("failed to update alert in db", "err", err, "alert_id", a.ID)
+					}
+				}
+			}
+
 			return true
 		}
 	}
@@ -198,6 +355,20 @@ func (m *Manager) AddNotificationGroup(group *NotificationGroup) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.groups[group.ID] = group
+
+	// Persist to database
+	if m.db != nil {
+		dbGroup := &models.NotificationGroupRecord{
+			ID:       group.ID,
+			Name:     group.Name,
+			Channels: group.Channels,
+		}
+		if err := m.db.SaveNotificationGroup(context.Background(), dbGroup); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to save notification group to db", "err", err, "group_id", group.ID)
+			}
+		}
+	}
 }
 
 // --- Threshold Checks ---

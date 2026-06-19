@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"promptsheon/internal/llm"
 	"promptsheon/internal/models"
 	"promptsheon/internal/trace"
 	"promptsheon/internal/workflow"
@@ -136,22 +137,39 @@ func (s *Server) handleExecuteAgent(w http.ResponseWriter, r *http.Request) erro
 		}
 	}
 
-	// Calculate cost
+	// Calculate cost from step results
 	var totalCost float64
-	if s.collector != nil {
-		totalCost = 0 // TODO: integrate with LLM cost calculation per step
+	var totalTokens int
+	for _, sr := range result.Steps {
+		totalCost += sr.CostUSD
+		totalTokens += sr.TokensUsed
+		if sr.Model != "" && sr.TokensUsed > 0 {
+			// Calculate cost if not already calculated by the step
+			if sr.CostUSD == 0 {
+				sr.CostUSD = llm.CalculateCost(sr.Model, models.Usage{
+					PromptTokens:     sr.TokensUsed / 2, // Estimate split
+					CompletionTokens: sr.TokensUsed / 2,
+					TotalTokens:      sr.TokensUsed,
+				})
+				totalCost += sr.CostUSD
+			}
+		}
 	}
 
 	// Build execution steps
 	execSteps := make([]models.AgentExecutionStep, 0, len(result.Steps))
 	for stepID, sr := range result.Steps {
 		execSteps = append(execSteps, models.AgentExecutionStep{
-			StepID:    stepID,
-			Status:    string(sr.Status),
-			Output:    sr.Output,
-			Error:     sr.Error,
-			ToolCalls: sr.ToolCalls,
-			LatencyMs: sr.LatencyMs,
+			StepID:     stepID,
+			Status:     string(sr.Status),
+			Output:     sr.Output,
+			Error:      sr.Error,
+			ToolCalls:  sr.ToolCalls,
+			LatencyMs:  sr.LatencyMs,
+			CostUSD:    sr.CostUSD,
+			TokensUsed: sr.TokensUsed,
+			Model:      sr.Model,
+			Provider:   sr.Provider,
 		})
 	}
 
@@ -165,6 +183,7 @@ func (s *Server) handleExecuteAgent(w http.ResponseWriter, r *http.Request) erro
 		Output:              result.Outputs,
 		Steps:               execSteps,
 		TotalCostUSD:        totalCost,
+		TotalTokens:         totalTokens,
 		TotalLatencyMs:      latency.Milliseconds(),
 		GuardrailViolations: postViolations,
 		ContextID:           req.ContextID,
@@ -189,6 +208,7 @@ func (s *Server) handleExecuteAgent(w http.ResponseWriter, r *http.Request) erro
 		span.SetAttribute("status", string(result.Status))
 		span.SetAttribute("latency_ms", fmt.Sprintf("%d", latency.Milliseconds()))
 		span.SetAttribute("total_cost_usd", fmt.Sprintf("%.6f", totalCost))
+		span.SetAttribute("total_tokens", fmt.Sprintf("%d", totalTokens))
 		if len(postViolations) > 0 {
 			span.SetAttribute("guardrail_violations", fmt.Sprintf("%d", len(postViolations)))
 		}
@@ -203,6 +223,7 @@ func (s *Server) handleExecuteAgent(w http.ResponseWriter, r *http.Request) erro
 		"steps":        len(result.Steps),
 		"latency_ms":   latency.Milliseconds(),
 		"cost_usd":     totalCost,
+		"total_tokens": totalTokens,
 	})
 
 	writeJSON(w, http.StatusOK, execution)

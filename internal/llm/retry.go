@@ -55,8 +55,8 @@ func isRetryable(err error) bool {
 		if netErr.Timeout() {
 			return true
 		}
-		// Other net errors - check if temporary
-		if netErr.Temporary() {
+		// Connection reset errors are retryable
+		if strings.Contains(err.Error(), "connection reset") {
 			return true
 		}
 	}

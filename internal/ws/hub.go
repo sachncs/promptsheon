@@ -25,7 +25,6 @@ type Client struct {
 	id     string
 	send   chan []byte
 	hub    *Hub
-	filter LogFilter
 }
 
 // LogFilter defines filtering for log subscription.

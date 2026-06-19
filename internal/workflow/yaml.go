@@ -178,7 +178,7 @@ func ExportYAML(a *models.Agent) ([]byte, error) {
 				sb.WriteString(fmt.Sprintf("    depends_on: %s\n", strings.Join(s.DependsOn, ", ")))
 			}
 			if s.Condition != nil {
-				sb.WriteString(fmt.Sprintf("    condition:\n"))
+				sb.WriteString("    condition:\n")
 				sb.WriteString(fmt.Sprintf("      field: %s\n", s.Condition.Field))
 				sb.WriteString(fmt.Sprintf("      operator: %s\n", s.Condition.Operator))
 				sb.WriteString(fmt.Sprintf("      value: %s\n", s.Condition.Value))

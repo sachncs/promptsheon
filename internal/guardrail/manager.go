@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"promptsheon/internal/metrics"
+	"promptsheon/internal/models"
+	"promptsheon/internal/store"
 )
 
 // Severity levels for guardrail violations.
@@ -86,6 +88,7 @@ type Manager struct {
 	violations []*Violation
 	logger     *slog.Logger
 	metrics    *metrics.Collector
+	db         store.Repository
 }
 
 // NewManager creates a new guardrail manager.
@@ -98,11 +101,78 @@ func NewManager(logger *slog.Logger, collector *metrics.Collector) *Manager {
 	}
 }
 
+// NewManagerWithDB creates a new guardrail manager with database persistence.
+func NewManagerWithDB(logger *slog.Logger, collector *metrics.Collector, db store.Repository) *Manager {
+	m := &Manager{
+		rules:      make(map[string]*Rule),
+		violations: []*Violation{},
+		logger:     logger,
+		metrics:    collector,
+		db:         db,
+	}
+	// Load rules from database
+	m.loadRulesFromDB()
+	return m
+}
+
+// loadRulesFromDB loads all rules from the database into memory.
+func (m *Manager) loadRulesFromDB() {
+	if m.db == nil {
+		return
+	}
+	ctx := context.Background()
+	dbRules, err := m.db.ListGuardrailRules(ctx)
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to load guardrail rules from db", "err", err)
+		}
+		return
+	}
+	for _, dr := range dbRules {
+		rule := &Rule{
+			ID:           dr.ID,
+			Name:         dr.Name,
+			Type:         ViolationType(dr.Type),
+			Severity:     Severity(dr.Severity),
+			Enabled:      dr.Enabled,
+			Config:       dr.Config,
+			Environments: dr.Environments,
+			PromptIDs:    dr.PromptIDs,
+			AgentIDs:     dr.AgentIDs,
+			CreatedAt:    dr.CreatedAt,
+			UpdatedAt:    dr.UpdatedAt,
+		}
+		m.rules[rule.ID] = rule
+	}
+}
+
 // AddRule adds or updates a guardrail rule.
 func (m *Manager) AddRule(rule *Rule) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.rules[rule.ID] = rule
+
+	// Persist to database
+	if m.db != nil {
+		dbRule := &models.GuardrailRule{
+			ID:           rule.ID,
+			Name:         rule.Name,
+			Type:         string(rule.Type),
+			Severity:     string(rule.Severity),
+			Enabled:      rule.Enabled,
+			Config:       rule.Config,
+			Environments: rule.Environments,
+			PromptIDs:    rule.PromptIDs,
+			AgentIDs:     rule.AgentIDs,
+			CreatedAt:    rule.CreatedAt,
+			UpdatedAt:    rule.UpdatedAt,
+		}
+		if err := m.db.SaveGuardrailRule(context.Background(), dbRule); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to save guardrail rule to db", "err", err, "rule_id", rule.ID)
+			}
+		}
+	}
 }
 
 // RemoveRule removes a guardrail rule.
