@@ -19,6 +19,7 @@ type NvidiaProvider struct {
 	apiKey     string
 	baseURL    string
 	httpClient *http.Client
+	config     ProviderConfig
 }
 
 // NewNvidia creates a new NVIDIA NIM provider.
@@ -33,6 +34,7 @@ func NewNvidia(cfg ProviderConfig) *NvidiaProvider {
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},
+		config: cfg,
 	}
 }
 
@@ -128,8 +130,16 @@ func (p *NvidiaProvider) Complete(ctx context.Context, req *Request) (*Response,
 		Stream:      req.Stream,
 	}
 
-	// Add reasoning support for Nemotron models
-	if strings.Contains(req.Model, "nemotron") {
+	// Add reasoning support for Nemotron models. M-10 fix: the
+	// previous implementation always enabled thinking + set the
+	// reasoning budget to max_tokens for any model whose name
+	// contains "nemotron", regardless of whether the caller asked
+	// for it. This was undocumented and forced a non-trivial
+	// behaviour change on every Nemotron request. Make it opt-in
+	// via the provider's Extra config: a caller sets
+	// Extra["enable_thinking"]="true" and the budget becomes
+	// max_tokens; otherwise the body is unchanged.
+	if strings.Contains(req.Model, "nemotron") && p.config.Extra["enable_thinking"] == "true" {
 		body.ExtraBody = &nvidiaExtraBody{
 			ChatTemplateKwargs: &chatTemplateKwargs{
 				EnableThinking: true,
