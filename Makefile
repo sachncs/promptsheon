@@ -68,6 +68,20 @@ run:
 cli:
 	go run ./cmd/promptsheon
 
+# Regenerate api/openapi.yaml from the server's route
+# registrations. The generator parses internal/api/server.go
+# for routes and internal/api/handlers_*.go for request
+# schemas, then emits a real OpenAPI 3.0 spec. Re-run this
+# target whenever a route or handler changes.
+openapi:
+	go run ./scripts/genopenapi
+
+# Check that api/openapi.yaml is up to date. CI runs this
+# target and fails the build if a developer added a route
+# without regenerating the spec.
+openapi-check: openapi
+	@git diff --exit-code api/openapi.yaml || (echo "api/openapi.yaml is out of date. Run 'make openapi' and commit the result."; exit 1)
+
 # Update dependencies
 update-deps:
 	go get -u ./...
@@ -101,6 +115,8 @@ help:
 	@echo "  coverage-raw     Show coverage in terminal"
 	@echo "  run              Run the server locally"
 	@echo "  cli              Run the CLI"
+	@echo "  openapi          Regenerate api/openapi.yaml from server routes"
+	@echo "  openapi-check    Fail if openapi.yaml is out of date"
 	@echo "  update-deps      Update all dependencies"
 	@echo "  security         Check for security vulnerabilities"
 	@echo "  help             Show this help message"

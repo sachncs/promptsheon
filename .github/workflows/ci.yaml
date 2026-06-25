@@ -61,6 +61,17 @@ jobs:
       - name: Build
         run: go build ./...
 
+      - name: OpenAPI spec is in sync
+        # Item 1 (openapi): CI fails the build if a developer
+        # added a route or changed a handler without
+        # regenerating api/openapi.yaml. The generator is
+        # invoked once on a clean tree and the output is
+        # compared to the committed file via git diff.
+        run: |
+          go run ./scripts/genopenapi
+          git diff --exit-code api/openapi.yaml || \
+            (echo "api/openapi.yaml is out of date. Run 'make openapi' and commit the result."; exit 1)
+
   lint:
     runs-on: ubuntu-latest
     steps:
