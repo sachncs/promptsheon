@@ -251,6 +251,7 @@ func (s *Server) routes() {
 	// Health (always unauthenticated).
 	s.mux.HandleFunc("GET /health", s.wrapHandler(s.handleHealth))
 	s.mux.HandleFunc("GET /ready", s.wrapHandler(s.handleReady))
+	s.mux.HandleFunc("GET /api/v1/version", s.wrapHandler(s.handleVersion))
 
 	// Prometheus metrics (always unauthenticated).
 	if s.collector != nil {
