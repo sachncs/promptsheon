@@ -81,24 +81,34 @@ func (s *Server) handleRunWorkflow(w http.ResponseWriter, r *http.Request) error
 		return err
 	}
 
-	// Persist individual step states
-	for stepID, sr := range result.Steps {
-		startedAt := result.StartedAt
-		finishedAt := result.FinishedAt
-		step := &models.WorkflowStep{
-			ID:         generateID(),
-			WorkflowID: wf.ID,
-			StepID:     stepID,
-			Status:     string(sr.Status),
-			Output:     sr.Output,
-			Error:      sr.Error,
-			ToolCalls:  sr.ToolCalls,
-			LatencyMs:  sr.LatencyMs,
-			StartedAt:  &startedAt,
-			FinishedAt: &finishedAt,
-		}
-		if err := s.db.SaveWorkflowStep(ctx, step); err != nil {
-			s.logger.Error("failed to save workflow step", "err", err, "step_id", stepID)
+	// Persist individual step states. M-20 fix: iterate in
+	// topological order rather than the (map-iteration-random)
+	// result.Steps map. The previous code wrote step rows in
+	// non-deterministic order, which made the workflow_steps table
+	// hard to read and to join against the parent workflow.
+	for _, level := range workflow.Levels(agent.Steps) {
+		for _, stepID := range level {
+			sr, ok := result.Steps[stepID]
+			if !ok {
+				continue
+			}
+			startedAt := result.StartedAt
+			finishedAt := result.FinishedAt
+			step := &models.WorkflowStep{
+				ID:         generateID(),
+				WorkflowID: wf.ID,
+				StepID:     stepID,
+				Status:     string(sr.Status),
+				Output:     sr.Output,
+				Error:      sr.Error,
+				ToolCalls:  sr.ToolCalls,
+				LatencyMs:  sr.LatencyMs,
+				StartedAt:  &startedAt,
+				FinishedAt: &finishedAt,
+			}
+			if err := s.db.SaveWorkflowStep(ctx, step); err != nil {
+				s.logger.Error("failed to save workflow step", "err", err, "step_id", stepID)
+			}
 		}
 	}
 

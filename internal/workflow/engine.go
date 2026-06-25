@@ -320,6 +320,14 @@ func topologicalLevels(steps []models.AgentStep) [][]string {
 	return levels
 }
 
+// Levels is a public alias for topologicalLevels so the API layer
+// can iterate the same dependency-aware order used by Execute
+// (M-20 fix: previously the persistence loop walked the result map
+// in random order, which made the stored step rows nondeterministic).
+func Levels(steps []models.AgentStep) [][]string {
+	return topologicalLevels(steps)
+}
+
 // validateDAG checks for cycles in the step dependency graph.
 func validateDAG(steps []models.AgentStep) error {
 	// Build step lookup map for O(1) access

@@ -30,6 +30,32 @@ func TestValidateDAG(t *testing.T) {
 	}
 }
 
+// TestLevels_PublicAlias pins the M-20 fix: the API layer uses
+// workflow.Levels(...) to iterate steps in topological order when
+// persisting the result. The public alias must return the same
+// levels as the internal topologicalLevels.
+func TestLevels_PublicAlias(t *testing.T) {
+	steps := []models.AgentStep{
+		{ID: "a"},
+		{ID: "b", DependsOn: []string{"a"}},
+		{ID: "c", DependsOn: []string{"a"}},
+		{ID: "d", DependsOn: []string{"b", "c"}},
+	}
+	levels := Levels(steps)
+	if len(levels) != 3 {
+		t.Fatalf("expected 3 levels, got %d", len(levels))
+	}
+	if levels[0][0] != "a" {
+		t.Fatalf("level 0 should be [a], got %v", levels[0])
+	}
+	if len(levels[1]) != 2 {
+		t.Fatalf("level 1 should have 2 steps, got %d", len(levels[1]))
+	}
+	if levels[2][0] != "d" {
+		t.Fatalf("level 2 should be [d], got %v", levels[2])
+	}
+}
+
 func TestTopologicalLevels(t *testing.T) {
 	steps := []models.AgentStep{
 		{ID: "a", DependsOn: []string{}},
