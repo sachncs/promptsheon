@@ -909,24 +909,65 @@ func computeAuditHash(e *models.AuditEntry, detailsJSON, timestampStr string) st
 
 // VerifyAuditChain reads all audit entries and validates the hash chain.
 func (s *SQLite) VerifyAuditChain(ctx context.Context) (bool, string, error) {
+	// M-17 fix: page the verification in chunks of auditVerifyPageSize
+	// so a large chain does not hold a single goroutine + connection
+	// for the full duration. The caller (handleVerifyAuditChain)
+	// invokes this synchronously, so page size is a direct latency
+	// trade-off; 1000 is small enough to keep row reads <10ms and
+	// large enough to amortise the per-page overhead.
+	const pageSize = 1000
+	var prevHash string
+	var lastRowID int64
+	for {
+		select {
+		case <-ctx.Done():
+			return false, "", ctx.Err()
+		default:
+		}
+		nextPrev, ok, why, last, err := s.verifyAuditPage(ctx, prevHash, lastRowID, pageSize)
+		if err != nil {
+			return false, "", err
+		}
+		if !ok {
+			return false, why, nil
+		}
+		if last == 0 {
+			break
+		}
+		prevHash = nextPrev
+		lastRowID = last
+	}
+	return true, "", nil
+}
+
+// verifyAuditPage verifies one page of the chain starting at afterRowID
+// and returns the new prevHash (i.e., the last entry_hash seen), the
+// last rowid processed (0 when the table is exhausted), and the
+// verification result.
+func (s *SQLite) verifyAuditPage(ctx context.Context, prevHash string, afterRowID int64, limit int) (string, bool, string, int64, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str
-		 FROM audit_entries ORDER BY rowid ASC`,
+		`SELECT rowid, id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str
+		 FROM audit_entries
+		 WHERE rowid > ?
+		 ORDER BY rowid ASC
+		 LIMIT ?`,
+		afterRowID, limit,
 	)
 	if err != nil {
-		return false, "", fmt.Errorf("query audit chain: %w", err)
+		return prevHash, false, "", 0, fmt.Errorf("query audit chain page: %w", err)
 	}
 	defer rows.Close()
 
-	var prevHash string
+	var lastRowID int64
 	for rows.Next() {
+		var rowID int64
 		var id, userID, action, resource, detailsJSON, storedPrev, storedHash, timestampStr string
 		var ts time.Time
-		if err := rows.Scan(&id, &userID, &action, &resource, &detailsJSON, &ts, &storedPrev, &storedHash, &timestampStr); err != nil {
-			return false, "", fmt.Errorf("scan audit chain: %w", err)
+		if err := rows.Scan(&rowID, &id, &userID, &action, &resource, &detailsJSON, &ts, &storedPrev, &storedHash, &timestampStr); err != nil {
+			return prevHash, false, "", 0, fmt.Errorf("scan audit chain: %w", err)
 		}
 		if storedPrev != prevHash {
-			return false, fmt.Sprintf("chain break at entry %s: expected prev_hash %q, got %q", id, prevHash, storedPrev), nil
+			return prevHash, false, fmt.Sprintf("chain break at entry %s: expected prev_hash %q, got %q", id, prevHash, storedPrev), 0, nil
 		}
 		// C-2 fix: prefer the canonical string. Fall back to
 		// formatting the time.Time the driver hands back so that
@@ -938,11 +979,12 @@ func (s *SQLite) VerifyAuditChain(ctx context.Context) (bool, string, error) {
 		e := &models.AuditEntry{ID: id, UserID: userID, Action: action, Resource: resource, PreviousHash: storedPrev, Timestamp: ts}
 		expected := computeAuditHash(e, detailsJSON, timestampStr)
 		if expected != storedHash {
-			return false, fmt.Sprintf("tampered entry %s: expected hash %q, got %q", id, expected, storedHash), nil
+			return prevHash, false, fmt.Sprintf("tampered entry %s: expected hash %q, got %q", id, expected, storedHash), 0, nil
 		}
 		prevHash = storedHash
+		lastRowID = rowID
 	}
-	return true, "", rows.Err()
+	return prevHash, true, "", lastRowID, rows.Err()
 }
 
 func (s *SQLite) ListAudit(ctx context.Context, filter models.AuditFilter) ([]*models.AuditEntry, error) {

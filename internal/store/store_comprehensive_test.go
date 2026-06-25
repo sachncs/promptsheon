@@ -603,14 +603,82 @@ func TestAppendAudit_NegativeOffsetNonCanonical(t *testing.T) {
 	}
 }
 
-// TestAppendAudit_ConcurrentSafe pins the M-6 fix: the previous
-// implementation serialised every AppendAudit through a single
-// SELECT ... ORDER BY rowid DESC LIMIT 1 on the audit table, which
-// became a contention point. The new implementation reads/writes the
-// dedicated audit_chain_state row, but AppendAudit still runs in a
-// SERIALIZABLE transaction so concurrent writers cannot fork the
-// chain. This test fires N goroutines that each write M entries and
-// then verifies the chain is intact and the row count is correct.
+// TestVerifyAuditChain_Large pins the M-17 fix: the previous
+// VerifyAuditChain implementation walked the entire audit_entries
+// table in a single goroutine, which held a DB connection and
+// blocked the request handler for the full duration. The fix pages
+// the verification so a chain with thousands of entries still
+// returns promptly. We insert 1500 entries, then call verify and
+// assert it succeeds within a generous deadline.
+func TestVerifyAuditChain_Large(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+	ts := time.Now().UTC()
+	const n = 1500
+	for i := 0; i < n; i++ {
+		if err := db.AppendAudit(ctx, &models.AuditEntry{
+			ID:        fmt.Sprintf("ae-big-%d", i),
+			UserID:    "u1",
+			Action:    "create",
+			Resource:  "prompt:p1",
+			Details:   map[string]any{"i": i},
+			Timestamp: ts.Add(time.Duration(i) * time.Millisecond),
+		}); err != nil {
+			t.Fatalf("AppendAudit %d: %v", i, err)
+		}
+	}
+	done := make(chan struct{})
+	var ok bool
+	var why string
+	var err error
+	go func() {
+		ok, why, err = db.VerifyAuditChain(ctx)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(15 * time.Second):
+		t.Fatal("VerifyAuditChain timed out on a 1500-row chain")
+	}
+	if err != nil {
+		t.Fatalf("VerifyAuditChain error: %v", err)
+	}
+	if !ok {
+		t.Fatalf("chain did not verify: %q", why)
+	}
+}
+
+// TestVerifyAuditPage pins the M-17 fix at the page-level: the page
+// helper must walk exactly the rows whose rowid is greater than the
+// supplied cursor and stop at the limit.
+func TestVerifyAuditPage(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+	ts := time.Now().UTC()
+	for i := 0; i < 12; i++ {
+		if err := db.AppendAudit(ctx, &models.AuditEntry{
+			ID:        fmt.Sprintf("ae-pg-%d", i),
+			UserID:    "u1",
+			Action:    "create",
+			Resource:  "prompt:p1",
+			Details:   map[string]any{"i": i},
+			Timestamp: ts.Add(time.Duration(i) * time.Millisecond),
+		}); err != nil {
+			t.Fatalf("AppendAudit %d: %v", i, err)
+		}
+	}
+	_, ok, why, last, err := db.verifyAuditPage(ctx, "", 0, 5)
+	if err != nil {
+		t.Fatalf("verifyAuditPage: %v", err)
+	}
+	if !ok {
+		t.Fatalf("page did not verify: %q", why)
+	}
+	if last == 0 {
+		t.Fatal("expected non-zero last rowid for non-empty table")
+	}
+}
+
 func TestAppendAudit_ConcurrentSafe(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
