@@ -550,7 +550,7 @@ func cmdGraph() error {
 	return nil
 }
 
-func assignGraphColumns(nodes []*promptsheon.GraphNode, refs []promptsheon.RefDetail, headRef string) map[string]int {
+func assignGraphColumns(nodes []*promptsheon.GraphNode, refs []*promptsheon.RefDetail, headRef string) map[string]int {
 	columns := make(map[string]int)
 	nodeMap := make(map[string]*promptsheon.GraphNode)
 	for _, n := range nodes {
