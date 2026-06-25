@@ -5343,7 +5343,58 @@ func TestRunWorkflow_WiresGuardrailManager(t *testing.T) {
 	}
 }
 
-// TestAuditQueue_BackpressureDrops pins the M-7 fix: when the audit
+// TestListPromptVersions_NoLeakage pins the H-2 fix: the previous
+// implementation returned the global commit log for every prompt,
+// leaking the history of every other prompt/agent/tool spec. The
+// new implementation returns an empty list for a prompt with no
+// CAS hash, and a single entry scoped to the current prompt
+// otherwise.
+func TestListPromptVersions_NoLeakage(t *testing.T) {
+	srv, db := setupTestServerWithDeps(t)
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	ctx := context.Background()
+	now := time.Now()
+	// Prompt A: no CAS hash → empty list.
+	db.CreatePrompt(ctx, &models.Prompt{ID: "pv-a", Name: "A", Content: "a", CreatedBy: "u", CreatedAt: now, UpdatedAt: now})
+	// Prompt B: with CAS hash → scoped list.
+	db.CreatePrompt(ctx, &models.Prompt{ID: "pv-b", Name: "B", Content: "b", CASHash: "fakehash-b", Status: models.StatusDeployed, Version: 3, CreatedBy: "u", CreatedAt: now, UpdatedAt: now})
+
+	resp, err := http.Get(ts.URL + "/api/v1/prompts/pv-a/versions")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var versionsA []map[string]any
+	json.NewDecoder(resp.Body).Decode(&versionsA)
+	if len(versionsA) != 0 {
+		t.Fatalf("expected 0 versions for prompt without CAS hash, got %d", len(versionsA))
+	}
+
+	resp2, err := http.Get(ts.URL + "/api/v1/prompts/pv-b/versions")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp2.StatusCode)
+	}
+	var versionsB []map[string]any
+	json.NewDecoder(resp2.Body).Decode(&versionsB)
+	if len(versionsB) != 1 {
+		t.Fatalf("expected 1 version for prompt with CAS hash, got %d", len(versionsB))
+	}
+	if versionsB[0]["cas_hash"] != "fakehash-b" {
+		t.Fatalf("expected cas_hash=fakehash-b, got %v", versionsB[0]["cas_hash"])
+	}
+	if versionsB[0]["version"] != float64(3) {
+		t.Fatalf("expected version=3, got %v", versionsB[0]["version"])
+	}
+}
 
 func TestAPIKeyRevokeNotFoundComprehensive(t *testing.T) {
 	srv, _ := setupTestServerWithDeps(t)

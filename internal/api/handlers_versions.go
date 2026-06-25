@@ -10,7 +10,20 @@ import (
 	"promptsheon/internal/snapshot"
 )
 
-// handleListPromptVersions returns the CAS commit history for a prompt.
+// promptVersion is the per-prompt version record returned by
+// handleListPromptVersions. H-2 fix: the previous implementation
+// returned the entire repository's commit log, which leaked the
+// history of every other prompt, agent config, and tool spec to
+// any caller who knew a single prompt ID. The handler now returns
+// a list scoped to the current prompt's version metadata.
+type promptVersion struct {
+	Version   int       `json:"version"`
+	CASHash   string    `json:"cas_hash"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Status    string    `json:"status"`
+}
+
+// handleListPromptVersions returns the version history for a prompt.
 func (s *Server) handleListPromptVersions(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	p, err := s.db.GetPrompt(r.Context(), id)
@@ -18,20 +31,23 @@ func (s *Server) handleListPromptVersions(w http.ResponseWriter, r *http.Request
 		return ErrNotFound
 	}
 
-	// Use the prompt's CAS hash to find version history if available
+	// H-2 fix: the previous implementation called promptsheon.Log(50)
+	// which returns the GLOBAL commit log, exposing every other
+	// prompt's history to any caller who knew one prompt ID. The
+	// correct semantics is "versions of THIS prompt", which the
+	// database tracks via the prompt's own row. Return a single
+	// entry for the current version; future migrations can add a
+	// per-version history table.
 	if p.CASHash == "" {
-		writeJSON(w, http.StatusOK, []any{})
+		writeJSON(w, http.StatusOK, []promptVersion{})
 		return nil
 	}
-
-	entries, err := promptsheon.Log(50)
-	if err != nil {
-		writeJSON(w, http.StatusOK, []any{})
-		return nil
-	}
-
-	// Filter entries relevant to this prompt (entries that touch this prompt's content)
-	writeJSON(w, http.StatusOK, entries)
+	writeJSON(w, http.StatusOK, []promptVersion{{
+		Version:   p.Version,
+		CASHash:   p.CASHash,
+		UpdatedAt: p.UpdatedAt,
+		Status:    string(p.Status),
+	}})
 	return nil
 }
 
