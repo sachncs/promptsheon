@@ -911,28 +911,19 @@ func (s *Server) handleStreamPrompt(w http.ResponseWriter, r *http.Request) erro
 			traceID = span.TraceID
 		}
 
-		// Persist execution log
-		execLog := &models.ExecutionLog{
-			ID:               generateID(),
-			PromptID:         p.ID,
-			PromptName:       p.Name,
-			PromptVersion:    p.Version,
-			Provider:         providerName,
-			Model:            model,
-			Status:           "success",
-			Variables:        reqBody.Variables,
-			SystemPrompt:     reqBody.SystemPrompt,
-			RequestMessages:  len(messages),
-			PromptTokens:     usage.PromptTokens,
-			CompletionTokens: usage.CompletionTokens,
-			TotalTokens:      usage.TotalTokens,
-			CostUSD:          costUSD,
-			LatencyMs:        latency.Milliseconds(),
-			TraceID:          traceID,
-			Environment:      p.Environment,
-			CreatedAt:        time.Now(),
-		}
-		s.db.SaveExecutionLog(r.Context(), execLog)
+		s.recordExecutionLog(r.Context(), executionLogInput{
+			Prompt:    p,
+			Provider:  providerName,
+			Model:     model,
+			Usage:     usage,
+			CostUSD:   costUSD,
+			Latency:   latency,
+			TraceID:   traceID,
+			Status:    "success",
+			Variables: reqBody.Variables,
+			SysPrompt: reqBody.SystemPrompt,
+			MsgCount:  len(messages),
+		})
 
 		return nil
 	}
@@ -1006,28 +997,19 @@ func (s *Server) handleStreamPrompt(w http.ResponseWriter, r *http.Request) erro
 		traceID = span.TraceID
 	}
 
-	// Persist execution log
-	execLog := &models.ExecutionLog{
-		ID:               generateID(),
-		PromptID:         p.ID,
-		PromptName:       p.Name,
-		PromptVersion:    p.Version,
-		Provider:         providerName,
-		Model:            model,
-		Status:           "success",
-		Variables:        reqBody.Variables,
-		SystemPrompt:     reqBody.SystemPrompt,
-		RequestMessages:  len(messages),
-		PromptTokens:     resp.Usage.PromptTokens,
-		CompletionTokens: resp.Usage.CompletionTokens,
-		TotalTokens:      resp.Usage.TotalTokens,
-		CostUSD:          costUSD,
-		LatencyMs:        latency.Milliseconds(),
-		TraceID:          traceID,
-		Environment:      p.Environment,
-		CreatedAt:        time.Now(),
-	}
-	s.db.SaveExecutionLog(r.Context(), execLog)
+	s.recordExecutionLog(r.Context(), executionLogInput{
+		Prompt:    p,
+		Provider:  providerName,
+		Model:     model,
+		Usage:     resp.Usage,
+		CostUSD:   costUSD,
+		Latency:   latency,
+		TraceID:   traceID,
+		Status:    "success",
+		Variables: reqBody.Variables,
+		SysPrompt: reqBody.SystemPrompt,
+		MsgCount:  len(messages),
+	})
 
 	return nil
 }
