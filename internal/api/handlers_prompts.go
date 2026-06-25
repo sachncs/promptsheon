@@ -306,9 +306,18 @@ func (s *Server) handleRunPrompt(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	// Resolve provider
+	// Resolve provider. H-8: when the prompt has a binding that pins
+	// a specific provider, the caller's per-request `provider` is
+	// rejected if it disagrees with the binding. The previous
+	// behaviour silently overrode the binding with the caller's
+	// choice, which meant a vault-bound OpenAI key could be sent to
+	// the Anthropic endpoint and exfiltrated via the per-call key
+	// mechanism.
 	providerName := req.Provider
-	if providerName == "" && p.Binding != nil {
+	if p.Binding != nil && p.Binding.Provider != "" {
+		if req.Provider != "" && req.Provider != p.Binding.Provider {
+			return badRequestf("prompt is bound to provider %q; cannot override to %q", p.Binding.Provider, req.Provider)
+		}
 		providerName = p.Binding.Provider
 	}
 	if providerName == "" {
@@ -316,7 +325,10 @@ func (s *Server) handleRunPrompt(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	model := req.Model
-	if model == "" && p.Binding != nil {
+	if p.Binding != nil && p.Binding.Model != "" {
+		if req.Model != "" && req.Model != p.Binding.Model {
+			return badRequestf("prompt is bound to model %q; cannot override to %q", p.Binding.Model, req.Model)
+		}
 		model = p.Binding.Model
 	}
 	if model == "" {

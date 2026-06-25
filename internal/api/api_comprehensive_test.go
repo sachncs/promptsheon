@@ -4762,6 +4762,57 @@ func TestPromptRunWithBindingComprehensive(t *testing.T) {
 	}
 }
 
+// TestPromptRunBindingRejectsProviderOverride pins the H-8 fix: when a
+// prompt has a binding that pins provider=openai, a caller who
+// submits provider=anthropic must be rejected (400) rather than
+// silently overridden. Without this, a vault-bound OpenAI key could
+// be sent to the wrong provider endpoint.
+func TestPromptRunBindingRejectsProviderOverride(t *testing.T) {
+	srv, db := setupTestServerWithDeps(t)
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	ctx := context.Background()
+	now := time.Now()
+	db.CreatePrompt(ctx, &models.Prompt{
+		ID: "run-bind-strict", Name: "bind", Content: "hi", Status: models.StatusDeployed,
+		Binding: &models.ProviderBinding{Provider: "openai", Model: "gpt-4", APIKeyRef: "encrypted-key"},
+		CreatedBy: "u", CreatedAt: now, UpdatedAt: now,
+	})
+
+	resp := doReq(t, "POST", ts.URL+"/api/v1/prompts/run-bind-strict/run", `{"variables":{},"provider":"anthropic"}`)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for provider override, got %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(strings.ToLower(string(body)), "bound") {
+		t.Fatalf("expected error to mention binding, got %q", string(body))
+	}
+}
+
+// TestPromptRunBindingRejectsModelOverride pins the H-8 model side:
+// same as above but for the model field.
+func TestPromptRunBindingRejectsModelOverride(t *testing.T) {
+	srv, db := setupTestServerWithDeps(t)
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	ctx := context.Background()
+	now := time.Now()
+	db.CreatePrompt(ctx, &models.Prompt{
+		ID: "run-bind-strict-2", Name: "bind", Content: "hi", Status: models.StatusDeployed,
+		Binding: &models.ProviderBinding{Provider: "openai", Model: "gpt-4", APIKeyRef: "encrypted-key"},
+		CreatedBy: "u", CreatedAt: now, UpdatedAt: now,
+	})
+
+	resp := doReq(t, "POST", ts.URL+"/api/v1/prompts/run-bind-strict-2/run", `{"variables":{},"model":"gpt-3.5-turbo"}`)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for model override, got %d", resp.StatusCode)
+	}
+}
+
 func TestPromptStreamWithBindingComprehensive(t *testing.T) {
 	srv, db := setupTestServerWithDeps(t)
 	ts := httptest.NewServer(srv)
