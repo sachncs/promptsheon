@@ -119,10 +119,10 @@ func TestDefaultRetryConfig(t *testing.T) {
 // can drive the inner provider through a known number of
 // failures.
 type flakyProvider struct {
-	name      string
-	failures  int
-	attempts  int
-	lastResp  *Response
+	name     string
+	failures int
+	attempts int
+	lastResp *Response
 }
 
 func (f *flakyProvider) Name() string { return f.name }
@@ -253,9 +253,9 @@ func TestRetryingDelayExponentialAndCapped(t *testing.T) {
 		{1, 200 * time.Millisecond},
 		{2, 400 * time.Millisecond},
 		{3, 800 * time.Millisecond},
-		{4, time.Second},   // capped at MaxDelay
-		{5, time.Second},   // still capped
-		{20, time.Second},  // very large attempt, still capped
+		{4, time.Second},  // capped at MaxDelay
+		{5, time.Second},  // still capped
+		{20, time.Second}, // very large attempt, still capped
 	}
 	for _, tt := range tests {
 		if got := r.delay(tt.attempt); got != tt.want {

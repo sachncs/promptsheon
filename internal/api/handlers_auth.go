@@ -370,10 +370,10 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	type response struct {
-		User      *models.User `json:"user"`
-		APIKey    *models.APIKey `json:"api_key"`
-		Key       string       `json:"key"`
-		Message   string       `json:"message"`
+		User    *models.User   `json:"user"`
+		APIKey  *models.APIKey `json:"api_key"`
+		Key     string         `json:"key"`
+		Message string         `json:"message"`
 	}
 	writeJSON(w, http.StatusCreated, response{
 		User:    admin,
