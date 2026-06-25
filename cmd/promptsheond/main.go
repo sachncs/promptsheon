@@ -230,7 +230,9 @@ func main() {
 	// Start server in goroutine. The startup banner includes the
 	// version, addr, db path, auth state, and OTel endpoint so an
 	// operator can verify the running configuration from a single
-	// log line.
+	// log line. When auth is disabled, the banner also advertises
+	// the one-time bootstrap endpoint and warns that it returns an
+	// admin key to whoever calls it first.
 	go func() {
 		info := buildinfo.Get()
 		logger.Info("starting server",
@@ -241,6 +243,10 @@ func main() {
 			"auth", cfg.Auth,
 			"otel_endpoint", cfg.OTelEndpoint,
 		)
+		if !cfg.Auth {
+			logger.Warn("authentication is DISABLED; POST /api/v1/setup will mint an admin key to the first caller. Set PROMPTSHEON_AUTH=true before exposing this server.",
+				"setup_endpoint", "POST /api/v1/setup")
+		}
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("server error", "err", err)
 			os.Exit(1)
@@ -385,10 +391,19 @@ The full list is documented in docs/configuration.md.
 
 Once running, the server exposes:
 
-  GET /health            liveness probe (always unauthenticated)
-  GET /ready             readiness probe (checks the database)
-  GET /api/v1/version    build info (always unauthenticated)
-  GET /metrics           Prometheus metrics (always unauthenticated)
-  /api/v1/...            REST API (see api/openapi.yaml)
+  GET /health              liveness probe (always unauthenticated)
+  GET /ready               readiness probe (checks the database)
+  GET /api/v1/version      build info (always unauthenticated)
+  GET /metrics             Prometheus metrics (always unauthenticated)
+  POST /api/v1/setup       first-run admin bootstrap; only active
+                           when PROMPTSHEON_AUTH=false and the
+                           user table is empty
+  /api/v1/...              REST API (see api/openapi.yaml)
+
+SECURITY: setting PROMPTSHEON_AUTH=false disables all
+authentication. The first caller of /api/v1/setup receives an
+admin key. Do not expose this server until you have set
+PROMPTSHEON_AUTH=true, rotated the bootstrap key, and configured
+a non-empty PROMPTSHEON_CORS_ORIGINS allowlist.
 `
 }

@@ -72,11 +72,12 @@ func LoadConfigFromEnv() Config {
 // NewLimiter creates a rate limiter with the given config.
 func NewLimiter(cfg Config) *Limiter {
 	l := &Limiter{
-		buckets:  make(map[string]*bucket),
-		rate:     cfg.Rate,
-		interval: cfg.Interval,
-		burst:    cfg.Burst,
-		stop:     make(chan struct{}),
+		buckets:     make(map[string]*bucket),
+		rate:        cfg.Rate,
+		interval:    cfg.Interval,
+		burst:       cfg.Burst,
+		stop:        make(chan struct{}),
+		cleanupDone: make(chan struct{}),
 	}
 	// Start background cleanup of stale buckets.
 	go l.cleanup()
