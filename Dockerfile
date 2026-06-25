@@ -18,8 +18,15 @@ RUN adduser -D -u 1000 promptsheon
 COPY --from=builder /app/promptsheond /usr/local/bin/promptsheond
 COPY --from=builder /app/promptsheon  /usr/local/bin/promptsheon
 USER promptsheon
+# Default to 8080 to match the documented PROMPTSHEON_ADDR
+# default. Operators who set PROMPTSHEON_ADDR to a different
+# port must also pass HEALTHCHECK_PORT at runtime (e.g.
+# '--env HEALTHCHECK_PORT=9090') so the container healthcheck
+# still hits the right endpoint.
+ENV PROMPTSHEON_ADDR=:8080
+ENV HEALTHCHECK_PORT=8080
 EXPOSE 8080
 VOLUME ["/data"]
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -qO- http://localhost:8080/health || exit 1
+  CMD wget -qO- http://localhost:${HEALTHCHECK_PORT}/health || exit 1
 ENTRYPOINT ["promptsheond"]
