@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -599,6 +600,65 @@ func TestAppendAudit_NegativeOffsetNonCanonical(t *testing.T) {
 	}
 	if !ok {
 		t.Fatalf("expected chain to verify across negative offset, got %q", why)
+	}
+}
+
+// TestAppendAudit_ConcurrentSafe pins the M-6 fix: the previous
+// implementation serialised every AppendAudit through a single
+// SELECT ... ORDER BY rowid DESC LIMIT 1 on the audit table, which
+// became a contention point. The new implementation reads/writes the
+// dedicated audit_chain_state row, but AppendAudit still runs in a
+// SERIALIZABLE transaction so concurrent writers cannot fork the
+// chain. This test fires N goroutines that each write M entries and
+// then verifies the chain is intact and the row count is correct.
+func TestAppendAudit_ConcurrentSafe(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+	const goroutines = 25
+	const perG = 20
+
+	var wg sync.WaitGroup
+	errs := make(chan error, goroutines*perG)
+	for g := 0; g < goroutines; g++ {
+		wg.Add(1)
+		go func(gid int) {
+			defer wg.Done()
+			for i := 0; i < perG; i++ {
+				err := db.AppendAudit(ctx, &models.AuditEntry{
+					ID:        fmt.Sprintf("ae-m6-%d-%d", gid, i),
+					UserID:    "u1",
+					Action:    "create",
+					Resource:  "prompt:p1",
+					Details:   map[string]any{"i": i},
+					Timestamp: time.Now().UTC(),
+				})
+				if err != nil {
+					errs <- err
+				}
+			}
+		}(g)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatalf("concurrent AppendAudit error: %v", err)
+	}
+
+	// Verify the chain
+	ok, why, err := db.VerifyAuditChain(ctx)
+	if err != nil {
+		t.Fatalf("VerifyAuditChain: %v", err)
+	}
+	if !ok {
+		t.Fatalf("chain did not verify after concurrent writes: %q", why)
+	}
+	// Verify the row count
+	entries, err := db.ListAudit(ctx, models.AuditFilter{})
+	if err != nil {
+		t.Fatalf("ListAudit: %v", err)
+	}
+	if len(entries) != goroutines*perG {
+		t.Fatalf("expected %d rows, got %d", goroutines*perG, len(entries))
 	}
 }
 

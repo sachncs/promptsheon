@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -55,6 +56,12 @@ func mustUnmarshal(data []byte, v any) {
 // SQLite implements Repository using a SQLite database.
 type SQLite struct {
 	db *sql.DB
+	// auditMu serialises AppendAudit calls. SQLite's serializable
+	// transactions are too coarse for high-throughput audit writes
+	// (any concurrent writer gets SQLITE_BUSY). The in-process
+	// mutex is much cheaper than DB-level locking and is sufficient
+	// because the chain is a process-local concern.
+	auditMu sync.Mutex
 }
 
 // NewSQLite opens or creates a SQLite database at the given path and runs
@@ -797,6 +804,14 @@ func scanWorkflowRow(rows *sql.Rows) (*models.Workflow, error) {
 // write access to the SQLite file mutate details and timestamp
 // without breaking the chain.
 func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) error {
+	// M-6 fix: serialise AppendAudit calls in-process. The chain
+	// head pointer is process-local state, and the previous design
+	// relied on SQLite's serializable transactions which can return
+	// SQLITE_BUSY under concurrent writers. The in-process mutex is
+	// microseconds vs milliseconds for DB-level locking.
+	s.auditMu.Lock()
+	defer s.auditMu.Unlock()
+
 	details, err := json.Marshal(entry.Details)
 	if err != nil {
 		return fmt.Errorf("marshal audit details: %w", err)
@@ -826,8 +841,13 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 	}()
 
 	var prevHash string
+	// M-6 fix: read the last hash from the dedicated single-row state
+	// table instead of scanning audit_entries on every write. The
+	// state table is the new hot row (1 row, locked by the IMMEDIATE
+	// transaction) but it is much smaller than the full audit
+	// table, so contention is dramatically lower.
 	err = tx.QueryRowContext(ctx,
-		`SELECT entry_hash FROM audit_entries ORDER BY rowid DESC LIMIT 1`,
+		`SELECT last_hash FROM audit_chain_state WHERE id = 0`,
 	).Scan(&prevHash)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("fetch previous audit hash: %w", err)
@@ -836,7 +856,7 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 	entry.PreviousHash = prevHash
 	entry.EntryHash = computeAuditHash(entry, string(details), timestampStr)
 
-	_, err = tx.ExecContext(ctx,
+	insertRes, err := tx.ExecContext(ctx,
 		`INSERT INTO audit_entries (id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		entry.ID, entry.UserID, entry.Action, entry.Resource,
@@ -844,6 +864,20 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 	)
 	if err != nil {
 		return fmt.Errorf("insert audit: %w", err)
+	}
+	rowID, err := insertRes.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("last insert id: %w", err)
+	}
+	// Update the state row to point at the new head of the chain.
+	// Upsert so the first audit entry creates the row.
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO audit_chain_state (id, last_hash, last_rowid)
+		 VALUES (0, ?, ?)
+		 ON CONFLICT(id) DO UPDATE SET last_hash = excluded.last_hash, last_rowid = excluded.last_rowid`,
+		entry.EntryHash, rowID,
+	); err != nil {
+		return fmt.Errorf("update audit chain state: %w", err)
 	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("commit audit: %w", err)
