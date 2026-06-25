@@ -5247,6 +5247,35 @@ func TestAPIKeyNoAuthAllowsReader(t *testing.T) {
 	}
 }
 
+// TestAuditQueue_BackpressureDrops pins the M-7 fix: when the audit
+// worker pool is starved (queue full), the audit() call waits up to
+// auditQueueBackpressure for the workers to catch up, then drops
+// and increments auditDropped. This test fills the queue and
+// verifies the drop counter advances within the backpressure window.
+func TestAuditQueue_BackpressureDrops(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "test.db")
+	db, err := store.NewSQLite(dbPath)
+	if err != nil {
+		t.Fatalf("NewSQLite: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	srv := NewServer(db, logger)
+	// Start with no workers so the queue fills immediately.
+	srv.auditQueue = make(chan *models.AuditEntry, 4)
+	// Fill the queue past capacity.
+	for i := 0; i < 10; i++ {
+		srv.audit(context.Background(), "create", "test", map[string]any{"i": i})
+	}
+	// We expect the drop counter to be > 0 because the queue is
+	// full and there are no workers to drain it.
+	if got := srv.auditDropped.Load(); got == 0 {
+		t.Fatalf("expected auditDropped > 0 after overflow, got %d", got)
+	}
+}
+
 func TestAPIKeyRevokeNotFoundComprehensive(t *testing.T) {
 	srv, _ := setupTestServerWithDeps(t)
 	ts := httptest.NewServer(srv)

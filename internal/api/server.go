@@ -83,6 +83,12 @@ type ServerConfig struct {
 	CircuitBreakerCooldown         int
 }
 
+// auditQueueBackpressure is the maximum time audit() waits for the
+// worker pool to drain before dropping the entry. M-7 keeps the
+// value short so a slow audit pipeline never holds up the request
+// path.
+const auditQueueBackpressure = 200 * time.Millisecond
+
 // Option configures the Server.
 type Option func(*Server)
 
@@ -518,11 +524,12 @@ func readJSON(r *http.Request, target any) error {
 // pool so the request goroutine is never blocked by audit I/O and a
 // burst of mutations cannot spawn one goroutine per write.
 //
-// The pool has a bounded queue: if the queue is full, the entry is
-// dropped and a counter is incremented. This is a deliberate
-// trade-off — we would rather lose an audit entry than block the
-// request path. Operators who need guaranteed delivery should
-// configure a faster DB or use a synchronous audit endpoint.
+// The pool has a bounded queue. M-7 fix: when the queue is full we
+// briefly wait (up to auditQueueBackpressure) for the workers to
+// catch up, then drop and increment the counter. The previous
+// behaviour dropped immediately under any backpressure, which made
+// the audit log lose entries under transient spikes that the worker
+// pool could otherwise have absorbed.
 func (s *Server) audit(ctx context.Context, action, resource string, details map[string]any) {
 	userID := "api"
 	if u, ok := auth.UserFromContext(ctx); ok && u != nil && u.ID != "" {
@@ -545,16 +552,21 @@ func (s *Server) audit(ctx context.Context, action, resource string, details map
 		entry.Details["remote_addr"] = r.RemoteAddr
 		entry.Details["user_agent"] = r.UserAgent()
 	}
+	// Try the fast path first. If the queue is full, briefly wait
+	// for a worker to drain. The wait is bounded so a request
+	// cannot be blocked indefinitely by an overwhelmed audit pool.
+	timer := time.NewTimer(auditQueueBackpressure)
+	defer timer.Stop()
 	select {
 	case s.auditQueue <- entry:
-	default:
-		// Queue is full. Increment the drop counter and log so
-		// operators notice the audit pipeline is overwhelmed.
-		s.auditDropped.Add(1)
-		if s.logger != nil {
-			s.logger.Warn("audit queue full, entry dropped",
-				"action", action, "resource", resource, "user_id", userID)
-		}
+		return
+	case <-timer.C:
+		// fall through to drop path
+	}
+	s.auditDropped.Add(1)
+	if s.logger != nil {
+		s.logger.Warn("audit queue full, entry dropped",
+			"action", action, "resource", resource, "user_id", userID)
 	}
 }
 
