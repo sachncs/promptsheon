@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"promptsheon/internal/eval"
+	"promptsheon/internal/llm"
 	"promptsheon/internal/models"
 	"promptsheon/internal/store"
 )
@@ -27,7 +29,22 @@ func setupTestServer(t *testing.T) (*Server, *store.SQLite) {
 	t.Cleanup(func() { db.Close() })
 
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	srv := NewServer(db, logger)
+	mockLLM := llm.NewMock("test response")
+	srv := NewServer(db, logger,
+		WithEvalRunner(eval.NewRunner(mockLLM, eval.ExactMatchScorer{})),
+	)
+	// Start the audit worker pool so the async writes are drained
+	// before the test reads audit entries back.
+	srv.StartAuditWorkers(context.Background(), 2)
+	// Drain the audit queue and stop the workers before the DB is
+	// closed. Without this, the workers can race with db.Close and
+	// produce "sql: database is closed" log lines (and silently
+	// drop entries).
+	t.Cleanup(func() {
+		stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = srv.StopAuditWorkers(stopCtx)
+	})
 	return srv, db
 }
 

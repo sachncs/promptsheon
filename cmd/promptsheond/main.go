@@ -235,6 +235,16 @@ func main() {
 		logger.Error("server forced to shutdown", "err", err)
 	}
 
+	// Drain the audit queue and stop the workers before the DB
+	// handle is closed by the deferred db.Close(). Without this,
+	// any in-flight audit writes race with the close and produce
+	// "sql: database is closed" errors.
+	auditStopCtx, cancelAuditStop := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := srv.StopAuditWorkers(auditStopCtx); err != nil {
+		logger.Warn("audit workers did not drain in time", "err", err)
+	}
+	cancelAuditStop()
+
 	// Stop the rate limiter and OAuth janitor cleanly.
 	limiter.Stop()
 	api.StopOAuthStateJanitor()

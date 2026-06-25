@@ -157,6 +157,14 @@ func setupTestServerWithDeps(t *testing.T) (*Server, *store.SQLite) {
 	srv.StartAuditWorkers(context.Background(), 2)
 
 	t.Cleanup(func() {
+		// Drain the audit queue and stop the workers before the
+		// DB handles are closed. Without this, the workers can
+		// race with db.Close and produce "sql: database is
+		// closed" log lines (and silently drop entries).
+		stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_ = srv.StopAuditWorkers(stopCtx)
+		cancel()
+
 		spans = nil
 		traceDB.Close()
 	})

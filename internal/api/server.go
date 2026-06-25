@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -58,6 +59,12 @@ type Server struct {
 	// auditDropped counts audit entries that were rejected because
 	// the queue was full. Exposed for tests and metrics.
 	auditDropped atomic.Int64
+	// auditWg tracks the in-flight audit workers. StopAuditWorkers
+	// closes the queue and waits for the workers to drain. The
+	// workers call Done() on any return path (queue closed or
+	// ctx cancelled), so the WaitGroup reaches zero exactly once
+	// per StopAuditWorkers invocation.
+	auditWg sync.WaitGroup
 
 	// oauthStates holds in-flight OAuth state tokens for this
 	// server. Stored on the Server (not as a package-level var) so
@@ -592,11 +599,53 @@ func (s *Server) StartAuditWorkers(ctx context.Context, n int) {
 	}
 	s.auditQueue = make(chan *models.AuditEntry, 1024)
 	for i := 0; i < n; i++ {
+		s.auditWg.Add(1)
 		go s.auditWorker(ctx)
 	}
 }
 
+// StopAuditWorkers closes the audit queue and waits for the
+// workers to drain the entries that are already enqueued. The
+// wait is bounded by ctx: if ctx is cancelled before the workers
+// finish, the function returns ctx.Err() and the workers
+// continue draining in the background (their context is the
+// one passed to StartAuditWorkers, which main.go cancels on
+// process shutdown).
+//
+// StopAuditWorkers is safe to call multiple times. Subsequent
+// calls are no-ops.
+//
+// The reason this function exists: tests were seeing
+// "failed to write audit entry err='sql: database is closed'"
+// because the test teardown closed the SQLite handle before the
+// audit workers had drained the queue. The fix is to drain the
+// queue first, then close the DB.
+func (s *Server) StopAuditWorkers(ctx context.Context) error {
+	if s.auditQueue == nil {
+		return nil
+	}
+	// Closing the channel signals "no more entries" to the workers,
+	// which then exit their for-range loops cleanly.
+	select {
+	case <-s.auditQueue: // already closed
+	default:
+		close(s.auditQueue)
+	}
+	done := make(chan struct{})
+	go func() {
+		s.auditWg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 func (s *Server) auditWorker(ctx context.Context) {
+	defer s.auditWg.Done()
 	for {
 		select {
 		case <-ctx.Done():

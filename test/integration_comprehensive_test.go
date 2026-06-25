@@ -76,6 +76,15 @@ func fullSetupServer(t *testing.T) *httptest.Server {
 	}
 	srv := api.NewServer(db, logger, opts...)
 	srv.StartAuditWorkers(context.Background(), 2)
+	// Drain the audit queue and stop the workers before the DB
+	// handle is closed by the deferred db.Close(). Without this,
+	// the workers race with db.Close and produce
+	// "sql: database is closed" log lines.
+	t.Cleanup(func() {
+		stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_ = srv.StopAuditWorkers(stopCtx)
+		cancel()
+	})
 	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
 	return ts
