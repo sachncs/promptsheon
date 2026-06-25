@@ -9,7 +9,11 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o promptshe
 
 # Runtime stage
 FROM alpine:3.20
-RUN apk add --no-cache ca-certificates tzdata
+# L-8 fix: install wget explicitly for HEALTHCHECK. The base
+# alpine image does not bundle wget (the busybox version is
+# unreliable across versions), and the previous HEALTHCHECK
+# silently failed on minimal images.
+RUN apk add --no-cache ca-certificates tzdata wget
 RUN adduser -D -u 1000 promptsheon
 COPY --from=builder /app/promptsheond /usr/local/bin/promptsheon
 COPY --from=builder /app/promptsheon /usr/local/bin/promptsheon-cli

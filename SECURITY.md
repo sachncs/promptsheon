@@ -8,15 +8,20 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability, please report it responsibly:
+If you discover a security vulnerability, please report it responsibly.
 
-1. **Do NOT** open a public GitHub issue
-2. Email security concerns to: https://github.com/sachn-cs/promptsheon/issues
-3. Include:
-   - Description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if any)
+- **L-9 fix**: do NOT open a public GitHub issue. Email the
+  maintainers at the address listed in the project's CODEOWNERS
+  file or via the GitHub Security Advisory workflow
+  (`https://github.com/sachn-cs/promptsheon/security/advisories/new`).
+  The previous instructions pointed at the public issues URL,
+  which contradicted the "do NOT open a public issue" line and
+  exposed vulnerability reports in a public stream.
+- Include:
+  - Description of the vulnerability
+  - Steps to reproduce
+  - Potential impact
+  - Suggested fix (if any)
 
 ## Response Timeline
 
