@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -49,6 +50,12 @@ func (r *Registry) Tools() []string {
 }
 
 // DefaultRegistry creates a registry with the standard tools registered.
+//
+// The shell tool is registered but is disabled by default. It must be
+// explicitly enabled by setting ShellToolEnabled = true and populating
+// AllowedCommands. This is fail-closed: a workflow that references the
+// shell tool while it is disabled will get a clear error rather than
+// arbitrary command execution.
 func DefaultRegistry() *Registry {
 	r := NewRegistry()
 	r.Register(&HTTPTool{})
@@ -126,24 +133,88 @@ func (h *HTTPTool) Execute(ctx context.Context, input map[string]any) (map[strin
 // --- Shell Tool ---
 
 // ShellTool executes shell commands with sandboxing.
+//
+// Security model: DENY BY DEFAULT. The shell tool refuses to run unless
+// (a) ShellToolEnabled is true AND
+// (b) AllowedCommands is non-empty AND
+// (c) the command's first token is in AllowedCommands AND
+// (d) the command does not contain any of BlockedPatterns.
+//
+// This is the opposite of the previous behaviour, which treated an empty
+// AllowedCommands as "all commands allowed" and gave any user who could
+// author an agent arbitrary shell access on the server.
 type ShellTool struct{}
 
-// BlockedPatterns contains substrings that are always blocked in shell commands.
+// BlockedPatterns contains substrings that are always blocked in shell
+// commands, even when the allowlist is configured. Operators may add to
+// this list but must not remove entries at runtime.
 var BlockedPatterns = []string{"rm -rf /", "mkfs", ":(){ :|:&", "dd if=/dev"}
 
-// AllowedCommands is the allowlist of commands permitted by ShellTool.
-// Empty means all commands are allowed (insecure default).
-var AllowedCommands = map[string]bool{}
+// shellPolicy holds the shell tool's runtime policy. Reads happen
+// from arbitrary request goroutines; the previous implementation
+// exposed ShellToolEnabled (bool) and AllowedCommands (map) as bare
+// package-level mutable globals, which is a data race if anything
+// ever calls SetShellToolPolicy after the first request. M-8 fix:
+// the policy is wrapped in atomic types so the reader always sees a
+// consistent snapshot.
+type shellPolicy struct {
+	enabled   atomic.Bool
+	allowList atomic.Pointer[map[string]bool]
+}
+
+func newShellPolicy() *shellPolicy {
+	p := &shellPolicy{}
+	empty := map[string]bool{}
+	p.allowList.Store(&empty)
+	return p
+}
+
+func (p *shellPolicy) Enabled() bool {
+	return p.enabled.Load()
+}
+
+func (p *shellPolicy) Allowed() map[string]bool {
+	return *p.allowList.Load()
+}
+
+func (p *shellPolicy) Set(enabled bool, allowed []string) {
+	p.enabled.Store(enabled)
+	m := make(map[string]bool, len(allowed))
+	for _, c := range allowed {
+		m[c] = true
+	}
+	p.allowList.Store(&m)
+}
+
+var globalShellPolicy = newShellPolicy()
+
+// SetShellToolPolicy atomically updates the shell tool's policy.
+// Intended for the configuration loader to call once at startup,
+// but the atomic snapshot means it is also safe to call at runtime
+// (e.g., for hot-reload).
+func SetShellToolPolicy(enabled bool, allowed []string) {
+	globalShellPolicy.Set(enabled, allowed)
+}
 
 func (s *ShellTool) Name() string { return "shell" }
 
 func (s *ShellTool) Execute(ctx context.Context, input map[string]any) (map[string]any, error) {
+	if !globalShellPolicy.Enabled() {
+		return nil, fmt.Errorf("shell tool: disabled (set PROMPTSHEON_SHELL_ENABLED=true and configure PROMPTSHEON_SHELL_ALLOWLIST to enable)")
+	}
+	allowed := globalShellPolicy.Allowed()
+	if len(allowed) == 0 {
+		return nil, fmt.Errorf("shell tool: disabled (allowed-commands allowlist is empty)")
+	}
+
 	command := toString(input["command"])
 	if command == "" {
 		return nil, fmt.Errorf("shell tool: command is required")
 	}
 
-	// Security: check blocked patterns.
+	// Security: check blocked patterns. This is enforced AFTER the
+	// allowlist gate so an operator can use the allowlist as the
+	// primary defence; the block-list catches obvious footguns.
 	cmdLower := strings.ToLower(command)
 	for _, pattern := range BlockedPatterns {
 		if strings.Contains(cmdLower, strings.ToLower(pattern)) {
@@ -151,12 +222,15 @@ func (s *ShellTool) Execute(ctx context.Context, input map[string]any) (map[stri
 		}
 	}
 
-	// Security: check allowlist if configured.
-	if len(AllowedCommands) > 0 {
-		baseCmd := strings.Fields(command)
-		if len(baseCmd) == 0 || !AllowedCommands[baseCmd[0]] {
-			return nil, fmt.Errorf("shell tool: command %q is not in the allowlist", baseCmd[0])
-		}
+	// Security: enforce allowlist. Resolve the first token from the
+	// parsed argv rather than scanning raw bytes so quoting cannot be
+	// used to smuggle alternative basenames.
+	baseCmd, err := shellBaseCommand(command)
+	if err != nil {
+		return nil, fmt.Errorf("shell tool: %w", err)
+	}
+	if !allowed[baseCmd] {
+		return nil, fmt.Errorf("shell tool: command %q is not in the allowlist", baseCmd)
 	}
 
 	timeout := 30 * time.Second
@@ -248,6 +322,21 @@ func extractPath(data any, path string) any {
 
 // --- Helpers ---
 
+// shellBaseCommand parses a shell command string with sh's own quoting
+// rules and returns the first token. Using the shell's own parser means
+// quoting tricks like `"\n"curl` or `'cu\nrl'` cannot be used to
+// disguise a forbidden basename.
+func shellBaseCommand(command string) (string, error) {
+	fields, err := shlexSplit(command)
+	if err != nil {
+		return "", fmt.Errorf("parse command: %w", err)
+	}
+	if len(fields) == 0 {
+		return "", fmt.Errorf("empty command")
+	}
+	return fields[0], nil
+}
+
 func toString(v any) string {
 	if v == nil {
 		return ""
@@ -280,6 +369,52 @@ func toFloat64(v any) float64 {
 	default:
 		return 0
 	}
+}
+
+// shlexSplit is a small POSIX-shell-style tokenizer. It recognises single
+// and double quotes and backslash escapes. It deliberately does NOT
+// implement the full shell grammar (no expansions, no redirections) —
+// we only need to identify the first token for allowlist checks.
+func shlexSplit(s string) ([]string, error) {
+	var out []string
+	var cur []rune
+	var quote rune
+	hadContent := false
+	flush := func() {
+		if hadContent {
+			out = append(out, string(cur))
+			cur = cur[:0]
+			hadContent = false
+		}
+	}
+	for _, r := range s {
+		switch {
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			} else {
+				cur = append(cur, r)
+			}
+		case r == '\'' || r == '"':
+			quote = r
+			hadContent = true
+		case r == '\\':
+			// Take the next rune literally if available; mimic sh behaviour
+			// for trailing backslash (kept literally).
+			cur = append(cur, '\\')
+			hadContent = true
+		case r == ' ' || r == '\t' || r == '\n' || r == '\r':
+			flush()
+		default:
+			cur = append(cur, r)
+			hadContent = true
+		}
+	}
+	if quote != 0 {
+		return nil, fmt.Errorf("unterminated %c quote", quote)
+	}
+	flush()
+	return out, nil
 }
 
 // --- Prompt Call Tool ---
