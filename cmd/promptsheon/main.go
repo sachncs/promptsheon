@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -92,9 +93,30 @@ func main() {
 	}
 
 	if err != nil {
+		if errors.Is(err, errUsage) {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			fmt.Fprintln(os.Stderr)
+			fmt.Fprintln(os.Stderr, "Run 'promptsheon help' for usage.")
+			// EX_USAGE: the args were wrong, not the system.
+			os.Exit(2)
+		}
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// errUsage is the sentinel error returned by command functions
+// when the arguments don't match the expected shape. main()
+// detects it and exits with status 2 (the conventional EX_USAGE
+// from sysexits.h) plus a hint to run 'promptsheon help'.
+var errUsage = errors.New("invalid arguments")
+
+// usageErrorf returns an errUsage that formats its message as a
+// per-command usage hint, e.g. "usage: promptsheon commit <tree>
+// [message]". The wrapping keeps the message visible to the user
+// while the sentinel lets main() pick the right exit code.
+func usageErrorf(format string, args ...any) error {
+	return fmt.Errorf("%w: %s", errUsage, fmt.Sprintf(format, args...))
 }
 
 func printUsage() {
@@ -136,7 +158,7 @@ func cmdInit() error {
 
 func cmdHashObject(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: promptsheon hash-object <data>")
+		return usageErrorf("promptsheon hash-object <data>")
 	}
 	data := strings.Join(args, " ")
 	obj := promptsheon.NewBlobObject(data)
@@ -150,7 +172,7 @@ func cmdHashObject(args []string) error {
 
 func cmdWriteObject(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: promptsheon write-object <data>")
+		return usageErrorf("promptsheon write-object <data>")
 	}
 	data := strings.Join(args, " ")
 	obj := promptsheon.NewBlobObject(data)
@@ -164,7 +186,7 @@ func cmdWriteObject(args []string) error {
 
 func cmdReadObject(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: promptsheon read-object <hash>")
+		return usageErrorf("promptsheon read-object <hash>")
 	}
 	obj, err := promptsheon.ReadObject(args[0])
 	if err != nil {
@@ -180,7 +202,7 @@ func cmdReadObject(args []string) error {
 
 func cmdCommit(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: promptsheon commit <tree-hash> [message]")
+		return usageErrorf("promptsheon commit <tree-hash> [message]")
 	}
 	treeHash := args[0]
 	message := "commit"
@@ -280,7 +302,7 @@ func cmdLog(args []string) error {
 
 func cmdCheckout(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: promptsheon checkout <ref|hash>")
+		return usageErrorf("promptsheon checkout <ref|hash>")
 	}
 	if err := promptsheon.Checkout(args[0]); err != nil {
 		return err
@@ -333,7 +355,7 @@ func cmdBranch(args []string) error {
 
 func cmdDeleteBranch(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: promptsheon delete-branch <name>")
+		return usageErrorf("promptsheon delete-branch <name>")
 	}
 	if err := promptsheon.DeleteBranch(args[0]); err != nil {
 		return err
@@ -344,7 +366,7 @@ func cmdDeleteBranch(args []string) error {
 
 func cmdDiff(args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("usage: promptsheon diff <hashA> <hashB>")
+		return usageErrorf("promptsheon diff <hashA> <hashB>")
 	}
 	result, err := promptsheon.DiffIntelligence(args[0], args[1])
 	if err != nil {
@@ -424,7 +446,7 @@ func cmdStatus() error {
 
 func cmdShow(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: promptsheon show <hash>")
+		return usageErrorf("promptsheon show <hash>")
 	}
 	hash := args[0]
 
@@ -490,7 +512,7 @@ func cmdShow(args []string) error {
 
 func cmdLsTree(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: promptsheon ls-tree <hash>")
+		return usageErrorf("promptsheon ls-tree <hash>")
 	}
 	hash := args[0]
 
@@ -528,7 +550,7 @@ func cmdLsTree(args []string) error {
 
 func cmdCatFile(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: promptsheon cat-file <hash>")
+		return usageErrorf("promptsheon cat-file <hash>")
 	}
 	obj, err := promptsheon.ReadObject(args[0])
 	if err != nil {
@@ -843,7 +865,7 @@ func cmdRun(args []string) error {
 	}
 
 	if prompt == "" {
-		return fmt.Errorf("usage: promptsheon run --provider <name> --model <model> --prompt <text>")
+		return usageErrorf("promptsheon run --provider <name> --model <model> --prompt <text>")
 	}
 
 	llm.LoadFromEnv()
@@ -874,7 +896,7 @@ func cmdRun(args []string) error {
 
 func cmdProvider(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: promptsheon provider <list|test>")
+		return usageErrorf("promptsheon provider <list|test>")
 	}
 
 	switch args[0] {
@@ -887,7 +909,7 @@ func cmdProvider(args []string) error {
 		}
 	case "test":
 		if len(args) < 2 {
-			return fmt.Errorf("usage: promptsheon provider test <name>")
+			return usageErrorf("promptsheon provider test <name>")
 		}
 		llm.LoadFromEnv()
 		name := args[1]
