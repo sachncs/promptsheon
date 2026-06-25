@@ -6,9 +6,41 @@ import (
 	"fmt"
 	"math"
 	"net"
-	"strings"
 	"time"
 )
+
+// ErrTransient is a marker that an error is worth retrying. Providers
+// should wrap retryable failures (5xx, timeouts, connection reset,
+// connection refused) with this so the retry classifier can decide
+// without resorting to fragile string matching. L-14 replaces the
+// previous strings.Contains logic with typed-error checks.
+type ErrTransient struct {
+	Cause error
+}
+
+func (e *ErrTransient) Error() string {
+	if e.Cause != nil {
+		return "transient: " + e.Cause.Error()
+	}
+	return "transient"
+}
+
+func (e *ErrTransient) Unwrap() error { return e.Cause }
+
+// ErrPermanent is a marker that an error must NOT be retried. Wrap
+// permanent failures (4xx auth/validation) with this.
+type ErrPermanent struct {
+	Cause error
+}
+
+func (e *ErrPermanent) Error() string {
+	if e.Cause != nil {
+		return "permanent: " + e.Cause.Error()
+	}
+	return "permanent"
+}
+
+func (e *ErrPermanent) Unwrap() error { return e.Cause }
 
 // RetryConfig controls retry behavior.
 type RetryConfig struct {
@@ -26,50 +58,61 @@ func DefaultRetryConfig() RetryConfig {
 	}
 }
 
-// isRetryable determines if an error should be retried.
-// Returns false for permanent errors (auth, validation) and true for transient errors.
+// isRetryable determines if an error should be retried. Returns
+// false for permanent errors (auth, validation, context cancellation,
+// circuit-breaker open) and true for transient errors. L-14: the
+// logic now switches on typed errors (ErrTransient, ErrPermanent) and
+// on known stdlib types (net.Error.Timeout, *net.OpError with
+// Op=="dial"), instead of strings.Contains on the error text. The
+// fallback for un-typed errors remains "retry" because the previous
+// behaviour was permissive.
 func isRetryable(err error) bool {
 	if err == nil {
 		return false
 	}
 
-	// Don't retry context cancellation
+	// Explicit permanent: never retry.
+	var perm *ErrPermanent
+	if errors.As(err, &perm) {
+		return false
+	}
+	// Explicit transient: always retry.
+	var trans *ErrTransient
+	if errors.As(err, &trans) {
+		return true
+	}
+
+	// Don't retry context cancellation.
 	if errors.Is(err, context.Canceled) {
 		return false
 	}
-
-	// Don't retry context deadline exceeded (already timed out)
 	if errors.Is(err, context.DeadlineExceeded) {
 		return false
 	}
 
-	// Check for circuit breaker open
+	// Circuit breaker is open: never retry (avoid pile-on).
 	if errors.Is(err, ErrCircuitOpen) {
 		return false
 	}
 
-	// Check for net errors (connection refused, DNS, etc.)
+	// net.Error.Timeout: retry.
 	var netErr net.Error
-	if errors.As(err, &netErr) {
-		// Timeout errors are retryable
-		if netErr.Timeout() {
-			return true
-		}
-		// Connection reset errors are retryable
-		if strings.Contains(err.Error(), "connection reset") {
-			return true
-		}
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
 	}
 
-	// Check for connection refused
+	// *net.OpError with Op=="dial" (connection refused / DNS):
+	// retry. We check the typed op rather than scanning the
+	// message text.
 	var opErr *net.OpError
-	if errors.As(err, &opErr) {
-		if strings.Contains(opErr.Error(), "connection refused") {
-			return true
-		}
+	if errors.As(err, &opErr) && opErr.Op == "dial" {
+		return true
 	}
 
-	// Default: retry on error (covers 5xx, network issues, etc.)
+	// Default: retry. The previous behaviour was to retry on any
+	// unclassified error, which is the right default for a
+	// permissive LLM gateway — the cost of one extra attempt is
+	// small compared to failing a customer request.
 	return true
 }
 
