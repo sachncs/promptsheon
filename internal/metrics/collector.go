@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/sachn-cs/promptsheon/internal/buildinfo"
 )
 
 // Counter is a monotonically increasing metric.
@@ -204,7 +206,9 @@ func NewCollector() *Collector {
 // Handler returns an http.Handler that serves Prometheus exposition format.
 func (c *Collector) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		// Use the live build version so the Prometheus scrape
+		// always matches the version /api/v1/version reports.
+		w.Header().Set("Content-Type", "text/plain; version="+buildinfo.Version)
 		fmt.Fprint(w, c.prometheusFormat())
 	})
 }
