@@ -41,8 +41,8 @@ func TestDefaultTokenEstimate(t *testing.T) {
 func TestAssembleFromContextNoTruncation(t *testing.T) {
 	m := newManagerWithEstimator(t)
 	c := &models.Context{
-		SystemPrompt:      "You are a helpful {{role}} assistant.",
-		TokenBudget:       100,
+		SystemPrompt:       "You are a helpful {{role}} assistant.",
+		TokenBudget:        100,
 		TruncationStrategy: models.TruncationSlidingWindow,
 		Messages: []models.ContextMessage{
 			{Role: "user", Content: "hi"},
@@ -70,13 +70,13 @@ func TestAssembleFromContextNoTruncation(t *testing.T) {
 func TestAssembleFromContextSlidingWindowTruncation(t *testing.T) {
 	m := newManagerWithEstimator(t)
 	c := &models.Context{
-		SystemPrompt:      "sys",
-		TokenBudget:       5, // tight budget
+		SystemPrompt:       "sys",
+		TokenBudget:        5, // tight budget
 		TruncationStrategy: models.TruncationSlidingWindow,
 		Messages: []models.ContextMessage{
 			{Role: "user", Content: "one two three four"},        // 4 tokens
-			{Role: "assistant", Content: "five six seven eight"},  // 4 tokens
-			{Role: "user", Content: "nine ten eleven twelve"},     // 4 tokens
+			{Role: "assistant", Content: "five six seven eight"}, // 4 tokens
+			{Role: "user", Content: "nine ten eleven twelve"},    // 4 tokens
 		},
 	}
 	got, err := m.AssembleFromContext(c, nil)
@@ -104,13 +104,13 @@ func TestAssembleFromContextSlidingWindowTruncation(t *testing.T) {
 func TestAssembleFromContextDropOldestTruncation(t *testing.T) {
 	m := newManagerWithEstimator(t)
 	c := &models.Context{
-		SystemPrompt:      "sys",
-		TokenBudget:       5,
+		SystemPrompt:       "sys",
+		TokenBudget:        5,
 		TruncationStrategy: models.TruncationDropOldest,
 		Messages: []models.ContextMessage{
-			{Role: "user", Content: "a b c d"},        // 4 tokens
-			{Role: "assistant", Content: "e f g h"},   // 4 tokens
-			{Role: "user", Content: "i j k l"},        // 4 tokens
+			{Role: "user", Content: "a b c d"},      // 4 tokens
+			{Role: "assistant", Content: "e f g h"}, // 4 tokens
+			{Role: "user", Content: "i j k l"},      // 4 tokens
 		},
 	}
 	got, err := m.AssembleFromContext(c, nil)

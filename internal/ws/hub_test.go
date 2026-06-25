@@ -305,7 +305,7 @@ func (n *nonFlusher) Header() http.Header {
 	return n.header
 }
 func (n *nonFlusher) Write(b []byte) (int, error) { return n.body.Write(b) }
-func (n *nonFlusher) WriteHeader(s int)          { n.status = s }
+func (n *nonFlusher) WriteHeader(s int)           { n.status = s }
 
 // TestStreamHandlerForwardsAndBroadcasts builds a chain of
 // two slog handlers, with the inner one being the streaming
