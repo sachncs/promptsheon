@@ -40,13 +40,22 @@ var (
 	testAdminKey     string
 )
 
-// authEnabled controls whether the comprehensive test suite turns on
-// WithAuth. When false, handlers run in legacy (no-auth) mode and the
-// test suite exercises the same paths the old code did. The default is
-// false to keep backward compatibility with the ~500 test functions in
-// this file; the targeted security test (TestAPINonAdminCannotEscalate)
-// flips it on.
-var authEnabled = false
+// authEnabledInEnv reads PROMPTSHEON_AUTH_TEST from the test's
+// environment. M-18 fix: the previous implementation used a
+// package-level `var authEnabled = false` that the comprehensive
+// test suite toggled by direct assignment, which leaked state
+// across tests. The new approach uses t.Setenv (or os.Setenv in
+// the per-test setup) so each test's decision to enable auth is
+// scoped to that test's environment.
+//
+// The default is "no auth" to keep backward compatibility with
+// the existing test surface (which exercises the unauthenticated
+// paths). Tests that need auth can call t.Setenv("PROMPTSHEON_AUTH_TEST", "true")
+// before calling setupTestServerWithDeps.
+func authEnabledInEnv() bool {
+	v := os.Getenv("PROMPTSHEON_AUTH_TEST")
+	return v == "true" || v == "1" || v == "yes"
+}
 
 func adminAuthHeader(t *testing.T, db *store.SQLite) string {
 	t.Helper()
@@ -137,7 +146,7 @@ func setupTestServerWithDeps(t *testing.T) (*Server, *store.SQLite) {
 			CircuitBreakerCooldown:         30,
 		}),
 	}
-	if authEnabled {
+	if authEnabledInEnv() {
 		_ = adminAuthHeader(t, db)
 		opts = append(opts, WithAuth(db))
 	}
@@ -5203,6 +5212,27 @@ func TestAPIKeyCreateInvalidRoleComprehensive(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+// TestAuthEnabled_DefaultsFromEnv pins the M-18 fix: the test
+// helper now reads PROMPTSHEON_AUTH_TEST instead of relying on a
+// package-level var. Setting the env var to "true" enables auth;
+// other values (or unset) keep the legacy no-auth path. The
+// previous design had authEnabled as a global that tests
+// flipped in place, leaking state across the test binary.
+func TestAuthEnabled_DefaultsFromEnv(t *testing.T) {
+	t.Setenv("PROMPTSHEON_AUTH_TEST", "true")
+	if !authEnabledInEnv() {
+		t.Fatal("expected authEnabledInEnv to be true")
+	}
+	t.Setenv("PROMPTSHEON_AUTH_TEST", "false")
+	if authEnabledInEnv() {
+		t.Fatal("expected authEnabledInEnv to be false")
+	}
+	os.Unsetenv("PROMPTSHEON_AUTH_TEST")
+	if authEnabledInEnv() {
+		t.Fatal("expected authEnabledInEnv to be false when unset")
 	}
 }
 
