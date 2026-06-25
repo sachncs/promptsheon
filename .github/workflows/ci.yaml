@@ -34,8 +34,14 @@ jobs:
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | tr -d '%')
           echo "Coverage: ${COVERAGE}%"
-          if [ $(echo "$COVERAGE < 50" | bc -l) -eq 1 ]; then
-            echo "Coverage ${COVERAGE}% is below 50% threshold"
+          # M-14 fix: raise the floor from 50% to 70%. The previous
+          # threshold was well below industry standards for a
+          # security-sensitive gateway and let large packages drift
+          # below 30% as long as a few test-heavy packages pulled
+          # the average up. 70% is a realistic bar for what is in
+          # the repo today.
+          if [ $(echo "$COVERAGE < 70" | bc -l) -eq 1 ]; then
+            echo "Coverage ${COVERAGE}% is below 70% threshold"
             exit 1
           fi
 
@@ -71,7 +77,7 @@ jobs:
         run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./...
 
       - name: Run gosec
-        uses: securego/gosec@master
+        uses: securego/gosec@v2.22.10
         with:
           args: ./...
 
