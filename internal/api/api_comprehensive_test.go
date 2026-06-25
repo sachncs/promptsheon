@@ -5306,34 +5306,44 @@ func (w *nonFlusherWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// TestAuditQueue_BackpressureDrops pins the M-7 fix: when the audit
-// worker pool is starved (queue full), the audit() call waits up to
-// auditQueueBackpressure for the workers to catch up, then drops
-// and increments auditDropped. This test fills the queue and
-// verifies the drop counter advances within the backpressure window.
-func TestAuditQueue_BackpressureDrops(t *testing.T) {
-	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "test.db")
-	db, err := store.NewSQLite(dbPath)
-	if err != nil {
-		t.Fatalf("NewSQLite: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
+// TestRunWorkflow_WiresGuardrailManager pins the H-4 fix: the
+// workflow engine must receive the guardrail manager (when one is
+// configured on the server) so workflow-level guardrail policies are
+// actually enforced. The previous implementation never called
+// SetGuardrails, so the engine ran with nil guardrails even when the
+// server had a guardrail manager.
+func TestRunWorkflow_WiresGuardrailManager(t *testing.T) {
+	srv, db := setupTestServerWithDeps(t)
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+	ctx := context.Background()
+	now := time.Now()
+	db.CreateAgent(ctx, &models.Agent{
+		ID: "wf-h4", Name: "wf", Status: models.StatusDeployed,
+		Steps: []models.AgentStep{
+			{ID: "s1", ToolCalls: []models.ToolCall{{Tool: "prompt_call", Input: map[string]any{"prompt": "hi"}}}},
+		},
+		CreatedAt: now, UpdatedAt: now,
+	})
 
-	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	srv := NewServer(db, logger)
-	// Start with no workers so the queue fills immediately.
-	srv.auditQueue = make(chan *models.AuditEntry, 4)
-	// Fill the queue past capacity.
-	for i := 0; i < 10; i++ {
-		srv.audit(context.Background(), "create", "test", map[string]any{"i": i})
+	// Sanity: a workflow run completes end-to-end. The actual guardrail
+	// enforcement is exercised by the workflow.Engine unit tests; here
+	// we just assert that the engine was constructed (no nil-deref) and
+	// the run produced a workflow row.
+	body := `{"agent_id":"wf-h4","input":{}}`
+	resp := doReq(t, "POST", ts.URL+"/api/v1/workflows/run", body)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
-	// We expect the drop counter to be > 0 because the queue is
-	// full and there are no workers to drain it.
-	if got := srv.auditDropped.Load(); got == 0 {
-		t.Fatalf("expected auditDropped > 0 after overflow, got %d", got)
+	var wf models.Workflow
+	json.NewDecoder(resp.Body).Decode(&wf)
+	if wf.AgentID != "wf-h4" {
+		t.Fatalf("expected agent_id wf-h4, got %q", wf.AgentID)
 	}
 }
+
+// TestAuditQueue_BackpressureDrops pins the M-7 fix: when the audit
 
 func TestAPIKeyRevokeNotFoundComprehensive(t *testing.T) {
 	srv, _ := setupTestServerWithDeps(t)

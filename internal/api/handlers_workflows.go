@@ -2,8 +2,8 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"promptsheon/internal/models"
@@ -31,8 +31,32 @@ func (s *Server) handleRunWorkflow(w http.ResponseWriter, r *http.Request) error
 		return ErrNotFound
 	}
 
+	// H-4 fix: load the agent's guardrail config and wire it (plus
+	// the context manager) into the engine. The previous
+	// implementation never called SetGuardrails /
+	// SetContextManager, so a workflow that declared
+	// RestrictedTerms or ContentPolicy was effectively running
+	// without any policy enforcement. The agent execute path
+	// already does this (see handlers_agent_execute.go); the
+	// workflow path must do the same so the advertised feature
+	// actually runs.
+	var agentGuardrailCfg *models.AgentGuardrailConfig
+	if agent.GuardrailConfigID != "" {
+		if cfg, gerr := s.db.GetAgentGuardrailConfig(ctx, agent.GuardrailConfigID); gerr == nil {
+			agentGuardrailCfg = cfg
+		}
+	} else if cfg, gerr := s.db.GetAgentGuardrailConfigByAgent(ctx, agent.ID); gerr == nil {
+		agentGuardrailCfg = cfg
+	}
+
 	registry := workflow.DefaultRegistry()
 	engine := workflow.NewEngine(registry)
+	if s.guardrailManager != nil && agentGuardrailCfg != nil {
+		engine.SetGuardrails(s.guardrailManager, agentGuardrailCfg)
+	}
+	if s.contextManager != nil {
+		engine.SetContextManager(s.contextManager)
+	}
 
 	result, err := engine.Execute(ctx, agent, req.Input)
 	if err != nil {
@@ -108,15 +132,15 @@ func (s *Server) handleListWorkflows(w http.ResponseWriter, r *http.Request) err
 
 	// Parse limit parameter
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := fmt.Sscanf(v, "%d", &filter.Limit); err == nil && n == 1 && filter.Limit > 0 && filter.Limit <= 1000 {
-			// Use parsed value
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 1000 {
+			filter.Limit = n
 		}
 	}
 
 	// Parse offset parameter
 	if v := r.URL.Query().Get("offset"); v != "" {
-		if n, err := fmt.Sscanf(v, "%d", &filter.Offset); err == nil && n == 1 && filter.Offset >= 0 {
-			// Use parsed value
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			filter.Offset = n
 		}
 	}
 
