@@ -2,7 +2,14 @@ openapi: "3.0.3"
 info:
   title: Promptsheon API
   description: Version Control System for AI agent intelligence
-  version: "1.0.0"
+  # L-4 fix: align the OpenAPI version with the project's actual
+  # release series. The repo is on 0.0.x per the most recent tag;
+  # declaring "1.0.0" implied API stability that has not been
+  # committed to. Bump to 0.3.0 (the version that introduced the
+  # workflow engine, evaluation framework, and OAuth/SSO) and
+  # document that the spec lags the implementation. M-15
+  # generator closes the documentation gap in the same release.
+  version: "0.3.0"
   contact:
     name: Promptsheon
 
@@ -2224,3 +2231,357 @@ paths:
             application/json:
               schema:
                 type: object
+  /api/v1/agents/{id}/guardrail-config/{config_id}:
+    DELETE:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/contexts/{id}:
+    DELETE:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/contexts/{id}/messages:
+    DELETE:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/webhooks/{id}:
+    DELETE:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/ab-tests:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/ab-tests/{id}:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/ab-tests/{id}/results:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/agents/{id}/executions:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/agents/{id}/executions/{exec_id}:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/agents/{id}/guardrail-config:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/agents/templates:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/collab/sessions/{id}:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/collab/sessions/{id}/changes:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/contexts:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/contexts/{id}:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/eval/compare:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/eval/runs:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/execution-logs:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/execution-logs/{id}:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/metrics:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/optimization/tips:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/playground/templates:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/prompts/{id}/analyze:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/prompts/{id}/diff:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/prompts/{id}/versions:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/prompts/similar:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/search/similar/{id}:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/snapshots:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/snapshots/{id}:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/traces:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/traces/{id}:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/webhooks:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/workflows:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/workflows/{id}:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/workflows/{id}/steps:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /metrics:
+    GET:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/ab-tests:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/ab-tests/{id}/stop:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/agents/{id}/execute:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/agents/{id}/fork:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/agents/{id}/guardrail-config:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/collab/sessions:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/contexts:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/contexts/{id}/assemble:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/contexts/{id}/messages:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/playground/compare:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/playground/run:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/prompts/{id}/clone:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/prompts/{id}/optimize:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/prompts/{id}/restore:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/prompts/{id}/stream:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/search/index:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/search/semantic:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/webhooks:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/workflows/run:
+    POST:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/agents/{id}/guardrail-config/{config_id}:
+    PUT:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/collab/sessions/{id}/cursor:
+    PUT:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/contexts/{id}:
+    PUT:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
+  /api/v1/workflows/{id}/cancel:
+    PUT:
+      summary: "TODO: M-15 generated stub, flesh out"
+      responses:
+        "200":
+          description: "OK"
