@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // TestTokenize_BasicSplit pins the BM25 tokeniser: unicode

@@ -17,20 +17,20 @@ import (
 	"testing"
 	"time"
 
-	"promptsheon/internal/alerting"
-	"promptsheon/internal/auth"
-	"promptsheon/internal/eval"
-	"promptsheon/internal/guardrail"
-	"promptsheon/internal/llm"
-	"promptsheon/internal/metrics"
-	"promptsheon/internal/models"
-	"promptsheon/internal/snapshot"
-	"promptsheon/internal/store"
-	"promptsheon/internal/trace"
-	"promptsheon/internal/vault"
-	"promptsheon/internal/webhook"
+	"github.com/sachn-cs/promptsheon/internal/alerting"
+	"github.com/sachn-cs/promptsheon/internal/auth"
+	"github.com/sachn-cs/promptsheon/internal/eval"
+	"github.com/sachn-cs/promptsheon/internal/guardrail"
+	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/metrics"
+	"github.com/sachn-cs/promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/snapshot"
+	"github.com/sachn-cs/promptsheon/internal/store"
+	"github.com/sachn-cs/promptsheon/internal/trace"
+	"github.com/sachn-cs/promptsheon/internal/vault"
+	"github.com/sachn-cs/promptsheon/internal/webhook"
 
-	contextpkg "promptsheon/internal/context"
+	contextpkg "github.com/sachn-cs/promptsheon/internal/context"
 )
 
 // testAdminKey is the bearer token for the seeded admin user in the

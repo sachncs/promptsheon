@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"promptsheon/internal/models"
-	"promptsheon/internal/store"
+	"github.com/sachn-cs/promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/store"
 )
 
 // TestStopAuditWorkers_DrainsPendingEntries pins the audit-shutdown

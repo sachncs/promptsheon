@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"promptsheon/internal/abtesting"
-	"promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/abtesting"
+	"github.com/sachn-cs/promptsheon/internal/llm"
 )
 
 func (s *Server) handleCreateABTest(w http.ResponseWriter, r *http.Request) error {

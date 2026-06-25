@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"promptsheon/internal/promptsheon"
+	"github.com/sachn-cs/promptsheon/internal/promptsheon"
 )
 
 var cliBinary string

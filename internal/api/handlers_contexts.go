@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 func (s *Server) handleListContexts(w http.ResponseWriter, r *http.Request) error {

@@ -13,7 +13,7 @@ import (
 	"sync"
 	"unicode"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // bm25K1 and bm25B are the standard BM25 hyperparameters. These

@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"promptsheon/internal/llm"
-	"promptsheon/internal/playground"
+	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/playground"
 )
 
 func (s *Server) handlePlaygroundRun(w http.ResponseWriter, r *http.Request) error {

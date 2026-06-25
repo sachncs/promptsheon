@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"promptsheon/internal/alerting"
+	"github.com/sachn-cs/promptsheon/internal/alerting"
 )
 
 func (s *Server) handleListAlertRules(w http.ResponseWriter, r *http.Request) error {

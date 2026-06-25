@@ -3,7 +3,7 @@ package collab_test
 import (
 	"testing"
 
-	"promptsheon/internal/collab"
+	"github.com/sachn-cs/promptsheon/internal/collab"
 )
 
 func TestCreateSession(t *testing.T) {

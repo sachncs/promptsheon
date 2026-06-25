@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	"promptsheon/internal/models"
-	"promptsheon/internal/promptsheon"
-	"promptsheon/internal/snapshot"
+	"github.com/sachn-cs/promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/promptsheon"
+	"github.com/sachn-cs/promptsheon/internal/snapshot"
 )
 
 // promptVersion is the per-prompt version record returned by

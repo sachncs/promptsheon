@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // OpenAI implements Provider for the OpenAI Chat Completions API.

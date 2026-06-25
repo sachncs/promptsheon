@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"promptsheon/internal/llm"
-	"promptsheon/internal/models"
-	"promptsheon/internal/trace"
-	"promptsheon/internal/workflow"
+	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/trace"
+	"github.com/sachn-cs/promptsheon/internal/workflow"
 )
 
 func (s *Server) handleExecuteAgent(w http.ResponseWriter, r *http.Request) error {

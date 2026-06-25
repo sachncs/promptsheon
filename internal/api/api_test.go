@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"promptsheon/internal/eval"
-	"promptsheon/internal/llm"
-	"promptsheon/internal/models"
-	"promptsheon/internal/store"
+	"github.com/sachn-cs/promptsheon/internal/eval"
+	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/store"
 )
 
 func setupTestServer(t *testing.T) (*Server, *store.SQLite) {

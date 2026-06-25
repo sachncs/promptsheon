@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/llm"
 )
 
 func (s *Server) handleListProviders(w http.ResponseWriter, r *http.Request) error {

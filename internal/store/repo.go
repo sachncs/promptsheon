@@ -6,7 +6,7 @@ package store
 import (
 	"context"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Repository defines the persistence contract for all domain types.

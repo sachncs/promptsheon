@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"promptsheon/internal/search"
+	"github.com/sachn-cs/promptsheon/internal/search"
 )
 
 func (s *Server) handleSemanticSearch(w http.ResponseWriter, r *http.Request) error {

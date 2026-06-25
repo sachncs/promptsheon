@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Scorer evaluates an LLM output against a test case and returns a score [0, 1].

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Mock is a controllable provider for testing. It returns a configured

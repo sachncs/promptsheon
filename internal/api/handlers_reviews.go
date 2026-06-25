@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"promptsheon/internal/models"
-	"promptsheon/internal/webhook"
+	"github.com/sachn-cs/promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/webhook"
 )
 
 func (s *Server) handleListPendingReviews(w http.ResponseWriter, r *http.Request) error {

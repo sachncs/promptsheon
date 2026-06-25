@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"promptsheon/internal/llm"
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 func TestRunnerBasic(t *testing.T) {

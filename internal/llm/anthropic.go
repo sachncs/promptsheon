@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Anthropic implements Provider for the Anthropic Messages API.

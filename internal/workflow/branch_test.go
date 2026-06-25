@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 func TestConditionEq(t *testing.T) {

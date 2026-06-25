@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"promptsheon/internal/llm"
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Runner executes evaluations by calling an LLM provider for each test case.

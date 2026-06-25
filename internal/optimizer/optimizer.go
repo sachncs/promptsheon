@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"promptsheon/internal/llm"
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // OptimizationSuggestion represents a suggested improvement for a prompt.

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // NvidiaProvider implements the NVIDIA NIM API provider.

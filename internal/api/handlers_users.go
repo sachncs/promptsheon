@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) error {

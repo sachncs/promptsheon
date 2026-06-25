@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"promptsheon/internal/models"
-	"promptsheon/internal/promptsheon"
-	"promptsheon/internal/workflow"
+	"github.com/sachn-cs/promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/promptsheon"
+	"github.com/sachn-cs/promptsheon/internal/workflow"
 )
 
 func (s *Server) handleListAgentVersions(w http.ResponseWriter, r *http.Request) error {

@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"promptsheon/internal/collab"
+	"github.com/sachn-cs/promptsheon/internal/collab"
 )
 
 var collabManager = collab.NewManager()

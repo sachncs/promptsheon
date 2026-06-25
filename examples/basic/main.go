@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"promptsheon/sdk"
+	"github.com/sachn-cs/promptsheon/sdk"
 )
 
 func main() {

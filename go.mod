@@ -1,4 +1,4 @@
-module promptsheon
+module github.com/sachn-cs/promptsheon
 
 go 1.25.0
 

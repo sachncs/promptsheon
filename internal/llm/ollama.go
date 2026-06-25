@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Ollama implements Provider for the Ollama local API.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Workflow is the persisted representation of a running/completed workflow.

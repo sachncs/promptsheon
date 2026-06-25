@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // CallMetrics holds the observed metrics for a single LLM call.

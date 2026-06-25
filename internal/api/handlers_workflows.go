@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"promptsheon/internal/models"
-	"promptsheon/internal/workflow"
+	"github.com/sachn-cs/promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/workflow"
 )
 
 func (s *Server) handleRunWorkflow(w http.ResponseWriter, r *http.Request) error {
