@@ -73,6 +73,27 @@ func main() {
 	}
 	collector := metrics.NewCollector()
 
+	// M-9 fix: when PROMPTSHEON_OTEL_ENDPOINT is set, install a real
+	// OTLP tracer provider as the global TracerProvider so traces
+	// flow to the configured collector. The previous implementation
+	// read the env vars into Config but never used them, so
+	// operators who configured an endpoint got no observability.
+	if cfg.OTelEndpoint != "" {
+		tp, terr := trace.InitTracerProvider("promptsheond", cfg.OTelEndpoint, cfg.OTelInsecure)
+		if terr != nil {
+			logger.Warn("OTel tracer init failed", "endpoint", cfg.OTelEndpoint, "err", terr)
+		} else {
+			logger.Info("OTel tracer initialised", "endpoint", cfg.OTelEndpoint, "insecure", cfg.OTelInsecure)
+			defer func() {
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := tp.Shutdown(shutdownCtx); err != nil {
+					logger.Warn("OTel tracer shutdown failed", "err", err)
+				}
+			}()
+		}
+	}
+
 	// Initialize output snapshots.
 	snapStore, err := snapshot.NewStore(db.DB())
 	if err != nil {
