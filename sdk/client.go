@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -18,22 +19,44 @@ type Client struct {
 	httpClient *http.Client
 }
 
-// New creates a new Promptsheon API client.
+// New creates a new Promptsheon API client with a 30-second
+// per-request timeout. Callers that need a different timeout or
+// want to inject a custom http.RoundTripper (for example to add
+// retry middleware or a metrics-instrumented transport) should
+// use NewWithHTTP.
 func New(baseURL, apiKey string) *Client {
+	return NewWithHTTP(baseURL, apiKey, &http.Client{Timeout: 30 * time.Second})
+}
+
+// NewWithHTTP creates a new Promptsheon API client using the
+// provided http.Client. The caller retains ownership of the
+// transport; the SDK does not mutate it. Passing nil falls back
+// to http.DefaultClient.
+func NewWithHTTP(baseURL, apiKey string, httpClient *http.Client) *Client {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
 	return &Client{
 		baseURL:    baseURL,
 		apiKey:     apiKey,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		httpClient: httpClient,
 	}
 }
 
-// APIError represents an error response from the API.
+// APIError represents an error response from the API. The server
+// returns a JSON body of the form {"error": "..."} on most 4xx
+// and 5xx responses; the SDK decodes that into Message. When the
+// body is empty or not JSON, Message is the raw body string so
+// the operator can still see what the server said.
 type APIError struct {
 	Status  int    `json:"-"`
-	Message string `json:"message"`
+	Message string `json:"error"`
 }
 
 func (e *APIError) Error() string {
+	if e.Message == "" {
+		return fmt.Sprintf("api error (status %d): no message body", e.Status)
+	}
 	return fmt.Sprintf("api error (status %d): %s", e.Status, e.Message)
 }
 
@@ -68,13 +91,44 @@ func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte,
 	}
 
 	if resp.StatusCode >= 400 {
-		var apiErr APIError
-		json.Unmarshal(data, &apiErr)
-		apiErr.Status = resp.StatusCode
-		return nil, &apiErr
+		return nil, decodeAPIError(resp.StatusCode, data)
 	}
 
 	return data, nil
+}
+
+// decodeAPIError builds an APIError from the server's error
+// body. The server typically returns {"error": "..."}, but
+// intermediate proxies or older versions may return plain text
+// or a different JSON shape; we try to extract the most useful
+// string in each case rather than dropping the body on the
+// floor.
+func decodeAPIError(status int, body []byte) error {
+	apiErr := APIError{Status: status}
+	if len(body) == 0 {
+		return &apiErr
+	}
+	// First try the canonical {"error": "..."} shape.
+	var wrapper struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(body, &wrapper); err == nil && wrapper.Error != "" {
+		apiErr.Message = wrapper.Error
+		return &apiErr
+	}
+	// Fall back to the legacy {"message": "..."} shape some
+	// handlers still emit.
+	var legacy struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(body, &legacy); err == nil && legacy.Message != "" {
+		apiErr.Message = legacy.Message
+		return &apiErr
+	}
+	// Non-JSON body: surface the raw bytes (trimmed) so the
+	// operator can see what the server actually said.
+	apiErr.Message = strings.TrimSpace(string(body))
+	return &apiErr
 }
 
 // --- Prompts ---
