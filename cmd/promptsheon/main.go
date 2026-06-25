@@ -11,11 +11,30 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sachn-cs/promptsheon/internal/buildinfo"
 	"github.com/sachn-cs/promptsheon/internal/llm"
 	"github.com/sachn-cs/promptsheon/internal/promptsheon"
 )
 
 func main() {
+	// Handle --version and --help before parsing subcommands. The
+	// CLI uses subcommand routing (os.Args[1]) rather than the
+	// flag package, so we can't just declare these with flag.Bool
+	// without disturbing the existing UX. We accept them only
+	// when they appear as the first non-empty argument.
+	if len(os.Args) >= 2 {
+		switch os.Args[1] {
+		case "--version", "-version", "-V":
+			info := buildinfo.Get()
+			fmt.Printf("promptsheon %s (commit %s, built %s, %s/%s)\n",
+				info.Version, info.Commit, info.BuildTime, info.OS, info.Arch)
+			return
+		case "--help", "-help", "-h":
+			printUsage()
+			return
+		}
+	}
+
 	if len(os.Args) < 2 {
 		printUsage()
 		os.Exit(1)

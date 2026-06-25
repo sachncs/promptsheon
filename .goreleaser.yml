@@ -22,7 +22,10 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - -s -w
+      - -X github.com/sachn-cs/promptsheon/internal/buildinfo.Version={{.Version}}
+      - -X github.com/sachn-cs/promptsheon/internal/buildinfo.Commit={{.Commit}}
+      - -X github.com/sachn-cs/promptsheon/internal/buildinfo.BuildTime={{.CommitDate}}
 
   - id: promptsheon-cli
     main: ./cmd/promptsheon
@@ -37,7 +40,10 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - -s -w
+      - -X github.com/sachn-cs/promptsheon/internal/buildinfo.Version={{.Version}}
+      - -X github.com/sachn-cs/promptsheon/internal/buildinfo.Commit={{.Commit}}
+      - -X github.com/sachn-cs/promptsheon/internal/buildinfo.BuildTime={{.CommitDate}}
 
 archives:
   - id: promptsheond
