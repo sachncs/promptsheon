@@ -1,0 +1,44 @@
+# CODEOWNERS
+#
+# Every PR that touches a line under a path listed here must be
+# reviewed by the matching owner before merge. GitHub auto-loads
+# this file from the repository root and surfaces the reviewer in
+# the PR UI.
+#
+# The default owner below is the project maintainer. Path-specific
+# overrides route the highest-risk areas (auth, crypto, persistence)
+# to the same person so the reviewer set is small enough to be
+# actionable for a single-maintainer project. As the project grows,
+# add domain owners here rather than letting reviews accumulate on
+# one person.
+
+# Default fallback: catch-all owner for any path not listed.
+*       @sachn-cs
+
+# Security-sensitive areas: vault, auth, audit, rate limiting,
+# and the CAS engine. These encode the threat model from
+# docs/security.md and should never merge without an explicit
+# maintainer review.
+/internal/auth/                 @sachn-cs
+/internal/vault/                @sachn-cs
+/internal/audit/                @sachn-cs
+/internal/ratelimit/            @sachn-cs
+/internal/promptsheon/          @sachn-cs
+/internal/store/                @sachn-cs
+
+# Public API surface: breaking changes here ripple to every SDK
+# consumer.
+/internal/api/                  @sachn-cs
+/sdk/                           @sachn-cs
+/api/openapi.yaml               @sachn-cs
+
+# Server entry point and the OpenAPI generator.
+/cmd/                           @sachn-cs
+/scripts/genopenapi/            @sachn-cs
+
+# CI, build, and release.
+/.github/                       @sachn-cs
+/.github/workflows/             @sachn-cs
+/Dockerfile                     @sachn-cs
+/.goreleaser.yml                @sachn-cs
+/Makefile                       @sachn-cs
