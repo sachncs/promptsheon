@@ -729,8 +729,8 @@ func TestAgentForkComprehensive(t *testing.T) {
 	now := time.Now()
 	db.CreateAgent(ctx, &models.Agent{
 		ID: "fork-orig", Name: "original", Description: "orig",
-		Steps: []models.AgentStep{{ID: "s1", OutputKey: "out1"}},
-		Tools: []models.ToolRef{{Name: "http", Type: models.ToolHTTP, Config: map[string]any{"url": "http://example.com"}}},
+		Steps:     []models.AgentStep{{ID: "s1", OutputKey: "out1"}},
+		Tools:     []models.ToolRef{{Name: "http", Type: models.ToolHTTP, Config: map[string]any{"url": "http://example.com"}}},
 		CreatedBy: "u", CreatedAt: now, UpdatedAt: now,
 	})
 
@@ -1335,7 +1335,7 @@ func TestContextAssembleWithVariablesComprehensive(t *testing.T) {
 		SystemPrompt: "You are {{role}}.", TokenBudget: 4096,
 		TruncationStrategy: models.TruncationSlidingWindow,
 		Messages:           []models.ContextMessage{},
-		CreatedAt: now, UpdatedAt: now,
+		CreatedAt:          now, UpdatedAt: now,
 	})
 
 	resp := doReq(t, "POST", ts.URL+"/api/v1/contexts/ctx-asm/assemble", `{"variables":{"role":"assistant"}}`)
@@ -4782,7 +4782,7 @@ func TestPromptRunWithBindingComprehensive(t *testing.T) {
 	now := time.Now()
 	db.CreatePrompt(ctx, &models.Prompt{
 		ID: "run-bind", Name: "bind", Content: "hi", Status: models.StatusDeployed,
-		Binding: &models.ProviderBinding{Provider: "openai", Model: "gpt-4", APIKeyRef: "encrypted-key"},
+		Binding:   &models.ProviderBinding{Provider: "openai", Model: "gpt-4", APIKeyRef: "encrypted-key"},
 		CreatedBy: "u", CreatedAt: now, UpdatedAt: now,
 	})
 
@@ -4808,7 +4808,7 @@ func TestPromptRunBindingRejectsProviderOverride(t *testing.T) {
 	now := time.Now()
 	db.CreatePrompt(ctx, &models.Prompt{
 		ID: "run-bind-strict", Name: "bind", Content: "hi", Status: models.StatusDeployed,
-		Binding: &models.ProviderBinding{Provider: "openai", Model: "gpt-4", APIKeyRef: "encrypted-key"},
+		Binding:   &models.ProviderBinding{Provider: "openai", Model: "gpt-4", APIKeyRef: "encrypted-key"},
 		CreatedBy: "u", CreatedAt: now, UpdatedAt: now,
 	})
 
@@ -4834,7 +4834,7 @@ func TestPromptRunBindingRejectsModelOverride(t *testing.T) {
 	now := time.Now()
 	db.CreatePrompt(ctx, &models.Prompt{
 		ID: "run-bind-strict-2", Name: "bind", Content: "hi", Status: models.StatusDeployed,
-		Binding: &models.ProviderBinding{Provider: "openai", Model: "gpt-4", APIKeyRef: "encrypted-key"},
+		Binding:   &models.ProviderBinding{Provider: "openai", Model: "gpt-4", APIKeyRef: "encrypted-key"},
 		CreatedBy: "u", CreatedAt: now, UpdatedAt: now,
 	})
 
@@ -4854,7 +4854,7 @@ func TestPromptStreamWithBindingComprehensive(t *testing.T) {
 	now := time.Now()
 	db.CreatePrompt(ctx, &models.Prompt{
 		ID: "str-bind", Name: "bind", Content: "hi", Status: models.StatusDeployed,
-		Binding: &models.ProviderBinding{Provider: "openai", Model: "gpt-4"},
+		Binding:   &models.ProviderBinding{Provider: "openai", Model: "gpt-4"},
 		CreatedBy: "u", CreatedAt: now, UpdatedAt: now,
 	})
 
@@ -4875,7 +4875,7 @@ func TestPromptRunWithGenerationParamsComprehensive(t *testing.T) {
 	db.CreatePrompt(ctx, &models.Prompt{
 		ID: "run-gen", Name: "gen", Content: "hi", Status: models.StatusDeployed,
 		Generation: &models.GenerationConfig{MaxTokens: 500, Temperature: 0.7, TopP: 0.9, Stop: []string{"\n"}},
-		CreatedBy: "u", CreatedAt: now, UpdatedAt: now,
+		CreatedBy:  "u", CreatedAt: now, UpdatedAt: now,
 	})
 
 	resp := doReq(t, "POST", ts.URL+"/api/v1/prompts/run-gen/run", `{"variables":{}}`)
@@ -5421,6 +5421,7 @@ func TestSearchIndex_StaysConsistentAcrossMutations(t *testing.T) {
 		t.Fatalf("after remove: size = %d, want 1", got)
 	}
 }
+
 // TestSubstituteVariables_PreservesAllKeys pins the M-12 fix: the
 // template, and leave placeholders for unknown keys alone. The
 // run/stream handlers use it to build the prompt exactly once so
@@ -5440,6 +5441,7 @@ func TestSubstituteVariables_PreservesAllKeys(t *testing.T) {
 		t.Fatalf("expected unknown placeholder preserved, got %q", got2)
 	}
 }
+
 // restore handler must validate the cas_hash shape before touching
 // the CAS. The previous implementation accepted any non-empty
 // string and either returned a foreign blob or a 500.
@@ -5495,6 +5497,7 @@ func TestRestorePrompt_RejectsUnknownBlob(t *testing.T) {
 		t.Fatalf("expected 400 for missing blob, got %d", resp.StatusCode)
 	}
 }
+
 // threshold parameter must be parsed AND validated to be in
 // [0,1]. The previous implementation silently reset to 0.7 on
 // any parse error, which let clients send garbage like
@@ -5515,7 +5518,7 @@ func TestFindSimilarPrompts_ThresholdDefaults(t *testing.T) {
 		{"one", "1", http.StatusOK},
 		{"out of range high", "1.5", http.StatusOK}, // server-side reset to 0.7
 		{"out of range low", "-0.1", http.StatusOK}, // server-side reset to 0.7
-		{"garbage", "abc", http.StatusOK},          // server-side reset to 0.7
+		{"garbage", "abc", http.StatusOK},           // server-side reset to 0.7
 		{"empty", "", http.StatusOK},
 	}
 	for _, c := range cases {
@@ -5532,6 +5535,7 @@ func TestFindSimilarPrompts_ThresholdDefaults(t *testing.T) {
 		})
 	}
 }
+
 // implementation returned the global commit log for every prompt,
 // leaking the history of every other prompt/agent/tool spec. The
 // new implementation returns an empty list for a prompt with no

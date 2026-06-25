@@ -702,10 +702,12 @@ func badRequest(msg string) error { return &HTTPError{Status: http.StatusBadRequ
 func badRequestf(format string, args ...any) error {
 	return &HTTPError{Status: http.StatusBadRequest, Message: fmt.Sprintf(format, args...)}
 }
-func notFound(msg string) error { return &HTTPError{Status: http.StatusNotFound, Message: msg} }
+func notFound(msg string) error     { return &HTTPError{Status: http.StatusNotFound, Message: msg} }
 func unauthorized(msg string) error { return &HTTPError{Status: http.StatusUnauthorized, Message: msg} }
-func forbidden(msg string) error { return &HTTPError{Status: http.StatusForbidden, Message: msg} }
-func serverError(msg string) error { return &HTTPError{Status: http.StatusInternalServerError, Message: msg} }
+func forbidden(msg string) error    { return &HTTPError{Status: http.StatusForbidden, Message: msg} }
+func serverError(msg string) error {
+	return &HTTPError{Status: http.StatusInternalServerError, Message: msg}
+}
 
 // callerID returns the authenticated user's ID, or "api" if no user
 // is in the request context. Used to populate CreatedBy fields

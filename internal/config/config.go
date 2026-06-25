@@ -15,10 +15,10 @@ type Config struct {
 	Auth     bool   // Enable authentication and authorization
 
 	// Server timeouts
-	WriteTimeout       int // Write timeout in seconds (default: 30)
-	ReadTimeout        int // Read timeout in seconds (default: 30)
-	ReadHeaderTimeout  int // ReadHeader timeout in seconds (default: 10)
-	IdleTimeout        int // Idle timeout in seconds (default: 120)
+	WriteTimeout      int // Write timeout in seconds (default: 30)
+	ReadTimeout       int // Read timeout in seconds (default: 30)
+	ReadHeaderTimeout int // ReadHeader timeout in seconds (default: 10)
+	IdleTimeout       int // Idle timeout in seconds (default: 120)
 
 	// Rate limiting
 	RateLimitRate     int // Requests per interval (default: 100)

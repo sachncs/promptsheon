@@ -175,19 +175,19 @@ func TestEvalRunLifecycle(t *testing.T) {
 	now := time.Now()
 
 	run := &models.EvalRun{
-		ID:           "er-1",
-		PromptHash:   "hash-abc",
-		DatasetID:    "ds-1",
-		Model:        "gpt-4",
-		Status:       "running",
-		TotalCases:   10,
-		PassedCases:  8,
-		PassRate:     0.8,
-		AvgScore:     0.85,
-		AvgLatencyMs: 200,
+		ID:               "er-1",
+		PromptHash:       "hash-abc",
+		DatasetID:        "ds-1",
+		Model:            "gpt-4",
+		Status:           "running",
+		TotalCases:       10,
+		PassedCases:      8,
+		PassRate:         0.8,
+		AvgScore:         0.85,
+		AvgLatencyMs:     200,
 		AvgHallucination: 0.1,
-		TotalTokens:  5000,
-		StartedAt:    now,
+		TotalTokens:      5000,
+		StartedAt:        now,
 	}
 
 	if err := db.SaveEvalRun(ctx, run); err != nil {
@@ -523,9 +523,9 @@ func TestAuditChainVerify(t *testing.T) {
 // verifier ran in a different zone than the writer.
 func TestComputeAuditHash_DeterministicAcrossZones(t *testing.T) {
 	entry := &models.AuditEntry{
-		ID:     "ae-c2",
-		UserID: "u1",
-		Action: "create",
+		ID:       "ae-c2",
+		UserID:   "u1",
+		Action:   "create",
 		Resource: "prompt:p1",
 	}
 	instant := time.Date(2024, 6, 25, 12, 0, 0, 0, time.FixedZone("X", -18000)) // UTC-5
@@ -1349,18 +1349,18 @@ func TestAgentExecutionCRUD(t *testing.T) {
 	now := time.Now()
 
 	e := &models.AgentExecution{
-		ID:          "ae-1",
-		AgentID:     "a-1",
-		WorkflowID:  "w-1",
-		Status:      "running",
-		Input:       map[string]any{"query": "test"},
-		Output:      map[string]any{},
-		Steps:       []models.AgentExecutionStep{{StepID: "s1", Status: "completed", LatencyMs: 100}},
-		TotalCostUSD: 0.05,
-		TotalLatencyMs: 500,
+		ID:                  "ae-1",
+		AgentID:             "a-1",
+		WorkflowID:          "w-1",
+		Status:              "running",
+		Input:               map[string]any{"query": "test"},
+		Output:              map[string]any{},
+		Steps:               []models.AgentExecutionStep{{StepID: "s1", Status: "completed", LatencyMs: 100}},
+		TotalCostUSD:        0.05,
+		TotalLatencyMs:      500,
 		GuardrailViolations: []string{"cost_exceeded"},
-		ContextID:   "ctx-1",
-		CreatedAt:   now,
+		ContextID:           "ctx-1",
+		CreatedAt:           now,
 	}
 
 	if err := db.SaveAgentExecution(ctx, e); err != nil {
@@ -1999,14 +1999,14 @@ func TestPromptBindingAndGeneration(t *testing.T) {
 	now := time.Now()
 
 	p := &models.Prompt{
-		ID:          "p-bg",
-		Name:        "binding-test",
-		Content:     "test",
-		Binding:     &models.ProviderBinding{Provider: "openai", Model: "gpt-4", APIKeyRef: "key-1"},
-		Generation:  &models.GenerationConfig{Temperature: 0.7, TopP: 0.9, MaxTokens: 100, Stop: []string{"STOP"}},
-		CreatedBy:   "u",
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:         "p-bg",
+		Name:       "binding-test",
+		Content:    "test",
+		Binding:    &models.ProviderBinding{Provider: "openai", Model: "gpt-4", APIKeyRef: "key-1"},
+		Generation: &models.GenerationConfig{Temperature: 0.7, TopP: 0.9, MaxTokens: 100, Stop: []string{"STOP"}},
+		CreatedBy:  "u",
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 
 	if err := db.CreatePrompt(ctx, p); err != nil {

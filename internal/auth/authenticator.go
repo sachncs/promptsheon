@@ -23,8 +23,8 @@ type Authenticator struct {
 	// DB was slow. The update is now fire-and-forget on a
 	// background goroutine.
 	lastUsedCh chan string
-	wg        sync.WaitGroup
-	stopCh    chan struct{}
+	wg         sync.WaitGroup
+	stopCh     chan struct{}
 }
 
 // AuthLogger logs authentication failures for audit purposes.

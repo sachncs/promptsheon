@@ -18,9 +18,9 @@ import (
 // (Add, Remove, Clear, Rebuild) take a write lock. The Manager is
 // safe for use from multiple goroutines.
 type Manager struct {
-	mu     sync.RWMutex
-	docs   map[string]*Document
-	dim    int
+	mu   sync.RWMutex
+	docs map[string]*Document
+	dim  int
 }
 
 // NewManager creates a new Manager with the given embedding
