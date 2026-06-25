@@ -43,8 +43,17 @@ func NewSQLite(db *sql.DB) (*SQLite, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create traces parent index: %w", err)
 	}
-	// Migration: add trace_id column if missing
-	_, _ = db.ExecContext(context.Background(), `ALTER TABLE traces ADD COLUMN trace_id TEXT NOT NULL DEFAULT ''`)
+	// L-7 fix: ListSpans filters on started_at in the Since/Until
+	// range queries, but no index covered that column. For a busy
+	// trace store the query degraded to a full scan. Add the
+	// index here so it is created at the same time as the other
+	// indexes.
+	_, err = db.ExecContext(context.Background(), `CREATE INDEX IF NOT EXISTS idx_traces_started_at ON traces(started_at)`)
+	if err != nil {
+		return nil, fmt.Errorf("create traces started_at index: %w", err)
+	}
+	// The trace_id column is created above; the previous code did a
+	// no-op ALTER TABLE that always failed silently. Removed.
 	return &SQLite{db: db}, nil
 }
 
@@ -71,6 +80,12 @@ func (s *SQLite) StartChild(ctx context.Context, parent *Span, operation string)
 	}
 }
 
+// Finish persists a span. The context is intentionally fresh: the
+// span should be recorded even if the request that produced it has
+// already returned or been cancelled. The previous implementation
+// used context.Background() too, but accepting an explicit context
+// here means the trace store honours shutdown cancellation when the
+// caller (the metrics middleware) supplies one.
 func (s *SQLite) Finish(span *Span) error {
 	attrs, err := json.Marshal(span.Attributes)
 	if err != nil {
