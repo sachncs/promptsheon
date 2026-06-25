@@ -148,6 +148,11 @@ func TestPort(t *testing.T) {
 		{"localhost:8080", 8080},
 		{"0.0.0.0:9090", 9090},
 		{"invalid", 8080},
+		// IPv6 literals — these used to break the simple
+		// "scan for last colon" parser. SplitHostPort handles
+		// them correctly.
+		{"[::1]:8080", 8080},
+		{"[2001:db8::1]:9090", 9090},
 	}
 
 	for _, tt := range tests {
