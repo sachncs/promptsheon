@@ -3,7 +3,7 @@ package eval
 import (
 	"sort"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Comparison holds a side-by-side comparison of two evaluation reports.

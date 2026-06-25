@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"promptsheon/internal/promptsheon"
+	"github.com/sachn-cs/promptsheon/internal/promptsheon"
 )
 
 func (s *Server) handlePromptDiff(w http.ResponseWriter, r *http.Request) error {

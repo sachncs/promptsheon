@@ -3,7 +3,7 @@ package search
 import (
 	"sync"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Manager owns a long-lived BM25 search index. M-1 fix kept the

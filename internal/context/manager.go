@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"promptsheon/internal/models"
-	"promptsheon/internal/store"
+	"github.com/sachn-cs/promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/store"
 )
 
 // TokenEstimateFunc estimates the number of tokens in a string.

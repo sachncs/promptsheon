@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // BatchConfig controls batch evaluation behavior.

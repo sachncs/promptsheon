@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"promptsheon/internal/auth"
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/auth"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // oauthStateStore holds in-flight OAuth state tokens. The previous

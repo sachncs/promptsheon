@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"promptsheon/internal/llm"
-	"promptsheon/internal/optimizer"
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/optimizer"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 func TestAnalyzePrompt(t *testing.T) {

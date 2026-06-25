@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 func (s *Server) handleListAudit(w http.ResponseWriter, r *http.Request) error {

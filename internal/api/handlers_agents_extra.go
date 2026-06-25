@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // handleForkAgent creates a new agent as a fork of an existing one.

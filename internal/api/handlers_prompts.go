@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"promptsheon/internal/guardrail"
-	"promptsheon/internal/llm"
-	"promptsheon/internal/models"
-	"promptsheon/internal/trace"
-	"promptsheon/internal/webhook"
+	"github.com/sachn-cs/promptsheon/internal/guardrail"
+	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/trace"
+	"github.com/sachn-cs/promptsheon/internal/webhook"
 )
 
 func (s *Server) handleListPrompts(w http.ResponseWriter, r *http.Request) error {

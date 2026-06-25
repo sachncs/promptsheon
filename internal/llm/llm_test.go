@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 func TestMockProvider(t *testing.T) {

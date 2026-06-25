@@ -1,6 +1,6 @@
 package llm
 
-import "promptsheon/internal/models"
+import "github.com/sachn-cs/promptsheon/internal/models"
 
 // ModelPricing defines per-token costs for a model.
 type ModelPricing struct {

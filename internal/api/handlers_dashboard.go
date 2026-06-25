@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"promptsheon/internal/trace"
+	"github.com/sachn-cs/promptsheon/internal/trace"
 )
 
 func (s *Server) handleDashboardSummary(w http.ResponseWriter, r *http.Request) error {

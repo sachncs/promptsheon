@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"promptsheon/internal/auth"
+	"github.com/sachn-cs/promptsheon/internal/auth"
 )
 
 // Limiter enforces rate limits per API key using a token bucket.

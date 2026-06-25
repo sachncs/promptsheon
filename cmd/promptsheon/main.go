@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"promptsheon/internal/llm"
-	"promptsheon/internal/promptsheon"
+	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/promptsheon"
 )
 
 func main() {

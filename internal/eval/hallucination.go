@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/llm"
 )
 
 // HallucinationDetector scores how likely an output is to contain

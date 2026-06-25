@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 func TestValidateDAG(t *testing.T) {

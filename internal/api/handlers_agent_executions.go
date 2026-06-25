@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 func (s *Server) handleListAgentExecutions(w http.ResponseWriter, r *http.Request) error {

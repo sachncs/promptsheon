@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/llm"
 )
 
 // Template is a pre-built prompt template for the playground.

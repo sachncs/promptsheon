@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"promptsheon/internal/trace"
+	"github.com/sachn-cs/promptsheon/internal/trace"
 )
 
 func (s *Server) handleListSpans(w http.ResponseWriter, r *http.Request) error {

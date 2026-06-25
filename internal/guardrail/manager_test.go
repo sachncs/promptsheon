@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"promptsheon/internal/metrics"
+	"github.com/sachn-cs/promptsheon/internal/metrics"
 )
 
 func TestManagerAddRemoveRule(t *testing.T) {

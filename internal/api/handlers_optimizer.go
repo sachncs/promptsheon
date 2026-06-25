@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"promptsheon/internal/llm"
-	"promptsheon/internal/optimizer"
+	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/optimizer"
 )
 
 func (s *Server) handleOptimizePrompt(w http.ResponseWriter, r *http.Request) error {

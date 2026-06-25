@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"promptsheon/internal/api"
-	"promptsheon/internal/eval"
-	"promptsheon/internal/llm"
-	"promptsheon/internal/metrics"
-	"promptsheon/internal/store"
-	"promptsheon/internal/trace"
+	"github.com/sachn-cs/promptsheon/internal/api"
+	"github.com/sachn-cs/promptsheon/internal/eval"
+	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachn-cs/promptsheon/internal/metrics"
+	"github.com/sachn-cs/promptsheon/internal/store"
+	"github.com/sachn-cs/promptsheon/internal/trace"
 )
 
 // setupServer creates a test HTTP server backed by an in-memory SQLite database.

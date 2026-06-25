@@ -8,7 +8,7 @@ import (
 	"io"
 	"time"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Provider is the interface that all LLM backends must implement.

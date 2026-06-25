@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // ValidateSteps checks a set of agent steps for DAG validity.

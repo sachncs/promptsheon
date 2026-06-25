@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"promptsheon/internal/auth"
-	"promptsheon/internal/guardrail"
+	"github.com/sachn-cs/promptsheon/internal/auth"
+	"github.com/sachn-cs/promptsheon/internal/guardrail"
 )
 
 func (s *Server) handleListGuardrailRules(w http.ResponseWriter, r *http.Request) error {

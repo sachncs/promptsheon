@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Azure implements Provider for Azure OpenAI's deployment-based endpoint.
