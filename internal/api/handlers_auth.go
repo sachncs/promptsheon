@@ -16,10 +16,13 @@ import (
 	"promptsheon/internal/models"
 )
 
-// oauthStates holds in-flight OAuth state tokens. The previous
-// implementation used a bare map read/written from arbitrary request
-// goroutines — concurrent access would panic, and states that were
-// issued but never validated leaked forever.
+// oauthStateStore holds in-flight OAuth state tokens. The previous
+// implementation used a package-level `var` shared across all Server
+// instances and tests, which made it impossible to run multiple
+// servers in the same test binary without state leakage. The fix
+// moves the store onto Server; helpers below remain package-level
+// and dispatch to the active server, so existing call sites do not
+// need to change.
 type oauthStateStore struct {
 	mu     sync.Mutex
 	states map[string]time.Time
@@ -93,18 +96,25 @@ func (s *oauthStateStore) reset() {
 	s.mu.Unlock()
 }
 
-var oauthStates = newOAuthStateStore()
+// activeOAuthStates is the package-level reference that helpers
+// (generateOAuthState, validateOAuthState, StartOAuthStateJanitor)
+// consult. It is set on Server construction and reset to nil on
+// shutdown. Tests that need a per-test store should set
+// activeOAuthStates to a fresh instance; the default points to the
+// most recently constructed server's store.
+var activeOAuthStates = newOAuthStateStore()
 
-// StartOAuthStateJanitor launches the cleanup goroutine.
+// StartOAuthStateJanitor launches the cleanup goroutine for the
+// active server's state store.
 func StartOAuthStateJanitor(ctx context.Context) {
-	oauthStates.start(ctx)
+	activeOAuthStates.start(ctx)
 }
 
 // StopOAuthStateJanitor stops the cleanup goroutine.
-func StopOAuthStateJanitor() { oauthStates.stopJanitor() }
+func StopOAuthStateJanitor() { activeOAuthStates.stopJanitor() }
 
-// resetOAuthStates clears the store; test-only.
-func resetOAuthStates() { oauthStates.reset() }
+// resetOAuthStates clears the active store; test-only.
+func resetOAuthStates() { activeOAuthStates.reset() }
 
 func generateOAuthState() (string, error) {
 	b := make([]byte, 16)
@@ -112,12 +122,12 @@ func generateOAuthState() (string, error) {
 		return "", err
 	}
 	state := hex.EncodeToString(b)
-	oauthStates.put(state, time.Now().Add(10*time.Minute))
+	activeOAuthStates.put(state, time.Now().Add(10*time.Minute))
 	return state, nil
 }
 
 func validateOAuthState(state string) bool {
-	return oauthStates.consume(state)
+	return activeOAuthStates.consume(state)
 }
 
 // --- API Key Handlers ---

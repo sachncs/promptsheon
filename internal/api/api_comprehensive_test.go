@@ -3367,7 +3367,7 @@ func TestOAuthCallbackExpiredStateComprehensive(t *testing.T) {
 
 	// Inject an expired state directly into the store
 	resetOAuthStates()
-	oauthStates.put("expired-state-123", time.Now().Add(-10*time.Minute))
+	srv.oauthStates.put("expired-state-123", time.Now().Add(-10*time.Minute))
 
 	req, _ := http.NewRequest("GET", ts.URL+"/api/v1/auth/github/callback?code=abc&state=expired-state-123", nil)
 	req.AddCookie(&http.Cookie{Name: "oauth_state", Value: "expired-state-123"})
@@ -3400,12 +3400,29 @@ func TestOAuthCallbackMissingCodeComprehensive(t *testing.T) {
 	}
 }
 
-// TestOAuthCallback_HidesUpstreamError pins the H-6 fix: when the
-// upstream OAuth provider returns an error (e.g., 500 with an HTML
-// body), the callback handler must NOT echo the upstream body back to
-// the client. The previous implementation returned
-// "token exchange failed: " + err.Error() which leaked the upstream
-// HTML to the unauthenticated caller.
+// TestOAuthStates_ArePerServer pins the M-3 fix: the previous
+// implementation used a package-level `var` shared across all
+// Server instances, so two servers in the same test binary could
+// observe each other's state. After the fix, each Server has its own
+// oauthStateStore and the active pointer is updated on construction.
+func TestOAuthStates_ArePerServer(t *testing.T) {
+	_, _ = setupTestServerWithDeps(t) // first server sets activeOAuthStates
+	srv1, _ := setupTestServerWithDeps(t)
+	srv2, _ := setupTestServerWithDeps(t)
+
+	if srv1.oauthStates == srv2.oauthStates {
+		t.Fatal("two servers share the same oauth state store")
+	}
+	// Putting a state in srv1 must not be visible in srv2.
+	srv1.oauthStates.put("server-1-state", time.Now().Add(10*time.Minute))
+	if srv2.oauthStates.consume("server-1-state") {
+		t.Fatal("srv2 observed a state that was put into srv1")
+	}
+	if !srv1.oauthStates.consume("server-1-state") {
+		t.Fatal("srv1 did not observe its own state")
+	}
+}
+
 func TestOAuthCallback_HidesUpstreamError(t *testing.T) {
 	// Upstream token endpoint that returns 500 with sensitive HTML
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

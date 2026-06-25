@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"promptsheon/internal/alerting"
@@ -36,7 +37,6 @@ type Server struct {
 	logger           *slog.Logger
 	cfg              *ServerConfig
 	authn            *auth.Authenticator
-	authz            *auth.Authorizer
 	requireAuth      bool
 	evalRunner       *eval.Runner
 	spans            *trace.SQLite
@@ -51,6 +51,29 @@ type Server struct {
 	alertingManager  *alerting.Manager
 	rateLimiter      *ratelimit.Limiter
 	contextManager   *contextpkg.Manager
+
+	// auditQueue is a bounded channel feeding the audit worker pool.
+	auditQueue chan *models.AuditEntry
+	// auditDropped counts audit entries that were rejected because
+	// the queue was full. Exposed for tests and metrics.
+	auditDropped atomic.Int64
+
+	// oauthStates holds in-flight OAuth state tokens for this
+	// server. Stored on the Server (not as a package-level var) so
+	// multiple servers in the same test binary do not share state.
+	// The package-level helpers (generateOAuthState,
+	// validateOAuthState) dispatch via activeOAuthStates which is
+	// set to the most recently constructed server.
+	oauthStates *oauthStateStore
+}
+
+// httpRequestKey is the context key used by the request middleware
+// to attach the in-flight *http.Request for downstream helpers.
+type httpRequestKey struct{}
+
+// WithRequest returns a context that carries the current request.
+func WithRequest(ctx context.Context, r *http.Request) context.Context {
+	return context.WithValue(ctx, httpRequestKey{}, r)
 }
 
 // ServerConfig holds configuration for the API server.
@@ -69,7 +92,6 @@ func WithAuth(db store.Repository) Option {
 		adapter := &storeAuthAdapter{db: db}
 		logger := &authAuditLogger{server: s}
 		s.authn = auth.NewAuthenticatorWithLogger(adapter, logger)
-		s.authz = auth.NewAuthorizer()
 		s.requireAuth = true
 	}
 }
@@ -177,7 +199,15 @@ func NewServer(db store.Repository, logger *slog.Logger, opts ...Option) *Server
 			CircuitBreakerSuccessThreshold: 3,
 			CircuitBreakerCooldown:         30,
 		},
+		oauthStates: newOAuthStateStore(),
 	}
+	// Make this server the active one for the package-level OAuth
+	// helpers (generateOAuthState, validateOAuthState, etc.). The
+	// helpers retain a package-level pointer for backward
+	// compatibility with call sites that don't have a *Server in
+	// scope; the pointer is updated here so each NewServer call
+	// produces an isolated store.
+	activeOAuthStates = s.oauthStates
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -200,15 +230,21 @@ func (s *Server) routes() {
 		s.mux.Handle("GET /metrics", s.collector.Handler())
 	}
 
-	// Auth endpoints (always unauthenticated — used to manage keys).
-	// Apply rate limiting to prevent brute force attacks.
-	authHandler := s.handleCreateAPIKey
+	// Auth endpoints. Previously these were registered as fully
+	// unauthenticated, which let any anonymous caller mint admin keys.
+	// The handlers now perform their own caller checks; we still wrap
+	// them with the global rate limiter to prevent brute force.
+	createKey := s.handleCreateAPIKey
+	listKeys := s.handleListAPIKeys
+	revokeKey := s.handleRevokeAPIKey
 	if s.rateLimiter != nil {
-		authHandler = s.rateLimit(s.handleCreateAPIKey)
+		createKey = s.rateLimit(createKey)
+		listKeys = s.rateLimit(listKeys)
+		revokeKey = s.rateLimit(revokeKey)
 	}
-	s.mux.HandleFunc("POST /api/v1/apikeys", s.wrapHandler(authHandler))
-	s.mux.HandleFunc("GET /api/v1/apikeys", s.wrapHandler(s.handleListAPIKeys))
-	s.mux.HandleFunc("DELETE /api/v1/apikeys/{id}", s.wrapHandler(s.handleRevokeAPIKey))
+	s.mux.HandleFunc("POST /api/v1/apikeys", s.wrapHandler(createKey))
+	s.mux.HandleFunc("GET /api/v1/apikeys", s.wrapHandler(listKeys))
+	s.mux.HandleFunc("DELETE /api/v1/apikeys/{id}", s.wrapHandler(revokeKey))
 
 	// OAuth endpoints (unauthenticated — used for SSO login).
 	s.mux.HandleFunc("GET /api/v1/auth/{provider}/login", s.wrapHandler(s.handleOAuthLogin))
@@ -476,12 +512,20 @@ func readJSON(r *http.Request, target any) error {
 	return json.NewDecoder(r.Body).Decode(target)
 }
 
-// audit writes an audit entry for a mutation. It extracts the user ID from the
-// request context (falling back to "api" when auth is disabled) and writes the
-// entry asynchronously so it never blocks the response.
+// audit writes an audit entry for a mutation. The user ID is taken
+// from the request context (falling back to "anonymous" when auth is
+// disabled or no caller is set). Entries are written by a small worker
+// pool so the request goroutine is never blocked by audit I/O and a
+// burst of mutations cannot spawn one goroutine per write.
+//
+// The pool has a bounded queue: if the queue is full, the entry is
+// dropped and a counter is incremented. This is a deliberate
+// trade-off — we would rather lose an audit entry than block the
+// request path. Operators who need guaranteed delivery should
+// configure a faster DB or use a synchronous audit endpoint.
 func (s *Server) audit(ctx context.Context, action, resource string, details map[string]any) {
 	userID := "api"
-	if u, ok := auth.UserFromContext(ctx); ok {
+	if u, ok := auth.UserFromContext(ctx); ok && u != nil && u.ID != "" {
 		userID = u.ID
 	}
 	entry := &models.AuditEntry{
@@ -492,11 +536,69 @@ func (s *Server) audit(ctx context.Context, action, resource string, details map
 		Details:   details,
 		Timestamp: time.Now(),
 	}
-	go func() {
-		if err := s.db.AppendAudit(context.Background(), entry); err != nil {
-			s.logger.Error("failed to write audit entry", "err", err)
+	// Add the request's remote address and user-agent so forensic
+	// analysis is possible from the audit log alone.
+	if r := httpRequestFromContext(ctx); r != nil {
+		if entry.Details == nil {
+			entry.Details = map[string]any{}
 		}
-	}()
+		entry.Details["remote_addr"] = r.RemoteAddr
+		entry.Details["user_agent"] = r.UserAgent()
+	}
+	select {
+	case s.auditQueue <- entry:
+	default:
+		// Queue is full. Increment the drop counter and log so
+		// operators notice the audit pipeline is overwhelmed.
+		s.auditDropped.Add(1)
+		if s.logger != nil {
+			s.logger.Warn("audit queue full, entry dropped",
+				"action", action, "resource", resource, "user_id", userID)
+		}
+	}
+}
+
+// StartAuditWorkers launches the bounded worker pool. Call once at
+// server startup. Cancel the context to stop the workers gracefully.
+func (s *Server) StartAuditWorkers(ctx context.Context, n int) {
+	if n < 1 {
+		n = 2
+	}
+	s.auditQueue = make(chan *models.AuditEntry, 1024)
+	for i := 0; i < n; i++ {
+		go s.auditWorker(ctx)
+	}
+}
+
+func (s *Server) auditWorker(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case entry, ok := <-s.auditQueue:
+			if !ok {
+				return
+			}
+			// Use a fresh background context for the DB write so a
+			// cancelled request does not abort the audit persistence.
+			if err := s.db.AppendAudit(context.Background(), entry); err != nil {
+				if s.logger != nil {
+					s.logger.Error("failed to write audit entry",
+						"err", err, "entry_id", entry.ID, "action", entry.Action)
+				}
+			}
+		}
+	}
+}
+
+// httpRequestFromContext returns the *http.Request stored in the
+// context by the request middleware, if any. Returns nil if there is
+// none (e.g. background work).
+func httpRequestFromContext(ctx context.Context) *http.Request {
+	if r, ok := ctx.Value(httpRequestKey{}).(*http.Request); ok {
+		return r
+	}
+	return nil
 }
 
 func (s *Server) auditDiff(ctx context.Context, action, resource string, prev, new any) {
@@ -546,6 +648,19 @@ func badRequestf(format string, args ...any) error {
 	return &HTTPError{Status: http.StatusBadRequest, Message: fmt.Sprintf(format, args...)}
 }
 func notFound(msg string) error { return &HTTPError{Status: http.StatusNotFound, Message: msg} }
+func unauthorized(msg string) error { return &HTTPError{Status: http.StatusUnauthorized, Message: msg} }
+func forbidden(msg string) error { return &HTTPError{Status: http.StatusForbidden, Message: msg} }
+func serverError(msg string) error { return &HTTPError{Status: http.StatusInternalServerError, Message: msg} }
+
+// callerID returns the authenticated user's ID, or "api" if no user
+// is in the request context. Used to populate CreatedBy fields
+// without each handler re-implementing the lookup.
+func callerID(r *http.Request) string {
+	if u, ok := auth.UserFromContext(r.Context()); ok && u != nil && u.ID != "" {
+		return u.ID
+	}
+	return "api"
+}
 
 // --- Rate Limiting ---
 
