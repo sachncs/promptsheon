@@ -10,7 +10,7 @@
 
 If you discover a security vulnerability, please report it responsibly:
 
-- **Do NOT open a public GitHub issue.** Use the [GitHub Security Advisories workflow](https://github.com/sachn-cs/promptsheon/security/advisories/new) or email the maintainers at the address in `CODEOWNERS`.
+- **Do NOT open a public GitHub issue.** Use the [GitHub Security Advisories workflow](https://github.com/sachn-cs/promptsheon/security/advisories/new) or email the maintainers at security@sachn-cs.dev.
 - Include: a description, reproduction steps, potential impact, and any suggested fix.
 - We acknowledge within 48 hours, give an initial assessment within 1 week, and aim to ship a fix within 2 weeks depending on severity.
 

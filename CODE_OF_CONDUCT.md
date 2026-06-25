@@ -59,13 +59,18 @@ representative at an online or offline event.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at
-https://github.com/sachn-cs/promptsheon/issues.
+reported to the community leaders responsible for enforcement by emailing
+conduct@sachn-cs.dev (or, if the address is not reachable, by opening a
+private security advisory at https://github.com/sachn-cs/promptsheon/security/advisories/new).
+
+Do not file Code of Conduct reports as public GitHub issues. The public
+issue tracker is for product bugs and feature requests; harassment
+reports are handled in private so we can protect the reporter.
 
 All complaints will be reviewed and investigated promptly and fairly.
 
-All community leaders are obligated to respect the privacy and security of the
-reporter of any incident.
+All community leaders are obligated to respect the privacy and security of
+the reporter of any incident.
 
 ## Enforcement Guidelines
 
