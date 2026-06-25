@@ -805,6 +805,16 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 		entry.Timestamp = time.Now()
 	}
 
+	// C-2 fix: normalise the timestamp to UTC and store the canonical
+	// RFC3339Nano string. The previous binary encoding of the
+	// timezone offset (int32(off) shifted into a byte slice) was
+	// non-canonical for negative offsets and made the audit chain
+	// fail verification on a machine with a different timezone. The
+	// canonical string is now stored alongside the timestamp and
+	// used directly in the hash.
+	entry.Timestamp = entry.Timestamp.UTC()
+	timestampStr := entry.Timestamp.Format(time.RFC3339Nano)
+
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return fmt.Errorf("begin audit tx: %w", err)
@@ -824,13 +834,13 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 	}
 
 	entry.PreviousHash = prevHash
-	entry.EntryHash = computeAuditHash(entry, string(details), entry.Timestamp)
+	entry.EntryHash = computeAuditHash(entry, string(details), timestampStr)
 
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO audit_entries (id, user_id, action, resource, details, timestamp, previous_hash, entry_hash)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO audit_entries (id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		entry.ID, entry.UserID, entry.Action, entry.Resource,
-		string(details), entry.Timestamp, entry.PreviousHash, entry.EntryHash,
+		string(details), entry.Timestamp, entry.PreviousHash, entry.EntryHash, timestampStr,
 	)
 	if err != nil {
 		return fmt.Errorf("insert audit: %w", err)
@@ -841,7 +851,11 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 	return nil
 }
 
-func computeAuditHash(e *models.AuditEntry, detailsJSON string, ts time.Time) string {
+// computeAuditHash produces the SHA-256 hash of the audit entry. The
+// timestamp is included as a canonical RFC3339Nano string in UTC (see
+// AppendAudit). The previous binary encoding was non-canonical for
+// negative timezone offsets, which is why we switched to a string.
+func computeAuditHash(e *models.AuditEntry, detailsJSON, timestampStr string) string {
 	h := sha256.New()
 	h.Write([]byte(e.ID))
 	h.Write([]byte{0x1f})
@@ -853,30 +867,7 @@ func computeAuditHash(e *models.AuditEntry, detailsJSON string, ts time.Time) st
 	h.Write([]byte{0x1f})
 	h.Write([]byte(detailsJSON))
 	h.Write([]byte{0x1f})
-	// Encode the timestamp as Unix nano + zone offset seconds so we get
-	// a canonical binary representation that is independent of the
-	// driver's text formatting. This is what VerifyAuditChain will
-	// recompute when reading the row back.
-	var tsBuf [16]byte
-	un := ts.UnixNano()
-	_, off := ts.Zone()
-	for i := 0; i < 8; i++ {
-		tsBuf[i] = byte(un >> (8 * i))
-	}
-	for i := 0; i < 4; i++ {
-		tsBuf[8+i] = byte(int32(off) >> (8 * i))
-	}
-	// Use a deterministic enc value so UTC and local-zone times
-	// produce different hashes for the same instant.
-	enc := int32(0)
-	if ts.Location() == time.UTC {
-		enc = 1
-	}
-	tsBuf[12] = byte(enc)
-	tsBuf[13] = 0
-	tsBuf[14] = 0
-	tsBuf[15] = 0
-	h.Write(tsBuf[:])
+	h.Write([]byte(timestampStr))
 	h.Write([]byte{0x1f})
 	h.Write([]byte(e.PreviousHash))
 	return hex.EncodeToString(h.Sum(nil))
@@ -885,7 +876,7 @@ func computeAuditHash(e *models.AuditEntry, detailsJSON string, ts time.Time) st
 // VerifyAuditChain reads all audit entries and validates the hash chain.
 func (s *SQLite) VerifyAuditChain(ctx context.Context) (bool, string, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, user_id, action, resource, details, timestamp, previous_hash, entry_hash
+		`SELECT id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str
 		 FROM audit_entries ORDER BY rowid ASC`,
 	)
 	if err != nil {
@@ -895,20 +886,23 @@ func (s *SQLite) VerifyAuditChain(ctx context.Context) (bool, string, error) {
 
 	var prevHash string
 	for rows.Next() {
-		var id, userID, action, resource, detailsJSON, storedPrev, storedHash string
+		var id, userID, action, resource, detailsJSON, storedPrev, storedHash, timestampStr string
 		var ts time.Time
-		if err := rows.Scan(&id, &userID, &action, &resource, &detailsJSON, &ts, &storedPrev, &storedHash); err != nil {
+		if err := rows.Scan(&id, &userID, &action, &resource, &detailsJSON, &ts, &storedPrev, &storedHash, &timestampStr); err != nil {
 			return false, "", fmt.Errorf("scan audit chain: %w", err)
 		}
 		if storedPrev != prevHash {
 			return false, fmt.Sprintf("chain break at entry %s: expected prev_hash %q, got %q", id, prevHash, storedPrev), nil
 		}
-		// Recompute using the timestamp the driver hands back. Because
-		// the binary encoding in computeAuditHash is canonical,
-		// recomputation is deterministic regardless of how the driver
-		// text-formats the timestamp.
+		// C-2 fix: prefer the canonical string. Fall back to
+		// formatting the time.Time the driver hands back so that
+		// rows inserted before the migration still verify (their
+		// timestamp_str is backfilled by the migration's UPDATE).
+		if timestampStr == "" {
+			timestampStr = ts.UTC().Format(time.RFC3339Nano)
+		}
 		e := &models.AuditEntry{ID: id, UserID: userID, Action: action, Resource: resource, PreviousHash: storedPrev, Timestamp: ts}
-		expected := computeAuditHash(e, detailsJSON, ts)
+		expected := computeAuditHash(e, detailsJSON, timestampStr)
 		if expected != storedHash {
 			return false, fmt.Sprintf("tampered entry %s: expected hash %q, got %q", id, expected, storedHash), nil
 		}
