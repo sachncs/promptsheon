@@ -1,13 +1,9 @@
 // Package search provides a BM25-based full-text search index for
-// prompts. The previous implementation used a hash-based "embedding"
-// stub that ranked documents by an unprincipled word-hash sum. This
-// file replaces that with a real BM25 ranking function: standard
-// k1=1.2, b=0.75, with token unigrams and bigrams, light suffix
-// stripping, and a per-document length normalisation.
-//
-// The interface is unchanged from the manager's perspective
-// (Add/Remove/Rebuild/Search/Size), so callers in internal/api
-// need no changes.
+// prompts. The ranking function is the standard BM25 (k1=1.2,
+// b=0.75) with token unigrams and bigrams, a light suffix
+// strip for crude plural handling, and per-document length
+// normalisation. The Manager type wraps an Index with a
+// thread-safe API used by internal/api.
 package search
 
 import (
