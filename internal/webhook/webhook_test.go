@@ -164,9 +164,12 @@ func TestDispatcherServerErrorTriggersRetry(t *testing.T) {
 	t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
 	defer t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "")
 
-	calls := 0
+	var calls int
+	var mu sync.Mutex
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		calls++
+		mu.Unlock()
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
@@ -182,6 +185,8 @@ func TestDispatcherServerErrorTriggersRetry(t *testing.T) {
 	// Wait for retries to complete (3 attempts × 250ms base).
 	time.Sleep(3 * time.Second)
 
+	mu.Lock()
+	defer mu.Unlock()
 	if calls < 2 {
 		t.Errorf("expected at least 2 attempts, got %d", calls)
 	}
@@ -240,8 +245,11 @@ func TestWithHTTPClientReplacesDefault(t *testing.T) {
 	defer t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "")
 
 	var hit bool
+	var mu sync.Mutex
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		hit = true
+		mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -256,6 +264,8 @@ func TestWithHTTPClientReplacesDefault(t *testing.T) {
 	d.Emit(Event{ID: "evt-custom", Type: EventEvalCompleted})
 	time.Sleep(500 * time.Millisecond)
 
+	mu.Lock()
+	defer mu.Unlock()
 	if !hit {
 		t.Error("expected custom http client to reach the test server")
 	}
