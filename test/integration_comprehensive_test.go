@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,14 +10,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 
 	"promptsheon/internal/api"
+	"promptsheon/internal/auth"
 	"promptsheon/internal/eval"
 	"promptsheon/internal/guardrail"
 	"promptsheon/internal/llm"
 	"promptsheon/internal/metrics"
+	"promptsheon/internal/models"
 	"promptsheon/internal/snapshot"
 	"promptsheon/internal/store"
 	"promptsheon/internal/trace"
@@ -25,6 +29,10 @@ import (
 )
 
 // fullSetupServer creates a test HTTP server with all optional dependencies wired.
+// Authentication is NOT enabled by default to preserve the behaviour the
+// integration tests were written against; the targeted security tests
+// (TestComprehensive_UnauthorizedAccess, TestComprehensive_APINonAdminCannotEscalate)
+// flip it on via the integrationTestAuthEnabled switch.
 func fullSetupServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	db, err := store.NewSQLite(":memory:")
@@ -47,29 +55,111 @@ func fullSetupServer(t *testing.T) *httptest.Server {
 		t.Fatalf("failed to create snapshot store: %v", err)
 	}
 	webhookDispatcher := webhook.NewDispatcher(logger)
-	vaultKey := "0000000000000000000000000000000000000000000000000000000000000000"
+	vaultKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	v, err := vault.New(vaultKey)
 	if err != nil {
 		t.Fatalf("failed to create vault: %v", err)
 	}
 
-	srv := api.NewServer(db, logger,
+	opts := []api.Option{
 		api.WithEvalRunner(evalRunner),
 		api.WithTracing(spans, collector),
 		api.WithGuardrailManager(guardrailMgr),
 		api.WithSnapshotStore(snapshotStore),
 		api.WithWebhooks(webhookDispatcher),
 		api.WithVault(v),
-	)
+	}
+	if integrationTestAuthEnabled {
+		// Seed a default admin user so the suite has a privileged caller.
+		seedDefaultUsers(t, db)
+		opts = append(opts, api.WithAuth(db))
+	}
+	srv := api.NewServer(db, logger, opts...)
+	srv.StartAuditWorkers(context.Background(), 2)
 	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
 	return ts
 }
 
+// integrationTestAuthEnabled flips WithAuth on for the integration
+// suite. The dedicated security tests set this to true; the rest of
+// the suite runs in legacy (no-auth) mode.
+var integrationTestAuthEnabled = false
+
+var (
+	defaultTestAuthOnce sync.Once
+	defaultTestAuth     string
+)
+
+func seedDefaultUsers(t *testing.T, db *store.SQLite) {
+	t.Helper()
+	for _, name := range []string{"admin", "user1", "user2", "writer1", "reader1"} {
+		role := "admin"
+		switch name {
+		case "writer1":
+			role = "writer"
+		case "reader1":
+			role = "reader"
+		case "user1", "user2":
+			role = "writer"
+		}
+		u := &models.User{
+			ID:        "u-" + name,
+			Email:     name + "@test.local",
+			Name:      name,
+			Role:      role,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+		if err := db.CreateUser(context.Background(), u); err != nil {
+			t.Fatalf("seed user %s: %v", name, err)
+		}
+	}
+	defaultTestAuthOnce.Do(func() {
+		key, hash, err := auth.GenerateAPIKey()
+		if err != nil {
+			t.Fatalf("gen admin key: %v", err)
+		}
+		rec := &models.APIKey{
+			ID:        "k-admin",
+			UserID:    "u-admin",
+			Name:      "test-admin",
+			KeyHash:   hash,
+			KeyPrefix: key[:8],
+			Role:      "admin",
+			CreatedAt: time.Now(),
+		}
+		if err := db.CreateAPIKey(context.Background(), rec); err != nil {
+			t.Fatalf("save admin key: %v", err)
+		}
+		defaultTestAuth = key
+	})
+}
+
+func authedRequest(t *testing.T, method, url, body string) *http.Request {
+	t.Helper()
+	var bodyReader io.Reader
+	if body != "" {
+		bodyReader = bytes.NewBufferString(body)
+	}
+	req, err := http.NewRequest(method, url, bodyReader)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if defaultTestAuth != "" {
+		req.Header.Set("Authorization", "Bearer "+defaultTestAuth)
+	}
+	return req
+}
+
 func createPrompt(t *testing.T, ts *httptest.Server, name string) string {
 	t.Helper()
 	body := fmt.Sprintf(`{"name":"%s","content":"You are a {{role}}. {{instruction}}","tags":["test"]}`, name)
-	resp, err := http.Post(ts.URL+"/api/v1/prompts", "application/json", bytes.NewBufferString(body))
+	req := authedRequest(t, "POST", ts.URL+"/api/v1/prompts", body)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1487,7 +1577,7 @@ func TestComprehensive_ProviderKeyGetByName(t *testing.T) {
 
 func TestComprehensive_APIKeyCreate(t *testing.T) {
 	ts := fullSetupServer(t)
-	resp := doPost(t, ts, "/api/v1/apikeys", `{"name":"test-key","user_id":"user1","role":"reader"}`, "")
+	resp := doPost(t, ts, "/api/v1/apikeys", `{"name":"test-key","user_id":"u-user1","role":"reader"}`, "")
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201, got %d", resp.StatusCode)
@@ -1501,10 +1591,11 @@ func TestComprehensive_APIKeyCreate(t *testing.T) {
 
 func TestComprehensive_APIKeyList(t *testing.T) {
 	ts := fullSetupServer(t)
-	doPost(t, ts, "/api/v1/apikeys", `{"name":"list-key-1","user_id":"user1","role":"reader"}`, "").Body.Close()
-	doPost(t, ts, "/api/v1/apikeys", `{"name":"list-key-2","user_id":"user1","role":"writer"}`, "").Body.Close()
+	doPost(t, ts, "/api/v1/apikeys", `{"name":"list-key-1","user_id":"u-user1","role":"reader"}`, "").Body.Close()
+	doPost(t, ts, "/api/v1/apikeys", `{"name":"list-key-2","user_id":"u-user1","role":"writer"}`, "").Body.Close()
 
-	resp, err := http.Get(ts.URL + "/api/v1/apikeys?user_id=user1")
+	req := authedRequest(t, "GET", ts.URL+"/api/v1/apikeys?user_id=u-user1", "")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1518,47 +1609,104 @@ func TestComprehensive_APIKeyList(t *testing.T) {
 
 func TestComprehensive_APIKeyRevoke(t *testing.T) {
 	ts := fullSetupServer(t)
-	resp := doPost(t, ts, "/api/v1/apikeys", `{"name":"revoke-key","user_id":"user1","role":"reader"}`, "")
+	resp := doPost(t, ts, "/api/v1/apikeys", `{"name":"revoke-key","user_id":"u-user1","role":"reader"}`, "")
 	var result map[string]any
 	decodeJSON(t, resp, &result)
-	keyID := result["id"].(string)
+	keyID, _ := result["id"].(string)
+	if keyID == "" {
+		t.Fatalf("missing key id in response: %v", result)
+	}
 
 	resp2 := doDelete(t, ts, "/api/v1/apikeys/"+keyID)
 	defer resp2.Body.Close()
 	if resp2.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp2.StatusCode)
+		buf, _ := io.ReadAll(resp2.Body)
+		t.Fatalf("expected 200, got %d body=%s", resp2.StatusCode, string(buf))
 	}
 }
 
 func TestComprehensive_APIKeyValidation(t *testing.T) {
 	ts := fullSetupServer(t)
-	resp := doPost(t, ts, "/api/v1/apikeys", `{"name":"val-key","user_id":"user1","role":"admin"}`, "")
+	// H-1 fix: admin keys are now refused in no-auth mode. The
+	// validation test exercises the legitimate "writer" path and
+	// expects a 403 for the admin attempt.
+	resp := doPost(t, ts, "/api/v1/apikeys", `{"name":"val-key","user_id":"u-user1","role":"writer"}`, "")
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", resp.StatusCode)
+		t.Fatalf("expected 201 for writer, got %d", resp.StatusCode)
+	}
+	respAdmin := doPost(t, ts, "/api/v1/apikeys", `{"name":"val-admin","user_id":"u-user1","role":"admin"}`, "")
+	defer respAdmin.Body.Close()
+	if respAdmin.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 for admin in no-auth mode, got %d", respAdmin.StatusCode)
 	}
 }
 
 func TestComprehensive_APIKeyInvalidRole(t *testing.T) {
 	ts := fullSetupServer(t)
-	resp := doPost(t, ts, "/api/v1/apikeys", `{"name":"bad-role","user_id":"user1","role":"superadmin"}`, "")
+	resp := doPost(t, ts, "/api/v1/apikeys", `{"name":"bad-role","user_id":"u-user1","role":"superadmin"}`, "")
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
 }
 
-func TestComprehensive_UnauthorizedAccess(t *testing.T) {
+// TestComprehensive_APINonAdminCannotEscalate verifies the security fix
+// for the unauthenticated-key-mint issue: a non-admin caller must not
+// be able to mint a key for a different user with a different role.
+func TestComprehensive_APINonAdminCannotEscalate(t *testing.T) {
+	prev := integrationTestAuthEnabled
+	integrationTestAuthEnabled = true
+	defer func() { integrationTestAuthEnabled = prev }()
+
 	ts := fullSetupServer(t)
-	// Without auth enabled, all endpoints are accessible
+	// Issue a writer-scoped key for u-writer1 (using the default admin token
+	// so we can create keys for arbitrary users in the seed step).
+	setupReq := authedRequest(t, "POST", ts.URL+"/api/v1/apikeys", `{"name":"writer-key","user_id":"u-writer1","role":"writer"}`)
+	resp, err := http.DefaultClient.Do(setupReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("setup: expected 201, got %d", resp.StatusCode)
+	}
+	var created map[string]any
+	decodeJSON(t, resp, &created)
+	writerKey, _ := created["key"].(string)
+	if writerKey == "" {
+		t.Fatal("setup: no key in response")
+	}
+
+	// Now try to mint an admin key for a different user using the
+	// writer key. This must be rejected.
+	req := authedRequest(t, "POST", ts.URL+"/api/v1/apikeys", `{"name":"escalate","user_id":"u-user2","role":"admin"}`)
+	req.Header.Set("Authorization", "Bearer "+writerKey)
+	resp2, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", resp2.StatusCode)
+	}
+}
+
+func TestComprehensive_UnauthorizedAccess(t *testing.T) {
+	prev := integrationTestAuthEnabled
+	integrationTestAuthEnabled = true
+	defer func() { integrationTestAuthEnabled = prev }()
+
+	ts := fullSetupServer(t)
+	// With auth enabled and no bearer token, anonymous access must be
+	// rejected.
 	resp, err := http.Get(ts.URL + "/api/v1/prompts")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-	// Without auth, this should return 200
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 without auth, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without auth, got %d", resp.StatusCode)
 	}
 }
 
