@@ -123,3 +123,30 @@ func TestOptimizePrompt(t *testing.T) {
 		t.Errorf("score %f out of range [0, 100]", report.Score)
 	}
 }
+
+func TestBatchOptimize(t *testing.T) {
+	provider := &mockProvider{}
+	opt := optimizer.NewOptimizer(provider)
+
+	prompts := []*models.Prompt{
+		{ID: "p1", Name: "P1", Content: "first"},
+		{ID: "p2", Name: "P2", Content: "second"},
+		{ID: "p3", Name: "P3", Content: "third"},
+	}
+	reports, err := opt.BatchOptimize(context.Background(), prompts)
+	if err != nil {
+		t.Fatalf("BatchOptimize: %v", err)
+	}
+	if len(reports) != len(prompts) {
+		t.Errorf("expected %d reports, got %d", len(prompts), len(reports))
+	}
+	for i, r := range reports {
+		if r == nil {
+			t.Errorf("report %d is nil", i)
+			continue
+		}
+		if r.PromptID != prompts[i].ID {
+			t.Errorf("report %d: expected id %q, got %q", i, prompts[i].ID, r.PromptID)
+		}
+	}
+}
