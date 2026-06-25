@@ -3400,6 +3400,62 @@ func TestOAuthCallbackMissingCodeComprehensive(t *testing.T) {
 	}
 }
 
+// TestOAuthCallback_HidesUpstreamError pins the H-6 fix: when the
+// upstream OAuth provider returns an error (e.g., 500 with an HTML
+// body), the callback handler must NOT echo the upstream body back to
+// the client. The previous implementation returned
+// "token exchange failed: " + err.Error() which leaked the upstream
+// HTML to the unauthenticated caller.
+func TestOAuthCallback_HidesUpstreamError(t *testing.T) {
+	// Upstream token endpoint that returns 500 with sensitive HTML
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("<html><body>internal stack trace leaked from upstream</body></html>"))
+	}))
+	defer upstream.Close()
+
+	// Build a server with an OAuthManager pointed at the upstream
+	srv, _ := setupTestServerWithDeps(t)
+	mgr := auth.NewOAuthManager()
+	mgr.RegisterProvider("testprovider", &auth.OAuthProvider{
+		Name:         "testprovider",
+		ClientID:     "cid",
+		ClientSecret: "csec",
+		RedirectURL:  "http://example/cb",
+		AuthURL:      upstream.URL,
+		TokenURL:     upstream.URL,
+		UserInfoURL:  upstream.URL,
+		Scopes:       []string{"openid"},
+	})
+	srv.oauth = mgr
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	state, _ := generateOAuthState()
+	req, _ := http.NewRequest("GET", ts.URL+"/api/v1/auth/testprovider/callback?state="+state+"&code=abc", nil)
+	req.AddCookie(&http.Cookie{Name: "oauth_state", Value: state})
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	bodyStr := string(body)
+	if strings.Contains(bodyStr, "internal stack trace") {
+		t.Fatalf("upstream error body leaked to client: %s", bodyStr)
+	}
+	if strings.Contains(bodyStr, "<html>") {
+		t.Fatalf("HTML leaked to client: %s", bodyStr)
+	}
+	if !strings.Contains(strings.ToLower(bodyStr), "oauth") {
+		t.Fatalf("expected generic 'oauth' error, got %q", bodyStr)
+	}
+}
+
 func TestValidateOAuthStateInvalidComprehensive(t *testing.T) {
 	if validateOAuthState("nonexistent-state") {
 		t.Fatal("expected false for nonexistent state")

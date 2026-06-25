@@ -383,12 +383,25 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 
 	token, err := s.oauth.ExchangeCode(r.Context(), providerName, code)
 	if err != nil {
-		return badRequest("token exchange failed: " + err.Error())
+		// Do NOT echo err.Error() to the unauthenticated client. The
+		// underlying error already wraps the upstream provider's
+		// response body, which may contain HTML, internal stack
+		// traces, or session-bound information. Log the detail and
+		// return a generic message.
+		if s.logger != nil {
+			s.logger.Error("oauth: token exchange failed",
+				"provider", providerName, "err", err)
+		}
+		return badRequest("oauth exchange failed")
 	}
 
 	user, err := s.oauth.GetUserInfo(r.Context(), providerName, token)
 	if err != nil {
-		return badRequest("user info failed: " + err.Error())
+		if s.logger != nil {
+			s.logger.Error("oauth: user info lookup failed",
+				"provider", providerName, "err", err)
+		}
+		return badRequest("oauth user lookup failed")
 	}
 
 	existing, err := s.db.GetUserByEmail(r.Context(), user.Email)
