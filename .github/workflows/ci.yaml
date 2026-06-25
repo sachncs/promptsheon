@@ -30,6 +30,19 @@ jobs:
       - name: Test
         run: go test -race -count=1 -timeout 120s -coverprofile=coverage.out ./...
 
+      - name: gofmt check
+        # L-10 fix: enforce gofmt on every PR. The previous CI ran
+        # `gofmt -s -w .` only via the local Makefile target, which
+        # developers can forget to run. Failing the build on a
+        # single gofmt diff is the cheapest way to keep formatting
+        # consistent.
+        run: |
+          if [ "$(gofmt -l . | wc -l)" -ne 0 ]; then
+            echo "The following files are not gofmt-clean:"
+            gofmt -l .
+            exit 1
+          fi
+
       - name: Check coverage threshold
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | tr -d '%')
