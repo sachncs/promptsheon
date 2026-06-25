@@ -212,6 +212,19 @@ func generateID() string {
 	return hex.EncodeToString(b)
 }
 
+// substituteVariables replaces {{name}} placeholders in template
+// with the values from variables. M-12: this is the single source
+// of truth for variable substitution in the run/stream handlers so
+// the pre-execution guardrail and the actual LLM call see the
+// exact same string.
+func substituteVariables(template string, variables map[string]string) string {
+	out := template
+	for k, v := range variables {
+		out = strings.ReplaceAll(out, "{{"+k+"}}", v)
+	}
+	return out
+}
+
 func (s *Server) handleDeployPrompt(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	p, err := s.db.GetPrompt(r.Context(), id)
@@ -353,12 +366,16 @@ func (s *Server) handleRunPrompt(w http.ResponseWriter, r *http.Request) error {
 		return badRequest("provider not available: " + err.Error())
 	}
 
+	// M-12 fix: build the substituted prompt text once and reuse it
+	// for both the pre-execution guardrail check and the actual LLM
+	// call. The previous implementation built the prompt twice
+	// (once for the guardrail, once for the LLM), and the two
+	// passes could drift if a future change modified one but not
+	// the other.
+	promptText := substituteVariables(p.Content, req.Variables)
+
 	// --- PRE-EXECUTION GUARDRAILS ---
 	if s.guardrailManager != nil {
-		promptText := p.Content
-		for k, v := range req.Variables {
-			promptText = strings.ReplaceAll(promptText, "{{"+k+"}}", v)
-		}
 		violations := s.guardrailManager.RunAllStaticChecks(r.Context(), promptText, model, p.Environment)
 		if len(violations) > 0 {
 			writeJSON(w, http.StatusBadRequest, map[string]any{
@@ -367,12 +384,6 @@ func (s *Server) handleRunPrompt(w http.ResponseWriter, r *http.Request) error {
 			})
 			return nil
 		}
-	}
-
-	// Build prompt by substituting variables
-	promptText := p.Content
-	for k, v := range req.Variables {
-		promptText = strings.ReplaceAll(promptText, "{{"+k+"}}", v)
 	}
 
 	// Build messages
@@ -674,12 +685,13 @@ func (s *Server) handleStreamPrompt(w http.ResponseWriter, r *http.Request) erro
 		return badRequest("provider not available: " + err.Error())
 	}
 
+	// M-12 fix: build the substituted prompt text once and reuse it
+	// for both the pre-execution guardrail check and the streamed
+	// LLM call. See the equivalent fix in handleRunPrompt.
+	promptText := substituteVariables(p.Content, reqBody.Variables)
+
 	// Pre-execution guardrails
 	if s.guardrailManager != nil {
-		promptText := p.Content
-		for k, v := range reqBody.Variables {
-			promptText = strings.ReplaceAll(promptText, "{{"+k+"}}", v)
-		}
 		violations := s.guardrailManager.RunAllStaticChecks(r.Context(), promptText, model, p.Environment)
 		if len(violations) > 0 {
 			writeJSON(w, http.StatusBadRequest, map[string]any{
@@ -688,12 +700,6 @@ func (s *Server) handleStreamPrompt(w http.ResponseWriter, r *http.Request) erro
 			})
 			return nil
 		}
-	}
-
-	// Build prompt by substituting variables
-	promptText := p.Content
-	for k, v := range reqBody.Variables {
-		promptText = strings.ReplaceAll(promptText, "{{"+k+"}}", v)
 	}
 
 	// Build messages

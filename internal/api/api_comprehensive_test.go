@@ -5343,7 +5343,26 @@ func TestRunWorkflow_WiresGuardrailManager(t *testing.T) {
 	}
 }
 
-// TestRestorePrompt_RejectsMalformedHash pins the M-13 fix: the
+// TestSubstituteVariables_PreservesAllKeys pins the M-12 fix: the
+// helper is a pure function that must replace every {{key}} in the
+// template, and leave placeholders for unknown keys alone. The
+// run/stream handlers use it to build the prompt exactly once so
+// the guardrail and the LLM call see the same string.
+func TestSubstituteVariables_PreservesAllKeys(t *testing.T) {
+	got := substituteVariables("hello {{name}}, welcome to {{product}}!", map[string]string{
+		"name":    "World",
+		"product": "Promptsheon",
+	})
+	want := "hello World, welcome to Promptsheon!"
+	if got != want {
+		t.Fatalf("substituteVariables: got %q, want %q", got, want)
+	}
+	// Unknown keys: placeholder preserved.
+	got2 := substituteVariables("hi {{name}} from {{unknown}}", map[string]string{"name": "x"})
+	if got2 != "hi x from {{unknown}}" {
+		t.Fatalf("expected unknown placeholder preserved, got %q", got2)
+	}
+}
 // restore handler must validate the cas_hash shape before touching
 // the CAS. The previous implementation accepted any non-empty
 // string and either returned a foreign blob or a 500.
