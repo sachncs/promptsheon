@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,12 +56,27 @@ func TestMustUnmarshalValidJSON(t *testing.T) {
 	}
 }
 
-func TestMustMarshalInvalid(t *testing.T) {
-	// channels cannot be marshalled
+func TestMarshalOrErrReturnsError(t *testing.T) {
+	// Channels cannot be JSON-marshalled. The previous mustMarshal
+	// silently swallowed this and returned "{}", which caused silent
+	// data loss in production. The fix (M-2) propagates the error.
 	ch := make(chan int)
-	b := mustMarshal(ch)
-	if string(b) != "{}" {
-		t.Fatalf("expected '{}', got %s", string(b))
+	_, err := marshalOrErr(ch)
+	if err == nil {
+		t.Fatal("marshalOrErr: expected error for channel value, got nil")
+	}
+	if !strings.Contains(err.Error(), "marshal json") {
+		t.Fatalf("expected wrapped error, got %v", err)
+	}
+}
+
+func TestMarshalOrErrValid(t *testing.T) {
+	b, err := marshalOrErr(map[string]any{"a": 1})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(b) != `{"a":1}` {
+		t.Fatalf("unexpected JSON: %s", string(b))
 	}
 }
 

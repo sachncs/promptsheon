@@ -37,6 +37,30 @@ func TestNewSQLiteCreatesDB(t *testing.T) {
 	}
 }
 
+// TestNewSQLite_RejectsUnwritablePath pins the C-1 fix: the previous
+// implementation had two identical `if err != nil` blocks after
+// sql.Open, the second of which was dead code. The fix is to delete the
+// dead block. We re-assert that NewSQLite actually reports an error
+// when sql.Open fails, so a future refactor that re-introduces a dead
+// block (and accidentally swallows the real one) is caught.
+func TestNewSQLite_RejectsUnwritablePath(t *testing.T) {
+	// A path inside a non-existent directory should propagate an error
+	// from sql.Open or the migration step. Either way, NewSQLite must
+	// return a non-nil error and a nil *SQLite.
+	dir := t.TempDir()
+	bad := filepath.Join(dir, "does", "not", "exist", "x.db")
+	db, err := NewSQLite(bad)
+	if err == nil {
+		if db != nil {
+			db.Close()
+		}
+		t.Fatal("NewSQLite: expected error for unwritable path, got nil")
+	}
+	if db != nil {
+		t.Fatal("NewSQLite: expected nil *SQLite on error, got non-nil")
+	}
+}
+
 func TestPromptCRUD(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()

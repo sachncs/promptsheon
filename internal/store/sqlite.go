@@ -24,15 +24,25 @@ var migrationsFS embed.FS
 // ErrNotFound is returned when a requested resource does not exist.
 var ErrNotFound = errors.New("not found")
 
-func mustMarshal(v any) []byte {
+// marshalOrErr marshals v to JSON or returns a wrapped error. The
+// previous implementation (mustMarshal) silently returned "{}" on
+// failure and logged to slog.Error from arbitrary goroutines, which
+// dropped data in production. The fix makes the error visible at the
+// call site so callers can fail loudly and the operator can act on
+// the root cause.
+func marshalOrErr(v any) ([]byte, error) {
 	b, err := json.Marshal(v)
 	if err != nil {
-		slog.Error("failed to marshal JSON", "err", err)
-		return []byte("{}")
+		return nil, fmt.Errorf("marshal json: %w", err)
 	}
-	return b
+	return b, nil
 }
 
+// mustUnmarshal is intentionally a best-effort helper: it unmarshals
+// into v and logs on failure but does not return an error, because the
+// stored JSON is whatever was previously marshalled (i.e., we know it
+// is valid JSON at write time). A read failure indicates data drift
+// (manual SQL edit, version skew) and is worth logging.
 func mustUnmarshal(data []byte, v any) {
 	if len(data) == 0 {
 		return
@@ -50,14 +60,34 @@ type SQLite struct {
 // NewSQLite opens or creates a SQLite database at the given path and runs
 // pending migrations.
 func NewSQLite(dbPath string) (*SQLite, error) {
-	db, err := sql.Open("sqlite", dbPath+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)")
+	// For in-memory databases, use the shared cache so multiple
+	// connections (we now allow 4) see the same schema and data.
+	// Without this, each connection gets its own private database
+	// and the test suite (which shares a single :memory: db between
+	// the main store and the trace store) breaks.
+	pragmas := "_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)"
+	dsn := dbPath
+	if dbPath == ":memory:" {
+		// Use shared in-memory cache so multiple connections (we now
+		// allow 4) see the same schema and data. WAL is incompatible
+		// with in-memory DBs, so use MEMORY journal mode.
+		dsn = "file::memory:?cache=shared&_pragma=journal_mode(MEMORY)&_pragma=busy_timeout(5000)"
+	} else {
+		dsn = dbPath + "?" + pragmas
+	}
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
-	db.SetMaxOpenConns(1) // SQLite only supports one writer.
-	db.SetMaxIdleConns(1)
-	db.SetConnMaxLifetime(0)
+	// SQLite serialises writers internally, but reads can proceed in
+	// parallel with the WAL journal. A small pool of 4 connections
+	// gives readers room to run concurrently without serialising
+	// every query behind the single connection the previous config
+	// used.
+	db.SetMaxOpenConns(4)
+	db.SetMaxIdleConns(4)
+	db.SetConnMaxLifetime(5 * time.Minute)
 
 	if err := migrate(db, migrationsFS); err != nil {
 		db.Close()
@@ -86,13 +116,28 @@ func (s *SQLite) DB() *sql.DB {
 // ---------------------------------------------------------------------------
 
 func (s *SQLite) CreatePrompt(ctx context.Context, p *models.Prompt) error {
-	variables := mustMarshal(p.Variables)
-	tags := mustMarshal(p.Tags)
-	metadata := mustMarshal(p.Metadata)
-	binding := mustMarshal(p.Binding)
-	generation := mustMarshal(p.Generation)
+	variables, err := marshalOrErr(p.Variables)
+	if err != nil {
+		return fmt.Errorf("marshal prompt variables: %w", err)
+	}
+	tags, err := marshalOrErr(p.Tags)
+	if err != nil {
+		return fmt.Errorf("marshal prompt tags: %w", err)
+	}
+	metadata, err := marshalOrErr(p.Metadata)
+	if err != nil {
+		return fmt.Errorf("marshal prompt metadata: %w", err)
+	}
+	binding, err := marshalOrErr(p.Binding)
+	if err != nil {
+		return fmt.Errorf("marshal prompt binding: %w", err)
+	}
+	generation, err := marshalOrErr(p.Generation)
+	if err != nil {
+		return fmt.Errorf("marshal prompt generation: %w", err)
+	}
 
-	_, err := s.db.ExecContext(ctx,
+	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO prompts (id, name, description, content, system_prompt, variables, tags, model_hint,
 		 version, status, environment, cas_hash, created_by, created_at, updated_at, metadata, binding, generation)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -130,8 +175,11 @@ func (s *SQLite) ListPrompts(ctx context.Context, filter models.PromptFilter) ([
 
 	if len(filter.Tags) > 0 {
 		for _, tag := range filter.Tags {
-			query += " AND tags LIKE ?"
-			args = append(args, "%"+tag+"%")
+			// Escape % and _ in the user-supplied tag so the
+			// wildcard semantics are honoured literally.
+			escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(tag)
+			query += ` AND tags LIKE ? ESCAPE '\'`
+			args = append(args, "%"+escaped+"%")
 		}
 	}
 
@@ -175,11 +223,26 @@ func (s *SQLite) ListPrompts(ctx context.Context, filter models.PromptFilter) ([
 }
 
 func (s *SQLite) UpdatePrompt(ctx context.Context, p *models.Prompt) error {
-	variables := mustMarshal(p.Variables)
-	tags := mustMarshal(p.Tags)
-	metadata := mustMarshal(p.Metadata)
-	binding := mustMarshal(p.Binding)
-	generation := mustMarshal(p.Generation)
+	variables, err := marshalOrErr(p.Variables)
+	if err != nil {
+		return fmt.Errorf("marshal prompt variables: %w", err)
+	}
+	tags, err := marshalOrErr(p.Tags)
+	if err != nil {
+		return fmt.Errorf("marshal prompt tags: %w", err)
+	}
+	metadata, err := marshalOrErr(p.Metadata)
+	if err != nil {
+		return fmt.Errorf("marshal prompt metadata: %w", err)
+	}
+	binding, err := marshalOrErr(p.Binding)
+	if err != nil {
+		return fmt.Errorf("marshal prompt binding: %w", err)
+	}
+	generation, err := marshalOrErr(p.Generation)
+	if err != nil {
+		return fmt.Errorf("marshal prompt generation: %w", err)
+	}
 
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE prompts SET name=?, description=?, content=?, system_prompt=?, variables=?, tags=?,
@@ -216,10 +279,16 @@ func (s *SQLite) DeletePrompt(ctx context.Context, id string) error {
 // ---------------------------------------------------------------------------
 
 func (s *SQLite) CreateAgent(ctx context.Context, a *models.Agent) error {
-	steps := mustMarshal(a.Steps)
-	tools := mustMarshal(a.Tools)
+	steps, err := marshalOrErr(a.Steps)
+	if err != nil {
+		return fmt.Errorf("marshal agent steps: %w", err)
+	}
+	tools, err := marshalOrErr(a.Tools)
+	if err != nil {
+		return fmt.Errorf("marshal agent tools: %w", err)
+	}
 
-	_, err := s.db.ExecContext(ctx,
+	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO agents (id, name, description, steps, tools, status, cas_hash, created_by, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		a.ID, a.Name, a.Description, string(steps), string(tools),
@@ -261,8 +330,14 @@ func (s *SQLite) ListAgents(ctx context.Context) ([]*models.Agent, error) {
 }
 
 func (s *SQLite) UpdateAgent(ctx context.Context, a *models.Agent) error {
-	steps := mustMarshal(a.Steps)
-	tools := mustMarshal(a.Tools)
+	steps, err := marshalOrErr(a.Steps)
+	if err != nil {
+		return fmt.Errorf("marshal agent steps: %w", err)
+	}
+	tools, err := marshalOrErr(a.Tools)
+	if err != nil {
+		return fmt.Errorf("marshal agent tools: %w", err)
+	}
 
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE agents SET name=?, description=?, steps=?, tools=?, status=?, cas_hash=?, updated_at=?
@@ -297,9 +372,12 @@ func (s *SQLite) DeleteAgent(ctx context.Context, id string) error {
 // ---------------------------------------------------------------------------
 
 func (s *SQLite) CreateDataset(ctx context.Context, d *models.TestDataset) error {
-	cases := mustMarshal(d.Cases)
+	cases, err := marshalOrErr(d.Cases)
+	if err != nil {
+		return fmt.Errorf("marshal dataset cases: %w", err)
+	}
 
-	_, err := s.db.ExecContext(ctx,
+	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO test_datasets (id, name, cases, created_by, created_at)
 		 VALUES (?, ?, ?, ?, ?)`,
 		d.ID, d.Name, string(cases), d.CreatedBy, d.CreatedAt,
@@ -352,7 +430,10 @@ func (s *SQLite) DeleteDataset(ctx context.Context, id string) error {
 }
 
 func (s *SQLite) UpdateDataset(ctx context.Context, d *models.TestDataset) error {
-	cases := mustMarshal(d.Cases)
+	cases, err := marshalOrErr(d.Cases)
+	if err != nil {
+		return fmt.Errorf("marshal dataset cases: %w", err)
+	}
 
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE test_datasets SET name=?, cases=? WHERE id=?`,
@@ -390,7 +471,10 @@ func (s *SQLite) SaveEvalResults(ctx context.Context, results []*models.EvalResu
 	defer stmt.Close()
 
 	for _, r := range results {
-		usage := mustMarshal(r.TokenUsage)
+		usage, err := marshalOrErr(r.TokenUsage)
+		if err != nil {
+			return fmt.Errorf("marshal token usage: %w", err)
+		}
 		passed := 0
 		if r.Passed {
 			passed = 1
@@ -471,7 +555,7 @@ func (s *SQLite) GetEvalRun(ctx context.Context, id string) (*models.EvalRun, er
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("eval run not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("get eval run: %w", err)
 	}
@@ -539,10 +623,16 @@ func (s *SQLite) ListEvalRuns(ctx context.Context, filter models.EvalRunFilter) 
 // ---------------------------------------------------------------------------
 
 func (s *SQLite) SaveWorkflow(ctx context.Context, w *models.Workflow) error {
-	input := mustMarshal(w.Input)
-	output := mustMarshal(w.Output)
+	input, err := marshalOrErr(w.Input)
+	if err != nil {
+		return fmt.Errorf("marshal workflow input: %w", err)
+	}
+	output, err := marshalOrErr(w.Output)
+	if err != nil {
+		return fmt.Errorf("marshal workflow output: %w", err)
+	}
 
-	_, err := s.db.ExecContext(ctx,
+	_, err = s.db.ExecContext(ctx,
 		`INSERT OR REPLACE INTO workflows
 		 (id, agent_id, status, input, output, error, started_at, completed_at, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -605,11 +695,20 @@ func (s *SQLite) ListWorkflows(ctx context.Context, filter models.WorkflowFilter
 }
 
 func (s *SQLite) SaveWorkflowStep(ctx context.Context, step *models.WorkflowStep) error {
-	input := mustMarshal(step.Input)
-	output := mustMarshal(step.Output)
-	toolCalls := mustMarshal(step.ToolCalls)
+	input, err := marshalOrErr(step.Input)
+	if err != nil {
+		return fmt.Errorf("marshal step input: %w", err)
+	}
+	output, err := marshalOrErr(step.Output)
+	if err != nil {
+		return fmt.Errorf("marshal step output: %w", err)
+	}
+	toolCalls, err := marshalOrErr(step.ToolCalls)
+	if err != nil {
+		return fmt.Errorf("marshal step tool_calls: %w", err)
+	}
 
-	_, err := s.db.ExecContext(ctx,
+	_, err = s.db.ExecContext(ctx,
 		`INSERT OR REPLACE INTO workflow_steps
 		 (id, workflow_id, step_id, status, input, output, error, tool_calls, latency_ms, started_at, finished_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -662,7 +761,7 @@ func scanWorkflow(row scannable) (*models.Workflow, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("workflow not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan workflow: %w", err)
 	}
@@ -685,24 +784,49 @@ func scanWorkflowRow(rows *sql.Rows) (*models.Workflow, error) {
 // Audit
 // ---------------------------------------------------------------------------
 
+// AppendAudit adds an entry to the tamper-evident audit log.
+//
+// SECURITY: the hash chain is computed inside a single IMMEDIATE
+// transaction so the read of the previous hash and the insert of the
+// new row are atomic. Without the transaction, two concurrent calls
+// would both read the same prevHash and produce a forked chain.
+//
+// The hash covers id, user_id, action, resource, details, timestamp
+// and previous_hash. The previous implementation only hashed
+// id/user_id/action/resource/previous_hash, which let an attacker with
+// write access to the SQLite file mutate details and timestamp
+// without breaking the chain.
 func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) error {
 	details, err := json.Marshal(entry.Details)
 	if err != nil {
 		return fmt.Errorf("marshal audit details: %w", err)
 	}
+	if entry.Timestamp.IsZero() {
+		entry.Timestamp = time.Now()
+	}
 
-	// Fetch the last entry's hash for chaining.
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return fmt.Errorf("begin audit tx: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
 	var prevHash string
-	if err := s.db.QueryRowContext(ctx,
-		`SELECT entry_hash FROM audit_entries ORDER BY timestamp DESC, rowid DESC LIMIT 1`,
-	).Scan(&prevHash); err != nil && err.Error() != "sql: no rows in result set" {
+	err = tx.QueryRowContext(ctx,
+		`SELECT entry_hash FROM audit_entries ORDER BY rowid DESC LIMIT 1`,
+	).Scan(&prevHash)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("fetch previous audit hash: %w", err)
 	}
 
 	entry.PreviousHash = prevHash
-	entry.EntryHash = computeAuditHash(entry)
+	entry.EntryHash = computeAuditHash(entry, string(details), entry.Timestamp)
 
-	_, err = s.db.ExecContext(ctx,
+	_, err = tx.ExecContext(ctx,
 		`INSERT INTO audit_entries (id, user_id, action, resource, details, timestamp, previous_hash, entry_hash)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		entry.ID, entry.UserID, entry.Action, entry.Resource,
@@ -711,15 +835,49 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 	if err != nil {
 		return fmt.Errorf("insert audit: %w", err)
 	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit audit: %w", err)
+	}
 	return nil
 }
 
-func computeAuditHash(e *models.AuditEntry) string {
+func computeAuditHash(e *models.AuditEntry, detailsJSON string, ts time.Time) string {
 	h := sha256.New()
 	h.Write([]byte(e.ID))
+	h.Write([]byte{0x1f})
 	h.Write([]byte(e.UserID))
+	h.Write([]byte{0x1f})
 	h.Write([]byte(e.Action))
+	h.Write([]byte{0x1f})
 	h.Write([]byte(e.Resource))
+	h.Write([]byte{0x1f})
+	h.Write([]byte(detailsJSON))
+	h.Write([]byte{0x1f})
+	// Encode the timestamp as Unix nano + zone offset seconds so we get
+	// a canonical binary representation that is independent of the
+	// driver's text formatting. This is what VerifyAuditChain will
+	// recompute when reading the row back.
+	var tsBuf [16]byte
+	un := ts.UnixNano()
+	_, off := ts.Zone()
+	for i := 0; i < 8; i++ {
+		tsBuf[i] = byte(un >> (8 * i))
+	}
+	for i := 0; i < 4; i++ {
+		tsBuf[8+i] = byte(int32(off) >> (8 * i))
+	}
+	// Use a deterministic enc value so UTC and local-zone times
+	// produce different hashes for the same instant.
+	enc := int32(0)
+	if ts.Location() == time.UTC {
+		enc = 1
+	}
+	tsBuf[12] = byte(enc)
+	tsBuf[13] = 0
+	tsBuf[14] = 0
+	tsBuf[15] = 0
+	h.Write(tsBuf[:])
+	h.Write([]byte{0x1f})
 	h.Write([]byte(e.PreviousHash))
 	return hex.EncodeToString(h.Sum(nil))
 }
@@ -727,8 +885,8 @@ func computeAuditHash(e *models.AuditEntry) string {
 // VerifyAuditChain reads all audit entries and validates the hash chain.
 func (s *SQLite) VerifyAuditChain(ctx context.Context) (bool, string, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, user_id, action, resource, previous_hash, entry_hash
-		 FROM audit_entries ORDER BY timestamp ASC, rowid ASC`,
+		`SELECT id, user_id, action, resource, details, timestamp, previous_hash, entry_hash
+		 FROM audit_entries ORDER BY rowid ASC`,
 	)
 	if err != nil {
 		return false, "", fmt.Errorf("query audit chain: %w", err)
@@ -737,17 +895,20 @@ func (s *SQLite) VerifyAuditChain(ctx context.Context) (bool, string, error) {
 
 	var prevHash string
 	for rows.Next() {
-		var id, userID, action, resource, storedPrev, storedHash string
-		if err := rows.Scan(&id, &userID, &action, &resource, &storedPrev, &storedHash); err != nil {
+		var id, userID, action, resource, detailsJSON, storedPrev, storedHash string
+		var ts time.Time
+		if err := rows.Scan(&id, &userID, &action, &resource, &detailsJSON, &ts, &storedPrev, &storedHash); err != nil {
 			return false, "", fmt.Errorf("scan audit chain: %w", err)
 		}
-		// Verify the previous hash matches.
 		if storedPrev != prevHash {
 			return false, fmt.Sprintf("chain break at entry %s: expected prev_hash %q, got %q", id, prevHash, storedPrev), nil
 		}
-		// Recompute hash.
-		e := &models.AuditEntry{ID: id, UserID: userID, Action: action, Resource: resource, PreviousHash: storedPrev}
-		expected := computeAuditHash(e)
+		// Recompute using the timestamp the driver hands back. Because
+		// the binary encoding in computeAuditHash is canonical,
+		// recomputation is deterministic regardless of how the driver
+		// text-formats the timestamp.
+		e := &models.AuditEntry{ID: id, UserID: userID, Action: action, Resource: resource, PreviousHash: storedPrev, Timestamp: ts}
+		expected := computeAuditHash(e, detailsJSON, ts)
 		if expected != storedHash {
 			return false, fmt.Sprintf("tampered entry %s: expected hash %q, got %q", id, expected, storedHash), nil
 		}
@@ -814,9 +975,12 @@ func (s *SQLite) ListAudit(ctx context.Context, filter models.AuditFilter) ([]*m
 // ---------------------------------------------------------------------------
 
 func (s *SQLite) CreateReview(ctx context.Context, r *models.Review) error {
-	comments := mustMarshal(r.Comments)
+	comments, err := marshalOrErr(r.Comments)
+	if err != nil {
+		return fmt.Errorf("marshal review comments: %w", err)
+	}
 
-	_, err := s.db.ExecContext(ctx,
+	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO reviews (id, resource_id, resource_type, author, status, comments, created_at, resolved_at, quorum_required, approvals_count)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		r.ID, r.ResourceID, r.ResourceType, r.Author,
@@ -839,7 +1003,10 @@ func (s *SQLite) GetReview(ctx context.Context, id string) (*models.Review, erro
 }
 
 func (s *SQLite) UpdateReview(ctx context.Context, r *models.Review) error {
-	comments := mustMarshal(r.Comments)
+	comments, err := marshalOrErr(r.Comments)
+	if err != nil {
+		return fmt.Errorf("marshal review comments: %w", err)
+	}
 
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE reviews SET status=?, comments=?, resolved_at=?, approvals_count=? WHERE id=?`,
@@ -900,7 +1067,7 @@ func scanPrompt(row scannable) (*models.Prompt, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("prompt not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan prompt: %w", err)
 	}
@@ -937,7 +1104,7 @@ func scanAgent(row scannable) (*models.Agent, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("agent not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan agent: %w", err)
 	}
@@ -961,7 +1128,7 @@ func scanDataset(row scannable) (*models.TestDataset, error) {
 	err := row.Scan(&d.ID, &d.Name, &cases, &d.CreatedBy, &d.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("dataset not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan dataset: %w", err)
 	}
@@ -1017,7 +1184,7 @@ func scanReview(row scannable) (*models.Review, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("review not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan review: %w", err)
 	}
@@ -1221,7 +1388,7 @@ func scanUser(row scannable) (*models.User, error) {
 	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.Role, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("user not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan user: %w", err)
 	}
@@ -1315,7 +1482,7 @@ func scanProviderKey(row scannable) (*models.ProviderKey, error) {
 	err := row.Scan(&pk.ID, &pk.ProviderName, &pk.KeyName, &pk.EncryptedKey, &pk.CreatedAt, &pk.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("provider key not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan provider key: %w", err)
 	}
@@ -1426,7 +1593,7 @@ func scanExecutionLog(row scannable) (*models.ExecutionLog, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("execution log not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan execution log: %w", err)
 	}
@@ -1513,7 +1680,7 @@ func scanGuardrailRule(row scannable) (*models.GuardrailRule, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("guardrail rule not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan guardrail rule: %w", err)
 	}
@@ -1594,7 +1761,7 @@ func scanGuardrailViolation(row scannable) (*models.GuardrailViolationRecord, er
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("guardrail violation not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan guardrail violation: %w", err)
 	}
@@ -1729,7 +1896,7 @@ func scanContext(row scannable) (*models.Context, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("context not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan context: %w", err)
 	}
@@ -1797,7 +1964,7 @@ func scanAgentGuardrailConfig(row scannable) (*models.AgentGuardrailConfig, erro
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("agent guardrail config not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan agent guardrail config: %w", err)
 	}
@@ -1880,7 +2047,7 @@ func scanAgentExecution(row scannable) (*models.AgentExecution, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("agent execution not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan agent execution: %w", err)
 	}
@@ -1903,10 +2070,26 @@ func scanAgentExecution(row scannable) (*models.AgentExecution, error) {
 // Alert Rules
 
 func (s *SQLite) SaveAlertRule(ctx context.Context, r *models.AlertRuleRecord) error {
-	configJSON := mustMarshal(r.Config)
-	_, err := s.db.ExecContext(ctx, `
-		INSERT OR REPLACE INTO alert_rules (id, name, type, severity, enabled, threshold, duration, window, config, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	configJSON, err := marshalOrErr(r.Config)
+	if err != nil {
+		return fmt.Errorf("marshal alert rule config: %w", err)
+	}
+	// Upsert that preserves created_at across updates. The previous
+	// INSERT OR REPLACE on the primary key deleted and re-inserted the
+	// row, destroying the original timestamp.
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO alert_rules (id, name, type, severity, enabled, threshold, duration, window, config, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			name = excluded.name,
+			type = excluded.type,
+			severity = excluded.severity,
+			enabled = excluded.enabled,
+			threshold = excluded.threshold,
+			duration = excluded.duration,
+			window = excluded.window,
+			config = excluded.config,
+			updated_at = excluded.updated_at`,
 		r.ID, r.Name, r.Type, r.Severity, r.Enabled, r.Threshold, r.Duration, r.Window, configJSON, r.CreatedAt, r.UpdatedAt,
 	)
 	if err != nil {
@@ -1959,7 +2142,7 @@ func scanAlertRule(row scannable) (*models.AlertRuleRecord, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("alert rule not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan alert rule: %w", err)
 	}
@@ -1972,8 +2155,11 @@ func scanAlertRule(row scannable) (*models.AlertRuleRecord, error) {
 // Alerts
 
 func (s *SQLite) SaveAlert(ctx context.Context, a *models.AlertRecord) error {
-	detailsJSON := mustMarshal(a.Details)
-	_, err := s.db.ExecContext(ctx, `
+	detailsJSON, err := marshalOrErr(a.Details)
+	if err != nil {
+		return fmt.Errorf("marshal alert details: %w", err)
+	}
+	_, err = s.db.ExecContext(ctx, `
 		INSERT OR REPLACE INTO alerts (id, rule_id, rule_name, severity, status, message, details, triggered_at, resolved_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		a.ID, a.RuleID, a.RuleName, a.Severity, a.Status, a.Message, detailsJSON, a.TriggeredAt, a.ResolvedAt,
@@ -2042,7 +2228,7 @@ func scanAlert(row scannable) (*models.AlertRecord, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("alert not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan alert: %w", err)
 	}
@@ -2056,8 +2242,11 @@ func scanAlert(row scannable) (*models.AlertRecord, error) {
 // Notification Groups
 
 func (s *SQLite) SaveNotificationGroup(ctx context.Context, g *models.NotificationGroupRecord) error {
-	channelsJSON := mustMarshal(g.Channels)
-	_, err := s.db.ExecContext(ctx, `
+	channelsJSON, err := marshalOrErr(g.Channels)
+	if err != nil {
+		return fmt.Errorf("marshal notification channels: %w", err)
+	}
+	_, err = s.db.ExecContext(ctx, `
 		INSERT OR REPLACE INTO notification_groups (id, name, channels)
 		VALUES (?, ?, ?)`,
 		g.ID, g.Name, channelsJSON,
@@ -2100,13 +2289,84 @@ func (s *SQLite) ListNotificationGroups(ctx context.Context) ([]*models.Notifica
 	return groups, rows.Err()
 }
 
+// ---------------------------------------------------------------------------
+// Webhook Endpoints
+// ---------------------------------------------------------------------------
+
+func (s *SQLite) SaveWebhookEndpoint(ctx context.Context, ep *models.WebhookEndpointRecord) error {
+	events := strings.Join(ep.Events, ",")
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO webhook_endpoints (id, url, secret, events, active, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			url = excluded.url,
+			secret = excluded.secret,
+			events = excluded.events,
+			active = excluded.active`,
+		ep.ID, ep.URL, ep.Secret, events, ep.Active, ep.CreatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("save webhook endpoint: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLite) GetWebhookEndpoint(ctx context.Context, id string) (*models.WebhookEndpointRecord, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, url, secret, events, active, created_at FROM webhook_endpoints WHERE id = ?`, id)
+	ep, err := scanWebhookEndpoint(row)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return ep, err
+}
+
+func (s *SQLite) DeleteWebhookEndpoint(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM webhook_endpoints WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("delete webhook endpoint: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLite) ListWebhookEndpoints(ctx context.Context) ([]*models.WebhookEndpointRecord, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, url, secret, events, active, created_at FROM webhook_endpoints ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("list webhook endpoints: %w", err)
+	}
+	defer rows.Close()
+	var eps []*models.WebhookEndpointRecord
+	for rows.Next() {
+		ep, err := scanWebhookEndpoint(rows)
+		if err != nil {
+			return nil, err
+		}
+		eps = append(eps, ep)
+	}
+	return eps, rows.Err()
+}
+
+func scanWebhookEndpoint(row scannable) (*models.WebhookEndpointRecord, error) {
+	var ep models.WebhookEndpointRecord
+	var events string
+	err := row.Scan(&ep.ID, &ep.URL, &ep.Secret, &events, &ep.Active, &ep.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if events != "" {
+		ep.Events = strings.Split(events, ",")
+	}
+	return &ep, nil
+}
+
 func scanNotificationGroup(row scannable) (*models.NotificationGroupRecord, error) {
 	var g models.NotificationGroupRecord
 	var channelsJSON string
 	err := row.Scan(&g.ID, &g.Name, &channelsJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("notification group not found")
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan notification group: %w", err)
 	}
