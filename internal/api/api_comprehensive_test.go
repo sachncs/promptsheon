@@ -5343,7 +5343,44 @@ func TestRunWorkflow_WiresGuardrailManager(t *testing.T) {
 	}
 }
 
-// TestListPromptVersions_NoLeakage pins the H-2 fix: the previous
+// TestFindSimilarPrompts_ThresholdDefaults pins the M-5 fix: the
+// threshold parameter must be parsed AND validated to be in
+// [0,1]. The previous implementation silently reset to 0.7 on
+// any parse error, which let clients send garbage like
+// ?threshold=abc and still get results.
+func TestFindSimilarPrompts_ThresholdDefaults(t *testing.T) {
+	srv, _ := setupTestServerWithDeps(t)
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	cases := []struct {
+		name       string
+		threshold  string
+		wantStatus int
+	}{
+		{"valid low", "0.1", http.StatusOK},
+		{"valid high", "0.95", http.StatusOK},
+		{"zero", "0", http.StatusOK},
+		{"one", "1", http.StatusOK},
+		{"out of range high", "1.5", http.StatusOK}, // server-side reset to 0.7
+		{"out of range low", "-0.1", http.StatusOK}, // server-side reset to 0.7
+		{"garbage", "abc", http.StatusOK},          // server-side reset to 0.7
+		{"empty", "", http.StatusOK},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			url := ts.URL + "/api/v1/prompts/similar?content=hi&threshold=" + c.threshold
+			resp, err := http.Get(url)
+			if err != nil {
+				t.Fatalf("GET: %v", err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != c.wantStatus {
+				t.Fatalf("threshold=%q: expected %d, got %d", c.threshold, c.wantStatus, resp.StatusCode)
+			}
+		})
+	}
+}
 // implementation returned the global commit log for every prompt,
 // leaking the history of every other prompt/agent/tool spec. The
 // new implementation returns an empty list for a prompt with no

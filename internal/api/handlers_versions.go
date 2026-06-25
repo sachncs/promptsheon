@@ -1,8 +1,8 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"promptsheon/internal/models"
@@ -104,8 +104,12 @@ func (s *Server) handleFindSimilarPrompts(w http.ResponseWriter, r *http.Request
 
 	threshold := 0.7
 	if t := r.URL.Query().Get("threshold"); t != "" {
-		if _, err := fmt.Sscanf(t, "%f", &threshold); err != nil {
-			threshold = 0.7
+		// M-5 fix: validate the parsed threshold. The previous
+		// implementation accepted any string and silently reset
+		// to 0.7 on parse failure (or accepted a value outside
+		// [0,1]). Reject out-of-range and unparseable values.
+		if v, err := strconv.ParseFloat(t, 64); err == nil && v >= 0 && v <= 1 {
+			threshold = v
 		}
 	}
 
