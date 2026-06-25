@@ -26,6 +26,11 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.ReadTimeout != 30 {
 		t.Errorf("ReadTimeout = %d, want 30", cfg.ReadTimeout)
 	}
+	// H-3 fix: ReadHeaderTimeout must default to a non-zero value so
+	// the server is not exposed to Slowloris attacks by default.
+	if cfg.ReadHeaderTimeout != 10 {
+		t.Errorf("ReadHeaderTimeout = %d, want 10 (Slowloris defence)", cfg.ReadHeaderTimeout)
+	}
 	if cfg.IdleTimeout != 120 {
 		t.Errorf("IdleTimeout = %d, want 120", cfg.IdleTimeout)
 	}
@@ -44,12 +49,14 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	os.Setenv("PROMPTSHEON_LOG_LEVEL", "debug")
 	os.Setenv("PROMPTSHEON_AUTH", "false")
 	os.Setenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT", "60")
+	os.Setenv("PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT", "5")
 	os.Setenv("PROMPTSHEON_RATE_LIMIT_RATE", "200")
 	defer os.Unsetenv("PROMPTSHEON_ADDR")
 	defer os.Unsetenv("PROMPTSHEON_DB_PATH")
 	defer os.Unsetenv("PROMPTSHEON_LOG_LEVEL")
 	defer os.Unsetenv("PROMPTSHEON_AUTH")
 	defer os.Unsetenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT")
+	defer os.Unsetenv("PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT")
 	defer os.Unsetenv("PROMPTSHEON_RATE_LIMIT_RATE")
 
 	cfg := LoadConfig()
@@ -68,6 +75,9 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	}
 	if cfg.WriteTimeout != 60 {
 		t.Errorf("WriteTimeout = %d, want 60", cfg.WriteTimeout)
+	}
+	if cfg.ReadHeaderTimeout != 5 {
+		t.Errorf("ReadHeaderTimeout = %d, want 5", cfg.ReadHeaderTimeout)
 	}
 	if cfg.RateLimitRate != 200 {
 		t.Errorf("RateLimitRate = %d, want 200", cfg.RateLimitRate)

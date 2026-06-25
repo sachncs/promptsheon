@@ -14,9 +14,10 @@ type Config struct {
 	Auth     bool   // Enable authentication and authorization
 
 	// Server timeouts
-	WriteTimeout int // Write timeout in seconds (default: 30)
-	ReadTimeout  int // Read timeout in seconds (default: 30)
-	IdleTimeout  int // Idle timeout in seconds (default: 120)
+	WriteTimeout       int // Write timeout in seconds (default: 30)
+	ReadTimeout        int // Read timeout in seconds (default: 30)
+	ReadHeaderTimeout  int // ReadHeader timeout in seconds (default: 10)
+	IdleTimeout        int // Idle timeout in seconds (default: 120)
 
 	// Rate limiting
 	RateLimitRate     int // Requests per interval (default: 100)
@@ -34,6 +35,9 @@ type Config struct {
 	// OpenTelemetry
 	OTelEndpoint string // OTLP gRPC endpoint (e.g., "jaeger:4317")
 	OTelInsecure bool   // Use insecure connection to OTel collector
+
+	// CORS
+	CORSOrigins string // Comma-separated allowed origins, or "*" to allow all (insecure)
 }
 
 // DefaultConfig returns the default configuration.
@@ -44,9 +48,10 @@ func DefaultConfig() Config {
 		LogLevel: "info",
 		Auth:     true,
 
-		WriteTimeout: 30,
-		ReadTimeout:  30,
-		IdleTimeout:  120,
+		WriteTimeout:      30,
+		ReadTimeout:       30,
+		ReadHeaderTimeout: 10,
+		IdleTimeout:       120,
 
 		RateLimitRate:     100,
 		RateLimitInterval: 60,
@@ -55,6 +60,11 @@ func DefaultConfig() Config {
 		CircuitBreakerFailureThreshold: 5,
 		CircuitBreakerSuccessThreshold: 3,
 		CircuitBreakerCooldown:         30,
+
+		// Default CORS policy: deny all cross-origin requests. Operators
+		// must explicitly set PROMPTSHEON_CORS_ORIGINS to a list of
+		// origins or "*" (for trusted local development only).
+		CORSOrigins: "",
 	}
 }
 
@@ -86,6 +96,11 @@ func LoadConfig() Config {
 	if v := os.Getenv("PROMPTSHEON_SERVER_READ_TIMEOUT"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.ReadTimeout = n
+		}
+	}
+	if v := os.Getenv("PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.ReadHeaderTimeout = n
 		}
 	}
 	if v := os.Getenv("PROMPTSHEON_SERVER_IDLE_TIMEOUT"); v != "" {
@@ -135,6 +150,31 @@ func LoadConfig() Config {
 	}
 	if v := os.Getenv("PROMPTSHEON_OTEL_INSECURE"); v == "true" || v == "1" || v == "yes" {
 		cfg.OTelInsecure = true
+	}
+
+	if v := os.Getenv("PROMPTSHEON_CORS_ORIGINS"); v != "" {
+		cfg.CORSOrigins = v
+	}
+
+	// Sanity-check the numeric config values. Operators can otherwise
+	// crash the server with PROMPTSHEON_RATE_LIMIT_RATE=-1 or similar.
+	if cfg.RateLimitRate < 0 {
+		cfg.RateLimitRate = 0
+	}
+	if cfg.RateLimitBurst < 0 {
+		cfg.RateLimitBurst = 0
+	}
+	if cfg.WriteTimeout < 0 {
+		cfg.WriteTimeout = 30
+	}
+	if cfg.ReadTimeout < 0 {
+		cfg.ReadTimeout = 30
+	}
+	if cfg.ReadHeaderTimeout < 0 {
+		cfg.ReadHeaderTimeout = 10
+	}
+	if cfg.IdleTimeout < 0 {
+		cfg.IdleTimeout = 120
 	}
 
 	return cfg
