@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,15 +29,15 @@ func (s *Server) handleListPrompts(w http.ResponseWriter, r *http.Request) error
 
 	// Parse limit parameter
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := fmt.Sscanf(v, "%d", &filter.Limit); err == nil && n == 1 && filter.Limit > 0 && filter.Limit <= 1000 {
-			// Use parsed value
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 1000 {
+			filter.Limit = n
 		}
 	}
 
 	// Parse offset parameter
 	if v := r.URL.Query().Get("offset"); v != "" {
-		if n, err := fmt.Sscanf(v, "%d", &filter.Offset); err == nil && n == 1 && filter.Offset >= 0 {
-			// Use parsed value
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			filter.Offset = n
 		}
 	}
 
@@ -83,7 +84,7 @@ func (s *Server) handleCreatePrompt(w http.ResponseWriter, r *http.Request) erro
 		Version:     1,
 		Status:      models.StatusDraft,
 		Environment: req.Environment,
-		CreatedBy:   "api",
+		CreatedBy:   callerID(r),
 		CreatedAt:   now,
 		UpdatedAt:   now,
 		Metadata:    req.Metadata,
@@ -188,8 +189,17 @@ func (s *Server) handleUpdatePrompt(w http.ResponseWriter, r *http.Request) erro
 
 func (s *Server) handleDeletePrompt(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
-	if err := s.db.DeletePrompt(r.Context(), id); err != nil {
+	// Pre-check existence so we can return a clean 404 and skip the
+	// audit write. The previous implementation relied on the SQL
+	// DELETE returning an error for unknown IDs, which produced an
+	// inconsistent audit trail (some 404s logged a delete, others
+	// did not). Fix: look up the prompt first, then delete + audit
+	// only if it exists.
+	if _, err := s.db.GetPrompt(r.Context(), id); err != nil {
 		return ErrNotFound
+	}
+	if err := s.db.DeletePrompt(r.Context(), id); err != nil {
+		return err
 	}
 	s.audit(r.Context(), "delete", "prompt:"+id, nil)
 	w.WriteHeader(http.StatusNoContent)
@@ -313,24 +323,23 @@ func (s *Server) handleRunPrompt(w http.ResponseWriter, r *http.Request) error {
 		model = p.ModelHint
 	}
 
-	// Resolve API key from vault if binding has api_key_ref.
-	// Note: API key is resolved here but currently passed to the provider
-	// through environment variables. Per-call key injection will be supported
-	// when the provider registry adds per-call configuration.
-	var apiKey string
+	// Resolve API key from vault if binding has api_key_ref. The key is
+	// injected into the per-call context so providers honour it for this
+	// single call without mutating the registry.
 	if p.Binding != nil && p.Binding.APIKeyRef != "" && s.vault != nil {
 		decrypted, err := s.vault.Decrypt(p.Binding.APIKeyRef)
-		if err == nil {
-			apiKey = decrypted
+		if err == nil && decrypted != "" {
+			r = r.WithContext(llm.WithPerCallKey(r.Context(), decrypted))
+		} else if s.logger != nil {
+			s.logger.Warn("vault: could not decrypt binding api_key_ref", "err", err, "prompt_id", p.ID)
 		}
 	}
 
-	// Get provider (with API key override if resolved from vault)
+	// Get provider.
 	provider, err := llm.Global.Get(providerName)
 	if err != nil {
 		return badRequest("provider not available: " + err.Error())
 	}
-	_ = apiKey // Reserved for future per-call key injection
 
 	// --- PRE-EXECUTION GUARDRAILS ---
 	if s.guardrailManager != nil {
@@ -723,6 +732,21 @@ func (s *Server) handleStreamPrompt(w http.ResponseWriter, r *http.Request) erro
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
+	// Lift the http.Server WriteTimeout for this specific response.
+	// Without this, the global 60s WriteTimeout would terminate any
+	// streaming LLM response that takes longer. SetReadDeadline is
+	// also lifted to time.Time{} (no deadline) so the connection
+	// stays open for the duration of the stream.
+	rc := http.NewResponseController(w)
+	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
+		// SetWriteDeadline may not be supported on some transports
+		// (e.g. HTTP/2). Log and continue; the response may simply
+		// time out at the server-wide limit.
+		if s.logger != nil {
+			s.logger.Debug("stream: SetWriteDeadline unsupported", "err", err)
+		}
+	}
+
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		return badRequest("streaming not supported")
@@ -1022,7 +1046,7 @@ func (s *Server) handleClonePrompt(w http.ResponseWriter, r *http.Request) error
 		Environment: existing.Environment,
 		Metadata:    existing.Metadata,
 		CASHash:     existing.CASHash,
-		CreatedBy:   "api",
+		CreatedBy:   callerID(r),
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}

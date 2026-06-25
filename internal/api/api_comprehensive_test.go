@@ -5020,6 +5020,35 @@ func TestPromptDeleteSuccessComprehensive(t *testing.T) {
 	}
 }
 
+// TestPromptDeleteNotFoundComprehensive pins the H-7 fix: deleting a
+// non-existent prompt must return 404 and must NOT emit an audit
+// entry. The previous implementation relied on the SQL DELETE
+// returning an error, which produced inconsistent audit behaviour
+// across paths.
+func TestPromptDeleteNotFoundComprehensive(t *testing.T) {
+	srv, db := setupTestServerWithDeps(t)
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	resp := doReq(t, "DELETE", ts.URL+"/api/v1/prompts/does-not-exist", "")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 for missing prompt, got %d", resp.StatusCode)
+	}
+
+	// Verify no audit entry was created for the missing delete.
+	// Drain the audit queue so the check is deterministic.
+	time.Sleep(150 * time.Millisecond)
+	ctx := context.Background()
+	entries, err := db.ListAudit(ctx, models.AuditFilter{Resource: "prompt:does-not-exist"})
+	if err != nil {
+		t.Fatalf("ListAudit: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected no audit entry for missing prompt delete, got %d", len(entries))
+	}
+}
+
 // =============================================================================
 // Agent delete not found
 // =============================================================================
