@@ -37,23 +37,23 @@ type Change struct {
 
 // Operation represents an operational transformation operation.
 type Operation struct {
-	Type      string `json:"type"`
-	Position  int    `json:"position"`
-	Content   string `json:"content,omitempty"`
-	Length    int    `json:"length,omitempty"`
+	Type     string `json:"type"`
+	Position int    `json:"position"`
+	Content  string `json:"content,omitempty"`
+	Length   int    `json:"length,omitempty"`
 }
 
 // Session represents a collaborative editing session.
 type Session struct {
-	ID           string              `json:"id"`
-	PromptID     string              `json:"prompt_id"`
-	Content      string              `json:"content"`
-	Version      int                 `json:"version"`
-	Cursors      map[string]*Cursor  `json:"cursors"`
-	Changes      []*Change           `json:"changes"`
-	Participants []string            `json:"participants"`
-	CreatedAt    time.Time           `json:"created_at"`
-	UpdatedAt    time.Time           `json:"updated_at"`
+	ID           string             `json:"id"`
+	PromptID     string             `json:"prompt_id"`
+	Content      string             `json:"content"`
+	Version      int                `json:"version"`
+	Cursors      map[string]*Cursor `json:"cursors"`
+	Changes      []*Change          `json:"changes"`
+	Participants []string           `json:"participants"`
+	CreatedAt    time.Time          `json:"created_at"`
+	UpdatedAt    time.Time          `json:"updated_at"`
 }
 
 // Manager manages collaborative editing sessions.
@@ -74,18 +74,18 @@ func NewManager() *Manager {
 func (m *Manager) CreateSession(promptID, initialContent string) *Session {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	session := &Session{
-		ID:       fmt.Sprintf("%d-%d", time.Now().UnixNano(), m.counter.Add(1)),
-		PromptID: promptID,
-		Content:  initialContent,
-		Version:  0,
-		Cursors:  make(map[string]*Cursor),
-		Changes:  make([]*Change, 0),
+		ID:        fmt.Sprintf("%d-%d", time.Now().UnixNano(), m.counter.Add(1)),
+		PromptID:  promptID,
+		Content:   initialContent,
+		Version:   0,
+		Cursors:   make(map[string]*Cursor),
+		Changes:   make([]*Change, 0),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	
+
 	m.sessions[session.ID] = session
 	return session
 }
@@ -94,7 +94,7 @@ func (m *Manager) CreateSession(promptID, initialContent string) *Session {
 func (m *Manager) GetSession(sessionID string) (*Session, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	session, exists := m.sessions[sessionID]
 	if !exists {
 		return nil, fmt.Errorf("session not found: %s", sessionID)
@@ -106,12 +106,12 @@ func (m *Manager) GetSession(sessionID string) (*Session, error) {
 func (m *Manager) ApplyChange(sessionID string, change *Change) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	session, exists := m.sessions[sessionID]
 	if !exists {
 		return fmt.Errorf("session not found: %s", sessionID)
 	}
-	
+
 	// Apply operational transformation
 	var newContent string
 	switch change.Type {
@@ -133,14 +133,14 @@ func (m *Manager) ApplyChange(sessionID string, change *Change) error {
 	default:
 		return fmt.Errorf("unknown change type: %s", change.Type)
 	}
-	
+
 	session.Content = newContent
 	session.Version++
 	change.Version = session.Version
 	change.Timestamp = time.Now()
 	session.Changes = append(session.Changes, change)
 	session.UpdatedAt = time.Now()
-	
+
 	return nil
 }
 
@@ -148,15 +148,15 @@ func (m *Manager) ApplyChange(sessionID string, change *Change) error {
 func (m *Manager) UpdateCursor(sessionID string, cursor *Cursor) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	session, exists := m.sessions[sessionID]
 	if !exists {
 		return fmt.Errorf("session not found: %s", sessionID)
 	}
-	
+
 	cursor.Timestamp = time.Now()
 	session.Cursors[cursor.UserID] = cursor
-	
+
 	// Add user to participants if not already there
 	found := false
 	for _, id := range session.Participants {
@@ -168,7 +168,7 @@ func (m *Manager) UpdateCursor(sessionID string, cursor *Cursor) error {
 	if !found {
 		session.Participants = append(session.Participants, cursor.UserID)
 	}
-	
+
 	return nil
 }
 
@@ -176,12 +176,12 @@ func (m *Manager) UpdateCursor(sessionID string, cursor *Cursor) error {
 func (m *Manager) GetChanges(sessionID string, sinceVersion int) []*Change {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	session, exists := m.sessions[sessionID]
 	if !exists {
 		return nil
 	}
-	
+
 	var changes []*Change
 	for _, change := range session.Changes {
 		if change.Version > sinceVersion {
@@ -195,7 +195,7 @@ func (m *Manager) GetChanges(sessionID string, sinceVersion int) []*Change {
 func (m *Manager) GetSessionContent(sessionID string) (string, int, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	session, exists := m.sessions[sessionID]
 	if !exists {
 		return "", 0, fmt.Errorf("session not found: %s", sessionID)
@@ -214,7 +214,7 @@ func (m *Manager) CloseSession(sessionID string) {
 func (m *Manager) GetActiveSessions() []*Session {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	sessions := make([]*Session, 0, len(m.sessions))
 	for _, s := range m.sessions {
 		sessions = append(sessions, s)

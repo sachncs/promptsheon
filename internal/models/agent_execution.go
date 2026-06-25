@@ -22,14 +22,14 @@ type AgentExecution struct {
 
 // AgentExecutionStep records a single step within an agent execution.
 type AgentExecutionStep struct {
-	StepID          string         `json:"step_id"`
-	Status          string         `json:"status"`
-	Output          map[string]any `json:"output,omitempty"`
-	Error           string         `json:"error,omitempty"`
-	ToolCalls       []ToolCall     `json:"tool_calls,omitempty"`
-	LatencyMs       int64          `json:"latency_ms"`
-	CostUSD         float64        `json:"cost_usd,omitempty"`
-	TokensUsed      int            `json:"tokens_used,omitempty"`
-	Model           string         `json:"model,omitempty"`
-	Provider        string         `json:"provider,omitempty"`
+	StepID     string         `json:"step_id"`
+	Status     string         `json:"status"`
+	Output     map[string]any `json:"output,omitempty"`
+	Error      string         `json:"error,omitempty"`
+	ToolCalls  []ToolCall     `json:"tool_calls,omitempty"`
+	LatencyMs  int64          `json:"latency_ms"`
+	CostUSD    float64        `json:"cost_usd,omitempty"`
+	TokensUsed int            `json:"tokens_used,omitempty"`
+	Model      string         `json:"model,omitempty"`
+	Provider   string         `json:"provider,omitempty"`
 }

@@ -12,8 +12,8 @@ import (
 // CommitA and CommitB hashes identify the two sides of the diff
 // and the TreeDiffs are per-entry comparisons.
 type DiffResult struct {
-	CommitA  string
-	CommitB  string
+	CommitA   string
+	CommitB   string
 	TreeDiffs []DiffEntry
 }
 

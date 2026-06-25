@@ -78,16 +78,16 @@ type EndpointStore interface {
 
 // Dispatcher delivers events to registered webhook endpoints.
 type Dispatcher struct {
-	mu            sync.RWMutex
-	endpoints     map[string]*Endpoint
-	store         EndpointStore
-	client        *http.Client
-	logger        *slog.Logger
-	deliveries    []Delivery
+	mu             sync.RWMutex
+	endpoints      map[string]*Endpoint
+	store          EndpointStore
+	client         *http.Client
+	logger         *slog.Logger
+	deliveries     []Delivery
 	deliveriesHead int
 	deliveriesLen  int
-	maxRetries    int
-	maxDeliveries int
+	maxRetries     int
+	maxDeliveries  int
 }
 
 // NewDispatcher creates a webhook dispatcher.

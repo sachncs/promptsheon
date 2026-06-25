@@ -40,7 +40,7 @@ type TreeEntry struct {
 //   - Blob:   Data is set; everything else is zero.
 //   - Tree:   Entries is set; everything else is zero.
 //   - Commit: TreeHash, Parents, Author, Message, Timestamp, and
-//             Telemetry are set; Data and Entries are zero.
+//     Telemetry are set; Data and Entries are zero.
 //
 // The kind is inferred from which fields are populated, not stored
 // explicitly. This keeps the JSON shape tiny and matches how the

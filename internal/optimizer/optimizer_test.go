@@ -5,18 +5,18 @@ import (
 	"testing"
 
 	"github.com/sachn-cs/promptsheon/internal/llm"
-	"github.com/sachn-cs/promptsheon/internal/optimizer"
 	"github.com/sachn-cs/promptsheon/internal/models"
+	"github.com/sachn-cs/promptsheon/internal/optimizer"
 )
 
 func TestAnalyzePrompt(t *testing.T) {
 	opt := optimizer.NewOptimizer(nil)
 
 	tests := []struct {
-		name     string
-		prompt   *models.Prompt
-		wantMin  float64
-		wantMax  float64
+		name    string
+		prompt  *models.Prompt
+		wantMin float64
+		wantMax float64
 	}{
 		{
 			name: "simple prompt",
@@ -96,9 +96,9 @@ func TestOptimizePrompt(t *testing.T) {
 	opt := optimizer.NewOptimizer(provider)
 
 	prompt := &models.Prompt{
-		ID:      "test-prompt",
-		Name:    "Test Prompt",
-		Content: "Summarize this text: {{text}}",
+		ID:        "test-prompt",
+		Name:      "Test Prompt",
+		Content:   "Summarize this text: {{text}}",
 		Variables: []models.Variable{{Name: "text"}},
 	}
 

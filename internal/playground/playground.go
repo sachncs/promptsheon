@@ -22,44 +22,44 @@ type Template struct {
 
 // RunRequest represents a request to run a prompt in the playground.
 type RunRequest struct {
-	PromptID   string            `json:"prompt_id,omitempty"`
-	Content    string            `json:"content"`
-	Variables  map[string]string `json:"variables"`
-	Model      string            `json:"model"`
-	SystemMsg  string            `json:"system_message,omitempty"`
-	MaxTokens  int               `json:"max_tokens"`
-	Temperature float64          `json:"temperature"`
+	PromptID    string            `json:"prompt_id,omitempty"`
+	Content     string            `json:"content"`
+	Variables   map[string]string `json:"variables"`
+	Model       string            `json:"model"`
+	SystemMsg   string            `json:"system_message,omitempty"`
+	MaxTokens   int               `json:"max_tokens"`
+	Temperature float64           `json:"temperature"`
 }
 
 // RunResponse represents the result of a playground run.
 type RunResponse struct {
-	Content      string        `json:"content"`
-	Model        string        `json:"model"`
-	Tokens       int           `json:"tokens"`
-	LatencyMs    int64         `json:"latency_ms"`
-	Cost         float64       `json:"cost_usd"`
-	Timestamp    time.Time     `json:"timestamp"`
+	Content   string    `json:"content"`
+	Model     string    `json:"model"`
+	Tokens    int       `json:"tokens"`
+	LatencyMs int64     `json:"latency_ms"`
+	Cost      float64   `json:"cost_usd"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // CompareRequest represents a request to compare multiple prompts.
 type CompareRequest struct {
-	Prompts   []ComparePrompt `json:"prompts"`
-	Model     string          `json:"model"`
+	Prompts   []ComparePrompt   `json:"prompts"`
+	Model     string            `json:"model"`
 	Variables map[string]string `json:"variables"`
 }
 
 // ComparePrompt is a prompt to compare.
 type ComparePrompt struct {
-	ID       string `json:"id,omitempty"`
-	Name     string `json:"name"`
-	Content  string `json:"content"`
+	ID      string `json:"id,omitempty"`
+	Name    string `json:"name"`
+	Content string `json:"content"`
 }
 
 // CompareResult contains results for a single prompt comparison.
 type CompareResult struct {
-	Name       string      `json:"name"`
-	Response   *RunResponse `json:"response"`
-	Rank       int         `json:"rank"`
+	Name     string       `json:"name"`
+	Response *RunResponse `json:"response"`
+	Rank     int          `json:"rank"`
 }
 
 // Playground provides prompt testing capabilities.
@@ -79,22 +79,22 @@ func (p *Playground) Run(ctx context.Context, provider llm.Provider, req *RunReq
 	if req.PromptID == "" && req.Content == "" {
 		return nil, fmt.Errorf("prompt content or ID required")
 	}
-	
+
 	content := req.Content
-	
+
 	// Replace variables
 	for k, v := range req.Variables {
 		placeholder := fmt.Sprintf("{{%s}}", k)
 		content = replaceAll(content, placeholder, v)
 	}
-	
+
 	// Build messages
 	messages := []llm.Message{}
 	if req.SystemMsg != "" {
 		messages = append(messages, llm.Message{Role: "system", Content: req.SystemMsg})
 	}
 	messages = append(messages, llm.Message{Role: "user", Content: content})
-	
+
 	// Set defaults
 	maxTokens := req.MaxTokens
 	if maxTokens <= 0 {
@@ -108,9 +108,9 @@ func (p *Playground) Run(ctx context.Context, provider llm.Provider, req *RunReq
 	if model == "" {
 		model = "gpt-4"
 	}
-	
+
 	start := time.Now()
-	
+
 	resp, err := provider.Complete(ctx, &llm.Request{
 		Model:       model,
 		Messages:    messages,
@@ -120,9 +120,9 @@ func (p *Playground) Run(ctx context.Context, provider llm.Provider, req *RunReq
 	if err != nil {
 		return nil, err
 	}
-	
+
 	latency := time.Since(start).Milliseconds()
-	
+
 	return &RunResponse{
 		Content:   resp.Content,
 		Model:     model,
@@ -136,26 +136,26 @@ func (p *Playground) Run(ctx context.Context, provider llm.Provider, req *RunReq
 // Compare runs multiple prompts and compares results.
 func (p *Playground) Compare(ctx context.Context, provider llm.Provider, req *CompareRequest) ([]*CompareResult, error) {
 	results := make([]*CompareResult, len(req.Prompts))
-	
+
 	for i, prompt := range req.Prompts {
 		runReq := &RunRequest{
 			Content:   prompt.Content,
 			Model:     req.Model,
 			Variables: req.Variables,
 		}
-		
+
 		resp, err := p.Run(ctx, provider, runReq)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		results[i] = &CompareResult{
 			Name:     prompt.Name,
 			Response: resp,
 			Rank:     i + 1,
 		}
 	}
-	
+
 	return results, nil
 }
 

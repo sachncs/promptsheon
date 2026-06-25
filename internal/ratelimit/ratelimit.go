@@ -14,12 +14,12 @@ import (
 
 // Limiter enforces rate limits per API key using a token bucket.
 type Limiter struct {
-	mu         sync.Mutex
-	buckets    map[string]*bucket
-	rate       int           // tokens per interval
-	interval   time.Duration // refill interval
-	burst      int           // max tokens (bucket capacity)
-	stop       chan struct{}
+	mu          sync.Mutex
+	buckets     map[string]*bucket
+	rate        int           // tokens per interval
+	interval    time.Duration // refill interval
+	burst       int           // max tokens (bucket capacity)
+	stop        chan struct{}
 	cleanupDone chan struct{}
 }
 

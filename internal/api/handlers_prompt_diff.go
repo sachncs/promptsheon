@@ -31,17 +31,17 @@ func (s *Server) handlePromptDiff(w http.ResponseWriter, r *http.Request) error 
 
 	// Compare the objects
 	diff := map[string]any{
-		"v1_hash":       v1Hash,
-		"v2_hash":       v2Hash,
-		"v1_data":       obj1.Data,
-		"v2_data":       obj2.Data,
-		"v1_tree_hash":  obj1.TreeHash,
-		"v2_tree_hash":  obj2.TreeHash,
-		"v1_timestamp":  obj1.Timestamp,
-		"v2_timestamp":  obj2.Timestamp,
-		"v1_message":    obj1.Message,
-		"v2_message":    obj2.Message,
-		"same_content":  obj1.Data == obj2.Data && obj1.TreeHash == obj2.TreeHash,
+		"v1_hash":      v1Hash,
+		"v2_hash":      v2Hash,
+		"v1_data":      obj1.Data,
+		"v2_data":      obj2.Data,
+		"v1_tree_hash": obj1.TreeHash,
+		"v2_tree_hash": obj2.TreeHash,
+		"v1_timestamp": obj1.Timestamp,
+		"v2_timestamp": obj2.Timestamp,
+		"v1_message":   obj1.Message,
+		"v2_message":   obj2.Message,
+		"same_content": obj1.Data == obj2.Data && obj1.TreeHash == obj2.TreeHash,
 	}
 
 	writeJSON(w, http.StatusOK, diff)
