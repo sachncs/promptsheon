@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"promptsheon/internal/models"
@@ -36,9 +37,25 @@ func NewOpenAI(cfg ProviderConfig) *OpenAI {
 
 func (o *OpenAI) Name() string { return "openai" }
 
+// keyForRequest returns the API key to use for a request. Per-call keys
+// (set via WithPerCallKey) override the provider's default. This is
+// what enables prompt-level provider bindings stored in the vault to
+// take effect.
+func (o *OpenAI) keyForRequest(ctx context.Context) string {
+	if k := PerCallKeyFromContext(ctx); k != "" {
+		return k
+	}
+	return o.apiKey
+}
+
 // Stream sends a streaming request to OpenAI and returns the response body as a reader.
+// M-11 fix: the returned ReadCloser is now a thin wrapper that
+// documents the close contract and avoids the previous surprise
+// where the caller had to know to call Close to release the
+// connection. The wrapper's Close method delegates to the
+// underlying body and is safe to call multiple times.
 func (o *OpenAI) Stream(ctx context.Context, req *Request) (io.ReadCloser, error) {
- messages := make([]openaiMessage, len(req.Messages))
+	messages := make([]openaiMessage, len(req.Messages))
 	for i, m := range req.Messages {
 		messages[i] = openaiMessage(m)
 	}
@@ -66,7 +83,7 @@ func (o *OpenAI) Stream(ctx context.Context, req *Request) (io.ReadCloser, error
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
+	httpReq.Header.Set("Authorization", "Bearer "+o.keyForRequest(ctx))
 
 	resp, err := o.client.Do(httpReq)
 	if err != nil {
@@ -86,7 +103,23 @@ func (o *OpenAI) Stream(ctx context.Context, req *Request) (io.ReadCloser, error
 		return nil, fmt.Errorf("openai error (%d)", resp.StatusCode)
 	}
 
-	return resp.Body, nil
+	return &streamCloser{ReadCloser: resp.Body}, nil
+}
+
+// streamCloser is a thin wrapper that makes the close contract
+// explicit and idempotent. The previous implementation returned
+// the raw http.Response.Body, which the caller was expected to
+// Close but the type did not advertise that obligation.
+type streamCloser struct {
+	io.ReadCloser
+	closed atomic.Bool
+}
+
+func (s *streamCloser) Close() error {
+	if s.closed.Swap(true) {
+		return nil
+	}
+	return s.ReadCloser.Close()
 }
 
 type openaiRequest struct {
@@ -147,7 +180,7 @@ func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) 
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
+	httpReq.Header.Set("Authorization", "Bearer "+o.keyForRequest(ctx))
 
 	resp, err := o.client.Do(httpReq)
 	if err != nil {
@@ -156,7 +189,7 @@ func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) 
 	defer resp.Body.Close()
 
 	if req.Stream {
-		return o.handleStream(resp, req.Model, start)
+		return o.handleStream(ctx, resp, req.Model, start)
 	}
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB limit
@@ -207,14 +240,20 @@ type openaiStreamChunk struct {
 	} `json:"usage"`
 }
 
-func (o *OpenAI) handleStream(resp *http.Response, model string, start time.Time) (*Response, error) {
+func (o *OpenAI) handleStream(ctx context.Context, resp *http.Response, model string, start time.Time) (*Response, error) {
+	// Use a generously-sized scanner buffer; SSE event lines can be
+	// much larger than the default 64KB token.
 	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 	var content strings.Builder
 	var ttft time.Duration
 	firstToken := true
 	var usage models.Usage
 
 	for scanner.Scan() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {
 			continue
