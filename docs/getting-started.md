@@ -39,7 +39,7 @@ The server starts and exposes a REST API on the configured address.
 
 ```bash
 curl http://localhost:8080/health
-# {"status":"ok","version":"1.0.0","uptime":"2.3s"}
+# {"status":"ok","version":"0.3.0","uptime":"2.3s"}
 ```
 
 ## Create a Prompt
@@ -139,3 +139,16 @@ curl -X POST http://localhost:8080/api/v1/agents \
 - [Workflows](workflows.md) — Build multi-step agent workflows
 - [Evaluations](evaluations.md) — Test prompts against datasets
 - [Guardrails](guardrails.md) — Enforce content policies
+- [Security](security.md) — the threat model and the operator checklist
+- [Architecture](architecture.md) — the system diagram and package layout
+- [Modules](modules.md) — one-line purposes for every Go package
+- [Algorithms](algorithms.md) — BM25, retry, circuit breaker, audit chain, vault, HMAC
+- [Design Decisions](design-decisions.md) — and the [ADRs](adr/README.md)
+- [CLI](cli.md) — the `promptsheon` client binary
+- [SDK](sdk.md) — the Go client library
+- [Observability](observability.md) — logs, traces, metrics, retention
+- [Troubleshooting](troubleshooting.md) — common problems
+- [Glossary](glossary.md) — terminology reference
+- [FAQ](faq.md) — frequently asked questions
+- [Development](development.md) — for contributors
+- [Testing](testing.md) — test layers and conventions

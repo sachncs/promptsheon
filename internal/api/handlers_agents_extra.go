@@ -35,7 +35,7 @@ func (s *Server) handleForkAgent(w http.ResponseWriter, r *http.Request) error {
 		Status:      models.StatusDraft,
 		IsTemplate:  false,
 		ParentID:    original.ID,
-		CreatedBy:   "api",
+		CreatedBy:   callerID(r),
 		Tags:        append([]string{}, original.Tags...),
 		CreatedAt:   now,
 		UpdatedAt:   now,

@@ -1,7 +1,13 @@
 package api
 
 import (
+	"context"
+	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"os"
+	"strings"
 
 	"promptsheon/internal/webhook"
 )
@@ -34,6 +40,9 @@ func (s *Server) handleCreateWebhook(w http.ResponseWriter, r *http.Request) err
 	if len(req.Events) == 0 {
 		return &HTTPError{Status: http.StatusBadRequest, Message: "at least one event is required"}
 	}
+	if err := ValidateWebhookURL(req.URL); err != nil {
+		return &HTTPError{Status: http.StatusBadRequest, Message: fmt.Sprintf("invalid url: %v", err)}
+	}
 	ep := &webhook.Endpoint{
 		ID:     generateID(),
 		URL:    req.URL,
@@ -56,5 +65,92 @@ func (s *Server) handleDeleteWebhook(w http.ResponseWriter, r *http.Request) err
 	}
 	s.webhooks.Remove(id)
 	writeJSON(w, http.StatusOK, map[string]string{"deleted": id})
+	return nil
+}
+
+// ValidateWebhookURL performs the SSRF protection for inbound webhook
+// registrations. The check rejects:
+//
+//   - non-http(s) schemes
+//   - URLs that resolve to loopback / private / link-local IPs
+//     (including cloud metadata endpoints like 169.254.169.254)
+//   - hosts that are themselves loopback names
+//
+// Operators can opt-in to allowing private/loopback targets for local
+// development by setting PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE=true. The
+// default is fail-closed.
+func ValidateWebhookURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("parse url: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("unsupported scheme %q (must be http or https)", u.Scheme)
+	}
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("missing host")
+	}
+	// Reject obvious loopback / metadata host names even if we cannot
+	// resolve them, so an operator cannot register `localhost` and have
+	// it pass on a system where the resolution is slow / cached.
+	lower := strings.ToLower(host)
+	if lower == "localhost" || strings.HasSuffix(lower, ".localhost") ||
+		lower == "metadata.google.internal" || strings.HasSuffix(lower, ".internal") {
+		if !webhookAllowPrivate() {
+			return fmt.Errorf("loopback / metadata hostnames are not allowed")
+		}
+	}
+
+	// Resolve every IP that the host maps to. Reject the URL if any of
+	// them is in a blocked range. This is the standard DNS-rebinding
+	// mitigation: validate at registration time AND at delivery time.
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return fmt.Errorf("resolve host: %w", err)
+	}
+	if len(ips) == 0 {
+		return fmt.Errorf("host did not resolve")
+	}
+	if webhookAllowPrivate() {
+		return nil
+	}
+	for _, ip := range ips {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+			return fmt.Errorf("host resolves to disallowed address %s", ip)
+		}
+	}
+	return nil
+}
+
+func webhookAllowPrivate() bool {
+	return os.Getenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE") == "true"
+}
+
+// ResolveAndValidateWebhook is the same as ValidateWebhookURL but is
+// intended to be called at delivery time as a DNS-rebinding defence: the
+// IP set can change between registration and invocation.
+func ResolveAndValidateWebhook(ctx context.Context, rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return err
+	}
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("missing host")
+	}
+	resolver := &net.Resolver{}
+	ips, err := resolver.LookupIP(ctx, "ip", host)
+	if err != nil {
+		return err
+	}
+	if webhookAllowPrivate() {
+		return nil
+	}
+	for _, ip := range ips {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
+			return fmt.Errorf("host resolves to disallowed address %s", ip)
+		}
+	}
 	return nil
 }

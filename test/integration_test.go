@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -38,6 +39,7 @@ func setupServer(t *testing.T) *httptest.Server {
 	collector := metrics.NewCollector()
 
 	srv := api.NewServer(db, logger, api.WithEvalRunner(evalRunner), api.WithTracing(spans, collector))
+	srv.StartAuditWorkers(context.Background(), 2)
 	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
 	return ts

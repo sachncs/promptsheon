@@ -5,6 +5,7 @@ package trace
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 )
 
@@ -124,12 +125,24 @@ func WithSpanContext(ctx context.Context, s *Span) context.Context {
 	return context.WithValue(ctx, spanContextKey, s)
 }
 
-// generateID creates a simple ID. For production, use UUID or similar.
+// idCounter is an atomic counter that disambiguates IDs created in
+// the same nanosecond. UnixNano alone is not unique when two spans
+// are created back-to-back on a fast machine, so we append a
+// process-wide counter to guarantee uniqueness.
+var idCounter atomic.Uint64
+
+// generateID creates a unique span ID. The ID is collision-safe even
+// for two spans created in the same nanosecond because we mix the
+// UnixNano timestamp with an atomic counter.
 func GenerateID() string {
-	return fmt.Sprintf("span-%d", time.Now().UnixNano())
+	n := idCounter.Add(1)
+	return fmt.Sprintf("span-%d-%d", time.Now().UnixNano(), n)
 }
 
-// GenerateTraceID creates a trace identifier.
+// GenerateTraceID creates a unique trace identifier. As with
+// GenerateID, the timestamp is combined with a counter to guarantee
+// uniqueness under burst creation.
 func GenerateTraceID() string {
-	return fmt.Sprintf("trace-%d", time.Now().UnixNano())
+	n := idCounter.Add(1)
+	return fmt.Sprintf("trace-%d-%d", time.Now().UnixNano(), n)
 }

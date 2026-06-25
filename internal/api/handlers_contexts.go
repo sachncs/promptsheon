@@ -1,8 +1,8 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"promptsheon/internal/models"
@@ -19,15 +19,15 @@ func (s *Server) handleListContexts(w http.ResponseWriter, r *http.Request) erro
 
 	// Parse limit parameter
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := fmt.Sscanf(v, "%d", &filter.Limit); err == nil && n == 1 && filter.Limit > 0 && filter.Limit <= 1000 {
-			// Use parsed value
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 1000 {
+			filter.Limit = n
 		}
 	}
 
 	// Parse offset parameter
 	if v := r.URL.Query().Get("offset"); v != "" {
-		if n, err := fmt.Sscanf(v, "%d", &filter.Offset); err == nil && n == 1 && filter.Offset >= 0 {
-			// Use parsed value
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			filter.Offset = n
 		}
 	}
 

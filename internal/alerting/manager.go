@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -341,12 +342,36 @@ func (m *Manager) ResolveAlert(id string) bool {
 	return false
 }
 
+// getNotificationChannels returns the channels that should receive
+// notifications for the given rule. Selection order:
+//
+//  1. A group whose Name matches the rule's Severity (case-insensitive)
+//  2. A group whose Name matches the rule's Type
+//  3. The first group whose ID is "default"
+//  4. A hard-coded ["webhook"] fallback so alerts are never silently dropped
+//
+// The previous implementation always returned the first group in the
+// map, which meant severity-based routing was broken as soon as more
+// than one group was registered.
 func (m *Manager) getNotificationChannels(rule *AlertRule) []string {
-	// Find notification group for this rule's severity
+	severityKey := strings.ToLower(string(rule.Severity))
+	typeKey := strings.ToLower(rule.Type)
+	var defaultGroup *NotificationGroup
 	for _, group := range m.groups {
-		return group.Channels
+		name := strings.ToLower(group.Name)
+		if name == severityKey {
+			return group.Channels
+		}
+		if name == typeKey {
+			return group.Channels
+		}
+		if group.ID == "default" {
+			defaultGroup = group
+		}
 	}
-	// Default to webhook
+	if defaultGroup != nil {
+		return defaultGroup.Channels
+	}
 	return []string{"webhook"}
 }
 

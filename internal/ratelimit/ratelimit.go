@@ -5,17 +5,22 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+
+	"promptsheon/internal/auth"
 )
 
 // Limiter enforces rate limits per API key using a token bucket.
 type Limiter struct {
-	mu       sync.Mutex
-	buckets  map[string]*bucket
-	rate     int           // tokens per interval
-	interval time.Duration // refill interval
-	burst    int           // max tokens (bucket capacity)
+	mu         sync.Mutex
+	buckets    map[string]*bucket
+	rate       int           // tokens per interval
+	interval   time.Duration // refill interval
+	burst      int           // max tokens (bucket capacity)
+	stop       chan struct{}
+	cleanupDone chan struct{}
 }
 
 type bucket struct {
@@ -71,25 +76,46 @@ func NewLimiter(cfg Config) *Limiter {
 		rate:     cfg.Rate,
 		interval: cfg.Interval,
 		burst:    cfg.Burst,
+		stop:     make(chan struct{}),
 	}
 	// Start background cleanup of stale buckets.
 	go l.cleanup()
 	return l
 }
 
+// Stop terminates the background cleanup goroutine. Safe to call more
+// than once.
+func (l *Limiter) Stop() {
+	l.mu.Lock()
+	select {
+	case <-l.stop:
+		// already stopped
+	default:
+		close(l.stop)
+	}
+	l.mu.Unlock()
+	<-l.cleanupDone
+}
+
 // cleanup periodically removes stale rate limit buckets to prevent memory leaks.
 func (l *Limiter) cleanup() {
+	defer close(l.cleanupDone)
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
-	for range ticker.C {
-		l.mu.Lock()
-		cutoff := time.Now().Add(-10 * time.Minute)
-		for key, b := range l.buckets {
-			if b.lastFill.Before(cutoff) {
-				delete(l.buckets, key)
+	for {
+		select {
+		case <-l.stop:
+			return
+		case <-ticker.C:
+			l.mu.Lock()
+			cutoff := time.Now().Add(-10 * time.Minute)
+			for key, b := range l.buckets {
+				if b.lastFill.Before(cutoff) {
+					delete(l.buckets, key)
+				}
 			}
+			l.mu.Unlock()
 		}
-		l.mu.Unlock()
 	}
 }
 
@@ -135,19 +161,28 @@ func (l *Limiter) Middleware(next http.Handler) http.Handler {
 	})
 }
 
+// extractKey derives the rate-limit bucket key from the request.
+//
+// SECURITY: the previous implementation keyed off the raw bearer token
+// value, which meant an attacker spamming with random tokens could grow
+// the bucket map to millions of entries between sweeps. We now key off
+// the authenticated user ID when auth has run, and the client IP
+// otherwise. Using the validated user ID (not the raw token) means
+// changing tokens for the same user still hits the same bucket.
 func extractKey(r *http.Request) string {
-	// Try Authorization header
-	if auth := r.Header.Get("Authorization"); auth != "" {
-		if len(auth) > 7 && auth[:7] == "Bearer " {
-			return auth[7:]
+	if u, ok := auth.UserFromContext(r.Context()); ok && u != nil && u.ID != "" {
+		return "user:" + u.ID
+	}
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if i := strings.IndexByte(xff, ','); i >= 0 {
+			return "ip:" + strings.TrimSpace(xff[:i])
 		}
+		return "ip:" + strings.TrimSpace(xff)
 	}
-	// Fall back to query param
-	if key := r.URL.Query().Get("api_key"); key != "" {
-		return key
+	if rip := r.Header.Get("X-Real-IP"); rip != "" {
+		return "ip:" + strings.TrimSpace(rip)
 	}
-	// Fall back to remote addr
-	return r.RemoteAddr
+	return "ip:" + r.RemoteAddr
 }
 
 // Reset clears all buckets.

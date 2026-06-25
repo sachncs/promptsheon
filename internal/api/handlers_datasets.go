@@ -38,7 +38,7 @@ func (s *Server) handleCreateDataset(w http.ResponseWriter, r *http.Request) err
 		ID:        generateID(),
 		Name:      req.Name,
 		Cases:     req.Cases,
-		CreatedBy: "api",
+		CreatedBy: callerID(r),
 		CreatedAt: time.Now(),
 	}
 
@@ -133,7 +133,7 @@ func (s *Server) handleImportDataset(w http.ResponseWriter, r *http.Request) err
 		ID:        generateID(),
 		Name:      req.Name,
 		Cases:     req.Cases,
-		CreatedBy: "api",
+		CreatedBy: callerID(r),
 		CreatedAt: time.Now(),
 	}
 

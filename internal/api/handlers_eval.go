@@ -1,12 +1,11 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"promptsheon/internal/eval"
-	"promptsheon/internal/llm"
 	"promptsheon/internal/models"
 )
 
@@ -31,13 +30,15 @@ func (s *Server) handleRunEval(w http.ResponseWriter, r *http.Request) error {
 		return ErrNotFound
 	}
 
-	// Use the configured eval runner if available, otherwise build a default one.
-	runner := s.evalRunner
-	if runner == nil {
-		provider := llm.NewMock("stub output — configure LLM provider for real evals")
-		scorers := buildScorers(req.Scorers)
-		runner = eval.NewRunner(provider, scorers...)
+	// SECURITY/RELIABILITY: do not silently fall back to a mock LLM
+	// provider. The previous behaviour returned a fake "success" with
+	// canned text, which made operators believe their model had run
+	// when it had not. If no eval runner is configured, refuse the
+	// request with 503 so the operator notices the misconfiguration.
+	if s.evalRunner == nil {
+		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "no eval runner configured: install an LLM provider or call WithEvalRunner"}
 	}
+	runner := s.evalRunner
 
 	startedAt := time.Now()
 
@@ -200,15 +201,15 @@ func (s *Server) handleListEvalRuns(w http.ResponseWriter, r *http.Request) erro
 
 	// Parse limit parameter
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := fmt.Sscanf(v, "%d", &filter.Limit); err == nil && n == 1 && filter.Limit > 0 && filter.Limit <= 1000 {
-			// Use parsed value
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 1000 {
+			filter.Limit = n
 		}
 	}
 
 	// Parse offset parameter
 	if v := r.URL.Query().Get("offset"); v != "" {
-		if n, err := fmt.Sscanf(v, "%d", &filter.Offset); err == nil && n == 1 && filter.Offset >= 0 {
-			// Use parsed value
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			filter.Offset = n
 		}
 	}
 

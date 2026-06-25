@@ -72,11 +72,13 @@ Tool inputs support template interpolation:
 
 ## Execution Model
 
-1. **DAG validation** — cycles are detected and rejected before execution.
-2. **Topological sort** — steps are grouped into levels of independent steps.
-3. **Level-by-level execution** — all steps in a level run concurrently.
-4. **Failure propagation** — if a step fails, all downstream dependents are skipped.
-5. **Cancellation** — passing a cancelled context halts execution gracefully.
+1. **DAG validation** — cycles are detected and rejected before execution. The validator uses a depth-first search and rejects on the first back-edge.
+2. **Topological sort** — steps are grouped into levels of independent steps (Kahn's algorithm). A step with no dependencies is on level 0; a step whose dependencies are all on level ≤ N-1 is on level N.
+3. **Level-by-level execution** — all steps in a level run concurrently. The next level starts only when the previous level is fully resolved.
+4. **Failure propagation** — if a step fails, all transitive descendants are marked `skipped` and never start.
+5. **Cancellation** — a cancelled `context.Context` is honoured by every step. In-flight steps are given a chance to clean up, then marked `cancelled`.
+
+See [Algorithms — Workflow DAG execution](algorithms.md#workflow-dag-execution) and ADR [0008](adr/0008-workflow-dag-with-topological-execution.md).
 
 ### Status Values
 
@@ -145,6 +147,22 @@ Register tools in the tool registry before execution. Built-in tool types:
 | Type | Description |
 |---|---|
 | `http` | Make HTTP requests to external services |
-| `shell` | Execute shell commands |
+| `shell` | Execute shell commands. **Disabled by default.** See policy below. |
 | `json_transform` | Transform JSON data between steps |
 | `prompt_call` | Call another prompt as a sub-workflow |
+
+### Shell tool policy
+
+The `shell` tool can execute arbitrary commands. It is therefore disabled by default and the policy is **fail-closed**:
+
+- `PROMPTSHEON_SHELL_ENABLED=true` enables the tool only if `PROMPTSHEON_SHELL_ALLOWLIST` contains at least one command.
+- An empty allowlist with the tool "enabled" is coerced to disabled (the server logs a warning and forces the enabled flag to `false`).
+- The allowlist matches the **first token** of the command (the program name). Arguments are not constrained.
+
+```bash
+# Enable only `ls` and `cat` (no arguments constrained)
+PROMPTSHEON_SHELL_ENABLED=true
+PROMPTSHEON_SHELL_ALLOWLIST=ls,cat
+```
+
+See [Security](security.md#shell-tool-policy) for the rationale.

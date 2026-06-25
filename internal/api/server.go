@@ -219,7 +219,7 @@ func NewServer(db store.Repository, logger *slog.Logger, opts ...Option) *Server
 			CircuitBreakerCooldown:         30,
 		},
 		oauthStates:   newOAuthStateStore(),
-		searchManager: search.NewManager(0),
+		searchManager: search.NewManager(),
 	}
 	// Make this server the active one for the package-level OAuth
 	// helpers (generateOAuthState, validateOAuthState, etc.). The

@@ -79,7 +79,7 @@ func (s *Server) handleFindSimilar(w http.ResponseWriter, r *http.Request) error
 	results := s.searchManager.Search(p.Content, 10)
 
 	// Filter out the source prompt
-	filtered := make([]*search.SearchResult, 0)
+	filtered := make([]search.Result, 0)
 	for _, r := range results {
 		if r.Document.PromptID != id {
 			filtered = append(filtered, r)

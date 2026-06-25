@@ -137,6 +137,12 @@ type Repository interface {
 	DeleteNotificationGroup(ctx context.Context, id string) error
 	ListNotificationGroups(ctx context.Context) ([]*models.NotificationGroupRecord, error)
 
+	// Webhook Endpoints
+	SaveWebhookEndpoint(ctx context.Context, ep *models.WebhookEndpointRecord) error
+	GetWebhookEndpoint(ctx context.Context, id string) (*models.WebhookEndpointRecord, error)
+	DeleteWebhookEndpoint(ctx context.Context, id string) error
+	ListWebhookEndpoints(ctx context.Context) ([]*models.WebhookEndpointRecord, error)
+
 	// Lifecycle
 	Ping(ctx context.Context) error
 	Close() error

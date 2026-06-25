@@ -62,6 +62,26 @@ type Response struct {
 	TimeToFirstToken time.Duration `json:"-"` // time from request to first token (for streaming)
 }
 
+// perCallKey is the context key under which a per-call API key is
+// stashed. Providers that support per-call key injection (see
+// PerCallKeyFromContext) prefer this over the registry-level key.
+type perCallKey struct{}
+
+// WithPerCallKey returns a new context with the per-call API key set.
+// The key overrides the provider's default key for this single call.
+func WithPerCallKey(ctx context.Context, key string) context.Context {
+	return context.WithValue(ctx, perCallKey{}, key)
+}
+
+// PerCallKeyFromContext returns the per-call API key, or empty if none
+// was set. Providers use this to honour prompt-level bindings.
+func PerCallKeyFromContext(ctx context.Context) string {
+	if v, ok := ctx.Value(perCallKey{}).(string); ok {
+		return v
+	}
+	return ""
+}
+
 // ProviderConfig holds configuration for constructing a provider.
 type ProviderConfig struct {
 	APIKey  string            `json:"api_key"`

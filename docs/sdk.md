@@ -123,6 +123,8 @@ fmt.Printf("Tokens: %d, Latency: %dms\n", resp.Usage.TotalTokens, resp.LatencyMs
 | `GetAgent(ctx, id)` | Get an agent by ID |
 | `ListProviders(ctx)` | List LLM providers |
 
+The method set is the public surface of `sdk/client.go`. Adding a method to the SDK is a one-line change in `client.go` plus a doc-comment update.
+
 ## Error Handling
 
 All methods return errors. API errors are typed as `*sdk.APIError`:

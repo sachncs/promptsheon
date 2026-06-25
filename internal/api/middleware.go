@@ -31,18 +31,22 @@ func generateRequestID() string {
 }
 
 // Logging returns middleware that logs each request with trace_id, request_id, user_id.
+//
+// SECURITY: user_id is read AFTER the inner handler runs because the
+// authenticator attaches the user to the request context inside the
+// per-route requirePerm middleware. The previous implementation
+// snapshotted user_id before the handler chain ran, which meant
+// `user_id` was always empty in access logs.
 func Logging(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 
-			// Generate request ID
 			requestID := generateRequestID()
 			if hdr := r.Header.Get("X-Request-ID"); hdr != "" {
 				requestID = hdr
 			}
 
-			// Propagate trace ID from span context if present
 			traceID := ""
 			if span, ok := trace.SpanFromContext(r.Context()); ok {
 				traceID = span.TraceID
@@ -51,42 +55,34 @@ func Logging(logger *slog.Logger) func(http.Handler) http.Handler {
 				traceID = hdr
 			}
 
-			// Inject IDs into context
 			ctx := trace.WithRequestID(r.Context(), requestID)
 			if traceID != "" {
 				ctx = trace.WithTraceID(ctx, traceID)
 			}
-
-			// Extract user ID if authenticated
-			userID := ""
-			if u, ok := auth.UserFromContext(ctx); ok {
-				userID = u.ID
-				ctx = trace.WithUserID(ctx, userID)
-			}
-
-			// Add slog context for downstream handlers
-			attrs := []slog.Attr{
+			ctx = WithSlogContext(ctx, logger.With(
 				slog.String("request_id", requestID),
-			}
-			if traceID != "" {
-				attrs = append(attrs, slog.String("trace_id", traceID))
-			}
-			if userID != "" {
-				attrs = append(attrs, slog.String("user_id", userID))
-			}
-			// Convert attrs to []any for slog.With
-			args := make([]any, len(attrs))
-			for i, a := range attrs {
-				args[i] = a
-			}
-			ctx = WithSlogContext(ctx, logger.With(args...))
-
+				slog.String("trace_id", traceID),
+			))
+			// Attach the request so downstream helpers (notably
+			// Server.audit) can enrich the audit entry with the
+			// remote address and user-agent.
+			ctx = WithRequest(ctx, r)
 			r = r.WithContext(ctx)
 
 			sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(sw, r)
 
-			logger.Info("http request",
+			// Re-read user_id after the handler chain. The
+			// authenticator populates auth.UserFromContext inside
+			// requirePerm, which runs as part of the handler.
+			userID := ""
+			if u, ok := auth.UserFromContext(r.Context()); ok && u != nil {
+				userID = u.ID
+			}
+
+			// Log at DEBUG for high-traffic servers. The structured
+			// logger is configured at the appropriate level by main.
+			logger.Debug("http request",
 				"method", r.Method,
 				"path", r.URL.Path,
 				"status", sw.status,
@@ -182,9 +178,12 @@ func WithSlogContext(ctx context.Context, logger *slog.Logger) context.Context {
 	return context.WithValue(ctx, slogContextKey{}, logger)
 }
 
-// SlogFromContext returns the logger from the context.
+// SlogFromContext returns the logger from the context. Falls back to
+// slog.Default() so handlers can use it without an explicit check.
+// Production code that wires the middleware should never see the
+// fallback because the middleware always attaches a logger.
 func SlogFromContext(ctx context.Context) *slog.Logger {
-	if l, ok := ctx.Value(slogContextKey{}).(*slog.Logger); ok {
+	if l, ok := ctx.Value(slogContextKey{}).(*slog.Logger); ok && l != nil {
 		return l
 	}
 	return slog.Default()

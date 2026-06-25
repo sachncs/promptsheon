@@ -48,7 +48,7 @@ func (s *Server) handleCreateAgent(w http.ResponseWriter, r *http.Request) error
 		Steps:       req.Steps,
 		Tools:       req.Tools,
 		Status:      models.StatusDraft,
-		CreatedBy:   "api",
+		CreatedBy:   callerID(r),
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}

@@ -1,8 +1,8 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"promptsheon/internal/trace"
@@ -29,8 +29,8 @@ func (s *Server) handleListSpans(w http.ResponseWriter, r *http.Request) error {
 
 	// Parse limit parameter
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := fmt.Sscanf(v, "%d", &filter.Limit); err == nil && n == 1 && filter.Limit > 0 && filter.Limit <= 1000 {
-			// Use parsed value
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 1000 {
+			filter.Limit = n
 		}
 	}
 

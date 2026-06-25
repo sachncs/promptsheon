@@ -8,34 +8,16 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability, please report it responsibly.
+If you discover a security vulnerability, please report it responsibly:
 
-- **L-9 fix**: do NOT open a public GitHub issue. Email the
-  maintainers at the address listed in the project's CODEOWNERS
-  file or via the GitHub Security Advisory workflow
-  (`https://github.com/sachn-cs/promptsheon/security/advisories/new`).
-  The previous instructions pointed at the public issues URL,
-  which contradicted the "do NOT open a public issue" line and
-  exposed vulnerability reports in a public stream.
-- Include:
-  - Description of the vulnerability
-  - Steps to reproduce
-  - Potential impact
-  - Suggested fix (if any)
+- **Do NOT open a public GitHub issue.** Use the [GitHub Security Advisories workflow](https://github.com/sachn-cs/promptsheon/security/advisories/new) or email the maintainers at the address in `CODEOWNERS`.
+- Include: a description, reproduction steps, potential impact, and any suggested fix.
+- We acknowledge within 48 hours, give an initial assessment within 1 week, and aim to ship a fix within 2 weeks depending on severity.
 
-## Response Timeline
+## Security Model
 
-- **Acknowledgment**: Within 48 hours
-- **Initial assessment**: Within 1 week
-- **Fix timeline**: Depends on severity, typically within 2 weeks
+For the full threat model, controls, and the operator checklist, see [docs/security.md](docs/security.md).
 
-## Security Measures
+## License
 
-- Authentication is enabled by default
-- All SQL queries use parameterized statements
-- SHA-256 for hashing, AES-256-GCM for encryption
-- Shell command sandboxing with allowlist/blocklist
-- Rate limiting on all endpoints
-- Request body size limits (10MB)
-- Security headers (X-Content-Type-Options, X-Frame-Options, etc.)
-- Audit trail with hash-chain integrity
+This project is licensed under the Apache License 2.0 — see [LICENSE](LICENSE).

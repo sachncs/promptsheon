@@ -1,248 +1,67 @@
 # Contributing to Promptsheon
 
-Thank you for your interest in contributing to Promptsheon! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing!
 
 ## Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
-- [Getting Started](#getting-started)
-- [Development Setup](#development-setup)
-- [Making Changes](#making-changes)
-- [Testing](#testing)
-- [Pull Request Process](#pull-request-process)
-- [Style Guidelines](#style-guidelines)
-- [Reporting Issues](#reporting-issues)
+- [Getting started](#getting-started)
+- [Pull request process](#pull-request-process)
+- [Reporting issues](#reporting-issues)
+- [Questions](#questions)
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+This project and everyone participating in it is governed by our [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## Getting Started
+## Getting started
 
-### Prerequisites
+1. Read [docs/development.md](docs/development.md) for setup, repository layout, code style, Make targets, the OpenAPI generator workflow, and migration conventions.
+2. Read [docs/architecture.md](docs/architecture.md) for the system diagram and request lifecycle.
+3. Read [docs/modules.md](docs/modules.md) to find the package closest to the area you want to work on.
+4. Read [docs/testing.md](docs/testing.md) for the test taxonomy and helpers.
 
-- Go 1.25 or later
-- Git
-- golangci-lint (for linting)
+## Pull request process
 
-### Fork and Clone
-
-1. Fork the repository on GitHub
-2. Clone your fork locally:
+1. Create a feature branch from `main` (`feature/<slug>`, `fix/<slug>`, `docs/<slug>`, `refactor/<slug>`).
+2. Make your changes with clear commits. Use the imperative mood and keep the first line under 72 characters.
+3. Write or update tests for your changes. See [docs/testing.md](docs/testing.md).
+4. Run the full pre-PR checklist:
 
    ```bash
-   git clone https://github.com/your-username/promptsheon.git
-   cd promptsheon
+   go test -race -count=1 ./...
+   make lint
+   make openapi-check
    ```
 
-3. Add the upstream remote:
-   ```bash
-   git remote add upstream https://github.com/sachn-cs/promptsheon.git
-   ```
+5. Push your branch and open a pull request. Fill out the PR template completely.
+6. Wait for CI to pass and request a review.
 
-## Development Setup
+If your change is documentation-only, the OpenAPI step is a no-op and can be skipped. If your change touches a route or handler, `make openapi-check` will fail the build if the spec is out of date — regenerate and commit.
 
-### Build
+## Style guidelines
 
-```bash
-# Build all binaries
-go build ./...
+- Follow [Effective Go](https://go.dev/doc/effective_go) and the [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments).
+- `gofmt -s` and `goimports` are mandatory. CI rejects PRs with unformatted code.
+- Every exported type and function must have a GoDoc comment.
+- Tests are table-driven where it makes sense. Use `t.Run` subtests.
+- Error wrapping: `fmt.Errorf("context: %w", err)`.
 
-# Or use Make
-make build
-```
-
-### Run Tests
-
-```bash
-# Run all tests
-go test ./...
-
-# Run tests with race detection
-go test -race ./...
-
-# Run integration tests
-go test -v ./test/...
-```
-
-### Lint
-
-```bash
-# Run linter
-golangci-lint run
-
-# Or use Make
-make lint
-```
-
-## Making Changes
-
-### Branch Naming
-
-Use descriptive branch names:
-
-- `feature/add-new-scorer`
-- `fix/handle-nil-pointer`
-- `docs/update-readme`
-- `refactor/improve-error-handling`
-
-### Commit Messages
-
-Write clear, concise commit messages:
-
-- Use the imperative mood ("Add feature" not "Added feature")
-- Keep the first line under 72 characters
-- Reference issues and pull requests when relevant
-
-Examples:
-
-```
-Add exact match scorer for evaluation
-
-- Implements ExactMatchScorer
-- Adds unit tests
-- Updates documentation
-
-Closes #42
-```
-
-### Code Style
-
-Follow the [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments) and [Effective Go](https://golang.org/doc/effective_go.html) guidelines.
-
-Key points:
-
-- Use `gofmt` to format code
-- Follow naming conventions (exported names are CamelCase)
-- Write meaningful variable and function names
-- Add comments for exported types and functions
-- Handle errors explicitly
-
-## Testing
-
-### Unit Tests
-
-- Place tests in `_test.go` files alongside the code
-- Use table-driven tests where appropriate
-- Mock external dependencies
-- Aim for meaningful coverage, not just high percentages
-
-Example:
-
-```go
-func TestExactMatchScorer_Score(t *testing.T) {
-    tests := []struct {
-        name     string
-        expected string
-        actual   string
-        want     float64
-    }{
-        {
-            name:     "exact match",
-            expected: "hello",
-            actual:   "hello",
-            want:     1.0,
-        },
-        {
-            name:     "no match",
-            expected: "hello",
-            actual:   "world",
-            want:     0.0,
-        },
-    }
-
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            s := ExactMatchScorer{}
-            got := s.Score(tt.expected, tt.actual)
-            if got != tt.want {
-                t.Errorf("Score() = %v, want %v", got, tt.want)
-            }
-        })
-    }
-}
-```
-
-### Integration Tests
-
-- Place integration tests in `test/` directory
-- Use `httptest.NewServer` for API tests
-- Clean up resources with `t.Cleanup`
-
-## Pull Request Process
-
-1. **Create a feature branch** from `main`
-2. **Make your changes** with clear commits
-3. **Write or update tests** for your changes
-4. **Run the full test suite**:
-   ```bash
-   go test -race ./...
-   golangci-lint run
-   ```
-5. **Push your branch** and create a pull request
-6. **Fill out the PR template** completely
-7. **Wait for CI** to pass
-8. **Request review** from maintainers
-
-### PR Checklist
-
-- [ ] Code compiles without errors
-- [ ] All tests pass
-- [ ] Linter passes
-- [ ] New code has tests
-- [ ] Documentation is updated (if applicable)
-- [ ] Commit messages are clear
-- [ ] PR description explains the changes
-
-## Style Guidelines
-
-### Go Style
-
-- Follow [Effective Go](https://golang.org/doc/effective_go.html) guidelines
-- Use `gofmt` and `goimports`
-- Keep functions focused and small
-- Prefer composition over inheritance
-- Use interfaces to define contracts
-
-### Documentation
-
-- Add GoDoc comments to all exported types and functions
-- Use complete sentences in comments
-- Include examples where helpful
-- Keep README.md updated
-
-### Error Handling
-
-- Always check and handle errors
-- Use `fmt.Errorf` with `%w` for error wrapping
-- Create meaningful error messages
-- Consider using custom error types for domain errors
-
-## Reporting Issues
-
-### Bug Reports
+## Reporting issues
 
 Include:
 
 - Go version (`go version`)
 - Operating system and architecture
 - Steps to reproduce
-- Expected behavior
-- Actual behavior
-- Relevant logs or error messages
+- Expected behaviour
+- Actual behaviour
+- Relevant logs (`./promptsheond 2>&1 | jq .`)
 
-### Feature Requests
+For security vulnerabilities, **do not** open a public issue. See [SECURITY.md](SECURITY.md).
 
-Include:
-
-- Clear description of the feature
-- Use case / motivation
-- Proposed implementation (if any)
-- Alternatives considered
-
-## Questions?
+## Questions
 
 - Open a [GitHub Discussion](https://github.com/sachn-cs/promptsheon/discussions)
 - Check existing [issues](https://github.com/sachn-cs/promptsheon/issues)
-
-Thank you for contributing!
+- The [docs/FAQ.md](docs/faq.md) and [docs/glossary.md](docs/glossary.md)

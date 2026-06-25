@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -98,11 +99,29 @@ func (m *RetentionManager) Start(ctx context.Context) {
 	}()
 }
 
+// protectedAuditActions is the set of audit actions that are never
+// purged by retention, regardless of age. The previous implementation
+// only protected 3 actions which meant almost every audit row
+// (create, update, delete, restore, etc.) was deleted after AuditTTL.
+var protectedAuditActions = map[string]bool{
+	"auth_failure":    true,
+	"auto_approve":    true,
+	"deploy":          true,
+	"create":          true,
+	"update":          true,
+	"delete":          true,
+	"restore":         true,
+	"approve":         true,
+	"reject":          true,
+	"permission_grant": true,
+	"key_mint":        true,
+	"key_revoke":      true,
+}
+
 // Enforce deletes expired data based on the retention policy.
 func (m *RetentionManager) Enforce(ctx context.Context) error {
 	var totalDeleted int
 
-	// Clean trace spans
 	if m.policy.TraceTTL > 0 {
 		cutoff := time.Now().Add(-m.policy.TraceTTL)
 		result, err := m.db.ExecContext(ctx,
@@ -115,7 +134,6 @@ func (m *RetentionManager) Enforce(ctx context.Context) error {
 		}
 	}
 
-	// Clean snapshots
 	if m.policy.SnapshotTTL > 0 {
 		cutoff := time.Now().Add(-m.policy.SnapshotTTL)
 		result, err := m.db.ExecContext(ctx,
@@ -128,12 +146,23 @@ func (m *RetentionManager) Enforce(ctx context.Context) error {
 		}
 	}
 
-	// Clean audit entries (only old completed/failed entries, keep important ones)
+	// Audit retention: never purge "important" actions, no matter
+	// how old. For everything else, delete only after AuditTTL.
+	// We build the NOT IN list from the protected set so the
+	// exclusion policy lives in one place.
 	if m.policy.AuditTTL > 0 {
 		cutoff := time.Now().Add(-m.policy.AuditTTL)
-		result, err := m.db.ExecContext(ctx,
-			`DELETE FROM audit_entries WHERE timestamp < ? 
-			 AND action NOT IN ('auth_failure', 'auto_approve', 'deploy')`, cutoff)
+		actions := make([]string, 0, len(protectedAuditActions))
+		for a := range protectedAuditActions {
+			actions = append(actions, a)
+		}
+		query := "DELETE FROM audit_entries WHERE timestamp < ? AND action NOT IN (?" +
+			strings.Repeat(",?", len(actions)-1) + ")"
+		args := []any{cutoff}
+		for _, a := range actions {
+			args = append(args, a)
+		}
+		result, err := m.db.ExecContext(ctx, query, args...)
 		if err != nil {
 			m.logger.Warn("failed to clean audit entries", "err", err)
 		} else {

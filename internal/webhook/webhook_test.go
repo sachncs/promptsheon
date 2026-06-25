@@ -115,7 +115,7 @@ func TestDispatcherConcurrentEmit(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	d.mu.RLock()
-	count := len(d.deliveries)
+	count := d.deliveriesLen
 	d.mu.RUnlock()
 	if count != 10 {
 		t.Fatalf("expected 10 deliveries, got %d", count)

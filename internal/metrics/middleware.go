@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"promptsheon/internal/trace"
@@ -16,12 +17,20 @@ func HTTPMiddleware(collector *Collector, tracer trace.Tracer, logger *slog.Logg
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 
+			// Skip metrics for liveness/readiness probes so the
+			// request count is meaningful. (Cheap to do, common
+			// monitoring pitfall.)
+			isProbe := r.URL.Path == "/health" || r.URL.Path == "/ready"
+
 			// Start trace span (if tracer available)
 			var span *trace.Span
 			if tracer != nil {
-				span = tracer.Start(r.Context(), r.Method+" "+r.URL.Path)
+				span = tracer.Start(r.Context(), spanOperationName(r))
 				span.SetAttribute("http.method", r.Method)
-				span.SetAttribute("http.url", r.URL.String())
+				// Strip query string from the recorded URL to avoid
+				// persisting secrets passed in the URL (e.g. an
+				// operator using ?api_key=... as a fallback).
+				span.SetAttribute("http.url", pathOnly(r.URL))
 			}
 
 			// Wrap response writer to capture status
@@ -31,8 +40,7 @@ func HTTPMiddleware(collector *Collector, tracer trace.Tracer, logger *slog.Logg
 			latency := time.Since(start)
 			latencySec := DurationSec(latency)
 
-			// Record metrics
-			if collector != nil {
+			if collector != nil && !isProbe {
 				collector.RequestsTotal.Inc()
 				collector.RequestDuration.Observe(latencySec)
 				if rw.status >= 400 {
@@ -40,7 +48,6 @@ func HTTPMiddleware(collector *Collector, tracer trace.Tracer, logger *slog.Logg
 				}
 			}
 
-			// Finish span
 			if span != nil {
 				span.SetAttribute("http.status", fmt.Sprintf("%d", rw.status))
 				span.SetAttribute("http.latency_ms", fmt.Sprintf("%d", latency.Milliseconds()))
@@ -54,6 +61,39 @@ func HTTPMiddleware(collector *Collector, tracer trace.Tracer, logger *slog.Logg
 			}
 		})
 	}
+}
+
+// pathOnly returns the URL without the query string. Used to keep
+// secrets out of trace attributes.
+func pathOnly(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+	return u.Path
+}
+
+// spanOperationName returns the operation name for the span. It
+// prefers the matched route pattern (no IDs in the path) and falls
+// back to the raw method+path.
+func spanOperationName(r *http.Request) string {
+	if tmpl, ok := matchedRoute(r); ok && tmpl != "" {
+		return r.Method + " " + tmpl
+	}
+	return r.Method + " " + r.URL.Path
+}
+
+// matchedRoute returns the mux template that matched r, if any.
+// Returns false when the request was not served by a mux that
+// populates the pattern (e.g. httptest without a mux).
+func matchedRoute(r *http.Request) (string, bool) {
+	if r == nil {
+		return "", false
+	}
+	tmpl := r.Pattern
+	if tmpl == "" {
+		return "", false
+	}
+	return tmpl, true
 }
 
 // LLMMiddleware instruments LLM calls with metrics and tracing.
