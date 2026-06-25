@@ -69,30 +69,57 @@ func (s *Server) handleRestorePrompt(w http.ResponseWriter, r *http.Request) err
 		return ErrBadRequest
 	}
 
+	// M-13 fix: validate the CAS hash format. The previous
+	// implementation accepted any non-empty string and forwarded it
+	// to the CAS layer, which then either returned a foreign
+	// blob (if the hash happened to match another prompt's content)
+	// or returned a 500. Reject malformed hashes up front.
+	if !isValidCASHash(req.CASHash) {
+		return badRequest("cas_hash must be 64 lowercase hex characters")
+	}
+
 	// Read the CAS object
 	obj, err := promptsheon.ReadObject(req.CASHash)
 	if err != nil {
-		return badRequest("CAS object not found: " + req.CASHash)
+		return badRequest("CAS object not found")
 	}
 
-	// Restore content from CAS blob
-	if obj.Data != "" {
-		existing.Content = obj.Data
-		existing.Version++
-		existing.CASHash = req.CASHash
-		existing.UpdatedAt = time.Now()
-		if err := s.db.UpdatePrompt(r.Context(), existing); err != nil {
-			return err
+	// M-13 fix: refuse to restore from a non-blob object (e.g., a
+	// tree or a commit). A previous version silently wrote
+	// `obj.Data` even when the object was a non-blob type with an
+	// empty Data field, producing an empty prompt after restore.
+	if obj.Data == "" {
+		return badRequest("CAS object is not a content blob")
+	}
+
+	existing.Content = obj.Data
+	existing.Version++
+	existing.CASHash = req.CASHash
+	existing.UpdatedAt = time.Now()
+	if err := s.db.UpdatePrompt(r.Context(), existing); err != nil {
+		return err
+	}
+	s.audit(r.Context(), "restore", "prompt:"+existing.ID, map[string]any{
+		"cas_hash": req.CASHash,
+		"version":  existing.Version,
+	})
+	writeJSON(w, http.StatusOK, existing)
+	return nil
+}
+
+// isValidCASHash returns true if s is a 64-character lowercase hex
+// string (i.e., a plausible SHA-256 hash).
+func isValidCASHash(s string) bool {
+	if len(s) != 64 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return false
 		}
-		s.audit(r.Context(), "restore", "prompt:"+existing.ID, map[string]any{
-			"cas_hash": req.CASHash,
-			"version":  existing.Version,
-		})
-		writeJSON(w, http.StatusOK, existing)
-		return nil
 	}
-
-	return badRequest("CAS object is not a content blob")
+	return true
 }
 
 // handleFindSimilarPrompts finds prompts with similar content using SimHash.

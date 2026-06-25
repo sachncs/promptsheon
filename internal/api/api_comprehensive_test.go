@@ -5343,7 +5343,62 @@ func TestRunWorkflow_WiresGuardrailManager(t *testing.T) {
 	}
 }
 
-// TestFindSimilarPrompts_ThresholdDefaults pins the M-5 fix: the
+// TestRestorePrompt_RejectsMalformedHash pins the M-13 fix: the
+// restore handler must validate the cas_hash shape before touching
+// the CAS. The previous implementation accepted any non-empty
+// string and either returned a foreign blob or a 500.
+func TestRestorePrompt_RejectsMalformedHash(t *testing.T) {
+	srv, db := setupTestServerWithDeps(t)
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+	ctx := context.Background()
+	now := time.Now()
+	db.CreatePrompt(ctx, &models.Prompt{ID: "restore-m13-malformed", Name: "r", Content: "x", CreatedBy: "u", CreatedAt: now, UpdatedAt: now})
+
+	cases := []struct {
+		name string
+		hash string
+	}{
+		{"empty", ""},
+		{"too short", "abc"},
+		{"too long", strings.Repeat("a", 65)},
+		{"uppercase", strings.Repeat("A", 64)},
+		{"non-hex", strings.Repeat("z", 64)},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			body := fmt.Sprintf(`{"cas_hash":%q}`, c.hash)
+			resp := doReq(t, "POST", ts.URL+"/api/v1/prompts/restore-m13-malformed/restore", body)
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("hash=%q: expected 400, got %d", c.hash, resp.StatusCode)
+			}
+		})
+	}
+}
+
+// TestRestorePrompt_RejectsUnknownBlob pins the M-13 fix: when the
+// CAS hash is well-formed but the object is missing, the handler
+// must return 400, not 500.
+func TestRestorePrompt_RejectsUnknownBlob(t *testing.T) {
+	srv, db := setupTestServerWithDeps(t)
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	// Seed a prompt so the prompt lookup succeeds.
+	ctx := context.Background()
+	now := time.Now()
+	db.CreatePrompt(ctx, &models.Prompt{ID: "restore-m13", Name: "r", Content: "x", CreatedBy: "u", CreatedAt: now, UpdatedAt: now})
+
+	// Use a well-formed hash that doesn't exist in the CAS.
+	hash := strings.Repeat("0", 64)
+	body := fmt.Sprintf(`{"cas_hash":%q}`, hash)
+	resp := doReq(t, "POST", ts.URL+"/api/v1/prompts/restore-m13/restore", body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for missing blob, got %d", resp.StatusCode)
+	}
+}
 // threshold parameter must be parsed AND validated to be in
 // [0,1]. The previous implementation silently reset to 0.7 on
 // any parse error, which let clients send garbage like
