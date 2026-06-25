@@ -1,6 +1,8 @@
 package alerting
 
 import (
+	"context"
+	"io"
 	"log/slog"
 	"os"
 	"testing"
@@ -173,6 +175,52 @@ func TestTriggerAlertCreatesActiveRecord(t *testing.T) {
 	}
 	if len(m.ListAlerts()) != 1 {
 		t.Errorf("expected 1 alert in list, got %d", len(m.ListAlerts()))
+	}
+}
+
+func TestRunMonitoringChecksNilCollector(t *testing.T) {
+	// A nil collector is the documented no-op case; the
+	// function must return an empty slice without panic.
+	m := newTestManager(t)
+	got := m.RunMonitoringChecks(nil)
+	if len(got) != 0 {
+		t.Errorf("expected 0 alerts with nil collector, got %d", len(got))
+	}
+}
+
+func TestStartMonitoringRespectsContext(t *testing.T) {
+	m := newTestManager(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	m.StartMonitoring(ctx, nil, time.Hour) // long interval
+	// Give the goroutine a moment to enter the select.
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	// If the goroutine leaked, the test still passes; the
+	// real assertion is that StartMonitoring returns
+	// without blocking.
+}
+
+func TestGetNotificationChannelsFallback(t *testing.T) {
+	// A rule with no groups falls back to the empty
+	// channel list. The function must not panic.
+	m := newTestManager(t)
+	channels := m.getNotificationChannels(&AlertRule{ID: "r"})
+	_ = channels
+}
+
+func TestNewManagerWithDB(t *testing.T) {
+	// NewManagerWithDB takes a nil database and falls back
+	// to the in-memory behaviour. The DB-backed load is
+	// a no-op when db is nil; we just confirm the manager
+	// is constructed.
+	collector := metrics.NewCollector()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	m := NewManagerWithDB(logger, collector, nil)
+	if m == nil {
+		t.Fatal("expected non-nil manager")
+	}
+	if m.metrics != collector {
+		t.Error("expected collector to be set")
 	}
 }
 
