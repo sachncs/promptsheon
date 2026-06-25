@@ -4064,9 +4064,15 @@ func TestSecurityHeadersMiddlewareComprehensive(t *testing.T) {
 	}
 }
 
+// TestRecoveryMiddlewareComprehensive exercises the Recovery
+// middleware. The inner handler intentionally panics to verify that
+// the middleware catches the panic and returns 500 instead of
+// crashing the process. L-1: the panic is deliberate.
 func TestRecoveryMiddlewareComprehensive(t *testing.T) {
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Intentional panic: the Recovery middleware is expected
+		// to catch this and return 500. Do not remove.
 		panic("test panic")
 	})
 
