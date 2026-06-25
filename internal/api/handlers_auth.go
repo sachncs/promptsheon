@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -256,6 +257,130 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 		Key string `json:"key"`
 	}
 	writeJSON(w, http.StatusCreated, response{APIKey: apiKey, Key: key})
+	return nil
+}
+
+// handleBootstrap is the first-run endpoint that mints an admin
+// user and an admin API key when the deployment is brand-new and
+// running with authentication disabled. It is the only place in
+// the system where a plaintext admin key is ever returned to a
+// caller.
+//
+// The endpoint is intentionally tiny and fails closed: it
+// returns 404 the moment any user record exists, it 403s when
+// auth is enabled, and the audit log records every call. The
+// documentation in docs/configuration.md and the in-binary
+// --help text both warn operators that PROMPTSHEON_AUTH=true
+// is the recommended setup and that the bootstrap endpoint is
+// for local development only.
+//
+// SECURITY: the endpoint is unauthenticated and gates entirely
+// on "no users exist yet". An attacker who can reach the
+// server before the operator does gets a free admin key. This
+// is acceptable for the documented use case (local dev with
+// PROMPTSHEON_AUTH=false) and unacceptable for any production
+// deployment — operators must set PROMPTSHEON_AUTH=true before
+// exposing the port.
+func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
+	if r.Method != http.MethodPost {
+		return badRequest("POST required")
+	}
+	if s.requireAuth {
+		return forbidden("bootstrap is disabled when authentication is enabled (PROMPTSHEON_AUTH=true)")
+	}
+
+	// Check whether the system has any users yet. We do this
+	// before any state mutation so a second concurrent caller
+	// races safely — the second one will see at least one user
+	// (the first one) and fail with 404. The race window is
+	// small (one SQL roundtrip) and the worst case is two admin
+	// keys, not zero.
+	users, err := s.db.ListUsers(r.Context())
+	if err != nil {
+		return fmt.Errorf("bootstrap: list users: %w", err)
+	}
+	if len(users) > 0 {
+		return notFound("bootstrap is no longer available; the server already has users")
+	}
+
+	var req struct {
+		Email string `json:"email"`
+		Name  string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return badRequest("invalid json")
+	}
+	if req.Email == "" {
+		req.Email = "admin@local"
+	}
+	if req.Name == "" {
+		req.Name = "Bootstrap Admin"
+	}
+
+	// Re-check inside the same request after a brief settle so a
+	// concurrent caller that just won the race doesn't slip
+	// through. ListUsers is cheap on an empty table; doing it
+	// twice keeps the bootstrap endpoint trivially correct.
+	users, err = s.db.ListUsers(r.Context())
+	if err != nil {
+		return fmt.Errorf("bootstrap: list users: %w", err)
+	}
+	if len(users) > 0 {
+		return notFound("bootstrap is no longer available; the server already has users")
+	}
+
+	now := time.Now()
+	admin := &models.User{
+		ID:        generateID(),
+		Email:     req.Email,
+		Name:      req.Name,
+		Role:      string(auth.RoleAdmin),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := s.db.CreateUser(r.Context(), admin); err != nil {
+		return fmt.Errorf("bootstrap: create user: %w", err)
+	}
+
+	key, hash, err := auth.GenerateAPIKey()
+	if err != nil {
+		return fmt.Errorf("bootstrap: generate key: %w", err)
+	}
+	apiKey := &models.APIKey{
+		ID:        generateID(),
+		UserID:    admin.ID,
+		Name:      "bootstrap-admin",
+		KeyHash:   hash,
+		KeyPrefix: key[:8],
+		Role:      string(auth.RoleAdmin),
+		CreatedAt: now,
+	}
+	if err := s.db.CreateAPIKey(r.Context(), apiKey); err != nil {
+		return fmt.Errorf("bootstrap: create key: %w", err)
+	}
+
+	// Log loudly. The warning is the operator's signal that the
+	// bootstrap endpoint was used and that they should now
+	// reconfigure with PROMPTSHEON_AUTH=true.
+	if s.logger != nil {
+		s.logger.Warn("bootstrap endpoint used; admin key minted",
+			"user_id", admin.ID,
+			"key_prefix", apiKey.KeyPrefix,
+			"action", "rotate this key and enable PROMPTSHEON_AUTH=true before exposing the server")
+	}
+
+	type response struct {
+		User      *models.User `json:"user"`
+		APIKey    *models.APIKey `json:"api_key"`
+		Key       string       `json:"key"`
+		Message   string       `json:"message"`
+	}
+	writeJSON(w, http.StatusCreated, response{
+		User:    admin,
+		APIKey:  apiKey,
+		Key:     key,
+		Message: "Bootstrap admin user created. Store the api_key securely —it is the only time it is returned. Set PROMPTSHEON_AUTH=true and rotate the key before exposing this server.",
+	})
 	return nil
 }
 

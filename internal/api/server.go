@@ -278,6 +278,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/auth/{provider}/login", s.wrapHandler(s.handleOAuthLogin))
 	s.mux.HandleFunc("GET /api/v1/auth/{provider}/callback", s.wrapHandler(s.handleOAuthCallback))
 
+	// First-run bootstrap. Active only when PROMPTSHEON_AUTH=false
+	// and the user table is empty; see handleBootstrap in
+	// handlers_auth.go for the security notes.
+	s.mux.HandleFunc("POST /api/v1/setup", s.wrapHandler(s.handleBootstrap))
+
 	// Users (admin only)
 	s.mux.HandleFunc("GET /api/v1/users", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleListUsers)))
 	s.mux.HandleFunc("POST /api/v1/users", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleCreateUser)))
