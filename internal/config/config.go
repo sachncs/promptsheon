@@ -2,6 +2,7 @@
 package config
 
 import (
+	"log/slog"
 	"os"
 	"strconv"
 )
@@ -91,53 +92,88 @@ func LoadConfig() Config {
 	if v := os.Getenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.WriteTimeout = n
+		} else {
+			// M-4 fix: warn the operator that their value is
+			// being ignored. The previous behaviour silently
+			// fell back to the default, which made operators
+			// believe they had configured the timeout when
+			// they had not.
+			slog.Warn("config: invalid PROMPTSHEON_SERVER_WRITE_TIMEOUT, using default",
+				"value", v, "default", cfg.WriteTimeout, "err", err)
 		}
 	}
 	if v := os.Getenv("PROMPTSHEON_SERVER_READ_TIMEOUT"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.ReadTimeout = n
+		} else {
+			slog.Warn("config: invalid PROMPTSHEON_SERVER_READ_TIMEOUT, using default",
+				"value", v, "default", cfg.ReadTimeout, "err", err)
 		}
 	}
 	if v := os.Getenv("PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.ReadHeaderTimeout = n
+		} else {
+			slog.Warn("config: invalid PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT, using default",
+				"value", v, "default", cfg.ReadHeaderTimeout, "err", err)
 		}
 	}
 	if v := os.Getenv("PROMPTSHEON_SERVER_IDLE_TIMEOUT"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.IdleTimeout = n
+		} else {
+			slog.Warn("config: invalid PROMPTSHEON_SERVER_IDLE_TIMEOUT, using default",
+				"value", v, "default", cfg.IdleTimeout, "err", err)
 		}
 	}
 
 	if v := os.Getenv("PROMPTSHEON_RATE_LIMIT_RATE"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.RateLimitRate = n
+		} else {
+			slog.Warn("config: invalid PROMPTSHEON_RATE_LIMIT_RATE, using default",
+				"value", v, "default", cfg.RateLimitRate, "err", err)
 		}
 	}
 	if v := os.Getenv("PROMPTSHEON_RATE_LIMIT_INTERVAL"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.RateLimitInterval = n
+		} else {
+			slog.Warn("config: invalid PROMPTSHEON_RATE_LIMIT_INTERVAL, using default",
+				"value", v, "default", cfg.RateLimitInterval, "err", err)
 		}
 	}
 	if v := os.Getenv("PROMPTSHEON_RATE_LIMIT_BURST"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.RateLimitBurst = n
+		} else {
+			slog.Warn("config: invalid PROMPTSHEON_RATE_LIMIT_BURST, using default",
+				"value", v, "default", cfg.RateLimitBurst, "err", err)
 		}
 	}
 
 	if v := os.Getenv("PROMPTSHEON_CIRCUIT_BREAKER_FAILURE_THRESHOLD"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.CircuitBreakerFailureThreshold = n
+		} else {
+			slog.Warn("config: invalid PROMPTSHEON_CIRCUIT_BREAKER_FAILURE_THRESHOLD, using default",
+				"value", v, "default", cfg.CircuitBreakerFailureThreshold, "err", err)
 		}
 	}
 	if v := os.Getenv("PROMPTSHEON_CIRCUIT_BREAKER_SUCCESS_THRESHOLD"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.CircuitBreakerSuccessThreshold = n
+		} else {
+			slog.Warn("config: invalid PROMPTSHEON_CIRCUIT_BREAKER_SUCCESS_THRESHOLD, using default",
+				"value", v, "default", cfg.CircuitBreakerSuccessThreshold, "err", err)
 		}
 	}
 	if v := os.Getenv("PROMPTSHEON_CIRCUIT_BREAKER_COOLDOWN"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.CircuitBreakerCooldown = n
+		} else {
+			slog.Warn("config: invalid PROMPTSHEON_CIRCUIT_BREAKER_COOLDOWN, using default",
+				"value", v, "default", cfg.CircuitBreakerCooldown, "err", err)
 		}
 	}
 

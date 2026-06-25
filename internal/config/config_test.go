@@ -1,7 +1,10 @@
 package config
 
 import (
+	"bytes"
+	"log/slog"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -109,6 +112,29 @@ func TestLoadConfigAuthValues(t *testing.T) {
 				t.Errorf("Auth = %v, want %v for value %q", cfg.Auth, tt.expected, tt.value)
 			}
 		})
+	}
+}
+
+// TestLoadConfig_InvalidNumericWarns pins the M-4 fix: an invalid
+// numeric env var must produce a warning (not silent fallback) so
+// operators notice when their configuration is being ignored. We
+// capture the slog output to verify the warning is emitted with
+// the right key/value pairs.
+func TestLoadConfig_InvalidNumericWarns(t *testing.T) {
+	// Redirect the default slog logger to a buffer for this test.
+	prev := slog.Default()
+	defer slog.SetDefault(prev)
+	var buf bytes.Buffer
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})))
+
+	os.Setenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT", "abc")
+	defer os.Unsetenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT")
+	cfg := LoadConfig()
+	if cfg.WriteTimeout != 30 {
+		t.Fatalf("expected default 30, got %d", cfg.WriteTimeout)
+	}
+	if !strings.Contains(buf.String(), "PROMPTSHEON_SERVER_WRITE_TIMEOUT") {
+		t.Fatalf("expected warning about PROMPTSHEON_SERVER_WRITE_TIMEOUT, got %q", buf.String())
 	}
 }
 
