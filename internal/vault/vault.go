@@ -18,6 +18,11 @@ type Vault struct {
 
 // New creates a vault with the given 32-byte hex-encoded key.
 // The key should be set from PROMPTSHEON_VAULT_KEY env var.
+// M-16 fix: reject the all-zero key, which AES would otherwise
+// accept but which produces ciphertexts that are trivially
+// decryptable (the resulting key schedule is also all-zero). The
+// previous implementation only checked byte length, which let a
+// misconfigured key pass validation.
 func New(hexKey string) (*Vault, error) {
 	key, err := hex.DecodeString(hexKey)
 	if err != nil {
@@ -25,6 +30,16 @@ func New(hexKey string) (*Vault, error) {
 	}
 	if len(key) != 32 {
 		return nil, fmt.Errorf("vault key must be 32 bytes (64 hex chars), got %d bytes", len(key))
+	}
+	allZero := true
+	for _, b := range key {
+		if b != 0 {
+			allZero = false
+			break
+		}
+	}
+	if allZero {
+		return nil, fmt.Errorf("vault key is all zeros; refusing to use a trivially-decryptable key")
 	}
 	return &Vault{key: key}, nil
 }

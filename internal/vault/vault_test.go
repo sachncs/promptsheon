@@ -62,6 +62,11 @@ func TestNewInvalidKey(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "all zeros",
+			key:     "0000000000000000000000000000000000000000000000000000000000000000",
+			wantErr: true,
+		},
+		{
 			name:    "valid key",
 			key:     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			wantErr: false,
