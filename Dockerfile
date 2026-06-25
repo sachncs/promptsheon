@@ -15,8 +15,8 @@ FROM alpine:3.20
 # silently failed on minimal images.
 RUN apk add --no-cache ca-certificates tzdata wget
 RUN adduser -D -u 1000 promptsheon
-COPY --from=builder /app/promptsheond /usr/local/bin/promptsheon
-COPY --from=builder /app/promptsheon /usr/local/bin/promptsheon-cli
+COPY --from=builder /app/promptsheond /usr/local/bin/promptsheond
+COPY --from=builder /app/promptsheon  /usr/local/bin/promptsheon
 USER promptsheon
 EXPOSE 8080
 VOLUME ["/data"]
