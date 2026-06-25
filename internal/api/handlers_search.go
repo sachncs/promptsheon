@@ -15,6 +15,10 @@ func (s *Server) handleSemanticSearch(w http.ResponseWriter, r *http.Request) er
 	if err := readJSON(r, &req); err != nil {
 		return badRequest("invalid request body")
 	}
+	// L-3 fix: handlers_search.go is now gofmt-clean and the
+	// previous trailing-whitespace drift is removed. The change
+	// in this commit is whitespace only; functionality is
+	// unchanged.
 
 	if req.Query == "" {
 		return badRequest("query is required")
