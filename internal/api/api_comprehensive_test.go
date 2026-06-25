@@ -5,18 +5,23 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"promptsheon/internal/alerting"
 	"promptsheon/internal/auth"
+	"promptsheon/internal/eval"
 	"promptsheon/internal/guardrail"
+	"promptsheon/internal/llm"
 	"promptsheon/internal/metrics"
 	"promptsheon/internal/models"
 	"promptsheon/internal/snapshot"
@@ -27,6 +32,52 @@ import (
 
 	contextpkg "promptsheon/internal/context"
 )
+
+// testAdminKey is the bearer token for the seeded admin user in the
+// comprehensive test suite. It is generated once per test binary.
+var (
+	testAdminKeyOnce sync.Once
+	testAdminKey     string
+)
+
+// authEnabled controls whether the comprehensive test suite turns on
+// WithAuth. When false, handlers run in legacy (no-auth) mode and the
+// test suite exercises the same paths the old code did. The default is
+// false to keep backward compatibility with the ~500 test functions in
+// this file; the targeted security test (TestAPINonAdminCannotEscalate)
+// flips it on.
+var authEnabled = false
+
+func adminAuthHeader(t *testing.T, db *store.SQLite) string {
+	t.Helper()
+	testAdminKeyOnce.Do(func() {
+		_ = db.CreateUser(context.Background(), &models.User{
+			ID:        "test-admin",
+			Email:     "admin@test.local",
+			Name:      "admin",
+			Role:      string(auth.RoleAdmin),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		})
+		key, hash, err := auth.GenerateAPIKey()
+		if err != nil {
+			t.Fatalf("gen admin key: %v", err)
+		}
+		if err := db.CreateAPIKey(context.Background(), &models.APIKey{
+			ID:        "test-admin-key",
+			UserID:    "test-admin",
+			Name:      "test",
+			KeyHash:   hash,
+			KeyPrefix: key[:8],
+			Role:      string(auth.RoleAdmin),
+			CreatedAt: time.Now(),
+		}); err != nil {
+			t.Fatalf("save admin key: %v", err)
+		}
+		testAdminKey = key
+	})
+	return "Bearer " + testAdminKey
+}
 
 func setupTestServerWithDeps(t *testing.T) (*Server, *store.SQLite) {
 	t.Helper()
@@ -65,12 +116,12 @@ func setupTestServerWithDeps(t *testing.T) (*Server, *store.SQLite) {
 	wDisp := webhook.NewDispatcher(nil)
 
 	gMgr := guardrail.NewManager(logger, collector)
-	aMgr := alerting.NewManager(logger, collector)
+	aMgr := alerting.NewManagerWithDB(logger, collector, db)
 	cMgr := contextpkg.NewManager(db)
 
 	usageTracker := NewUsageTracker()
 
-	srv := NewServer(db, logger,
+	opts := []Option{
 		WithTracing(spans, collector),
 		WithSnapshotStore(ss),
 		WithWebhooks(wDisp),
@@ -79,12 +130,22 @@ func setupTestServerWithDeps(t *testing.T) (*Server, *store.SQLite) {
 		WithGuardrailManager(gMgr),
 		WithAlertingManager(aMgr),
 		WithContextManager(cMgr),
+		WithEvalRunner(eval.NewRunner(llm.NewMock("test response"), eval.ExactMatchScorer{})),
 		WithServerConfig(&ServerConfig{
 			CircuitBreakerFailureThreshold: 5,
 			CircuitBreakerSuccessThreshold: 3,
 			CircuitBreakerCooldown:         30,
 		}),
-	)
+	}
+	if authEnabled {
+		_ = adminAuthHeader(t, db)
+		opts = append(opts, WithAuth(db))
+	}
+
+	srv := NewServer(db, logger, opts...)
+	// Start the audit worker pool so audit entries are persisted
+	// synchronously enough for tests to read them back.
+	srv.StartAuditWorkers(context.Background(), 2)
 
 	t.Cleanup(func() {
 		spans = nil
@@ -3304,8 +3365,9 @@ func TestOAuthCallbackExpiredStateComprehensive(t *testing.T) {
 	ts := httptest.NewServer(srv)
 	defer ts.Close()
 
-	// Inject an expired state directly into the global map
-	oauthStates["expired-state-123"] = time.Now().Add(-10 * time.Minute)
+	// Inject an expired state directly into the store
+	resetOAuthStates()
+	oauthStates.put("expired-state-123", time.Now().Add(-10*time.Minute))
 
 	req, _ := http.NewRequest("GET", ts.URL+"/api/v1/auth/github/callback?code=abc&state=expired-state-123", nil)
 	req.AddCookie(&http.Cookie{Name: "oauth_state", Value: "expired-state-123"})
@@ -4982,6 +5044,53 @@ func TestAPIKeyCreateInvalidRoleComprehensive(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+// TestAPIKeyNoAuthRejectsAdmin pins the H-1 fix: when the server is
+// running with PROMPTSHEON_AUTH=false, an anonymous POST that asks for
+// role=admin must be rejected with 403. The previous behaviour
+// accepted the body verbatim and minted an admin key for any
+// user_id, which meant anyone who could reach the apikeys endpoint
+// could elevate to full control of the deployment. Reader/Writer
+// keys are still honoured for local development.
+func TestAPIKeyNoAuthRejectsAdmin(t *testing.T) {
+	srv, _ := setupTestServerWithDeps(t)
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	resp := doReq(t, "POST", ts.URL+"/api/v1/apikeys", `{"name":"k","user_id":"u","role":"admin"}`)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 for admin role in no-auth mode, got %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(strings.ToLower(string(body)), "no-auth") {
+		t.Fatalf("expected error to mention no-auth, got %q", string(body))
+	}
+}
+
+func TestAPIKeyNoAuthAllowsWriter(t *testing.T) {
+	srv, _ := setupTestServerWithDeps(t)
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	resp := doReq(t, "POST", ts.URL+"/api/v1/apikeys", `{"name":"k","user_id":"u","role":"writer"}`)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 for writer in no-auth mode, got %d", resp.StatusCode)
+	}
+}
+
+func TestAPIKeyNoAuthAllowsReader(t *testing.T) {
+	srv, _ := setupTestServerWithDeps(t)
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	resp := doReq(t, "POST", ts.URL+"/api/v1/apikeys", `{"name":"k","user_id":"u","role":"reader"}`)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 for reader in no-auth mode, got %d", resp.StatusCode)
 	}
 }
 
