@@ -5247,6 +5247,59 @@ func TestAPIKeyNoAuthAllowsReader(t *testing.T) {
 	}
 }
 
+// TestStreamPrompt_NonFlusherRejected pins the L-13 fix: when the
+// http.ResponseWriter does NOT implement http.Flusher, the stream
+// handler must return 400 BEFORE writing any body. The previous
+// implementation wrote the "event: start" line first and only
+// checked for Flusher afterwards, which produced a 200 with a
+// half-formed SSE body.
+func TestStreamPrompt_NonFlusherRejected(t *testing.T) {
+	srv, db := setupTestServerWithDeps(t)
+	ctx := context.Background()
+	now := time.Now()
+	// Seed a deployed prompt so the handler reaches the streaming
+	// branch.
+	db.CreatePrompt(ctx, &models.Prompt{
+		ID: "stream-no-flush", Name: "stream", Content: "hi", Status: models.StatusDeployed,
+		CreatedBy: "u", CreatedAt: now, UpdatedAt: now,
+	})
+
+	// Wrap the server in a middleware that strips http.Flusher from
+	// the response writer, simulating a transport that does not
+	// support streaming.
+	noFlusher := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv.ServeHTTP(&nonFlusherWriter{ResponseWriter: w}, r)
+	})
+	ts := httptest.NewServer(noFlusher)
+	defer ts.Close()
+
+	resp, err := http.Post(ts.URL+"/api/v1/prompts/stream-no-flush/stream", "application/json", strings.NewReader(`{"variables":{}}`))
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for non-flusher writer, got %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if strings.Contains(string(body), "event: start") {
+		t.Fatalf("response body leaked partial SSE stream: %q", string(body))
+	}
+}
+
+// nonFlusherWriter hides http.Flusher from the underlying writer.
+type nonFlusherWriter struct {
+	http.ResponseWriter
+}
+
+func (w *nonFlusherWriter) WriteHeader(code int) {
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *nonFlusherWriter) Write(b []byte) (int, error) {
+	return w.ResponseWriter.Write(b)
+}
+
 // TestAuditQueue_BackpressureDrops pins the M-7 fix: when the audit
 // worker pool is starved (queue full), the audit() call waits up to
 // auditQueueBackpressure for the workers to catch up, then drops

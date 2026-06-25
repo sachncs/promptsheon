@@ -744,6 +744,17 @@ func (s *Server) handleStreamPrompt(w http.ResponseWriter, r *http.Request) erro
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
+	// L-13 fix: assert http.Flusher BEFORE writing the first event.
+	// The previous code wrote the "event: start" line and only then
+	// checked whether the writer supported flushing. By the time the
+	// assertion failed the body had already been partially written,
+	// which produced a 200 with a half-formed SSE stream instead of
+	// a clean 400.
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		return badRequest("streaming not supported")
+	}
+
 	// Lift the http.Server WriteTimeout for this specific response.
 	// Without this, the global 60s WriteTimeout would terminate any
 	// streaming LLM response that takes longer. SetReadDeadline is
@@ -757,11 +768,6 @@ func (s *Server) handleStreamPrompt(w http.ResponseWriter, r *http.Request) erro
 		if s.logger != nil {
 			s.logger.Debug("stream: SetWriteDeadline unsupported", "err", err)
 		}
-	}
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		return badRequest("streaming not supported")
 	}
 
 	// Send initial event
