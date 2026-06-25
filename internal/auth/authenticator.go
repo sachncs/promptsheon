@@ -3,8 +3,10 @@ package auth
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -12,6 +14,17 @@ import (
 type Authenticator struct {
 	store      APIKeyStore
 	authLogger AuthLogger
+
+	// lastUsedCh is a buffered channel of API key IDs whose
+	// last_used_at timestamp should be updated. H-5 fix: the
+	// previous implementation called UpdateAPIKeyLastUsed
+	// synchronously with context.Background() and //nolint:errcheck,
+	// which could stall the request goroutine indefinitely if the
+	// DB was slow. The update is now fire-and-forget on a
+	// background goroutine.
+	lastUsedCh chan string
+	wg        sync.WaitGroup
+	stopCh    chan struct{}
 }
 
 // AuthLogger logs authentication failures for audit purposes.
@@ -64,12 +77,63 @@ func WithUserContext(ctx context.Context, u *User) context.Context {
 
 // NewAuthenticator creates a new Authenticator.
 func NewAuthenticator(store APIKeyStore) *Authenticator {
-	return &Authenticator{store: store, authLogger: &noopLogger{}}
+	a := &Authenticator{
+		store:      store,
+		authLogger: &noopLogger{},
+		lastUsedCh: make(chan string, 1024),
+		stopCh:     make(chan struct{}),
+	}
+	a.wg.Add(1)
+	go a.lastUsedWorker()
+	return a
 }
 
 // NewAuthenticatorWithLogger creates a new Authenticator with an audit logger.
 func NewAuthenticatorWithLogger(store APIKeyStore, logger AuthLogger) *Authenticator {
-	return &Authenticator{store: store, authLogger: logger}
+	a := &Authenticator{
+		store:      store,
+		authLogger: logger,
+		lastUsedCh: make(chan string, 1024),
+		stopCh:     make(chan struct{}),
+	}
+	a.wg.Add(1)
+	go a.lastUsedWorker()
+	return a
+}
+
+// lastUsedWorker drains the lastUsedCh channel and applies updates on
+// a background goroutine. Errors are logged via slog and never
+// bubble up to the request path. The previous design called
+// UpdateAPIKeyLastUsed synchronously inside the request hot path.
+func (a *Authenticator) lastUsedWorker() {
+	defer a.wg.Done()
+	for {
+		select {
+		case <-a.stopCh:
+			return
+		case id, ok := <-a.lastUsedCh:
+			if !ok {
+				return
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			if err := a.store.UpdateAPIKeyLastUsed(ctx, id); err != nil {
+				slog.Error("auth: update last_used failed", "err", err, "api_key_id", id)
+			}
+			cancel()
+		}
+	}
+}
+
+// Stop signals the lastUsedWorker to exit and waits for it. Safe to
+// call multiple times.
+func (a *Authenticator) Stop() {
+	select {
+	case <-a.stopCh:
+		return
+	default:
+		close(a.stopCh)
+	}
+	a.wg.Wait()
 }
 
 // Authenticate extracts and validates the API key from the request.
@@ -100,8 +164,16 @@ func (a *Authenticator) Authenticate(r *http.Request) (*User, error) {
 		return nil, fmt.Errorf("api key expired")
 	}
 
-	// Update last used (best effort, don't fail request).
-	a.store.UpdateAPIKeyLastUsed(context.Background(), rec.ID) //nolint:errcheck
+	// H-5 fix: queue the last-used update on a background
+	// goroutine. The request hot path is now non-blocking — a
+	// slow or stalled DB can no longer freeze the response.
+	select {
+	case a.lastUsedCh <- rec.ID:
+	default:
+		// Channel full: drop the update. The last_used column is
+		// for observability, not for security, so it is safe to
+		// lose an occasional write under heavy load.
+	}
 
 	return &User{
 		ID:   rec.UserID,

@@ -5,13 +5,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
 // mockStore implements APIKeyStore for testing.
 type mockStore struct {
-	keys map[string]*APIKeyRecord
+	keys             map[string]*APIKeyRecord
+	updateCalls      atomic.Int64
+	updateBlocks     chan struct{} // closed to unblock all blocked calls
+	individualBlocks map[string]chan struct{}
 }
 
 func (m *mockStore) GetAPIKeyByHash(_ context.Context, keyHash string) (*APIKeyRecord, error) {
@@ -21,7 +25,11 @@ func (m *mockStore) GetAPIKeyByHash(_ context.Context, keyHash string) (*APIKeyR
 	return nil, nil
 }
 
-func (m *mockStore) UpdateAPIKeyLastUsed(_ context.Context, _ string) error {
+func (m *mockStore) UpdateAPIKeyLastUsed(_ context.Context, id string) error {
+	m.updateCalls.Add(1)
+	if m.updateBlocks != nil {
+		<-m.updateBlocks // wait until test closes the channel
+	}
 	return nil
 }
 
@@ -242,6 +250,52 @@ func TestAuthenticatorMiddleware(t *testing.T) {
 	if rr.Body.String() != "user:u1" {
 		t.Errorf("body = %q, want %q", rr.Body.String(), "user:u1")
 	}
+}
+
+// TestAuthenticate_UpdateLastUsedIsNonBlocking pins the H-5 fix: a
+// synchronous UpdateAPIKeyLastUsed that blocks the request goroutine
+// is unsafe because a slow DB can stall the request path. The fix
+// moves the call to a background goroutine; the request hot path
+// returns promptly even if the store is wedged.
+func TestAuthenticate_UpdateLastUsedIsNonBlocking(t *testing.T) {
+	key, hash, _ := GenerateAPIKey()
+	store := &mockStore{
+		keys: map[string]*APIKeyRecord{
+			hash: {ID: "k1", UserID: "u1", Role: string(RoleAdmin)},
+		},
+		updateBlocks: make(chan struct{}),
+	}
+	auth := NewAuthenticator(store)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer "+key)
+
+	// Bound Authenticate to 500ms. The pre-fix implementation would
+	// block for as long as the store's updateBlocks channel stays
+	// open. The post-fix implementation returns immediately and
+	// the update happens on the background goroutine.
+	done := make(chan struct{})
+	var authErr error
+	go func() {
+		_, authErr = auth.Authenticate(req)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Authenticate blocked the request goroutine on UpdateAPIKeyLastUsed")
+	}
+	if authErr != nil {
+		t.Fatalf("unexpected error: %v", authErr)
+	}
+	// Give the worker a moment to pick up the queued update.
+	time.Sleep(100 * time.Millisecond)
+	if store.updateCalls.Load() == 0 {
+		t.Fatal("expected background worker to invoke UpdateAPIKeyLastUsed")
+	}
+	// Unblock the worker and stop.
+	close(store.updateBlocks)
+	auth.Stop()
 }
 
 func TestAuthorizer_Require(t *testing.T) {
