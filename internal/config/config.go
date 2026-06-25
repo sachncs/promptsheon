@@ -3,8 +3,10 @@ package config
 
 import (
 	"log/slog"
+	"net"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config holds all configuration for the server.
@@ -216,18 +218,33 @@ func LoadConfig() Config {
 	return cfg
 }
 
-// Port extracts the port number from the address string.
+// Port extracts the port number from the address string. The
+// implementation uses net.SplitHostPort so IPv6 literals
+// (e.g. "[::1]:8080") and empty ports (":http") are handled
+// correctly. Returns 8080 if the address can't be parsed.
 func (c Config) Port() int {
-	// Simple extraction: find the last colon and parse the number.
-	addr := c.Addr
-	for i := len(addr) - 1; i >= 0; i-- {
-		if addr[i] == ':' {
-			port, err := strconv.Atoi(addr[i+1:])
-			if err == nil {
-				return port
+	host, port, err := net.SplitHostPort(c.Addr)
+	if err != nil {
+		// No port in the address: try the bare string as a
+		// port number for the ":8080" form.
+		if strings.HasPrefix(c.Addr, ":") {
+			if n, err := strconv.Atoi(c.Addr[1:]); err == nil {
+				return n
 			}
-			break
 		}
+		// Address like ":http": SplitHostPort returns the
+		// service name in port. We don't do service-name
+		// resolution; just return the default.
+		_ = host
+		return 8080
 	}
+	if n, err := strconv.Atoi(port); err == nil {
+		return n
+	}
+	// Address like ":http" or "host:http": SplitHostPort
+	// succeeds but the port is a service name. We could call
+	// net.LookupPort here, but that adds a syscall on the
+	// hot path; return the default and let the caller
+	// override via configuration.
 	return 8080
 }
