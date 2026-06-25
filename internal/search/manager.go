@@ -13,7 +13,7 @@ import (
 // underlying Index; writes (Add, Remove, Rebuild) take a write
 // lock. The Manager is safe for use from multiple goroutines.
 type Manager struct {
-	mu sync.RWMutex
+	mu  sync.RWMutex
 	idx *Index
 }
 
