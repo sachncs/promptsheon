@@ -104,18 +104,18 @@ func (m *RetentionManager) Start(ctx context.Context) {
 // only protected 3 actions which meant almost every audit row
 // (create, update, delete, restore, etc.) was deleted after AuditTTL.
 var protectedAuditActions = map[string]bool{
-	"auth_failure":    true,
-	"auto_approve":    true,
-	"deploy":          true,
-	"create":          true,
-	"update":          true,
-	"delete":          true,
-	"restore":         true,
-	"approve":         true,
-	"reject":          true,
+	"auth_failure":     true,
+	"auto_approve":     true,
+	"deploy":           true,
+	"create":           true,
+	"update":           true,
+	"delete":           true,
+	"restore":          true,
+	"approve":          true,
+	"reject":           true,
 	"permission_grant": true,
-	"key_mint":        true,
-	"key_revoke":      true,
+	"key_mint":         true,
+	"key_revoke":       true,
 }
 
 // Enforce deletes expired data based on the retention policy.

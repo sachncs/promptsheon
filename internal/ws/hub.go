@@ -22,9 +22,9 @@ type LogEntry struct {
 
 // Client represents an SSE client connection.
 type Client struct {
-	id     string
-	send   chan []byte
-	hub    *Hub
+	id   string
+	send chan []byte
+	hub  *Hub
 }
 
 // LogFilter defines filtering for log subscription.

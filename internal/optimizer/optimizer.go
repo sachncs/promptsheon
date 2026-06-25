@@ -13,16 +13,16 @@ import (
 
 // OptimizationSuggestion represents a suggested improvement for a prompt.
 type OptimizationSuggestion struct {
-	ID          string         `json:"id"`
-	PromptID    string         `json:"prompt_id"`
-	Type        string         `json:"type"` // "clarity", "conciseness", "effectiveness", "cost", "structure"
-	Severity    string         `json:"severity"` // "low", "medium", "high"
-	Title       string         `json:"title"`
-	Description string         `json:"description"`
-	Original    string         `json:"original,omitempty"`
-	Suggested   string         `json:"suggested,omitempty"`
-	Impact      string         `json:"impact"` // estimated impact description
-	CreatedAt   time.Time      `json:"created_at"`
+	ID          string    `json:"id"`
+	PromptID    string    `json:"prompt_id"`
+	Type        string    `json:"type"`     // "clarity", "conciseness", "effectiveness", "cost", "structure"
+	Severity    string    `json:"severity"` // "low", "medium", "high"
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	Original    string    `json:"original,omitempty"`
+	Suggested   string    `json:"suggested,omitempty"`
+	Impact      string    `json:"impact"` // estimated impact description
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // OptimizationReport contains a full optimization analysis of a prompt.
@@ -64,10 +64,10 @@ func NewOptimizer(provider llm.Provider) *Optimizer {
 func (o *Optimizer) AnalyzePrompt(prompt *models.Prompt) *PromptMetrics {
 	content := prompt.Content
 	words := strings.Fields(content)
-	
+
 	// Estimate tokens (rough: 1 token ≈ 4 chars)
 	estimatedTokens := len(content) / 4
-	
+
 	// Calculate complexity score based on various factors
 	complexity := 0.0
 	if len(words) > 100 {
@@ -119,7 +119,7 @@ func (o *Optimizer) AnalyzePrompt(prompt *models.Prompt) *PromptMetrics {
 // OptimizePrompt uses LLM to suggest improvements for a prompt.
 func (o *Optimizer) OptimizePrompt(ctx context.Context, prompt *models.Prompt) (*OptimizationReport, error) {
 	metrics := o.AnalyzePrompt(prompt)
-	
+
 	// Build optimization request
 	systemPrompt := `You are a prompt engineering expert. Analyze the given prompt and provide optimization suggestions.
 Focus on:
@@ -172,10 +172,10 @@ Provide optimization suggestions and an improved version.`, prompt.Name, prompt.
 
 	// Parse response (simplified - in production would use structured parsing)
 	report := &OptimizationReport{
-		PromptID:    prompt.ID,
-		PromptName:  prompt.Name,
-		Metrics:     metrics,
-		CreatedAt:   time.Now(),
+		PromptID:   prompt.ID,
+		PromptName: prompt.Name,
+		Metrics:    metrics,
+		CreatedAt:  time.Now(),
 	}
 
 	// Extract score from response

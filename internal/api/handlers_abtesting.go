@@ -10,47 +10,47 @@ import (
 
 func (s *Server) handleCreateABTest(w http.ResponseWriter, r *http.Request) error {
 	var req struct {
-		Name        string              `json:"name"`
-		PromptID    string              `json:"prompt_id"`
+		Name        string               `json:"name"`
+		PromptID    string               `json:"prompt_id"`
 		Variants    []*abtesting.Variant `json:"variants"`
-		WinCriteria string              `json:"win_criteria"`
-		MinSamples  int                 `json:"min_samples"`
+		WinCriteria string               `json:"win_criteria"`
+		MinSamples  int                  `json:"min_samples"`
 	}
-	
+
 	if err := readJSON(r, &req); err != nil {
 		return badRequest("invalid request body")
 	}
-	
+
 	if req.Name == "" || req.PromptID == "" {
 		return badRequest("name and prompt_id are required")
 	}
-	
+
 	if len(req.Variants) < 2 {
 		return badRequest("at least 2 variants required")
 	}
-	
+
 	if req.MinSamples <= 0 {
 		req.MinSamples = 100
 	}
-	
+
 	// Get provider
 	p, err := s.db.GetPrompt(r.Context(), req.PromptID)
 	if err != nil {
 		return ErrNotFound
 	}
-	
+
 	var providerName string
 	if p.Binding != nil && p.Binding.Provider != "" {
 		providerName = p.Binding.Provider
 	} else {
 		providerName = "openai"
 	}
-	
+
 	provider, err := llm.Global.Get(providerName)
 	if err != nil {
 		return badRequest("provider not available")
 	}
-	
+
 	engine := abtesting.NewEngine(provider)
 	test := &abtesting.Test{
 		ID:          generateID(),
@@ -60,11 +60,11 @@ func (s *Server) handleCreateABTest(w http.ResponseWriter, r *http.Request) erro
 		WinCriteria: req.WinCriteria,
 		MinSamples:  req.MinSamples,
 	}
-	
+
 	if err := engine.CreateTest(test); err != nil {
 		return err
 	}
-	
+
 	writeJSON(w, http.StatusCreated, test)
 	return nil
 }
@@ -84,7 +84,7 @@ func (s *Server) handleGetABTest(w http.ResponseWriter, r *http.Request) error {
 	if id == "" {
 		return badRequest("id is required")
 	}
-	
+
 	// Would retrieve from database in production
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id":     id,
@@ -98,7 +98,7 @@ func (s *Server) handleStopABTest(w http.ResponseWriter, r *http.Request) error 
 	if id == "" {
 		return badRequest("id is required")
 	}
-	
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"message": "test stopped",
 		"id":      id,
@@ -111,15 +111,15 @@ func (s *Server) handleGetABTestResults(w http.ResponseWriter, r *http.Request) 
 	if id == "" {
 		return badRequest("id is required")
 	}
-	
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"test_id":     id,
-		"status":      "completed",
-		"variants":    []any{},
-		"winner":      nil,
-		"confidence":  0,
+		"test_id":        id,
+		"status":         "completed",
+		"variants":       []any{},
+		"winner":         nil,
+		"confidence":     0,
 		"is_significant": false,
-		"timestamp":   time.Now(),
+		"timestamp":      time.Now(),
 	})
 	return nil
 }
