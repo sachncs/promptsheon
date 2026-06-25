@@ -107,7 +107,7 @@ func ParseYAML(data []byte) (*models.Agent, error) {
 	var currentStep *models.AgentStep
 	indent := 0
 
-	for i, line := range lines {
+	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
@@ -147,8 +147,6 @@ func ParseYAML(data []byte) (*models.Agent, error) {
 		case key == "output_key" && currentStep != nil:
 			agent.Steps[len(agent.Steps)-1].OutputKey = value
 		}
-
-		_ = i
 	}
 
 	if agent.Name == "" {
