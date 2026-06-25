@@ -3,6 +3,8 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/sachn-cs/promptsheon/internal/alerting"
 	"github.com/sachn-cs/promptsheon/internal/api"
+	"github.com/sachn-cs/promptsheon/internal/buildinfo"
 	"github.com/sachn-cs/promptsheon/internal/config"
 	contextpkg "github.com/sachn-cs/promptsheon/internal/context"
 	"github.com/sachn-cs/promptsheon/internal/guardrail"
@@ -30,6 +33,25 @@ import (
 )
 
 func main() {
+	// Handle --version and --help before loading the rest of the
+	// config. Operators commonly run 'promptsheond --version' to
+	// confirm a deployment, and we don't want a missing or invalid
+	// env var to mask the simple cases.
+	showVersion := flag.Bool("version", false, "print version information and exit")
+	showHelp := flag.Bool("help", false, "print configuration and runtime flags and exit")
+	flag.Parse()
+
+	if *showVersion {
+		info := buildinfo.Get()
+		fmt.Printf("promptsheond %s (commit %s, built %s, %s/%s)\n",
+			info.Version, info.Commit, info.BuildTime, info.OS, info.Arch)
+		return
+	}
+	if *showHelp {
+		fmt.Print(serverHelpText())
+		return
+	}
+
 	cfg := config.LoadConfig()
 
 	// SECURITY: shell tool policy must be configured at startup, not
@@ -205,9 +227,20 @@ func main() {
 		IdleTimeout:       idleTimeout,
 	}
 
-	// Start server in goroutine.
+	// Start server in goroutine. The startup banner includes the
+	// version, addr, db path, auth state, and OTel endpoint so an
+	// operator can verify the running configuration from a single
+	// log line.
 	go func() {
-		logger.Info("starting server", "addr", cfg.Addr)
+		info := buildinfo.Get()
+		logger.Info("starting server",
+			"version", info.Version,
+			"commit", info.Commit,
+			"addr", cfg.Addr,
+			"db_path", cfg.DBPath,
+			"auth", cfg.Auth,
+			"otel_endpoint", cfg.OTelEndpoint,
+		)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("server error", "err", err)
 			os.Exit(1)
@@ -321,4 +354,41 @@ func (a *webhookStoreAdapter) ListWebhookEndpoints(ctx context.Context) ([]*webh
 		})
 	}
 	return eps, nil
+}
+
+// serverHelpText returns the human-readable usage block printed
+// by --help. We keep the text in a function so it can be
+// exercised by a test (e.g. a future doc-snippet test) without
+// having to actually exec the binary.
+func serverHelpText() string {
+	return `promptsheond — Promptsheon API server
+
+Usage:
+  promptsheond [flags]
+
+Flags:
+  --version           print version information and exit
+  --help              print this help text and exit
+
+Configuration is read entirely from environment variables. The
+most common variables are:
+
+  PROMPTSHEON_ADDR           listen address (default ":8080")
+  PROMPTSHEON_DB_PATH        SQLite database path (default "promptsheon.db")
+  PROMPTSHEON_AUTH           enable authentication (default true)
+  PROMPTSHEON_LOG_LEVEL      debug | info | warn | error (default info)
+  PROMPTSHEON_VAULT_KEY      32-byte hex AES key for the provider vault
+  PROMPTSHEON_OTEL_ENDPOINT  OTLP gRPC endpoint for traces
+  PROMPTSHEON_CORS_ORIGINS   comma-separated CORS allowlist, or "*"
+
+The full list is documented in docs/configuration.md.
+
+Once running, the server exposes:
+
+  GET /health            liveness probe (always unauthenticated)
+  GET /ready             readiness probe (checks the database)
+  GET /api/v1/version    build info (always unauthenticated)
+  GET /metrics           Prometheus metrics (always unauthenticated)
+  /api/v1/...            REST API (see api/openapi.yaml)
+`
 }
