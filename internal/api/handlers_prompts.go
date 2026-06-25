@@ -93,6 +93,7 @@ func (s *Server) handleCreatePrompt(w http.ResponseWriter, r *http.Request) erro
 	if err := s.db.CreatePrompt(r.Context(), p); err != nil {
 		return err
 	}
+	s.refreshSearchIndex(r.Context(), "upsert", p)
 	s.audit(r.Context(), "create", "prompt:"+p.ID, map[string]any{"name": p.Name})
 	writeJSON(w, http.StatusCreated, p)
 	return nil
@@ -182,6 +183,7 @@ func (s *Server) handleUpdatePrompt(w http.ResponseWriter, r *http.Request) erro
 	if err := s.db.UpdatePrompt(r.Context(), existing); err != nil {
 		return err
 	}
+	s.refreshSearchIndex(r.Context(), "upsert", existing)
 	s.audit(r.Context(), "update", "prompt:"+existing.ID, map[string]any{"name": existing.Name, "version": existing.Version})
 	writeJSON(w, http.StatusOK, existing)
 	return nil
@@ -195,12 +197,14 @@ func (s *Server) handleDeletePrompt(w http.ResponseWriter, r *http.Request) erro
 	// inconsistent audit trail (some 404s logged a delete, others
 	// did not). Fix: look up the prompt first, then delete + audit
 	// only if it exists.
-	if _, err := s.db.GetPrompt(r.Context(), id); err != nil {
+	p, err := s.db.GetPrompt(r.Context(), id)
+	if err != nil {
 		return ErrNotFound
 	}
 	if err := s.db.DeletePrompt(r.Context(), id); err != nil {
 		return err
 	}
+	s.refreshSearchIndex(r.Context(), "remove", p)
 	s.audit(r.Context(), "delete", "prompt:"+id, nil)
 	w.WriteHeader(http.StatusNoContent)
 	return nil

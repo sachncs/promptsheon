@@ -19,6 +19,7 @@ import (
 	"promptsheon/internal/metrics"
 	"promptsheon/internal/models"
 	"promptsheon/internal/ratelimit"
+	"promptsheon/internal/search"
 	"promptsheon/internal/snapshot"
 	"promptsheon/internal/store"
 	"promptsheon/internal/trace"
@@ -65,6 +66,11 @@ type Server struct {
 	// validateOAuthState) dispatch via activeOAuthStates which is
 	// set to the most recently constructed server.
 	oauthStates *oauthStateStore
+
+	// searchManager owns the in-memory semantic search index.
+	// M-1: built once on Server construction, refreshed on
+	// prompt create/update/delete via RefreshSearchIndex.
+	searchManager *search.Manager
 }
 
 // httpRequestKey is the context key used by the request middleware
@@ -205,7 +211,8 @@ func NewServer(db store.Repository, logger *slog.Logger, opts ...Option) *Server
 			CircuitBreakerSuccessThreshold: 3,
 			CircuitBreakerCooldown:         30,
 		},
-		oauthStates: newOAuthStateStore(),
+		oauthStates:   newOAuthStateStore(),
+		searchManager: search.NewManager(0),
 	}
 	// Make this server the active one for the package-level OAuth
 	// helpers (generateOAuthState, validateOAuthState, etc.). The
@@ -218,6 +225,13 @@ func NewServer(db store.Repository, logger *slog.Logger, opts ...Option) *Server
 		opt(s)
 	}
 	s.routes()
+	// M-1: warm the search index from the current prompt set.
+	// This is best-effort: a failure here does not block server
+	// startup (the index can be rebuilt lazily on the first
+	// search request if the warm-up fails).
+	if prompts, err := s.db.ListPrompts(context.Background(), models.PromptFilter{}); err == nil {
+		s.searchManager.Rebuild(prompts)
+	}
 	return s
 }
 
@@ -611,6 +625,35 @@ func httpRequestFromContext(ctx context.Context) *http.Request {
 		return r
 	}
 	return nil
+}
+
+// refreshSearchIndex updates the in-memory search index with the
+// latest version of a single prompt. Called from the prompt
+// create/update/delete handlers. M-1: without this hook, the
+// index would drift out of sync with the database.
+func (s *Server) refreshSearchIndex(ctx context.Context, op string, p *models.Prompt) {
+	if s.searchManager == nil {
+		return
+	}
+	switch op {
+	case "remove":
+		if p != nil {
+			s.searchManager.Remove(p.ID)
+		}
+	case "upsert":
+		if p == nil {
+			return
+		}
+		// Fetch the latest version from the DB so the index always
+		// reflects the persisted state, not the request body
+		// (which may not have all fields populated).
+		fresh, err := s.db.GetPrompt(ctx, p.ID)
+		if err != nil {
+			s.searchManager.Remove(p.ID)
+			return
+		}
+		s.searchManager.Add(fresh)
+	}
 }
 
 func (s *Server) auditDiff(ctx context.Context, action, resource string, prev, new any) {

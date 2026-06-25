@@ -5343,8 +5343,55 @@ func TestRunWorkflow_WiresGuardrailManager(t *testing.T) {
 	}
 }
 
+// TestSearchIndex_StaysConsistentAcrossMutations pins the M-1 fix:
+// the server-owned in-memory search index must reflect prompt
+// create/update/delete operations. The previous implementation
+// re-indexed every prompt on every search request, which made the
+// index ephemeral and unbounded. The new implementation maintains
+// a single index that the create/update/delete handlers refresh.
+func TestSearchIndex_StaysConsistentAcrossMutations(t *testing.T) {
+	srv, db := setupTestServerWithDeps(t)
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+	ctx := context.Background()
+	now := time.Now()
+
+	// Create
+	db.CreatePrompt(ctx, &models.Prompt{ID: "m1-a", Name: "alpha", Content: "alpha", CreatedBy: "u", CreatedAt: now, UpdatedAt: now})
+	srv.refreshSearchIndex(ctx, "upsert", &models.Prompt{ID: "m1-a", Name: "alpha", Content: "alpha", CreatedBy: "u", CreatedAt: now, UpdatedAt: now})
+	if got := srv.searchManager.Size(); got != 1 {
+		t.Fatalf("after create: size = %d, want 1", got)
+	}
+
+	// Update: re-add with new content
+	db.CreatePrompt(ctx, &models.Prompt{ID: "m1-b", Name: "beta", Content: "beta beta", CreatedBy: "u", CreatedAt: now, UpdatedAt: now})
+	srv.refreshSearchIndex(ctx, "upsert", &models.Prompt{ID: "m1-b", Name: "beta", Content: "beta beta", CreatedBy: "u", CreatedAt: now, UpdatedAt: now})
+	if got := srv.searchManager.Size(); got != 2 {
+		t.Fatalf("after second create: size = %d, want 2", got)
+	}
+
+	// Search: alpha is in the index
+	results := srv.searchManager.Search("alpha", 10)
+	if len(results) == 0 {
+		t.Fatal("expected results for 'alpha'")
+	}
+	foundAlpha := false
+	for _, r := range results {
+		if r.Document.PromptID == "m1-a" {
+			foundAlpha = true
+		}
+	}
+	if !foundAlpha {
+		t.Fatal("expected m1-a in search results")
+	}
+
+	// Remove
+	srv.refreshSearchIndex(ctx, "remove", &models.Prompt{ID: "m1-a"})
+	if got := srv.searchManager.Size(); got != 1 {
+		t.Fatalf("after remove: size = %d, want 1", got)
+	}
+}
 // TestSubstituteVariables_PreservesAllKeys pins the M-12 fix: the
-// helper is a pure function that must replace every {{key}} in the
 // template, and leave placeholders for unknown keys alone. The
 // run/stream handlers use it to build the prompt exactly once so
 // the guardrail and the LLM call see the same string.
