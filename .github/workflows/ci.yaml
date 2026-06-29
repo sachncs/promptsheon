@@ -106,7 +106,7 @@ jobs:
         run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./...
 
       - name: Run gosec
-        uses: securego/gosec@v2.22.10
+        uses: securego/gosec@v2.27.1
         with:
           args: ./...
 
