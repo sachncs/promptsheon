@@ -7,14 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `internal/api/handlers_capabilities.go`: CRUD REST handlers for Workspace,
+  Project, Capability, CapabilityVersion, and Execution resources. 18 new
+  endpoints registered in the server router.
+- `cmd/promptsheon`: `workspace`, `project`, and `capability` subcommands for
+  managing capability resources through the daemon API (`PROMPTSHEON_SERVER`).
+- `internal/api/helpers.go`: `generateID()` utility for handler use.
+
 ### Changed
 
+- `internal/api/server.go`: `routes()` now registers capability-centric
+  endpoints (workspaces, projects, capabilities, versions, executions) in
+  place of the old `// TODO: capability routes` marker. Auth endpoints,
+  users, audit, alerts, webhooks, vault, metrics, tracing, and providers
+  remain unchanged.
 - `internal/llm/types.go`: `Usage` type moved from `internal/models/eval.go` to
   `internal/llm/` to break the circular dependency between models and llm
   packages. All `models.Usage` references across the codebase updated to
   `llm.Usage`.
 - `internal/store/repo.go`: `CapabilityRepository` interface embedded into the
   main `Repository` interface.
+
+### Removed
+
+- All old domain model files deleted from `internal/models/` (prompt.go,
+  agent.go, context.go, dataset.go, eval.go, workflow.go, guardrail.go,
+  review.go, execution_log.go, provider_key.go, versioned.go).
+- Old CRUD methods removed from `internal/store/sqlite.go`;
+  `internal/store/sqlite.go` now contains only infra and capability methods.
+- 17 old API handler files deleted from `internal/api/` (handlers_prompts.go,
+  handlers_agents.go, handlers_contexts.go, handlers_datasets.go,
+  handlers_evals.go, handlers_workflows.go, handlers_guardrails.go,
+  handlers_reviews.go, handlers_execution_logs.go, handlers_search.go).
+- All old handler files (handlers_projects.go, handlers_snapshots.go,
+  handlers_swagger.go, handlers_collab.go, handlers_abtesting.go,
+  handlers_resources.go, handlers_rbac_migration.go) deleted.
+- Old route registrations stripped from `server.go`; replaced by capability
+  routes.
+- Old API test files removed (`api_test.go`, `api_comprehensive_test.go`,
+  `audit_shutdown_test.go`, `handlers_abtesting_test.go`,
+  `store_comprehensive_test.go`).
+- Integration test files removed (`test/integration_test.go`,
+  `test/integration_comprehensive_test.go`).
+- Old test files removed (`internal/models/models_test.go`,
+  `internal/context/manager_test.go`,
+  `internal/guardrail/manager_test.go`,
+  `internal/optimizer/optimizer_test.go`,
+  `internal/store/store_test.go`).
+- Old code removed from `internal/workflow/`, `internal/eval/`,
+  `internal/guardrail/`, `internal/optimizer/`, `internal/context/`,
+  `internal/search/` — all now compile with zero `internal/models`
+  dependency.
 
 ### Added
 

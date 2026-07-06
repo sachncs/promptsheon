@@ -232,13 +232,6 @@ func NewServer(db store.Repository, logger *slog.Logger, opts ...Option) *Server
 		opt(s)
 	}
 	s.routes()
-	// M-1: warm the search index from the current prompt set.
-	// This is best-effort: a failure here does not block server
-	// startup (the index can be rebuilt lazily on the first
-	// search request if the warm-up fails).
-	if prompts, err := s.db.ListPrompts(context.Background(), models.PromptFilter{}); err == nil {
-		s.searchManager.Rebuild(prompts)
-	}
 	return s
 }
 
@@ -258,10 +251,7 @@ func (s *Server) routes() {
 		s.mux.Handle("GET /metrics", s.collector.Handler())
 	}
 
-	// Auth endpoints. Previously these were registered as fully
-	// unauthenticated, which let any anonymous caller mint admin keys.
-	// The handlers now perform their own caller checks; we still wrap
-	// them with the global rate limiter to prevent brute force.
+	// Auth endpoints.
 	createKey := s.handleCreateAPIKey
 	listKeys := s.handleListAPIKeys
 	revokeKey := s.handleRevokeAPIKey
@@ -274,13 +264,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/apikeys", s.wrapHandler(listKeys))
 	s.mux.HandleFunc("DELETE /api/v1/apikeys/{id}", s.wrapHandler(revokeKey))
 
-	// OAuth endpoints (unauthenticated — used for SSO login).
+	// OAuth endpoints (unauthenticated).
 	s.mux.HandleFunc("GET /api/v1/auth/{provider}/login", s.wrapHandler(s.handleOAuthLogin))
 	s.mux.HandleFunc("GET /api/v1/auth/{provider}/callback", s.wrapHandler(s.handleOAuthCallback))
 
-	// First-run bootstrap. Active only when PROMPTSHEON_AUTH=false
-	// and the user table is empty; see handleBootstrap in
-	// handlers_auth.go for the security notes.
+	// First-run bootstrap.
 	s.mux.HandleFunc("POST /api/v1/setup", s.wrapHandler(s.handleBootstrap))
 
 	// Users (admin only)
@@ -290,98 +278,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PUT /api/v1/users/{id}", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleUpdateUser)))
 	s.mux.HandleFunc("DELETE /api/v1/users/{id}", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleDeleteUser)))
 
-	// Protected routes — apply auth + permission checks if auth is enabled.
-	s.mux.HandleFunc("GET /api/v1/prompts", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListPrompts)))
-	s.mux.HandleFunc("POST /api/v1/prompts", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreatePrompt)))
-	s.mux.HandleFunc("GET /api/v1/prompts/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetPrompt)))
-	s.mux.HandleFunc("PUT /api/v1/prompts/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdatePrompt)))
-	s.mux.HandleFunc("DELETE /api/v1/prompts/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptDelete)(s.handleDeletePrompt)))
-	s.mux.HandleFunc("GET /api/v1/prompts/{id}/versions", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListPromptVersions)))
-	s.mux.HandleFunc("POST /api/v1/prompts/{id}/restore", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleRestorePrompt)))
-	s.mux.HandleFunc("GET /api/v1/prompts/similar", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleFindSimilarPrompts)))
-	s.mux.HandleFunc("POST /api/v1/prompts/{id}/deploy", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleDeployPrompt)))
-	s.mux.HandleFunc("POST /api/v1/prompts/{id}/archive", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleArchivePrompt)))
-	s.mux.HandleFunc("POST /api/v1/prompts/{id}/run", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleRunPrompt)))
-	s.mux.HandleFunc("POST /api/v1/prompts/{id}/stream", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleStreamPrompt)))
-	s.mux.HandleFunc("POST /api/v1/prompts/{id}/preview", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handlePreviewPrompt)))
-	s.mux.HandleFunc("GET /api/v1/prompts/{id}/diff", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handlePromptDiff)))
-	s.mux.HandleFunc("POST /api/v1/prompts/{id}/clone", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleClonePrompt)))
-
-	s.mux.HandleFunc("GET /api/v1/agents", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleListAgents)))
-	s.mux.HandleFunc("POST /api/v1/agents", s.wrapHandler(s.requirePerm(auth.PermAgentCreate)(s.handleCreateAgent)))
-	s.mux.HandleFunc("GET /api/v1/agents/{id}", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleGetAgent)))
-	s.mux.HandleFunc("PUT /api/v1/agents/{id}", s.wrapHandler(s.requirePerm(auth.PermAgentUpdate)(s.handleUpdateAgent)))
-	s.mux.HandleFunc("DELETE /api/v1/agents/{id}", s.wrapHandler(s.requirePerm(auth.PermAgentDelete)(s.handleDeleteAgent)))
-	s.mux.HandleFunc("GET /api/v1/agents/{id}/export", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleExportAgent)))
-	s.mux.HandleFunc("POST /api/v1/agents/import-yaml", s.wrapHandler(s.requirePerm(auth.PermAgentCreate)(s.handleImportAgentYAML)))
-	s.mux.HandleFunc("POST /api/v1/agents/{id}/fork", s.wrapHandler(s.requirePerm(auth.PermAgentCreate)(s.handleForkAgent)))
-	s.mux.HandleFunc("GET /api/v1/agents/templates", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleListTemplates)))
-	s.mux.HandleFunc("GET /api/v1/agents/{id}/versions", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleListAgentVersions)))
-	s.mux.HandleFunc("POST /api/v1/agents/{id}/restore", s.wrapHandler(s.requirePerm(auth.PermAgentUpdate)(s.handleRestoreAgent)))
-	s.mux.HandleFunc("POST /api/v1/agents/{id}/deploy", s.wrapHandler(s.requirePerm(auth.PermAgentUpdate)(s.handleDeployAgent)))
-	s.mux.HandleFunc("POST /api/v1/agents/{id}/archive", s.wrapHandler(s.requirePerm(auth.PermAgentUpdate)(s.handleArchiveAgent)))
-	s.mux.HandleFunc("POST /api/v1/agents/{id}/rerun", s.wrapHandler(s.requirePerm(auth.PermAgentCreate)(s.handleRerunAgent)))
-	s.mux.HandleFunc("POST /api/v1/agents/validate", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleValidateAgentWorkflow)))
-
-	// Agent Execute (full orchestration)
-	s.mux.HandleFunc("POST /api/v1/agents/{id}/execute", s.wrapHandler(s.requirePerm(auth.PermAgentCreate)(s.handleExecuteAgent)))
-
-	// Agent Guardrail Configs
-	s.mux.HandleFunc("POST /api/v1/agents/{id}/guardrail-config", s.wrapHandler(s.requirePerm(auth.PermAgentUpdate)(s.handleCreateAgentGuardrailConfig)))
-	s.mux.HandleFunc("GET /api/v1/agents/{id}/guardrail-config", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleGetAgentGuardrailConfig)))
-	s.mux.HandleFunc("PUT /api/v1/agents/{id}/guardrail-config/{config_id}", s.wrapHandler(s.requirePerm(auth.PermAgentUpdate)(s.handleUpdateAgentGuardrailConfig)))
-	s.mux.HandleFunc("DELETE /api/v1/agents/{id}/guardrail-config/{config_id}", s.wrapHandler(s.requirePerm(auth.PermAgentUpdate)(s.handleDeleteAgentGuardrailConfig)))
-
-	// Agent Executions
-	s.mux.HandleFunc("GET /api/v1/agents/{id}/executions", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleListAgentExecutions)))
-	s.mux.HandleFunc("GET /api/v1/agents/{id}/executions/{exec_id}", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleGetAgentExecution)))
-
-	// Execution Logs
-	s.mux.HandleFunc("GET /api/v1/execution-logs", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListExecutionLogs)))
-	s.mux.HandleFunc("GET /api/v1/execution-logs/{id}", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleGetExecutionLog)))
-
-	// Contexts
-	s.mux.HandleFunc("POST /api/v1/contexts", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateContext)))
-	s.mux.HandleFunc("GET /api/v1/contexts", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListContexts)))
-	s.mux.HandleFunc("GET /api/v1/contexts/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetContext)))
-	s.mux.HandleFunc("PUT /api/v1/contexts/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateContext)))
-	s.mux.HandleFunc("DELETE /api/v1/contexts/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptDelete)(s.handleDeleteContext)))
-	s.mux.HandleFunc("POST /api/v1/contexts/{id}/messages", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleAppendContextMessage)))
-	s.mux.HandleFunc("DELETE /api/v1/contexts/{id}/messages", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleClearContextMessages)))
-	s.mux.HandleFunc("POST /api/v1/contexts/{id}/assemble", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleAssembleContext)))
-
-	s.mux.HandleFunc("GET /api/v1/datasets", s.wrapHandler(s.requirePerm(auth.PermDatasetRead)(s.handleListDatasets)))
-	s.mux.HandleFunc("POST /api/v1/datasets", s.wrapHandler(s.requirePerm(auth.PermDatasetCreate)(s.handleCreateDataset)))
-	s.mux.HandleFunc("GET /api/v1/datasets/{id}", s.wrapHandler(s.requirePerm(auth.PermDatasetRead)(s.handleGetDataset)))
-	s.mux.HandleFunc("PUT /api/v1/datasets/{id}", s.wrapHandler(s.requirePerm(auth.PermDatasetUpdate)(s.handleUpdateDataset)))
-	s.mux.HandleFunc("DELETE /api/v1/datasets/{id}", s.wrapHandler(s.requirePerm(auth.PermDatasetDelete)(s.handleDeleteDataset)))
-	s.mux.HandleFunc("POST /api/v1/datasets/import", s.wrapHandler(s.requirePerm(auth.PermDatasetCreate)(s.handleImportDataset)))
-	s.mux.HandleFunc("POST /api/v1/datasets/{id}/import-csv", s.wrapHandler(s.requirePerm(auth.PermDatasetCreate)(s.handleImportCSVDataset)))
-	s.mux.HandleFunc("GET /api/v1/datasets/{id}/export", s.wrapHandler(s.requirePerm(auth.PermDatasetRead)(s.handleExportDataset)))
-
-	s.mux.HandleFunc("GET /api/v1/reviews", s.wrapHandler(s.requirePerm(auth.PermReviewCreate)(s.handleListPendingReviews)))
-	s.mux.HandleFunc("POST /api/v1/reviews", s.wrapHandler(s.requirePerm(auth.PermReviewCreate)(s.handleCreateReview)))
-	s.mux.HandleFunc("PUT /api/v1/reviews/{id}/approve", s.wrapHandler(s.requirePerm(auth.PermReviewApprove)(s.handleApproveReview)))
-	s.mux.HandleFunc("PUT /api/v1/reviews/{id}/reject", s.wrapHandler(s.requirePerm(auth.PermReviewApprove)(s.handleRejectReview)))
-	s.mux.HandleFunc("POST /api/v1/reviews/{id}/comment", s.wrapHandler(s.requirePerm(auth.PermReviewCreate)(s.handleAddComment)))
-
+	// Audit
 	s.mux.HandleFunc("GET /api/v1/audit", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListAudit)))
 	s.mux.HandleFunc("GET /api/v1/audit/export", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleExportAudit)))
 	s.mux.HandleFunc("GET /api/v1/audit/verify", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleVerifyAuditChain)))
-
-	// Evaluations
-	s.mux.HandleFunc("POST /api/v1/eval/run", s.wrapHandler(s.requirePerm(auth.PermEvalRun)(s.handleRunEval)))
-	s.mux.HandleFunc("GET /api/v1/eval/results", s.wrapHandler(s.requirePerm(auth.PermEvalRead)(s.handleListEvalResults)))
-	s.mux.HandleFunc("GET /api/v1/eval/report", s.wrapHandler(s.requirePerm(auth.PermEvalRead)(s.handleGetEvalReport)))
-	s.mux.HandleFunc("GET /api/v1/eval/compare", s.wrapHandler(s.requirePerm(auth.PermEvalRead)(s.handleCompareEval)))
-	s.mux.HandleFunc("GET /api/v1/eval/runs", s.wrapHandler(s.requirePerm(auth.PermEvalRead)(s.handleListEvalRuns)))
-
-	// Workflows
-	s.mux.HandleFunc("POST /api/v1/workflows/run", s.wrapHandler(s.requirePerm(auth.PermAgentCreate)(s.handleRunWorkflow)))
-	s.mux.HandleFunc("GET /api/v1/workflows", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleListWorkflows)))
-	s.mux.HandleFunc("GET /api/v1/workflows/{id}", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleGetWorkflow)))
-	s.mux.HandleFunc("GET /api/v1/workflows/{id}/steps", s.wrapHandler(s.requirePerm(auth.PermAgentRead)(s.handleGetWorkflowSteps)))
-	s.mux.HandleFunc("PUT /api/v1/workflows/{id}/cancel", s.wrapHandler(s.requirePerm(auth.PermAgentUpdate)(s.handleCancelWorkflow)))
 
 	// Tracing
 	s.mux.HandleFunc("GET /api/v1/traces", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListSpans)))
@@ -397,10 +297,6 @@ func (s *Server) routes() {
 	// Searchable logs
 	s.mux.HandleFunc("GET /api/v1/logs/search", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleSearchSpans)))
 
-	// Snapshots
-	s.mux.HandleFunc("GET /api/v1/snapshots", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListSnapshots)))
-	s.mux.HandleFunc("GET /api/v1/snapshots/{id}", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleGetSnapshot)))
-
 	// Providers
 	s.mux.HandleFunc("GET /api/v1/providers", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListProviders)))
 	s.mux.HandleFunc("GET /api/v1/providers/{name}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetProvider)))
@@ -414,17 +310,7 @@ func (s *Server) routes() {
 	// Real-time logs (SSE)
 	s.mux.HandleFunc("GET /api/v1/logs/stream", s.wrapHandler(s.handleLogsStream))
 
-	// Guardrails (specific routes first)
-	s.mux.HandleFunc("POST /api/v1/guardrails/check", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleCheckGuardrails)))
-	s.mux.HandleFunc("GET /api/v1/guardrails/violations", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListGuardrailViolations)))
-	s.mux.HandleFunc("PUT /api/v1/guardrails/violations/{id}/resolve", s.wrapHandler(s.requirePerm(auth.PermReviewApprove)(s.handleResolveGuardrailViolation)))
-	s.mux.HandleFunc("GET /api/v1/guardrails/rules", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListGuardrailRules)))
-	s.mux.HandleFunc("POST /api/v1/guardrails/rules", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleCreateGuardrailRule)))
-	s.mux.HandleFunc("GET /api/v1/guardrails/rules/{id}", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleGetGuardrailRule)))
-	s.mux.HandleFunc("PUT /api/v1/guardrails/rules/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateGuardrailRule)))
-	s.mux.HandleFunc("DELETE /api/v1/guardrails/rules/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleDeleteGuardrailRule)))
-
-	// Alerting (specific routes first to avoid pattern conflicts)
+	// Alerting
 	s.mux.HandleFunc("GET /api/v1/alerts/rules", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListAlertRules)))
 	s.mux.HandleFunc("POST /api/v1/alerts/rules", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleCreateAlertRule)))
 	s.mux.HandleFunc("GET /api/v1/alerts/rules/{id}", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleGetAlertRule)))
@@ -442,33 +328,37 @@ func (s *Server) routes() {
 	// Metrics (Prometheus format, authenticated)
 	s.mux.HandleFunc("GET /api/v1/metrics", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsPrometheus)))
 
-	// Prompt Optimization
-	s.mux.HandleFunc("POST /api/v1/prompts/{id}/optimize", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleOptimizePrompt)))
-	s.mux.HandleFunc("GET /api/v1/prompts/{id}/analyze", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleAnalyzePrompt)))
-	s.mux.HandleFunc("GET /api/v1/optimization/tips", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetOptimizationTips)))
+	// Workspaces
+	s.mux.HandleFunc("GET /api/v1/workspaces", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListWorkspaces)))
+	s.mux.HandleFunc("POST /api/v1/workspaces", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateWorkspace)))
+	s.mux.HandleFunc("GET /api/v1/workspaces/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetWorkspace)))
+	s.mux.HandleFunc("PUT /api/v1/workspaces/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateWorkspace)))
+	s.mux.HandleFunc("DELETE /api/v1/workspaces/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptDelete)(s.handleDeleteWorkspace)))
 
-	// Prompt Playground
-	s.mux.HandleFunc("POST /api/v1/playground/run", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handlePlaygroundRun)))
-	s.mux.HandleFunc("POST /api/v1/playground/compare", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handlePlaygroundCompare)))
-	s.mux.HandleFunc("GET /api/v1/playground/templates", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handlePlaygroundTemplates)))
+	// Projects (scoped to workspace)
+	s.mux.HandleFunc("GET /api/v1/workspaces/{workspace_id}/projects", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListProjects)))
+	s.mux.HandleFunc("POST /api/v1/workspaces/{workspace_id}/projects", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateProject)))
+	s.mux.HandleFunc("GET /api/v1/projects/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetProject)))
+	s.mux.HandleFunc("PUT /api/v1/projects/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateProject)))
+	s.mux.HandleFunc("DELETE /api/v1/projects/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptDelete)(s.handleDeleteProject)))
 
-	// A/B Testing
-	s.mux.HandleFunc("POST /api/v1/ab-tests", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateABTest)))
-	s.mux.HandleFunc("GET /api/v1/ab-tests", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListABTests)))
-	s.mux.HandleFunc("GET /api/v1/ab-tests/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetABTest)))
-	s.mux.HandleFunc("POST /api/v1/ab-tests/{id}/stop", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleStopABTest)))
-	s.mux.HandleFunc("GET /api/v1/ab-tests/{id}/results", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetABTestResults)))
+	// Capabilities (scoped to project)
+	s.mux.HandleFunc("GET /api/v1/projects/{project_id}/capabilities", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListCapabilities)))
+	s.mux.HandleFunc("POST /api/v1/projects/{project_id}/capabilities", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateCapability)))
+	s.mux.HandleFunc("GET /api/v1/capabilities/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetCapability)))
+	s.mux.HandleFunc("PUT /api/v1/capabilities/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateCapability)))
+	s.mux.HandleFunc("DELETE /api/v1/capabilities/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptDelete)(s.handleDeleteCapability)))
 
-	// Semantic Search
-	s.mux.HandleFunc("POST /api/v1/search/semantic", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleSemanticSearch)))
-	s.mux.HandleFunc("POST /api/v1/search/index", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleIndexPrompt)))
-	s.mux.HandleFunc("GET /api/v1/search/similar/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleFindSimilar)))
+	// Versions (scoped to capability)
+	s.mux.HandleFunc("GET /api/v1/capabilities/{capability_id}/versions", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListVersions)))
+	s.mux.HandleFunc("POST /api/v1/capabilities/{capability_id}/versions", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateVersion)))
+	s.mux.HandleFunc("GET /api/v1/versions/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetVersion)))
+	s.mux.HandleFunc("GET /api/v1/capabilities/{capability_id}/versions/latest", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetLatestVersion)))
 
-	// Real-time Collaboration
-	s.mux.HandleFunc("POST /api/v1/collab/sessions", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleCreateCollabSession)))
-	s.mux.HandleFunc("GET /api/v1/collab/sessions/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetCollabSession)))
-	s.mux.HandleFunc("PUT /api/v1/collab/sessions/{id}/cursor", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateCursor)))
-	s.mux.HandleFunc("GET /api/v1/collab/sessions/{id}/changes", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetChanges)))
+	// Executions (scoped to version)
+	s.mux.HandleFunc("GET /api/v1/versions/{version_id}/executions", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListExecutions)))
+	s.mux.HandleFunc("POST /api/v1/versions/{version_id}/executions", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateExecution)))
+	s.mux.HandleFunc("GET /api/v1/executions/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetExecution)))
 }
 
 // requirePerm returns middleware that requires a specific permission.
@@ -682,34 +572,7 @@ func httpRequestFromContext(ctx context.Context) *http.Request {
 	return nil
 }
 
-// refreshSearchIndex updates the in-memory search index with the
-// latest version of a single prompt. Called from the prompt
-// create/update/delete handlers. M-1: without this hook, the
-// index would drift out of sync with the database.
-func (s *Server) refreshSearchIndex(ctx context.Context, op string, p *models.Prompt) {
-	if s.searchManager == nil {
-		return
-	}
-	switch op {
-	case "remove":
-		if p != nil {
-			s.searchManager.Remove(p.ID)
-		}
-	case "upsert":
-		if p == nil {
-			return
-		}
-		// Fetch the latest version from the DB so the index always
-		// reflects the persisted state, not the request body
-		// (which may not have all fields populated).
-		fresh, err := s.db.GetPrompt(ctx, p.ID)
-		if err != nil {
-			s.searchManager.Remove(p.ID)
-			return
-		}
-		s.searchManager.Add(fresh)
-	}
-}
+
 
 func (s *Server) auditDiff(ctx context.Context, action, resource string, prev, new any) {
 	details := make(map[string]any)

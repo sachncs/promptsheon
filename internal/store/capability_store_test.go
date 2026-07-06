@@ -3,11 +3,24 @@ package store
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/sachn-cs/promptsheon/internal/capability"
 )
+
+func setupTestDB(t *testing.T) *SQLite {
+	t.Helper()
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "test.db")
+	db, err := NewSQLite(dbPath)
+	if err != nil {
+		t.Fatalf("NewSQLite: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
+}
 
 func TestCapabilityStore_WorkspaceCRUD(t *testing.T) {
 	db := setupTestDB(t)

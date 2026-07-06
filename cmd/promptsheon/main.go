@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"sort"
 	"strconv"
@@ -84,6 +85,12 @@ func main() {
 		err = cmdRun(args)
 	case "provider":
 		err = cmdProvider(args)
+	case "workspace":
+		err = cmdWorkspace(args)
+	case "project":
+		err = cmdProject(args)
+	case "capability":
+		err = cmdCapability(args)
 	case "help":
 		printUsage()
 	default:
@@ -142,7 +149,10 @@ Usage:
   verify                      Check repository integrity
   run --provider <p> --model <m> --prompt <text>   Run a prompt via LLM
   provider list               List registered LLM providers
-  provider test <name>        Test an LLM provider`)
+  provider test <name>        Test an LLM provider
+  workspace <list|create|get|delete>  Manage workspaces via API
+  project <list|create|get|delete>    Manage projects via API
+  capability <list|create|get|delete> Manage capabilities via API`)
 }
 
 func cmdInit() error {
@@ -935,6 +945,206 @@ func cmdProvider(args []string) error {
 		fmt.Fprintf(os.Stderr, "Latency: %v | Tokens: %d\n", latency.Round(time.Millisecond), resp.Usage.TotalTokens)
 	default:
 		return fmt.Errorf("unknown provider subcommand: %s", args[0])
+	}
+	return nil
+}
+
+func cmdWorkspace(args []string) error {
+	if len(args) == 0 {
+		return usageErrorf("promptsheon workspace <list|create|get|delete>")
+	}
+	server := serverURL()
+	switch args[0] {
+	case "list":
+		var workspaces []any
+		if err := httpGet(server+"/api/v1/workspaces", &workspaces); err != nil {
+			return err
+		}
+		for _, w := range workspaces {
+			fmt.Printf("%+v\n", w)
+		}
+	case "create":
+		if len(args) < 2 {
+			return usageErrorf("promptsheon workspace create <name>")
+		}
+		var result any
+		if err := httpPost(server+"/api/v1/workspaces", map[string]string{"name": args[1]}, &result); err != nil {
+			return err
+		}
+		fmt.Printf("%+v\n", result)
+	case "get":
+		if len(args) < 2 {
+			return usageErrorf("promptsheon workspace get <id>")
+		}
+		var result any
+		if err := httpGet(server+"/api/v1/workspaces/"+args[1], &result); err != nil {
+			return err
+		}
+		fmt.Printf("%+v\n", result)
+	case "delete":
+		if len(args) < 2 {
+			return usageErrorf("promptsheon workspace delete <id>")
+		}
+		if err := httpDelete(server + "/api/v1/workspaces/" + args[1]); err != nil {
+			return err
+		}
+		fmt.Println("deleted")
+	default:
+		return fmt.Errorf("unknown workspace subcommand: %s", args[0])
+	}
+	return nil
+}
+
+func cmdProject(args []string) error {
+	if len(args) == 0 {
+		return usageErrorf("promptsheon project <list|create|get|delete>")
+	}
+	server := serverURL()
+	switch args[0] {
+	case "list":
+		if len(args) < 2 {
+			return usageErrorf("promptsheon project list <workspace_id>")
+		}
+		var projects []any
+		if err := httpGet(server+"/api/v1/workspaces/"+args[1]+"/projects", &projects); err != nil {
+			return err
+		}
+		for _, p := range projects {
+			fmt.Printf("%+v\n", p)
+		}
+	case "create":
+		if len(args) < 3 {
+			return usageErrorf("promptsheon project create <workspace_id> <name>")
+		}
+		var result any
+		if err := httpPost(server+"/api/v1/workspaces/"+args[1]+"/projects", map[string]string{"name": args[2]}, &result); err != nil {
+			return err
+		}
+		fmt.Printf("%+v\n", result)
+	case "get":
+		if len(args) < 2 {
+			return usageErrorf("promptsheon project get <id>")
+		}
+		var result any
+		if err := httpGet(server+"/api/v1/projects/"+args[1], &result); err != nil {
+			return err
+		}
+		fmt.Printf("%+v\n", result)
+	case "delete":
+		if len(args) < 2 {
+			return usageErrorf("promptsheon project delete <id>")
+		}
+		if err := httpDelete(server + "/api/v1/projects/" + args[1]); err != nil {
+			return err
+		}
+		fmt.Println("deleted")
+	default:
+		return fmt.Errorf("unknown project subcommand: %s", args[0])
+	}
+	return nil
+}
+
+func cmdCapability(args []string) error {
+	if len(args) == 0 {
+		return usageErrorf("promptsheon capability <list|create|get|delete>")
+	}
+	server := serverURL()
+	switch args[0] {
+	case "list":
+		if len(args) < 2 {
+			return usageErrorf("promptsheon capability list <project_id>")
+		}
+		var caps []any
+		if err := httpGet(server+"/api/v1/projects/"+args[1]+"/capabilities", &caps); err != nil {
+			return err
+		}
+		for _, c := range caps {
+			fmt.Printf("%+v\n", c)
+		}
+	case "create":
+		if len(args) < 3 {
+			return usageErrorf("promptsheon capability create <project_id> <name>")
+		}
+		var result any
+		if err := httpPost(server+"/api/v1/projects/"+args[1]+"/capabilities", map[string]string{"name": args[2]}, &result); err != nil {
+			return err
+		}
+		fmt.Printf("%+v\n", result)
+	case "get":
+		if len(args) < 2 {
+			return usageErrorf("promptsheon capability get <id>")
+		}
+		var result any
+		if err := httpGet(server+"/api/v1/capabilities/"+args[1], &result); err != nil {
+			return err
+		}
+		fmt.Printf("%+v\n", result)
+	case "delete":
+		if len(args) < 2 {
+			return usageErrorf("promptsheon capability delete <id>")
+		}
+		if err := httpDelete(server + "/api/v1/capabilities/" + args[1]); err != nil {
+			return err
+		}
+		fmt.Println("deleted")
+	default:
+		return fmt.Errorf("unknown capability subcommand: %s", args[0])
+	}
+	return nil
+}
+
+func serverURL() string {
+	u := os.Getenv("PROMPTSHEON_SERVER")
+	if u == "" {
+		u = "http://localhost:8080"
+	}
+	return strings.TrimRight(u, "/")
+}
+
+func httpGet(url string, v any) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("GET %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		var body map[string]string
+		json.NewDecoder(resp.Body).Decode(&body)
+		return fmt.Errorf("GET %s: %s (%s)", url, resp.Status, body["error"])
+	}
+	return json.NewDecoder(resp.Body).Decode(v)
+}
+
+func httpPost(url string, body any, v any) error {
+	b, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	resp, err := http.Post(url, "application/json", bytes.NewReader(b))
+	if err != nil {
+		return fmt.Errorf("POST %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		var errBody map[string]string
+		json.NewDecoder(resp.Body).Decode(&errBody)
+		return fmt.Errorf("POST %s: %s (%s)", url, resp.Status, errBody["error"])
+	}
+	return json.NewDecoder(resp.Body).Decode(v)
+}
+
+func httpDelete(url string) error {
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("DELETE %s: %w", url, err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("DELETE %s: %s", url, resp.Status)
 	}
 	return nil
 }

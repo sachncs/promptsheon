@@ -7,7 +7,7 @@ import (
 )
 
 func TestAssembleFromContract_Nil(t *testing.T) {
-	m := NewManager(nil)
+	m := NewManager()
 	_, err := m.AssembleFromContract(nil)
 	if err == nil {
 		t.Fatal("expected error for nil contract")
@@ -15,7 +15,7 @@ func TestAssembleFromContract_Nil(t *testing.T) {
 }
 
 func TestAssembleFromContract_Empty(t *testing.T) {
-	m := NewManager(nil)
+	m := NewManager()
 	contract := &capability.ContextContract{}
 	assembled, err := m.AssembleFromContract(contract)
 	if err != nil {
@@ -27,7 +27,7 @@ func TestAssembleFromContract_Empty(t *testing.T) {
 }
 
 func TestAssembleFromContract_WithRequired(t *testing.T) {
-	m := NewManager(nil)
+	m := NewManager()
 	contract := &capability.ContextContract{
 		RequiredContext: []capability.ContextRef{
 			{Key: "user_input", Source: "session"},
@@ -44,7 +44,7 @@ func TestAssembleFromContract_WithRequired(t *testing.T) {
 }
 
 func TestAssembleFromContract_EmptyKey(t *testing.T) {
-	m := NewManager(nil)
+	m := NewManager()
 	contract := &capability.ContextContract{
 		RequiredContext: []capability.ContextRef{
 			{Key: ""},
@@ -57,7 +57,7 @@ func TestAssembleFromContract_EmptyKey(t *testing.T) {
 }
 
 func TestAssembleFromContract_MaximumSize(t *testing.T) {
-	m := NewManager(nil)
+	m := NewManager()
 	contract := &capability.ContextContract{
 		MaximumSize: 4096,
 	}
@@ -71,7 +71,7 @@ func TestAssembleFromContract_MaximumSize(t *testing.T) {
 }
 
 func TestAssembleFromContract_CompressionStrategy(t *testing.T) {
-	m := NewManager(nil)
+	m := NewManager()
 	contract := &capability.ContextContract{
 		CompressionStrategy: "summary",
 	}
@@ -85,7 +85,7 @@ func TestAssembleFromContract_CompressionStrategy(t *testing.T) {
 }
 
 func TestAssembleFromContract_ForbiddenContext(t *testing.T) {
-	m := NewManager(nil)
+	m := NewManager()
 	contract := &capability.ContextContract{
 		ForbiddenContext: []string{"password", "secret"},
 		RequiredContext: []capability.ContextRef{
