@@ -16,6 +16,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   EvaluationResult, Recommendation, Deployment, Event). This is the foundation
   for the capability-centric architecture — the Capability is the root object
   and everything else defines, executes, observes, or improves it.
+- `internal/store/capability_repo.go`: `CapabilityRepository` interface with
+  20 methods for persisting Workspaces, Projects, Capabilities,
+  CapabilityVersions, and Executions.
+- `internal/store/sqlite_capabilities.go`: SQLite implementation of
+  `CapabilityRepository`.
+- `internal/store/migrations/022_capabilities.sql`: schema for workspaces,
+  projects, capabilities, capability_versions, and executions tables with
+  indexes.
+- `internal/workflow/engine_version.go`: `ExecuteVersion` function — executes
+  a capability version through the workflow engine.
+- `internal/eval/runner_version.go`: `RunVersion` function — evaluates a
+  capability version against its evaluation suite.
+- `internal/guardrail/manager_version.go`: `CheckVersion` function — checks
+  a capability version against its configured guardrails.
+- `internal/optimizer/optimizer_version.go`: `AnalyzeVersion` function —
+  analyzes a capability version and produces optimization recommendations.
+- `internal/context/manager_version.go`: `AssembleFromContract` function —
+  assembles context from a capability version's context contract.
 - `internal/buildinfo` package: central source of build version, commit, and
   build-time strings. Used by `--version`, `/api/v1/version`, the
   Prometheus `Content-Type` version parameter, and the startup banner.
