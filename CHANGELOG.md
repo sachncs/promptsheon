@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `internal/capability` package: new capability-centric domain model with 18
+  types (Workspace, Project, Capability, CapabilityVersion, Prompt,
+  ModelPolicy, ContextContract, KnowledgeSource, MemoryConfig, Guardrail,
+  Tool, MCPServer, RuntimePolicy, EvaluationSuite, Execution, Observation,
+  EvaluationResult, Recommendation, Deployment, Event). This is the foundation
+  for the capability-centric architecture — the Capability is the root object
+  and everything else defines, executes, observes, or improves it.
 - `internal/buildinfo` package: central source of build version, commit, and
   build-time strings. Used by `--version`, `/api/v1/version`, the
   Prometheus `Content-Type` version parameter, and the startup banner.
