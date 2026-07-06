@@ -146,7 +146,7 @@ func (s *Server) handleExecuteAgent(w http.ResponseWriter, r *http.Request) erro
 		if sr.Model != "" && sr.TokensUsed > 0 {
 			// Calculate cost if not already calculated by the step
 			if sr.CostUSD == 0 {
-				sr.CostUSD = llm.CalculateCost(sr.Model, models.Usage{
+				sr.CostUSD = llm.CalculateCost(sr.Model, llm.Usage{
 					PromptTokens:     sr.TokensUsed / 2, // Estimate split
 					CompletionTokens: sr.TokensUsed / 2,
 					TotalTokens:      sr.TokensUsed,

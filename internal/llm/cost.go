@@ -1,7 +1,5 @@
 package llm
 
-import "github.com/sachn-cs/promptsheon/internal/models"
-
 // ModelPricing defines per-token costs for a model.
 type ModelPricing struct {
 	Name               string
@@ -32,7 +30,7 @@ var pricingTable = map[string]ModelPricing{
 }
 
 // CalculateCost returns the cost in USD for the given token usage.
-func CalculateCost(model string, usage models.Usage) float64 {
+func CalculateCost(model string, usage Usage) float64 {
 	pricing, ok := pricingTable[model]
 	if !ok {
 		return 0

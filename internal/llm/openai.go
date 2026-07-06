@@ -11,8 +11,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
-
-	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // OpenAI implements Provider for the OpenAI Chat Completions API.
@@ -215,7 +213,7 @@ func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) 
 
 	return &Response{
 		Content: content,
-		Usage: models.Usage{
+		Usage: Usage{
 			PromptTokens:     oResp.Usage.PromptTokens,
 			CompletionTokens: oResp.Usage.CompletionTokens,
 			TotalTokens:      oResp.Usage.TotalTokens,
@@ -248,7 +246,7 @@ func (o *OpenAI) handleStream(ctx context.Context, resp *http.Response, model st
 	var content strings.Builder
 	var ttft time.Duration
 	firstToken := true
-	var usage models.Usage
+	var usage Usage
 
 	for scanner.Scan() {
 		if err := ctx.Err(); err != nil {

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `internal/llm/types.go`: `Usage` type moved from `internal/models/eval.go` to
+  `internal/llm/` to break the circular dependency between models and llm
+  packages. All `models.Usage` references across the codebase updated to
+  `llm.Usage`.
+- `internal/store/repo.go`: `CapabilityRepository` interface embedded into the
+  main `Repository` interface.
+
 ### Added
 
 - `internal/capability` package: new capability-centric domain model with 18

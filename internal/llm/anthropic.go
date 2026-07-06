@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Anthropic implements Provider for the Anthropic Messages API.
@@ -125,7 +123,7 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 	totalTokens := aResp.Usage.InputTokens + aResp.Usage.OutputTokens
 	return &Response{
 		Content: sb.String(),
-		Usage: models.Usage{
+		Usage: Usage{
 			PromptTokens:     aResp.Usage.InputTokens,
 			CompletionTokens: aResp.Usage.OutputTokens,
 			TotalTokens:      totalTokens,

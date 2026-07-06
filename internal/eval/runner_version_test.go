@@ -6,7 +6,6 @@ import (
 
 	"github.com/sachn-cs/promptsheon/internal/capability"
 	"github.com/sachn-cs/promptsheon/internal/llm"
-	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 func TestRunVersion_Basic(t *testing.T) {
@@ -105,7 +104,7 @@ type mockProvider struct{}
 func (m *mockProvider) Complete(ctx context.Context, req *llm.Request) (*llm.Response, error) {
 	return &llm.Response{
 		Content: "mock response",
-		Usage:   models.Usage{PromptTokens: 10, CompletionTokens: 20, TotalTokens: 30},
+		Usage:   llm.Usage{PromptTokens: 10, CompletionTokens: 20, TotalTokens: 30},
 	}, nil
 }
 

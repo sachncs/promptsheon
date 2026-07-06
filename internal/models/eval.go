@@ -1,13 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
 
-// Usage tracks token consumption for a single LLM call.
-type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
-}
+	"github.com/sachn-cs/promptsheon/internal/llm"
+)
 
 // EvalResult records the outcome of running a prompt against one test case.
 type EvalResult struct {
@@ -19,7 +16,7 @@ type EvalResult struct {
 	Output             string    `json:"output"`
 	Score              float64   `json:"score"`
 	LatencyMs          int64     `json:"latency_ms"`
-	TokenUsage         Usage     `json:"token_usage"`
+	TokenUsage         llm.Usage `json:"token_usage"`
 	HallucinationScore float64   `json:"hallucination_score"`
 	Passed             bool      `json:"passed"`
 	Error              string    `json:"error,omitempty"`

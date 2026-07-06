@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/sachn-cs/promptsheon/internal/llm"
 	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
@@ -15,7 +16,7 @@ type executionLogInput struct {
 	Prompt     *models.Prompt
 	Provider   string
 	Model      string
-	Usage      models.Usage
+	Usage      llm.Usage
 	CostUSD    float64
 	Latency    time.Duration
 	TraceID    string

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/models"
+
 )
 
 func TestMockProvider(t *testing.T) {
@@ -143,9 +143,9 @@ func TestAggregateMetrics(t *testing.T) {
 	agg := NewAggregateMetrics()
 	collect := agg.Collect()
 
-	collect(CallMetrics{Provider: "openai", Model: "gpt-4o", Usage: models.Usage{TotalTokens: 100}, CostUSD: 0.001, Latency: 100 * time.Millisecond})
-	collect(CallMetrics{Provider: "openai", Model: "gpt-4o-mini", Usage: models.Usage{TotalTokens: 200}, CostUSD: 0.0005, Latency: 50 * time.Millisecond})
-	collect(CallMetrics{Provider: "ollama", Model: "llama3", Usage: models.Usage{TotalTokens: 150}, CostUSD: 0, Latency: 200 * time.Millisecond})
+	collect(CallMetrics{Provider: "openai", Model: "gpt-4o", Usage: Usage{TotalTokens: 100}, CostUSD: 0.001, Latency: 100 * time.Millisecond})
+	collect(CallMetrics{Provider: "openai", Model: "gpt-4o-mini", Usage: Usage{TotalTokens: 200}, CostUSD: 0.0005, Latency: 50 * time.Millisecond})
+	collect(CallMetrics{Provider: "ollama", Model: "llama3", Usage: Usage{TotalTokens: 150}, CostUSD: 0, Latency: 200 * time.Millisecond})
 
 	if agg.TotalCalls != 3 {
 		t.Fatalf("expected 3 total calls, got %d", agg.TotalCalls)
@@ -165,7 +165,7 @@ func TestAggregateMetrics(t *testing.T) {
 }
 
 func TestCostCalculation(t *testing.T) {
-	usage := models.Usage{PromptTokens: 1000, CompletionTokens: 500}
+	usage := Usage{PromptTokens: 1000, CompletionTokens: 500}
 	cost := CalculateCost("gpt-4o", usage)
 	if cost <= 0 {
 		t.Fatalf("expected positive cost, got %f", cost)
@@ -274,7 +274,7 @@ func (f *failAfterProvider) Complete(_ context.Context, _ *Request) (*Response, 
 	if *f.calls <= f.failUntil {
 		return nil, errors.New("transient error")
 	}
-	return &Response{Content: "ok", Usage: models.Usage{TotalTokens: 1}}, nil
+	return &Response{Content: "ok", Usage: Usage{TotalTokens: 1}}, nil
 }
 
 type slowProvider struct {

@@ -8,8 +8,6 @@ import (
 	"io"
 	"net/http"
 	"time"
-
-	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Ollama implements Provider for the Ollama local API.
@@ -102,7 +100,7 @@ func (o *Ollama) Complete(ctx context.Context, req *Request) (*Response, error) 
 
 	return &Response{
 		Content: oResp.Message.Content,
-		Usage: models.Usage{
+		Usage: Usage{
 			PromptTokens:     promptTokens,
 			CompletionTokens: completionTokens,
 			TotalTokens:      promptTokens + completionTokens,
