@@ -155,7 +155,7 @@ func main() {
 	// Initialize context manager. The manager is stateless and
 	// fetches contexts from the database on demand via Assemble, so
 	// no warm-up step is required at startup.
-	contextMgr := contextpkg.NewManager(db)
+	contextMgr := contextpkg.NewManager()
 
 	// Initialize usage tracker for top-used resources.
 	usageTracker := api.NewUsageTracker()

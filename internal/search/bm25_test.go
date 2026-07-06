@@ -3,8 +3,6 @@ package search
 import (
 	"strings"
 	"testing"
-
-	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // TestTokenize_BasicSplit pins the BM25 tokeniser: unicode
@@ -243,32 +241,6 @@ func TestBM25_SearchLimit(t *testing.T) {
 	results := idx.Search("alpha", 3)
 	if len(results) != 3 {
 		t.Fatalf("expected 3 results, got %d", len(results))
-	}
-}
-
-// TestDocumentFromPrompt pins the prompt -> document mapping.
-func TestDocumentFromPrompt(t *testing.T) {
-	p := &models.Prompt{
-		ID:          "p1",
-		Name:        "greeting",
-		Description: "friendly hello",
-		Content:     "say hello to the user",
-	}
-	d := DocumentFromPrompt(p)
-	if d.ID != "p1" || d.PromptID != "p1" {
-		t.Fatalf("ID mismatch: %+v", d)
-	}
-	if !strings.Contains(d.Content, "greeting") {
-		t.Fatalf("content missing name: %q", d.Content)
-	}
-	if !strings.Contains(d.Content, "friendly hello") {
-		t.Fatalf("content missing description: %q", d.Content)
-	}
-	if !strings.Contains(d.Content, "say hello to the user") {
-		t.Fatalf("content missing body: %q", d.Content)
-	}
-	if d.Metadata["name"] != "greeting" {
-		t.Fatalf("metadata name mismatch: %v", d.Metadata)
 	}
 }
 

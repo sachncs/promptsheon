@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/sachn-cs/promptsheon/internal/capability"
-	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // AssembleFromContract assembles context from a ContextContract.
@@ -22,7 +21,7 @@ func (m *Manager) AssembleFromContract(contract *capability.ContextContract) (*A
 		Messages:      nil,
 		TokenCount:    0,
 		Truncated:     false,
-		Strategy:      models.TruncationStrategy(contract.CompressionStrategy),
+		Strategy:      contract.CompressionStrategy,
 	}
 
 	// Validate required context

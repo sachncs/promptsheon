@@ -12,8 +12,6 @@ import (
 	"strings"
 	"sync"
 	"unicode"
-
-	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // bm25K1 and bm25B are the standard BM25 hyperparameters. These
@@ -312,22 +310,4 @@ func tokenize(text string) []string {
 		bigrams = append(bigrams, stemmed[i]+" "+stemmed[i+1])
 	}
 	return append(stemmed, bigrams...)
-}
-
-// DocumentFromPrompt builds a Document from a prompt. The
-// content is the prompt's content + name + description so the
-// search index matches the most identifying fields. This is the
-// single source of truth for "how a prompt becomes a document".
-func DocumentFromPrompt(p *models.Prompt) Document {
-	parts := []string{p.Name, p.Description, p.Content}
-	content := strings.TrimSpace(strings.Join(parts, "\n"))
-	return Document{
-		ID:       p.ID,
-		PromptID: p.ID,
-		Content:  content,
-		Metadata: map[string]string{
-			"name":   p.Name,
-			"status": string(p.Status),
-		},
-	}
 }

@@ -146,11 +146,11 @@ func TestGenerator_RequestBodyOnWrites(t *testing.T) {
 	// Spot-check a few well-known handlers. The names
 	// below must be present in handlers_*.go.
 	known := []string{
-		"handleCreatePrompt",
-		"handleUpdatePrompt",
-		"handleCreateAgent",
-		"handleCreateUser",
-		"handleCreateABTest",
+		"handleCreateWorkspace",
+		"handleCreateProject",
+		"handleCreateCapability",
+		"handleCreateVersion",
+		"handleCreateExecution",
 	}
 	for _, name := range known {
 		h, ok := handlers[name]
