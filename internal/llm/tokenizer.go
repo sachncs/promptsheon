@@ -1,7 +1,6 @@
 package llm
 
 import (
-	"github.com/sachn-cs/promptsheon/internal/models"
 	"unicode"
 )
 
@@ -42,7 +41,7 @@ func EstimateTokens(text string) int {
 
 // EstimateCost calculates estimated cost in USD for a given token count and model.
 func EstimateCost(inputTokens, outputTokens int, model string) float64 {
-	usage := models.Usage{
+	usage := Usage{
 		PromptTokens:     inputTokens,
 		CompletionTokens: outputTokens,
 		TotalTokens:      inputTokens + outputTokens,

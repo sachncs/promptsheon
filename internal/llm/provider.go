@@ -7,8 +7,6 @@ import (
 	"context"
 	"io"
 	"time"
-
-	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Provider is the interface that all LLM backends must implement.
@@ -55,7 +53,7 @@ type Message struct {
 // Response holds the output from an LLM call.
 type Response struct {
 	Content          string        `json:"content"`
-	Usage            models.Usage  `json:"usage"`
+	Usage            Usage  `json:"usage"`
 	Model            string        `json:"model"`
 	StopReason       string        `json:"stop_reason,omitempty"`
 	Latency          time.Duration `json:"-"`

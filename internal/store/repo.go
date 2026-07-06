@@ -11,6 +11,8 @@ import (
 
 // Repository defines the persistence contract for all domain types.
 type Repository interface {
+	CapabilityRepository
+
 	// Prompts
 	CreatePrompt(ctx context.Context, p *models.Prompt) error
 	GetPrompt(ctx context.Context, id string) (*models.Prompt, error)

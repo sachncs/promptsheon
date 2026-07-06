@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Azure implements Provider for Azure OpenAI's deployment-based endpoint.
@@ -136,7 +134,7 @@ func (a *Azure) Complete(ctx context.Context, req *Request) (*Response, error) {
 
 	return &Response{
 		Content: content,
-		Usage: models.Usage{
+		Usage: Usage{
 			PromptTokens:     aResp.Usage.PromptTokens,
 			CompletionTokens: aResp.Usage.CompletionTokens,
 			TotalTokens:      totalTokens,

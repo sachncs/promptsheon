@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sachn-cs/promptsheon/internal/llm"
 	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
@@ -158,7 +159,7 @@ func TestRecordExecutionLogNilDB(t *testing.T) {
 		Prompt:   &models.Prompt{ID: "p"},
 		Provider: "openai",
 		Model:    "gpt-4",
-		Usage:    models.Usage{TotalTokens: 1},
+		Usage:    llm.Usage{TotalTokens: 1},
 		Latency:  time.Millisecond,
 	})
 	// Reaching here without panic is the assertion.

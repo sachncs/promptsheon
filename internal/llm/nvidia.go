@@ -10,8 +10,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // NvidiaProvider implements the NVIDIA NIM API provider.
@@ -201,7 +199,7 @@ func (p *NvidiaProvider) Complete(ctx context.Context, req *Request) (*Response,
 
 	return &Response{
 		Content: content,
-		Usage: models.Usage{
+		Usage: Usage{
 			PromptTokens:     nResp.Usage.PromptTokens,
 			CompletionTokens: nResp.Usage.CompletionTokens,
 			TotalTokens:      nResp.Usage.TotalTokens,
@@ -219,7 +217,7 @@ func (p *NvidiaProvider) handleStream(resp *http.Response, model string, start t
 	var reasoning strings.Builder
 	var ttft time.Duration
 	firstToken := true
-	var usage models.Usage
+	var usage Usage
 
 	for scanner.Scan() {
 		line := scanner.Text()

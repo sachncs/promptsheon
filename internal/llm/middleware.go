@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/models"
+
 )
 
 // CallMetrics holds the observed metrics for a single LLM call.
@@ -14,7 +14,7 @@ type CallMetrics struct {
 	Provider string        `json:"provider"`
 	Model    string        `json:"model"`
 	Latency  time.Duration `json:"latency"`
-	Usage    models.Usage  `json:"usage"`
+	Usage    Usage  `json:"usage"`
 	CostUSD  float64       `json:"cost_usd"`
 	Error    string        `json:"error,omitempty"`
 }

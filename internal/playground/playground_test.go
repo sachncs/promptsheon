@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/sachn-cs/promptsheon/internal/llm"
-	"github.com/sachn-cs/promptsheon/internal/models"
+
 	"github.com/sachn-cs/promptsheon/internal/playground"
 )
 
@@ -15,7 +15,7 @@ func (m *mockProvider) Complete(ctx context.Context, req *llm.Request) (*llm.Res
 	return &llm.Response{
 		Content: "Mock response for: " + req.Messages[len(req.Messages)-1].Content,
 		Model:   req.Model,
-		Usage: models.Usage{
+		Usage: llm.Usage{
 			TotalTokens: 50,
 		},
 	}, nil

@@ -4,8 +4,6 @@ import (
 	"context"
 	"sync"
 	"time"
-
-	"github.com/sachn-cs/promptsheon/internal/models"
 )
 
 // Mock is a controllable provider for testing. It returns a configured
@@ -36,7 +34,7 @@ func (m *Mock) Complete(_ context.Context, req *Request) (*Response, error) {
 
 	return &Response{
 		Content: m.Response,
-		Usage: models.Usage{
+		Usage: Usage{
 			PromptTokens:     10,
 			CompletionTokens: 20,
 			TotalTokens:      30,

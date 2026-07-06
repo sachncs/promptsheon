@@ -819,7 +819,7 @@ func (s *Server) handleStreamPrompt(w http.ResponseWriter, r *http.Request) erro
 		var content strings.Builder
 		var ttft time.Duration
 		firstToken := true
-		var usage models.Usage
+		var usage llm.Usage
 
 		for scanner.Scan() {
 			line := scanner.Text()
