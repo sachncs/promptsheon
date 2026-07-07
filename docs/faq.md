@@ -124,7 +124,7 @@ Yes. The build is `CGO_ENABLED=0`, so the binary runs on any platform that Go su
 
 ### Where is the SDK?
 
-`github.com/sachn-cs/promptsheon/sdk`. See [SDK](sdk.md).
+`github.com/sachncs/promptsheon/sdk`. See [SDK](sdk.md).
 
 ### Where is the CLI?
 

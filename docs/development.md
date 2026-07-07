@@ -14,7 +14,7 @@ The Go module has one direct dependency: `modernc.org/sqlite`. There is no `go.s
 ## Clone and build
 
 ```bash
-git clone https://github.com/sachn-cs/promptsheon.git
+git clone https://github.com/sachncs/promptsheon.git
 cd promptsheon
 go build -o promptsheond ./cmd/promptsheond
 go build -o promptsheon  ./cmd/promptsheon

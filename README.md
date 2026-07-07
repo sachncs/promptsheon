@@ -2,8 +2,8 @@
 
 **Version Control System for AI Agent Intelligence**
 
-[![CI](https://github.com/sachn-cs/promptsheon/actions/workflows/ci.yaml/badge.svg)](https://github.com/sachn-cs/promptsheon/actions/workflows/ci.yaml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/sachn-cs/promptsheon)](https://goreportcard.com/report/github.com/sachn-cs/promptsheon)
+[![CI](https://github.com/sachncs/promptsheon/actions/workflows/ci.yaml/badge.svg)](https://github.com/sachncs/promptsheon/actions/workflows/ci.yaml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/sachncs/promptsheon)](https://goreportcard.com/report/github.com/sachncs/promptsheon)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 Promptsheon applies software engineering discipline to AI agents by providing Git-native version control primitives adapted for agent architectures. Every agent state (system prompts, tool definitions, hyperparameters, evaluation metrics) is stored as an immutable, cryptographically-addressed object in a Directed Acyclic Graph (DAG).
@@ -11,7 +11,7 @@ Promptsheon applies software engineering discipline to AI agents by providing Gi
 ## Quick start
 
 ```bash
-git clone https://github.com/sachn-cs/promptsheon.git
+git clone https://github.com/sachncs/promptsheon.git
 cd promptsheon
 
 # Build both binaries
@@ -70,5 +70,5 @@ Apache License 2.0 — see [LICENSE](LICENSE).
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/sachn-cs/promptsheon/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/sachn-cs/promptsheon/discussions)
+- **Issues**: [GitHub Issues](https://github.com/sachncs/promptsheon/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/sachncs/promptsheon/discussions)

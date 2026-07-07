@@ -1,6 +1,6 @@
 # Promptsheon Go SDK
 
-`github.com/sachn-cs/promptsheon/sdk` is the official Go client
+`github.com/sachncs/promptsheon/sdk` is the official Go client
 for the Promptsheon REST API. It targets the `0.x` line of the
 server and is regenerated on every release to match the OpenAPI
 spec at `api/openapi.yaml`.
@@ -8,7 +8,7 @@ spec at `api/openapi.yaml`.
 ## Install
 
 ```bash
-go get github.com/sachn-cs/promptsheon/sdk
+go get github.com/sachncs/promptsheon/sdk
 ```
 
 ## Quick start
@@ -21,7 +21,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/sachn-cs/promptsheon/sdk"
+    "github.com/sachncs/promptsheon/sdk"
 )
 
 func main() {

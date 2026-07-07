@@ -3,7 +3,7 @@ package context
 import (
 	"fmt"
 
-	"github.com/sachn-cs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/capability"
 )
 
 // AssembleFromContract assembles context from a ContextContract.

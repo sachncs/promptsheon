@@ -9,7 +9,7 @@
 ## Build
 
 ```bash
-git clone https://github.com/sachn-cs/promptsheon.git
+git clone https://github.com/sachncs/promptsheon.git
 cd promptsheon
 
 # Build both binaries

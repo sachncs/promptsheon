@@ -120,7 +120,7 @@ The HTTP daemon binary. Built from `cmd/promptsheond`.
 The client binary that operates on a `.promptsheon` repository. Built from `cmd/promptsheon`.
 
 **SDK**
-The Go client library at `github.com/sachn-cs/promptsheon/sdk`. Wraps the HTTP API.
+The Go client library at `github.com/sachncs/promptsheon/sdk`. Wraps the HTTP API.
 
 **Provider**
 An implementation of the `llm.Provider` interface for a single LLM backend (OpenAI, Anthropic, Azure OpenAI, Ollama, NVIDIA). See [LLM Providers](llm-providers.md).

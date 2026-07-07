@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/buildinfo"
+	"github.com/sachncs/promptsheon/internal/buildinfo"
 )
 
 var startTime = time.Now()

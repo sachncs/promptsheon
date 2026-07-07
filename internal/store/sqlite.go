@@ -16,7 +16,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/sachn-cs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/internal/models"
 )
 
 //go:embed migrations/*.sql

@@ -3,7 +3,7 @@ package context
 import (
 	"testing"
 
-	"github.com/sachn-cs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/capability"
 )
 
 func TestAssembleFromContract_Nil(t *testing.T) {

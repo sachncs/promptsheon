@@ -62,6 +62,6 @@ For security vulnerabilities, **do not** open a public issue. See [SECURITY.md](
 
 ## Questions
 
-- Open a [GitHub Discussion](https://github.com/sachn-cs/promptsheon/discussions)
-- Check existing [issues](https://github.com/sachn-cs/promptsheon/issues)
+- Open a [GitHub Discussion](https://github.com/sachncs/promptsheon/discussions)
+- Check existing [issues](https://github.com/sachncs/promptsheon/issues)
 - The [docs/FAQ.md](docs/faq.md) and [docs/glossary.md](docs/glossary.md)

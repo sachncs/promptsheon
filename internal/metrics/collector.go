@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/buildinfo"
+	"github.com/sachncs/promptsheon/internal/buildinfo"
 )
 
 // Counter is a monotonically increasing metric.

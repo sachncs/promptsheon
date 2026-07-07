@@ -60,8 +60,8 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement by emailing
-conduct@sachn-cs.dev (or, if the address is not reachable, by opening a
-private security advisory at https://github.com/sachn-cs/promptsheon/security/advisories/new).
+sachncs@gmail.com (or, if the address is not reachable, by opening a
+private security advisory at https://github.com/sachncs/promptsheon/security/advisories/new).
 
 Do not file Code of Conduct reports as public GitHub issues. The public
 issue tracker is for product bugs and feature requests; harassment
