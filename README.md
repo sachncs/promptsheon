@@ -3,7 +3,6 @@
 **Version Control System for AI Agent Intelligence**
 
 [![CI](https://github.com/sachncs/promptsheon/actions/workflows/ci.yaml/badge.svg)](https://github.com/sachncs/promptsheon/actions/workflows/ci.yaml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/sachncs/promptsheon)](https://goreportcard.com/report/github.com/sachncs/promptsheon)
 [![Go Version](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go)](https://go.dev)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
