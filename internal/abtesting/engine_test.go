@@ -3,7 +3,7 @@ package abtesting_test
 import (
 	"testing"
 
-	"github.com/sachn-cs/promptsheon/internal/abtesting"
+	"github.com/sachncs/promptsheon/internal/abtesting"
 )
 
 func TestCreateTest(t *testing.T) {

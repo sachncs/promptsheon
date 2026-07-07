@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/capability"
-	"github.com/sachn-cs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/store"
 )
 
 func (s *Server) handleListWorkspaces(w http.ResponseWriter, r *http.Request) error {

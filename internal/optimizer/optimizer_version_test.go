@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/sachn-cs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/capability"
 )
 
 func TestAnalyzeVersion_Nil(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/internal/models"
 )
 
 func (s *Server) handleSaveVaultKey(w http.ResponseWriter, r *http.Request) error {

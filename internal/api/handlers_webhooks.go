@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/sachn-cs/promptsheon/internal/webhook"
+	"github.com/sachncs/promptsheon/internal/webhook"
 )
 
 func (s *Server) handleListWebhooks(w http.ResponseWriter, r *http.Request) error {

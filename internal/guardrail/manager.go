@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/metrics"
+	"github.com/sachncs/promptsheon/internal/metrics"
 )
 
 type Severity string

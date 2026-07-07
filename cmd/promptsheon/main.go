@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/buildinfo"
-	"github.com/sachn-cs/promptsheon/internal/llm"
-	"github.com/sachn-cs/promptsheon/internal/promptsheon"
+	"github.com/sachncs/promptsheon/internal/buildinfo"
+	"github.com/sachncs/promptsheon/internal/llm"
+	"github.com/sachncs/promptsheon/internal/promptsheon"
 )
 
 func main() {

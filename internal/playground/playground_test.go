@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachncs/promptsheon/internal/llm"
 
-	"github.com/sachn-cs/promptsheon/internal/playground"
+	"github.com/sachncs/promptsheon/internal/playground"
 )
 
 type mockProvider struct{}

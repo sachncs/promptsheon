@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/capability"
 )
 
 func setupTestDB(t *testing.T) *SQLite {

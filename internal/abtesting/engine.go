@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachncs/promptsheon/internal/llm"
 )
 
 // Variant represents an A/B test variant.

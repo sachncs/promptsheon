@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sachn-cs/promptsheon/internal/trace"
+	"github.com/sachncs/promptsheon/internal/trace"
 )
 
 // noopTracer is a minimal in-memory tracer used so the

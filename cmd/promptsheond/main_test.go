@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sachn-cs/promptsheon/internal/config"
+	"github.com/sachncs/promptsheon/internal/config"
 )
 
 func TestServerHelpText(t *testing.T) {

@@ -13,32 +13,32 @@
 # one person.
 
 # Default fallback: catch-all owner for any path not listed.
-*       @sachn-cs
+*       @sachncs
 
 # Security-sensitive areas: vault, auth, audit, rate limiting,
 # and the CAS engine. These encode the threat model from
 # docs/security.md and should never merge without an explicit
 # maintainer review.
-/internal/auth/                 @sachn-cs
-/internal/vault/                @sachn-cs
-/internal/audit/                @sachn-cs
-/internal/ratelimit/            @sachn-cs
-/internal/promptsheon/          @sachn-cs
-/internal/store/                @sachn-cs
+/internal/auth/                 @sachncs
+/internal/vault/                @sachncs
+/internal/audit/                @sachncs
+/internal/ratelimit/            @sachncs
+/internal/promptsheon/          @sachncs
+/internal/store/                @sachncs
 
 # Public API surface: breaking changes here ripple to every SDK
 # consumer.
-/internal/api/                  @sachn-cs
-/sdk/                           @sachn-cs
-/api/openapi.yaml               @sachn-cs
+/internal/api/                  @sachncs
+/sdk/                           @sachncs
+/api/openapi.yaml               @sachncs
 
 # Server entry point and the OpenAPI generator.
-/cmd/                           @sachn-cs
-/scripts/genopenapi/            @sachn-cs
+/cmd/                           @sachncs
+/scripts/genopenapi/            @sachncs
 
 # CI, build, and release.
-/.github/                       @sachn-cs
-/.github/workflows/             @sachn-cs
-/Dockerfile                     @sachn-cs
-/.goreleaser.yml                @sachn-cs
-/Makefile                       @sachn-cs
+/.github/                       @sachncs
+/.github/workflows/             @sachncs
+/Dockerfile                     @sachncs
+/.goreleaser.yml                @sachncs
+/Makefile                       @sachncs

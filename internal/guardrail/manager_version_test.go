@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sachn-cs/promptsheon/internal/capability"
-	"github.com/sachn-cs/promptsheon/internal/metrics"
+	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/metrics"
 )
 
 func testManager() *Manager {

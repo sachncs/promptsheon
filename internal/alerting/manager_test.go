@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/metrics"
+	"github.com/sachncs/promptsheon/internal/metrics"
 )
 
 func newTestManager(t *testing.T) *Manager {

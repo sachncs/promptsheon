@@ -3,7 +3,7 @@ package store
 import (
 	"context"
 
-	"github.com/sachn-cs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/capability"
 )
 
 // CapabilityRepository defines persistence for capability-centric domain types.

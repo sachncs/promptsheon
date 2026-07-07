@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/capability"
 )
 
 // ExecuteVersion runs a workflow defined by a CapabilityVersion.

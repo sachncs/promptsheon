@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sachn-cs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/capability"
 )
 
 // CheckVersion runs all guardrails defined in a capability version.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/capability"
 )
 
 // AnalyzeVersion analyzes a capability version and returns recommendations.

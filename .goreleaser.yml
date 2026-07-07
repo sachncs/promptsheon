@@ -2,7 +2,7 @@ version: 2
 
 release:
   github:
-    owner: sachn-cs
+    owner: sachncs
     name: promptsheon
   draft: false
   prerelease: auto
@@ -23,9 +23,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/sachn-cs/promptsheon/internal/buildinfo.Version={{.Version}}
-      - -X github.com/sachn-cs/promptsheon/internal/buildinfo.Commit={{.Commit}}
-      - -X github.com/sachn-cs/promptsheon/internal/buildinfo.BuildTime={{.CommitDate}}
+      - -X github.com/sachncs/promptsheon/internal/buildinfo.Version={{.Version}}
+      - -X github.com/sachncs/promptsheon/internal/buildinfo.Commit={{.Commit}}
+      - -X github.com/sachncs/promptsheon/internal/buildinfo.BuildTime={{.CommitDate}}
 
   - id: promptsheon-cli
     main: ./cmd/promptsheon
@@ -41,9 +41,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/sachn-cs/promptsheon/internal/buildinfo.Version={{.Version}}
-      - -X github.com/sachn-cs/promptsheon/internal/buildinfo.Commit={{.Commit}}
-      - -X github.com/sachn-cs/promptsheon/internal/buildinfo.BuildTime={{.CommitDate}}
+      - -X github.com/sachncs/promptsheon/internal/buildinfo.Version={{.Version}}
+      - -X github.com/sachncs/promptsheon/internal/buildinfo.Commit={{.Commit}}
+      - -X github.com/sachncs/promptsheon/internal/buildinfo.BuildTime={{.CommitDate}}
 
 archives:
   - id: promptsheond

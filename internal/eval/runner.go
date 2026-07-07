@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/capability"
-	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/llm"
 )
 
 type Runner struct {

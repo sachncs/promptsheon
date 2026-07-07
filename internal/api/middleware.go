@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/auth"
-	"github.com/sachn-cs/promptsheon/internal/trace"
+	"github.com/sachncs/promptsheon/internal/auth"
+	"github.com/sachncs/promptsheon/internal/trace"
 )
 
 // Middleware is a function that wraps an APIFunc with additional behavior.

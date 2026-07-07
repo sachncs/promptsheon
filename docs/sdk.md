@@ -5,7 +5,7 @@ The `sdk` package provides a Go client for the Promptsheon REST API.
 ## Installation
 
 ```bash
-go get github.com/sachn-cs/promptsheon/sdk
+go get github.com/sachncs/promptsheon/sdk
 ```
 
 ## Usage
@@ -18,7 +18,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/sachn-cs/promptsheon/sdk"
+    "github.com/sachncs/promptsheon/sdk"
 )
 
 func main() {

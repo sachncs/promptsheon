@@ -3,7 +3,7 @@ package store
 import (
 	"context"
 
-	"github.com/sachn-cs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/internal/models"
 )
 
 type Repository interface {

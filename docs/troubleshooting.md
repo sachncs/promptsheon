@@ -2,7 +2,7 @@
 
 This page consolidates the operator-facing runbook. It supersedes the old root `TROUBLESHOOTING.md` (which is now a 3-line redirect).
 
-If your problem is not listed here, open a [GitHub Issue](https://github.com/sachn-cs/promptsheon/issues) with the output of `make coverage-raw` and the relevant log lines.
+If your problem is not listed here, open a [GitHub Issue](https://github.com/sachncs/promptsheon/issues) with the output of `make coverage-raw` and the relevant log lines.
 
 ## Server
 
@@ -215,6 +215,6 @@ Levels: `debug`, `info`, `warn`, `error`. The default is `info`.
 
 ## Getting help
 
-- GitHub Issues: <https://github.com/sachn-cs/promptsheon/issues>
-- GitHub Security Advisories: <https://github.com/sachn-cs/promptsheon/security/advisories/new>
+- GitHub Issues: <https://github.com/sachncs/promptsheon/issues>
+- GitHub Security Advisories: <https://github.com/sachncs/promptsheon/security/advisories/new>
 - The [FAQ](faq.md) and the [Glossary](glossary.md) for terminology questions.

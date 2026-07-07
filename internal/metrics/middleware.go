@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/trace"
+	"github.com/sachncs/promptsheon/internal/trace"
 )
 
 // HTTPMiddleware instruments HTTP requests with metrics and tracing.

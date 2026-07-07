@@ -82,7 +82,7 @@ All queries use parameterised statements via the `database/sql` package. There a
 If you discover a security vulnerability:
 
 - **Do not** open a public GitHub issue.
-- Use the GitHub Security Advisory workflow: `https://github.com/sachn-cs/promptsheon/security/advisories/new`.
+- Use the GitHub Security Advisory workflow: `https://github.com/sachncs/promptsheon/security/advisories/new`.
 - Or email the maintainers at the address in `CODEOWNERS`.
 
 We will acknowledge within 48 hours, give an initial assessment within 1 week, and aim to ship a fix within 2 weeks depending on severity.

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sachn-cs/promptsheon/internal/llm"
+	"github.com/sachncs/promptsheon/internal/llm"
 )
 
 type OptimizationSuggestion struct {
