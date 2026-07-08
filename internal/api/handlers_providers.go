@@ -7,7 +7,10 @@ import (
 	"github.com/sachncs/promptsheon/internal/llm"
 )
 
-func (s *Server) handleListProviders(w http.ResponseWriter, r *http.Request) error {
+const keyProvider = "provider"
+const valError = "error"
+
+func (s *Server) handleListProviders(w http.ResponseWriter, _ *http.Request) error {
 	names := llm.Global.Providers()
 	writeJSON(w, http.StatusOK, map[string]any{"providers": names})
 	return nil
@@ -27,8 +30,8 @@ func (s *Server) handleGetProvider(w http.ResponseWriter, r *http.Request) error
 		return notFound("provider not found: " + name)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"name":   name,
-		"status": "registered",
+		keyName:   name,
+		keyStatus: "registered",
 	})
 	return nil
 }
@@ -63,19 +66,19 @@ func (s *Server) handleTestProvider(w http.ResponseWriter, r *http.Request) erro
 
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
-			"provider":   name,
+			keyProvider:  name,
 			"model":      req.Model,
-			"status":     "error",
-			"error":      err.Error(),
+			keyStatus:    valError,
+			valError:     err.Error(),
 			"latency_ms": latency.Milliseconds(),
 		})
 		return nil
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"provider":   name,
+		keyProvider:  name,
 		"model":      resp.Model,
-		"status":     "ok",
+		keyStatus:    "ok",
 		"content":    resp.Content,
 		"usage":      resp.Usage,
 		"latency_ms": latency.Milliseconds(),

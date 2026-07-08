@@ -44,16 +44,16 @@ func TestNewSQLite_IndexesCreated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sql.Open: %v", err)
 	}
-	defer db.Close()
-	if _, err := NewSQLite(db); err != nil {
-		t.Fatalf("NewSQLite: %v", err)
+	defer func() { _ = db.Close() }()
+	if _, e := NewSQLite(db); e != nil {
+		t.Fatalf("NewSQLite: %v", e)
 	}
 	rows, err := db.QueryContext(context.Background(),
 		`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='traces'`)
 	if err != nil {
 		t.Fatalf("list indexes: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	indexes := map[string]bool{}
 	for rows.Next() {
 		var name string
@@ -159,11 +159,11 @@ func TestSQLiteStartChildAndFinish(t *testing.T) {
 		t.Errorf("expected same trace ID, got %s", child.TraceID)
 	}
 
-	if err := s.Finish(child); err != nil {
-		t.Fatalf("Finish child: %v", err)
+	if e := s.Finish(child); e != nil {
+		t.Fatalf("Finish child: %v", e)
 	}
-	if err := s.Finish(root); err != nil {
-		t.Fatalf("Finish root: %v", err)
+	if e := s.Finish(root); e != nil {
+		t.Fatalf("Finish root: %v", e)
 	}
 
 	got, err := s.GetSpan(context.Background(), root.ID)
@@ -196,7 +196,7 @@ func TestSQLiteListSpansFilters(t *testing.T) {
 		_ = s.Finish(span)
 	}
 
-	all, err := s.ListSpans(context.Background(), SpanFilter{})
+	all, err := s.ListSpans(context.Background(), &SpanFilter{})
 	if err != nil {
 		t.Fatalf("ListSpans: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestSQLiteListSpansFilters(t *testing.T) {
 		t.Errorf("expected 3 spans, got %d", len(all))
 	}
 
-	onlyA, err := s.ListSpans(context.Background(), SpanFilter{Operation: "a"})
+	onlyA, err := s.ListSpans(context.Background(), &SpanFilter{Operation: "a"})
 	if err != nil {
 		t.Fatalf("ListSpans a: %v", err)
 	}
@@ -212,7 +212,7 @@ func TestSQLiteListSpansFilters(t *testing.T) {
 		t.Errorf("expected 2 'a' spans, got %d", len(onlyA))
 	}
 
-	limited, err := s.ListSpans(context.Background(), SpanFilter{Limit: 1})
+	limited, err := s.ListSpans(context.Background(), &SpanFilter{Limit: 1})
 	if err != nil {
 		t.Fatalf("ListSpans limit: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestSQLiteListSpansTimeRange(t *testing.T) {
 	since := time.Now().Add(-time.Hour)
 	future := time.Now().Add(time.Hour)
 
-	out, err := s.ListSpans(context.Background(), SpanFilter{Since: &since})
+	out, err := s.ListSpans(context.Background(), &SpanFilter{Since: &since})
 	if err != nil {
 		t.Fatalf("ListSpans Since: %v", err)
 	}
@@ -242,7 +242,7 @@ func TestSQLiteListSpansTimeRange(t *testing.T) {
 		t.Errorf("expected 1 span in recent window, got %d", len(out))
 	}
 
-	out, err = s.ListSpans(context.Background(), SpanFilter{Until: &future})
+	out, err = s.ListSpans(context.Background(), &SpanFilter{Until: &future})
 	if err != nil {
 		t.Fatalf("ListSpans Until: %v", err)
 	}
@@ -251,7 +251,7 @@ func TestSQLiteListSpansTimeRange(t *testing.T) {
 	}
 
 	past := time.Now().Add(-2 * time.Hour)
-	out, err = s.ListSpans(context.Background(), SpanFilter{Until: &past})
+	out, err = s.ListSpans(context.Background(), &SpanFilter{Until: &past})
 	if err != nil {
 		t.Fatalf("ListSpans past Until: %v", err)
 	}

@@ -47,7 +47,7 @@ func (s *Server) handleListAudit(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	entries, err := s.db.ListAudit(r.Context(), filter)
+	entries, err := s.db.ListAudit(r.Context(), &filter)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func (s *Server) handleExportAudit(w http.ResponseWriter, r *http.Request) error
 		filter.Until = &t
 	}
 
-	entries, err := s.db.ExportAudit(r.Context(), filter)
+	entries, err := s.db.ExportAudit(r.Context(), &filter)
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func (s *Server) writeAuditCSV(w http.ResponseWriter, entries []*models.AuditEnt
 	defer writer.Flush()
 
 	// Header
-	writer.Write([]string{"id", "user_id", "action", "resource", "details", "timestamp", "previous_hash", "entry_hash"})
+	_ = writer.Write([]string{"id", "user_id", "action", "resource", "details", "timestamp", "previous_hash", "entry_hash"})
 
 	// Data
 	for _, e := range entries {
@@ -112,7 +112,7 @@ func (s *Server) writeAuditCSV(w http.ResponseWriter, entries []*models.AuditEnt
 		if err != nil {
 			details = []byte("{}")
 		}
-		writer.Write([]string{
+		_ = writer.Write([]string{
 			e.ID,
 			e.UserID,
 			e.Action,

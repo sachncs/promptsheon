@@ -12,7 +12,7 @@ import (
 // AllowedCommands (map) as bare package-level mutable globals. This
 // test fires concurrent writers and readers and asserts no race
 // detector hits and the reads always see a consistent snapshot.
-func TestShellTool_PolicyRaceFree(t *testing.T) {
+func TestShellTool_PolicyRaceFree(_ *testing.T) {
 	p := newShellPolicy()
 	p.Set(false, nil)
 

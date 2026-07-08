@@ -301,7 +301,7 @@ func TestCheckCostOverrun(t *testing.T) {
 func TestSetDeliveryFunc(t *testing.T) {
 	m := newTestManager(t)
 	called := make(chan struct{}, 1)
-	m.SetDeliveryFunc(func(a *Alert, channels []string) error {
+	m.SetDeliveryFunc(func(_ *Alert, _ []string) error {
 		called <- struct{}{}
 		return nil
 	})

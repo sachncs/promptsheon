@@ -43,10 +43,14 @@ type Config struct {
 	CORSOrigins string // Comma-separated allowed origins, or "*" to allow all (insecure)
 }
 
+const defaultAddr = ":8080"
+const valFalse = "false"
+const valTrue = "true"
+
 // DefaultConfig returns the default configuration.
 func DefaultConfig() Config {
 	return Config{
-		Addr:     ":8080",
+		Addr:     defaultAddr,
 		DBPath:   "promptsheon.db",
 		LogLevel: "info",
 		Auth:     true,
@@ -76,126 +80,69 @@ func DefaultConfig() Config {
 func LoadConfig() Config {
 	cfg := DefaultConfig()
 
-	if v := os.Getenv("PROMPTSHEON_ADDR"); v != "" {
-		cfg.Addr = v
-	}
-	if v := os.Getenv("PROMPTSHEON_DB_PATH"); v != "" {
-		cfg.DBPath = v
-	}
-	if v := os.Getenv("PROMPTSHEON_LOG_LEVEL"); v != "" {
-		cfg.LogLevel = v
-	}
-	if v := os.Getenv("PROMPTSHEON_AUTH"); v == "0" || v == "false" || v == "no" {
-		cfg.Auth = false
-	} else if v == "1" || v == "true" || v == "yes" {
-		cfg.Auth = true
-	}
+	cfg.Addr = getEnvString("PROMPTSHEON_ADDR", cfg.Addr)
+	cfg.DBPath = getEnvString("PROMPTSHEON_DB_PATH", cfg.DBPath)
+	cfg.LogLevel = getEnvString("PROMPTSHEON_LOG_LEVEL", cfg.LogLevel)
+	cfg.Auth = getEnvBool("PROMPTSHEON_AUTH", cfg.Auth)
 
-	if v := os.Getenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			cfg.WriteTimeout = n
-		} else {
-			// M-4 fix: warn the operator that their value is
-			// being ignored. The previous behaviour silently
-			// fell back to the default, which made operators
-			// believe they had configured the timeout when
-			// they had not.
-			slog.Warn("config: invalid PROMPTSHEON_SERVER_WRITE_TIMEOUT, using default",
-				"value", v, "default", cfg.WriteTimeout, "err", err)
-		}
-	}
-	if v := os.Getenv("PROMPTSHEON_SERVER_READ_TIMEOUT"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			cfg.ReadTimeout = n
-		} else {
-			slog.Warn("config: invalid PROMPTSHEON_SERVER_READ_TIMEOUT, using default",
-				"value", v, "default", cfg.ReadTimeout, "err", err)
-		}
-	}
-	if v := os.Getenv("PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			cfg.ReadHeaderTimeout = n
-		} else {
-			slog.Warn("config: invalid PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT, using default",
-				"value", v, "default", cfg.ReadHeaderTimeout, "err", err)
-		}
-	}
-	if v := os.Getenv("PROMPTSHEON_SERVER_IDLE_TIMEOUT"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			cfg.IdleTimeout = n
-		} else {
-			slog.Warn("config: invalid PROMPTSHEON_SERVER_IDLE_TIMEOUT, using default",
-				"value", v, "default", cfg.IdleTimeout, "err", err)
-		}
-	}
+	cfg.WriteTimeout = getEnvInt("PROMPTSHEON_SERVER_WRITE_TIMEOUT", cfg.WriteTimeout)
+	cfg.ReadTimeout = getEnvInt("PROMPTSHEON_SERVER_READ_TIMEOUT", cfg.ReadTimeout)
+	cfg.ReadHeaderTimeout = getEnvInt("PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT", cfg.ReadHeaderTimeout)
+	cfg.IdleTimeout = getEnvInt("PROMPTSHEON_SERVER_IDLE_TIMEOUT", cfg.IdleTimeout)
 
-	if v := os.Getenv("PROMPTSHEON_RATE_LIMIT_RATE"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			cfg.RateLimitRate = n
-		} else {
-			slog.Warn("config: invalid PROMPTSHEON_RATE_LIMIT_RATE, using default",
-				"value", v, "default", cfg.RateLimitRate, "err", err)
-		}
-	}
-	if v := os.Getenv("PROMPTSHEON_RATE_LIMIT_INTERVAL"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			cfg.RateLimitInterval = n
-		} else {
-			slog.Warn("config: invalid PROMPTSHEON_RATE_LIMIT_INTERVAL, using default",
-				"value", v, "default", cfg.RateLimitInterval, "err", err)
-		}
-	}
-	if v := os.Getenv("PROMPTSHEON_RATE_LIMIT_BURST"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			cfg.RateLimitBurst = n
-		} else {
-			slog.Warn("config: invalid PROMPTSHEON_RATE_LIMIT_BURST, using default",
-				"value", v, "default", cfg.RateLimitBurst, "err", err)
-		}
-	}
+	cfg.RateLimitRate = getEnvInt("PROMPTSHEON_RATE_LIMIT_RATE", cfg.RateLimitRate)
+	cfg.RateLimitInterval = getEnvInt("PROMPTSHEON_RATE_LIMIT_INTERVAL", cfg.RateLimitInterval)
+	cfg.RateLimitBurst = getEnvInt("PROMPTSHEON_RATE_LIMIT_BURST", cfg.RateLimitBurst)
 
-	if v := os.Getenv("PROMPTSHEON_CIRCUIT_BREAKER_FAILURE_THRESHOLD"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			cfg.CircuitBreakerFailureThreshold = n
-		} else {
-			slog.Warn("config: invalid PROMPTSHEON_CIRCUIT_BREAKER_FAILURE_THRESHOLD, using default",
-				"value", v, "default", cfg.CircuitBreakerFailureThreshold, "err", err)
-		}
-	}
-	if v := os.Getenv("PROMPTSHEON_CIRCUIT_BREAKER_SUCCESS_THRESHOLD"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			cfg.CircuitBreakerSuccessThreshold = n
-		} else {
-			slog.Warn("config: invalid PROMPTSHEON_CIRCUIT_BREAKER_SUCCESS_THRESHOLD, using default",
-				"value", v, "default", cfg.CircuitBreakerSuccessThreshold, "err", err)
-		}
-	}
-	if v := os.Getenv("PROMPTSHEON_CIRCUIT_BREAKER_COOLDOWN"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			cfg.CircuitBreakerCooldown = n
-		} else {
-			slog.Warn("config: invalid PROMPTSHEON_CIRCUIT_BREAKER_COOLDOWN, using default",
-				"value", v, "default", cfg.CircuitBreakerCooldown, "err", err)
-		}
-	}
+	cfg.CircuitBreakerFailureThreshold = getEnvInt("PROMPTSHEON_CIRCUIT_BREAKER_FAILURE_THRESHOLD", cfg.CircuitBreakerFailureThreshold)
+	cfg.CircuitBreakerSuccessThreshold = getEnvInt("PROMPTSHEON_CIRCUIT_BREAKER_SUCCESS_THRESHOLD", cfg.CircuitBreakerSuccessThreshold)
+	cfg.CircuitBreakerCooldown = getEnvInt("PROMPTSHEON_CIRCUIT_BREAKER_COOLDOWN", cfg.CircuitBreakerCooldown)
 
-	if v := os.Getenv("PROMPTSHEON_LLM_FALLBACK"); v != "" {
-		cfg.LLMFallback = v
-	}
+	cfg.LLMFallback = getEnvString("PROMPTSHEON_LLM_FALLBACK", cfg.LLMFallback)
+	cfg.OTelEndpoint = getEnvString("PROMPTSHEON_OTEL_ENDPOINT", cfg.OTelEndpoint)
+	cfg.OTelInsecure = getEnvBool("PROMPTSHEON_OTEL_INSECURE", cfg.OTelInsecure)
+	cfg.CORSOrigins = getEnvString("PROMPTSHEON_CORS_ORIGINS", cfg.CORSOrigins)
 
-	if v := os.Getenv("PROMPTSHEON_OTEL_ENDPOINT"); v != "" {
-		cfg.OTelEndpoint = v
-	}
-	if v := os.Getenv("PROMPTSHEON_OTEL_INSECURE"); v == "true" || v == "1" || v == "yes" {
-		cfg.OTelInsecure = true
-	}
+	sanitizeConfig(&cfg)
+	return cfg
+}
 
-	if v := os.Getenv("PROMPTSHEON_CORS_ORIGINS"); v != "" {
-		cfg.CORSOrigins = v
+func getEnvString(key, defaultVal string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
+	return defaultVal
+}
 
-	// Sanity-check the numeric config values. Operators can otherwise
-	// crash the server with PROMPTSHEON_RATE_LIMIT_RATE=-1 or similar.
+func getEnvBool(key string, defaultVal bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultVal
+	}
+	switch v {
+	case "1", "true", "yes":
+		return true
+	case "0", "false", "no":
+		return false
+	}
+	return defaultVal
+}
+
+func getEnvInt(key string, defaultVal int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultVal
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		slog.Warn("config: invalid "+key+", using default",
+			"value", v, "default", defaultVal, "err", err)
+		return defaultVal
+	}
+	return n
+}
+
+func sanitizeConfig(cfg *Config) {
 	if cfg.RateLimitRate < 0 {
 		cfg.RateLimitRate = 0
 	}
@@ -214,15 +161,13 @@ func LoadConfig() Config {
 	if cfg.IdleTimeout < 0 {
 		cfg.IdleTimeout = 120
 	}
-
-	return cfg
 }
 
 // Port extracts the port number from the address string. The
 // implementation uses net.SplitHostPort so IPv6 literals
 // (e.g. "[::1]:8080") and empty ports (":http") are handled
 // correctly. Returns 8080 if the address can't be parsed.
-func (c Config) Port() int {
+func (c *Config) Port() int {
 	host, port, err := net.SplitHostPort(c.Addr)
 	if err != nil {
 		// No port in the address: try the bare string as a

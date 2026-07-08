@@ -44,7 +44,7 @@ func BenchmarkCircuitBreakerRecordFailure(b *testing.B) {
 func BenchmarkCircuitBreakerMiddleware(b *testing.B) {
 	mock := &mockProvider{
 		name: "mock",
-		completeFunc: func(ctx context.Context, req *Request) (*Response, error) {
+		completeFunc: func(_ context.Context, _ *Request) (*Response, error) {
 			return &Response{Content: "ok"}, nil
 		},
 	}
@@ -61,14 +61,14 @@ func BenchmarkCircuitBreakerMiddleware(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		middleware.Complete(ctx, req)
+		_, _ = middleware.Complete(ctx, req)
 	}
 }
 
 func BenchmarkRetryingComplete(b *testing.B) {
 	mock := &mockProvider{
 		name: "mock",
-		completeFunc: func(ctx context.Context, req *Request) (*Response, error) {
+		completeFunc: func(_ context.Context, _ *Request) (*Response, error) {
 			return &Response{Content: "ok"}, nil
 		},
 	}
@@ -80,6 +80,6 @@ func BenchmarkRetryingComplete(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		retrying.Complete(ctx, req)
+		_, _ = retrying.Complete(ctx, req)
 	}
 }

@@ -1,3 +1,4 @@
+// Package models provides data models for persistence.
 package models
 
 import "time"

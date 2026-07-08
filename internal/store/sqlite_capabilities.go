@@ -12,12 +12,6 @@ import (
 // ensure SQLite implements CapabilityRepository.
 var _ CapabilityRepository = (*SQLite)(nil)
 
-// workspaceCapabilityRepo is a helper that returns the SQLite as CapabilityRepository.
-// This avoids the need to change the SQLite type itself.
-func (s *SQLite) workspaceCapabilityRepo() CapabilityRepository {
-	return s
-}
-
 // ---------------------------------------------------------------------------
 // Workspaces
 // ---------------------------------------------------------------------------
@@ -48,7 +42,7 @@ func (s *SQLite) ListWorkspaces(ctx context.Context) ([]*capability.Workspace, e
 	if err != nil {
 		return nil, fmt.Errorf("list workspaces: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []*capability.Workspace
 	for rows.Next() {
@@ -125,7 +119,7 @@ func (s *SQLite) ListProjects(ctx context.Context, workspaceID string) ([]*capab
 	if err != nil {
 		return nil, fmt.Errorf("list projects: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []*capability.Project
 	for rows.Next() {
@@ -208,7 +202,7 @@ func (s *SQLite) ListCapabilities(ctx context.Context, projectID string) ([]*cap
 	if err != nil {
 		return nil, fmt.Errorf("list capabilities: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []*capability.Capability
 	for rows.Next() {
@@ -265,76 +259,67 @@ func scanCapability(scanner interface {
 // Capability Versions
 // ---------------------------------------------------------------------------
 
-// marshalCapabilityVersionJSONFields marshals the JSON fields of a version.
-func marshalCapabilityVersionJSONFields(v *capability.CapabilityVersion) (prompt, modelPolicy, contextContract, knowledge, memory, guardrails, tools, mcp, runtimePolicy, evalSuite string, err error) {
-	var b []byte
-	b, err = marshalOrErr(v.Prompt)
-	if err != nil {
-		return
-	}
-	prompt = string(b)
-
-	b, err = marshalOrErr(v.ModelPolicy)
-	if err != nil {
-		return
-	}
-	modelPolicy = string(b)
-
-	b, err = marshalOrErr(v.ContextContract)
-	if err != nil {
-		return
-	}
-	contextContract = string(b)
-
-	b, err = marshalOrErr(v.Knowledge)
-	if err != nil {
-		return
-	}
-	knowledge = string(b)
-
-	b, err = marshalOrErr(v.Memory)
-	if err != nil {
-		return
-	}
-	memory = string(b)
-
-	b, err = marshalOrErr(v.Guardrails)
-	if err != nil {
-		return
-	}
-	guardrails = string(b)
-
-	b, err = marshalOrErr(v.Tools)
-	if err != nil {
-		return
-	}
-	tools = string(b)
-
-	b, err = marshalOrErr(v.MCPServers)
-	if err != nil {
-		return
-	}
-	mcp = string(b)
-
-	b, err = marshalOrErr(v.RuntimePolicy)
-	if err != nil {
-		return
-	}
-	runtimePolicy = string(b)
-
-	b, err = marshalOrErr(v.EvaluationSuite)
-	if err != nil {
-		return
-	}
-	evalSuite = string(b)
-
-	return
+// versionJSONFields holds the JSON-marshalled fields of a capability.Version.
+type versionJSONFields struct {
+	prompt, modelPolicy, contextContract, knowledge, memory          string
+	guardrails, tools, mcp, runtimePolicy, evalSuite                  string
 }
 
-func (s *SQLite) CreateVersion(ctx context.Context, v *capability.CapabilityVersion) error {
-	promptJSON, modelPolicyJSON, contextContractJSON, knowledgeJSON, memoryJSON,
-		guardrailsJSON, toolsJSON, mcpJSON, runtimePolicyJSON, evalSuiteJSON, err :=
-		marshalCapabilityVersionJSONFields(v)
+// marshalCapabilityVersionJSONFields marshals the JSON fields of a version.
+func marshalCapabilityVersionJSONFields(v *capability.Version) (f versionJSONFields, err error) {
+	f.prompt, err = marshalField(v.Prompt)
+	if err != nil {
+		return f, err
+	}
+	f.modelPolicy, err = marshalField(v.ModelPolicy)
+	if err != nil {
+		return f, err
+	}
+	f.contextContract, err = marshalField(v.ContextContract)
+	if err != nil {
+		return f, err
+	}
+	f.knowledge, err = marshalField(v.Knowledge)
+	if err != nil {
+		return f, err
+	}
+	f.memory, err = marshalField(v.Memory)
+	if err != nil {
+		return f, err
+	}
+	f.guardrails, err = marshalField(v.Guardrails)
+	if err != nil {
+		return f, err
+	}
+	f.tools, err = marshalField(v.Tools)
+	if err != nil {
+		return f, err
+	}
+	f.mcp, err = marshalField(v.MCPServers)
+	if err != nil {
+		return f, err
+	}
+	f.runtimePolicy, err = marshalField(v.RuntimePolicy)
+	if err != nil {
+		return f, err
+	}
+	f.evalSuite, err = marshalField(v.EvaluationSuite)
+	if err != nil {
+		return f, err
+	}
+	return f, nil
+}
+
+func marshalField(v any) (string, error) {
+	b, err := marshalOrErr(v)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func (s *SQLite) CreateVersion(ctx context.Context, v *capability.Version) error {
+	f, err := marshalCapabilityVersionJSONFields(v)
 	if err != nil {
 		return fmt.Errorf("marshal version JSON fields: %w", err)
 	}
@@ -344,9 +329,9 @@ func (s *SQLite) CreateVersion(ctx context.Context, v *capability.CapabilityVers
 		 (id, capability_id, version, prompt, model_policy, context_contract, knowledge,
 		  memory, guardrails, tools, mcp_servers, runtime_policy, evaluation_suite, created_at, created_by)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		v.ID, v.CapabilityID, v.Version, promptJSON, modelPolicyJSON, contextContractJSON,
-		knowledgeJSON, memoryJSON, guardrailsJSON, toolsJSON, mcpJSON, runtimePolicyJSON,
-		evalSuiteJSON, v.CreatedAt, v.CreatedBy,
+		v.ID, v.CapabilityID, v.Version, f.prompt, f.modelPolicy, f.contextContract,
+		f.knowledge, f.memory, f.guardrails, f.tools, f.mcp, f.runtimePolicy,
+		f.evalSuite, v.CreatedAt, v.CreatedBy,
 	)
 	if err != nil {
 		return fmt.Errorf("insert version: %w", err)
@@ -354,7 +339,7 @@ func (s *SQLite) CreateVersion(ctx context.Context, v *capability.CapabilityVers
 	return nil
 }
 
-func (s *SQLite) GetVersion(ctx context.Context, id string) (*capability.CapabilityVersion, error) {
+func (s *SQLite) GetVersion(ctx context.Context, id string) (*capability.Version, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT id, capability_id, version, prompt, model_policy, context_contract, knowledge,
 		 memory, guardrails, tools, mcp_servers, runtime_policy, evaluation_suite, created_at, created_by
@@ -363,7 +348,7 @@ func (s *SQLite) GetVersion(ctx context.Context, id string) (*capability.Capabil
 	return scanCapabilityVersion(row)
 }
 
-func (s *SQLite) ListVersions(ctx context.Context, capabilityID string) ([]*capability.CapabilityVersion, error) {
+func (s *SQLite) ListVersions(ctx context.Context, capabilityID string) ([]*capability.Version, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, capability_id, version, prompt, model_policy, context_contract, knowledge,
 		 memory, guardrails, tools, mcp_servers, runtime_policy, evaluation_suite, created_at, created_by
@@ -372,9 +357,9 @@ func (s *SQLite) ListVersions(ctx context.Context, capabilityID string) ([]*capa
 	if err != nil {
 		return nil, fmt.Errorf("list versions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
-	var result []*capability.CapabilityVersion
+	var result []*capability.Version
 	for rows.Next() {
 		v, err := scanCapabilityVersion(rows)
 		if err != nil {
@@ -385,7 +370,7 @@ func (s *SQLite) ListVersions(ctx context.Context, capabilityID string) ([]*capa
 	return result, rows.Err()
 }
 
-func (s *SQLite) GetLatestVersion(ctx context.Context, capabilityID string) (*capability.CapabilityVersion, error) {
+func (s *SQLite) GetLatestVersion(ctx context.Context, capabilityID string) (*capability.Version, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT id, capability_id, version, prompt, model_policy, context_contract, knowledge,
 		 memory, guardrails, tools, mcp_servers, runtime_policy, evaluation_suite, created_at, created_by
@@ -396,8 +381,8 @@ func (s *SQLite) GetLatestVersion(ctx context.Context, capabilityID string) (*ca
 
 func scanCapabilityVersion(scanner interface {
 	Scan(dest ...any) error
-}) (*capability.CapabilityVersion, error) {
-	var v capability.CapabilityVersion
+}) (*capability.Version, error) {
+	var v capability.Version
 	var promptJSON, modelPolicyJSON, contextContractJSON, knowledgeJSON, memoryJSON string
 	var guardrailsJSON, toolsJSON, mcpJSON, runtimePolicyJSON, evalSuiteJSON string
 
@@ -493,7 +478,7 @@ func (s *SQLite) ListExecutions(ctx context.Context, filter ExecutionFilter) ([]
 	if err != nil {
 		return nil, fmt.Errorf("list executions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []*capability.Execution
 	for rows.Next() {

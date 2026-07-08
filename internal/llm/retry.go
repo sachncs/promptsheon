@@ -127,8 +127,10 @@ func NewRetrying(p Provider, cfg RetryConfig) *Retrying {
 	return &Retrying{inner: p, cfg: cfg}
 }
 
+// Name returns the wrapped provider name.
 func (r *Retrying) Name() string { return r.inner.Name() }
 
+// Complete sends a request with exponential-backoff retry logic.
 func (r *Retrying) Complete(ctx context.Context, req *Request) (*Response, error) {
 	var lastErr error
 	for attempt := 0; attempt <= r.cfg.MaxRetries; attempt++ {
@@ -176,8 +178,10 @@ func NewTimeouting(p Provider, timeout time.Duration) *Timeouting {
 	return &Timeouting{inner: p, timeout: timeout}
 }
 
+// Name returns the wrapped provider name.
 func (t *Timeouting) Name() string { return t.inner.Name() }
 
+// Complete sends a request with a per-call timeout.
 func (t *Timeouting) Complete(ctx context.Context, req *Request) (*Response, error) {
 	ctx, cancel := context.WithTimeout(ctx, t.timeout)
 	defer cancel()

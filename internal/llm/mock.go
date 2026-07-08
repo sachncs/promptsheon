@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+const providerMock = "mock"
+
 // Mock is a controllable provider for testing. It returns a configured
 // response and records all calls for assertion.
 type Mock struct {
@@ -20,7 +22,8 @@ func NewMock(content string) *Mock {
 	return &Mock{Response: content}
 }
 
-func (m *Mock) Name() string { return "mock" }
+// Name returns the provider name.
+func (m *Mock) Name() string { return providerMock }
 
 // Complete returns the configured response and records the call.
 func (m *Mock) Complete(_ context.Context, req *Request) (*Response, error) {

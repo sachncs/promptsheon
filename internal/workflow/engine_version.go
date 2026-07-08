@@ -13,12 +13,12 @@ import (
 // This is the capability-centric equivalent of Execute(*models.Agent).
 // It extracts the prompt, guardrails, and runtime policy from the version
 // and executes the workflow against the given input.
-func (e *Engine) ExecuteVersion(ctx context.Context, version *capability.CapabilityVersion, input map[string]any) (*WorkflowResult, error) {
+func (e *Engine) ExecuteVersion(ctx context.Context, version *capability.Version, input map[string]any) (*Result, error) {
 	if version == nil {
 		return nil, fmt.Errorf("capability version is required")
 	}
 
-	result := &WorkflowResult{
+	result := &Result{
 		WorkflowID: version.ID,
 		Status:     StatusRunning,
 		Steps:      make(map[string]*StepResult),
@@ -50,11 +50,11 @@ func (e *Engine) ExecuteVersion(ctx context.Context, version *capability.Capabil
 }
 
 // executePromptStep executes a single step using the capability version's prompt.
-func (e *Engine) executePromptStep(ctx context.Context, version *capability.CapabilityVersion, input map[string]any) *StepResult {
+func (e *Engine) executePromptStep(ctx context.Context, version *capability.Version, input map[string]any) *StepResult {
 	result := &StepResult{
-		StepID:   "main",
-		Status:   StatusRunning,
-		Output:   make(map[string]any),
+		StepID: "main",
+		Status: StatusRunning,
+		Output: make(map[string]any),
 	}
 
 	start := time.Now()
@@ -65,7 +65,7 @@ func (e *Engine) executePromptStep(ctx context.Context, version *capability.Capa
 	// Check guardrails
 	if len(version.Guardrails) > 0 && e.guardrailMgr != nil {
 		if mgr, ok := e.guardrailMgr.(interface {
-			CheckVersion(ctx context.Context, version *capability.CapabilityVersion) error
+			CheckVersion(ctx context.Context, version *capability.Version) error
 		}); ok {
 			if err := mgr.CheckVersion(ctx, version); err != nil {
 				result.Status = StatusFailed

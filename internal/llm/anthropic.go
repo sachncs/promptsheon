@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const providerAnthropic = "anthropic"
+
 // Anthropic implements Provider for the Anthropic Messages API.
 type Anthropic struct {
 	apiKey  string
@@ -31,7 +33,8 @@ func NewAnthropic(cfg ProviderConfig) *Anthropic {
 	}
 }
 
-func (a *Anthropic) Name() string { return "anthropic" }
+// Name returns the provider name.
+func (a *Anthropic) Name() string { return providerAnthropic }
 
 type anthropicRequest struct {
 	Model       string             `json:"model"`
@@ -58,6 +61,7 @@ type anthropicResponse struct {
 	} `json:"usage"`
 }
 
+// Complete sends a prompt to the Anthropic API and returns the response.
 func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, error) {
 	var systemPrompt string
 	var msgs []anthropicMessage
@@ -83,7 +87,7 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 
 	data, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf("marshal anthropic request: %w", err)
+		return nil, fmt.Errorf("marshal %s request: %w", providerAnthropic, err)
 	}
 
 	start := time.Now()
@@ -93,13 +97,13 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("x-api-key", a.apiKey)
-	httpReq.Header.Set("anthropic-version", "2023-06-01")
+	httpReq.Header.Set(providerAnthropic+"-version", "2023-06-01")
 
 	resp, err := a.client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("anthropic request: %w", err)
+		return nil, fmt.Errorf("%s request: %w", providerAnthropic, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB limit
 	if err != nil {
@@ -107,12 +111,12 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("anthropic error (status %d): %s", resp.StatusCode, string(raw))
+		return nil, fmt.Errorf("%s error (status %d): %s", providerAnthropic, resp.StatusCode, string(raw))
 	}
 
 	var aResp anthropicResponse
 	if err := json.Unmarshal(raw, &aResp); err != nil {
-		return nil, fmt.Errorf("decode anthropic response: %w", err)
+		return nil, fmt.Errorf("decode %s response: %w", providerAnthropic, err)
 	}
 
 	var sb strings.Builder

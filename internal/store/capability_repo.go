@@ -1,3 +1,4 @@
+// Package store provides the repository interface for data access.
 package store
 
 import (
@@ -34,10 +35,10 @@ type CapabilityRepository interface {
 	DeleteCapability(ctx context.Context, id string) error
 
 	// Capability Versions
-	CreateVersion(ctx context.Context, v *capability.CapabilityVersion) error
-	GetVersion(ctx context.Context, id string) (*capability.CapabilityVersion, error)
-	ListVersions(ctx context.Context, capabilityID string) ([]*capability.CapabilityVersion, error)
-	GetLatestVersion(ctx context.Context, capabilityID string) (*capability.CapabilityVersion, error)
+	CreateVersion(ctx context.Context, v *capability.Version) error
+	GetVersion(ctx context.Context, id string) (*capability.Version, error)
+	ListVersions(ctx context.Context, capabilityID string) ([]*capability.Version, error)
+	GetLatestVersion(ctx context.Context, capabilityID string) (*capability.Version, error)
 
 	// Executions
 	CreateExecution(ctx context.Context, e *capability.Execution) error

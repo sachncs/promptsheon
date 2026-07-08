@@ -6,11 +6,11 @@ package capability
 // instruction, not about telemetry, deployments, latency, or history.
 // Those concerns live in other artifacts (RuntimePolicy, Deployment, Execution).
 type Prompt struct {
-	Role          string           `json:"role,omitempty"`
-	Instructions  string           `json:"instructions"`
-	Examples      []PromptExample  `json:"examples,omitempty"`
-	Variables     []PromptVariable `json:"variables,omitempty"`
-	Template      string           `json:"template,omitempty"`
+	Role           string            `json:"role,omitempty"`
+	Instructions   string            `json:"instructions"`
+	Examples       []PromptExample   `json:"examples,omitempty"`
+	Variables      []PromptVariable  `json:"variables,omitempty"`
+	Template       string            `json:"template,omitempty"`
 	LocaleVariants map[string]string `json:"locale_variants,omitempty"`
 }
 

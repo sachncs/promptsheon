@@ -69,7 +69,8 @@ func (f *Fallback) Complete(ctx context.Context, req *Request) (*Response, error
 
 // Name returns the primary provider name with fallback indicator.
 func (f *Fallback) Name() string {
-	names := []string{f.primary.Name()}
+	names := make([]string, 0, 1+len(f.fallbacks))
+	names = append(names, f.primary.Name())
 	for _, fb := range f.fallbacks {
 		names = append(names, fb.Name())
 	}

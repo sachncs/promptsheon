@@ -57,7 +57,7 @@ func TestSeparateKeys(t *testing.T) {
 func TestMiddleware(t *testing.T) {
 	l := NewLimiter(Config{Rate: 2, Interval: time.Second, Burst: 2})
 
-	handler := l.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := l.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok")) //nolint:errcheck
 	}))
@@ -89,7 +89,7 @@ func TestMiddleware(t *testing.T) {
 func TestMiddlewareQueryParam(t *testing.T) {
 	l := NewLimiter(Config{Rate: 1, Interval: time.Second, Burst: 1})
 
-	handler := l.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := l.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 

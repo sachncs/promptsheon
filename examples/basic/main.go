@@ -1,3 +1,4 @@
+// Package main provides an example Promptsheon application.
 package main
 
 import (

@@ -32,7 +32,7 @@ func TestDispatcherEmit(t *testing.T) {
 		Data:      map[string]any{"pass_rate": 0.95},
 		Timestamp: time.Now(),
 	}
-	d.Emit(evt)
+	d.Emit(&evt)
 
 	// Give async delivery time to run (including retries)
 	time.Sleep(2 * time.Second)
@@ -57,7 +57,7 @@ func TestDispatcherInactiveEndpoint(t *testing.T) {
 	}
 	d.Register(ep)
 
-	d.Emit(Event{ID: "evt-2", Type: EventEvalCompleted})
+	d.Emit(&Event{ID: "evt-2", Type: EventEvalCompleted})
 	time.Sleep(100 * time.Millisecond)
 
 	if len(d.ListDeliveries()) != 0 {
@@ -76,7 +76,7 @@ func TestDispatcherEventFiltering(t *testing.T) {
 	}
 	d.Register(ep)
 
-	d.Emit(Event{ID: "evt-eval", Type: EventEvalCompleted})
+	d.Emit(&Event{ID: "evt-eval", Type: EventEvalCompleted})
 	time.Sleep(100 * time.Millisecond)
 
 	if len(d.ListDeliveries()) != 0 {
@@ -111,7 +111,7 @@ func TestDispatcherConcurrentEmit(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			d.Emit(Event{ID: "evt-concurrent", Type: EventEvalCompleted})
+			d.Emit(&Event{ID: "evt-concurrent", Type: EventEvalCompleted})
 		}()
 	}
 	wg.Wait()
@@ -135,7 +135,7 @@ func TestDispatcherSuccessfulDelivery(t *testing.T) {
 	defer t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "")
 
 	hit := make(chan struct{}, 1)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		select {
 		case hit <- struct{}{}:
 		default:
@@ -151,7 +151,7 @@ func TestDispatcherSuccessfulDelivery(t *testing.T) {
 		Events: []EventType{EventEvalCompleted},
 		Active: true,
 	})
-	d.Emit(Event{ID: "evt-ok", Type: EventEvalCompleted})
+	d.Emit(&Event{ID: "evt-ok", Type: EventEvalCompleted})
 	select {
 	case <-hit:
 		// expected
@@ -166,7 +166,7 @@ func TestDispatcherServerErrorTriggersRetry(t *testing.T) {
 
 	var calls int
 	var mu sync.Mutex
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		mu.Lock()
 		calls++
 		mu.Unlock()
@@ -181,7 +181,7 @@ func TestDispatcherServerErrorTriggersRetry(t *testing.T) {
 		Events: []EventType{EventEvalCompleted},
 		Active: true,
 	})
-	d.Emit(Event{ID: "evt-500", Type: EventEvalCompleted})
+	d.Emit(&Event{ID: "evt-500", Type: EventEvalCompleted})
 	// Wait for retries to complete (3 attempts × 250ms base).
 	time.Sleep(3 * time.Second)
 
@@ -246,7 +246,7 @@ func TestWithHTTPClientReplacesDefault(t *testing.T) {
 
 	var hit bool
 	var mu sync.Mutex
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		mu.Lock()
 		hit = true
 		mu.Unlock()
@@ -261,7 +261,7 @@ func TestWithHTTPClientReplacesDefault(t *testing.T) {
 		Events: []EventType{EventEvalCompleted},
 		Active: true,
 	})
-	d.Emit(Event{ID: "evt-custom", Type: EventEvalCompleted})
+	d.Emit(&Event{ID: "evt-custom", Type: EventEvalCompleted})
 	time.Sleep(500 * time.Millisecond)
 
 	mu.Lock()
@@ -300,15 +300,15 @@ type fakeStore struct {
 	endpoints map[string]*Endpoint
 }
 
-func (f *fakeStore) SaveWebhookEndpoint(ctx context.Context, ep *Endpoint) error {
+func (f *fakeStore) SaveWebhookEndpoint(_ context.Context, ep *Endpoint) error {
 	f.endpoints[ep.ID] = ep
 	return nil
 }
-func (f *fakeStore) DeleteWebhookEndpoint(ctx context.Context, id string) error {
+func (f *fakeStore) DeleteWebhookEndpoint(_ context.Context, id string) error {
 	delete(f.endpoints, id)
 	return nil
 }
-func (f *fakeStore) ListWebhookEndpoints(ctx context.Context) ([]*Endpoint, error) {
+func (f *fakeStore) ListWebhookEndpoints(_ context.Context) ([]*Endpoint, error) {
 	out := make([]*Endpoint, 0, len(f.endpoints))
 	for _, e := range f.endpoints {
 		out = append(out, e)

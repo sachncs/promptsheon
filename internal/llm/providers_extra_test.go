@@ -84,7 +84,7 @@ func TestAnthropicCompleteHappyPath(t *testing.T) {
 }
 
 func TestAnthropicCompleteServerError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"error":{"message":"bad request"}}`))
 	}))
@@ -143,7 +143,7 @@ func TestOllamaComplete(t *testing.T) {
 }
 
 func TestOllamaCompleteServerError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"error":"model not found"}`))
 	}))

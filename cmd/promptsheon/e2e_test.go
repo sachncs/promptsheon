@@ -1,3 +1,4 @@
+// Package main provides end-to-end tests.
 package main
 
 import (
@@ -35,14 +36,14 @@ func setupE2ERepo(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("mkdtemp: %v", err)
 	}
-	t.Cleanup(func() { os.RemoveAll(dir) })
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 
 	oldWd, _ := os.Getwd()
-	os.Chdir(dir)
-	t.Cleanup(func() { os.Chdir(oldWd) })
+	_ = os.Chdir(dir)
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
-	if err := promptsheon.Init(); err != nil {
-		t.Fatalf("Init(): %v", err)
+	if e := promptsheon.Init(); e != nil {
+		t.Fatalf("Init(): %v", e)
 	}
 
 	b1 := promptsheon.NewBlobObject("system prompt: You are a helpful assistant")
@@ -80,11 +81,11 @@ func setupE2ERepo(t *testing.T) string {
 		t.Fatalf("WriteObject(tree2): %v", err)
 	}
 
-	if err := promptsheon.CreateBranch("experimental", ""); err != nil {
-		t.Fatalf("CreateBranch(): %v", err)
+	if e := promptsheon.CreateBranch("experimental", ""); e != nil {
+		t.Fatalf("CreateBranch(): %v", e)
 	}
-	if err := promptsheon.Checkout("experimental"); err != nil {
-		t.Fatalf("Checkout(): %v", err)
+	if e := promptsheon.Checkout("experimental"); e != nil {
+		t.Fatalf("Checkout(): %v", e)
 	}
 	tel2 := map[string]any{"accuracy": 0.98, "latency_ms": 350}
 	_, err = promptsheon.Commit(treeHash2, nil, "engineer", "Optimize hyperparams", tel2)
@@ -360,7 +361,7 @@ func TestE2EGraphOutputFormat(t *testing.T) {
 
 func TestE2EUninitializedCommand(t *testing.T) {
 	dir, _ := os.MkdirTemp("", "promptsheon-not-init-*")
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	cmds := []string{"status", "stats", "verify", "graph"}
 	for _, cmd := range cmds {
@@ -391,7 +392,7 @@ func TestE2EBadTelemetryWarns(t *testing.T) {
 	}))
 
 	hash, _ := promptsheon.GetCurrentCommitHash()
-	promptsheon.WriteRef("main", hash)
+	_ = promptsheon.WriteRef("main", hash)
 
 	cmd := exec.Command(cliBinary, "commit", th, "telemetry test commit")
 	cmd.Dir = dir

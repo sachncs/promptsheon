@@ -1,3 +1,4 @@
+// Package trace provides distributed tracing for LLM and workflow operations.
 package trace
 
 import (
@@ -5,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -57,7 +59,8 @@ func NewSQLite(db *sql.DB) (*SQLite, error) {
 	return &SQLite{db: db}, nil
 }
 
-func (s *SQLite) Start(ctx context.Context, operation string) *Span {
+// Start creates a new root span for the given operation.
+func (s *SQLite) Start(_ context.Context, operation string) *Span {
 	return &Span{
 		ID:        GenerateID(),
 		TraceID:   GenerateTraceID(),
@@ -68,7 +71,8 @@ func (s *SQLite) Start(ctx context.Context, operation string) *Span {
 	}
 }
 
-func (s *SQLite) StartChild(ctx context.Context, parent *Span, operation string) *Span {
+// StartChild creates a new child span under the given parent.
+func (s *SQLite) StartChild(_ context.Context, parent *Span, operation string) *Span {
 	return &Span{
 		ID:        GenerateID(),
 		TraceID:   parent.TraceID,
@@ -111,7 +115,7 @@ func (s *SQLite) GetSpan(ctx context.Context, id string) (*Span, error) {
 }
 
 // ListSpans returns spans matching the filter.
-func (s *SQLite) ListSpans(ctx context.Context, filter SpanFilter) ([]*Span, error) {
+func (s *SQLite) ListSpans(ctx context.Context, filter *SpanFilter) ([]*Span, error) {
 	query := "SELECT id, trace_id, parent_id, operation, service, status, attributes, error, started_at, ended_at, duration_ms FROM traces WHERE 1=1"
 	args := []any{}
 
@@ -151,7 +155,7 @@ func (s *SQLite) ListSpans(ctx context.Context, filter SpanFilter) ([]*Span, err
 	if err != nil {
 		return nil, fmt.Errorf("list spans: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var spans []*Span
 	for rows.Next() {
@@ -173,7 +177,7 @@ func (s *SQLite) GetTraceTree(ctx context.Context, traceID string) ([]*Span, err
 	if err != nil {
 		return nil, fmt.Errorf("get trace tree: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var spans []*Span
 	for rows.Next() {
@@ -215,7 +219,9 @@ func scanSpan(row scannable) (*Span, error) {
 	}
 	s.EndedAt = endedAt
 	s.Status = Status(status)
-	json.Unmarshal([]byte(attrs), &s.Attributes)
+	if err := json.Unmarshal([]byte(attrs), &s.Attributes); err != nil {
+		slog.Error("failed to unmarshal span attributes", "err", err, "id", s.ID)
+	}
 	return &s, nil
 }
 
@@ -240,7 +246,8 @@ func NewInMemory() *InMemory {
 	return &InMemory{}
 }
 
-func (m *InMemory) Start(ctx context.Context, operation string) *Span {
+// Start creates a new root span for the given operation.
+func (m *InMemory) Start(_ context.Context, operation string) *Span {
 	span := &Span{
 		ID:        GenerateID(),
 		TraceID:   GenerateTraceID(),
@@ -252,7 +259,8 @@ func (m *InMemory) Start(ctx context.Context, operation string) *Span {
 	return span
 }
 
-func (m *InMemory) StartChild(ctx context.Context, parent *Span, operation string) *Span {
+// StartChild creates a new child span under the given parent.
+func (m *InMemory) StartChild(_ context.Context, parent *Span, operation string) *Span {
 	span := &Span{
 		ID:        GenerateID(),
 		TraceID:   parent.TraceID,
@@ -265,6 +273,7 @@ func (m *InMemory) StartChild(ctx context.Context, parent *Span, operation strin
 	return span
 }
 
+// Finish records a span's completion.
 func (m *InMemory) Finish(span *Span) error {
 	span.Finish()
 	m.mu.Lock()

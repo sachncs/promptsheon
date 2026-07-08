@@ -19,7 +19,7 @@ func TestAnalyzeVersion_EmptyVersion(t *testing.T) {
 	o := NewOptimizer(nil)
 	ctx := context.Background()
 
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		ID:      "ver-1",
 		Version: 1,
 		Prompt: capability.Prompt{
@@ -54,7 +54,7 @@ func TestAnalyzeVersion_AllRecommendationTypes(t *testing.T) {
 	o := NewOptimizer(nil)
 	ctx := context.Background()
 
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		ID:      "ver-1",
 		Version: 1,
 		Prompt: capability.Prompt{
@@ -154,7 +154,7 @@ func TestPromptNeedsReasoning(t *testing.T) {
 
 func TestAnalyzeModelPolicy_ReasoningButNotNeeded(t *testing.T) {
 	o := NewOptimizer(nil)
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		ID: "ver-1",
 		Prompt: capability.Prompt{
 			Instructions: "Translate to Spanish",
@@ -187,7 +187,7 @@ func TestAnalyzeModelPolicy_ReasoningButNotNeeded(t *testing.T) {
 
 func TestAnalyzeRuntimePolicy_CacheDisabled(t *testing.T) {
 	o := NewOptimizer(nil)
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		ID: "ver-1",
 		RuntimePolicy: capability.RuntimePolicy{
 			Caching: "disabled",
@@ -212,7 +212,7 @@ func TestAnalyzeRuntimePolicy_CacheDisabled(t *testing.T) {
 
 func TestAnalyzeTools_TooMany(t *testing.T) {
 	o := NewOptimizer(nil)
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		ID: "ver-1",
 		Tools: []capability.Tool{
 			{ID: "t1"}, {ID: "t2"}, {ID: "t3"}, {ID: "t4"},
@@ -234,7 +234,7 @@ func TestAnalyzeTools_TooMany(t *testing.T) {
 
 func TestAnalyzeGuardrails_Missing(t *testing.T) {
 	o := NewOptimizer(nil)
-	version := &capability.CapabilityVersion{ID: "ver-1"}
+	version := &capability.Version{ID: "ver-1"}
 
 	recs := o.analyzeGuardrails(version)
 	hasGuardrail := false

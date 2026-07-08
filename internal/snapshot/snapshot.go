@@ -123,7 +123,7 @@ func (s *Store) List(ctx context.Context, f Filter) ([]*Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var snaps []*Snapshot
 	for rows.Next() {
@@ -134,8 +134,8 @@ func (s *Store) List(ctx context.Context, f Filter) ([]*Snapshot, error) {
 			&snap.Hallucination, &metaJSON, &snap.CreatedAt); err != nil {
 			return nil, err
 		}
-		json.Unmarshal([]byte(usageJSON), &snap.TokenUsage) //nolint:errcheck
-		json.Unmarshal([]byte(metaJSON), &snap.Metadata)    //nolint:errcheck
+		json.Unmarshal([]byte(usageJSON), &snap.TokenUsage) //nolint:errcheck // JSON was just marshalled by database driver; must be valid
+		json.Unmarshal([]byte(metaJSON), &snap.Metadata)    //nolint:errcheck // JSON was just marshalled by database driver; must be valid
 		snaps = append(snaps, snap)
 	}
 	return snaps, nil
@@ -155,7 +155,7 @@ func (s *Store) Get(ctx context.Context, id string) (*Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	json.Unmarshal([]byte(usageJSON), &snap.TokenUsage) //nolint:errcheck
-	json.Unmarshal([]byte(metaJSON), &snap.Metadata)    //nolint:errcheck
+	json.Unmarshal([]byte(usageJSON), &snap.TokenUsage) //nolint:errcheck // JSON was just marshalled by database driver; must be valid
+	json.Unmarshal([]byte(metaJSON), &snap.Metadata)    //nolint:errcheck // JSON was just marshalled by database driver; must be valid
 	return snap, nil
 }

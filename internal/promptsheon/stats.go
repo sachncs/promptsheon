@@ -37,9 +37,9 @@ func GetStats() (*RepoStats, error) {
 		if !shard.IsDir() || len(shard.Name()) != 2 {
 			continue
 		}
-		entries, err := os.ReadDir(filepath.Join(objectsDir, shard.Name()))
-		if err != nil {
-			return nil, fmt.Errorf("read shard %s: %w", shard.Name(), err)
+		entries, e := os.ReadDir(filepath.Join(objectsDir, shard.Name()))
+		if e != nil {
+			return nil, fmt.Errorf("read shard %s: %w", shard.Name(), e)
 		}
 		for _, e := range entries {
 			if e.IsDir() {

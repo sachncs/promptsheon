@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+const apiVersionVal = "2024-02-15-preview"
+const deploymentModel = "gpt-4"
+const providerAzure = "azure"
+
 // Azure implements Provider for Azure OpenAI's deployment-based endpoint.
 type Azure struct {
 	apiKey     string
@@ -24,11 +28,11 @@ type Azure struct {
 func NewAzure(cfg ProviderConfig) *Azure {
 	apiVersion := cfg.Extra["api_version"]
 	if apiVersion == "" {
-		apiVersion = "2024-02-15-preview"
+		apiVersion = apiVersionVal
 	}
 	deployment := cfg.Extra["deployment"]
 	if deployment == "" {
-		deployment = "gpt-4"
+		deployment = deploymentModel
 	}
 	return &Azure{
 		apiKey:     cfg.APIKey,
@@ -39,7 +43,8 @@ func NewAzure(cfg ProviderConfig) *Azure {
 	}
 }
 
-func (a *Azure) Name() string { return "azure" }
+// Name returns the provider name.
+func (a *Azure) Name() string { return providerAzure }
 
 type azureRequest struct {
 	Model       string          `json:"model,omitempty"`
@@ -67,6 +72,7 @@ type azureResponse struct {
 	} `json:"usage"`
 }
 
+// Complete sends a prompt to the Azure OpenAI API and returns the response.
 func (a *Azure) Complete(ctx context.Context, req *Request) (*Response, error) {
 	body := azureRequest{
 		Messages:  toOpenAIMessages(req.Messages),
@@ -104,7 +110,7 @@ func (a *Azure) Complete(ctx context.Context, req *Request) (*Response, error) {
 	if err != nil {
 		return nil, fmt.Errorf("azure request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB limit
 	if err != nil {

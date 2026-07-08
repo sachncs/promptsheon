@@ -23,14 +23,14 @@ type noopTracer struct {
 	finished  int
 }
 
-func (n *noopTracer) Start(ctx context.Context, op string) *trace.Span {
+func (n *noopTracer) Start(_ context.Context, op string) *trace.Span {
 	n.started++
 	return &trace.Span{ID: "s1", TraceID: "t1", Operation: op, Status: trace.StatusOK}
 }
-func (n *noopTracer) StartChild(ctx context.Context, parent *trace.Span, op string) *trace.Span {
+func (n *noopTracer) StartChild(_ context.Context, parent *trace.Span, op string) *trace.Span {
 	return &trace.Span{ID: "s2", TraceID: parent.TraceID, Operation: op, Status: trace.StatusOK}
 }
-func (n *noopTracer) Finish(span *trace.Span) error {
+func (n *noopTracer) Finish(_ *trace.Span) error {
 	n.finished++
 	return n.finishErr
 }
@@ -41,7 +41,7 @@ func TestHTTPMiddlewareRecordsRequest(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	calls := 0
-	mw := HTTPMiddleware(c, tr, logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mw := HTTPMiddleware(c, tr, logger)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls++
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -66,7 +66,7 @@ func TestHTTPMiddlewareSkipsProbes(t *testing.T) {
 	tr := &noopTracer{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	mw := HTTPMiddleware(c, tr, logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mw := HTTPMiddleware(c, tr, logger)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -86,7 +86,7 @@ func TestHTTPMiddlewareCountsErrors(t *testing.T) {
 	tr := &noopTracer{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	mw := HTTPMiddleware(c, tr, logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mw := HTTPMiddleware(c, tr, logger)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 
@@ -107,7 +107,7 @@ func TestHTTPMiddlewareLoggerReceivesFinishError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&got, &slog.HandlerOptions{Level: slog.LevelError}))
 	tr := &noopTracer{finishErr: errors.New("boom")}
 
-	mw := HTTPMiddleware(NewCollector(), tr, logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mw := HTTPMiddleware(NewCollector(), tr, logger)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -125,7 +125,7 @@ func TestLLMMiddleware(t *testing.T) {
 
 	mw := LLMMiddleware(c, tr, slog.Default())
 	called := false
-	inner := mw(func(operation string, req any) (any, error) {
+	inner := mw(func(_ string, _ any) (any, error) {
 		called = true
 		return "response", nil
 	})
@@ -151,7 +151,7 @@ func TestWorkflowMiddleware(t *testing.T) {
 
 	mw := WorkflowMiddleware(c, tr)
 	called := false
-	inner := mw(func(agentID string, input map[string]any) (map[string]any, error) {
+	inner := mw(func(_ string, _ map[string]any) (map[string]any, error) {
 		called = true
 		return map[string]any{"ok": true}, nil
 	})

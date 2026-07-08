@@ -5,8 +5,6 @@ import (
 	"log/slog"
 	"sync"
 	"time"
-
-
 )
 
 // CallMetrics holds the observed metrics for a single LLM call.
@@ -14,7 +12,7 @@ type CallMetrics struct {
 	Provider string        `json:"provider"`
 	Model    string        `json:"model"`
 	Latency  time.Duration `json:"latency"`
-	Usage    Usage  `json:"usage"`
+	Usage    Usage         `json:"usage"`
 	CostUSD  float64       `json:"cost_usd"`
 	Error    string        `json:"error,omitempty"`
 }
@@ -34,6 +32,7 @@ func NewInstrumented(p Provider, collector MetricsCollector, logger *slog.Logger
 	return &Instrumented{inner: p, collector: collector, logger: logger}
 }
 
+// Name returns the wrapped provider name.
 func (i *Instrumented) Name() string { return i.inner.Name() }
 
 // Complete delegates to the inner provider, then records metrics.

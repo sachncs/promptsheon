@@ -20,7 +20,7 @@ func TestCheckVersion_NoGuardrails(t *testing.T) {
 	mgr := testManager()
 	ctx := context.Background()
 
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		ID:      "ver-1",
 		Version: 1,
 		Prompt: capability.Prompt{
@@ -47,7 +47,7 @@ func TestCheckVersion_PreGuardrailPasses(t *testing.T) {
 	mgr := testManager()
 	ctx := context.Background()
 
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		ID:      "ver-1",
 		Version: 1,
 		Prompt: capability.Prompt{
@@ -80,7 +80,7 @@ func TestCheckVersion_PreGuardrailLengthExceeded(t *testing.T) {
 		longPrompt[i] = 'a'
 	}
 
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		ID:      "ver-1",
 		Version: 1,
 		Prompt: capability.Prompt{
@@ -108,7 +108,7 @@ func TestCheckVersion_PreGuardrailRestrictedTerms(t *testing.T) {
 	mgr := testManager()
 	ctx := context.Background()
 
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		ID:      "ver-1",
 		Version: 1,
 		Prompt: capability.Prompt{

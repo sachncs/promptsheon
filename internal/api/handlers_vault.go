@@ -42,7 +42,7 @@ func (s *Server) handleSaveVaultKey(w http.ResponseWriter, r *http.Request) erro
 	if err := s.db.SaveProviderKey(r.Context(), pk); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "vault_key:"+pk.ID, map[string]any{"provider": pk.ProviderName, "key_name": pk.KeyName})
+	s.audit(r.Context(), "create", "vault_key:"+pk.ID, map[string]any{keyProvider: pk.ProviderName, "key_name": pk.KeyName})
 
 	// Return without the encrypted key for security
 	writeJSON(w, http.StatusCreated, map[string]any{

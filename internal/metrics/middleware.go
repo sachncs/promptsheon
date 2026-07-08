@@ -97,7 +97,7 @@ func matchedRoute(r *http.Request) (string, bool) {
 }
 
 // LLMMiddleware instruments LLM calls with metrics and tracing.
-func LLMMiddleware(collector *Collector, tracer trace.Tracer, logger *slog.Logger) func(next LLMMiddlewareFunc) LLMMiddlewareFunc {
+func LLMMiddleware(collector *Collector, tracer trace.Tracer, _ *slog.Logger) func(next LLMMiddlewareFunc) LLMMiddlewareFunc {
 	return func(next LLMMiddlewareFunc) LLMMiddlewareFunc {
 		return func(operation string, req any) (any, error) {
 			start := time.Now()
@@ -118,7 +118,7 @@ func LLMMiddleware(collector *Collector, tracer trace.Tracer, logger *slog.Logge
 			}
 			span.SetAttribute("llm.latency_ms", fmt.Sprintf("%d", latency.Milliseconds()))
 			span.Finish()
-			tracer.Finish(span) //nolint:errcheck
+			tracer.Finish(span) //nolint:errcheck // span is already finished; error is safe to ignore
 
 			return resp, err
 		}
@@ -150,7 +150,7 @@ func WorkflowMiddleware(collector *Collector, tracer trace.Tracer) func(next Wor
 				span.SetError(err)
 			}
 			span.Finish()
-			tracer.Finish(span) //nolint:errcheck
+			tracer.Finish(span) //nolint:errcheck // span is already finished; error is safe to ignore
 
 			return output, err
 		}

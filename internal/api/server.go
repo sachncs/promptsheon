@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -29,8 +28,8 @@ import (
 	"github.com/sachncs/promptsheon/internal/ws"
 )
 
-// APIFunc is the handler signature that returns errors for centralized handling.
-type APIFunc func(http.ResponseWriter, *http.Request) error
+// Func is the handler signature that returns errors for centralized handling.
+type Func func(http.ResponseWriter, *http.Request) error
 
 // Server holds dependencies and routes for the HTTP API.
 type Server struct {
@@ -241,17 +240,32 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) routes() {
-	// Health (always unauthenticated).
+	s.registerHealthRoutes()
+	s.registerAuthRoutes()
+	s.registerAuditRoutes()
+	s.registerTracingRoutes()
+	s.registerMetricsRoutes()
+	s.registerProviderRoutes()
+	s.registerVaultRoutes()
+	s.registerAlertRoutes()
+	s.registerWebhookRoutes()
+	s.registerWorkspaceRoutes()
+	s.registerProjectRoutes()
+	s.registerCapabilityRoutes()
+	s.registerVersionRoutes()
+	s.registerExecutionRoutes()
+}
+
+func (s *Server) registerHealthRoutes() {
 	s.mux.HandleFunc("GET /health", s.wrapHandler(s.handleHealth))
 	s.mux.HandleFunc("GET /ready", s.wrapHandler(s.handleReady))
 	s.mux.HandleFunc("GET /api/v1/version", s.wrapHandler(s.handleVersion))
-
-	// Prometheus metrics (always unauthenticated).
 	if s.collector != nil {
 		s.mux.Handle("GET /metrics", s.collector.Handler())
 	}
+}
 
-	// Auth endpoints.
+func (s *Server) registerAuthRoutes() {
 	createKey := s.handleCreateAPIKey
 	listKeys := s.handleListAPIKeys
 	revokeKey := s.handleRevokeAPIKey
@@ -263,54 +277,51 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/apikeys", s.wrapHandler(createKey))
 	s.mux.HandleFunc("GET /api/v1/apikeys", s.wrapHandler(listKeys))
 	s.mux.HandleFunc("DELETE /api/v1/apikeys/{id}", s.wrapHandler(revokeKey))
-
-	// OAuth endpoints (unauthenticated).
 	s.mux.HandleFunc("GET /api/v1/auth/{provider}/login", s.wrapHandler(s.handleOAuthLogin))
 	s.mux.HandleFunc("GET /api/v1/auth/{provider}/callback", s.wrapHandler(s.handleOAuthCallback))
-
-	// First-run bootstrap.
 	s.mux.HandleFunc("POST /api/v1/setup", s.wrapHandler(s.handleBootstrap))
-
-	// Users (admin only)
 	s.mux.HandleFunc("GET /api/v1/users", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleListUsers)))
 	s.mux.HandleFunc("POST /api/v1/users", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleCreateUser)))
 	s.mux.HandleFunc("GET /api/v1/users/{id}", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleGetUser)))
 	s.mux.HandleFunc("PUT /api/v1/users/{id}", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleUpdateUser)))
 	s.mux.HandleFunc("DELETE /api/v1/users/{id}", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleDeleteUser)))
+}
 
-	// Audit
+func (s *Server) registerAuditRoutes() {
 	s.mux.HandleFunc("GET /api/v1/audit", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListAudit)))
 	s.mux.HandleFunc("GET /api/v1/audit/export", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleExportAudit)))
 	s.mux.HandleFunc("GET /api/v1/audit/verify", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleVerifyAuditChain)))
+	s.mux.HandleFunc("GET /api/v1/logs/search", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleSearchSpans)))
+	s.mux.HandleFunc("GET /api/v1/logs/stream", s.wrapHandler(s.handleLogsStream))
+}
 
-	// Tracing
+func (s *Server) registerTracingRoutes() {
 	s.mux.HandleFunc("GET /api/v1/traces", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListSpans)))
 	s.mux.HandleFunc("GET /api/v1/traces/{id}", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleGetSpan)))
 	s.mux.HandleFunc("GET /api/v1/traces/tree/{trace_id}", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleGetTraceTree)))
+}
 
-	// Metrics
+func (s *Server) registerMetricsRoutes() {
 	s.mux.HandleFunc("GET /api/v1/metrics/summary", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsSummary)))
 	s.mux.HandleFunc("GET /api/v1/metrics/top-prompts", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleTopPrompts)))
 	s.mux.HandleFunc("GET /api/v1/metrics/top-agents", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleTopAgents)))
 	s.mux.HandleFunc("GET /api/v1/metrics/dashboard", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleDashboardSummary)))
+	s.mux.HandleFunc("GET /api/v1/metrics", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsPrometheus)))
+}
 
-	// Searchable logs
-	s.mux.HandleFunc("GET /api/v1/logs/search", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleSearchSpans)))
-
-	// Providers
+func (s *Server) registerProviderRoutes() {
 	s.mux.HandleFunc("GET /api/v1/providers", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListProviders)))
 	s.mux.HandleFunc("GET /api/v1/providers/{name}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetProvider)))
 	s.mux.HandleFunc("POST /api/v1/providers/{name}/test", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleTestProvider)))
+}
 
-	// Vault (provider key management)
+func (s *Server) registerVaultRoutes() {
 	s.mux.HandleFunc("POST /api/v1/vault/keys", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleSaveVaultKey)))
 	s.mux.HandleFunc("GET /api/v1/vault/keys", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListVaultKeys)))
 	s.mux.HandleFunc("DELETE /api/v1/vault/keys/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleDeleteVaultKey)))
+}
 
-	// Real-time logs (SSE)
-	s.mux.HandleFunc("GET /api/v1/logs/stream", s.wrapHandler(s.handleLogsStream))
-
-	// Alerting
+func (s *Server) registerAlertRoutes() {
 	s.mux.HandleFunc("GET /api/v1/alerts/rules", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListAlertRules)))
 	s.mux.HandleFunc("POST /api/v1/alerts/rules", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleCreateAlertRule)))
 	s.mux.HandleFunc("GET /api/v1/alerts/rules/{id}", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleGetAlertRule)))
@@ -319,51 +330,54 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/alerts/notifications", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleAddNotificationGroup)))
 	s.mux.HandleFunc("GET /api/v1/alerts/active", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListAlerts)))
 	s.mux.HandleFunc("PUT /api/v1/alerts/active/{id}/resolve", s.wrapHandler(s.requirePerm(auth.PermReviewApprove)(s.handleResolveAlert)))
+}
 
-	// Webhooks
+func (s *Server) registerWebhookRoutes() {
 	s.mux.HandleFunc("GET /api/v1/webhooks", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListWebhooks)))
 	s.mux.HandleFunc("POST /api/v1/webhooks", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleCreateWebhook)))
 	s.mux.HandleFunc("DELETE /api/v1/webhooks/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleDeleteWebhook)))
+}
 
-	// Metrics (Prometheus format, authenticated)
-	s.mux.HandleFunc("GET /api/v1/metrics", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsPrometheus)))
-
-	// Workspaces
+func (s *Server) registerWorkspaceRoutes() {
 	s.mux.HandleFunc("GET /api/v1/workspaces", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListWorkspaces)))
 	s.mux.HandleFunc("POST /api/v1/workspaces", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateWorkspace)))
 	s.mux.HandleFunc("GET /api/v1/workspaces/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetWorkspace)))
 	s.mux.HandleFunc("PUT /api/v1/workspaces/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateWorkspace)))
 	s.mux.HandleFunc("DELETE /api/v1/workspaces/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptDelete)(s.handleDeleteWorkspace)))
+}
 
-	// Projects (scoped to workspace)
+func (s *Server) registerProjectRoutes() {
 	s.mux.HandleFunc("GET /api/v1/workspaces/{workspace_id}/projects", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListProjects)))
 	s.mux.HandleFunc("POST /api/v1/workspaces/{workspace_id}/projects", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateProject)))
 	s.mux.HandleFunc("GET /api/v1/projects/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetProject)))
 	s.mux.HandleFunc("PUT /api/v1/projects/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateProject)))
 	s.mux.HandleFunc("DELETE /api/v1/projects/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptDelete)(s.handleDeleteProject)))
+}
 
-	// Capabilities (scoped to project)
+func (s *Server) registerCapabilityRoutes() {
 	s.mux.HandleFunc("GET /api/v1/projects/{project_id}/capabilities", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListCapabilities)))
 	s.mux.HandleFunc("POST /api/v1/projects/{project_id}/capabilities", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateCapability)))
 	s.mux.HandleFunc("GET /api/v1/capabilities/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetCapability)))
 	s.mux.HandleFunc("PUT /api/v1/capabilities/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateCapability)))
 	s.mux.HandleFunc("DELETE /api/v1/capabilities/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptDelete)(s.handleDeleteCapability)))
+}
 
-	// Versions (scoped to capability)
+func (s *Server) registerVersionRoutes() {
 	s.mux.HandleFunc("GET /api/v1/capabilities/{capability_id}/versions", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListVersions)))
 	s.mux.HandleFunc("POST /api/v1/capabilities/{capability_id}/versions", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateVersion)))
 	s.mux.HandleFunc("GET /api/v1/versions/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetVersion)))
 	s.mux.HandleFunc("GET /api/v1/capabilities/{capability_id}/versions/latest", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetLatestVersion)))
+}
 
-	// Executions (scoped to version)
+func (s *Server) registerExecutionRoutes() {
 	s.mux.HandleFunc("GET /api/v1/versions/{version_id}/executions", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListExecutions)))
 	s.mux.HandleFunc("POST /api/v1/versions/{version_id}/executions", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateExecution)))
 	s.mux.HandleFunc("GET /api/v1/executions/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetExecution)))
 }
 
 // requirePerm returns middleware that requires a specific permission.
-func (s *Server) requirePerm(perm auth.Permission) func(APIFunc) APIFunc {
-	return func(fn APIFunc) APIFunc {
+func (s *Server) requirePerm(perm auth.Permission) func(Func) Func {
+	return func(fn Func) Func {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			if s.requireAuth && s.authn != nil {
 				user, err := s.authn.Authenticate(r)
@@ -384,8 +398,8 @@ func (s *Server) requirePerm(perm auth.Permission) func(APIFunc) APIFunc {
 	}
 }
 
-// wrapHandler wraps an APIFunc into an http.HandlerFunc with error handling.
-func (s *Server) wrapHandler(fn APIFunc) http.HandlerFunc {
+// wrapHandler wraps a Func into an http.HandlerFunc with error handling.
+func (s *Server) wrapHandler(fn Func) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := fn(w, r); err != nil {
 			s.logger.Error("handler error",
@@ -412,26 +426,27 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 func writeError(w http.ResponseWriter, err error) {
 	status := http.StatusInternalServerError
 	var httpErr *HTTPError
-	if errors.As(err, &httpErr) {
+	switch {
+	case errors.As(err, &httpErr):
 		status = httpErr.Status
-	} else if errors.Is(err, ErrNotFound) {
+	case errors.Is(err, ErrNotFound):
 		status = http.StatusNotFound
-	} else if errors.Is(err, ErrBadRequest) {
+	case errors.Is(err, ErrBadRequest):
 		status = http.StatusBadRequest
-	} else if errors.Is(err, ErrConflict) {
+	case errors.Is(err, ErrConflict):
 		status = http.StatusConflict
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if encErr := json.NewEncoder(w).Encode(map[string]string{"error": err.Error()}); encErr != nil {
+	if encErr := json.NewEncoder(w).Encode(map[string]string{valError: err.Error()}); encErr != nil {
 		slog.Error("failed to encode error json response", "err", encErr)
 	}
 }
 
 // readJSON decodes the request body into target.
 func readJSON(r *http.Request, target any) error {
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 	return json.NewDecoder(r.Body).Decode(target)
 }
 
@@ -572,15 +587,13 @@ func httpRequestFromContext(ctx context.Context) *http.Request {
 	return nil
 }
 
-
-
-func (s *Server) auditDiff(ctx context.Context, action, resource string, prev, new any) {
+func (s *Server) auditDiff(ctx context.Context, action, resource string, prev, newObj any) {
 	details := make(map[string]any)
 	if prev != nil {
 		details["previous"] = prev
 	}
-	if new != nil {
-		details["new"] = new
+	if newObj != nil {
+		details["new"] = newObj
 	}
 	s.audit(ctx, action, resource, details)
 }
@@ -617,15 +630,9 @@ type HTTPError struct {
 func (e *HTTPError) Error() string { return e.Message }
 
 func badRequest(msg string) error { return &HTTPError{Status: http.StatusBadRequest, Message: msg} }
-func badRequestf(format string, args ...any) error {
-	return &HTTPError{Status: http.StatusBadRequest, Message: fmt.Sprintf(format, args...)}
-}
 func notFound(msg string) error     { return &HTTPError{Status: http.StatusNotFound, Message: msg} }
 func unauthorized(msg string) error { return &HTTPError{Status: http.StatusUnauthorized, Message: msg} }
 func forbidden(msg string) error    { return &HTTPError{Status: http.StatusForbidden, Message: msg} }
-func serverError(msg string) error {
-	return &HTTPError{Status: http.StatusInternalServerError, Message: msg}
-}
 
 // callerID returns the authenticated user's ID, or "api" if no user
 // is in the request context. Used to populate CreatedBy fields
@@ -639,14 +646,14 @@ func callerID(r *http.Request) string {
 
 // --- Rate Limiting ---
 
-// rateLimit wraps an APIFunc with rate limiting.
-func (s *Server) rateLimit(next APIFunc) APIFunc {
+// rateLimit wraps a Func with rate limiting.
+func (s *Server) rateLimit(next Func) Func {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		if s.rateLimiter != nil && !s.rateLimiter.Allow(r.RemoteAddr) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Retry-After", "60")
 			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"error":"rate limit exceeded"}`)) //nolint:errcheck
+			w.Write([]byte(`{"error":"rate limit exceeded"}`)) //nolint:errcheck // write failure is benign; middleware will close the connection
 			return nil
 		}
 		return next(w, r)
@@ -685,7 +692,7 @@ func (a *storeAuthAdapter) UpdateAPIKeyLastUsed(ctx context.Context, id string) 
 
 // --- Auth Audit Logger ---
 
-// authAuditLogger adapts the server's audit method to auth.AuthLogger.
+// authAuditLogger adapts the server's audit method to auth.Logger.
 type authAuditLogger struct {
 	server *Server
 }

@@ -45,7 +45,7 @@ func TestOAuthManager_ExchangeCode(t *testing.T) {
 				RefreshToken: "refresh-token",
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(token)
+			_ = json.NewEncoder(w).Encode(token)
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -82,7 +82,7 @@ func TestOAuthManager_GetUserInfo(t *testing.T) {
 				Name:  "Test User",
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(user)
+			_ = json.NewEncoder(w).Encode(user)
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)

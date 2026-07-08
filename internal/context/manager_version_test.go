@@ -79,8 +79,8 @@ func TestAssembleFromContract_CompressionStrategy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AssembleFromContract: %v", err)
 	}
-	if string(assembled.Strategy) != "summary" {
-		t.Errorf("expected strategy 'summary', got %q", string(assembled.Strategy))
+	if assembled.Strategy != "summary" {
+		t.Errorf("expected strategy 'summary', got %q", assembled.Strategy)
 	}
 }
 

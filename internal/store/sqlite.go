@@ -1,3 +1,4 @@
+// Package store provides the repository interface for data access.
 package store
 
 import (
@@ -14,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // sqlite driver
 
 	"github.com/sachncs/promptsheon/internal/models"
 )
@@ -22,6 +23,7 @@ import (
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
+// ErrNotFound is returned when a requested resource is not found.
 var ErrNotFound = errors.New("not found")
 
 func marshalOrErr(v any) ([]byte, error) {
@@ -41,14 +43,16 @@ func mustUnmarshal(data []byte, v any) {
 	}
 }
 
+// SQLite implements Repository backed by a SQLite database.
 type SQLite struct {
 	db      *sql.DB
 	auditMu sync.Mutex
 }
 
+// NewSQLite opens or creates a SQLite database at dbPath and runs migrations.
 func NewSQLite(dbPath string) (*SQLite, error) {
 	pragmas := "_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)"
-	dsn := dbPath
+	var dsn string
 	if dbPath == ":memory:" {
 		dsn = "file::memory:?cache=shared&_pragma=journal_mode(MEMORY)&_pragma=busy_timeout(5000)"
 	} else {
@@ -64,7 +68,7 @@ func NewSQLite(dbPath string) (*SQLite, error) {
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	if err := migrate(db, migrationsFS); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 
@@ -136,13 +140,13 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 	if err != nil {
 		return fmt.Errorf("last insert id: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx,
+	if _, e := tx.ExecContext(ctx,
 		`INSERT INTO audit_chain_state (id, last_hash, last_rowid)
 		 VALUES (0, ?, ?)
 		 ON CONFLICT(id) DO UPDATE SET last_hash = excluded.last_hash, last_rowid = excluded.last_rowid`,
 		entry.EntryHash, rowID,
-	); err != nil {
-		return fmt.Errorf("update audit chain state: %w", err)
+	); e != nil {
+		return fmt.Errorf("update audit chain state: %w", e)
 	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("commit audit: %w", err)
@@ -168,7 +172,7 @@ func computeAuditHash(e *models.AuditEntry, detailsJSON, timestampStr string) st
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func (s *SQLite) VerifyAuditChain(ctx context.Context) (bool, string, error) {
+func (s *SQLite) VerifyAuditChain(ctx context.Context) (ok bool, reason string, err error) {
 	const pageSize = 1000
 	var prevHash string
 	var lastRowID int64
@@ -194,7 +198,7 @@ func (s *SQLite) VerifyAuditChain(ctx context.Context) (bool, string, error) {
 	return true, "", nil
 }
 
-func (s *SQLite) verifyAuditPage(ctx context.Context, prevHash string, afterRowID int64, limit int) (string, bool, string, int64, error) {
+func (s *SQLite) verifyAuditPage(ctx context.Context, prevHash string, afterRowID int64, limit int) (nextPrevHash string, ok bool, reason string, lastRowID int64, err error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT rowid, id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str
 		 FROM audit_entries
@@ -208,7 +212,6 @@ func (s *SQLite) verifyAuditPage(ctx context.Context, prevHash string, afterRowI
 	}
 	defer rows.Close()
 
-	var lastRowID int64
 	for rows.Next() {
 		var rowID int64
 		var id, userID, action, resource, detailsJSON, storedPrev, storedHash, timestampStr string
@@ -233,7 +236,7 @@ func (s *SQLite) verifyAuditPage(ctx context.Context, prevHash string, afterRowI
 	return prevHash, true, "", lastRowID, rows.Err()
 }
 
-func (s *SQLite) ListAudit(ctx context.Context, filter models.AuditFilter) ([]*models.AuditEntry, error) {
+func (s *SQLite) ListAudit(ctx context.Context, filter *models.AuditFilter) ([]*models.AuditEntry, error) {
 	query := "SELECT id, user_id, action, resource, details, timestamp, previous_hash, entry_hash FROM audit_entries WHERE 1=1"
 	args := []any{}
 
@@ -273,7 +276,7 @@ func (s *SQLite) ListAudit(ctx context.Context, filter models.AuditFilter) ([]*m
 	if err != nil {
 		return nil, fmt.Errorf("list audit: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var entries []*models.AuditEntry
 	for rows.Next() {
@@ -293,17 +296,19 @@ func scanAuditRow(rows *sql.Rows) (*models.AuditEntry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("scan audit entry: %w", err)
 	}
-	json.Unmarshal([]byte(details), &e.Details)
+	if err := json.Unmarshal([]byte(details), &e.Details); err != nil {
+		slog.Error("failed to unmarshal audit details", "err", err, "id", e.ID)
+	}
 	e.PreviousHash = prevHash
 	e.EntryHash = entryHash
 	return &e, nil
 }
 
-func (s *SQLite) ExportAudit(ctx context.Context, filter models.AuditFilter) ([]*models.AuditEntry, error) {
-	exportFilter := filter
+func (s *SQLite) ExportAudit(ctx context.Context, filter *models.AuditFilter) ([]*models.AuditEntry, error) {
+	exportFilter := *filter
 	exportFilter.Limit = 0
 	exportFilter.Offset = 0
-	return s.ListAudit(ctx, exportFilter)
+	return s.ListAudit(ctx, &exportFilter)
 }
 
 // ---------------------------------------------------------------------------
@@ -343,7 +348,7 @@ func (s *SQLite) ListUsers(ctx context.Context) ([]*models.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var users []*models.User
 	for rows.Next() {
@@ -468,7 +473,7 @@ func (s *SQLite) ListAPIKeysByUser(ctx context.Context, userID string) ([]*model
 	if err != nil {
 		return nil, fmt.Errorf("list api keys: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var keys []*models.APIKey
 	for rows.Next() {
@@ -548,7 +553,7 @@ func (s *SQLite) ListProviderKeys(ctx context.Context) ([]*models.ProviderKey, e
 	if err != nil {
 		return nil, fmt.Errorf("list provider keys: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var keys []*models.ProviderKey
 	for rows.Next() {
@@ -627,7 +632,7 @@ func (s *SQLite) ListAlertRules(ctx context.Context) ([]*models.AlertRuleRecord,
 	if err != nil {
 		return nil, fmt.Errorf("list alert rules: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var rules []*models.AlertRuleRecord
 	for rows.Next() {
@@ -654,7 +659,9 @@ func scanAlertRule(row scannable) (*models.AlertRuleRecord, error) {
 		return nil, fmt.Errorf("scan alert rule: %w", err)
 	}
 	if configJSON != "" {
-		json.Unmarshal([]byte(configJSON), &r.Config)
+		if err := json.Unmarshal([]byte(configJSON), &r.Config); err != nil {
+			slog.Error("failed to unmarshal alert rule config", "err", err, "id", r.ID)
+		}
 	}
 	return &r, nil
 }
@@ -712,7 +719,7 @@ func (s *SQLite) ListAlerts(ctx context.Context, status string) ([]*models.Alert
 	if err != nil {
 		return nil, fmt.Errorf("list alerts: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var alerts []*models.AlertRecord
 	for rows.Next() {
@@ -740,7 +747,9 @@ func scanAlert(row scannable) (*models.AlertRecord, error) {
 		return nil, fmt.Errorf("scan alert: %w", err)
 	}
 	if detailsJSON != "" {
-		json.Unmarshal([]byte(detailsJSON), &a.Details)
+		if err := json.Unmarshal([]byte(detailsJSON), &a.Details); err != nil {
+			slog.Error("failed to unmarshal alert details", "err", err, "id", a.ID)
+		}
 	}
 	a.ResolvedAt = resolvedAt
 	return &a, nil
@@ -783,7 +792,7 @@ func (s *SQLite) ListNotificationGroups(ctx context.Context) ([]*models.Notifica
 	if err != nil {
 		return nil, fmt.Errorf("list notification groups: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groups []*models.NotificationGroupRecord
 	for rows.Next() {
@@ -807,7 +816,9 @@ func scanNotificationGroup(row scannable) (*models.NotificationGroupRecord, erro
 		return nil, fmt.Errorf("scan notification group: %w", err)
 	}
 	if channelsJSON != "" {
-		json.Unmarshal([]byte(channelsJSON), &g.Channels)
+		if err := json.Unmarshal([]byte(channelsJSON), &g.Channels); err != nil {
+			slog.Error("failed to unmarshal notification channels", "err", err, "id", g.ID)
+		}
 	}
 	return &g, nil
 }
@@ -858,7 +869,7 @@ func (s *SQLite) ListWebhookEndpoints(ctx context.Context) ([]*models.WebhookEnd
 	if err != nil {
 		return nil, fmt.Errorf("list webhook endpoints: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var eps []*models.WebhookEndpointRecord
 	for rows.Next() {
 		ep, err := scanWebhookEndpoint(rows)

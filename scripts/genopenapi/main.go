@@ -28,7 +28,6 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 )
@@ -58,7 +57,7 @@ func main() {
 		*outPath = filepath.Join(repoRoot, *outPath)
 	}
 
-	routes, err := collectRoutes(filepath.Join(repoRoot, "internal/api/server.go"))
+	routes, err := collectRoutes(repoRoot + "/internal/api/server.go")
 	if err != nil {
 		fail("collect routes: %v", err)
 	}
@@ -71,7 +70,7 @@ func main() {
 	// collection.
 	for i := range routes {
 		if routes[i].handlerName == "" {
-			resolved, err := resolveAlias(filepath.Join(repoRoot, "internal/api/server.go"), routes[i])
+			resolved, err := resolveAlias(repoRoot+"/internal/api/server.go", routes[i])
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "warn: could not resolve handler for %s %s: %v\n", routes[i].Method, routes[i].Path, err)
 			} else {
@@ -82,7 +81,7 @@ func main() {
 
 	// For each route, find the handler in handlers_*.go and
 	// extract the request struct.
-	handlersByName, err := collectHandlers(filepath.Join(repoRoot, "internal/api"))
+	handlersByName, err := collectHandlers(repoRoot + "/internal/api")
 	if err != nil {
 		fail("collect handlers: %v", err)
 	}
@@ -121,15 +120,19 @@ func main() {
 	fmt.Fprintf(os.Stderr, "wrote %d path(s) to %s\n", len(byPath), *outPath)
 }
 
+const methodGET = "GET"
+const methodDELETE = "DELETE"
+const typeObject = "object"
+
 func methodOrder(m string) int {
 	switch strings.ToUpper(m) {
-	case "GET":
+	case methodGET:
 		return 0
 	case "POST":
 		return 1
 	case "PUT":
 		return 2
-	case "DELETE":
+	case methodDELETE:
 		return 3
 	case "PATCH":
 		return 4
@@ -143,13 +146,7 @@ func fail(format string, args ...any) {
 	os.Exit(1)
 }
 
-// routeRe matches: s.mux.HandleFunc("GET /path", s.handleX)
-// and the alias form:   s.mux.HandleFunc("GET /path", createKey)
-var routeRe = regexp.MustCompile(`mux\.HandleFunc\(\s*"(GET|POST|PUT|DELETE|PATCH)\s+([^"]+)"\s*,\s*([^)]+?)\s*\)`)
 
-// methodPathRe matches the wrapper: s.wrapHandler(...)
-// It is used to unwrap the handler expression.
-var methodPathRe = regexp.MustCompile(`\s*"?([A-Z][a-zA-Z]+)"?\s*`)
 
 func collectRoutes(path string) ([]route, error) {
 	fset := token.NewFileSet()
@@ -534,7 +531,7 @@ func newTagParser(raw string) *tagParser { return &tagParser{raw: raw} }
 // parse returns the parsed tag. The "_default_" key is the
 // unnamed value of the first whitespace-separated field. For
 // a `json:"name,omitempty"` tag, _default_="name".
-func (p *tagParser) parse(key string) (map[string]string, error) {
+func (p *tagParser) parse(_ string) (map[string]string, error) {
 	out := map[string]string{}
 	if p.raw == "" {
 		return out, nil
@@ -628,7 +625,7 @@ func yamlType(goType string) (string, bool) {
 		return "array", false
 	}
 	if strings.HasPrefix(goType, "map[") {
-		return "object", false
+		return typeObject, false
 	}
 	if strings.HasPrefix(goType, "*") {
 		// For pointers, the schema is the same as the
@@ -675,7 +672,7 @@ paths:
 `)
 }
 
-func writeFooter(buf *bytes.Buffer) {
+func writeFooter(_ *bytes.Buffer) {
 	// No footer needed: the paths section is the last block.
 }
 
@@ -689,7 +686,7 @@ func writePath(buf *bytes.Buffer, path string, rs []route, handlers map[string]*
 	}
 }
 
-func writeMethod(buf *bytes.Buffer, method string, h *handlerInfo, path string, r route) {
+func writeMethod(buf *bytes.Buffer, method string, h *handlerInfo, path string, _ route) {
 	buf.WriteString("    ")
 	buf.WriteString(strings.ToLower(method))
 	buf.WriteString(":\n")
@@ -711,7 +708,7 @@ func writeMethod(buf *bytes.Buffer, method string, h *handlerInfo, path string, 
 		writePathParams(buf, path)
 	}
 
-	if method != "GET" && method != "DELETE" && h != nil && h.requestType != nil {
+	if method != methodGET && method != methodDELETE && h != nil && h.requestType != nil {
 		writeRequestBody(buf, h.requestType)
 	}
 
@@ -736,7 +733,7 @@ func writeMethod(buf *bytes.Buffer, method string, h *handlerInfo, path string, 
 	fmt.Fprintf(buf, "          description: Unauthorized\n")
 	fmt.Fprintf(buf, "        \"404\":\n")
 	fmt.Fprintf(buf, "          description: Not found\n")
-	if method == "POST" || method == "PUT" || method == "DELETE" {
+	if method == "POST" || method == "PUT" || method == methodDELETE {
 		fmt.Fprintf(buf, "        \"500\":\n")
 		fmt.Fprintf(buf, "          description: Internal server error\n")
 	}
@@ -809,8 +806,8 @@ func writeRequestBody(buf *bytes.Buffer, rt *requestStruct) {
 // isListPath returns true if the handler is conventionally a
 // list endpoint. We use a small heuristic on the path +
 // method, which covers every current handler.
-func isListPath(path string, method string) bool {
-	if method != "GET" {
+func isListPath(path, method string) bool {
+	if method != methodGET {
 		return false
 	}
 	// Path parameters (e.g. /api/v1/prompts/{id}) are
@@ -835,25 +832,24 @@ func isListPath(path string, method string) bool {
 func listItemRef(path string) string {
 	segs := strings.Split(strings.Trim(path, "/"), "/")
 	if len(segs) < 2 {
-		return "object"
+		return typeObject
 	}
-	// Special cases for compound resource names.
+	if name := compoundResourceRef(segs); name != "" {
+		return name
+	}
+	if name := simpleResourceRef(segs[1]); name != "" {
+		return name
+	}
+	return typeObject
+}
+
+func compoundResourceRef(segs []string) string {
 	switch segs[1] {
-	case "ab-tests":
-		return "ABTest"
-	case "agents":
-		return "Agent"
 	case "alerts":
 		if len(segs) > 2 && segs[2] == "active" {
 			return "Alert"
 		}
 		return "AlertRule"
-	case "audit":
-		return "AuditEntry"
-	case "contexts":
-		return "Context"
-	case "datasets":
-		return "TestDataset"
 	case "eval":
 		switch {
 		case len(segs) > 2 && segs[2] == "results":
@@ -864,13 +860,29 @@ func listItemRef(path string) string {
 			return "EvalReport"
 		}
 		return "EvalReport"
-	case "execution-logs":
-		return "ExecutionLog"
 	case "guardrails":
 		if len(segs) > 2 && segs[2] == "violations" {
 			return "GuardrailViolation"
 		}
 		return "GuardrailRule"
+	}
+	return ""
+}
+
+func simpleResourceRef(segment string) string {
+	switch segment {
+	case "ab-tests":
+		return "ABTest"
+	case "agents":
+		return "Agent"
+	case "audit":
+		return "AuditEntry"
+	case "contexts":
+		return "Context"
+	case "datasets":
+		return "TestDataset"
+	case "execution-logs":
+		return "ExecutionLog"
 	case "prompts":
 		return "Prompt"
 	case "providers":
@@ -890,5 +902,5 @@ func listItemRef(path string) string {
 	case "workflows":
 		return "Workflow"
 	}
-	return "object"
+	return ""
 }

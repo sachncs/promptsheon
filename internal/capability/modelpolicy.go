@@ -6,9 +6,9 @@ package capability
 // capability needs (reasoning, vision, JSON mode, latency, cost, etc.)
 // and Promptsheon selects the best provider and model at runtime.
 type ModelPolicy struct {
-	Requirements     ModelRequirements     `json:"requirements"`
-	SelectionStrategy SelectionStrategy    `json:"selection_strategy"`
-	ProviderHints    []string              `json:"provider_hints,omitempty"`
+	Requirements      ModelRequirements `json:"requirements"`
+	SelectionStrategy SelectionStrategy `json:"selection_strategy"`
+	ProviderHints     []string          `json:"provider_hints,omitempty"`
 }
 
 // ModelRequirements describes what the capability needs from a model.
@@ -26,8 +26,12 @@ type ModelRequirements struct {
 type SelectionStrategy string
 
 const (
-	SelectionStrategyCostOptimized SelectionStrategy = "cost_optimized"
+	// SelectionStrategyCostOptimized selects the most cost-effective model.
+	SelectionStrategyCostOptimized    SelectionStrategy = "cost_optimized"
+	// SelectionStrategyLatencyOptimized selects the lowest-latency model.
 	SelectionStrategyLatencyOptimized SelectionStrategy = "latency_optimized"
+	// SelectionStrategyQualityOptimized selects the highest-quality model.
 	SelectionStrategyQualityOptimized SelectionStrategy = "quality_optimized"
-	SelectionStrategyManual            SelectionStrategy = "manual"
+	// SelectionStrategyManual uses explicitly specified model selection.
+	SelectionStrategyManual           SelectionStrategy = "manual"
 )

@@ -12,8 +12,8 @@ import (
 	"github.com/sachncs/promptsheon/internal/trace"
 )
 
-// Middleware is a function that wraps an APIFunc with additional behavior.
-type Middleware func(APIFunc) APIFunc
+// Middleware is a function that wraps a Func with additional behavior.
+type Middleware func(Func) Func
 
 // ChainHTTP applies http.Handler middlewares in order.
 func ChainHTTP(h http.Handler, mws ...func(http.Handler) http.Handler) http.Handler {
@@ -26,7 +26,7 @@ func ChainHTTP(h http.Handler, mws ...func(http.Handler) http.Handler) http.Hand
 // generateRequestID creates a cryptographically random request ID.
 func generateRequestID() string {
 	b := make([]byte, 8)
-	rand.Read(b) //nolint:errcheck
+	rand.Read(b) //nolint:errcheck // 8 random bytes always succeeds on macOS/Linux
 	return hex.EncodeToString(b)
 }
 
@@ -103,7 +103,7 @@ func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
 			defer func() {
 				if rec := recover(); rec != nil {
 					requestID, _ := trace.RequestIDFromContext(r.Context())
-					traceID, _ := trace.TraceIDFromContext(r.Context())
+					traceID, _ := trace.IDFromContext(r.Context())
 					logger.Error("panic recovered",
 						"err", rec,
 						"method", r.Method,

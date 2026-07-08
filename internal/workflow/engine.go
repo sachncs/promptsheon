@@ -1,20 +1,29 @@
+// Package workflow provides workflow orchestration for capability execution.
 package workflow
 
 import (
 	"time"
 )
 
+// Status represents a workflow execution status.
 type Status string
 
 const (
+	// StatusPending is a pending workflow status.
 	StatusPending   Status = "pending"
+	// StatusRunning is a running workflow status.
 	StatusRunning   Status = "running"
+	// StatusCompleted is a completed workflow status.
 	StatusCompleted Status = "completed"
+	// StatusFailed is a failed workflow status.
 	StatusFailed    Status = "failed"
+	// StatusCancelled is a cancelled workflow status.
 	StatusCancelled Status = "cancelled"
+	// StatusSkipped is a skipped workflow status.
 	StatusSkipped   Status = "skipped"
 )
 
+// StepResult contains the outcome of a single workflow step.
 type StepResult struct {
 	StepID     string         `json:"step_id"`
 	Status     Status         `json:"status"`
@@ -27,7 +36,8 @@ type StepResult struct {
 	Provider   string         `json:"provider,omitempty"`
 }
 
-type WorkflowResult struct {
+// Result holds the complete output of a workflow execution.
+type Result struct {
 	WorkflowID string                 `json:"workflow_id"`
 	Status     Status                 `json:"status"`
 	Steps      map[string]*StepResult `json:"steps"`
@@ -37,6 +47,7 @@ type WorkflowResult struct {
 	Error      string                 `json:"error,omitempty"`
 }
 
+// Engine orchestrates workflow execution.
 type Engine struct {
 	toolRegistry *Registry
 	guardrailMgr any
@@ -44,15 +55,18 @@ type Engine struct {
 	contextMgr   any
 }
 
+// NewEngine creates a new Engine.
 func NewEngine(registry *Registry) *Engine {
 	return &Engine{toolRegistry: registry}
 }
 
-func (e *Engine) SetGuardrails(mgr any, cfg any) {
+// SetGuardrails configures guardrail manager and agent config.
+func (e *Engine) SetGuardrails(mgr, cfg any) {
 	e.guardrailMgr = mgr
 	e.agentConfig = cfg
 }
 
+// SetContextManager configures the context manager.
 func (e *Engine) SetContextManager(mgr any) {
 	e.contextMgr = mgr
 }

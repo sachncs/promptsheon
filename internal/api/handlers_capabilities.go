@@ -42,7 +42,7 @@ func (s *Server) handleCreateWorkspace(w http.ResponseWriter, r *http.Request) e
 	if err := s.db.CreateWorkspace(r.Context(), wksp); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "workspace:"+wksp.ID, map[string]any{"name": wksp.Name})
+	s.audit(r.Context(), "create", "workspace:"+wksp.ID, map[string]any{keyName: wksp.Name})
 	writeJSON(w, http.StatusCreated, wksp)
 	return nil
 }
@@ -132,7 +132,7 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) err
 	if err := s.db.CreateProject(r.Context(), proj); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "project:"+proj.ID, map[string]any{"name": proj.Name, "workspace_id": workspaceID})
+	s.audit(r.Context(), "create", "project:"+proj.ID, map[string]any{keyName: proj.Name, "workspace_id": workspaceID})
 	writeJSON(w, http.StatusCreated, proj)
 	return nil
 }
@@ -201,11 +201,11 @@ func (s *Server) handleListCapabilities(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleCreateCapability(w http.ResponseWriter, r *http.Request) error {
 	projectID := r.PathValue("project_id")
 	var req struct {
-		Name        string                `json:"name"`
-		Description string                `json:"description,omitempty"`
-		Owner       string                `json:"owner,omitempty"`
-		Tags        []string              `json:"tags,omitempty"`
-		State       capability.CapabilityState `json:"state,omitempty"`
+		Name        string                     `json:"name"`
+		Description string                     `json:"description,omitempty"`
+		Owner       string                     `json:"owner,omitempty"`
+		Tags        []string                   `json:"tags,omitempty"`
+		State       capability.State `json:"state,omitempty"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
@@ -214,10 +214,10 @@ func (s *Server) handleCreateCapability(w http.ResponseWriter, r *http.Request) 
 		return ErrBadRequest
 	}
 	if req.State == "" {
-		req.State = capability.CapabilityStateDraft
+		req.State = capability.StateDraft
 	}
 	now := time.Now()
-	cap := &capability.Capability{
+	capab := &capability.Capability{
 		ID:          generateID(),
 		ProjectID:   projectID,
 		Name:        req.Name,
@@ -228,11 +228,11 @@ func (s *Server) handleCreateCapability(w http.ResponseWriter, r *http.Request) 
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
-	if err := s.db.CreateCapability(r.Context(), cap); err != nil {
+	if err := s.db.CreateCapability(r.Context(), capab); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "capability:"+cap.ID, map[string]any{"name": cap.Name, "project_id": projectID})
-	writeJSON(w, http.StatusCreated, cap)
+	s.audit(r.Context(), "create", "capability:"+capab.ID, map[string]any{keyName: capab.Name, "project_id": projectID})
+	writeJSON(w, http.StatusCreated, capab)
 	return nil
 }
 
@@ -253,11 +253,11 @@ func (s *Server) handleUpdateCapability(w http.ResponseWriter, r *http.Request) 
 		return ErrNotFound
 	}
 	var req struct {
-		Name        *string                `json:"name"`
-		Description *string                `json:"description,omitempty"`
-		Owner       *string                `json:"owner,omitempty"`
-		Tags        *[]string              `json:"tags,omitempty"`
-		State       *capability.CapabilityState `json:"state,omitempty"`
+		Name        *string                     `json:"name"`
+		Description *string                     `json:"description,omitempty"`
+		Owner       *string                     `json:"owner,omitempty"`
+		Tags        *[]string                   `json:"tags,omitempty"`
+		State       *capability.State `json:"state,omitempty"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
@@ -303,7 +303,7 @@ func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request) erro
 		return err
 	}
 	if versions == nil {
-		versions = []*capability.CapabilityVersion{}
+		versions = []*capability.Version{}
 	}
 	writeJSON(w, http.StatusOK, versions)
 	return nil
@@ -328,7 +328,7 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 		return ErrBadRequest
 	}
 	now := time.Now()
-	v := &capability.CapabilityVersion{
+	v := &capability.Version{
 		ID:              generateID(),
 		CapabilityID:    capabilityID,
 		Version:         req.Version,
@@ -393,9 +393,9 @@ func (s *Server) handleListExecutions(w http.ResponseWriter, r *http.Request) er
 func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) error {
 	capabilityVersionID := r.PathValue("version_id")
 	var req struct {
-		Inputs  map[string]any `json:"inputs,omitempty"`
-		Model   string         `json:"model"`
-		Provider string        `json:"provider"`
+		Inputs   map[string]any `json:"inputs,omitempty"`
+		Model    string         `json:"model"`
+		Provider string         `json:"provider"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest

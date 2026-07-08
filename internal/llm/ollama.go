@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const providerOllama = "ollama"
+
 // Ollama implements Provider for the Ollama local API.
 type Ollama struct {
 	baseURL string
@@ -28,7 +30,8 @@ func NewOllama(cfg ProviderConfig) *Ollama {
 	}
 }
 
-func (o *Ollama) Name() string { return "ollama" }
+// Name returns the provider name.
+func (o *Ollama) Name() string { return providerOllama }
 
 type ollamaRequest struct {
 	Model    string          `json:"model"`
@@ -51,6 +54,7 @@ type ollamaResponse struct {
 	EvalDuration       int64 `json:"eval_duration"`
 }
 
+// Complete sends a prompt to the Ollama API and returns the response.
 func (o *Ollama) Complete(ctx context.Context, req *Request) (*Response, error) {
 	msgs := make([]ollamaMessage, len(req.Messages))
 	for i, m := range req.Messages {
@@ -79,7 +83,7 @@ func (o *Ollama) Complete(ctx context.Context, req *Request) (*Response, error) 
 	if err != nil {
 		return nil, fmt.Errorf("ollama request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB limit
 	if err != nil {

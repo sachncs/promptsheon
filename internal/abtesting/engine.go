@@ -176,7 +176,7 @@ func (e *Engine) SelectVariant(testID string) (*Variant, error) {
 }
 
 // RecordResult records the result of a variant execution.
-func (e *Engine) RecordResult(testID, variantID string, success bool, latencyMs, tokens float64, cost float64) {
+func (e *Engine) RecordResult(testID, variantID string, success bool, latencyMs, tokens, cost float64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 

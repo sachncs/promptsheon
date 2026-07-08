@@ -1,3 +1,4 @@
+// Package workflow provides workflow orchestration for capability execution.
 package workflow
 
 import (
@@ -8,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -70,8 +72,10 @@ func DefaultRegistry() *Registry {
 // HTTPTool makes HTTP requests.
 type HTTPTool struct{}
 
+// Name returns the tool name.
 func (h *HTTPTool) Name() string { return "http" }
 
+// Execute makes an HTTP request with the given input parameters.
 func (h *HTTPTool) Execute(ctx context.Context, input map[string]any) (map[string]any, error) {
 	method := strings.ToUpper(toString(input["method"]))
 	if method == "" {
@@ -109,7 +113,7 @@ func (h *HTTPTool) Execute(ctx context.Context, input map[string]any) (map[strin
 	if err != nil {
 		return nil, fmt.Errorf("http tool: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -196,8 +200,10 @@ func SetShellToolPolicy(enabled bool, allowed []string) {
 	globalShellPolicy.Set(enabled, allowed)
 }
 
+// Name returns the tool name.
 func (s *ShellTool) Name() string { return "shell" }
 
+// Execute runs a shell command with the given input parameters.
 func (s *ShellTool) Execute(ctx context.Context, input map[string]any) (map[string]any, error) {
 	if !globalShellPolicy.Enabled() {
 		return nil, fmt.Errorf("shell tool: disabled (set PROMPTSHEON_SHELL_ENABLED=true and configure PROMPTSHEON_SHELL_ALLOWLIST to enable)")
@@ -266,6 +272,8 @@ func (s *ShellTool) Execute(ctx context.Context, input map[string]any) (map[stri
 
 // --- JSON Transform Tool ---
 
+const keyResult = "result"
+
 // JSONTransformTool applies simple transformations to JSON data.
 type JSONTransformTool struct{}
 
@@ -282,7 +290,7 @@ func (j *JSONTransformTool) Execute(_ context.Context, input map[string]any) (ma
 			return nil, fmt.Errorf("json_transform: path is required for extract")
 		}
 		val := extractPath(data, path)
-		return map[string]any{"result": val}, nil
+		return map[string]any{keyResult: val}, nil
 
 	case "merge":
 		other := input["merge_with"]
@@ -297,19 +305,19 @@ func (j *JSONTransformTool) Execute(_ context.Context, input map[string]any) (ma
 				merged[k] = v
 			}
 		}
-		return map[string]any{"result": merged}, nil
+		return map[string]any{keyResult: merged}, nil
 
 	case "to_json":
-		return map[string]any{"result": data}, nil
+		return map[string]any{keyResult: data}, nil
 
 	default:
-		return map[string]any{"result": data}, nil
+		return map[string]any{keyResult: data}, nil
 	}
 }
 
 func extractPath(data any, path string) any {
 	parts := strings.Split(path, ".")
-	var current any = data
+	var current = data
 	for _, part := range parts {
 		m, ok := current.(map[string]any)
 		if !ok {
@@ -363,8 +371,7 @@ func toFloat64(v any) float64 {
 	case int:
 		return float64(val)
 	case string:
-		var f float64
-		fmt.Sscanf(val, "%f", &f)
+		f, _ := strconv.ParseFloat(val, 64)
 		return f
 	default:
 		return 0

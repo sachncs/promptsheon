@@ -2,7 +2,6 @@ package promptsheon
 
 import (
 	"sort"
-	"strings"
 )
 
 // ObjectType identifies the kind of object stored in the CAS.
@@ -140,6 +139,4 @@ func shortHash(hash string) string {
 	return hash[:12]
 }
 
-// nonEmpty trims and tests whether s has any visible content. Used
-// for sanity-checking user input on the CLI.
-func nonEmpty(s string) bool { return strings.TrimSpace(s) != "" }
+

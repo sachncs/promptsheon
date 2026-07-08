@@ -7,8 +7,8 @@ package capability
 // the model invokes (e.g. "search_github"), while MCP is the transport
 // protocol that connects the tool to the execution runtime.
 type MCPServer struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Transport string `json:"transport"` // "stdio", "sse", "grpc"
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	Transport string         `json:"transport"` // "stdio", "sse", "grpc"
 	Config    map[string]any `json:"config,omitempty"`
 }

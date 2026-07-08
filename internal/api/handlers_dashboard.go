@@ -12,7 +12,7 @@ func (s *Server) handleDashboardSummary(w http.ResponseWriter, r *http.Request) 
 
 	// Add trace stats
 	if s.spans != nil {
-		spans, _ := s.spans.ListSpans(r.Context(), trace.SpanFilter{Limit: 1000})
+		spans, _ := s.spans.ListSpans(r.Context(), &trace.SpanFilter{Limit: 1000})
 		summary.TraceStats = &TraceStats{
 			TotalSpans:      len(spans),
 			RecentTraces:    getRecentTraceCount(spans, 1*time.Hour),
@@ -25,9 +25,10 @@ func (s *Server) handleDashboardSummary(w http.ResponseWriter, r *http.Request) 
 	return nil
 }
 
+// TraceStats holds summary statistics about traced spans.
 type TraceStats struct {
 	TotalSpans      int     `json:"total_spans"`
-	RecentTraces    int     `json:"recent_traces_1h"`
+	RecentTraces    int     `json:"recent_traces"`
 	AvgSpanDuration float64 `json:"avg_span_duration_ms"`
 	ErrorSpans      int     `json:"error_spans"`
 }
@@ -83,7 +84,7 @@ func (s *Server) handleSearchSpans(w http.ResponseWriter, r *http.Request) error
 		}
 	}
 
-	spans, err := s.spans.ListSpans(r.Context(), filter)
+	spans, err := 	s.spans.ListSpans(r.Context(), &filter)
 	if err != nil {
 		return err
 	}

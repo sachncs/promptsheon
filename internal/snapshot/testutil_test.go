@@ -2,7 +2,8 @@ package snapshot
 
 import (
 	"database/sql"
-	_ "modernc.org/sqlite"
+
+	_ "modernc.org/sqlite" // sqlite driver
 )
 
 func newTestDB() (*sql.DB, error) {

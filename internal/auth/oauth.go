@@ -116,7 +116,7 @@ func (m *OAuthManager) ExchangeCode(ctx context.Context, providerName, code stri
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -142,7 +142,7 @@ func (m *OAuthManager) GetUserInfo(ctx context.Context, providerName string, tok
 		return nil, fmt.Errorf("provider %s not registered", providerName)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", provider.UserInfoURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", provider.UserInfoURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func (m *OAuthManager) GetUserInfo(ctx context.Context, providerName string, tok
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

@@ -22,8 +22,8 @@ func TestGenerator_NoStubsInOutput(t *testing.T) {
 	}
 	// Run the generator from the repo root so it finds
 	// internal/api/server.go.
-	if err := os.Chdir(repoRoot(t)); err != nil {
-		t.Fatal(err)
+	if e := os.Chdir(repoRoot(t)); e != nil {
+		t.Fatal(e)
 	}
 	defer func() { _ = os.Chdir(oldwd) }()
 
@@ -62,8 +62,8 @@ func TestGenerator_Idempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chdir(repoRoot(t)); err != nil {
-		t.Fatal(err)
+	if e := os.Chdir(repoRoot(t)); e != nil {
+		t.Fatal(e)
 	}
 	defer func() { _ = os.Chdir(oldwd) }()
 
@@ -95,8 +95,8 @@ func TestGenerator_AllServerRoutesCovered(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chdir(repoRoot(t)); err != nil {
-		t.Fatal(err)
+	if e := os.Chdir(repoRoot(t)); e != nil {
+		t.Fatal(e)
 	}
 	defer func() { _ = os.Chdir(oldwd) }()
 
@@ -132,8 +132,8 @@ func TestGenerator_RequestBodyOnWrites(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chdir(repoRoot(t)); err != nil {
-		t.Fatal(err)
+	if e := os.Chdir(repoRoot(t)); e != nil {
+		t.Fatal(e)
 	}
 	defer func() { _ = os.Chdir(oldwd) }()
 

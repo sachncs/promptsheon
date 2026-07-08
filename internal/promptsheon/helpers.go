@@ -2,7 +2,7 @@ package promptsheon
 
 import (
 	"fmt"
-	"path/filepath"
+
 	"regexp"
 	"strings"
 	"unicode"
@@ -40,16 +40,6 @@ func validateHash(cleaned string) error {
 	return nil
 }
 
-// objectPath returns the on-disk path of the object file for the
-// given sanitized hash. Objects are sharded into 256 directories
-// keyed by the first two hex characters of the hash to keep
-// directory listings short.
-func objectPath(hash string) (string, error) {
-	if err := validateHash(hash); err != nil {
-		return "", err
-	}
-	return filepath.Join(PromptsheonDir, objectsDir, hash[:2], hash[2:]), nil
-}
 
 // branchNamePattern matches a valid branch name. Empty, names
 // containing whitespace or path separators, and names containing

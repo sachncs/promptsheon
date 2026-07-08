@@ -226,7 +226,7 @@ func (idx *Index) Search(query string, limit int) []Result {
 //
 // where IDF(t) = ln(1 + (N - df(t) + 0.5) / (df(t) + 0.5))
 // (the "lucene" smoothed form, bounded below by 0).
-func bm25Score(d *indexedDoc, queryTerms map[string]struct{}, N, avgLen float64, df map[string]int) float64 {
+func bm25Score(d *indexedDoc, queryTerms map[string]struct{}, n, avgLen float64, df map[string]int) float64 {
 	if avgLen <= 0 {
 		return 0
 	}
@@ -242,7 +242,7 @@ func bm25Score(d *indexedDoc, queryTerms map[string]struct{}, N, avgLen float64,
 		}
 		// IDF, smoothed.
 		dfTerm := float64(df[term])
-		idf := log1Plus(N-dfTerm+0.5, dfTerm+0.5)
+		idf := log1Plus(n-dfTerm+0.5, dfTerm+0.5)
 		// Length-normalised term frequency.
 		numerator := float64(tf) * (bm25K1 + 1)
 		denom := float64(tf) + bm25K1*(1-bm25B+bm25B*docLen/avgLen)

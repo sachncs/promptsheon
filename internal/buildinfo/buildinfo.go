@@ -19,13 +19,13 @@ import "runtime"
 var (
 	// Version is the semantic version of the running binary.
 	// Examples: "0.0.6", "1.0.0-rc1".
-	Version string = "dev"
+	Version = "dev"
 
 	// Commit is the git commit hash the binary was built from.
-	Commit string = "unknown"
+	Commit = "unknown"
 
 	// BuildTime is the RFC3339 timestamp of the build.
-	BuildTime string = "unknown"
+	BuildTime = "unknown"
 )
 
 // Info is the structured form returned by the /api/v1/version

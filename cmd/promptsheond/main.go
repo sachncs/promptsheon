@@ -64,7 +64,47 @@ func main() {
 	rootCtx, rootCancel := context.WithCancel(context.Background())
 	defer rootCancel()
 
-	// Set up structured logging.
+	logger := setupLogger(cfg)
+
+	db := openDB(cfg, logger)
+	defer func() {
+		if db != nil {
+			_ = db.Close()
+		}
+	}()
+
+	srv, limiter, spans, collector := buildServer(cfg, db, logger, rootCtx)
+
+	srv.StartAuditWorkers(rootCtx, 2)
+
+	startHTTPServerAndWait(cfg, srv, logger, limiter, spans, collector, rootCtx, rootCancel)
+}
+
+// configureShellTool loads the shell tool policy from environment. The
+// tool is disabled unless BOTH PROMPTSHEON_SHELL_ENABLED=true and
+// PROMPTSHEON_SHELL_ALLOWLIST contains at least one command.
+func configureShellTool(_ *config.Config) {
+	enabled := os.Getenv("PROMPTSHEON_SHELL_ENABLED") == "true"
+	raw := os.Getenv("PROMPTSHEON_SHELL_ALLOWLIST")
+	var allow []string
+	if raw != "" {
+		for _, c := range strings.Split(raw, ",") {
+			c = strings.TrimSpace(c)
+			if c != "" {
+				allow = append(allow, c)
+			}
+		}
+	}
+	if enabled && len(allow) == 0 {
+		// Fail-closed: an empty allowlist with the tool "enabled" would
+		// otherwise behave as disabled, which is confusing. Force the
+		// enabled flag to match the actual policy.
+		enabled = false
+	}
+	workflow.SetShellToolPolicy(enabled, allow)
+}
+
+func setupLogger(cfg config.Config) *slog.Logger {
 	var logLevel slog.Level
 	switch cfg.LogLevel {
 	case "debug":
@@ -78,28 +118,28 @@ func main() {
 	default:
 		logLevel = slog.LevelInfo
 	}
-	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel}))
+	return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel}))
+}
 
-	// Open database.
+func openDB(cfg config.Config, logger *slog.Logger) *store.SQLite {
 	db, err := store.NewSQLite(cfg.DBPath)
 	if err != nil {
 		logger.Error("failed to open database", "err", err)
+		if db != nil {
+			db.Close()
+		}
 		os.Exit(1)
 	}
-	defer db.Close()
+	return db
+}
 
-	// Initialize tracing and metrics.
+func buildServer(cfg config.Config, db *store.SQLite, logger *slog.Logger, rootCtx context.Context) (*api.Server, *ratelimit.Limiter, *trace.SQLite, *metrics.Collector) {
 	spans, err := trace.NewSQLite(db.DB())
 	if err != nil {
 		logger.Warn("tracing disabled", "err", err)
 	}
 	collector := metrics.NewCollector()
 
-	// M-9 fix: when PROMPTSHEON_OTEL_ENDPOINT is set, install a real
-	// OTLP tracer provider as the global TracerProvider so traces
-	// flow to the configured collector. The previous implementation
-	// read the env vars into Config but never used them, so
-	// operators who configured an endpoint got no observability.
 	if cfg.OTelEndpoint != "" {
 		tp, terr := trace.InitTracerProvider("promptsheond", cfg.OTelEndpoint, cfg.OTelInsecure)
 		if terr != nil {
@@ -109,34 +149,28 @@ func main() {
 			defer func() {
 				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
-				if err := tp.Shutdown(shutdownCtx); err != nil {
-					logger.Warn("OTel tracer shutdown failed", "err", err)
+				if e := tp.Shutdown(shutdownCtx); e != nil {
+					logger.Warn("OTel tracer shutdown failed", "err", e)
 				}
 			}()
 		}
 	}
 
-	// Initialize output snapshots.
 	snapStore, err := snapshot.NewStore(db.DB())
 	if err != nil {
 		logger.Warn("snapshot store disabled", "err", err)
 	}
 
-	// Initialize retention manager for cleanup of old data.
 	retentionPolicy := observability.LoadRetentionPolicyFromEnv()
 	retention := observability.NewRetentionManager(db.DB(), retentionPolicy, logger)
 	retention.Start(rootCtx)
 
-	// Initialize webhooks. The dispatcher is configured with the
-	// repository as its persistence backend so registered endpoints
-	// survive a restart.
 	webhookDispatcher := webhook.NewDispatcher(logger).
 		WithEndpointStore(&webhookStoreAdapter{db: db})
 	if err := webhookDispatcher.LoadFromStore(rootCtx); err != nil {
 		logger.Warn("webhook: load endpoints from store failed", "err", err)
 	}
 
-	// Initialize vault for provider key encryption.
 	var v *vault.Vault
 	if vaultKey := os.Getenv("PROMPTSHEON_VAULT_KEY"); vaultKey != "" {
 		var err error
@@ -148,31 +182,17 @@ func main() {
 		}
 	}
 
-	// Initialize log hub for real-time streaming.
 	logHub := ws.NewHub(logger)
 	go logHub.Run()
 
-	// Initialize context manager. The manager is stateless and
-	// fetches contexts from the database on demand via Assemble, so
-	// no warm-up step is required at startup.
 	contextMgr := contextpkg.NewManager()
-
-	// Initialize usage tracker for top-used resources.
 	usageTracker := api.NewUsageTracker()
-
-	// Initialize guardrail manager.
 	guardrailManager := guardrail.NewManager(logger, collector)
-
-	// Initialize alerting manager. NewManagerWithDB loads existing rules
-	// from the database into the in-memory map; AddRule persists back.
 	alertingManager := alerting.NewManagerWithDB(logger, collector, db)
 	alertingManager.StartMonitoring(rootCtx, collector, 1*time.Minute)
 
-	// Construct the rate limiter early so the API server can share
-	// the same bucket map as the global middleware.
 	limiter := ratelimit.NewLimiter(ratelimit.LoadConfigFromEnv())
 
-	// Create API server.
 	var opts []api.Option
 	if cfg.Auth {
 		opts = append(opts, api.WithAuth(db))
@@ -188,21 +208,22 @@ func main() {
 	if v != nil {
 		opts = append(opts, api.WithVault(v))
 	}
-	opts = append(opts, api.WithLogHub(logHub))
-	opts = append(opts, api.WithUsageTracker(usageTracker))
-	opts = append(opts, api.WithGuardrailManager(guardrailManager))
-	opts = append(opts, api.WithAlertingManager(alertingManager))
-	opts = append(opts, api.WithContextManager(contextMgr))
-	opts = append(opts, api.WithRateLimiter(limiter))
+	opts = append(opts,
+		api.WithLogHub(logHub),
+		api.WithUsageTracker(usageTracker),
+		api.WithGuardrailManager(guardrailManager),
+		api.WithAlertingManager(alertingManager),
+		api.WithContextManager(contextMgr),
+		api.WithRateLimiter(limiter),
+	)
 	srv := api.NewServer(db, logger, opts...)
-	// Start the bounded audit worker pool. The pool drains the queue
-	// until the root context is cancelled.
-	srv.StartAuditWorkers(rootCtx, 2)
+	return srv, limiter, spans, collector
+}
 
-	// Set up HTTP server with middleware.
+func startHTTPServerAndWait(cfg config.Config, srv *api.Server, logger *slog.Logger, limiter *ratelimit.Limiter, spans *trace.SQLite, collector *metrics.Collector, rootCtx context.Context, rootCancel func()) {
 	handler := api.ChainHTTP(srv,
 		api.Recovery(logger),
-		api.MaxBytesReader(10<<20), // 10 MB max request body
+		api.MaxBytesReader(10<<20),
 		api.SecurityHeaders,
 		limiter.Middleware,
 		metrics.HTTPMiddleware(collector, spans, logger),
@@ -210,9 +231,6 @@ func main() {
 		api.CORS(cfg.CORSOrigins),
 	)
 
-	// Server timeouts come from config so operators can tune them via
-	// PROMPTSHEON_SERVER_*_TIMEOUT env vars. Defaults are validated to
-	// be non-negative by LoadConfig.
 	writeTimeout := time.Duration(cfg.WriteTimeout) * time.Second
 	readTimeout := time.Duration(cfg.ReadTimeout) * time.Second
 	readHeaderTimeout := time.Duration(cfg.ReadHeaderTimeout) * time.Second
@@ -227,12 +245,6 @@ func main() {
 		IdleTimeout:       idleTimeout,
 	}
 
-	// Start server in goroutine. The startup banner includes the
-	// version, addr, db path, auth state, and OTel endpoint so an
-	// operator can verify the running configuration from a single
-	// log line. When auth is disabled, the banner also advertises
-	// the one-time bootstrap endpoint and warns that it returns an
-	// admin key to whoever calls it first.
 	go func() {
 		info := buildinfo.Get()
 		logger.Info("starting server",
@@ -253,20 +265,15 @@ func main() {
 		}
 	}()
 
-	// Start the OAuth state janitor. Cancelled by rootCtx on shutdown.
 	api.StartOAuthStateJanitor(rootCtx)
 
-	// Wait for interrupt signal.
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	logger.Info("shutting down server...")
-
-	// Cancel background goroutines (retention, oauth janitor, etc).
 	rootCancel()
 
-	// Graceful shutdown with timeout.
 	ctx, cancelShutdown := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelShutdown()
 
@@ -274,45 +281,15 @@ func main() {
 		logger.Error("server forced to shutdown", "err", err)
 	}
 
-	// Drain the audit queue and stop the workers before the DB
-	// handle is closed by the deferred db.Close(). Without this,
-	// any in-flight audit writes race with the close and produce
-	// "sql: database is closed" errors.
 	auditStopCtx, cancelAuditStop := context.WithTimeout(context.Background(), 10*time.Second)
 	if err := srv.StopAuditWorkers(auditStopCtx); err != nil {
 		logger.Warn("audit workers did not drain in time", "err", err)
 	}
 	cancelAuditStop()
 
-	// Stop the rate limiter and OAuth janitor cleanly.
 	limiter.Stop()
 	api.StopOAuthStateJanitor()
-
 	logger.Info("server exited")
-}
-
-// configureShellTool loads the shell tool policy from environment. The
-// tool is disabled unless BOTH PROMPTSHEON_SHELL_ENABLED=true and
-// PROMPTSHEON_SHELL_ALLOWLIST contains at least one command.
-func configureShellTool(cfg *config.Config) {
-	enabled := os.Getenv("PROMPTSHEON_SHELL_ENABLED") == "true"
-	raw := os.Getenv("PROMPTSHEON_SHELL_ALLOWLIST")
-	var allow []string
-	if raw != "" {
-		for _, c := range strings.Split(raw, ",") {
-			c = strings.TrimSpace(c)
-			if c != "" {
-				allow = append(allow, c)
-			}
-		}
-	}
-	if enabled && len(allow) == 0 {
-		// Fail-closed: an empty allowlist with the tool "enabled" would
-		// otherwise behave as disabled, which is confusing. Force the
-		// enabled flag to match the actual policy.
-		enabled = false
-	}
-	workflow.SetShellToolPolicy(enabled, allow)
 }
 
 // webhookStoreAdapter bridges store.Repository to webhook.EndpointStore.

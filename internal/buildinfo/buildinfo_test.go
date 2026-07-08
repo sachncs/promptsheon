@@ -63,11 +63,7 @@ func TestGetIsJSONSerializable(t *testing.T) {
 		Arch      string
 	}{
 		Version:   info.Version,
-		Commit:    info.Commit,
-		BuildTime: info.BuildTime,
 		GoVersion: info.GoVersion,
-		OS:        info.OS,
-		Arch:      info.Arch,
 	}
 	if json.Version == "" {
 		t.Error("expected non-empty Version in serialised form")

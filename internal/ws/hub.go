@@ -140,7 +140,7 @@ func (h *Hub) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	// Send initial connection event
-	fmt.Fprintf(w, "event: connected\ndata: {\"client_id\":\"%s\"}\n\n", client.id) //nolint:errcheck
+	fmt.Fprintf(w, "event: connected\ndata: {\"client_id\":\"%s\"}\n\n", client.id) //nolint:errcheck // SSE write errors are unrecoverable; client will reconnect
 	flusher.Flush()
 
 	// Handle client disconnect
@@ -155,7 +155,7 @@ func (h *Hub) HandleSSE(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			fmt.Fprintf(w, "event: log\ndata: %s\n\n", msg) //nolint:errcheck
+			fmt.Fprintf(w, "event: log\ndata: %s\n\n", msg) //nolint:errcheck // SSE write errors are unrecoverable; client will disconnect
 			flusher.Flush()
 		}
 	}
@@ -195,7 +195,7 @@ func (h *streamHandler) Enabled(_ context.Context, _ slog.Level) bool {
 	return true
 }
 
-func (h *streamHandler) Handle(_ context.Context, record slog.Record) error {
+func (h *streamHandler) Handle(_ context.Context, record slog.Record) error { //nolint:gocritic // must match slog.Handler interface
 	// Forward to next handler
 	if err := h.next.Handle(context.Background(), record); err != nil {
 		return err

@@ -1,3 +1,4 @@
+// Package eval provides evaluation runners for capability versions.
 package eval
 
 import (
@@ -10,15 +11,18 @@ import (
 	"github.com/sachncs/promptsheon/internal/llm"
 )
 
+// Runner executes evaluation runs for capability versions.
 type Runner struct {
 	provider llm.Provider
 }
 
+// NewRunner creates a new Runner with the given provider.
 func NewRunner(provider llm.Provider) *Runner {
 	return &Runner{provider: provider}
 }
 
-func (r *Runner) RunVersion(ctx context.Context, version *capability.CapabilityVersion, suite *capability.EvaluationSuite) (*capability.EvaluationResult, error) {
+// RunVersion runs an evaluation suite against a capability version.
+func (r *Runner) RunVersion(_ context.Context, version *capability.Version, suite *capability.EvaluationSuite) (*capability.EvaluationResult, error) {
 	if version == nil {
 		return nil, fmt.Errorf("capability version is required")
 	}
@@ -71,17 +75,17 @@ func (r *Runner) RunVersion(ctx context.Context, version *capability.CapabilityV
 	totalHallucination = 0.03
 	totalLatencyMs = 750
 	totalCostUSD = 0.008
-	totalCases = 1
-	passedCases = 1
 
 	_ = promptText
 	_ = maxTokens
+
+	const metricAccuracy = "accuracy"
 
 	thresholdsMet := true
 	for metric, threshold := range suite.Thresholds {
 		var actual float64
 		switch metric {
-		case "accuracy":
+		case metricAccuracy:
 			actual = totalAccuracy
 		case "precision":
 			actual = totalPrecision
@@ -113,7 +117,7 @@ func (r *Runner) RunVersion(ctx context.Context, version *capability.CapabilityV
 	}
 
 	result.PerMetric = make(map[string]float64)
-	result.PerMetric["accuracy"] = totalAccuracy
+	result.PerMetric[metricAccuracy] = totalAccuracy
 	result.PerMetric["precision"] = totalPrecision
 	result.PerMetric["recall"] = totalRecall
 	result.PerMetric["hallucination"] = totalHallucination
@@ -126,7 +130,7 @@ func (r *Runner) RunVersion(ctx context.Context, version *capability.CapabilityV
 	return result, nil
 }
 
-func (r *Runner) buildVersionPrompt(version *capability.CapabilityVersion, input map[string]any) string {
+func (r *Runner) buildVersionPrompt(version *capability.Version, input map[string]any) string {
 	promptText := version.Prompt.Instructions
 	if version.Prompt.Template != "" {
 		promptText = version.Prompt.Template
