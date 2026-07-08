@@ -26,23 +26,23 @@ type EventType string
 
 const (
 	// EventEvalCompleted is emitted when an evaluation completes.
-	EventEvalCompleted     EventType = "eval.completed"
+	EventEvalCompleted EventType = "eval.completed"
 	// EventReviewApproved is emitted when a review is approved.
-	EventReviewApproved    EventType = "review.approved"
+	EventReviewApproved EventType = "review.approved"
 	// EventReviewRejected is emitted when a review is rejected.
-	EventReviewRejected    EventType = "review.rejected"
+	EventReviewRejected EventType = "review.rejected"
 	// EventWorkflowCompleted is emitted when a workflow completes.
 	EventWorkflowCompleted EventType = "workflow.completed"
 	// EventWorkflowFailed is emitted when a workflow fails.
-	EventWorkflowFailed    EventType = "workflow.failed"
+	EventWorkflowFailed EventType = "workflow.failed"
 	// EventPromptCreated is emitted when a prompt is created.
-	EventPromptCreated     EventType = "prompt.created"
+	EventPromptCreated EventType = "prompt.created"
 	// EventPromptUpdated is emitted when a prompt is updated.
-	EventPromptUpdated     EventType = "prompt.updated"
+	EventPromptUpdated EventType = "prompt.updated"
 	// EventPromptDeployed is emitted when a prompt is deployed.
-	EventPromptDeployed    EventType = "prompt.deployed"
+	EventPromptDeployed EventType = "prompt.deployed"
 	// EventPromptArchived is emitted when a prompt is archived.
-	EventPromptArchived    EventType = "prompt.archived"
+	EventPromptArchived EventType = "prompt.archived"
 )
 
 // Event is the payload sent to webhook endpoints.
@@ -324,8 +324,12 @@ func (d *Dispatcher) deliver(ctx context.Context, ep *Endpoint, evt *Event) {
 			}
 			continue
 		}
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
+		if _, err := io.Copy(io.Discard, resp.Body); err != nil && d.logger != nil {
+			d.logger.Warn("webhook: drain response body failed", "endpoint", ep.ID, "err", err)
+		}
+		if err := resp.Body.Close(); err != nil && d.logger != nil {
+			d.logger.Warn("webhook: close response body failed", "endpoint", ep.ID, "err", err)
+		}
 
 		delivery := Delivery{
 			ID:         generateID(),

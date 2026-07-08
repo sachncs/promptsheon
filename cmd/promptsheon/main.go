@@ -56,59 +56,39 @@ func handleEarlyExit() bool {
 }
 
 func dispatchCommand(cmd string, args []string) error {
-	switch cmd {
-	case "init":
-		return cmdInit()
-	case "hash-object":
-		return cmdHashObject(args)
-	case "write-object":
-		return cmdWriteObject(args)
-	case "read-object":
-		return cmdReadObject(args)
-	case "commit":
-		return cmdCommit(args)
-	case "log":
-		return cmdLog(args)
-	case "checkout":
-		return cmdCheckout(args)
-	case "branch":
-		return cmdBranch(args)
-	case "delete-branch":
-		return cmdDeleteBranch(args)
-	case "diff":
-		return cmdDiff(args)
-	case "status":
-		return cmdStatus()
-	case "show":
-		return cmdShow(args)
-	case "ls-tree":
-		return cmdLsTree(args)
-	case "cat-file":
-		return cmdCatFile(args)
-	case "graph":
-		return cmdGraph()
-	case "stats":
-		return cmdStats()
-	case "verify":
-		return cmdVerify()
-	case "run":
-		return cmdRun(args)
-	case "provider":
-		return cmdProvider(args)
-	case "workspace":
-		return cmdWorkspace(args)
-	case "project":
-		return cmdProject(args)
-	case "capability":
-		return cmdCapability(args)
-	case "help":
-		printUsage()
-	default:
+	h, ok := commandHandlers[cmd]
+	if !ok {
 		fmt.Fprintf(os.Stderr, "error: unknown command: %s\n", cmd)
 		printUsage()
 		os.Exit(1)
 	}
-	return nil
+	return h(args)
+}
+
+var commandHandlers = map[string]func([]string) error{
+	"init":          func(_ []string) error { return cmdInit() },
+	"hash-object":   cmdHashObject,
+	"write-object":  cmdWriteObject,
+	"read-object":   cmdReadObject,
+	"commit":        cmdCommit,
+	"log":           cmdLog,
+	"checkout":      cmdCheckout,
+	"branch":        cmdBranch,
+	"delete-branch": cmdDeleteBranch,
+	"diff":          cmdDiff,
+	"status":        func(_ []string) error { return cmdStatus() },
+	"show":          cmdShow,
+	"ls-tree":       cmdLsTree,
+	"cat-file":      cmdCatFile,
+	"graph":         func(_ []string) error { return cmdGraph() },
+	"stats":         func(_ []string) error { return cmdStats() },
+	"verify":        func(_ []string) error { return cmdVerify() },
+	"run":           cmdRun,
+	"provider":      cmdProvider,
+	"workspace":     cmdWorkspace,
+	"project":       cmdProject,
+	"capability":    cmdCapability,
+	"help":          func(_ []string) error { printUsage(); return nil },
 }
 
 func handleCmdError(err error) {
@@ -132,8 +112,8 @@ var errUsage = errors.New("invalid arguments")
 // per-command usage hint, e.g. "usage: promptsheon commit <tree>
 // [message]". The wrapping keeps the message visible to the user
 // while the sentinel lets main() pick the right exit code.
-func usageErrorf(format string, args ...any) error {
-	return fmt.Errorf("%w: %s", errUsage, fmt.Sprintf(format, args...))
+func usageErrorf(format string) error {
+	return fmt.Errorf("%w: %s", errUsage, format)
 }
 
 func printUsage() {

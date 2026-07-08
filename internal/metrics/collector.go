@@ -26,9 +26,11 @@ func newCounter(labels map[string]string) *Counter {
 }
 
 // Inc increments the counter by 1.
-func (c *Counter) Inc()           { c.Add(1) }
+func (c *Counter) Inc() { c.Add(1) }
+
 // Add increments the counter by the given value.
-func (c *Counter) Add(v float64)  { c.mu.Lock(); c.value += v; c.mu.Unlock() }
+func (c *Counter) Add(v float64) { c.mu.Lock(); c.value += v; c.mu.Unlock() }
+
 // Value returns the current counter value.
 func (c *Counter) Value() float64 { c.mu.Lock(); defer c.mu.Unlock(); return c.value }
 
@@ -77,6 +79,7 @@ func (h *Histogram) Observe(v float64) {
 
 // Count returns the number of observed values.
 func (h *Histogram) Count() int64 { h.mu.Lock(); defer h.mu.Unlock(); return h.count }
+
 // Sum returns the sum of all observed values.
 func (h *Histogram) Sum() float64 { h.mu.Lock(); defer h.mu.Unlock(); return h.sum }
 
@@ -172,11 +175,14 @@ type Gauge struct {
 }
 
 // Set sets the gauge to a specific value.
-func (g *Gauge) Set(v float64)  { g.mu.Lock(); g.value = v; g.mu.Unlock() }
+func (g *Gauge) Set(v float64) { g.mu.Lock(); g.value = v; g.mu.Unlock() }
+
 // Inc increments the gauge by 1.
-func (g *Gauge) Inc()           { g.mu.Lock(); g.value++; g.mu.Unlock() }
+func (g *Gauge) Inc() { g.mu.Lock(); g.value++; g.mu.Unlock() }
+
 // Dec decrements the gauge by 1.
-func (g *Gauge) Dec()           { g.mu.Lock(); g.value--; g.mu.Unlock() }
+func (g *Gauge) Dec() { g.mu.Lock(); g.value--; g.mu.Unlock() }
+
 // Value returns the current gauge value.
 func (g *Gauge) Value() float64 { g.mu.Lock(); defer g.mu.Unlock(); return g.value }
 

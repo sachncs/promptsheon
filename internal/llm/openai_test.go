@@ -196,3 +196,95 @@ func TestOpenAITimeout(t *testing.T) {
 		t.Errorf("expected 120s timeout, got %v", o.client.Timeout)
 	}
 }
+
+// TestOpenAICompleteStreamingPath drives the streaming code
+// path inside Complete (when req.Stream is true). This is
+// separate from the Stream method and exercises handleStream.
+func TestOpenAICompleteStreamingPath(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\" world\"}}],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":2,\"total_tokens\":5}}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer srv.Close()
+
+	o := NewOpenAI(ProviderConfig{APIKey: "sk-test", BaseURL: srv.URL})
+	resp, err := o.Complete(context.Background(), &Request{
+		Model:    "gpt-4",
+		Messages: []Message{{Role: "user", Content: "hi"}},
+		Stream:   true,
+	})
+	if err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	if resp.Content != "hello world" {
+		t.Errorf("Content: got %q", resp.Content)
+	}
+	if resp.Usage.TotalTokens != 5 {
+		t.Errorf("Usage.TotalTokens: got %d", resp.Usage.TotalTokens)
+	}
+	if resp.TimeToFirstToken <= 0 {
+		t.Errorf("expected positive TimeToFirstToken, got %v", resp.TimeToFirstToken)
+	}
+}
+
+func TestOpenAIStreamWithTemperatureAndStop(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Temperature float64  `json:"temperature"`
+			Stop        []string `json:"stop"`
+			Stream      bool     `json:"stream"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if body.Temperature == 0 {
+			t.Error("expected non-zero temperature")
+		}
+		if len(body.Stop) == 0 {
+			t.Error("expected stop tokens")
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer srv.Close()
+
+	o := NewOpenAI(ProviderConfig{APIKey: "sk-test", BaseURL: srv.URL})
+	rc, err := o.Stream(context.Background(), &Request{
+		Model:       "gpt-4",
+		Messages:    []Message{{Role: "user", Content: "hi"}},
+		Temperature: 0.7,
+		Stop:        []string{"\n"},
+	})
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	defer func() { _ = rc.Close() }()
+	buf := make([]byte, 4096)
+	n, _ := rc.Read(buf)
+	if !strings.Contains(string(buf[:n]), "ok") {
+		t.Errorf("expected 'ok' in stream, got %q", string(buf[:n]))
+	}
+}
+
+func TestOpenAICompleteServerErrorBodyNonJSON(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte("rate limit exceeded"))
+	}))
+	defer srv.Close()
+
+	o := NewOpenAI(ProviderConfig{APIKey: "sk-test", BaseURL: srv.URL})
+	_, err := o.Complete(context.Background(), &Request{
+		Model:    "gpt-4",
+		Messages: []Message{{Role: "user", Content: "hi"}},
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "429") {
+		t.Errorf("expected 429 in error, got %v", err)
+	}
+}

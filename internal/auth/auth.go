@@ -17,7 +17,7 @@ type Role string
 
 const (
 	// RoleAdmin is an admin role with full permissions.
-	RoleAdmin  Role = "admin"
+	RoleAdmin Role = "admin"
 	// RoleWriter is a writer role with write permissions.
 	RoleWriter Role = "writer"
 	// RoleReader is a reader role with read-only permissions.
@@ -29,43 +29,43 @@ type Permission string
 
 const (
 	// PermPromptCreate is the permission to create prompts.
-	PermPromptCreate  Permission = "prompt:create"
+	PermPromptCreate Permission = "prompt:create"
 	// PermPromptRead is the permission to read prompts.
-	PermPromptRead    Permission = "prompt:read"
+	PermPromptRead Permission = "prompt:read"
 	// PermPromptUpdate is the permission to update prompts.
-	PermPromptUpdate  Permission = "prompt:update"
+	PermPromptUpdate Permission = "prompt:update"
 	// PermPromptDelete is the permission to delete prompts.
-	PermPromptDelete  Permission = "prompt:delete"
+	PermPromptDelete Permission = "prompt:delete"
 	// PermAgentCreate is the permission to create agents.
-	PermAgentCreate   Permission = "agent:create"
+	PermAgentCreate Permission = "agent:create"
 	// PermAgentRead is the permission to read agents.
-	PermAgentRead     Permission = "agent:read"
+	PermAgentRead Permission = "agent:read"
 	// PermAgentUpdate is the permission to update agents.
-	PermAgentUpdate   Permission = "agent:update"
+	PermAgentUpdate Permission = "agent:update"
 	// PermAgentDelete is the permission to delete agents.
-	PermAgentDelete   Permission = "agent:delete"
+	PermAgentDelete Permission = "agent:delete"
 	// PermDatasetCreate is the permission to create datasets.
 	PermDatasetCreate Permission = "dataset:create"
 	// PermDatasetRead is the permission to read datasets.
-	PermDatasetRead   Permission = "dataset:read"
+	PermDatasetRead Permission = "dataset:read"
 	// PermDatasetUpdate is the permission to update datasets.
 	PermDatasetUpdate Permission = "dataset:update"
 	// PermDatasetDelete is the permission to delete datasets.
 	PermDatasetDelete Permission = "dataset:delete"
 	// PermEvalRun is the permission to run evaluations.
-	PermEvalRun       Permission = "eval:run"
+	PermEvalRun Permission = "eval:run"
 	// PermEvalRead is the permission to read evaluation results.
-	PermEvalRead      Permission = "eval:read"
+	PermEvalRead Permission = "eval:read"
 	// PermReviewCreate is the permission to create reviews.
-	PermReviewCreate  Permission = "review:create"
+	PermReviewCreate Permission = "review:create"
 	// PermReviewApprove is the permission to approve reviews.
 	PermReviewApprove Permission = "review:approve"
 	// PermAuditRead is the permission to read audit logs.
-	PermAuditRead     Permission = "audit:read"
+	PermAuditRead Permission = "audit:read"
 	// PermAPIKeyManage is the permission to manage API keys.
-	PermAPIKeyManage  Permission = "apikey:manage"
+	PermAPIKeyManage Permission = "apikey:manage"
 	// PermUserManage is the permission to manage users.
-	PermUserManage    Permission = "user:manage"
+	PermUserManage Permission = "user:manage"
 )
 
 // rolePermissions maps roles to their allowed permissions.

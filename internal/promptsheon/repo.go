@@ -135,5 +135,3 @@ func IsInitialized() bool {
 	}
 	return true
 }
-
-

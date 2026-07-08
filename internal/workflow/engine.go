@@ -10,17 +10,17 @@ type Status string
 
 const (
 	// StatusPending is a pending workflow status.
-	StatusPending   Status = "pending"
+	StatusPending Status = "pending"
 	// StatusRunning is a running workflow status.
-	StatusRunning   Status = "running"
+	StatusRunning Status = "running"
 	// StatusCompleted is a completed workflow status.
 	StatusCompleted Status = "completed"
 	// StatusFailed is a failed workflow status.
-	StatusFailed    Status = "failed"
+	StatusFailed Status = "failed"
 	// StatusCancelled is a cancelled workflow status.
 	StatusCancelled Status = "cancelled"
 	// StatusSkipped is a skipped workflow status.
-	StatusSkipped   Status = "skipped"
+	StatusSkipped Status = "skipped"
 )
 
 // StepResult contains the outcome of a single workflow step.

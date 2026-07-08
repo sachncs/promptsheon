@@ -261,8 +261,8 @@ func scanCapability(scanner interface {
 
 // versionJSONFields holds the JSON-marshalled fields of a capability.Version.
 type versionJSONFields struct {
-	prompt, modelPolicy, contextContract, knowledge, memory          string
-	guardrails, tools, mcp, runtimePolicy, evalSuite                  string
+	prompt, modelPolicy, contextContract, knowledge, memory string
+	guardrails, tools, mcp, runtimePolicy, evalSuite        string
 }
 
 // marshalCapabilityVersionJSONFields marshals the JSON fields of a version.

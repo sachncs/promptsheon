@@ -41,12 +41,12 @@ func GetStats() (*RepoStats, error) {
 		if e != nil {
 			return nil, fmt.Errorf("read shard %s: %w", shard.Name(), e)
 		}
-		for _, e := range entries {
-			if e.IsDir() {
+		for _, entry := range entries {
+			if entry.IsDir() {
 				continue
 			}
-			info, err := e.Info()
-			if err != nil {
+			info, infoErr := entry.Info()
+			if infoErr != nil {
 				continue
 			}
 			stats.TotalObjects++
@@ -55,9 +55,9 @@ func GetStats() (*RepoStats, error) {
 			// Peek at the object to count by type. We do this in
 			// the same pass as the file walk to avoid a second
 			// directory traversal.
-			hash := shard.Name() + e.Name()
-			obj, err := ReadObject(hash)
-			if err != nil {
+			hash := shard.Name() + entry.Name()
+			obj, objErr := ReadObject(hash)
+			if objErr != nil {
 				// Corrupt or unreadable object: still count it
 				// in TotalObjects and StorageBytes but skip the
 				// type breakdown. Verify() will surface the

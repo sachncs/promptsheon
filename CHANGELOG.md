@@ -19,8 +19,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gocritic, staticcheck, goconst, revive, nakedret, ineffassign, prealloc,
   unconvert, unparam, unused, funlen, gocyclo, gofmt, dogsled
   ([`e084427`](https://github.com/sachncs/promptsheon/commit/e084427), 2026-07-08)
+- Fix suppressed errors and bugs across the codebase — see `Fixed` section for details
+
+### Fixed
+
+- `internal/llm/registry.go`: Race condition in `Registry.Get()` — uses double-checked
+  locking so `factory(cfg)` is never called outside the write lock, preventing
+  duplicate provider instances under concurrent access
+  (internal audit, 2026-07-08)
+- `internal/alerting/manager.go`: Unbounded goroutine creation in `TriggerAlert` —
+  added semaphore-based concurrency limit (`MaxConcurrentDeliveries=100`); added
+  `StopMonitoring()` to cleanly await the monitoring goroutine
+  (internal audit, 2026-07-08)
+- `internal/webhook/webhook.go`: Silently ignored `io.Copy` and `resp.Body.Close`
+  errors — both are now logged via `d.logger.Warn`
+  (internal audit, 2026-07-08)
+- `internal/api/handlers_audit.go`: CSV write errors silently ignored — errors are
+  now propagated via `fmt.Errorf`; `writer.Flush()` error also checked via
+  `writer.Error()`
+  (internal audit, 2026-07-08)
+- `internal/snapshot/snapshot.go`: `json.Unmarshal` errors silently suppressed with
+  `//nolint:errcheck` — now propagated as `fmt.Errorf` so corrupt database JSON
+  never produces silent zero values
+  (internal audit, 2026-07-08)
+- `internal/api/middleware.go`: Panic recovery logged only the panic value — stack
+  trace is now captured via `debug.Stack()` and included in the structured log
+  (internal audit, 2026-07-08)
+- `internal/trace/otel.go`: Unused context result suppressed with `_ = ctx` —
+  uses `_ = context.WithValue(...)` with explicit discard
+  (internal audit, 2026-07-08)
+- `internal/workflow/engine_version.go`: Dead code `_ = input` / `_ = version.RuntimePolicy`
+  removed; `input` parameter marked as `_` to indicate intentionally unused
+  (internal audit, 2026-07-08)
+- `internal/eval/runner.go`: Dead code `_, _ = time.Now(), version` removed;
+  unused `time` import dropped
+  (internal audit, 2026-07-08)
+- Remaining `//nolint:errcheck` comments across `ws/hub.go`, `api/server.go`,
+  `ratelimit/*.go`, `metrics/middleware.go`, `auth/*.go` replaced with explicit
+  `_ =` error discards
+  (internal audit, 2026-07-08)
+- `internal/vault/vault_test.go`, `internal/config/config_test.go`,
+  `internal/llm/providers_extra_test.go`, `internal/auth/oauth_test.go`:
+  suppressed errors in test helper code now properly checked or explicitly discarded
+  with `_ =` pattern
+  (internal audit, 2026-07-08)
 
 ### Added
+
+- `internal/llm/registry_test.go`: Unit tests for registry `Get`, `Configure`,
+  `Register`, and concurrent access (8 tests)
+- `internal/alerting/manager_test.go`: `TestTriggerAlertBoundedConcurrency`
+  verifies concurrent deliveries never exceed `MaxConcurrentDeliveries`;
+  `TestStopMonitoring` verifies clean goroutine shutdown
+- `internal/snapshot/snapshot_test.go`: `TestSnapshotCorruptJSON` verifies
+  corrupt token_usage/metadata JSON produces an error instead of silently
+  zero-filling the struct
 
 - Capability-centric domain model with 18 types (Workspace, Project, Capability,
   CapabilityVersion, Prompt, ModelPolicy, ContextContract, KnowledgeSource,

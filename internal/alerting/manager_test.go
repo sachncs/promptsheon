@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -312,4 +313,50 @@ func TestSetDeliveryFunc(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Error("expected delivery func to be invoked on trigger")
 	}
+}
+
+func TestTriggerAlertBoundedConcurrency(t *testing.T) {
+	m := newTestManager(t)
+
+	var mu sync.Mutex
+	concurrent := 0
+	maxConcurrent := 0
+
+	m.SetDeliveryFunc(func(_ *Alert, _ []string) error {
+		mu.Lock()
+		concurrent++
+		if concurrent > maxConcurrent {
+			maxConcurrent = concurrent
+		}
+		mu.Unlock()
+		defer func() {
+			mu.Lock()
+			concurrent--
+			mu.Unlock()
+		}()
+		time.Sleep(50 * time.Millisecond)
+		return nil
+	})
+
+	// Trigger more alerts than MaxConcurrentDeliveries
+	for i := 0; i < MaxConcurrentDeliveries+10; i++ {
+		_ = m.TriggerAlert(&AlertRule{ID: "r", Name: "n", Type: "latency"}, "msg", nil)
+	}
+
+	// Give goroutines time to start
+	time.Sleep(200 * time.Millisecond)
+
+	if maxConcurrent > MaxConcurrentDeliveries {
+		t.Errorf("expected max concurrent deliveries <= %d, got %d", MaxConcurrentDeliveries, maxConcurrent)
+	}
+}
+
+func TestStopMonitoring(t *testing.T) {
+	m := newTestManager(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	m.StartMonitoring(ctx, nil, 100*time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+	m.StopMonitoring()
+	// If StopMonitoring returns without blocking, the test passes.
 }

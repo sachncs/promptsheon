@@ -7,13 +7,13 @@ type DeploymentStatus string
 
 const (
 	// DeploymentStatusPending is a pending deployment status.
-	DeploymentStatusPending    DeploymentStatus = "pending"
+	DeploymentStatusPending DeploymentStatus = "pending"
 	// DeploymentStatusActive is an active deployment status.
-	DeploymentStatusActive     DeploymentStatus = "active"
+	DeploymentStatusActive DeploymentStatus = "active"
 	// DeploymentStatusRolledBack is a rolled back deployment status.
 	DeploymentStatusRolledBack DeploymentStatus = "rolled_back"
 	// DeploymentStatusFailed is a failed deployment status.
-	DeploymentStatusFailed     DeploymentStatus = "failed"
+	DeploymentStatusFailed DeploymentStatus = "failed"
 )
 
 // DeploymentHealth represents the health of an active deployment.
@@ -21,9 +21,9 @@ type DeploymentHealth string
 
 const (
 	// DeploymentHealthHealthy is a healthy deployment health.
-	DeploymentHealthHealthy   DeploymentHealth = "healthy"
+	DeploymentHealthHealthy DeploymentHealth = "healthy"
 	// DeploymentHealthDegraded is a degraded deployment health.
-	DeploymentHealthDegraded  DeploymentHealth = "degraded"
+	DeploymentHealthDegraded DeploymentHealth = "degraded"
 	// DeploymentHealthUnhealthy is an unhealthy deployment health.
 	DeploymentHealthUnhealthy DeploymentHealth = "unhealthy"
 )

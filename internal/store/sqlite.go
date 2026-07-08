@@ -210,7 +210,7 @@ func (s *SQLite) verifyAuditPage(ctx context.Context, prevHash string, afterRowI
 	if err != nil {
 		return prevHash, false, "", 0, fmt.Errorf("query audit chain page: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var rowID int64

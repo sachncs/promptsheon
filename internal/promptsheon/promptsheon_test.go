@@ -504,7 +504,7 @@ func TestBranchDelete(t *testing.T) {
 
 	tree := NewBlobObject("data")
 	treeHash, _ := WriteObject(tree)
-	Commit(treeHash, nil, "author", "init", nil)
+	_, _ = Commit(treeHash, nil, "author", "init", nil)
 
 	if err := CreateBranch("feature", ""); err != nil {
 		t.Fatalf("CreateBranch(): %v", err)
@@ -529,7 +529,7 @@ func TestBranchDeleteErrors(t *testing.T) {
 
 	tree := NewBlobObject("data")
 	treeHash, _ := WriteObject(tree)
-	Commit(treeHash, nil, "author", "init", nil)
+	_, _ = Commit(treeHash, nil, "author", "init", nil)
 
 	if err := DeleteBranch("nonexistent"); err == nil {
 		t.Fatal("expected error deleting nonexistent branch")
@@ -1081,7 +1081,7 @@ func TestBuildGraphWithCommits(t *testing.T) {
 	b := NewBlobObject("data")
 	bh, _ := WriteObject(b)
 	th, _ := WriteObject(NewTreeObject([]TreeEntry{{Name: "file", Type: TypeBlob, Hash: bh}}))
-	Commit(th, nil, "author", "first", nil)
+	_, _ = Commit(th, nil, "author", "first", nil)
 
 	nodes, err := BuildGraph()
 	if err != nil {
@@ -1204,7 +1204,7 @@ func TestBuildGraphDetachedHead(t *testing.T) {
 	th, _ := WriteObject(NewTreeObject([]TreeEntry{{Name: "file", Type: TypeBlob, Hash: bh}}))
 
 	c1, _ := Commit(th, nil, "author", "first", nil)
-	Checkout(c1.Hash)
+	_ = Checkout(c1.Hash)
 
 	nodes, err := BuildGraph()
 	if err != nil {
@@ -1359,7 +1359,7 @@ func TestValidateBranchNameMaxLength(t *testing.T) {
 	b := NewBlobObject("data")
 	bh, _ := WriteObject(b)
 	th, _ := WriteObject(NewTreeObject([]TreeEntry{{Name: "file", Type: TypeBlob, Hash: bh}}))
-	Commit(th, nil, "author", "init", nil)
+	_, _ = Commit(th, nil, "author", "init", nil)
 
 	// Exactly at limit should succeed.
 	validName := strings.Repeat("a", maxBranchLength)

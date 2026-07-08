@@ -19,11 +19,11 @@ type Severity string
 
 const (
 	// SeverityLow is a low severity level.
-	SeverityLow      Severity = "low"
+	SeverityLow Severity = "low"
 	// SeverityMedium is a medium severity level.
-	SeverityMedium   Severity = "medium"
+	SeverityMedium Severity = "medium"
 	// SeverityHigh is a high severity level.
-	SeverityHigh     Severity = "high"
+	SeverityHigh Severity = "high"
 	// SeverityCritical is a critical severity level.
 	SeverityCritical Severity = "critical"
 )
@@ -33,11 +33,11 @@ type AlertStatus string
 
 const (
 	// StatusActive is an active alert status.
-	StatusActive   AlertStatus = "active"
+	StatusActive AlertStatus = "active"
 	// StatusResolved is a resolved alert status.
 	StatusResolved AlertStatus = "resolved"
 	// StatusPending is a pending alert status.
-	StatusPending  AlertStatus = "pending"
+	StatusPending AlertStatus = "pending"
 )
 
 // AlertRule defines a threshold-based alert rule.
@@ -75,6 +75,11 @@ type NotificationGroup struct {
 	Channels []string `json:"channels"`
 }
 
+// MaxConcurrentDeliveries is the maximum number of concurrent alert
+// delivery goroutines. Additional alerts are dropped rather than
+// unboundedly spawning goroutines.
+const MaxConcurrentDeliveries = 100
+
 // Manager manages alert rules and alerts.
 type Manager struct {
 	mu           sync.RWMutex
@@ -85,16 +90,19 @@ type Manager struct {
 	metrics      *metrics.Collector
 	db           store.Repository
 	deliveryFunc func(alert *Alert, channels []string) error
+	deliverySem  chan struct{}
+	monitoringWg sync.WaitGroup
 }
 
 // NewManager creates a new alerting manager.
 func NewManager(logger *slog.Logger, collector *metrics.Collector) *Manager {
 	return &Manager{
-		rules:   make(map[string]*AlertRule),
-		alerts:  []*Alert{},
-		groups:  make(map[string]*NotificationGroup),
-		logger:  logger,
-		metrics: collector,
+		rules:       make(map[string]*AlertRule),
+		alerts:      []*Alert{},
+		groups:      make(map[string]*NotificationGroup),
+		logger:      logger,
+		metrics:     collector,
+		deliverySem: make(chan struct{}, MaxConcurrentDeliveries),
 	}
 }
 
@@ -306,10 +314,15 @@ func (m *Manager) TriggerAlert(rule *AlertRule, message string, details map[stri
 		"message", message,
 	)
 
-	// Deliver notification
+	// Deliver notification with bounded concurrency.
+	// Acquiring the semaphore token before spawning the goroutine
+	// means we block TriggerAlert when the delivery pool is saturated,
+	// which naturally back-pressures the caller.
 	if m.deliveryFunc != nil {
 		channels := m.getNotificationChannels(rule)
+		m.deliverySem <- struct{}{}
 		go func() {
+			defer func() { <-m.deliverySem }()
 			if err := m.deliveryFunc(alert, channels); err != nil {
 				m.logger.Error("failed to deliver alert", "alert_id", alert.ID, "err", err)
 			}
@@ -520,7 +533,9 @@ func (m *Manager) RunMonitoringChecks(collector *metrics.Collector) []*Alert {
 
 // StartMonitoring begins periodic monitoring checks.
 func (m *Manager) StartMonitoring(ctx context.Context, collector *metrics.Collector, interval time.Duration) {
+	m.monitoringWg.Add(1)
 	go func() {
+		defer m.monitoringWg.Done()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -533,4 +548,9 @@ func (m *Manager) StartMonitoring(ctx context.Context, collector *metrics.Collec
 			}
 		}
 	}()
+}
+
+// StopMonitoring waits for the monitoring goroutine to finish.
+func (m *Manager) StopMonitoring() {
+	m.monitoringWg.Wait()
 }

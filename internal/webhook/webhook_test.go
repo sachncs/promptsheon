@@ -1,10 +1,13 @@
 package webhook
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -292,6 +295,154 @@ func TestEventTypeConstants(t *testing.T) {
 			t.Errorf("event constant: got %q, want %q", c.got, c.want)
 		}
 	}
+}
+
+func TestRegisterWithStoreError(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelError}))
+	d := NewDispatcher(logger)
+	d = d.WithEndpointStore(&errorStore{})
+	d.Register(&Endpoint{ID: "ep-err", URL: "http://example.com", Events: []EventType{EventEvalCompleted}, Active: true})
+	if !strings.Contains(buf.String(), "persist endpoint failed") {
+		t.Errorf("expected log about persist failure, got %q", buf.String())
+	}
+}
+
+func TestRemoveWithStoreError(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelError}))
+	d := NewDispatcher(logger)
+	d = d.WithEndpointStore(&errorStore{})
+	d.Register(&Endpoint{ID: "ep-rm-err", URL: "http://example.com", Events: []EventType{EventEvalCompleted}, Active: true})
+	buf.Reset()
+	d.Remove("ep-rm-err")
+	if !strings.Contains(buf.String(), "persist delete failed") {
+		t.Errorf("expected log about delete failure, got %q", buf.String())
+	}
+}
+
+func TestLoadFromStoreNoStore(t *testing.T) {
+	d := NewDispatcher(slog.Default())
+	if err := d.LoadFromStore(context.Background()); err != nil {
+		t.Fatalf("expected no error without store, got %v", err)
+	}
+}
+
+func TestValidateURLMissingHost(t *testing.T) {
+	err := ValidateURL("http://")
+	if err == nil {
+		t.Error("expected error for missing host")
+	}
+}
+
+func TestDeliverHMACSigning(t *testing.T) {
+	t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
+	defer t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "")
+
+	var mu sync.Mutex
+	var gotSignature string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		gotSignature = r.Header.Get("X-Promptsheon-Signature")
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	d := NewDispatcher(slog.Default()).WithMaxRetries(0)
+	d.Register(&Endpoint{
+		ID: "ep-hmac", URL: srv.URL, Secret: "my-secret",
+		Events: []EventType{EventEvalCompleted}, Active: true,
+	})
+	d.Emit(&Event{ID: "evt-hmac", Type: EventEvalCompleted})
+	time.Sleep(500 * time.Millisecond)
+
+	mu.Lock()
+	sig := gotSignature
+	mu.Unlock()
+	if sig == "" {
+		t.Fatal("expected X-Promptsheon-Signature header to be set")
+	}
+	if !strings.HasPrefix(sig, "sha256=") {
+		t.Errorf("expected sha256= prefix, got %q", sig)
+	}
+}
+
+func TestDeliverContextCancellation(t *testing.T) {
+	t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
+	defer t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	d := NewDispatcher(slog.Default()).WithMaxRetries(2)
+	d.Register(&Endpoint{
+		ID: "ep-cancel", URL: "http://127.0.0.1:19999",
+		Events: []EventType{EventEvalCompleted}, Active: true,
+	})
+	d.EmitContext(ctx, &Event{ID: "evt-cancel", Type: EventEvalCompleted})
+	time.Sleep(500 * time.Millisecond)
+
+	deliveries := d.ListDeliveries()
+	if len(deliveries) != 1 {
+		t.Fatalf("expected 1 delivery, got %d", len(deliveries))
+	}
+	if deliveries[0].Success {
+		t.Fatal("expected delivery to fail due to context cancellation")
+	}
+}
+
+func TestSleepBackoffContextCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if sleepBackoff(ctx, 0) {
+		t.Error("expected sleepBackoff to return false with cancelled context")
+	}
+}
+
+func TestValidateURLRejectsPrivateIP(t *testing.T) {
+	err := ValidateURL("http://localhost")
+	if err == nil {
+		t.Error("expected error for private IP without ALLOW_PRIVATE")
+	}
+}
+
+func TestDeliverWithSecretAnd500(t *testing.T) {
+	t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
+	defer t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	d := NewDispatcher(slog.Default()).WithMaxRetries(1)
+	d.Register(&Endpoint{
+		ID: "ep-hmac-500", URL: srv.URL, Secret: "s",
+		Events: []EventType{EventEvalCompleted}, Active: true,
+	})
+	d.Emit(&Event{ID: "evt-hmac-500", Type: EventEvalCompleted})
+	time.Sleep(3 * time.Second)
+
+	deliveries := d.ListDeliveries()
+	if len(deliveries) == 0 {
+		t.Fatal("expected at least 1 delivery")
+	}
+	if deliveries[len(deliveries)-1].Success {
+		t.Fatal("expected final delivery to be failure")
+	}
+}
+
+type errorStore struct{}
+
+func (e *errorStore) SaveWebhookEndpoint(_ context.Context, _ *Endpoint) error {
+	return fmt.Errorf("save error")
+}
+func (e *errorStore) DeleteWebhookEndpoint(_ context.Context, _ string) error {
+	return fmt.Errorf("delete error")
+}
+func (e *errorStore) ListWebhookEndpoints(_ context.Context) ([]*Endpoint, error) {
+	return nil, fmt.Errorf("list error")
 }
 
 // fakeStore is a minimal EndpointStore used to exercise

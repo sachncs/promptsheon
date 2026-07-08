@@ -145,7 +145,7 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 	// self-only key).
 	newCtx, caller, err := s.authenticateRequest(r)
 	if err != nil {
-		return unauthorized("authentication required")
+		return unauthorized()
 	}
 	r = newCtx
 
@@ -199,7 +199,7 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 			}
 		}
 	case s.requireAuth:
-		return unauthorized("authentication required")
+		return unauthorized()
 	default:
 		// No-auth mode (PROMPTSHEON_AUTH=false). Admin keys are the
 		// highest-trust credential, and minting them without
@@ -382,7 +382,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 func (s *Server) handleListAPIKeys(w http.ResponseWriter, r *http.Request) error {
 	newCtx, _, err := s.authenticateRequest(r)
 	if err != nil {
-		return unauthorized("authentication required")
+		return unauthorized()
 	}
 	r = newCtx
 	caller, hasCaller := auth.UserFromContext(r.Context())
@@ -413,12 +413,12 @@ func (s *Server) handleListAPIKeys(w http.ResponseWriter, r *http.Request) error
 func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) error {
 	newCtx, _, err := s.authenticateRequest(r)
 	if err != nil {
-		return unauthorized("authentication required")
+		return unauthorized()
 	}
 	r = newCtx
 	caller, hasCaller := auth.UserFromContext(r.Context())
 	if !hasCaller && s.requireAuth {
-		return unauthorized("authentication required")
+		return unauthorized()
 	}
 	id := strings.TrimPrefix(r.URL.Path, "/api/v1/apikeys/")
 	if id == "" {

@@ -12,9 +12,9 @@ import (
 
 // mockStore implements APIKeyStore for testing.
 type mockStore struct {
-	keys             map[string]*APIKeyRecord
-	updateCalls      atomic.Int64
-	updateBlocks     chan struct{} // closed to unblock all blocked calls
+	keys         map[string]*APIKeyRecord
+	updateCalls  atomic.Int64
+	updateBlocks chan struct{} // closed to unblock all blocked calls
 }
 
 func (m *mockStore) GetAPIKeyByHash(_ context.Context, keyHash string) (*APIKeyRecord, error) {
@@ -225,7 +225,7 @@ func TestAuthenticatorMiddleware(t *testing.T) {
 			http.Error(w, "no user", http.StatusUnauthorized)
 			return
 		}
-		w.Write([]byte("user:" + u.ID)) //nolint:errcheck
+		_, _ = w.Write([]byte("user:" + u.ID))
 	})
 
 	handler := a.AuthenticateMiddleware(inner)
@@ -328,4 +328,73 @@ func TestAuthorizer_Require(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Errorf("correct role: code = %d, want %d", rr.Code, http.StatusOK)
 	}
+}
+
+func TestWithUserContext(t *testing.T) {
+	u := &User{ID: "u42", Role: RoleAdmin}
+	ctx := WithUserContext(context.Background(), u)
+	got, ok := UserFromContext(ctx)
+	if !ok {
+		t.Fatal("expected user in context")
+	}
+	if got.ID != "u42" || got.Role != RoleAdmin {
+		t.Errorf("got {ID: %q, Role: %q}, want {ID: u42, Role: admin}", got.ID, got.Role)
+	}
+}
+
+func TestHasPermissionUnknownRole(t *testing.T) {
+	if HasPermission("superadmin", PermPromptRead) {
+		t.Error("expected false for unknown role")
+	}
+}
+
+func TestAuthenticator_RevokedKey(t *testing.T) {
+	key, hash, _ := GenerateAPIKey()
+	s := &mockStore{
+		keys: map[string]*APIKeyRecord{
+			hash: {ID: "k1", UserID: "u1", Role: string(RoleReader), Revoked: true},
+		},
+	}
+	a := NewAuthenticator(s)
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer "+key)
+	_, err := a.Authenticate(req)
+	if err == nil {
+		t.Fatal("expected error for revoked key")
+	}
+}
+
+// mockLogger records auth failures for testing.
+type mockLogger struct {
+	failures []struct{ keyPrefix, reason, remoteAddr string }
+}
+
+func (m *mockLogger) LogAuthFailure(_ context.Context, keyPrefix, reason, remoteAddr string) {
+	m.failures = append(m.failures, struct{ keyPrefix, reason, remoteAddr string }{keyPrefix, reason, remoteAddr})
+}
+
+func TestNewAuthenticatorWithLogger(t *testing.T) {
+	logger := &mockLogger{}
+	s := &mockStore{keys: make(map[string]*APIKeyRecord)}
+	a := NewAuthenticatorWithLogger(s, logger)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	_, err := a.Authenticate(req)
+	if err == nil {
+		t.Fatal("expected error for missing key")
+	}
+	if len(logger.failures) != 1 {
+		t.Fatalf("expected 1 logged failure, got %d", len(logger.failures))
+	}
+	if logger.failures[0].reason != "missing api key" {
+		t.Errorf("reason = %q, want %q", logger.failures[0].reason, "missing api key")
+	}
+	a.Stop()
+}
+
+func TestAuthenticator_StopMultipleTimes(t *testing.T) {
+	s := &mockStore{keys: make(map[string]*APIKeyRecord)}
+	a := NewAuthenticator(s)
+	a.Stop()
+	a.Stop() // must not panic or hang
 }

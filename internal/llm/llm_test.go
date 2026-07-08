@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 )
@@ -338,5 +341,171 @@ func TestIsRetryable(t *testing.T) {
 				t.Errorf("isRetryable() = %v, want %v", got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestLoadFromEnv(t *testing.T) {
+	t.Setenv("PROMPTSHEON_OPENAI_API_KEY", "sk-test")
+	t.Setenv("PROMPTSHEON_ANTHROPIC_API_KEY", "sk-ant-test")
+	t.Setenv("PROMPTSHEON_OLLAMA_BASE_URL", "http://localhost:11434")
+	t.Setenv("PROMPTSHEON_AZURE_API_KEY", "sk-azure-test")
+	t.Setenv("PROMPTSHEON_NVIDIA_API_KEY", "nv-test")
+	t.Setenv("PROMPTSHEON_LLM_PROVIDER", "openai")
+
+	provider := LoadFromEnv()
+	if provider != "openai" {
+		t.Fatalf("expected 'openai', got %q", provider)
+	}
+
+	for _, name := range []string{"openai", "anthropic", "ollama", "azure", "nvidia"} {
+		p, err := Global.Get(name)
+		if err != nil {
+			t.Fatalf("Global.Get(%q): %v", name, err)
+		}
+		if p.Name() != name {
+			t.Errorf("Global.Get(%q).Name() = %q, want %q", name, p.Name(), name)
+		}
+	}
+}
+
+func TestEstimateTokens(t *testing.T) {
+	if got := EstimateTokens(""); got != 0 {
+		t.Errorf("empty string: got %d, want 0", got)
+	}
+	if got := EstimateTokens("hello"); got <= 0 {
+		t.Errorf("short string: got %d, want > 0", got)
+	}
+	long := strings.Repeat("hello world ", 100)
+	if got := EstimateTokens(long); got <= 0 {
+		t.Errorf("long string: got %d, want > 0", got)
+	}
+	punct := "... !!! ??? ,,, ;;;"
+	if got := EstimateTokens(punct); got <= 0 {
+		t.Errorf("punctuation-heavy: got %d, want > 0", got)
+	}
+}
+
+func TestEstimateCost(t *testing.T) {
+	cost := EstimateCost(100, 50, "gpt-4o")
+	if cost <= 0 {
+		t.Errorf("expected cost > 0 for gpt-4o, got %f", cost)
+	}
+	cost = EstimateCost(100, 50, "unknown-model")
+	if cost != 0 {
+		t.Errorf("expected cost 0 for unknown model, got %f", cost)
+	}
+}
+
+func TestCircuitStateString(t *testing.T) {
+	if StateClosed.String() != "closed" {
+		t.Errorf("StateClosed: got %q", StateClosed.String())
+	}
+	if StateOpen.String() != "open" {
+		t.Errorf("StateOpen: got %q", StateOpen.String())
+	}
+	if StateHalfOpen.String() != "half-open" {
+		t.Errorf("StateHalfOpen: got %q", StateHalfOpen.String())
+	}
+	if CircuitState(99).String() != "unknown" {
+		t.Errorf("CircuitState(99): got %q", CircuitState(99).String())
+	}
+}
+
+func TestDefaultCircuitBreakerConfig(t *testing.T) {
+	cfg := DefaultCircuitBreakerConfig()
+	if cfg.FailureThreshold != 5 {
+		t.Errorf("FailureThreshold: got %d, want 5", cfg.FailureThreshold)
+	}
+	if cfg.SuccessThreshold != 3 {
+		t.Errorf("SuccessThreshold: got %d, want 3", cfg.SuccessThreshold)
+	}
+	if cfg.Cooldown != 30*time.Second {
+		t.Errorf("Cooldown: got %v, want 30s", cfg.Cooldown)
+	}
+}
+
+func TestInstrumentedName(t *testing.T) {
+	mock := NewMock("test")
+	inst := NewInstrumented(mock, nil, nil)
+	if inst.Name() != "mock" {
+		t.Errorf("Instrumented.Name() = %q, want %q", inst.Name(), "mock")
+	}
+}
+
+func TestCircuitBreakerMiddlewareName(t *testing.T) {
+	mock := NewMock("test")
+	cbm := NewCircuitBreakerMiddleware(mock, DefaultCircuitBreakerConfig())
+	if cbm.Name() != "mock" {
+		t.Errorf("CircuitBreakerMiddleware.Name() = %q, want %q", cbm.Name(), "mock")
+	}
+}
+
+func TestMockLastCallEmpty(t *testing.T) {
+	mock := NewMock("test")
+	if last := mock.LastCall(); last != nil {
+		t.Fatal("expected nil LastCall on mock with no calls")
+	}
+}
+
+func TestInstrumentedError(t *testing.T) {
+	mock := NewMock("")
+	mock.Error = errors.New("provider failure")
+	var collected []CallMetrics
+	inst := NewInstrumented(mock, func(m CallMetrics) {
+		collected = append(collected, m)
+	}, nil)
+
+	_, err := inst.Complete(context.Background(), &Request{Model: "test"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if len(collected) != 1 {
+		t.Fatalf("expected 1 metric, got %d", len(collected))
+	}
+	if collected[0].Error != "provider failure" {
+		t.Errorf("expected error metric, got %v", collected[0].Error)
+	}
+}
+
+func TestInstrumentedWithLogger(t *testing.T) {
+	mock := NewMock("test")
+	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	inst := NewInstrumented(mock, nil, logger)
+
+	resp, err := inst.Complete(context.Background(), &Request{
+		Model:    "gpt-4o",
+		Messages: []Message{{Role: "user", Content: "hi"}},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Content != "test" {
+		t.Errorf("expected 'test', got %q", resp.Content)
+	}
+}
+
+func TestCircuitBreakerAllowEdgeCases(t *testing.T) {
+	cb := NewCircuitBreaker(CircuitBreakerConfig{
+		FailureThreshold: 1,
+		SuccessThreshold: 1,
+		Cooldown:         time.Hour,
+	})
+
+	cb.RecordFailure()
+	if cb.State() != StateOpen {
+		t.Fatal("expected open state")
+	}
+	if cb.Allow() {
+		t.Error("expected Allow to return false when open and cooldown not elapsed")
+	}
+
+	cb.state = StateHalfOpen
+	if !cb.Allow() {
+		t.Error("expected Allow to return true in half-open state")
+	}
+
+	cb.state = CircuitState(99)
+	if cb.Allow() {
+		t.Error("expected Allow to return false for invalid state")
 	}
 }

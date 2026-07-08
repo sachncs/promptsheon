@@ -14,7 +14,7 @@ type Status string
 
 const (
 	// StatusOK is a successful span status.
-	StatusOK    Status = "ok"
+	StatusOK Status = "ok"
 	// StatusError is an error span status.
 	StatusError Status = "error"
 	// StatusUnset is the default unset span status.

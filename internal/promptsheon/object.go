@@ -138,5 +138,3 @@ func shortHash(hash string) string {
 	}
 	return hash[:12]
 }
-
-

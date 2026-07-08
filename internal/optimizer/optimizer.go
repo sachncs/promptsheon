@@ -71,5 +71,3 @@ func GetOptimizationTips() []string {
 		"Use variables for dynamic content to enable reuse",
 	}
 }
-
-

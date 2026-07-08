@@ -84,7 +84,7 @@ func (s *Server) handleSearchSpans(w http.ResponseWriter, r *http.Request) error
 		}
 	}
 
-	spans, err := 	s.spans.ListSpans(r.Context(), &filter)
+	spans, err := s.spans.ListSpans(r.Context(), &filter)
 	if err != nil {
 		return err
 	}

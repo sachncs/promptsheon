@@ -118,7 +118,7 @@ func LLMMiddleware(collector *Collector, tracer trace.Tracer, _ *slog.Logger) fu
 			}
 			span.SetAttribute("llm.latency_ms", fmt.Sprintf("%d", latency.Milliseconds()))
 			span.Finish()
-			tracer.Finish(span) //nolint:errcheck // span is already finished; error is safe to ignore
+			_ = tracer.Finish(span)
 
 			return resp, err
 		}
@@ -150,7 +150,7 @@ func WorkflowMiddleware(collector *Collector, tracer trace.Tracer) func(next Wor
 				span.SetError(err)
 			}
 			span.Finish()
-			tracer.Finish(span) //nolint:errcheck // span is already finished; error is safe to ignore
+			_ = tracer.Finish(span)
 
 			return output, err
 		}

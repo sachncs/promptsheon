@@ -50,7 +50,7 @@ func (e *Engine) ExecuteVersion(ctx context.Context, version *capability.Version
 }
 
 // executePromptStep executes a single step using the capability version's prompt.
-func (e *Engine) executePromptStep(ctx context.Context, version *capability.Version, input map[string]any) *StepResult {
+func (e *Engine) executePromptStep(ctx context.Context, version *capability.Version, _ map[string]any) *StepResult {
 	result := &StepResult{
 		StepID: "main",
 		Status: StatusRunning,
@@ -58,9 +58,6 @@ func (e *Engine) executePromptStep(ctx context.Context, version *capability.Vers
 	}
 
 	start := time.Now()
-
-	_ = input
-	_ = version.RuntimePolicy
 
 	// Check guardrails
 	if len(version.Guardrails) > 0 && e.guardrailMgr != nil {

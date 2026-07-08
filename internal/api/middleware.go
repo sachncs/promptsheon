@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/auth"
@@ -26,7 +27,7 @@ func ChainHTTP(h http.Handler, mws ...func(http.Handler) http.Handler) http.Hand
 // generateRequestID creates a cryptographically random request ID.
 func generateRequestID() string {
 	b := make([]byte, 8)
-	rand.Read(b) //nolint:errcheck // 8 random bytes always succeeds on macOS/Linux
+	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }
 
@@ -106,6 +107,7 @@ func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
 					traceID, _ := trace.IDFromContext(r.Context())
 					logger.Error("panic recovered",
 						"err", rec,
+						"stack", string(debug.Stack()),
 						"method", r.Method,
 						"path", r.URL.Path,
 						"request_id", requestID,

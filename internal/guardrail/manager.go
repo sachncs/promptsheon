@@ -21,11 +21,11 @@ type Severity string
 
 const (
 	// SeverityLow is a low severity level.
-	SeverityLow      Severity = "low"
+	SeverityLow Severity = "low"
 	// SeverityMedium is a medium severity level.
-	SeverityMedium   Severity = "medium"
+	SeverityMedium Severity = "medium"
 	// SeverityHigh is a high severity level.
-	SeverityHigh     Severity = "high"
+	SeverityHigh Severity = "high"
 	// SeverityCritical is a critical severity level.
 	SeverityCritical Severity = "critical"
 )
@@ -37,23 +37,23 @@ type ViolationType string
 
 const (
 	// ViolationPromptLength is a prompt length violation type.
-	ViolationPromptLength      ViolationType = "prompt_length"
+	ViolationPromptLength ViolationType = "prompt_length"
 	// ViolationRestrictedTerm is a restricted term violation type.
-	ViolationRestrictedTerm    ViolationType = "restricted_term"
+	ViolationRestrictedTerm ViolationType = "restricted_term"
 	// ViolationModelAccess is a model access violation type.
-	ViolationModelAccess       ViolationType = "model_access"
+	ViolationModelAccess ViolationType = "model_access"
 	// ViolationQuotaExceeded is a quota exceeded violation type.
-	ViolationQuotaExceeded     ViolationType = "quota_exceeded"
+	ViolationQuotaExceeded ViolationType = "quota_exceeded"
 	// ViolationHallucinationHigh is a high hallucination violation type.
 	ViolationHallucinationHigh ViolationType = "hallucination_high"
 	// ViolationFormatInvalid is an invalid format violation type.
-	ViolationFormatInvalid     ViolationType = "format_invalid"
+	ViolationFormatInvalid ViolationType = "format_invalid"
 	// ViolationCostLimit is a cost limit violation type.
-	ViolationCostLimit         ViolationType = "cost_limit"
+	ViolationCostLimit ViolationType = "cost_limit"
 	// ViolationLatencyLimit is a latency limit violation type.
-	ViolationLatencyLimit      ViolationType = "latency_limit"
+	ViolationLatencyLimit ViolationType = "latency_limit"
 	// ViolationContentPolicy is a content policy violation type.
-	ViolationContentPolicy     ViolationType = "content_policy"
+	ViolationContentPolicy ViolationType = "content_policy"
 )
 
 // Violation records a single guardrail violation.

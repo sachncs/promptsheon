@@ -40,8 +40,23 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.RateLimitRate != 100 {
 		t.Errorf("RateLimitRate = %d, want 100", cfg.RateLimitRate)
 	}
+	if cfg.RateLimitInterval != 60 {
+		t.Errorf("RateLimitInterval = %d, want 60", cfg.RateLimitInterval)
+	}
+	if cfg.RateLimitBurst != 50 {
+		t.Errorf("RateLimitBurst = %d, want 50", cfg.RateLimitBurst)
+	}
 	if cfg.CircuitBreakerFailureThreshold != 5 {
 		t.Errorf("CircuitBreakerFailureThreshold = %d, want 5", cfg.CircuitBreakerFailureThreshold)
+	}
+	if cfg.CircuitBreakerSuccessThreshold != 3 {
+		t.Errorf("CircuitBreakerSuccessThreshold = %d, want 3", cfg.CircuitBreakerSuccessThreshold)
+	}
+	if cfg.CircuitBreakerCooldown != 30 {
+		t.Errorf("CircuitBreakerCooldown = %d, want 30", cfg.CircuitBreakerCooldown)
+	}
+	if cfg.CORSOrigins != "" {
+		t.Errorf("CORSOrigins = %q, want %q", cfg.CORSOrigins, "")
 	}
 }
 
@@ -162,5 +177,92 @@ func TestPort(t *testing.T) {
 				t.Errorf("Port() = %d, want %d", got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestPortServiceName(t *testing.T) {
+	cfg := Config{Addr: ":http"}
+	if got := cfg.Port(); got != 8080 {
+		t.Errorf("Port(:http) = %d, want 8080", got)
+	}
+}
+
+func TestLoadConfig_AdditionalEnvs(t *testing.T) {
+	_ = os.Setenv("PROMPTSHEON_RATE_LIMIT_INTERVAL", "30")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_RATE_LIMIT_INTERVAL") }()
+	_ = os.Setenv("PROMPTSHEON_RATE_LIMIT_BURST", "100")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_RATE_LIMIT_BURST") }()
+	_ = os.Setenv("PROMPTSHEON_CIRCUIT_BREAKER_SUCCESS_THRESHOLD", "5")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_CIRCUIT_BREAKER_SUCCESS_THRESHOLD") }()
+	_ = os.Setenv("PROMPTSHEON_CIRCUIT_BREAKER_COOLDOWN", "60")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_CIRCUIT_BREAKER_COOLDOWN") }()
+	_ = os.Setenv("PROMPTSHEON_LLM_FALLBACK", "anthropic,ollama")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_LLM_FALLBACK") }()
+	_ = os.Setenv("PROMPTSHEON_OTEL_INSECURE", "true")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_OTEL_INSECURE") }()
+	_ = os.Setenv("PROMPTSHEON_CORS_ORIGINS", "*")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_CORS_ORIGINS") }()
+
+	cfg := LoadConfig()
+	if cfg.RateLimitInterval != 30 {
+		t.Errorf("RateLimitInterval = %d, want 30", cfg.RateLimitInterval)
+	}
+	if cfg.RateLimitBurst != 100 {
+		t.Errorf("RateLimitBurst = %d, want 100", cfg.RateLimitBurst)
+	}
+	if cfg.CircuitBreakerSuccessThreshold != 5 {
+		t.Errorf("CircuitBreakerSuccessThreshold = %d, want 5", cfg.CircuitBreakerSuccessThreshold)
+	}
+	if cfg.CircuitBreakerCooldown != 60 {
+		t.Errorf("CircuitBreakerCooldown = %d, want 60", cfg.CircuitBreakerCooldown)
+	}
+	if cfg.LLMFallback != "anthropic,ollama" {
+		t.Errorf("LLMFallback = %q, want %q", cfg.LLMFallback, "anthropic,ollama")
+	}
+	if !cfg.OTelInsecure {
+		t.Error("OTelInsecure should be true")
+	}
+	if cfg.CORSOrigins != "*" {
+		t.Errorf("CORSOrigins = %q, want %q", cfg.CORSOrigins, "*")
+	}
+}
+
+func TestSanitizeConfigClampsNegative(t *testing.T) {
+	prev := slog.Default()
+	defer slog.SetDefault(prev)
+	var buf bytes.Buffer
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})))
+
+	_ = os.Setenv("PROMPTSHEON_RATE_LIMIT_RATE", "-1")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_RATE_LIMIT_RATE") }()
+	_ = os.Setenv("PROMPTSHEON_RATE_LIMIT_BURST", "-5")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_RATE_LIMIT_BURST") }()
+	_ = os.Setenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT", "-1")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT") }()
+	_ = os.Setenv("PROMPTSHEON_SERVER_READ_TIMEOUT", "-1")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_SERVER_READ_TIMEOUT") }()
+	_ = os.Setenv("PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT", "-1")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT") }()
+	_ = os.Setenv("PROMPTSHEON_SERVER_IDLE_TIMEOUT", "-1")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_SERVER_IDLE_TIMEOUT") }()
+
+	cfg := LoadConfig()
+	if cfg.RateLimitRate != 0 {
+		t.Errorf("RateLimitRate = %d, want 0", cfg.RateLimitRate)
+	}
+	if cfg.RateLimitBurst != 0 {
+		t.Errorf("RateLimitBurst = %d, want 0", cfg.RateLimitBurst)
+	}
+	if cfg.WriteTimeout != 30 {
+		t.Errorf("WriteTimeout = %d, want 30", cfg.WriteTimeout)
+	}
+	if cfg.ReadTimeout != 30 {
+		t.Errorf("ReadTimeout = %d, want 30", cfg.ReadTimeout)
+	}
+	if cfg.ReadHeaderTimeout != 10 {
+		t.Errorf("ReadHeaderTimeout = %d, want 10", cfg.ReadHeaderTimeout)
+	}
+	if cfg.IdleTimeout != 120 {
+		t.Errorf("IdleTimeout = %d, want 120", cfg.IdleTimeout)
 	}
 }
