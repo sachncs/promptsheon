@@ -68,7 +68,7 @@ One-line descriptions of every Go package in the repository, grouped by layer. T
 If you are new to the codebase:
 
 1. `cmd/promptsheond/main.go` — server startup, wiring, graceful shutdown.
-2. `internal/api/server.go` — route table, middleware chain, the `APIFunc` signature.
+2. `internal/api/server.go` — route table, middleware chain, the `Func` signature (exported as `api.Func`).
 3. `internal/config/config.go` — every env var and its default.
 4. `internal/store/sqlite.go` — the `Repository` interface and its SQLite implementation.
 5. `internal/llm/provider.go` — the `Provider` interface, the `Request`/`Response` shapes.
