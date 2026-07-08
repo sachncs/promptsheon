@@ -6,10 +6,10 @@ package capability
 // source can be updated (re-indexed, re-embedded, new documents) without
 // creating a new capability version.
 type KnowledgeSource struct {
-	ID             string   `json:"id"`
-	Name           string   `json:"name"`
-	Type           string   `json:"type"` // "documents", "index", "rag", "graph", "sql", "files"
-	Version        string   `json:"version"`
-	EmbeddingModel string   `json:"embedding_model,omitempty"`
+	ID             string         `json:"id"`
+	Name           string         `json:"name"`
+	Type           string         `json:"type"` // "documents", "index", "rag", "graph", "sql", "files"
+	Version        string         `json:"version"`
+	EmbeddingModel string         `json:"embedding_model,omitempty"`
 	Config         map[string]any `json:"config,omitempty"`
 }

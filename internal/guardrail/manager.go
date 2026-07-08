@@ -1,3 +1,4 @@
+// Package guardrail provides guardrail management for safety and quality checks.
 package guardrail
 
 import (
@@ -12,31 +13,50 @@ import (
 	"github.com/sachncs/promptsheon/internal/metrics"
 )
 
+const keyTerm = "term"
+const keyExpectedFormat = "expected_format"
+
+// Severity represents the severity level of a guardrail violation.
 type Severity string
 
 const (
+	// SeverityLow is a low severity level.
 	SeverityLow      Severity = "low"
+	// SeverityMedium is a medium severity level.
 	SeverityMedium   Severity = "medium"
+	// SeverityHigh is a high severity level.
 	SeverityHigh     Severity = "high"
+	// SeverityCritical is a critical severity level.
 	SeverityCritical Severity = "critical"
 )
 
 const maxViolations = 10000
 
+// ViolationType identifies the kind of guardrail violation.
 type ViolationType string
 
 const (
+	// ViolationPromptLength is a prompt length violation type.
 	ViolationPromptLength      ViolationType = "prompt_length"
+	// ViolationRestrictedTerm is a restricted term violation type.
 	ViolationRestrictedTerm    ViolationType = "restricted_term"
+	// ViolationModelAccess is a model access violation type.
 	ViolationModelAccess       ViolationType = "model_access"
+	// ViolationQuotaExceeded is a quota exceeded violation type.
 	ViolationQuotaExceeded     ViolationType = "quota_exceeded"
+	// ViolationHallucinationHigh is a high hallucination violation type.
 	ViolationHallucinationHigh ViolationType = "hallucination_high"
+	// ViolationFormatInvalid is an invalid format violation type.
 	ViolationFormatInvalid     ViolationType = "format_invalid"
+	// ViolationCostLimit is a cost limit violation type.
 	ViolationCostLimit         ViolationType = "cost_limit"
+	// ViolationLatencyLimit is a latency limit violation type.
 	ViolationLatencyLimit      ViolationType = "latency_limit"
+	// ViolationContentPolicy is a content policy violation type.
 	ViolationContentPolicy     ViolationType = "content_policy"
 )
 
+// Violation records a single guardrail violation.
 type Violation struct {
 	ID           string         `json:"id"`
 	RuleID       string         `json:"rule_id"`
@@ -54,6 +74,7 @@ type Violation struct {
 	Timestamp    time.Time      `json:"timestamp"`
 }
 
+// Rule defines a guardrail rule.
 type Rule struct {
 	ID           string         `json:"id"`
 	Name         string         `json:"name"`
@@ -68,11 +89,13 @@ type Rule struct {
 	UpdatedAt    time.Time      `json:"updated_at"`
 }
 
+// ViolationResult contains the result of a guardrail check.
 type ViolationResult struct {
 	Passed    bool       `json:"passed"`
 	Violation *Violation `json:"violation,omitempty"`
 }
 
+// Manager manages guardrail rules and violations.
 type Manager struct {
 	mu         sync.RWMutex
 	rules      map[string]*Rule
@@ -81,6 +104,7 @@ type Manager struct {
 	metrics    *metrics.Collector
 }
 
+// NewManager creates a new Manager.
 func NewManager(logger *slog.Logger, collector *metrics.Collector) *Manager {
 	return &Manager{
 		rules:      make(map[string]*Rule),
@@ -90,6 +114,7 @@ func NewManager(logger *slog.Logger, collector *metrics.Collector) *Manager {
 	}
 }
 
+// ListRules returns all registered guardrail rules.
 func (m *Manager) ListRules() []*Rule {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -100,12 +125,14 @@ func (m *Manager) ListRules() []*Rule {
 	return rules
 }
 
+// ListViolations returns all recorded violations.
 func (m *Manager) ListViolations() []*Violation {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.violations
 }
 
+// RecordViolation records a guardrail violation.
 func (m *Manager) RecordViolation(v *Violation) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -130,18 +157,21 @@ func (m *Manager) RecordViolation(v *Violation) {
 	}
 }
 
+// RecordBlock increments the block counter.
 func (m *Manager) RecordBlock() {
 	if m.metrics != nil {
 		m.metrics.GuardrailBlocks.Inc()
 	}
 }
 
+// RecordPass increments the pass counter.
 func (m *Manager) RecordPass() {
 	if m.metrics != nil {
 		m.metrics.GuardrailPasses.Inc()
 	}
 }
 
+// CheckPromptLength checks if content exceeds the maximum length.
 func (m *Manager) CheckPromptLength(content string, maxLength int) *ViolationResult {
 	if maxLength <= 0 {
 		return &ViolationResult{Passed: true}
@@ -164,6 +194,7 @@ func (m *Manager) CheckPromptLength(content string, maxLength int) *ViolationRes
 	return &ViolationResult{Passed: true}
 }
 
+// CheckRestrictedTerms checks if content contains banned terms.
 func (m *Manager) CheckRestrictedTerms(content string, bannedTerms []string) *ViolationResult {
 	contentLower := strings.ToLower(content)
 	for _, term := range bannedTerms {
@@ -175,7 +206,7 @@ func (m *Manager) CheckRestrictedTerms(content string, bannedTerms []string) *Vi
 					Type:      ViolationRestrictedTerm,
 					Severity:  SeverityHigh,
 					Message:   fmt.Sprintf("restricted term detected: %q", term),
-					Details:   map[string]any{"term": term},
+					Details:   map[string]any{keyTerm: term},
 					Timestamp: time.Now(),
 				},
 			}
@@ -184,6 +215,7 @@ func (m *Manager) CheckRestrictedTerms(content string, bannedTerms []string) *Vi
 	return &ViolationResult{Passed: true}
 }
 
+// CheckModelAccess checks if a model is allowed in the given environment.
 func (m *Manager) CheckModelAccess(model, environment string, allowedModels map[string][]string) *ViolationResult {
 	if allowedModels == nil {
 		return &ViolationResult{Passed: true}
@@ -213,7 +245,8 @@ func (m *Manager) CheckModelAccess(model, environment string, allowedModels map[
 	}
 }
 
-func (m *Manager) CheckResponseFormat(response string, formatSpec string) *ViolationResult {
+// CheckResponseFormat checks if the response matches the expected format.
+func (m *Manager) CheckResponseFormat(response, formatSpec string) *ViolationResult {
 	if formatSpec == "" {
 		return &ViolationResult{Passed: true}
 	}
@@ -229,7 +262,7 @@ func (m *Manager) CheckResponseFormat(response string, formatSpec string) *Viola
 					Type:      ViolationFormatInvalid,
 					Severity:  SeverityMedium,
 					Message:   "response is not valid JSON",
-					Details:   map[string]any{"expected_format": "json"},
+					Details:   map[string]any{keyExpectedFormat: "json"},
 					Timestamp: time.Now(),
 				},
 			}
@@ -243,7 +276,7 @@ func (m *Manager) CheckResponseFormat(response string, formatSpec string) *Viola
 					Type:      ViolationFormatInvalid,
 					Severity:  SeverityLow,
 					Message:   "response may not be valid markdown",
-					Details:   map[string]any{"expected_format": "markdown"},
+					Details:   map[string]any{keyExpectedFormat: "markdown"},
 					Timestamp: time.Now(),
 				},
 			}
@@ -258,7 +291,7 @@ func (m *Manager) CheckResponseFormat(response string, formatSpec string) *Viola
 					Type:      ViolationFormatInvalid,
 					Severity:  SeverityMedium,
 					Message:   fmt.Sprintf("response does not match expected pattern: %s", formatSpec),
-					Details:   map[string]any{"expected_format": formatSpec},
+					Details:   map[string]any{keyExpectedFormat: formatSpec},
 					Timestamp: time.Now(),
 				},
 			}
@@ -268,6 +301,7 @@ func (m *Manager) CheckResponseFormat(response string, formatSpec string) *Viola
 	return &ViolationResult{Passed: true}
 }
 
+// CheckContentPolicy checks content against defined content policies.
 func (m *Manager) CheckContentPolicy(content string, policies []string) *ViolationResult {
 	contentLower := strings.ToLower(content)
 
@@ -305,7 +339,7 @@ func (m *Manager) CheckContentPolicy(content string, policies []string) *Violati
 							Type:      ViolationContentPolicy,
 							Severity:  SeverityCritical,
 							Message:   fmt.Sprintf("harmful content detected: %s", term),
-							Details:   map[string]any{"policy": "no_harmful", "term": term},
+							Details:   map[string]any{"policy": "no_harmful", keyTerm: term},
 							Timestamp: time.Now(),
 						},
 					}
@@ -317,7 +351,8 @@ func (m *Manager) CheckContentPolicy(content string, policies []string) *Violati
 	return &ViolationResult{Passed: true}
 }
 
-func (m *Manager) CheckCostLimit(estimatedCostUSD float64, limitUSD float64) *ViolationResult {
+// CheckCostLimit checks if the estimated cost exceeds the limit.
+func (m *Manager) CheckCostLimit(estimatedCostUSD, limitUSD float64) *ViolationResult {
 	if limitUSD <= 0 {
 		return &ViolationResult{Passed: true}
 	}
@@ -338,7 +373,8 @@ func (m *Manager) CheckCostLimit(estimatedCostUSD float64, limitUSD float64) *Vi
 	return &ViolationResult{Passed: true}
 }
 
-func (m *Manager) CheckLatencyLimit(latencyMs int64, limitMs int64) *ViolationResult {
+// CheckLatencyLimit checks if the latency exceeds the limit.
+func (m *Manager) CheckLatencyLimit(latencyMs, limitMs int64) *ViolationResult {
 	if limitMs <= 0 {
 		return &ViolationResult{Passed: true}
 	}
@@ -359,7 +395,8 @@ func (m *Manager) CheckLatencyLimit(latencyMs int64, limitMs int64) *ViolationRe
 	return &ViolationResult{Passed: true}
 }
 
-func (m *Manager) RunAllStaticChecks(ctx context.Context, content, model, environment string) []*Violation {
+// RunAllStaticChecks runs all static guardrail checks against content.
+func (m *Manager) RunAllStaticChecks(_ context.Context, content, model, environment string) []*Violation {
 	var violations []*Violation
 
 	if result := m.CheckPromptLength(content, 10000); !result.Passed {
@@ -392,7 +429,8 @@ func (m *Manager) RunAllStaticChecks(ctx context.Context, content, model, enviro
 	return violations
 }
 
-func (m *Manager) RunAgentChecks(ctx context.Context, restrictedTerms []string, contentPolicy []string, content string) []*Violation {
+// RunAgentChecks runs guardrail checks for agent-driven content.
+func (m *Manager) RunAgentChecks(_ context.Context, restrictedTerms, contentPolicy []string, content string) []*Violation {
 	var violations []*Violation
 
 	for _, term := range restrictedTerms {
@@ -402,7 +440,7 @@ func (m *Manager) RunAgentChecks(ctx context.Context, restrictedTerms []string, 
 				Type:      ViolationRestrictedTerm,
 				Severity:  SeverityHigh,
 				Message:   fmt.Sprintf("restricted term found: %s", term),
-				Details:   map[string]any{"term": term},
+				Details:   map[string]any{keyTerm: term},
 				Timestamp: time.Now(),
 			}
 			violations = append(violations, v)

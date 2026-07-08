@@ -18,7 +18,7 @@ func setupTestDB(t *testing.T) *SQLite {
 	if err != nil {
 		t.Fatalf("NewSQLite: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 	return db
 }
 
@@ -57,8 +57,8 @@ func TestCapabilityStore_WorkspaceCRUD(t *testing.T) {
 
 	w.Name = "Acme Updated"
 	w.UpdatedAt = time.Now().UTC()
-	if err := db.UpdateWorkspace(ctx, w); err != nil {
-		t.Fatalf("UpdateWorkspace: %v", err)
+	if e := db.UpdateWorkspace(ctx, w); e != nil {
+		t.Fatalf("UpdateWorkspace: %v", e)
 	}
 
 	got, _ = db.GetWorkspace(ctx, "ws-1")
@@ -66,8 +66,8 @@ func TestCapabilityStore_WorkspaceCRUD(t *testing.T) {
 		t.Errorf("after update: got name %q", got.Name)
 	}
 
-	if err := db.DeleteWorkspace(ctx, "ws-1"); err != nil {
-		t.Fatalf("DeleteWorkspace: %v", err)
+	if e := db.DeleteWorkspace(ctx, "ws-1"); e != nil {
+		t.Fatalf("DeleteWorkspace: %v", e)
 	}
 	_, err = db.GetWorkspace(ctx, "ws-1")
 	if err != ErrNotFound {
@@ -81,7 +81,7 @@ func TestCapabilityStore_ProjectCRUD(t *testing.T) {
 	now := time.Now().UTC()
 
 	// Create workspace first
-	db.CreateWorkspace(ctx, &capability.Workspace{
+	_ = db.CreateWorkspace(ctx, &capability.Workspace{
 		ID: "ws-1", Name: "Test", CreatedAt: now, UpdatedAt: now,
 	})
 
@@ -110,8 +110,8 @@ func TestCapabilityStore_ProjectCRUD(t *testing.T) {
 		t.Fatalf("expected 1 project, got %d", len(list))
 	}
 
-	if err := db.DeleteProject(ctx, "proj-1"); err != nil {
-		t.Fatalf("DeleteProject: %v", err)
+	if e := db.DeleteProject(ctx, "proj-1"); e != nil {
+		t.Fatalf("DeleteProject: %v", e)
 	}
 	_, err = db.GetProject(ctx, "proj-1")
 	if err != ErrNotFound {
@@ -129,7 +129,7 @@ func TestCapabilityStore_CapabilityCRUD(t *testing.T) {
 	c := &capability.Capability{
 		ID: "cap-1", ProjectID: "proj-1", Name: "Summarize Invoice",
 		Description: "Extract invoice data", Owner: "alice",
-		Tags: []string{"finance", "invoices"}, State: capability.CapabilityStateDraft,
+		Tags: []string{"finance", "invoices"}, State: capability.StateDraft,
 		CreatedAt: now, UpdatedAt: now,
 	}
 
@@ -147,7 +147,7 @@ func TestCapabilityStore_CapabilityCRUD(t *testing.T) {
 	if len(got.Tags) != 2 {
 		t.Errorf("expected 2 tags, got %d", len(got.Tags))
 	}
-	if got.State != capability.CapabilityStateDraft {
+	if got.State != capability.StateDraft {
 		t.Errorf("expected draft state")
 	}
 
@@ -159,21 +159,21 @@ func TestCapabilityStore_CapabilityCRUD(t *testing.T) {
 		t.Fatalf("expected 1 capability, got %d", len(list))
 	}
 
-	c.State = capability.CapabilityStateActive
+	c.State = capability.StateActive
 	c.CurrentVersionID = "ver-1"
-	if err := db.UpdateCapability(ctx, c); err != nil {
-		t.Fatalf("UpdateCapability: %v", err)
+	if e := db.UpdateCapability(ctx, c); e != nil {
+		t.Fatalf("UpdateCapability: %v", e)
 	}
 	got, _ = db.GetCapability(ctx, "cap-1")
-	if got.State != capability.CapabilityStateActive {
+	if got.State != capability.StateActive {
 		t.Errorf("expected active state after update")
 	}
 	if got.CurrentVersionID != "ver-1" {
 		t.Errorf("expected current_version_id ver-1")
 	}
 
-	if err := db.DeleteCapability(ctx, "cap-1"); err != nil {
-		t.Fatalf("DeleteCapability: %v", err)
+	if e := db.DeleteCapability(ctx, "cap-1"); e != nil {
+		t.Fatalf("DeleteCapability: %v", e)
 	}
 	_, err = db.GetCapability(ctx, "cap-1")
 	if err != ErrNotFound {
@@ -188,7 +188,7 @@ func TestCapabilityStore_VersionCRUD(t *testing.T) {
 
 	setupCapability(t, db, now)
 
-	v := &capability.CapabilityVersion{
+	v := &capability.Version{
 		ID:           "ver-1",
 		CapabilityID: "cap-1",
 		Version:      1,
@@ -200,7 +200,7 @@ func TestCapabilityStore_VersionCRUD(t *testing.T) {
 		},
 		ModelPolicy: capability.ModelPolicy{
 			Requirements: capability.ModelRequirements{
-				NeedsJSON:  true,
+				NeedsJSON:    true,
 				MaxLatencyMs: 2000,
 			},
 			SelectionStrategy: capability.SelectionStrategyCostOptimized,
@@ -263,7 +263,7 @@ func TestCapabilityStore_MultipleVersions(t *testing.T) {
 	setupCapability(t, db, now)
 
 	for i := 1; i <= 3; i++ {
-		v := &capability.CapabilityVersion{
+		v := &capability.Version{
 			ID:           fmt.Sprintf("ver-%d", i),
 			CapabilityID: "cap-1",
 			Version:      i,
@@ -361,7 +361,7 @@ func TestCapabilityStore_VersionWithFullConfig(t *testing.T) {
 
 	setupCapability(t, db, now)
 
-	v := &capability.CapabilityVersion{
+	v := &capability.Version{
 		ID:           "ver-full",
 		CapabilityID: "cap-1",
 		Version:      1,
@@ -387,12 +387,12 @@ func TestCapabilityStore_VersionWithFullConfig(t *testing.T) {
 				MaxCostUSD:     0.05,
 			},
 			SelectionStrategy: capability.SelectionStrategyQualityOptimized,
-			ProviderHints:    []string{"openai", "anthropic"},
+			ProviderHints:     []string{"openai", "anthropic"},
 		},
 		ContextContract: capability.ContextContract{
-			RequiredContext:    []capability.ContextRef{{Key: "user", Source: "session"}},
-			MaximumSize:        8192,
-			RetrievalStrategy:  "hybrid",
+			RequiredContext:   []capability.ContextRef{{Key: "user", Source: "session"}},
+			MaximumSize:       8192,
+			RetrievalStrategy: "hybrid",
 		},
 		Knowledge: []capability.KnowledgeSource{
 			{ID: "ks-1", Name: "docs", Type: "rag", Version: "v2", EmbeddingModel: "text-embedding-3-small"},
@@ -413,7 +413,7 @@ func TestCapabilityStore_VersionWithFullConfig(t *testing.T) {
 			Retries: 2, TimeoutMs: 30000, Caching: "semantic", Temperature: 0.3, MaxTokens: 2048,
 		},
 		EvaluationSuite: capability.EvaluationSuite{
-			Metrics: []string{"accuracy", "hallucination"},
+			Metrics:    []string{"accuracy", "hallucination"},
 			Thresholds: map[string]float64{"accuracy": 0.9},
 		},
 		CreatedAt: now,
@@ -527,7 +527,7 @@ func setupCapability(t *testing.T, db *SQLite, now time.Time) {
 	setupWorkspaceAndProject(t, db, now)
 	if err := db.CreateCapability(context.Background(), &capability.Capability{
 		ID: "cap-1", ProjectID: "proj-1", Name: "Test Capability",
-		State: capability.CapabilityStateDraft, CreatedAt: now, UpdatedAt: now,
+		State: capability.StateDraft, CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
 		t.Fatalf("setup capability: %v", err)
 	}
@@ -536,9 +536,9 @@ func setupCapability(t *testing.T, db *SQLite, now time.Time) {
 func setupVersion(t *testing.T, db *SQLite, now time.Time) {
 	t.Helper()
 	setupCapability(t, db, now)
-	if err := db.CreateVersion(context.Background(), &capability.CapabilityVersion{
+	if err := db.CreateVersion(context.Background(), &capability.Version{
 		ID: "ver-1", CapabilityID: "cap-1", Version: 1,
-		Prompt: capability.Prompt{Instructions: "test"},
+		Prompt:    capability.Prompt{Instructions: "test"},
 		CreatedAt: now,
 	}); err != nil {
 		t.Fatalf("setup version: %v", err)

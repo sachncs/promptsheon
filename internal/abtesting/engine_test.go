@@ -70,7 +70,7 @@ func TestSelectVariant(t *testing.T) {
 		},
 	}
 
-	engine.CreateTest(test)
+	_ = engine.CreateTest(test)
 
 	// Run multiple selections to verify distribution
 	counts := map[string]int{}
@@ -100,7 +100,7 @@ func TestRecordResult(t *testing.T) {
 		},
 	}
 
-	engine.CreateTest(test)
+	_ = engine.CreateTest(test)
 
 	// Record some results
 	for i := 0; i < 10; i++ {
@@ -140,8 +140,8 @@ func TestStopTest(t *testing.T) {
 		},
 	}
 
-	engine.CreateTest(test)
-	engine.StopTest("test1")
+	_ = engine.CreateTest(test)
+	_ = engine.StopTest("test1")
 
 	got, _ := engine.GetTest("test1")
 	if got.Status != "completed" {
@@ -152,14 +152,14 @@ func TestStopTest(t *testing.T) {
 func TestListTests(t *testing.T) {
 	engine := abtesting.NewEngine(nil)
 
-	engine.CreateTest(&abtesting.Test{
+	_ = engine.CreateTest(&abtesting.Test{
 		ID:       "test1",
 		Name:     "Test 1",
 		PromptID: "prompt1",
 		Variants: []*abtesting.Variant{{ID: "v1", TrafficPct: 100}},
 	})
 
-	engine.CreateTest(&abtesting.Test{
+	_ = engine.CreateTest(&abtesting.Test{
 		ID:       "test2",
 		Name:     "Test 2",
 		PromptID: "prompt2",

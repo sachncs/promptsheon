@@ -151,12 +151,12 @@ func TestGetChanges(t *testing.T) {
 	session := manager.CreateSession("prompt1", "test")
 
 	// Apply some changes
-	manager.ApplyChange(session.ID, &collab.Change{
+	_ = manager.ApplyChange(session.ID, &collab.Change{
 		Type:     "insert",
 		Position: 0,
 		Content:  "A",
 	})
-	manager.ApplyChange(session.ID, &collab.Change{
+	_ = manager.ApplyChange(session.ID, &collab.Change{
 		Type:     "insert",
 		Position: 1,
 		Content:  "B",
@@ -207,8 +207,8 @@ func TestConcurrentAccess(t *testing.T) {
 	// Run concurrent operations
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
-		go func(id int) {
-			manager.ApplyChange(session.ID, &collab.Change{
+		go func(_ int) {
+			_ = manager.ApplyChange(session.ID, &collab.Change{
 				Type:     "insert",
 				Position: 4, // Insert at end
 				Content:  "X",

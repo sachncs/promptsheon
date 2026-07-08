@@ -6,12 +6,12 @@ package capability
 // required context item is present, no forbidden items leak through, and
 // the total size stays within budget.
 type ContextContract struct {
-	RequiredContext    []ContextRef    `json:"required_context,omitempty"`
-	OptionalContext    []ContextRef    `json:"optional_context,omitempty"`
-	ForbiddenContext   []string        `json:"forbidden_context,omitempty"` // keys / patterns
-	MaximumSize        int             `json:"maximum_size"`               // in tokens
-	CompressionStrategy string         `json:"compression_strategy,omitempty"`
-	RetrievalStrategy  string         `json:"retrieval_strategy,omitempty"` // semantic, keyword, hybrid
+	RequiredContext     []ContextRef `json:"required_context,omitempty"`
+	OptionalContext     []ContextRef `json:"optional_context,omitempty"`
+	ForbiddenContext    []string     `json:"forbidden_context,omitempty"` // keys / patterns
+	MaximumSize         int          `json:"maximum_size"`                // in tokens
+	CompressionStrategy string       `json:"compression_strategy,omitempty"`
+	RetrievalStrategy   string       `json:"retrieval_strategy,omitempty"` // semantic, keyword, hybrid
 }
 
 // ContextRef references a piece of context by key, with an optional source.

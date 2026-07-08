@@ -17,6 +17,11 @@ type DiffResult struct {
 	TreeDiffs []DiffEntry
 }
 
+const statusRemoved = "removed"
+const statusAdded = "added"
+const statusModified = "modified"
+const statusMetric = "metric"
+
 // DiffEntry is one row of a DiffResult. Status is one of "added",
 // "removed", "modified", or "metric" — the formatter upper-cases
 // these for display.
@@ -98,33 +103,33 @@ func DiffIntelligence(a, b string) (*DiffResult, error) {
 
 	for _, name := range names {
 		old, oldOK := oldEntries[name]
-		new, newOK := newEntries[name]
+		newEntry, newOK := newEntries[name]
 		switch {
 		case oldOK && !newOK:
 			result.TreeDiffs = append(result.TreeDiffs, DiffEntry{
 				Name:    name,
-				Type:    "blob",
-				Status:  "removed",
+				Type:    string(TypeBlob),
+				Status:  statusRemoved,
 				OldHash: old.hash,
 			})
 		case !oldOK && newOK:
 			result.TreeDiffs = append(result.TreeDiffs, DiffEntry{
 				Name:    name,
-				Type:    "blob",
-				Status:  "added",
-				NewHash: new.hash,
+				Type:    string(TypeBlob),
+				Status:  statusAdded,
+				NewHash: newEntry.hash,
 			})
-		case old.hash != new.hash:
+		case old.hash != newEntry.hash:
 			textDiff := ""
-			if old.kind == "blob" && new.kind == "blob" {
-				textDiff = computeTextDiff(old.content, new.content, name)
+			if old.kind == string(TypeBlob) && newEntry.kind == string(TypeBlob) {
+				textDiff = computeTextDiff(old.content, newEntry.content, name)
 			}
 			result.TreeDiffs = append(result.TreeDiffs, DiffEntry{
 				Name:     name,
-				Type:     "blob",
-				Status:   "modified",
+				Type:     string(TypeBlob),
+				Status:   statusModified,
 				OldHash:  old.hash,
-				NewHash:  new.hash,
+				NewHash:  newEntry.hash,
 				TextDiff: textDiff,
 			})
 		}
@@ -137,7 +142,7 @@ func DiffIntelligence(a, b string) (*DiffResult, error) {
 	if len(metricDiffs) > 0 {
 		result.TreeDiffs = append(result.TreeDiffs, DiffEntry{
 			Name:        "(metric)",
-			Status:      "metric",
+			Status:      statusMetric,
 			MetricDiffs: metricDiffs,
 		})
 	}
@@ -186,7 +191,7 @@ func flattenTree(root, prefix string) map[string]treeEntry {
 		}
 		out[path] = treeEntry{
 			hash:    e.Hash,
-			kind:    "blob",
+			kind:    string(TypeBlob),
 			content: child.Data,
 		}
 	}
@@ -251,8 +256,8 @@ func FormatDiff(d *DiffResult) string {
 	}
 	var b strings.Builder
 	b.WriteString("Intelligence Diff\n")
-	b.WriteString(fmt.Sprintf("  from %s\n", shortHash(d.CommitA)))
-	b.WriteString(fmt.Sprintf("  to   %s\n", shortHash(d.CommitB)))
+	fmt.Fprintf(&b, "  from %s\n", shortHash(d.CommitA))
+	fmt.Fprintf(&b, "  to   %s\n", shortHash(d.CommitB))
 	b.WriteString("\n")
 	for _, e := range d.TreeDiffs {
 		status := strings.ToUpper(e.Status)

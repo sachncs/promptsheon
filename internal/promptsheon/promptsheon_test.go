@@ -12,7 +12,7 @@ import (
 
 func setupTestRepo(t *testing.T) {
 	t.Helper()
-	os.RemoveAll(PromptsheonDir)
+	_ = os.RemoveAll(PromptsheonDir)
 	if err := Init(); err != nil {
 		t.Fatalf("Init() error: %v", err)
 	}
@@ -20,7 +20,7 @@ func setupTestRepo(t *testing.T) {
 
 func teardownTestRepo(t *testing.T) {
 	t.Helper()
-	os.RemoveAll(PromptsheonDir)
+	_ = os.RemoveAll(PromptsheonDir)
 }
 
 // ---------------------------------------------------------------------------
@@ -477,8 +477,8 @@ func TestBranchAndCheckout(t *testing.T) {
 		t.Fatalf("expected ref 'feature', got %q", result2.Ref)
 	}
 
-	if err := Checkout("main"); err != nil {
-		t.Fatalf("Checkout('main') error: %v", err)
+	if e := Checkout("main"); e != nil {
+		t.Fatalf("Checkout('main') error: %v", e)
 	}
 
 	commits, _ := Log(10)
@@ -568,8 +568,8 @@ func TestDetachedHEAD(t *testing.T) {
 		t.Fatalf("Commit() error: %v", err)
 	}
 
-	if err := Checkout(result.Hash); err != nil {
-		t.Fatalf("Checkout() error: %v", err)
+	if e := Checkout(result.Hash); e != nil {
+		t.Fatalf("Checkout() error: %v", e)
 	}
 
 	head, _ := ReadHEAD()
@@ -594,7 +594,7 @@ func TestDetachedHeadCommit(t *testing.T) {
 	treeHash, _ := WriteObject(tree)
 
 	c1, _ := Commit(treeHash, nil, "author", "first", nil)
-	Checkout(c1.Hash)
+	_ = Checkout(c1.Hash)
 
 	c2, err := Commit(treeHash, []string{c1.Hash}, "author", "detached commit", nil)
 	if err != nil {
@@ -620,7 +620,7 @@ func TestReAttachHEAD(t *testing.T) {
 	tree := NewBlobObject("data")
 	treeHash, _ := WriteObject(tree)
 	c1, _ := Commit(treeHash, nil, "author", "first", nil)
-	Checkout(c1.Hash)
+	_ = Checkout(c1.Hash)
 
 	if err := CreateBranch("from-detached", ""); err != nil {
 		t.Fatalf("CreateBranch() from detached HEAD: %v", err)
@@ -669,11 +669,11 @@ func TestLogWithMergeCommits(t *testing.T) {
 	rootTree, _ := WriteObject(NewTreeObject([]TreeEntry{{Name: "root", Type: TypeBlob, Hash: rootHash}}))
 
 	c1, _ := Commit(rootTree, nil, "author", "root", nil)
-	Checkout(c1.Hash)
+	_ = Checkout(c1.Hash)
 	c2, _ := Commit(rootTree, []string{c1.Hash}, "author", "branch", nil)
-	Checkout("main")
+	_ = Checkout("main")
 	c3, _ := Commit(rootTree, []string{c1.Hash}, "author", "main second", nil)
-	Commit(rootTree, []string{c3.Hash, c2.Hash}, "author", "merge", nil)
+	_, _ = Commit(rootTree, []string{c3.Hash, c2.Hash}, "author", "merge", nil)
 
 	commits, err := Log(10)
 	if err != nil {
@@ -795,8 +795,8 @@ func TestCommitDeterminism(t *testing.T) {
 	}
 
 	var deserialized Object
-	if err := json.Unmarshal(serialized, &deserialized); err != nil {
-		t.Fatalf("Unmarshal() error: %v", err)
+	if e := json.Unmarshal(serialized, &deserialized); e != nil {
+		t.Fatalf("Unmarshal() error: %v", e)
 	}
 
 	hash3, err := ObjectHash(&deserialized)
@@ -833,8 +833,8 @@ func TestInvalidHash(t *testing.T) {
 }
 
 func TestUninitializedRepoErrors(t *testing.T) {
-	os.RemoveAll(PromptsheonDir)
-	defer os.RemoveAll(PromptsheonDir)
+	_ = os.RemoveAll(PromptsheonDir)
+	defer func() { _ = os.RemoveAll(PromptsheonDir) }()
 
 	if IsInitialized() {
 		t.Fatal("expected IsInitialized() to be false")
@@ -928,7 +928,7 @@ func TestConcurrentWrites(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
-		go func(i int) {
+		go func(_ int) {
 			defer wg.Done()
 			obj := NewBlobObject("concurrent write")
 			hash, err := WriteObject(obj)
@@ -1003,7 +1003,7 @@ func TestGetStatsWithObjects(t *testing.T) {
 	defer teardownTestRepo(t)
 
 	b := NewBlobObject("test data")
-	WriteObject(b)
+	_, _ = WriteObject(b)
 
 	stats, err := GetStats()
 	if err != nil {
@@ -1025,7 +1025,7 @@ func TestVerifyHealthyRepo(t *testing.T) {
 	defer teardownTestRepo(t)
 
 	b := NewBlobObject("test")
-	WriteObject(b)
+	_, _ = WriteObject(b)
 
 	result, err := Verify()
 	if err != nil {
@@ -1107,11 +1107,11 @@ func TestBuildGraphMultiBranch(t *testing.T) {
 	th, _ := WriteObject(NewTreeObject([]TreeEntry{{Name: "file", Type: TypeBlob, Hash: bh}}))
 	c1, _ := Commit(th, nil, "author", "first", nil)
 
-	CreateBranch("feature", "")
-	Checkout("feature")
-	Commit(th, []string{c1.Hash}, "author", "feature commit", nil)
+	_ = CreateBranch("feature", "")
+	_ = Checkout("feature")
+	_, _ = Commit(th, []string{c1.Hash}, "author", "feature commit", nil)
 
-	Checkout("main")
+	_ = Checkout("main")
 
 	nodes, err := BuildGraph()
 	if err != nil {
@@ -1142,8 +1142,8 @@ func TestBuildGraphMultiBranch(t *testing.T) {
 }
 
 func TestGetStatsUninitialized(t *testing.T) {
-	os.RemoveAll(PromptsheonDir)
-	defer os.RemoveAll(PromptsheonDir)
+	_ = os.RemoveAll(PromptsheonDir)
+	defer func() { _ = os.RemoveAll(PromptsheonDir) }()
 
 	_, err := GetStats()
 	if err != ErrRepoNotInitialized {
@@ -1152,8 +1152,8 @@ func TestGetStatsUninitialized(t *testing.T) {
 }
 
 func TestVerifyUninitialized(t *testing.T) {
-	os.RemoveAll(PromptsheonDir)
-	defer os.RemoveAll(PromptsheonDir)
+	_ = os.RemoveAll(PromptsheonDir)
+	defer func() { _ = os.RemoveAll(PromptsheonDir) }()
 
 	_, err := Verify()
 	if err != ErrRepoNotInitialized {
@@ -1162,8 +1162,8 @@ func TestVerifyUninitialized(t *testing.T) {
 }
 
 func TestBuildGraphUninitialized(t *testing.T) {
-	os.RemoveAll(PromptsheonDir)
-	defer os.RemoveAll(PromptsheonDir)
+	_ = os.RemoveAll(PromptsheonDir)
+	defer func() { _ = os.RemoveAll(PromptsheonDir) }()
 
 	_, err := BuildGraph()
 	if err != ErrRepoNotInitialized {
@@ -1180,11 +1180,11 @@ func TestBuildGraphMergeCommit(t *testing.T) {
 	th, _ := WriteObject(NewTreeObject([]TreeEntry{{Name: "file", Type: TypeBlob, Hash: bh}}))
 
 	c1, _ := Commit(th, nil, "author", "root", nil)
-	Checkout(c1.Hash)
+	_ = Checkout(c1.Hash)
 	c2, _ := Commit(th, []string{c1.Hash}, "author", "feature", nil)
-	Checkout("main")
+	_ = Checkout("main")
 	c3, _ := Commit(th, []string{c1.Hash}, "author", "main second", nil)
-	Commit(th, []string{c3.Hash, c2.Hash}, "author", "merge", nil)
+	_, _ = Commit(th, []string{c3.Hash, c2.Hash}, "author", "merge", nil)
 
 	nodes, err := BuildGraph()
 	if err != nil {
@@ -1228,7 +1228,7 @@ func TestListRefDetailsAfterCommit(t *testing.T) {
 	b := NewBlobObject("data")
 	bh, _ := WriteObject(b)
 	th, _ := WriteObject(NewTreeObject([]TreeEntry{{Name: "file", Type: TypeBlob, Hash: bh}}))
-	Commit(th, nil, "author", "first", nil)
+	_, _ = Commit(th, nil, "author", "first", nil)
 
 	details, err := ListRefDetails()
 	if err != nil {
@@ -1510,10 +1510,10 @@ func TestVerifyCorruptedObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if err := os.WriteFile(objPath, data[:len(data)/2], 0644); err != nil {
-		t.Fatalf("WriteFile: %v", err)
+	if e := os.WriteFile(objPath, data[:len(data)/2], 0644); e != nil {
+		t.Fatalf("WriteFile: %v", e)
 	}
-	os.Chmod(objPath, 0444)
+	_ = os.Chmod(objPath, 0444)
 
 	result, err := Verify()
 	if err != nil {

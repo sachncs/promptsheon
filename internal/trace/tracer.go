@@ -13,8 +13,11 @@ import (
 type Status string
 
 const (
+	// StatusOK is a successful span status.
 	StatusOK    Status = "ok"
+	// StatusError is an error span status.
 	StatusError Status = "error"
+	// StatusUnset is the default unset span status.
 	StatusUnset Status = ""
 )
 
@@ -81,8 +84,8 @@ const (
 	UserIDContextKey contextKey = "user_id"
 )
 
-// TraceIDFromContext returns the trace ID from the context, if any.
-func TraceIDFromContext(ctx context.Context) (string, bool) {
+// IDFromContext returns the trace ID from the context, if any.
+func IDFromContext(ctx context.Context) (string, bool) {
 	id, ok := ctx.Value(TraceIDContextKey).(string)
 	return id, ok
 }
@@ -131,7 +134,7 @@ func WithSpanContext(ctx context.Context, s *Span) context.Context {
 // process-wide counter to guarantee uniqueness.
 var idCounter atomic.Uint64
 
-// generateID creates a unique span ID. The ID is collision-safe even
+// GenerateID creates a unique span ID. The ID is collision-safe even
 // for two spans created in the same nanosecond because we mix the
 // UnixNano timestamp with an atomic counter.
 func GenerateID() string {

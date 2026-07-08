@@ -2,7 +2,6 @@ package promptsheon
 
 import (
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -137,22 +136,4 @@ func IsInitialized() bool {
 	return true
 }
 
-// copyFile copies src to dst with the given mode. It is used by
-// the test helpers and by Init; isolating it keeps the test code
-// short and makes the intent obvious.
-func copyFile(src, dst string, mode os.FileMode) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	if _, err := io.Copy(out, in); err != nil {
-		return err
-	}
-	return nil
-}
+

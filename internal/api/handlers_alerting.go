@@ -7,7 +7,10 @@ import (
 	"github.com/sachncs/promptsheon/internal/alerting"
 )
 
-func (s *Server) handleListAlertRules(w http.ResponseWriter, r *http.Request) error {
+const keyName = "name"
+const keyStatus = "status"
+
+func (s *Server) handleListAlertRules(w http.ResponseWriter, _ *http.Request) error {
 	if s.alertingManager == nil {
 		writeJSON(w, http.StatusOK, []*alerting.AlertRule{})
 		return nil
@@ -58,7 +61,7 @@ func (s *Server) handleCreateAlertRule(w http.ResponseWriter, r *http.Request) e
 	}
 
 	s.alertingManager.AddRule(rule)
-	s.audit(r.Context(), "create", "alert_rule:"+rule.ID, map[string]any{"name": rule.Name})
+	s.audit(r.Context(), "create", "alert_rule:"+rule.ID, map[string]any{keyName: rule.Name})
 	writeJSON(w, http.StatusCreated, rule)
 	return nil
 }
@@ -128,7 +131,7 @@ func (s *Server) handleDeleteAlertRule(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
-func (s *Server) handleListAlerts(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleListAlerts(w http.ResponseWriter, _ *http.Request) error {
 	if s.alertingManager == nil {
 		writeJSON(w, http.StatusOK, []*alerting.Alert{})
 		return nil
@@ -149,7 +152,7 @@ func (s *Server) handleResolveAlert(w http.ResponseWriter, r *http.Request) erro
 	if !s.alertingManager.ResolveAlert(id) {
 		return ErrNotFound
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "resolved"})
+	writeJSON(w, http.StatusOK, map[string]any{keyStatus: "resolved"})
 	return nil
 }
 

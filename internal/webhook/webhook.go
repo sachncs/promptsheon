@@ -25,14 +25,23 @@ import (
 type EventType string
 
 const (
+	// EventEvalCompleted is emitted when an evaluation completes.
 	EventEvalCompleted     EventType = "eval.completed"
+	// EventReviewApproved is emitted when a review is approved.
 	EventReviewApproved    EventType = "review.approved"
+	// EventReviewRejected is emitted when a review is rejected.
 	EventReviewRejected    EventType = "review.rejected"
+	// EventWorkflowCompleted is emitted when a workflow completes.
 	EventWorkflowCompleted EventType = "workflow.completed"
+	// EventWorkflowFailed is emitted when a workflow fails.
 	EventWorkflowFailed    EventType = "workflow.failed"
+	// EventPromptCreated is emitted when a prompt is created.
 	EventPromptCreated     EventType = "prompt.created"
+	// EventPromptUpdated is emitted when a prompt is updated.
 	EventPromptUpdated     EventType = "prompt.updated"
+	// EventPromptDeployed is emitted when a prompt is deployed.
 	EventPromptDeployed    EventType = "prompt.deployed"
+	// EventPromptArchived is emitted when a prompt is archived.
 	EventPromptArchived    EventType = "prompt.archived"
 )
 
@@ -83,7 +92,7 @@ type Dispatcher struct {
 	store          EndpointStore
 	client         *http.Client
 	logger         *slog.Logger
-	deliveries     []Delivery
+	deliveries     []*Delivery
 	deliveriesHead int
 	deliveriesLen  int
 	maxRetries     int
@@ -182,26 +191,30 @@ func (d *Dispatcher) ListEndpoints() []*Endpoint {
 }
 
 // ListDeliveries returns the delivery log (oldest first).
-func (d *Dispatcher) ListDeliveries() []Delivery {
+func (d *Dispatcher) ListDeliveries() []*Delivery {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	out := make([]Delivery, 0, d.deliveriesLen)
+	out := make([]*Delivery, 0, d.deliveriesLen)
 	for i := 0; i < d.deliveriesLen; i++ {
-		idx := (d.deliveriesHead - d.deliveriesLen + i + cap(d.deliveries)) % cap(d.deliveries)
-		out = append(out, d.deliveries[idx])
+		if d.deliveriesLen < cap(d.deliveries) {
+			out = append(out, d.deliveries[i])
+		} else {
+			idx := (d.deliveriesHead + i) % cap(d.deliveries)
+			out = append(out, d.deliveries[idx])
+		}
 	}
 	return out
 }
 
 // Emit sends an event to all matching endpoints asynchronously.
-func (d *Dispatcher) Emit(evt Event) {
+func (d *Dispatcher) Emit(evt *Event) {
 	d.EmitContext(context.Background(), evt)
 }
 
 // EmitContext is the ctx-aware variant of Emit. The returned context
 // is the parent of all per-endpoint delivery goroutines; cancelling it
 // aborts in-flight deliveries.
-func (d *Dispatcher) EmitContext(ctx context.Context, evt Event) {
+func (d *Dispatcher) EmitContext(ctx context.Context, evt *Event) {
 	d.mu.RLock()
 	var targets []*Endpoint
 	for _, ep := range d.endpoints {
@@ -254,10 +267,10 @@ func ValidateURL(rawURL string) error {
 	return nil
 }
 
-func (d *Dispatcher) deliver(ctx context.Context, ep *Endpoint, evt Event) {
+func (d *Dispatcher) deliver(ctx context.Context, ep *Endpoint, evt *Event) {
 	// Re-validate the URL at delivery time to defeat DNS rebinding.
 	if err := ValidateURL(ep.URL); err != nil {
-		d.recordDelivery(Delivery{
+		d.recordDelivery(&Delivery{
 			ID:         generateID(),
 			EndpointID: ep.ID,
 			EventID:    evt.ID,
@@ -311,8 +324,8 @@ func (d *Dispatcher) deliver(ctx context.Context, ep *Endpoint, evt Event) {
 			}
 			continue
 		}
-		io.Copy(io.Discard, resp.Body) //nolint:errcheck
-		resp.Body.Close()
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
 
 		delivery := Delivery{
 			ID:         generateID(),
@@ -332,11 +345,11 @@ func (d *Dispatcher) deliver(ctx context.Context, ep *Endpoint, evt Event) {
 			continue
 		}
 
-		d.recordDelivery(delivery)
+		d.recordDelivery(&delivery)
 		return
 	}
 
-	d.recordDelivery(Delivery{
+	d.recordDelivery(&Delivery{
 		ID:         generateID(),
 		EndpointID: ep.ID,
 		EventID:    evt.ID,
@@ -374,16 +387,16 @@ func sleepBackoff(ctx context.Context, attempt int) bool {
 // recordDelivery appends to a fixed-capacity ring buffer. The previous
 // implementation used a slice with head-shift truncation, which is
 // O(n) on every overflow; the ring buffer is O(1).
-func (d *Dispatcher) recordDelivery(delivery Delivery) {
+func (d *Dispatcher) recordDelivery(delivery *Delivery) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.deliveries == nil {
-		d.deliveries = make([]Delivery, d.maxDeliveries)
+		d.deliveries = make([]*Delivery, d.maxDeliveries)
 		d.deliveriesHead = 0
 		d.deliveriesLen = 0
 	}
 	if cap(d.deliveries) == 0 {
-		d.deliveries = make([]Delivery, d.maxDeliveries)
+		d.deliveries = make([]*Delivery, d.maxDeliveries)
 	}
 	if d.deliveriesLen < cap(d.deliveries) {
 		idx := (d.deliveriesHead + d.deliveriesLen) % cap(d.deliveries)

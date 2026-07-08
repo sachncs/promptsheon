@@ -11,7 +11,7 @@ func TestExecuteVersion_Basic(t *testing.T) {
 	e := NewEngine(NewRegistry())
 	ctx := context.Background()
 
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		ID:      "ver-1",
 		Version: 1,
 		Prompt: capability.Prompt{
@@ -59,7 +59,7 @@ func TestExecuteVersion_WithGuardrails(t *testing.T) {
 	mockMgr := &mockGuardrailChecker{shouldFail: false}
 	e.SetGuardrails(mockMgr, nil)
 
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		ID:      "ver-1",
 		Version: 1,
 		Prompt: capability.Prompt{
@@ -86,7 +86,7 @@ func TestExecuteVersion_GuardrailFailure(t *testing.T) {
 	mockMgr := &mockGuardrailChecker{shouldFail: true}
 	e.SetGuardrails(mockMgr, nil)
 
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		ID:      "ver-1",
 		Version: 1,
 		Prompt: capability.Prompt{
@@ -111,7 +111,7 @@ type mockGuardrailChecker struct {
 	shouldFail bool
 }
 
-func (m *mockGuardrailChecker) CheckVersion(ctx context.Context, version *capability.CapabilityVersion) error {
+func (m *mockGuardrailChecker) CheckVersion(_ context.Context, _ *capability.Version) error {
 	if m.shouldFail {
 		return &guardrailError{msg: "guardrail check failed"}
 	}

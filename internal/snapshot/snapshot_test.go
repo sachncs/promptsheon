@@ -11,7 +11,7 @@ func TestSnapshotStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	store, err := NewStore(db)
 	if err != nil {
@@ -34,8 +34,8 @@ func TestSnapshotStore(t *testing.T) {
 	}
 
 	// Save
-	if err := store.Save(ctx, snap); err != nil {
-		t.Fatal(err)
+	if e := store.Save(ctx, snap); e != nil {
+		t.Fatal(e)
 	}
 
 	// Get

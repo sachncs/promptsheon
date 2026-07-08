@@ -167,11 +167,11 @@ func (p *NvidiaProvider) Complete(ctx context.Context, req *Request) (*Response,
 	if err != nil {
 		return nil, fmt.Errorf("nvidia request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Handle streaming
 	if req.Stream {
-		return p.handleStream(resp, req.Model, start)
+		return p.handleStream(resp, req.Model, start), nil
 	}
 
 	// Read response
@@ -211,7 +211,7 @@ func (p *NvidiaProvider) Complete(ctx context.Context, req *Request) (*Response,
 }
 
 // handleStream handles streaming responses.
-func (p *NvidiaProvider) handleStream(resp *http.Response, model string, start time.Time) (*Response, error) {
+func (p *NvidiaProvider) handleStream(resp *http.Response, model string, start time.Time) *Response {
 	scanner := bufio.NewScanner(resp.Body)
 	var content strings.Builder
 	var reasoning strings.Builder
@@ -262,5 +262,5 @@ func (p *NvidiaProvider) handleStream(resp *http.Response, model string, start t
 		Model:            model,
 		Latency:          time.Since(start),
 		TimeToFirstToken: ttft,
-	}, nil
+	}
 }

@@ -11,7 +11,7 @@ import (
 //
 // This is the capability-centric equivalent of RunAllStaticChecks.
 // It evaluates pre-execution guardrails against the version's configuration.
-func (m *Manager) CheckVersion(ctx context.Context, version *capability.CapabilityVersion) error {
+func (m *Manager) CheckVersion(ctx context.Context, version *capability.Version) error {
 	if version == nil {
 		return fmt.Errorf("capability version is required")
 	}
@@ -51,7 +51,7 @@ func (m *Manager) isRuleEnabled(name string) bool {
 }
 
 // checkPreGuardrail evaluates a single pre-execution guardrail.
-func (m *Manager) checkPreGuardrail(ctx context.Context, g *capability.Guardrail, version *capability.CapabilityVersion) error {
+func (m *Manager) checkPreGuardrail(_ context.Context, g *capability.Guardrail, version *capability.Version) error {
 	// Validate prompt content against guardrail config
 	promptText := version.Prompt.Instructions
 	if version.Prompt.Template != "" {
@@ -83,7 +83,7 @@ func (m *Manager) checkPreGuardrail(ctx context.Context, g *capability.Guardrail
 
 // contains is a simple substring check (avoids importing strings in this file).
 func contains(s, substr string) bool {
-	return len(substr) == 0 || findInString(s, substr)
+	return substr == "" || findInString(s, substr)
 }
 
 func findInString(s, substr string) bool {

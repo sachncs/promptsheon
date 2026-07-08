@@ -15,7 +15,6 @@ type mockStore struct {
 	keys             map[string]*APIKeyRecord
 	updateCalls      atomic.Int64
 	updateBlocks     chan struct{} // closed to unblock all blocked calls
-	individualBlocks map[string]chan struct{}
 }
 
 func (m *mockStore) GetAPIKeyByHash(_ context.Context, keyHash string) (*APIKeyRecord, error) {
@@ -25,7 +24,7 @@ func (m *mockStore) GetAPIKeyByHash(_ context.Context, keyHash string) (*APIKeyR
 	return nil, nil
 }
 
-func (m *mockStore) UpdateAPIKeyLastUsed(_ context.Context, id string) error {
+func (m *mockStore) UpdateAPIKeyLastUsed(_ context.Context, _ string) error {
 	m.updateCalls.Add(1)
 	if m.updateBlocks != nil {
 		<-m.updateBlocks // wait until test closes the channel

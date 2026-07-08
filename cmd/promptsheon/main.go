@@ -18,79 +18,89 @@ import (
 	"github.com/sachncs/promptsheon/internal/promptsheon"
 )
 
+const opList = "list"
+const opCreate = "create"
+const keyName = "name"
+const opGet = "get"
+const opDelete = "delete"
+
 func main() {
-	// Handle --version and --help before parsing subcommands. The
-	// CLI uses subcommand routing (os.Args[1]) rather than the
-	// flag package, so we can't just declare these with flag.Bool
-	// without disturbing the existing UX. We accept them only
-	// when they appear as the first non-empty argument.
+	if handleEarlyExit() {
+		return
+	}
+	if len(os.Args) < 2 {
+		printUsage()
+		os.Exit(1)
+	}
+	cmd := os.Args[1]
+	args := os.Args[2:]
+	if err := dispatchCommand(cmd, args); err != nil {
+		handleCmdError(err)
+	}
+}
+
+func handleEarlyExit() bool {
 	if len(os.Args) >= 2 {
 		switch os.Args[1] {
 		case "--version", "-version", "-V":
 			info := buildinfo.Get()
 			fmt.Printf("promptsheon %s (commit %s, built %s, %s/%s)\n",
 				info.Version, info.Commit, info.BuildTime, info.OS, info.Arch)
-			return
+			return true
 		case "--help", "-help", "-h":
 			printUsage()
-			return
+			return true
 		}
 	}
+	return false
+}
 
-	if len(os.Args) < 2 {
-		printUsage()
-		os.Exit(1)
-	}
-
-	cmd := os.Args[1]
-	args := os.Args[2:]
-
-	var err error
+func dispatchCommand(cmd string, args []string) error {
 	switch cmd {
 	case "init":
-		err = cmdInit()
+		return cmdInit()
 	case "hash-object":
-		err = cmdHashObject(args)
+		return cmdHashObject(args)
 	case "write-object":
-		err = cmdWriteObject(args)
+		return cmdWriteObject(args)
 	case "read-object":
-		err = cmdReadObject(args)
+		return cmdReadObject(args)
 	case "commit":
-		err = cmdCommit(args)
+		return cmdCommit(args)
 	case "log":
-		err = cmdLog(args)
+		return cmdLog(args)
 	case "checkout":
-		err = cmdCheckout(args)
+		return cmdCheckout(args)
 	case "branch":
-		err = cmdBranch(args)
+		return cmdBranch(args)
 	case "delete-branch":
-		err = cmdDeleteBranch(args)
+		return cmdDeleteBranch(args)
 	case "diff":
-		err = cmdDiff(args)
+		return cmdDiff(args)
 	case "status":
-		err = cmdStatus()
+		return cmdStatus()
 	case "show":
-		err = cmdShow(args)
+		return cmdShow(args)
 	case "ls-tree":
-		err = cmdLsTree(args)
+		return cmdLsTree(args)
 	case "cat-file":
-		err = cmdCatFile(args)
+		return cmdCatFile(args)
 	case "graph":
-		err = cmdGraph()
+		return cmdGraph()
 	case "stats":
-		err = cmdStats()
+		return cmdStats()
 	case "verify":
-		err = cmdVerify()
+		return cmdVerify()
 	case "run":
-		err = cmdRun(args)
+		return cmdRun(args)
 	case "provider":
-		err = cmdProvider(args)
+		return cmdProvider(args)
 	case "workspace":
-		err = cmdWorkspace(args)
+		return cmdWorkspace(args)
 	case "project":
-		err = cmdProject(args)
+		return cmdProject(args)
 	case "capability":
-		err = cmdCapability(args)
+		return cmdCapability(args)
 	case "help":
 		printUsage()
 	default:
@@ -98,18 +108,18 @@ func main() {
 		printUsage()
 		os.Exit(1)
 	}
+	return nil
+}
 
-	if err != nil {
-		if errors.Is(err, errUsage) {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			fmt.Fprintln(os.Stderr)
-			fmt.Fprintln(os.Stderr, "Run 'promptsheon help' for usage.")
-			// EX_USAGE: the args were wrong, not the system.
-			os.Exit(2)
-		}
+func handleCmdError(err error) {
+	if errors.Is(err, errUsage) {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Run 'promptsheon help' for usage.")
+		os.Exit(2)
 	}
+	fmt.Fprintf(os.Stderr, "error: %v\n", err)
+	os.Exit(1)
 }
 
 // errUsage is the sentinel error returned by command functions
@@ -279,10 +289,6 @@ func cmdLog(args []string) error {
 	}
 
 	ref, _ := promptsheon.GetCurrentRef()
-	refDisplay := ref
-	if refDisplay == "" {
-		refDisplay = "(detached HEAD)"
-	}
 
 	for i, e := range entries {
 		refMarker := ""
@@ -409,18 +415,19 @@ func cmdStatus() error {
 	}
 
 	headLine := ""
-	if headHash == "" {
+	switch {
+	case headHash == "":
 		headLine = "no commits yet"
-	} else if ref == "" {
+	case ref == "":
 		headLine = fmt.Sprintf("detached HEAD at %s", headHash[:12])
-	} else {
+	default:
 		headLine = fmt.Sprintf("on branch %s", ref)
 	}
 	fmt.Printf("HEAD: %s\n", headLine)
 
 	if headHash != "" {
-		obj, err := promptsheon.ReadObject(headHash)
-		if err == nil {
+		obj, e := promptsheon.ReadObject(headHash)
+		if e == nil {
 			ts := time.Unix(0, obj.Timestamp)
 			fmt.Printf("last commit: %s (%s)\n", headHash[:12], ts.Format(time.RFC3339))
 			if obj.Message != "" {
@@ -721,7 +728,7 @@ func renderGraph(nodes []*promptsheon.GraphNode, columns map[string]int, maxCol 
 	return buf.String()
 }
 
-func drawConnLines(buf *bytes.Buffer, prevCol, col, maxCol int, colRemaining []int, node *promptsheon.GraphNode) {
+func drawConnLines(buf *bytes.Buffer, prevCol, col, maxCol int, colRemaining []int, _ *promptsheon.GraphNode) {
 	for c := 0; c <= maxCol; c++ {
 		switch {
 		case c == prevCol && c < col:
@@ -777,13 +784,14 @@ func drawMergeForkLines(buf *bytes.Buffer, node *promptsheon.GraphNode, columns 
 				buf.WriteString("  ")
 			}
 		case c >= minPC && c <= maxPC:
-			if c == minPC && c == maxPC {
+			switch {
+			case minPC == maxPC:
 				buf.WriteString("\\ ")
-			} else if c == minPC {
+			case c == minPC:
 				buf.WriteString("| ")
-			} else if c == maxPC {
+			case c == maxPC:
 				buf.WriteString("/ ")
-			} else {
+			default:
 				buf.WriteString("  ")
 			}
 		default:
@@ -910,7 +918,7 @@ func cmdProvider(args []string) error {
 	}
 
 	switch args[0] {
-	case "list":
+	case opList:
 		llm.LoadFromEnv()
 		providers := llm.Global.Providers()
 		fmt.Println("Registered providers:")
@@ -955,7 +963,7 @@ func cmdWorkspace(args []string) error {
 	}
 	server := serverURL()
 	switch args[0] {
-	case "list":
+	case opList:
 		var workspaces []any
 		if err := httpGet(server+"/api/v1/workspaces", &workspaces); err != nil {
 			return err
@@ -963,16 +971,16 @@ func cmdWorkspace(args []string) error {
 		for _, w := range workspaces {
 			fmt.Printf("%+v\n", w)
 		}
-	case "create":
+	case opCreate:
 		if len(args) < 2 {
 			return usageErrorf("promptsheon workspace create <name>")
 		}
 		var result any
-		if err := httpPost(server+"/api/v1/workspaces", map[string]string{"name": args[1]}, &result); err != nil {
+		if err := httpPost(server+"/api/v1/workspaces", map[string]string{keyName: args[1]}, &result); err != nil {
 			return err
 		}
 		fmt.Printf("%+v\n", result)
-	case "get":
+	case opGet:
 		if len(args) < 2 {
 			return usageErrorf("promptsheon workspace get <id>")
 		}
@@ -981,7 +989,7 @@ func cmdWorkspace(args []string) error {
 			return err
 		}
 		fmt.Printf("%+v\n", result)
-	case "delete":
+	case opDelete:
 		if len(args) < 2 {
 			return usageErrorf("promptsheon workspace delete <id>")
 		}
@@ -1001,7 +1009,7 @@ func cmdProject(args []string) error {
 	}
 	server := serverURL()
 	switch args[0] {
-	case "list":
+	case opList:
 		if len(args) < 2 {
 			return usageErrorf("promptsheon project list <workspace_id>")
 		}
@@ -1012,16 +1020,16 @@ func cmdProject(args []string) error {
 		for _, p := range projects {
 			fmt.Printf("%+v\n", p)
 		}
-	case "create":
+	case opCreate:
 		if len(args) < 3 {
 			return usageErrorf("promptsheon project create <workspace_id> <name>")
 		}
 		var result any
-		if err := httpPost(server+"/api/v1/workspaces/"+args[1]+"/projects", map[string]string{"name": args[2]}, &result); err != nil {
+		if err := httpPost(server+"/api/v1/workspaces/"+args[1]+"/projects", map[string]string{keyName: args[2]}, &result); err != nil {
 			return err
 		}
 		fmt.Printf("%+v\n", result)
-	case "get":
+	case opGet:
 		if len(args) < 2 {
 			return usageErrorf("promptsheon project get <id>")
 		}
@@ -1030,7 +1038,7 @@ func cmdProject(args []string) error {
 			return err
 		}
 		fmt.Printf("%+v\n", result)
-	case "delete":
+	case opDelete:
 		if len(args) < 2 {
 			return usageErrorf("promptsheon project delete <id>")
 		}
@@ -1050,7 +1058,7 @@ func cmdCapability(args []string) error {
 	}
 	server := serverURL()
 	switch args[0] {
-	case "list":
+	case opList:
 		if len(args) < 2 {
 			return usageErrorf("promptsheon capability list <project_id>")
 		}
@@ -1061,16 +1069,16 @@ func cmdCapability(args []string) error {
 		for _, c := range caps {
 			fmt.Printf("%+v\n", c)
 		}
-	case "create":
+	case opCreate:
 		if len(args) < 3 {
 			return usageErrorf("promptsheon capability create <project_id> <name>")
 		}
 		var result any
-		if err := httpPost(server+"/api/v1/projects/"+args[1]+"/capabilities", map[string]string{"name": args[2]}, &result); err != nil {
+		if err := httpPost(server+"/api/v1/projects/"+args[1]+"/capabilities", map[string]string{keyName: args[2]}, &result); err != nil {
 			return err
 		}
 		fmt.Printf("%+v\n", result)
-	case "get":
+	case opGet:
 		if len(args) < 2 {
 			return usageErrorf("promptsheon capability get <id>")
 		}
@@ -1079,7 +1087,7 @@ func cmdCapability(args []string) error {
 			return err
 		}
 		fmt.Printf("%+v\n", result)
-	case "delete":
+	case opDelete:
 		if len(args) < 2 {
 			return usageErrorf("promptsheon capability delete <id>")
 		}
@@ -1106,16 +1114,18 @@ func httpGet(url string, v any) error {
 	if err != nil {
 		return fmt.Errorf("GET %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
 		var body map[string]string
-		json.NewDecoder(resp.Body).Decode(&body)
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			return fmt.Errorf("GET %s: %s", url, resp.Status)
+		}
 		return fmt.Errorf("GET %s: %s (%s)", url, resp.Status, body["error"])
 	}
 	return json.NewDecoder(resp.Body).Decode(v)
 }
 
-func httpPost(url string, body any, v any) error {
+func httpPost(url string, body, v any) error {
 	b, err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -1124,17 +1134,19 @@ func httpPost(url string, body any, v any) error {
 	if err != nil {
 		return fmt.Errorf("POST %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
 		var errBody map[string]string
-		json.NewDecoder(resp.Body).Decode(&errBody)
+		if err := json.NewDecoder(resp.Body).Decode(&errBody); err != nil {
+			return fmt.Errorf("POST %s: %s", url, resp.Status)
+		}
 		return fmt.Errorf("POST %s: %s (%s)", url, resp.Status, errBody["error"])
 	}
 	return json.NewDecoder(resp.Body).Decode(v)
 }
 
 func httpDelete(url string) error {
-	req, err := http.NewRequest("DELETE", url, nil)
+	req, err := http.NewRequest("DELETE", url, http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -1142,7 +1154,7 @@ func httpDelete(url string) error {
 	if err != nil {
 		return fmt.Errorf("DELETE %s: %w", url, err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("DELETE %s: %s", url, resp.Status)
 	}

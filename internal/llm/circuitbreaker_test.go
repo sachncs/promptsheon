@@ -108,7 +108,7 @@ func TestCircuitBreakerStateMachine(t *testing.T) {
 func TestCircuitBreakerMiddleware(t *testing.T) {
 	mock := &mockProvider{
 		name: "mock",
-		completeFunc: func(ctx context.Context, req *Request) (*Response, error) {
+		completeFunc: func(_ context.Context, _ *Request) (*Response, error) {
 			return &Response{Content: "ok"}, nil
 		},
 	}
@@ -131,12 +131,12 @@ func TestCircuitBreakerMiddleware(t *testing.T) {
 	}
 
 	// Test circuit opens after failures
-	mock.completeFunc = func(ctx context.Context, req *Request) (*Response, error) {
+	mock.completeFunc = func(_ context.Context, _ *Request) (*Response, error) {
 		return nil, errors.New("provider error")
 	}
 
 	for i := 0; i < config.FailureThreshold; i++ {
-		middleware.Complete(context.Background(), &Request{})
+		_, _ = middleware.Complete(context.Background(), &Request{})
 	}
 
 	// Circuit should be open now
@@ -149,7 +149,7 @@ func TestCircuitBreakerMiddleware(t *testing.T) {
 	time.Sleep(config.Cooldown + 10*time.Millisecond)
 
 	// Circuit should be half-open, allow one request
-	mock.completeFunc = func(ctx context.Context, req *Request) (*Response, error) {
+	mock.completeFunc = func(_ context.Context, _ *Request) (*Response, error) {
 		return &Response{Content: "recovered"}, nil
 	}
 

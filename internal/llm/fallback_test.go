@@ -11,13 +11,13 @@ import (
 func TestFallbackPrimarySuccess(t *testing.T) {
 	primary := &mockProvider{
 		name: "primary",
-		completeFunc: func(ctx context.Context, req *Request) (*Response, error) {
+		completeFunc: func(_ context.Context, _ *Request) (*Response, error) {
 			return &Response{Content: "primary response"}, nil
 		},
 	}
 	fallback := &mockProvider{
 		name: "fallback",
-		completeFunc: func(ctx context.Context, req *Request) (*Response, error) {
+		completeFunc: func(_ context.Context, _ *Request) (*Response, error) {
 			return &Response{Content: "fallback response"}, nil
 		},
 	}
@@ -37,13 +37,13 @@ func TestFallbackPrimarySuccess(t *testing.T) {
 func TestFallbackPrimaryFailsFallbackSucceeds(t *testing.T) {
 	primary := &mockProvider{
 		name: "primary",
-		completeFunc: func(ctx context.Context, req *Request) (*Response, error) {
+		completeFunc: func(_ context.Context, _ *Request) (*Response, error) {
 			return nil, errors.New("primary failed")
 		},
 	}
 	fallback := &mockProvider{
 		name: "fallback",
-		completeFunc: func(ctx context.Context, req *Request) (*Response, error) {
+		completeFunc: func(_ context.Context, _ *Request) (*Response, error) {
 			return &Response{Content: "fallback response"}, nil
 		},
 	}
@@ -63,19 +63,19 @@ func TestFallbackPrimaryFailsFallbackSucceeds(t *testing.T) {
 func TestFallbackAllFail(t *testing.T) {
 	primary := &mockProvider{
 		name: "primary",
-		completeFunc: func(ctx context.Context, req *Request) (*Response, error) {
+		completeFunc: func(_ context.Context, _ *Request) (*Response, error) {
 			return nil, errors.New("primary failed")
 		},
 	}
 	fallback1 := &mockProvider{
 		name: "fallback1",
-		completeFunc: func(ctx context.Context, req *Request) (*Response, error) {
+		completeFunc: func(_ context.Context, _ *Request) (*Response, error) {
 			return nil, errors.New("fallback1 failed")
 		},
 	}
 	fallback2 := &mockProvider{
 		name: "fallback2",
-		completeFunc: func(ctx context.Context, req *Request) (*Response, error) {
+		completeFunc: func(_ context.Context, _ *Request) (*Response, error) {
 			return nil, errors.New("fallback2 failed")
 		},
 	}
@@ -95,14 +95,14 @@ func TestFallbackAllFail(t *testing.T) {
 func TestFallbackSkipsDuplicateProviders(t *testing.T) {
 	primary := &mockProvider{
 		name: "primary",
-		completeFunc: func(ctx context.Context, req *Request) (*Response, error) {
+		completeFunc: func(_ context.Context, _ *Request) (*Response, error) {
 			return nil, errors.New("primary failed")
 		},
 	}
 	// fallback has same name as primary
 	fallback := &mockProvider{
 		name: "primary",
-		completeFunc: func(ctx context.Context, req *Request) (*Response, error) {
+		completeFunc: func(_ context.Context, _ *Request) (*Response, error) {
 			return &Response{Content: "should not reach"}, nil
 		},
 	}

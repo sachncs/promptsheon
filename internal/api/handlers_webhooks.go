@@ -12,7 +12,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/webhook"
 )
 
-func (s *Server) handleListWebhooks(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleListWebhooks(w http.ResponseWriter, _ *http.Request) error {
 	if s.webhooks == nil {
 		writeJSON(w, http.StatusOK, []any{})
 		return nil

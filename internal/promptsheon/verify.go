@@ -33,7 +33,23 @@ func Verify() (*VerifyResult, error) {
 	}
 	result := &VerifyResult{}
 
-	// Map hash → on-disk path for the orphan scan.
+	allObjects, err := collectAllObjects(result)
+	if err != nil {
+		return nil, err
+	}
+
+	verifyObjects(result, allObjects)
+
+	refs, err := checkRefs(result, allObjects)
+	if err != nil {
+		return nil, err
+	}
+
+	findOrphans(result, allObjects, refs)
+	return result, nil
+}
+
+func collectAllObjects(result *VerifyResult) (map[string]string, error) {
 	allObjects := make(map[string]string)
 	objectsDirPath := filepath.Join(PromptsheonDir, objectsDir)
 	shards, err := os.ReadDir(objectsDirPath)
@@ -44,9 +60,9 @@ func Verify() (*VerifyResult, error) {
 		if !shard.IsDir() || len(shard.Name()) != 2 {
 			continue
 		}
-		entries, err := os.ReadDir(filepath.Join(objectsDirPath, shard.Name()))
-		if err != nil {
-			return nil, fmt.Errorf("read shard %s: %w", shard.Name(), err)
+		entries, e := os.ReadDir(filepath.Join(objectsDirPath, shard.Name()))
+		if e != nil {
+			return nil, fmt.Errorf("read shard %s: %w", shard.Name(), e)
 		}
 		for _, e := range entries {
 			if e.IsDir() {
@@ -57,16 +73,15 @@ func Verify() (*VerifyResult, error) {
 			result.TotalObjects++
 		}
 	}
+	return allObjects, nil
+}
 
-	// Verify each object's hash. We do this by reading the
-	// compressed file and recomputing the SHA-256 of the
-	// round-tripped JSON. A failure means the on-disk bytes no
-	// longer match the file name.
+func verifyObjects(result *VerifyResult, allObjects map[string]string) {
 	for hash, path := range allObjects {
-		obj, err := ReadObject(hash)
-		if err != nil {
+		obj, e := ReadObject(hash)
+		if e != nil {
 			result.CorruptedObjects++
-			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", shortHash(hash), err))
+			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", shortHash(hash), e))
 			continue
 		}
 		recomputed, err := ObjectHash(obj)
@@ -81,11 +96,11 @@ func Verify() (*VerifyResult, error) {
 			continue
 		}
 		result.VerifiedObjects++
-		// We don't need path after this; suppress unused-var lint.
 		_ = path
 	}
+}
 
-	// Check that every ref points at an existing object.
+func checkRefs(result *VerifyResult, allObjects map[string]string) ([]string, error) {
 	refs, err := ListRefs()
 	if err != nil {
 		return nil, err
@@ -101,8 +116,6 @@ func Verify() (*VerifyResult, error) {
 			continue
 		}
 		if hash == "" {
-			// Empty ref is "branch exists but no commits yet";
-			// not a broken ref.
 			continue
 		}
 		if _, ok := allObjects[hash]; !ok {
@@ -110,9 +123,10 @@ func Verify() (*VerifyResult, error) {
 			result.Errors = append(result.Errors, fmt.Sprintf("ref %s -> missing object %s", r, shortHash(hash)))
 		}
 	}
+	return refs, nil
+}
 
-	// Compute the reachable set so we can find orphans. We walk
-	// from every ref through parent links.
+func findOrphans(result *VerifyResult, allObjects map[string]string, refs []string) {
 	reachable := make(map[string]struct{})
 	for _, r := range refs {
 		hash, err := ReadRef(r)
@@ -126,7 +140,6 @@ func Verify() (*VerifyResult, error) {
 			result.OrphanedObjects++
 		}
 	}
-	return result, nil
 }
 
 // walkReachable performs a BFS from hash following the Parents

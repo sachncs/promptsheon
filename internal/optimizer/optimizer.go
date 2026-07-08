@@ -1,12 +1,13 @@
+// Package optimizer provides prompt optimization and recommendations.
 package optimizer
 
 import (
-	"strings"
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/llm"
 )
 
+// OptimizationSuggestion represents a single prompt optimization suggestion.
 type OptimizationSuggestion struct {
 	ID          string    `json:"id"`
 	PromptID    string    `json:"prompt_id"`
@@ -20,6 +21,7 @@ type OptimizationSuggestion struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+// OptimizationReport contains the full results of a prompt optimization.
 type OptimizationReport struct {
 	PromptID      string                    `json:"prompt_id"`
 	PromptName    string                    `json:"prompt_name"`
@@ -30,6 +32,7 @@ type OptimizationReport struct {
 	CreatedAt     time.Time                 `json:"created_at"`
 }
 
+// PromptMetrics contains computed metrics for a prompt.
 type PromptMetrics struct {
 	WordCount       int     `json:"word_count"`
 	CharCount       int     `json:"char_count"`
@@ -41,16 +44,19 @@ type PromptMetrics struct {
 	HasSystemPrompt bool    `json:"has_system_prompt"`
 }
 
+// Optimizer provides prompt optimization and analysis.
 type Optimizer struct {
 	provider llm.Provider
 }
 
+// NewOptimizer creates a new Optimizer with the given provider.
 func NewOptimizer(provider llm.Provider) *Optimizer {
 	return &Optimizer{
 		provider: provider,
 	}
 }
 
+// GetOptimizationTips returns general tips for writing effective prompts.
 func GetOptimizationTips() []string {
 	return []string{
 		"Be specific and clear about what you want the model to do",
@@ -66,52 +72,4 @@ func GetOptimizationTips() []string {
 	}
 }
 
-func computePromptMetrics(content string, variables []string) *PromptMetrics {
-	words := strings.Fields(content)
 
-	estimatedTokens := len(content) / 4
-
-	complexity := 0.0
-	if len(words) > 100 {
-		complexity += 0.2
-	}
-	if strings.Count(content, "{{") > 0 {
-		complexity += 0.1 * float64(strings.Count(content, "{{"))
-	}
-	if strings.Contains(content, "```") {
-		complexity += 0.2
-	}
-	if len(variables) > 3 {
-		complexity += 0.1
-	}
-	if complexity > 1 {
-		complexity = 1
-	}
-
-	clarity := 1.0
-	if len(words) > 200 {
-		clarity -= 0.2
-	}
-	if strings.Count(content, "\n") < 3 && len(words) > 50 {
-		clarity -= 0.2
-	}
-	if strings.Contains(content, "  ") {
-		clarity -= 0.1
-	}
-	if clarity < 0 {
-		clarity = 0
-	}
-
-	estimatedCost := float64(estimatedTokens) * 0.00003
-
-	return &PromptMetrics{
-		WordCount:       len(words),
-		CharCount:       len(content),
-		EstimatedTokens: estimatedTokens,
-		EstimatedCost:   estimatedCost,
-		ComplexityScore: complexity,
-		ClarityScore:    clarity,
-		VariableCount:   len(variables),
-		HasSystemPrompt: strings.Contains(strings.ToLower(content), "system") || strings.Contains(content, "{{system}}"),
-	}
-}

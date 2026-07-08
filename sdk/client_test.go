@@ -81,7 +81,7 @@ func TestAuthHeaderOmittedWhenKeyEmpty(t *testing.T) {
 }
 
 func TestAPIErrorDecodedFromCanonicalBody(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"error":"prompt name is required"}`))
@@ -106,7 +106,7 @@ func TestAPIErrorDecodedFromCanonicalBody(t *testing.T) {
 }
 
 func TestAPIErrorDecodedFromLegacyMessageField(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write([]byte(`{"message":"unauthorized"}`))
 	}))
@@ -124,7 +124,7 @@ func TestAPIErrorDecodedFromLegacyMessageField(t *testing.T) {
 }
 
 func TestAPIErrorFallsBackToRawBodyForPlainText(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("upstream proxy error"))
@@ -146,7 +146,7 @@ func TestAPIErrorFallsBackToRawBodyForPlainText(t *testing.T) {
 }
 
 func TestAPIErrorHandlesEmptyBody(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
 	}))
 	defer srv.Close()
@@ -169,9 +169,9 @@ func TestPromptCRUDRoundtrip(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/prompts":
-			w.Write([]byte(`[{"id":"p1","name":"greeting","content":"hi","version":1,"status":"draft","created_by":"u1","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z"}]`))
+			_, _ = w.Write([]byte(`[{"id":"p1","name":"greeting","content":"hi","version":1,"status":"draft","created_by":"u1","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z"}]`))
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/prompts/"):
-			w.Write([]byte(`{"id":"p1","name":"greeting","content":"hi","version":1,"status":"draft","created_by":"u1","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z"}`))
+			_, _ = w.Write([]byte(`{"id":"p1","name":"greeting","content":"hi","version":1,"status":"draft","created_by":"u1","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z"}`))
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/prompts":
 			var req CreatePromptRequest
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -187,7 +187,7 @@ func TestPromptCRUDRoundtrip(t *testing.T) {
 				Version: 1,
 				Status:  "draft",
 			})
-			w.Write(body)
+			_, _ = w.Write(body)
 		case r.Method == http.MethodDelete:
 			w.WriteHeader(http.StatusNoContent)
 		default:
@@ -241,7 +241,7 @@ func TestRunPromptRoundtrip(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		w.Write([]byte(`{"content":"hi there","model":"gpt-4","usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5},"latency_ms":120}`))
+		_, _ = w.Write([]byte(`{"content":"hi there","model":"gpt-4","usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5},"latency_ms":120}`))
 	}))
 	defer srv.Close()
 
@@ -264,7 +264,7 @@ func TestRunPromptRoundtrip(t *testing.T) {
 }
 
 func TestContextCancellationPropagates(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		<-r.Context().Done()
 	}))
 	defer srv.Close()

@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"testing"
 	"time"
-
-
 )
 
 func TestMockProvider(t *testing.T) {
@@ -63,7 +61,7 @@ func TestRegistry(t *testing.T) {
 	}
 
 	// Register custom provider
-	r.Register("custom", func(cfg ProviderConfig) Provider {
+	r.Register("custom", func(_ ProviderConfig) Provider {
 		return NewMock("custom-response")
 	})
 	r.Configure("custom", ProviderConfig{})
@@ -237,7 +235,7 @@ func TestTimeout(t *testing.T) {
 	slow := &slowProvider{delay: 5 * time.Millisecond}
 	timeouting := NewTimeouting(slow, 1*time.Millisecond)
 
-	_, err := retryingComplete(timeouting, context.Background())
+	_, err := retryingComplete(context.Background(), timeouting)
 	if err == nil {
 		t.Fatal("expected timeout error")
 	}
@@ -259,7 +257,7 @@ func TestRetryContextCancellation(t *testing.T) {
 
 // --- helpers ---
 
-func retryingComplete(p Provider, ctx context.Context) (*Response, error) {
+func retryingComplete(ctx context.Context, p Provider) (*Response, error) {
 	return p.Complete(ctx, &Request{Model: "test"})
 }
 

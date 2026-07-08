@@ -1,3 +1,4 @@
+// Package store provides the repository interface for data access.
 package store
 
 import (
@@ -6,6 +7,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/models"
 )
 
+// Repository defines the data access interface for all persistence operations.
 type Repository interface {
 	CapabilityRepository
 
@@ -27,8 +29,8 @@ type Repository interface {
 
 	// Audit
 	AppendAudit(ctx context.Context, entry *models.AuditEntry) error
-	ListAudit(ctx context.Context, filter models.AuditFilter) ([]*models.AuditEntry, error)
-	ExportAudit(ctx context.Context, filter models.AuditFilter) ([]*models.AuditEntry, error)
+	ListAudit(ctx context.Context, filter *models.AuditFilter) ([]*models.AuditEntry, error)
+	ExportAudit(ctx context.Context, filter *models.AuditFilter) ([]*models.AuditEntry, error)
 	VerifyAuditChain(ctx context.Context) (bool, string, error)
 
 	// Provider Keys (LLM API key vaulting)

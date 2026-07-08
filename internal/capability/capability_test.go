@@ -15,7 +15,7 @@ func TestCapabilityDefaults(t *testing.T) {
 		Description: "Extract and summarize key fields from invoice PDFs",
 		Owner:       "alice",
 		Tags:        []string{"invoices", "finance"},
-		State:       CapabilityStateDraft,
+		State:       StateDraft,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -23,7 +23,7 @@ func TestCapabilityDefaults(t *testing.T) {
 	if c.ID != "cap-1" {
 		t.Errorf("expected cap-1, got %s", c.ID)
 	}
-	if c.State != CapabilityStateDraft {
+	if c.State != StateDraft {
 		t.Errorf("expected draft, got %s", c.State)
 	}
 	if len(c.Tags) != 2 {
@@ -34,13 +34,13 @@ func TestCapabilityDefaults(t *testing.T) {
 func TestCapabilityJSONRoundTrip(t *testing.T) {
 	now := time.Now()
 	c := Capability{
-		ID:          "cap-2",
-		ProjectID:   "proj-1",
-		Name:        "Review PR",
-		Owner:       "bob",
-		State:       CapabilityStateActive,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:        "cap-2",
+		ProjectID: "proj-1",
+		Name:      "Review PR",
+		Owner:     "bob",
+		State:     StateActive,
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 
 	data, err := json.Marshal(c)
@@ -64,8 +64,8 @@ func TestCapabilityJSONRoundTrip(t *testing.T) {
 	}
 }
 
-func TestCapabilityVersionImmutable(t *testing.T) {
-	v := CapabilityVersion{
+func TestVersionImmutable(t *testing.T) {
+	v := Version{
 		ID:           "ver-1",
 		CapabilityID: "cap-1",
 		Version:      1,
@@ -89,8 +89,8 @@ func TestCapabilityVersionImmutable(t *testing.T) {
 	}
 }
 
-func TestCapabilityVersionJSONRoundTrip(t *testing.T) {
-	v := CapabilityVersion{
+func TestVersionJSONRoundTrip(t *testing.T) {
+	v := Version{
 		ID:           "ver-2",
 		CapabilityID: "cap-2",
 		Version:      2,
@@ -122,7 +122,7 @@ func TestCapabilityVersionJSONRoundTrip(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	var got CapabilityVersion
+	var got Version
 	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -222,8 +222,8 @@ func TestContextContractFields(t *testing.T) {
 		OptionalContext: []ContextRef{
 			{Key: "conversation_history", Source: "memory"},
 		},
-		ForbiddenContext:   []string{"password", "secret"},
-		MaximumSize:        4096,
+		ForbiddenContext:    []string{"password", "secret"},
+		MaximumSize:         4096,
 		CompressionStrategy: "summary",
 		RetrievalStrategy:   "hybrid",
 	}
@@ -258,12 +258,12 @@ func TestKnowledgeSourceTypes(t *testing.T) {
 
 func TestMemoryConfig(t *testing.T) {
 	mc := MemoryConfig{
-		SessionMemory:    true,
+		SessionMemory:      true,
 		ConversationMemory: true,
-		WorkingMemory:    false,
-		LongTermMemory:   false,
-		SharedMemory:     false,
-		MaxSessionTokens: 8192,
+		WorkingMemory:      false,
+		LongTermMemory:     false,
+		SharedMemory:       false,
+		MaxSessionTokens:   8192,
 	}
 
 	if !mc.SessionMemory {
@@ -303,7 +303,7 @@ func TestGuardrailPhases(t *testing.T) {
 		g.Phase = p
 		data, _ := json.Marshal(g)
 		var got Guardrail
-		json.Unmarshal(data, &got)
+		_ = json.Unmarshal(data, &got)
 		if got.Phase != p {
 			t.Errorf("phase round-trip failed for %s", p)
 		}
@@ -494,13 +494,13 @@ func TestRecommendationTypes(t *testing.T) {
 
 	for _, rt := range types {
 		r := Recommendation{
-			ID:                   "rec-1",
-			CapabilityVersionID:  "ver-1",
-			Type:                 rt,
-			Reason:               "test reason",
-			Confidence:           0.85,
-			Impact:               "medium",
-			AutoApplicable:       true,
+			ID:                  "rec-1",
+			CapabilityVersionID: "ver-1",
+			Type:                rt,
+			Reason:              "test reason",
+			Confidence:          0.85,
+			Impact:              "medium",
+			AutoApplicable:      true,
 		}
 
 		if r.Type != rt {
@@ -516,11 +516,11 @@ func TestDeploymentLifecycle(t *testing.T) {
 	now := time.Now()
 
 	d := Deployment{
-		ID:                   "dep-1",
-		CapabilityVersionID:  "ver-1",
-		Environment:          "prod",
-		Status:               DeploymentStatusPending,
-		DeployedAt:           now,
+		ID:                  "dep-1",
+		CapabilityVersionID: "ver-1",
+		Environment:         "prod",
+		Status:              DeploymentStatusPending,
+		DeployedAt:          now,
 	}
 
 	if d.Status != DeploymentStatusPending {
@@ -667,9 +667,9 @@ func TestKnowledgeSourceWithEmbedding(t *testing.T) {
 		Version:        "2024-01-15",
 		EmbeddingModel: "text-embedding-3-small",
 		Config: map[string]any{
-			"chunk_size":  512,
-			"overlap":     50,
-			"index_type":  "hnsw",
+			"chunk_size": 512,
+			"overlap":    50,
+			"index_type": "hnsw",
 		},
 	}
 
@@ -687,11 +687,11 @@ func TestKnowledgeSourceWithEmbedding(t *testing.T) {
 }
 
 func TestCapabilityStateValues(t *testing.T) {
-	states := []CapabilityState{
-		CapabilityStateDraft,
-		CapabilityStateActive,
-		CapabilityStateDeprecated,
-		CapabilityStateArchived,
+	states := []State{
+		StateDraft,
+		StateActive,
+		StateDeprecated,
+		StateArchived,
 	}
 
 	for _, s := range states {

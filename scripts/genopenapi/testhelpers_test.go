@@ -13,7 +13,8 @@ import (
 // tests are independent of the cwd the user happened to run
 // them from.
 func packageDir() string {
-	_, file, _, _ := runtime.Caller(0)
+	var file string
+	_, file, _, _ = runtime.Caller(0)
 	return filepath.Dir(file)
 }
 

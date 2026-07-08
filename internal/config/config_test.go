@@ -47,20 +47,20 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestLoadConfigFromEnv(t *testing.T) {
 	// Set environment variables
-	os.Setenv("PROMPTSHEON_ADDR", ":9090")
-	os.Setenv("PROMPTSHEON_DB_PATH", "/tmp/test.db")
-	os.Setenv("PROMPTSHEON_LOG_LEVEL", "debug")
-	os.Setenv("PROMPTSHEON_AUTH", "false")
-	os.Setenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT", "60")
-	os.Setenv("PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT", "5")
-	os.Setenv("PROMPTSHEON_RATE_LIMIT_RATE", "200")
-	defer os.Unsetenv("PROMPTSHEON_ADDR")
-	defer os.Unsetenv("PROMPTSHEON_DB_PATH")
-	defer os.Unsetenv("PROMPTSHEON_LOG_LEVEL")
-	defer os.Unsetenv("PROMPTSHEON_AUTH")
-	defer os.Unsetenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT")
-	defer os.Unsetenv("PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT")
-	defer os.Unsetenv("PROMPTSHEON_RATE_LIMIT_RATE")
+	_ = os.Setenv("PROMPTSHEON_ADDR", ":9090")
+	_ = os.Setenv("PROMPTSHEON_DB_PATH", "/tmp/test.db")
+	_ = os.Setenv("PROMPTSHEON_LOG_LEVEL", "debug")
+	_ = os.Setenv("PROMPTSHEON_AUTH", "false")
+	_ = os.Setenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT", "60")
+	_ = os.Setenv("PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT", "5")
+	_ = os.Setenv("PROMPTSHEON_RATE_LIMIT_RATE", "200")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_ADDR") }()
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_DB_PATH") }()
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_LOG_LEVEL") }()
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_AUTH") }()
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT") }()
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT") }()
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_RATE_LIMIT_RATE") }()
 
 	cfg := LoadConfig()
 
@@ -104,8 +104,8 @@ func TestLoadConfigAuthValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("PROMPTSHEON_AUTH", tt.value)
-			defer os.Unsetenv("PROMPTSHEON_AUTH")
+			_ = os.Setenv("PROMPTSHEON_AUTH", tt.value)
+			defer func() { _ = os.Unsetenv("PROMPTSHEON_AUTH") }()
 
 			cfg := LoadConfig()
 			if cfg.Auth != tt.expected {
@@ -127,8 +127,8 @@ func TestLoadConfig_InvalidNumericWarns(t *testing.T) {
 	var buf bytes.Buffer
 	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})))
 
-	os.Setenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT", "abc")
-	defer os.Unsetenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT")
+	_ = os.Setenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT", "abc")
+	defer func() { _ = os.Unsetenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT") }()
 	cfg := LoadConfig()
 	if cfg.WriteTimeout != 30 {
 		t.Fatalf("expected default 30, got %d", cfg.WriteTimeout)

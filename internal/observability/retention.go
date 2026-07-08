@@ -158,7 +158,8 @@ func (m *RetentionManager) Enforce(ctx context.Context) error {
 		}
 		query := "DELETE FROM audit_entries WHERE timestamp < ? AND action NOT IN (?" +
 			strings.Repeat(",?", len(actions)-1) + ")"
-		args := []any{cutoff}
+		args := make([]any, 0, 1+len(actions))
+		args = append(args, cutoff)
 		for _, a := range actions {
 			args = append(args, a)
 		}

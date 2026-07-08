@@ -12,7 +12,7 @@ func TestRunVersion_Basic(t *testing.T) {
 	r := NewRunner(&mockProvider{})
 	ctx := context.Background()
 
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		ID:      "ver-1",
 		Version: 1,
 		Prompt: capability.Prompt{
@@ -55,7 +55,7 @@ func TestRunVersion_NilVersion(t *testing.T) {
 
 func TestRunVersion_NilSuite(t *testing.T) {
 	r := NewRunner(&mockProvider{})
-	_, err := r.RunVersion(context.Background(), &capability.CapabilityVersion{}, nil)
+	_, err := r.RunVersion(context.Background(), &capability.Version{}, nil)
 	if err == nil {
 		t.Fatal("expected error for nil suite")
 	}
@@ -64,7 +64,7 @@ func TestRunVersion_NilSuite(t *testing.T) {
 func TestBuildVersionPrompt(t *testing.T) {
 	r := NewRunner(&mockProvider{})
 
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		Prompt: capability.Prompt{
 			Instructions: "Process {{.id}} and {{.name}}",
 		},
@@ -85,7 +85,7 @@ func TestBuildVersionPrompt(t *testing.T) {
 func TestBuildVersionPromptWithTemplate(t *testing.T) {
 	r := NewRunner(&mockProvider{})
 
-	version := &capability.CapabilityVersion{
+	version := &capability.Version{
 		Prompt: capability.Prompt{
 			Instructions: "fallback",
 			Template:     "{{.key}}",
@@ -101,7 +101,7 @@ func TestBuildVersionPromptWithTemplate(t *testing.T) {
 // mockProvider is a minimal LLM provider for testing.
 type mockProvider struct{}
 
-func (m *mockProvider) Complete(ctx context.Context, req *llm.Request) (*llm.Response, error) {
+func (m *mockProvider) Complete(_ context.Context, _ *llm.Request) (*llm.Response, error) {
 	return &llm.Response{
 		Content: "mock response",
 		Usage:   llm.Usage{PromptTokens: 10, CompletionTokens: 20, TotalTokens: 30},

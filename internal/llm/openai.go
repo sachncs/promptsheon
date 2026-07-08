@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+const providerOpenAI = "openai"
+
 // OpenAI implements Provider for the OpenAI Chat Completions API.
 type OpenAI struct {
 	apiKey  string
@@ -33,7 +35,8 @@ func NewOpenAI(cfg ProviderConfig) *OpenAI {
 	}
 }
 
-func (o *OpenAI) Name() string { return "openai" }
+// Name returns the provider name.
+func (o *OpenAI) Name() string { return providerOpenAI }
 
 // keyForRequest returns the API key to use for a request. Per-call keys
 // (set via WithPerCallKey) override the provider's default. This is
@@ -89,7 +92,7 @@ func (o *OpenAI) Stream(ctx context.Context, req *Request) (io.ReadCloser, error
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		var errResp struct {
 			Error struct {
 				Message string `json:"message"`
@@ -148,6 +151,7 @@ type openaiResponse struct {
 	} `json:"usage"`
 }
 
+// Complete sends a prompt to the OpenAI API and returns the response.
 func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) {
 	msgs := make([]openaiMessage, len(req.Messages))
 	for i, m := range req.Messages {
@@ -184,7 +188,7 @@ func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) 
 	if err != nil {
 		return nil, fmt.Errorf("openai request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if req.Stream {
 		return o.handleStream(ctx, resp, req.Model, start)

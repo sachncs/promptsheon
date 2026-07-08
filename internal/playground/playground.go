@@ -189,14 +189,14 @@ func calculateCost(model string, tokens int) float64 {
 	}
 }
 
-func replaceAll(s, old, new string) string {
+func replaceAll(s, old, newStr string) string {
 	result := s
 	for {
 		idx := indexOf(result, old)
 		if idx == -1 {
 			return result
 		}
-		result = result[:idx] + new + result[idx+len(old):]
+		result = result[:idx] + newStr + result[idx+len(old):]
 	}
 }
 

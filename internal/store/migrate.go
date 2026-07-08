@@ -32,16 +32,16 @@ func migrate(db *sql.DB, migrationsFS fs.FS) error {
 	if err != nil {
 		return fmt.Errorf("query migrations: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var v int
-		if err := rows.Scan(&v); err != nil {
-			return fmt.Errorf("scan migration version: %w", err)
+		if e := rows.Scan(&v); e != nil {
+			return fmt.Errorf("scan migration version: %w", e)
 		}
 		applied[v] = true
 	}
-	if err := rows.Err(); err != nil {
-		return err
+	if e := rows.Err(); e != nil {
+		return e
 	}
 
 	// Read migration files.
@@ -86,15 +86,15 @@ func migrate(db *sql.DB, migrationsFS fs.FS) error {
 
 // applyMigration applies a single migration within a transaction.
 // If the migration fails, the transaction is rolled back.
-func applyMigration(db *sql.DB, version int, sql string) error {
+func applyMigration(db *sql.DB, version int, sqlStr string) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Execute the migration SQL.
-	if _, err := tx.Exec(sql); err != nil {
+	if _, err := tx.Exec(sqlStr); err != nil {
 		return fmt.Errorf("execute migration: %w", err)
 	}
 

@@ -40,7 +40,7 @@ func TestPerCallKeyFromContextWrongType(t *testing.T) {
 	}
 }
 
-func TestOpenAIKeyForRequest(t *testing.T) {
+func TestOpenAIKeyForRequest(_ *testing.T) {
 	// openaiKeyForRequest is unexported but the per-call
 	// key context behaviour is part of the public
 	// surface. We exercise it indirectly: a request made

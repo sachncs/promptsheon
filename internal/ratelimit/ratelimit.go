@@ -155,7 +155,7 @@ func (l *Limiter) Middleware(next http.Handler) http.Handler {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Retry-After", "60")
 			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"error":"rate limit exceeded"}`)) //nolint:errcheck
+			w.Write([]byte(`{"error":"rate limit exceeded"}`)) //nolint:errcheck // write failure is benign; rate limit already enforced
 			return
 		}
 		next.ServeHTTP(w, r)

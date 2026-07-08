@@ -11,7 +11,7 @@ import (
 
 type mockProvider struct{}
 
-func (m *mockProvider) Complete(ctx context.Context, req *llm.Request) (*llm.Response, error) {
+func (m *mockProvider) Complete(_ context.Context, req *llm.Request) (*llm.Response, error) {
 	return &llm.Response{
 		Content: "Mock response for: " + req.Messages[len(req.Messages)-1].Content,
 		Model:   req.Model,

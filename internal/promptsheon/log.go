@@ -1,7 +1,6 @@
 package promptsheon
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 )
@@ -108,10 +107,21 @@ func BuildGraph() ([]*GraphNode, error) {
 		return nil, err
 	}
 
-	// Build the commit map and the reverse parent map in a single
-	// pass so we can topologically order the commits later.
+	commits, branchOf, err := collectCommits(refs)
+	if err != nil {
+		return nil, err
+	}
+	if len(commits) == 0 {
+		return nil, nil
+	}
+
+	order := topologicalSort(commits)
+	return buildGraphNodes(order, commits, branchOf, headHash), nil
+}
+
+func collectCommits(refs []*RefDetail) (map[string]*Object, map[string][]string, error) {
 	commits := make(map[string]*Object)
-	branchOf := make(map[string][]string) // hash → branch names
+	branchOf := make(map[string][]string)
 	for _, r := range refs {
 		if r.Hash == "" {
 			continue
@@ -126,24 +136,19 @@ func BuildGraph() ([]*GraphNode, error) {
 			}
 			obj, err := ReadObject(h)
 			if err != nil {
-				return nil, fmt.Errorf("build graph: read %s: %w", shortHash(h), err)
+				return nil, nil, fmt.Errorf("build graph: read %s: %w", shortHash(h), err)
 			}
 			if !obj.IsCommit() {
-				return nil, fmt.Errorf("build graph: %s is not a commit", shortHash(h))
+				return nil, nil, fmt.Errorf("build graph: %s is not a commit", shortHash(h))
 			}
 			commits[h] = obj
-			for _, p := range obj.Parents {
-				queue = append(queue, p)
-			}
+			queue = append(queue, obj.Parents...)
 		}
 	}
+	return commits, branchOf, nil
+}
 
-	if len(commits) == 0 {
-		return nil, nil
-	}
-
-	// Topological order: parents before children. We Kahn-sort by
-	// indegree so the result is deterministic across runs.
+func topologicalSort(commits map[string]*Object) []string {
 	indeg := make(map[string]int)
 	children := make(map[string][]string)
 	for h, obj := range commits {
@@ -162,15 +167,13 @@ func BuildGraph() ([]*GraphNode, error) {
 			ready = append(ready, h)
 		}
 	}
-	sort.Strings(ready) // stable input order
+	sort.Strings(ready)
 
 	order := make([]string, 0, len(commits))
 	for len(ready) > 0 {
 		h := ready[0]
 		ready = ready[1:]
 		order = append(order, h)
-		// Process children in sorted order so the result is stable
-		// even when a commit has multiple children.
 		kids := append([]string(nil), children[h]...)
 		sort.Strings(kids)
 		for _, c := range kids {
@@ -180,7 +183,10 @@ func BuildGraph() ([]*GraphNode, error) {
 			}
 		}
 	}
+	return order
+}
 
+func buildGraphNodes(order []string, commits map[string]*Object, branchOf map[string][]string, headHash string) []*GraphNode {
 	nodes := make([]*GraphNode, 0, len(order))
 	for _, h := range order {
 		obj := commits[h]
@@ -194,12 +200,7 @@ func BuildGraph() ([]*GraphNode, error) {
 			Message:  obj.Message,
 		})
 	}
-	return nodes, nil
+	return nodes
 }
 
-// errIsRefNotFound is a tiny helper to keep the call sites
-// readable. It is duplicated here to avoid yet another tiny
-// import dance in this small file.
-func errIsRefNotFound(err error) bool {
-	return errors.Is(err, ErrRefNotFound)
-}
+

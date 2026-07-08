@@ -25,8 +25,11 @@ func newCounter(labels map[string]string) *Counter {
 	return &Counter{labels: labels}
 }
 
+// Inc increments the counter by 1.
 func (c *Counter) Inc()           { c.Add(1) }
+// Add increments the counter by the given value.
 func (c *Counter) Add(v float64)  { c.mu.Lock(); c.value += v; c.mu.Unlock() }
+// Value returns the current counter value.
 func (c *Counter) Value() float64 { c.mu.Lock(); defer c.mu.Unlock(); return c.value }
 
 // Histogram tracks distribution of values.
@@ -52,6 +55,7 @@ func newHistogram(labels map[string]string) *Histogram {
 	}
 }
 
+// Observe records a value in the histogram.
 func (h *Histogram) Observe(v float64) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -71,7 +75,9 @@ func (h *Histogram) Observe(v float64) {
 	h.counts[len(h.buckets)]++
 }
 
+// Count returns the number of observed values.
 func (h *Histogram) Count() int64 { h.mu.Lock(); defer h.mu.Unlock(); return h.count }
+// Sum returns the sum of all observed values.
 func (h *Histogram) Sum() float64 { h.mu.Lock(); defer h.mu.Unlock(); return h.sum }
 
 // Avg returns the mean of all observed values.
@@ -165,9 +171,13 @@ type Gauge struct {
 	value float64
 }
 
+// Set sets the gauge to a specific value.
 func (g *Gauge) Set(v float64)  { g.mu.Lock(); g.value = v; g.mu.Unlock() }
+// Inc increments the gauge by 1.
 func (g *Gauge) Inc()           { g.mu.Lock(); g.value++; g.mu.Unlock() }
+// Dec decrements the gauge by 1.
 func (g *Gauge) Dec()           { g.mu.Lock(); g.value--; g.mu.Unlock() }
+// Value returns the current gauge value.
 func (g *Gauge) Value() float64 { g.mu.Lock(); defer g.mu.Unlock(); return g.value }
 
 // NewCollector creates a new metrics collector.
@@ -205,11 +215,11 @@ func NewCollector() *Collector {
 
 // Handler returns an http.Handler that serves Prometheus exposition format.
 func (c *Collector) Handler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		// Use the live build version so the Prometheus scrape
 		// always matches the version /api/v1/version reports.
 		w.Header().Set("Content-Type", "text/plain; version="+buildinfo.Version)
-		fmt.Fprint(w, c.prometheusFormat())
+		_, _ = fmt.Fprint(w, c.prometheusFormat())
 	})
 }
 
@@ -317,28 +327,28 @@ func (c *Collector) prometheusFormat() string {
 	var sb strings.Builder
 
 	writeCounter := func(name, help string, val float64) {
-		sb.WriteString(fmt.Sprintf("# HELP %s %s\n", name, help))
-		sb.WriteString(fmt.Sprintf("# TYPE %s counter\n", name))
-		sb.WriteString(fmt.Sprintf("%s %g\n", name, val))
+		fmt.Fprintf(&sb, "# HELP %s %s\n", name, help)
+		fmt.Fprintf(&sb, "# TYPE %s counter\n", name)
+		fmt.Fprintf(&sb, "%s %g\n", name, val)
 	}
 
 	writeHistogram := func(name, help string, h *Histogram) {
 		h.mu.Lock()
 		defer h.mu.Unlock()
-		sb.WriteString(fmt.Sprintf("# HELP %s %s\n", name, help))
-		sb.WriteString(fmt.Sprintf("# TYPE %s histogram\n", name))
+		fmt.Fprintf(&sb, "# HELP %s %s\n", name, help)
+		fmt.Fprintf(&sb, "# TYPE %s histogram\n", name)
 		for i, b := range h.buckets {
-			sb.WriteString(fmt.Sprintf("%s_bucket{le=\"%g\"} %d\n", name, b, h.counts[i]))
+			fmt.Fprintf(&sb, "%s_bucket{le=\"%g\"} %d\n", name, b, h.counts[i])
 		}
-		sb.WriteString(fmt.Sprintf("%s_bucket{le=\"+Inf\"} %d\n", name, h.counts[len(h.buckets)]))
-		sb.WriteString(fmt.Sprintf("%s_sum %g\n", name, h.sum))
-		sb.WriteString(fmt.Sprintf("%s_count %d\n", name, h.count))
+		fmt.Fprintf(&sb, "%s_bucket{le=\"+Inf\"} %d\n", name, h.counts[len(h.buckets)])
+		fmt.Fprintf(&sb, "%s_sum %g\n", name, h.sum)
+		fmt.Fprintf(&sb, "%s_count %d\n", name, h.count)
 	}
 
 	writeGauge := func(name, help string, val float64) {
-		sb.WriteString(fmt.Sprintf("# HELP %s %s\n", name, help))
-		sb.WriteString(fmt.Sprintf("# TYPE %s gauge\n", name))
-		sb.WriteString(fmt.Sprintf("%s %g\n", name, val))
+		fmt.Fprintf(&sb, "# HELP %s %s\n", name, help)
+		fmt.Fprintf(&sb, "# TYPE %s gauge\n", name)
+		fmt.Fprintf(&sb, "%s %g\n", name, val)
 	}
 
 	writeCounter("promptsheon_http_requests_total", "Total HTTP requests", c.RequestsTotal.Value())

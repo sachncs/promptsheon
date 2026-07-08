@@ -192,7 +192,7 @@ func (m *Manager) GetChanges(sessionID string, sinceVersion int) []*Change {
 }
 
 // GetSessionContent returns the current content and version.
-func (m *Manager) GetSessionContent(sessionID string) (string, int, error) {
+func (m *Manager) GetSessionContent(sessionID string) (content string, version int, err error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 

@@ -167,7 +167,7 @@ func TestRetryingReturnsLastError(t *testing.T) {
 	}
 }
 
-func TestRetryingStopsOnPermanentError(t *testing.T) {
+func TestRetryingStopsOnPermanentError(_ *testing.T) {
 	// A permanent error must short-circuit the retry loop;
 	// the inner provider should see only one attempt.
 	inner := &flakyProvider{

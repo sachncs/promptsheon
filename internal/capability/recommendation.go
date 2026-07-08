@@ -6,16 +6,26 @@ import "time"
 type RecommendationType string
 
 const (
-	RecommendationSwitchModel       RecommendationType = "switch_model"
-	RecommendationCompressPrompt    RecommendationType = "compress_prompt"
-	RecommendationReduceContext     RecommendationType = "reduce_context"
-	RecommendationEnableCache       RecommendationType = "enable_cache"
-	RecommendationDisableReasoning  RecommendationType = "disable_reasoning"
-	RecommendationUpgradeMCP        RecommendationType = "upgrade_mcp"
-	RecommendationRemoveTool        RecommendationType = "remove_tool"
-	RecommendationSplitCapability   RecommendationType = "split_capability"
-	RecommendationAddGuardrail      RecommendationType = "add_guardrail"
-	RecommendationTunePolicy        RecommendationType = "tune_policy"
+	// RecommendationSwitchModel suggests switching to a different model.
+	RecommendationSwitchModel      RecommendationType = "switch_model"
+	// RecommendationCompressPrompt suggests compressing the prompt.
+	RecommendationCompressPrompt   RecommendationType = "compress_prompt"
+	// RecommendationReduceContext suggests reducing context.
+	RecommendationReduceContext    RecommendationType = "reduce_context"
+	// RecommendationEnableCache suggests enabling caching.
+	RecommendationEnableCache      RecommendationType = "enable_cache"
+	// RecommendationDisableReasoning suggests disabling reasoning.
+	RecommendationDisableReasoning RecommendationType = "disable_reasoning"
+	// RecommendationUpgradeMCP suggests upgrading MCP server.
+	RecommendationUpgradeMCP       RecommendationType = "upgrade_mcp"
+	// RecommendationRemoveTool suggests removing a tool.
+	RecommendationRemoveTool       RecommendationType = "remove_tool"
+	// RecommendationSplitCapability suggests splitting the capability.
+	RecommendationSplitCapability  RecommendationType = "split_capability"
+	// RecommendationAddGuardrail suggests adding a guardrail.
+	RecommendationAddGuardrail     RecommendationType = "add_guardrail"
+	// RecommendationTunePolicy suggests tuning the policy.
+	RecommendationTunePolicy       RecommendationType = "tune_policy"
 )
 
 // Recommendation suggests an improvement to a capability version.
@@ -26,7 +36,7 @@ const (
 type Recommendation struct {
 	ID                   string             `json:"id"`
 	CapabilityVersionID  string             `json:"capability_version_id"`
-	Type                 RecommendationType  `json:"type"`
+	Type                 RecommendationType `json:"type"`
 	Reason               string             `json:"reason"`
 	Confidence           float64            `json:"confidence"`
 	ExpectedSavingsUSD   float64            `json:"expected_savings_usd,omitempty"`

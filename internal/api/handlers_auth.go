@@ -91,12 +91,6 @@ func (s *oauthStateStore) consume(state string) bool {
 	return time.Now().Before(exp)
 }
 
-func (s *oauthStateStore) reset() {
-	s.mu.Lock()
-	s.states = make(map[string]time.Time)
-	s.mu.Unlock()
-}
-
 // activeOAuthStates is the package-level reference that helpers
 // (generateOAuthState, validateOAuthState, StartOAuthStateJanitor)
 // consult. It is set on Server construction and reset to nil on
@@ -113,9 +107,6 @@ func StartOAuthStateJanitor(ctx context.Context) {
 
 // StopOAuthStateJanitor stops the cleanup goroutine.
 func StopOAuthStateJanitor() { activeOAuthStates.stopJanitor() }
-
-// resetOAuthStates clears the active store; test-only.
-func resetOAuthStates() { activeOAuthStates.reset() }
 
 func generateOAuthState() (string, error) {
 	b := make([]byte, 16)
@@ -136,15 +127,15 @@ func validateOAuthState(state string) bool {
 // authenticateRequest runs the configured authenticator on the request and
 // attaches the resulting user to the context. Returns nil, false if auth
 // is disabled.
-func (s *Server) authenticateRequest(r *http.Request) (*http.Request, *auth.User, bool, error) {
+func (s *Server) authenticateRequest(r *http.Request) (*http.Request, *auth.User, error) {
 	if !s.requireAuth || s.authn == nil {
-		return r, nil, false, nil
+		return r, nil, nil
 	}
 	user, err := s.authn.Authenticate(r)
 	if err != nil {
-		return r, nil, false, err
+		return r, nil, err
 	}
-	return r.WithContext(auth.WithUserContext(r.Context(), user)), user, true, nil
+	return r.WithContext(auth.WithUserContext(r.Context(), user)), user, nil
 }
 
 func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) error {
@@ -152,7 +143,7 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 	// with requirePerm (the create-key route is the bootstrap path for
 	// admin keys and is permitted for admin users; non-admins get a
 	// self-only key).
-	newCtx, caller, _, err := s.authenticateRequest(r)
+	newCtx, caller, err := s.authenticateRequest(r)
 	if err != nil {
 		return unauthorized("authentication required")
 	}
@@ -164,7 +155,7 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 		Role      string     `json:"role"`
 		ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if e := json.NewDecoder(r.Body).Decode(&req); e != nil {
 		return badRequest("invalid json")
 	}
 	if req.Name == "" {
@@ -188,7 +179,8 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 	// `{role:"admin"}` and walk away with an admin key.
 	_, hasCaller := auth.UserFromContext(r.Context())
 	var targetUserID, targetRole string
-	if hasCaller {
+	switch {
+	case hasCaller:
 		targetUserID = caller.ID
 		targetRole = string(caller.Role)
 		if auth.HasPermission(caller.Role, auth.PermAPIKeyManage) {
@@ -198,14 +190,17 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 			if req.Role != "" {
 				targetRole = req.Role
 			}
-		} else if req.UserID != "" && req.UserID != caller.ID {
-			return forbidden("only admins may create keys for other users")
-		} else if req.Role != "" && req.Role != string(caller.Role) {
-			return forbidden("only admins may create keys with a different role")
+		} else {
+			switch {
+			case req.UserID != "" && req.UserID != caller.ID:
+				return forbidden("only admins may create keys for other users")
+			case req.Role != "" && req.Role != string(caller.Role):
+				return forbidden("only admins may create keys with a different role")
+			}
 		}
-	} else if s.requireAuth {
+	case s.requireAuth:
 		return unauthorized("authentication required")
-	} else {
+	default:
 		// No-auth mode (PROMPTSHEON_AUTH=false). Admin keys are the
 		// highest-trust credential, and minting them without
 		// authentication is a privilege-escalation vector. Refuse the
@@ -224,8 +219,8 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 	// with the test suite. In auth-enabled mode we reject unknown users
 	// to prevent orphan keys.
 	if targetUserID != "" && s.requireAuth {
-		if _, err := s.db.GetUser(r.Context(), targetUserID); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+		if _, e := s.db.GetUser(r.Context(), targetUserID); e != nil {
+			if errors.Is(e, sql.ErrNoRows) {
 				return badRequest("user not found")
 			}
 			return err
@@ -307,7 +302,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 		Email string `json:"email"`
 		Name  string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if e := json.NewDecoder(r.Body).Decode(&req); e != nil {
 		return badRequest("invalid json")
 	}
 	if req.Email == "" {
@@ -338,8 +333,8 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	if err := s.db.CreateUser(r.Context(), admin); err != nil {
-		return fmt.Errorf("bootstrap: create user: %w", err)
+	if e := s.db.CreateUser(r.Context(), admin); e != nil {
+		return fmt.Errorf("bootstrap: create user: %w", e)
 	}
 
 	key, hash, err := auth.GenerateAPIKey()
@@ -385,7 +380,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) handleListAPIKeys(w http.ResponseWriter, r *http.Request) error {
-	newCtx, _, _, err := s.authenticateRequest(r)
+	newCtx, _, err := s.authenticateRequest(r)
 	if err != nil {
 		return unauthorized("authentication required")
 	}
@@ -416,7 +411,7 @@ func (s *Server) handleListAPIKeys(w http.ResponseWriter, r *http.Request) error
 }
 
 func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) error {
-	newCtx, _, _, err := s.authenticateRequest(r)
+	newCtx, _, err := s.authenticateRequest(r)
 	if err != nil {
 		return unauthorized("authentication required")
 	}
@@ -450,7 +445,7 @@ func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) erro
 		return err
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked"})
+	writeJSON(w, http.StatusOK, map[string]string{keyStatus: "revoked"})
 	return nil
 }
 
@@ -549,8 +544,8 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
-		if err := s.db.CreateUser(r.Context(), newUser); err != nil {
-			return err
+		if e := s.db.CreateUser(r.Context(), newUser); e != nil {
+			return e
 		}
 		existing = newUser
 	} else if err != nil {

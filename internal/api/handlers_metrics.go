@@ -106,13 +106,13 @@ func (t *UsageTracker) GetTopAgents(limit int) []*UsageCount {
 	return usages
 }
 
-func (s *Server) handleMetricsSummary(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleMetricsSummary(w http.ResponseWriter, _ *http.Request) error {
 	summary := s.collector.GetSummary()
 	writeJSON(w, http.StatusOK, summary)
 	return nil
 }
 
-func (s *Server) handleTopPrompts(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleTopPrompts(w http.ResponseWriter, _ *http.Request) error {
 	if s.usageTracker == nil {
 		writeJSON(w, http.StatusOK, []*UsageCount{})
 		return nil
@@ -127,7 +127,7 @@ func (s *Server) handleTopPrompts(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
-func (s *Server) handleTopAgents(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleTopAgents(w http.ResponseWriter, _ *http.Request) error {
 	if s.usageTracker == nil {
 		writeJSON(w, http.StatusOK, []*UsageCount{})
 		return nil

@@ -81,8 +81,8 @@ func WriteObject(obj *Object) (string, error) {
 	relPath := filepath.Join(objectsDir, hash[:2], hash[2:])
 	fullPath := filepath.Join(PromptsheonDir, relPath)
 
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-		return "", fmt.Errorf("mkdir: %w", err)
+	if e := os.MkdirAll(filepath.Dir(fullPath), 0755); e != nil {
+		return "", fmt.Errorf("mkdir: %w", e)
 	}
 
 	// Try to create the file atomically. O_EXCL ensures we fail if the file
@@ -100,31 +100,31 @@ func WriteObject(obj *Object) (string, error) {
 
 	jsonData, err := canonicalSerialize(obj)
 	if err != nil {
-		f.Close()
-		os.Remove(fullPath)
+		_ = f.Close()
+		_ = os.Remove(fullPath)
 		return "", fmt.Errorf("serialize: %w", err)
 	}
 
 	var compressed bytes.Buffer
 	gw := gzip.NewWriter(&compressed)
 	if _, err := gw.Write(jsonData); err != nil {
-		f.Close()
-		os.Remove(fullPath)
+		_ = f.Close()
+		_ = os.Remove(fullPath)
 		return "", fmt.Errorf("gzip write: %w", err)
 	}
 	if err := gw.Close(); err != nil {
-		f.Close()
-		os.Remove(fullPath)
+		_ = f.Close()
+		_ = os.Remove(fullPath)
 		return "", fmt.Errorf("gzip close: %w", err)
 	}
 
 	if _, err := f.Write(compressed.Bytes()); err != nil {
-		f.Close()
-		os.Remove(fullPath)
+		_ = f.Close()
+		_ = os.Remove(fullPath)
 		return "", fmt.Errorf("write: %w", err)
 	}
 	if err := f.Close(); err != nil {
-		os.Remove(fullPath)
+		_ = os.Remove(fullPath)
 		return "", fmt.Errorf("close: %w", err)
 	}
 
@@ -156,7 +156,7 @@ func ReadObject(hash string) (*Object, error) {
 	if err != nil {
 		return nil, fmt.Errorf("gzip reader: %w", err)
 	}
-	defer gr.Close()
+	defer func() { _ = gr.Close() }()
 
 	jsonData, err := io.ReadAll(gr)
 	if err != nil {
@@ -164,8 +164,8 @@ func ReadObject(hash string) (*Object, error) {
 	}
 
 	var obj Object
-	if err := json.Unmarshal(jsonData, &obj); err != nil {
-		return nil, fmt.Errorf("unmarshal: %w", err)
+	if e := json.Unmarshal(jsonData, &obj); e != nil {
+		return nil, fmt.Errorf("unmarshal: %w", e)
 	}
 
 	computed, err := canonicalHash(&obj)

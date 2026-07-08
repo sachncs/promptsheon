@@ -18,9 +18,13 @@ import (
 type Severity string
 
 const (
+	// SeverityLow is a low severity level.
 	SeverityLow      Severity = "low"
+	// SeverityMedium is a medium severity level.
 	SeverityMedium   Severity = "medium"
+	// SeverityHigh is a high severity level.
 	SeverityHigh     Severity = "high"
+	// SeverityCritical is a critical severity level.
 	SeverityCritical Severity = "critical"
 )
 
@@ -28,8 +32,11 @@ const (
 type AlertStatus string
 
 const (
+	// StatusActive is an active alert status.
 	StatusActive   AlertStatus = "active"
+	// StatusResolved is a resolved alert status.
 	StatusResolved AlertStatus = "resolved"
+	// StatusPending is a pending alert status.
 	StatusPending  AlertStatus = "pending"
 )
 
@@ -241,7 +248,7 @@ func (m *Manager) GetRule(id string) (*AlertRule, bool) {
 func (m *Manager) ListRules() []*AlertRule {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	var rules []*AlertRule
+	rules := make([]*AlertRule, 0, len(m.rules))
 	for _, r := range m.rules {
 		rules = append(rules, r)
 	}
@@ -317,27 +324,28 @@ func (m *Manager) ResolveAlert(id string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, a := range m.alerts {
-		if a.ID == id && a.Status == StatusActive {
-			a.Status = StatusResolved
-			now := time.Now()
-			a.ResolvedAt = &now
+		if a.ID != id || a.Status != StatusActive {
+			continue
+		}
+		a.Status = StatusResolved
+		now := time.Now()
+		a.ResolvedAt = &now
 
-			// Update in database
-			if m.db != nil {
-				dbAlert := &models.AlertRecord{
-					ID:         a.ID,
-					Status:     string(a.Status),
-					ResolvedAt: a.ResolvedAt,
-				}
-				if err := m.db.UpdateAlert(context.Background(), dbAlert); err != nil {
-					if m.logger != nil {
-						m.logger.Error("failed to update alert in db", "err", err, "alert_id", a.ID)
-					}
+		// Update in database
+		if m.db != nil {
+			dbAlert := &models.AlertRecord{
+				ID:         a.ID,
+				Status:     string(a.Status),
+				ResolvedAt: a.ResolvedAt,
+			}
+			if err := m.db.UpdateAlert(context.Background(), dbAlert); err != nil {
+				if m.logger != nil {
+					m.logger.Error("failed to update alert in db", "err", err, "alert_id", a.ID)
 				}
 			}
-
-			return true
 		}
+
+		return true
 	}
 	return false
 }
@@ -396,6 +404,8 @@ func (m *Manager) AddNotificationGroup(group *NotificationGroup) {
 	}
 }
 
+const alertTypeLatencySpike = "latency_spike"
+
 // --- Threshold Checks ---
 
 // CheckLatencySpike checks if p95 latency exceeds threshold.
@@ -404,7 +414,7 @@ func (m *Manager) CheckLatencySpike(latencyMs, thresholdMs float64, consecutiveR
 		return &AlertRule{
 			ID:        "latency-spike",
 			Name:      "Execution Latency Spike",
-			Type:      "latency_spike",
+			Type:      alertTypeLatencySpike,
 			Severity:  SeverityHigh,
 			Enabled:   true,
 			Threshold: thresholdMs,
@@ -474,7 +484,7 @@ func (m *Manager) RunMonitoringChecks(collector *metrics.Collector) []*Alert {
 		rule := &AlertRule{
 			ID:        "latency-spike",
 			Name:      "Execution Latency Spike",
-			Type:      "latency_spike",
+			Type:      alertTypeLatencySpike,
 			Severity:  SeverityHigh,
 			Threshold: 2000,
 		}

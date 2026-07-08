@@ -7,7 +7,7 @@ import (
 // EstimateTokens provides a rough token count estimate.
 // Uses ~4 characters per token as a heuristic for English text.
 func EstimateTokens(text string) int {
-	if len(text) == 0 {
+	if text == "" {
 		return 0
 	}
 
@@ -32,7 +32,7 @@ func EstimateTokens(text string) int {
 	tokens := int(float64(words) * 1.3)
 
 	// Ensure minimum of 1 token for non-empty text
-	if tokens == 0 && len(text) > 0 {
+	if tokens == 0 && text != "" {
 		tokens = 1
 	}
 

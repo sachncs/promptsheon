@@ -10,10 +10,10 @@ import (
 
 var startTime = time.Now()
 
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) error {
 	info := buildinfo.Get()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":  "healthy",
+		keyStatus: "healthy",
 		"version": info.Version,
 		"uptime":  time.Since(startTime).String(),
 	})
@@ -22,12 +22,12 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
 
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 	ready := map[string]any{
-		"status": "ready",
+		keyStatus: "ready",
 		"go":     runtime.Version(),
 	}
 	if s.db != nil {
 		if err := s.db.Ping(r.Context()); err != nil {
-			ready["status"] = "not_ready"
+			ready[keyStatus] = "not_ready"
 			ready["database"] = "unreachable"
 			writeJSON(w, http.StatusServiceUnavailable, ready)
 			return nil
@@ -41,7 +41,7 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 // handleVersion returns the structured build info. The endpoint
 // is intentionally unauthenticated so external uptime probes and
 // load balancers can read the running version without an API key.
-func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleVersion(w http.ResponseWriter, _ *http.Request) error {
 	writeJSON(w, http.StatusOK, buildinfo.Get())
 	return nil
 }

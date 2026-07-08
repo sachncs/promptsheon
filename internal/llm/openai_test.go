@@ -74,7 +74,7 @@ func TestOpenAICompleteHappyPath(t *testing.T) {
 }
 
 func TestOpenAICompleteServerError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
 		_, _ = w.Write([]byte(`{"error":{"message":"rate limited"}}`))
 	}))
@@ -98,7 +98,7 @@ func TestOpenAICompleteServerError(t *testing.T) {
 // [DONE] and the provider should return a Response with
 // the chunk's content.
 func TestOpenAIStreamHappyPath(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n"))
 		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\" world\"}}]}\n\n"))
@@ -114,7 +114,7 @@ func TestOpenAIStreamHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Stream: %v", err)
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 	buf := make([]byte, 4096)
 	n, _ := rc.Read(buf)
 	got := string(buf[:n])
@@ -124,7 +124,7 @@ func TestOpenAIStreamHappyPath(t *testing.T) {
 }
 
 func TestOpenAIStreamServerError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write([]byte(`{"error":{"message":"bad key"}}`))
 	}))
