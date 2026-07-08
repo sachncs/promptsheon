@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: bump `golangci/golangci-lint-action` from v6 to v7 to use Node 24
   (Node 20 is being deprecated on GitHub Actions runners)
   ([`2aba5bb`](https://github.com/sachncs/promptsheon/commit/2aba5bb), 2026-07-07)
+- Address all 553 golangci-lint issues across 124 files — errcheck, govet shadow,
+  gocritic, staticcheck, goconst, revive, nakedret, ineffassign, prealloc,
+  unconvert, unparam, unused, funlen, gocyclo, gofmt, dogsled
+  ([`e084427`](https://github.com/sachncs/promptsheon/commit/e084427), 2026-07-08)
 
 ### Added
 
