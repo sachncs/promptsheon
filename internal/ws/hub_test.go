@@ -1,8 +1,10 @@
 package ws
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -153,11 +155,9 @@ func TestHubBroadcastToMultipleClients(t *testing.T) {
 
 func TestLogEntryJSON(t *testing.T) {
 	entry := &LogEntry{
-		Timestamp: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
-		Level:     "info",
-		Message:   "test message",
-		Source:    "test-source",
-		Attrs:     map[string]any{"key": "value"},
+		Level:   "info",
+		Message: "test message",
+		Source:  "test-source",
 	}
 
 	if entry.Level != "info" {
@@ -380,5 +380,156 @@ func TestStreamHandlerWithAttrsAndGroup(t *testing.T) {
 	withGroup := handler.WithGroup("grp")
 	if withGroup == nil {
 		t.Fatal("WithGroup returned nil")
+	}
+}
+
+func TestRun_DisconnectsSlowClient(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	hub := NewHub(logger)
+	go hub.Run()
+
+	client := &Client{
+		id:   "slow",
+		send: make(chan []byte, 1),
+		hub:  hub,
+	}
+	hub.register <- client
+	time.Sleep(5 * time.Millisecond)
+
+	hub.BroadcastLog(&LogEntry{Message: "a"})
+	hub.BroadcastLog(&LogEntry{Message: "b"})
+	time.Sleep(20 * time.Millisecond)
+
+	if got := hub.ClientCount(); got != 0 {
+		t.Errorf("expected 0 clients after disconnect, got %d", got)
+	}
+}
+
+func TestBroadcastLog_MarshalError(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelError}))
+	hub := NewHub(logger)
+
+	entry := &LogEntry{
+		Attrs: map[string]any{"bad": make(chan int)},
+	}
+	hub.BroadcastLog(entry)
+
+	if !strings.Contains(buf.String(), "failed to marshal") {
+		t.Errorf("expected marshal error log, got %q", buf.String())
+	}
+}
+
+func TestHandleSSE_DeliversLogEvent(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	hub := NewHub(logger)
+	go hub.Run()
+
+	rec := httptest.NewRecorder()
+	ctx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest("GET", "/logs/stream", nil).WithContext(ctx)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		hub.HandleSSE(rec, req)
+	}()
+	time.Sleep(20 * time.Millisecond)
+
+	hub.BroadcastLog(&LogEntry{Message: "sse-delivery-test"})
+	time.Sleep(20 * time.Millisecond)
+
+	cancel()
+	<-done
+
+	if !strings.Contains(rec.Body.String(), "sse-delivery-test") {
+		t.Errorf("expected log event in body, got %q", rec.Body.String())
+	}
+}
+
+
+
+type errHandler struct{}
+
+func (e errHandler) Enabled(context.Context, slog.Level) bool  { return true }
+func (e errHandler) Handle(context.Context, slog.Record) error { return fmt.Errorf("fail") }
+func (e errHandler) WithAttrs([]slog.Attr) slog.Handler        { return e }
+func (e errHandler) WithGroup(string) slog.Handler             { return e }
+
+func TestStreamHandler_NextHandlerError(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	hub := NewHub(logger)
+	streamer := NewLogStreamer(logger, hub)
+	handler := streamer.StreamHandler(errHandler{})
+
+	rec := slog.NewRecord(time.Now(), slog.LevelInfo, "test", 0)
+	err := handler.Handle(context.Background(), rec)
+	if err == nil || err.Error() != "fail" {
+		t.Fatalf("expected 'fail' error, got %v", err)
+	}
+}
+
+func TestStreamHandler_RecordWithAttrs(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	hub := NewHub(logger)
+	go hub.Run()
+
+	client := &Client{id: "attr-test", send: make(chan []byte, 16), hub: hub}
+	hub.register <- client
+	time.Sleep(5 * time.Millisecond)
+
+	streamer := NewLogStreamer(logger, hub)
+	handler := streamer.StreamHandler(slog.NewTextHandler(io.Discard, nil))
+
+	rec := slog.NewRecord(time.Now(), slog.LevelInfo, "attr-msg", 0)
+	rec.AddAttrs(slog.String("key1", "val1"), slog.Int("key2", 42))
+
+	if err := handler.Handle(context.Background(), rec); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case msg := <-client.send:
+		var entry LogEntry
+		if err := json.Unmarshal(msg, &entry); err != nil {
+			t.Fatal(err)
+		}
+		if entry.Attrs["key1"] != "val1" {
+			t.Errorf("expected key1=val1, got %v", entry.Attrs)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for streamed log with attrs")
+	}
+}
+
+func TestStreamHandler_WithAttrsHandle(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	hub := NewHub(logger)
+	go hub.Run()
+
+	client := &Client{id: "withattrs-test", send: make(chan []byte, 16), hub: hub}
+	hub.register <- client
+	time.Sleep(5 * time.Millisecond)
+
+	streamer := NewLogStreamer(logger, hub)
+	handler := streamer.StreamHandler(slog.NewTextHandler(io.Discard, nil))
+	handler = handler.WithAttrs([]slog.Attr{slog.String("builtin", "yes")})
+
+	rec := slog.NewRecord(time.Now(), slog.LevelInfo, "withattrs-msg", 0)
+	if err := handler.Handle(context.Background(), rec); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case msg := <-client.send:
+		var entry LogEntry
+		if err := json.Unmarshal(msg, &entry); err != nil {
+			t.Fatal(err)
+		}
+		if entry.Attrs["builtin"] != "yes" {
+			t.Errorf("expected builtin=yes, got %v", entry.Attrs)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for streamed log with builtin attrs")
 	}
 }

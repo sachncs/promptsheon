@@ -35,11 +35,20 @@ func TestDecryptWrongKey(t *testing.T) {
 	key1 := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	key2 := "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
 
-	v1, _ := New(key1)
-	v2, _ := New(key2)
+	v1, err := New(key1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2, err := New(key2)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	encrypted, _ := v1.Encrypt("secret")
-	_, err := v2.Decrypt(encrypted)
+	encrypted, err := v1.Encrypt("secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = v2.Decrypt(encrypted)
 	if err == nil {
 		t.Fatal("expected error when decrypting with wrong key")
 	}
@@ -85,18 +94,33 @@ func TestNewInvalidKey(t *testing.T) {
 
 func TestEncryptProducesDifferentCiphertext(t *testing.T) {
 	key := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	v, _ := New(key)
+	v, err := New(key)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	enc1, _ := v.Encrypt("same plaintext")
-	enc2, _ := v.Encrypt("same plaintext")
+	enc1, err := v.Encrypt("same plaintext")
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc2, err := v.Encrypt("same plaintext")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if enc1 == enc2 {
 		t.Fatal("encryption should produce different ciphertext due to random nonce")
 	}
 
 	// Both should decrypt to same plaintext
-	d1, _ := v.Decrypt(enc1)
-	d2, _ := v.Decrypt(enc2)
+	d1, err := v.Decrypt(enc1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d2, err := v.Decrypt(enc2)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if d1 != d2 || d1 != "same plaintext" {
 		t.Fatal("both should decrypt to same plaintext")
 	}
@@ -122,6 +146,32 @@ func TestEncryptDecryptEmptyString(t *testing.T) {
 
 	if decrypted != plaintext {
 		t.Fatalf("expected %q, got %q", plaintext, decrypted)
+	}
+}
+
+func TestDecryptInvalidHex(t *testing.T) {
+	key := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	v, err := New(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = v.Decrypt("this-is-not-hex!!")
+	if err == nil {
+		t.Fatal("expected error for invalid hex input")
+	}
+}
+
+func TestDecryptCiphertextTooShort(t *testing.T) {
+	key := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	v, err := New(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = v.Decrypt("ab")
+	if err == nil {
+		t.Fatal("expected error for ciphertext too short")
 	}
 }
 

@@ -27,11 +27,11 @@ type SelectionStrategy string
 
 const (
 	// SelectionStrategyCostOptimized selects the most cost-effective model.
-	SelectionStrategyCostOptimized    SelectionStrategy = "cost_optimized"
+	SelectionStrategyCostOptimized SelectionStrategy = "cost_optimized"
 	// SelectionStrategyLatencyOptimized selects the lowest-latency model.
 	SelectionStrategyLatencyOptimized SelectionStrategy = "latency_optimized"
 	// SelectionStrategyQualityOptimized selects the highest-quality model.
 	SelectionStrategyQualityOptimized SelectionStrategy = "quality_optimized"
 	// SelectionStrategyManual uses explicitly specified model selection.
-	SelectionStrategyManual           SelectionStrategy = "manual"
+	SelectionStrategyManual SelectionStrategy = "manual"
 )

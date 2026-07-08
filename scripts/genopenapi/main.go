@@ -70,9 +70,9 @@ func main() {
 	// collection.
 	for i := range routes {
 		if routes[i].handlerName == "" {
-			resolved, err := resolveAlias(repoRoot+"/internal/api/server.go", routes[i])
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "warn: could not resolve handler for %s %s: %v\n", routes[i].Method, routes[i].Path, err)
+			resolved, resolveErr := resolveAlias(repoRoot+"/internal/api/server.go", routes[i])
+			if resolveErr != nil {
+				fmt.Fprintf(os.Stderr, "warn: could not resolve handler for %s %s: %v\n", routes[i].Method, routes[i].Path, resolveErr)
 			} else {
 				routes[i].handlerName = resolved
 			}
@@ -145,8 +145,6 @@ func fail(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "genopenapi: "+format+"\n", args...)
 	os.Exit(1)
 }
-
-
 
 func collectRoutes(path string) ([]route, error) {
 	fset := token.NewFileSet()
@@ -481,10 +479,7 @@ func jsonTagInfo(tag *ast.BasicLit) (jsonNameFn, bool) {
 		return func(fallback string) string { return fallback }, true
 	}
 	raw := strings.Trim(tag.Value, "`")
-	st, err := newTagParser(raw).parse("json")
-	if err != nil {
-		return func(fallback string) string { return fallback }, true
-	}
+	st := newTagParser(raw).parse("json")
 	required := true
 	if _, ok := st["omitempty"]; ok {
 		required = false
@@ -531,10 +526,10 @@ func newTagParser(raw string) *tagParser { return &tagParser{raw: raw} }
 // parse returns the parsed tag. The "_default_" key is the
 // unnamed value of the first whitespace-separated field. For
 // a `json:"name,omitempty"` tag, _default_="name".
-func (p *tagParser) parse(_ string) (map[string]string, error) {
+func (p *tagParser) parse(_ string) map[string]string {
 	out := map[string]string{}
 	if p.raw == "" {
-		return out, nil
+		return out
 	}
 	fields := splitTagFields(p.raw)
 	for i, f := range fields {
@@ -558,7 +553,7 @@ func (p *tagParser) parse(_ string) (map[string]string, error) {
 		v := strings.Trim(f[colon+1:], `"`)
 		out[k] = v
 	}
-	return out, nil
+	return out
 }
 
 func splitTagFields(s string) []string {

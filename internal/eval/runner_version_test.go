@@ -109,3 +109,87 @@ func (m *mockProvider) Complete(_ context.Context, _ *llm.Request) (*llm.Respons
 }
 
 func (m *mockProvider) Name() string { return "mock" }
+
+func TestRunVersion_ThresholdNotMet(t *testing.T) {
+	r := NewRunner(&mockProvider{})
+	version := &capability.Version{ID: "ver-1"}
+	suite := &capability.EvaluationSuite{
+		Thresholds: map[string]float64{"accuracy": 0.99},
+	}
+	result, err := r.RunVersion(context.Background(), version, suite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ThresholdsMet {
+		t.Error("expected thresholds not met")
+	}
+}
+
+func TestRunVersion_MultipleMetrics(t *testing.T) {
+	r := NewRunner(&mockProvider{})
+	version := &capability.Version{ID: "ver-multi"}
+	suite := &capability.EvaluationSuite{
+		Thresholds: map[string]float64{
+			"precision":     0.90,
+			"recall":        0.90,
+			"hallucination": 0.01,
+			"latency":       750.0,
+			"cost":          0.008,
+		},
+	}
+	result, err := r.RunVersion(context.Background(), version, suite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.ThresholdsMet {
+		t.Error("expected all thresholds met")
+	}
+	if result.Precision != 0.93 {
+		t.Errorf("precision = %f, want 0.93", result.Precision)
+	}
+	if result.Recall != 0.91 {
+		t.Errorf("recall = %f, want 0.91", result.Recall)
+	}
+	if result.Hallucination != 0.03 {
+		t.Errorf("hallucination = %f, want 0.03", result.Hallucination)
+	}
+	if result.LatencyMs != 750.0 {
+		t.Errorf("latency = %f, want 750.0", result.LatencyMs)
+	}
+	if result.CostUSD != 0.008 {
+		t.Errorf("cost = %f, want 0.008", result.CostUSD)
+	}
+}
+
+func TestRunVersion_OneMetricFailsAmongMany(t *testing.T) {
+	r := NewRunner(&mockProvider{})
+	version := &capability.Version{ID: "ver-partial"}
+	suite := &capability.EvaluationSuite{
+		Thresholds: map[string]float64{
+			"accuracy":  0.80,
+			"precision": 0.95,
+		},
+	}
+	result, err := r.RunVersion(context.Background(), version, suite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ThresholdsMet {
+		t.Error("expected thresholds not met (precision fails)")
+	}
+}
+
+func TestRunVersion_EmptyThresholds(t *testing.T) {
+	r := NewRunner(&mockProvider{})
+	version := &capability.Version{ID: "ver-empty"}
+	suite := &capability.EvaluationSuite{
+		Thresholds: map[string]float64{},
+	}
+	result, err := r.RunVersion(context.Background(), version, suite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.ThresholdsMet {
+		t.Error("expected thresholds met (empty map)")
+	}
+}

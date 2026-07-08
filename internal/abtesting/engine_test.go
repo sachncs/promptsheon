@@ -6,6 +6,21 @@ import (
 	"github.com/sachncs/promptsheon/internal/abtesting"
 )
 
+// makeTest is a helper to create a test with two variants.
+func makeTest(id string) *abtesting.Test {
+	return &abtesting.Test{
+		ID:       id,
+		Name:     "Test " + id,
+		PromptID: "prompt1",
+		Variants: []*abtesting.Variant{
+			{ID: "v1", Name: "Control", PromptID: "prompt1", TrafficPct: 50},
+			{ID: "v2", Name: "Variant", PromptID: "prompt2", TrafficPct: 50},
+		},
+		WinCriteria: "success_rate",
+		MinSamples:  100,
+	}
+}
+
 func TestCreateTest(t *testing.T) {
 	engine := abtesting.NewEngine(nil)
 
@@ -169,5 +184,282 @@ func TestListTests(t *testing.T) {
 	tests := engine.ListTests()
 	if len(tests) != 2 {
 		t.Errorf("expected 2 tests, got %d", len(tests))
+	}
+}
+
+func TestCreateTestDuplicateID(t *testing.T) {
+	engine := abtesting.NewEngine(nil)
+	_ = engine.CreateTest(makeTest("dup"))
+	err := engine.CreateTest(makeTest("dup"))
+	if err == nil {
+		t.Fatal("expected error for duplicate test ID")
+	}
+}
+
+func TestGetTestNotFound(t *testing.T) {
+	engine := abtesting.NewEngine(nil)
+	_, err := engine.GetTest("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for nonexistent test")
+	}
+}
+
+func TestStopTestNotFound(t *testing.T) {
+	engine := abtesting.NewEngine(nil)
+	err := engine.StopTest("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for nonexistent test")
+	}
+}
+
+func TestSelectVariantNotFound(t *testing.T) {
+	engine := abtesting.NewEngine(nil)
+	_, err := engine.SelectVariant("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for nonexistent test")
+	}
+}
+
+func TestSelectVariantNotRunning(t *testing.T) {
+	engine := abtesting.NewEngine(nil)
+	_ = engine.CreateTest(makeTest("stopped"))
+	_ = engine.StopTest("stopped")
+	_, err := engine.SelectVariant("stopped")
+	if err == nil {
+		t.Fatal("expected error for stopped test")
+	}
+}
+
+func TestRecordResultMixedSuccessAndFailure(t *testing.T) {
+	engine := abtesting.NewEngine(nil)
+	test := &abtesting.Test{
+		ID:       "mixed",
+		Name:     "Mixed",
+		PromptID: "prompt1",
+		Variants: []*abtesting.Variant{
+			{ID: "v1", TrafficPct: 100},
+		},
+		WinCriteria: "success_rate",
+		MinSamples:  10,
+	}
+	_ = engine.CreateTest(test)
+
+	for i := 0; i < 7; i++ {
+		engine.RecordResult("mixed", "v1", true, 100, 50, 0.001)
+	}
+	for i := 0; i < 3; i++ {
+		engine.RecordResult("mixed", "v1", false, 100, 50, 0.001)
+	}
+
+	results, err := engine.GetResults("mixed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := results.Variants[0].Metrics
+	if m.TotalRuns != 10 {
+		t.Errorf("TotalRuns = %d, want 10", m.TotalRuns)
+	}
+	if m.SuccessCount != 7 {
+		t.Errorf("SuccessCount = %d, want 7", m.SuccessCount)
+	}
+	if m.ErrorCount != 3 {
+		t.Errorf("ErrorCount = %d, want 3", m.ErrorCount)
+	}
+	if m.SuccessRate != 0.7 {
+		t.Errorf("SuccessRate = %f, want 0.7", m.SuccessRate)
+	}
+}
+
+func TestRecordResultNonexistentVariant(t *testing.T) {
+	engine := abtesting.NewEngine(nil)
+	_ = engine.CreateTest(makeTest("rrtest"))
+	// Should not panic or error
+	engine.RecordResult("rrtest", "nonexistent", true, 100, 50, 0.001)
+}
+
+func TestGetResultsLatencyCriteria(t *testing.T) {
+	engine := abtesting.NewEngine(nil)
+
+	test := &abtesting.Test{
+		ID:       "lat-test",
+		Name:     "Latency Test",
+		PromptID: "prompt1",
+		Variants: []*abtesting.Variant{
+			{ID: "fast", Name: "Fast", PromptID: "p1", TrafficPct: 50},
+			{ID: "slow", Name: "Slow", PromptID: "p2", TrafficPct: 50},
+		},
+		WinCriteria: "latency",
+		MinSamples:  10,
+	}
+	_ = engine.CreateTest(test)
+
+	for i := 0; i < 5; i++ {
+		engine.RecordResult("lat-test", "fast", true, 10, 50, 0.001)
+		engine.RecordResult("lat-test", "slow", true, 500, 50, 0.001)
+	}
+
+	results, err := engine.GetResults("lat-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results.Winner != "fast" {
+		t.Errorf("Winner = %s, want fast", results.Winner)
+	}
+	if len(results.Variants) != 2 {
+		t.Fatalf("expected 2 variant results, got %d", len(results.Variants))
+	}
+	if results.Variants[0].Rank != 1 {
+		t.Errorf("Rank[0] = %d, want 1", results.Variants[0].Rank)
+	}
+	if results.Variants[1].Rank != 2 {
+		t.Errorf("Rank[1] = %d, want 2", results.Variants[1].Rank)
+	}
+}
+
+func TestGetResultsCostCriteria(t *testing.T) {
+	engine := abtesting.NewEngine(nil)
+
+	test := &abtesting.Test{
+		ID:       "cost-test",
+		Name:     "Cost Test",
+		PromptID: "prompt1",
+		Variants: []*abtesting.Variant{
+			{ID: "cheap", Name: "Cheap", PromptID: "p1", TrafficPct: 50},
+			{ID: "expensive", Name: "Expensive", PromptID: "p2", TrafficPct: 50},
+		},
+		WinCriteria: "cost",
+		MinSamples:  10,
+	}
+	_ = engine.CreateTest(test)
+
+	for i := 0; i < 5; i++ {
+		engine.RecordResult("cost-test", "cheap", true, 100, 50, 0.001)
+		engine.RecordResult("cost-test", "expensive", true, 100, 50, 0.100)
+	}
+
+	results, err := engine.GetResults("cost-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results.Winner != "cheap" {
+		t.Errorf("Winner = %s, want cheap", results.Winner)
+	}
+}
+
+func TestGetResultsSuccessRateCriteria(t *testing.T) {
+	engine := abtesting.NewEngine(nil)
+
+	test := &abtesting.Test{
+		ID:       "sr-test",
+		Name:     "Success Rate Test",
+		PromptID: "prompt1",
+		Variants: []*abtesting.Variant{
+			{ID: "good", Name: "Good", PromptID: "p1", TrafficPct: 50},
+			{ID: "bad", Name: "Bad", PromptID: "p2", TrafficPct: 50},
+		},
+		WinCriteria: "success_rate",
+		MinSamples:  10,
+	}
+	_ = engine.CreateTest(test)
+
+	for i := 0; i < 10; i++ {
+		engine.RecordResult("sr-test", "good", true, 100, 50, 0.001)
+		engine.RecordResult("sr-test", "bad", false, 100, 50, 0.001)
+	}
+
+	results, err := engine.GetResults("sr-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results.Winner != "good" {
+		t.Errorf("Winner = %s, want good", results.Winner)
+	}
+	if !results.IsSignificant {
+		t.Error("expected IsSignificant = true")
+	}
+	if results.Confidence != 1.0 {
+		t.Errorf("Confidence = %f, want 1.0", results.Confidence)
+	}
+	if results.Status != "running" {
+		t.Errorf("Status = %s, want running", results.Status)
+	}
+}
+
+func TestGetResultsConfidenceClamped(t *testing.T) {
+	engine := abtesting.NewEngine(nil)
+
+	test := &abtesting.Test{
+		ID:       "conf-test",
+		Name:     "Confidence",
+		PromptID: "prompt1",
+		Variants: []*abtesting.Variant{
+			{ID: "v1", TrafficPct: 100},
+		},
+		MinSamples: 5,
+	}
+	_ = engine.CreateTest(test)
+
+	for i := 0; i < 10; i++ {
+		engine.RecordResult("conf-test", "v1", true, 100, 50, 0.001)
+	}
+
+	results, err := engine.GetResults("conf-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results.Confidence != 1.0 {
+		t.Errorf("Confidence = %f, want 1.0", results.Confidence)
+	}
+	if !results.IsSignificant {
+		t.Error("expected IsSignificant = true")
+	}
+}
+
+func TestSelectVariantFallback(t *testing.T) {
+	engine := abtesting.NewEngine(nil)
+
+	// Test with a single variant at 100% traffic to exercise the fallback path
+	test := &abtesting.Test{
+		ID:       "fallback",
+		Name:     "Fallback",
+		PromptID: "prompt1",
+		Variants: []*abtesting.Variant{
+			{ID: "only", TrafficPct: 100},
+		},
+	}
+	_ = engine.CreateTest(test)
+
+	v, err := engine.SelectVariant("fallback")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.ID != "only" {
+		t.Errorf("expected 'only', got %s", v.ID)
+	}
+}
+
+func TestCreateTestWeights(t *testing.T) {
+	engine := abtesting.NewEngine(nil)
+
+	test := &abtesting.Test{
+		ID:       "weight-test",
+		Name:     "Weight Test",
+		PromptID: "prompt1",
+		Variants: []*abtesting.Variant{
+			{ID: "v1", TrafficPct: 25},
+			{ID: "v2", TrafficPct: 75},
+		},
+	}
+	err := engine.CreateTest(test)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := engine.GetTest("weight-test")
+	for _, v := range got.Variants {
+		expectedWeight := v.TrafficPct / 100.0
+		if v.Weight != expectedWeight {
+			t.Errorf("Variant %s: Weight = %f, want %f", v.ID, v.Weight, expectedWeight)
+		}
 	}
 }

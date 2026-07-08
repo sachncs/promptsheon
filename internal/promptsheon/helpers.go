@@ -40,7 +40,6 @@ func validateHash(cleaned string) error {
 	return nil
 }
 
-
 // branchNamePattern matches a valid branch name. Empty, names
 // containing whitespace or path separators, and names containing
 // backslashes or ASCII control characters are all rejected. This

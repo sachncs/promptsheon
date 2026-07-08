@@ -59,7 +59,7 @@ func TestMiddleware(t *testing.T) {
 
 	handler := l.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok")) //nolint:errcheck
+		_, _ = w.Write([]byte("ok"))
 	}))
 
 	// First two should pass

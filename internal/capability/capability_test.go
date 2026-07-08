@@ -7,17 +7,10 @@ import (
 )
 
 func TestCapabilityDefaults(t *testing.T) {
-	now := time.Now()
 	c := Capability{
-		ID:          "cap-1",
-		ProjectID:   "proj-1",
-		Name:        "Summarize Invoice",
-		Description: "Extract and summarize key fields from invoice PDFs",
-		Owner:       "alice",
-		Tags:        []string{"invoices", "finance"},
-		State:       StateDraft,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:    "cap-1",
+		Tags:  []string{"invoices", "finance"},
+		State: StateDraft,
 	}
 
 	if c.ID != "cap-1" {
@@ -32,15 +25,10 @@ func TestCapabilityDefaults(t *testing.T) {
 }
 
 func TestCapabilityJSONRoundTrip(t *testing.T) {
-	now := time.Now()
 	c := Capability{
-		ID:        "cap-2",
-		ProjectID: "proj-1",
-		Name:      "Review PR",
-		Owner:     "bob",
-		State:     StateActive,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:    "cap-2",
+		Name:  "Review PR",
+		State: StateActive,
 	}
 
 	data, err := json.Marshal(c)
@@ -66,9 +54,7 @@ func TestCapabilityJSONRoundTrip(t *testing.T) {
 
 func TestVersionImmutable(t *testing.T) {
 	v := Version{
-		ID:           "ver-1",
-		CapabilityID: "cap-1",
-		Version:      1,
+		Version: 1,
 		Prompt: Prompt{
 			Instructions: "Summarize this invoice",
 		},
@@ -172,6 +158,9 @@ func TestPromptAllFields(t *testing.T) {
 	if len(p.LocaleVariants) != 2 {
 		t.Errorf("expected 2 locale variants, got %d", len(p.LocaleVariants))
 	}
+	_ = p.Role
+	_ = p.Instructions
+	_ = p.Template
 	if !p.Variables[0].Required {
 		t.Errorf("first variable should be required")
 	}
@@ -219,13 +208,9 @@ func TestContextContractFields(t *testing.T) {
 			{Key: "user_input", Source: "session"},
 			{Key: "document", Source: "knowledge"},
 		},
-		OptionalContext: []ContextRef{
-			{Key: "conversation_history", Source: "memory"},
-		},
-		ForbiddenContext:    []string{"password", "secret"},
-		MaximumSize:         4096,
-		CompressionStrategy: "summary",
-		RetrievalStrategy:   "hybrid",
+		ForbiddenContext:  []string{"password", "secret"},
+		MaximumSize:       4096,
+		RetrievalStrategy: "hybrid",
 	}
 
 	if len(cc.RequiredContext) != 2 {
@@ -245,11 +230,7 @@ func TestContextContractFields(t *testing.T) {
 func TestKnowledgeSourceTypes(t *testing.T) {
 	sources := []string{"documents", "index", "rag", "graph", "sql", "files"}
 	for _, st := range sources {
-		ks := KnowledgeSource{
-			ID:   "ks-1",
-			Name: "test",
-			Type: st,
-		}
+		ks := KnowledgeSource{Type: st}
 		if ks.Type != st {
 			t.Errorf("type mismatch: %s", st)
 		}
@@ -258,12 +239,9 @@ func TestKnowledgeSourceTypes(t *testing.T) {
 
 func TestMemoryConfig(t *testing.T) {
 	mc := MemoryConfig{
-		SessionMemory:      true,
-		ConversationMemory: true,
-		WorkingMemory:      false,
-		LongTermMemory:     false,
-		SharedMemory:       false,
-		MaxSessionTokens:   8192,
+		SessionMemory:    true,
+		WorkingMemory:    false,
+		MaxSessionTokens: 8192,
 	}
 
 	if !mc.SessionMemory {
@@ -312,13 +290,8 @@ func TestGuardrailPhases(t *testing.T) {
 
 func TestTool(t *testing.T) {
 	tool := Tool{
-		ID:      "t-1",
-		Name:    "search-github",
 		Version: "2.1.0",
 		Type:    "http",
-		Config: map[string]any{
-			"url": "https://api.github.com",
-		},
 	}
 
 	if tool.Type != "http" {
@@ -330,14 +303,7 @@ func TestTool(t *testing.T) {
 }
 
 func TestMCPServer(t *testing.T) {
-	mcp := MCPServer{
-		ID:        "mcp-1",
-		Name:      "github-mcp",
-		Transport: "sse",
-		Config: map[string]any{
-			"endpoint": "https://mcp.github.com",
-		},
-	}
+	mcp := MCPServer{Transport: "sse"}
 
 	if mcp.Transport != "sse" {
 		t.Errorf("expected sse transport")
@@ -346,14 +312,9 @@ func TestMCPServer(t *testing.T) {
 
 func TestRuntimePolicy(t *testing.T) {
 	rp := RuntimePolicy{
-		Retries:         3,
-		TimeoutMs:       30000,
-		Streaming:       true,
-		Parallelism:     1,
-		Caching:         "semantic",
-		Temperature:     0.3,
-		MaxTokens:       4096,
-		ReasoningBudget: 0,
+		Retries:     3,
+		Caching:     "semantic",
+		Temperature: 0.3,
 	}
 
 	if rp.Retries != 3 {
@@ -377,8 +338,6 @@ func TestEvaluationSuite(t *testing.T) {
 			"accuracy":      0.9,
 			"hallucination": 0.05,
 		},
-		RegressionTests: []string{"reg-1", "reg-2"},
-		SecurityTests:   []string{"sec-1"},
 	}
 
 	if len(es.Datasets) != 1 {
@@ -393,22 +352,11 @@ func TestEvaluationSuite(t *testing.T) {
 }
 
 func TestExecution(t *testing.T) {
-	now := time.Now()
 	e := Execution{
-		ID:                  "exec-1",
-		CapabilityVersionID: "ver-1",
-		Timestamp:           now,
-		Inputs:              map[string]any{"text": "hello"},
-		Outputs:             map[string]any{"response": "hi"},
-		Model:               "gpt-4",
-		Provider:            "openai",
-		LatencyMs:           1200,
-		CostUSD:             0.015,
-		PromptTokens:        500,
-		CompletionTokens:    100,
-		TotalTokens:         600,
-		TraceID:             "trace-abc",
-		Environment:         "prod",
+		Model:       "gpt-4",
+		LatencyMs:   1200,
+		TotalTokens: 600,
+		Environment: "prod",
 	}
 
 	if e.LatencyMs != 1200 {
@@ -426,20 +374,10 @@ func TestExecution(t *testing.T) {
 }
 
 func TestObservation(t *testing.T) {
-	start := time.Now()
-	end := start.Add(1 * time.Hour)
-
 	o := Observation{
-		CapabilityVersionID: "ver-1",
-		PeriodStart:         start,
-		PeriodEnd:           end,
-		P95LatencyMs:        850,
-		P99LatencyMs:        2200,
-		AvgCostUSD:          0.012,
-		HallucinationRate:   0.02,
-		SuccessRate:         0.98,
-		Availability:        0.995,
-		ExecutionCount:      15000,
+		P95LatencyMs:   850,
+		SuccessRate:    0.98,
+		ExecutionCount: 15000,
 	}
 
 	if o.P95LatencyMs != 850 {
@@ -455,16 +393,9 @@ func TestObservation(t *testing.T) {
 
 func TestEvaluationResult(t *testing.T) {
 	er := EvaluationResult{
-		CapabilityVersionID: "ver-1",
-		Accuracy:            0.95,
-		Precision:           0.93,
-		Recall:              0.91,
-		Hallucination:       0.03,
-		LatencyMs:           750,
-		CostUSD:             0.008,
-		Schema:              1.0,
-		Groundedness:        0.97,
-		ThresholdsMet:       true,
+		Accuracy:      0.95,
+		Schema:        1.0,
+		ThresholdsMet: true,
 	}
 
 	if !er.ThresholdsMet {
@@ -494,13 +425,8 @@ func TestRecommendationTypes(t *testing.T) {
 
 	for _, rt := range types {
 		r := Recommendation{
-			ID:                  "rec-1",
-			CapabilityVersionID: "ver-1",
-			Type:                rt,
-			Reason:              "test reason",
-			Confidence:          0.85,
-			Impact:              "medium",
-			AutoApplicable:      true,
+			Type:       rt,
+			Confidence: 0.85,
 		}
 
 		if r.Type != rt {
@@ -516,11 +442,7 @@ func TestDeploymentLifecycle(t *testing.T) {
 	now := time.Now()
 
 	d := Deployment{
-		ID:                  "dep-1",
-		CapabilityVersionID: "ver-1",
-		Environment:         "prod",
-		Status:              DeploymentStatusPending,
-		DeployedAt:          now,
+		Status: DeploymentStatusPending,
 	}
 
 	if d.Status != DeploymentStatusPending {
@@ -559,10 +481,7 @@ func TestDeploymentHealthValues(t *testing.T) {
 	}
 
 	for _, h := range healthValues {
-		d := Deployment{
-			Status: DeploymentStatusActive,
-			Health: h,
-		}
+		d := Deployment{Health: h}
 		if d.Health != h {
 			t.Errorf("health round-trip failed for %s", h)
 		}
@@ -588,15 +507,8 @@ func TestEventTypes(t *testing.T) {
 		EventRegressionDetected,
 		EventRollbackPerformed,
 	}
-
-	now := time.Now()
 	for _, et := range eventTypes {
-		e := Event{
-			ID:          "evt-1",
-			Type:        et,
-			AggregateID: "agg-1",
-			Timestamp:   now,
-		}
+		e := Event{Type: et}
 
 		if e.Type != et {
 			t.Errorf("event type mismatch: %s", et)
@@ -606,10 +518,6 @@ func TestEventTypes(t *testing.T) {
 
 func TestEventCorrelation(t *testing.T) {
 	e1 := Event{
-		ID:            "evt-1",
-		Type:          EventExecutionFinished,
-		AggregateID:   "ver-1",
-		AggregateType: "version",
 		Data: map[string]any{
 			"execution_id": "exec-1",
 			"latency_ms":   1200,
@@ -626,14 +534,7 @@ func TestEventCorrelation(t *testing.T) {
 }
 
 func TestWorkspace(t *testing.T) {
-	now := time.Now()
-	w := Workspace{
-		ID:           "ws-1",
-		Name:         "Acme Corp",
-		Organization: "Acme Corporation",
-		CreatedAt:    now,
-		UpdatedAt:    now,
-	}
+	w := Workspace{Name: "Acme Corp"}
 
 	if w.Name != "Acme Corp" {
 		t.Errorf("expected Acme Corp")
@@ -641,14 +542,9 @@ func TestWorkspace(t *testing.T) {
 }
 
 func TestProject(t *testing.T) {
-	now := time.Now()
 	p := Project{
-		ID:          "proj-1",
 		WorkspaceID: "ws-1",
 		Name:        "Customer Support",
-		Description: "AI-powered customer support agent",
-		CreatedAt:   now,
-		UpdatedAt:   now,
 	}
 
 	if p.WorkspaceID != "ws-1" {
@@ -661,10 +557,6 @@ func TestProject(t *testing.T) {
 
 func TestKnowledgeSourceWithEmbedding(t *testing.T) {
 	ks := KnowledgeSource{
-		ID:             "ks-2",
-		Name:           "product-docs",
-		Type:           "rag",
-		Version:        "2024-01-15",
 		EmbeddingModel: "text-embedding-3-small",
 		Config: map[string]any{
 			"chunk_size": 512,

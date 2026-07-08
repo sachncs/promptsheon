@@ -134,8 +134,12 @@ func (s *Store) List(ctx context.Context, f Filter) ([]*Snapshot, error) {
 			&snap.Hallucination, &metaJSON, &snap.CreatedAt); err != nil {
 			return nil, err
 		}
-		json.Unmarshal([]byte(usageJSON), &snap.TokenUsage) //nolint:errcheck // JSON was just marshalled by database driver; must be valid
-		json.Unmarshal([]byte(metaJSON), &snap.Metadata)    //nolint:errcheck // JSON was just marshalled by database driver; must be valid
+		if err := json.Unmarshal([]byte(usageJSON), &snap.TokenUsage); err != nil {
+			return nil, fmt.Errorf("unmarshal token_usage for snapshot %s: %w", snap.ID, err)
+		}
+		if err := json.Unmarshal([]byte(metaJSON), &snap.Metadata); err != nil {
+			return nil, fmt.Errorf("unmarshal metadata for snapshot %s: %w", snap.ID, err)
+		}
 		snaps = append(snaps, snap)
 	}
 	return snaps, nil
@@ -155,7 +159,11 @@ func (s *Store) Get(ctx context.Context, id string) (*Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	json.Unmarshal([]byte(usageJSON), &snap.TokenUsage) //nolint:errcheck // JSON was just marshalled by database driver; must be valid
-	json.Unmarshal([]byte(metaJSON), &snap.Metadata)    //nolint:errcheck // JSON was just marshalled by database driver; must be valid
+	if err := json.Unmarshal([]byte(usageJSON), &snap.TokenUsage); err != nil {
+		return nil, fmt.Errorf("unmarshal token_usage for snapshot %s: %w", snap.ID, err)
+	}
+	if err := json.Unmarshal([]byte(metaJSON), &snap.Metadata); err != nil {
+		return nil, fmt.Errorf("unmarshal metadata for snapshot %s: %w", snap.ID, err)
+	}
 	return snap, nil
 }

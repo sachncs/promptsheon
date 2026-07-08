@@ -84,6 +84,60 @@ func TestAssembleFromContract_CompressionStrategy(t *testing.T) {
 	}
 }
 
+func TestDefaultTokenEstimate_Empty(t *testing.T) {
+	if got := DefaultTokenEstimate(""); got != 0 {
+		t.Errorf("DefaultTokenEstimate(\"\") = %d, want 0", got)
+	}
+}
+
+func TestDefaultTokenEstimate_SpacesOnly(t *testing.T) {
+	if got := DefaultTokenEstimate("   "); got != 0 {
+		t.Errorf("DefaultTokenEstimate(\"   \") = %d, want 0", got)
+	}
+}
+
+func TestDefaultTokenEstimate_Words(t *testing.T) {
+	tests := []struct {
+		input string
+		want  int
+	}{
+		{"hello", 1},
+		{"hello world", 2},
+		{"one two three four five", 6},
+		{"a b c d e f g h i j", 13},
+	}
+	for _, tt := range tests {
+		if got := DefaultTokenEstimate(tt.input); got != tt.want {
+			t.Errorf("DefaultTokenEstimate(%q) = %d, want %d", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestNewManagerWithEstimator(t *testing.T) {
+	custom := func(s string) int { return len(s) }
+	m := NewManagerWithEstimator(custom)
+	if m == nil {
+		t.Fatal("expected non-nil manager")
+	}
+	if got := m.EstimateTokens("hello"); got != 5 {
+		t.Errorf("EstimateTokens with custom estimator = %d, want 5", got)
+	}
+}
+
+func TestEstimateTokens_Default(t *testing.T) {
+	m := NewManager()
+	if got := m.EstimateTokens("hello world"); got != 2 {
+		t.Errorf("EstimateTokens(\"hello world\") = %d, want 2", got)
+	}
+}
+
+func TestEstimateTokens_Empty(t *testing.T) {
+	m := NewManager()
+	if got := m.EstimateTokens(""); got != 0 {
+		t.Errorf("EstimateTokens(\"\") = %d, want 0", got)
+	}
+}
+
 func TestAssembleFromContract_ForbiddenContext(t *testing.T) {
 	m := NewManager()
 	contract := &capability.ContextContract{

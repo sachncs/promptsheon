@@ -46,7 +46,7 @@ func TestOpenAIKeyForRequest(_ *testing.T) {
 	// surface. We exercise it indirectly: a request made
 	// via a context carrying a per-call key should have
 	// access to that key.
-	req := &Request{Model: "gpt-4", Messages: []Message{{Role: "user", Content: "hi"}}}
+	req := &Request{}
 	ctx := WithPerCallKey(context.Background(), "sk-percall")
 	_ = req
 	_ = ctx

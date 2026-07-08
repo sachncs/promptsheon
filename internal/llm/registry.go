@@ -56,21 +56,29 @@ func (r *Registry) Get(name string) (Provider, error) {
 		r.mu.RUnlock()
 		return p, nil
 	}
-	factory, ok := r.providers[name]
-	cfg, cfgOK := r.configs[name]
 	r.mu.RUnlock()
 
+	// Double-checked locking: re-acquire write lock to avoid a race
+	// where two concurrent calls both miss the cache and create
+	// duplicate instances of the same provider.
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if p, ok := r.cache[name]; ok {
+		return p, nil
+	}
+
+	factory, ok := r.providers[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown provider: %s", name)
 	}
+	cfg, cfgOK := r.configs[name]
 	if !cfgOK {
 		return nil, fmt.Errorf("provider %s not configured", name)
 	}
 
 	p := factory(cfg)
-	r.mu.Lock()
 	r.cache[name] = p
-	r.mu.Unlock()
 	return p, nil
 }
 

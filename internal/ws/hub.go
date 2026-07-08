@@ -140,7 +140,7 @@ func (h *Hub) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	// Send initial connection event
-	fmt.Fprintf(w, "event: connected\ndata: {\"client_id\":\"%s\"}\n\n", client.id) //nolint:errcheck // SSE write errors are unrecoverable; client will reconnect
+	_, _ = fmt.Fprintf(w, "event: connected\ndata: {\"client_id\":\"%s\"}\n\n", client.id)
 	flusher.Flush()
 
 	// Handle client disconnect
@@ -155,7 +155,7 @@ func (h *Hub) HandleSSE(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			fmt.Fprintf(w, "event: log\ndata: %s\n\n", msg) //nolint:errcheck // SSE write errors are unrecoverable; client will disconnect
+			_, _ = fmt.Fprintf(w, "event: log\ndata: %s\n\n", msg)
 			flusher.Flush()
 		}
 	}

@@ -46,6 +46,8 @@ type Config struct {
 const defaultAddr = ":8080"
 const valFalse = "false"
 const valTrue = "true"
+const valYes = "yes"
+const valNo = "no"
 
 // DefaultConfig returns the default configuration.
 func DefaultConfig() Config {
@@ -120,9 +122,9 @@ func getEnvBool(key string, defaultVal bool) bool {
 		return defaultVal
 	}
 	switch v {
-	case "1", "true", "yes":
+	case "1", valTrue, valYes:
 		return true
-	case "0", "false", "no":
+	case "0", valFalse, valNo:
 		return false
 	}
 	return defaultVal

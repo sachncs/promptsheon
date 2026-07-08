@@ -75,9 +75,8 @@ func (t *OTelTracer) StartChild(ctx context.Context, parent *Span, operation str
 		StartedAt: time.Now(),
 	}
 
-	// Store OTel span in context
-	ctx = context.WithValue(ctx, otelSpanKey{}, otelSpan)
-	_ = ctx
+	// Store OTel span in context for child span linking
+	_ = context.WithValue(ctx, otelSpanKey{}, otelSpan)
 
 	return span
 }

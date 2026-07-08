@@ -14,7 +14,9 @@ import (
 // them from.
 func packageDir() string {
 	var file string
-	_, file, _, _ = runtime.Caller(0)
+	var line int
+	_, file, line, _ = runtime.Caller(0)
+	_ = line
 	return filepath.Dir(file)
 }
 

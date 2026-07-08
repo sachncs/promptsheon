@@ -64,20 +64,20 @@ func main() {
 	rootCtx, rootCancel := context.WithCancel(context.Background())
 	defer rootCancel()
 
-	logger := setupLogger(cfg)
+	logger := setupLogger(&cfg)
 
-	db := openDB(cfg, logger)
+	db := openDB(&cfg, logger)
 	defer func() {
 		if db != nil {
 			_ = db.Close()
 		}
 	}()
 
-	srv, limiter, spans, collector := buildServer(cfg, db, logger, rootCtx)
+	srv, limiter, spans, collector := buildServer(rootCtx, &cfg, db, logger)
 
 	srv.StartAuditWorkers(rootCtx, 2)
 
-	startHTTPServerAndWait(cfg, srv, logger, limiter, spans, collector, rootCtx, rootCancel)
+	startHTTPServerAndWait(rootCtx, rootCancel, &cfg, srv, logger, limiter, spans, collector)
 }
 
 // configureShellTool loads the shell tool policy from environment. The
@@ -104,7 +104,7 @@ func configureShellTool(_ *config.Config) {
 	workflow.SetShellToolPolicy(enabled, allow)
 }
 
-func setupLogger(cfg config.Config) *slog.Logger {
+func setupLogger(cfg *config.Config) *slog.Logger {
 	var logLevel slog.Level
 	switch cfg.LogLevel {
 	case "debug":
@@ -121,19 +121,19 @@ func setupLogger(cfg config.Config) *slog.Logger {
 	return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel}))
 }
 
-func openDB(cfg config.Config, logger *slog.Logger) *store.SQLite {
+func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
 	db, err := store.NewSQLite(cfg.DBPath)
 	if err != nil {
 		logger.Error("failed to open database", "err", err)
 		if db != nil {
-			db.Close()
+			_ = db.Close()
 		}
 		os.Exit(1)
 	}
 	return db
 }
 
-func buildServer(cfg config.Config, db *store.SQLite, logger *slog.Logger, rootCtx context.Context) (*api.Server, *ratelimit.Limiter, *trace.SQLite, *metrics.Collector) {
+func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger) (*api.Server, *ratelimit.Limiter, *trace.SQLite, *metrics.Collector) {
 	spans, err := trace.NewSQLite(db.DB())
 	if err != nil {
 		logger.Warn("tracing disabled", "err", err)
@@ -220,7 +220,7 @@ func buildServer(cfg config.Config, db *store.SQLite, logger *slog.Logger, rootC
 	return srv, limiter, spans, collector
 }
 
-func startHTTPServerAndWait(cfg config.Config, srv *api.Server, logger *slog.Logger, limiter *ratelimit.Limiter, spans *trace.SQLite, collector *metrics.Collector, rootCtx context.Context, rootCancel func()) {
+func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *config.Config, srv *api.Server, logger *slog.Logger, limiter *ratelimit.Limiter, spans *trace.SQLite, collector *metrics.Collector) {
 	handler := api.ChainHTTP(srv,
 		api.Recovery(logger),
 		api.MaxBytesReader(10<<20),

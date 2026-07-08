@@ -587,17 +587,6 @@ func httpRequestFromContext(ctx context.Context) *http.Request {
 	return nil
 }
 
-func (s *Server) auditDiff(ctx context.Context, action, resource string, prev, newObj any) {
-	details := make(map[string]any)
-	if prev != nil {
-		details["previous"] = prev
-	}
-	if newObj != nil {
-		details["new"] = newObj
-	}
-	s.audit(ctx, action, resource, details)
-}
-
 func (s *Server) handleLogsStream(w http.ResponseWriter, r *http.Request) error {
 	if s.logHub == nil {
 		return badRequest("log streaming not configured")
@@ -630,9 +619,11 @@ type HTTPError struct {
 func (e *HTTPError) Error() string { return e.Message }
 
 func badRequest(msg string) error { return &HTTPError{Status: http.StatusBadRequest, Message: msg} }
-func notFound(msg string) error     { return &HTTPError{Status: http.StatusNotFound, Message: msg} }
-func unauthorized(msg string) error { return &HTTPError{Status: http.StatusUnauthorized, Message: msg} }
-func forbidden(msg string) error    { return &HTTPError{Status: http.StatusForbidden, Message: msg} }
+func notFound(msg string) error   { return &HTTPError{Status: http.StatusNotFound, Message: msg} }
+func unauthorized() error {
+	return &HTTPError{Status: http.StatusUnauthorized, Message: "authentication required"}
+}
+func forbidden(msg string) error { return &HTTPError{Status: http.StatusForbidden, Message: msg} }
 
 // callerID returns the authenticated user's ID, or "api" if no user
 // is in the request context. Used to populate CreatedBy fields
@@ -653,7 +644,7 @@ func (s *Server) rateLimit(next Func) Func {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Retry-After", "60")
 			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"error":"rate limit exceeded"}`)) //nolint:errcheck // write failure is benign; middleware will close the connection
+			_, _ = w.Write([]byte(`{"error":"rate limit exceeded"}`))
 			return nil
 		}
 		return next(w, r)

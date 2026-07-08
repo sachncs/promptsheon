@@ -5,11 +5,11 @@ type GuardrailPhase string
 
 const (
 	// GuardrailPhasePre is a pre-execution guardrail phase.
-	GuardrailPhasePre     GuardrailPhase = "pre"
+	GuardrailPhasePre GuardrailPhase = "pre"
 	// GuardrailPhaseRuntime is a runtime guardrail phase.
 	GuardrailPhaseRuntime GuardrailPhase = "runtime"
 	// GuardrailPhasePost is a post-execution guardrail phase.
-	GuardrailPhasePost    GuardrailPhase = "post"
+	GuardrailPhasePost GuardrailPhase = "post"
 )
 
 // Guardrail is an independent safety or quality policy artifact.

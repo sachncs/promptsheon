@@ -101,10 +101,11 @@ func (s *Server) writeAuditCSV(w http.ResponseWriter, entries []*models.AuditEnt
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=audit_%s.csv", time.Now().Format("20060102_150405")))
 
 	writer := csv.NewWriter(w)
-	defer writer.Flush()
 
 	// Header
-	_ = writer.Write([]string{"id", "user_id", "action", "resource", "details", "timestamp", "previous_hash", "entry_hash"})
+	if err := writer.Write([]string{"id", "user_id", "action", "resource", "details", "timestamp", "previous_hash", "entry_hash"}); err != nil {
+		return fmt.Errorf("csv write header: %w", err)
+	}
 
 	// Data
 	for _, e := range entries {
@@ -112,7 +113,7 @@ func (s *Server) writeAuditCSV(w http.ResponseWriter, entries []*models.AuditEnt
 		if err != nil {
 			details = []byte("{}")
 		}
-		_ = writer.Write([]string{
+		if err := writer.Write([]string{
 			e.ID,
 			e.UserID,
 			e.Action,
@@ -121,10 +122,13 @@ func (s *Server) writeAuditCSV(w http.ResponseWriter, entries []*models.AuditEnt
 			e.Timestamp.Format(time.RFC3339),
 			e.PreviousHash,
 			e.EntryHash,
-		})
+		}); err != nil {
+			return fmt.Errorf("csv write row %s: %w", e.ID, err)
+		}
 	}
 
-	return nil
+	writer.Flush()
+	return writer.Error()
 }
 
 func (s *Server) handleVerifyAuditChain(w http.ResponseWriter, r *http.Request) error {

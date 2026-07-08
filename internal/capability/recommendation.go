@@ -7,25 +7,25 @@ type RecommendationType string
 
 const (
 	// RecommendationSwitchModel suggests switching to a different model.
-	RecommendationSwitchModel      RecommendationType = "switch_model"
+	RecommendationSwitchModel RecommendationType = "switch_model"
 	// RecommendationCompressPrompt suggests compressing the prompt.
-	RecommendationCompressPrompt   RecommendationType = "compress_prompt"
+	RecommendationCompressPrompt RecommendationType = "compress_prompt"
 	// RecommendationReduceContext suggests reducing context.
-	RecommendationReduceContext    RecommendationType = "reduce_context"
+	RecommendationReduceContext RecommendationType = "reduce_context"
 	// RecommendationEnableCache suggests enabling caching.
-	RecommendationEnableCache      RecommendationType = "enable_cache"
+	RecommendationEnableCache RecommendationType = "enable_cache"
 	// RecommendationDisableReasoning suggests disabling reasoning.
 	RecommendationDisableReasoning RecommendationType = "disable_reasoning"
 	// RecommendationUpgradeMCP suggests upgrading MCP server.
-	RecommendationUpgradeMCP       RecommendationType = "upgrade_mcp"
+	RecommendationUpgradeMCP RecommendationType = "upgrade_mcp"
 	// RecommendationRemoveTool suggests removing a tool.
-	RecommendationRemoveTool       RecommendationType = "remove_tool"
+	RecommendationRemoveTool RecommendationType = "remove_tool"
 	// RecommendationSplitCapability suggests splitting the capability.
-	RecommendationSplitCapability  RecommendationType = "split_capability"
+	RecommendationSplitCapability RecommendationType = "split_capability"
 	// RecommendationAddGuardrail suggests adding a guardrail.
-	RecommendationAddGuardrail     RecommendationType = "add_guardrail"
+	RecommendationAddGuardrail RecommendationType = "add_guardrail"
 	// RecommendationTunePolicy suggests tuning the policy.
-	RecommendationTunePolicy       RecommendationType = "tune_policy"
+	RecommendationTunePolicy RecommendationType = "tune_policy"
 )
 
 // Recommendation suggests an improvement to a capability version.

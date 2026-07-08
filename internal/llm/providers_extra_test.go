@@ -47,7 +47,9 @@ func TestAnthropicCompleteHappyPath(t *testing.T) {
 				Role string `json:"role"`
 			} `json:"messages"`
 		}
-		_ = json.NewDecoder(r.Body).Decode(&body)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
 		if body.System != "you are helpful" {
 			t.Errorf("expected system prompt, got %q", body.System)
 		}
@@ -55,11 +57,13 @@ func TestAnthropicCompleteHappyPath(t *testing.T) {
 			t.Errorf("expected only user message, got %+v", body.Messages)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"content":     []map[string]string{{"text": "hello"}},
 			"stop_reason": "end_turn",
 			"usage":       map[string]int{"input_tokens": 3, "output_tokens": 2},
-		})
+		}); err != nil {
+			t.Fatalf("encode response: %v", err)
+		}
 	}))
 	defer srv.Close()
 

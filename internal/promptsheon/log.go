@@ -202,5 +202,3 @@ func buildGraphNodes(order []string, commits map[string]*Object, branchOf map[st
 	}
 	return nodes
 }
-
-

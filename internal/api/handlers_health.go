@@ -23,7 +23,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) error {
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 	ready := map[string]any{
 		keyStatus: "ready",
-		"go":     runtime.Version(),
+		"go":      runtime.Version(),
 	}
 	if s.db != nil {
 		if err := s.db.Ping(r.Context()); err != nil {

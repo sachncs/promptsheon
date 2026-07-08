@@ -37,13 +37,13 @@ type State string
 
 const (
 	// StateDraft is a draft state.
-	StateDraft      State = "draft"
+	StateDraft State = "draft"
 	// StateActive is an active state.
-	StateActive     State = "active"
+	StateActive State = "active"
 	// StateDeprecated is a deprecated state.
 	StateDeprecated State = "deprecated"
 	// StateArchived is an archived state.
-	StateArchived   State = "archived"
+	StateArchived State = "archived"
 )
 
 // Capability represents one business outcome.
@@ -53,14 +53,14 @@ const (
 // while Promptsheon is free to evolve the implementation behind that
 // capability based on evidence from evaluations and production telemetry.
 type Capability struct {
-	ID               string          `json:"id"`
-	ProjectID        string          `json:"project_id"`
-	Name             string          `json:"name"`
-	Description      string          `json:"description,omitempty"`
-	Owner            string          `json:"owner,omitempty"`
-	Tags             []string        `json:"tags,omitempty"`
-	State            State `json:"state"`
-	CurrentVersionID string          `json:"current_version_id,omitempty"`
-	CreatedAt        time.Time       `json:"created_at"`
-	UpdatedAt        time.Time       `json:"updated_at"`
+	ID               string    `json:"id"`
+	ProjectID        string    `json:"project_id"`
+	Name             string    `json:"name"`
+	Description      string    `json:"description,omitempty"`
+	Owner            string    `json:"owner,omitempty"`
+	Tags             []string  `json:"tags,omitempty"`
+	State            State     `json:"state"`
+	CurrentVersionID string    `json:"current_version_id,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
