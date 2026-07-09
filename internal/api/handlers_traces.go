@@ -61,6 +61,9 @@ func (s *Server) handleGetTraceTree(w http.ResponseWriter, r *http.Request) erro
 	if err != nil {
 		return ErrNotFound
 	}
+	if len(spans) == 0 {
+		return ErrNotFound
+	}
 
 	// Build tree structure
 	type SpanNode struct {

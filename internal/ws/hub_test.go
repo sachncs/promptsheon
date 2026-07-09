@@ -447,8 +447,6 @@ func TestHandleSSE_DeliversLogEvent(t *testing.T) {
 	}
 }
 
-
-
 type errHandler struct{}
 
 func (e errHandler) Enabled(context.Context, slog.Level) bool  { return true }

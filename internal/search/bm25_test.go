@@ -254,3 +254,122 @@ func contains(haystack []string, needle string) bool {
 	}
 	return false
 }
+
+// TestAvgDocLen pins the average document length calculation,
+// including the empty-index boundary.
+func TestAvgDocLen(t *testing.T) {
+	idx := NewIndex()
+	if got := idx.AvgDocLen(); got != 0 {
+		t.Fatalf("empty index: expected 0, got %f", got)
+	}
+	idx.Add(Document{ID: "a", Content: "hello world"})
+	idx.Add(Document{ID: "b", Content: "foo bar"})
+	// "hello world" → ["hello", "world", "hello world"] = 3 tokens
+	// "foo bar"    → ["foo", "bar", "foo bar"]     = 3 tokens
+	// avg = (3+3)/2 = 3
+	if got, want := idx.AvgDocLen(), 3.0; got != want {
+		t.Fatalf("expected %f, got %f", want, got)
+	}
+}
+
+// TestBM25_EmptyIndex pins that Search on an empty index returns nil.
+func TestBM25_EmptyIndex(t *testing.T) {
+	idx := NewIndex()
+	if got := idx.Search("anything", 10); got != nil {
+		t.Fatalf("expected nil, got %v", got)
+	}
+}
+
+// TestBM25_DefaultLimit pins that non-positive limit defaults to 10.
+func TestBM25_DefaultLimit(t *testing.T) {
+	idx := NewIndex()
+	for i := 0; i < 15; i++ {
+		idx.Add(Document{ID: string(rune('a' + i)), Content: "alpha"})
+	}
+	results := idx.Search("alpha", 0)
+	if len(results) != 10 {
+		t.Fatalf("expected 10 results with limit=0, got %d", len(results))
+	}
+	results = idx.Search("alpha", -5)
+	if len(results) != 10 {
+		t.Fatalf("expected 10 results with limit=-5, got %d", len(results))
+	}
+}
+
+// TestLog1Plus exercises the boundary branches of the log1Plus
+// helper that cannot be reached through normal BM25 scoring.
+func TestLog1Plus(t *testing.T) {
+	if got := log1Plus(10, 0); got != 0 {
+		t.Fatalf("denom=0: expected 0, got %f", got)
+	}
+	if got := log1Plus(-5, 1); got != 0 {
+		t.Fatalf("ratio<=0: expected 0, got %f", got)
+	}
+	if got := log1Plus(3, 2); got <= 0 {
+		t.Fatalf("normal: expected >0, got %f", got)
+	}
+}
+
+// TestBM25_ReplaceDocument pins that adding a document with an
+// existing ID replaces the old entry and its df/totalLen
+// contributions are removed first.
+func TestBM25_ReplaceDocument(t *testing.T) {
+	idx := NewIndex()
+	idx.Add(Document{ID: "a", Content: "alpha beta"})
+	idx.Add(Document{ID: "a", Content: "gamma delta"})
+	if idx.Size() != 1 {
+		t.Fatalf("expected size 1 after replace, got %d", idx.Size())
+	}
+	if got := idx.Search("alpha", 10); len(got) != 0 {
+		t.Fatalf("expected no results for old content, got %d", len(got))
+	}
+	if got := idx.Search("gamma", 10); len(got) != 1 {
+		t.Fatalf("expected 1 result for new content, got %d", len(got))
+	}
+	// Replace with same content should still work
+	idx.Add(Document{ID: "a", Content: "gamma delta"})
+	if idx.Size() != 1 {
+		t.Fatalf("expected size 1 after re-replace, got %d", idx.Size())
+	}
+}
+
+// TestBM25_EmptyDocContent pins that documents with empty content
+// are indexed but never returned in results.
+func TestBM25_EmptyDocContent(t *testing.T) {
+	idx := NewIndex()
+	idx.Add(Document{ID: "empty", Content: ""})
+	idx.Add(Document{ID: "normal", Content: "hello world"})
+	results := idx.Search("hello", 10)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Document.ID != "normal" {
+		t.Fatalf("expected 'normal', got %s", results[0].Document.ID)
+	}
+}
+
+// TestBM25_AllEmptyDocs pins that an index where every document
+// has empty content returns nil for any search.
+func TestBM25_AllEmptyDocs(t *testing.T) {
+	idx := NewIndex()
+	idx.Add(Document{ID: "a", Content: ""})
+	idx.Add(Document{ID: "b", Content: ""})
+	results := idx.Search("anything", 10)
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results, got %d", len(results))
+	}
+}
+
+// TestBM25_RemoveNonExistent pins that removing a non-existent
+// document is a silent no-op.
+func TestBM25_RemoveNonExistent(t *testing.T) {
+	idx := NewIndex()
+	idx.Add(Document{ID: "a", Content: "alpha"})
+	idx.Remove("nonexistent")
+	if idx.Size() != 1 {
+		t.Fatalf("expected size 1, got %d", idx.Size())
+	}
+	if got := idx.Search("alpha", 10); len(got) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(got))
+	}
+}

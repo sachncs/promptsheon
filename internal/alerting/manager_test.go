@@ -2,6 +2,7 @@ package alerting
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"os"
@@ -10,7 +11,57 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/metrics"
+	"github.com/sachncs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/internal/store"
 )
+
+// mockStore implements store.Repository for testing.
+type mockStore struct {
+	store.Repository
+	alertRules          []*models.AlertRuleRecord
+	alerts              []*models.AlertRecord
+	notificationGroups  []*models.NotificationGroupRecord
+	listAlertRulesErr   error
+	listAlertsErr       error
+	listGroupsErr       error
+	saveAlertRuleErr    error
+	deleteAlertRuleErr  error
+	saveAlertErr        error
+	updateAlertErr      error
+	saveNotificationGroupErr error
+}
+
+func (m *mockStore) ListAlertRules(_ context.Context) ([]*models.AlertRuleRecord, error) {
+	return m.alertRules, m.listAlertRulesErr
+}
+
+func (m *mockStore) ListAlerts(_ context.Context, _ string) ([]*models.AlertRecord, error) {
+	return m.alerts, m.listAlertsErr
+}
+
+func (m *mockStore) ListNotificationGroups(_ context.Context) ([]*models.NotificationGroupRecord, error) {
+	return m.notificationGroups, m.listGroupsErr
+}
+
+func (m *mockStore) SaveAlertRule(_ context.Context, _ *models.AlertRuleRecord) error {
+	return m.saveAlertRuleErr
+}
+
+func (m *mockStore) DeleteAlertRule(_ context.Context, _ string) error {
+	return m.deleteAlertRuleErr
+}
+
+func (m *mockStore) SaveAlert(_ context.Context, _ *models.AlertRecord) error {
+	return m.saveAlertErr
+}
+
+func (m *mockStore) UpdateAlert(_ context.Context, _ *models.AlertRecord) error {
+	return m.updateAlertErr
+}
+
+func (m *mockStore) SaveNotificationGroup(_ context.Context, _ *models.NotificationGroupRecord) error {
+	return m.saveNotificationGroupErr
+}
 
 func newTestManager(t *testing.T) *Manager {
 	t.Helper()
@@ -359,4 +410,427 @@ func TestStopMonitoring(t *testing.T) {
 	cancel()
 	m.StopMonitoring()
 	// If StopMonitoring returns without blocking, the test passes.
+}
+
+// ---------------------------------------------------------------------------
+// loadFromDB tests
+// ---------------------------------------------------------------------------
+
+func TestLoadFromDB_NilDB(t *testing.T) {
+	m := newTestManager(t)
+	// loadFromDB is called internally when db is nil; should not panic
+	m.loadFromDB()
+}
+
+func TestLoadFromDB_LoadsRulesAlertsGroups(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	collector := metrics.NewCollector()
+	now := time.Now()
+
+	ms := &mockStore{
+		alertRules: []*models.AlertRuleRecord{
+			{ID: "r1", Name: "rule1", Type: "latency", Severity: "high", Enabled: true, Threshold: 100, CreatedAt: now, UpdatedAt: now},
+		},
+		alerts: []*models.AlertRecord{
+			{ID: "a1", RuleID: "r1", RuleName: "rule1", Severity: "high", Status: "active", Message: "test", TriggeredAt: now},
+		},
+		notificationGroups: []*models.NotificationGroupRecord{
+			{ID: "g1", Name: "ops", Channels: []string{"slack"}},
+		},
+	}
+
+	m := NewManagerWithDB(logger, collector, ms)
+	if m == nil {
+		t.Fatal("expected non-nil manager")
+	}
+	if len(m.rules) != 1 {
+		t.Errorf("expected 1 rule, got %d", len(m.rules))
+	}
+	if m.rules["r1"].Name != "rule1" {
+		t.Errorf("expected rule1, got %q", m.rules["r1"].Name)
+	}
+	if len(m.alerts) != 1 {
+		t.Errorf("expected 1 alert, got %d", len(m.alerts))
+	}
+	if m.alerts[0].ID != "a1" {
+		t.Errorf("expected a1, got %q", m.alerts[0].ID)
+	}
+	if len(m.groups) != 1 {
+		t.Errorf("expected 1 group, got %d", len(m.groups))
+	}
+	if m.groups["g1"].Channels[0] != "slack" {
+		t.Errorf("expected slack channel, got %q", m.groups["g1"].Channels[0])
+	}
+}
+
+func TestLoadFromDB_ListAlertRulesError(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	ms := &mockStore{
+		listAlertRulesErr: errors.New("db error"),
+	}
+	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	if len(m.rules) != 0 {
+		t.Errorf("expected 0 rules on error, got %d", len(m.rules))
+	}
+}
+
+func TestLoadFromDB_ListAlertsError(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	ms := &mockStore{
+		alertRules: []*models.AlertRuleRecord{
+			{ID: "r1", Name: "rule1", Type: "latency", Severity: "low"},
+		},
+		listAlertsErr: errors.New("db error"),
+	}
+	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	// Rules should still load
+	if len(m.rules) != 1 {
+		t.Errorf("expected 1 rule despite alerts error, got %d", len(m.rules))
+	}
+	if len(m.alerts) != 0 {
+		t.Errorf("expected 0 alerts on error, got %d", len(m.alerts))
+	}
+}
+
+func TestLoadFromDB_ListGroupsError(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	ms := &mockStore{
+		listGroupsErr: errors.New("db error"),
+	}
+	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	if len(m.groups) != 0 {
+		t.Errorf("expected 0 groups on error, got %d", len(m.groups))
+	}
+}
+
+func TestLoadFromDB_NilLogger(t *testing.T) {
+	ms := &mockStore{
+		listAlertRulesErr: errors.New("db error"),
+		listAlertsErr:     errors.New("db error"),
+		listGroupsErr:     errors.New("db error"),
+	}
+	// Should not panic with nil logger
+	m := &Manager{
+		rules:       make(map[string]*AlertRule),
+		alerts:      []*Alert{},
+		groups:      make(map[string]*NotificationGroup),
+		metrics:     metrics.NewCollector(),
+		db:          ms,
+	}
+	m.loadFromDB()
+}
+
+// ---------------------------------------------------------------------------
+// RemoveRule with DB tests
+// ---------------------------------------------------------------------------
+
+func TestRemoveRuleWithDB(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	ms := &mockStore{}
+	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m.AddRule(&AlertRule{ID: "r1", Name: "n", Type: "latency"})
+	m.RemoveRule("r1")
+	_, ok := m.GetRule("r1")
+	if ok {
+		t.Fatal("expected rule to be gone after RemoveRule")
+	}
+}
+
+func TestRemoveRuleWithDB_DeleteError(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	ms := &mockStore{deleteAlertRuleErr: errors.New("db error")}
+	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m.AddRule(&AlertRule{ID: "r1", Name: "n", Type: "latency"})
+	// Should not panic; rule removed from memory despite DB error
+	m.RemoveRule("r1")
+	_, ok := m.GetRule("r1")
+	if ok {
+		t.Fatal("expected rule to be removed from memory despite DB error")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ResolveAlert additional tests
+// ---------------------------------------------------------------------------
+
+func TestResolveAlertAlreadyResolved(t *testing.T) {
+	m := newTestManager(t)
+	rule := &AlertRule{ID: "r1", Name: "spike", Type: "latency", Severity: SeverityHigh}
+	m.AddRule(rule)
+	alert := m.TriggerAlert(rule, "msg", nil)
+	if !m.ResolveAlert(alert.ID) {
+		t.Fatal("expected first resolve to return true")
+	}
+	// Resolving again should return false since status is already resolved
+	if m.ResolveAlert(alert.ID) {
+		t.Fatal("expected second resolve to return false for already-resolved alert")
+	}
+}
+
+func TestResolveAlertWithDB(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	ms := &mockStore{}
+	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	rule := &AlertRule{ID: "r1", Name: "spike", Type: "latency", Severity: SeverityHigh}
+	m.AddRule(rule)
+	alert := m.TriggerAlert(rule, "msg", nil)
+	if !m.ResolveAlert(alert.ID) {
+		t.Fatal("expected ResolveAlert to return true")
+	}
+	alerts := m.ListAlerts()
+	if alerts[0].Status != StatusResolved {
+		t.Errorf("expected resolved status, got %q", alerts[0].Status)
+	}
+}
+
+func TestResolveAlertWithDB_UpdateError(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	ms := &mockStore{updateAlertErr: errors.New("db error")}
+	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	rule := &AlertRule{ID: "r1", Name: "spike", Type: "latency", Severity: SeverityHigh}
+	m.AddRule(rule)
+	alert := m.TriggerAlert(rule, "msg", nil)
+	// Should still resolve in-memory even if DB update fails
+	if !m.ResolveAlert(alert.ID) {
+		t.Fatal("expected ResolveAlert to return true despite DB error")
+	}
+	if alert.Status != StatusResolved {
+		t.Errorf("expected resolved status, got %q", alert.Status)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TriggerAlert additional tests
+// ---------------------------------------------------------------------------
+
+func TestTriggerAlertWithDB(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	ms := &mockStore{}
+	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	rule := &AlertRule{ID: "r1", Name: "spike", Type: "latency", Severity: SeverityHigh}
+	m.AddRule(rule)
+	alert := m.TriggerAlert(rule, "latency too high", map[string]any{"ms": 1234})
+	if alert.Status != StatusActive {
+		t.Errorf("expected active status, got %q", alert.Status)
+	}
+	if len(m.ListAlerts()) != 1 {
+		t.Errorf("expected 1 alert, got %d", len(m.ListAlerts()))
+	}
+}
+
+func TestTriggerAlertWithDB_SaveError(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	ms := &mockStore{saveAlertErr: errors.New("db error")}
+	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	rule := &AlertRule{ID: "r1", Name: "spike", Type: "latency", Severity: SeverityHigh}
+	m.AddRule(rule)
+	// Should not panic; alert still added in-memory
+	alert := m.TriggerAlert(rule, "msg", nil)
+	if alert == nil {
+		t.Fatal("expected non-nil alert despite DB error")
+	}
+	if len(m.ListAlerts()) != 1 {
+		t.Errorf("expected 1 alert in memory despite DB error, got %d", len(m.ListAlerts()))
+	}
+}
+
+func TestTriggerAlertWithDeliveryError(t *testing.T) {
+	m := newTestManager(t)
+	m.SetDeliveryFunc(func(_ *Alert, _ []string) error {
+		return errors.New("delivery failed")
+	})
+	rule := &AlertRule{ID: "r1", Name: "n", Type: "latency", Severity: SeverityHigh}
+	m.AddRule(rule)
+	alert := m.TriggerAlert(rule, "msg", nil)
+	if alert == nil {
+		t.Fatal("expected non-nil alert")
+	}
+	// Give delivery goroutine time to run
+	time.Sleep(50 * time.Millisecond)
+}
+
+func TestAddRuleWithDB_SaveError(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	ms := &mockStore{saveAlertRuleErr: errors.New("db error")}
+	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m.AddRule(&AlertRule{ID: "r1", Name: "n", Type: "latency"})
+	got, ok := m.GetRule("r1")
+	if !ok {
+		t.Fatal("expected rule to exist in memory despite DB error")
+	}
+	if got.Name != "n" {
+		t.Errorf("expected name 'n', got %q", got.Name)
+	}
+}
+
+func TestAddNotificationGroupWithDB_SaveError(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	ms := &mockStore{saveNotificationGroupErr: errors.New("db error")}
+	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m.AddNotificationGroup(&NotificationGroup{ID: "g1", Name: "ops", Channels: []string{"slack"}})
+	if len(m.groups) != 1 {
+		t.Errorf("expected 1 group in memory despite DB error, got %d", len(m.groups))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// RunMonitoringChecks tests
+// ---------------------------------------------------------------------------
+
+func TestRunMonitoringChecksLatencySpike(t *testing.T) {
+	m := newTestManager(t)
+	collector := metrics.NewCollector()
+	// Add latency observations > 2s to trigger P95 > 2000ms
+	for i := 0; i < 20; i++ {
+		collector.LLMLatency.Observe(3.0) // 3 seconds > 2s threshold
+	}
+	alerts := m.RunMonitoringChecks(collector)
+	if len(alerts) == 0 {
+		t.Fatal("expected at least 1 alert for latency spike")
+	}
+	found := false
+	for _, a := range alerts {
+		if a.RuleID == "latency-spike" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected latency-spike alert to be triggered")
+	}
+}
+
+func TestRunMonitoringChecksFailureRate(t *testing.T) {
+	m := newTestManager(t)
+	collector := metrics.NewCollector()
+	// 30 errors out of 100 requests = 30% > 10%
+	collector.RequestsTotal.Add(100)
+	collector.ErrorsTotal.Add(30)
+	alerts := m.RunMonitoringChecks(collector)
+	if len(alerts) == 0 {
+		t.Fatal("expected at least 1 alert for high failure rate")
+	}
+	found := false
+	for _, a := range alerts {
+		if a.RuleID == "failure-rate" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected failure-rate alert to be triggered")
+	}
+}
+
+func TestRunMonitoringChecksLatencyAndFailure(t *testing.T) {
+	m := newTestManager(t)
+	collector := metrics.NewCollector()
+	// Both conditions met
+	for i := 0; i < 20; i++ {
+		collector.LLMLatency.Observe(3.0)
+	}
+	collector.RequestsTotal.Add(100)
+	collector.ErrorsTotal.Add(30)
+	alerts := m.RunMonitoringChecks(collector)
+	if len(alerts) < 2 {
+		t.Errorf("expected at least 2 alerts, got %d", len(alerts))
+	}
+}
+
+func TestRunMonitoringChecksBelowThresholds(t *testing.T) {
+	m := newTestManager(t)
+	collector := metrics.NewCollector()
+	// Low latency and no errors
+	collector.LLMLatency.Observe(0.1)
+	collector.RequestsTotal.Add(100)
+	collector.ErrorsTotal.Add(1) // 1% < 10%
+	alerts := m.RunMonitoringChecks(collector)
+	if len(alerts) != 0 {
+		t.Errorf("expected 0 alerts when below thresholds, got %d", len(alerts))
+	}
+}
+
+func TestRunMonitoringChecksZeroRequests(t *testing.T) {
+	m := newTestManager(t)
+	collector := metrics.NewCollector()
+	// No requests yet but has errors — error rate math is skipped
+	collector.ErrorsTotal.Add(5)
+	alerts := m.RunMonitoringChecks(collector)
+	if len(alerts) != 0 {
+		t.Errorf("expected 0 alerts when no requests, got %d", len(alerts))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// getNotificationChannels tests
+// ---------------------------------------------------------------------------
+
+func TestGetNotificationChannels_BySeverity(t *testing.T) {
+	m := newTestManager(t)
+	m.groups["g1"] = &NotificationGroup{ID: "g1", Name: "High", Channels: []string{"pagerduty"}}
+	m.groups["g2"] = &NotificationGroup{ID: "g2", Name: "latency", Channels: []string{"slack"}}
+	channels := m.getNotificationChannels(&AlertRule{
+		ID: "r1", Severity: SeverityHigh, Type: "latency",
+	})
+	if len(channels) != 1 || channels[0] != "pagerduty" {
+		t.Errorf("expected [pagerduty] for severity 'High', got %v", channels)
+	}
+}
+
+func TestGetNotificationChannels_ByType(t *testing.T) {
+	m := newTestManager(t)
+	m.groups["g1"] = &NotificationGroup{ID: "g1", Name: "unknown", Channels: []string{"email"}}
+	m.groups["g2"] = &NotificationGroup{ID: "g2", Name: "latency", Channels: []string{"slack"}}
+	channels := m.getNotificationChannels(&AlertRule{
+		ID: "r1", Severity: SeverityLow, Type: "latency",
+	})
+	if len(channels) != 1 || channels[0] != "slack" {
+		t.Errorf("expected [slack] for type 'latency', got %v", channels)
+	}
+}
+
+func TestGetNotificationChannels_DefaultGroup(t *testing.T) {
+	m := newTestManager(t)
+	m.groups["default"] = &NotificationGroup{ID: "default", Name: "Default", Channels: []string{"webhook"}}
+	m.groups["other"] = &NotificationGroup{ID: "other", Name: "misc", Channels: []string{"email"}}
+	channels := m.getNotificationChannels(&AlertRule{
+		ID: "r1", Severity: SeverityLow, Type: "something",
+	})
+	if len(channels) != 1 || channels[0] != "webhook" {
+		t.Errorf("expected [webhook] for default group, got %v", channels)
+	}
+}
+
+func TestGetNotificationChannels_Fallback(t *testing.T) {
+	m := newTestManager(t)
+	channels := m.getNotificationChannels(&AlertRule{
+		ID: "r1", Severity: SeverityLow, Type: "unknown",
+	})
+	if len(channels) != 1 || channels[0] != "webhook" {
+		t.Errorf("expected [webhook] fallback, got %v", channels)
+	}
+}
+
+func TestGetNotificationChannels_CaseInsensitiveSeverityMatch(t *testing.T) {
+	m := newTestManager(t)
+	m.groups["g1"] = &NotificationGroup{ID: "g1", Name: "CRITICAL", Channels: []string{"sms"}}
+	channels := m.getNotificationChannels(&AlertRule{
+		ID: "r1", Severity: SeverityCritical, Type: "latency",
+	})
+	if len(channels) != 1 || channels[0] != "sms" {
+		t.Errorf("expected [sms] for case-insensitive severity match, got %v", channels)
+	}
+}
+
+func TestGetNotificationChannels_SeverityTakesPrecedenceOverType(t *testing.T) {
+	m := newTestManager(t)
+	m.groups["g1"] = &NotificationGroup{ID: "g1", Name: "high", Channels: []string{"pagerduty"}}
+	m.groups["g2"] = &NotificationGroup{ID: "g2", Name: "latency", Channels: []string{"slack"}}
+	// Both severity 'high' and type 'latency' match, but severity should win
+	channels := m.getNotificationChannels(&AlertRule{
+		ID: "r1", Severity: SeverityHigh, Type: "latency",
+	})
+	if len(channels) != 1 || channels[0] != "pagerduty" {
+		t.Errorf("expected [pagerduty] (severity takes precedence), got %v", channels)
+	}
 }

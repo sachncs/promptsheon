@@ -681,10 +681,10 @@ func renderGraph(nodes []*promptsheon.GraphNode, columns map[string]int, maxCol 
 		if node.IsHEAD {
 			if len(node.Branches) > 0 {
 				labels = append(labels, "HEAD -> "+node.Branches[0])
+				labels = append(labels, node.Branches[1:]...)
 			} else {
 				labels = append(labels, "HEAD")
 			}
-			labels = append(labels, node.Branches[1:]...)
 		} else {
 			labels = append(labels, node.Branches...)
 		}

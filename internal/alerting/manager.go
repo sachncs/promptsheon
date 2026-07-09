@@ -377,18 +377,24 @@ func (m *Manager) ResolveAlert(id string) bool {
 func (m *Manager) getNotificationChannels(rule *AlertRule) []string {
 	severityKey := strings.ToLower(string(rule.Severity))
 	typeKey := strings.ToLower(rule.Type)
-	var defaultGroup *NotificationGroup
+	var (
+		typeMatch     []string
+		defaultGroup  *NotificationGroup
+	)
 	for _, group := range m.groups {
 		name := strings.ToLower(group.Name)
 		if name == severityKey {
 			return group.Channels
 		}
-		if name == typeKey {
-			return group.Channels
+		if name == typeKey && typeMatch == nil {
+			typeMatch = group.Channels
 		}
 		if group.ID == "default" {
 			defaultGroup = group
 		}
+	}
+	if typeMatch != nil {
+		return typeMatch
 	}
 	if defaultGroup != nil {
 		return defaultGroup.Channels
