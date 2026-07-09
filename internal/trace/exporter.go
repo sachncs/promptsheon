@@ -21,19 +21,16 @@ func InitTracerProvider(serviceName, endpoint string, insecureConn bool) (*sdktr
 	ctx := context.Background()
 
 	// Create resource with service info
-	res, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceName(serviceName),
-		),
+	res := resource.NewWithAttributes(
+		semconv.SchemaURL,
+		semconv.ServiceName(serviceName),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("create resource: %w", err)
-	}
 
 	// Create exporter
-	var exporter sdktrace.SpanExporter
+	var (
+		exporter sdktrace.SpanExporter
+		err      error
+	)
 	if endpoint != "" {
 		opts := []otlptracegrpc.Option{
 			otlptracegrpc.WithEndpoint(endpoint),

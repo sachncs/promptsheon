@@ -3,10 +3,15 @@ package trace
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	_ "modernc.org/sqlite"
 )
@@ -304,4 +309,490 @@ func openTestDB(t *testing.T) *sql.DB {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	return db
+}
+
+// --- Context key functions ---
+
+func TestContextKeys(t *testing.T) {
+	ctx := context.Background()
+
+	// WithTraceID / IDFromContext
+	ctx = WithTraceID(ctx, "trace-42")
+	id, ok := IDFromContext(ctx)
+	if !ok {
+		t.Fatal("expected trace ID in context")
+	}
+	if id != "trace-42" {
+		t.Errorf("expected 'trace-42', got %q", id)
+	}
+
+	// WithRequestID / RequestIDFromContext
+	ctx = WithRequestID(ctx, "req-99")
+	rid, ok := RequestIDFromContext(ctx)
+	if !ok {
+		t.Fatal("expected request ID in context")
+	}
+	if rid != "req-99" {
+		t.Errorf("expected 'req-99', got %q", rid)
+	}
+
+	// WithUserID / UserIDFromContext
+	ctx = WithUserID(ctx, "user-abc")
+	uid, ok := UserIDFromContext(ctx)
+	if !ok {
+		t.Fatal("expected user ID in context")
+	}
+	if uid != "user-abc" {
+		t.Errorf("expected 'user-abc', got %q", uid)
+	}
+
+	// Empty context returns false / zero value
+	_, ok = IDFromContext(context.Background())
+	if ok {
+		t.Fatal("expected no trace ID in empty context")
+	}
+	_, ok = RequestIDFromContext(context.Background())
+	if ok {
+		t.Fatal("expected no request ID in empty context")
+	}
+	_, ok = UserIDFromContext(context.Background())
+	if ok {
+		t.Fatal("expected no user ID in empty context")
+	}
+}
+
+// --- Span SetError with actual error ---
+
+func TestSpanSetErrorWithErr(t *testing.T) {
+	span := &Span{ID: "s1", Status: StatusOK}
+	err := errors.New("something broke")
+	span.SetError(err)
+	if span.Status != StatusError {
+		t.Fatalf("expected StatusError, got %s", span.Status)
+	}
+	if span.Error != "something broke" {
+		t.Fatalf("expected 'something broke', got %q", span.Error)
+	}
+}
+
+func TestSpanSetAttributeNilMap(t *testing.T) {
+	span := &Span{ID: "s1"}
+	span.SetAttribute("a", "b")
+	if span.Attributes == nil {
+		t.Fatal("expected Attributes map to be initialized")
+	}
+	if span.Attributes["a"] != "b" {
+		t.Fatalf("expected 'b', got %q", span.Attributes["a"])
+	}
+
+	// Set on already-initialized map
+	span.SetAttribute("c", "d")
+	if span.Attributes["c"] != "d" {
+		t.Fatalf("expected 'd', got %q", span.Attributes["c"])
+	}
+}
+
+// --- OTel tracer tests ---
+
+func newOTelTestTracer(t *testing.T) (*OTelTracer, *sdktrace.TracerProvider) {
+	t.Helper()
+	tp := sdktrace.NewTracerProvider()
+	otel.SetTracerProvider(tp)
+	return NewOTelTracer("test-service"), tp
+}
+
+func TestNewOTelTracer(t *testing.T) {
+	tracer, tp := newOTelTestTracer(t)
+	defer tp.Shutdown(context.Background())
+
+	if tracer == nil {
+		t.Fatal("expected non-nil tracer")
+	}
+	if tracer.serviceName != "test-service" {
+		t.Errorf("expected 'test-service', got %q", tracer.serviceName)
+	}
+	if tracer.tracer == nil {
+		t.Error("expected non-nil OTel tracer")
+	}
+}
+
+func TestOTelTracerStart(t *testing.T) {
+	tracer, tp := newOTelTestTracer(t)
+	defer tp.Shutdown(context.Background())
+
+	span := tracer.Start(context.Background(), "test-op")
+	if span == nil {
+		t.Fatal("expected non-nil span")
+	}
+	if span.Operation != "test-op" {
+		t.Errorf("expected 'test-op', got %q", span.Operation)
+	}
+	if span.ID == "" {
+		t.Error("expected non-empty span ID")
+	}
+	if span.TraceID == "" {
+		t.Error("expected non-empty trace ID")
+	}
+	if span.Service != "test-service" {
+		t.Errorf("expected 'test-service', got %q", span.Service)
+	}
+	if span.Status != StatusUnset {
+		t.Errorf("expected StatusUnset, got %s", span.Status)
+	}
+	if span.StartedAt.IsZero() {
+		t.Error("expected non-zero StartedAt")
+	}
+}
+
+func TestOTelTracerStartChild(t *testing.T) {
+	tracer, tp := newOTelTestTracer(t)
+	defer tp.Shutdown(context.Background())
+
+	parent := &Span{
+		ID:        "parent-id",
+		TraceID:   "trace-id",
+		Operation: "parent-op",
+		Service:   "test-service",
+		Status:    StatusUnset,
+		StartedAt: time.Now(),
+	}
+
+	child := tracer.StartChild(context.Background(), parent, "child-op")
+	if child == nil {
+		t.Fatal("expected non-nil child span")
+	}
+	if child.Operation != "child-op" {
+		t.Errorf("expected 'child-op', got %q", child.Operation)
+	}
+	if child.ParentID != "parent-id" {
+		t.Errorf("expected parent 'parent-id', got %q", child.ParentID)
+	}
+	if child.ID == "" {
+		t.Error("expected non-empty child span ID")
+	}
+}
+
+func TestOTelTracerStartChildNilParent(t *testing.T) {
+	tracer, tp := newOTelTestTracer(t)
+	defer tp.Shutdown(context.Background())
+
+	// When parent is nil, StartChild falls back to Start (root span)
+	span := tracer.StartChild(context.Background(), nil, "orphan")
+	if span == nil {
+		t.Fatal("expected non-nil span")
+	}
+	if span.Operation != "orphan" {
+		t.Errorf("expected 'orphan', got %q", span.Operation)
+	}
+	if span.ParentID != "" {
+		t.Errorf("expected empty parent for root span, got %q", span.ParentID)
+	}
+}
+
+func TestOTelTracerFinish(t *testing.T) {
+	tracer, tp := newOTelTestTracer(t)
+	defer tp.Shutdown(context.Background())
+
+	// nil span is a no-op
+	if err := tracer.Finish(nil); err != nil {
+		t.Errorf("expected nil error for nil span, got %v", err)
+	}
+
+	span := tracer.Start(context.Background(), "finish-me")
+	if err := tracer.Finish(span); err != nil {
+		t.Fatalf("Finish: %v", err)
+	}
+	if span.EndedAt == nil {
+		t.Error("expected EndedAt to be set")
+	}
+	if span.DurationMs < 0 {
+		t.Errorf("expected non-negative duration, got %d", span.DurationMs)
+	}
+}
+
+func TestOTelTracerFinishWithError(t *testing.T) {
+	tracer, tp := newOTelTestTracer(t)
+	defer tp.Shutdown(context.Background())
+
+	// nil span is a no-op
+	if err := tracer.FinishWithError(nil, nil); err != nil {
+		t.Errorf("expected nil error for nil span, got %v", err)
+	}
+
+	// Finish with no error
+	span := tracer.Start(context.Background(), "ok")
+	if err := tracer.FinishWithError(span, nil); err != nil {
+		t.Fatalf("FinishWithError nil: %v", err)
+	}
+	if span.EndedAt == nil {
+		t.Error("expected EndedAt to be set after FinishWithError")
+	}
+
+	// Finish with an error
+	span2 := tracer.Start(context.Background(), "fail")
+	err := errors.New("oops")
+	if err := tracer.FinishWithError(span2, err); err != nil {
+		t.Fatalf("FinishWithError err: %v", err)
+	}
+	if span2.Status != StatusError {
+		t.Errorf("expected StatusError, got %s", span2.Status)
+	}
+	if span2.Error != "oops" {
+		t.Errorf("expected 'oops', got %q", span2.Error)
+	}
+	if span2.EndedAt == nil {
+		t.Error("expected EndedAt to be set")
+	}
+}
+
+func TestOTelTracerRecordSpan(t *testing.T) {
+	tracer, tp := newOTelTestTracer(t)
+	defer tp.Shutdown(context.Background())
+
+	// Nil arguments should not panic
+	tracer.RecordSpan(nil, nil)
+	tracer.RecordSpan(nil, &Span{ID: "s1"})
+
+	_, otelSpan := tracer.tracer.Start(context.Background(), "record-normal")
+	span := &Span{
+		ID:         "s1",
+		Attributes: map[string]string{"key1": "val1", "key2": "val2"},
+	}
+	tracer.RecordSpan(otelSpan, span)
+
+	// Record with error
+	_, otelSpan2 := tracer.tracer.Start(context.Background(), "record-error")
+	span2 := &Span{
+		ID:         "s2",
+		Attributes: map[string]string{"k": "v"},
+		Error:      "something failed",
+	}
+	tracer.RecordSpan(otelSpan2, span2)
+}
+
+func TestOTelAttributeString(t *testing.T) {
+	kv := otelAttributeString("my-key", "my-value")
+	if kv.Key != "my-key" {
+		t.Errorf("expected key 'my-key', got %q", kv.Key)
+	}
+	var _ attribute.KeyValue = kv
+}
+
+// --- Exporter tests ---
+
+func TestNoopExporter(t *testing.T) {
+	e := newnoopExporter()
+	if e == nil {
+		t.Fatal("expected non-nil exporter")
+	}
+
+	if err := e.ExportSpans(context.Background(), nil); err != nil {
+		t.Errorf("ExportSpans: %v", err)
+	}
+
+	if err := e.Shutdown(context.Background()); err != nil {
+		t.Errorf("Shutdown: %v", err)
+	}
+}
+
+func TestInitTracerProviderNoop(t *testing.T) {
+	tp, err := InitTracerProvider("test-svc", "", false)
+	if err != nil {
+		t.Fatalf("InitTracerProvider: %v", err)
+	}
+	if tp == nil {
+		t.Fatal("expected non-nil TracerProvider")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := tp.Shutdown(ctx); err != nil {
+		t.Errorf("Shutdown: %v", err)
+	}
+}
+
+// --- OTel StartChild with OTel span in context ---
+
+func TestOTelTracerStartChild_WithOTelSpanInContext(t *testing.T) {
+	tracer, tp := newOTelTestTracer(t)
+	defer tp.Shutdown(context.Background())
+
+	ctx, otelSpan := tracer.tracer.Start(context.Background(), "parent-otel")
+	ctx = context.WithValue(ctx, otelSpanKey{}, otelSpan)
+
+	parent := &Span{ID: "parent-id"}
+	child := tracer.StartChild(ctx, parent, "child")
+	if child.ParentID != "parent-id" {
+		t.Errorf("expected 'parent-id', got %q", child.ParentID)
+	}
+	if child.TraceID == "" {
+		t.Error("expected non-empty trace ID")
+	}
+}
+
+// --- SQLite error / edge-case tests ---
+
+func TestNewSQLite_ClosedDB(t *testing.T) {
+	db := openTestDB(t)
+	db.Close()
+
+	_, err := NewSQLite(db)
+	if err == nil {
+		t.Fatal("expected error with closed DB")
+	}
+}
+
+func TestSQLiteFinish_ClosedDB(t *testing.T) {
+	db := openTestDB(t)
+	s, err := NewSQLite(db)
+	if err != nil {
+		t.Fatalf("NewSQLite: %v", err)
+	}
+	db.Close()
+
+	span := s.Start(context.Background(), "test")
+	err = s.Finish(span)
+	if err == nil {
+		t.Fatal("expected error with closed DB")
+	}
+}
+
+func TestSQLiteListSpans_Error(t *testing.T) {
+	db := openTestDB(t)
+	s, err := NewSQLite(db)
+	if err != nil {
+		t.Fatalf("NewSQLite: %v", err)
+	}
+	db.Close()
+
+	_, err = s.ListSpans(context.Background(), &SpanFilter{})
+	if err == nil {
+		t.Fatal("expected error with closed DB")
+	}
+}
+
+func TestSQLiteGetTraceTree_Error(t *testing.T) {
+	db := openTestDB(t)
+	s, err := NewSQLite(db)
+	if err != nil {
+		t.Fatalf("NewSQLite: %v", err)
+	}
+	db.Close()
+
+	_, err = s.GetTraceTree(context.Background(), "trace-1")
+	if err == nil {
+		t.Fatal("expected error with closed DB")
+	}
+}
+
+func TestScanSpan_InvalidJSON(t *testing.T) {
+	db := openTestDB(t)
+	s, err := NewSQLite(db)
+	if err != nil {
+		t.Fatalf("NewSQLite: %v", err)
+	}
+
+	// Insert a row with unparseable JSON in the attributes column
+	_, err = db.ExecContext(context.Background(),
+		`INSERT INTO traces (id, trace_id, parent_id, operation, service, status, attributes, started_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"bad-json", "trace-x", "", "op", "svc", "ok", "{invalid json}", time.Now())
+	if err != nil {
+		t.Fatalf("insert invalid json: %v", err)
+	}
+
+	span, err := s.GetSpan(context.Background(), "bad-json")
+	if err != nil {
+		t.Fatalf("GetSpan: %v", err)
+	}
+	if span.ID != "bad-json" {
+		t.Errorf("expected 'bad-json', got %q", span.ID)
+	}
+	if span.Attributes != nil {
+		t.Errorf("expected nil attributes for unparseable json, got %v", span.Attributes)
+	}
+}
+
+// --- Additional SQLite tests ---
+
+func TestSQLiteFinishWithAttributes(t *testing.T) {
+	db := openTestDB(t)
+	s, err := NewSQLite(db)
+	if err != nil {
+		t.Fatalf("NewSQLite: %v", err)
+	}
+
+	span := s.Start(context.Background(), "attr-test")
+	span.SetAttribute("color", "blue")
+	span.SetAttribute("size", "large")
+	if err := s.Finish(span); err != nil {
+		t.Fatalf("Finish: %v", err)
+	}
+
+	got, err := s.GetSpan(context.Background(), span.ID)
+	if err != nil {
+		t.Fatalf("GetSpan: %v", err)
+	}
+	if got.Attributes["color"] != "blue" {
+		t.Errorf("expected color=blue, got %v", got.Attributes["color"])
+	}
+	if got.Attributes["size"] != "large" {
+		t.Errorf("expected size=large, got %v", got.Attributes["size"])
+	}
+	if got.Operation != "attr-test" {
+		t.Errorf("expected 'attr-test', got %q", got.Operation)
+	}
+}
+
+func TestSQLiteListSpansExtraFilters(t *testing.T) {
+	db := openTestDB(t)
+	s, err := NewSQLite(db)
+	if err != nil {
+		t.Fatalf("NewSQLite: %v", err)
+	}
+
+	span1 := s.Start(context.Background(), "op1")
+	span1.Service = "service-a"
+	span1.Status = StatusOK
+	_ = s.Finish(span1)
+
+	span2 := s.Start(context.Background(), "op2")
+	span2.Service = "service-b"
+	span2.Status = StatusError
+	_ = s.Finish(span2)
+
+	// Filter by service
+	out, err := s.ListSpans(context.Background(), &SpanFilter{Service: "service-a"})
+	if err != nil {
+		t.Fatalf("ListSpans service: %v", err)
+	}
+	if len(out) != 1 {
+		t.Errorf("expected 1 span for service-a, got %d", len(out))
+	}
+
+	// Filter by status
+	out, err = s.ListSpans(context.Background(), &SpanFilter{Status: StatusError})
+	if err != nil {
+		t.Fatalf("ListSpans status: %v", err)
+	}
+	if len(out) != 1 {
+		t.Errorf("expected 1 span with error status, got %d", len(out))
+	}
+
+	// Filter by traceID
+	out, err = s.ListSpans(context.Background(), &SpanFilter{TraceID: span1.TraceID})
+	if err != nil {
+		t.Fatalf("ListSpans traceID: %v", err)
+	}
+	if len(out) != 1 {
+		t.Errorf("expected 1 span for traceID, got %d", len(out))
+	}
+
+	// Combined filters with no match
+	out, err = s.ListSpans(context.Background(), &SpanFilter{Service: "service-a", Status: StatusError})
+	if err != nil {
+		t.Fatalf("ListSpans combined: %v", err)
+	}
+	if len(out) != 0 {
+		t.Errorf("expected 0 spans for combined filter, got %d", len(out))
+	}
 }
