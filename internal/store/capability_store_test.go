@@ -129,7 +129,7 @@ func TestCapabilityStore_CapabilityCRUD(t *testing.T) {
 	c := &capability.Capability{
 		ID: "cap-1", ProjectID: "proj-1", Name: "Summarize Invoice",
 		Description: "Extract invoice data", Owner: "alice",
-		Tags: []string{"finance", "invoices"}, State: capability.StateDraft,
+		Tags: []string{"finance", "invoices"},
 		CreatedAt: now, UpdatedAt: now,
 	}
 
@@ -147,9 +147,9 @@ func TestCapabilityStore_CapabilityCRUD(t *testing.T) {
 	if len(got.Tags) != 2 {
 		t.Errorf("expected 2 tags, got %d", len(got.Tags))
 	}
-	if got.State != capability.StateDraft {
-		t.Errorf("expected draft state")
-	}
+	// State is now derived from Releases (M0.8). The capability
+	// row is not checked here; derive in a higher-level call.
+	_ = got
 
 	list, err := db.ListCapabilities(ctx, "proj-1")
 	if err != nil {
@@ -159,17 +159,12 @@ func TestCapabilityStore_CapabilityCRUD(t *testing.T) {
 		t.Fatalf("expected 1 capability, got %d", len(list))
 	}
 
-	c.State = capability.StateActive
-	c.CurrentVersionID = "ver-1"
 	if e := db.UpdateCapability(ctx, c); e != nil {
 		t.Fatalf("UpdateCapability: %v", e)
 	}
 	got, _ = db.GetCapability(ctx, "cap-1")
-	if got.State != capability.StateActive {
-		t.Errorf("expected active state after update")
-	}
-	if got.CurrentVersionID != "ver-1" {
-		t.Errorf("expected current_version_id ver-1")
+	if got.ID != "cap-1" {
+		t.Errorf("expected cap-1 after update")
 	}
 
 	if e := db.DeleteCapability(ctx, "cap-1"); e != nil {
@@ -527,7 +522,6 @@ func setupCapability(t *testing.T, db *SQLite, now time.Time) {
 	setupWorkspaceAndProject(t, db, now)
 	if err := db.CreateCapability(context.Background(), &capability.Capability{
 		ID: "cap-1", ProjectID: "proj-1", Name: "Test Capability",
-		State: capability.StateDraft, CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
 		t.Fatalf("setup capability: %v", err)
 	}

@@ -52,15 +52,63 @@ const (
 // The business thinks in terms of capabilities ("Review a contract"),
 // while Promptsheon is free to evolve the implementation behind that
 // capability based on evidence from evaluations and production telemetry.
+//
+// Per M0.8 / ADR-0011-follow-on, State and CurrentVersionID are
+// DERIVED from Release state, not stored. A Capability moves through
+// StateDraft when no Release exists for any Environment; StateActive
+// when at least one Release is Active; StateDeprecated when all
+// Environments are Superseded. Use DeriveState to compute.
 type Capability struct {
-	ID               string    `json:"id"`
-	ProjectID        string    `json:"project_id"`
-	Name             string    `json:"name"`
-	Description      string    `json:"description,omitempty"`
-	Owner            string    `json:"owner,omitempty"`
-	Tags             []string  `json:"tags,omitempty"`
-	State            State     `json:"state"`
-	CurrentVersionID string    `json:"current_version_id,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID          string    `json:"id"`
+	ProjectID   string    `json:"project_id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description,omitempty"`
+	Owner       string    `json:"owner,omitempty"`
+	Tags        []string  `json:"tags,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
+
+// DeriveState computes the Capability's lifecycle state from a set of
+// Releases. The empty slice (no Releases) yields StateDraft; a
+// mix with at least one Active Release yields StateActive; all
+// Releases Superseded yields StateDeprecated.
+func (c Capability) DeriveState(releases []ReleaseProbe) State {
+	active := 0
+	superseded := 0
+	for _, r := range releases {
+		switch r.Status {
+		case ReleaseStatusActive:
+			active++
+		case ReleaseStatusSuperseded, ReleaseStatusRolledBack:
+			superseded++
+		}
+	}
+	switch {
+	case active == 0 && superseded == 0:
+		return StateDraft
+	case active > 0:
+		return StateActive
+	default:
+		return StateDeprecated
+	}
+}
+
+// ReleaseProbe is the minimal shape DeriveState needs; the type
+// lives here (not in the release package) so the capability package
+// stays free of an import cycle. Callers construct values from
+// release.Release values.
+type ReleaseProbe struct {
+	Status ReleaseStatusValue
+}
+
+// ReleaseStatusValue is the small closed set of states the
+// Capability cares about. Anything not in this set is treated as
+// StateDraft.
+type ReleaseStatusValue string
+
+const (
+	ReleaseStatusActive     ReleaseStatusValue = "active"
+	ReleaseStatusSuperseded ReleaseStatusValue = "superseded"
+	ReleaseStatusRolledBack ReleaseStatusValue = "rolled_back"
+)

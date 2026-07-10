@@ -1089,7 +1089,7 @@ func TestCapabilityStore_DeleteCapability(t *testing.T) {
 
 	if err := db.CreateCapability(ctx, &capability.Capability{
 		ID: "cap-del", ProjectID: "proj-1", Name: "To Delete",
-		State: capability.StateDraft, CreatedAt: now, UpdatedAt: now,
+		CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
 		t.Fatalf("CreateCapability: %v", err)
 	}
@@ -1263,7 +1263,7 @@ func TestCreateCapabilityAndVersionEdgeCases(t *testing.T) {
 	// Create capability with empty tags
 	c := &capability.Capability{
 		ID: "cap-edge", ProjectID: "proj-1", Name: "Edge",
-		State: capability.StateDraft, CreatedAt: now, UpdatedAt: now,
+		CreatedAt: now, UpdatedAt: now,
 	}
 	if err := db.CreateCapability(ctx, c); err != nil {
 		t.Fatalf("CreateCapability: %v", err)

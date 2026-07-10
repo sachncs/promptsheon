@@ -10,14 +10,10 @@ func TestCapabilityDefaults(t *testing.T) {
 	c := Capability{
 		ID:    "cap-1",
 		Tags:  []string{"invoices", "finance"},
-		State: StateDraft,
 	}
 
 	if c.ID != "cap-1" {
 		t.Errorf("expected cap-1, got %s", c.ID)
-	}
-	if c.State != StateDraft {
-		t.Errorf("expected draft, got %s", c.State)
 	}
 	if len(c.Tags) != 2 {
 		t.Errorf("expected 2 tags, got %d", len(c.Tags))
@@ -28,7 +24,6 @@ func TestCapabilityJSONRoundTrip(t *testing.T) {
 	c := Capability{
 		ID:    "cap-2",
 		Name:  "Review PR",
-		State: StateActive,
 	}
 
 	data, err := json.Marshal(c)
@@ -46,9 +41,6 @@ func TestCapabilityJSONRoundTrip(t *testing.T) {
 	}
 	if got.Name != c.Name {
 		t.Errorf("Name: got %s, want %s", got.Name, c.Name)
-	}
-	if got.State != c.State {
-		t.Errorf("State: got %s, want %s", got.State, c.State)
 	}
 }
 
@@ -585,12 +577,38 @@ func TestCapabilityStateValues(t *testing.T) {
 		StateDeprecated,
 		StateArchived,
 	}
-
 	for _, s := range states {
-		c := Capability{State: s}
-		if c.State != s {
-			t.Errorf("state round-trip failed for %s", s)
+		if string(s) == "" {
+			t.Errorf("empty state value")
 		}
+	}
+}
+
+func TestCapabilityDeriveState(t *testing.T) {
+	caps := Capability{ID: "cap"}
+	cases := []struct {
+		name     string
+		releases []ReleaseProbe
+		want     State
+	}{
+		{"empty", nil, StateDraft},
+		{"draft", []ReleaseProbe{{Status: ReleaseStatusSuperseded}}, StateDeprecated},
+		{"active", []ReleaseProbe{{Status: ReleaseStatusActive}}, StateActive},
+		{"active-and-superseded", []ReleaseProbe{
+			{Status: ReleaseStatusActive},
+			{Status: ReleaseStatusSuperseded},
+		}, StateActive},
+		{"all-superseded", []ReleaseProbe{
+			{Status: ReleaseStatusSuperseded},
+			{Status: ReleaseStatusSuperseded},
+		}, StateDeprecated},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := caps.DeriveState(tc.releases); got != tc.want {
+				t.Errorf("got %s, want %s", got, tc.want)
+			}
+		})
 	}
 }
 
