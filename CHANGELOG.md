@@ -7,7 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
+### Added
+
+- **Recommendation loop end-to-end (Tier 1.04).** New
+  `internal/observation.Aggregator` rolls `ExecutionRecord`
+  values into `(capability, version, env)` windows; new
+  `internal/recommendation.Producer` is an EventBus subscriber
+  that drives `rules.Engine`, persists via a supplied `SinkFunc`,
+  and emits one `capability.EventRecommendationGenerated` per
+  emitted Recommendation. Wire into the daemon via
+  `producer.Subscribe(bus, capability.EventExecutionFinished)`.
+- **Canonical Invoke path with Budget + Quota enforcement
+  (Tier 1.33 / 1.34).** New `internal/invoke.Invoker` enforces Quota
+  before any LLM call (returns `ErrQuotaExceeded` → HTTP 429) and
+  enforces Budget against the Caller-reported cost (returns
+  `ErrBudgetExceeded` → HTTP 402). `DefaultEnforcer` is the
+  in-memory implementation; production wiring supplies a backend-
+  backed `Enforcer`.
+- **Postgres backend with per-workspace RLS (Tier 1.10).**
+  `internal/store/postgres` ships the consumer-defined
+  `capability.Repository` interface implemented against
+  `jackc/pgx/v5`. Migration `025_capabilities.sql` (Postgres)
+  mirrors the SQLite schema with TIMESTAMPTZ/JSONB; migration
+  `100_rls.sql` enables Row Level Security on every per-workspace
+  table with policies keyed to `SET LOCAL app.current_workspace`.
+- **Domain-purity CI gate (Tier 1.07).** New
+  `scripts/check-domain-purity.sh` and `make lint-deps` step
+  fail CI when any of 14 domain packages imports from
+  `internal/llm`, `internal/api`, `internal/store/sqlite`, or
+  `cmd/`. Companion to `make lint-domain` (no package-level
+  mutable state). Together they enforce Charter Principle 5 from
+  structural (AST-walked) and import-shape (grep-walked) angles.
+- **Observability Primitive — `WindowAggregator`.**
+  Subscription on `capability.EventRecommendationGenerated` is the
+  next observable to expose at a `/v1/metrics` endpoint.
+
+### Changed (Tier 1)
+
+- **Approval→Release wiring closes quorum-reality gap
+  (Tier 1.27, the real bug).** `Release.ApproveWith(*Approval,
+  Policy)` runs the supplied Policy against recorded votes,
+  enforces separation of duties via `VerifySeparationOfDuties`,
+  and only advances Status from Pending to Approved on quorum. New
+  errors: `approval.ErrCreatorVoted`, `approval.ErrQuorumNotSatisfied`.
+  ADR-0017.
+- **Migrations: legacy `prompts` / `agents` /
+  `prompt_versions` / `agent_executions` /
+  `test_datasets` / `eval_results` / `eval_runs` /
+  `reviews` / `output_snapshots` / `workflows` /
+  `workflow_steps` tables dropped (Tier 1.26, migration 024).**
+  Audit confirmed zero code or test references to those tables;
+  the capability-centric architecture had already superseded them
+  at the code layer. The migration is mirrored under
+  `internal/store/migrations/postgres/` for the Postgres backend.
+- **`internal/snapshot` deleted (Tier 1.38).** Subsumed by
+  `capability.Execution.Inputs` / `Outputs` (json.RawMessage)
+  plus the Replay buffer. `WithSnapshotStore` / `snapshot.NewStore`
+  gone from server and main.
+- **`internal/capability/deployment` deleted (Tier 1.39).** The
+  Release lifecycle (`Pending → Approved → Active →
+  Superseded → RolledBack`) is the canonical deployment record.
+  Unused event constants `EventDeploymentStarted`,
+  `EventDeploymentSucceeded`, `EventDeploymentFailed` removed.
+  `EventDeploymentRolledBack` retained for backward compatibility.
+- **Import cycle fix**: `internal/optimizer/rules` no longer
+  imports `internal/recommendation`; `CanAutoAdopt` moves into
+  the rules package as a plain function. Recommendation producers
+  import rules directly.
+- **Compilation**: pkg/plugin / pkg/cas / internal/eventbus /
+  internal/replay / internal/schedule / internal/scheduler /
+  internal/budget / internal/quota / internal/observation /
+  internal/executor / internal/invoke / internal/policy /
+  internal/lineage / internal/approval / internal/release all
+  green at strict verification: gofmt, go vet, `-race
+  -count=1 -timeout 180s ./...` 44/44 ok.
+
+### ADRs and architecture
+
+- **ADR-0015**: Postgres as a first-class backend with per-workspace
+  RLS.
+- **ADR-0016**: Plugins over gRPC, loopback only.
+- **ADR-0017**: Approval→Release wiring closes quorum-reality gap.
+- **ADR-0018**: End-to-end Recommendation loop wired through
+  Executor → Observation → Producer.
+- **ADR-0019**: Deferred architecture review items (plugin
+  supervisor, bandit, LLM-judge, Python/TS SDKs, Helm chart, etc).
+
 
 - **`internal/llm` no longer carries package-level mutable state.**
   The `Registry` was a package-level singleton (`var global =
