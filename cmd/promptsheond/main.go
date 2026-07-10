@@ -19,6 +19,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/config"
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
 	"github.com/sachncs/promptsheon/internal/guardrail"
+	"github.com/sachncs/promptsheon/internal/llm"
 	"github.com/sachncs/promptsheon/internal/metrics"
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/observability"
@@ -198,6 +199,9 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 
 	limiter := ratelimit.NewLimiter(ratelimit.LoadConfigFromEnv())
 
+	providers := llm.NewRegistry()
+	providers.LoadFromEnv()
+
 	var opts []api.Option
 	if cfg.Auth {
 		opts = append(opts, api.WithAuth(db))
@@ -220,6 +224,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		api.WithAlertingManager(alertingManager),
 		api.WithContextManager(contextMgr),
 		api.WithRateLimiter(limiter),
+		api.WithProviders(providers),
 	)
 	srv := api.NewServer(db, logger, opts...)
 	return srv, limiter, spans, collector

@@ -12,14 +12,21 @@ const valError = "error"
 const fieldModel = "model"
 
 func (s *Server) handleListProviders(w http.ResponseWriter, _ *http.Request) error {
-	names := llm.Default().Providers()
+	if s.providers == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"providers": []string{}})
+		return nil
+	}
+	names := s.providers.Providers()
 	writeJSON(w, http.StatusOK, map[string]any{"providers": names})
 	return nil
 }
 
 func (s *Server) handleGetProvider(w http.ResponseWriter, r *http.Request) error {
+	if s.providers == nil {
+		return notFound("providers not configured")
+	}
 	name := r.PathValue("name")
-	names := llm.Default().Providers()
+	names := s.providers.Providers()
 	found := false
 	for _, n := range names {
 		if n == name {
@@ -38,6 +45,9 @@ func (s *Server) handleGetProvider(w http.ResponseWriter, r *http.Request) error
 }
 
 func (s *Server) handleTestProvider(w http.ResponseWriter, r *http.Request) error {
+	if s.providers == nil {
+		return notFound("providers not configured")
+	}
 	name := r.PathValue("name")
 
 	var req struct {
@@ -50,7 +60,7 @@ func (s *Server) handleTestProvider(w http.ResponseWriter, r *http.Request) erro
 		req.Model = "gpt-3.5-turbo"
 	}
 
-	provider, err := llm.Default().Get(name)
+	provider, err := s.providers.Get(name)
 	if err != nil {
 		return badRequest("provider not available: " + err.Error())
 	}

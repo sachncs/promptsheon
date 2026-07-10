@@ -55,7 +55,7 @@ func TestMockError(t *testing.T) {
 }
 
 func TestRegistry(t *testing.T) {
-	r := newRegistry()
+	r := NewRegistry()
 
 	// Unknown provider
 	_, err := r.Get("unknown")
@@ -92,7 +92,7 @@ func TestRegistry(t *testing.T) {
 }
 
 func TestRegistryWithConfig(t *testing.T) {
-	r := newRegistry()
+	r := NewRegistry()
 	r.Configure("openai", ProviderConfig{APIKey: "test-key"})
 
 	p, err := r.Get("openai")
@@ -352,18 +352,19 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("PROMPTSHEON_NVIDIA_API_KEY", "nv-test")
 	t.Setenv("PROMPTSHEON_LLM_PROVIDER", "openai")
 
-	provider := LoadFromEnv()
+	r := NewRegistry()
+	provider := r.LoadFromEnv()
 	if provider != "openai" {
 		t.Fatalf("expected 'openai', got %q", provider)
 	}
 
 	for _, name := range []string{"openai", "anthropic", "ollama", "azure", "nvidia"} {
-		p, err := global.Get(name)
+		p, err := r.Get(name)
 		if err != nil {
-			t.Fatalf("global.Get(%q): %v", name, err)
+			t.Fatalf("r.Get(%q): %v", name, err)
 		}
 		if p.Name() != name {
-			t.Errorf("global.Get(%q).Name() = %q, want %q", name, p.Name(), name)
+			t.Errorf("r.Get(%q).Name() = %q, want %q", name, p.Name(), name)
 		}
 	}
 }
