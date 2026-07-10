@@ -111,7 +111,7 @@ func TestInstrumented(t *testing.T) {
 	var collected []CallMetrics
 	inst := NewInstrumented(mock, func(m CallMetrics) {
 		collected = append(collected, m)
-	}, nil)
+	}, nil, nil)
 
 	resp, err := inst.Complete(context.Background(), &Request{
 		Model:    "gpt-4o",
@@ -166,27 +166,29 @@ func TestAggregateMetrics(t *testing.T) {
 }
 
 func TestCostCalculation(t *testing.T) {
+	pt := NewPricingTable()
 	usage := Usage{PromptTokens: 1000, CompletionTokens: 500}
-	cost := CalculateCost("gpt-4o", usage)
+	cost := pt.Calculate("gpt-4o", usage)
 	if cost <= 0 {
 		t.Fatalf("expected positive cost, got %f", cost)
 	}
 
 	// Unknown model returns 0
-	cost = CalculateCost("unknown-model", usage)
+	cost = pt.Calculate("unknown-model", usage)
 	if cost != 0 {
 		t.Fatalf("expected 0 cost for unknown model, got %f", cost)
 	}
 
 	// Ollama is free
-	cost = CalculateCost("llama3", usage)
+	cost = pt.Calculate("llama3", usage)
 	if cost != 0 {
 		t.Fatalf("expected 0 cost for llama3, got %f", cost)
 	}
 }
 
 func TestGetPricing(t *testing.T) {
-	p := GetPricing("gpt-4o")
+	pt := NewPricingTable()
+	p := pt.Lookup("gpt-4o")
 	if p == nil {
 		t.Fatal("expected pricing for gpt-4o")
 	}
@@ -194,7 +196,7 @@ func TestGetPricing(t *testing.T) {
 		t.Fatalf("expected positive prompt price, got %f", p.PromptPerToken)
 	}
 
-	p = GetPricing("nonexistent")
+	p = pt.Lookup("nonexistent")
 	if p != nil {
 		t.Fatal("expected nil for nonexistent model")
 	}
@@ -427,7 +429,7 @@ func TestDefaultCircuitBreakerConfig(t *testing.T) {
 
 func TestInstrumentedName(t *testing.T) {
 	mock := NewMock("test")
-	inst := NewInstrumented(mock, nil, nil)
+	inst := NewInstrumented(mock, nil, nil, nil)
 	if inst.Name() != "mock" {
 		t.Errorf("Instrumented.Name() = %q, want %q", inst.Name(), "mock")
 	}
@@ -454,7 +456,7 @@ func TestInstrumentedError(t *testing.T) {
 	var collected []CallMetrics
 	inst := NewInstrumented(mock, func(m CallMetrics) {
 		collected = append(collected, m)
-	}, nil)
+	}, nil, nil)
 
 	_, err := inst.Complete(context.Background(), &Request{Model: "test"})
 	if err == nil {
@@ -471,7 +473,7 @@ func TestInstrumentedError(t *testing.T) {
 func TestInstrumentedWithLogger(t *testing.T) {
 	mock := NewMock("test")
 	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	inst := NewInstrumented(mock, nil, logger)
+	inst := NewInstrumented(mock, nil, logger, nil)
 
 	resp, err := inst.Complete(context.Background(), &Request{
 		Model:    "gpt-4o",

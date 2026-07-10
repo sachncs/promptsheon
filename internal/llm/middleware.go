@@ -25,11 +25,15 @@ type Instrumented struct {
 	inner     Provider
 	collector MetricsCollector
 	logger    *slog.Logger
+	pricing   *PricingTable
 }
 
-// NewInstrumented wraps a provider with metrics collection.
-func NewInstrumented(p Provider, collector MetricsCollector, logger *slog.Logger) *Instrumented {
-	return &Instrumented{inner: p, collector: collector, logger: logger}
+// NewInstrumented wraps a provider with metrics collection. pricing
+// may be nil; when it is, the CostUSD field on each CallMetrics is
+// left at zero. Callers that want cost recorded should construct a
+// *PricingTable (llm.NewPricingTable) and pass it explicitly.
+func NewInstrumented(p Provider, collector MetricsCollector, logger *slog.Logger, pricing *PricingTable) *Instrumented {
+	return &Instrumented{inner: p, collector: collector, logger: logger, pricing: pricing}
 }
 
 // Name returns the wrapped provider name.
@@ -51,7 +55,9 @@ func (i *Instrumented) Complete(ctx context.Context, req *Request) (*Response, e
 		metrics.Error = err.Error()
 	} else {
 		metrics.Usage = resp.Usage
-		metrics.CostUSD = CalculateCost(req.Model, resp.Usage)
+		if i.pricing != nil {
+			metrics.CostUSD = i.pricing.Calculate(req.Model, resp.Usage)
+		}
 	}
 
 	if i.collector != nil {
