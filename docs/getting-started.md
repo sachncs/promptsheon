@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Go 1.25 or later
+- Go 1.26 or later
 - SQLite (included — no separate install needed via `modernc.org/sqlite`)
 - golangci-lint (optional, for linting)
 
