@@ -25,6 +25,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   returned by `AllEnvironments() []Environment`. `Environment.Valid()`
   uses a switch instead of looping over the slice. Behaviour
   preserved.
+- **Capability.Version is a Manifest.** `internal/capability/version.go`
+  gained `Manifest Manifest` and `ManifestHash string` fields (ADR-0010).
+  Migration `023_versions_manifest.sql` adds a `manifest` JSON column
+  and a `manifest_hash` index column. The legacy per-artifact columns
+  remain during the transition window. The API handler synthesises a
+  Manifest from legacy bundle fields when no explicit Manifest is
+  supplied; explicit Manifests are validated at the API boundary.
+- **Per-aggregate Repository interfaces** now live with their
+  aggregate packages: `internal/capability.Repository`,
+  `internal/release.Repository`, `internal/approval.Repository`,
+  `internal/recommendation.Repository`, `internal/lineage.Repository`,
+  `internal/policy.Repository`. `internal/store.Repository` embeds
+  `capability.Repository`. The SQLite implementation satisfies every
+  consumer-defined interface, making the Postgres backend a
+  drop-in replacement (Charter Principle 3 — interfaces belong to
+  consumers).
+- **CAS promoted to `pkg/cas`.** `internal/promptsheon` is now a
+  deprecation shim that re-exports every identifier under the
+  historical names. New code MUST import `pkg/cas` directly
+  (ADR-0013).
+- **Capability.State is derived, not stored.** The
+  `State` and `CurrentVersionID` fields have been removed from
+  `capability.Capability`; `Capability.DeriveState(releases)` computes
+  the lifecycle state from the set of Releases attached to the
+  Capability. The state columns remain in the schema for migration
+  forwards-compatibility.
+- **`DBBackend` config knob.** Production deployments can set
+  `PROMPTSHEON_DB_BACKEND=postgres` plus `PROMPTSHEON_DB_DSN` to
+  route through the new `internal/store/postgres` backend
+  (ADR-0015). SQLite remains the default.
 
 ### Added
 
