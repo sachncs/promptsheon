@@ -19,6 +19,7 @@ ADRs are immutable. When a decision is superseded, the original ADR is updated w
 | [0009](0009-prompt-binding-version-0-3-0.md) | Adopt prompt-binding schema version 0.3.0 | Accepted |
 | [0010](0010-version-is-a-manifest-not-a-bundle.md) | Capability Version is a Manifest, not a Bundle | Accepted |
 | [0011](0011-release-and-approval-aggregates.md) | Release and Approval are separate aggregates | Accepted |
+| [0012](0012-providers-and-pricing-are-injected.md) | Providers and pricing are injected, never global | Accepted |
 
 ## Status legend
 
