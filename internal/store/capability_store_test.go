@@ -129,7 +129,7 @@ func TestCapabilityStore_CapabilityCRUD(t *testing.T) {
 	c := &capability.Capability{
 		ID: "cap-1", ProjectID: "proj-1", Name: "Summarize Invoice",
 		Description: "Extract invoice data", Owner: "alice",
-		Tags: []string{"finance", "invoices"},
+		Tags:      []string{"finance", "invoices"},
 		CreatedAt: now, UpdatedAt: now,
 	}
 

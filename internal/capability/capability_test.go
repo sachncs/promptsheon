@@ -8,8 +8,8 @@ import (
 
 func TestCapabilityDefaults(t *testing.T) {
 	c := Capability{
-		ID:    "cap-1",
-		Tags:  []string{"invoices", "finance"},
+		ID:   "cap-1",
+		Tags: []string{"invoices", "finance"},
 	}
 
 	if c.ID != "cap-1" {
@@ -22,8 +22,8 @@ func TestCapabilityDefaults(t *testing.T) {
 
 func TestCapabilityJSONRoundTrip(t *testing.T) {
 	c := Capability{
-		ID:    "cap-2",
-		Name:  "Review PR",
+		ID:   "cap-2",
+		Name: "Review PR",
 	}
 
 	data, err := json.Marshal(c)

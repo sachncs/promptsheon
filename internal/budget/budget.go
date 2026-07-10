@@ -36,21 +36,21 @@ const (
 type Scope string
 
 const (
-	ScopeWorkspace Scope = "workspace"
+	ScopeWorkspace  Scope = "workspace"
 	ScopeCapability Scope = "capability"
 )
 
 // Budget is the value-typed aggregate.
 type Budget struct {
-	ID         string    `json:"id"`
-	Scope      Scope     `json:"scope"`
-	TargetID   string    `json:"target_id"`
-	Period     Period    `json:"period"`
-	CapUSD     float64   `json:"cap_usd"`
+	ID          string    `json:"id"`
+	Scope       Scope     `json:"scope"`
+	TargetID    string    `json:"target_id"`
+	Period      Period    `json:"period"`
+	CapUSD      float64   `json:"cap_usd"`
 	PeriodStart time.Time `json:"period_start"`
-	SpentUSD   float64   `json:"spent_usd"`
-	CreatedAt  time.Time `json:"created_at"`
-	CreatedBy  string    `json:"created_by"`
+	SpentUSD    float64   `json:"spent_usd"`
+	CreatedAt   time.Time `json:"created_at"`
+	CreatedBy   string    `json:"created_by"`
 }
 
 // ErrCapNotPositive is returned when constructing a Budget with a

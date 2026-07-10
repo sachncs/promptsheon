@@ -59,7 +59,7 @@ type fakePlugin struct {
 }
 
 func (f *fakePlugin) Handshake(_ context.Context) (PluginDescriptor, error) { return f.d, nil }
-func (f *fakePlugin) Shutdown(_ context.Context) error                       { return nil }
+func (f *fakePlugin) Shutdown(_ context.Context) error                      { return nil }
 
 func TestPluginInterfaceConformance(t *testing.T) {
 	t.Parallel()

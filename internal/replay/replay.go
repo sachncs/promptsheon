@@ -26,22 +26,22 @@ import (
 
 // Record is one immutable observation of one execution.
 type Record struct {
-	ExecutionHash  string          `json:"execution_hash"`
-	WorkspaceID    string          `json:"workspace_id"`
-	ReleaseID      string          `json:"release_id"`
-	ManifestHash   string          `json:"manifest_hash"`
-	InputHash      string          `json:"input_hash"`
-	Model          string          `json:"model"`
-	ModelRevision  string          `json:"model_revision"`
-	Input          json.RawMessage `json:"input"`
-	Output         json.RawMessage `json:"output"`
-	PromptTokens   int             `json:"prompt_tokens"`
-	OutputTokens   int             `json:"output_tokens"`
-	CostUSD        float64         `json:"cost_usd"`
-	LatencyMS      int64           `json:"latency_ms"`
-	Status         string          `json:"status"`
-	Error          string          `json:"error,omitempty"`
-	CapturedAt     time.Time       `json:"captured_at"`
+	ExecutionHash string          `json:"execution_hash"`
+	WorkspaceID   string          `json:"workspace_id"`
+	ReleaseID     string          `json:"release_id"`
+	ManifestHash  string          `json:"manifest_hash"`
+	InputHash     string          `json:"input_hash"`
+	Model         string          `json:"model"`
+	ModelRevision string          `json:"model_revision"`
+	Input         json.RawMessage `json:"input"`
+	Output        json.RawMessage `json:"output"`
+	PromptTokens  int             `json:"prompt_tokens"`
+	OutputTokens  int             `json:"output_tokens"`
+	CostUSD       float64         `json:"cost_usd"`
+	LatencyMS     int64           `json:"latency_ms"`
+	Status        string          `json:"status"`
+	Error         string          `json:"error,omitempty"`
+	CapturedAt    time.Time       `json:"captured_at"`
 }
 
 // HashInput is the bundle of fields used to compute the ExecutionHash.

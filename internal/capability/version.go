@@ -21,11 +21,11 @@ import "time"
 // spec: a self-contained, versioned, immutable snapshot of the
 // implementation.
 type Version struct {
-	ID              string            `json:"id"`
-	CapabilityID    string            `json:"capability_id"`
-	Version         int               `json:"version"`
-	Manifest        Manifest          `json:"manifest"`
-	ManifestHash    string            `json:"manifest_hash,omitempty"`
+	ID           string   `json:"id"`
+	CapabilityID string   `json:"capability_id"`
+	Version      int      `json:"version"`
+	Manifest     Manifest `json:"manifest"`
+	ManifestHash string   `json:"manifest_hash,omitempty"`
 	// Legacy fields retained during the migration; new code should
 	// not read or write them. Set by the storage layer from the
 	// embedded JSON columns when the row was written before
