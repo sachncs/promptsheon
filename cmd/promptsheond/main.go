@@ -78,6 +78,7 @@ func main() {
 			_ = db.Close()
 		}
 	}()
+	_ = db // keep linter happy until wiring is finalised in M1
 
 	srv, limiter, spans, collector := buildServer(rootCtx, &cfg, db, logger)
 
