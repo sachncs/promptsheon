@@ -28,9 +28,9 @@ type Signal string
 const (
 	SignalP95LatencyMS      Signal = "p95_latency_ms"
 	SignalP99LatencyMS      Signal = "p99_latency_ms"
-	SignalSuccessRate        Signal = "success_rate"
-	SignalHallucinationRate  Signal = "hallucination_rate"
-	SignalAvgCostMicroUSD    Signal = "avg_cost_usd_micro"
+	SignalSuccessRate       Signal = "success_rate"
+	SignalHallucinationRate Signal = "hallucination_rate"
+	SignalAvgCostMicroUSD   Signal = "avg_cost_usd_micro"
 	SignalAvailability      Signal = "availability"
 )
 
@@ -38,20 +38,20 @@ const (
 type Window time.Duration
 
 const (
-	Window5Min   Window = Window(5 * time.Minute)
-	Window1Hour  Window = Window(time.Hour)
-	Window1Day   Window = Window(24 * time.Hour)
+	Window5Min  Window = Window(5 * time.Minute)
+	Window1Hour Window = Window(time.Hour)
+	Window1Day  Window = Window(24 * time.Hour)
 )
 
 // Goal declares a target on a Signal. "value <" or "value >"
 // combined with Target produces the comparison the SLO evaluator
 // applies.
 type Goal struct {
-	Signal  Signal
-	Op      Op
-	Target  float64
-	Window  Window
-	Breach  float64 // burn-rate threshold: 1.0 means any breach alerts
+	Signal Signal
+	Op     Op
+	Target float64
+	Window Window
+	Breach float64 // burn-rate threshold: 1.0 means any breach alerts
 }
 
 // Op is the comparison operator on a target value.
@@ -68,13 +68,13 @@ const (
 // or more SLOs; an SLO breach fires an alert and (optionally) a
 // Recommendation.
 type SLO struct {
-	ID            string    `json:"id"`
-	WorkspaceID   string    `json:"workspace_id"`
-	CapabilityID  string    `json:"capability_id"`
-	Goal          Goal      `json:"goal"`
-	Severity      string    `json:"severity"` // page | ticket | log
-	CreatedAt     time.Time `json:"created_at"`
-	CreatedBy     string    `json:"created_by"`
+	ID           string    `json:"id"`
+	WorkspaceID  string    `json:"workspace_id"`
+	CapabilityID string    `json:"capability_id"`
+	Goal         Goal      `json:"goal"`
+	Severity     string    `json:"severity"` // page | ticket | log
+	CreatedAt    time.Time `json:"created_at"`
+	CreatedBy    string    `json:"created_by"`
 }
 
 // Errorf-from-validation path: every SLO must specify a Signal,
@@ -161,9 +161,9 @@ func (g Goal) BurnRate(actual float64) float64 {
 
 // Repository is the consumer-defined persistence interface for SLOs.
 type Repository interface {
-	CreateSLO(ctx interfaceCtx, s *SLO) error
-	GetSLO(ctx interfaceCtx, id string) (*SLO, error)
-	ListSLOsForCapability(ctx interfaceCtx, capabilityID string) ([]*SLO, error)
-	UpdateSLO(ctx interfaceCtx, s *SLO) error
-	DeleteSLO(ctx interfaceCtx, id string) error
+	CreateSLO(ctx context.Context, s *SLO) error
+	GetSLO(ctx context.Context, id string) (*SLO, error)
+	ListSLOsForCapability(ctx context.Context, capabilityID string) ([]*SLO, error)
+	UpdateSLO(ctx context.Context, s *SLO) error
+	DeleteSLO(ctx context.Context, id string) error
 }
