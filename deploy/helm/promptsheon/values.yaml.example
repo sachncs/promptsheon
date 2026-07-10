@@ -1,0 +1,43 @@
+# Promptsheon production values example.
+#
+# Activate Postgres-backed deployments by setting dbBackend=postgres
+# and providing a DSN. The Postgres migration files in
+# internal/store/migrations/postgres/ run automatically on first
+# boot when the daemon detects the DSN.
+
+replicaCount: 3
+
+image:
+  repository: registry.example.com/promptsheon/promptsheon
+  tag: "0.0.7"
+  pullPolicy: Always
+
+service:
+  type: LoadBalancer
+  port: 443
+
+resources:
+  cpuLimit: "4"
+  memoryLimit: 4Gi
+
+config:
+  dbBackend: postgres
+  # dbDSN is mandatory when dbBackend=postgres. The chart ships a
+  # Secret that backs a project_secret_ref via External Secrets
+  # Operator; rotate via ESO, not by editing the Secret.
+  dbDSN: "postgres://promptsheon:CHANGE_ME@promptsheon-pg.promptsheon.svc:5432/promptsheon?sslmode=require"
+  addr: ":8080"
+  logLevel: info
+  auth: "true"
+  rateLimitRate: 1000
+  rateLimitInterval: 60
+  corsOrigins: "https://app.example.com"
+  otelEndpoint: "otel-collector.observability.svc:4317"
+
+persistence:
+  size: 50Gi
+  accessMode: ReadWriteOnce
+  storageClassName: gp3
+
+serviceMonitor:
+  enabled: true
