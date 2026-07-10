@@ -324,12 +324,18 @@ func (s *SQLite) CreateVersion(ctx context.Context, v *capability.Version) error
 		return fmt.Errorf("marshal version JSON fields: %w", err)
 	}
 
+	manifestJSON, err := marshalOrErr(v.Manifest)
+	if err != nil {
+		return fmt.Errorf("marshal version manifest: %w", err)
+	}
+
 	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO capability_versions
-		 (id, capability_id, version, prompt, model_policy, context_contract, knowledge,
+		 (id, capability_id, version, manifest, manifest_hash, prompt, model_policy, context_contract, knowledge,
 		  memory, guardrails, tools, mcp_servers, runtime_policy, evaluation_suite, created_at, created_by)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		v.ID, v.CapabilityID, v.Version, f.prompt, f.modelPolicy, f.contextContract,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		v.ID, v.CapabilityID, v.Version, string(manifestJSON), v.ManifestHash,
+		f.prompt, f.modelPolicy, f.contextContract,
 		f.knowledge, f.memory, f.guardrails, f.tools, f.mcp, f.runtimePolicy,
 		f.evalSuite, v.CreatedAt, v.CreatedBy,
 	)
@@ -341,7 +347,7 @@ func (s *SQLite) CreateVersion(ctx context.Context, v *capability.Version) error
 
 func (s *SQLite) GetVersion(ctx context.Context, id string) (*capability.Version, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, capability_id, version, prompt, model_policy, context_contract, knowledge,
+		`SELECT id, capability_id, version, manifest, manifest_hash, prompt, model_policy, context_contract, knowledge,
 		 memory, guardrails, tools, mcp_servers, runtime_policy, evaluation_suite, created_at, created_by
 		 FROM capability_versions WHERE id = ?`, id,
 	)
@@ -350,7 +356,7 @@ func (s *SQLite) GetVersion(ctx context.Context, id string) (*capability.Version
 
 func (s *SQLite) ListVersions(ctx context.Context, capabilityID string) ([]*capability.Version, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, capability_id, version, prompt, model_policy, context_contract, knowledge,
+		`SELECT id, capability_id, version, manifest, manifest_hash, prompt, model_policy, context_contract, knowledge,
 		 memory, guardrails, tools, mcp_servers, runtime_policy, evaluation_suite, created_at, created_by
 		 FROM capability_versions WHERE capability_id = ? ORDER BY version DESC`, capabilityID,
 	)
@@ -372,7 +378,7 @@ func (s *SQLite) ListVersions(ctx context.Context, capabilityID string) ([]*capa
 
 func (s *SQLite) GetLatestVersion(ctx context.Context, capabilityID string) (*capability.Version, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, capability_id, version, prompt, model_policy, context_contract, knowledge,
+		`SELECT id, capability_id, version, manifest, manifest_hash, prompt, model_policy, context_contract, knowledge,
 		 memory, guardrails, tools, mcp_servers, runtime_policy, evaluation_suite, created_at, created_by
 		 FROM capability_versions WHERE capability_id = ? ORDER BY version DESC LIMIT 1`, capabilityID,
 	)
@@ -383,10 +389,12 @@ func scanCapabilityVersion(scanner interface {
 	Scan(dest ...any) error
 }) (*capability.Version, error) {
 	var v capability.Version
+	var manifestJSON string
 	var promptJSON, modelPolicyJSON, contextContractJSON, knowledgeJSON, memoryJSON string
 	var guardrailsJSON, toolsJSON, mcpJSON, runtimePolicyJSON, evalSuiteJSON string
 
 	err := scanner.Scan(&v.ID, &v.CapabilityID, &v.Version,
+		&manifestJSON, &v.ManifestHash,
 		&promptJSON, &modelPolicyJSON, &contextContractJSON, &knowledgeJSON,
 		&memoryJSON, &guardrailsJSON, &toolsJSON, &mcpJSON,
 		&runtimePolicyJSON, &evalSuiteJSON, &v.CreatedAt, &v.CreatedBy,
@@ -396,6 +404,10 @@ func scanCapabilityVersion(scanner interface {
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan version: %w", err)
+	}
+
+	if manifestJSON != "" && manifestJSON != "{}" {
+		mustUnmarshal([]byte(manifestJSON), &v.Manifest)
 	}
 
 	mustUnmarshal([]byte(promptJSON), &v.Prompt)
