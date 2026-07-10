@@ -27,14 +27,14 @@ type File struct {
 
 // Entry is one plugin descriptor.
 type Entry struct {
-	Name        string   `yaml:"name"`
-	Version     string   `yaml:"version"`
-	Binary      string   `yaml:"binary"`
-	Args        []string `yaml:"args"`
-	Env         []string `yaml:"env"` // KEY=VALUE form
-	Services    []string `yaml:"services"` // e.g. ["Provider", "Guardrail"]
-	UDS         string   `yaml:"uds"` // optional, default /tmp/promptsheon/<name>.sock
-	MinCoreVersion string `yaml:"min_core_version"`
+	Name           string   `yaml:"name"`
+	Version        string   `yaml:"version"`
+	Binary         string   `yaml:"binary"`
+	Args           []string `yaml:"args"`
+	Env            []string `yaml:"env"`      // KEY=VALUE form
+	Services       []string `yaml:"services"` // e.g. ["Provider", "Guardrail"]
+	UDS            string   `yaml:"uds"`      // optional, default /tmp/promptsheon/<name>.sock
+	MinCoreVersion string   `yaml:"min_core_version"`
 }
 
 // ErrEmpty is returned when a manifest is empty.

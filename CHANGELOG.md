@@ -166,6 +166,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the ratio for the recommendation engine. ADR-0020 records
   why the closed-set wins over open-ended PromQL or vendor-
   specific models.
+
+### Added (Tier 2 follow-on, third pass)
+
+- **Bandit recommender foundation (Tier 2.35).** New
+  `internal/bandit` ships Thompson Sampling arm selection:
+  `ArmPosterior` is a Beta(alpha, beta) posterior over the
+  success rate; `Selector` runs concurrent-safe Thompson draws
+  and returns the highest-posterior arm. The M4 bandit
+  recommender that consumes this foundation ships in a
+  follow-on. ADR-0021 records the algorithmic choice.
+- **Per-Workspace MCP allowlist (Tier 2.49 follow-on).** New
+  `internal/mcplist` ships `List` and `Entry` value types plus
+  a closed-set Name validator (alnum, dash, dot, underscore;
+  1-64 characters). The empty list allows nothing — only
+  explicitly-listed servers may be called.
+- **Plugin manifest (PROMPTSHEON_PLUGINS_FILE, Tier 2.32).**
+  New `internal/manifest` parses a YAML manifest of plugin
+  descriptors: name, version, binary, args, env, services, uds,
+  min_core_version. The supervisor (M3 follow-on) reads the
+  manifest at boot and spawns one process per entry. ADR-0022
+  records the format and the closed-set Name format.
+- **Workspace observation rollup surface (Tier 2.34).** New
+  route `GET /v1/workspaces/{id}/observation` returns the
+  per-Workspace Budget/Quota rollup; new `WithWorkspaceRollups`
+  and `WithInvoker` options on `internal/api.Server` close the
+  production wiring scaffold.
+- **Per-Workspace adoption record (Tier 2.55).** New
+  `internal/adoption` ships `Record`, `Filter`, and the
+  consumer-defined `Repository` plus `CountByOutcome` for
+  observability. M4 wires the recommendation engine to read
+  prior adoptions.
+- **KMS-backed KeyProvider stub (Tier 2.45 follow-on).** New
+  `internal/vault/kmsbyok` ships the value type, the
+  `KMSClient` interface, and a deterministic test double. The
+  full AWS SDK adapter ships in M3 follow-on; today's commit
+  delivers the production shape and the test path so the
+  daemon boots in CI without an AWS account.
+- **Examples (Tier 2.39 + 2.36 follow-on).** New
+  `examples/python-list-capabilities/` and `examples/bash/invoke-release.sh`
+  give downstream consumers runnable reference code; `examples/README.md`
+  documents the directory.
 - **Vestigial `state` / `current_version_id` columns (Tier 1.40
   follow-on).** Migration 026 documents that the `capabilities`
   schema retains these columns for forward compatibility but
