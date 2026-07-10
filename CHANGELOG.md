@@ -7,7 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`internal/llm` no longer carries package-level mutable state.**
+  The `Registry` was a package-level singleton (`var global =
+  newRegistry()`) reached via `llm.Default()`; it is now an explicit
+  value constructed with `llm.NewRegistry()` and passed through
+  `api.WithProviders()` from `cmd/promptsheond`. `LoadFromEnv` is now
+  a method on `*Registry`. The `pricingTable` map was a package-level
+  global used by `CalculateCost` / `GetPricing`; both are replaced by
+  `*PricingTable` methods. `Instrumented` accepts an optional
+  `*PricingTable` constructor argument so cost metrics are opt-in.
+  Charter Principle 5 (explicit dependencies) is now honored in
+  this package. ADR-0012.
+- **`internal/release.AllEnvironments` is a function, not a
+  variable.** The closed-set list of supported Environments is
+  returned by `AllEnvironments() []Environment`. `Environment.Valid()`
+  uses a switch instead of looping over the slice. Behaviour
+  preserved.
+
 ### Added
+
+- **`make lint-domain` enforces no package-level mutable state in
+  domain packages.** A small AST walker at
+  `scripts/check-no-package-state.go` parses every non-test Go file
+  in `internal/{capability,release,approval,recommendation,lineage,policy,eventbus}`
+  and fails CI when a non-error, non-import-pin package-level `var`
+  appears. Wired into the `lint` job in CI before `golangci-lint`.
+  ADR-0012.
+
 
 - **Version bundle → Manifest split** — `internal/capability/manifest.go`
   introduces a content-addressed Manifest type that references each
