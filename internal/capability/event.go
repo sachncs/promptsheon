@@ -20,14 +20,14 @@ const (
 	EventEvaluationCompleted EventType = "evaluation_completed"
 	// EventEvaluationThresholdsMet is emitted when evaluation thresholds are met.
 	EventEvaluationThresholdsMet EventType = "evaluation_thresholds_met"
-	// EventDeploymentStarted is emitted when a deployment starts.
-	EventDeploymentStarted EventType = "deployment_started"
-	// EventDeploymentSucceeded is emitted when a deployment succeeds.
-	EventDeploymentSucceeded EventType = "deployment_succeeded"
-	// EventDeploymentFailed is emitted when a deployment fails.
-	EventDeploymentFailed EventType = "deployment_failed"
-	// EventDeploymentRolledBack is emitted when a deployment is rolled back.
+
+	// EventDeploymentRolledBack is emitted when a deployment is rolled
+	// back. After M0.5 the Deployment aggregate was merged into
+	// Release, so this constant is retained for compatibility and
+	// is re-aliased to EventRollbackPerformed at the API boundary
+	// in a later release.
 	EventDeploymentRolledBack EventType = "deployment_rolled_back"
+
 	// EventExecutionFinished is emitted when an execution finishes.
 	EventExecutionFinished EventType = "execution_finished"
 	// EventObservationGenerated is emitted when an observation is generated.
@@ -54,3 +54,8 @@ type Event struct {
 	Timestamp     time.Time      `json:"timestamp"`
 	CorrelationID string         `json:"correlation_id,omitempty"`
 }
+
+// Note: Deployment-status events were removed in commit e17bff8
+// because the Deployment aggregate was merged into the Release
+// aggregate. The Release lifecycle (Pending -> Approved -> Active
+// -> Superseded/RolledBack) carries the same semantics.
