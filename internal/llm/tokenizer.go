@@ -40,11 +40,16 @@ func EstimateTokens(text string) int {
 }
 
 // EstimateCost calculates estimated cost in USD for a given token count and model.
+//
+// It builds a default PricingTable on every call. The cost is computed
+// sparsely (one model per call) so the allocation is negligible;
+// callers that compute costs in a hot loop should construct a
+// *PricingTable once and reuse it.
 func EstimateCost(inputTokens, outputTokens int, model string) float64 {
 	usage := Usage{
 		PromptTokens:     inputTokens,
 		CompletionTokens: outputTokens,
 		TotalTokens:      inputTokens + outputTokens,
 	}
-	return CalculateCost(model, usage)
+	return NewPricingTable().Calculate(model, usage)
 }
