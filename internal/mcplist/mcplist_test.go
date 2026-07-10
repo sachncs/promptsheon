@@ -17,10 +17,10 @@ func TestEntryValidateBadChars(t *testing.T) {
 	bad := []string{
 		"server one",   // space
 		"server/two",   // slash
-		"server!three",  // bang
-		"server$four",   // dollar
-		"server\nfive",  // newline
-		"",              // empty
+		"server!three", // bang
+		"server$four",  // dollar
+		"server\nfive", // newline
+		"",             // empty
 	}
 	for _, n := range bad {
 		if err := (Entry{Name: n}).Validate(); err == nil {
