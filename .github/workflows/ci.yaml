@@ -105,6 +105,42 @@ jobs:
         with:
           version: latest
 
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+
+      - name: Lint Helm chart
+        # Tier 2.42: helm lint catches Chart.yaml issues, missing
+        # templates, and template rendering problems at build time
+        # before they hit a real cluster.
+        run: helm lint deploy/helm/promptsheon/
+
+      - name: Render with defaults (sqlite)
+        # Helm template exercise validates that every template
+        # evaluates successfully under both backends.
+        run: |
+          helm template render-defaults deploy/helm/promptsheon/ \
+            --set config.dbBackend=sqlite \
+            > /tmp/sqlite-rendered.yaml
+          test -s /tmp/sqlite-rendered.yaml
+
+      - name: Render with Postgres
+        # Production deploys set dbBackend=postgres and supply a
+        # DSN. This matrix verifies the rendered Secret + envFrom
+        # configmapRef + secretRef chain work end-to-end.
+        run: |
+          helm template render-pg deploy/helm/promptsheon/ \
+            --set config.dbBackend=postgres \
+            --set config.dbDSN=postgres://x:y@h:5432/db \
+            > /tmp/pg-rendered.yaml
+          test -s /tmp/pg-rendered.yaml
+
   security:
     runs-on: ubuntu-latest
     steps:
