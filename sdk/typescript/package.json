@@ -1,0 +1,21 @@
+{
+  "name": "@promptsheon/typescript",
+  "version": "0.0.7",
+  "description": "Auto-generated TypeScript client for the Promptsheon API.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc --noEmit",
+    "codegen": "bash scripts/codegen.sh"
+  },
+  "files": ["dist"],
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^7.0.2"
+  },
+  "keywords": ["promptsheon", "api", "openapi"],
+  "license": "Apache-2.0"
+}
