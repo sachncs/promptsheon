@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -23,6 +24,8 @@ const opCreate = "create"
 const keyName = "name"
 const opGet = "get"
 const opDelete = "delete"
+const flagProvider = "--provider"
+const cmdTest = "test"
 
 func main() {
 	if handleEarlyExit() {
@@ -840,7 +843,7 @@ func cmdRun(args []string) error {
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
-		case "--provider", "-p":
+		case flagProvider, "-p":
 			if i+1 < len(args) {
 				provider = args[i+1]
 				i++
@@ -905,7 +908,7 @@ func cmdProvider(args []string) error {
 		for _, name := range providers {
 			fmt.Printf("  - %s\n", name)
 		}
-	case "test":
+	case cmdTest:
 		if len(args) < 2 {
 			return usageErrorf("promptsheon provider test <name>")
 		}
@@ -1089,54 +1092,82 @@ func serverURL() string {
 	return strings.TrimRight(u, "/")
 }
 
-func httpGet(url string, v any) error {
-	resp, err := http.Get(url)
+// validateLocalURL restricts HTTP requests to loopback addresses
+// to prevent SSRF. The CLI only talks to a local daemon.
+func validateLocalURL(rawURL string) error {
+	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return fmt.Errorf("GET %s: %w", url, err)
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	host := parsed.Hostname()
+	if host != "localhost" && host != "127.0.0.1" && host != "::1" {
+		return fmt.Errorf("remote requests not allowed: %s", host)
+	}
+	return nil
+}
+
+func httpGet(rawURL string, v any) error {
+	if err := validateLocalURL(rawURL); err != nil {
+		return err
+	}
+	// #nosec G704,G107 -- URL validated to localhost by validateLocalURL above.
+	// The CLI only connects to the local daemon; SSRF is not a concern.
+	resp, err := http.Get(rawURL)
+	if err != nil {
+		return fmt.Errorf("GET %s: %w", rawURL, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
 		var body map[string]string
 		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-			return fmt.Errorf("GET %s: %s", url, resp.Status)
+			return fmt.Errorf("GET %s: %s", rawURL, resp.Status)
 		}
-		return fmt.Errorf("GET %s: %s (%s)", url, resp.Status, body["error"])
+		return fmt.Errorf("GET %s: %s (%s)", rawURL, resp.Status, body["error"])
 	}
 	return json.NewDecoder(resp.Body).Decode(v)
 }
 
-func httpPost(url string, body, v any) error {
+func httpPost(rawURL string, body, v any) error {
+	if err := validateLocalURL(rawURL); err != nil {
+		return err
+	}
 	b, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
-	resp, err := http.Post(url, "application/json", bytes.NewReader(b))
+	// #nosec G704,G107 -- URL validated to localhost by validateLocalURL above.
+	resp, err := http.Post(rawURL, "application/json", bytes.NewReader(b))
 	if err != nil {
-		return fmt.Errorf("POST %s: %w", url, err)
+		return fmt.Errorf("POST %s: %w", rawURL, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
 		var errBody map[string]string
 		if err := json.NewDecoder(resp.Body).Decode(&errBody); err != nil {
-			return fmt.Errorf("POST %s: %s", url, resp.Status)
+			return fmt.Errorf("POST %s: %s", rawURL, resp.Status)
 		}
-		return fmt.Errorf("POST %s: %s (%s)", url, resp.Status, errBody["error"])
+		return fmt.Errorf("POST %s: %s (%s)", rawURL, resp.Status, errBody["error"])
 	}
 	return json.NewDecoder(resp.Body).Decode(v)
 }
 
-func httpDelete(url string) error {
-	req, err := http.NewRequest("DELETE", url, http.NoBody)
+func httpDelete(rawURL string) error {
+	if err := validateLocalURL(rawURL); err != nil {
+		return err
+	}
+	// #nosec G704 -- URL validated to localhost by validateLocalURL above.
+	req, err := http.NewRequest("DELETE", rawURL, http.NoBody)
 	if err != nil {
 		return err
 	}
+	// #nosec G704 -- URL validated to localhost by validateLocalURL above.
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("DELETE %s: %w", url, err)
+		return fmt.Errorf("DELETE %s: %w", rawURL, err)
 	}
 	_ = resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("DELETE %s: %s", url, resp.Status)
+		return fmt.Errorf("DELETE %s: %s", rawURL, resp.Status)
 	}
 	return nil
 }

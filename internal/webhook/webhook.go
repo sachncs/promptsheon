@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math/rand"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/url"
@@ -376,7 +376,9 @@ func sleepBackoff(ctx context.Context, attempt int) bool {
 	if d > maxd || d < 0 {
 		d = maxd
 	}
-	jitter := time.Duration(rand.Int63n(int64(d) / 2))
+	// #nosec G404 -- jitter uses math/rand/v2, not crypto/rand;
+	// cryptographic randomness is not needed for backoff timing.
+	jitter := time.Duration(rand.Int64N(int64(d) / 2))
 	d += jitter
 	t := time.NewTimer(d)
 	defer t.Stop()

@@ -8,6 +8,8 @@ import (
 	"github.com/sachncs/promptsheon/internal/store"
 )
 
+const fieldVersion = "version"
+
 func (s *Server) handleListWorkspaces(w http.ResponseWriter, r *http.Request) error {
 	workspaces, err := s.db.ListWorkspaces(r.Context())
 	if err != nil {
@@ -348,7 +350,7 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 	if err := s.db.CreateVersion(r.Context(), v); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "version:"+v.ID, map[string]any{"capability_id": capabilityID, "version": v.Version})
+	s.audit(r.Context(), "create", "version:"+v.ID, map[string]any{"capability_id": capabilityID, fieldVersion: v.Version})
 	writeJSON(w, http.StatusCreated, v)
 	return nil
 }

@@ -141,8 +141,8 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestLoadConfigFromEnv(t *testing.T) {
 	t.Run("defaults when no env set", func(t *testing.T) {
-		os.Unsetenv("PROMPTSHEON_RATE_LIMIT")
-		os.Unsetenv("PROMPTSHEON_RATE_BURST")
+		_ = os.Unsetenv("PROMPTSHEON_RATE_LIMIT")
+		_ = os.Unsetenv("PROMPTSHEON_RATE_BURST")
 		cfg := LoadConfigFromEnv()
 		if cfg.Rate != 60 || cfg.Burst != 10 {
 			t.Fatalf("expected 60/10, got %d/%d", cfg.Rate, cfg.Burst)
@@ -150,9 +150,9 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	})
 
 	t.Run("custom rate", func(t *testing.T) {
-		os.Setenv("PROMPTSHEON_RATE_LIMIT", "30")
-		t.Cleanup(func() { os.Unsetenv("PROMPTSHEON_RATE_LIMIT") })
-		os.Unsetenv("PROMPTSHEON_RATE_BURST")
+		_ = os.Setenv("PROMPTSHEON_RATE_LIMIT", "30")
+		t.Cleanup(func() { _ = os.Unsetenv("PROMPTSHEON_RATE_LIMIT") })
+		_ = os.Unsetenv("PROMPTSHEON_RATE_BURST")
 		cfg := LoadConfigFromEnv()
 		if cfg.Rate != 30 {
 			t.Fatalf("expected rate 30, got %d", cfg.Rate)
@@ -160,8 +160,8 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	})
 
 	t.Run("rate zero disables", func(t *testing.T) {
-		os.Setenv("PROMPTSHEON_RATE_LIMIT", "0")
-		t.Cleanup(func() { os.Unsetenv("PROMPTSHEON_RATE_LIMIT") })
+		_ = os.Setenv("PROMPTSHEON_RATE_LIMIT", "0")
+		t.Cleanup(func() { _ = os.Unsetenv("PROMPTSHEON_RATE_LIMIT") })
 		cfg := LoadConfigFromEnv()
 		if cfg.Rate != 0 {
 			t.Fatalf("expected rate 0, got %d", cfg.Rate)
@@ -172,9 +172,9 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	})
 
 	t.Run("custom burst", func(t *testing.T) {
-		os.Unsetenv("PROMPTSHEON_RATE_LIMIT")
-		os.Setenv("PROMPTSHEON_RATE_BURST", "25")
-		t.Cleanup(func() { os.Unsetenv("PROMPTSHEON_RATE_BURST") })
+		_ = os.Unsetenv("PROMPTSHEON_RATE_LIMIT")
+		_ = os.Setenv("PROMPTSHEON_RATE_BURST", "25")
+		t.Cleanup(func() { _ = os.Unsetenv("PROMPTSHEON_RATE_BURST") })
 		cfg := LoadConfigFromEnv()
 		if cfg.Burst != 25 {
 			t.Fatalf("expected burst 25, got %d", cfg.Burst)
@@ -182,9 +182,9 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	})
 
 	t.Run("invalid rate uses default", func(t *testing.T) {
-		os.Setenv("PROMPTSHEON_RATE_LIMIT", "not-a-number")
-		t.Cleanup(func() { os.Unsetenv("PROMPTSHEON_RATE_LIMIT") })
-		os.Unsetenv("PROMPTSHEON_RATE_BURST")
+		_ = os.Setenv("PROMPTSHEON_RATE_LIMIT", "not-a-number")
+		t.Cleanup(func() { _ = os.Unsetenv("PROMPTSHEON_RATE_LIMIT") })
+		_ = os.Unsetenv("PROMPTSHEON_RATE_BURST")
 		cfg := LoadConfigFromEnv()
 		if cfg.Rate != 60 {
 			t.Fatalf("expected rate 60, got %d", cfg.Rate)
@@ -192,9 +192,9 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	})
 
 	t.Run("invalid burst uses default", func(t *testing.T) {
-		os.Unsetenv("PROMPTSHEON_RATE_LIMIT")
-		os.Setenv("PROMPTSHEON_RATE_BURST", "-5")
-		t.Cleanup(func() { os.Unsetenv("PROMPTSHEON_RATE_BURST") })
+		_ = os.Unsetenv("PROMPTSHEON_RATE_LIMIT")
+		_ = os.Setenv("PROMPTSHEON_RATE_BURST", "-5")
+		t.Cleanup(func() { _ = os.Unsetenv("PROMPTSHEON_RATE_BURST") })
 		cfg := LoadConfigFromEnv()
 		if cfg.Burst != 10 {
 			t.Fatalf("expected burst 10, got %d", cfg.Burst)
@@ -202,7 +202,7 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	})
 }
 
-func TestStop(t *testing.T) {
+func TestStop(_ *testing.T) {
 	l := NewLimiter(Config{Rate: 10, Interval: time.Second, Burst: 10})
 	l.Stop()
 	// Should be safe to use after stop
@@ -210,13 +210,13 @@ func TestStop(t *testing.T) {
 	l.Reset()
 }
 
-func TestStopTwice(t *testing.T) {
+func TestStopTwice(_ *testing.T) {
 	l := NewLimiter(Config{Rate: 10, Interval: time.Second, Burst: 10})
 	l.Stop()
 	l.Stop()
 }
 
-func TestCleanupExit(t *testing.T) {
+func TestCleanupExit(_ *testing.T) {
 	l := NewLimiter(Config{Rate: 10, Interval: time.Second, Burst: 10})
 	// Give the goroutine a moment to start, then stop
 	time.Sleep(10 * time.Millisecond)

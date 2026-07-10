@@ -3,7 +3,7 @@ package abtesting
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"sync"
 	"time"
 
@@ -161,6 +161,8 @@ func (e *Engine) SelectVariant(testID string) (*Variant, error) {
 	}
 
 	// Weighted random selection
+	// #nosec G404 -- weighted selection uses math/rand/v2, not crypto/rand;
+	// cryptographic randomness is not required for A/B traffic splitting.
 	r := rand.Float64()
 	cumulative := 0.0
 

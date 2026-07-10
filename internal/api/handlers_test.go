@@ -19,8 +19,8 @@ import (
 	"github.com/sachncs/promptsheon/internal/auth"
 	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/metrics"
-	"github.com/sachncs/promptsheon/internal/ratelimit"
 	"github.com/sachncs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/internal/ratelimit"
 	"github.com/sachncs/promptsheon/internal/store"
 	"github.com/sachncs/promptsheon/internal/trace"
 	"github.com/sachncs/promptsheon/internal/vault"
@@ -33,20 +33,20 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockRepo struct {
-	mu                sync.Mutex
-	users             map[string]*models.User
-	apiKeys           map[string]*models.APIKey
-	apiKeysByHash     map[string]*models.APIKey
-	providerKeys      map[string]*models.ProviderKey
-	auditEntries      []*models.AuditEntry
-	workspaces        map[string]*capability.Workspace
-	projects          map[string]*capability.Project
-	capabilities      map[string]*capability.Capability
-	versions          map[string]*capability.Version
-	executions        map[string]*capability.Execution
-	versionsByCap     map[string][]*capability.Version
-	pingErr           error
-	closeErr          error
+	mu            sync.Mutex
+	users         map[string]*models.User
+	apiKeys       map[string]*models.APIKey
+	apiKeysByHash map[string]*models.APIKey
+	providerKeys  map[string]*models.ProviderKey
+	auditEntries  []*models.AuditEntry
+	workspaces    map[string]*capability.Workspace
+	projects      map[string]*capability.Project
+	capabilities  map[string]*capability.Capability
+	versions      map[string]*capability.Version
+	executions    map[string]*capability.Execution
+	versionsByCap map[string][]*capability.Version
+	pingErr       error
+	closeErr      error
 }
 
 func newMockRepo() *mockRepo {
@@ -64,8 +64,8 @@ func newMockRepo() *mockRepo {
 	}
 }
 
-func (m *mockRepo) Close() error                                    { return m.closeErr }
-func (m *mockRepo) Ping(_ context.Context) error                   { return m.pingErr }
+func (m *mockRepo) Close() error                 { return m.closeErr }
+func (m *mockRepo) Ping(_ context.Context) error { return m.pingErr }
 
 // Users
 func (m *mockRepo) CreateUser(_ context.Context, u *models.User) error {
@@ -469,7 +469,8 @@ func newTestServer(t *testing.T, opts ...Option) *Server {
 func newAuthTestServer(t *testing.T, repo store.Repository, opts ...Option) *Server {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError}))
-	allOpts := []Option{WithAuth(repo)}
+	allOpts := make([]Option, 0, 1+len(opts))
+	allOpts = append(allOpts, WithAuth(repo))
 	allOpts = append(allOpts, opts...)
 	return NewServer(repo, logger, allOpts...)
 }
@@ -506,7 +507,7 @@ func newSpanStore(t *testing.T) *trace.SQLite {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 	store, err := trace.NewSQLite(db)
 	if err != nil {
 		t.Fatal(err)
@@ -835,6 +836,7 @@ func TestGenerateID(t *testing.T) {
 	if !strings.HasPrefix(id, "api-") {
 		t.Errorf("expected api- prefix, got %s", id)
 	}
+	time.Sleep(time.Nanosecond)
 	id2 := generateID()
 	if id == id2 {
 		t.Error("expected different IDs")
@@ -3091,7 +3093,7 @@ func TestAuditWorkerProcess(t *testing.T) {
 func TestAudit_DropWhenQueueFull(t *testing.T) {
 	s := newTestServer(t)
 	// Use a closed channel so all sends fail
-	s.auditQueue = make(chan *models.AuditEntry, 0)
+	s.auditQueue = make(chan *models.AuditEntry)
 	s.auditDropped.Store(0)
 
 	ctx := context.Background()
@@ -3202,7 +3204,7 @@ func TestOAuthStateStore_Janitor(t *testing.T) {
 	}
 }
 
-func TestStartOAuthStateJanitor(t *testing.T) {
+func TestStartOAuthStateJanitor(_ *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	StartOAuthStateJanitor(ctx)
@@ -3221,8 +3223,8 @@ func TestResolveAndValidateWebhook(t *testing.T) {
 	}
 
 	old := os.Getenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE")
-	os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
-	defer os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", old)
+	_ = os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
+	defer func() { _ = os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", old) }()
 
 	err = ResolveAndValidateWebhook(context.Background(), "http://localhost:8080/hook")
 	if err != nil {
@@ -3264,8 +3266,8 @@ func TestValidateWebhookURL_LocalhostBlocked(t *testing.T) {
 
 func TestValidateWebhookURL_LocalhostAllowed(t *testing.T) {
 	oldVal := os.Getenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE")
-	os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
-	defer os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", oldVal)
+	_ = os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
+	defer func() { _ = os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", oldVal) }()
 
 	err := ValidateWebhookURL("http://localhost:8080/hook")
 	if err != nil {
@@ -3281,15 +3283,15 @@ func TestValidateWebhookURL_MetadataHostname(t *testing.T) {
 }
 
 func TestWebhookAllowPrivate(t *testing.T) {
-	os.Unsetenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE")
+	_ = os.Unsetenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE")
 	if webhookAllowPrivate() {
 		t.Error("expected false when env not set")
 	}
-	os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
+	_ = os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
 	if !webhookAllowPrivate() {
 		t.Error("expected true when env set")
 	}
-	os.Unsetenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE")
+	_ = os.Unsetenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE")
 }
 
 // ---------------------------------------------------------------------------

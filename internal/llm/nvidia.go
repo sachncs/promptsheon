@@ -36,9 +36,11 @@ func NewNvidia(cfg ProviderConfig) *NvidiaProvider {
 	}
 }
 
+const providerNameNvidia = "nvidia"
+
 // Name returns the provider name.
 func (p *NvidiaProvider) Name() string {
-	return "nvidia"
+	return providerNameNvidia
 }
 
 // nvidiaRequest represents the request body for NVIDIA NIM API.

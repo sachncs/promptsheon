@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	_ "modernc.org/sqlite"
@@ -403,7 +402,7 @@ func newOTelTestTracer(t *testing.T) (*OTelTracer, *sdktrace.TracerProvider) {
 
 func TestNewOTelTracer(t *testing.T) {
 	tracer, tp := newOTelTestTracer(t)
-	defer tp.Shutdown(context.Background())
+	defer func() { _ = tp.Shutdown(context.Background()) }()
 
 	if tracer == nil {
 		t.Fatal("expected non-nil tracer")
@@ -418,7 +417,7 @@ func TestNewOTelTracer(t *testing.T) {
 
 func TestOTelTracerStart(t *testing.T) {
 	tracer, tp := newOTelTestTracer(t)
-	defer tp.Shutdown(context.Background())
+	defer func() { _ = tp.Shutdown(context.Background()) }()
 
 	span := tracer.Start(context.Background(), "test-op")
 	if span == nil {
@@ -446,7 +445,7 @@ func TestOTelTracerStart(t *testing.T) {
 
 func TestOTelTracerStartChild(t *testing.T) {
 	tracer, tp := newOTelTestTracer(t)
-	defer tp.Shutdown(context.Background())
+	defer func() { _ = tp.Shutdown(context.Background()) }()
 
 	parent := &Span{
 		ID:        "parent-id",
@@ -474,7 +473,7 @@ func TestOTelTracerStartChild(t *testing.T) {
 
 func TestOTelTracerStartChildNilParent(t *testing.T) {
 	tracer, tp := newOTelTestTracer(t)
-	defer tp.Shutdown(context.Background())
+	defer func() { _ = tp.Shutdown(context.Background()) }()
 
 	// When parent is nil, StartChild falls back to Start (root span)
 	span := tracer.StartChild(context.Background(), nil, "orphan")
@@ -491,7 +490,7 @@ func TestOTelTracerStartChildNilParent(t *testing.T) {
 
 func TestOTelTracerFinish(t *testing.T) {
 	tracer, tp := newOTelTestTracer(t)
-	defer tp.Shutdown(context.Background())
+	defer func() { _ = tp.Shutdown(context.Background()) }()
 
 	// nil span is a no-op
 	if err := tracer.Finish(nil); err != nil {
@@ -512,7 +511,7 @@ func TestOTelTracerFinish(t *testing.T) {
 
 func TestOTelTracerFinishWithError(t *testing.T) {
 	tracer, tp := newOTelTestTracer(t)
-	defer tp.Shutdown(context.Background())
+	defer func() { _ = tp.Shutdown(context.Background()) }()
 
 	// nil span is a no-op
 	if err := tracer.FinishWithError(nil, nil); err != nil {
@@ -531,7 +530,7 @@ func TestOTelTracerFinishWithError(t *testing.T) {
 	// Finish with an error
 	span2 := tracer.Start(context.Background(), "fail")
 	err := errors.New("oops")
-	if err := tracer.FinishWithError(span2, err); err != nil {
+	if err = tracer.FinishWithError(span2, err); err != nil {
 		t.Fatalf("FinishWithError err: %v", err)
 	}
 	if span2.Status != StatusError {
@@ -547,7 +546,7 @@ func TestOTelTracerFinishWithError(t *testing.T) {
 
 func TestOTelTracerRecordSpan(t *testing.T) {
 	tracer, tp := newOTelTestTracer(t)
-	defer tp.Shutdown(context.Background())
+	defer func() { _ = tp.Shutdown(context.Background()) }()
 
 	// Nil arguments should not panic
 	tracer.RecordSpan(nil, nil)
@@ -575,7 +574,7 @@ func TestOTelAttributeString(t *testing.T) {
 	if kv.Key != "my-key" {
 		t.Errorf("expected key 'my-key', got %q", kv.Key)
 	}
-	var _ attribute.KeyValue = kv
+	var _ = kv
 }
 
 // --- Exporter tests ---
@@ -614,7 +613,7 @@ func TestInitTracerProviderNoop(t *testing.T) {
 
 func TestOTelTracerStartChild_WithOTelSpanInContext(t *testing.T) {
 	tracer, tp := newOTelTestTracer(t)
-	defer tp.Shutdown(context.Background())
+	defer func() { _ = tp.Shutdown(context.Background()) }()
 
 	ctx, otelSpan := tracer.tracer.Start(context.Background(), "parent-otel")
 	ctx = context.WithValue(ctx, otelSpanKey{}, otelSpan)
@@ -633,7 +632,7 @@ func TestOTelTracerStartChild_WithOTelSpanInContext(t *testing.T) {
 
 func TestNewSQLite_ClosedDB(t *testing.T) {
 	db := openTestDB(t)
-	db.Close()
+	_ = db.Close()
 
 	_, err := NewSQLite(db)
 	if err == nil {
@@ -647,7 +646,7 @@ func TestSQLiteFinish_ClosedDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLite: %v", err)
 	}
-	db.Close()
+	_ = db.Close()
 
 	span := s.Start(context.Background(), "test")
 	err = s.Finish(span)
@@ -662,7 +661,7 @@ func TestSQLiteListSpans_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLite: %v", err)
 	}
-	db.Close()
+	_ = db.Close()
 
 	_, err = s.ListSpans(context.Background(), &SpanFilter{})
 	if err == nil {
@@ -676,7 +675,7 @@ func TestSQLiteGetTraceTree_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLite: %v", err)
 	}
-	db.Close()
+	_ = db.Close()
 
 	_, err = s.GetTraceTree(context.Background(), "trace-1")
 	if err == nil {
@@ -724,7 +723,7 @@ func TestSQLiteFinishWithAttributes(t *testing.T) {
 	span := s.Start(context.Background(), "attr-test")
 	span.SetAttribute("color", "blue")
 	span.SetAttribute("size", "large")
-	if err := s.Finish(span); err != nil {
+	if err = s.Finish(span); err != nil {
 		t.Fatalf("Finish: %v", err)
 	}
 

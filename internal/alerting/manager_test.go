@@ -18,16 +18,16 @@ import (
 // mockStore implements store.Repository for testing.
 type mockStore struct {
 	store.Repository
-	alertRules          []*models.AlertRuleRecord
-	alerts              []*models.AlertRecord
-	notificationGroups  []*models.NotificationGroupRecord
-	listAlertRulesErr   error
-	listAlertsErr       error
-	listGroupsErr       error
-	saveAlertRuleErr    error
-	deleteAlertRuleErr  error
-	saveAlertErr        error
-	updateAlertErr      error
+	alertRules               []*models.AlertRuleRecord
+	alerts                   []*models.AlertRecord
+	notificationGroups       []*models.NotificationGroupRecord
+	listAlertRulesErr        error
+	listAlertsErr            error
+	listGroupsErr            error
+	saveAlertRuleErr         error
+	deleteAlertRuleErr       error
+	saveAlertErr             error
+	updateAlertErr           error
 	saveNotificationGroupErr error
 }
 
@@ -503,7 +503,7 @@ func TestLoadFromDB_ListGroupsError(t *testing.T) {
 	}
 }
 
-func TestLoadFromDB_NilLogger(t *testing.T) {
+func TestLoadFromDB_NilLogger(_ *testing.T) {
 	ms := &mockStore{
 		listAlertRulesErr: errors.New("db error"),
 		listAlertsErr:     errors.New("db error"),
@@ -511,11 +511,11 @@ func TestLoadFromDB_NilLogger(t *testing.T) {
 	}
 	// Should not panic with nil logger
 	m := &Manager{
-		rules:       make(map[string]*AlertRule),
-		alerts:      []*Alert{},
-		groups:      make(map[string]*NotificationGroup),
-		metrics:     metrics.NewCollector(),
-		db:          ms,
+		rules:   make(map[string]*AlertRule),
+		alerts:  []*Alert{},
+		groups:  make(map[string]*NotificationGroup),
+		metrics: metrics.NewCollector(),
+		db:      ms,
 	}
 	m.loadFromDB()
 }

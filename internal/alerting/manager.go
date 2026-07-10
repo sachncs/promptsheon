@@ -378,8 +378,8 @@ func (m *Manager) getNotificationChannels(rule *AlertRule) []string {
 	severityKey := strings.ToLower(string(rule.Severity))
 	typeKey := strings.ToLower(rule.Type)
 	var (
-		typeMatch     []string
-		defaultGroup  *NotificationGroup
+		typeMatch    []string
+		defaultGroup *NotificationGroup
 	)
 	for _, group := range m.groups {
 		name := strings.ToLower(group.Name)
@@ -399,7 +399,7 @@ func (m *Manager) getNotificationChannels(rule *AlertRule) []string {
 	if defaultGroup != nil {
 		return defaultGroup.Channels
 	}
-	return []string{"webhook"}
+	return []string{channelWebhook}
 }
 
 // AddNotificationGroup adds a notification group.
@@ -424,6 +424,9 @@ func (m *Manager) AddNotificationGroup(group *NotificationGroup) {
 }
 
 const alertTypeLatencySpike = "latency_spike"
+const alertIDLatencySpike = "latency-spike"
+const alertIDFailureRate = "failure-rate"
+const channelWebhook = "webhook"
 
 // --- Threshold Checks ---
 
@@ -431,7 +434,7 @@ const alertTypeLatencySpike = "latency_spike"
 func (m *Manager) CheckLatencySpike(latencyMs, thresholdMs float64, consecutiveRuns int) *AlertRule {
 	if latencyMs > thresholdMs && consecutiveRuns >= 10 {
 		return &AlertRule{
-			ID:        "latency-spike",
+			ID:        alertIDLatencySpike,
 			Name:      "Execution Latency Spike",
 			Type:      alertTypeLatencySpike,
 			Severity:  SeverityHigh,
@@ -447,7 +450,7 @@ func (m *Manager) CheckLatencySpike(latencyMs, thresholdMs float64, consecutiveR
 func (m *Manager) CheckFailureRate(errorRate float64) *AlertRule {
 	if errorRate > 10.0 {
 		return &AlertRule{
-			ID:        "failure-rate",
+			ID:        alertIDFailureRate,
 			Name:      "Prompt Failure Spike",
 			Type:      "failure_rate",
 			Severity:  SeverityHigh,
@@ -501,7 +504,7 @@ func (m *Manager) RunMonitoringChecks(collector *metrics.Collector) []*Alert {
 	p95 := collector.LLMLatency.P95() * 1000 // convert to ms
 	if p95 > 2000 {                          // > 2s
 		rule := &AlertRule{
-			ID:        "latency-spike",
+			ID:        alertIDLatencySpike,
 			Name:      "Execution Latency Spike",
 			Type:      alertTypeLatencySpike,
 			Severity:  SeverityHigh,
@@ -520,7 +523,7 @@ func (m *Manager) RunMonitoringChecks(collector *metrics.Collector) []*Alert {
 		errorRate := (totalErrors / totalRequests) * 100
 		if errorRate > 10 {
 			rule := &AlertRule{
-				ID:        "failure-rate",
+				ID:        alertIDFailureRate,
 				Name:      "Prompt Failure Spike",
 				Type:      "failure_rate",
 				Severity:  SeverityHigh,

@@ -94,7 +94,7 @@ func TestRecordBlock_WithMetrics(t *testing.T) {
 	}
 }
 
-func TestRecordBlock_NilMetrics(t *testing.T) {
+func TestRecordBlock_NilMetrics(_ *testing.T) {
 	m := testManagerWithoutMetrics()
 	m.RecordBlock()
 }
@@ -109,7 +109,7 @@ func TestRecordPass_WithMetrics(t *testing.T) {
 	}
 }
 
-func TestRecordPass_NilMetrics(t *testing.T) {
+func TestRecordPass_NilMetrics(_ *testing.T) {
 	m := testManagerWithoutMetrics()
 	m.RecordPass()
 }

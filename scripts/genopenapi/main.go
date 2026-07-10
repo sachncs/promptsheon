@@ -114,7 +114,7 @@ func main() {
 		_, _ = os.Stdout.Write(buf.Bytes())
 		return
 	}
-	if err := os.WriteFile(*outPath, buf.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(*outPath, buf.Bytes(), 0o600); err != nil {
 		fail("write: %v", err)
 	}
 	fmt.Fprintf(os.Stderr, "wrote %d path(s) to %s\n", len(byPath), *outPath)
@@ -122,15 +122,35 @@ func main() {
 
 const methodGET = "GET"
 const methodDELETE = "DELETE"
+const methodPOST = "POST"
+const methodPUT = "PUT"
 const typeObject = "object"
+const typeString = "string"
+const typeNumber = "number"
+const typeArray = "array"
+const typeInt = "int"
+const pathHealth = "/health"
+const pathReady = "/ready"
+const resAlert = "Alert"
+const resAlertRule = "AlertRule"
+const resEvalResult = "EvalResult"
+const resEvalRun = "EvalRun"
+const resEvalReport = "EvalReport"
+const resGuardrailViolation = "GuardrailViolation"
+const resGuardrailRule = "GuardrailRule"
+const resPrompt = "Prompt"
+const segAlerts = "alerts"
+const segEval = "eval"
+const segGuardrails = "guardrails"
+const segPrompts = "prompts"
 
 func methodOrder(m string) int {
 	switch strings.ToUpper(m) {
 	case methodGET:
 		return 0
-	case "POST":
+	case methodPOST:
 		return 1
-	case "PUT":
+	case methodPUT:
 		return 2
 	case methodDELETE:
 		return 3
@@ -607,17 +627,17 @@ func typeName(expr ast.Expr) string {
 // `type: object` and is later resolved as a $ref.
 func yamlType(goType string) (string, bool) {
 	switch goType {
-	case "string":
-		return "string", false
-	case "int", "int8", "int16", "int32", "int64",
+	case typeString:
+		return typeString, false
+	case typeInt, "int8", "int16", "int32", "int64",
 		"uint", "uint8", "uint16", "uint32", "uint64",
 		"float32", "float64":
-		return "number", false
+		return typeNumber, false
 	case "bool":
 		return "boolean", false
 	}
 	if strings.HasPrefix(goType, "[]") {
-		return "array", false
+		return typeArray, false
 	}
 	if strings.HasPrefix(goType, "map[") {
 		return typeObject, false
@@ -694,7 +714,7 @@ func writeMethod(buf *bytes.Buffer, method string, h *handlerInfo, path string, 
 	}
 	fmt.Fprintf(buf, "      summary: %q\n", summary)
 
-	if path == "/health" || path == "/ready" {
+	if path == pathHealth || path == pathReady {
 		// System endpoints are unauthenticated.
 		fmt.Fprintf(buf, "      security: []\n")
 	}
@@ -728,7 +748,7 @@ func writeMethod(buf *bytes.Buffer, method string, h *handlerInfo, path string, 
 	fmt.Fprintf(buf, "          description: Unauthorized\n")
 	fmt.Fprintf(buf, "        \"404\":\n")
 	fmt.Fprintf(buf, "          description: Not found\n")
-	if method == "POST" || method == "PUT" || method == methodDELETE {
+	if method == methodPOST || method == methodPUT || method == methodDELETE {
 		fmt.Fprintf(buf, "        \"500\":\n")
 		fmt.Fprintf(buf, "          description: Internal server error\n")
 	}
@@ -811,7 +831,7 @@ func isListPath(path, method string) bool {
 		return false
 	}
 	// Health and metrics endpoints are not list responses.
-	if path == "/health" || path == "/ready" || path == "/metrics" {
+	if path == pathHealth || path == "/ready" || path == "/metrics" {
 		return false
 	}
 	return true
@@ -840,26 +860,26 @@ func listItemRef(path string) string {
 
 func compoundResourceRef(segs []string) string {
 	switch segs[1] {
-	case "alerts":
+	case segAlerts:
 		if len(segs) > 2 && segs[2] == "active" {
-			return "Alert"
+			return resAlert
 		}
-		return "AlertRule"
-	case "eval":
+		return resAlertRule
+	case segEval:
 		switch {
 		case len(segs) > 2 && segs[2] == "results":
-			return "EvalResult"
+			return resEvalResult
 		case len(segs) > 2 && segs[2] == "runs":
-			return "EvalRun"
+			return resEvalRun
 		case len(segs) > 2 && segs[2] == "report":
-			return "EvalReport"
+			return resEvalReport
 		}
-		return "EvalReport"
-	case "guardrails":
+		return resEvalReport
+	case segGuardrails:
 		if len(segs) > 2 && segs[2] == "violations" {
-			return "GuardrailViolation"
+			return resGuardrailViolation
 		}
-		return "GuardrailRule"
+		return resGuardrailRule
 	}
 	return ""
 }
@@ -878,8 +898,8 @@ func simpleResourceRef(segment string) string {
 		return "TestDataset"
 	case "execution-logs":
 		return "ExecutionLog"
-	case "prompts":
-		return "Prompt"
+	case segPrompts:
+		return resPrompt
 	case "providers":
 		return "Provider"
 	case "reviews":

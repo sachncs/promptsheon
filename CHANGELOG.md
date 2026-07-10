@@ -7,19 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **26 gosec issues resolved** — permissions tightened to owner-only
+  (G301/G302/G306: `0755→0750`, `0444→0400`, `0644→0600`), path
+  traversal prevented via `os.Root` scoping in CAS store (G304), weak
+  RNG replaced with `math/rand/v2` (G404), CLI SSRF blocked by localhost
+  URL validation (G704/G107), OAuth cookie hardened with `Secure` flag
+  and `SameSiteStrictMode` (G124), shell tool allowlist documented (G204),
+  SQL injection surface eliminated with parameterised placeholders (G201),
+  open redirect guarded by URL parse validation (G710), long-lived
+  goroutine context justified (G118), OAuth provider metadata annotated
+  as non-secret (G101)
+- **Go toolchain upgraded from 1.25 to 1.26** — `go.mod`, CI matrix,
+  Dockerfile, docs all updated to require Go 1.26; resolves GO-2026-5856
+  (`crypto/tls`) and GO-2026-4970 (`os` symlink) when Go 1.26.5 is
+  available in CI
+
 ### Changed
 
 - README: content upgrade with architecture diagram, configuration table, and
-  table of contents; added Go version badge
+  table of contents; added Go version badge; Go 1.25→1.26
   ([`2aba5bb`](https://github.com/sachncs/promptsheon/commit/2aba5bb), 2026-07-07)
 - CI: bump `golangci/golangci-lint-action` from v6 to v7 to use Node 24
-  (Node 20 is being deprecated on GitHub Actions runners)
+  (Node 20 is being deprecated on GitHub Actions runners); Go matrix `1.25→1.26`
   ([`2aba5bb`](https://github.com/sachncs/promptsheon/commit/2aba5bb), 2026-07-07)
 - Address all 553 golangci-lint issues across 124 files — errcheck, govet shadow,
   gocritic, staticcheck, goconst, revive, nakedret, ineffassign, prealloc,
   unconvert, unparam, unused, funlen, gocyclo, gofmt, dogsled
   ([`e084427`](https://github.com/sachncs/promptsheon/commit/e084427), 2026-07-08)
 - Fix suppressed errors and bugs across the codebase — see `Fixed` section for details
+- **OpenAPI spec regenerated** — 478 insertions, 2509 deletions; old routes
+  (datasets, eval, guardrails, reviews, search, snapshots, workflows) removed,
+  new routes (projects, workspaces, capabilities) added to match handler code
+- Dockerfile build stage uses `golang:1.26-alpine`
 
 ### Fixed
 

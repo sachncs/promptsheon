@@ -15,6 +15,15 @@ import (
 	"time"
 )
 
+const toolNameHTTP = "http"
+const toolNameShell = "shell"
+const toolNameJSONTransform = "json_transform"
+const toolNamePromptCall = "prompt_call"
+const opExtract = "extract"
+const opMerge = "merge"
+const strFalse = "false"
+const keyBody = "body"
+
 // Tool is the interface for tools that can be executed within a workflow step.
 type Tool interface {
 	Execute(ctx context.Context, input map[string]any) (map[string]any, error)
@@ -73,7 +82,7 @@ func DefaultRegistry() *Registry {
 type HTTPTool struct{}
 
 // Name returns the tool name.
-func (h *HTTPTool) Name() string { return "http" }
+func (h *HTTPTool) Name() string { return toolNameHTTP }
 
 // Execute makes an HTTP request with the given input parameters.
 func (h *HTTPTool) Execute(ctx context.Context, input map[string]any) (map[string]any, error) {
@@ -122,7 +131,7 @@ func (h *HTTPTool) Execute(ctx context.Context, input map[string]any) (map[strin
 
 	result := map[string]any{
 		"status": resp.StatusCode,
-		"body":   string(respBody),
+		keyBody:  string(respBody),
 	}
 
 	// Try to parse JSON body
@@ -201,7 +210,7 @@ func SetShellToolPolicy(enabled bool, allowed []string) {
 }
 
 // Name returns the tool name.
-func (s *ShellTool) Name() string { return "shell" }
+func (s *ShellTool) Name() string { return toolNameShell }
 
 // Execute runs a shell command with the given input parameters.
 func (s *ShellTool) Execute(ctx context.Context, input map[string]any) (map[string]any, error) {
@@ -247,6 +256,8 @@ func (s *ShellTool) Execute(ctx context.Context, input map[string]any) (map[stri
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	// #nosec G204 -- command is validated against an allowlist
+	// by shellBaseCommand before reaching this line.
 	cmd := exec.CommandContext(ctx, "sh", "-c", command)
 	output, err := cmd.CombinedOutput()
 
@@ -277,14 +288,14 @@ const keyResult = "result"
 // JSONTransformTool applies simple transformations to JSON data.
 type JSONTransformTool struct{}
 
-func (j *JSONTransformTool) Name() string { return "json_transform" }
+func (j *JSONTransformTool) Name() string { return toolNameJSONTransform }
 
 func (j *JSONTransformTool) Execute(_ context.Context, input map[string]any) (map[string]any, error) {
 	data := input["data"]
 	operation := toString(input["operation"])
 
 	switch operation {
-	case "extract":
+	case opExtract:
 		path := toString(input["path"])
 		if path == "" {
 			return nil, fmt.Errorf("json_transform: path is required for extract")
@@ -292,7 +303,7 @@ func (j *JSONTransformTool) Execute(_ context.Context, input map[string]any) (ma
 		val := extractPath(data, path)
 		return map[string]any{keyResult: val}, nil
 
-	case "merge":
+	case opMerge:
 		other := input["merge_with"]
 		merged := make(map[string]any)
 		if m, ok := data.(map[string]any); ok {
@@ -358,7 +369,7 @@ func toString(v any) string {
 		if val {
 			return "true"
 		}
-		return "false"
+		return strFalse
 	default:
 		return fmt.Sprintf("%v", val)
 	}
@@ -432,7 +443,7 @@ func shlexSplit(s string) ([]string, error) {
 // The actual LLM call is handled by the engine's LLM provider.
 type PromptCallTool struct{}
 
-func (p *PromptCallTool) Name() string { return "prompt_call" }
+func (p *PromptCallTool) Name() string { return toolNamePromptCall }
 
 func (p *PromptCallTool) Execute(_ context.Context, input map[string]any) (map[string]any, error) {
 	prompt := toString(input["prompt"])

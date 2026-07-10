@@ -9,6 +9,7 @@ import (
 
 const keyProvider = "provider"
 const valError = "error"
+const fieldModel = "model"
 
 func (s *Server) handleListProviders(w http.ResponseWriter, _ *http.Request) error {
 	names := llm.Global.Providers()
@@ -67,7 +68,7 @@ func (s *Server) handleTestProvider(w http.ResponseWriter, r *http.Request) erro
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
 			keyProvider:  name,
-			"model":      req.Model,
+			fieldModel:   req.Model,
 			keyStatus:    valError,
 			valError:     err.Error(),
 			"latency_ms": latency.Milliseconds(),
@@ -77,8 +78,8 @@ func (s *Server) handleTestProvider(w http.ResponseWriter, r *http.Request) erro
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		keyProvider:  name,
-		"model":      resp.Model,
-		keyStatus:    "ok",
+		fieldModel:   resp.Model,
+		keyStatus:    dbStatusOK,
 		"content":    resp.Content,
 		"usage":      resp.Usage,
 		"latency_ms": latency.Milliseconds(),

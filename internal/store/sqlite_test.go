@@ -50,7 +50,7 @@ func TestNewSQLite_ReOpenSameFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLite: %v", err)
 	}
-	if err := db.Close(); err != nil {
+	if err = db.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 
@@ -141,7 +141,7 @@ func TestUserCRUD(t *testing.T) {
 
 	u.Name = "Alice Updated"
 	u.UpdatedAt = time.Now().UTC()
-	if err := db.UpdateUser(ctx, u); err != nil {
+	if err = db.UpdateUser(ctx, u); err != nil {
 		t.Fatalf("UpdateUser: %v", err)
 	}
 	got, _ = db.GetUser(ctx, "user-1")
@@ -149,7 +149,7 @@ func TestUserCRUD(t *testing.T) {
 		t.Errorf("after update: got name %q", got.Name)
 	}
 
-	if err := db.DeleteUser(ctx, "user-1"); err != nil {
+	if err = db.DeleteUser(ctx, "user-1"); err != nil {
 		t.Fatalf("DeleteUser: %v", err)
 	}
 	_, err = db.GetUser(ctx, "user-1")
@@ -238,7 +238,7 @@ func TestAPIKeyCRUD(t *testing.T) {
 		t.Fatalf("expected 1 key, got %d", len(list))
 	}
 
-	if err := db.UpdateAPIKeyLastUsed(ctx, "key-1"); err != nil {
+	if err = db.UpdateAPIKeyLastUsed(ctx, "key-1"); err != nil {
 		t.Fatalf("UpdateAPIKeyLastUsed: %v", err)
 	}
 	got3, _ := db.GetAPIKeyByID(ctx, "key-1")
@@ -259,7 +259,7 @@ func TestAPIKeyCRUD(t *testing.T) {
 		t.Errorf("expected sql.ErrNoRows, got %v", err)
 	}
 
-	if err := db.DeleteAPIKey(ctx, "key-1"); err != nil {
+	if err = db.DeleteAPIKey(ctx, "key-1"); err != nil {
 		t.Fatalf("DeleteAPIKey: %v", err)
 	}
 	got5, _ := db.GetAPIKeyByID(ctx, "key-1")
@@ -483,7 +483,7 @@ func TestProviderKeyCRUD(t *testing.T) {
 
 	pk.EncryptedKey = "new-encrypted"
 	pk.UpdatedAt = time.Now().UTC()
-	if err := db.SaveProviderKey(ctx, pk); err != nil {
+	if err = db.SaveProviderKey(ctx, pk); err != nil {
 		t.Fatalf("SaveProviderKey update: %v", err)
 	}
 	got3, _ := db.GetProviderKey(ctx, "pk-1")
@@ -491,7 +491,7 @@ func TestProviderKeyCRUD(t *testing.T) {
 		t.Errorf("got encrypted_key %q", got3.EncryptedKey)
 	}
 
-	if err := db.DeleteProviderKey(ctx, "pk-1"); err != nil {
+	if err = db.DeleteProviderKey(ctx, "pk-1"); err != nil {
 		t.Fatalf("DeleteProviderKey: %v", err)
 	}
 	_, err = db.GetProviderKey(ctx, "pk-1")
@@ -562,7 +562,7 @@ func TestAlertRuleCRUD(t *testing.T) {
 		t.Fatalf("expected 1 rule, got %d", len(list))
 	}
 
-	if err := db.DeleteAlertRule(ctx, "rule-1"); err != nil {
+	if err = db.DeleteAlertRule(ctx, "rule-1"); err != nil {
 		t.Fatalf("DeleteAlertRule: %v", err)
 	}
 	_, err = db.GetAlertRule(ctx, "rule-1")
@@ -615,7 +615,7 @@ func TestAlertCRUD(t *testing.T) {
 	resolved := time.Now().UTC()
 	a.Status = "resolved"
 	a.ResolvedAt = &resolved
-	if err := db.UpdateAlert(ctx, a); err != nil {
+	if err = db.UpdateAlert(ctx, a); err != nil {
 		t.Fatalf("UpdateAlert: %v", err)
 	}
 	got2, _ := db.GetAlert(ctx, "alert-1")
@@ -700,7 +700,7 @@ func TestNotificationGroupCRUD(t *testing.T) {
 		t.Fatalf("expected 1 group, got %d", len(list))
 	}
 
-	if err := db.DeleteNotificationGroup(ctx, "ng-1"); err != nil {
+	if err = db.DeleteNotificationGroup(ctx, "ng-1"); err != nil {
 		t.Fatalf("DeleteNotificationGroup: %v", err)
 	}
 	_, err = db.GetNotificationGroup(ctx, "ng-1")
@@ -760,7 +760,7 @@ func TestWebhookEndpointCRUD(t *testing.T) {
 	}
 
 	ep.Active = false
-	if err := db.SaveWebhookEndpoint(ctx, ep); err != nil {
+	if err = db.SaveWebhookEndpoint(ctx, ep); err != nil {
 		t.Fatalf("SaveWebhookEndpoint update: %v", err)
 	}
 	got2, _ := db.GetWebhookEndpoint(ctx, "wh-1")
@@ -768,7 +768,7 @@ func TestWebhookEndpointCRUD(t *testing.T) {
 		t.Error("expected endpoint to be inactive")
 	}
 
-	if err := db.DeleteWebhookEndpoint(ctx, "wh-1"); err != nil {
+	if err = db.DeleteWebhookEndpoint(ctx, "wh-1"); err != nil {
 		t.Fatalf("DeleteWebhookEndpoint: %v", err)
 	}
 	_, err = db.GetWebhookEndpoint(ctx, "wh-1")

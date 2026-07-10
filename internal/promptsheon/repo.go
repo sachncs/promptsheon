@@ -96,7 +96,7 @@ func Init() error {
 			filepath.Join(PromptsheonDir, headsDir),
 		}
 		for _, d := range dirs {
-			if err := os.MkdirAll(d, 0o755); err != nil {
+			if err := os.MkdirAll(d, 0o750); err != nil {
 				return fmt.Errorf("mkdir %s: %w", d, err)
 			}
 		}

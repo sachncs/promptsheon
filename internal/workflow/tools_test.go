@@ -59,7 +59,7 @@ func TestRegistry_Tools(t *testing.T) {
 
 // --- Engine tests ---
 
-func TestSetContextManager(t *testing.T) {
+func TestSetContextManager(_ *testing.T) {
 	e := NewEngine(NewRegistry())
 	e.SetContextManager("some-manager")
 	// no panic = pass
@@ -88,7 +88,7 @@ func TestHTTPTool_Execute_Success(t *testing.T) {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"message": "ok"}`))
+		_, _ = w.Write([]byte(`{"message": "ok"}`))
 	}))
 	defer ts.Close()
 
@@ -111,7 +111,7 @@ func TestHTTPTool_Execute_PostWithBody(t *testing.T) {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`{"id": 1}`))
+		_, _ = w.Write([]byte(`{"id": 1}`))
 	}))
 	defer ts.Close()
 
@@ -168,7 +168,7 @@ func TestHTTPTool_Execute_WithHeaders(t *testing.T) {
 			t.Errorf("expected Authorization header")
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer ts.Close()
 

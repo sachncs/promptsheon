@@ -15,6 +15,11 @@ import (
 
 const keyTerm = "term"
 const keyExpectedFormat = "expected_format"
+const policyNoPII = "no_pii"
+const policyNoHarmful = "no_harmful"
+const bannedTopic1 = "banned_topic_1"
+const modelGPT4 = "gpt-4"
+const environmentProd = "prod"
 
 // Severity represents the severity level of a guardrail violation.
 type Severity string
@@ -307,7 +312,7 @@ func (m *Manager) CheckContentPolicy(content string, policies []string) *Violati
 
 	for _, policy := range policies {
 		switch policy {
-		case "no_pii":
+		case policyNoPII:
 			piiPatterns := []string{
 				`\b\d{3}-\d{2}-\d{4}\b`,
 				`\b\d{16}\b`,
@@ -322,13 +327,13 @@ func (m *Manager) CheckContentPolicy(content string, policies []string) *Violati
 							Type:      ViolationContentPolicy,
 							Severity:  SeverityHigh,
 							Message:   "PII detected in response",
-							Details:   map[string]any{"policy": "no_pii"},
+							Details:   map[string]any{"policy": policyNoPII},
 							Timestamp: time.Now(),
 						},
 					}
 				}
 			}
-		case "no_harmful":
+		case policyNoHarmful:
 			harmfulTerms := []string{"suicide", "self-harm", "bomb", "weapon", "kill"}
 			for _, term := range harmfulTerms {
 				if strings.Contains(contentLower, term) {
@@ -339,7 +344,7 @@ func (m *Manager) CheckContentPolicy(content string, policies []string) *Violati
 							Type:      ViolationContentPolicy,
 							Severity:  SeverityCritical,
 							Message:   fmt.Sprintf("harmful content detected: %s", term),
-							Details:   map[string]any{"policy": "no_harmful", keyTerm: term},
+							Details:   map[string]any{"policy": policyNoHarmful, keyTerm: term},
 							Timestamp: time.Now(),
 						},
 					}
@@ -403,14 +408,14 @@ func (m *Manager) RunAllStaticChecks(_ context.Context, content, model, environm
 		violations = append(violations, result.Violation)
 	}
 
-	bannedTerms := []string{"banned_topic_1", "banned_topic_2"}
+	bannedTerms := []string{bannedTopic1, "banned_topic_2"}
 	if result := m.CheckRestrictedTerms(content, bannedTerms); !result.Passed {
 		violations = append(violations, result.Violation)
 	}
 
 	allowedModels := map[string][]string{
-		"prod": {"gpt-4", "claude-3-opus"},
-		"dev":  {"gpt-3.5-turbo", "gpt-4", "claude-3-haiku"},
+		environmentProd: {modelGPT4, "claude-3-opus"},
+		"dev":           {"gpt-3.5-turbo", modelGPT4, "claude-3-haiku"},
 	}
 	if result := m.CheckModelAccess(model, environment, allowedModels); !result.Passed {
 		violations = append(violations, result.Violation)

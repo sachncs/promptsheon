@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"flag"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -14,8 +17,14 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/config"
+	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/internal/webhook"
 )
+
+// ---------------------------------------------------------------------------
+// serverHelpText
+// ---------------------------------------------------------------------------
 
 func TestServerHelpText(t *testing.T) {
 	text := serverHelpText()
@@ -40,6 +49,10 @@ func TestServerHelpText(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// configureShellTool
+// ---------------------------------------------------------------------------
+
 func TestConfigureShellToolEmptyAllowlistDisables(t *testing.T) {
 	t.Setenv("PROMPTSHEON_SHELL_ENABLED", "true")
 	t.Setenv("PROMPTSHEON_SHELL_ALLOWLIST", "")
@@ -57,6 +70,28 @@ func TestConfigureShellToolDisabledByDefault(t *testing.T) {
 	t.Setenv("PROMPTSHEON_SHELL_ALLOWLIST", "")
 	configureShellTool(&config.Config{})
 }
+
+func TestConfigureShellToolEnabledWithValidAllowlist(t *testing.T) {
+	t.Setenv("PROMPTSHEON_SHELL_ENABLED", "true")
+	t.Setenv("PROMPTSHEON_SHELL_ALLOWLIST", "ls,cat")
+	configureShellTool(&config.Config{})
+}
+
+func TestConfigureShellToolOnlySpaces(t *testing.T) {
+	t.Setenv("PROMPTSHEON_SHELL_ENABLED", "true")
+	t.Setenv("PROMPTSHEON_SHELL_ALLOWLIST", "  ,  ,  ")
+	configureShellTool(&config.Config{})
+}
+
+func TestConfigureShellToolNotEnabled(t *testing.T) {
+	t.Setenv("PROMPTSHEON_SHELL_ENABLED", "false")
+	t.Setenv("PROMPTSHEON_SHELL_ALLOWLIST", "ls,cat")
+	configureShellTool(&config.Config{})
+}
+
+// ---------------------------------------------------------------------------
+// setupLogger
+// ---------------------------------------------------------------------------
 
 func TestSetupLogger(t *testing.T) {
 	tests := []struct {
@@ -81,6 +116,10 @@ func TestSetupLogger(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// openDB
+// ---------------------------------------------------------------------------
+
 func TestOpenDB(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "promptsheon_test.db")
 	cfg := &config.Config{DBPath: dbPath}
@@ -89,7 +128,11 @@ func TestOpenDB(t *testing.T) {
 	if db == nil {
 		t.Fatal("expected non-nil db")
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("failed to close db: %v", err)
+		}
+	}()
 	if err := db.Ping(context.Background()); err != nil {
 		t.Fatalf("ping failed: %v", err)
 	}
@@ -102,15 +145,37 @@ func TestOpenDB_InMemory(t *testing.T) {
 	if db == nil {
 		t.Fatal("expected non-nil db")
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("failed to close db: %v", err)
+		}
+	}()
 	if err := db.Ping(context.Background()); err != nil {
 		t.Fatalf("ping failed: %v", err)
 	}
 }
 
+func TestOpenDB_InvalidPath(t *testing.T) {
+	if os.Getenv("GO_TEST_OPENDB_SUBPROCESS") == "1" {
+		runOpenDBSubprocess()
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestOpenDB_InvalidPath")
+	cmd.Env = append(os.Environ(), "GO_TEST_OPENDB_SUBPROCESS=1")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected subprocess to exit with non-zero status")
+	}
+	t.Logf("subprocess output: %s", string(out))
+}
+
+// ---------------------------------------------------------------------------
+// buildServer
+// ---------------------------------------------------------------------------
+
 func TestBuildServer_Minimal(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
 
 	cfg := config.DefaultConfig()
 	cfg.LogLevel = "warn"
@@ -146,7 +211,6 @@ func TestBuildServer_Minimal(t *testing.T) {
 
 func TestBuildServer_WithAuth(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
 
 	cfg := config.DefaultConfig()
 	cfg.LogLevel = "warn"
@@ -181,7 +245,6 @@ func TestBuildServer_WithAuth(t *testing.T) {
 
 func TestBuildServer_WithVault(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
 
 	t.Setenv("PROMPTSHEON_VAULT_KEY", "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")
 
@@ -193,7 +256,39 @@ func TestBuildServer_WithVault(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv, _, _, _ := buildServer(ctx, &cfg, db, logger)
+	srv, limiter, spans, collector := buildServer(ctx, &cfg, db, logger)
+	_ = limiter
+	_ = spans
+	_ = collector
+	if srv == nil {
+		t.Fatal("expected non-nil server")
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("GET /health returned %d; body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestBuildServer_WithInvalidVaultKey(t *testing.T) {
+	db := setupTestDB(t)
+
+	t.Setenv("PROMPTSHEON_VAULT_KEY", "not-a-valid-hex-key")
+
+	cfg := config.DefaultConfig()
+	cfg.LogLevel = "warn"
+	cfg.Auth = false
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	srv, limiter, spans, collector := buildServer(ctx, &cfg, db, logger)
+	_ = limiter
+	_ = spans
+	_ = collector
 	if srv == nil {
 		t.Fatal("expected non-nil server")
 	}
@@ -208,12 +303,9 @@ func TestBuildServer_WithVault(t *testing.T) {
 
 func TestBuildServer_WithWebhookEndpointsInDB(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
 
 	ctx := context.Background()
 
-	// Insert a webhook endpoint so the adapter's ListWebhookEndpoints
-	// loop body is exercised during buildServer.
 	now := time.Now()
 	err := db.SaveWebhookEndpoint(ctx, testWebhookEndpoint("wh-1", now))
 	if err != nil {
@@ -233,7 +325,10 @@ func TestBuildServer_WithWebhookEndpointsInDB(t *testing.T) {
 	srvCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv, _, _, _ := buildServer(srvCtx, &cfg, db, logger)
+	srv, limiter, spans, collector := buildServer(srvCtx, &cfg, db, logger)
+	_ = limiter
+	_ = spans
+	_ = collector
 	if srv == nil {
 		t.Fatal("expected non-nil server")
 	}
@@ -248,7 +343,6 @@ func TestBuildServer_WithWebhookEndpointsInDB(t *testing.T) {
 
 func TestBuildServer_WithOTelEndpoint(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
 
 	cfg := config.DefaultConfig()
 	cfg.LogLevel = "warn"
@@ -271,7 +365,6 @@ func TestBuildServer_WithOTelEndpoint(t *testing.T) {
 	if collector == nil {
 		t.Error("expected non-nil metrics collector")
 	}
-	// spans may be nil if OTel init failed, that's OK
 	_ = spans
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
@@ -281,6 +374,38 @@ func TestBuildServer_WithOTelEndpoint(t *testing.T) {
 		t.Errorf("GET /health returned %d; body: %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestBuildServer_ClosedDB(t *testing.T) {
+	db := setupTestDB(t)
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cfg := config.DefaultConfig()
+	cfg.LogLevel = "warn"
+	cfg.Auth = false
+
+	_ = db.Close()
+
+	srv, limiter, spans, collector := buildServer(ctx, &cfg, db, logger)
+	if srv == nil {
+		t.Fatal("expected non-nil server")
+	}
+	if limiter == nil {
+		t.Error("expected non-nil rate limiter")
+	}
+	if collector == nil {
+		t.Error("expected non-nil metrics collector")
+	}
+	if spans != nil {
+		t.Error("expected nil spans with closed DB")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// startHTTPServerAndWait
+// ---------------------------------------------------------------------------
 
 func TestStartHTTPServerAndWait_Subprocess(t *testing.T) {
 	if os.Getenv("GO_TEST_SIGNAL_SUBPROCESS") == "1" {
@@ -319,19 +444,533 @@ func TestStartHTTPServerAndWait_Subprocess(t *testing.T) {
 	}
 }
 
-func TestOpenDB_InvalidPath(t *testing.T) {
-	if os.Getenv("GO_TEST_OPENDB_SUBPROCESS") == "1" {
-		runOpenDBSubprocess()
-		return
+func TestStartHTTPServerAndWait_InProcess(t *testing.T) {
+	db := setupTestDB(t)
+
+	cfg := config.DefaultConfig()
+	cfg.Addr = ":0"
+	cfg.LogLevel = "warn"
+	cfg.Auth = false
+	cfg.WriteTimeout = 5
+	cfg.ReadTimeout = 5
+	cfg.ReadHeaderTimeout = 5
+	cfg.IdleTimeout = 10
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	srv, limiter, spans, collector := buildServer(ctx, &cfg, db, logger)
+	srv.StartAuditWorkers(ctx, 1)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		startHTTPServerAndWait(ctx, cancel, &cfg, srv, logger, limiter, spans, collector)
+	}()
+
+	time.Sleep(2 * time.Second)
+
+	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
+		t.Fatal(err)
 	}
 
-	cmd := exec.Command(os.Args[0], "-test.run=TestOpenDB_InvalidPath")
-	cmd.Env = append(os.Environ(), "GO_TEST_OPENDB_SUBPROCESS=1")
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatal("expected subprocess to exit with non-zero status")
+	select {
+	case <-done:
+	case <-time.After(15 * time.Second):
+		t.Fatal("startHTTPServerAndWait did not return in time")
 	}
-	t.Logf("subprocess output: %s", string(out))
+}
+
+func TestStartHTTPServerAndWait_WithCORS(t *testing.T) {
+	db := setupTestDB(t)
+
+	cfg := config.DefaultConfig()
+	cfg.Addr = ":0"
+	cfg.LogLevel = "warn"
+	cfg.Auth = false
+	cfg.CORSOrigins = "https://example.com"
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	srv, limiter, spans, collector := buildServer(ctx, &cfg, db, logger)
+	srv.StartAuditWorkers(ctx, 1)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		startHTTPServerAndWait(ctx, cancel, &cfg, srv, logger, limiter, spans, collector)
+	}()
+
+	time.Sleep(2 * time.Second)
+
+	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(15 * time.Second):
+		t.Fatal("startHTTPServerAndWait did not return in time")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// main() via flag manipulation
+// ---------------------------------------------------------------------------
+
+func TestMain_VersionFlag(t *testing.T) {
+	origArgs := os.Args
+	origCL := flag.CommandLine
+	defer func() {
+		os.Args = origArgs
+		flag.CommandLine = origCL
+	}()
+
+	os.Args = []string{"promptsheond", "-version"}
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	main()
+
+	_ = w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+
+	if !strings.Contains(output, "promptsheond") {
+		t.Errorf("expected version output, got: %s", output)
+	}
+}
+
+func TestMain_HelpFlag(t *testing.T) {
+	origArgs := os.Args
+	origCL := flag.CommandLine
+	defer func() {
+		os.Args = origArgs
+		flag.CommandLine = origCL
+	}()
+
+	os.Args = []string{"promptsheond", "-help"}
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	main()
+
+	_ = w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+
+	if !strings.Contains(output, "promptsheond") {
+		t.Errorf("expected help output, got: %s", output)
+	}
+	if !strings.Contains(output, "PROMPTSHEON_ADDR") {
+		t.Errorf("expected help text to mention PROMPTSHEON_ADDR")
+	}
+}
+
+func TestMain_FullServer(t *testing.T) {
+	origArgs := os.Args
+	origCL := flag.CommandLine
+	defer func() {
+		os.Args = origArgs
+		flag.CommandLine = origCL
+	}()
+
+	os.Args = []string{"promptsheond"}
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+
+	dbPath := filepath.Join(t.TempDir(), "main_test.db")
+	t.Setenv("PROMPTSHEON_ADDR", ":0")
+	t.Setenv("PROMPTSHEON_DB_PATH", dbPath)
+	t.Setenv("PROMPTSHEON_AUTH", "false")
+	t.Setenv("PROMPTSHEON_LOG_LEVEL", "warn")
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		main()
+	}()
+
+	time.Sleep(3 * time.Second)
+
+	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(20 * time.Second):
+		t.Fatal("main did not exit in time")
+	}
+}
+
+func TestMain_FullServerWithAuth(t *testing.T) {
+	origArgs := os.Args
+	origCL := flag.CommandLine
+	defer func() {
+		os.Args = origArgs
+		flag.CommandLine = origCL
+	}()
+
+	os.Args = []string{"promptsheond"}
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+
+	dbPath := filepath.Join(t.TempDir(), "main_auth_test.db")
+	t.Setenv("PROMPTSHEON_ADDR", ":0")
+	t.Setenv("PROMPTSHEON_DB_PATH", dbPath)
+	t.Setenv("PROMPTSHEON_AUTH", "true")
+	t.Setenv("PROMPTSHEON_LOG_LEVEL", "warn")
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		main()
+	}()
+
+	time.Sleep(3 * time.Second)
+
+	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(20 * time.Second):
+		t.Fatal("main did not exit in time")
+	}
+}
+
+func TestMain_WithShellToolEnabled(t *testing.T) {
+	origArgs := os.Args
+	origCL := flag.CommandLine
+	defer func() {
+		os.Args = origArgs
+		flag.CommandLine = origCL
+	}()
+
+	os.Args = []string{"promptsheond"}
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+
+	dbPath := filepath.Join(t.TempDir(), "main_shell_test.db")
+	t.Setenv("PROMPTSHEON_ADDR", ":0")
+	t.Setenv("PROMPTSHEON_DB_PATH", dbPath)
+	t.Setenv("PROMPTSHEON_AUTH", "false")
+	t.Setenv("PROMPTSHEON_LOG_LEVEL", "warn")
+	t.Setenv("PROMPTSHEON_SHELL_ENABLED", "true")
+	t.Setenv("PROMPTSHEON_SHELL_ALLOWLIST", "ls,cat")
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		main()
+	}()
+
+	time.Sleep(3 * time.Second)
+
+	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(20 * time.Second):
+		t.Fatal("main did not exit in time")
+	}
+}
+
+func TestMain_WithVaultKey(t *testing.T) {
+	origArgs := os.Args
+	origCL := flag.CommandLine
+	defer func() {
+		os.Args = origArgs
+		flag.CommandLine = origCL
+	}()
+
+	os.Args = []string{"promptsheond"}
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+
+	dbPath := filepath.Join(t.TempDir(), "main_vault_test.db")
+	t.Setenv("PROMPTSHEON_ADDR", ":0")
+	t.Setenv("PROMPTSHEON_DB_PATH", dbPath)
+	t.Setenv("PROMPTSHEON_AUTH", "false")
+	t.Setenv("PROMPTSHEON_LOG_LEVEL", "warn")
+	t.Setenv("PROMPTSHEON_VAULT_KEY", "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		main()
+	}()
+
+	time.Sleep(3 * time.Second)
+
+	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(20 * time.Second):
+		t.Fatal("main did not exit in time")
+	}
+}
+
+func TestMain_WithCORSOrigins(t *testing.T) {
+	origArgs := os.Args
+	origCL := flag.CommandLine
+	defer func() {
+		os.Args = origArgs
+		flag.CommandLine = origCL
+	}()
+
+	os.Args = []string{"promptsheond"}
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+
+	dbPath := filepath.Join(t.TempDir(), "main_cors_test.db")
+	t.Setenv("PROMPTSHEON_ADDR", ":0")
+	t.Setenv("PROMPTSHEON_DB_PATH", dbPath)
+	t.Setenv("PROMPTSHEON_AUTH", "false")
+	t.Setenv("PROMPTSHEON_LOG_LEVEL", "warn")
+	t.Setenv("PROMPTSHEON_CORS_ORIGINS", "https://example.com,https://test.com")
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		main()
+	}()
+
+	time.Sleep(3 * time.Second)
+
+	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(20 * time.Second):
+		t.Fatal("main did not exit in time")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// webhookStoreAdapter
+// ---------------------------------------------------------------------------
+
+func TestWebhookStoreAdapter_SaveWebhookEndpoint(t *testing.T) {
+	db := setupTestDB(t)
+
+	adapter := &webhookStoreAdapter{db: db}
+	ctx := context.Background()
+
+	ep := &webhook.Endpoint{
+		ID:        "test-1",
+		URL:       "https://example.com/hook",
+		Secret:    "secret123",
+		Events:    []webhook.EventType{"prompt.created", "prompt.updated"},
+		Active:    true,
+		CreatedAt: time.Now(),
+	}
+
+	if err := adapter.SaveWebhookEndpoint(ctx, ep); err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := db.ListWebhookEndpoints(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("expected 1 endpoint, got %d", len(list))
+	}
+	if list[0].ID != "test-1" {
+		t.Errorf("expected ID test-1, got %s", list[0].ID)
+	}
+	if list[0].URL != "https://example.com/hook" {
+		t.Errorf("expected URL https://example.com/hook, got %s", list[0].URL)
+	}
+	if list[0].Secret != "secret123" {
+		t.Errorf("expected secret secret123, got %s", list[0].Secret)
+	}
+	if len(list[0].Events) != 2 {
+		t.Errorf("expected 2 events, got %d", len(list[0].Events))
+	}
+}
+
+func TestWebhookStoreAdapter_SaveWebhookEndpoint_Overwrite(t *testing.T) {
+	db := setupTestDB(t)
+
+	adapter := &webhookStoreAdapter{db: db}
+	ctx := context.Background()
+
+	ep := &webhook.Endpoint{
+		ID:        "test-1",
+		URL:       "https://example.com/hook",
+		Events:    []webhook.EventType{"prompt.created"},
+		Active:    true,
+		CreatedAt: time.Now(),
+	}
+
+	if err := adapter.SaveWebhookEndpoint(ctx, ep); err != nil {
+		t.Fatal(err)
+	}
+
+	ep.URL = "https://example.com/hook-v2"
+	if err := adapter.SaveWebhookEndpoint(ctx, ep); err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := db.ListWebhookEndpoints(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("expected 1 endpoint, got %d", len(list))
+	}
+	if list[0].URL != "https://example.com/hook-v2" {
+		t.Errorf("expected URL https://example.com/hook-v2, got %s", list[0].URL)
+	}
+}
+
+func TestWebhookStoreAdapter_DeleteWebhookEndpoint(t *testing.T) {
+	db := setupTestDB(t)
+
+	adapter := &webhookStoreAdapter{db: db}
+	ctx := context.Background()
+
+	ep := &webhook.Endpoint{
+		ID:        "test-1",
+		URL:       "https://example.com/hook",
+		Events:    []webhook.EventType{"prompt.created"},
+		Active:    true,
+		CreatedAt: time.Now(),
+	}
+	if err := adapter.SaveWebhookEndpoint(ctx, ep); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := adapter.DeleteWebhookEndpoint(ctx, "test-1"); err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := db.ListWebhookEndpoints(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("expected 0 endpoints, got %d", len(list))
+	}
+}
+
+func TestWebhookStoreAdapter_DeleteWebhookEndpoint_NotFound(t *testing.T) {
+	db := setupTestDB(t)
+
+	adapter := &webhookStoreAdapter{db: db}
+	ctx := context.Background()
+
+	if err := adapter.DeleteWebhookEndpoint(ctx, "nonexistent"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWebhookStoreAdapter_ListWebhookEndpoints(t *testing.T) {
+	db := setupTestDB(t)
+
+	adapter := &webhookStoreAdapter{db: db}
+	ctx := context.Background()
+
+	ep1 := &webhook.Endpoint{
+		ID:        "wh-1",
+		URL:       "https://example.com/hook1",
+		Secret:    "s1",
+		Events:    []webhook.EventType{"prompt.created"},
+		Active:    true,
+		CreatedAt: time.Now(),
+	}
+	ep2 := &webhook.Endpoint{
+		ID:        "wh-2",
+		URL:       "https://example.com/hook2",
+		Secret:    "s2",
+		Events:    []webhook.EventType{"prompt.updated", "prompt.deleted"},
+		Active:    false,
+		CreatedAt: time.Now().Add(-time.Hour),
+	}
+
+	if err := adapter.SaveWebhookEndpoint(ctx, ep1); err != nil {
+		t.Fatal(err)
+	}
+	if err := adapter.SaveWebhookEndpoint(ctx, ep2); err != nil {
+		t.Fatal(err)
+	}
+
+	eps, err := adapter.ListWebhookEndpoints(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(eps) != 2 {
+		t.Fatalf("expected 2 endpoints, got %d", len(eps))
+	}
+
+	byID := make(map[string]*webhook.Endpoint)
+	for _, e := range eps {
+		byID[e.ID] = e
+	}
+	if byID["wh-1"] == nil || byID["wh-2"] == nil {
+		t.Fatal("expected both endpoints")
+	}
+	if byID["wh-1"].URL != "https://example.com/hook1" {
+		t.Errorf("wrong URL for wh-1: %s", byID["wh-1"].URL)
+	}
+	if byID["wh-2"].URL != "https://example.com/hook2" {
+		t.Errorf("wrong URL for wh-2: %s", byID["wh-2"].URL)
+	}
+	if len(byID["wh-2"].Events) != 2 {
+		t.Errorf("expected 2 events for wh-2, got %d", len(byID["wh-2"].Events))
+	}
+}
+
+func TestWebhookStoreAdapter_ListWebhookEndpoints_Empty(t *testing.T) {
+	db := setupTestDB(t)
+
+	adapter := &webhookStoreAdapter{db: db}
+	ctx := context.Background()
+
+	eps, err := adapter.ListWebhookEndpoints(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(eps) != 0 {
+		t.Fatalf("expected 0 endpoints, got %d", len(eps))
+	}
+}
+
+func TestWebhookStoreAdapter_ListWebhookEndpoints_Error(t *testing.T) {
+	db := setupTestDB(t)
+	adapter := &webhookStoreAdapter{db: db}
+
+	_ = db.Close()
+
+	_, err := adapter.ListWebhookEndpoints(context.Background())
+	if err == nil {
+		t.Fatal("expected error from closed DB")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -345,11 +984,16 @@ func setupTestDB(t *testing.T) *store.SQLite {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Logf("failed to close db: %v", err)
+		}
+	})
 	return db
 }
 
-func testWebhookEndpoint(id string, now time.Time) *store.WebhookEndpointRecord {
-	return &store.WebhookEndpointRecord{
+func testWebhookEndpoint(id string, now time.Time) *models.WebhookEndpointRecord {
+	return &models.WebhookEndpointRecord{
 		ID:        id,
 		URL:       "https://example.com/webhook",
 		Secret:    "test-secret",
@@ -365,8 +1009,8 @@ func runServerSubprocess() {
 	if err != nil {
 		os.Exit(1)
 	}
-	defer db.Close()
-	defer os.Remove(dbPath)
+	_ = db.Close()
+	defer func() { _ = os.Remove(dbPath) }()
 
 	cfg := config.DefaultConfig()
 	cfg.DBPath = dbPath

@@ -4,6 +4,7 @@ package observability
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"os"
 	"strconv"
@@ -156,8 +157,14 @@ func (m *RetentionManager) Enforce(ctx context.Context) error {
 		for a := range protectedAuditActions {
 			actions = append(actions, a)
 		}
-		query := "DELETE FROM audit_entries WHERE timestamp < ? AND action NOT IN (?" +
-			strings.Repeat(",?", len(actions)-1) + ")"
+		placeholders := make([]string, len(actions))
+		for i := range placeholders {
+			placeholders[i] = "?"
+		}
+		// #nosec G201 -- fully parameterized query; the dynamic part is only
+		// the number of ? placeholders. All data values are passed via args.
+		query := fmt.Sprintf("DELETE FROM audit_entries WHERE timestamp < ? AND action NOT IN (%s)",
+			strings.Join(placeholders, ","))
 		args := make([]any, 0, 1+len(actions))
 		args = append(args, cutoff)
 		for _, a := range actions {
