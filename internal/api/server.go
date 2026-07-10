@@ -20,6 +20,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/metrics"
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/ratelimit"
+	"github.com/sachncs/promptsheon/internal/rollups"
 	"github.com/sachncs/promptsheon/internal/search"
 	"github.com/sachncs/promptsheon/internal/store"
 	"github.com/sachncs/promptsheon/internal/trace"
@@ -52,6 +53,7 @@ type Server struct {
 	rateLimiter      *ratelimit.Limiter
 	contextManager   *contextpkg.Manager
 	providers        *llm.Registry
+	rollupAgg        *rollups.Aggregator
 
 	// auditQueue is a bounded channel feeding the audit worker pool.
 	auditQueue chan *models.AuditEntry
@@ -348,6 +350,11 @@ func (s *Server) registerWorkspaceRoutes() {
 	s.mux.HandleFunc("GET /api/v1/workspaces/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetWorkspace)))
 	s.mux.HandleFunc("PUT /api/v1/workspaces/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateWorkspace)))
 	s.mux.HandleFunc("DELETE /api/v1/workspaces/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptDelete)(s.handleDeleteWorkspace)))
+	// Per-Workspace rollup (Tier 2.37): Budget / Quota consumption
+	// aggregated at the current moment. The handler returns an
+	// empty summary if no Aggregator is configured; production
+	// wiring sets rollupAgg via WithWorkspaceRollups in a follow-on.
+	s.mux.HandleFunc("GET /api/v1/workspaces/{id}/observation", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetWorkspaceObservation)))
 }
 
 func (s *Server) registerProjectRoutes() {
