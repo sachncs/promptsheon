@@ -25,6 +25,7 @@ ADRs are immutable. When a decision is superseded, the original ADR is updated w
 | [0017](0017-approval-release-wiring.md) | Approval→Release wiring closes quorum-reality gap | Accepted |
 | [0018](0018-recommendation-loop-wired.md) | End-to-end Recommendation loop wired through Executor → Observation → Producer | Accepted |
 | [0019](0019-deferred-items.md) | Deferred architecture review items | Accepted |
+| [0020](0020-capability-slos.md) | Capability Service Level Objectives — Goal / Burn-rate / Repository contract | Accepted |
 
 ## Status legend
 
