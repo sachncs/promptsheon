@@ -244,7 +244,6 @@ func (s *Server) handleCreateCapability(w http.ResponseWriter, r *http.Request) 
 		Description: req.Description,
 		Owner:       req.Owner,
 		Tags:        req.Tags,
-		State:       req.State,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -293,9 +292,6 @@ func (s *Server) handleUpdateCapability(w http.ResponseWriter, r *http.Request) 
 	}
 	if req.Tags != nil {
 		existing.Tags = *req.Tags
-	}
-	if req.State != nil {
-		existing.State = *req.State
 	}
 	existing.UpdatedAt = time.Now()
 	if err := s.db.UpdateCapability(r.Context(), existing); err != nil {

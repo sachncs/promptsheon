@@ -178,7 +178,7 @@ func (s *SQLite) CreateCapability(ctx context.Context, c *capability.Capability)
 		`INSERT INTO capabilities (id, project_id, name, description, owner, tags, state, current_version_id, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		c.ID, c.ProjectID, c.Name, c.Description, c.Owner, string(tags),
-		string(c.State), c.CurrentVersionID, c.CreatedAt, c.UpdatedAt,
+		string(capability.StateDraft), "", c.CreatedAt, c.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("insert capability: %w", err)
@@ -223,7 +223,7 @@ func (s *SQLite) UpdateCapability(ctx context.Context, c *capability.Capability)
 	_, err = s.db.ExecContext(ctx,
 		`UPDATE capabilities SET name = ?, description = ?, owner = ?, tags = ?, state = ?, current_version_id = ?, updated_at = ?
 		 WHERE id = ?`,
-		c.Name, c.Description, c.Owner, string(tags), string(c.State), c.CurrentVersionID, c.UpdatedAt, c.ID,
+		c.Name, c.Description, c.Owner, string(tags), string(capability.StateDraft), "", c.UpdatedAt, c.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update capability: %w", err)
@@ -244,7 +244,9 @@ func scanCapability(scanner interface {
 }) (*capability.Capability, error) {
 	var c capability.Capability
 	var tagsStr string
-	err := scanner.Scan(&c.ID, &c.ProjectID, &c.Name, &c.Description, &c.Owner, &tagsStr, &c.State, &c.CurrentVersionID, &c.CreatedAt, &c.UpdatedAt)
+	var stateStr string
+	var currentVersion string
+	err := scanner.Scan(&c.ID, &c.ProjectID, &c.Name, &c.Description, &c.Owner, &tagsStr, &stateStr, &currentVersion, &c.CreatedAt, &c.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
@@ -252,6 +254,9 @@ func scanCapability(scanner interface {
 		return nil, fmt.Errorf("scan capability: %w", err)
 	}
 	mustUnmarshal([]byte(tagsStr), &c.Tags)
+	// State and CurrentVersionID are derived from Release state, not
+	// stored on Capability. The columns remain in the schema for
+	// forward compatibility; callers should use capability.DeriveState.
 	return &c, nil
 }
 

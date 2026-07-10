@@ -2790,8 +2790,11 @@ func TestHandleCreateCapability(t *testing.T) {
 	if resp["name"] != "test-capability" {
 		t.Errorf("expected test-capability, got %v", resp["name"])
 	}
-	if resp["state"] != "draft" {
-		t.Errorf("expected draft state, got %v", resp["state"])
+	if resp["name"] != "test-capability" {
+		t.Errorf("expected test-capability, got %v", resp["name"])
+	}
+	if _, ok := resp["state"]; ok {
+		t.Errorf("post-M0.8: state must not be returned on create (it is derived from Releases), got %v", resp["state"])
 	}
 }
 
