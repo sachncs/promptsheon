@@ -47,43 +47,43 @@ type InvokeRequest struct {
 
 // InvokeResult is the Caller's response.
 type InvokeResult struct {
-	Output         json.RawMessage
-	PromptTokens   int
-	OutputTokens   int
-	CostUSDMicro   int64
-	LatencyMS      int64
-	Status         string
-	Error          string
+	Output       json.RawMessage
+	PromptTokens int
+	OutputTokens int
+	CostUSDMicro int64
+	LatencyMS    int64
+	Status       string
+	Error        string
 }
 
 // ExecutionRecord is the immutable record an Executor produces.
 type ExecutionRecord struct {
-	ID              string    `json:"id"`
-	WorkspaceID     string    `json:"workspace_id"`
-	ReleaseID       string    `json:"release_id"`
-	CapabilityID    string    `json:"capability_id"`
-	Environment     string    `json:"environment"`
-	ManifestHash    string    `json:"manifest_hash"`
-	InputHash       string    `json:"input_hash"`
-	Input           json.RawMessage `json:"input"`
-	Output          json.RawMessage `json:"output,omitempty"`
-	Model           string    `json:"model"`
-	ModelRevision   string    `json:"model_revision"`
-	PromptTokens    int       `json:"prompt_tokens"`
-	OutputTokens    int       `json:"output_tokens"`
-	CostUSD         float64   `json:"cost_usd"`
-	LatencyMS       int64     `json:"latency_ms"`
-	Status          string    `json:"status"`
-	Error           string    `json:"error,omitempty"`
-	StartedAt       time.Time `json:"started_at"`
-	FinishedAt      time.Time `json:"finished_at"`
+	ID            string          `json:"id"`
+	WorkspaceID   string          `json:"workspace_id"`
+	ReleaseID     string          `json:"release_id"`
+	CapabilityID  string          `json:"capability_id"`
+	Environment   string          `json:"environment"`
+	ManifestHash  string          `json:"manifest_hash"`
+	InputHash     string          `json:"input_hash"`
+	Input         json.RawMessage `json:"input"`
+	Output        json.RawMessage `json:"output,omitempty"`
+	Model         string          `json:"model"`
+	ModelRevision string          `json:"model_revision"`
+	PromptTokens  int             `json:"prompt_tokens"`
+	OutputTokens  int             `json:"output_tokens"`
+	CostUSD       float64         `json:"cost_usd"`
+	LatencyMS     int64           `json:"latency_ms"`
+	Status        string          `json:"status"`
+	Error         string          `json:"error,omitempty"`
+	StartedAt     time.Time       `json:"started_at"`
+	FinishedAt    time.Time       `json:"finished_at"`
 }
 
 // Executor wires a Caller to an EventBus so that schedule.fired
 // events trigger Executions.
 type Executor struct {
-	publisher   eventbus.Publisher
-	caller      Caller
+	publisher       eventbus.Publisher
+	caller          Caller
 	costUSDPerMicro float64
 }
 
@@ -136,23 +136,23 @@ func (e *Executor) Run(ctx context.Context, workspaceID, releaseID, environment 
 	now := time.Now().UTC()
 	inputHash := hashRaw(input)
 	req := InvokeRequest{
-		WorkspaceID: workspaceID,
-		ReleaseID:   releaseID,
-		ManifestHash: "<injected-by-caller>",
-		InputHash:    inputHash,
-		Input:        input,
-		Model:        "<injected-by-caller>",
+		WorkspaceID:   workspaceID,
+		ReleaseID:     releaseID,
+		ManifestHash:  "<injected-by-caller>",
+		InputHash:     inputHash,
+		Input:         input,
+		Model:         "<injected-by-caller>",
 		ModelRevision: time.Now().UTC().Format("2006-01-02"),
 	}
 	rec := ExecutionRecord{
-		ID:            generateID("exec"),
-		WorkspaceID:   workspaceID,
-		ReleaseID:     releaseID,
-		Environment:   environment,
-		Input:         input,
-		InputHash:     inputHash,
-		StartedAt:     now,
-		Status:        "running",
+		ID:          generateID("exec"),
+		WorkspaceID: workspaceID,
+		ReleaseID:   releaseID,
+		Environment: environment,
+		Input:       input,
+		InputHash:   inputHash,
+		StartedAt:   now,
+		Status:      "running",
 	}
 	res, err := e.caller(ctx, req)
 	rec.FinishedAt = time.Now().UTC()

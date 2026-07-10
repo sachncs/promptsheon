@@ -127,14 +127,14 @@ func (f *fakeBus) count() int {
 
 func recWithCost(avgMicroUSD int64) (r executor.ExecutionRecord) {
 	return executor.ExecutionRecord{
-		ID:            "exec-1",
-		CapabilityID:  "cap-1",
-		ReleaseID:     "rel-1",
-		Environment:   "prod",
-		Status:        "ok",
-		LatencyMS:     200,
-		CostUSD:       float64(avgMicroUSD) / 1e6,
-		PromptTokens:  100,
-		OutputTokens:  50,
+		ID:           "exec-1",
+		CapabilityID: "cap-1",
+		ReleaseID:    "rel-1",
+		Environment:  "prod",
+		Status:       "ok",
+		LatencyMS:    200,
+		CostUSD:      float64(avgMicroUSD) / 1e6,
+		PromptTokens: 100,
+		OutputTokens: 50,
 	}
 }
