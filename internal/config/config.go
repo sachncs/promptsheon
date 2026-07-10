@@ -12,7 +12,9 @@ import (
 // Config holds all configuration for the server.
 type Config struct {
 	Addr     string // Listen address (e.g., ":8080")
+	DBBackend string // "sqlite" (default) or "postgres"
 	DBPath   string // SQLite database file path
+	DBDSN    string // Postgres connection string (when DBBackend=postgres)
 	LogLevel string // Log level: debug, info, warn, error
 	Auth     bool   // Enable authentication and authorization
 
@@ -52,10 +54,11 @@ const valNo = "no"
 // DefaultConfig returns the default configuration.
 func DefaultConfig() Config {
 	return Config{
-		Addr:     defaultAddr,
-		DBPath:   "promptsheon.db",
-		LogLevel: "info",
-		Auth:     true,
+		Addr:      defaultAddr,
+		DBBackend: "sqlite",
+		DBPath:    "promptsheon.db",
+		LogLevel:  "info",
+		Auth:      true,
 
 		WriteTimeout:      30,
 		ReadTimeout:       30,
@@ -83,7 +86,9 @@ func LoadConfig() Config {
 	cfg := DefaultConfig()
 
 	cfg.Addr = getEnvString("PROMPTSHEON_ADDR", cfg.Addr)
+	cfg.DBBackend = getEnvString("PROMPTSHEON_DB_BACKEND", cfg.DBBackend)
 	cfg.DBPath = getEnvString("PROMPTSHEON_DB_PATH", cfg.DBPath)
+	cfg.DBDSN = getEnvString("PROMPTSHEON_DB_DSN", cfg.DBDSN)
 	cfg.LogLevel = getEnvString("PROMPTSHEON_LOG_LEVEL", cfg.LogLevel)
 	cfg.Auth = getEnvBool("PROMPTSHEON_AUTH", cfg.Auth)
 
