@@ -543,7 +543,6 @@ func TestNewServerOptions(t *testing.T) {
 	_ = newTestServer(t,
 		WithEvalRunner(nil),
 		WithTracing(nil, nil),
-		WithSnapshotStore(nil),
 		WithWebhooks(nil),
 		WithVault(nil),
 		WithOAuth(nil),

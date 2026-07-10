@@ -24,7 +24,6 @@ import (
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/observability"
 	"github.com/sachncs/promptsheon/internal/ratelimit"
-	"github.com/sachncs/promptsheon/internal/snapshot"
 	"github.com/sachncs/promptsheon/internal/store"
 	"github.com/sachncs/promptsheon/internal/trace"
 	"github.com/sachncs/promptsheon/internal/vault"
@@ -163,11 +162,6 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		}
 	}
 
-	snapStore, err := snapshot.NewStore(db.DB())
-	if err != nil {
-		logger.Warn("snapshot store disabled", "err", err)
-	}
-
 	retentionPolicy := observability.LoadRetentionPolicyFromEnv()
 	retention := observability.NewRetentionManager(db.DB(), retentionPolicy, logger)
 	retention.Start(rootCtx)
@@ -210,9 +204,6 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	}
 	if spans != nil {
 		opts = append(opts, api.WithTracing(spans, collector))
-	}
-	if snapStore != nil {
-		opts = append(opts, api.WithSnapshotStore(snapStore))
 	}
 	opts = append(opts, api.WithWebhooks(webhookDispatcher))
 	if v != nil {
