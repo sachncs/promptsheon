@@ -1,0 +1,9 @@
+{
+  "name": "python-list-capabilities",
+  "version": "0.0.1",
+  "description": "Example: list the Capabilities in a Project via the Python SDK.",
+  "private": true,
+  "dependencies": {
+    "promptsheon": {"path": "../../sdk/python"}
+  }
+}
