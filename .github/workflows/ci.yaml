@@ -93,6 +93,13 @@ jobs:
         # are not error sentinels or import pins). See ADR-0012.
         run: make lint-domain
 
+      - name: Lint domain-purity (no infra imports from domain packages)
+        # CI gate: domain packages depend only on other domain
+        # packages and the standard library. They MUST NOT import
+        # internal/llm, internal/api, internal/store, or cmd. See
+        # ADR-0012.
+        run: make lint-deps
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:

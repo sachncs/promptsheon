@@ -37,6 +37,12 @@ lint:
 lint-domain:
 	go run ./scripts/check-no-package-state.go
 
+# Lint domain-purity: fail if any domain package imports internal/llm,
+# internal/api, internal/store, or cmd. Domain packages depend only
+# on each other and the standard library (Charter Principle 5).
+lint-deps:
+	scripts/check-domain-purity.sh
+
 # Format code
 fmt:
 	gofmt -s -w .

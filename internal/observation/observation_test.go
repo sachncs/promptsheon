@@ -10,17 +10,17 @@ import (
 func mk(cap, version, env string, status string, latencyMS int64, costUSD float64) executor.ExecutionRecord {
 	now := time.Now().UTC()
 	return executor.ExecutionRecord{
-		ID:            "exec-" + cap + "-" + version + "-" + env,
-		CapabilityID:  cap,
-		ReleaseID:     version,
-		Environment:   env,
-		LatencyMS:     latencyMS,
-		CostUSD:       costUSD,
-		Status:        status,
-		StartedAt:     now,
-		FinishedAt:    now.Add(time.Duration(latencyMS) * time.Millisecond),
-		PromptTokens:  100,
-		OutputTokens:  50,
+		ID:           "exec-" + cap + "-" + version + "-" + env,
+		CapabilityID: cap,
+		ReleaseID:    version,
+		Environment:  env,
+		LatencyMS:    latencyMS,
+		CostUSD:      costUSD,
+		Status:       status,
+		StartedAt:    now,
+		FinishedAt:   now.Add(time.Duration(latencyMS) * time.Millisecond),
+		PromptTokens: 100,
+		OutputTokens: 50,
 	}
 }
 
