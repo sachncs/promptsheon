@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sachncs/promptsheon/internal/approval"
 	"github.com/sachncs/promptsheon/internal/capability"
 )
 
@@ -137,29 +138,88 @@ func New(capabilityID string, capabilityVersion int, manifest capability.Manifes
 	}, nil
 }
 
-// Approve transitions a Pending Release to Approved, recording the
-// approver identity. A Release may require multiple approvers; the
-// caller passes the cumulative list of approvers seen so far, and the
-// quorum policy decides when approval is complete. That decision lives
-// in the approval package, not here, so this aggregate does not
-// silently couple itself to a quorum policy.
+// ApproveWith transitions a Pending Release to Approved by reading
+// the supplied *approval.Approval and consulting its Policy. When
+// the Policy reports the quorum satisfied AND no pending Reject, the
+// Release moves to Approved and the approvers list is recorded.
 //
-// Approve returns ErrNotPending if the Release is already past Pending.
-func (r Release) Approve(approvers []string) (Release, error) {
+// This is the closing piece of the Approval→Release wiring: prior to
+// this commit the Release.Aggregate honoured the Status field but
+// Release.Approve did not consult the Approval. That meant a Release
+// could be Approved regardless of whether quorum was actually
+// satisfied — see Tier 1.27 of the architecture review board.
+//
+// ApproveWith returns ErrNotPending if the Release is already past
+// Pending, and returns the underlying Policy error (ErrApproved,
+// ErrRejected, ErrUnknownDecision) wrapped if the quorum has not
+// been reached or a Reject was recorded.
+func (r Release) ApproveWith(a approval.Approval, pol approval.Policy) (Release, error) {
 	if r.Status != StatusPending {
 		return r, ErrNotPending
 	}
-	if len(approvers) == 0 {
-		return r, errors.New("release: approve requires at least one approver")
+	if r.CreatedBy == "" {
+		return r, errors.New("release: cannot approve; created_by is empty (cannot run separation-of-duties check)")
 	}
+	if !approval.VerifySeparationOfDuties(a, r.CreatedBy) {
+		return r, approval.ErrCreatorVoted
+	}
+	state, satisfied, err := pol.Evaluate(a.Votes)
+	if err != nil {
+		return r, fmt.Errorf("release: policy: %w", err)
+	}
+	if !satisfied {
+		return r, fmt.Errorf("%w: state=%s, votes=%d", approval.ErrQuorumNotSatisfied, state, len(a.Votes))
+	}
+	for _, v := range a.Votes {
+		if v.Decision == approval.Approve {
+			r.ApprovedBy = append(r.ApprovedBy, v.Identity)
+		}
+	}
+	r.Status = StatusApproved
+	return r, nil
+}
+
+// ApproveWithApprovalList is a convenience for callers that have not
+// (yet) wired up the full Approval package. It accepts a flat list of
+// approver identities and uses the built-in MajorityPolicy with
+// Required=len(approvers). Empty identities are rejected before the
+// Approval is constructed so a release cannot be Approved with a
+// blank voter.
+//
+// Approve returns ErrNotPending if the Release is already past Pending.
+func (r Release) ApproveWithApprovalList(approvers []string) (Release, error) {
 	for _, a := range approvers {
 		if a == "" {
 			return r, errors.New("release: approver identity must not be empty")
 		}
 	}
-	r.ApprovedBy = append([]string{}, approvers...)
-	r.Status = StatusApproved
-	return r, nil
+	return r.ApproveWith(
+		approval.Approval{ReleaseID: r.ID, Votes: castApprovesToVotes(approvers)},
+		approval.MajorityPolicy{Required: len(approvers)},
+	)
+}
+
+// Approve is retained as a thin wrapper over ApproveWithApprovalList
+// so existing tests and call sites compile. New callers should use
+// ApproveWith against a configured Policy. The wrapper accepts a
+// flat list of approver identities for backwards compatibility.
+//
+// Deprecated: use ApproveWith(approval.Approval, approval.Policy).
+func (r Release) Approve(approvers []string) (Release, error) {
+	return r.ApproveWithApprovalList(approvers)
+}
+
+func castApprovesToVotes(identities []string) []approval.Vote {
+	out := make([]approval.Vote, 0, len(identities))
+	now := time.Now().UTC()
+	for _, id := range identities {
+		out = append(out, approval.Vote{
+			Identity:  id,
+			Decision:  approval.Approve,
+			Timestamp: now,
+		})
+	}
+	return out
 }
 
 // Activate transitions an Approved Release to Active.
