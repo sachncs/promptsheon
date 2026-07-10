@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "promptsheon.fullname" . }}-config
+  labels:
+    {{- include "promptsheon.labels" . | nindent 4 }}
+data:
+  # Backend selection: "sqlite" (default) or "postgres"
+  PROMPTSHEON_DB_BACKEND: {{ .Values.config.dbBackend | default "sqlite" | quote }}
+  PROMPTSHEON_DB_PATH: {{ .Values.config.dbPath | default "/var/lib/promptsheon/promptsheon.db" | quote }}
+  {{- if eq (.Values.config.dbBackend | default "sqlite") "postgres" }}
+  PROMPTSHEON_DB_DSN: {{ required "config.dbDSN required when dbBackend=postgres" .Values.config.dbDSN | quote }}
+  {{- end }}
+  PROMPTSHEON_ADDR: {{ .Values.config.addr | default ":8080" | quote }}
+  PROMPTSHEON_LOG_LEVEL: {{ .Values.config.logLevel | default "info" | quote }}
+  PROMPTSHEON_AUTH: {{ .Values.config.auth | default "false" | quote }}
+  PROMPTSHEON_RATE_LIMIT_RATE: {{ .Values.config.rateLimitRate | default 100 | quote }}
+  PROMPTSHEON_RATE_LIMIT_INTERVAL: {{ .Values.config.rateLimitInterval | default 60 | quote }}
+  {{- if .Values.config.otelEndpoint }}
+  PROMPTSHEON_OTEL_ENDPOINT: {{ .Values.config.otelEndpoint | quote }}
+  {{- end }}
+  {{- if .Values.config.corsOrigins }}
+  PROMPTSHEON_CORS_ORIGINS: {{ .Values.config.corsOrigins | quote }}
+  {{- end }}

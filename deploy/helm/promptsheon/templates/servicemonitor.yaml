@@ -1,0 +1,21 @@
+{{- /*
+  Prometheus scrape — chart provides a default ServiceMonitor that
+  users with the Prometheus Operator can enable by setting
+  .Values.serviceMonitor.enabled=true.
+*/}}
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "promptsheon.fullname" . }}
+  labels:
+    {{- include "promptsheon.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "promptsheon.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /v1/metrics
+      interval: 30s
+{{- end }}

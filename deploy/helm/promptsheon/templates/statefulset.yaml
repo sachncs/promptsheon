@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "promptsheon.fullname" . }}
+  labels:
+    {{- include "promptsheon.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "promptsheon.fullname" . }}
+  replicas: {{ .Values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "promptsheon.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "promptsheon.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: promptsheond
+          image: "{{ .Values.image.repository | default "promptsheon/promptsheon" }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "promptsheon.fullname" . }}-config
+            {{- if eq (.Values.config.dbBackend | default "sqlite") "postgres" }}
+            - secretRef:
+                name: {{ include "promptsheon.fullname" . }}-db
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /v1/healthz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /v1/readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: {{ .Values.resources.cpuLimit | default "2" }}
+              memory: {{ .Values.resources.memoryLimit | default "1Gi" }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            {{- if eq (.Values.config.dbBackend | default "sqlite") "sqlite" }}
+            - name: data
+              mountPath: /var/lib/promptsheon
+            {{- end }}
+      securityContext:
+        fsGroup: 1000
+      {{- if eq (.Values.config.dbBackend | default "sqlite") "sqlite" }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "promptsheon.fullname" . }}-data
+      {{- end }}
+  {{- if .Values.persistence.storageClassName }}
+  volumeClaimTemplates: []
+  {{- end }}

@@ -1,0 +1,43 @@
+# Default values for Promptsheon.
+# See values.yaml.example for the full set of knobs.
+
+replicaCount: 1
+
+image:
+  repository: promptsheon/promptsheon
+  tag: ""  # Default to Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+# resource limits. Requests are deliberately tiny; cap to whatever
+# your tenant's per-pod budget allows.
+resources:
+  cpuLimit: "2"
+  memoryLimit: 1Gi
+
+# config knobs land in a ConfigMap and are read by the daemon at
+# boot. See internal/config/config.go for every supported env var.
+config:
+  dbBackend: sqlite
+  dbPath: /var/lib/promptsheon/promptsheon.db
+  # dbDSN: ""  # set only when dbBackend=postgres
+  addr: ":8080"
+  logLevel: info
+  auth: "false"
+  rateLimitRate: 100
+  rateLimitInterval: 60
+  # corsOrigins: ""  # blank is deny-all; set to "*" only for trusted local
+  # otelEndpoint: ""  # blank disables OTel
+
+persistence:
+  size: 8Gi
+  accessMode: ReadWriteOnce
+  # storageClassName: ""  # cluster-default
+
+# Optional Prometheus ServiceMonitor (requires the Prometheus
+# Operator CRDs).
+serviceMonitor:
+  enabled: false

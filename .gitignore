@@ -2,9 +2,9 @@
 arc-agi/
 environment_files/
 
-# Binaries
-promptsheond
-promptsheon
+# Binaries (anchored so the pattern doesn't match nested paths like deploy/helm/promptsheon/)
+/promptsheond
+/promptsheon
 bin/
 *.exe
 *.test
