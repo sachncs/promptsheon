@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -23,8 +24,10 @@ import (
 	"github.com/sachncs/promptsheon/internal/metrics"
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/observability"
+	"github.com/sachncs/promptsheon/internal/plugins/builtins"
 	"github.com/sachncs/promptsheon/internal/ratelimit"
 	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/internal/supervisor"
 	"github.com/sachncs/promptsheon/internal/trace"
 	"github.com/sachncs/promptsheon/internal/vault"
 	"github.com/sachncs/promptsheon/internal/webhook"
@@ -77,7 +80,19 @@ func main() {
 			_ = db.Close()
 		}
 	}()
-	_ = db // keep linter happy until wiring is finalised in M1
+
+	// Wire the plugin supervisor: register every built-in Guardrail
+	// plugin, set the publisher to nil (production wiring adds an
+	// EventBus adapter in a follow-on), and start the supervisor in
+	// a goroutine that observes rootCtx for shutdown. The supervisor
+	// owns plugin lifecycle; the daemon owns the supervisor.
+	sup := supervisor.New(nil, logger)
+	builtins.Register(sup)
+	go func() {
+		if err := sup.Run(rootCtx); err != nil && !errors.Is(err, context.Canceled) {
+			logger.Warn("plugin supervisor exited with error", "err", err)
+		}
+	}()
 
 	srv, limiter, spans, collector := buildServer(rootCtx, &cfg, db, logger)
 
