@@ -865,7 +865,7 @@ func TestScanFunctionsWithBadJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("insert bad execution: %v", err)
 	}
-	_, err = db.ListExecutions(ctx, ExecutionFilter{})
+	_, err = db.ListExecutions(ctx, capability.ExecutionFilter{})
 	if err != nil {
 		t.Fatalf("ListExecutions: %v", err)
 	}
@@ -1312,7 +1312,7 @@ func TestListExecutionsWithOffset(t *testing.T) {
 		}
 	}
 
-	all, err := db.ListExecutions(ctx, ExecutionFilter{})
+	all, err := db.ListExecutions(ctx, capability.ExecutionFilter{})
 	if err != nil {
 		t.Fatalf("ListExecutions: %v", err)
 	}
@@ -1320,7 +1320,7 @@ func TestListExecutionsWithOffset(t *testing.T) {
 		t.Fatalf("expected 3 executions, got %d", len(all))
 	}
 
-	offset := ExecutionFilter{Limit: 2, Offset: 1}
+	offset := capability.ExecutionFilter{Limit: 2, Offset: 1}
 	paginated, err := db.ListExecutions(ctx, offset)
 	if err != nil {
 		t.Fatalf("ListExecutions with offset: %v", err)

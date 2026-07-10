@@ -333,7 +333,7 @@ func TestCapabilityStore_ExecutionCRUD(t *testing.T) {
 	}
 
 	// Test with version filter
-	filter := ExecutionFilter{
+	filter := capability.ExecutionFilter{
 		CapabilityVersionID: "ver-1",
 		Limit:               10,
 	}

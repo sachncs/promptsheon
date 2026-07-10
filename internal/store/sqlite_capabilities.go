@@ -9,8 +9,8 @@ import (
 	"github.com/sachncs/promptsheon/internal/capability"
 )
 
-// ensure SQLite implements CapabilityRepository.
-var _ CapabilityRepository = (*SQLite)(nil)
+// ensure SQLite implements the consumer-defined capability.Repository interface.
+var _ capability.Repository = (*SQLite)(nil)
 
 // ---------------------------------------------------------------------------
 // Workspaces
@@ -464,7 +464,7 @@ func (s *SQLite) GetExecution(ctx context.Context, id string) (*capability.Execu
 	return scanExecution(row)
 }
 
-func (s *SQLite) ListExecutions(ctx context.Context, filter ExecutionFilter) ([]*capability.Execution, error) {
+func (s *SQLite) ListExecutions(ctx context.Context, filter capability.ExecutionFilter) ([]*capability.Execution, error) {
 	query := `SELECT id, capability_version_id, timestamp, inputs, outputs, model, provider,
 	 latency_ms, cost_usd, prompt_tokens, completion_tokens, total_tokens,
 	 error, trace_id, environment FROM executions WHERE 1=1`
