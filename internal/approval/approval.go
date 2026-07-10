@@ -72,6 +72,14 @@ type Approval struct {
 // vote twice on the same Release.
 var ErrDuplicateIdentity = errors.New("approval: duplicate voter")
 
+// ErrCreatorVoted is returned by VerifySeparationOfDuties when the
+// Release creator is found in the votes list.
+var ErrCreatorVoted = errors.New("approval: creator voted on own release (separation of duties)")
+
+// ErrQuorumNotSatisfied is returned when the Policy reports the
+// supplied votes do not yet constitute an Approved state.
+var ErrQuorumNotSatisfied = errors.New("approval: quorum not yet satisfied")
+
 // ErrUnknownDecision is returned when a decision value is not one of
 // the supported closed-set values.
 var ErrUnknownDecision = errors.New("approval: unknown decision")

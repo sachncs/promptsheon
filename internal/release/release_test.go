@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sachncs/promptsheon/internal/approval"
 	"github.com/sachncs/promptsheon/internal/capability"
 )
 
@@ -124,5 +125,72 @@ func TestRollbackFromActiveOrApproved(t *testing.T) {
 	}
 	if got.Status != StatusRolledBack {
 		t.Fatalf("expected RolledBack, got %s", got.Status)
+	}
+}
+
+func TestApproveWithEnforcesQuorum(t *testing.T) {
+	t.Parallel()
+	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
+	a, err := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
+	)
+	if err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	// Required=2, only one Approve vote: quorum not yet satisfied.
+	_, err = r.ApproveWith(a, approval.MajorityPolicy{Required: 2})
+	if err == nil {
+		t.Fatalf("expected ErrQuorumNotSatisfied, got nil")
+	}
+	// Second Approve reaches quorum.
+	a, _ = a.Record(approval.Vote{Identity: "carol", Decision: approval.Approve, Timestamp: time.Now()})
+	out, err := r.ApproveWith(a, approval.MajorityPolicy{Required: 2})
+	if err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+	if out.Status != StatusApproved {
+		t.Fatalf("expected Approved, got %s", out.Status)
+	}
+	if len(out.ApprovedBy) != 2 {
+		t.Fatalf("expected 2 approvers recorded, got %d", len(out.ApprovedBy))
+	}
+}
+
+func TestApproveWithRejectsCreatorVote(t *testing.T) {
+	t.Parallel()
+	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
+	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "alice", Decision: approval.Approve, Timestamp: time.Now()},
+	)
+	_, err := r.ApproveWith(a, approval.MajorityPolicy{Required: 1})
+	if err == nil {
+		t.Fatalf("expected separation-of-duties rejection")
+	}
+}
+
+func TestApproveWithStopsOnReject(t *testing.T) {
+	t.Parallel()
+	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
+	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "bob", Decision: approval.Reject, Timestamp: time.Now()},
+	)
+	_, err := r.ApproveWith(a, approval.MajorityPolicy{Required: 1})
+	if err == nil {
+		t.Fatalf("expected rejection error")
+	}
+}
+
+func TestApproveWithMakerCheckerPolicy(t *testing.T) {
+	t.Parallel()
+	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
+	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
+	)
+	out, err := r.ApproveWith(a, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	if err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+	if out.Status != StatusApproved {
+		t.Fatalf("expected Approved, got %s", out.Status)
 	}
 }
