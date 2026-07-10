@@ -7,6 +7,9 @@ import (
 	"github.com/sachncs/promptsheon/internal/models"
 )
 
+const fieldKeyName = "key_name"
+const fieldProviderName = "provider_name"
+
 func (s *Server) handleSaveVaultKey(w http.ResponseWriter, r *http.Request) error {
 	if s.vault == nil {
 		return badRequest("vault not configured")
@@ -42,14 +45,14 @@ func (s *Server) handleSaveVaultKey(w http.ResponseWriter, r *http.Request) erro
 	if err := s.db.SaveProviderKey(r.Context(), pk); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "vault_key:"+pk.ID, map[string]any{keyProvider: pk.ProviderName, "key_name": pk.KeyName})
+	s.audit(r.Context(), "create", "vault_key:"+pk.ID, map[string]any{keyProvider: pk.ProviderName, fieldKeyName: pk.KeyName})
 
 	// Return without the encrypted key for security
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"id":            pk.ID,
-		"provider_name": pk.ProviderName,
-		"key_name":      pk.KeyName,
-		"created_at":    pk.CreatedAt,
+		"id":              pk.ID,
+		fieldProviderName: pk.ProviderName,
+		fieldKeyName:      pk.KeyName,
+		"created_at":      pk.CreatedAt,
 	})
 	return nil
 }

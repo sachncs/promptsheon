@@ -99,6 +99,7 @@ type ServerConfig struct {
 // worker pool to drain before dropping the entry. M-7 keeps the
 // value short so a slow audit pipeline never holds up the request
 // path.
+const auditDefaultUser = "api"
 const auditQueueBackpressure = 200 * time.Millisecond
 
 // Option configures the Server.
@@ -463,7 +464,7 @@ func readJSON(r *http.Request, target any) error {
 // the audit log lose entries under transient spikes that the worker
 // pool could otherwise have absorbed.
 func (s *Server) audit(ctx context.Context, action, resource string, details map[string]any) {
-	userID := "api"
+	userID := auditDefaultUser
 	if u, ok := auth.UserFromContext(ctx); ok && u != nil && u.ID != "" {
 		userID = u.ID
 	}
@@ -511,6 +512,9 @@ func (s *Server) StartAuditWorkers(ctx context.Context, n int) {
 	s.auditQueue = make(chan *models.AuditEntry, 1024)
 	for i := 0; i < n; i++ {
 		s.auditWg.Add(1)
+		// #nosec G118 -- ctx is the server-level context from StartAuditWorkers
+		// (passed from main.go), not a request-scoped context. The caller
+		// cancels it on shutdown to stop the workers.
 		go s.auditWorker(ctx)
 	}
 }
@@ -632,7 +636,7 @@ func callerID(r *http.Request) string {
 	if u, ok := auth.UserFromContext(r.Context()); ok && u != nil && u.ID != "" {
 		return u.ID
 	}
-	return "api"
+	return auditDefaultUser
 }
 
 // --- Rate Limiting ---

@@ -392,7 +392,7 @@ func TestNewAuthenticatorWithLogger(t *testing.T) {
 	a.Stop()
 }
 
-func TestAuthenticator_StopMultipleTimes(t *testing.T) {
+func TestAuthenticator_StopMultipleTimes(_ *testing.T) {
 	s := &mockStore{keys: make(map[string]*APIKeyRecord)}
 	a := NewAuthenticator(s)
 	a.Stop()

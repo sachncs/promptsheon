@@ -8,14 +8,16 @@ import (
 	"github.com/sachncs/promptsheon/internal/buildinfo"
 )
 
+const dbStatusOK = "ok"
+
 var startTime = time.Now()
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) error {
 	info := buildinfo.Get()
 	writeJSON(w, http.StatusOK, map[string]any{
-		keyStatus: "healthy",
-		"version": info.Version,
-		"uptime":  time.Since(startTime).String(),
+		keyStatus:    "healthy",
+		fieldVersion: info.Version,
+		"uptime":     time.Since(startTime).String(),
 	})
 	return nil
 }
@@ -32,7 +34,7 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 			writeJSON(w, http.StatusServiceUnavailable, ready)
 			return nil
 		}
-		ready["database"] = "ok"
+		ready["database"] = dbStatusOK
 	}
 	writeJSON(w, http.StatusOK, ready)
 	return nil

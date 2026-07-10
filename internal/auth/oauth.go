@@ -169,6 +169,8 @@ func (m *OAuthManager) GetUserInfo(ctx context.Context, providerName string, tok
 }
 
 // DefaultGoogleProvider returns default Google OAuth configuration.
+// #nosec G101 -- provider names and endpoint URLs are metadata, not credentials.
+// The actual secrets (clientID, clientSecret) are function parameters.
 func DefaultGoogleProvider(clientID, clientSecret, redirectURL string) *OAuthProvider {
 	return &OAuthProvider{
 		Name:         "google",
@@ -183,6 +185,7 @@ func DefaultGoogleProvider(clientID, clientSecret, redirectURL string) *OAuthPro
 }
 
 // DefaultGitHubProvider returns default GitHub OAuth configuration.
+// #nosec G101 -- provider names and endpoint URLs are metadata, not credentials.
 func DefaultGitHubProvider(clientID, clientSecret, redirectURL string) *OAuthProvider {
 	return &OAuthProvider{
 		Name:         "github",

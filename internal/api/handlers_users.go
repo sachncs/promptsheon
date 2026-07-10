@@ -7,6 +7,10 @@ import (
 	"github.com/sachncs/promptsheon/internal/models"
 )
 
+const roleReader = "reader"
+const fieldEmail = "email"
+const fieldRole = "role"
+
 func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) error {
 	users, err := s.db.ListUsers(r.Context())
 	if err != nil {
@@ -32,7 +36,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) error 
 		return ErrBadRequest
 	}
 	if req.Role == "" {
-		req.Role = "reader"
+		req.Role = roleReader
 	}
 
 	now := time.Now()
@@ -48,7 +52,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) error 
 	if err := s.db.CreateUser(r.Context(), u); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "user:"+u.ID, map[string]any{"email": u.Email, "role": u.Role})
+	s.audit(r.Context(), "create", "user:"+u.ID, map[string]any{fieldEmail: u.Email, fieldRole: u.Role})
 	writeJSON(w, http.StatusCreated, u)
 	return nil
 }
@@ -93,7 +97,7 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) error 
 	if err := s.db.UpdateUser(r.Context(), existing); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "update", "user:"+existing.ID, map[string]any{"email": existing.Email, "role": existing.Role})
+	s.audit(r.Context(), "update", "user:"+existing.ID, map[string]any{fieldEmail: existing.Email, fieldRole: existing.Role})
 	writeJSON(w, http.StatusOK, existing)
 	return nil
 }

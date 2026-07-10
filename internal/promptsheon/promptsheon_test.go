@@ -196,11 +196,11 @@ func TestObjectImmutability(t *testing.T) {
 	}
 
 	perm := info.Mode().Perm()
-	if perm != 0444 {
-		t.Fatalf("expected 0444 permissions, got %o", perm)
+	if perm != 0400 {
+		t.Fatalf("expected 0400 permissions, got %o", perm)
 	}
 
-	if err := os.WriteFile(objPath, []byte("tampered"), 0444); err == nil {
+	if err := os.WriteFile(objPath, []byte("tampered"), 0400); err == nil {
 		t.Fatal("expected write to read-only file to fail")
 	}
 }

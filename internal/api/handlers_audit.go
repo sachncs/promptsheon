@@ -11,6 +11,8 @@ import (
 	"github.com/sachncs/promptsheon/internal/models"
 )
 
+const fieldUserID = "user_id"
+
 func (s *Server) handleListAudit(w http.ResponseWriter, r *http.Request) error {
 	filter := models.AuditFilter{
 		UserID:   r.URL.Query().Get("user_id"),
@@ -103,7 +105,7 @@ func (s *Server) writeAuditCSV(w http.ResponseWriter, entries []*models.AuditEnt
 	writer := csv.NewWriter(w)
 
 	// Header
-	if err := writer.Write([]string{"id", "user_id", "action", "resource", "details", "timestamp", "previous_hash", "entry_hash"}); err != nil {
+	if err := writer.Write([]string{"id", fieldUserID, "action", "resource", "details", "timestamp", "previous_hash", "entry_hash"}); err != nil {
 		return fmt.Errorf("csv write header: %w", err)
 	}
 

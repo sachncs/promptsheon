@@ -270,7 +270,7 @@ func TestRecordResultMixedSuccessAndFailure(t *testing.T) {
 	}
 }
 
-func TestRecordResultNonexistentVariant(t *testing.T) {
+func TestRecordResultNonexistentVariant(_ *testing.T) {
 	engine := abtesting.NewEngine(nil)
 	_ = engine.CreateTest(makeTest("rrtest"))
 	// Should not panic or error

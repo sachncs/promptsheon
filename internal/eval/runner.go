@@ -30,6 +30,10 @@ func (r *Runner) RunVersion(_ context.Context, version *capability.Version, suit
 	}
 
 	const metricAccuracy = "accuracy"
+	const metricPrecision = "precision"
+	const metricRecall = "recall"
+	const metricHallucination = "hallucination"
+	const metricCost = "cost"
 	const metricLatency = "latency"
 
 	totalAccuracy := 0.95
@@ -45,15 +49,15 @@ func (r *Runner) RunVersion(_ context.Context, version *capability.Version, suit
 		switch metric {
 		case metricAccuracy:
 			actual = totalAccuracy
-		case "precision":
+		case metricPrecision:
 			actual = totalPrecision
-		case "recall":
+		case metricRecall:
 			actual = totalRecall
-		case "hallucination":
+		case metricHallucination:
 			actual = totalHallucination
 		case metricLatency:
 			actual = totalLatencyMs
-		case "cost":
+		case metricCost:
 			actual = totalCostUSD
 		}
 		if actual < threshold {
@@ -73,12 +77,12 @@ func (r *Runner) RunVersion(_ context.Context, version *capability.Version, suit
 		Groundedness:        0.97,
 		ThresholdsMet:       thresholdsMet,
 		PerMetric: map[string]float64{
-			metricAccuracy:  totalAccuracy,
-			"precision":     totalPrecision,
-			"recall":        totalRecall,
-			"hallucination": totalHallucination,
-			metricLatency:   totalLatencyMs,
-			"cost":          totalCostUSD,
+			metricAccuracy:      totalAccuracy,
+			metricPrecision:     totalPrecision,
+			metricRecall:        totalRecall,
+			metricHallucination: totalHallucination,
+			metricLatency:       totalLatencyMs,
+			metricCost:          totalCostUSD,
 		},
 	}
 

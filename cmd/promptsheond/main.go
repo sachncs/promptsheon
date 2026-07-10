@@ -32,6 +32,11 @@ import (
 	"github.com/sachncs/promptsheon/internal/ws"
 )
 
+const logLevelDebug = "debug"
+const logLevelInfo = "info"
+const logLevelWarn = "warn"
+const logLevelError = "error"
+
 func main() {
 	// Handle --version and --help before loading the rest of the
 	// config. Operators commonly run 'promptsheond --version' to
@@ -107,13 +112,13 @@ func configureShellTool(_ *config.Config) {
 func setupLogger(cfg *config.Config) *slog.Logger {
 	var logLevel slog.Level
 	switch cfg.LogLevel {
-	case "debug":
+	case logLevelDebug:
 		logLevel = slog.LevelDebug
-	case "info":
+	case logLevelInfo:
 		logLevel = slog.LevelInfo
-	case "warn":
+	case logLevelWarn:
 		logLevel = slog.LevelWarn
-	case "error":
+	case logLevelError:
 		logLevel = slog.LevelError
 	default:
 		logLevel = slog.LevelInfo

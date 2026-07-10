@@ -422,7 +422,7 @@ func TestAPIErrorMessage(t *testing.T) {
 }
 
 func TestDoTransportError(t *testing.T) {
-	rt := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+	rt := roundTripFunc(func(_ *http.Request) (*http.Response, error) {
 		return nil, io.ErrUnexpectedEOF
 	})
 	c := NewWithHTTP("http://example.invalid", "k", &http.Client{Transport: rt})
@@ -661,7 +661,7 @@ func TestDoCreateRequestError(t *testing.T) {
 }
 
 func TestDoReadResponseError(t *testing.T) {
-	rt := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+	rt := roundTripFunc(func(_ *http.Request) (*http.Response, error) {
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(&errReader{err: io.ErrUnexpectedEOF}),

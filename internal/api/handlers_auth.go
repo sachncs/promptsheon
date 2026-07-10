@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,10 @@ import (
 	"github.com/sachncs/promptsheon/internal/auth"
 	"github.com/sachncs/promptsheon/internal/models"
 )
+
+const defaultAdminEmail = "admin@local"
+const oauthStateCookie = "oauth_state"
+const fieldAPIKey = "key"
 
 // oauthStateStore holds in-flight OAuth state tokens. The previous
 // implementation used a package-level `var` shared across all Server
@@ -306,7 +311,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 		return badRequest("invalid json")
 	}
 	if req.Email == "" {
-		req.Email = "admin@local"
+		req.Email = defaultAdminEmail
 	}
 	if req.Name == "" {
 		req.Name = "Bootstrap Admin"
@@ -463,7 +468,7 @@ func (s *Server) handleOAuthLogin(w http.ResponseWriter, r *http.Request) error 
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     "oauth_state",
+		Name:     oauthStateCookie,
 		Value:    state,
 		Path:     "/",
 		HttpOnly: true,
@@ -481,6 +486,13 @@ func (s *Server) handleOAuthLogin(w http.ResponseWriter, r *http.Request) error 
 		return badRequest(err.Error())
 	}
 
+	parsed, err := url.Parse(authURL)
+	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") {
+		return badRequest("invalid redirect URL")
+	}
+
+	// #nosec G710 -- authURL is constructed by oauth.GetAuthURL which returns
+	// a URL from the configured OAuth provider (not user input).
 	http.Redirect(w, r, authURL, http.StatusFound)
 	return nil
 }
@@ -491,7 +503,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 		return badRequest("provider is required")
 	}
 
-	stateCookie, err := r.Cookie("oauth_state")
+	stateCookie, err := r.Cookie(oauthStateCookie)
 	if err != nil {
 		return badRequest("missing OAuth state")
 	}
@@ -572,17 +584,18 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     "oauth_state",
+		Name:     oauthStateCookie,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
 		MaxAge:   -1,
 	})
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"user": existing,
-		"key":  apiKey,
+		"user":      existing,
+		fieldAPIKey: apiKey,
 	})
 	return nil
 }
