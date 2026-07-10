@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/store"
 )
 
 const fieldVersion = "version"
@@ -488,10 +487,10 @@ func (s *Server) handleGetLatestVersion(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleListExecutions(w http.ResponseWriter, r *http.Request) error {
 	capabilityVersionID := r.PathValue("version_id")
-	filter := store.ExecutionFilter{
-		CapabilityVersionID: capabilityVersionID,
-		Limit:               100,
-	}
+		filter := capability.ExecutionFilter{
+			CapabilityVersionID: capabilityVersionID,
+			Limit:               100,
+		}
 	execs, err := s.db.ListExecutions(r.Context(), filter)
 	if err != nil {
 		return err

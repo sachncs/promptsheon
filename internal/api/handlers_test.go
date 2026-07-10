@@ -445,7 +445,7 @@ func (m *mockRepo) GetExecution(_ context.Context, id string) (*capability.Execu
 	}
 	return e, nil
 }
-func (m *mockRepo) ListExecutions(_ context.Context, filter store.ExecutionFilter) ([]*capability.Execution, error) {
+func (m *mockRepo) ListExecutions(_ context.Context, filter capability.ExecutionFilter) ([]*capability.Execution, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var execs []*capability.Execution

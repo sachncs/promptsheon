@@ -4,12 +4,21 @@ package store
 import (
 	"context"
 
+	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/models"
 )
 
 // Repository defines the data access interface for all persistence operations.
+//
+// It embeds capability.Repository (the consumer-defined interface)
+// and adds aggregates that don't yet have per-package interfaces
+// (Users, API Keys, Audit, Provider Keys, Alert Rules, Alerts,
+// Notification Groups, Webhook Endpoints). Migration to per-aggregate
+// interfaces is a follow-on; today's structure already follows the
+// dependency direction: domain packages declare the interface,
+// storage satisfies it.
 type Repository interface {
-	CapabilityRepository
+	capability.Repository
 
 	// Users
 	CreateUser(ctx context.Context, u *models.User) error
