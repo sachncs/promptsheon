@@ -41,6 +41,11 @@ coverage.html
 # Dependency directories
 vendor/
 
+# Node/TypeScript (sdk/typescript)
+sdk/typescript/node_modules/
+sdk/typescript/dist/
+sdk/typescript/*.tsbuildinfo
+
 # Security files
 *.pem
 *.key
