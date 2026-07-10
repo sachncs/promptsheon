@@ -20,6 +20,8 @@ ADRs are immutable. When a decision is superseded, the original ADR is updated w
 | [0010](0010-version-is-a-manifest-not-a-bundle.md) | Capability Version is a Manifest, not a Bundle | Accepted |
 | [0011](0011-release-and-approval-aggregates.md) | Release and Approval are separate aggregates | Accepted |
 | [0012](0012-providers-and-pricing-are-injected.md) | Providers and pricing are injected, never global | Accepted |
+| [0015](0015-postgres-backend-with-rls.md) | Postgres as a first-class backend with per-workspace RLS | Accepted |
+| [0016](0016-plugins-over-grpc.md) | Plugins over gRPC, loopback only | Accepted |
 
 ## Status legend
 
