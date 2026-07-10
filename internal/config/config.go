@@ -11,12 +11,12 @@ import (
 
 // Config holds all configuration for the server.
 type Config struct {
-	Addr     string // Listen address (e.g., ":8080")
+	Addr      string // Listen address (e.g., ":8080")
 	DBBackend string // "sqlite" (default) or "postgres"
-	DBPath   string // SQLite database file path
-	DBDSN    string // Postgres connection string (when DBBackend=postgres)
-	LogLevel string // Log level: debug, info, warn, error
-	Auth     bool   // Enable authentication and authorization
+	DBPath    string // SQLite database file path
+	DBDSN     string // Postgres connection string (when DBBackend=postgres)
+	LogLevel  string // Log level: debug, info, warn, error
+	Auth      bool   // Enable authentication and authorization
 
 	// Server timeouts
 	WriteTimeout      int // Write timeout in seconds (default: 30)

@@ -42,10 +42,10 @@ type PluginVersion string
 // registration time. The server uses it to validate capabilities
 // against expected consumers.
 type PluginDescriptor struct {
-	Name              string
-	Version           PluginVersion
-	Services          []string
-	MinCoreVersion    PluginVersion
+	Name           string
+	Version        PluginVersion
+	Services       []string
+	MinCoreVersion PluginVersion
 }
 
 // Handshake is the registration message a plugin sends on its

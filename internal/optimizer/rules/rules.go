@@ -85,12 +85,12 @@ func compressWhenSlow(_ context.Context, obs Observation) []capability.Recommend
 		return nil
 	}
 	return []capability.Recommendation{{
-		Type:                 capability.RecommendationCompressPrompt,
-		CapabilityVersionID:  obs.CapabilityVersion,
-		Reason:               "P95 latency > 1s across recent executions",
-		Confidence:           0.7,
-		Impact:               "medium",
-		AutoApplicable:       true,
+		Type:                capability.RecommendationCompressPrompt,
+		CapabilityVersionID: obs.CapabilityVersion,
+		Reason:              "P95 latency > 1s across recent executions",
+		Confidence:          0.7,
+		Impact:              "medium",
+		AutoApplicable:      true,
 	}}
 }
 
@@ -102,12 +102,12 @@ func cacheWhenCostly(_ context.Context, obs Observation) []capability.Recommenda
 		return nil
 	}
 	return []capability.Recommendation{{
-		Type:                 capability.RecommendationEnableCache,
-		CapabilityVersionID:  obs.CapabilityVersion,
-		Reason:               "Average cost > 1c per 100 executions",
-		Confidence:           0.85,
-		Impact:               "medium",
-		AutoApplicable:       true,
+		Type:                capability.RecommendationEnableCache,
+		CapabilityVersionID: obs.CapabilityVersion,
+		Reason:              "Average cost > 1c per 100 executions",
+		Confidence:          0.85,
+		Impact:              "medium",
+		AutoApplicable:      true,
 	}}
 }
 
@@ -118,11 +118,11 @@ func guardrailWhenUngrounded(_ context.Context, obs Observation) []capability.Re
 		return nil
 	}
 	return []capability.Recommendation{{
-		Type:                 capability.RecommendationAddGuardrail,
-		CapabilityVersionID:  obs.CapabilityVersion,
-		Reason:               "Hallucination rate above 5%",
-		Confidence:           0.8,
-		Impact:               "high",
-		AutoApplicable:       false, // adds a guardrail — never auto
+		Type:                capability.RecommendationAddGuardrail,
+		CapabilityVersionID: obs.CapabilityVersion,
+		Reason:              "Hallucination rate above 5%",
+		Confidence:          0.8,
+		Impact:              "high",
+		AutoApplicable:      false, // adds a guardrail — never auto
 	}}
 }

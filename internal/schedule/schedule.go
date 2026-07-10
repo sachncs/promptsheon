@@ -4,9 +4,9 @@
 // trigger can be:
 //
 //   - cron:       a 5-field cron expression evaluated in the
-//                 daemon's local timezone (UTC by default).
+//     daemon's local timezone (UTC by default).
 //   - webhook:    an HTTP POST to /v1/schedules/{id}/fire authenticated
-//                 with the workspace API key.
+//     with the workspace API key.
 //   - manual:     a human-initiated fire via the CLI.
 //
 // All three converge on a single tick that produces an Execution
@@ -41,18 +41,18 @@ const (
 // values rather than mutating in place, in keeping with the
 // immutability principle for domain objects.
 type Schedule struct {
-	ID                string    `json:"id"`
-	WorkspaceID       string    `json:"workspace_id"`
-	ReleaseID         string    `json:"release_id"`
-	Kind              Kind      `json:"kind"`
-	Cron              string    `json:"cron,omitempty"`
-	WebhookPath       string    `json:"webhook_path,omitempty"`
-	NextFireAt        time.Time `json:"next_fire_at"`
-	LastFireAt        *time.Time `json:"last_fire_at,omitempty"`
-	FiredCount        int64     `json:"fired_count"`
-	Enabled           bool      `json:"enabled"`
-	CreatedAt         time.Time `json:"created_at"`
-	CreatedBy         string    `json:"created_by"`
+	ID          string     `json:"id"`
+	WorkspaceID string     `json:"workspace_id"`
+	ReleaseID   string     `json:"release_id"`
+	Kind        Kind       `json:"kind"`
+	Cron        string     `json:"cron,omitempty"`
+	WebhookPath string     `json:"webhook_path,omitempty"`
+	NextFireAt  time.Time  `json:"next_fire_at"`
+	LastFireAt  *time.Time `json:"last_fire_at,omitempty"`
+	FiredCount  int64      `json:"fired_count"`
+	Enabled     bool       `json:"enabled"`
+	CreatedAt   time.Time  `json:"created_at"`
+	CreatedBy   string     `json:"created_by"`
 }
 
 // New constructs a Schedule. Returns ErrInvalidCron when the kind
@@ -132,11 +132,11 @@ func (s Schedule) Enable() Schedule {
 // firing time strictly after `from`. It supports the spec the user
 // is most likely to type in a config file:
 //
-//   field 1: minute        (0-59)
-//   field 2: hour          (0-23)
-//   field 3: day of month  (1-31)
-//   field 4: month         (1-12)
-//   field 5: day of week    (0-6, 0=Sun)
+//	field 1: minute        (0-59)
+//	field 2: hour          (0-23)
+//	field 3: day of month  (1-31)
+//	field 4: month         (1-12)
+//	field 5: day of week    (0-6, 0=Sun)
 //
 // Each field may be `*`, a single integer, or a comma list. Range
 // lists (a-b) and step expressions (a-b/n) are NOT supported in M2
