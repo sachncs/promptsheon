@@ -16,7 +16,6 @@ import (
 	"context"
 
 	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/recommendation"
 )
 
 // Observation is the minimal signal a rule consumes. The full
@@ -72,10 +71,29 @@ func (e *Engine) Evaluate(ctx context.Context, obs Observation) []capability.Rec
 }
 
 // CanAutoAdopt gates the engine output against the conservative
-// defaults shipped in recommendation.CanAutoAdopt. Centralised
-// here so callers do not have to import recommendation.
+// defaults shipped here. Types and Recommendation are in the
+// capability package, so the rules package keeps zero dependency on
+// internal/recommendation (which would create an import cycle).
+//
+// Move the body to capability.CanAutoAdopt when a Recommendation
+// carry-only helper emerges; today this colocates with the gate so
+// all four Recommendation types and thresholds are in one place.
 func CanAutoAdopt(r capability.Recommendation) bool {
-	return recommendation.CanAutoAdopt(r, 0.8)
+	if !r.AutoApplicable {
+		return false
+	}
+	if r.Confidence < 0.8 {
+		return false
+	}
+	switch r.Type {
+	case capability.RecommendationCompressPrompt,
+		capability.RecommendationEnableCache,
+		capability.RecommendationDisableReasoning,
+		capability.RecommendationRemoveTool:
+		return true
+	default:
+		return false
+	}
 }
 
 // compressWhenSlow emits a compress-prompt Recommendation when the
