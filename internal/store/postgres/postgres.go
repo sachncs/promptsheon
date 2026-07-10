@@ -235,7 +235,7 @@ func (p *Postgres) DeleteProject(ctx context.Context, id string) error {
 //
 // Note: capability.State is derived from Releases (M0.8); the row
 // is inserted with the legacy state/current_version_id columns
-// supplied defaults ('draft', '') for forward-compatibility with
+// supplied defaults ('draft', ”) for forward-compatibility with
 // the SQLite schema that retains those columns until migration 026
 // drops them. Callers that need the live state call
 // capability.DeriveState over the Release set.

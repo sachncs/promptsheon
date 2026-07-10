@@ -93,6 +93,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ADR-0019**: Deferred architecture review items (plugin
   supervisor, bandit, LLM-judge, Python/TS SDKs, Helm chart, etc).
 
+### Added (Tier 2 follow-on)
+
+- **Plugin supervisor with restart budget + health gate (Tier
+  2.46).** New `internal/supervisor.Supervisor` implements the
+  in-process Plugin lifecycle: `Register(name, plugin, policy)`
+  adds an item, `Run(ctx)` starts every plugin, polls `Health`
+  every 5s, applies exponential `Backoff` capped at `MaxBackoff`
+  on failures, and emits `PluginEvent` through the
+  consumer-defined `Publisher`. Wired into `cmd/promptsheond/main.go`
+  with both built-in Guardrail plugins attached via
+  `internal/plugins/builtins.Register`.
+- **Built-in PII redactor Guardrail (Tier 2.47).** New
+  `internal/redactor.Redactor` implements the consumer-defined
+  Guardrail interface. Six builtin patterns: email, US SSN,
+  E.164 phone, Luhn-verified credit-card 13–19 digits, IPv4, IBAN.
+  `Enable`/`Disable` for ops to extend. Luhn checksum exposed as
+  `LuhnValid` for tests.
+- **Built-in prompt-injection heuristic Guardrail (Tier 2.48).**
+  New `internal/injection.Detector` scores user inputs against
+  16 heuristics (ignore_previous, system_override, dan_mode,
+  jailbreak_mode, ignore_safety, …) and returns Reject when
+  the score crosses the threshold (default 0.6,
+  `OverrideThreshold` for ops). Note in code documents Go RE2
+  limitations on patterns mixing nested alternations with optional
+  quantifiers; the v1 set is written with one alternation or one
+  quantifier per group.
+- **TypeScript SDK scaffold (Tier 2.41 part 1).** New
+  `sdk/typescript/` package ships `PromptsheonClient`
+  (handwritten against `paths`-typed shapes for
+  `listCapabilities` / `invokeRelease`) plus
+  `scripts/codegen.sh` that runs `npx openapi-typescript` against
+  `api/openapi.yaml` and `tsc --noEmit`. The codegen pipeline is
+  wired; the production `src/openapi.ts` ships as a hand-written
+  placeholder so consumers can adopt the SDK today. The M3
+  follow-on commit regenerates against the production spec once
+  it covers every v1 resource.
+- **Helm chart (Tier 2.43).** New `deploy/helm/promptsheon/`
+  deploys a single-replica (configurable) `StatefulSet` with a
+  PVC-backed SQLite database by default; Postgres deploys set
+  `dbBackend=postgres` plus `dbDSN`. Probes wire to `/v1/healthz`
+  and `/v1/readyz`. `ServiceMonitor` ships gated on
+  `serviceMonitor.enabled=true`. Helm-template rendering verified
+  manually with `helm template release deploy/helm/promptsheon/`
+  under both sqlite (default) and postgres (--set
+  config.dbBackend=postgres ...) configs.
+- **Vestigial `state` / `current_version_id` columns (Tier 1.40
+  follow-on).** Migration 026 documents that the `capabilities`
+  schema retains these columns for forward compatibility but
+  they are unused after M0.8. Operators using the Postgres
+  backend can drop the columns and their index once they confirm
+  no SQL reads them; the migration is mirrored under
+  `internal/store/migrations/postgres/`.
+
 
 - **`internal/llm` no longer carries package-level mutable state.**
   The `Registry` was a package-level singleton (`var global =
