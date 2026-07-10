@@ -29,754 +29,6 @@ components:
           type: string
 
 paths:
-  /api/v1/ab-tests:
-    get:
-      summary: "GET ab-tests"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-    post:
-      summary: "POST ab-tests"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              name:
-                type: string
-              promptID:
-                type: string
-              variants:
-                type: array
-              winCriteria:
-                type: string
-              minSamples:
-                type: number
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/ab-tests/{id}:
-    get:
-      summary: "GET ab-tests/{id}"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/ab-tests/{id}/results:
-    get:
-      summary: "GET ab-tests/{id}/results"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/ab-tests/{id}/stop:
-    post:
-      summary: "POST ab-tests/{id}/stop"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/agents:
-    get:
-      summary: "GET agents"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-    post:
-      summary: "POST agents"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              name:
-                type: string
-              description:
-                type: string
-              steps:
-                type: array
-              tools:
-                type: array
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/agents/import-yaml:
-    post:
-      summary: "POST agents/import-yaml"
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/agents/templates:
-    get:
-      summary: "handleListTemplates returns all agents marked as templates."
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/agents/validate:
-    post:
-      summary: "POST agents/validate"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              steps:
-                type: array
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/agents/{id}:
-    get:
-      summary: "GET agents/{id}"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-    put:
-      summary: "PUT agents/{id}"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              name:
-                type: string
-              description:
-                type: string
-              steps:
-                type: array
-              tools:
-                type: array
-              status:
-                type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-    delete:
-      summary: "DELETE agents/{id}"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/agents/{id}/archive:
-    post:
-      summary: "POST agents/{id}/archive"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/agents/{id}/deploy:
-    post:
-      summary: "POST agents/{id}/deploy"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/agents/{id}/execute:
-    post:
-      summary: "POST agents/{id}/execute"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              input:
-                type: object
-              contextID:
-                type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/agents/{id}/executions:
-    get:
-      summary: "GET agents/{id}/executions"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/agents/{id}/executions/{exec_id}:
-    get:
-      summary: "GET agents/{id}/executions/{exec_id}"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      parameters:
-        - name: exec_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/agents/{id}/export:
-    get:
-      summary: "GET agents/{id}/export"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/agents/{id}/fork:
-    post:
-      summary: "handleForkAgent creates a new agent as a fork of an existing one."
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              name:
-                type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/agents/{id}/guardrail-config:
-    get:
-      summary: "GET agents/{id}/guardrail-config"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-    post:
-      summary: "POST agents/{id}/guardrail-config"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              name:
-                type: string
-              enabled:
-                type: boolean
-              maxCostPerRun:
-                type: number
-              maxLatencyMs:
-                type: number
-              maxTokensPerStep:
-                type: number
-              contentPolicy:
-                type: array
-              restrictedTerms:
-                type: array
-              stopOnViolation:
-                type: boolean
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/agents/{id}/guardrail-config/{config_id}:
-    put:
-      summary: "PUT agents/{id}/guardrail-config/{config_id}"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      parameters:
-        - name: config_id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              name:
-                type: string
-              enabled:
-                type: boolean
-              maxCostPerRun:
-                type: number
-              maxLatencyMs:
-                type: number
-              maxTokensPerStep:
-                type: number
-              contentPolicy:
-                type: array
-              restrictedTerms:
-                type: array
-              stopOnViolation:
-                type: boolean
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-    delete:
-      summary: "DELETE agents/{id}/guardrail-config/{config_id}"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      parameters:
-        - name: config_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/agents/{id}/rerun:
-    post:
-      summary: "POST agents/{id}/rerun"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              input:
-                type: object
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/agents/{id}/restore:
-    post:
-      summary: "POST agents/{id}/restore"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              version:
-                type: number
-              cASHash:
-                type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/agents/{id}/versions:
-    get:
-      summary: "GET agents/{id}/versions"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
   /api/v1/alerts/active:
     get:
       summary: "GET alerts/active"
@@ -1165,39 +417,11 @@ paths:
           description: Unauthorized
         "404":
           description: Not found
-  /api/v1/collab/sessions:
-    post:
-      summary: "POST collab/sessions"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              promptID:
-                type: string
-              content:
-                type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/collab/sessions/{id}:
+  /api/v1/capabilities/{capability_id}/versions:
     get:
-      summary: "GET collab/sessions/{id}"
+      summary: "GET capabilities/{capability_id}/versions"
       parameters:
-        - name: id
+        - name: capability_id
           in: path
           required: true
           schema:
@@ -1205,86 +429,6 @@ paths:
       responses:
         "200":
           description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/collab/sessions/{id}/changes:
-    get:
-      summary: "GET collab/sessions/{id}/changes"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/collab/sessions/{id}/cursor:
-    put:
-      summary: "PUT collab/sessions/{id}/cursor"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              userID:
-                type: string
-              position:
-                type: number
-              color:
-                type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/contexts:
-    get:
-      summary: "GET contexts"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
         "400":
           description: Bad request
           content:
@@ -1296,31 +440,41 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "POST contexts"
+      summary: "POST capabilities/{capability_id}/versions"
+      parameters:
+        - name: capability_id
+          in: path
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              name:
-                type: string
-              description:
-                type: string
-              type:
-                $ref: "#/components/schemas/models.ContextType"
-              systemPrompt:
-                type: string
-              messages:
-                type: array
-              tokenBudget:
+              version:
                 type: number
-              truncationStrategy:
-                $ref: "#/components/schemas/models.TruncationStrategy"
-              agentID:
-                type: string
-              metadata:
-                type: object
+              prompt:
+                $ref: "#/components/schemas/capability.Prompt"
+              modelPolicy:
+                $ref: "#/components/schemas/capability.ModelPolicy"
+              contextContract:
+                $ref: "#/components/schemas/capability.ContextContract"
+              knowledge:
+                type: array
+              memory:
+                $ref: "#/components/schemas/capability.MemoryConfig"
+              guardrails:
+                type: array
+              tools:
+                type: array
+              mCPServers:
+                type: array
+              runtimePolicy:
+                $ref: "#/components/schemas/capability.RuntimePolicy"
+              evaluationSuite:
+                $ref: "#/components/schemas/capability.EvaluationSuite"
       responses:
         "200":
           description: OK
@@ -1336,9 +490,31 @@ paths:
           description: Not found
         "500":
           description: Internal server error
-  /api/v1/contexts/{id}:
+  /api/v1/capabilities/{capability_id}/versions/latest:
     get:
-      summary: "GET contexts/{id}"
+      summary: "GET capabilities/{capability_id}/versions/latest"
+      parameters:
+        - name: capability_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+  /api/v1/capabilities/{id}:
+    get:
+      summary: "GET capabilities/{id}"
       parameters:
         - name: id
           in: path
@@ -1359,7 +535,7 @@ paths:
         "404":
           description: Not found
     put:
-      summary: "PUT contexts/{id}"
+      summary: "PUT capabilities/{id}"
       parameters:
         - name: id
           in: path
@@ -1376,20 +552,12 @@ paths:
                 type: string
               description:
                 type: string
-              type:
-                $ref: "#/components/schemas/models.ContextType"
-              systemPrompt:
+              owner:
                 type: string
-              messages:
+              tags:
                 type: array
-              tokenBudget:
-                type: number
-              truncationStrategy:
-                $ref: "#/components/schemas/models.TruncationStrategy"
-              status:
-                $ref: "#/components/schemas/models.PromptStatus"
-              metadata:
-                type: object
+              state:
+                $ref: "#/components/schemas/capability.State"
       responses:
         "200":
           description: OK
@@ -1406,7 +574,7 @@ paths:
         "500":
           description: Internal server error
     delete:
-      summary: "DELETE contexts/{id}"
+      summary: "DELETE capabilities/{id}"
       parameters:
         - name: id
           in: path
@@ -1428,175 +596,9 @@ paths:
           description: Not found
         "500":
           description: Internal server error
-  /api/v1/contexts/{id}/assemble:
-    post:
-      summary: "POST contexts/{id}/assemble"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              variables:
-                type: object
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/contexts/{id}/messages:
-    post:
-      summary: "POST contexts/{id}/messages"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              role:
-                type: string
-              content:
-                type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-    delete:
-      summary: "DELETE contexts/{id}/messages"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/datasets:
+  /api/v1/executions/{id}:
     get:
-      summary: "GET datasets"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-    post:
-      summary: "POST datasets"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              name:
-                type: string
-              cases:
-                type: array
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/datasets/import:
-    post:
-      summary: "POST datasets/import"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              name:
-                type: string
-              cases:
-                type: array
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/datasets/{id}:
-    get:
-      summary: "GET datasets/{id}"
+      summary: "GET executions/{id}"
       parameters:
         - name: id
           in: path
@@ -1616,505 +618,6 @@ paths:
           description: Unauthorized
         "404":
           description: Not found
-    put:
-      summary: "PUT datasets/{id}"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              name:
-                type: string
-              cases:
-                type: array
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-    delete:
-      summary: "DELETE datasets/{id}"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/datasets/{id}/export:
-    get:
-      summary: "GET datasets/{id}/export"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/datasets/{id}/import-csv:
-    post:
-      summary: "POST datasets/{id}/import-csv"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              cSV:
-                type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/eval/compare:
-    get:
-      summary: "GET eval/compare"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/eval/report:
-    get:
-      summary: "GET eval/report"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/eval/results:
-    get:
-      summary: "GET eval/results"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/eval/run:
-    post:
-      summary: "POST eval/run"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              promptHash:
-                type: string
-              promptText:
-                type: string
-              datasetID:
-                type: string
-              model:
-                type: string
-              scorers:
-                type: array
-              maxTokens:
-                type: number
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/eval/runs:
-    get:
-      summary: "GET eval/runs"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/execution-logs:
-    get:
-      summary: "GET execution-logs"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/execution-logs/{id}:
-    get:
-      summary: "GET execution-logs/{id}"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/guardrails/check:
-    post:
-      summary: "POST guardrails/check"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              content:
-                type: string
-              model:
-                type: string
-              environment:
-                type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/guardrails/rules:
-    get:
-      summary: "GET guardrails/rules"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-    post:
-      summary: "POST guardrails/rules"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              name:
-                type: string
-              type:
-                type: string
-              severity:
-                type: string
-              config:
-                type: object
-              environments:
-                type: array
-              promptIDs:
-                type: array
-              agentIDs:
-                type: array
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/guardrails/rules/{id}:
-    get:
-      summary: "GET guardrails/rules/{id}"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-    put:
-      summary: "PUT guardrails/rules/{id}"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              name:
-                type: string
-              enabled:
-                type: boolean
-              config:
-                type: object
-              environments:
-                type: array
-              promptIDs:
-                type: array
-              agentIDs:
-                type: array
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-    delete:
-      summary: "DELETE guardrails/rules/{id}"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/guardrails/violations:
-    get:
-      summary: "GET guardrails/violations"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/guardrails/violations/{id}/resolve:
-    put:
-      summary: "PUT guardrails/violations/{id}/resolve"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
   /api/v1/logs/search:
     get:
       summary: "GET logs/search"
@@ -2269,210 +772,9 @@ paths:
           description: Unauthorized
         "404":
           description: Not found
-  /api/v1/optimization/tips:
+  /api/v1/projects/{id}:
     get:
-      summary: "GET optimization/tips"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/playground/compare:
-    post:
-      summary: "POST playground/compare"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              prompts:
-                type: array
-              model:
-                type: string
-              variables:
-                type: object
-              provider:
-                type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/playground/run:
-    post:
-      summary: "POST playground/run"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              promptID:
-                type: string
-              content:
-                type: string
-              variables:
-                type: object
-              model:
-                type: string
-              systemMsg:
-                type: string
-              maxTokens:
-                type: number
-              temperature:
-                type: number
-              provider:
-                type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/playground/templates:
-    get:
-      summary: "GET playground/templates"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/prompts:
-    get:
-      summary: "GET prompts"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-    post:
-      summary: "POST prompts"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              name:
-                type: string
-              description:
-                type: string
-              content:
-                type: string
-              variables:
-                type: array
-              tags:
-                type: array
-              modelHint:
-                type: string
-              binding:
-                $ref: "#/components/schemas/models.ProviderBinding"
-              environment:
-                type: string
-              metadata:
-                type: object
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/prompts/similar:
-    get:
-      summary: "handleFindSimilarPrompts finds prompts with similar content using SimHash."
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/prompts/{id}:
-    get:
-      summary: "GET prompts/{id}"
+      summary: "GET projects/{id}"
       parameters:
         - name: id
           in: path
@@ -2493,7 +795,7 @@ paths:
         "404":
           description: Not found
     put:
-      summary: "PUT prompts/{id}"
+      summary: "PUT projects/{id}"
       parameters:
         - name: id
           in: path
@@ -2510,20 +812,6 @@ paths:
                 type: string
               description:
                 type: string
-              content:
-                type: string
-              variables:
-                type: array
-              tags:
-                type: array
-              modelHint:
-                type: string
-              binding:
-                $ref: "#/components/schemas/models.ProviderBinding"
-              status:
-                type: string
-              metadata:
-                type: object
       responses:
         "200":
           description: OK
@@ -2540,7 +828,7 @@ paths:
         "500":
           description: Internal server error
     delete:
-      summary: "DELETE prompts/{id}"
+      summary: "DELETE projects/{id}"
       parameters:
         - name: id
           in: path
@@ -2562,11 +850,11 @@ paths:
           description: Not found
         "500":
           description: Internal server error
-  /api/v1/prompts/{id}/analyze:
+  /api/v1/projects/{project_id}/capabilities:
     get:
-      summary: "GET prompts/{id}/analyze"
+      summary: "GET projects/{project_id}/capabilities"
       parameters:
-        - name: id
+        - name: project_id
           in: path
           required: true
           schema:
@@ -2584,35 +872,10 @@ paths:
           description: Unauthorized
         "404":
           description: Not found
-  /api/v1/prompts/{id}/archive:
     post:
-      summary: "POST prompts/{id}/archive"
+      summary: "POST projects/{project_id}/capabilities"
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/prompts/{id}/clone:
-    post:
-      summary: "POST prompts/{id}/clone"
-      parameters:
-        - name: id
+        - name: project_id
           in: path
           required: true
           schema:
@@ -2625,6 +888,14 @@ paths:
               type: object
               name:
                 type: string
+              description:
+                type: string
+              owner:
+                type: string
+              tags:
+                type: array
+              state:
+                $ref: "#/components/schemas/capability.State"
       responses:
         "200":
           description: OK
@@ -2640,246 +911,6 @@ paths:
           description: Not found
         "500":
           description: Internal server error
-  /api/v1/prompts/{id}/deploy:
-    post:
-      summary: "POST prompts/{id}/deploy"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/prompts/{id}/diff:
-    get:
-      summary: "GET prompts/{id}/diff"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/prompts/{id}/optimize:
-    post:
-      summary: "POST prompts/{id}/optimize"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/prompts/{id}/preview:
-    post:
-      summary: "POST prompts/{id}/preview"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              variables:
-                type: object
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/prompts/{id}/restore:
-    post:
-      summary: "handleRestorePrompt restores a prompt to a previous CAS snapshot."
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              cASHash:
-                type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/prompts/{id}/run:
-    post:
-      summary: "POST prompts/{id}/run"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              variables:
-                type: object
-              provider:
-                type: string
-              model:
-                type: string
-              systemPrompt:
-                type: string
-              maxTokens:
-                type: number
-              temperature:
-                type: number
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/prompts/{id}/stream:
-    post:
-      summary: "POST prompts/{id}/stream"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              variables:
-                type: object
-              provider:
-                type: string
-              model:
-                type: string
-              systemPrompt:
-                type: string
-              maxTokens:
-                type: number
-              temperature:
-                type: number
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/prompts/{id}/versions:
-    get:
-      summary: "handleListPromptVersions returns the version history for a prompt."
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
   /api/v1/providers:
     get:
       summary: "GET providers"
@@ -2956,101 +987,18 @@ paths:
           description: Not found
         "500":
           description: Internal server error
-  /api/v1/reviews:
-    get:
-      summary: "GET reviews"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
+  /api/v1/setup:
     post:
-      summary: "POST reviews"
+      summary: "handleBootstrap is the first-run endpoint that mints an admin\nuser and an admin API key when the deployment is brand-new and\nrunning with authentication disabled."
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              resourceID:
+              email:
                 type: string
-              resourceType:
-                type: string
-              author:
-                type: string
-              quorumRequired:
-                type: number
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/reviews/{id}/approve:
-    put:
-      summary: "PUT reviews/{id}/approve"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/reviews/{id}/comment:
-    post:
-      summary: "POST reviews/{id}/comment"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              userID:
-                type: string
-              content:
+              name:
                 type: string
       responses:
         "200":
@@ -3067,150 +1015,6 @@ paths:
           description: Not found
         "500":
           description: Internal server error
-  /api/v1/reviews/{id}/reject:
-    put:
-      summary: "PUT reviews/{id}/reject"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              reason:
-                type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/search/index:
-    post:
-      summary: "POST search/index"
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/search/semantic:
-    post:
-      summary: "POST search/semantic"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              query:
-                type: string
-              limit:
-                type: number
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-        "500":
-          description: Internal server error
-  /api/v1/search/similar/{id}:
-    get:
-      summary: "GET search/similar/{id}"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/snapshots:
-    get:
-      summary: "handleListSnapshots returns output snapshots."
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/snapshots/{id}:
-    get:
-      summary: "handleGetSnapshot returns a single snapshot by ID."
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
   /api/v1/traces:
     get:
       summary: "GET traces"
@@ -3483,6 +1287,107 @@ paths:
           description: Not found
         "500":
           description: Internal server error
+  /api/v1/version:
+    get:
+      summary: "handleVersion returns the structured build info."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/object"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+  /api/v1/versions/{id}:
+    get:
+      summary: "GET versions/{id}"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+  /api/v1/versions/{version_id}/executions:
+    get:
+      summary: "GET versions/{version_id}/executions"
+      parameters:
+        - name: version_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+    post:
+      summary: "POST versions/{version_id}/executions"
+      parameters:
+        - name: version_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              inputs:
+                type: object
+              model:
+                type: string
+              provider:
+                type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
   /api/v1/webhooks:
     get:
       summary: "GET webhooks"
@@ -3558,9 +1463,9 @@ paths:
           description: Not found
         "500":
           description: Internal server error
-  /api/v1/workflows:
+  /api/v1/workspaces:
     get:
-      summary: "GET workflows"
+      summary: "GET workspaces"
       responses:
         "200":
           description: OK
@@ -3580,19 +1485,18 @@ paths:
           description: Unauthorized
         "404":
           description: Not found
-  /api/v1/workflows/run:
     post:
-      summary: "POST workflows/run"
+      summary: "POST workspaces"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              agentID:
+              name:
                 type: string
-              input:
-                type: object
+              organization:
+                type: string
       responses:
         "200":
           description: OK
@@ -3608,9 +1512,9 @@ paths:
           description: Not found
         "500":
           description: Internal server error
-  /api/v1/workflows/{id}:
+  /api/v1/workspaces/{id}:
     get:
-      summary: "GET workflows/{id}"
+      summary: "GET workspaces/{id}"
       parameters:
         - name: id
           in: path
@@ -3630,9 +1534,41 @@ paths:
           description: Unauthorized
         "404":
           description: Not found
-  /api/v1/workflows/{id}/cancel:
     put:
-      summary: "PUT workflows/{id}/cancel"
+      summary: "PUT workspaces/{id}"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              name:
+                type: string
+              organization:
+                type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+    delete:
+      summary: "DELETE workspaces/{id}"
       parameters:
         - name: id
           in: path
@@ -3654,11 +1590,11 @@ paths:
           description: Not found
         "500":
           description: Internal server error
-  /api/v1/workflows/{id}/steps:
+  /api/v1/workspaces/{workspace_id}/projects:
     get:
-      summary: "GET workflows/{id}/steps"
+      summary: "GET workspaces/{workspace_id}/projects"
       parameters:
-        - name: id
+        - name: workspace_id
           in: path
           required: true
           schema:
@@ -3676,6 +1612,39 @@ paths:
           description: Unauthorized
         "404":
           description: Not found
+    post:
+      summary: "POST workspaces/{workspace_id}/projects"
+      parameters:
+        - name: workspace_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              name:
+                type: string
+              description:
+                type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
   /health:
     get:
       summary: "GET health"
