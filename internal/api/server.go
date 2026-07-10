@@ -21,7 +21,6 @@ import (
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/ratelimit"
 	"github.com/sachncs/promptsheon/internal/search"
-	"github.com/sachncs/promptsheon/internal/snapshot"
 	"github.com/sachncs/promptsheon/internal/store"
 	"github.com/sachncs/promptsheon/internal/trace"
 	"github.com/sachncs/promptsheon/internal/vault"
@@ -43,7 +42,6 @@ type Server struct {
 	evalRunner       *eval.Runner
 	spans            *trace.SQLite
 	collector        *metrics.Collector
-	snapshotStore    *snapshot.Store
 	webhooks         *webhook.Dispatcher
 	vault            *vault.Vault
 	oauth            *auth.OAuthManager
@@ -129,13 +127,6 @@ func WithTracing(spans *trace.SQLite, collector *metrics.Collector) Option {
 	return func(s *Server) {
 		s.spans = spans
 		s.collector = collector
-	}
-}
-
-// WithSnapshotStore attaches an output snapshot store.
-func WithSnapshotStore(ss *snapshot.Store) Option {
-	return func(s *Server) {
-		s.snapshotStore = ss
 	}
 }
 
