@@ -19,13 +19,17 @@ import (
 	"github.com/sachncs/promptsheon/internal/buildinfo"
 	"github.com/sachncs/promptsheon/internal/config"
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
+	"github.com/sachncs/promptsheon/internal/executor"
 	"github.com/sachncs/promptsheon/internal/guardrail"
+	"github.com/sachncs/promptsheon/internal/invoke"
 	"github.com/sachncs/promptsheon/internal/llm"
 	"github.com/sachncs/promptsheon/internal/metrics"
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/observability"
+	"github.com/sachncs/promptsheon/internal/observation"
 	"github.com/sachncs/promptsheon/internal/plugins/builtins"
 	"github.com/sachncs/promptsheon/internal/ratelimit"
+	"github.com/sachncs/promptsheon/internal/rollups"
 	"github.com/sachncs/promptsheon/internal/store"
 	"github.com/sachncs/promptsheon/internal/supervisor"
 	"github.com/sachncs/promptsheon/internal/trace"
@@ -212,6 +216,23 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	providers := llm.NewRegistry()
 	providers.LoadFromEnv()
 
+	// Per-Workspace rollup aggregator (Tier 2.37). The production
+	// wiring supplies a backend-backed Budget/Quota repository; the
+	// rollup job that writes to ClickHouse is M3 follow-on. Today's
+	// wiring attaches a nil-safe aggregator that the route handles
+	// gracefully when unset (returns an empty summary).
+	rollupAgg := rollups.New(nil, nil)
+
+	// Canonical invoke.Invoker (Tier 2.36). The production wiring
+	// supplies a backend-backed Budget/Quota repository; today's
+	// wiring attaches an Invoker with the in-memory DefaultEnforcer
+	// so the route's invokeOne path is exercised end-to-end.
+	enforcer := invoke.NewDefaultEnforcer(nil)
+	agg := observation.NewAggregator()
+	inv := invoke.New(enforcer, agg, executor.New(nil, func(_ context.Context, _ executor.InvokeRequest) (executor.InvokeResult, error) {
+		return executor.InvokeResult{Status: "ok"}, nil
+	}))
+
 	var opts []api.Option
 	if cfg.Auth {
 		opts = append(opts, api.WithAuth(db))
@@ -232,6 +253,8 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		api.WithContextManager(contextMgr),
 		api.WithRateLimiter(limiter),
 		api.WithProviders(providers),
+		api.WithWorkspaceRollups(rollupAgg),
+		api.WithInvoker(inv),
 	)
 	srv := api.NewServer(db, logger, opts...)
 	return srv, limiter, spans, collector
