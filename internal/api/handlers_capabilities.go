@@ -1,6 +1,10 @@
 package api
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -9,6 +13,21 @@ import (
 )
 
 const fieldVersion = "version"
+
+// computeManifestHash returns the canonical SHA-256 hex of a Manifest
+// in its JSON serialisation. It is used to set Version.ManifestHash,
+// which becomes the deduplication key on the CAS table that the
+// content-addressable store will be backed by in a later milestone.
+func computeManifestHash(m capability.Manifest) (string, error) {
+	b, err := json.Marshal(m)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+var _ = fmt.Sprintf
 
 func (s *Server) handleListWorkspaces(w http.ResponseWriter, r *http.Request) error {
 	workspaces, err := s.db.ListWorkspaces(r.Context())
@@ -315,6 +334,7 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 	capabilityID := r.PathValue("capability_id")
 	var req struct {
 		Version         int                          `json:"version"`
+		Manifest        capability.Manifest          `json:"manifest"`
 		Prompt          capability.Prompt            `json:"prompt"`
 		ModelPolicy     capability.ModelPolicy       `json:"model_policy"`
 		ContextContract capability.ContextContract   `json:"context_contract"`
@@ -329,11 +349,35 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
+
+	// During the transition window (migration 023) the API still
+	// accepts the legacy bundle shape. When the request carries no
+	// manifest we synthesise one from the bundle so the persisted
+	// row is consistent. Once the legacy columns are dropped in a
+	// later migration this synthesis block will be removed and
+	// every request must supply a manifest.
+	manifest := req.Manifest
+	if manifestIsEmpty(manifest) {
+		manifest = manifestFromLegacy(
+			req.Prompt, req.ModelPolicy, req.ContextContract,
+			req.Memory, req.Knowledge, req.Guardrails,
+			req.Tools, req.MCPServers,
+		)
+	}
+	if err := manifest.Validate(); err != nil {
+		return badRequest("manifest: " + err.Error())
+	}
+	hash, err := computeManifestHash(manifest)
+	if err != nil {
+		return fmt.Errorf("compute manifest hash: %w", err)
+	}
 	now := time.Now()
 	v := &capability.Version{
 		ID:              generateID(),
 		CapabilityID:    capabilityID,
 		Version:         req.Version,
+		Manifest:        manifest,
+		ManifestHash:    hash,
 		Prompt:          req.Prompt,
 		ModelPolicy:     req.ModelPolicy,
 		ContextContract: req.ContextContract,
@@ -350,9 +394,76 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 	if err := s.db.CreateVersion(r.Context(), v); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "version:"+v.ID, map[string]any{"capability_id": capabilityID, fieldVersion: v.Version})
+	s.audit(r.Context(), "create", "version:"+v.ID, map[string]any{"capability_id": capabilityID, fieldVersion: v.Version, "manifest_hash": hash})
 	writeJSON(w, http.StatusCreated, v)
 	return nil
+}
+
+// manifestIsEmpty reports whether m has no populated artifact references.
+// An empty Manifest with default Kind values would otherwise Validate
+// as ErrEmptyManifest; this helper decides whether to synthesise from
+// legacy fields first.
+func manifestIsEmpty(m capability.Manifest) bool {
+	return m.Prompt.Hash == "" &&
+		m.ModelPolicy.Hash == "" &&
+		m.RuntimePolicy.Hash == "" &&
+		m.Context.Hash == "" &&
+		m.Memory.Hash == ""
+}
+
+// manifestFromLegacy builds a content-addressed Manifest from the
+// legacy embedded-bundle fields by hashing the canonical JSON of
+// each value. The hashes are deterministic; the same legacy bundle
+// always produces the same manifest hash. Synthetic placeholder
+// hashes for empty values satisfy the kind requirement while
+// leaving the obvious "this came from a legacy row" footprint in
+// the manifest_hash column during the transition window.
+func manifestFromLegacy(
+	p capability.Prompt, mp capability.ModelPolicy, cc capability.ContextContract,
+	mem capability.MemoryConfig, ks []capability.KnowledgeSource, gs []capability.Guardrail,
+	ts []capability.Tool, ms []capability.MCPServer,
+) capability.Manifest {
+	refFrom := func(kind capability.ArtifactKind, v any) capability.ArtifactRef {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return capability.ArtifactRef{Kind: kind, Hash: legacyPlaceholderHash(kind)}
+		}
+		return capability.ArtifactRef{Kind: kind, Hash: sha256Hex(b)}
+	}
+	m := capability.Manifest{
+		Prompt:        refFrom(capability.ArtifactPrompt, p),
+		ModelPolicy:   refFrom(capability.ArtifactModelPolicy, mp),
+		RuntimePolicy: refFrom(capability.ArtifactRuntimePolicy, capability.RuntimePolicy{}),
+		Context:       refFrom(capability.ArtifactContext, cc),
+		Memory:        refFrom(capability.ArtifactMemory, mem),
+	}
+	for _, k := range ks {
+		m.Knowledge = append(m.Knowledge, refFrom(capability.ArtifactKnowledge, k))
+	}
+	for _, g := range gs {
+		m.Guardrails = append(m.Guardrails, refFrom(capability.ArtifactGuardrail, g))
+	}
+	for _, t := range ts {
+		m.Tools = append(m.Tools, refFrom(capability.ArtifactTool, t))
+	}
+	for _, sv := range ms {
+		m.MCPServers = append(m.MCPServers, refFrom(capability.ArtifactMCPServer, sv))
+	}
+	return m
+}
+
+// sha256Hex returns hex(sha256(b)).
+func sha256Hex(b []byte) string {
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
+}
+
+// legacyPlaceholderHash is used when marshalling fails. It is a
+// recognisable 64-hex string that flags the row as having arrived via
+// the migration rather than the canonical CAS path.
+func legacyPlaceholderHash(kind capability.ArtifactKind) string {
+	digest := sha256.Sum256([]byte("legacy:" + string(kind)))
+	return hex.EncodeToString(digest[:])
 }
 
 func (s *Server) handleGetVersion(w http.ResponseWriter, r *http.Request) error {
