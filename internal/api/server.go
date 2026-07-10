@@ -205,6 +205,17 @@ func WithRateLimiter(l *ratelimit.Limiter) Option {
 	}
 }
 
+// WithWorkspaceRollups attaches the per-Workspace rollup
+// aggregator. The Tier 2.37 GET /v1/workspaces/{id}/observation
+// route queries this aggregator; when nil, the route returns
+// an empty summary so the route is observable while the
+// production rollup job ships in M3 follow-on.
+func WithWorkspaceRollups(a *rollups.Aggregator) Option {
+	return func(s *Server) {
+		s.rollupAgg = a
+	}
+}
+
 // WithServerConfig sets the server configuration.
 func WithServerConfig(cfg *ServerConfig) Option {
 	return func(s *Server) {
