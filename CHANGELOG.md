@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Version bundle → Manifest split** — `internal/capability/manifest.go`
+  introduces a content-addressed Manifest type that references each
+  Capability Version's leaf artifacts (Prompt, ModelPolicy,
+  RuntimePolicy, ContextContract, Memory, Guardrails, Tools,
+  KnowledgeSources, MCPServers) by SHA-256 hash. Decouples artifact
+  evolution from Version numbering; stops the version-explosion
+  pattern where a guardrail typo produced v17.43.118. ADR-0010.
+- **`release` package** — Release aggregate with `Pending → Approved
+  → Active → Superseded/RolledBack` lifecycle. Environment is a
+  closed set (dev/staging/prod); only one Release may be Active per
+  Environment per Capability at a time. Rollback produces a successor
+  Release rather than mutating the predecessor.
+- **`approval` package** — Approval aggregate with `MajorityPolicy`
+  and `MakerCheckerPolicy`; `VerifySeparationOfDuties` enforces that
+  the Release creator is not in the Approver list.
+- **`recommendation` package** — Decision value type with
+  `Adopted`, `Rejected`, `Superseded` outcomes; `NewAdoptedAuto` and
+  `NewAdopted` distinguish human and auto-promotion in audit logs;
+  `CanAutoAdopt` encodes the conservative default for which
+  Recommendation types are eligible for auto-promotion.
+- **`policy` package** — Workspace-scoped Policies (`AllowedProviders`,
+  `CostCeiling`, `ChangeWindow`, `PIIRedaction`, `DataResidency`)
+  with a `Bundle` aggregator that short-circuits on Deny/Redact.
+  Policies are fail-closed and deterministic so they can be recorded
+  in audit logs and replayed.
+- **`eventbus` package** — Consumer-defined `Publisher` interface
+  with a default in-memory synchronous implementation. Subscribers
+  are filtered by EventType; panics are recovered so a buggy
+  subscriber does not poison the audit chain.
+- **`lineage` package** — `Graph` and `Edge` types that record
+  parent → child Capability Version derivations and the
+  Recommendation that motivated them. Closes the audit gap between
+  "v18 exists" and "v18 came from v17 because of recommendation R".
+- **ADRs 0010 and 0011** — design decisions for the Manifest split
+  and the Release/Approval separation.
+
 ### Security
 
 - **26 gosec issues resolved** — permissions tightened to owner-only
