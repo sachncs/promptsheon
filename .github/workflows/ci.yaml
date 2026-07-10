@@ -87,6 +87,12 @@ jobs:
           go-version: "1.26.5"
           cache: true
 
+      - name: Lint domain packages (no package-level mutable state)
+        # CI gate enforcing Charter Principle 5 — domain packages
+        # MUST NOT declare package-level mutable state (vars that
+        # are not error sentinels or import pins). See ADR-0012.
+        run: make lint-domain
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:

@@ -54,19 +54,23 @@ const (
 	EnvProd    Environment = "prod"
 )
 
-// AllEnvironments is the closed set of supported environments, in the
-// order they appear in a typical promotion pipeline.
-var AllEnvironments = []Environment{EnvDev, EnvStaging, EnvProd}
+// AllEnvironments returns the closed set of supported environments, in
+// the order they appear in a typical promotion pipeline. It is a
+// function (not a package-level variable) so the slice is constructed
+// at call time and the package declares no mutable state.
+func AllEnvironments() []Environment {
+	return []Environment{EnvDev, EnvStaging, EnvProd}
+}
 
 // Valid reports whether the environment is one of the supported
 // closed-set values.
 func (e Environment) Valid() bool {
-	for _, v := range AllEnvironments {
-		if v == e {
-			return true
-		}
+	switch e {
+	case EnvDev, EnvStaging, EnvProd:
+		return true
+	default:
+		return false
 	}
-	return false
 }
 
 // ErrNotPending is returned when a transition is attempted on a

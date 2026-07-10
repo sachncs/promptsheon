@@ -1,4 +1,4 @@
-.PHONY: all build build-server build-cli test lint clean help
+.PHONY: all build build-server build-cli test lint lint-domain clean help
 
 # Default target
 all: build
@@ -29,6 +29,13 @@ test-integration:
 # Run linter
 lint:
 	golangci-lint run
+
+# Lint domain packages: fail on any package-level mutable state
+# (Charter Principle 5). Runs as part of CI. The check is a small
+# AST walker at scripts/check-no-package-state.go; it allows error
+# sentinels and import-pin discards.
+lint-domain:
+	go run ./scripts/check-no-package-state.go
 
 # Format code
 fmt:
@@ -107,6 +114,7 @@ help:
 	@echo "  test-verbose     Run tests with verbose output"
 	@echo "  test-integration Run integration tests"
 	@echo "  lint             Run golangci-lint"
+	@echo "  lint-domain      Fail on package-level mutable state in domain packages"
 	@echo "  fmt              Format code with gofmt and goimports"
 	@echo "  vet              Run go vet"
 	@echo "  deps             Download and verify dependencies"
