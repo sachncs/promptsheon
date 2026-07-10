@@ -1,0 +1,32 @@
+[project]
+name = "promptsheon"
+version = "0.0.7"
+description = "Auto-generated Python client for the Promptsheon v1 API."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Promptsheon Maintainers", email = "maintainers@promptsheon.dev" }]
+keywords = ["promptsheon", "api", "openapi"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.6",
+]
+
+[project.optional-dependencies]
+codegen = ["openapi-python-client>=0.21"]
+
+[project.urls]
+Homepage = "https://github.com/sachncs/promptsheon"
+Source = "https://github.com/sachncs/promptsheon"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
