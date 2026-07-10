@@ -455,6 +455,8 @@ paths:
               type: object
               version:
                 type: number
+              manifest:
+                $ref: "#/components/schemas/capability.Manifest"
               prompt:
                 $ref: "#/components/schemas/capability.Prompt"
               modelPolicy:
