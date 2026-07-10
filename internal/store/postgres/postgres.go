@@ -234,9 +234,10 @@ func (p *Postgres) DeleteProject(ctx context.Context, id string) error {
 // CreateCapability implements capability.Repository.
 //
 // Note: capability.State is derived from Releases (M0.8); the row
-// is inserted with state='draft' and capability.current_version_id
-// empty so the schema stays forward-compatible but the column has
-// no semantic meaning. Callers that need the live state call
+// is inserted with the legacy state/current_version_id columns
+// supplied defaults ('draft', '') for forward-compatibility with
+// the SQLite schema that retains those columns until migration 026
+// drops them. Callers that need the live state call
 // capability.DeriveState over the Release set.
 func (p *Postgres) CreateCapability(ctx context.Context, c *capability.Capability) error {
 	tags, err := jsonMarshal(c.Tags)
