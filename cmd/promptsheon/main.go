@@ -869,8 +869,9 @@ func cmdRun(args []string) error {
 		return usageErrorf("promptsheon run --provider <name> --model <model> --prompt <text>")
 	}
 
-	llm.LoadFromEnv()
-	p, err := llm.Default().Get(provider)
+	providers := llm.NewRegistry()
+	providers.LoadFromEnv()
+	p, err := providers.Get(provider)
 	if err != nil {
 		return fmt.Errorf("provider not available: %w", err)
 	}
@@ -902,19 +903,21 @@ func cmdProvider(args []string) error {
 
 	switch args[0] {
 	case opList:
-		llm.LoadFromEnv()
-		providers := llm.Default().Providers()
+		providers := llm.NewRegistry()
+		providers.LoadFromEnv()
+		names := providers.Providers()
 		fmt.Println("Registered providers:")
-		for _, name := range providers {
+		for _, name := range names {
 			fmt.Printf("  - %s\n", name)
 		}
 	case cmdTest:
 		if len(args) < 2 {
 			return usageErrorf("promptsheon provider test <name>")
 		}
-		llm.LoadFromEnv()
+		providers := llm.NewRegistry()
+		providers.LoadFromEnv()
 		name := args[1]
-		p, err := llm.Default().Get(name)
+		p, err := providers.Get(name)
 		if err != nil {
 			return fmt.Errorf("provider not available: %w", err)
 		}

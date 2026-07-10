@@ -7,21 +7,26 @@ import (
 )
 
 // Registry manages provider construction and lookup.
+//
+// A Registry is an explicit value owned by the caller; it is not a
+// package-level singleton. Wiring is performed at process startup
+// (cmd/promptsheond or cmd/promptsheon) and the resulting Registry is
+// passed to consumers via dependency injection. See ADR-0012 for the
+// rationale.
 type Registry struct {
 	mu        sync.RWMutex
 	providers map[string]func(ProviderConfig) Provider
 	configs   map[string]ProviderConfig
-	cache     map[string]Provider // cached provider instances
+	cache     map[string]Provider
 }
 
-// Default returns the default provider registry, pre-populated with all
-// built-in providers.
-func Default() *Registry { return global }
-
-// global is the default provider registry instance. Exported as Default().
-var global = newRegistry()
-
-func newRegistry() *Registry {
+// NewRegistry constructs a Registry pre-populated with the built-in
+// providers (openai, anthropic, ollama, azure, nvidia). A fresh
+// Registry is safe for concurrent use.
+//
+// Tests and embedders can construct their own Registry and Register
+// only the providers they need.
+func NewRegistry() *Registry {
 	r := &Registry{
 		providers: make(map[string]func(ProviderConfig) Provider),
 		configs:   make(map[string]ProviderConfig),
@@ -40,16 +45,14 @@ func (r *Registry) Register(name string, factory func(ProviderConfig) Provider) 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.providers[name] = factory
-	// Invalidate cache when factory changes
 	delete(r.cache, name)
 }
 
-// Configure sets the config for a named provider and invalidates cache.
+// Configure sets the config for a named provider and invalidates the cache.
 func (r *Registry) Configure(name string, cfg ProviderConfig) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.configs[name] = cfg
-	// Invalidate cache when config changes
 	delete(r.cache, name)
 }
 
@@ -62,9 +65,6 @@ func (r *Registry) Get(name string) (Provider, error) {
 	}
 	r.mu.RUnlock()
 
-	// Double-checked locking: re-acquire write lock to avoid a race
-	// where two concurrent calls both miss the cache and create
-	// duplicate instances of the same provider.
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -97,37 +97,40 @@ func (r *Registry) Providers() []string {
 	return names
 }
 
-// LoadFromEnv configures providers from environment variables.
-// Supported env vars:
+// LoadFromEnv configures providers from environment variables on this
+// Registry instance (not a package-level singleton). Supported env vars:
 //
-//	PROMPTSHEON_LLM_PROVIDER     — default provider name
-//	PROMPTSHEON_OPENAI_API_KEY   — OpenAI API key
-//	PROMPTSHEON_OPENAI_BASE_URL  — OpenAI base URL (optional)
+//	PROMPTSHEON_LLM_PROVIDER      — default provider name
+//	PROMPTSHEON_OPENAI_API_KEY    — OpenAI API key
+//	PROMPTSHEON_OPENAI_BASE_URL   — OpenAI base URL (optional)
 //	PROMPTSHEON_ANTHROPIC_API_KEY — Anthropic API key
 //	PROMPTSHEON_ANTHROPIC_BASE_URL — Anthropic base URL (optional)
-//	PROMPTSHEON_OLLAMA_BASE_URL  — Ollama base URL (optional)
-//	PROMPTSHEON_NVIDIA_API_KEY   — NVIDIA NIM API key
-//	PROMPTSHEON_NVIDIA_BASE_URL  — NVIDIA NIM base URL (optional)
-func LoadFromEnv() string {
+//	PROMPTSHEON_OLLAMA_BASE_URL   — Ollama base URL (optional)
+//	PROMPTSHEON_NVIDIA_API_KEY    — NVIDIA NIM API key
+//	PROMPTSHEON_NVIDIA_BASE_URL   — NVIDIA base URL (optional)
+//
+// Returns the value of PROMPTSHEON_LLM_PROVIDER (empty string when
+// unset) for callers that want to default to a specific provider.
+func (r *Registry) LoadFromEnv() string {
 	if v := os.Getenv("PROMPTSHEON_OPENAI_API_KEY"); v != "" {
-		global.Configure("openai", ProviderConfig{
+		r.Configure("openai", ProviderConfig{
 			APIKey:  v,
 			BaseURL: os.Getenv("PROMPTSHEON_OPENAI_BASE_URL"),
 		})
 	}
 	if v := os.Getenv("PROMPTSHEON_ANTHROPIC_API_KEY"); v != "" {
-		global.Configure("anthropic", ProviderConfig{
+		r.Configure("anthropic", ProviderConfig{
 			APIKey:  v,
 			BaseURL: os.Getenv("PROMPTSHEON_ANTHROPIC_BASE_URL"),
 		})
 	}
 	if v := os.Getenv("PROMPTSHEON_OLLAMA_BASE_URL"); v != "" {
-		global.Configure("ollama", ProviderConfig{
+		r.Configure("ollama", ProviderConfig{
 			BaseURL: v,
 		})
 	}
 	if v := os.Getenv("PROMPTSHEON_AZURE_API_KEY"); v != "" {
-		global.Configure("azure", ProviderConfig{
+		r.Configure("azure", ProviderConfig{
 			APIKey:  v,
 			BaseURL: os.Getenv("PROMPTSHEON_AZURE_RESOURCE"),
 			Extra: map[string]string{
@@ -137,7 +140,7 @@ func LoadFromEnv() string {
 		})
 	}
 	if v := os.Getenv("PROMPTSHEON_NVIDIA_API_KEY"); v != "" {
-		global.Configure("nvidia", ProviderConfig{
+		r.Configure("nvidia", ProviderConfig{
 			APIKey:  v,
 			BaseURL: os.Getenv("PROMPTSHEON_NVIDIA_BASE_URL"),
 		})

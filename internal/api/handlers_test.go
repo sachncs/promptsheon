@@ -18,6 +18,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/alerting"
 	"github.com/sachncs/promptsheon/internal/auth"
 	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/llm"
 	"github.com/sachncs/promptsheon/internal/metrics"
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/ratelimit"
@@ -463,7 +464,12 @@ func (m *mockRepo) ListExecutions(_ context.Context, filter store.ExecutionFilte
 func newTestServer(t *testing.T, opts ...Option) *Server {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError}))
-	return NewServer(newMockRepo(), logger, opts...)
+	providers := llm.NewRegistry()
+	providers.Configure("openai", llm.ProviderConfig{APIKey: "sk-test"})
+	allOpts := make([]Option, 0, 2+len(opts))
+	allOpts = append(allOpts, WithProviders(providers))
+	allOpts = append(allOpts, opts...)
+	return NewServer(newMockRepo(), logger, allOpts...)
 }
 
 func newAuthTestServer(t *testing.T, repo store.Repository, opts ...Option) *Server {

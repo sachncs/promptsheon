@@ -6,7 +6,7 @@ import (
 )
 
 func TestRegistryGetWithConfig(t *testing.T) {
-	r := newRegistry()
+	r := NewRegistry()
 	r.Configure("openai", ProviderConfig{APIKey: "sk-test"})
 	p, err := r.Get("openai")
 	if err != nil {
@@ -18,7 +18,7 @@ func TestRegistryGetWithConfig(t *testing.T) {
 }
 
 func TestRegistryGetNoConfig(t *testing.T) {
-	r := newRegistry()
+	r := NewRegistry()
 	_, err := r.Get("openai")
 	if err == nil {
 		t.Fatal("expected error for unconfigured provider")
@@ -26,7 +26,7 @@ func TestRegistryGetNoConfig(t *testing.T) {
 }
 
 func TestRegistryGetUnknown(t *testing.T) {
-	r := newRegistry()
+	r := NewRegistry()
 	_, err := r.Get("nonexistent")
 	if err == nil {
 		t.Fatal("expected error for unknown provider")
@@ -34,7 +34,7 @@ func TestRegistryGetUnknown(t *testing.T) {
 }
 
 func TestRegistryConfigureInvalidatesCache(t *testing.T) {
-	r := newRegistry()
+	r := NewRegistry()
 	r.Configure("openai", ProviderConfig{APIKey: "sk-old"})
 	p1, err := r.Get("openai")
 	if err != nil {
@@ -51,7 +51,7 @@ func TestRegistryConfigureInvalidatesCache(t *testing.T) {
 }
 
 func TestRegistryConcurrentGet(t *testing.T) {
-	r := newRegistry()
+	r := NewRegistry()
 	r.Configure("openai", ProviderConfig{APIKey: "sk-concurrent"})
 
 	var (
@@ -86,7 +86,7 @@ func TestRegistryConcurrentGet(t *testing.T) {
 }
 
 func TestRegistryRegisterInvalidatesCache(t *testing.T) {
-	r := newRegistry()
+	r := NewRegistry()
 	r.Configure("custom", ProviderConfig{APIKey: "sk-custom"})
 	// Register a factory that would be needed for "custom"
 	r.Register("custom", func(cfg ProviderConfig) Provider {

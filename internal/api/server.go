@@ -16,6 +16,7 @@ import (
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
 	"github.com/sachncs/promptsheon/internal/eval"
 	"github.com/sachncs/promptsheon/internal/guardrail"
+	"github.com/sachncs/promptsheon/internal/llm"
 	"github.com/sachncs/promptsheon/internal/metrics"
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/ratelimit"
@@ -52,6 +53,7 @@ type Server struct {
 	alertingManager  *alerting.Manager
 	rateLimiter      *ratelimit.Limiter
 	contextManager   *contextpkg.Manager
+	providers        *llm.Registry
 
 	// auditQueue is a bounded channel feeding the audit worker pool.
 	auditQueue chan *models.AuditEntry
@@ -190,6 +192,16 @@ func WithAlertingManager(m *alerting.Manager) Option {
 func WithContextManager(m *contextpkg.Manager) Option {
 	return func(s *Server) {
 		s.contextManager = m
+	}
+}
+
+// WithProviders attaches the LLM provider Registry to the server. The
+// Registry is the single source of truth for provider construction and
+// lookup at runtime; it must be supplied by main, never shared as a
+// package-level singleton. See ADR-0012.
+func WithProviders(p *llm.Registry) Option {
+	return func(s *Server) {
+		s.providers = p
 	}
 }
 
