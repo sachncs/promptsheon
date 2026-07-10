@@ -56,7 +56,7 @@ func TestPublisherReceivesAllWhenFilterEmpty(t *testing.T) {
 	defer sub.Cancel()
 
 	_ = p.Publish(capability.Event{Type: capability.EventVersionCreated, ID: "1"})
-	_ = p.Publish(capability.Event{Type: capability.EventDeploymentSucceeded, ID: "2"})
+	_ = p.Publish(capability.Event{Type: capability.EventExecutionFinished, ID: "2"})
 
 	mu.Lock()
 	defer mu.Unlock()

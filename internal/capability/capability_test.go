@@ -3,7 +3,6 @@ package capability
 import (
 	"encoding/json"
 	"testing"
-	"time"
 )
 
 func TestCapabilityDefaults(t *testing.T) {
@@ -430,55 +429,16 @@ func TestRecommendationTypes(t *testing.T) {
 	}
 }
 
-func TestDeploymentLifecycle(t *testing.T) {
-	now := time.Now()
+// TestDeploymentLifecycleMoved is intentionally omitted post-M0.5:
+// Deployment was merged into the Release aggregate (commit removing
+// internal/capability/deployment.go). The Release lifecycle is
+// tested in internal/release/release_test.go (TestApprove*, TestActivateRequiresApproved,
+// TestSupersedeRequiresActive).
 
-	d := Deployment{
-		Status: DeploymentStatusPending,
-	}
-
-	if d.Status != DeploymentStatusPending {
-		t.Errorf("expected pending status")
-	}
-
-	// Transition to active
-	d.Status = DeploymentStatusActive
-	d.Health = DeploymentHealthHealthy
-
-	if d.Status != DeploymentStatusActive {
-		t.Errorf("expected active status")
-	}
-	if d.Health != DeploymentHealthHealthy {
-		t.Errorf("expected healthy")
-	}
-
-	// Transition to rolled back
-	rb := now.Add(30 * time.Minute)
-	d.Status = DeploymentStatusRolledBack
-	d.RolledBackAt = &rb
-
-	if d.Status != DeploymentStatusRolledBack {
-		t.Errorf("expected rolled back")
-	}
-	if d.RolledBackAt == nil {
-		t.Errorf("expected rolled back timestamp")
-	}
-}
-
-func TestDeploymentHealthValues(t *testing.T) {
-	healthValues := []DeploymentHealth{
-		DeploymentHealthHealthy,
-		DeploymentHealthDegraded,
-		DeploymentHealthUnhealthy,
-	}
-
-	for _, h := range healthValues {
-		d := Deployment{Health: h}
-		if d.Health != h {
-			t.Errorf("health round-trip failed for %s", h)
-		}
-	}
-}
+// TestDeploymentHealthValuesRemoved: Deployment was merged into
+// Release in commit removing internal/capability/deployment.go.
+// Release health is not yet surfaced; the consolidated Release tests
+// in internal/release/release_test.go cover the lifecycle.
 
 func TestEventTypes(t *testing.T) {
 	eventTypes := []EventType{
@@ -489,10 +449,6 @@ func TestEventTypes(t *testing.T) {
 		EventVersionPromoted,
 		EventEvaluationCompleted,
 		EventEvaluationThresholdsMet,
-		EventDeploymentStarted,
-		EventDeploymentSucceeded,
-		EventDeploymentFailed,
-		EventDeploymentRolledBack,
 		EventExecutionFinished,
 		EventObservationGenerated,
 		EventRecommendationGenerated,
