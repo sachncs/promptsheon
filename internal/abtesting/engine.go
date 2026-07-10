@@ -177,31 +177,38 @@ func (e *Engine) SelectVariant(testID string) (*Variant, error) {
 	return test.Variants[0], nil
 }
 
+// ResultMetrics holds the numerical measurements for a variant execution.
+type ResultMetrics struct {
+	LatencyMs float64
+	Tokens    float64
+	Cost      float64
+}
+
 // RecordResult records the result of a variant execution.
-func (e *Engine) RecordResult(testID, variantID string, success bool, latencyMs, tokens, cost float64) {
+func (e *Engine) RecordResult(testID, variantID string, success bool, m ResultMetrics) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	metrics, exists := e.metrics[testID][variantID]
+	agg, exists := e.metrics[testID][variantID]
 	if !exists {
 		return
 	}
 
-	metrics.TotalRuns++
+	agg.TotalRuns++
 	if success {
-		metrics.SuccessCount++
+		agg.SuccessCount++
 	} else {
-		metrics.ErrorCount++
+		agg.ErrorCount++
 	}
 
 	// Update averages
-	n := float64(metrics.TotalRuns)
-	metrics.AvgLatencyMs = (metrics.AvgLatencyMs*(n-1) + latencyMs) / n
-	metrics.AvgTokens = (metrics.AvgTokens*(n-1) + tokens) / n
-	metrics.AvgCost = (metrics.AvgCost*(n-1) + cost) / n
+	n := float64(agg.TotalRuns)
+	agg.AvgLatencyMs = (agg.AvgLatencyMs*(n-1) + m.LatencyMs) / n
+	agg.AvgTokens = (agg.AvgTokens*(n-1) + m.Tokens) / n
+	agg.AvgCost = (agg.AvgCost*(n-1) + m.Cost) / n
 
-	if metrics.TotalRuns > 0 {
-		metrics.SuccessRate = float64(metrics.SuccessCount) / float64(metrics.TotalRuns)
+	if agg.TotalRuns > 0 {
+		agg.SuccessRate = float64(agg.SuccessCount) / float64(agg.TotalRuns)
 	}
 }
 

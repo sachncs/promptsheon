@@ -12,14 +12,14 @@ const valError = "error"
 const fieldModel = "model"
 
 func (s *Server) handleListProviders(w http.ResponseWriter, _ *http.Request) error {
-	names := llm.Global.Providers()
+	names := llm.Default().Providers()
 	writeJSON(w, http.StatusOK, map[string]any{"providers": names})
 	return nil
 }
 
 func (s *Server) handleGetProvider(w http.ResponseWriter, r *http.Request) error {
 	name := r.PathValue("name")
-	names := llm.Global.Providers()
+	names := llm.Default().Providers()
 	found := false
 	for _, n := range names {
 		if n == name {
@@ -50,7 +50,7 @@ func (s *Server) handleTestProvider(w http.ResponseWriter, r *http.Request) erro
 		req.Model = "gpt-3.5-turbo"
 	}
 
-	provider, err := llm.Global.Get(name)
+	provider, err := llm.Default().Get(name)
 	if err != nil {
 		return badRequest("provider not available: " + err.Error())
 	}

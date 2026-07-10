@@ -870,7 +870,7 @@ func cmdRun(args []string) error {
 	}
 
 	llm.LoadFromEnv()
-	p, err := llm.Global.Get(provider)
+	p, err := llm.Default().Get(provider)
 	if err != nil {
 		return fmt.Errorf("provider not available: %w", err)
 	}
@@ -903,7 +903,7 @@ func cmdProvider(args []string) error {
 	switch args[0] {
 	case opList:
 		llm.LoadFromEnv()
-		providers := llm.Global.Providers()
+		providers := llm.Default().Providers()
 		fmt.Println("Registered providers:")
 		for _, name := range providers {
 			fmt.Printf("  - %s\n", name)
@@ -914,7 +914,7 @@ func cmdProvider(args []string) error {
 		}
 		llm.LoadFromEnv()
 		name := args[1]
-		p, err := llm.Global.Get(name)
+		p, err := llm.Default().Get(name)
 		if err != nil {
 			return fmt.Errorf("provider not available: %w", err)
 		}

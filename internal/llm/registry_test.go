@@ -54,21 +54,35 @@ func TestRegistryConcurrentGet(t *testing.T) {
 	r := newRegistry()
 	r.Configure("openai", ProviderConfig{APIKey: "sk-concurrent"})
 
-	var wg sync.WaitGroup
+	var (
+		wg      sync.WaitGroup
+		errs    = make(chan error, 20)
+		zeroErr = make(chan struct{}, 20)
+	)
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			p, err := r.Get("openai")
 			if err != nil {
-				t.Errorf("concurrent Get: %v", err)
+				errs <- err
+				return
 			}
 			if p == nil {
-				t.Errorf("concurrent Get returned nil")
+				zeroErr <- struct{}{}
 			}
 		}()
 	}
 	wg.Wait()
+	close(errs)
+	close(zeroErr)
+
+	for err := range errs {
+		t.Errorf("concurrent Get: %v", err)
+	}
+	if len(zeroErr) > 0 {
+		t.Errorf("concurrent Get returned nil %d time(s)", len(zeroErr))
+	}
 }
 
 func TestRegistryRegisterInvalidatesCache(t *testing.T) {

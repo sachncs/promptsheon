@@ -108,13 +108,13 @@ func TestLoadConfigAuthValues(t *testing.T) {
 		value    string
 		expected bool
 	}{
-		{"false", "false", false},
-		{"0", "0", false},
-		{"no", "no", false},
-		{"true", "true", true},
-		{"1", "1", true},
-		{"yes", "yes", true},
-		{"empty", "", true},
+		{name: "false", value: "false", expected: false},
+		{name: "0", value: "0", expected: false},
+		{name: "no", value: "no", expected: false},
+		{name: "true", value: "true", expected: true},
+		{name: "1", value: "1", expected: true},
+		{name: "yes", value: "yes", expected: true},
+		{name: "empty", value: "", expected: true},
 	}
 
 	for _, tt := range tests {
@@ -158,16 +158,16 @@ func TestPort(t *testing.T) {
 		addr     string
 		expected int
 	}{
-		{":8080", 8080},
-		{":3000", 3000},
-		{"localhost:8080", 8080},
-		{"0.0.0.0:9090", 9090},
-		{"invalid", 8080},
+		{addr: ":8080", expected: 8080},
+		{addr: ":3000", expected: 3000},
+		{addr: "localhost:8080", expected: 8080},
+		{addr: "0.0.0.0:9090", expected: 9090},
+		{addr: "invalid", expected: 8080},
 		// IPv6 literals — these used to break the simple
 		// "scan for last colon" parser. SplitHostPort handles
 		// them correctly.
-		{"[::1]:8080", 8080},
-		{"[2001:db8::1]:9090", 9090},
+		{addr: "[::1]:8080", expected: 8080},
+		{addr: "[2001:db8::1]:9090", expected: 9090},
 	}
 
 	for _, tt := range tests {

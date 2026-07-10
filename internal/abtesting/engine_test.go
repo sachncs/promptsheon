@@ -119,7 +119,7 @@ func TestRecordResult(t *testing.T) {
 
 	// Record some results
 	for i := 0; i < 10; i++ {
-		engine.RecordResult("test1", "v1", true, 100, 50, 0.001)
+		engine.RecordResult("test1", "v1", true, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
 	}
 
 	results, err := engine.GetResults("test1")
@@ -245,10 +245,10 @@ func TestRecordResultMixedSuccessAndFailure(t *testing.T) {
 	_ = engine.CreateTest(test)
 
 	for i := 0; i < 7; i++ {
-		engine.RecordResult("mixed", "v1", true, 100, 50, 0.001)
+		engine.RecordResult("mixed", "v1", true, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
 	}
 	for i := 0; i < 3; i++ {
-		engine.RecordResult("mixed", "v1", false, 100, 50, 0.001)
+		engine.RecordResult("mixed", "v1", false, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
 	}
 
 	results, err := engine.GetResults("mixed")
@@ -274,7 +274,7 @@ func TestRecordResultNonexistentVariant(_ *testing.T) {
 	engine := abtesting.NewEngine(nil)
 	_ = engine.CreateTest(makeTest("rrtest"))
 	// Should not panic or error
-	engine.RecordResult("rrtest", "nonexistent", true, 100, 50, 0.001)
+	engine.RecordResult("rrtest", "nonexistent", true, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
 }
 
 func TestGetResultsLatencyCriteria(t *testing.T) {
@@ -294,8 +294,8 @@ func TestGetResultsLatencyCriteria(t *testing.T) {
 	_ = engine.CreateTest(test)
 
 	for i := 0; i < 5; i++ {
-		engine.RecordResult("lat-test", "fast", true, 10, 50, 0.001)
-		engine.RecordResult("lat-test", "slow", true, 500, 50, 0.001)
+		engine.RecordResult("lat-test", "fast", true, abtesting.ResultMetrics{LatencyMs: 10, Tokens: 50, Cost: 0.001})
+		engine.RecordResult("lat-test", "slow", true, abtesting.ResultMetrics{LatencyMs: 500, Tokens: 50, Cost: 0.001})
 	}
 
 	results, err := engine.GetResults("lat-test")
@@ -333,8 +333,8 @@ func TestGetResultsCostCriteria(t *testing.T) {
 	_ = engine.CreateTest(test)
 
 	for i := 0; i < 5; i++ {
-		engine.RecordResult("cost-test", "cheap", true, 100, 50, 0.001)
-		engine.RecordResult("cost-test", "expensive", true, 100, 50, 0.100)
+		engine.RecordResult("cost-test", "cheap", true, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
+		engine.RecordResult("cost-test", "expensive", true, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.100})
 	}
 
 	results, err := engine.GetResults("cost-test")
@@ -363,8 +363,8 @@ func TestGetResultsSuccessRateCriteria(t *testing.T) {
 	_ = engine.CreateTest(test)
 
 	for i := 0; i < 10; i++ {
-		engine.RecordResult("sr-test", "good", true, 100, 50, 0.001)
-		engine.RecordResult("sr-test", "bad", false, 100, 50, 0.001)
+		engine.RecordResult("sr-test", "good", true, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
+		engine.RecordResult("sr-test", "bad", false, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
 	}
 
 	results, err := engine.GetResults("sr-test")
@@ -400,7 +400,7 @@ func TestGetResultsConfidenceClamped(t *testing.T) {
 	_ = engine.CreateTest(test)
 
 	for i := 0; i < 10; i++ {
-		engine.RecordResult("conf-test", "v1", true, 100, 50, 0.001)
+		engine.RecordResult("conf-test", "v1", true, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
 	}
 
 	results, err := engine.GetResults("conf-test")

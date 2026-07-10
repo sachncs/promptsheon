@@ -14,8 +14,12 @@ type Registry struct {
 	cache     map[string]Provider // cached provider instances
 }
 
-// Global is the default provider registry, pre-populated with all built-in providers.
-var Global = newRegistry()
+// Default returns the default provider registry, pre-populated with all
+// built-in providers.
+func Default() *Registry { return global }
+
+// global is the default provider registry instance. Exported as Default().
+var global = newRegistry()
 
 func newRegistry() *Registry {
 	r := &Registry{
@@ -106,24 +110,24 @@ func (r *Registry) Providers() []string {
 //	PROMPTSHEON_NVIDIA_BASE_URL  — NVIDIA NIM base URL (optional)
 func LoadFromEnv() string {
 	if v := os.Getenv("PROMPTSHEON_OPENAI_API_KEY"); v != "" {
-		Global.Configure("openai", ProviderConfig{
+		global.Configure("openai", ProviderConfig{
 			APIKey:  v,
 			BaseURL: os.Getenv("PROMPTSHEON_OPENAI_BASE_URL"),
 		})
 	}
 	if v := os.Getenv("PROMPTSHEON_ANTHROPIC_API_KEY"); v != "" {
-		Global.Configure("anthropic", ProviderConfig{
+		global.Configure("anthropic", ProviderConfig{
 			APIKey:  v,
 			BaseURL: os.Getenv("PROMPTSHEON_ANTHROPIC_BASE_URL"),
 		})
 	}
 	if v := os.Getenv("PROMPTSHEON_OLLAMA_BASE_URL"); v != "" {
-		Global.Configure("ollama", ProviderConfig{
+		global.Configure("ollama", ProviderConfig{
 			BaseURL: v,
 		})
 	}
 	if v := os.Getenv("PROMPTSHEON_AZURE_API_KEY"); v != "" {
-		Global.Configure("azure", ProviderConfig{
+		global.Configure("azure", ProviderConfig{
 			APIKey:  v,
 			BaseURL: os.Getenv("PROMPTSHEON_AZURE_RESOURCE"),
 			Extra: map[string]string{
@@ -133,7 +137,7 @@ func LoadFromEnv() string {
 		})
 	}
 	if v := os.Getenv("PROMPTSHEON_NVIDIA_API_KEY"); v != "" {
-		Global.Configure("nvidia", ProviderConfig{
+		global.Configure("nvidia", ProviderConfig{
 			APIKey:  v,
 			BaseURL: os.Getenv("PROMPTSHEON_NVIDIA_BASE_URL"),
 		})

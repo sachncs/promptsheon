@@ -358,12 +358,12 @@ func TestLoadFromEnv(t *testing.T) {
 	}
 
 	for _, name := range []string{"openai", "anthropic", "ollama", "azure", "nvidia"} {
-		p, err := Global.Get(name)
+		p, err := global.Get(name)
 		if err != nil {
-			t.Fatalf("Global.Get(%q): %v", name, err)
+			t.Fatalf("global.Get(%q): %v", name, err)
 		}
 		if p.Name() != name {
-			t.Errorf("Global.Get(%q).Name() = %q, want %q", name, p.Name(), name)
+			t.Errorf("global.Get(%q).Name() = %q, want %q", name, p.Name(), name)
 		}
 	}
 }
