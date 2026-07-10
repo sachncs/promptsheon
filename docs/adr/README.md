@@ -17,6 +17,8 @@ ADRs are immutable. When a decision is superseded, the original ADR is updated w
 | [0007](0007-slog-as-observability-foundation.md) | Use `log/slog` as the single observability foundation | Accepted |
 | [0008](0008-workflow-dag-with-topological-execution.md) | Execute workflows as a topological DAG with level-by-level concurrency | Accepted |
 | [0009](0009-prompt-binding-version-0-3-0.md) | Adopt prompt-binding schema version 0.3.0 | Accepted |
+| [0010](0010-version-is-a-manifest-not-a-bundle.md) | Capability Version is a Manifest, not a Bundle | Accepted |
+| [0011](0011-release-and-approval-aggregates.md) | Release and Approval are separate aggregates | Accepted |
 
 ## Status legend
 
