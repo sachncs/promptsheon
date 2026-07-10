@@ -16,16 +16,16 @@ func TestIsRetryable_TypedErrors(t *testing.T) {
 		err  error
 		want bool
 	}{
-		{"nil", nil, false},
-		{"ErrTransient", &ErrTransient{Cause: errors.New("x")}, true},
-		{"ErrPermanent", &ErrPermanent{Cause: errors.New("x")}, false},
-		{"context.Canceled", context.Canceled, false},
-		{"context.DeadlineExceeded", context.DeadlineExceeded, false},
-		{"ErrCircuitOpen", ErrCircuitOpen, false},
-		{"net.Timeout", &timeoutErr{}, true},
-		{"wrapped ErrTransient", fmt.Errorf("wrap: %w", &ErrTransient{Cause: errors.New("x")}), true},
-		{"wrapped ErrPermanent", fmt.Errorf("wrap: %w", &ErrPermanent{Cause: errors.New("x")}), false},
-		{"unknown error (default retry)", errors.New("random failure"), true},
+		{name: "nil", err: nil, want: false},
+		{name: "ErrTransient", err: &ErrTransient{Cause: errors.New("x")}, want: true},
+		{name: "ErrPermanent", err: &ErrPermanent{Cause: errors.New("x")}, want: false},
+		{name: "context.Canceled", err: context.Canceled, want: false},
+		{name: "context.DeadlineExceeded", err: context.DeadlineExceeded, want: false},
+		{name: "ErrCircuitOpen", err: ErrCircuitOpen, want: false},
+		{name: "net.Timeout", err: &timeoutErr{}, want: true},
+		{name: "wrapped ErrTransient", err: fmt.Errorf("wrap: %w", &ErrTransient{Cause: errors.New("x")}), want: true},
+		{name: "wrapped ErrPermanent", err: fmt.Errorf("wrap: %w", &ErrPermanent{Cause: errors.New("x")}), want: false},
+		{name: "unknown error (default retry)", err: errors.New("random failure"), want: true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

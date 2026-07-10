@@ -64,10 +64,10 @@ func TestValidateAPIKeyFormat(t *testing.T) {
 		key  string
 		want bool
 	}{
-		{"ps_" + strings.Repeat("a", 64), true},
-		{"ps_short", false},
-		{"not_ps_abcdefghijklmnopqrstuvwxyz1234567890abcdefghij", false},
-		{"", false},
+		{key: "ps_" + strings.Repeat("a", 64), want: true},
+		{key: "ps_short", want: false},
+		{key: "not_ps_abcdefghijklmnopqrstuvwxyz1234567890abcdefghij", want: false},
+		{key: "", want: false},
 	}
 	for _, tt := range tests {
 		if got := ValidateAPIKeyFormat(tt.key); got != tt.want {

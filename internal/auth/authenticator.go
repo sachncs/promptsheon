@@ -13,7 +13,7 @@ import (
 // Authenticator validates API keys and attaches user info to requests.
 type Authenticator struct {
 	store      APIKeyStore
-	authLogger Logger
+	authLogger logger
 
 	// lastUsedCh is a buffered channel of API key IDs whose
 	// last_used_at timestamp should be updated. H-5 fix: the
@@ -27,8 +27,8 @@ type Authenticator struct {
 	stopCh     chan struct{}
 }
 
-// Logger logs authentication failures for audit purposes.
-type Logger interface {
+// logger logs authentication failures for audit purposes.
+type logger interface {
 	LogAuthFailure(ctx context.Context, keyPrefix, reason, remoteAddr string)
 }
 
@@ -89,7 +89,7 @@ func NewAuthenticator(store APIKeyStore) *Authenticator {
 }
 
 // NewAuthenticatorWithLogger creates a new Authenticator with an audit logger.
-func NewAuthenticatorWithLogger(store APIKeyStore, logger Logger) *Authenticator {
+func NewAuthenticatorWithLogger(store APIKeyStore, logger logger) *Authenticator {
 	a := &Authenticator{
 		store:      store,
 		authLogger: logger,

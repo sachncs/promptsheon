@@ -158,10 +158,24 @@ func (h *HTTPTool) Execute(ctx context.Context, input map[string]any) (map[strin
 // author an agent arbitrary shell access on the server.
 type ShellTool struct{}
 
-// BlockedPatterns contains substrings that are always blocked in shell
-// commands, even when the allowlist is configured. Operators may add to
-// this list but must not remove entries at runtime.
-var BlockedPatterns = []string{"rm -rf /", "mkfs", ":(){ :|:&", "dd if=/dev"}
+// blockedPatterns contains substrings that are always blocked in shell
+// commands, even when the allowlist is configured. Set via SetBlockedPatterns.
+var blockedPatterns = []string{"rm -rf /", "mkfs", ":(){ :|:&", "dd if=/dev"}
+
+// BlockedPatterns returns a copy of the blocked command patterns.
+func BlockedPatterns() []string {
+	p := make([]string, len(blockedPatterns))
+	copy(p, blockedPatterns)
+	return p
+}
+
+// SetBlockedPatterns atomically replaces the blocked pattern list.
+// Operators may call this at startup. Not safe for concurrent runtime calls.
+func SetBlockedPatterns(p []string) {
+	n := make([]string, len(p))
+	copy(n, p)
+	blockedPatterns = n
+}
 
 // shellPolicy holds the shell tool's runtime policy. Reads happen
 // from arbitrary request goroutines; the previous implementation
@@ -231,7 +245,7 @@ func (s *ShellTool) Execute(ctx context.Context, input map[string]any) (map[stri
 	// allowlist gate so an operator can use the allowlist as the
 	// primary defence; the block-list catches obvious footguns.
 	cmdLower := strings.ToLower(command)
-	for _, pattern := range BlockedPatterns {
+	for _, pattern := range blockedPatterns {
 		if strings.Contains(cmdLower, strings.ToLower(pattern)) {
 			return nil, fmt.Errorf("shell tool: command contains blocked pattern: %s", pattern)
 		}

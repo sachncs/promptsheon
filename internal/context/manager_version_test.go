@@ -101,10 +101,10 @@ func TestDefaultTokenEstimate_Words(t *testing.T) {
 		input string
 		want  int
 	}{
-		{"hello", 1},
-		{"hello world", 2},
-		{"one two three four five", 6},
-		{"a b c d e f g h i j", 13},
+		{input: "hello", want: 1},
+		{input: "hello world", want: 2},
+		{input: "one two three four five", want: 6},
+		{input: "a b c d e f g h i j", want: 13},
 	}
 	for _, tt := range tests {
 		if got := DefaultTokenEstimate(tt.input); got != tt.want {

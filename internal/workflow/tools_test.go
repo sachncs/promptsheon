@@ -514,13 +514,13 @@ func TestToString(t *testing.T) {
 		input any
 		want  string
 	}{
-		{nil, ""},
-		{"hello", "hello"},
-		{float64(3.14), "3.14"},
-		{true, "true"},
-		{false, "false"},
-		{42, "42"},
-		{[]int{1, 2}, "[1 2]"},
+		{input: nil, want: ""},
+		{input: "hello", want: "hello"},
+		{input: float64(3.14), want: "3.14"},
+		{input: true, want: "true"},
+		{input: false, want: "false"},
+		{input: 42, want: "42"},
+		{input: []int{1, 2}, want: "[1 2]"},
 	}
 	for _, tt := range tests {
 		if got := toString(tt.input); got != tt.want {
@@ -536,12 +536,12 @@ func TestToFloat64(t *testing.T) {
 		input any
 		want  float64
 	}{
-		{float64(3.14), 3.14},
-		{42, float64(42)},
-		{"3.14", 3.14},
-		{"invalid", float64(0)},
-		{true, 0},
-		{nil, 0},
+		{input: float64(3.14), want: 3.14},
+		{input: 42, want: float64(42)},
+		{input: "3.14", want: 3.14},
+		{input: "invalid", want: float64(0)},
+		{input: true, want: 0},
+		{input: nil, want: 0},
 	}
 	for _, tt := range tests {
 		if got := toFloat64(tt.input); got != tt.want {
@@ -557,13 +557,13 @@ func TestShlexSplit(t *testing.T) {
 		input string
 		want  []string
 	}{
-		{"echo hello world", []string{"echo", "hello", "world"}},
-		{"  spaced  ", []string{"spaced"}},
-		{"", nil},
-		{`echo "hello world"`, []string{"echo", "hello world"}},
-		{`echo 'single quoted'`, []string{"echo", "single quoted"}},
-		{`echo hello\ world`, []string{"echo", "hello\\", "world"}},
-		{"line1\nline2", []string{"line1", "line2"}},
+		{input: "echo hello world", want: []string{"echo", "hello", "world"}},
+		{input: "  spaced  ", want: []string{"spaced"}},
+		{input: "", want: nil},
+		{input: `echo "hello world"`, want: []string{"echo", "hello world"}},
+		{input: `echo 'single quoted'`, want: []string{"echo", "single quoted"}},
+		{input: `echo hello\ world`, want: []string{"echo", "hello\\", "world"}},
+		{input: "line1\nline2", want: []string{"line1", "line2"}},
 	}
 	for _, tt := range tests {
 		got, err := shlexSplit(tt.input)

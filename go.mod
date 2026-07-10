@@ -1,6 +1,6 @@
 module github.com/sachncs/promptsheon
 
-go 1.26.0
+go 1.26.5
 
 require (
 	go.opentelemetry.io/otel v1.44.0

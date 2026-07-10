@@ -795,11 +795,11 @@ func TestWriteError(t *testing.T) {
 		err        error
 		wantStatus int
 	}{
-		{"internal error", errors.New("oops"), http.StatusInternalServerError},
-		{"not found", ErrNotFound, http.StatusNotFound},
-		{"bad request", ErrBadRequest, http.StatusBadRequest},
-		{"conflict", ErrConflict, http.StatusConflict},
-		{"http error", &HTTPError{Status: http.StatusTeapot, Message: "teapot"}, http.StatusTeapot},
+		{name: "internal error", err: errors.New("oops"), wantStatus: http.StatusInternalServerError},
+		{name: "not found", err: ErrNotFound, wantStatus: http.StatusNotFound},
+		{name: "bad request", err: ErrBadRequest, wantStatus: http.StatusBadRequest},
+		{name: "conflict", err: ErrConflict, wantStatus: http.StatusConflict},
+		{name: "http error", err: &HTTPError{Status: http.StatusTeapot, Message: "teapot"}, wantStatus: http.StatusTeapot},
 	}
 
 	for _, tt := range tests {

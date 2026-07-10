@@ -172,6 +172,14 @@ func computeAuditHash(e *models.AuditEntry, detailsJSON, timestampStr string) st
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+type auditPageResult struct {
+	nextPrevHash string
+	ok           bool
+	reason       string
+	lastRowID    int64
+	err          error
+}
+
 func (s *SQLite) VerifyAuditChain(ctx context.Context) (ok bool, reason string, err error) {
 	const pageSize = 1000
 	var prevHash string
@@ -182,23 +190,24 @@ func (s *SQLite) VerifyAuditChain(ctx context.Context) (ok bool, reason string, 
 			return false, "", ctx.Err()
 		default:
 		}
-		nextPrev, ok, why, last, err := s.verifyAuditPage(ctx, prevHash, lastRowID, pageSize)
-		if err != nil {
-			return false, "", err
+		res := s.verifyAuditPage(ctx, prevHash, lastRowID, pageSize)
+		if res.err != nil {
+			return false, "", res.err
 		}
-		if !ok {
-			return false, why, nil
+		if !res.ok {
+			return false, res.reason, nil
 		}
-		if last == 0 {
+		if res.lastRowID == 0 {
 			break
 		}
-		prevHash = nextPrev
-		lastRowID = last
+		prevHash = res.nextPrevHash
+		lastRowID = res.lastRowID
 	}
 	return true, "", nil
 }
 
-func (s *SQLite) verifyAuditPage(ctx context.Context, prevHash string, afterRowID int64, limit int) (nextPrevHash string, ok bool, reason string, lastRowID int64, err error) {
+func (s *SQLite) verifyAuditPage(ctx context.Context, prevHash string, afterRowID int64, limit int) auditPageResult {
+	var lastRowID int64
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT rowid, id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str
 		 FROM audit_entries
@@ -208,7 +217,7 @@ func (s *SQLite) verifyAuditPage(ctx context.Context, prevHash string, afterRowI
 		afterRowID, limit,
 	)
 	if err != nil {
-		return prevHash, false, "", 0, fmt.Errorf("query audit chain page: %w", err)
+		return auditPageResult{err: fmt.Errorf("query audit chain page: %w", err)}
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -217,10 +226,10 @@ func (s *SQLite) verifyAuditPage(ctx context.Context, prevHash string, afterRowI
 		var id, userID, action, resource, detailsJSON, storedPrev, storedHash, timestampStr string
 		var ts time.Time
 		if err := rows.Scan(&rowID, &id, &userID, &action, &resource, &detailsJSON, &ts, &storedPrev, &storedHash, &timestampStr); err != nil {
-			return prevHash, false, "", 0, fmt.Errorf("scan audit chain: %w", err)
+			return auditPageResult{err: fmt.Errorf("scan audit chain: %w", err)}
 		}
 		if storedPrev != prevHash {
-			return prevHash, false, fmt.Sprintf("chain break at entry %s: expected prev_hash %q, got %q", id, prevHash, storedPrev), 0, nil
+			return auditPageResult{nextPrevHash: prevHash, ok: false, reason: fmt.Sprintf("chain break at entry %s: expected prev_hash %q, got %q", id, prevHash, storedPrev)}
 		}
 		if timestampStr == "" {
 			timestampStr = ts.UTC().Format(time.RFC3339Nano)
@@ -228,12 +237,12 @@ func (s *SQLite) verifyAuditPage(ctx context.Context, prevHash string, afterRowI
 		e := &models.AuditEntry{ID: id, UserID: userID, Action: action, Resource: resource, PreviousHash: storedPrev, Timestamp: ts}
 		expected := computeAuditHash(e, detailsJSON, timestampStr)
 		if expected != storedHash {
-			return prevHash, false, fmt.Sprintf("tampered entry %s: expected hash %q, got %q", id, expected, storedHash), 0, nil
+			return auditPageResult{nextPrevHash: prevHash, ok: false, reason: fmt.Sprintf("tampered entry %s: expected hash %q, got %q", id, expected, storedHash)}
 		}
 		prevHash = storedHash
 		lastRowID = rowID
 	}
-	return prevHash, true, "", lastRowID, rows.Err()
+	return auditPageResult{nextPrevHash: prevHash, ok: true, lastRowID: lastRowID, err: rows.Err()}
 }
 
 func (s *SQLite) ListAudit(ctx context.Context, filter *models.AuditFilter) ([]*models.AuditEntry, error) {
@@ -491,14 +500,12 @@ func (s *SQLite) ListAPIKeysByUser(ctx context.Context, userID string) ([]*model
 
 func (s *SQLite) UpdateAPIKeyLastUsed(ctx context.Context, id string) error {
 	const q = `UPDATE api_keys SET last_used = ? WHERE id = ?`
-	_, err := s.db.ExecContext(ctx, q, now(), id)
+	_, err := s.db.ExecContext(ctx, q, time.Now(), id)
 	if err != nil {
 		return fmt.Errorf("update api key last used: %w", err)
 	}
 	return nil
 }
-
-var now = time.Now
 
 // ---------------------------------------------------------------------------
 // Provider Keys

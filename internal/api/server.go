@@ -687,7 +687,7 @@ func (a *storeAuthAdapter) UpdateAPIKeyLastUsed(ctx context.Context, id string) 
 
 // --- Auth Audit Logger ---
 
-// authAuditLogger adapts the server's audit method to auth.Logger.
+// authAuditLogger adapts the server's audit method to auth.logger.
 type authAuditLogger struct {
 	server *Server
 }
