@@ -4,11 +4,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/executor"
+	"github.com/sachncs/promptsheon/internal/invoke"
 )
 
 const fieldVersion = "version"
@@ -508,6 +511,22 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
+	// Tier 2.36 / Tier 2.44 follow-on: the production wiring
+	// constructs an invoke.Invoker per request, runs it through
+	// the Budget/Quota enforcer, and maps the resulting errors to
+	// HTTP 402 (Payment Required) and 429 (Too Many Requests).
+	// Today's commit ships the API surface; the Invoker call is
+	// M3 follow-on (see internal/invoke/invoke.go's NewInvoker +
+	// DefaultEnforcer wiring).
+	if err := s.invokeOne(r, capabilityVersionID, req.Inputs, req.Model, req.Provider); err != nil {
+		if errors.Is(err, invoke.ErrQuotaExceeded) {
+			return &HTTPError{Status: http.StatusTooManyRequests, Message: err.Error()}
+		}
+		if errors.Is(err, invoke.ErrBudgetExceeded) {
+			return &HTTPError{Status: http.StatusPaymentRequired, Message: err.Error()}
+		}
+		return err
+	}
 	now := time.Now()
 	exec := &capability.Execution{
 		ID:                  generateID(),
@@ -523,6 +542,33 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 	s.audit(r.Context(), "create", "execution:"+exec.ID, map[string]any{"version_id": capabilityVersionID})
 	writeJSON(w, http.StatusCreated, exec)
 	return nil
+}
+
+// invokeOne is the per-request invocation entry point. It is
+// introduced as a method on Server rather than a package-level
+// function so that the production wiring can override the
+// default Caller and AggregatorConsumer with a workspace-scoped
+// Caller chain. Today's commit ships the wrapper; the production
+// wiring lands in M3 follow-on.
+func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]any, model, provider string) error {
+	if s.invoker == nil {
+		// No Invoker configured (today's build). The handler
+		// records the stub execution and returns nil; the route
+		// is observable while the M3 follow-on wires the
+		// production Caller chain.
+		return nil
+	}
+	req := executor.InvokeRequest{
+		WorkspaceID:   r.PathValue("workspace_id"),
+		ReleaseID:     versionID,
+		ManifestHash:  "stub",
+		InputHash:     "stub",
+		Input:         mustMarshalNoArgs(inputs),
+		Model:         model,
+		ModelRevision: "stub",
+	}
+	_, err := s.invoker.Invoke(r.Context(), req)
+	return err
 }
 
 func (s *Server) handleGetExecution(w http.ResponseWriter, r *http.Request) error {

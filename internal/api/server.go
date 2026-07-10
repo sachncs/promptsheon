@@ -16,6 +16,7 @@ import (
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
 	"github.com/sachncs/promptsheon/internal/eval"
 	"github.com/sachncs/promptsheon/internal/guardrail"
+	"github.com/sachncs/promptsheon/internal/invoke"
 	"github.com/sachncs/promptsheon/internal/llm"
 	"github.com/sachncs/promptsheon/internal/metrics"
 	"github.com/sachncs/promptsheon/internal/models"
@@ -54,6 +55,7 @@ type Server struct {
 	contextManager   *contextpkg.Manager
 	providers        *llm.Registry
 	rollupAgg        *rollups.Aggregator
+	invoker          *invoke.Invoker
 
 	// auditQueue is a bounded channel feeding the audit worker pool.
 	auditQueue chan *models.AuditEntry
@@ -213,6 +215,17 @@ func WithRateLimiter(l *ratelimit.Limiter) Option {
 func WithWorkspaceRollups(a *rollups.Aggregator) Option {
 	return func(s *Server) {
 		s.rollupAgg = a
+	}
+}
+
+// WithInvoker attaches the canonical invoke.Invoker that
+// production wiring supplies. The Tier 2.36 follow-on route
+// /v1/versions/{id}/executions calls the Invoker per request
+// for Budget / Quota enforcement; when nil, the route records
+// the execution as a stub.
+func WithInvoker(i *invoke.Invoker) Option {
+	return func(s *Server) {
+		s.invoker = i
 	}
 }
 
