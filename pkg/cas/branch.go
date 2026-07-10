@@ -1,5 +1,5 @@
 // Package promptsheon implements the core Promptsheon engine.
-package promptsheon
+package cas
 
 import (
 	"errors"

@@ -1,4 +1,4 @@
-package promptsheon
+package cas
 
 import (
 	"errors"
