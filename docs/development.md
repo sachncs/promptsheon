@@ -4,7 +4,7 @@ This page is the contributor's handbook. It assumes you have read [Architecture]
 
 ## Prerequisites
 
-- **Go 1.25 or later.** Earlier versions will not compile.
+- **Go 1.26 or later.** Earlier versions will not compile.
 - **golangci-lint v1.60+.** Optional in the strictest sense (CI runs it) but expected on every developer machine.
 - **k6.** For load testing. See [Load testing](#load-testing).
 - **govulncheck.** For the `make security` target. `go install golang.org/x/vuln/cmd/govulncheck@latest`.

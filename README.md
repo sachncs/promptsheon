@@ -3,7 +3,7 @@
 **Version Control System for AI Agent Intelligence**
 
 [![CI](https://github.com/sachncs/promptsheon/actions/workflows/ci.yaml/badge.svg)](https://github.com/sachncs/promptsheon/actions/workflows/ci.yaml)
-[![Go Version](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go)](https://go.dev)
+[![Go Version](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](https://go.dev)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 Promptsheon applies software engineering discipline to AI agents by providing Git-native version control primitives adapted for agent architectures. Every agent state — system prompts, tool definitions, hyperparameters, evaluation metrics — is stored as an immutable, cryptographically-addressed object in a **Directed Acyclic Graph (DAG)**.
