@@ -36,8 +36,8 @@ type KMSClient interface {
 // concurrency-safe; the underlying KMSClient is responsible for
 // thread-safety.
 type Provider struct {
-	mu   sync.Mutex
-	cfg  Config
+	mu    sync.Mutex
+	cfg   Config
 	cache []byte
 }
 
