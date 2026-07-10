@@ -2047,6 +2047,56 @@ func TestHandleTestProvider_NotAvailable(t *testing.T) {
 	}
 }
 
+// TestHandleCreateVersionWithManifest verifies that POST /v1/capabilities/
+// {c}/versions accepts an explicit Manifest in the request body and
+// rejects an invalid manifest with HTTP 400.
+func TestHandleCreateVersionWithManifest(t *testing.T) {
+	s := newTestServer(t)
+	srv, _ := s.db.(*mockRepo)
+	if srv == nil {
+		t.Fatalf("expected mock repo")
+	}
+	_ = srv.CreateCapability(context.Background(), &capability.Capability{ID: "c-manifest", Name: "manifest-test", ProjectID: "p1"})
+	capID := "c-manifest"
+
+	good := capability.Manifest{
+		Prompt:        capability.ArtifactRef{Kind: capability.ArtifactPrompt, Hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		ModelPolicy:   capability.ArtifactRef{Kind: capability.ArtifactModelPolicy, Hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		RuntimePolicy: capability.ArtifactRef{Kind: capability.ArtifactRuntimePolicy, Hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		Context:       capability.ArtifactRef{Kind: capability.ArtifactContext, Hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		Memory:        capability.ArtifactRef{Kind: capability.ArtifactMemory, Hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+	}
+	body, err := json.Marshal(map[string]any{"version": 1, "manifest": good})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	req := httptest.NewRequest("POST", "/api/v1/capabilities/"+capID+"/versions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	s.ServeHTTP(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for valid manifest, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var got capability.Version
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.ManifestHash == "" {
+		t.Fatalf("expected manifest_hash to be set, got empty")
+	}
+
+	body, _ = json.Marshal(map[string]any{"version": 2, "manifest": capability.Manifest{
+		Prompt: capability.ArtifactRef{Kind: capability.ArtifactKind("bogus"), Hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+	}})
+	req = httptest.NewRequest("POST", "/api/v1/capabilities/"+capID+"/versions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr = httptest.NewRecorder()
+	s.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid manifest kind, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Vault Handler Tests
 // ---------------------------------------------------------------------------
