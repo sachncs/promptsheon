@@ -56,6 +56,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   route through the new `internal/store/postgres` backend
   (ADR-0015). SQLite remains the default.
 
+- **`internal/schedule`** — Schedule aggregate with cron / webhook /
+  manual trigger kinds, a minimal 5-field cron parser, and the
+  consumer-defined `Schedule.Repository`. Charge transitions
+  return new values; `Disable`/`Enable` are also value-methods.
+- **`internal/replay`** — write-once replay buffer keyed by an
+  `ExecutionHash` that fixes `(workspace_id, release_id,
+  manifest_hash, input_hash, model, model_revision)` so identical
+  inputs reproduce identically. `Put` returns the existing record
+  when the hash is already known (dedup invariant).
+- **`internal/scheduler`** — tick worker that reads due Schedules
+  every 5 seconds and publishes `schedule.fired` events on the
+  in-process EventBus for downstream Executors to consume.
+- **`pkg/plugin`** — gRPC plugin SDK at the public surface
+  (`pkg/plugin`) with `PluginDescriptor`, `Handshake`, and the
+  `Plugin` lifecycle interface. Plugins are standalone binaries
+  that speak gRPC over loopback; the server validates services
+  and supervises crashes (ADR-0016).
+- **`internal/optimizer/rules`** — deterministic Recommendation
+  engine v1 with three rules: compress prompt on slow P95, enable
+  cache on costly executions, add guardrail on hallucinations.
+  `CanAutoAdopt` centralises the conservative gate already
+  shipped by `recommendation.CanAutoAdopt`. M4+ follows with
+  bandit and LLM-judge engines once the Decision path is wired.
+- **`internal/budget`** — Budget aggregate (USD cap on a closed-set
+  period: daily / weekly / monthly) with PeriodStart rolled
+  forward on charge and `ErrCapExceeded` returned when over.
+  Scopes: Workspace, Capability.
+- **`internal/quota`** — Quota aggregate (rate cap on a sliding
+  window: second / minute / hour) with `ErrOverLimit`. Scopes:
+  Workspace, Provider. Distinct from `internal/ratelimit` which is
+  the process-local HTTP-edge throttler.
+
 ### Added
 
 - **`make lint-domain` enforces no package-level mutable state in
