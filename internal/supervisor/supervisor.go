@@ -76,10 +76,10 @@ type Managed struct {
 // supervisor is the public entry point. Construct it with New,
 // register plugins via Register, then call Run.
 type Supervisor struct {
-	mu       sync.Mutex
-	plugins  map[string]*Managed
+	mu        sync.Mutex
+	plugins   map[string]*Managed
 	publisher Publisher
-	logger   *slog.Logger
+	logger    *slog.Logger
 }
 
 // Publisher is the consumer-defined event sink; the supervisor
@@ -104,9 +104,9 @@ func New(p Publisher, logger *slog.Logger) *Supervisor {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	return &Supervisor{
-		plugins:  map[string]*Managed{},
+		plugins:   map[string]*Managed{},
 		publisher: p,
-		logger:   logger,
+		logger:    logger,
 	}
 }
 
@@ -210,7 +210,7 @@ func (s *Supervisor) tryRestart(ctx context.Context, m *Managed) bool {
 	go func(mm *Managed) {
 		if err := mm.Plugin.Start(ctx); err != nil {
 			s.publish(PluginEvent{Name: mm.Name, Kind: "crashed", Timestamp: time.Now(), Err: err})
-			_ = s  // keep s alive for publish
+			_ = s // keep s alive for publish
 		}
 	}(m)
 	return true

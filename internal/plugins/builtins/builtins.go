@@ -24,9 +24,9 @@ type PIIDetector struct{ R *redactor.Redactor }
 
 func NewPIIDetector() *PIIDetector { return &PIIDetector{R: redactor.NewRedactor()} }
 
-func (p *PIIDetector) Start(context.Context) error { return nil }
-func (p *PIIDetector) Stop(context.Context) error    { return nil }
-func (p *PIIDetector) Health(context.Context) error  { return nil }
+func (p *PIIDetector) Start(context.Context) error  { return nil }
+func (p *PIIDetector) Stop(context.Context) error   { return nil }
+func (p *PIIDetector) Health(context.Context) error { return nil }
 
 // InjectionDetector adapts injection.Detector.
 type InjectionDetector struct{ D *injection.Detector }
@@ -35,9 +35,9 @@ func NewInjectionDetector() *InjectionDetector {
 	return &InjectionDetector{D: injection.NewDetector()}
 }
 
-func (p *InjectionDetector) Start(context.Context) error { return nil }
-func (p *InjectionDetector) Stop(context.Context) error    { return nil }
-func (p *InjectionDetector) Health(context.Context) error  { return nil }
+func (p *InjectionDetector) Start(context.Context) error  { return nil }
+func (p *InjectionDetector) Stop(context.Context) error   { return nil }
+func (p *InjectionDetector) Health(context.Context) error { return nil }
 
 // Register attaches every built-in to the supervisor with a
 // sensible RestartPolicy: 3 restarts max with exponential
