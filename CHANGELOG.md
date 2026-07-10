@@ -207,6 +207,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `examples/python-list-capabilities/` and `examples/bash/invoke-release.sh`
   give downstream consumers runnable reference code; `examples/README.md`
   documents the directory.
+
+### Added (Tier 2 follow-on, fourth pass)
+
+- **Plugin manifest consumer (Tier 2.32 follow-on).** New
+  `internal/pluginsup.PluginSupervisor` reads
+  `PROMPTSHEON_PLUGINS_FILE`, validates each entry, and
+  registers one Plugin adapter per row with the lifecycle
+  supervisor. The `Remote` adapter satisfies the `Plugin`
+  interface (Start/Stop/Health) with no-ops; the M3 follow-on
+  replaces the body with the subprocess-execution path
+  (fork the binary, dial the UDS, proxy the gRPC Lifecycle).
+  When the env var is unset, the supervisor runs with only
+  the in-process built-ins — the same path as before.
+- **Production wiring: `WithInvoker` + `WithWorkspaceRollups`
+  in `cmd/promptsheond` (Tier 2.36 + 2.37).** The daemon now
+  constructs the canonical `invoke.Invoker` (with a
+  in-memory `DefaultEnforcer` and the
+  `observation.Aggregator`) and the per-Workspace rollup
+  aggregator and attaches them via the Options that
+  `internal/api.Server` exposes. The route POST
+  `/v1/versions/{id}/executions` exercises `s.invoker.Invoke`
+  end-to-end; the route GET `/v1/workspaces/{id}/observation`
+  reads the live rollup. Production callers supply a real
+  Caller that reaches the workspace's LLM provider chain;
+  today's shipped stub returns success so the route is
+  observable in CI.
+- **SLO breach → Recommendation bridge (Tier 2.49 follow-on).**
+  New `internal/bridge.BreachEvent.Evaluate` and `Run` turn
+  SLO breach events into `capability.Recommendation` values.
+  v1 contract covers hallucination_rate and success_rate;
+  both emit `RecommendationAddGuardrail` with high confidence
+  and `AutoApplicable=false`. The M3 follow-on wires the
+  production breach-detector to call `Run` per Observation
+  window. The bridge joins the rules engine as a second
+  Recommendation source.
+
+### Verification
+
+- 57/57 packages pass `go test -race -count=1 -timeout 180s ./...`
+  with no data-race warnings.
+- `gofmt -l .` is empty.
+- `go vet ./...` is clean.
+- `make lint-domain` and `make lint-deps` are clean.
+- `make openapi-check` confirms the spec is byte-identical.
 - **Vestigial `state` / `current_version_id` columns (Tier 1.40
   follow-on).** Migration 026 documents that the `capabilities`
   schema retains these columns for forward compatibility but

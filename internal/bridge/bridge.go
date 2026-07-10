@@ -30,12 +30,12 @@ import (
 // observation rollups; the bridge produces zero or one
 // Recommendations per event.
 type BreachEvent struct {
-	CapabilityID  string
-	VersionID     string
-	Environment   string
-	Signal        string
-	BurnRate      float64
-	DetectedAt    time.Time
+	CapabilityID string
+	VersionID    string
+	Environment  string
+	Signal       string
+	BurnRate     float64
+	DetectedAt   time.Time
 }
 
 // Evaluate returns one Recommendation per breach. The shape is
@@ -61,7 +61,7 @@ func (b BreachEvent) Evaluate() (*capability.Recommendation, error) {
 	case "hallucination_rate", "success_rate":
 		rec := &capability.Recommendation{
 			ID:                  "slo-bridge-" + b.Signal + "-" + b.VersionID,
-			CapabilityVersionID:  b.VersionID,
+			CapabilityVersionID: b.VersionID,
 			Type:                capability.RecommendationAddGuardrail,
 			Reason:              fmt.Sprintf("SLO breach signal=%s burn_rate=%.4f", b.Signal, b.BurnRate),
 			Confidence:          0.95,
