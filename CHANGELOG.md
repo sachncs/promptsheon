@@ -138,6 +138,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   manually with `helm template release deploy/helm/promptsheon/`
   under both sqlite (default) and postgres (--set
   config.dbBackend=postgres ...) configs.
+- **Helm chart CI integration (Tier 2.42).** New `helm` job in
+  `.github/workflows/ci.yaml` installs Helm v3.16.2 and runs
+  `helm lint` plus two `helm template` renders (sqlite default
+  and Postgres with a representative DSN). Each render is
+  asserted to produce non-empty output. The chart cannot merge
+  with malformed templates — the gate is on every PR.
+- **Vault `KeyProvider` + `SecretBroker` abstractions (Tier 2.45).**
+  Two consumer-defined interfaces abstract the master-key source
+  and short-lived secret lookup, respectively, for BYOK and
+  managed-key service (AWS KMS, HashiCorp Vault) integrations.
+  Two built-in implementations ship today: `EnvKeyProvider`
+  reads `PROMPTSHEON_VAULT_KEY` (today's behavior), and
+  `StaticKeyProvider` carries a fixed key for air-gapped and
+  test deployments. `StaticSecretBroker` resolves pre-encrypted
+  secrets at startup. `BuildEnvVault()` preserves the legacy
+  path so existing deployments keep working unchanged.
+- **Python SDK scaffold (Tier 2.39).** New `sdk/python/` ships
+  `Client` (sync) + `AsyncClient` (async), `ClientConfig`,
+  `PromptsheonAPIError`, and a `py.typed` marker (PEP 561).
+  `scripts/codegen.sh` runs `openapi-python-client` against
+  `api/openapi.yaml` in M3 follow-on; today the implementation
+  is hand-written against the public resource list in §7.
+- **Capability SLO library (Tier 2.49).** New `internal/slo`
+  ships a closed-set Signal/Op/Window model with `SLO.Evaluate`
+  returning detailed breach errors and `Goal.BurnRate` returning
+  the ratio for the recommendation engine. ADR-0020 records
+  why the closed-set wins over open-ended PromQL or vendor-
+  specific models.
 - **Vestigial `state` / `current_version_id` columns (Tier 1.40
   follow-on).** Migration 026 documents that the `capabilities`
   schema retains these columns for forward compatibility but
