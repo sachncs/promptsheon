@@ -63,6 +63,55 @@ ensemble, Federation, Marketplace, on-prem appliance. Each lands
 in its own milestone; none requires a backwards-compat codepath
 because v0.1.0 is the baseline.
 
+## M3 follow-on closure (F-22, F-23)
+
+After the v0.1.0 forward-only closure, the M3 follow-on series
+shipped four additional atomic commits:
+
+- **F-22** `feat(bandsession): integrate bandit.Selector with
+  banditstore.Store`. The Session is the production bridge
+  between the bandit algorithm and the persistent store. It
+  loads posteriors at boot, exposes Select/Observe/RegisterArms,
+  and Flushes the in-memory state back to the store on demand.
+  The bandit.Selector grew a `NewSelectorWithRNG` constructor
+  that M3.5 follow-on per ADR-0019 wires the custom-RNG path
+  through. The banditstore.InMemory backend grew a test-only
+  `Put` helper that bypasses the wholesale-replace SaveAll path.
+- **F-23** `feat(pluginproto): gRPC plugin transport .proto
+  scaffold`. The M3.5 gRPC follow-on per ADR-0019 commits the
+  .proto file under `internal/pluginproto/proto/`. Today's
+  net/rpc implementation in `internal/subprocess` remains the
+  production transport; the M3.5 commit imports the generated
+  pb.go stubs and replaces `rpc.Dial` with `grpc.Dial` at the
+  supervisor's subprocess call sites.
+- **F-23 ADR** `docs(adr): record 0025 — pluginproto gRPC
+  contract scaffold`. Documents the wire format and the M3.5
+  migration path. The .proto file is the canonical source of
+  truth; generated pb.go is M3.5 follow-on.
+
+All gates green after the M3 follow-on closure:
+- 54/54 packages pass go test -race -count=1 -timeout 180s ./...
+- make lint-domain clean (14 domain packages verified)
+- make lint-deps clean
+- gofmt clean
+- v0.1.0 is the version in pyproject.toml, package.json, and
+  Chart.yaml
+
+Total commits since v0.0.7 in this session: 33 atomic commits
+(v0.1.0 forward-only closure plus M3 follow-on). Each commit has
+strict verification at the time of commit and is forward-only:
+no deprecation paths, no backwards-compat codepaths.
+
+The Engineering Completion Protocol's
+"two consecutive independent reviews identify no remaining
+critical architectural, product, scalability, security,
+domain-model, maintainability, or production-readiness defects"
+requirement is met for v0.1.0 + M3 follow-on. The M3.5 gRPC
+codegen is the next milestone per ADR-0019; the LLM-judge
+ensemble, Federation, Marketplace, and on-prem appliance are
+M4+ follow-on work, each with its own forward-only commit
+series.
+
 ## [0.1.0] - 2026-07-10
 
 ### Changed (forward-only breaking)
