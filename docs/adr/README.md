@@ -28,6 +28,7 @@ ADRs are immutable. When a decision is superseded, the original ADR is updated w
 | [0020](0020-capability-slos.md) | Capability Service Level Objectives — Goal / Burn-rate / Repository contract | Accepted |
 | [0021](0021-bandit-foundation.md) | Multi-armed bandit recommender foundation (Thompson Sampling) | Accepted |
 | [0022](0022-plugin-manifest.md) | Plugin manifest (PROMPTSHEON_PLUGINS_FILE) | Accepted |
+| [0023](0023-forward-only-cleanup.md) | Forward-only cleanup of the legacy bundle model | Accepted |
 
 ## Status legend
 
