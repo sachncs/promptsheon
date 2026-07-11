@@ -348,20 +348,10 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 		return ErrBadRequest
 	}
 
-	// During the transition window (migration 023) the API still
-	// accepts the legacy bundle shape. When the request carries no
-	// manifest we synthesise one from the bundle so the persisted
-	// row is consistent. Once the legacy columns are dropped in a
-	// later migration this synthesis block will be removed and
-	// every request must supply a manifest.
+	// Forward-only: every request MUST supply a Manifest. The
+	// legacy synthesis helper is gone; clients that still pass
+	// the old bundle shape get 400 with a manifest-required error.
 	manifest := req.Manifest
-	if manifestIsEmpty(manifest) {
-		manifest = manifestFromLegacy(
-			req.Prompt, req.ModelPolicy, req.ContextContract,
-			req.Memory, req.Knowledge, req.Guardrails,
-			req.Tools, req.MCPServers,
-		)
-	}
 	if err := manifest.Validate(); err != nil {
 		return badRequest("manifest: " + err.Error())
 	}
@@ -395,59 +385,6 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 	s.audit(r.Context(), "create", "version:"+v.ID, map[string]any{"capability_id": capabilityID, fieldVersion: v.Version, "manifest_hash": hash})
 	writeJSON(w, http.StatusCreated, v)
 	return nil
-}
-
-// manifestIsEmpty reports whether m has no populated artifact references.
-// An empty Manifest with default Kind values would otherwise Validate
-// as ErrEmptyManifest; this helper decides whether to synthesise from
-// legacy fields first.
-func manifestIsEmpty(m capability.Manifest) bool {
-	return m.Prompt.Hash == "" &&
-		m.ModelPolicy.Hash == "" &&
-		m.RuntimePolicy.Hash == "" &&
-		m.Context.Hash == "" &&
-		m.Memory.Hash == ""
-}
-
-// manifestFromLegacy builds a content-addressed Manifest from the
-// legacy embedded-bundle fields by hashing the canonical JSON of
-// each value. The hashes are deterministic; the same legacy bundle
-// always produces the same manifest hash. Synthetic placeholder
-// hashes for empty values satisfy the kind requirement while
-// leaving the obvious "this came from a legacy row" footprint in
-// the manifest_hash column during the transition window.
-func manifestFromLegacy(
-	p capability.Prompt, mp capability.ModelPolicy, cc capability.ContextContract,
-	mem capability.MemoryConfig, ks []capability.KnowledgeSource, gs []capability.Guardrail,
-	ts []capability.Tool, ms []capability.MCPServer,
-) capability.Manifest {
-	refFrom := func(kind capability.ArtifactKind, v any) capability.ArtifactRef {
-		b, err := json.Marshal(v)
-		if err != nil {
-			return capability.ArtifactRef{Kind: kind, Hash: legacyPlaceholderHash(kind)}
-		}
-		return capability.ArtifactRef{Kind: kind, Hash: sha256Hex(b)}
-	}
-	m := capability.Manifest{
-		Prompt:        refFrom(capability.ArtifactPrompt, p),
-		ModelPolicy:   refFrom(capability.ArtifactModelPolicy, mp),
-		RuntimePolicy: refFrom(capability.ArtifactRuntimePolicy, capability.RuntimePolicy{}),
-		Context:       refFrom(capability.ArtifactContext, cc),
-		Memory:        refFrom(capability.ArtifactMemory, mem),
-	}
-	for _, k := range ks {
-		m.Knowledge = append(m.Knowledge, refFrom(capability.ArtifactKnowledge, k))
-	}
-	for _, g := range gs {
-		m.Guardrails = append(m.Guardrails, refFrom(capability.ArtifactGuardrail, g))
-	}
-	for _, t := range ts {
-		m.Tools = append(m.Tools, refFrom(capability.ArtifactTool, t))
-	}
-	for _, sv := range ms {
-		m.MCPServers = append(m.MCPServers, refFrom(capability.ArtifactMCPServer, sv))
-	}
-	return m
 }
 
 // sha256Hex returns hex(sha256(b)).

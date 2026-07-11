@@ -2874,21 +2874,14 @@ func TestHandleListVersions(t *testing.T) {
 
 func TestHandleCreateVersion(t *testing.T) {
 	s := newTestServer(t)
-	body := mustMarshal(t, map[string]any{
-		"version": 1,
-		"prompt": map[string]any{
-			"system_prompt": "You are a helpful assistant.",
-		},
-		"model_policy": map[string]any{
-			"provider":   "openai",
-			"model":      "gpt-4",
-			"max_tokens": 1000,
-		},
-		"context_contract": map[string]any{},
-		"memory":           map[string]any{},
-		"runtime_policy":   map[string]any{},
-		"evaluation_suite": map[string]any{},
-	})
+	good := capability.Manifest{
+		Prompt:        capability.ArtifactRef{Kind: capability.ArtifactPrompt, Hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		ModelPolicy:   capability.ArtifactRef{Kind: capability.ArtifactModelPolicy, Hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		RuntimePolicy: capability.ArtifactRef{Kind: capability.ArtifactRuntimePolicy, Hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		Context:       capability.ArtifactRef{Kind: capability.ArtifactContext, Hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		Memory:        capability.ArtifactRef{Kind: capability.ArtifactMemory, Hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+	}
+	body, _ := json.Marshal(map[string]any{"version": 1, "manifest": good})
 	req := httptest.NewRequest("POST", "/api/v1/capabilities/c1/versions", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
