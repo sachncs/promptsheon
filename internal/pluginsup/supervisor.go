@@ -4,18 +4,14 @@
 // boot, validates each entry, and registers one Plugin adapter per
 // manifest row.
 //
-// The in-process Plugin interface (internal/supervisor.Plugin) is
-// the production interface today; today's commit implements the
-// `Remote` Plugin adapter that would, in the M3 follow-on, exec
-// the manifest Entry's Binary, connect to its UDS, and proxy the
-// Lifecycle. For now the Remote adapter is a stub that records the
-// configured binary and env, satisfies the Plugin interface
-// (Start/Stop/Health no-op), and is the integration point the
-// subprocess supervisor will replace.
-//
-// This is Tier 2.32 follow-on: the manifest parser shipped in the
-// previous commit; today's commit is the consumer that registers
-// the parsed entries with the lifecycle runner.
+// Forward-only path: a manifest entry with a `binary:` line
+// produces a real subprocess plugin (internal/subprocess.Binary)
+// that the supervisor launches, supervises, and restarts. A
+// manifest entry without a binary line is a pure registration
+// stub (the manifest validation path) that the operator may
+// extend in a later commit. gRPC codegen with .proto files is the
+// M3.5 follow-on per ADR-0019; today's net/rpc over UDS is the
+// v0.1.x production transport.
 package pluginsup
 
 import (
@@ -27,6 +23,7 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/manifest"
+	"github.com/sachncs/promptsheon/internal/subprocess"
 	"github.com/sachncs/promptsheon/internal/supervisor"
 )
 
@@ -55,6 +52,11 @@ func New(sup *supervisor.Supervisor, log *slog.Logger) *PluginSupervisor {
 // plugin descriptor in the supervisor. When the env var is unset
 // or empty, the supervisor runs with only the in-process built-ins
 // (the same path as before this commit).
+//
+// A manifest entry that declares a `binary:` line produces a
+// subprocess.Binary that the supervisor launches, supervises,
+// and restarts. A manifest entry without a binary line is a
+// pure registration stub.
 func (p *PluginSupervisor) LoadFromEnv(ctx context.Context) error {
 	path := strings.TrimSpace(os.Getenv(EnvKey))
 	if path == "" {
@@ -67,59 +69,64 @@ func (p *PluginSupervisor) LoadFromEnv(ctx context.Context) error {
 	}
 	for i := range f.Plugins {
 		e := f.Plugins[i]
-		adapter := &Remote{
-			Entry:  e,
-			Logger: p.log,
+		uds := e.UDS
+		if uds == "" {
+			uds = "/tmp/promptsheon/" + e.Name + ".sock"
 		}
-		p.sup.Register(e.Name, adapter, defaultPolicy())
-		p.log.Info("manifest: registered plugin",
-			"name", e.Name, "binary", e.Binary, "uds", adapter.DefaultUDS())
+		var plugin supervisor.Plugin
+		if e.Binary != "" {
+			// Real subprocess: the supervisor launches the binary,
+			// dials the UDS, and proxies the Plugin wire protocol
+			// over net/rpc. Health() and Stop() are RPC calls.
+			plugin = subprocess.New(e.Name, e.Binary, uds, e.Args, e.Env)
+			p.log.Info("manifest: registered subprocess plugin",
+				"name", e.Name, "binary", e.Binary, "uds", uds)
+		} else {
+			// Pure registration: no binary path. The entry
+			// declares services the operator intends to fulfil
+			// through some other mechanism (e.g. a future built-in).
+			plugin = &Remote{Entry: e, Logger: p.log}
+			p.log.Info("manifest: registered stub plugin (no binary)",
+				"name", e.Name, "uds", uds)
+		}
+		p.sup.Register(e.Name, plugin, defaultPolicy())
 	}
 	return nil
 }
 
-// Remote is the Plugin adapter for one manifest entry. M3 follow-on
-// replaces the body with the subprocess-execution path: fork
-// exec.Command, dial the UDS, run a gRPC client. Today's adapter
-// is a no-op that satisfies the interface and provides a clean
-// integration point.
+// Remote is the Plugin adapter for a manifest entry that has no
+// `binary:` line. It is a registration stub. The real
+// subprocess path uses internal/subprocess.Binary which is
+// constructed in LoadFromEnv.
 type Remote struct {
 	Entry  manifest.Entry
 	Logger *slog.Logger
 }
 
-// Start is a no-op today; M3 follow-on execs the binary.
+// Start is a no-op for the stub: the entry has no binary to
+// launch. Production tenants extend the stub by implementing
+// the Plugin interface.
 func (r *Remote) Start(_ context.Context) error {
 	if r.Logger != nil {
-		r.Logger.Info("remote plugin: Start placeholder (M3 follow-on)",
-			"name", r.Entry.Name, "binary", r.Entry.Binary)
-	}
-	return nil
-}
-
-// Stop is a no-op today; M3 follow-on sends a graceful stop signal
-// to the subprocess.
-func (r *Remote) Stop(_ context.Context) error {
-	if r.Logger != nil {
-		r.Logger.Info("remote plugin: Stop placeholder (M3 follow-on)",
+		r.Logger.Info("remote plugin: Start stub (no binary)",
 			"name", r.Entry.Name)
 	}
 	return nil
 }
 
-// Health is a no-op today; M3 follow-on dials the UDS and calls
-// the plugin's Health RPC.
+// Stop is a no-op for the stub.
+func (r *Remote) Stop(_ context.Context) error {
+	if r.Logger != nil {
+		r.Logger.Info("remote plugin: Stop stub (no binary)",
+			"name", r.Entry.Name)
+	}
+	return nil
+}
+
+// Health is a no-op for the stub.
 func (r *Remote) Health(_ context.Context) error { return nil }
 
-// DefaultUDS returns the UDS path the manifest declares, falling
-// back to the canonical /tmp/promptsheon/<name>.sock path when
-// the manifest entry does not specify one.
-func (r *Remote) DefaultUDS() string {
-	if r.Entry.UDS != "" {
-		return r.Entry.UDS
-	}
-	return "/tmp/promptsheon/" + r.Entry.Name + ".sock"
-}
+var _ supervisor.Plugin = (*Remote)(nil)
 
 // defaultPolicy returns the restart policy that the supervisor
 // applies to every plugin registered through the manifest.
@@ -130,5 +137,3 @@ func defaultPolicy() supervisor.RestartPolicy {
 		MaxBackoff:  30 * time.Second,
 	}
 }
-
-var _ supervisor.Plugin = (*Remote)(nil)
