@@ -1,12 +1,21 @@
 # Promptsheon
 
-**Version Control System for AI Agent Intelligence**
+**The Control Plane for AI Capabilities — v0.1.0**
 
 [![CI](https://github.com/sachncs/promptsheon/actions/workflows/ci.yaml/badge.svg)](https://github.com/sachncs/promptsheon/actions/workflows/ci.yaml)
 [![Go Version](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](https://go.dev)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-Promptsheon applies software engineering discipline to AI agents by providing Git-native version control primitives adapted for agent architectures. Every agent state — system prompts, tool definitions, hyperparameters, evaluation metrics — is stored as an immutable, cryptographically-addressed object in a **Directed Acyclic Graph (DAG)**.
+Promptsheon is the control plane for AI Capabilities. Every
+Capability — its Prompt, Model Policy, Runtime Policy, Context
+Contract, Memory, Guardrails, Tools, MCP servers, and
+Evaluation Suite — is an immutable, content-addressed Manifest
+recorded as a Directed Acyclic Graph. Production tenants manage
+their Capabilities the way engineers manage code: with versions,
+reviews, releases, canary deployments, and rollbacks. v0.1.0 is
+the forward-only baseline; the legacy bundle model and the
+v0.0.7 prompts/agents tables are gone (see
+[CHANGELOG.md](CHANGELOG.md) for the migration path).
 
 ---
 
@@ -37,15 +46,21 @@ go build -o promptsheon  ./cmd/promptsheon
 ```
 
 ```bash
-# Create a prompt
-curl -X POST http://localhost:8080/api/v1/prompts \
+# Create a Capability (POST /v1/projects/{p}/capabilities)
+curl -X POST http://localhost:8080/api/v1/projects/p1/capabilities \
   -H "Content-Type: application/json" \
-  -d '{"name":"greeting","content":"Hello {{name}}, welcome to {{product}}!"}'
+  -d '{"name":"greeting","description":"Friendly greeting"}'
 
-# Run it
-curl -X POST http://localhost:8080/api/v1/prompts/{id}/run \
+# Add a Version to the Capability with a Manifest of artifacts
+curl -X POST http://localhost:8080/api/v1/capabilities/c1/versions \
   -H "Content-Type: application/json" \
-  -d '{"variables":{"name":"World","product":"Promptsheon"}}'
+  -d '{"version":1, "manifest":{"prompt":"<cas-hash>", ...}}'
+
+# Approve the Version into a Release, then invoke the Release
+curl -X POST http://localhost:8080/api/v1/releases/r1/approve -d '{}'
+curl -X POST http://localhost:8080/api/v1/releases/r1/invoke \
+  -H "Content-Type: application/json" \
+  -d '{"inputs":{"q":"hello"}}'
 ```
 
 ---
@@ -53,16 +68,20 @@ curl -X POST http://localhost:8080/api/v1/prompts/{id}/run \
 ## Features
 
 - **Content-Addressable Storage (CAS)** — immutable, SHA-256-based object storage with Merkle DAG structure
-- **Version control** — Git-like primitives (commit, branch, diff, log) for AI agent configurations
-- **Prompt management** — create, version, and manage prompts with variable substitution
-- **Evaluation engine** — run prompts against test datasets with automated scoring
-- **LLM provider abstraction** — unified interface for OpenAI, Anthropic, Azure OpenAI, Ollama, NVIDIA NIM
-- **Agent workflows** — DAG-based workflow execution with tool integration
-- **Observability** — distributed tracing (OpenTelemetry), metrics, and audit logging
-- **Guardrails** — content policy enforcement and safety checks
+- **Capability Versioning** — every Capability has zero or more immutable Versions; the live Release per Environment points at exactly one Version
+- **Manifest** — content-addressed composition of Prompt, Model Policy, Runtime Policy, Context Contract, Memory, Guardrails, Tools, MCP servers, and Evaluation Suite
+- **Recommendation Engine** — the deterministic rules engine (Tier 2.35) plus the bandit Thompson Sampling selector (Tier 2.36) close the loop
+- **Approval Workflow** — MajorityPolicy and MakerCheckerPolicy with separation of duties
+- **Evaluation Engine** — run Versions against test datasets with automated scoring
+- **LLM Provider Abstraction** — unified interface for OpenAI, Anthropic, Azure OpenAI, Ollama, NVIDIA NIM
+- **Workflow DAG** — topological execution with tool integration
+- **Observability** — OpenTelemetry tracing, Prometheus metrics, audit logging
+- **Built-in Guardrails** — PII redaction (Tier 2.47) and prompt-injection detection (Tier 2.48) ship as in-process plugins through the supervisor (Tier 2.46)
+- **Plugin SDK** — gRPC over loopback for remote plugins (Tier 2.32 manifest); KMS-backed KeyProvider (Tier 2.45) for BYOK
 - **Webhooks** — event-driven integrations with HMAC signing and SSRF protection
-- **Secrets management** — encrypted vault for API keys and sensitive configuration
-- **Rate limiting** — configurable per-client rate limiting with burst support
+- **Secrets Management** — encrypted vault for API keys and sensitive configuration
+- **Rate Limiting** — configurable per-client rate limiting with burst support
+- **Per-Workspace Budgets and Quotas** — USD-cap enforcement (Tier 2.37) and rate-cap enforcement
 - **REST API** — full-featured HTTP API with auto-generated OpenAPI specification
 
 ---
@@ -77,14 +96,17 @@ curl -X POST http://localhost:8080/api/v1/prompts/{id}/run \
 │  Auth      │  Rate Limit  │  Audit Log  │  CORS   │
 │  Middleware │  Middleware  │  Middleware │         │
 ├─────────────┴──────────────┴─────────────┴───────┤
-│  Prompt Mgr  │  Workflow Engine  │  Eval Engine   │
-│  Capability  │  Tool Registry   │  Guardrails     │
+│  Capability Mgr  │  Workflow Engine  │  Eval   │
+│  Manifests       │  DAG              │  Engine  │
 ├──────────────────────────────────────────────────┤
-│  Content-Addressable Store  │  SQLite  │  Vault   │
-│  (Merkle DAG)              │          │          │
+│  Content-Addressable Store  │  SQLite/Postgres  │
+│  (Merkle DAG)               │  (with RLS)        │
 ├──────────────────────────────────────────────────┤
 │  LLM Providers  │  Observability  │  Webhooks     │
 │  OpenAI/Anthro  │  OTel+Tracing   │  Event-Driven │
+├──────────────────────────────────────────────────┤
+│  Plugin Supervisor  │  Vault  │  KeyProvider     │
+│  (gRPC over UDS)   │  (KMS)  │  (BYOK)          │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -93,12 +115,13 @@ The server is composed of layered modules:
 | Layer | Description |
 |---|---|
 | **API** | HTTP handlers, middleware (auth, rate-limit, audit, CORS) |
-| **Capabilities** | Prompt, tool, knowledge, MCP, deployment, evaluation |
+| **Capabilities** | Manifests, Releases, Approvals, Recommendations, Lineage |
 | **Workflow** | DAG-based execution engine with shell policy |
-| **Storage** | CAS (Merkle DAG) + SQLite for relational data |
+| **Storage** | CAS (Merkle DAG) + SQLite or Postgres with RLS |
 | **Providers** | Unified LLM provider abstraction layer |
 | **Observability** | OpenTelemetry tracing, metrics collection, retention |
 | **Security** | AuthN/AuthZ, vault, guardrails, SSRF protection |
+| **Plugins** | gRPC over loopback; supervisor-managed lifecycle |
 
 ---
 
@@ -109,9 +132,13 @@ Promptsheon is configured via environment variables or a config file. Key settin
 | Variable | Default | Description |
 |---|---|---|
 | `PROMPTSHEON_ADDR` | `:8080` | Listen address |
+| `PROMPTSHEON_DB_BACKEND` | `sqlite` | `sqlite` (default) or `postgres` |
 | `PROMPTSHEON_DB_PATH` | `promptsheon.db` | SQLite database path |
+| `PROMPTSHEON_DB_DSN` | (none) | Postgres connection string when DB_BACKEND=postgres |
 | `PROMPTSHEON_LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
-| `PROMPTSHEON_AUTH_ENABLED` | `false` | Enable authentication |
+| `PROMPTSHEON_AUTH` | `false` | Enable authentication |
+| `PROMPTSHEON_PLUGINS_FILE` | (none) | Path to the plugin manifest (Tier 2.32) |
+| `PROMPTSHEON_VAULT_KEY` | (none) | Master key for AES-256-GCM vault; override with KMS-backed KeyProvider for production |
 
 See [docs/configuration.md](docs/configuration.md) for the full reference.
 
@@ -125,7 +152,7 @@ Full documentation lives in **[docs/](docs/)**:
 - [Configuration](docs/configuration.md)
 - [API Reference](docs/api-reference.md) — [OpenAPI spec](api/openapi.yaml)
 - [Architecture](docs/architecture.md) — [Modules](docs/modules.md)
-- [Design Decisions](docs/design-decisions.md)
+- [Design Decisions](docs/design-decisions.md) and [ADRs](docs/adr/)
 - [Security](docs/security.md)
 - [Troubleshooting](docs/troubleshooting.md) — [FAQ](docs/faq.md)
 
