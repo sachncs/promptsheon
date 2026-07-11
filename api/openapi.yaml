@@ -457,26 +457,6 @@ paths:
                 type: number
               manifest:
                 $ref: "#/components/schemas/capability.Manifest"
-              prompt:
-                $ref: "#/components/schemas/capability.Prompt"
-              modelPolicy:
-                $ref: "#/components/schemas/capability.ModelPolicy"
-              contextContract:
-                $ref: "#/components/schemas/capability.ContextContract"
-              knowledge:
-                type: array
-              memory:
-                $ref: "#/components/schemas/capability.MemoryConfig"
-              guardrails:
-                type: array
-              tools:
-                type: array
-              mCPServers:
-                type: array
-              runtimePolicy:
-                $ref: "#/components/schemas/capability.RuntimePolicy"
-              evaluationSuite:
-                $ref: "#/components/schemas/capability.EvaluationSuite"
       responses:
         "200":
           description: OK
