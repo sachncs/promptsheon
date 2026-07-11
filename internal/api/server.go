@@ -333,8 +333,7 @@ func (s *Server) registerTracingRoutes() {
 
 func (s *Server) registerMetricsRoutes() {
 	s.mux.HandleFunc("GET /api/v1/metrics/summary", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsSummary)))
-	s.mux.HandleFunc("GET /api/v1/metrics/top-prompts", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleTopPrompts)))
-	s.mux.HandleFunc("GET /api/v1/metrics/top-agents", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleTopAgents)))
+	s.mux.HandleFunc("GET /api/v1/metrics/top-capabilities", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleTopCapabilities)))
 	s.mux.HandleFunc("GET /api/v1/metrics/dashboard", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleDashboardSummary)))
 	s.mux.HandleFunc("GET /api/v1/metrics", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsPrometheus)))
 }
