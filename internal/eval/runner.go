@@ -2,15 +2,15 @@
 package eval
 
 import (
-	"context"
-	"fmt"
-	"strings"
-
-	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/llm"
 )
 
-// Runner executes evaluation runs for capability versions.
+// Runner executes evaluation runs for capability versions. F-05
+// forward-only: the legacy RunVersion / buildVersionPrompt
+// analyzers that consumed the deleted bundle types (Prompt,
+// ModelPolicy, etc.) are gone. The Runner type stays because
+// production wiring will use it for v2+ RunVersion signatures
+// (signature lands with the v0.1.0 follow-on).
 type Runner struct {
 	provider llm.Provider
 }
@@ -18,86 +18,4 @@ type Runner struct {
 // NewRunner creates a new Runner with the given provider.
 func NewRunner(provider llm.Provider) *Runner {
 	return &Runner{provider: provider}
-}
-
-// RunVersion runs an evaluation suite against a capability version.
-func (r *Runner) RunVersion(_ context.Context, version *capability.Version, suite *capability.EvaluationSuite) (*capability.EvaluationResult, error) {
-	if version == nil {
-		return nil, fmt.Errorf("capability version is required")
-	}
-	if suite == nil {
-		return nil, fmt.Errorf("evaluation suite is required")
-	}
-
-	const metricAccuracy = "accuracy"
-	const metricPrecision = "precision"
-	const metricRecall = "recall"
-	const metricHallucination = "hallucination"
-	const metricCost = "cost"
-	const metricLatency = "latency"
-
-	totalAccuracy := 0.95
-	totalPrecision := 0.93
-	totalRecall := 0.91
-	totalHallucination := 0.03
-	totalLatencyMs := 750.0
-	totalCostUSD := 0.008
-
-	thresholdsMet := true
-	for metric, threshold := range suite.Thresholds {
-		var actual float64
-		switch metric {
-		case metricAccuracy:
-			actual = totalAccuracy
-		case metricPrecision:
-			actual = totalPrecision
-		case metricRecall:
-			actual = totalRecall
-		case metricHallucination:
-			actual = totalHallucination
-		case metricLatency:
-			actual = totalLatencyMs
-		case metricCost:
-			actual = totalCostUSD
-		}
-		if actual < threshold {
-			thresholdsMet = false
-		}
-	}
-
-	result := &capability.EvaluationResult{
-		CapabilityVersionID: version.ID,
-		Accuracy:            totalAccuracy,
-		Precision:           totalPrecision,
-		Recall:              totalRecall,
-		Hallucination:       totalHallucination,
-		LatencyMs:           totalLatencyMs,
-		CostUSD:             totalCostUSD,
-		Schema:              1.0,
-		Groundedness:        0.97,
-		ThresholdsMet:       thresholdsMet,
-		PerMetric: map[string]float64{
-			metricAccuracy:      totalAccuracy,
-			metricPrecision:     totalPrecision,
-			metricRecall:        totalRecall,
-			metricHallucination: totalHallucination,
-			metricLatency:       totalLatencyMs,
-			metricCost:          totalCostUSD,
-		},
-	}
-
-	return result, nil
-}
-
-func (r *Runner) buildVersionPrompt(version *capability.Version, input map[string]any) string {
-	promptText := version.Prompt.Instructions
-	if version.Prompt.Template != "" {
-		promptText = version.Prompt.Template
-	}
-	for k, v := range input {
-		placeholder := fmt.Sprintf("{{.%s}}", k)
-		val := fmt.Sprintf("%v", v)
-		promptText = strings.ReplaceAll(promptText, placeholder, val)
-	}
-	return promptText
 }

@@ -331,18 +331,8 @@ func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request) erro
 func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) error {
 	capabilityID := r.PathValue("capability_id")
 	var req struct {
-		Version         int                          `json:"version"`
-		Manifest        capability.Manifest          `json:"manifest"`
-		Prompt          capability.Prompt            `json:"prompt"`
-		ModelPolicy     capability.ModelPolicy       `json:"model_policy"`
-		ContextContract capability.ContextContract   `json:"context_contract"`
-		Knowledge       []capability.KnowledgeSource `json:"knowledge,omitempty"`
-		Memory          capability.MemoryConfig      `json:"memory"`
-		Guardrails      []capability.Guardrail       `json:"guardrails,omitempty"`
-		Tools           []capability.Tool            `json:"tools,omitempty"`
-		MCPServers      []capability.MCPServer       `json:"mcp_servers,omitempty"`
-		RuntimePolicy   capability.RuntimePolicy     `json:"runtime_policy"`
-		EvaluationSuite capability.EvaluationSuite   `json:"evaluation_suite"`
+		Version  int                 `json:"version"`
+		Manifest capability.Manifest `json:"manifest"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
@@ -361,23 +351,13 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 	}
 	now := time.Now()
 	v := &capability.Version{
-		ID:              generateID(),
-		CapabilityID:    capabilityID,
-		Version:         req.Version,
-		Manifest:        manifest,
-		ManifestHash:    hash,
-		Prompt:          req.Prompt,
-		ModelPolicy:     req.ModelPolicy,
-		ContextContract: req.ContextContract,
-		Knowledge:       req.Knowledge,
-		Memory:          req.Memory,
-		Guardrails:      req.Guardrails,
-		Tools:           req.Tools,
-		MCPServers:      req.MCPServers,
-		RuntimePolicy:   req.RuntimePolicy,
-		EvaluationSuite: req.EvaluationSuite,
-		CreatedAt:       now,
-		CreatedBy:       callerID(r),
+		ID:           generateID(),
+		CapabilityID: capabilityID,
+		Version:      req.Version,
+		Manifest:     manifest,
+		ManifestHash: hash,
+		CreatedAt:    now,
+		CreatedBy:    callerID(r),
 	}
 	if err := s.db.CreateVersion(r.Context(), v); err != nil {
 		return err
