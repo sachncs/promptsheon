@@ -326,55 +326,12 @@ func (p *Postgres) CreateVersion(ctx context.Context, v *capability.Version) err
 	if err != nil {
 		return err
 	}
-	promptJSON, err := jsonMarshal(v.Prompt)
-	if err != nil {
-		return err
-	}
-	mpJSON, err := jsonMarshal(v.ModelPolicy)
-	if err != nil {
-		return err
-	}
-	ccJSON, err := jsonMarshal(v.ContextContract)
-	if err != nil {
-		return err
-	}
-	memJSON, err := jsonMarshal(v.Memory)
-	if err != nil {
-		return err
-	}
-	knowJSON, err := jsonMarshal(v.Knowledge)
-	if err != nil {
-		return err
-	}
-	gJSON, err := jsonMarshal(v.Guardrails)
-	if err != nil {
-		return err
-	}
-	tJSON, err := jsonMarshal(v.Tools)
-	if err != nil {
-		return err
-	}
-	mcpJSON, err := jsonMarshal(v.MCPServers)
-	if err != nil {
-		return err
-	}
-	rpJSON, err := jsonMarshal(v.RuntimePolicy)
-	if err != nil {
-		return err
-	}
-	esJSON, err := jsonMarshal(v.EvaluationSuite)
-	if err != nil {
-		return err
-	}
 	_, err = p.pool.Exec(ctx,
 		`INSERT INTO capability_versions
-		   (id, capability_id, version, manifest, manifest_hash, prompt, model_policy,
-		    context_contract, knowledge, memory, guardrails, tools, mcp_servers,
-		    runtime_policy, evaluation_suite, created_at, created_by)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+		   (id, capability_id, version, manifest, manifest_hash, created_at, created_by)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7)`,
 		v.ID, v.CapabilityID, v.Version, manifestJSON, v.ManifestHash,
-		promptJSON, mpJSON, ccJSON, knowJSON, memJSON, gJSON, tJSON, mcpJSON,
-		rpJSON, esJSON, v.CreatedAt, v.CreatedBy,
+		v.CreatedAt, v.CreatedBy,
 	)
 	return err
 }
@@ -382,9 +339,7 @@ func (p *Postgres) CreateVersion(ctx context.Context, v *capability.Version) err
 // GetVersion implements capability.Repository.
 func (p *Postgres) GetVersion(ctx context.Context, id string) (*capability.Version, error) {
 	row := p.pool.QueryRow(ctx,
-		`SELECT id, capability_id, version, manifest, manifest_hash, prompt, model_policy,
-		        context_contract, knowledge, memory, guardrails, tools, mcp_servers,
-		        runtime_policy, evaluation_suite, created_at, created_by
+		`SELECT id, capability_id, version, manifest, manifest_hash, created_at, created_by
 		 FROM capability_versions WHERE id = $1`, id,
 	)
 	return scanVersion(row)
@@ -393,9 +348,7 @@ func (p *Postgres) GetVersion(ctx context.Context, id string) (*capability.Versi
 // ListVersions implements capability.Repository.
 func (p *Postgres) ListVersions(ctx context.Context, capabilityID string) ([]*capability.Version, error) {
 	rows, err := p.pool.Query(ctx,
-		`SELECT id, capability_id, version, manifest, manifest_hash, prompt, model_policy,
-		        context_contract, knowledge, memory, guardrails, tools, mcp_servers,
-		        runtime_policy, evaluation_suite, created_at, created_by
+		`SELECT id, capability_id, version, manifest, manifest_hash, created_at, created_by
 		 FROM capability_versions WHERE capability_id = $1 ORDER BY version DESC`, capabilityID,
 	)
 	if err != nil {
@@ -416,9 +369,7 @@ func (p *Postgres) ListVersions(ctx context.Context, capabilityID string) ([]*ca
 // GetLatestVersion implements capability.Repository.
 func (p *Postgres) GetLatestVersion(ctx context.Context, capabilityID string) (*capability.Version, error) {
 	row := p.pool.QueryRow(ctx,
-		`SELECT id, capability_id, version, manifest, manifest_hash, prompt, model_policy,
-		        context_contract, knowledge, memory, guardrails, tools, mcp_servers,
-		        runtime_policy, evaluation_suite, created_at, created_by
+		`SELECT id, capability_id, version, manifest, manifest_hash, created_at, created_by
 		 FROM capability_versions WHERE capability_id = $1 ORDER BY version DESC LIMIT 1`, capabilityID,
 	)
 	return scanVersion(row)
@@ -496,9 +447,8 @@ func (p *Postgres) ListExecutions(ctx context.Context, f capability.ExecutionFil
 // scanVersion reads one capability_versions row.
 func scanVersion(row pgx.Row) (*capability.Version, error) {
 	var v capability.Version
-	var manifest, prompt, mp, cc, know, mem, g, t, mcp, rp, es []byte
+	var manifest []byte
 	if err := row.Scan(&v.ID, &v.CapabilityID, &v.Version, &manifest, &v.ManifestHash,
-		&prompt, &mp, &cc, &know, &mem, &g, &t, &mcp, &rp, &es,
 		&v.CreatedAt, &v.CreatedBy,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -509,16 +459,6 @@ func scanVersion(row pgx.Row) (*capability.Version, error) {
 	if len(manifest) > 0 && string(manifest) != "{}" {
 		_ = jsonUnmarshal(manifest, &v.Manifest)
 	}
-	_ = jsonUnmarshal(prompt, &v.Prompt)
-	_ = jsonUnmarshal(mp, &v.ModelPolicy)
-	_ = jsonUnmarshal(cc, &v.ContextContract)
-	_ = jsonUnmarshal(know, &v.Knowledge)
-	_ = jsonUnmarshal(mem, &v.Memory)
-	_ = jsonUnmarshal(g, &v.Guardrails)
-	_ = jsonUnmarshal(t, &v.Tools)
-	_ = jsonUnmarshal(mcp, &v.MCPServers)
-	_ = jsonUnmarshal(rp, &v.RuntimePolicy)
-	_ = jsonUnmarshal(es, &v.EvaluationSuite)
 	return &v, nil
 }
 

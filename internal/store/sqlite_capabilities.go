@@ -264,57 +264,9 @@ func scanCapability(scanner interface {
 // Capability Versions
 // ---------------------------------------------------------------------------
 
-// versionJSONFields holds the JSON-marshalled fields of a capability.Version.
-type versionJSONFields struct {
-	prompt, modelPolicy, contextContract, knowledge, memory string
-	guardrails, tools, mcp, runtimePolicy, evalSuite        string
-}
-
-// marshalCapabilityVersionJSONFields marshals the JSON fields of a version.
-func marshalCapabilityVersionJSONFields(v *capability.Version) (f versionJSONFields, err error) {
-	f.prompt, err = marshalField(v.Prompt)
-	if err != nil {
-		return f, err
-	}
-	f.modelPolicy, err = marshalField(v.ModelPolicy)
-	if err != nil {
-		return f, err
-	}
-	f.contextContract, err = marshalField(v.ContextContract)
-	if err != nil {
-		return f, err
-	}
-	f.knowledge, err = marshalField(v.Knowledge)
-	if err != nil {
-		return f, err
-	}
-	f.memory, err = marshalField(v.Memory)
-	if err != nil {
-		return f, err
-	}
-	f.guardrails, err = marshalField(v.Guardrails)
-	if err != nil {
-		return f, err
-	}
-	f.tools, err = marshalField(v.Tools)
-	if err != nil {
-		return f, err
-	}
-	f.mcp, err = marshalField(v.MCPServers)
-	if err != nil {
-		return f, err
-	}
-	f.runtimePolicy, err = marshalField(v.RuntimePolicy)
-	if err != nil {
-		return f, err
-	}
-	f.evalSuite, err = marshalField(v.EvaluationSuite)
-	if err != nil {
-		return f, err
-	}
-	return f, nil
-}
-
+// marshalField is the single remaining helper from the legacy
+// versionJSONFields shape. F-05 forward-only: Version carries
+// only the Manifest; the per-artifact JSON columns are gone.
 func marshalField(v any) (string, error) {
 	b, err := marshalOrErr(v)
 	if err != nil {
@@ -324,11 +276,6 @@ func marshalField(v any) (string, error) {
 }
 
 func (s *SQLite) CreateVersion(ctx context.Context, v *capability.Version) error {
-	f, err := marshalCapabilityVersionJSONFields(v)
-	if err != nil {
-		return fmt.Errorf("marshal version JSON fields: %w", err)
-	}
-
 	manifestJSON, err := marshalOrErr(v.Manifest)
 	if err != nil {
 		return fmt.Errorf("marshal version manifest: %w", err)
@@ -336,13 +283,10 @@ func (s *SQLite) CreateVersion(ctx context.Context, v *capability.Version) error
 
 	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO capability_versions
-		 (id, capability_id, version, manifest, manifest_hash, prompt, model_policy, context_contract, knowledge,
-		  memory, guardrails, tools, mcp_servers, runtime_policy, evaluation_suite, created_at, created_by)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 (id, capability_id, version, manifest, manifest_hash, created_at, created_by)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		v.ID, v.CapabilityID, v.Version, string(manifestJSON), v.ManifestHash,
-		f.prompt, f.modelPolicy, f.contextContract,
-		f.knowledge, f.memory, f.guardrails, f.tools, f.mcp, f.runtimePolicy,
-		f.evalSuite, v.CreatedAt, v.CreatedBy,
+		v.CreatedAt, v.CreatedBy,
 	)
 	if err != nil {
 		return fmt.Errorf("insert version: %w", err)
@@ -352,8 +296,7 @@ func (s *SQLite) CreateVersion(ctx context.Context, v *capability.Version) error
 
 func (s *SQLite) GetVersion(ctx context.Context, id string) (*capability.Version, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, capability_id, version, manifest, manifest_hash, prompt, model_policy, context_contract, knowledge,
-		 memory, guardrails, tools, mcp_servers, runtime_policy, evaluation_suite, created_at, created_by
+		`SELECT id, capability_id, version, manifest, manifest_hash, created_at, created_by
 		 FROM capability_versions WHERE id = ?`, id,
 	)
 	return scanCapabilityVersion(row)
@@ -361,8 +304,7 @@ func (s *SQLite) GetVersion(ctx context.Context, id string) (*capability.Version
 
 func (s *SQLite) ListVersions(ctx context.Context, capabilityID string) ([]*capability.Version, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, capability_id, version, manifest, manifest_hash, prompt, model_policy, context_contract, knowledge,
-		 memory, guardrails, tools, mcp_servers, runtime_policy, evaluation_suite, created_at, created_by
+		`SELECT id, capability_id, version, manifest, manifest_hash, created_at, created_by
 		 FROM capability_versions WHERE capability_id = ? ORDER BY version DESC`, capabilityID,
 	)
 	if err != nil {
@@ -395,14 +337,9 @@ func scanCapabilityVersion(scanner interface {
 }) (*capability.Version, error) {
 	var v capability.Version
 	var manifestJSON string
-	var promptJSON, modelPolicyJSON, contextContractJSON, knowledgeJSON, memoryJSON string
-	var guardrailsJSON, toolsJSON, mcpJSON, runtimePolicyJSON, evalSuiteJSON string
 
 	err := scanner.Scan(&v.ID, &v.CapabilityID, &v.Version,
-		&manifestJSON, &v.ManifestHash,
-		&promptJSON, &modelPolicyJSON, &contextContractJSON, &knowledgeJSON,
-		&memoryJSON, &guardrailsJSON, &toolsJSON, &mcpJSON,
-		&runtimePolicyJSON, &evalSuiteJSON, &v.CreatedAt, &v.CreatedBy,
+		&manifestJSON, &v.ManifestHash, &v.CreatedAt, &v.CreatedBy,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -414,17 +351,6 @@ func scanCapabilityVersion(scanner interface {
 	if manifestJSON != "" && manifestJSON != "{}" {
 		mustUnmarshal([]byte(manifestJSON), &v.Manifest)
 	}
-
-	mustUnmarshal([]byte(promptJSON), &v.Prompt)
-	mustUnmarshal([]byte(modelPolicyJSON), &v.ModelPolicy)
-	mustUnmarshal([]byte(contextContractJSON), &v.ContextContract)
-	mustUnmarshal([]byte(knowledgeJSON), &v.Knowledge)
-	mustUnmarshal([]byte(memoryJSON), &v.Memory)
-	mustUnmarshal([]byte(guardrailsJSON), &v.Guardrails)
-	mustUnmarshal([]byte(toolsJSON), &v.Tools)
-	mustUnmarshal([]byte(mcpJSON), &v.MCPServers)
-	mustUnmarshal([]byte(runtimePolicyJSON), &v.RuntimePolicy)
-	mustUnmarshal([]byte(evalSuiteJSON), &v.EvaluationSuite)
 
 	return &v, nil
 }
