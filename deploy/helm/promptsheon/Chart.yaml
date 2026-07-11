@@ -7,8 +7,8 @@ description: |
   (PROMPTSHEON_DB_BACKEND=postgres, RLS migrations in
   internal/store/migrations/postgres/).
 type: application
-version: 0.0.7
-appVersion: 0.0.7
+version: 0.1.0
+appVersion: 0.1.0
 keywords:
   - ai
   - capabilities

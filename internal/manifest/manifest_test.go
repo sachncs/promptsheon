@@ -19,7 +19,7 @@ func TestLoadValidManifest(t *testing.T) {
       - "OPENAI_API_KEY_FILE=/etc/promptsheon/openai.key"
     services: ["Provider"]
     uds: /tmp/promptsheon/openai-gpt4.sock
-    min_core_version: "0.0.7"
+    min_core_version: "0.1.0"
   - name: pii-redactor
     version: "0.1.0"
     binary: /opt/promptsheon/plugins/pii-redactor
