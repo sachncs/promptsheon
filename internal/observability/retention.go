@@ -15,7 +15,6 @@ import (
 // RetentionPolicy defines TTL for different log types.
 type RetentionPolicy struct {
 	TraceTTL      time.Duration
-	SnapshotTTL   time.Duration
 	AuditTTL      time.Duration
 	CheckInterval time.Duration
 }
@@ -24,7 +23,6 @@ type RetentionPolicy struct {
 func DefaultRetentionPolicy() RetentionPolicy {
 	return RetentionPolicy{
 		TraceTTL:      30 * 24 * time.Hour, // 30 days minimum
-		SnapshotTTL:   30 * 24 * time.Hour, // 30 days
 		AuditTTL:      90 * 24 * time.Hour, // 90 days
 		CheckInterval: 1 * time.Hour,       // check every hour
 	}
@@ -39,11 +37,6 @@ func LoadRetentionPolicyFromEnv() RetentionPolicy {
 	if v := os.Getenv("PROMPTSHEON_TRACE_TTL_DAYS"); v != "" {
 		if days, err := strconv.Atoi(v); err == nil && days >= 1 {
 			p.TraceTTL = time.Duration(days) * 24 * time.Hour
-		}
-	}
-	if v := os.Getenv("PROMPTSHEON_SNAPSHOT_TTL_DAYS"); v != "" {
-		if days, err := strconv.Atoi(v); err == nil && days >= 1 {
-			p.SnapshotTTL = time.Duration(days) * 24 * time.Hour
 		}
 	}
 	if v := os.Getenv("PROMPTSHEON_AUDIT_TTL_DAYS"); v != "" {
@@ -135,18 +128,6 @@ func (m *RetentionManager) Enforce(ctx context.Context) error {
 		}
 	}
 
-	if m.policy.SnapshotTTL > 0 {
-		cutoff := time.Now().Add(-m.policy.SnapshotTTL)
-		result, err := m.db.ExecContext(ctx,
-			"DELETE FROM output_snapshots WHERE created_at < ?", cutoff)
-		if err != nil {
-			m.logger.Warn("failed to clean snapshots", "err", err)
-		} else {
-			n, _ := result.RowsAffected()
-			totalDeleted += int(n)
-		}
-	}
-
 	// Audit retention: never purge "important" actions, no matter
 	// how old. For everything else, delete only after AuditTTL.
 	// We build the NOT IN list from the protected set so the
@@ -182,7 +163,6 @@ func (m *RetentionManager) Enforce(ctx context.Context) error {
 	if totalDeleted > 0 {
 		m.logger.Info("retention cleanup completed", "deleted", totalDeleted,
 			"trace_ttl", m.policy.TraceTTL,
-			"snapshot_ttl", m.policy.SnapshotTTL,
 			"audit_ttl", m.policy.AuditTTL)
 	}
 
