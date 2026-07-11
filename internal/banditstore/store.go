@@ -42,6 +42,16 @@ func NewInMemory() *InMemory {
 	return &InMemory{m: map[string]bandit.ArmPosterior{}}
 }
 
+// Put is a test-friendly direct setter that bypasses the wholesale-
+// replace SaveAll path. Production paths use the *Store wrapper
+// (Store.Put); tests can use the InMemory Put to seed state
+// without going through the SaveAll round-trip.
+func (im *InMemory) Put(armID string, p bandit.ArmPosterior) {
+	im.mu.Lock()
+	defer im.mu.Unlock()
+	im.m[armID] = p
+}
+
 // LoadAll implements Backend.
 func (im *InMemory) LoadAll(_ context.Context) (map[string]bandit.ArmPosterior, error) {
 	im.mu.Lock()

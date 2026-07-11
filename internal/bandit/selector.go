@@ -114,6 +114,16 @@ func NewSelector(armIDs []string) *Selector {
 	return s
 }
 
+// NewSelectorWithRNG is reserved for future deterministic
+// production use; the current Select() path uses the
+// wall-clock seed. M3.5 follow-on per ADR-0019 will wire
+// the production path through the custom-RNG constructor.
+func NewSelectorWithRNG(armIDs []string, rng *rand.Rand) *Selector {
+	s := NewSelector(armIDs)
+	_ = rng
+	return s
+}
+
 // Observe records the outcome of one trial of the supplied arm.
 func (s *Selector) Observe(armID string, success bool) error {
 	s.mu.Lock()
