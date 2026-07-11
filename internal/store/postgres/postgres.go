@@ -237,8 +237,6 @@ func (p *Postgres) DeleteProject(ctx context.Context, id string) error {
 // is inserted with the legacy state/current_version_id columns
 // supplied defaults ('draft', ”) for forward-compatibility with
 // the SQLite schema that retains those columns until migration 026
-// drops them. Callers that need the live state call
-// capability.DeriveState over the Release set.
 func (p *Postgres) CreateCapability(ctx context.Context, c *capability.Capability) error {
 	tags, err := jsonMarshal(c.Tags)
 	if err != nil {
@@ -246,8 +244,8 @@ func (p *Postgres) CreateCapability(ctx context.Context, c *capability.Capabilit
 	}
 	return p.withWorkspace(ctx, c.ProjectID, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx,
-			`INSERT INTO capabilities (id, project_id, name, description, owner, tags, state, current_version_id, created_at, updated_at)
-			 VALUES ($1, $2, $3, $4, $5, $6, 'draft', '', $7, $8)`,
+			`INSERT INTO capabilities (id, project_id, name, description, owner, tags, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 			c.ID, c.ProjectID, c.Name, c.Description, c.Owner, tags, c.CreatedAt, c.UpdatedAt,
 		)
 		return err

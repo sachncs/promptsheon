@@ -244,9 +244,7 @@ func scanCapability(scanner interface {
 }) (*capability.Capability, error) {
 	var c capability.Capability
 	var tagsStr string
-	var stateStr string
-	var currentVersion string
-	err := scanner.Scan(&c.ID, &c.ProjectID, &c.Name, &c.Description, &c.Owner, &tagsStr, &stateStr, &currentVersion, &c.CreatedAt, &c.UpdatedAt)
+	err := scanner.Scan(&c.ID, &c.ProjectID, &c.Name, &c.Description, &c.Owner, &tagsStr, &c.CreatedAt, &c.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
