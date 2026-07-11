@@ -1,0 +1,62 @@
+// M3.5 gRPC plugin transport — wire contract.
+//
+// Service shape: each plugin binary is a gRPC server; the
+// supervisor is a gRPC client. The wire format is the canonical
+// contract; v0.1.x plugin binaries can implement either the
+// net/rpc PluginRPC (subprocess.go) or this gRPC pluginv1.PluginServer.
+//
+// F-23 forward-only. The net/rpc implementation in
+// internal/subprocess remains the production transport for
+// v0.1.x; the gRPC adapter replaces it in M3.5. The two
+// transports share the same wire semantics (Ping/Health/Stop)
+// so plugins written against one can be ported to the other.
+
+syntax = "proto3";
+
+package pluginv1.v0_1_0;
+
+option go_package = "github.com/sachncs/promptsheon/internal/pluginproto/pluginv1;pluginv1";
+
+// Plugin is the service every plugin binary implements.
+// The supervisor is the client.
+service Plugin {
+  // Ping returns the plugin's identity for observability.
+  // Used at supervisor boot to confirm the binary is the
+  // version the manifest declared.
+  rpc Ping(PingRequest) returns (PingResponse);
+
+  // Health returns nil when the plugin is ready to accept
+  // traffic. The supervisor polls Health on a 5-second
+  // interval; consecutive failures trigger a restart.
+  rpc Health(HealthRequest) returns (HealthResponse);
+
+  // Stop asks the plugin to drain and exit. The plugin
+  // returns when ready for the supervisor to call
+  // process.Wait. The supervisor kills the process if it
+  // does not exit in 2 seconds.
+  rpc Stop(StopRequest) returns (StopResponse);
+}
+
+message PingRequest {}
+
+message PingResponse {
+  // Name is the manifest entry name the plugin was
+  // registered under.
+  string name = 1;
+  // Version is the plugin binary's semver string.
+  string version = 2;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  // OK is true when the plugin is ready to accept traffic.
+  // A nil err in the unary response is the canonical "OK";
+  // this field is reserved for future structured health
+  // reports.
+  bool ok = 1;
+}
+
+message StopRequest {}
+
+message StopResponse {}
