@@ -7,14 +7,17 @@ import (
 	"time"
 )
 
-// UsageTracker tracks usage counts for prompts and agents.
+// UsageTracker tracks per-Capability usage counts in-process. The
+// legacy PromptUsage / AgentUsage maps were removed in v0.1.0:
+// the new abstraction is the Capability aggregate (ADR-0010) and
+// the v0.0.7 prompts/agents tables are dropped (F-06). The map
+// name reflects that.
 type UsageTracker struct {
-	mu          sync.RWMutex
-	promptUsage map[string]*UsageCount
-	agentUsage  map[string]*UsageCount
+	mu              sync.RWMutex
+	capabilityUsage map[string]*UsageCount
 }
 
-// UsageCount tracks usage statistics for a resource.
+// UsageCount tracks usage statistics for one Capability.
 type UsageCount struct {
 	ID         string    `json:"id"`
 	Name       string    `json:"name"`
@@ -27,20 +30,19 @@ type UsageCount struct {
 // NewUsageTracker creates a new usage tracker.
 func NewUsageTracker() *UsageTracker {
 	return &UsageTracker{
-		promptUsage: make(map[string]*UsageCount),
-		agentUsage:  make(map[string]*UsageCount),
+		capabilityUsage: make(map[string]*UsageCount),
 	}
 }
 
-// RecordPromptUsage records a prompt usage event.
-func (t *UsageTracker) RecordPromptUsage(id, name string, tokens int, latencyMs float64) {
+// RecordCapabilityUsage records a Capability usage event.
+func (t *UsageTracker) RecordCapabilityUsage(id, name string, tokens int, latencyMs float64) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	usage, ok := t.promptUsage[id]
+	usage, ok := t.capabilityUsage[id]
 	if !ok {
 		usage = &UsageCount{ID: id, Name: name}
-		t.promptUsage[id] = usage
+		t.capabilityUsage[id] = usage
 	}
 
 	usage.Count++
@@ -49,49 +51,13 @@ func (t *UsageTracker) RecordPromptUsage(id, name string, tokens int, latencyMs 
 	usage.AvgLatency = (usage.AvgLatency*float64(usage.Count-1) + latencyMs) / float64(usage.Count)
 }
 
-// RecordAgentUsage records an agent usage event.
-func (t *UsageTracker) RecordAgentUsage(id, name string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	usage, ok := t.agentUsage[id]
-	if !ok {
-		usage = &UsageCount{ID: id, Name: name}
-		t.agentUsage[id] = usage
-	}
-
-	usage.Count++
-	usage.LastUsed = time.Now()
-}
-
-// GetTopPrompts returns the most used prompts.
-func (t *UsageTracker) GetTopPrompts(limit int) []*UsageCount {
+// GetTopCapabilities returns the most-used Capabilities.
+func (t *UsageTracker) GetTopCapabilities(limit int) []*UsageCount {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
 	var usages []*UsageCount
-	for _, u := range t.promptUsage {
-		usages = append(usages, u)
-	}
-
-	sort.Slice(usages, func(i, j int) bool {
-		return usages[i].Count > usages[j].Count
-	})
-
-	if limit > 0 && len(usages) > limit {
-		usages = usages[:limit]
-	}
-
-	return usages
-}
-
-// GetTopAgents returns the most used agents.
-func (t *UsageTracker) GetTopAgents(limit int) []*UsageCount {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	var usages []*UsageCount
-	for _, u := range t.agentUsage {
+	for _, u := range t.capabilityUsage {
 		usages = append(usages, u)
 	}
 
@@ -112,32 +78,17 @@ func (s *Server) handleMetricsSummary(w http.ResponseWriter, _ *http.Request) er
 	return nil
 }
 
-func (s *Server) handleTopPrompts(w http.ResponseWriter, _ *http.Request) error {
+func (s *Server) handleTopCapabilities(w http.ResponseWriter, _ *http.Request) error {
 	if s.usageTracker == nil {
 		writeJSON(w, http.StatusOK, []*UsageCount{})
 		return nil
 	}
 
 	limit := 10
-	usages := s.usageTracker.GetTopPrompts(limit)
+	usages := s.usageTracker.GetTopCapabilities(limit)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"prompts": usages,
-		"total":   len(usages),
-	})
-	return nil
-}
-
-func (s *Server) handleTopAgents(w http.ResponseWriter, _ *http.Request) error {
-	if s.usageTracker == nil {
-		writeJSON(w, http.StatusOK, []*UsageCount{})
-		return nil
-	}
-
-	limit := 10
-	usages := s.usageTracker.GetTopAgents(limit)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"agents": usages,
-		"total":  len(usages),
+		"capabilities": usages,
+		"total":        len(usages),
 	})
 	return nil
 }

@@ -1842,12 +1842,12 @@ func TestHandleMetricsSummary(t *testing.T) {
 	}
 }
 
-func TestHandleTopPrompts(t *testing.T) {
+func TestHandleTopCapabilities(t *testing.T) {
 	s := newTestServer(t)
 	s.usageTracker = NewUsageTracker()
-	s.usageTracker.RecordPromptUsage("p1", "Prompt 1", 100, 50)
+	s.usageTracker.RecordCapabilityUsage("p1", "Prompt 1", 100, 50)
 
-	req := httptest.NewRequest("GET", "/api/v1/metrics/top-prompts", nil)
+	req := httptest.NewRequest("GET", "/api/v1/metrics/top-capabilities", nil)
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
 
@@ -1862,40 +1862,9 @@ func TestHandleTopPrompts(t *testing.T) {
 	}
 }
 
-func TestHandleTopPrompts_NilTracker(t *testing.T) {
+func TestHandleTopCapabilities_NilTracker(t *testing.T) {
 	s := newTestServer(t)
-	req := httptest.NewRequest("GET", "/api/v1/metrics/top-prompts", nil)
-	rr := httptest.NewRecorder()
-	s.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleTopAgents(t *testing.T) {
-	s := newTestServer(t)
-	s.usageTracker = NewUsageTracker()
-	s.usageTracker.RecordAgentUsage("a1", "Agent 1")
-
-	req := httptest.NewRequest("GET", "/api/v1/metrics/top-agents", nil)
-	rr := httptest.NewRecorder()
-	s.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-
-	var resp map[string]any
-	readJSONBody(t, rr.Body.Bytes(), &resp)
-	if resp["total"] != float64(1) {
-		t.Errorf("expected total 1, got %v", resp["total"])
-	}
-}
-
-func TestHandleTopAgents_NilTracker(t *testing.T) {
-	s := newTestServer(t)
-	req := httptest.NewRequest("GET", "/api/v1/metrics/top-agents", nil)
+	req := httptest.NewRequest("GET", "/api/v1/metrics/top-capabilities", nil)
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
 
@@ -3351,10 +3320,10 @@ func TestWebhookAllowPrivate(t *testing.T) {
 
 func TestUsageTracker_RecordAndGet(t *testing.T) {
 	ut := NewUsageTracker()
-	ut.RecordPromptUsage("p1", "Prompt 1", 100, 50.0)
-	ut.RecordPromptUsage("p1", "Prompt 1", 200, 150.0)
+	ut.RecordCapabilityUsage("p1", "Prompt 1", 100, 50.0)
+	ut.RecordCapabilityUsage("p1", "Prompt 1", 200, 150.0)
 
-	top := ut.GetTopPrompts(10)
+	top := ut.GetTopCapabilities(10)
 	if len(top) != 1 {
 		t.Fatalf("expected 1 prompt, got %d", len(top))
 	}
@@ -3368,11 +3337,11 @@ func TestUsageTracker_RecordAndGet(t *testing.T) {
 
 func TestUsageTracker_RecordAgent(t *testing.T) {
 	ut := NewUsageTracker()
-	ut.RecordAgentUsage("a1", "Agent 1")
-	ut.RecordAgentUsage("a1", "Agent 1")
-	ut.RecordAgentUsage("a2", "Agent 2")
+	ut.RecordCapabilityUsage("a1", "Agent 1", 100, 50.0)
+	ut.RecordCapabilityUsage("a1", "Agent 1", 100, 50.0)
+	ut.RecordCapabilityUsage("a2", "Agent 2", 100, 50.0)
 
-	top := ut.GetTopAgents(10)
+	top := ut.GetTopCapabilities(10)
 	if len(top) != 2 {
 		t.Fatalf("expected 2 agents, got %d", len(top))
 	}
@@ -3383,31 +3352,31 @@ func TestUsageTracker_RecordAgent(t *testing.T) {
 
 func TestUsageTracker_GetEmpty(t *testing.T) {
 	ut := NewUsageTracker()
-	if prompts := ut.GetTopPrompts(10); len(prompts) != 0 {
+	if prompts := ut.GetTopCapabilities(10); len(prompts) != 0 {
 		t.Errorf("expected empty, got %d", len(prompts))
 	}
-	if agents := ut.GetTopAgents(10); len(agents) != 0 {
+	if agents := ut.GetTopCapabilities(10); len(agents) != 0 {
 		t.Errorf("expected empty, got %d", len(agents))
 	}
 }
 
-func TestUsageTracker_GetTopPromptsLimit(t *testing.T) {
+func TestUsageTracker_GetTopCapabilitiesLimit(t *testing.T) {
 	ut := NewUsageTracker()
-	ut.RecordPromptUsage("p1", "P1", 10, 1)
-	ut.RecordPromptUsage("p2", "P2", 20, 2)
-	ut.RecordPromptUsage("p3", "P3", 30, 3)
-	top := ut.GetTopPrompts(1)
+	ut.RecordCapabilityUsage("p1", "P1", 10, 1)
+	ut.RecordCapabilityUsage("p2", "P2", 20, 2)
+	ut.RecordCapabilityUsage("p3", "P3", 30, 3)
+	top := ut.GetTopCapabilities(1)
 	if len(top) != 1 {
 		t.Errorf("expected 1 result, got %d", len(top))
 	}
 }
 
-func TestUsageTracker_GetTopAgentsLimit(t *testing.T) {
+func TestUsageTracker_GetTopCapabilitiesMore(t *testing.T) {
 	ut := NewUsageTracker()
-	ut.RecordAgentUsage("a1", "A1")
-	ut.RecordAgentUsage("a2", "A2")
-	ut.RecordAgentUsage("a3", "A3")
-	top := ut.GetTopAgents(2)
+	ut.RecordCapabilityUsage("a1", "A1", 100, 50.0)
+	ut.RecordCapabilityUsage("a2", "A2", 100, 50.0)
+	ut.RecordCapabilityUsage("a3", "A3", 100, 50.0)
+	top := ut.GetTopCapabilities(2)
 	if len(top) != 2 {
 		t.Errorf("expected 2 results, got %d", len(top))
 	}
@@ -3418,7 +3387,7 @@ func TestUsageTracker_NewUsageTracker(t *testing.T) {
 	if ut == nil {
 		t.Fatal("expected non-nil tracker")
 	}
-	if ut.promptUsage == nil || ut.agentUsage == nil {
+	if ut.capabilityUsage == nil {
 		t.Error("expected initialized maps")
 	}
 }

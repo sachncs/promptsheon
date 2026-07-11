@@ -710,31 +710,9 @@ paths:
           description: Unauthorized
         "404":
           description: Not found
-  /api/v1/metrics/top-agents:
+  /api/v1/metrics/top-capabilities:
     get:
-      summary: "GET metrics/top-agents"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/object"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Not found
-  /api/v1/metrics/top-prompts:
-    get:
-      summary: "GET metrics/top-prompts"
+      summary: "GET metrics/top-capabilities"
       responses:
         "200":
           description: OK
