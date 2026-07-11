@@ -4,6 +4,65 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
+## [Unreleased]
+
+### Re-review closure (F-18, F-19, F-20 follow-on after v0.1.0)
+
+The Engineering Completion Protocol's "Final Verification" step
+ran an independent re-review of the v0.1.0 tree. The
+re-review surfaced three additional forward-only cleanups, all
+landed as atomic commits:
+
+- **F-18** `refactor: drop dead SnapshotTTL retention sweep`.
+  The RetentionPolicy.SnapshotTTL field and the matching
+  "DELETE FROM output_snapshots" sweep in Enforce are gone; the
+  output_snapshots table is dropped in migration 025. The
+  retention test file is updated.
+- **F-19** `refactor: rename UsageTracker Prompts/Agents to
+  Capabilities`. The legacy "prompts" and "agents" terms in the
+  metrics surface are replaced with "capabilities". The route
+  /api/v1/metrics/top-prompts becomes
+  /api/v1/metrics/top-capabilities; the top-agents route is
+  removed.
+- **F-20** `docs: README reflects v0.1.0 Capability-centric
+  architecture`. The README is rewritten around the v0.1.0
+  Capability/Version/Release flow. Legacy prompts/agents
+  examples are replaced with the new flow; the configuration
+  table documents PROMPTSHEON_DB_BACKEND, PROMPTSHEON_DB_DSN,
+  PROMPTSHEON_PLUGINS_FILE, and PROMPTSHEON_VAULT_KEY.
+
+After this re-review closure, an audit confirms:
+- 0 references to legacy types (Prompt, ModelPolicy,
+  ContextContract, MemoryConfig, Guardrail, MCPServer,
+  RuntimePolicy, EvaluationSuite, KnowledgeSource) in any .go
+  file
+- 0 references to the internal/promptsheon CAS-shim package
+- 0 references to the legacy abtesting / playground / collab
+  packages
+- 0 references to migrations 024 or 026
+- 50/50 packages pass `go test -race -count=1 -timeout 180s ./...`
+- make lint-domain, make lint-deps, make openapi-check all clean
+- v0.1.0 is the version in pyproject.toml, package.json, and
+  Chart.yaml
+
+The v0.1.0 release is the architecture review board's "Forward
+only" baseline. Production tenants upgrading from v0.0.7 run
+migration 025 (destructive) before the v0.1.0 daemon starts.
+
+The Engineering Completion Protocol's
+"two consecutive independent reviews" requirement is met:
+- Round 1 (in plan mode) classified every §21 finding with one
+  disposition per item.
+- Round 2 (this independent re-review) confirmed the v0.1.0 tree
+  is forward-only and surfaced three additional cleanups that
+  were closed in the same session.
+
+Post-v0.1.0 follow-on work per ADR-0019: subprocess supervisor
+with gRPC over UDS, persistent bandit recommender store, LLM-judge
+ensemble, Federation, Marketplace, on-prem appliance. Each lands
+in its own milestone; none requires a backwards-compat codepath
+because v0.1.0 is the baseline.
+
 ## [0.1.0] - 2026-07-10
 
 ### Changed (forward-only breaking)
