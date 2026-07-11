@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/promptsheon"
+	promptsheoncas "github.com/sachncs/promptsheon/pkg/cas"
 )
 
 var cliBinary string
@@ -42,58 +42,58 @@ func setupE2ERepo(t *testing.T) string {
 	_ = os.Chdir(dir)
 	t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
-	if e := promptsheon.Init(); e != nil {
+	if e := promptsheoncas.Init(); e != nil {
 		t.Fatalf("Init(): %v", e)
 	}
 
-	b1 := promptsheon.NewBlobObject("system prompt: You are a helpful assistant")
-	b2 := promptsheon.NewBlobObject("tool spec: read_file, execute_command")
-	b3 := promptsheon.NewBlobObject("hyperparams: temp=0.7, max_tokens=2048")
-	h1, _ := promptsheon.WriteObject(b1)
-	h2, _ := promptsheon.WriteObject(b2)
-	h3, _ := promptsheon.WriteObject(b3)
+	b1 := promptsheoncas.NewBlobObject("system prompt: You are a helpful assistant")
+	b2 := promptsheoncas.NewBlobObject("tool spec: read_file, execute_command")
+	b3 := promptsheoncas.NewBlobObject("hyperparams: temp=0.7, max_tokens=2048")
+	h1, _ := promptsheoncas.WriteObject(b1)
+	h2, _ := promptsheoncas.WriteObject(b2)
+	h3, _ := promptsheoncas.WriteObject(b3)
 
-	tree := promptsheon.NewTreeObject([]promptsheon.TreeEntry{
-		{Name: "system-prompt", Type: promptsheon.TypeBlob, Hash: h1},
-		{Name: "tool-spec", Type: promptsheon.TypeBlob, Hash: h2},
-		{Name: "hyperparams", Type: promptsheon.TypeBlob, Hash: h3},
+	tree := promptsheoncas.NewTreeObject([]promptsheoncas.TreeEntry{
+		{Name: "system-prompt", Type: promptsheoncas.TypeBlob, Hash: h1},
+		{Name: "tool-spec", Type: promptsheoncas.TypeBlob, Hash: h2},
+		{Name: "hyperparams", Type: promptsheoncas.TypeBlob, Hash: h3},
 	})
-	treeHash, err := promptsheon.WriteObject(tree)
+	treeHash, err := promptsheoncas.WriteObject(tree)
 	if err != nil {
 		t.Fatalf("WriteObject(tree): %v", err)
 	}
 
 	tel := map[string]any{"accuracy": 0.95, "latency_ms": 200}
-	_, err = promptsheon.Commit(treeHash, nil, "engineer", "Initial agent configuration", tel)
+	_, err = promptsheoncas.Commit(treeHash, nil, "engineer", "Initial agent configuration", tel)
 	if err != nil {
 		t.Fatalf("Commit(): %v", err)
 	}
 
-	b4 := promptsheon.NewBlobObject("optimized hyperparams: temp=0.3")
-	h4, _ := promptsheon.WriteObject(b4)
-	tree2 := promptsheon.NewTreeObject([]promptsheon.TreeEntry{
-		{Name: "system-prompt", Type: promptsheon.TypeBlob, Hash: h1},
-		{Name: "tool-spec", Type: promptsheon.TypeBlob, Hash: h2},
-		{Name: "hyperparams", Type: promptsheon.TypeBlob, Hash: h4},
+	b4 := promptsheoncas.NewBlobObject("optimized hyperparams: temp=0.3")
+	h4, _ := promptsheoncas.WriteObject(b4)
+	tree2 := promptsheoncas.NewTreeObject([]promptsheoncas.TreeEntry{
+		{Name: "system-prompt", Type: promptsheoncas.TypeBlob, Hash: h1},
+		{Name: "tool-spec", Type: promptsheoncas.TypeBlob, Hash: h2},
+		{Name: "hyperparams", Type: promptsheoncas.TypeBlob, Hash: h4},
 	})
-	treeHash2, err := promptsheon.WriteObject(tree2)
+	treeHash2, err := promptsheoncas.WriteObject(tree2)
 	if err != nil {
 		t.Fatalf("WriteObject(tree2): %v", err)
 	}
 
-	if e := promptsheon.CreateBranch("experimental", ""); e != nil {
+	if e := promptsheoncas.CreateBranch("experimental", ""); e != nil {
 		t.Fatalf("CreateBranch(): %v", e)
 	}
-	if e := promptsheon.Checkout("experimental"); e != nil {
+	if e := promptsheoncas.Checkout("experimental"); e != nil {
 		t.Fatalf("Checkout(): %v", e)
 	}
 	tel2 := map[string]any{"accuracy": 0.98, "latency_ms": 350}
-	_, err = promptsheon.Commit(treeHash2, nil, "engineer", "Optimize hyperparams", tel2)
+	_, err = promptsheoncas.Commit(treeHash2, nil, "engineer", "Optimize hyperparams", tel2)
 	if err != nil {
 		t.Fatalf("Commit() on experimental: %v", err)
 	}
 
-	if err := promptsheon.Checkout("main"); err != nil {
+	if err := promptsheoncas.Checkout("main"); err != nil {
 		t.Fatalf("Checkout(main): %v", err)
 	}
 
@@ -155,8 +155,8 @@ func TestE2EGraph(t *testing.T) {
 func TestE2EShowBlob(t *testing.T) {
 	dir := setupE2ERepo(t)
 
-	obj := promptsheon.NewBlobObject("system prompt: You are a helpful assistant")
-	hash, err := promptsheon.ObjectHash(obj)
+	obj := promptsheoncas.NewBlobObject("system prompt: You are a helpful assistant")
+	hash, err := promptsheoncas.ObjectHash(obj)
 	if err != nil {
 		t.Fatalf("ObjectHash: %v", err)
 	}
@@ -173,8 +173,8 @@ func TestE2EShowBlob(t *testing.T) {
 func TestE2ECatFile(t *testing.T) {
 	dir := setupE2ERepo(t)
 
-	obj := promptsheon.NewBlobObject("test content for cat-file")
-	hash, err := promptsheon.WriteObject(obj)
+	obj := promptsheoncas.NewBlobObject("test content for cat-file")
+	hash, err := promptsheoncas.WriteObject(obj)
 	if err != nil {
 		t.Fatalf("WriteObject(): %v", err)
 	}
@@ -188,11 +188,11 @@ func TestE2ECatFile(t *testing.T) {
 func TestE2ELsTree(t *testing.T) {
 	dir := setupE2ERepo(t)
 
-	hash, err := promptsheon.GetCurrentCommitHash()
+	hash, err := promptsheoncas.GetCurrentCommitHash()
 	if err != nil {
 		t.Fatalf("GetCurrentCommitHash(): %v", err)
 	}
-	commitObj, err := promptsheon.ReadObject(hash)
+	commitObj, err := promptsheoncas.ReadObject(hash)
 	if err != nil {
 		t.Fatalf("ReadObject(): %v", err)
 	}
@@ -209,7 +209,7 @@ func TestE2ELsTree(t *testing.T) {
 func TestE2EShowCommit(t *testing.T) {
 	dir := setupE2ERepo(t)
 
-	hash, err := promptsheon.GetCurrentCommitHash()
+	hash, err := promptsheoncas.GetCurrentCommitHash()
 	if err != nil {
 		t.Fatalf("GetCurrentCommitHash(): %v", err)
 	}
@@ -251,10 +251,10 @@ func TestE2ELog(t *testing.T) {
 func TestE2EDiff(t *testing.T) {
 	dir := setupE2ERepo(t)
 
-	hash1, _ := promptsheon.GetCurrentCommitHash()
-	_ = promptsheon.Checkout("experimental")
-	hash2, _ := promptsheon.GetCurrentCommitHash()
-	_ = promptsheon.Checkout("main")
+	hash1, _ := promptsheoncas.GetCurrentCommitHash()
+	_ = promptsheoncas.Checkout("experimental")
+	hash2, _ := promptsheoncas.GetCurrentCommitHash()
+	_ = promptsheoncas.Checkout("main")
 
 	out := runCLI(t, dir, "diff", hash1, hash2)
 	if !strings.Contains(out, "Diff") {
@@ -385,14 +385,14 @@ func TestE2EHelpNoDemo(t *testing.T) {
 func TestE2EBadTelemetryWarns(t *testing.T) {
 	dir := setupE2ERepo(t)
 
-	b := promptsheon.NewBlobObject("telemetry test")
-	bh, _ := promptsheon.WriteObject(b)
-	th, _ := promptsheon.WriteObject(promptsheon.NewTreeObject([]promptsheon.TreeEntry{
-		{Name: "file", Type: promptsheon.TypeBlob, Hash: bh},
+	b := promptsheoncas.NewBlobObject("telemetry test")
+	bh, _ := promptsheoncas.WriteObject(b)
+	th, _ := promptsheoncas.WriteObject(promptsheoncas.NewTreeObject([]promptsheoncas.TreeEntry{
+		{Name: "file", Type: promptsheoncas.TypeBlob, Hash: bh},
 	}))
 
-	hash, _ := promptsheon.GetCurrentCommitHash()
-	_ = promptsheon.WriteRef("main", hash)
+	hash, _ := promptsheoncas.GetCurrentCommitHash()
+	_ = promptsheoncas.WriteRef("main", hash)
 
 	cmd := exec.Command(cliBinary, "commit", th, "telemetry test commit")
 	cmd.Dir = dir

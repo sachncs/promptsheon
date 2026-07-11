@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/promptsheon"
+	promptsheoncas "github.com/sachncs/promptsheon/pkg/cas"
 )
 
 func captureStdout(t *testing.T, fn func()) string {
@@ -200,7 +200,7 @@ func TestPrintUsage(t *testing.T) {
 }
 
 func TestWalkChain(t *testing.T) {
-	nodeMap := map[string]*promptsheon.GraphNode{
+	nodeMap := map[string]*promptsheoncas.GraphNode{
 		"c1": {Hash: "c1", Parents: []string{"b1"}},
 		"b1": {Hash: "b1", Parents: []string{"a1"}},
 		"a1": {Hash: "a1", Parents: []string{}},
@@ -235,7 +235,7 @@ func TestWalkChain(t *testing.T) {
 
 	t.Run("node not in map", func(t *testing.T) {
 		columns := make(map[string]int)
-		nm := map[string]*promptsheon.GraphNode{
+		nm := map[string]*promptsheoncas.GraphNode{
 			"x1": {Hash: "x1", Parents: []string{"missing"}},
 		}
 		walkChain("x1", 0, columns, nm)
@@ -249,7 +249,7 @@ func TestWalkChain(t *testing.T) {
 
 	t.Run("node with no parents", func(t *testing.T) {
 		columns := make(map[string]int)
-		nm := map[string]*promptsheon.GraphNode{
+		nm := map[string]*promptsheoncas.GraphNode{
 			"root": {Hash: "root", Parents: []string{}},
 		}
 		walkChain("root", 2, columns, nm)
@@ -268,12 +268,12 @@ func TestAssignGraphColumns(t *testing.T) {
 	})
 
 	t.Run("single branch with HEAD", func(t *testing.T) {
-		nodes := []*promptsheon.GraphNode{
+		nodes := []*promptsheoncas.GraphNode{
 			{Hash: "a1", Parents: []string{}},
 			{Hash: "b1", Parents: []string{"a1"}},
 			{Hash: "c1", Parents: []string{"b1"}, Branches: []string{"main"}, IsHEAD: true},
 		}
-		refs := []*promptsheon.RefDetail{
+		refs := []*promptsheoncas.RefDetail{
 			{Name: "main", Hash: "c1"},
 		}
 		cols := assignGraphColumns(nodes, refs, "main")
@@ -283,13 +283,13 @@ func TestAssignGraphColumns(t *testing.T) {
 	})
 
 	t.Run("multi branch", func(t *testing.T) {
-		nodes := []*promptsheon.GraphNode{
+		nodes := []*promptsheoncas.GraphNode{
 			{Hash: "a1", Parents: []string{}},
 			{Hash: "b1", Parents: []string{"a1"}},
 			{Hash: "c1", Parents: []string{"b1"}, Branches: []string{"main"}, IsHEAD: true},
 			{Hash: "d1", Parents: []string{"a1"}, Branches: []string{"feature"}},
 		}
-		refs := []*promptsheon.RefDetail{
+		refs := []*promptsheoncas.RefDetail{
 			{Name: "main", Hash: "c1"},
 			{Name: "feature", Hash: "d1"},
 		}
@@ -303,11 +303,11 @@ func TestAssignGraphColumns(t *testing.T) {
 	})
 
 	t.Run("fallback to IsHEAD when no ref matches", func(t *testing.T) {
-		nodes := []*promptsheon.GraphNode{
+		nodes := []*promptsheoncas.GraphNode{
 			{Hash: "a1", Parents: []string{}},
 			{Hash: "b1", Parents: []string{"a1"}, IsHEAD: true},
 		}
-		refs := []*promptsheon.RefDetail{}
+		refs := []*promptsheoncas.RefDetail{}
 		cols := assignGraphColumns(nodes, refs, "")
 		if cols["a1"] != 0 || cols["b1"] != 0 {
 			t.Errorf("expected both in col 0, got %v", cols)
@@ -315,7 +315,7 @@ func TestAssignGraphColumns(t *testing.T) {
 	})
 
 	t.Run("unassigned nodes get col 0", func(t *testing.T) {
-		nodes := []*promptsheon.GraphNode{
+		nodes := []*promptsheoncas.GraphNode{
 			{Hash: "a1", Parents: []string{}},
 			{Hash: "orphan", Parents: []string{}},
 		}
@@ -326,14 +326,14 @@ func TestAssignGraphColumns(t *testing.T) {
 	})
 
 	t.Run("two branches feature and dev", func(t *testing.T) {
-		nodes := []*promptsheon.GraphNode{
+		nodes := []*promptsheoncas.GraphNode{
 			{Hash: "a1", Parents: []string{}},
 			{Hash: "b1", Parents: []string{"a1"}},
 			{Hash: "c1", Parents: []string{"b1"}, Branches: []string{"main"}, IsHEAD: true},
 			{Hash: "d1", Parents: []string{"a1"}, Branches: []string{"feature"}},
 			{Hash: "e1", Parents: []string{"a1"}, Branches: []string{"dev"}},
 		}
-		refs := []*promptsheon.RefDetail{
+		refs := []*promptsheoncas.RefDetail{
 			{Name: "main", Hash: "c1"},
 			{Name: "feature", Hash: "d1"},
 			{Name: "dev", Hash: "e1"},
@@ -389,7 +389,7 @@ func TestDrawConnLines(t *testing.T) {
 func TestDrawMergeForkLines(t *testing.T) {
 	t.Run("single parent - no-op", func(t *testing.T) {
 		var buf bytes.Buffer
-		node := &promptsheon.GraphNode{Hash: "c1", Parents: []string{"b1"}}
+		node := &promptsheoncas.GraphNode{Hash: "c1", Parents: []string{"b1"}}
 		drawMergeForkLines(&buf, node, map[string]int{"c1": 0, "b1": 0}, 0, []int{0})
 		if buf.Len() != 0 {
 			t.Errorf("expected no output for single parent, got %q", buf.String())
@@ -398,7 +398,7 @@ func TestDrawMergeForkLines(t *testing.T) {
 
 	t.Run("merge from different column", func(t *testing.T) {
 		var buf bytes.Buffer
-		node := &promptsheon.GraphNode{Hash: "c1", Parents: []string{"b1", "d1"}}
+		node := &promptsheoncas.GraphNode{Hash: "c1", Parents: []string{"b1", "d1"}}
 		columns := map[string]int{"c1": 0, "b1": 0, "d1": 1}
 		drawMergeForkLines(&buf, node, columns, 1, []int{0, 0})
 		want := "  \\ \n"
@@ -409,7 +409,7 @@ func TestDrawMergeForkLines(t *testing.T) {
 
 	t.Run("merge from three parent columns", func(t *testing.T) {
 		var buf bytes.Buffer
-		node := &promptsheon.GraphNode{Hash: "e1", Parents: []string{"a1", "b1", "c1"}}
+		node := &promptsheoncas.GraphNode{Hash: "e1", Parents: []string{"a1", "b1", "c1"}}
 		columns := map[string]int{"e1": 0, "a1": 0, "b1": 1, "c1": 2}
 		drawMergeForkLines(&buf, node, columns, 2, []int{0, 0, 0})
 		want := "  | / \n"
@@ -420,7 +420,7 @@ func TestDrawMergeForkLines(t *testing.T) {
 
 	t.Run("merge with nodes below", func(t *testing.T) {
 		var buf bytes.Buffer
-		node := &promptsheon.GraphNode{Hash: "c1", Parents: []string{"a1", "b1"}}
+		node := &promptsheoncas.GraphNode{Hash: "c1", Parents: []string{"a1", "b1"}}
 		columns := map[string]int{"c1": 0, "a1": 0, "b1": 1}
 		drawMergeForkLines(&buf, node, columns, 1, []int{1, 1})
 		want := "| \\ \n"
@@ -431,7 +431,7 @@ func TestDrawMergeForkLines(t *testing.T) {
 
 	t.Run("fork from different column", func(t *testing.T) {
 		var buf bytes.Buffer
-		node := &promptsheon.GraphNode{Hash: "a1", Parents: []string{"b1", "c1"}}
+		node := &promptsheoncas.GraphNode{Hash: "a1", Parents: []string{"b1", "c1"}}
 		columns := map[string]int{"a1": 1, "b1": 0, "c1": 1}
 		drawMergeForkLines(&buf, node, columns, 1, []int{0, 0})
 		want := "\\   \n"
@@ -450,7 +450,7 @@ func TestRenderGraph(t *testing.T) {
 	})
 
 	t.Run("single node", func(t *testing.T) {
-		nodes := []*promptsheon.GraphNode{
+		nodes := []*promptsheoncas.GraphNode{
 			{Hash: "abcdef1234567890123456789012345678901234", Parents: []string{}, Message: "initial"},
 		}
 		columns := map[string]int{"abcdef1234567890123456789012345678901234": 0}
@@ -467,7 +467,7 @@ func TestRenderGraph(t *testing.T) {
 	})
 
 	t.Run("HEAD with branch labels", func(t *testing.T) {
-		nodes := []*promptsheon.GraphNode{
+		nodes := []*promptsheoncas.GraphNode{
 			{Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Parents: []string{}, Branches: []string{"main"}, IsHEAD: true, Message: "root"},
 		}
 		columns := map[string]int{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 0}
@@ -478,7 +478,7 @@ func TestRenderGraph(t *testing.T) {
 	})
 
 	t.Run("detached HEAD", func(t *testing.T) {
-		nodes := []*promptsheon.GraphNode{
+		nodes := []*promptsheoncas.GraphNode{
 			{Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Parents: []string{}, Branches: []string{}, IsHEAD: true, Message: "detached"},
 		}
 		columns := map[string]int{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 0}
@@ -492,7 +492,7 @@ func TestRenderGraph(t *testing.T) {
 		hashA := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 		hashB := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 		hashC := "cccccccccccccccccccccccccccccccccccccccccccc"
-		nodes := []*promptsheon.GraphNode{
+		nodes := []*promptsheoncas.GraphNode{
 			{Hash: hashA, Parents: []string{}},
 			{Hash: hashB, Parents: []string{hashA}},
 			{Hash: hashC, Parents: []string{hashB}, Branches: []string{"main"}, IsHEAD: true, Message: "third"},
@@ -515,7 +515,7 @@ func TestRenderGraph(t *testing.T) {
 		hashB := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 		hashC := "cccccccccccccccccccccccccccccccccccccccccccc"
 		hashD := "dddddddddddddddddddddddddddddddddddddddddddd"
-		nodes := []*promptsheon.GraphNode{
+		nodes := []*promptsheoncas.GraphNode{
 			{Hash: hashA, Parents: []string{}},
 			{Hash: hashB, Parents: []string{hashA}},
 			{Hash: hashC, Parents: []string{hashB}, Branches: []string{"main"}, IsHEAD: true, Message: "third"},
@@ -532,7 +532,7 @@ func TestRenderGraph(t *testing.T) {
 		hashA := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 		hashB := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 		hashC := "cccccccccccccccccccccccccccccccccccccccccccc"
-		nodes := []*promptsheon.GraphNode{
+		nodes := []*promptsheoncas.GraphNode{
 			{Hash: hashA, Parents: []string{}},
 			{Hash: hashB, Parents: []string{hashA}},
 			{Hash: hashC, Parents: []string{hashB, hashA}, Branches: []string{"main"}, IsHEAD: true, Message: "merge"},
@@ -1074,29 +1074,29 @@ func withTempRepo(t *testing.T) string {
 		_ = os.RemoveAll(dir)
 	})
 
-	if e := promptsheon.Init(); e != nil {
+	if e := promptsheoncas.Init(); e != nil {
 		t.Fatalf("Init(): %v", e)
 	}
 
-	b1 := promptsheon.NewBlobObject("system prompt: You are a helpful assistant")
-	b2 := promptsheon.NewBlobObject("tool spec: read_file, execute_command")
-	b3 := promptsheon.NewBlobObject("hyperparams: temp=0.7, max_tokens=2048")
-	h1, _ := promptsheon.WriteObject(b1)
-	h2, _ := promptsheon.WriteObject(b2)
-	h3, _ := promptsheon.WriteObject(b3)
+	b1 := promptsheoncas.NewBlobObject("system prompt: You are a helpful assistant")
+	b2 := promptsheoncas.NewBlobObject("tool spec: read_file, execute_command")
+	b3 := promptsheoncas.NewBlobObject("hyperparams: temp=0.7, max_tokens=2048")
+	h1, _ := promptsheoncas.WriteObject(b1)
+	h2, _ := promptsheoncas.WriteObject(b2)
+	h3, _ := promptsheoncas.WriteObject(b3)
 
-	tree := promptsheon.NewTreeObject([]promptsheon.TreeEntry{
-		{Name: "system-prompt", Type: promptsheon.TypeBlob, Hash: h1},
-		{Name: "tool-spec", Type: promptsheon.TypeBlob, Hash: h2},
-		{Name: "hyperparams", Type: promptsheon.TypeBlob, Hash: h3},
+	tree := promptsheoncas.NewTreeObject([]promptsheoncas.TreeEntry{
+		{Name: "system-prompt", Type: promptsheoncas.TypeBlob, Hash: h1},
+		{Name: "tool-spec", Type: promptsheoncas.TypeBlob, Hash: h2},
+		{Name: "hyperparams", Type: promptsheoncas.TypeBlob, Hash: h3},
 	})
-	treeHash, err := promptsheon.WriteObject(tree)
+	treeHash, err := promptsheoncas.WriteObject(tree)
 	if err != nil {
 		t.Fatalf("WriteObject(tree): %v", err)
 	}
 
 	tel := map[string]any{"accuracy": 0.95, "latency_ms": 200}
-	_, err = promptsheon.Commit(treeHash, nil, "engineer", "Initial agent configuration", tel)
+	_, err = promptsheoncas.Commit(treeHash, nil, "engineer", "Initial agent configuration", tel)
 	if err != nil {
 		t.Fatalf("Commit(): %v", err)
 	}
@@ -1132,8 +1132,8 @@ func TestCmdWriteObjectWithRepo(t *testing.T) {
 func TestCmdReadObjectWithRepo(t *testing.T) {
 	dir := withTempRepo(t)
 
-	obj := promptsheon.NewBlobObject("test content")
-	hash, err := promptsheon.WriteObject(obj)
+	obj := promptsheoncas.NewBlobObject("test content")
+	hash, err := promptsheoncas.WriteObject(obj)
 	if err != nil {
 		t.Fatalf("WriteObject: %v", err)
 	}
@@ -1153,12 +1153,12 @@ func TestCmdReadObjectWithRepo(t *testing.T) {
 func TestCmdCommitWithRepo(t *testing.T) {
 	dir := withTempRepo(t)
 
-	blob := promptsheon.NewBlobObject("new data")
-	bh, _ := promptsheon.WriteObject(blob)
-	tree := promptsheon.NewTreeObject([]promptsheon.TreeEntry{
-		{Name: "file", Type: promptsheon.TypeBlob, Hash: bh},
+	blob := promptsheoncas.NewBlobObject("new data")
+	bh, _ := promptsheoncas.WriteObject(blob)
+	tree := promptsheoncas.NewTreeObject([]promptsheoncas.TreeEntry{
+		{Name: "file", Type: promptsheoncas.TypeBlob, Hash: bh},
 	})
-	th, _ := promptsheon.WriteObject(tree)
+	th, _ := promptsheoncas.WriteObject(tree)
 
 	_ = dir
 	out := captureStdout(t, func() {
@@ -1175,12 +1175,12 @@ func TestCmdCommitWithRepo(t *testing.T) {
 	}
 
 	t.Run("commit with telemetry warning", func(t *testing.T) {
-		blob2 := promptsheon.NewBlobObject("more data")
-		bh2, _ := promptsheon.WriteObject(blob2)
-		tree2 := promptsheon.NewTreeObject([]promptsheon.TreeEntry{
-			{Name: "file", Type: promptsheon.TypeBlob, Hash: bh2},
+		blob2 := promptsheoncas.NewBlobObject("more data")
+		bh2, _ := promptsheoncas.WriteObject(blob2)
+		tree2 := promptsheoncas.NewTreeObject([]promptsheoncas.TreeEntry{
+			{Name: "file", Type: promptsheoncas.TypeBlob, Hash: bh2},
 		})
-		th2, _ := promptsheon.WriteObject(tree2)
+		th2, _ := promptsheoncas.WriteObject(tree2)
 
 		t.Setenv("PROMPTSHEON_TELEMETRY", "invalid json{{{")
 		var stdout, stderr bytes.Buffer
@@ -1271,7 +1271,7 @@ func TestCmdBranchWithRepo(t *testing.T) {
 func TestCmdDeleteBranchWithRepo(t *testing.T) {
 	_ = withTempRepo(t)
 
-	_ = promptsheon.CreateBranch("feature", "")
+	_ = promptsheoncas.CreateBranch("feature", "")
 
 	out := captureStdout(t, func() {
 		err := dispatchCommand("delete-branch", []string{"feature"})
@@ -1287,20 +1287,20 @@ func TestCmdDeleteBranchWithRepo(t *testing.T) {
 func TestCmdDiffWithRepo(t *testing.T) {
 	_ = withTempRepo(t)
 
-	hash1, _ := promptsheon.GetCurrentCommitHash()
-	_ = promptsheon.CreateBranch("other", "")
-	_ = promptsheon.Checkout("other")
+	hash1, _ := promptsheoncas.GetCurrentCommitHash()
+	_ = promptsheoncas.CreateBranch("other", "")
+	_ = promptsheoncas.Checkout("other")
 
-	blob := promptsheon.NewBlobObject("different content")
-	bh, _ := promptsheon.WriteObject(blob)
-	tree := promptsheon.NewTreeObject([]promptsheon.TreeEntry{
-		{Name: "file", Type: promptsheon.TypeBlob, Hash: bh},
+	blob := promptsheoncas.NewBlobObject("different content")
+	bh, _ := promptsheoncas.WriteObject(blob)
+	tree := promptsheoncas.NewTreeObject([]promptsheoncas.TreeEntry{
+		{Name: "file", Type: promptsheoncas.TypeBlob, Hash: bh},
 	})
-	th, _ := promptsheon.WriteObject(tree)
-	_, _ = promptsheon.Commit(th, nil, "engineer", "other commit", nil)
-	hash2, _ := promptsheon.GetCurrentCommitHash()
+	th, _ := promptsheoncas.WriteObject(tree)
+	_, _ = promptsheoncas.Commit(th, nil, "engineer", "other commit", nil)
+	hash2, _ := promptsheoncas.GetCurrentCommitHash()
 
-	_ = promptsheon.Checkout("main")
+	_ = promptsheoncas.Checkout("main")
 
 	out := captureStdout(t, func() {
 		err := dispatchCommand("diff", []string{hash1, hash2})
@@ -1335,8 +1335,8 @@ func TestCmdStatus(t *testing.T) {
 func TestCmdShowBlob(t *testing.T) {
 	_ = withTempRepo(t)
 
-	obj := promptsheon.NewBlobObject("display content")
-	hash, _ := promptsheon.WriteObject(obj)
+	obj := promptsheoncas.NewBlobObject("display content")
+	hash, _ := promptsheoncas.WriteObject(obj)
 
 	out := captureStdout(t, func() {
 		err := dispatchCommand("show", []string{hash})
@@ -1355,7 +1355,7 @@ func TestCmdShowBlob(t *testing.T) {
 func TestCmdShowCommit(t *testing.T) {
 	_ = withTempRepo(t)
 
-	hash, _ := promptsheon.GetCurrentCommitHash()
+	hash, _ := promptsheoncas.GetCurrentCommitHash()
 
 	out := captureStdout(t, func() {
 		err := dispatchCommand("show", []string{hash})
@@ -1383,8 +1383,8 @@ func TestCmdShowCommit(t *testing.T) {
 func TestCmdLsTree(t *testing.T) {
 	_ = withTempRepo(t)
 
-	hash, _ := promptsheon.GetCurrentCommitHash()
-	commitObj, _ := promptsheon.ReadObject(hash)
+	hash, _ := promptsheoncas.GetCurrentCommitHash()
+	commitObj, _ := promptsheoncas.ReadObject(hash)
 
 	out := captureStdout(t, func() {
 		err := dispatchCommand("ls-tree", []string{commitObj.TreeHash})
@@ -1403,8 +1403,8 @@ func TestCmdLsTree(t *testing.T) {
 func TestCmdCatFile(t *testing.T) {
 	_ = withTempRepo(t)
 
-	obj := promptsheon.NewBlobObject("cat file content")
-	hash, err := promptsheon.WriteObject(obj)
+	obj := promptsheoncas.NewBlobObject("cat file content")
+	hash, err := promptsheoncas.WriteObject(obj)
 	if err != nil {
 		t.Fatalf("WriteObject: %v", err)
 	}
@@ -1868,7 +1868,7 @@ func TestDrawConnLinesPrevColGTCol(t *testing.T) {
 
 func TestDrawMergeForkLinesSkipWhenNoColumnsBelowNoParentCols(t *testing.T) {
 	var buf bytes.Buffer
-	node := &promptsheon.GraphNode{Hash: "a1", Parents: []string{"b1", "c1"}}
+	node := &promptsheoncas.GraphNode{Hash: "a1", Parents: []string{"b1", "c1"}}
 	columns := map[string]int{"a1": 0, "b1": 0, "c1": 0}
 	drawMergeForkLines(&buf, node, columns, 0, []int{0})
 	if buf.Len() != 0 {
@@ -1879,8 +1879,8 @@ func TestDrawMergeForkLinesSkipWhenNoColumnsBelowNoParentCols(t *testing.T) {
 func TestCmdShowTree(t *testing.T) {
 	_ = withTempRepo(t)
 
-	hash, _ := promptsheon.GetCurrentCommitHash()
-	commitObj, _ := promptsheon.ReadObject(hash)
+	hash, _ := promptsheoncas.GetCurrentCommitHash()
+	commitObj, _ := promptsheoncas.ReadObject(hash)
 	treeHash := commitObj.TreeHash
 
 	out := captureStdout(t, func() {
@@ -1900,8 +1900,8 @@ func TestCmdShowTree(t *testing.T) {
 func TestCmdShowEmptyObject(t *testing.T) {
 	_ = withTempRepo(t)
 
-	emptyObj := promptsheon.NewBlobObject("")
-	hash, err := promptsheon.WriteObject(emptyObj)
+	emptyObj := promptsheoncas.NewBlobObject("")
+	hash, err := promptsheoncas.WriteObject(emptyObj)
 	if err != nil {
 		t.Fatalf("WriteObject: %v", err)
 	}
@@ -1920,8 +1920,8 @@ func TestCmdShowEmptyObject(t *testing.T) {
 func TestCmdLsTreeNotATree(t *testing.T) {
 	_ = withTempRepo(t)
 
-	obj := promptsheon.NewBlobObject("not a tree")
-	hash, _ := promptsheon.WriteObject(obj)
+	obj := promptsheoncas.NewBlobObject("not a tree")
+	hash, _ := promptsheoncas.WriteObject(obj)
 
 	err := dispatchCommand("ls-tree", []string{hash})
 	if err == nil {
@@ -1935,7 +1935,7 @@ func TestCmdLsTreeNotATree(t *testing.T) {
 func TestCmdCatFileNotABlob(t *testing.T) {
 	_ = withTempRepo(t)
 
-	hash, _ := promptsheon.GetCurrentCommitHash()
+	hash, _ := promptsheoncas.GetCurrentCommitHash()
 
 	err := dispatchCommand("cat-file", []string{hash})
 	if err == nil {
@@ -1949,8 +1949,8 @@ func TestCmdCatFileNotABlob(t *testing.T) {
 func TestCmdCatFileMissingNewline(t *testing.T) {
 	_ = withTempRepo(t)
 
-	obj := promptsheon.NewBlobObject("no newline at end")
-	hash, err := promptsheon.WriteObject(obj)
+	obj := promptsheoncas.NewBlobObject("no newline at end")
+	hash, err := promptsheoncas.WriteObject(obj)
 	if err != nil {
 		t.Fatalf("WriteObject: %v", err)
 	}
@@ -2023,7 +2023,7 @@ func TestCmdGraphNoCommits(t *testing.T) {
 	_ = os.Chdir(dir)
 	defer func() { _ = os.Chdir(origWd) }()
 
-	_ = promptsheon.Init()
+	_ = promptsheoncas.Init()
 
 	out := captureStdout(t, func() {
 		err := dispatchCommand("graph", nil)
@@ -2046,7 +2046,7 @@ func TestCmdLogNoCommits(t *testing.T) {
 	_ = os.Chdir(dir)
 	defer func() { _ = os.Chdir(origWd) }()
 
-	_ = promptsheon.Init()
+	_ = promptsheoncas.Init()
 
 	out := captureStdout(t, func() {
 		err := dispatchCommand("log", nil)
@@ -2075,18 +2075,18 @@ func TestCmdLogWithCount(t *testing.T) {
 func TestCmdCheckoutDetached(t *testing.T) {
 	dir := withTempRepo(t)
 
-	hash, _ := promptsheon.GetCurrentCommitHash()
+	hash, _ := promptsheoncas.GetCurrentCommitHash()
 
-	_ = promptsheon.CreateBranch("other", "")
-	_ = promptsheon.Checkout("other")
+	_ = promptsheoncas.CreateBranch("other", "")
+	_ = promptsheoncas.Checkout("other")
 
-	blob := promptsheon.NewBlobObject("new")
-	bh, _ := promptsheon.WriteObject(blob)
-	tree := promptsheon.NewTreeObject([]promptsheon.TreeEntry{
-		{Name: "f", Type: promptsheon.TypeBlob, Hash: bh},
+	blob := promptsheoncas.NewBlobObject("new")
+	bh, _ := promptsheoncas.WriteObject(blob)
+	tree := promptsheoncas.NewTreeObject([]promptsheoncas.TreeEntry{
+		{Name: "f", Type: promptsheoncas.TypeBlob, Hash: bh},
 	})
-	th, _ := promptsheon.WriteObject(tree)
-	_, _ = promptsheon.Commit(th, nil, "e", "msg", nil)
+	th, _ := promptsheoncas.WriteObject(tree)
+	_, _ = promptsheoncas.Commit(th, nil, "e", "msg", nil)
 
 	_ = dir
 	out := captureStdout(t, func() {
@@ -2103,7 +2103,7 @@ func TestCmdCheckoutDetached(t *testing.T) {
 func TestCmdBranchCreateWithHash(t *testing.T) {
 	_ = withTempRepo(t)
 
-	hash, _ := promptsheon.GetCurrentCommitHash()
+	hash, _ := promptsheoncas.GetCurrentCommitHash()
 
 	out := captureStdout(t, func() {
 		err := dispatchCommand("branch", []string{"newbranch", hash})
@@ -2119,19 +2119,19 @@ func TestCmdBranchCreateWithHash(t *testing.T) {
 func TestCmdShowTreeNested(t *testing.T) {
 	_ = withTempRepo(t)
 
-	inner := promptsheon.NewTreeObject([]promptsheon.TreeEntry{
-		{Name: "nested.txt", Type: promptsheon.TypeBlob, Hash: "0000000000000000000000000000000000000000000000000000000000000000"},
+	inner := promptsheoncas.NewTreeObject([]promptsheoncas.TreeEntry{
+		{Name: "nested.txt", Type: promptsheoncas.TypeBlob, Hash: "0000000000000000000000000000000000000000000000000000000000000000"},
 	})
-	innerHash, _ := promptsheon.WriteObject(inner)
+	innerHash, _ := promptsheoncas.WriteObject(inner)
 
-	b1 := promptsheon.NewBlobObject("root content")
-	bh, _ := promptsheon.WriteObject(b1)
+	b1 := promptsheoncas.NewBlobObject("root content")
+	bh, _ := promptsheoncas.WriteObject(b1)
 
-	outer := promptsheon.NewTreeObject([]promptsheon.TreeEntry{
-		{Name: "inner", Type: promptsheon.TypeTree, Hash: innerHash},
-		{Name: "root.txt", Type: promptsheon.TypeBlob, Hash: bh},
+	outer := promptsheoncas.NewTreeObject([]promptsheoncas.TreeEntry{
+		{Name: "inner", Type: promptsheoncas.TypeTree, Hash: innerHash},
+		{Name: "root.txt", Type: promptsheoncas.TypeBlob, Hash: bh},
 	})
-	outerHash, _ := promptsheon.WriteObject(outer)
+	outerHash, _ := promptsheoncas.WriteObject(outer)
 
 	out := captureStdout(t, func() {
 		err := dispatchCommand("show", []string{outerHash})
@@ -2150,15 +2150,15 @@ func TestCmdShowTreeNested(t *testing.T) {
 func TestCmdLsTreeRecursive(t *testing.T) {
 	_ = withTempRepo(t)
 
-	inner := promptsheon.NewTreeObject([]promptsheon.TreeEntry{
-		{Name: "nested.txt", Type: promptsheon.TypeBlob, Hash: "0000000000000000000000000000000000000000000000000000000000000000"},
+	inner := promptsheoncas.NewTreeObject([]promptsheoncas.TreeEntry{
+		{Name: "nested.txt", Type: promptsheoncas.TypeBlob, Hash: "0000000000000000000000000000000000000000000000000000000000000000"},
 	})
-	innerHash, _ := promptsheon.WriteObject(inner)
+	innerHash, _ := promptsheoncas.WriteObject(inner)
 
-	outer := promptsheon.NewTreeObject([]promptsheon.TreeEntry{
-		{Name: "inner", Type: promptsheon.TypeTree, Hash: innerHash},
+	outer := promptsheoncas.NewTreeObject([]promptsheoncas.TreeEntry{
+		{Name: "inner", Type: promptsheoncas.TypeTree, Hash: innerHash},
 	})
-	outerHash, _ := promptsheon.WriteObject(outer)
+	outerHash, _ := promptsheoncas.WriteObject(outer)
 
 	out := captureStdout(t, func() {
 		err := dispatchCommand("ls-tree", []string{outerHash})
@@ -2190,10 +2190,10 @@ func TestFormatBytesEdgeCases(t *testing.T) {
 }
 
 func TestAssignGraphColumnsNoMatchingRef(t *testing.T) {
-	nodes := []*promptsheon.GraphNode{
+	nodes := []*promptsheoncas.GraphNode{
 		{Hash: "a1", Parents: []string{}, IsHEAD: true},
 	}
-	refs := []*promptsheon.RefDetail{
+	refs := []*promptsheoncas.RefDetail{
 		{Name: "main", Hash: "b1"},
 	}
 	cols := assignGraphColumns(nodes, refs, "main")
@@ -2204,7 +2204,7 @@ func TestAssignGraphColumnsNoMatchingRef(t *testing.T) {
 
 func TestDrawMergeForkLinesMultipleParentsBelow(t *testing.T) {
 	var buf bytes.Buffer
-	node := &promptsheon.GraphNode{Hash: "c1", Parents: []string{"a1", "b1", "d1"}}
+	node := &promptsheoncas.GraphNode{Hash: "c1", Parents: []string{"a1", "b1", "d1"}}
 	columns := map[string]int{"c1": 1, "a1": 0, "b1": 1, "d1": 2}
 	drawMergeForkLines(&buf, node, columns, 2, []int{0, 0, 0})
 	want := "|   / \n"
@@ -2233,7 +2233,7 @@ func TestDrawConnLinesAllColsBelow(t *testing.T) {
 
 func TestDrawMergeForkLinesNoParentColsDifferent(t *testing.T) {
 	var buf bytes.Buffer
-	node := &promptsheon.GraphNode{Hash: "c1", Parents: []string{"a1", "b1"}}
+	node := &promptsheoncas.GraphNode{Hash: "c1", Parents: []string{"a1", "b1"}}
 	columns := map[string]int{"c1": 0, "a1": 0, "b1": 0}
 	drawMergeForkLines(&buf, node, columns, 0, []int{0})
 	if buf.Len() != 0 {
@@ -2242,7 +2242,7 @@ func TestDrawMergeForkLinesNoParentColsDifferent(t *testing.T) {
 }
 
 func TestRenderGraphBranchLabels(t *testing.T) {
-	nodes := []*promptsheon.GraphNode{
+	nodes := []*promptsheoncas.GraphNode{
 		{Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Parents: []string{}, Branches: []string{"main", "backup"}, IsHEAD: true, Message: "multi"},
 	}
 	columns := map[string]int{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 0}
@@ -2256,7 +2256,7 @@ func TestRenderGraphBranchLabels(t *testing.T) {
 }
 
 func TestRenderGraphBranchLabelsNonHEAD(t *testing.T) {
-	nodes := []*promptsheon.GraphNode{
+	nodes := []*promptsheoncas.GraphNode{
 		{Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Parents: []string{}, Branches: []string{"feature"}, Message: "feat"},
 	}
 	columns := map[string]int{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 0}
@@ -2270,7 +2270,7 @@ func TestRenderGraphBranchLabelsNonHEAD(t *testing.T) {
 }
 
 func TestRenderGraphNoMessage(t *testing.T) {
-	nodes := []*promptsheon.GraphNode{
+	nodes := []*promptsheoncas.GraphNode{
 		{Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Parents: []string{}},
 	}
 	columns := map[string]int{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 0}

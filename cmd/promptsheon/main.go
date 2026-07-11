@@ -16,7 +16,7 @@ import (
 
 	"github.com/sachncs/promptsheon/internal/buildinfo"
 	"github.com/sachncs/promptsheon/internal/llm"
-	"github.com/sachncs/promptsheon/internal/promptsheon"
+	promptsheoncas "github.com/sachncs/promptsheon/pkg/cas"
 )
 
 const opList = "list"
@@ -149,10 +149,10 @@ Usage:
 }
 
 func cmdInit() error {
-	if promptsheon.IsInitialized() {
+	if promptsheoncas.IsInitialized() {
 		return fmt.Errorf("repository already initialized")
 	}
-	if err := promptsheon.Init(); err != nil {
+	if err := promptsheoncas.Init(); err != nil {
 		return err
 	}
 	fmt.Println("initialized empty promptsheon repository in .promptsheon/")
@@ -164,8 +164,8 @@ func cmdHashObject(args []string) error {
 		return usageErrorf("promptsheon hash-object <data>")
 	}
 	data := strings.Join(args, " ")
-	obj := promptsheon.NewBlobObject(data)
-	hash, err := promptsheon.ObjectHash(obj)
+	obj := promptsheoncas.NewBlobObject(data)
+	hash, err := promptsheoncas.ObjectHash(obj)
 	if err != nil {
 		return fmt.Errorf("compute hash: %w", err)
 	}
@@ -178,8 +178,8 @@ func cmdWriteObject(args []string) error {
 		return usageErrorf("promptsheon write-object <data>")
 	}
 	data := strings.Join(args, " ")
-	obj := promptsheon.NewBlobObject(data)
-	hash, err := promptsheon.WriteObject(obj)
+	obj := promptsheoncas.NewBlobObject(data)
+	hash, err := promptsheoncas.WriteObject(obj)
 	if err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func cmdReadObject(args []string) error {
 	if len(args) < 1 {
 		return usageErrorf("promptsheon read-object <hash>")
 	}
-	obj, err := promptsheon.ReadObject(args[0])
+	obj, err := promptsheoncas.ReadObject(args[0])
 	if err != nil {
 		return err
 	}
@@ -219,14 +219,14 @@ func cmdCommit(args []string) error {
 	}
 
 	var parentHashes []string
-	currentHash, err := promptsheon.GetCurrentCommitHash()
+	currentHash, err := promptsheoncas.GetCurrentCommitHash()
 	if err == nil && currentHash != "" {
 		parentHashes = []string{currentHash}
 	}
 
 	telemetry, telErr := parseTelemetry()
 
-	result, err := promptsheon.Commit(treeHash, parentHashes, author, message, telemetry)
+	result, err := promptsheoncas.Commit(treeHash, parentHashes, author, message, telemetry)
 	if err != nil {
 		return err
 	}
@@ -262,7 +262,7 @@ func cmdLog(args []string) error {
 		}
 	}
 
-	entries, err := promptsheon.Log(count)
+	entries, err := promptsheoncas.Log(count)
 	if err != nil {
 		return err
 	}
@@ -271,7 +271,7 @@ func cmdLog(args []string) error {
 		return nil
 	}
 
-	ref, _ := promptsheon.GetCurrentRef()
+	ref, _ := promptsheoncas.GetCurrentRef()
 
 	for i, e := range entries {
 		refMarker := ""
@@ -303,29 +303,29 @@ func cmdCheckout(args []string) error {
 	if len(args) < 1 {
 		return usageErrorf("promptsheon checkout <ref|hash>")
 	}
-	if err := promptsheon.Checkout(args[0]); err != nil {
+	if err := promptsheoncas.Checkout(args[0]); err != nil {
 		return err
 	}
 
-	head, _ := promptsheon.ReadHEAD()
-	if promptsheon.IsHEADDetached(head) {
+	head, _ := promptsheoncas.ReadHEAD()
+	if promptsheoncas.IsHEADDetached(head) {
 		fmt.Printf("HEAD is now at %s\n", head[:12])
 	} else {
-		fmt.Printf("switched to branch '%s'\n", promptsheon.HEADRefName(head))
+		fmt.Printf("switched to branch '%s'\n", promptsheoncas.HEADRefName(head))
 	}
 	return nil
 }
 
 func cmdBranch(args []string) error {
 	if len(args) == 0 {
-		refs, err := promptsheon.ListRefs()
+		refs, err := promptsheoncas.ListRefs()
 		if err != nil {
 			return err
 		}
 		sort.Strings(refs)
-		currentRef, _ := promptsheon.GetCurrentRef()
+		currentRef, _ := promptsheoncas.GetCurrentRef()
 		for _, r := range refs {
-			hash, _ := promptsheon.ReadRef(r)
+			hash, _ := promptsheoncas.ReadRef(r)
 			prefix := "  "
 			if r == currentRef {
 				prefix = "* "
@@ -345,7 +345,7 @@ func cmdBranch(args []string) error {
 		targetHash = args[1]
 	}
 
-	if err := promptsheon.CreateBranch(name, targetHash); err != nil {
+	if err := promptsheoncas.CreateBranch(name, targetHash); err != nil {
 		return err
 	}
 	fmt.Printf("created branch '%s'\n", name)
@@ -356,7 +356,7 @@ func cmdDeleteBranch(args []string) error {
 	if len(args) < 1 {
 		return usageErrorf("promptsheon delete-branch <name>")
 	}
-	if err := promptsheon.DeleteBranch(args[0]); err != nil {
+	if err := promptsheoncas.DeleteBranch(args[0]); err != nil {
 		return err
 	}
 	fmt.Printf("deleted branch '%s'\n", args[0])
@@ -367,11 +367,11 @@ func cmdDiff(args []string) error {
 	if len(args) < 2 {
 		return usageErrorf("promptsheon diff <hashA> <hashB>")
 	}
-	result, err := promptsheon.DiffIntelligence(args[0], args[1])
+	result, err := promptsheoncas.DiffIntelligence(args[0], args[1])
 	if err != nil {
 		return err
 	}
-	fmt.Print(promptsheon.FormatDiff(result))
+	fmt.Print(promptsheoncas.FormatDiff(result))
 	return nil
 }
 
@@ -380,19 +380,19 @@ func cmdDiff(args []string) error {
 // ---------------------------------------------------------------------------
 
 func cmdStatus() error {
-	if !promptsheon.IsInitialized() {
+	if !promptsheoncas.IsInitialized() {
 		return fmt.Errorf("not a promptsheon repository")
 	}
 
-	ref, err := promptsheon.GetCurrentRef()
+	ref, err := promptsheoncas.GetCurrentRef()
 	if err != nil {
 		return fmt.Errorf("read ref: %w", err)
 	}
-	headHash, err := promptsheon.GetCurrentCommitHash()
+	headHash, err := promptsheoncas.GetCurrentCommitHash()
 	if err != nil {
 		return fmt.Errorf("read HEAD: %w", err)
 	}
-	refs, err := promptsheon.ListRefs()
+	refs, err := promptsheoncas.ListRefs()
 	if err != nil {
 		return fmt.Errorf("list refs: %w", err)
 	}
@@ -409,7 +409,7 @@ func cmdStatus() error {
 	fmt.Printf("HEAD: %s\n", headLine)
 
 	if headHash != "" {
-		obj, e := promptsheon.ReadObject(headHash)
+		obj, e := promptsheoncas.ReadObject(headHash)
 		if e == nil {
 			ts := time.Unix(0, obj.Timestamp)
 			fmt.Printf("last commit: %s (%s)\n", headHash[:12], ts.Format(time.RFC3339))
@@ -426,7 +426,7 @@ func cmdStatus() error {
 			if r == ref {
 				prefix = " *"
 			}
-			h, _ := promptsheon.ReadRef(r)
+			h, _ := promptsheoncas.ReadRef(r)
 			shortHash := ""
 			if len(h) >= 12 {
 				shortHash = h[:12]
@@ -435,7 +435,7 @@ func cmdStatus() error {
 		}
 	}
 
-	stats, err := promptsheon.GetStats()
+	stats, err := promptsheoncas.GetStats()
 	if err == nil {
 		fmt.Printf("objects: %d (blobs: %d, trees: %d, commits: %d)\n",
 			stats.TotalObjects, stats.BlobCount, stats.TreeCount, stats.CommitCount)
@@ -450,7 +450,7 @@ func cmdShow(args []string) error {
 	}
 	hash := args[0]
 
-	obj, err := promptsheon.ReadObject(hash)
+	obj, err := promptsheoncas.ReadObject(hash)
 	if err != nil {
 		return err
 	}
@@ -496,7 +496,7 @@ func cmdShow(args []string) error {
 
 		fmt.Println()
 		fmt.Println("Tree contents:")
-		treeObj, err := promptsheon.ReadObject(obj.TreeHash)
+		treeObj, err := promptsheoncas.ReadObject(obj.TreeHash)
 		if err == nil {
 			for _, e := range treeObj.Entries {
 				fmt.Printf("  %-6s  %-12s  %s\n", e.Type, e.Hash[:12], e.Name)
@@ -516,7 +516,7 @@ func cmdLsTree(args []string) error {
 	}
 	hash := args[0]
 
-	obj, err := promptsheon.ReadObject(hash)
+	obj, err := promptsheoncas.ReadObject(hash)
 	if err != nil {
 		return err
 	}
@@ -526,7 +526,7 @@ func cmdLsTree(args []string) error {
 
 	var walkTree func(hash string, prefix string) error
 	walkTree = func(hash string, prefix string) error {
-		obj, err := promptsheon.ReadObject(hash)
+		obj, err := promptsheoncas.ReadObject(hash)
 		if err != nil {
 			return err
 		}
@@ -536,7 +536,7 @@ func cmdLsTree(args []string) error {
 				path = prefix + "/" + e.Name
 			}
 			fmt.Printf("%-6s %s  %s\n", e.Type, e.Hash[:12], path)
-			if e.Type == promptsheon.TypeTree {
+			if e.Type == promptsheoncas.TypeTree {
 				if err := walkTree(e.Hash, path); err != nil {
 					return err
 				}
@@ -552,7 +552,7 @@ func cmdCatFile(args []string) error {
 	if len(args) < 1 {
 		return usageErrorf("promptsheon cat-file <hash>")
 	}
-	obj, err := promptsheon.ReadObject(args[0])
+	obj, err := promptsheoncas.ReadObject(args[0])
 	if err != nil {
 		return err
 	}
@@ -567,7 +567,7 @@ func cmdCatFile(args []string) error {
 }
 
 func cmdGraph() error {
-	nodes, err := promptsheon.BuildGraph()
+	nodes, err := promptsheoncas.BuildGraph()
 	if err != nil {
 		return err
 	}
@@ -576,8 +576,8 @@ func cmdGraph() error {
 		return nil
 	}
 
-	refs, _ := promptsheon.ListRefDetails()
-	headRef, _ := promptsheon.GetCurrentRef()
+	refs, _ := promptsheoncas.ListRefDetails()
+	headRef, _ := promptsheoncas.GetCurrentRef()
 
 	columns := assignGraphColumns(nodes, refs, headRef)
 	maxCol := 0
@@ -591,9 +591,9 @@ func cmdGraph() error {
 	return nil
 }
 
-func assignGraphColumns(nodes []*promptsheon.GraphNode, refs []*promptsheon.RefDetail, headRef string) map[string]int {
+func assignGraphColumns(nodes []*promptsheoncas.GraphNode, refs []*promptsheoncas.RefDetail, headRef string) map[string]int {
 	columns := make(map[string]int)
-	nodeMap := make(map[string]*promptsheon.GraphNode)
+	nodeMap := make(map[string]*promptsheoncas.GraphNode)
 	for _, n := range nodes {
 		nodeMap[n.Hash] = n
 	}
@@ -632,7 +632,7 @@ func assignGraphColumns(nodes []*promptsheon.GraphNode, refs []*promptsheon.RefD
 	return columns
 }
 
-func walkChain(hash string, col int, columns map[string]int, nodeMap map[string]*promptsheon.GraphNode) {
+func walkChain(hash string, col int, columns map[string]int, nodeMap map[string]*promptsheoncas.GraphNode) {
 	for hash != "" {
 		if _, assigned := columns[hash]; assigned {
 			return
@@ -646,7 +646,7 @@ func walkChain(hash string, col int, columns map[string]int, nodeMap map[string]
 	}
 }
 
-func renderGraph(nodes []*promptsheon.GraphNode, columns map[string]int, maxCol int) string {
+func renderGraph(nodes []*promptsheoncas.GraphNode, columns map[string]int, maxCol int) string {
 	var buf bytes.Buffer
 
 	colRemaining := make([]int, maxCol+1)
@@ -711,7 +711,7 @@ func renderGraph(nodes []*promptsheon.GraphNode, columns map[string]int, maxCol 
 	return buf.String()
 }
 
-func drawConnLines(buf *bytes.Buffer, prevCol, col, maxCol int, colRemaining []int, _ *promptsheon.GraphNode) {
+func drawConnLines(buf *bytes.Buffer, prevCol, col, maxCol int, colRemaining []int, _ *promptsheoncas.GraphNode) {
 	for c := 0; c <= maxCol; c++ {
 		switch {
 		case c == prevCol && c < col:
@@ -731,7 +731,7 @@ func drawConnLines(buf *bytes.Buffer, prevCol, col, maxCol int, colRemaining []i
 	buf.WriteString("\n")
 }
 
-func drawMergeForkLines(buf *bytes.Buffer, node *promptsheon.GraphNode, columns map[string]int, maxCol int, colRemaining []int) {
+func drawMergeForkLines(buf *bytes.Buffer, node *promptsheoncas.GraphNode, columns map[string]int, maxCol int, colRemaining []int) {
 	if len(node.Parents) <= 1 {
 		return
 	}
@@ -785,7 +785,7 @@ func drawMergeForkLines(buf *bytes.Buffer, node *promptsheon.GraphNode, columns 
 }
 
 func cmdStats() error {
-	stats, err := promptsheon.GetStats()
+	stats, err := promptsheoncas.GetStats()
 	if err != nil {
 		return err
 	}
@@ -812,7 +812,7 @@ func formatBytes(b int64) string {
 }
 
 func cmdVerify() error {
-	result, err := promptsheon.Verify()
+	result, err := promptsheoncas.Verify()
 	if err != nil {
 		return err
 	}
