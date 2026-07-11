@@ -30,9 +30,6 @@ func TestDefaultRetentionPolicyIs30Days(t *testing.T) {
 	if p.TraceTTL != 30*24*time.Hour {
 		t.Errorf("TraceTTL: got %v, want 30 days", p.TraceTTL)
 	}
-	if p.SnapshotTTL != 30*24*time.Hour {
-		t.Errorf("SnapshotTTL: got %v, want 30 days", p.SnapshotTTL)
-	}
 	if p.AuditTTL != 90*24*time.Hour {
 		t.Errorf("AuditTTL: got %v, want 90 days", p.AuditTTL)
 	}
@@ -43,15 +40,11 @@ func TestDefaultRetentionPolicyIs30Days(t *testing.T) {
 
 func TestLoadRetentionPolicyFromEnvOverrides(t *testing.T) {
 	t.Setenv("PROMPTSHEON_TRACE_TTL_DAYS", "60")
-	t.Setenv("PROMPTSHEON_SNAPSHOT_TTL_DAYS", "45")
 	t.Setenv("PROMPTSHEON_AUDIT_TTL_DAYS", "180")
 	t.Setenv("PROMPTSHEON_RETENTION_CHECK_MINUTES", "30")
 	p := LoadRetentionPolicyFromEnv()
 	if p.TraceTTL != 60*24*time.Hour {
 		t.Errorf("TraceTTL: got %v", p.TraceTTL)
-	}
-	if p.SnapshotTTL != 45*24*time.Hour {
-		t.Errorf("SnapshotTTL: got %v", p.SnapshotTTL)
 	}
 	if p.AuditTTL != 180*24*time.Hour {
 		t.Errorf("AuditTTL: got %v", p.AuditTTL)
@@ -74,7 +67,6 @@ func TestLoadRetentionPolicyEnforcesTraceFloor(t *testing.T) {
 
 func TestLoadRetentionPolicyIgnoresGarbage(t *testing.T) {
 	t.Setenv("PROMPTSHEON_TRACE_TTL_DAYS", "not a number")
-	t.Setenv("PROMPTSHEON_SNAPSHOT_TTL_DAYS", "-5")
 	t.Setenv("PROMPTSHEON_AUDIT_TTL_DAYS", "0")
 	t.Setenv("PROMPTSHEON_RETENTION_CHECK_MINUTES", "")
 	p := LoadRetentionPolicyFromEnv()
@@ -82,9 +74,6 @@ func TestLoadRetentionPolicyIgnoresGarbage(t *testing.T) {
 	// corresponding field at its default.
 	if p.TraceTTL != 30*24*time.Hour {
 		t.Errorf("TraceTTL: got %v, want default 30d", p.TraceTTL)
-	}
-	if p.SnapshotTTL != 30*24*time.Hour {
-		t.Errorf("SnapshotTTL: got %v, want default 30d", p.SnapshotTTL)
 	}
 	if p.AuditTTL != 90*24*time.Hour {
 		t.Errorf("AuditTTL: got %v, want default 90d", p.AuditTTL)
@@ -97,7 +86,6 @@ func TestLoadRetentionPolicyIgnoresGarbage(t *testing.T) {
 func TestGetPolicyReturnsConstructorValue(t *testing.T) {
 	want := RetentionPolicy{
 		TraceTTL:      60 * 24 * time.Hour,
-		SnapshotTTL:   45 * 24 * time.Hour,
 		AuditTTL:      180 * 24 * time.Hour,
 		CheckInterval: 15 * time.Minute,
 	}
@@ -152,7 +140,6 @@ func TestStartRespectsContextCancellation(t *testing.T) {
 	// goroutine blocks in select for the duration of the test.
 	m := newTestManager(t, RetentionPolicy{
 		TraceTTL:      30 * 24 * time.Hour,
-		SnapshotTTL:   30 * 24 * time.Hour,
 		AuditTTL:      90 * 24 * time.Hour,
 		CheckInterval: 24 * time.Hour,
 	})
