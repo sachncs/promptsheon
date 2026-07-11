@@ -3,6 +3,69 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+
+## [0.1.0] - 2026-07-10
+
+### Changed (forward-only breaking)
+
+- **F-01**: Deleted `internal/promptsheon/alias.go` (the M0.7 CAS
+  re-export shim). Callers must import `pkg/cas` directly.
+- **F-04 + F-05**: Deleted the legacy bundle types
+  (`Prompt`, `ModelPolicy`, `ContextContract`, `Memory`,
+  `Guardrails`, `Tools`, `MCPServers`, `RuntimePolicy`,
+  `EvaluationSuite`) and the corresponding fields on
+  `capability.Version`. The Version struct is now
+  `{ID, CapabilityID, Manifest, ManifestHash, Version,
+  CreatedAt, CreatedBy}`. The legacy analyzers
+  (`internal/{context,guardrail,optimizer,workflow}/
+  *version*.go`) and `internal/eval/runner.go`'s
+  `RunVersion` / `buildVersionPrompt` are deleted.
+- **F-03**: Deleted `manifestFromLegacy` in
+  `handleCreateVersion`. The route accepts only
+  `{version, manifest}`; missing Manifest returns 400.
+- **F-06**: Migration 025 is destructive. Drops the legacy
+  `prompts`, `agents`, `prompt_versions`,
+  `agent_executions`, `test_datasets`, `eval_results`,
+  `eval_runs`, `reviews`, `output_snapshots`,
+  `workflows`, `workflow_steps` tables. Drops the
+  `capabilities.state`, `capabilities.current_version_id`,
+  and the per-artifact `capability_versions` columns.
+- **F-07**: Removed the defensive writes of
+  `state='draft' / current_version_id=''` from
+  `internal/store/sqlite_capabilities.go` and
+  `internal/store/postgres/postgres.go`.
+- **F-08**: Renamed `internal/abtesting` to
+  `internal/experiment` (board §22).
+- **F-09 + F-10**: Deleted `internal/playground` and
+  `internal/collab` (board §22).
+- **F-13**: OpenAPI spec regenerated. The Version resource
+  request body no longer exposes the legacy bundle fields; the
+  `prompt`, `modelPolicy`, `contextContract`, `knowledge`,
+  `memory`, `guardrails`, `tools`, `mCPServers`,
+  `runtimePolicy`, `evaluationSuite` fields are gone.
+- **F-14**: Version bump to v0.1.0 across
+  `sdk/python/pyproject.toml`,
+  `sdk/typescript/package.json`,
+  `deploy/helm/promptsheon/Chart.yaml`, and the
+  `internal/manifest/manifest_test.go` example.
+
+### Added
+
+- **F-15**: `docs/adr/0023` records the forward-only cleanup
+  decision: no deprecation period, no backwards-compat codepath;
+  the legacy tables and columns are gone in v0.1.0.
+
+### Migration
+
+Production tenants upgrading from v0.0.7 to v0.1.0 must run
+migration 025 (destructive) before starting the daemon. There
+is no automatic backwards-compat codepath. Operators that
+still need the legacy model must roll back to v0.0.7.
+
+## [0.0.7] - 2026-06-26
+
+Last release that supports the legacy bundle model. v0.1.0 is a
+breaking semver bump per the charter's "forward only" principle.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
