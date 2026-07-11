@@ -1,5 +1,5 @@
 // Package abtesting provides A/B testing capabilities for prompts.
-package abtesting
+package experiment
 
 import (
 	"fmt"

@@ -1,18 +1,18 @@
-package abtesting_test
+package experiment_test
 
 import (
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/abtesting"
+	"github.com/sachncs/promptsheon/internal/experiment"
 )
 
 // makeTest is a helper to create a test with two variants.
-func makeTest(id string) *abtesting.Test {
-	return &abtesting.Test{
+func makeTest(id string) *experiment.Test {
+	return &experiment.Test{
 		ID:       id,
 		Name:     "Test " + id,
 		PromptID: "prompt1",
-		Variants: []*abtesting.Variant{
+		Variants: []*experiment.Variant{
 			{ID: "v1", Name: "Control", PromptID: "prompt1", TrafficPct: 50},
 			{ID: "v2", Name: "Variant", PromptID: "prompt2", TrafficPct: 50},
 		},
@@ -22,13 +22,13 @@ func makeTest(id string) *abtesting.Test {
 }
 
 func TestCreateTest(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 
-	test := &abtesting.Test{
+	test := &experiment.Test{
 		ID:       "test1",
 		Name:     "My Test",
 		PromptID: "prompt1",
-		Variants: []*abtesting.Variant{
+		Variants: []*experiment.Variant{
 			{ID: "v1", Name: "Control", PromptID: "prompt1", TrafficPct: 50},
 			{ID: "v2", Name: "Variant", PromptID: "prompt2", TrafficPct: 50},
 		},
@@ -54,13 +54,13 @@ func TestCreateTest(t *testing.T) {
 }
 
 func TestCreateTestInvalidTraffic(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 
-	test := &abtesting.Test{
+	test := &experiment.Test{
 		ID:       "test1",
 		Name:     "My Test",
 		PromptID: "prompt1",
-		Variants: []*abtesting.Variant{
+		Variants: []*experiment.Variant{
 			{ID: "v1", TrafficPct: 60},
 			{ID: "v2", TrafficPct: 60}, // Total > 100
 		},
@@ -73,13 +73,13 @@ func TestCreateTestInvalidTraffic(t *testing.T) {
 }
 
 func TestSelectVariant(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 
-	test := &abtesting.Test{
+	test := &experiment.Test{
 		ID:       "test1",
 		Name:     "My Test",
 		PromptID: "prompt1",
-		Variants: []*abtesting.Variant{
+		Variants: []*experiment.Variant{
 			{ID: "v1", TrafficPct: 50},
 			{ID: "v2", TrafficPct: 50},
 		},
@@ -104,13 +104,13 @@ func TestSelectVariant(t *testing.T) {
 }
 
 func TestRecordResult(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 
-	test := &abtesting.Test{
+	test := &experiment.Test{
 		ID:       "test1",
 		Name:     "My Test",
 		PromptID: "prompt1",
-		Variants: []*abtesting.Variant{
+		Variants: []*experiment.Variant{
 			{ID: "v1", TrafficPct: 100},
 		},
 	}
@@ -119,7 +119,7 @@ func TestRecordResult(t *testing.T) {
 
 	// Record some results
 	for i := 0; i < 10; i++ {
-		engine.RecordResult("test1", "v1", true, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
+		engine.RecordResult("test1", "v1", true, experiment.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
 	}
 
 	results, err := engine.GetResults("test1")
@@ -144,13 +144,13 @@ func TestRecordResult(t *testing.T) {
 }
 
 func TestStopTest(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 
-	test := &abtesting.Test{
+	test := &experiment.Test{
 		ID:       "test1",
 		Name:     "My Test",
 		PromptID: "prompt1",
-		Variants: []*abtesting.Variant{
+		Variants: []*experiment.Variant{
 			{ID: "v1", TrafficPct: 100},
 		},
 	}
@@ -165,20 +165,20 @@ func TestStopTest(t *testing.T) {
 }
 
 func TestListTests(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 
-	_ = engine.CreateTest(&abtesting.Test{
+	_ = engine.CreateTest(&experiment.Test{
 		ID:       "test1",
 		Name:     "Test 1",
 		PromptID: "prompt1",
-		Variants: []*abtesting.Variant{{ID: "v1", TrafficPct: 100}},
+		Variants: []*experiment.Variant{{ID: "v1", TrafficPct: 100}},
 	})
 
-	_ = engine.CreateTest(&abtesting.Test{
+	_ = engine.CreateTest(&experiment.Test{
 		ID:       "test2",
 		Name:     "Test 2",
 		PromptID: "prompt2",
-		Variants: []*abtesting.Variant{{ID: "v1", TrafficPct: 100}},
+		Variants: []*experiment.Variant{{ID: "v1", TrafficPct: 100}},
 	})
 
 	tests := engine.ListTests()
@@ -188,7 +188,7 @@ func TestListTests(t *testing.T) {
 }
 
 func TestCreateTestDuplicateID(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 	_ = engine.CreateTest(makeTest("dup"))
 	err := engine.CreateTest(makeTest("dup"))
 	if err == nil {
@@ -197,7 +197,7 @@ func TestCreateTestDuplicateID(t *testing.T) {
 }
 
 func TestGetTestNotFound(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 	_, err := engine.GetTest("nonexistent")
 	if err == nil {
 		t.Fatal("expected error for nonexistent test")
@@ -205,7 +205,7 @@ func TestGetTestNotFound(t *testing.T) {
 }
 
 func TestStopTestNotFound(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 	err := engine.StopTest("nonexistent")
 	if err == nil {
 		t.Fatal("expected error for nonexistent test")
@@ -213,7 +213,7 @@ func TestStopTestNotFound(t *testing.T) {
 }
 
 func TestSelectVariantNotFound(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 	_, err := engine.SelectVariant("nonexistent")
 	if err == nil {
 		t.Fatal("expected error for nonexistent test")
@@ -221,7 +221,7 @@ func TestSelectVariantNotFound(t *testing.T) {
 }
 
 func TestSelectVariantNotRunning(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 	_ = engine.CreateTest(makeTest("stopped"))
 	_ = engine.StopTest("stopped")
 	_, err := engine.SelectVariant("stopped")
@@ -231,12 +231,12 @@ func TestSelectVariantNotRunning(t *testing.T) {
 }
 
 func TestRecordResultMixedSuccessAndFailure(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
-	test := &abtesting.Test{
+	engine := experiment.NewEngine(nil)
+	test := &experiment.Test{
 		ID:       "mixed",
 		Name:     "Mixed",
 		PromptID: "prompt1",
-		Variants: []*abtesting.Variant{
+		Variants: []*experiment.Variant{
 			{ID: "v1", TrafficPct: 100},
 		},
 		WinCriteria: "success_rate",
@@ -245,10 +245,10 @@ func TestRecordResultMixedSuccessAndFailure(t *testing.T) {
 	_ = engine.CreateTest(test)
 
 	for i := 0; i < 7; i++ {
-		engine.RecordResult("mixed", "v1", true, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
+		engine.RecordResult("mixed", "v1", true, experiment.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
 	}
 	for i := 0; i < 3; i++ {
-		engine.RecordResult("mixed", "v1", false, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
+		engine.RecordResult("mixed", "v1", false, experiment.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
 	}
 
 	results, err := engine.GetResults("mixed")
@@ -271,20 +271,20 @@ func TestRecordResultMixedSuccessAndFailure(t *testing.T) {
 }
 
 func TestRecordResultNonexistentVariant(_ *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 	_ = engine.CreateTest(makeTest("rrtest"))
 	// Should not panic or error
-	engine.RecordResult("rrtest", "nonexistent", true, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
+	engine.RecordResult("rrtest", "nonexistent", true, experiment.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
 }
 
 func TestGetResultsLatencyCriteria(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 
-	test := &abtesting.Test{
+	test := &experiment.Test{
 		ID:       "lat-test",
 		Name:     "Latency Test",
 		PromptID: "prompt1",
-		Variants: []*abtesting.Variant{
+		Variants: []*experiment.Variant{
 			{ID: "fast", Name: "Fast", PromptID: "p1", TrafficPct: 50},
 			{ID: "slow", Name: "Slow", PromptID: "p2", TrafficPct: 50},
 		},
@@ -294,8 +294,8 @@ func TestGetResultsLatencyCriteria(t *testing.T) {
 	_ = engine.CreateTest(test)
 
 	for i := 0; i < 5; i++ {
-		engine.RecordResult("lat-test", "fast", true, abtesting.ResultMetrics{LatencyMs: 10, Tokens: 50, Cost: 0.001})
-		engine.RecordResult("lat-test", "slow", true, abtesting.ResultMetrics{LatencyMs: 500, Tokens: 50, Cost: 0.001})
+		engine.RecordResult("lat-test", "fast", true, experiment.ResultMetrics{LatencyMs: 10, Tokens: 50, Cost: 0.001})
+		engine.RecordResult("lat-test", "slow", true, experiment.ResultMetrics{LatencyMs: 500, Tokens: 50, Cost: 0.001})
 	}
 
 	results, err := engine.GetResults("lat-test")
@@ -317,13 +317,13 @@ func TestGetResultsLatencyCriteria(t *testing.T) {
 }
 
 func TestGetResultsCostCriteria(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 
-	test := &abtesting.Test{
+	test := &experiment.Test{
 		ID:       "cost-test",
 		Name:     "Cost Test",
 		PromptID: "prompt1",
-		Variants: []*abtesting.Variant{
+		Variants: []*experiment.Variant{
 			{ID: "cheap", Name: "Cheap", PromptID: "p1", TrafficPct: 50},
 			{ID: "expensive", Name: "Expensive", PromptID: "p2", TrafficPct: 50},
 		},
@@ -333,8 +333,8 @@ func TestGetResultsCostCriteria(t *testing.T) {
 	_ = engine.CreateTest(test)
 
 	for i := 0; i < 5; i++ {
-		engine.RecordResult("cost-test", "cheap", true, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
-		engine.RecordResult("cost-test", "expensive", true, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.100})
+		engine.RecordResult("cost-test", "cheap", true, experiment.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
+		engine.RecordResult("cost-test", "expensive", true, experiment.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.100})
 	}
 
 	results, err := engine.GetResults("cost-test")
@@ -347,13 +347,13 @@ func TestGetResultsCostCriteria(t *testing.T) {
 }
 
 func TestGetResultsSuccessRateCriteria(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 
-	test := &abtesting.Test{
+	test := &experiment.Test{
 		ID:       "sr-test",
 		Name:     "Success Rate Test",
 		PromptID: "prompt1",
-		Variants: []*abtesting.Variant{
+		Variants: []*experiment.Variant{
 			{ID: "good", Name: "Good", PromptID: "p1", TrafficPct: 50},
 			{ID: "bad", Name: "Bad", PromptID: "p2", TrafficPct: 50},
 		},
@@ -363,8 +363,8 @@ func TestGetResultsSuccessRateCriteria(t *testing.T) {
 	_ = engine.CreateTest(test)
 
 	for i := 0; i < 10; i++ {
-		engine.RecordResult("sr-test", "good", true, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
-		engine.RecordResult("sr-test", "bad", false, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
+		engine.RecordResult("sr-test", "good", true, experiment.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
+		engine.RecordResult("sr-test", "bad", false, experiment.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
 	}
 
 	results, err := engine.GetResults("sr-test")
@@ -386,13 +386,13 @@ func TestGetResultsSuccessRateCriteria(t *testing.T) {
 }
 
 func TestGetResultsConfidenceClamped(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 
-	test := &abtesting.Test{
+	test := &experiment.Test{
 		ID:       "conf-test",
 		Name:     "Confidence",
 		PromptID: "prompt1",
-		Variants: []*abtesting.Variant{
+		Variants: []*experiment.Variant{
 			{ID: "v1", TrafficPct: 100},
 		},
 		MinSamples: 5,
@@ -400,7 +400,7 @@ func TestGetResultsConfidenceClamped(t *testing.T) {
 	_ = engine.CreateTest(test)
 
 	for i := 0; i < 10; i++ {
-		engine.RecordResult("conf-test", "v1", true, abtesting.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
+		engine.RecordResult("conf-test", "v1", true, experiment.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
 	}
 
 	results, err := engine.GetResults("conf-test")
@@ -416,14 +416,14 @@ func TestGetResultsConfidenceClamped(t *testing.T) {
 }
 
 func TestSelectVariantFallback(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 
 	// Test with a single variant at 100% traffic to exercise the fallback path
-	test := &abtesting.Test{
+	test := &experiment.Test{
 		ID:       "fallback",
 		Name:     "Fallback",
 		PromptID: "prompt1",
-		Variants: []*abtesting.Variant{
+		Variants: []*experiment.Variant{
 			{ID: "only", TrafficPct: 100},
 		},
 	}
@@ -439,13 +439,13 @@ func TestSelectVariantFallback(t *testing.T) {
 }
 
 func TestCreateTestWeights(t *testing.T) {
-	engine := abtesting.NewEngine(nil)
+	engine := experiment.NewEngine(nil)
 
-	test := &abtesting.Test{
+	test := &experiment.Test{
 		ID:       "weight-test",
 		Name:     "Weight Test",
 		PromptID: "prompt1",
-		Variants: []*abtesting.Variant{
+		Variants: []*experiment.Variant{
 			{ID: "v1", TrafficPct: 25},
 			{ID: "v2", TrafficPct: 75},
 		},

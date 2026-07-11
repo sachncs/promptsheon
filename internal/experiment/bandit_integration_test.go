@@ -1,4 +1,4 @@
-package abtesting
+package experiment
 
 import (
 	"testing"
