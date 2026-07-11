@@ -1,6 +1,6 @@
 {
   "name": "@promptsheon/typescript",
-  "version": "0.0.7",
+  "version": "0.1.0",
   "description": "Auto-generated TypeScript client for the Promptsheon API.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
