@@ -663,7 +663,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Module path from `github.com/sachn-cs/promptsheon` to `github.com/sachncs/promptsheon`
+- Module path from `github.com/sachncs/promptsheon` to `github.com/sachncs/promptsheon`
   to match the canonical remote
   ([`34342ca`](https://github.com/sachncs/promptsheon/commit/34342ca), 2026-06-25)
 
