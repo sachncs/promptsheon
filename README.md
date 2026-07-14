@@ -1,10 +1,13 @@
-# Promptsheon
-
-**The Control Plane for AI Capabilities — v0.1.0**
-
-[![CI](https://github.com/sachncs/promptsheon/actions/workflows/ci.yaml/badge.svg)](https://github.com/sachncs/promptsheon/actions/workflows/ci.yaml)
-[![Go Version](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](https://go.dev)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+<p align="center">
+  <h1 align="center">Promptsheon</h1>
+  <p align="center">The Control Plane for AI Capabilities — v0.1.0</p>
+  <p align="center">
+    <a href="#installation"><img src="https://img.shields.io/badge/go-1.26-00ADD8?logo=go" alt="Go"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
+    <a href="https://github.com/sachncs/promptsheon/actions"><img src="https://img.shields.io/github/actions/workflow/status/sachncs/promptsheon/ci.yaml?branch=master" alt="CI"></a>
+    <a href="https://github.com/sachncs/promptsheon/stargazers"><img src="https://img.shields.io/github/stars/sachncs/promptsheon" alt="Stars"></a>
+  </p>
+</p>
 
 Promptsheon is the control plane for AI Capabilities. Every
 Capability — its Prompt, Model Policy, Runtime Policy, Context
@@ -19,20 +22,53 @@ v0.0.7 prompts/agents tables are gone (see
 
 ---
 
-## Table of Contents
+## Features
 
-- [Quick Start](#quick-start)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Configuration](#configuration)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
-- [Security](#security)
-- [License](#license)
+- **Content-Addressable Storage (CAS)** — Immutable, SHA-256-based object storage with Merkle DAG structure
+- **Capability Versioning** — Every Capability has zero or more immutable Versions; the live Release per Environment points at exactly one Version
+- **Manifest** — Content-addressed composition of Prompt, Model Policy, Runtime Policy, Context Contract, Memory, Guardrails, Tools, MCP servers, and Evaluation Suite
+- **Recommendation Engine** — The deterministic rules engine (Tier 2.35) plus the bandit Thompson Sampling selector (Tier 2.36) close the loop
+- **Approval Workflow** — `MajorityPolicy` and `MakerCheckerPolicy` with separation of duties
+- **Evaluation Engine** — Run Versions against test datasets with automated scoring
+- **LLM Provider Abstraction** — Unified interface for OpenAI, Anthropic, Azure OpenAI, Ollama, NVIDIA NIM
+- **Workflow DAG** — Topological execution with tool integration
+- **Observability** — OpenTelemetry tracing, Prometheus metrics, audit logging
+- **Built-in Guardrails** — PII redaction (Tier 2.47) and prompt-injection detection (Tier 2.48) ship as in-process plugins through the supervisor (Tier 2.46)
+- **Plugin SDK** — gRPC over loopback for remote plugins (Tier 2.32 manifest); KMS-backed KeyProvider (Tier 2.45) for BYOK
+- **Webhooks** — Event-driven integrations with HMAC signing and SSRF protection
+- **Secrets Management** — Encrypted vault for API keys and sensitive configuration
+- **Rate Limiting** — Configurable per-client rate limiting with burst support
+- **Per-Workspace Budgets and Quotas** — USD-cap enforcement (Tier 2.37) and rate-cap enforcement
+- **REST API** — Full-featured HTTP API with auto-generated OpenAPI specification
+
+---
+
+## Installation
+
+### From source
+
+```bash
+git clone https://github.com/sachncs/promptsheon.git
+cd promptsheon
+go build -o promptsheond ./cmd/promptsheond
+go build -o promptsheon  ./cmd/promptsheon
+```
+
+### Run from a release binary
+
+```bash
+# Download the release binary for your platform from GitHub Releases.
+# Then start the server.
+./promptsheond
+```
+
+**Requirements**: Go 1.26+ (see `go.mod`).
 
 ---
 
 ## Quick Start
+
+### CLI
 
 ```bash
 # Clone and build
@@ -45,8 +81,10 @@ go build -o promptsheon  ./cmd/promptsheon
 ./promptsheond
 ```
 
+### REST API (curl)
+
 ```bash
-# Create a Capability (POST /v1/projects/{p}/capabilities)
+# Create a Capability
 curl -X POST http://localhost:8080/api/v1/projects/p1/capabilities \
   -H "Content-Type: application/json" \
   -d '{"name":"greeting","description":"Friendly greeting"}'
@@ -54,7 +92,7 @@ curl -X POST http://localhost:8080/api/v1/projects/p1/capabilities \
 # Add a Version to the Capability with a Manifest of artifacts
 curl -X POST http://localhost:8080/api/v1/capabilities/c1/versions \
   -H "Content-Type: application/json" \
-  -d '{"version":1, "manifest":{"prompt":"<cas-hash>", ...}}'
+  -d '{"version":1, "manifest":{"prompt":"Sachin", ...}}'
 
 # Approve the Version into a Release, then invoke the Release
 curl -X POST http://localhost:8080/api/v1/releases/r1/approve -d '{}'
@@ -63,26 +101,108 @@ curl -X POST http://localhost:8080/api/v1/releases/r1/invoke \
   -d '{"inputs":{"q":"hello"}}'
 ```
 
+### Go SDK
+
+```go
+import "github.com/sachncs/promptsheon/sdk"
+
+client, err := sdk.NewClient(sdk.Config{Addr: "http://localhost:8080"})
+if err != nil { return err }
+
+cap, err := client.CreateCapability(ctx, "p1", sdk.CreateCapabilityRequest{
+    Name:        "greeting",
+    Description: "Friendly greeting",
+})
+ver, err := client.AddVersion(ctx, cap.ID, sdk.AddVersionRequest{
+    Version: 1,
+    Manifest: sdk.Manifest{Prompt: "Sachin"},
+})
+rel, err := client.CreateRelease(ctx, ver.ID)
+out, err := client.ApproveAndInvoke(ctx, rel.ID, sdk.InvokeRequest{
+    Inputs: map[string]any{"q": "hello"},
+})
+```
+
 ---
 
-## Features
+## Configuration
 
-- **Content-Addressable Storage (CAS)** — immutable, SHA-256-based object storage with Merkle DAG structure
-- **Capability Versioning** — every Capability has zero or more immutable Versions; the live Release per Environment points at exactly one Version
-- **Manifest** — content-addressed composition of Prompt, Model Policy, Runtime Policy, Context Contract, Memory, Guardrails, Tools, MCP servers, and Evaluation Suite
-- **Recommendation Engine** — the deterministic rules engine (Tier 2.35) plus the bandit Thompson Sampling selector (Tier 2.36) close the loop
-- **Approval Workflow** — MajorityPolicy and MakerCheckerPolicy with separation of duties
-- **Evaluation Engine** — run Versions against test datasets with automated scoring
-- **LLM Provider Abstraction** — unified interface for OpenAI, Anthropic, Azure OpenAI, Ollama, NVIDIA NIM
-- **Workflow DAG** — topological execution with tool integration
-- **Observability** — OpenTelemetry tracing, Prometheus metrics, audit logging
-- **Built-in Guardrails** — PII redaction (Tier 2.47) and prompt-injection detection (Tier 2.48) ship as in-process plugins through the supervisor (Tier 2.46)
-- **Plugin SDK** — gRPC over loopback for remote plugins (Tier 2.32 manifest); KMS-backed KeyProvider (Tier 2.45) for BYOK
-- **Webhooks** — event-driven integrations with HMAC signing and SSRF protection
-- **Secrets Management** — encrypted vault for API keys and sensitive configuration
-- **Rate Limiting** — configurable per-client rate limiting with burst support
-- **Per-Workspace Budgets and Quotas** — USD-cap enforcement (Tier 2.37) and rate-cap enforcement
-- **REST API** — full-featured HTTP API with auto-generated OpenAPI specification
+Promptsheon is configured via environment variables or a config file. Key settings:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PROMPTSHEON_ADDR` | `:8080` | Listen address |
+| `PROMPTSHEON_DB_BACKEND` | `sqlite` | `sqlite` (default) or `postgres` |
+| `PROMPTSHEON_DB_PATH` | `promptsheon.db` | SQLite database path |
+| `PROMPTSHEON_DB_DSN` | (none) | Postgres connection string when DB_BACKEND=postgres |
+| `PROMPTSHEON_LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
+| `PROMPTSHEON_AUTH` | `false` | Enable authentication |
+| `PROMPTSHEON_PLUGINS_FILE` | (none) | Path to the plugin manifest (Tier 2.32) |
+| `PROMPTSHEON_VAULT_KEY` | (none) | Master key for AES-256-GCM vault; override with KMS-backed KeyProvider for production |
+
+See [docs/configuration.md](docs/configuration.md) for the full reference.
+
+---
+
+## API
+
+| Symbol | Type | Description |
+|--------|------|-------------|
+| `Capability` | struct | A named logical capability with N immutable Versions |
+| `Version` | struct | A specific immutable build of a Capability Manifest |
+| `Release` | struct | A pointer to a Version inside a tenant Environment |
+| `Manifest` | struct | Composes Prompt, ModelPolicy, RuntimePolicy, ContextContract, Memory, Guardrails, Tools, MCP, EvalSuite |
+| `CapabilityService` | type | Server interface for capability/manifest/recommendation operations |
+| `WorkflowEngine` | type | DAG-based workflow executor with shell policy |
+| `CAS` | type | Content-addressable store (Merkle DAG) |
+| `Vault` | type | AES-256-GCM vault (or KMS-backed `KeyProvider`) |
+| `PluginSupervisor` | type | gRPC-over-UDS supervisor for in-process and remote plugins |
+| `EvalEngine` | type | Runs a Version against a dataset and scores the output |
+| `RecommendationEngine` | type | Tier-2.35 rules + Tier-2.36 Thompson-sampling selector |
+| `OpenAPI` | resource | Auto-generated OpenAPI spec at `api/openapi.yaml` |
+
+---
+
+## Examples
+
+```bash
+# 1. End-to-end capability lifecycle against a local server.
+./promptsheond &  # in another shell
+
+curl -X POST http://localhost:8080/api/v1/projects/p1/capabilities \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"greeting","description":"Friendly greeting"}'
+
+curl -X POST http://localhost:8080/api/v1/capabilities/c1/versions \
+  -H 'Content-Type: application/json' \
+  -d '{"version":1, "manifest":{"prompt":"Sachin"}}'
+
+curl -X POST http://localhost:8080/api/v1/releases/r1/approve -d '{}'
+curl -X POST http://localhost:8080/api/v1/releases/r1/invoke \
+  -H 'Content-Type: application/json' \
+  -d '{"inputs":{"q":"hello"}}'
+```
+
+```go
+// 2. Programmatic Go SDK lifecycle
+client, _ := sdk.NewClient(sdk.Config{Addr: "http://localhost:8080"})
+
+cap, _ := client.CreateCapability(ctx, "p1", sdk.CreateCapabilityRequest{
+    Name: "summariser",
+})
+ver, _ := client.AddVersion(ctx, cap.ID, sdk.AddVersionRequest{
+    Version:  1,
+    Manifest: sdk.Manifest{Prompt: "Sachin"},
+})
+rel, _ := client.CreateRelease(ctx, ver.ID)
+out, _ := client.ApproveAndInvoke(ctx, rel.ID, sdk.InvokeRequest{
+    Inputs: map[string]any{"text": "long document..."},
+})
+fmt.Println(out.Output)
+```
+
+The [`examples/`](examples/) directory has more end-to-end recipes for
+policy-based approvals, plugin manifests, and rate-limit configuration.
 
 ---
 
@@ -113,7 +233,7 @@ curl -X POST http://localhost:8080/api/v1/releases/r1/invoke \
 The server is composed of layered modules:
 
 | Layer | Description |
-|---|---|
+|-------|-------------|
 | **API** | HTTP handlers, middleware (auth, rate-limit, audit, CORS) |
 | **Capabilities** | Manifests, Releases, Approvals, Recommendations, Lineage |
 | **Workflow** | DAG-based execution engine with shell policy |
@@ -125,22 +245,122 @@ The server is composed of layered modules:
 
 ---
 
-## Configuration
+## Project Structure
 
-Promptsheon is configured via environment variables or a config file. Key settings:
+```
+promptsheon/
+├── cmd/
+│   ├── promptsheond/   # Server binary
+│   └── promptsheon/    # CLI binary
+├── api/                # OpenAPI spec and codegen
+├── internal/           # Server-side implementation modules
+│   ├── capabilities/
+│   ├── workflow/
+│   ├── cas/            # Content-addressable store (Merkle DAG)
+│   ├── vault/          # AES-256-GCM + KMS KeyProvider
+│   ├── observability/  # OTel tracing and Prometheus metrics
+│   ├── providers/      # OpenAI, Anthropic, Azure, Ollama, NVIDIA NIM
+│   ├── plugins/        # Plugin supervisor + RPC bridge
+│   ├── guardrails/     # PII redaction, prompt-injection detection
+│   └── ...
+├── pkg/                # Stable public packages consumable by other Go projects
+├── sdk/                # Go SDK for embedding Promptsheon
+├── deploy/             # systemd, docker, kubernetes manifests
+├── docs/               # Architecture, deployment, ADRs, troubleshooting, FAQ
+├── examples/           # End-to-end recipes
+├── tests/              # Test suite
+├── scripts/            # Local-dev helpers
+├── go.mod
+├── go.sum
+├── Makefile
+├── Dockerfile
+├── .github/workflows/  # CI (ci.yaml), release pipeline
+├── LICENSE             # Apache 2.0
+├── CONTRIBUTING.md
+├── CODE_OF_CONDUCT.md
+└── SECURITY.md
+```
 
-| Variable | Default | Description |
-|---|---|---|
-| `PROMPTSHEON_ADDR` | `:8080` | Listen address |
-| `PROMPTSHEON_DB_BACKEND` | `sqlite` | `sqlite` (default) or `postgres` |
-| `PROMPTSHEON_DB_PATH` | `promptsheon.db` | SQLite database path |
-| `PROMPTSHEON_DB_DSN` | (none) | Postgres connection string when DB_BACKEND=postgres |
-| `PROMPTSHEON_LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
-| `PROMPTSHEON_AUTH` | `false` | Enable authentication |
-| `PROMPTSHEON_PLUGINS_FILE` | (none) | Path to the plugin manifest (Tier 2.32) |
-| `PROMPTSHEON_VAULT_KEY` | (none) | Master key for AES-256-GCM vault; override with KMS-backed KeyProvider for production |
+---
 
-See [docs/configuration.md](docs/configuration.md) for the full reference.
+## Development
+
+```bash
+# Run all checks (format, vet, lint, test)
+make check
+
+# Build binaries
+make build
+
+# Run unit + integration tests
+make test
+
+# Regenerate the OpenAPI spec
+make openapi
+
+# Run the server on the default addr (`:8080`)
+make run
+
+# Format, vet, lint individually
+gofmt -w .
+go vet ./...
+golangci-lint run
+```
+
+---
+
+## Testing
+
+```bash
+go test ./...
+# Run with coverage
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
+---
+
+## Build
+
+```bash
+go build -o promptsheond ./cmd/promptsheond
+go build -o promptsheon  ./cmd/promptsheon
+```
+
+A GoReleaser pipeline (`.goreleaser.yml`) publishes multi-platform binaries
+and a Docker image on tagged releases.
+
+---
+
+## Release
+
+Tagged `vX.Y.X` releases are produced by `.goreleaser.yml`. Each release:
+
+- Builds binaries for Linux, macOS, and Windows on amd64 and arm64.
+- Generates a Docker image published to the configured registry.
+- Produces a `promptsheon_${VERSION}_checksums.txt` SBOM and a `.deb`/`.rpm`
+  pair (when enabled).
+- Tags the Git repository.
+
+See [docs/release.md](docs/release.md) for the full process.
+
+---
+
+## Tech Stack
+
+| Category | Technology |
+|----------|------------|
+| Language | Go 1.26 |
+| HTTP Routing | [chi](https://github.com/go-chi/chi) (or stdlib `http.ServeMux`) |
+| CLI | [cobra](https://github.com/spf13/cobra) |
+| Storage | [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) (CGo-free SQLite), [pgx/v5](https://github.com/jackc/pgx) (Postgres) |
+| RPC | [google.golang.org/grpc](https://grpc.io/docs/languages/go/) |
+| Observability | [OpenTelemetry](https://opentelemetry.io/), Prometheus |
+| Auth | OIDC, static API keys |
+| Vault | AES-256-GCM via [crypto/aes](https://pkg.go.dev/crypto/aes); KMS via pluggable `KeyProvider` |
+| Lint/Format | [golangci-lint](https://golangci-lint.run/) (see `.golangci.yml`) |
+| Releases | [GoReleaser](https://goreleaser.com/) (`.goreleaser.yml`) |
+| Containerization | Docker (multi-stage) |
 
 ---
 
@@ -158,6 +378,15 @@ Full documentation lives in **[docs/](docs/)**:
 
 ---
 
+## Roadmap
+
+- **v0.1.x** — Current: forward-only manifest + release model, CAS + Merkle DAG, approval policies, REST API
+- **v0.2.0** — Multi-region replication, configurable retention, Prometheus exporter
+- **v0.3.0** — Webhook delivery retries + dead-letter queue
+- **v1.0.0** — Stable API, gRPC streaming for real-time updates, additional KMS integrations
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/development.md](docs/development.md).
@@ -166,11 +395,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/development.md](docs/developmen
 
 See [SECURITY.md](SECURITY.md). Report vulnerabilities via the GitHub Security Advisories workflow — do not open a public issue.
 
-## License
-
-Apache License 2.0 — see [LICENSE](LICENSE).
-
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/sachncs/promptsheon/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/sachncs/promptsheon/discussions)
+
+## License
+
+Apache License 2.0 — see [LICENSE](LICENSE) © 2026 Sachin
