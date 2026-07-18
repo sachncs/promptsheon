@@ -478,3 +478,235 @@ func (c *Client) ApproveAndInvoke(ctx context.Context, releaseID, voterIdentity 
 	}
 	return c.Invoke(ctx, releaseID, invokeReq)
 }
+
+// --- Harness engineering: Datasets, Preconditions, Evals ---
+
+// Dataset mirrors the server's harness.Dataset.
+type Dataset struct {
+	ID           string   `json:"id"`
+	CapabilityID string   `json:"capability_id"`
+	Name         string   `json:"name"`
+	Description  string   `json:"description,omitempty"`
+	CreatedAt    string   `json:"created_at"`
+	UpdatedAt    string   `json:"updated_at"`
+}
+
+// DatasetCase mirrors harness.DatasetCase.
+type DatasetCase struct {
+	ID          string          `json:"id"`
+	DatasetID   string          `json:"dataset_id"`
+	Seq         int             `json:"seq"`
+	Inputs      json.RawMessage `json:"inputs"`
+	Expected    json.RawMessage `json:"expected"`
+	Description string          `json:"description,omitempty"`
+}
+
+// DatasetWithCases is the GET /datasets/{id} response shape: dataset
+// + its cases.
+type DatasetWithCases struct {
+	Dataset
+	Cases []DatasetCase `json:"cases"`
+}
+
+// Precondition mirrors harness.Precondition.
+type Precondition struct {
+	ID           string `json:"id"`
+	CapabilityID string `json:"capability_id"`
+	Name         string `json:"name"`
+	Command      string `json:"command"`
+	TimeoutSec   int    `json:"timeout_sec"`
+	Enabled      bool   `json:"enabled"`
+	CreatedAt    string `json:"created_at"`
+}
+
+// PreconditionFailure describes one failing precondition in a 409
+// response body when Activate is blocked.
+type PreconditionFailure struct {
+	Name   string `json:"name"`
+	Output string `json:"output"`
+}
+
+// CreateDatasetRequest is the request body for creating a Dataset.
+// Cases may be omitted; callers can add them via PutCases.
+type CreateDatasetRequest struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description,omitempty"`
+	Cases       []DatasetCase   `json:"cases,omitempty"`
+}
+
+// CreateDataset creates a Dataset (optionally seeded with cases).
+func (c *Client) CreateDataset(ctx context.Context, capabilityID string, req CreateDatasetRequest) (*Dataset, error) {
+	data, err := c.do(ctx, "POST", "/api/v1/capabilities/"+capabilityID+"/datasets", req)
+	if err != nil {
+		return nil, err
+	}
+	var d Dataset
+	if err := json.Unmarshal(data, &d); err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+// ListDatasets returns all Datasets attached to a Capability.
+func (c *Client) ListDatasets(ctx context.Context, capabilityID string) ([]*Dataset, error) {
+	data, err := c.do(ctx, "GET", "/api/v1/capabilities/"+capabilityID+"/datasets", nil)
+	if err != nil {
+		return nil, err
+	}
+	var ds []*Dataset
+	if err := json.Unmarshal(data, &ds); err != nil {
+		return nil, err
+	}
+	return ds, nil
+}
+
+// GetDataset returns a Dataset with its cases.
+func (c *Client) GetDataset(ctx context.Context, id string) (*DatasetWithCases, error) {
+	data, err := c.do(ctx, "GET", "/api/v1/datasets/"+id, nil)
+	if err != nil {
+		return nil, err
+	}
+	var d DatasetWithCases
+	if err := json.Unmarshal(data, &d); err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+// PutCases atomically replaces a Dataset's cases.
+func (c *Client) PutCases(ctx context.Context, id string, cases []DatasetCase) error {
+	_, err := c.do(ctx, "PUT", "/api/v1/datasets/"+id+"/cases", map[string]any{"cases": cases})
+	return err
+}
+
+// DeleteDataset removes a Dataset (cascades to cases).
+func (c *Client) DeleteDataset(ctx context.Context, id string) error {
+	return c.delete("/api/v1/datasets/" + id)
+}
+
+// CreatePreconditionRequest is the request body for adding a
+// Precondition to a Capability.
+type CreatePreconditionRequest struct {
+	Name       string `json:"name"`
+	Command    string `json:"command"`
+	TimeoutSec int    `json:"timeout_sec,omitempty"`
+	Enabled    *bool  `json:"enabled,omitempty"`
+}
+
+// CreatePrecondition attaches a precondition hook.
+func (c *Client) CreatePrecondition(ctx context.Context, capabilityID string, req CreatePreconditionRequest) (*Precondition, error) {
+	data, err := c.do(ctx, "POST", "/api/v1/capabilities/"+capabilityID+"/preconditions", req)
+	if err != nil {
+		return nil, err
+	}
+	var p Precondition
+	if err := json.Unmarshal(data, &p); err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+// ListPreconditions returns all preconditions for a Capability.
+func (c *Client) ListPreconditions(ctx context.Context, capabilityID string) ([]*Precondition, error) {
+	data, err := c.do(ctx, "GET", "/api/v1/capabilities/"+capabilityID+"/preconditions", nil)
+	if err != nil {
+		return nil, err
+	}
+	var ps []*Precondition
+	if err := json.Unmarshal(data, &ps); err != nil {
+		return nil, err
+	}
+	return ps, nil
+}
+
+// DeletePrecondition removes a precondition.
+func (c *Client) DeletePrecondition(ctx context.Context, id string) error {
+	return c.delete("/api/v1/preconditions/" + id)
+}
+
+// EvalRun mirrors harness.EvalRun.
+type EvalRun struct {
+	ID         string  `json:"id"`
+	ReleaseID  string  `json:"release_id"`
+	DatasetID  string  `json:"dataset_id"`
+	Scorer     string  `json:"scorer"`
+	Score      float64 `json:"score"`
+	Passed     int     `json:"passed"`
+	Failed     int     `json:"failed"`
+	Total      int     `json:"total"`
+	Status     string  `json:"status"`
+	StartedAt  string  `json:"started_at"`
+	FinishedAt string  `json:"finished_at,omitempty"`
+}
+
+// EvalResult mirrors harness.EvalResult.
+type EvalResult struct {
+	ID        string          `json:"id"`
+	RunID     string          `json:"run_id"`
+	CaseID    string          `json:"case_id"`
+	Seq       int             `json:"seq"`
+	Passed    bool            `json:"passed"`
+	Actual    json.RawMessage `json:"actual"`
+	Error     string          `json:"error,omitempty"`
+	LatencyMs  int64          `json:"latency_ms"`
+}
+
+// EvalRunWithResults is the GET /evals/{id} response shape: run + results.
+type EvalRunWithResults struct {
+	Run     EvalRun      `json:"run"`
+	Results []EvalResult `json:"results"`
+}
+
+// RunEvalRequest is the request body for POST /releases/{id}/evals.
+type RunEvalRequest struct {
+	DatasetID string `json:"dataset_id"`
+	Scorer    string `json:"scorer,omitempty"`
+}
+
+// RunEval invokes an eval against a Release. Returns the persisted
+// EvalRun. A failed run returns the EvalRun + a 422-mapped error;
+// callers can inspect run.Failed to drive their own UI.
+func (c *Client) RunEval(ctx context.Context, releaseID string, req RunEvalRequest) (*EvalRun, error) {
+	data, err := c.do(ctx, "POST", "/api/v1/releases/"+releaseID+"/evals", req)
+	if err != nil {
+		return nil, err
+	}
+	var r EvalRun
+	if err := json.Unmarshal(data, &r); err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+// ListEvals returns all eval runs for a Release.
+func (c *Client) ListEvals(ctx context.Context, releaseID string) ([]*EvalRun, error) {
+	data, err := c.do(ctx, "GET", "/api/v1/releases/"+releaseID+"/evals", nil)
+	if err != nil {
+		return nil, err
+	}
+	var rs []*EvalRun
+	if err := json.Unmarshal(data, &rs); err != nil {
+		return nil, err
+	}
+	return rs, nil
+}
+
+// GetEval returns an eval run with its per-case results.
+func (c *Client) GetEval(ctx context.Context, id string) (*EvalRunWithResults, error) {
+	data, err := c.do(ctx, "GET", "/api/v1/evals/"+id, nil)
+	if err != nil {
+		return nil, err
+	}
+	var r EvalRunWithResults
+	if err := json.Unmarshal(data, &r); err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+// delete is a small helper that swallows the body's []byte result
+// and returns just the error.
+func (c *Client) delete(path string) error {
+	_, err := c.do(context.Background(), "DELETE", path, nil)
+	return err
+}
