@@ -100,3 +100,25 @@ func TestDefaultUDSWhenSet(t *testing.T) {
 		t.Fatalf("expected /custom/path.sock, got %s", got)
 	}
 }
+
+func TestValidateRejectsUDSOutsideTmpPromptsheon(t *testing.T) {
+	t.Parallel()
+	e := Entry{Name: "ok", Binary: "/x", UDS: "/var/run/foo.sock"}
+	if err := e.Validate(); err == nil {
+		t.Fatal("expected error for UDS outside /tmp/promptsheon/")
+	}
+}
+
+func TestValidateAcceptsUDSUnderTmpPromptsheon(t *testing.T) {
+	t.Parallel()
+	for _, uds := range []string{
+		"/tmp/promptsheon/foo.sock",
+		"/tmp/promptsheon/sub/foo.sock",
+		"",
+	} {
+		e := Entry{Name: "ok", Binary: "/x", UDS: uds}
+		if err := e.Validate(); err != nil {
+			t.Errorf("UDS %q should validate: %v", uds, err)
+		}
+	}
+}

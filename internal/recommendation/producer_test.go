@@ -16,7 +16,7 @@ import (
 
 func TestProducerEmitsOnQuietObservation(t *testing.T) {
 	t.Parallel()
-	a := observation.NewAggregator()
+	a := observation.NewAggregator(nil)
 	var captured []capability.Recommendation
 	var mu sync.Mutex
 	sink := func(_ context.Context, r *capability.Recommendation) error {
@@ -46,7 +46,7 @@ func TestProducerEmitsOnQuietObservation(t *testing.T) {
 
 func TestProducerCapturesPersistFailures(t *testing.T) {
 	t.Parallel()
-	a := observation.NewAggregator()
+	a := observation.NewAggregator(nil)
 	sink := func(_ context.Context, r *capability.Recommendation) error {
 		return errors.New("db down")
 	}
@@ -67,7 +67,7 @@ func TestProducerCapturesPersistFailures(t *testing.T) {
 
 func TestProducerCommitsIDAndTimestamp(t *testing.T) {
 	t.Parallel()
-	a := observation.NewAggregator()
+	a := observation.NewAggregator(nil)
 	// Add 64 records so the rule's 32-exec minimum is satisfied.
 	for i := int64(0); i < 64; i++ {
 		a.Add(recWithCost(500_000))

@@ -149,7 +149,7 @@ func (s *Store) ReconcileSeed(armIDs []string) {
 	defer s.mu.Unlock()
 	for _, id := range armIDs {
 		if _, ok := s.armed[id]; !ok {
-			s.armed[id] = bandit.ArmPosterior{}
+			s.armed[id] = *bandit.NewArmPosterior()
 		}
 	}
 }

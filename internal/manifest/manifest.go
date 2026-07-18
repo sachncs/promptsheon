@@ -65,8 +65,14 @@ func Load(path string) (*File, error) {
 	return &f, nil
 }
 
+// ErrBadUDS is returned when a manifest entry's UDS path does
+// not live under /tmp/promptsheon/. The path namespace avoids
+// collisions with system sockets and keeps plugin lifecycles
+// scoped to a single tenant.
+var ErrBadUDS = errors.New("manifest: UDS path must be under /tmp/promptsheon/")
+
 // Validate enforces the closed-set Name, a non-empty Binary, and
-// (if set) a UDS path that points under /tmp.
+// (if set) a UDS path that points under /tmp/promptsheon/.
 func (e Entry) Validate() error {
 	if !namePattern.MatchString(e.Name) {
 		return fmt.Errorf("%w: %q", ErrBadName, e.Name)
@@ -74,10 +80,19 @@ func (e Entry) Validate() error {
 	if e.Binary == "" {
 		return fmt.Errorf("manifest: empty binary path for %q", e.Name)
 	}
+	if e.UDS != "" && !udsPattern.MatchString(e.UDS) {
+		return fmt.Errorf("%w: got %q", ErrBadUDS, e.UDS)
+	}
 	return nil
 }
 
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
+
+// udsPattern accepts any absolute path that resolves under
+// /tmp/promptsheon/. Realpath normalization happens at the
+// supervisor when it binds the listener; this validator only
+// rejects paths that are clearly out of bounds.
+var udsPattern = regexp.MustCompile(`^/tmp/promptsheon(/[A-Za-z0-9._-]+)*\.sock$`)
 
 // DefaultUDS returns the UDS path the supervisor would use when an
 // entry does not specify one. The path is namespaced under
