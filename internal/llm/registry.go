@@ -21,8 +21,8 @@ type Registry struct {
 }
 
 // NewRegistry constructs a Registry pre-populated with the built-in
-// providers (openai, anthropic, ollama, azure, nvidia). A fresh
-// Registry is safe for concurrent use.
+// providers (openai, anthropic). A fresh Registry is safe for
+// concurrent use.
 //
 // Tests and embedders can construct their own Registry and Register
 // only the providers they need.
@@ -34,9 +34,6 @@ func NewRegistry() *Registry {
 	}
 	r.Register("openai", func(cfg ProviderConfig) Provider { return NewOpenAI(cfg) })
 	r.Register("anthropic", func(cfg ProviderConfig) Provider { return NewAnthropic(cfg) })
-	r.Register("ollama", func(cfg ProviderConfig) Provider { return NewOllama(cfg) })
-	r.Register("azure", func(cfg ProviderConfig) Provider { return NewAzure(cfg) })
-	r.Register("nvidia", func(cfg ProviderConfig) Provider { return NewNvidia(cfg) })
 	return r
 }
 
@@ -105,9 +102,6 @@ func (r *Registry) Providers() []string {
 //	PROMPTSHEON_OPENAI_BASE_URL   — OpenAI base URL (optional)
 //	PROMPTSHEON_ANTHROPIC_API_KEY — Anthropic API key
 //	PROMPTSHEON_ANTHROPIC_BASE_URL — Anthropic base URL (optional)
-//	PROMPTSHEON_OLLAMA_BASE_URL   — Ollama base URL (optional)
-//	PROMPTSHEON_NVIDIA_API_KEY    — NVIDIA NIM API key
-//	PROMPTSHEON_NVIDIA_BASE_URL   — NVIDIA base URL (optional)
 //
 // Returns the value of PROMPTSHEON_LLM_PROVIDER (empty string when
 // unset) for callers that want to default to a specific provider.
@@ -122,27 +116,6 @@ func (r *Registry) LoadFromEnv() string {
 		r.Configure("anthropic", ProviderConfig{
 			APIKey:  v,
 			BaseURL: os.Getenv("PROMPTSHEON_ANTHROPIC_BASE_URL"),
-		})
-	}
-	if v := os.Getenv("PROMPTSHEON_OLLAMA_BASE_URL"); v != "" {
-		r.Configure("ollama", ProviderConfig{
-			BaseURL: v,
-		})
-	}
-	if v := os.Getenv("PROMPTSHEON_AZURE_API_KEY"); v != "" {
-		r.Configure("azure", ProviderConfig{
-			APIKey:  v,
-			BaseURL: os.Getenv("PROMPTSHEON_AZURE_RESOURCE"),
-			Extra: map[string]string{
-				"deployment":  os.Getenv("PROMPTSHEON_AZURE_DEPLOYMENT"),
-				"api_version": os.Getenv("PROMPTSHEON_AZURE_API_VERSION"),
-			},
-		})
-	}
-	if v := os.Getenv("PROMPTSHEON_NVIDIA_API_KEY"); v != "" {
-		r.Configure("nvidia", ProviderConfig{
-			APIKey:  v,
-			BaseURL: os.Getenv("PROMPTSHEON_NVIDIA_BASE_URL"),
 		})
 	}
 
