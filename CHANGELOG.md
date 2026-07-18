@@ -6,6 +6,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Harness engineering surface
+
+Inspired by the OpenAI [harness engineering](https://openai.com/index/harness-engineering/)
+article — evals are the new tests for LLM work, and the fast
+iteration loop is the lever. Adds three first-class primitives
+plus the application wiring that gates Release activation on
+them.
+
+- **`feat(store):` migration 027** — `datasets`, `dataset_cases`,
+  `preconditions`, `eval_runs`, `eval_results` tables. Postgres
+  parity included.
+- **`feat(domain):` harness types** — `Dataset`, `DatasetCase`,
+  `Precondition`, `EvalRun`, `EvalResult` plus the `Scorer` enum
+  (`exact_match`, `contains`, `regex`, `json_schema`).
+- **`feat(store):` SQLite repository impls** for all five tables.
+  `mockRepo` in handler tests grows the matching methods.
+- **`feat(eval):` Scorer interface + built-ins** — exact_match,
+  contains, regex, json_schema (placeholder). Pluggable via
+  `Register`.
+- **`feat(harness):` PreconditionRunner** — executes named
+  command hooks via `sh -c` with per-hook timeouts, captures
+  combined stdout+stderr (truncated to 8 KiB), and exposes a
+  typed `*PreconditionError` for the HTTP 409 mapping.
+- **`feat(harness):` EvalRunner service** — loops a Dataset's cases
+  through a `ReleaseInvoker`, scores each via the chosen Scorer,
+  persists per-case results and the aggregate EvalRun.
+- **`feat(release):` Activate runs preconditions** — `Service.WithHarness`
+  attaches the runner + harness repo; a failing hook returns
+  `harness.ErrPreconditionFailed` and the Release is left in
+  `pending` (no supersede + activate happens).
+- **`feat(api):` eight new HTTP routes** — `/datasets`,
+  `/preconditions`, `/evals` under `/api/v1`.
+- **`feat(daemon):` wire harness service into promptsheond startup**.
+  `apiReleaseInvoker` adapts `invoke.Invoker` for the eval loop
+  so eval cases use the same provider wiring as the live
+  `/releases/{id}/invoke` route.
+- **`feat(cli):` `dataset`, `precondition`, `eval` subcommands**.
+- **`feat(sdk):` `CreateDataset` / `ListDatasets` / `GetDataset` /
+  `PutCases` / `DeleteDataset` / `CreatePrecondition` /
+  `ListPreconditions` / `DeletePrecondition` / `RunEval` /
+  `ListEvals` / `GetEval`**.
+- **`docs:` `docs/eval.md`** — Dataset / Precondition / Eval
+  primitive, built-in scorers, iteration loop, programmatic
+  surface.
+- **`docs:` `docs/harness.md`** — why the harness exists; the four
+  surfaces; what the harness deliberately is not.
+- **`README:` Harness engineering section** with the curl-style
+  iteration loop.
+
+## [Unreleased]
+
 ### Release + Approval lifecycle (v0.1.0)
 
 The headline v0.1.0 feature: a Capability Version can be promoted
