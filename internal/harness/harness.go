@@ -18,28 +18,24 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/sachncs/promptsheon/internal/eval"
 )
 
-// Scorer is the registered name of a built-in or user-supplied
-// scoring strategy. Valid values today are ScorerExactMatch,
-// ScorerContains, ScorerRegex, and ScorerJSONSchema.
-type Scorer string
+// Scorer is an alias for eval.Scorer so callers that already import
+// internal/harness don't need to also import internal/eval just to
+// name the enum.
+type Scorer = eval.Scorer
 
 const (
-	ScorerExactMatch Scorer = "exact_match"
-	ScorerContains   Scorer = "contains"
-	ScorerRegex      Scorer = "regex"
-	ScorerJSONSchema Scorer = "json_schema"
+	ScorerExactMatch = eval.ScorerExactMatch
+	ScorerContains   = eval.ScorerContains
+	ScorerRegex      = eval.ScorerRegex
+	ScorerJSONSchema = eval.ScorerJSONSchema
 )
 
-// ValidScorers reports whether s is a recognised scorer name.
-func ValidScorers(s Scorer) bool {
-	switch s {
-	case ScorerExactMatch, ScorerContains, ScorerRegex, ScorerJSONSchema:
-		return true
-	}
-	return false
-}
+// ValidScorers delegates to eval.ValidScorers.
+func ValidScorers(s Scorer) bool { return eval.ValidScorers(s) }
 
 // RunStatus is the lifecycle state of an EvalRun.
 type RunStatus string
