@@ -5,10 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/sachncs/promptsheon/internal/approval"
-	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/release"
 )
 
@@ -365,23 +363,3 @@ func scanApproval(scanner interface {
 	}
 	return &a, nil
 }
-
-// CapabilityIDsForReleases is a small helper used by capability handlers
-// when validating release->capability references; it is satisfied by the
-// SQLite store and is intentionally not part of the public Repository
-// interface to keep the latter narrow.
-func (s *SQLite) CapabilityExists(ctx context.Context, id string) (bool, error) {
-	var got string
-	err := s.db.QueryRowContext(ctx, `SELECT id FROM capabilities WHERE id = ?`, id).Scan(&got)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("capability lookup: %w", err)
-	}
-	return true, nil
-}
-
-// used to silence unused imports if any
-var _ = time.Now
-var _ = capability.Manifest{}
