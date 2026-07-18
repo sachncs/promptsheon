@@ -40,8 +40,46 @@ func TestEntryValidateGood(t *testing.T) {
 		repeat64(),
 	}
 	for _, n := range good {
-		if err := (Entry{Name: n}).Validate(); err != nil {
+		e := Entry{Name: n, URL: "unix:///tmp/" + n + ".sock"}
+		if err := e.Validate(); err != nil {
 			t.Errorf("expected ok for %q, got %v", n, err)
+		}
+	}
+}
+
+func TestEntryValidateRejectsBadURL(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		url  string
+	}{
+		{"empty", ""},
+		{"file scheme", "file:///etc/passwd"},
+		{"no host", "http://"},
+		{"relative unix", "unix://tmp/foo.sock"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			e := Entry{Name: "good", URL: tc.url}
+			if err := e.Validate(); err == nil {
+				t.Errorf("expected ErrBadURL for %q", tc.url)
+			}
+		})
+	}
+}
+
+func TestEntryValidateAcceptsHTTPS(t *testing.T) {
+	t.Parallel()
+	for _, u := range []string{
+		"http://localhost:7700",
+		"https://mcp.example.com/v1",
+		"unix:///var/run/mcp.sock",
+	} {
+		e := Entry{Name: "good", URL: u}
+		if err := e.Validate(); err != nil {
+			t.Errorf("URL %q should validate: %v", u, err)
 		}
 	}
 }
@@ -85,9 +123,9 @@ func TestListAddDeduplicates(t *testing.T) {
 func TestListIsSorted(t *testing.T) {
 	t.Parallel()
 	l := NewList("ws-1")
-	_ = l.Add(Entry{Name: "zeta", WorkspaceID: "ws-1"})
-	_ = l.Add(Entry{Name: "alpha", WorkspaceID: "ws-1"})
-	_ = l.Add(Entry{Name: "mu", WorkspaceID: "ws-1"})
+	_ = l.Add(Entry{Name: "zeta", URL: "unix:///tmp/z.sock", WorkspaceID: "ws-1"})
+	_ = l.Add(Entry{Name: "alpha", URL: "unix:///tmp/a.sock", WorkspaceID: "ws-1"})
+	_ = l.Add(Entry{Name: "mu", URL: "unix:///tmp/m.sock", WorkspaceID: "ws-1"})
 	if l.Entries[0].Name != "alpha" || l.Entries[1].Name != "mu" || l.Entries[2].Name != "zeta" {
 		t.Fatalf("expected alphabetical sort, got %+v", l.Entries)
 	}
@@ -96,7 +134,7 @@ func TestListIsSorted(t *testing.T) {
 func TestListValidateRejectsBadEntry(t *testing.T) {
 	t.Parallel()
 	l := NewList("ws-1")
-	_ = l.Add(Entry{Name: "good", WorkspaceID: "ws-1"})
+	_ = l.Add(Entry{Name: "good", URL: "unix:///tmp/g.sock", WorkspaceID: "ws-1"})
 	l.Entries = append(l.Entries, Entry{Name: "bad name", WorkspaceID: "ws-1"})
 	if err := l.Validate(); err == nil {
 		t.Fatalf("expected validation error on bad entry")

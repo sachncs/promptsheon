@@ -15,7 +15,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v4.25.3
-// source: plugin.proto
+// source: internal/pluginproto/proto/plugin.proto
 
 package pluginv1
 
@@ -43,7 +43,7 @@ type PingRequest struct {
 
 func (x *PingRequest) Reset() {
 	*x = PingRequest{}
-	mi := &file_plugin_proto_msgTypes[0]
+	mi := &file_internal_pluginproto_proto_plugin_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -55,7 +55,7 @@ func (x *PingRequest) String() string {
 func (*PingRequest) ProtoMessage() {}
 
 func (x *PingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_proto_msgTypes[0]
+	mi := &file_internal_pluginproto_proto_plugin_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -68,7 +68,7 @@ func (x *PingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingRequest.ProtoReflect.Descriptor instead.
 func (*PingRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_proto_rawDescGZIP(), []int{0}
+	return file_internal_pluginproto_proto_plugin_proto_rawDescGZIP(), []int{0}
 }
 
 type PingResponse struct {
@@ -84,7 +84,7 @@ type PingResponse struct {
 
 func (x *PingResponse) Reset() {
 	*x = PingResponse{}
-	mi := &file_plugin_proto_msgTypes[1]
+	mi := &file_internal_pluginproto_proto_plugin_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -96,7 +96,7 @@ func (x *PingResponse) String() string {
 func (*PingResponse) ProtoMessage() {}
 
 func (x *PingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_proto_msgTypes[1]
+	mi := &file_internal_pluginproto_proto_plugin_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -109,7 +109,7 @@ func (x *PingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingResponse.ProtoReflect.Descriptor instead.
 func (*PingResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_proto_rawDescGZIP(), []int{1}
+	return file_internal_pluginproto_proto_plugin_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *PingResponse) GetName() string {
@@ -134,7 +134,7 @@ type HealthRequest struct {
 
 func (x *HealthRequest) Reset() {
 	*x = HealthRequest{}
-	mi := &file_plugin_proto_msgTypes[2]
+	mi := &file_internal_pluginproto_proto_plugin_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -146,7 +146,7 @@ func (x *HealthRequest) String() string {
 func (*HealthRequest) ProtoMessage() {}
 
 func (x *HealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_proto_msgTypes[2]
+	mi := &file_internal_pluginproto_proto_plugin_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -159,7 +159,7 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
 func (*HealthRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_proto_rawDescGZIP(), []int{2}
+	return file_internal_pluginproto_proto_plugin_proto_rawDescGZIP(), []int{2}
 }
 
 type HealthResponse struct {
@@ -175,7 +175,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_plugin_proto_msgTypes[3]
+	mi := &file_internal_pluginproto_proto_plugin_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -187,7 +187,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_proto_msgTypes[3]
+	mi := &file_internal_pluginproto_proto_plugin_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -200,7 +200,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_proto_rawDescGZIP(), []int{3}
+	return file_internal_pluginproto_proto_plugin_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *HealthResponse) GetOk() bool {
@@ -218,7 +218,7 @@ type StopRequest struct {
 
 func (x *StopRequest) Reset() {
 	*x = StopRequest{}
-	mi := &file_plugin_proto_msgTypes[4]
+	mi := &file_internal_pluginproto_proto_plugin_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -230,7 +230,7 @@ func (x *StopRequest) String() string {
 func (*StopRequest) ProtoMessage() {}
 
 func (x *StopRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_proto_msgTypes[4]
+	mi := &file_internal_pluginproto_proto_plugin_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -243,7 +243,7 @@ func (x *StopRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopRequest.ProtoReflect.Descriptor instead.
 func (*StopRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_proto_rawDescGZIP(), []int{4}
+	return file_internal_pluginproto_proto_plugin_proto_rawDescGZIP(), []int{4}
 }
 
 type StopResponse struct {
@@ -254,7 +254,7 @@ type StopResponse struct {
 
 func (x *StopResponse) Reset() {
 	*x = StopResponse{}
-	mi := &file_plugin_proto_msgTypes[5]
+	mi := &file_internal_pluginproto_proto_plugin_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -266,7 +266,7 @@ func (x *StopResponse) String() string {
 func (*StopResponse) ProtoMessage() {}
 
 func (x *StopResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_proto_msgTypes[5]
+	mi := &file_internal_pluginproto_proto_plugin_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -279,14 +279,14 @@ func (x *StopResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopResponse.ProtoReflect.Descriptor instead.
 func (*StopResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_proto_rawDescGZIP(), []int{5}
+	return file_internal_pluginproto_proto_plugin_proto_rawDescGZIP(), []int{5}
 }
 
-var File_plugin_proto protoreflect.FileDescriptor
+var File_internal_pluginproto_proto_plugin_proto protoreflect.FileDescriptor
 
-const file_plugin_proto_rawDesc = "" +
+const file_internal_pluginproto_proto_plugin_proto_rawDesc = "" +
 	"\n" +
-	"\fplugin.proto\x12\x0fpluginv1.v0_1_0\"\r\n" +
+	"'internal/pluginproto/proto/plugin.proto\x12\x0fpluginv1.v0_1_0\"\r\n" +
 	"\vPingRequest\"<\n" +
 	"\fPingResponse\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
@@ -302,19 +302,19 @@ const file_plugin_proto_rawDesc = "" +
 	"\x04Stop\x12\x1c.pluginv1.v0_1_0.StopRequest\x1a\x1d.pluginv1.v0_1_0.StopResponseBGZEgithub.com/sachncs/promptsheon/internal/pluginproto/pluginv1;pluginv1b\x06proto3"
 
 var (
-	file_plugin_proto_rawDescOnce sync.Once
-	file_plugin_proto_rawDescData []byte
+	file_internal_pluginproto_proto_plugin_proto_rawDescOnce sync.Once
+	file_internal_pluginproto_proto_plugin_proto_rawDescData []byte
 )
 
-func file_plugin_proto_rawDescGZIP() []byte {
-	file_plugin_proto_rawDescOnce.Do(func() {
-		file_plugin_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_plugin_proto_rawDesc), len(file_plugin_proto_rawDesc)))
+func file_internal_pluginproto_proto_plugin_proto_rawDescGZIP() []byte {
+	file_internal_pluginproto_proto_plugin_proto_rawDescOnce.Do(func() {
+		file_internal_pluginproto_proto_plugin_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_pluginproto_proto_plugin_proto_rawDesc), len(file_internal_pluginproto_proto_plugin_proto_rawDesc)))
 	})
-	return file_plugin_proto_rawDescData
+	return file_internal_pluginproto_proto_plugin_proto_rawDescData
 }
 
-var file_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
-var file_plugin_proto_goTypes = []any{
+var file_internal_pluginproto_proto_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_internal_pluginproto_proto_plugin_proto_goTypes = []any{
 	(*PingRequest)(nil),    // 0: pluginv1.v0_1_0.PingRequest
 	(*PingResponse)(nil),   // 1: pluginv1.v0_1_0.PingResponse
 	(*HealthRequest)(nil),  // 2: pluginv1.v0_1_0.HealthRequest
@@ -322,7 +322,7 @@ var file_plugin_proto_goTypes = []any{
 	(*StopRequest)(nil),    // 4: pluginv1.v0_1_0.StopRequest
 	(*StopResponse)(nil),   // 5: pluginv1.v0_1_0.StopResponse
 }
-var file_plugin_proto_depIdxs = []int32{
+var file_internal_pluginproto_proto_plugin_proto_depIdxs = []int32{
 	0, // 0: pluginv1.v0_1_0.Plugin.Ping:input_type -> pluginv1.v0_1_0.PingRequest
 	2, // 1: pluginv1.v0_1_0.Plugin.Health:input_type -> pluginv1.v0_1_0.HealthRequest
 	4, // 2: pluginv1.v0_1_0.Plugin.Stop:input_type -> pluginv1.v0_1_0.StopRequest
@@ -336,26 +336,26 @@ var file_plugin_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_plugin_proto_init() }
-func file_plugin_proto_init() {
-	if File_plugin_proto != nil {
+func init() { file_internal_pluginproto_proto_plugin_proto_init() }
+func file_internal_pluginproto_proto_plugin_proto_init() {
+	if File_internal_pluginproto_proto_plugin_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_proto_rawDesc), len(file_plugin_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_pluginproto_proto_plugin_proto_rawDesc), len(file_internal_pluginproto_proto_plugin_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_plugin_proto_goTypes,
-		DependencyIndexes: file_plugin_proto_depIdxs,
-		MessageInfos:      file_plugin_proto_msgTypes,
+		GoTypes:           file_internal_pluginproto_proto_plugin_proto_goTypes,
+		DependencyIndexes: file_internal_pluginproto_proto_plugin_proto_depIdxs,
+		MessageInfos:      file_internal_pluginproto_proto_plugin_proto_msgTypes,
 	}.Build()
-	File_plugin_proto = out.File
-	file_plugin_proto_goTypes = nil
-	file_plugin_proto_depIdxs = nil
+	File_internal_pluginproto_proto_plugin_proto = out.File
+	file_internal_pluginproto_proto_plugin_proto_goTypes = nil
+	file_internal_pluginproto_proto_plugin_proto_depIdxs = nil
 }
