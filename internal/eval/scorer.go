@@ -15,16 +15,32 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-
-	"github.com/sachncs/promptsheon/internal/harness"
 )
 
-// Scorer is the contract every scoring strategy satisfies.
-type Scorer interface {
-	// Name returns the harness.Scorer enum value this Scorer
-	// implements. Used to dispatch case-by-case to the right
-	// registered scorer.
-	Name() harness.Scorer
+// Scorer is the registered name of a built-in or user-supplied
+// scoring strategy.
+type Scorer string
+
+const (
+	ScorerExactMatch Scorer = "exact_match"
+	ScorerContains   Scorer = "contains"
+	ScorerRegex      Scorer = "regex"
+	ScorerJSONSchema Scorer = "json_schema"
+)
+
+// ValidScorers reports whether s is a recognised scorer name.
+func ValidScorers(s Scorer) bool {
+	switch s {
+	case ScorerExactMatch, ScorerContains, ScorerRegex, ScorerJSONSchema:
+		return true
+	}
+	return false
+}
+
+// Strategy is the contract every scoring strategy satisfies.
+type Strategy interface {
+	// Name returns the Scorer enum value this Strategy implements.
+	Name() Scorer
 
 	// ScoreCase reports whether the LLM-produced actual matches
 	// the case's expected, plus any error encountered during
@@ -35,21 +51,19 @@ type Scorer interface {
 
 var (
 	scorerMu sync.RWMutex
-	scorers  = map[harness.Scorer]Scorer{}
+	scorers  = map[Scorer]Strategy{}
 )
 
-// Register makes a Scorer available by name. Re-registering the
-// same name overwrites the prior registration (useful for
-// operators who want to swap a built-in for their own implementation
-// at process start).
-func Register(s Scorer) {
+// Register makes a Strategy available by name. Re-registering the
+// same name overwrites the prior registration.
+func Register(s Strategy) {
 	scorerMu.Lock()
 	defer scorerMu.Unlock()
 	scorers[s.Name()] = s
 }
 
-// Lookup returns the registered Scorer for the given name.
-func Lookup(name harness.Scorer) (Scorer, bool) {
+// Lookup returns the registered Strategy for the given name.
+func Lookup(name Scorer) (Strategy, bool) {
 	scorerMu.RLock()
 	defer scorerMu.RUnlock()
 	s, ok := scorers[name]
@@ -57,10 +71,10 @@ func Lookup(name harness.Scorer) (Scorer, bool) {
 }
 
 // Names returns the registered scorer names in no particular order.
-func Names() []harness.Scorer {
+func Names() []Scorer {
 	scorerMu.RLock()
 	defer scorerMu.RUnlock()
-	out := make([]harness.Scorer, 0, len(scorers))
+	out := make([]Scorer, 0, len(scorers))
 	for n := range scorers {
 		out = append(out, n)
 	}
@@ -71,7 +85,7 @@ func Names() []harness.Scorer {
 // (after JSON canonicalisation if both decode successfully).
 type ExactMatch struct{}
 
-func (ExactMatch) Name() harness.Scorer { return harness.ScorerExactMatch }
+func (ExactMatch) Name() Scorer { return ScorerExactMatch }
 func (ExactMatch) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 	ac, err := canonicalise(actual)
 	if err != nil {
@@ -90,7 +104,7 @@ func (ExactMatch) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 // the raw bytes treated as UTF-8 (which may be a JSON document).
 type Contains struct{}
 
-func (Contains) Name() harness.Scorer { return harness.ScorerContains }
+func (Contains) Name() Scorer { return ScorerContains }
 func (Contains) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 	return strings.Contains(stringof(actual), stringof(expected)), nil
 }
@@ -99,7 +113,7 @@ func (Contains) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 // actual. Compilation failure marks the case as failed.
 type Regex struct{}
 
-func (Regex) Name() harness.Scorer { return harness.ScorerRegex }
+func (Regex) Name() Scorer { return ScorerRegex }
 func (Regex) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 	pattern := stringof(expected)
 	re, err := regexp.Compile(pattern)
@@ -115,7 +129,7 @@ func (Regex) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 // than a silent pass.
 type JSONSchema struct{}
 
-func (JSONSchema) Name() harness.Scorer { return harness.ScorerJSONSchema }
+func (JSONSchema) Name() Scorer { return ScorerJSONSchema }
 func (JSONSchema) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 	return false, errors.New("json_schema scorer not yet implemented (M3 follow-on)")
 }

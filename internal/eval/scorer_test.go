@@ -6,17 +6,16 @@ import (
 	"testing"
 
 	"github.com/sachncs/promptsheon/internal/eval"
-	"github.com/sachncs/promptsheon/internal/harness"
 )
 
 func raw(s string) json.RawMessage { return json.RawMessage(s) }
 
 func TestExactMatch(t *testing.T) {
 	cases := []struct {
-		name    string
-		actual  string
+		name     string
+		actual   string
 		expected string
-		want    bool
+		want     bool
 	}{
 		{"equal strings", `"hi"`, `"hi"`, true},
 		{"different strings", `"hi"`, `"bye"`, false},
@@ -45,8 +44,8 @@ func TestContains(t *testing.T) {
 		want             bool
 	}{
 		{`"hello world"`, `"world"`, true},
-		{`"hello world"`, `"WORLD"`, false}, // case-sensitive
-		{`"hi"`, `""`, true},                 // empty is substring of everything
+		{`"hello world"`, `"WORLD"`, false},
+		{`"hi"`, `""`, true},
 		{`"hi"`, `"bye"`, false},
 	}
 	s := eval.Contains{}
@@ -110,11 +109,11 @@ func TestJSONSchemaPlaceholder(t *testing.T) {
 
 func TestRegisteredScorers(t *testing.T) {
 	names := eval.Names()
-	want := map[harness.Scorer]bool{
-		harness.ScorerExactMatch:  false,
-		harness.ScorerContains:    false,
-		harness.ScorerRegex:       false,
-		harness.ScorerJSONSchema: false,
+	want := map[eval.Scorer]bool{
+		eval.ScorerExactMatch:  false,
+		eval.ScorerContains:    false,
+		eval.ScorerRegex:       false,
+		eval.ScorerJSONSchema: false,
 	}
 	for _, n := range names {
 		if _, ok := want[n]; ok {
@@ -129,11 +128,11 @@ func TestRegisteredScorers(t *testing.T) {
 }
 
 func TestLookup(t *testing.T) {
-	s, ok := eval.Lookup(harness.ScorerExactMatch)
+	s, ok := eval.Lookup(eval.ScorerExactMatch)
 	if !ok || s == nil {
 		t.Fatal("expected ExactMatch scorer to be registered")
 	}
-	if s.Name() != harness.ScorerExactMatch {
-		t.Fatalf("got %q want %q", s.Name(), harness.ScorerExactMatch)
+	if s.Name() != eval.ScorerExactMatch {
+		t.Fatalf("got %q want %q", s.Name(), eval.ScorerExactMatch)
 	}
 }
