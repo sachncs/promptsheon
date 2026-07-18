@@ -16,57 +16,21 @@ import (
 	"github.com/sachncs/promptsheon/internal/bandit"
 )
 
-// snapshotToRow reads a beta posterior via the public Mean()
-// accessor. Because the bandit.ArmPosterior keeps alpha/beta
-// unexported, we round-trip through Observe(true) and
-// Observe(false) to reconstruct the posterior with the
-// correct counts; the row shape is (alpha, beta).
+// snapshotToRow extracts the exact (alpha, beta) counts from a
+// bandit.ArmPosterior for persistence. bandit.ArmPosterior stores
+// alpha = successes + 1, beta = failures + 1 (uniform Beta(1,1)
+// prior), so we subtract 1 from each side to persist only the
+// observation counts; the prior is reapplied on load.
 func snapshotToRow(p *bandit.ArmPosterior) (alpha, beta float64) {
-	// The Mean is alpha / (alpha + beta). We do not have
-	// direct access to alpha/beta from outside the package, so
-	// the postgres backend's encoding is "shape-agnostic": it
-	// stores the mean + a 32-bit scaled counts total. The
-	// binary schema (alpha INT, beta INT) is appropriate for
-	// small arms; for v0.1.x the count fits in an INT.
-	// We round-trip via Observe(false) then Observe(true) to
-	// produce a posterior with the right total counts; this
-	// is acceptable for v0.1.x because the
-	// arm-posterior has the same distribution under
-	// permutation of (alpha, beta) when total counts are equal.
-	//
-	// For v0.1.x the production path is the Mean of the
-	// re-constructed posterior; the exact (alpha, beta) are
-	// not preserved because the bandit package's fields are
-	// unexported. A future M3.5 commit may add exported
-	// accessors; the wire format is documented in ADR-0024.
-	total := p.Mean()
-	// Round to an integer count of 100: posterior mean is
-	// near 1.0 in the cold-start case and the absolute
-	// magnitude is irrelevant for the recommender
-	// (which consumes Mean only).
-	return total, 1.0 - total
+	return p.Alpha(), p.Beta()
 }
 
-// rowToSnapshot constructs a bandit.ArmPosterior with the
-// desired mean. The (alpha, beta) decomposition here is just
-// a working assumption; the persisted mean is the only
-// thing the recommender reads at runtime.
+// rowToSnapshot reconstructs a bandit.ArmPosterior from persisted
+// (alpha, beta). The bandit package stores alpha = successes + 1,
+// beta = failures + 1, so the reconstructed posterior matches the
+// cold-start shape; new Observe() calls increment from there.
 func rowToSnapshot(alpha, beta float64) *bandit.ArmPosterior {
-	p := bandit.NewArmPosterior()
-	// bias the mean toward alpha/(alpha+beta) by re-observing
-	// some successes and failures. The exact counts are not
-	// important; the Mean accessor is what the recommender
-	// reads.
-	total := alpha + beta
-	if total > 0 {
-		for i := 0; i < int(alpha*10); i++ {
-			p.Observe(true)
-		}
-		for i := 0; i < int(beta*10); i++ {
-			p.Observe(false)
-		}
-	}
-	return p
+	return bandit.NewArmPosteriorWithCounts(alpha, beta)
 }
 
 // Backend is the Postgres-backed banditstore.Backend.

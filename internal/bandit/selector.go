@@ -34,6 +34,13 @@ func NewArmPosterior() *ArmPosterior {
 	return &ArmPosterior{alpha: 1, beta: 1}
 }
 
+// NewArmPosteriorWithCounts returns a posterior with the supplied
+// alpha and beta. Used by persistence layers that have stored
+// the exact counts and need to reconstitute the same posterior.
+func NewArmPosteriorWithCounts(alpha, beta float64) *ArmPosterior {
+	return &ArmPosterior{alpha: alpha, beta: beta}
+}
+
 // Observe records one success or failure.
 func (a *ArmPosterior) Observe(success bool) {
 	if success {
@@ -47,6 +54,16 @@ func (a *ArmPosterior) Observe(success bool) {
 func (a *ArmPosterior) Mean() float64 {
 	return a.alpha / (a.alpha + a.beta)
 }
+
+// Alpha returns the posterior's alpha parameter (successes + 1).
+// Exported for persistence layers that need the exact (alpha, beta)
+// rather than only the resulting mean.
+func (a *ArmPosterior) Alpha() float64 { return a.alpha }
+
+// Beta returns the posterior's beta parameter (failures + 1).
+// Exported for persistence layers that need the exact (alpha, beta)
+// rather than only the resulting mean.
+func (a *ArmPosterior) Beta() float64 { return a.beta }
 
 // Sample draws one Thompson sample from Beta(alpha, beta) using
 // two Gamma samples. Implementation adapted from the
@@ -175,6 +192,32 @@ func (s *Selector) PosteriorMean(armID string) (float64, error) {
 		return 0, ErrUnknownArm
 	}
 	return a.Mean(), nil
+}
+
+// Posterior returns the current posterior for the arm. The bool
+// result is false if the arm is unknown. Used by persistence
+// layers to read the exact (alpha, beta) for serialization.
+func (s *Selector) Posterior(armID string) (ArmPosterior, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a, ok := s.arms[armID]
+	if !ok {
+		return ArmPosterior{}, false
+	}
+	return *a, true
+}
+
+// SetPosterior replaces the posterior for an arm. Used by the
+// bandsession.Session to reconstitute a Selector from persisted
+// counts. Returns ErrUnknownArm if the arm is not registered.
+func (s *Selector) SetPosterior(armID string, p ArmPosterior) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.arms[armID]; !ok {
+		return ErrUnknownArm
+	}
+	s.arms[armID] = &p
+	return nil
 }
 
 // Errors.
