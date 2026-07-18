@@ -15,21 +15,21 @@ var startTime = time.Now()
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) error {
 	info := buildinfo.Get()
 	writeJSON(w, http.StatusOK, map[string]any{
-		keyStatus:    "healthy",
-		fieldVersion: info.Version,
-		"uptime":     time.Since(startTime).String(),
+		auditKeyStatus: "healthy",
+		auditKeyVersion: info.Version,
+		"uptime":       time.Since(startTime).String(),
 	})
 	return nil
 }
 
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 	ready := map[string]any{
-		keyStatus: "ready",
-		"go":      runtime.Version(),
+		auditKeyStatus: "ready",
+		"go":           runtime.Version(),
 	}
 	if s.db != nil {
 		if err := s.db.Ping(r.Context()); err != nil {
-			ready[keyStatus] = "not_ready"
+			ready[auditKeyStatus] = "not_ready"
 			ready["database"] = "unreachable"
 			writeJSON(w, http.StatusServiceUnavailable, ready)
 			return nil
