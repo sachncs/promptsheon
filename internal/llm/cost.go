@@ -13,7 +13,6 @@ const (
 	modelGPT4Turbo  = "gpt-4-turbo"
 	modelGPT4       = "gpt-4"
 	modelGPT35Turbo = "gpt-3.5-turbo"
-	modelLlama3     = "llama3"
 )
 
 // PricingTable holds per-token USD pricing for known models.
@@ -49,11 +48,6 @@ func NewPricingTable() *PricingTable {
 	pt.pricing[claude35Haiku] = ModelPricing{Name: claude35Haiku, PromptPerToken: 0.80 / 1e6, CompletionPerToken: 4.00 / 1e6}
 	pt.pricing[claude3Opus] = ModelPricing{Name: claude3Opus, PromptPerToken: 15.00 / 1e6, CompletionPerToken: 75.00 / 1e6}
 
-	// Ollama (local — zero cost)
-	pt.pricing[modelLlama3] = ModelPricing{Name: modelLlama3, PromptPerToken: 0, CompletionPerToken: 0}
-	pt.pricing[llama31] = ModelPricing{Name: llama31, PromptPerToken: 0, CompletionPerToken: 0}
-	pt.pricing[mistral] = ModelPricing{Name: mistral, PromptPerToken: 0, CompletionPerToken: 0}
-	pt.pricing[codellama] = ModelPricing{Name: codellama, PromptPerToken: 0, CompletionPerToken: 0}
 	return pt
 }
 
@@ -64,9 +58,6 @@ const (
 	claude35Sonnet = "claude-3-5-sonnet-20241022"
 	claude35Haiku  = "claude-3-5-haiku-20241022"
 	claude3Opus    = "claude-3-opus-20240229"
-	llama31        = "llama3.1"
-	mistral        = "mistral"
-	codellama      = "codellama"
 )
 
 // Register adds or overrides a pricing entry.
