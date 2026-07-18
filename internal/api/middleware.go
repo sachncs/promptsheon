@@ -13,6 +13,15 @@ import (
 	"github.com/sachncs/promptsheon/internal/trace"
 )
 
+// Shared audit-detail keys. Handler packages reference these
+// constants when populating s.audit() details; centralising them
+// here keeps the audit vocabulary consistent across handlers.
+const (
+	auditKeyName    = "name"
+	auditKeyStatus  = "status"
+	auditKeyVersion = "version"
+)
+
 // Middleware is a function that wraps a Func with additional behavior.
 type Middleware func(Func) Func
 

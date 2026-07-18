@@ -450,7 +450,7 @@ func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) erro
 		return err
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{keyStatus: "revoked"})
+	writeJSON(w, http.StatusOK, map[string]string{auditKeyStatus: "revoked"})
 	return nil
 }
 

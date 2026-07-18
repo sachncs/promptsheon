@@ -14,8 +14,6 @@ import (
 	"github.com/sachncs/promptsheon/internal/invoke"
 )
 
-const fieldVersion = "version"
-
 // computeManifestHash returns the canonical SHA-256 hex of a Manifest
 // in its JSON serialisation. It is used to set Version.ManifestHash,
 // which becomes the deduplication key on the CAS table that the
@@ -65,7 +63,7 @@ func (s *Server) handleCreateWorkspace(w http.ResponseWriter, r *http.Request) e
 	if err := s.db.CreateWorkspace(r.Context(), wksp); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "workspace:"+wksp.ID, map[string]any{keyName: wksp.Name})
+	s.audit(r.Context(), "create", "workspace:"+wksp.ID, map[string]any{auditKeyName: wksp.Name})
 	writeJSON(w, http.StatusCreated, wksp)
 	return nil
 }
@@ -155,7 +153,7 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) err
 	if err := s.db.CreateProject(r.Context(), proj); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "project:"+proj.ID, map[string]any{keyName: proj.Name, "workspace_id": workspaceID})
+	s.audit(r.Context(), "create", "project:"+proj.ID, map[string]any{auditKeyName: proj.Name, "workspace_id": workspaceID})
 	writeJSON(w, http.StatusCreated, proj)
 	return nil
 }
@@ -253,7 +251,7 @@ func (s *Server) handleCreateCapability(w http.ResponseWriter, r *http.Request) 
 	if err := s.db.CreateCapability(r.Context(), capab); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "capability:"+capab.ID, map[string]any{keyName: capab.Name, "project_id": projectID})
+	s.audit(r.Context(), "create", "capability:"+capab.ID, map[string]any{auditKeyName: capab.Name, "project_id": projectID})
 	writeJSON(w, http.StatusCreated, capab)
 	return nil
 }
@@ -362,7 +360,7 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 	if err := s.db.CreateVersion(r.Context(), v); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "version:"+v.ID, map[string]any{"capability_id": capabilityID, fieldVersion: v.Version, "manifest_hash": hash})
+	s.audit(r.Context(), "create", "version:"+v.ID, map[string]any{"capability_id": capabilityID, auditKeyVersion: v.Version, "manifest_hash": hash})
 	writeJSON(w, http.StatusCreated, v)
 	return nil
 }
