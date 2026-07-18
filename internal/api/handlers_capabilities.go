@@ -475,16 +475,20 @@ func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]
 		// production Caller chain.
 		return nil
 	}
+	input, err := marshalNoArgs(inputs)
+	if err != nil {
+		return err
+	}
 	req := executor.InvokeRequest{
 		WorkspaceID:   r.PathValue("workspace_id"),
 		ReleaseID:     versionID,
-		ManifestHash:  "stub",
-		InputHash:     "stub",
-		Input:         mustMarshalNoArgs(inputs),
+		ManifestHash:  manifestHash(versionID, model, provider),
+		InputHash:     inputHash(input),
+		Input:         input,
 		Model:         model,
-		ModelRevision: "stub",
+		ModelRevision: modelRevision(model, provider),
 	}
-	_, err := s.invoker.Invoke(r.Context(), req)
+	_, err = s.invoker.Invoke(r.Context(), req)
 	return err
 }
 
@@ -496,4 +500,34 @@ func (s *Server) handleGetExecution(w http.ResponseWriter, r *http.Request) erro
 	}
 	writeJSON(w, http.StatusOK, e)
 	return nil
+}
+
+// manifestHash returns a stable SHA-256 hex of the inputs that
+// uniquely identify a Release. The HTTP handler has only the
+// release ID, model, and provider to work with; the active Release
+// lookup in production fills in the full manifest hash.
+func manifestHash(versionID, model, provider string) string {
+	h := sha256.New()
+	h.Write([]byte(versionID))
+	h.Write([]byte{0x1f})
+	h.Write([]byte(model))
+	h.Write([]byte{0x1f})
+	h.Write([]byte(provider))
+	return "sha256:" + hex.EncodeToString(h.Sum(nil))
+}
+
+// inputHash returns the SHA-256 hex of the JSON-encoded inputs.
+func inputHash(input []byte) string {
+	if len(input) == 0 {
+		return ""
+	}
+	h := sha256.Sum256(input)
+	return "sha256:" + hex.EncodeToString(h[:])
+}
+
+// modelRevision returns the calendar-day revision label for the
+// supplied model+provider pair. The active Release lookup fills in
+// the precise revision from the manifest.
+func modelRevision(model, provider string) string {
+	return time.Now().UTC().Format("2006-01-02") + ":" + model + ":" + provider
 }
