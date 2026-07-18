@@ -19,6 +19,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/buildinfo"
 	"github.com/sachncs/promptsheon/internal/config"
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
+	"github.com/sachncs/promptsheon/internal/eventbus"
 	"github.com/sachncs/promptsheon/internal/executor"
 	"github.com/sachncs/promptsheon/internal/guardrail"
 	"github.com/sachncs/promptsheon/internal/invoke"
@@ -30,6 +31,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/plugins/builtins"
 	"github.com/sachncs/promptsheon/internal/ratelimit"
 	"github.com/sachncs/promptsheon/internal/rollups"
+	"github.com/sachncs/promptsheon/internal/scheduler"
 	"github.com/sachncs/promptsheon/internal/store"
 	"github.com/sachncs/promptsheon/internal/supervisor"
 	"github.com/sachncs/promptsheon/internal/trace"
@@ -95,6 +97,16 @@ func main() {
 	go func() {
 		if err := sup.Run(rootCtx); err != nil && !errors.Is(err, context.Canceled) {
 			logger.Warn("plugin supervisor exited with error", "err", err)
+		}
+	}()
+
+	// Schedule ticker: poll the schedules table for due rows and
+	// publish schedule.fired events. The scheduler runs alongside
+	// the supervisor and exits cleanly when rootCtx is cancelled.
+	sched := scheduler.New(db, eventbus.NewMemory(), 5*time.Second)
+	go func() {
+		if err := sched.Start(rootCtx); err != nil && !errors.Is(err, context.Canceled) {
+			logger.Warn("scheduler exited with error", "err", err)
 		}
 	}()
 
@@ -223,14 +235,49 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	// gracefully when unset (returns an empty summary).
 	rollupAgg := rollups.New(nil, nil)
 
-	// Canonical invoke.Invoker (Tier 2.36). The production wiring
-	// supplies a backend-backed Budget/Quota repository; today's
-	// wiring attaches an Invoker with the in-memory DefaultEnforcer
-	// so the route's invokeOne path is exercised end-to-end.
+	// Canonical invoke.Invoker (Tier 2.36). The Caller resolves
+	// the model + provider from the request, then routes through
+	// the LLM registry so OpenAI / Anthropic / Ollama / etc. all
+	// go through the same path. When no provider is configured
+	// the Caller returns an explicit error rather than a fake
+	// success — the route surfaces it as 502 Bad Gateway.
 	enforcer := invoke.NewDefaultEnforcer(nil)
-	agg := observation.NewAggregator()
-	inv := invoke.New(enforcer, agg, executor.New(nil, func(_ context.Context, _ executor.InvokeRequest) (executor.InvokeResult, error) {
-		return executor.InvokeResult{Status: "ok"}, nil
+	agg := observation.NewAggregator(nil)
+	inv := invoke.New(enforcer, agg, executor.New(nil, func(ctx context.Context, req executor.InvokeRequest) (executor.InvokeResult, error) {
+		if req.Model == "" || req.Model == "<unspecified>" {
+			return executor.InvokeResult{Status: "error", Error: "no model configured"}, nil
+		}
+		p, err := providers.Get(req.Model)
+		if err != nil {
+			// Fall back to the first registered provider when
+			// the model name is unrecognized; production wiring
+			// fills the canonical name from the active Release.
+			names := providers.Providers()
+			if len(names) == 0 {
+				return executor.InvokeResult{Status: "error", Error: "no provider registered"}, nil
+			}
+			p, err = providers.Get(names[0])
+			if err != nil {
+				return executor.InvokeResult{Status: "error", Error: err.Error()}, nil
+			}
+		}
+		llmReq := &llm.Request{
+			Messages: []llm.Message{{Role: "user", Content: string(req.Input)}},
+			Model:    req.Model,
+		}
+		resp, err := p.Complete(ctx, llmReq)
+		if err != nil {
+			return executor.InvokeResult{Status: "error", Error: err.Error()}, nil
+		}
+		usage := resp.Usage
+		costUSD := llm.EstimateCost(usage.PromptTokens, usage.CompletionTokens, resp.Model)
+		return executor.InvokeResult{
+			Output:       []byte(resp.Content),
+			PromptTokens: usage.PromptTokens,
+			OutputTokens: usage.CompletionTokens,
+			CostUSDMicro: int64(costUSD * 1e6),
+			Status:       "ok",
+		}, nil
 	}))
 
 	var opts []api.Option
