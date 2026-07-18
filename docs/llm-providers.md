@@ -1,143 +1,85 @@
 # LLM Providers
 
-Promptsheon provides a unified abstraction over multiple LLM providers. Configure one or more providers via environment variables and reference them in prompts, agents, and evaluations.
+Promptsheon ships two first-class LLM providers in v0.1.x, each
+implemented against the official SDK:
 
-## Provider List
-
-| Provider | Package | Environment Variables |
+| Provider | SDK | Env vars |
 |---|---|---|
-| OpenAI | `internal/llm/openai.go` | `OPENAI_API_KEY`, `OPENAI_BASE_URL` |
-| Anthropic | `internal/llm/anthropic.go` | `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL` |
-| Azure OpenAI | `internal/llm/azure.go` | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_VERSION`, `AZURE_OPENAI_DEPLOYMENT` |
-| Ollama | `internal/llm/ollama.go` | `OLLAMA_BASE_URL` (default: `http://localhost:11434`) |
-| NVIDIA NIM | `internal/llm/nvidia.go` | `NVIDIA_API_KEY`, `NVIDIA_BASE_URL` |
+| Anthropic | [`anthropics/anthropic-sdk-go`](https://github.com/anthropics/anthropic-sdk-go) | `PROMPTSHEON_ANTHROPIC_API_KEY`, `PROMPTSHEON_ANTHROPIC_BASE_URL` |
+| OpenAI | [`openai/openai-go/v3`](https://github.com/openai/openai-go) (Responses API) | `PROMPTSHEON_OPENAI_API_KEY`, `PROMPTSHEON_OPENAI_BASE_URL` |
 
-The list of providers is registered in `internal/llm/registry.go`. Adding a new provider is a single `r.Register("name", func(cfg) Provider { return NewMyProvider(cfg) })` line.
-
-## OpenAI
-
-```bash
-export OPENAI_API_KEY="sk-..."
-```
-
-Supported models: `gpt-4`, `gpt-4-turbo`, `gpt-4o`, `gpt-3.5-turbo`, and all other OpenAI models.
-
-### Example: Create prompt with OpenAI binding
-
-```json
-POST /api/v1/prompts
-{
-  "name": "summarizer",
-  "content": "Summarize the following text: {{text}}",
-  "binding": {
-    "provider": "openai",
-    "model": "gpt-4o",
-    "api_key_ref": "openai-production"
-  }
-}
-```
+The provider registry in `internal/llm/registry.go` registers both by
+default. Add a new provider by calling `r.Register("name", factory)`
+on the registry — no daemon restart is needed if you swap factories
+in code.
 
 ## Anthropic
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
+export PROMPTSHEON_ANTHROPIC_API_KEY="sk-ant-..."
+# Optional: override the base URL for a proxy or self-hosted gateway
+# export PROMPTSHEON_ANTHROPIC_BASE_URL="https://api.anthropic.com"
 ```
 
-Supported models: `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku`, and newer Claude models.
+Supported models: `claude-opus-4-*`, `claude-sonnet-4-*`,
+`claude-3-5-sonnet-*`, `claude-3-5-haiku-*`, and any other model the
+Anthropic Messages API accepts.
 
-## Azure OpenAI
+The provider translates `llm.Request.Messages` into the
+Anthropic Messages format, extracting a single `system` prompt when
+present and mapping user/assistant messages to the corresponding
+blocks.
+
+## OpenAI
 
 ```bash
-export AZURE_OPENAI_API_KEY="..."
-export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
-export AZURE_OPENAI_API_VERSION="2024-02-15-preview"
-export AZURE_OPENAI_DEPLOYMENT="my-gpt4-deployment"   # the deployment name, not the model
+export PROMPTSHEON_OPENAI_API_KEY="sk-..."
+# Optional: override the base URL for a proxy or the Azure-compatible
+# /openai/v1 Responses endpoint
+# export PROMPTSHEON_OPENAI_BASE_URL="https://api.openai.com"
 ```
 
-Use the **deployment name** as the model parameter. Azure uses the same API format as OpenAI with a different base URL. The `api_key_ref` field in a prompt binding should reference a vault key tagged for Azure.
+Supported models: any model that the OpenAI Responses API accepts
+(`gpt-5`, `gpt-5.2`, `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`,
+`gpt-4`, `gpt-3.5-turbo`, …).
 
-## Ollama (Local)
+The provider uses the v3 Responses API (not Chat Completions) and
+joins `Request.Messages` into a single `Input` string; richer
+message types can be added by introducing a per-message `Input`
+list-builder if a call site needs them.
 
-```bash
-export OLLAMA_BASE_URL="http://localhost:11434"
+`Request.Stop` is intentionally not surfaced: the Responses API in
+v3 only accepts a single stop sequence and the field is documented
+as silently dropped. Callers that need deterministic truncation
+should set `max_tokens` instead.
+
+## Adding a new provider
+
+Implement `llm.Provider`:
+
+```go
+type MyProvider struct{ ... }
+func (p *MyProvider) Complete(ctx context.Context, req *llm.Request) (*llm.Response, error) { ... }
+func (p *MyProvider) Name() string { return "my-provider" }
 ```
 
-Ollama runs locally with no API key required. Pull models first:
+Then register it:
 
-```bash
-ollama pull llama3
-ollama pull mistral
+```go
+r := llm.NewRegistry()
+r.Register("my-provider", func(cfg llm.ProviderConfig) llm.Provider {
+    return &MyProvider{cfg: cfg}
+})
+r.Configure("my-provider", llm.ProviderConfig{APIKey: "..."})
 ```
 
-Then reference them as the model in requests. Ollama is ideal for development and testing without incurring API costs.
+The provider participates in the same flow as Anthropic and
+OpenAI: the daemon's `WithInvoker` path consumes `llm.Provider`,
+the CLI's `provider test` exercises it directly.
 
-## NVIDIA NIM
+## Removed providers (v0.0.x)
 
-```bash
-export NVIDIA_API_KEY="..."
-```
-
-NVIDIA NIM provides optimized inference endpoints for popular models.
-
-## Provider Vault
-
-Store encrypted API keys in the vault so they are never exposed in environment variables or request bodies:
-
-```bash
-# Save a key
-curl -X POST http://localhost:8080/api/v1/vault/keys \
-  -H "Content-Type: application/json" \
-  -d '{
-    "provider_name": "openai",
-    "key_name": "production",
-    "key": "sk-..."
-  }'
-
-# List stored keys (metadata only, not the actual key)
-curl http://localhost:8080/api/v1/vault/keys
-```
-
-The vault is encrypted with AES-256-GCM using `PROMPTSHEON_VAULT_KEY`. See [Algorithms — Vault](algorithms.md#vault-aes-256-gcm) and ADR [0004](adr/0004-aes-256-gcm-vault.md).
-
-## Resilience
-
-Every provider call goes through three middleware layers, in this order:
-
-1. **Timeout** — `Timeouting` wraps the provider with a per-call context timeout.
-2. **Circuit breaker** — when the provider fails repeatedly, calls are rejected with `ErrCircuitOpen` until a cooldown elapses. See [Algorithms — Circuit breaker](algorithms.md#circuit-breaker).
-3. **Retry** — transient failures are retried with exponential backoff. See [Algorithms — Retry](algorithms.md#retry).
-
-If the primary provider fails, the dispatcher walks a configured fallback chain. See [Algorithms — Fallback chain](algorithms.md#fallback-chain).
-
-```bash
-# Comma-separated fallback list
-PROMPTSHEON_LLM_FALLBACK=anthropic,ollama
-```
-
-## Cost
-
-The cost of a call is computed from a per-model pricing table in `internal/llm/cost.go` and recorded as a `llm_call_cost_usd_total` metric. See [Algorithms — Cost calculation](algorithms.md#cost-calculation) and [Observability](observability.md#metrics).
-
-## Testing Providers
-
-Test provider connectivity before use:
-
-```bash
-curl -X POST http://localhost:8080/api/v1/providers/openai/test \
-  -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4o"}'
-```
-
-Response:
-
-```json
-{"provider": "openai", "status": "ok", "latency_ms": 850}
-```
-
-## Listing Providers
-
-```bash
-curl http://localhost:8080/api/v1/providers
-```
-
-Returns only providers that have valid credentials configured.
+Azure OpenAI, Ollama, and NVIDIA NIM were removed in v0.1.0
+(forward-only cleanup). Operators who need an Ollama-compatible
+local endpoint should run a proxy that exposes the OpenAI Responses
+API and set `PROMPTSHEON_OPENAI_BASE_URL` accordingly.
