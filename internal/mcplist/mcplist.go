@@ -6,14 +6,16 @@
 //
 // This is Tier 2.49 follow-on: per-Workspace MCP allowlist. The
 // scope here is the value type, the closed-set validation, and the
-// Repository interface; runtime enforcement is in the invoke path
-// (M4 follow-on). The MCP server SDK itself is M3 follow-on
-// (gRPC over UDS plus the server manifest).
+// Repository interface. Runtime enforcement is in the invoke path;
+// the MCP server SDK ships in M3 follow-on (gRPC over UDS plus
+// the server manifest).
 package mcplist
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -22,9 +24,10 @@ import (
 // Entry is one allowlisted MCP server.
 //
 // The Name is the canonical identifier (the manifest's
-// "name" field). URL is the server's UDS or TCP endpoint; the
-// format is opaque here and validated by the runtime in M3
-// follow-on. WorkspaceID and CreatedBy are the audit-trail
+// "name" field). URL is the server's UDS or TCP endpoint;
+// Validate rejects obvious injection (non-http schemes, missing
+// host) so a malformed entry fails at allowlist time rather than
+// at invoke time. WorkspaceID and CreatedBy are the audit-trail
 // fields.
 type Entry struct {
 	Name        string `json:"name"`
@@ -41,14 +44,48 @@ var ErrEmptyName = errors.New("mcplist: empty name")
 // outside the allowed set (alnum, dash, dot, underscore).
 var ErrBadName = errors.New("mcplist: bad name")
 
-// Validate enforces the closed-set Name format. URL is not
-// checked here; runtime validation is in M3 follow-on.
+// ErrBadURL is returned when the URL cannot be parsed as an
+// absolute http(s) URL or unix UDS path.
+var ErrBadURL = errors.New("mcplist: bad url")
+
+// Validate enforces the closed-set Name format and a syntactically
+// valid URL (http(s)://host[:port][/path] or unix:///abs/path).
 func (e Entry) Validate() error {
 	if strings.TrimSpace(e.Name) == "" {
 		return ErrEmptyName
 	}
 	if !namePattern.MatchString(e.Name) {
 		return fmt.Errorf("%w: %q", ErrBadName, e.Name)
+	}
+	if err := validateURL(e.URL); err != nil {
+		return fmt.Errorf("%w: %q: %w", ErrBadURL, e.URL, err)
+	}
+	return nil
+}
+
+// validateURL accepts absolute http(s) URLs with a non-empty host
+// and unix:///absolute/path UDS endpoints. Anything else is
+// rejected; runtime SSRF checks happen at invoke time.
+func validateURL(raw string) error {
+	if raw == "" {
+		return errors.New("empty url")
+	}
+	if strings.HasPrefix(raw, "unix://") {
+		path := strings.TrimPrefix(raw, "unix://")
+		if path == "" || path[0] != '/' {
+			return errors.New("unix url must be absolute")
+		}
+		return nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("scheme %q not http(s)", u.Scheme)
+	}
+	if u.Host == "" {
+		return errors.New("missing host")
 	}
 	return nil
 }
@@ -135,14 +172,6 @@ var ErrUnknownName = errors.New("mcplist: unknown name")
 // Production wiring supplies a backend-backed implementation;
 // tests use an in-memory map.
 type Repository interface {
-	Load(ctx interfaceCtx, workspaceID string) (*List, error)
-	Save(ctx interfaceCtx, l *List) error
+	Load(ctx context.Context, workspaceID string) (*List, error)
+	Save(ctx context.Context, l *List) error
 }
-
-// interfaceCtx is a placeholder for context.Context. The
-// canonical Repository signature uses context.Context; today's
-// Repository uses an interface so the type compiles without
-// pulling the context import into this small file. Production
-// code swaps the Repository implementation for one that uses
-// context.Context; the value type List stays the same.
-type interfaceCtx = interface{}

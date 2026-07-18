@@ -136,6 +136,8 @@ func (b *Binary) Start(ctx context.Context) error {
 		if time.Now().After(deadline) {
 			// Plugin binary started but never became reachable;
 			// kill it so the supervisor's restart policy applies.
+			// ponytail: best-effort cleanup; the supervisor will
+			// restart the plugin from a clean state.
 			_ = cmd.Process.Kill()
 			_ = cmd.Wait()
 			b.mu.Lock()
@@ -180,12 +182,16 @@ func (b *Binary) Stop(_ context.Context) error {
 	if c != nil {
 		// Graceful RPC shutdown; ignore the reply (the plugin
 		// may already be in a stuck state).
+		// ponytail: best-effort; the plugin may already be
+		// shutting down so we don't propagate the error.
 		var reply string
 		_ = c.Call("Plugin.Stop", struct{}{}, &reply)
 		_ = c.Close()
 	}
 	if cmd != nil && cmd.Process != nil {
 		// Best-effort graceful termination; SIGKILL after 2s.
+		// ponytail: process cleanup is best-effort; the daemon
+		// records the failed shutdown via metrics if needed.
 		_ = cmd.Process.Signal(syscall.SIGTERM)
 		done := make(chan struct{})
 		go func() { _ = cmd.Wait(); close(done) }()
