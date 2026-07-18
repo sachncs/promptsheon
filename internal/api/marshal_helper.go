@@ -1,16 +1,18 @@
 package api
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
-// mustMarshalNoArgs returns the JSON encoding of v. The package's
-// tests define a mustMarshal(t, v) variant for test ergonomics;
-// the production path uses this no-arg variant. The reason for
-// two helpers is that the test version captures *testing.T for
-// t.Helper() while the production path doesn't.
-func mustMarshalNoArgs(v any) []byte {
+// marshalNoArgs returns the JSON encoding of v or an error.
+// Library code does not panic on marshalling failures; callers
+// surface the error to the HTTP handler so the route returns 500
+// rather than crashing the daemon.
+func marshalNoArgs(v any) ([]byte, error) {
 	b, err := json.Marshal(v)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("api: marshal request: %w", err)
 	}
-	return b
+	return b, nil
 }

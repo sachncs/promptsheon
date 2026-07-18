@@ -93,9 +93,9 @@ func (i *Invoker) Invoke(ctx context.Context, req executor.InvokeRequest) (execu
 		if errors.Is(err, quota.ErrOverLimit) {
 			return executor.ExecutionRecord{}, ErrQuotaExceeded
 		}
-		return executor.ExecutionRecord{}, fmt.Errorf("%w: %v", ErrQuotaEnforcer, err)
+		return executor.ExecutionRecord{}, fmt.Errorf("%w: %w", ErrQuotaEnforcer, err)
 	}
-	rec, err := i.exec.Run(ctx, req.WorkspaceID, req.ReleaseID, "prod", req.Input)
+	rec, err := i.exec.RunRequest(ctx, req, "prod")
 	if err != nil {
 		return rec, err
 	}
@@ -106,7 +106,7 @@ func (i *Invoker) Invoke(ctx context.Context, req executor.InvokeRequest) (execu
 			return rec, ErrBudgetExceeded
 		}
 		i.agg.Add(rec)
-		return rec, fmt.Errorf("%w: %v", ErrBudgetEnforcer, err)
+		return rec, fmt.Errorf("%w: %w", ErrBudgetEnforcer, err)
 	}
 	i.agg.Add(rec)
 	return rec, nil

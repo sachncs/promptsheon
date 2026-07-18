@@ -28,7 +28,7 @@ func TestInvokeHappyPath(t *testing.T) {
 	t.Parallel()
 	now := func() time.Time { return time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC) }
 	enforcer := NewDefaultEnforcer(now)
-	agg := observation.NewAggregator()
+	agg := observation.NewAggregator(nil)
 	exec := executor.New(nil, func(_ context.Context, _ executor.InvokeRequest) (executor.InvokeResult, error) {
 		return executor.InvokeResult{Output: json.RawMessage(`{"ok":true}`), Status: "ok", PromptTokens: 10, OutputTokens: 5, CostUSDMicro: 100_000, LatencyMS: 50}, nil
 	})
@@ -59,7 +59,7 @@ func TestInvokeRejectsQuota(t *testing.T) {
 		t.Fatalf("first call should pass: %v", err)
 	}
 
-	agg := observation.NewAggregator()
+	agg := observation.NewAggregator(nil)
 	exec := executor.New(nil, func(_ context.Context, _ executor.InvokeRequest) (executor.InvokeResult, error) {
 		return executor.InvokeResult{Status: "ok"}, nil
 	})
@@ -80,7 +80,7 @@ func TestInvokeRejectsBudget(t *testing.T) {
 	b, _ := budget.New(budget.ScopeWorkspace, "ws", budget.PeriodDaily, 0.0001, now(), "alice")
 	enforcer.SetBudget(b)
 
-	agg := observation.NewAggregator()
+	agg := observation.NewAggregator(nil)
 	exec := executor.New(nil, func(_ context.Context, _ executor.InvokeRequest) (executor.InvokeResult, error) {
 		return executor.InvokeResult{Status: "ok", CostUSDMicro: 1_000_000}, nil
 	})
