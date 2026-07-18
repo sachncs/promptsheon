@@ -1,139 +1,100 @@
 package llm
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"strings"
 	"time"
+
+	anthropic "github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
-const providerAnthropic = "anthropic"
-
-// Anthropic implements Provider for the Anthropic Messages API.
+// Anthropic implements Provider for the Anthropic Messages API using
+// the official anthropic-sdk-go. The provider name is "anthropic".
 type Anthropic struct {
-	apiKey  string
+	client  anthropic.Client
 	baseURL string
-	client  *http.Client
 }
 
-// NewAnthropic creates an Anthropic provider.
+// NewAnthropic creates an Anthropic provider. cfg.APIKey is required;
+// cfg.BaseURL defaults to https://api.anthropic.com when empty.
 func NewAnthropic(cfg ProviderConfig) *Anthropic {
 	base := cfg.BaseURL
 	if base == "" {
 		base = "https://api.anthropic.com"
 	}
+	opts := []option.RequestOption{option.WithBaseURL(base)}
+	if cfg.APIKey != "" {
+		opts = append(opts, option.WithAPIKey(cfg.APIKey))
+	}
 	return &Anthropic{
-		apiKey:  cfg.APIKey,
+		client:  anthropic.NewClient(opts...),
 		baseURL: base,
-		client:  &http.Client{Timeout: 120 * time.Second},
 	}
 }
 
 // Name returns the provider name.
-func (a *Anthropic) Name() string { return providerAnthropic }
-
-type anthropicRequest struct {
-	Model       string             `json:"model"`
-	Messages    []anthropicMessage `json:"messages"`
-	MaxTokens   int                `json:"max_tokens"`
-	Temperature *float64           `json:"temperature,omitempty"`
-	System      string             `json:"system,omitempty"`
-	Stop        []string           `json:"stop_sequences,omitempty"`
-}
-
-type anthropicMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type anthropicResponse struct {
-	Content []struct {
-		Text string `json:"text"`
-	} `json:"content"`
-	StopReason string `json:"stop_reason"`
-	Usage      struct {
-		InputTokens  int `json:"input_tokens"`
-		OutputTokens int `json:"output_tokens"`
-	} `json:"usage"`
-}
+func (a *Anthropic) Name() string { return string(ProviderAnthropic) }
 
 // Complete sends a prompt to the Anthropic API and returns the response.
 func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, error) {
-	var systemPrompt string
-	var msgs []anthropicMessage
+	maxTokens := int64(req.MaxTokens)
+	if maxTokens <= 0 {
+		maxTokens = 1024
+	}
 
+	var systemBlocks []anthropic.TextBlockParam
+	var msgs []anthropic.MessageParam
 	for _, m := range req.Messages {
-		if m.Role == "system" {
-			systemPrompt = m.Content
-		} else {
-			msgs = append(msgs, anthropicMessage(m))
+		switch m.Role {
+		case "system":
+			systemBlocks = append(systemBlocks, anthropic.TextBlockParam{Text: m.Content})
+		case "assistant":
+			msgs = append(msgs, anthropic.NewAssistantMessage(anthropic.NewTextBlock(m.Content)))
+		default:
+			msgs = append(msgs, anthropic.NewUserMessage(anthropic.NewTextBlock(m.Content)))
 		}
 	}
 
-	body := anthropicRequest{
-		Model:     req.Model,
+	params := anthropic.MessageNewParams{
+		Model:     anthropic.Model(req.Model),
+		MaxTokens: maxTokens,
 		Messages:  msgs,
-		MaxTokens: req.MaxTokens,
-		System:    systemPrompt,
-		Stop:      req.Stop,
+	}
+	if len(systemBlocks) > 0 {
+		params.System = systemBlocks
 	}
 	if req.Temperature > 0 {
-		body.Temperature = &req.Temperature
+		params.Temperature = anthropic.Float(req.Temperature)
 	}
-
-	data, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("marshal %s request: %w", providerAnthropic, err)
+	if len(req.Stop) > 0 {
+		params.StopSequences = req.Stop
 	}
 
 	start := time.Now()
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", a.baseURL+"/v1/messages", bytes.NewReader(data))
+	msg, err := a.client.Messages.New(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("x-api-key", a.apiKey)
-	httpReq.Header.Set(providerAnthropic+"-version", "2023-06-01")
-
-	resp, err := a.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("%s request: %w", providerAnthropic, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB limit
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
+		return nil, fmt.Errorf("%s request: %w", ProviderAnthropic, err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s error (status %d): %s", providerAnthropic, resp.StatusCode, string(raw))
+	var content string
+	for _, block := range msg.Content {
+		if text := block.Text; text != "" {
+			content += text
+		}
 	}
 
-	var aResp anthropicResponse
-	if err := json.Unmarshal(raw, &aResp); err != nil {
-		return nil, fmt.Errorf("decode %s response: %w", providerAnthropic, err)
-	}
+	inTok, outTok := int64(msg.Usage.InputTokens), int64(msg.Usage.OutputTokens)
 
-	var sb strings.Builder
-	for _, c := range aResp.Content {
-		sb.WriteString(c.Text)
-	}
-
-	totalTokens := aResp.Usage.InputTokens + aResp.Usage.OutputTokens
 	return &Response{
-		Content: sb.String(),
+		Content: content,
 		Usage: Usage{
-			PromptTokens:     aResp.Usage.InputTokens,
-			CompletionTokens: aResp.Usage.OutputTokens,
-			TotalTokens:      totalTokens,
+			PromptTokens:     int(inTok),
+			CompletionTokens: int(outTok),
+			TotalTokens:      int(inTok + outTok),
 		},
-		Model:      req.Model,
-		StopReason: aResp.StopReason,
+		Model:      string(msg.Model),
+		StopReason: string(msg.StopReason),
 		Latency:    time.Since(start),
 	}, nil
 }
