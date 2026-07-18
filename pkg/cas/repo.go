@@ -37,13 +37,19 @@ const (
 	maxBranchLength = 255
 )
 
-// logger is the package-wide structured logger. It is configured
-// at init() to write JSON records to stderr at the level requested
-// by the PROMPTSHEON_LOG_LEVEL environment variable. Library
-// consumers can override it via SetLogger.
-var logger *slog.Logger
+// logger is the package-wide structured logger. It is initialised
+// at package load time via the package-level defaultLogger() call
+// (no init() — Google Go style guide §1.7.4 discourages init()
+// for package-level state because it cannot be overridden before
+// first use). The PROMPTSHEON_LOG_LEVEL environment variable is
+// consulted exactly once, at process start. Library consumers can
+// override via SetLogger at any time.
+var logger = defaultLogger()
 
-func init() {
+// defaultLogger returns a JSON slog handler writing to stderr at
+// the level requested by the PROMPTSHEON_LOG_LEVEL environment
+// variable. The function is called once during package load.
+func defaultLogger() *slog.Logger {
 	level := slog.LevelInfo
 	switch os.Getenv("PROMPTSHEON_LOG_LEVEL") {
 	case "debug":
@@ -53,7 +59,7 @@ func init() {
 	case "error":
 		level = slog.LevelError
 	}
-	logger = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+	return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 }
 
 // SetLogger replaces the package logger. Useful for tests and for
