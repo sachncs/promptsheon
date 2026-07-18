@@ -21,6 +21,19 @@ const bannedTopic1 = "banned_topic_1"
 const modelGPT4 = "gpt-4"
 const environmentProd = "prod"
 
+// Exported policy identifiers for use by callers wiring
+// CheckContentPolicy.
+const (
+	// PolicyNoPII rejects content containing PII patterns.
+	PolicyNoPII = policyNoPII
+	// PolicyNoHarmful rejects content containing harmful terms.
+	PolicyNoHarmful = policyNoHarmful
+)
+
+// MaxViolationsForTest exposes the internal cap for tests that
+// need to exercise the bounded-violation invariant.
+func MaxViolationsForTest() int { return maxViolations }
+
 // Severity represents the severity level of a guardrail violation.
 type Severity string
 
