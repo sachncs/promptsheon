@@ -5,6 +5,9 @@ for the Promptsheon REST API. It targets the `0.x` line of the
 server and is regenerated on every release to match the OpenAPI
 spec at `api/openapi.yaml`.
 
+> **Forward-only.** v0.0.7 Prompt and Agent SDK methods are gone
+> in v0.1.0. Use the Capability/Version/Release flow below.
+
 ## Install
 
 ```bash
@@ -24,26 +27,50 @@ import (
     "github.com/sachncs/promptsheon/sdk"
 )
 
+const sampleHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
 func main() {
     client := sdk.New("http://localhost:8080", "ps_...")
     ctx := context.Background()
 
-    prompt, err := client.CreatePrompt(ctx, &sdk.CreatePromptRequest{
-        Name:    "greeting",
-        Content: "Hello {{name}}, welcome to {{product}}!",
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-    fmt.Printf("created %s (id=%s)\n", prompt.Name, prompt.ID)
+    // Server-side: workspace + project + capability + version are
+    // assumed created (curl works fine; or use CreateWorkspace /
+    // CreateCapability / AddVersion from this SDK). The flow below
+    // drives the Release lifecycle end-to-end.
 
-    resp, err := client.RunPrompt(ctx, prompt.ID, &sdk.RunPromptRequest{
-        Variables: map[string]string{"name": "world", "product": "Promptsheon"},
+    rel, err := client.CreateRelease(ctx, "v1", sdk.CreateReleaseRequest{
+        Environment: "prod",
     })
     if err != nil {
         log.Fatal(err)
     }
-    fmt.Println(resp.Content)
+    fmt.Printf("release=%s status=%s\n", rel.ID, rel.Status)
+
+    // Vote as a non-creator identity (MakerChecker policy default).
+    if _, err := client.Vote(ctx, rel.ID, sdk.VoteRequest{
+        Identity: "alice",
+        Decision: "approve",
+    }); err != nil {
+        log.Fatal(err)
+    }
+
+    // Activate, then invoke.
+    if _, err := client.Activate(ctx, rel.ID); err != nil {
+        log.Fatal(err)
+    }
+    out, err := client.Invoke(ctx, rel.ID, sdk.InvokeRequest{
+        Inputs: map[string]any{"q": "hello"},
+        Model:  "claude-opus-4",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("invoked: %s\n", out.ID)
+
+    // Convenience: do all three in one call.
+    // out, err := client.ApproveAndInvoke(ctx, rel.ID, "alice", sdk.InvokeRequest{
+    //     Model: "claude-opus-4",
+    // })
 }
 ```
 
@@ -72,7 +99,7 @@ SDK decodes the server's `{"error": "..."}` body into the
 (legacy `{"message": "..."}` and raw text):
 
 ```go
-prompt, err := client.GetPrompt(ctx, "missing")
+rel, err := client.GetRelease(ctx, "missing")
 if err != nil {
     var apiErr *sdk.APIError
     if errors.As(err, &apiErr) {
@@ -80,7 +107,9 @@ if err != nil {
         case 401:
             log.Println("bad key")
         case 404:
-            log.Println("not found")
+            log.Println("release not found")
+        case 409:
+            log.Println("quorum not satisfied")
         default:
             log.Printf("server said: %s", apiErr.Message)
         }
@@ -91,13 +120,15 @@ if err != nil {
 
 ## API coverage
 
-The SDK currently exposes the high-traffic read/write surface:
+The SDK exposes the high-traffic capability/release surface:
 
 | Resource | Methods |
 |---|---|
-| Prompts | `ListPrompts`, `GetPrompt`, `CreatePrompt`, `UpdatePrompt`, `DeletePrompt`, `RunPrompt`, `DeployPrompt`, `ArchivePrompt` |
-| Agents  | `ListAgents`, `GetAgent` |
-| Health  | `Health` |
+| Workspaces | `CreateWorkspace` |
+| Capabilities | `CreateCapability` |
+| Versions | `AddVersion` |
+| Releases | `CreateRelease`, `GetRelease`, `ListReleases`, `Vote`, `Activate`, `Rollback`, `Invoke`, `Approval`, `ApproveAndInvoke` |
+| Health | `Health` |
 | Providers | `ListProviders` |
 
 The full HTTP surface is documented in `api/openapi.yaml`; if
@@ -106,9 +137,6 @@ use `http.Post` against the documented endpoint while a typed
 wrapper is being added.
 
 ## Testing
-
-The SDK ships with a table-driven test suite that exercises
-each method against an `httptest` server:
 
 ```bash
 go test -race -count=1 ./sdk/...
