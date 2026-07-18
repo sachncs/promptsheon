@@ -16,7 +16,6 @@ import (
 
 	"github.com/sachncs/promptsheon/internal/alerting"
 	"github.com/sachncs/promptsheon/internal/api"
-	"github.com/sachncs/promptsheon/internal/approval"
 	"github.com/sachncs/promptsheon/internal/buildinfo"
 	"github.com/sachncs/promptsheon/internal/config"
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
@@ -336,12 +335,6 @@ func buildReleaseService(db *store.SQLite, policy string) *release.Service {
 		return nil
 	}
 }
-
-// avoid unused-import errors when approval/release are only used in
-// buildReleaseService and its callers.
-var (
-	_ = approval.Approve
-)
 
 func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *config.Config, srv *api.Server, logger *slog.Logger, limiter *ratelimit.Limiter, spans *trace.SQLite, collector *metrics.Collector) {
 	handler := api.ChainHTTP(srv,
