@@ -131,242 +131,6 @@ func decodeAPIError(status int, body []byte) error {
 	return &apiErr
 }
 
-// --- Prompts ---
-
-// Prompt represents a versioned prompt asset.
-type Prompt struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	Content     string            `json:"content"`
-	Variables   []Variable        `json:"variables"`
-	Tags        []string          `json:"tags"`
-	ModelHint   string            `json:"model_hint"`
-	Binding     *ProviderBinding  `json:"binding,omitempty"`
-	Version     int               `json:"version"`
-	Status      string            `json:"status"`
-	CreatedBy   string            `json:"created_by"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
-	Metadata    map[string]string `json:"metadata"`
-}
-
-// Variable defines a template variable for a prompt.
-type Variable struct {
-	Name        string `json:"name"`
-	Type        string `json:"type"`
-	Required    bool   `json:"required"`
-	Default     string `json:"default,omitempty"`
-	Description string `json:"description"`
-}
-
-// ProviderBinding specifies which LLM provider and model to use.
-type ProviderBinding struct {
-	Provider  string `json:"provider"`
-	Model     string `json:"model"`
-	APIKeyRef string `json:"api_key_ref,omitempty"`
-}
-
-// CreatePromptRequest is the request body for creating a prompt.
-type CreatePromptRequest struct {
-	Name        string           `json:"name"`
-	Description string           `json:"description"`
-	Content     string           `json:"content"`
-	Variables   []Variable       `json:"variables,omitempty"`
-	Tags        []string         `json:"tags,omitempty"`
-	ModelHint   string           `json:"model_hint,omitempty"`
-	Binding     *ProviderBinding `json:"binding,omitempty"`
-}
-
-// UpdatePromptRequest is the request body for updating a prompt.
-type UpdatePromptRequest struct {
-	Name        *string `json:"name,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Content     *string `json:"content,omitempty"`
-	Status      *string `json:"status,omitempty"`
-}
-
-// RunPromptRequest is the request body for running a prompt.
-type RunPromptRequest struct {
-	Variables map[string]string `json:"variables,omitempty"`
-	Provider  string            `json:"provider,omitempty"`
-	Model     string            `json:"model,omitempty"`
-}
-
-// RunPromptResponse holds the output from a prompt execution.
-type RunPromptResponse struct {
-	Content   string `json:"content"`
-	Model     string `json:"model"`
-	Usage     Usage  `json:"usage"`
-	LatencyMs int64  `json:"latency_ms"`
-}
-
-// Usage tracks token consumption for a single LLM call.
-type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
-}
-
-// ListPrompts returns all prompts from the server.
-func (c *Client) ListPrompts(ctx context.Context) ([]*Prompt, error) {
-	data, err := c.do(ctx, "GET", "/api/v1/prompts", nil)
-	if err != nil {
-		return nil, err
-	}
-	var prompts []*Prompt
-	if err := json.Unmarshal(data, &prompts); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-	return prompts, nil
-}
-
-// GetPrompt returns a prompt by its ID.
-func (c *Client) GetPrompt(ctx context.Context, id string) (*Prompt, error) {
-	data, err := c.do(ctx, "GET", "/api/v1/prompts/"+id, nil)
-	if err != nil {
-		return nil, err
-	}
-	var p Prompt
-	if err := json.Unmarshal(data, &p); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-	return &p, nil
-}
-
-// CreatePrompt creates a new prompt on the server.
-func (c *Client) CreatePrompt(ctx context.Context, req *CreatePromptRequest) (*Prompt, error) {
-	data, err := c.do(ctx, "POST", "/api/v1/prompts", req)
-	if err != nil {
-		return nil, err
-	}
-	var p Prompt
-	if err := json.Unmarshal(data, &p); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-	return &p, nil
-}
-
-// UpdatePrompt updates an existing prompt by ID.
-func (c *Client) UpdatePrompt(ctx context.Context, id string, req *UpdatePromptRequest) (*Prompt, error) {
-	data, err := c.do(ctx, "PUT", "/api/v1/prompts/"+id, req)
-	if err != nil {
-		return nil, err
-	}
-	var p Prompt
-	if err := json.Unmarshal(data, &p); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-	return &p, nil
-}
-
-// DeletePrompt deletes a prompt by ID.
-func (c *Client) DeletePrompt(ctx context.Context, id string) error {
-	_, err := c.do(ctx, "DELETE", "/api/v1/prompts/"+id, nil)
-	return err
-}
-
-// RunPrompt executes a prompt via the configured LLM provider and returns the response.
-func (c *Client) RunPrompt(ctx context.Context, id string, req *RunPromptRequest) (*RunPromptResponse, error) {
-	data, err := c.do(ctx, "POST", "/api/v1/prompts/"+id+"/run", req)
-	if err != nil {
-		return nil, err
-	}
-	var resp RunPromptResponse
-	if err := json.Unmarshal(data, &resp); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-	return &resp, nil
-}
-
-// DeployPrompt deploys an approved prompt to production status.
-func (c *Client) DeployPrompt(ctx context.Context, id string) (*Prompt, error) {
-	data, err := c.do(ctx, "POST", "/api/v1/prompts/"+id+"/deploy", nil)
-	if err != nil {
-		return nil, err
-	}
-	var p Prompt
-	if err := json.Unmarshal(data, &p); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-	return &p, nil
-}
-
-// ArchivePrompt archives a prompt, moving it to read-only status.
-func (c *Client) ArchivePrompt(ctx context.Context, id string) (*Prompt, error) {
-	data, err := c.do(ctx, "POST", "/api/v1/prompts/"+id+"/archive", nil)
-	if err != nil {
-		return nil, err
-	}
-	var p Prompt
-	if err := json.Unmarshal(data, &p); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-	return &p, nil
-}
-
-// --- Agents ---
-
-// Agent represents an agent workflow with ordered steps.
-type Agent struct {
-	ID          string      `json:"id"`
-	Name        string      `json:"name"`
-	Description string      `json:"description"`
-	Steps       []AgentStep `json:"steps"`
-	Tools       []ToolRef   `json:"tools"`
-	Status      string      `json:"status"`
-}
-
-// AgentStep defines a single step within an agent workflow.
-type AgentStep struct {
-	ID        string            `json:"id"`
-	Name      string            `json:"name"`
-	Tool      string            `json:"tool"`
-	Config    map[string]string `json:"config"`
-	DependsOn []string          `json:"depends_on"`
-	Condition *Condition        `json:"condition,omitempty"`
-}
-
-// Condition defines a branching condition for a workflow step.
-type Condition struct {
-	Field    string `json:"field"`
-	Operator string `json:"operator"`
-	Value    string `json:"value"`
-}
-
-// ToolRef references a tool configuration for an agent step.
-type ToolRef struct {
-	Name   string            `json:"name"`
-	Type   string            `json:"type"`
-	Config map[string]string `json:"config"`
-}
-
-// ListAgents returns all agents from the server.
-func (c *Client) ListAgents(ctx context.Context) ([]*Agent, error) {
-	data, err := c.do(ctx, "GET", "/api/v1/agents", nil)
-	if err != nil {
-		return nil, err
-	}
-	var agents []*Agent
-	if err := json.Unmarshal(data, &agents); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-	return agents, nil
-}
-
-// GetAgent returns an agent by its ID.
-func (c *Client) GetAgent(ctx context.Context, id string) (*Agent, error) {
-	data, err := c.do(ctx, "GET", "/api/v1/agents/"+id, nil)
-	if err != nil {
-		return nil, err
-	}
-	var a Agent
-	if err := json.Unmarshal(data, &a); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-	return &a, nil
-}
-
 // --- Health ---
 
 // HealthResponse represents the health check response.
@@ -411,4 +175,306 @@ func (c *Client) ListProviders(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return resp.Providers, nil
+}
+
+// --- Capability lifecycle ---
+
+// Workspace is a Promptsheon tenant workspace.
+type Workspace struct {
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Organization string    `json:"organization,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// Project is a logical grouping of capabilities.
+type Project struct {
+	ID          string    `json:"id"`
+	WorkspaceID string    `json:"workspace_id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// Capability is the unit of business outcome.
+type Capability struct {
+	ID          string    `json:"id"`
+	ProjectID   string    `json:"project_id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description,omitempty"`
+	Owner       string    `json:"owner,omitempty"`
+	Tags        []string  `json:"tags,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// ArtifactRef is the content-addressed reference to an immutable artifact.
+type ArtifactRef struct {
+	Kind string `json:"kind"`
+	Hash string `json:"hash"`
+}
+
+// Manifest is the composition of artifacts that defines a Version.
+type Manifest struct {
+	Prompt        ArtifactRef   `json:"prompt"`
+	ModelPolicy   ArtifactRef   `json:"model_policy"`
+	RuntimePolicy ArtifactRef   `json:"runtime_policy"`
+	Context       ArtifactRef   `json:"context_contract"`
+	Memory        ArtifactRef   `json:"memory"`
+	Guardrails    []ArtifactRef `json:"guardrails,omitempty"`
+	Tools         []ArtifactRef `json:"tools,omitempty"`
+	Knowledge     []ArtifactRef `json:"knowledge_sources,omitempty"`
+	MCPServers    []ArtifactRef `json:"mcp_servers,omitempty"`
+}
+
+// Version is an immutable build of a Capability.
+type Version struct {
+	ID           string    `json:"id"`
+	CapabilityID string    `json:"capability_id"`
+	Version      int       `json:"version"`
+	Manifest     Manifest  `json:"manifest"`
+	ManifestHash string    `json:"manifest_hash,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	CreatedBy    string    `json:"created_by"`
+}
+
+// Release is the approved pointer from a Capability Version to a target Environment.
+type Release struct {
+	ID                string    `json:"id"`
+	CapabilityID      string    `json:"capability_id"`
+	CapabilityVersion int       `json:"capability_version"`
+	Manifest          Manifest  `json:"manifest"`
+	Environment       string    `json:"environment"`
+	Status            string    `json:"status"`
+	ApprovedBy        []string  `json:"approved_by,omitempty"`
+	SupersededBy      string    `json:"superseded_by,omitempty"`
+	ReplacesReleaseID string    `json:"replaces_release_id,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	CreatedBy         string    `json:"created_by"`
+	ActivatedAt       *time.Time `json:"activated_at,omitempty"`
+	SupersededAt      *time.Time `json:"superseded_at,omitempty"`
+}
+
+// Vote is one identity's recorded position on a Release.
+type Vote struct {
+	Identity  string    `json:"identity"`
+	Decision  string    `json:"decision"`
+	Reason    string    `json:"reason,omitempty"`
+	Timestamp time.Time `json:"timestamp,omitempty"`
+}
+
+// Approval is the trail of votes against a Release.
+type Approval struct {
+	ReleaseID string    `json:"release_id"`
+	Votes     []Vote    `json:"votes"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Execution is the recorded outcome of a single Release invocation.
+type Execution struct {
+	ID                  string    `json:"id"`
+	CapabilityVersionID string    `json:"capability_version_id"`
+	Timestamp           time.Time `json:"timestamp"`
+	Inputs              map[string]any `json:"inputs,omitempty"`
+	Outputs             map[string]any `json:"outputs,omitempty"`
+	Model               string    `json:"model"`
+	Provider            string    `json:"provider"`
+}
+
+// CreateWorkspaceRequest is the request body for creating a Workspace.
+type CreateWorkspaceRequest struct {
+	Name         string `json:"name"`
+	Organization string `json:"organization,omitempty"`
+}
+
+// CreateCapabilityRequest is the request body for creating a Capability.
+type CreateCapabilityRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Owner       string `json:"owner,omitempty"`
+}
+
+// AddVersionRequest is the request body for creating a Version.
+type AddVersionRequest struct {
+	Version  int      `json:"version"`
+	Manifest Manifest `json:"manifest"`
+}
+
+// CreateReleaseRequest is the request body for creating a Release.
+type CreateReleaseRequest struct {
+	Environment string `json:"environment"`
+}
+
+// VoteRequest is the request body for recording a vote.
+type VoteRequest struct {
+	Identity string `json:"identity,omitempty"`
+	Decision string `json:"decision"`
+	Reason   string `json:"reason,omitempty"`
+}
+
+// InvokeRequest is the request body for invoking a Release.
+type InvokeRequest struct {
+	Inputs   map[string]any `json:"inputs,omitempty"`
+	Model    string         `json:"model"`
+	Provider string         `json:"provider"`
+}
+
+// --- Workspace / Project / Capability ---
+
+func (c *Client) CreateWorkspace(ctx context.Context, req CreateWorkspaceRequest) (*Workspace, error) {
+	data, err := c.do(ctx, "POST", "/api/v1/workspaces", req)
+	if err != nil {
+		return nil, err
+	}
+	var w Workspace
+	if err := json.Unmarshal(data, &w); err != nil {
+		return nil, err
+	}
+	return &w, nil
+}
+
+func (c *Client) CreateCapability(ctx context.Context, projectID string, req CreateCapabilityRequest) (*Capability, error) {
+	data, err := c.do(ctx, "POST", "/api/v1/projects/"+projectID+"/capabilities", req)
+	if err != nil {
+		return nil, err
+	}
+	var cap Capability
+	if err := json.Unmarshal(data, &cap); err != nil {
+		return nil, err
+	}
+	return &cap, nil
+}
+
+func (c *Client) AddVersion(ctx context.Context, capabilityID string, req AddVersionRequest) (*Version, error) {
+	data, err := c.do(ctx, "POST", "/api/v1/capabilities/"+capabilityID+"/versions", req)
+	if err != nil {
+		return nil, err
+	}
+	var v Version
+	if err := json.Unmarshal(data, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+// --- Release + Approval ---
+
+// CreateRelease creates a Pending Release for a Version.
+func (c *Client) CreateRelease(ctx context.Context, versionID string, req CreateReleaseRequest) (*Release, error) {
+	data, err := c.do(ctx, "POST", "/api/v1/versions/"+versionID+"/releases", req)
+	if err != nil {
+		return nil, err
+	}
+	var r Release
+	if err := json.Unmarshal(data, &r); err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+// GetRelease returns a Release by id.
+func (c *Client) GetRelease(ctx context.Context, id string) (*Release, error) {
+	data, err := c.do(ctx, "GET", "/api/v1/releases/"+id, nil)
+	if err != nil {
+		return nil, err
+	}
+	var r Release
+	if err := json.Unmarshal(data, &r); err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+// ListReleases returns all Releases for a Capability.
+func (c *Client) ListReleases(ctx context.Context, capabilityID string) ([]*Release, error) {
+	data, err := c.do(ctx, "GET", "/api/v1/capabilities/"+capabilityID+"/releases", nil)
+	if err != nil {
+		return nil, err
+	}
+	var rs []*Release
+	if err := json.Unmarshal(data, &rs); err != nil {
+		return nil, err
+	}
+	return rs, nil
+}
+
+// Vote records a vote on a Release.
+func (c *Client) Vote(ctx context.Context, releaseID string, req VoteRequest) (*Approval, error) {
+	data, err := c.do(ctx, "POST", "/api/v1/releases/"+releaseID+"/votes", req)
+	if err != nil {
+		return nil, err
+	}
+	var a Approval
+	if err := json.Unmarshal(data, &a); err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+// Activate transitions a Pending Release to Active.
+func (c *Client) Activate(ctx context.Context, releaseID string) (*Release, error) {
+	data, err := c.do(ctx, "POST", "/api/v1/releases/"+releaseID+"/activate", nil)
+	if err != nil {
+		return nil, err
+	}
+	var r Release
+	if err := json.Unmarshal(data, &r); err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+// Rollback moves a Release to RolledBack.
+func (c *Client) Rollback(ctx context.Context, releaseID string) (*Release, error) {
+	data, err := c.do(ctx, "POST", "/api/v1/releases/"+releaseID+"/rollback", nil)
+	if err != nil {
+		return nil, err
+	}
+	var r Release
+	if err := json.Unmarshal(data, &r); err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+// Invoke runs the Release through the configured LLM providers.
+func (c *Client) Invoke(ctx context.Context, releaseID string, req InvokeRequest) (*Execution, error) {
+	data, err := c.do(ctx, "POST", "/api/v1/releases/"+releaseID+"/invoke", req)
+	if err != nil {
+		return nil, err
+	}
+	var e Execution
+	if err := json.Unmarshal(data, &e); err != nil {
+		return nil, err
+	}
+	return &e, nil
+}
+
+// Approval returns the vote trail for a Release.
+func (c *Client) Approval(ctx context.Context, releaseID string) (*Approval, error) {
+	data, err := c.do(ctx, "GET", "/api/v1/releases/"+releaseID+"/approval", nil)
+	if err != nil {
+		return nil, err
+	}
+	var a Approval
+	if err := json.Unmarshal(data, &a); err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+// ApproveAndInvoke is the convenience flow used by the README: vote
+// as a non-creator identity, activate, then invoke. The voter
+// identity must differ from the Release's CreatedBy; otherwise the
+// maker-checker policy rejects the activation.
+func (c *Client) ApproveAndInvoke(ctx context.Context, releaseID, voterIdentity string, invokeReq InvokeRequest) (*Execution, error) {
+	if _, err := c.Vote(ctx, releaseID, VoteRequest{Identity: voterIdentity, Decision: "approve"}); err != nil {
+		return nil, fmt.Errorf("vote: %w", err)
+	}
+	if _, err := c.Activate(ctx, releaseID); err != nil {
+		return nil, fmt.Errorf("activate: %w", err)
+	}
+	return c.Invoke(ctx, releaseID, invokeReq)
 }
