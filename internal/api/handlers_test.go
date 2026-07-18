@@ -528,6 +528,23 @@ func (m *mockRepo) DeleteRelease(_ context.Context, id string) error {
 	delete(m.releases, id)
 	return nil
 }
+func (m *mockRepo) ActivateAtomic(_ context.Context, prior, next *release.Release) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if prior != nil {
+		if _, ok := m.releases[prior.ID]; !ok {
+			return release.ErrNotFound
+		}
+		cp := *prior
+		m.releases[prior.ID] = &cp
+	}
+	if _, ok := m.releases[next.ID]; !ok {
+		return release.ErrNotFound
+	}
+	cp := *next
+	m.releases[next.ID] = &cp
+	return nil
+}
 
 // Approvals
 func (m *mockRepo) CreateApproval(_ context.Context, a *approval.Approval) error {

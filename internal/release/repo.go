@@ -24,4 +24,14 @@ type Repository interface {
 	ListActiveReleasesForEnvironment(ctx context.Context, env Environment) ([]*Release, error)
 	UpdateRelease(ctx context.Context, r *Release) error
 	DeleteRelease(ctx context.Context, id string) error
+
+	// ActivateAtomic supersedes the prior Release (if non-nil) and
+	// persists the next Release in a single transaction. The
+	// invariant "exactly one Active Release per (Capability, Environment)"
+	// is upheld atomically: either both writes commit or neither does.
+	//
+	// Storage backends without transactional support may implement
+	// this as two separate writes (and document the gap); the call
+	// site does not need to know which.
+	ActivateAtomic(ctx context.Context, prior, next *Release) error
 }
