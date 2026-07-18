@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -216,4 +217,44 @@ func TestApprovalRoundTrip(t *testing.T) {
 	if len(got2.Votes) != 2 {
 		t.Fatalf("votes = %d want 2", len(got2.Votes))
 	}
+}
+
+// TestActivateAtomicRollbackOnMissingNext verifies that ActivateAtomic
+// returns ErrNotFound and rolls back when the next Release ID is not
+// present in the table. The prior must not be mutated.
+func TestActivateAtomicRollbackOnMissingNext(t *testing.T) {
+	fx := newReleaseFixture(t)
+	ctx := context.Background()
+
+	prior, _ := release.New(fx.capabilityID, 1, validManifest(), release.EnvProd, "alice")
+	prior.ID = "prior-existing"
+	if err := fx.db.CreateRelease(ctx, &prior); err != nil {
+		t.Fatalf("create prior: %v", err)
+	}
+	priorSnapshot := mustGetRelease(t, fx.db, "prior-existing")
+
+	next := prior
+	next.ID = "next-missing"
+	priorTransformed := prior
+	priorTransformed.Status = release.StatusSuperseded
+	priorTransformed.SupersededBy = "next-missing"
+
+	err := fx.db.ActivateAtomic(ctx, &priorTransformed, &next)
+	if !errors.Is(err, release.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+
+	got := mustGetRelease(t, fx.db, "prior-existing")
+	if got.Status != priorSnapshot.Status {
+		t.Fatalf("prior mutated despite next missing: status=%q want %q", got.Status, priorSnapshot.Status)
+	}
+}
+
+func mustGetRelease(t *testing.T, s *store.SQLite, id string) *release.Release {
+	t.Helper()
+	r, err := s.GetRelease(context.Background(), id)
+	if err != nil {
+		t.Fatalf("mustGetRelease(%q): %v", id, err)
+	}
+	return r
 }
