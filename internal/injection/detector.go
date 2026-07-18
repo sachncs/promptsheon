@@ -136,12 +136,12 @@ func formatFloat(s float64, places int) string {
 		frac = -frac
 	}
 	if places == 2 && intPart < 10 {
-		return itoa(intPart) + "." + pad2(itoa(frac))
+		return writeInt(intPart) + "." + pad2(writeInt(frac))
 	}
-	return itoa(intPart) + "." + itoa(frac)
+	return writeInt(intPart) + "." + writeInt(frac)
 }
 
-func itoa(n int) string {
+func writeInt(n int) string {
 	if n == 0 {
 		return "0"
 	}

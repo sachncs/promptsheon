@@ -1,4 +1,5 @@
-// Package abtesting provides A/B testing capabilities for prompts.
+// Package experiment provides in-memory weighted A/B testing
+// with per-variant metric aggregation.
 package experiment
 
 import (
@@ -31,23 +32,47 @@ type Metric struct {
 	SuccessRate  float64 `json:"success_rate"`
 }
 
+// TestStatus identifies the lifecycle state of a Test.
+type TestStatus string
+
+const (
+	// TestStatusRunning is the default state for an active test.
+	TestStatusRunning TestStatus = "running"
+	// TestStatusPaused halts variant selection without losing history.
+	TestStatusPaused TestStatus = "paused"
+	// TestStatusCompleted marks a finished test.
+	TestStatusCompleted TestStatus = "completed"
+)
+
+// WinCriterion names the metric used to declare a winner.
+type WinCriterion string
+
+const (
+	// WinBySuccessRate picks the variant with the highest success rate.
+	WinBySuccessRate WinCriterion = "success_rate"
+	// WinByLatency picks the variant with the lowest latency.
+	WinByLatency WinCriterion = "latency"
+	// WinByCost picks the variant with the lowest average cost.
+	WinByCost WinCriterion = "cost"
+)
+
 // Test represents an A/B test configuration.
 type Test struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	PromptID    string     `json:"prompt_id"`
-	Status      string     `json:"status"` // "running", "paused", "completed"
-	Variants    []*Variant `json:"variants"`
-	WinCriteria string     `json:"win_criteria"` // "success_rate", "latency", "cost"
-	StartTime   time.Time  `json:"start_time"`
-	EndTime     *time.Time `json:"end_time,omitempty"`
-	MinSamples  int        `json:"min_samples"`
+	ID          string       `json:"id"`
+	Name        string       `json:"name"`
+	PromptID    string       `json:"prompt_id"`
+	Status      TestStatus   `json:"status"`
+	Variants    []*Variant   `json:"variants"`
+	WinCriteria WinCriterion `json:"win_criteria"`
+	StartTime   time.Time    `json:"start_time"`
+	EndTime     *time.Time   `json:"end_time,omitempty"`
+	MinSamples  int          `json:"min_samples"`
 }
 
 // TestResults contains the results of an A/B test.
 type TestResults struct {
 	TestID        string           `json:"test_id"`
-	Status        string           `json:"status"`
+	Status        TestStatus       `json:"status"`
 	Variants      []*VariantResult `json:"variants"`
 	Winner        string           `json:"winner,omitempty"`
 	Confidence    float64          `json:"confidence"`
@@ -244,11 +269,11 @@ func (e *Engine) GetResults(testID string) (*TestResults, error) {
 		// Determine winner based on criteria
 		var score float64
 		switch test.WinCriteria {
-		case "success_rate":
+		case WinBySuccessRate:
 			score = metrics.SuccessRate
-		case "latency":
+		case WinByLatency:
 			score = 1.0 / (metrics.AvgLatencyMs + 1) // lower is better
-		case "cost":
+		case WinByCost:
 			score = 1.0 / (metrics.AvgCost + 0.001) // lower is better
 		default:
 			score = metrics.SuccessRate
@@ -289,18 +314,18 @@ func (e *Engine) ListTests() []*Test {
 	return tests
 }
 
-func sortVariantsByScore(variants []*VariantResult, criteria string) {
+func sortVariantsByScore(variants []*VariantResult, criteria WinCriterion) {
 	for i := 0; i < len(variants); i++ {
 		for j := i + 1; j < len(variants); j++ {
 			var scoreI, scoreJ float64
 			switch criteria {
-			case "success_rate":
+			case WinBySuccessRate:
 				scoreI = variants[i].Metrics.SuccessRate
 				scoreJ = variants[j].Metrics.SuccessRate
-			case "latency":
+			case WinByLatency:
 				scoreI = 1.0 / (variants[i].Metrics.AvgLatencyMs + 1)
 				scoreJ = 1.0 / (variants[j].Metrics.AvgLatencyMs + 1)
-			case "cost":
+			case WinByCost:
 				scoreI = 1.0 / (variants[i].Metrics.AvgCost + 0.001)
 				scoreJ = 1.0 / (variants[j].Metrics.AvgCost + 0.001)
 			default:
