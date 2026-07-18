@@ -11,12 +11,10 @@ import (
 
 // Config holds all configuration for the server.
 type Config struct {
-	Addr      string // Listen address (e.g., ":8080")
-	DBBackend string // "sqlite" (default) or "postgres"
-	DBPath    string // SQLite database file path
-	DBDSN     string // Postgres connection string (when DBBackend=postgres)
-	LogLevel  string // Log level: debug, info, warn, error
-	Auth      bool   // Enable authentication and authorization
+	Addr     string // Listen address (e.g., ":8080")
+	DBPath   string // SQLite database file path
+	LogLevel string // Log level: debug, info, warn, error
+	Auth     bool   // Enable authentication and authorization
 
 	// Server timeouts
 	WriteTimeout      int // Write timeout in seconds (default: 30)
@@ -30,12 +28,12 @@ type Config struct {
 	RateLimitBurst    int // Burst capacity (default: 50)
 
 	// Circuit breaker
-	CircuitBreakerFailureThreshold int // Failures before opening (default: 5)
-	CircuitBreakerSuccessThreshold int // Successes to close (default: 3)
+	CircuitBreakerFailureThreshold int // Failures before opening the circuit (default: 5)
+	CircuitBreakerSuccessThreshold int // Successes to close the circuit (default: 3)
 	CircuitBreakerCooldown         int // Cooldown in seconds (default: 30)
 
 	// LLM fallback
-	LLMFallback string // Comma-separated fallback providers (e.g., "anthropic,ollama")
+	LLMFallback string // Comma-separated fallback providers (e.g., "anthropic,openai")
 
 	// OpenTelemetry
 	OTelEndpoint string // OTLP gRPC endpoint (e.g., "jaeger:4317")
@@ -57,11 +55,10 @@ const valNo = "no"
 // DefaultConfig returns the default configuration.
 func DefaultConfig() Config {
 	return Config{
-		Addr:      defaultAddr,
-		DBBackend: "sqlite",
-		DBPath:    "promptsheon.db",
-		LogLevel:  "info",
-		Auth:      true,
+		Addr:     defaultAddr,
+		DBPath:   "promptsheon.db",
+		LogLevel: "info",
+		Auth:     true,
 
 		WriteTimeout:      30,
 		ReadTimeout:       30,
@@ -93,9 +90,7 @@ func LoadConfig() Config {
 	cfg := DefaultConfig()
 
 	cfg.Addr = getEnvString("PROMPTSHEON_ADDR", cfg.Addr)
-	cfg.DBBackend = getEnvString("PROMPTSHEON_DB_BACKEND", cfg.DBBackend)
 	cfg.DBPath = getEnvString("PROMPTSHEON_DB_PATH", cfg.DBPath)
-	cfg.DBDSN = getEnvString("PROMPTSHEON_DB_DSN", cfg.DBDSN)
 	cfg.LogLevel = getEnvString("PROMPTSHEON_LOG_LEVEL", cfg.LogLevel)
 	cfg.Auth = getEnvBool("PROMPTSHEON_AUTH", cfg.Auth)
 
