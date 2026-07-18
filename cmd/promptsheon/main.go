@@ -91,6 +91,7 @@ var commandHandlers = map[string]func([]string) error{
 	"workspace":     cmdWorkspace,
 	"project":       cmdProject,
 	"capability":    cmdCapability,
+	"release":       cmdRelease,
 	"help":          func(_ []string) error { printUsage(); return nil },
 }
 
@@ -131,7 +132,7 @@ Usage:
   log [n]                     Show commit history
   checkout <ref|hash>         Switch to a branch or commit
   branch [name] [hash]        Create or list branches
-  delete-branch <name>        Delete a branch
+  delete-branch <name>        Delete branch
   diff <hashA> <hashB>        Diff two intelligence states
   status                      Show repository state summary
   show <hash>                 Show object details (type-aware)
@@ -145,7 +146,8 @@ Usage:
   provider test <name>        Test an LLM provider
   workspace <list|create|get|delete>  Manage workspaces via API
   project <list|create|get|delete>    Manage projects via API
-  capability <list|create|get|delete> Manage capabilities via API`)
+  capability <list|create|get|delete> Manage capabilities via API
+  release <list|get|vote|activate|rollback|invoke|approval>  Manage releases via API`)
 }
 
 func cmdInit() error {
@@ -1083,6 +1085,102 @@ func cmdCapability(args []string) error {
 		fmt.Println("deleted")
 	default:
 		return fmt.Errorf("unknown capability subcommand: %s", args[0])
+	}
+	return nil
+}
+
+func cmdRelease(args []string) error {
+	if len(args) == 0 {
+		return usageErrorf("promptsheon release <list|create|get|vote|activate|rollback|invoke|approval>")
+	}
+	server := serverURL()
+	switch args[0] {
+	case opList:
+		if len(args) < 2 {
+			return usageErrorf("promptsheon release list <capability_id>")
+		}
+		var rs []any
+		if err := httpGet(server+"/api/v1/capabilities/"+args[1]+"/releases", &rs); err != nil {
+			return err
+		}
+		for _, r := range rs {
+			fmt.Printf("%+v\n", r)
+		}
+	case opCreate:
+		if len(args) < 3 {
+			return usageErrorf("promptsheon release create <version_id> <environment>")
+		}
+		var result any
+		body := map[string]string{"environment": args[2]}
+		if err := httpPost(server+"/api/v1/versions/"+args[1]+"/releases", body, &result); err != nil {
+			return err
+		}
+		fmt.Printf("%+v\n", result)
+	case opGet:
+		if len(args) < 2 {
+			return usageErrorf("promptsheon release get <id>")
+		}
+		var result any
+		if err := httpGet(server+"/api/v1/releases/"+args[1], &result); err != nil {
+			return err
+		}
+		fmt.Printf("%+v\n", result)
+	case "vote":
+		if len(args) < 4 {
+			return usageErrorf("promptsheon release vote <id> <identity> <approve|reject|abstain>")
+		}
+		var result any
+		body := map[string]string{"identity": args[2], "decision": args[3]}
+		if err := httpPost(server+"/api/v1/releases/"+args[1]+"/votes", body, &result); err != nil {
+			return err
+		}
+		fmt.Printf("%+v\n", result)
+	case "activate":
+		if len(args) < 2 {
+			return usageErrorf("promptsheon release activate <id>")
+		}
+		var result any
+		if err := httpPost(server+"/api/v1/releases/"+args[1]+"/activate", map[string]string{}, &result); err != nil {
+			return err
+		}
+		fmt.Printf("%+v\n", result)
+	case "rollback":
+		if len(args) < 2 {
+			return usageErrorf("promptsheon release rollback <id>")
+		}
+		var result any
+		if err := httpPost(server+"/api/v1/releases/"+args[1]+"/rollback", map[string]string{}, &result); err != nil {
+			return err
+		}
+		fmt.Printf("%+v\n", result)
+	case "invoke":
+		if len(args) < 2 {
+			return usageErrorf("promptsheon release invoke <id> --model <m>")
+		}
+		model := ""
+		for i := 2; i < len(args); i++ {
+			if args[i] == "--model" && i+1 < len(args) {
+				model = args[i+1]
+				break
+			}
+		}
+		body := map[string]string{"model": model}
+		var result any
+		if err := httpPost(server+"/api/v1/releases/"+args[1]+"/invoke", body, &result); err != nil {
+			return err
+		}
+		fmt.Printf("%+v\n", result)
+	case "approval":
+		if len(args) < 2 {
+			return usageErrorf("promptsheon release approval <id>")
+		}
+		var result any
+		if err := httpGet(server+"/api/v1/releases/"+args[1]+"/approval", &result); err != nil {
+			return err
+		}
+		fmt.Printf("%+v\n", result)
+	default:
+		return fmt.Errorf("unknown release subcommand: %s", args[0])
 	}
 	return nil
 }
