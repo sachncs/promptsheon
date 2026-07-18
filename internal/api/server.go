@@ -493,7 +493,11 @@ func writeError(w http.ResponseWriter, err error) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if encErr := json.NewEncoder(w).Encode(map[string]string{valError: err.Error()}); encErr != nil {
+	body := map[string]any{valError: err.Error()}
+	if errors.As(err, &httpErr) && httpErr.Details != nil {
+		body["details"] = httpErr.Details
+	}
+	if encErr := json.NewEncoder(w).Encode(body); encErr != nil {
 		slog.Error("failed to encode error json response", "err", encErr)
 	}
 }
@@ -671,6 +675,7 @@ var (
 type HTTPError struct {
 	Status  int
 	Message string
+	Details any // optional structured payload (e.g. precondition failures)
 }
 
 func (e *HTTPError) Error() string { return e.Message }
