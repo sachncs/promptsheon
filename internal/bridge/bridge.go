@@ -4,18 +4,18 @@
 // values; the Producer's existing SinkFunc then persists them
 // alongside the rule-engine output.
 //
-// This is the Tier 2.49 follow-on: the SLO library shipped its
-// value type in the previous commit. Today's commit provides the
-// adapter that makes SLO breaches a first-class source of
-// Recommendations, alongside the deterministic rules engine.
+// Each breach signal maps to a RecommendationType:
 //
-// The recommended type is fixed at capability.RecommendationAddGuardrail
-// when the breach is on HallucinationRate or SuccessRate; the
-// engine is forced to AddGuardrail because SLO breaches are the
-// single most authoritative signal for a Capability to need
-// additional defence. Other signal types (latency, cost) are
-// surfaced as recommendations in a follow-on commit; today they
-// are not emitted by the bridge to keep the contract narrow.
+//   - hallucination_rate, success_rate -> add_guardrail
+//   - p95_latency_ms                  -> compress_prompt or
+//     reduce_context
+//   - avg_cost_usd_micro              -> enable_cache
+//   - availability                    -> tune_policy
+//
+// The mapping is the single source of truth for "what does an SLO
+// breach recommend". Production wiring runs Run() on the
+// observation tick; the resulting recommendations feed the same
+// Producer pipeline as the rule-engine output.
 package bridge
 
 import (
@@ -38,15 +38,11 @@ type BreachEvent struct {
 	DetectedAt   time.Time
 }
 
-// Evaluate returns one Recommendation per breach. The shape is
-// fixed (AddGuardrail) and the Reason field carries the
-// auditable signal name and burn-rate. The bridge returns nil
-// when the breach is on a signal the v1 bridge does not cover
-// (latency, cost) so the rules engine can keep emitting
-// compress/cache recommendations for those.
-//
-// The non-blocking nature of the bridge is deliberate: an empty
-// event returns nil, nil.
+// Evaluate returns one Recommendation per breach. The Reason
+// field carries the auditable signal name and burn-rate. The
+// bridge returns (nil, nil) when the breach is on a signal it
+// does not cover so the caller can keep emitting complementary
+// recommendations from other engines.
 func (b BreachEvent) Evaluate() (*capability.Recommendation, error) {
 	if b.CapabilityID == "" {
 		return nil, fmt.Errorf("bridge: empty capability_id")
@@ -57,25 +53,70 @@ func (b BreachEvent) Evaluate() (*capability.Recommendation, error) {
 	if b.BurnRate <= 0 {
 		return nil, nil
 	}
-	switch b.Signal {
-	case "hallucination_rate", "success_rate":
-		rec := &capability.Recommendation{
-			ID:                  "slo-bridge-" + b.Signal + "-" + b.VersionID,
+	recType, ok := signalToRecommendation[b.Signal]
+	if !ok {
+		return nil, nil
+	}
+	rec := &capability.Recommendation{
+		ID:                  "slo-bridge-" + b.Signal + "-" + b.VersionID,
+		CapabilityVersionID: b.VersionID,
+		Type:                recType,
+		Reason:              fmt.Sprintf("SLO breach signal=%s burn_rate=%.4f", b.Signal, b.BurnRate),
+		Confidence:          0.95,
+		Impact:              "high",
+		AutoApplicable:      recType == capability.RecommendationEnableCache, // cache is the only safe auto-apply
+		CreatedAt:           b.DetectedAt,
+	}
+	return rec, nil
+}
+
+// signalToRecommendation maps an SLO signal name to the
+// RecommendationType the bridge emits. Latency breaches at high
+// p95 get compress_prompt; very-high p95 escalates to
+// reduce_context. The boundary is governed by the burn rate:
+// burn >= 2.0 means the prompt itself is too long, otherwise the
+// history window is the target.
+var signalToRecommendation = func() map[string]capability.RecommendationType {
+	m := map[string]capability.RecommendationType{
+		"hallucination_rate": capability.RecommendationAddGuardrail,
+		"success_rate":       capability.RecommendationAddGuardrail,
+		"avg_cost_usd_micro": capability.RecommendationEnableCache,
+		"availability":       capability.RecommendationTunePolicy,
+	}
+	// Latency has two recommendation shapes; the per-event
+	// evaluator picks one based on burn rate.
+	m["p95_latency_ms"] = capability.RecommendationCompressPrompt
+	return m
+}()
+
+// Evaluate is called as a method on BreachEvent so the latency
+// signal can branch on burn rate without polluting the static map.
+func (b BreachEvent) recTypeForLatency() capability.RecommendationType {
+	if b.BurnRate >= 2.0 {
+		return capability.RecommendationReduceContext
+	}
+	return capability.RecommendationCompressPrompt
+}
+
+// Evaluate returns the recommendation for this breach. The public
+// entry point; the (signal -> type) map covers the simple cases,
+// and latency routes through recTypeForLatency for burn-rate
+// escalation.
+func (b BreachEvent) recommendation() (*capability.Recommendation, error) {
+	if b.Signal == "p95_latency_ms" {
+		recType := b.recTypeForLatency()
+		return &capability.Recommendation{
+			ID:                  "slo-bridge-p95_latency_ms-" + b.VersionID,
 			CapabilityVersionID: b.VersionID,
-			Type:                capability.RecommendationAddGuardrail,
+			Type:                recType,
 			Reason:              fmt.Sprintf("SLO breach signal=%s burn_rate=%.4f", b.Signal, b.BurnRate),
 			Confidence:          0.95,
 			Impact:              "high",
-			AutoApplicable:      false, // guardrail additions never auto-applied
+			AutoApplicable:      false,
 			CreatedAt:           b.DetectedAt,
-		}
-		return rec, nil
-	default:
-		// Latency, cost, availability are surfaced by the rules
-		// engine today; the bridge ignores them. The empty
-		// Recommendation list is the contract.
-		return nil, nil
+		}, nil
 	}
+	return b.Evaluate()
 }
 
 // Run consumes a stream of breach events (typically the
@@ -88,7 +129,7 @@ func Run(ctx context.Context, events []BreachEvent) ([]capability.Recommendation
 		if err := ctx.Err(); err != nil {
 			return out, err
 		}
-		rec, err := e.Evaluate()
+		rec, err := e.recommendation()
 		if err != nil {
 			return out, err
 		}

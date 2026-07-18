@@ -67,15 +67,66 @@ func TestBreachEventSuccessRateProducesAddGuardrail(t *testing.T) {
 	}
 }
 
-func TestBreachEventLatencyIsIgnored(t *testing.T) {
+func TestBreachEventLatencyMapsToCompressPrompt(t *testing.T) {
 	t.Parallel()
-	b := BreachEvent{CapabilityID: "cap-1", VersionID: "ver-1", Signal: "p95_latency_ms", BurnRate: 2.0}
+	b := BreachEvent{CapabilityID: "cap-1", VersionID: "ver-1", Signal: "p95_latency_ms", BurnRate: 1.5}
+	rec, err := b.recommendation()
+	if err != nil {
+		t.Fatalf("recommendation: %v", err)
+	}
+	if rec == nil {
+		t.Fatal("expected recommendation for latency breach")
+	}
+	if rec.Type != "compress_prompt" {
+		t.Errorf("Type = %q, want compress_prompt", rec.Type)
+	}
+}
+
+func TestBreachEventHighLatencyEscalatesToReduceContext(t *testing.T) {
+	t.Parallel()
+	b := BreachEvent{CapabilityID: "cap-1", VersionID: "ver-1", Signal: "p95_latency_ms", BurnRate: 5.0}
+	rec, err := b.recommendation()
+	if err != nil {
+		t.Fatalf("recommendation: %v", err)
+	}
+	if rec == nil {
+		t.Fatal("expected recommendation for latency breach")
+	}
+	if rec.Type != "reduce_context" {
+		t.Errorf("Type = %q, want reduce_context", rec.Type)
+	}
+}
+
+func TestBreachEventCostMapsToEnableCache(t *testing.T) {
+	t.Parallel()
+	b := BreachEvent{CapabilityID: "cap-1", VersionID: "ver-1", Signal: "avg_cost_usd_micro", BurnRate: 1.2}
 	rec, err := b.Evaluate()
 	if err != nil {
 		t.Fatalf("evaluate: %v", err)
 	}
-	if rec != nil {
-		t.Fatalf("expected nil for latency, got %+v", rec)
+	if rec == nil {
+		t.Fatal("expected recommendation for cost breach")
+	}
+	if rec.Type != "enable_cache" {
+		t.Errorf("Type = %q, want enable_cache", rec.Type)
+	}
+	if !rec.AutoApplicable {
+		t.Error("enable_cache should be AutoApplicable=true")
+	}
+}
+
+func TestBreachEventAvailabilityMapsToTunePolicy(t *testing.T) {
+	t.Parallel()
+	b := BreachEvent{CapabilityID: "cap-1", VersionID: "ver-1", Signal: "availability", BurnRate: 3.0}
+	rec, err := b.Evaluate()
+	if err != nil {
+		t.Fatalf("evaluate: %v", err)
+	}
+	if rec == nil {
+		t.Fatal("expected recommendation for availability breach")
+	}
+	if rec.Type != "tune_policy" {
+		t.Errorf("Type = %q, want tune_policy", rec.Type)
 	}
 }
 
@@ -91,8 +142,8 @@ func TestRunAggregatesEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if len(got) != 2 {
-		t.Fatalf("expected 2 recommendations (hallucination + success_rate), got %d", len(got))
+	if len(got) != 3 {
+		t.Fatalf("expected 3 recommendations (hallucination + latency + success_rate), got %d", len(got))
 	}
 }
 

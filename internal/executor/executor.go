@@ -133,44 +133,65 @@ func (e *Executor) HandleScheduleEvent(ctx context.Context, ev capability.Event)
 // for the (Workspace, Capability, Environment) tuple; this method
 // keeps that lookup out of the test path.
 func (e *Executor) Run(ctx context.Context, workspaceID, releaseID, environment string, input json.RawMessage) (ExecutionRecord, error) {
-	now := time.Now().UTC()
-	inputHash := hashRaw(input)
-	req := InvokeRequest{
+	return e.RunRequest(ctx, InvokeRequest{
 		WorkspaceID:   workspaceID,
 		ReleaseID:     releaseID,
-		ManifestHash:  "<injected-by-caller>",
-		InputHash:     inputHash,
+		ManifestHash:  deriveManifestHash(workspaceID, releaseID),
+		InputHash:     hashRaw(input),
 		Input:         input,
-		Model:         "<injected-by-caller>",
+		Model:         "<unspecified>",
 		ModelRevision: time.Now().UTC().Format("2006-01-02"),
+	}, environment)
+}
+
+// RunRequest executes an invocation using the supplied InvokeRequest.
+// The caller is responsible for filling ManifestHash, Model, and
+// ModelRevision from the production lookup; this method does not
+// second-guess them.
+func (e *Executor) RunRequest(ctx context.Context, req InvokeRequest, environment string) (ExecutionRecord, error) {
+	now := time.Now().UTC()
+	if req.InputHash == "" {
+		req.InputHash = hashRaw(req.Input)
 	}
 	rec := ExecutionRecord{
-		ID:          generateID("exec"),
-		WorkspaceID: workspaceID,
-		ReleaseID:   releaseID,
-		Environment: environment,
-		Input:       input,
-		InputHash:   inputHash,
-		StartedAt:   now,
-		Status:      "running",
+		ID:            generateID("exec"),
+		WorkspaceID:   req.WorkspaceID,
+		ReleaseID:     req.ReleaseID,
+		Environment:   environment,
+		ManifestHash:  req.ManifestHash,
+		InputHash:     req.InputHash,
+		Input:         req.Input,
+		Model:         req.Model,
+		ModelRevision: req.ModelRevision,
+		StartedAt:     now,
+		Status:        "running",
 	}
 	res, err := e.caller(ctx, req)
 	rec.FinishedAt = time.Now().UTC()
 	if err != nil {
 		rec.Status = "error"
 		rec.Error = err.Error()
-	} else {
-		rec.Output = res.Output
-		rec.Status = res.Status
-		rec.Error = res.Error
-		rec.PromptTokens = res.PromptTokens
-		rec.OutputTokens = res.OutputTokens
-		rec.CostUSD = float64(res.CostUSDMicro) * e.costUSDPerMicro
-		rec.LatencyMS = res.LatencyMS
-		rec.Model = req.Model
-		rec.ModelRevision = req.ModelRevision
+		return rec, nil
 	}
+	rec.Output = res.Output
+	rec.Status = res.Status
+	rec.Error = res.Error
+	rec.PromptTokens = res.PromptTokens
+	rec.OutputTokens = res.OutputTokens
+	rec.CostUSD = float64(res.CostUSDMicro) * e.costUSDPerMicro
+	rec.LatencyMS = res.LatencyMS
 	return rec, nil
+}
+
+// deriveManifestHash returns a deterministic placeholder when no
+// manifest hash is supplied. Real production paths fill it from
+// the active Release lookup.
+func deriveManifestHash(workspaceID, releaseID string) string {
+	h := sha256.New()
+	h.Write([]byte(workspaceID))
+	h.Write([]byte{0x1f})
+	h.Write([]byte(releaseID))
+	return "sha256:" + hex.EncodeToString(h.Sum(nil))
 }
 
 // ReplayBuf is a tiny in-memory implementation of replay.Repository
