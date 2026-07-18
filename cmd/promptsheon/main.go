@@ -99,6 +99,9 @@ var commandHandlers = map[string]func([]string) error{
 	"project":       cmdProject,
 	"capability":    cmdCapability,
 	"release":       cmdRelease,
+	"dataset":       cmdDataset,
+	"precondition":  cmdPrecondition,
+	"eval":          cmdEval,
 	"help":          func(_ []string) error { printUsage(); return nil },
 }
 
@@ -154,7 +157,10 @@ Usage:
   workspace <list|create|get|delete>  Manage workspaces via API
   project <list|create|get|delete>    Manage projects via API
   capability <list|create|get|delete> Manage capabilities via API
-  release <list|get|vote|activate|rollback|invoke|approval>  Manage releases via API`)
+  release <list|get|vote|activate|rollback|invoke|approval>  Manage releases via API
+  dataset <list|create|get|put-cases|delete>        Manage eval datasets
+  precondition <list|add|delete>                  Manage Activate preconditions
+  eval <list|run|get>                              Run and inspect eval runs`)
 }
 
 // ---------------------------------------------------------------------------
