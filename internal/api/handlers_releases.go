@@ -10,6 +10,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/auth"
 	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/executor"
+	"github.com/sachncs/promptsheon/internal/harness"
 	"github.com/sachncs/promptsheon/internal/release"
 )
 
@@ -143,6 +144,17 @@ func (s *Server) handleActivateRelease(w http.ResponseWriter, r *http.Request) e
 		}
 		if errors.Is(err, release.ErrNotFound) {
 			return ErrNotFound
+		}
+		if errors.Is(err, harness.ErrPreconditionFailed) {
+			var pe *harness.PreconditionError
+			if errors.As(err, &pe) {
+				return &HTTPError{
+					Status:  http.StatusConflict,
+					Message: pe.Error(),
+					Details: map[string]any{"failures": pe.Failures},
+				}
+			}
+			return &HTTPError{Status: http.StatusConflict, Message: err.Error()}
 		}
 		return badRequest(err.Error())
 	}
