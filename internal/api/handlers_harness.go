@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"time"
 
@@ -280,16 +279,6 @@ func (s *Server) handleGetEval(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"run": run, "results": results})
-	return nil
-}
-
-// errors.As helper: returns true if any error in err's chain matches
-// target. Used by handlers to translate PreconditionError to 409.
-func preconditionErrorFromChain(err error) *harness.PreconditionError {
-	var pe *harness.PreconditionError
-	if errors.As(err, &pe) {
-		return pe
-	}
 	return nil
 }
 
