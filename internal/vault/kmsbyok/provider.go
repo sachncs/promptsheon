@@ -1,10 +1,9 @@
-// Package kmsbyok is a stub KMS-backed KeyProvider for production
-// deployments. The shape matches the architecture review board's
-// Tier 2.45 follow-on plan: a thin wrapper around the AWS KMS
-// GenerateDataKey API. The full SDK dependency ships in M3
-// follow-on; today's commit delivers the value type, the
-// production-time configuration, and the deterministic test
-// double that lets the daemon boot in CI without an AWS account.
+// Package kmsbyok is a real KMS-backed KeyProvider for production
+// deployments. The Provider wraps a KMSClient (typically the AWS
+// KMS adapter in aws.go) and caches the plaintext data key. AWS
+// is the only supported KMS in this build; swapping providers is
+// a one-line change at the construction site (just supply a
+// different KMSClient).
 package kmsbyok
 
 import (
@@ -14,15 +13,23 @@ import (
 	"sync"
 )
 
-// Config is the per-deployment configuration. Today it is read
-// from PROMPTSHEON_KMS_KEY_ID plus the standard AWS SDK env
-// (region, credentials); the real path constructs an AWS KMS
-// client and calls GenerateDataKey. The stub returns a
-// deterministic test key when KMSClient is nil.
+// ErrKMSClientRequired is returned when the Provider is
+// constructed without a KMSClient. Production tenants MUST wire a
+// real AWS KMS client; the only consumers allowed to use the
+// nil-client path are tests that explicitly inject a test double
+// via Config.AllowTestDouble.
+var ErrKMSClientRequired = errors.New("kmsbyok: KMSClient required (production); tests must set AllowTestDouble")
+
+// Config is the per-deployment configuration. KeyID is the KMS
+// key ARN; Region is the AWS region for the SDK config; KMSClient
+// is the consumer-supplied adapter (the AWS SDK adapter is in
+// aws.go). AllowTestDouble is true only in tests; production
+// constructors reject an unset KMSClient.
 type Config struct {
-	KeyID     string
-	Region    string
-	KMSClient KMSClient
+	KeyID           string
+	Region          string
+	KMSClient       KMSClient
+	AllowTestDouble bool
 }
 
 // KMSClient is the consumer-defined interface that abstracts the
@@ -41,19 +48,23 @@ type Provider struct {
 	cache []byte
 }
 
-// New returns a Provider that talks to the configured KMSClient
-// (or a deterministic test double when cfg.KMSClient is nil).
+// New returns a Provider that talks to the configured KMSClient.
+// Production paths MUST supply a non-nil KMSClient; tests that
+// need the deterministic test double must set AllowTestDouble.
 func New(cfg Config) (*Provider, error) {
 	if cfg.KeyID == "" {
 		return nil, errors.New("kmsbyok: KeyID required")
+	}
+	if cfg.KMSClient == nil && !cfg.AllowTestDouble {
+		return nil, ErrKMSClientRequired
 	}
 	return &Provider{cfg: cfg}, nil
 }
 
 // Key returns the cached plaintext key, fetching it from KMS on
-// the first call. The plaintext key is cached for the lifetime
-// of the daemon; rotation is a M3 follow-on (Rotate is a no-op
-// today because the AWS SDK adapter is not in this build).
+// the first call. Subsequent calls return the cached value
+// without re-contacting KMS; Rotate invalidates the cache so the
+// next call re-fetches.
 func (p *Provider) Key(ctx context.Context) ([]byte, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -63,7 +74,6 @@ func (p *Provider) Key(ctx context.Context) ([]byte, error) {
 		return out, nil
 	}
 	if p.cfg.KMSClient == nil {
-		// Test double: deterministic 32-byte key derived from KeyID.
 		out := deterministicTestKey(p.cfg.KeyID)
 		p.cache = out
 		return append([]byte(nil), out...), nil
@@ -79,27 +89,22 @@ func (p *Provider) Key(ctx context.Context) ([]byte, error) {
 	return append([]byte(nil), pt...), nil
 }
 
-// Rotate is a no-op today; the AWS SDK adapter is M3 follow-on.
+// Rotate invalidates the cached key so the next Key() call re-
+// fetches from KMS. Returns nil on success; the underlying KMS
+// call's error is propagated when the next Key() runs.
 func (p *Provider) Rotate(context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.cache = nil
 	return nil
 }
 
 // deterministicTestKey returns a stable 32-byte key derived from
-// the supplied KMS keyID. Used when no KMSClient is configured.
-// The derivation is intentionally simple: SHA-256 of the keyID
-// (after the literal test-prefix marker).
+// the supplied KMS keyID. Used only when Config.AllowTestDouble
+// is true (test path). The derivation is intentionally simple:
+// SHA-256 of the keyID prefixed with a marker so production
+// operators can grep audit logs for accidental test-double use.
 func deterministicTestKey(keyID string) []byte {
 	const marker = "kmsbyok-test-v1:"
-	return sha256Sum([]byte(marker + keyID))
-}
-
-func sha256Sum(b []byte) []byte {
-	// Lightweight inline implementation to avoid importing
-	// crypto/sha256 in this small file. The function is consumed
-	// only by the test double.
-	return inlineSHA256(b)
-}
-
-func inlineSHA256(b []byte) []byte {
-	return sha256Hash(b)
+	return sha256Hash([]byte(marker + keyID))
 }
