@@ -24,7 +24,23 @@ test-verbose:
 
 # Run integration tests
 test-integration:
-	go test -v -race -count=1 ./test/...
+	go test -v -race -count=1 ./tests/...
+
+# Run end-to-end tests (HTTP API against a built daemon)
+test-e2e:
+	go test -v -race -count=1 -timeout 300s ./tests/e2e/...
+
+# Run k6 load scenarios against a running daemon. Set
+# PROMPTSHEON_ADDR to override the target URL; the default is
+# http://localhost:8080.
+load-test:
+	@command -v k6 >/dev/null 2>&1 || { echo "k6 not installed (brew install k6)"; exit 1; }
+	@mkdir -p /tmp/load-results
+	@for scenario in tests/load/scenarios/*.js; do \
+	  name=$$(basename "$$scenario" .js); \
+	  echo "=== $$name ==="; \
+	  k6 run "$$scenario" --out json=/tmp/load-results/$$name.json || true; \
+	done
 
 # Run linter
 lint:
