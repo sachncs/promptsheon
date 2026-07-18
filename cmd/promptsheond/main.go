@@ -16,6 +16,7 @@ import (
 
 	"github.com/sachncs/promptsheon/internal/alerting"
 	"github.com/sachncs/promptsheon/internal/api"
+	"github.com/sachncs/promptsheon/internal/approval"
 	"github.com/sachncs/promptsheon/internal/buildinfo"
 	"github.com/sachncs/promptsheon/internal/config"
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
@@ -30,6 +31,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/observation"
 	"github.com/sachncs/promptsheon/internal/plugins/builtins"
 	"github.com/sachncs/promptsheon/internal/ratelimit"
+	"github.com/sachncs/promptsheon/internal/release"
 	"github.com/sachncs/promptsheon/internal/rollups"
 	"github.com/sachncs/promptsheon/internal/scheduler"
 	"github.com/sachncs/promptsheon/internal/store"
@@ -303,9 +305,43 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		api.WithWorkspaceRollups(rollupAgg),
 		api.WithInvoker(inv),
 	)
+
+	// releaseSvc is the application layer for the Release + Approval
+	// endpoints. Default policy is MakerCheckerPolicy{RequiredApprovers: 1}:
+	// the creator cannot approve their own release, and at least one
+	// other identity must approve before activation. Override with
+	// PROMPTSHEON_APPROVAL_POLICY=majority for a flat majority count.
+	releaseSvc := buildReleaseService(db, cfg.ApprovalPolicy)
+	if releaseSvc != nil {
+		opts = append(opts, api.WithReleaseService(releaseSvc))
+	}
 	srv := api.NewServer(db, logger, opts...)
 	return srv, limiter, spans, collector
 }
+
+// buildReleaseService constructs the application-layer release.Service
+// using the configured policy. Returns nil if the policy string is
+// unrecognized; the daemon continues to run with release routes
+// unregistered (404) rather than failing the boot.
+func buildReleaseService(db *store.SQLite, policy string) *release.Service {
+	switch policy {
+	case "majority":
+		return release.NewServiceFromKind(db, db, release.PolicyMajority, 1)
+	case "", "maker_checker":
+		return release.NewServiceFromKind(db, db, release.PolicyMakerChecker, 1)
+	default:
+		// unknown policy: log nothing here; the daemon's job is to
+		// keep running. Operators see the misconfiguration when they
+		// hit /activate.
+		return nil
+	}
+}
+
+// avoid unused-import errors when approval/release are only used in
+// buildReleaseService and its callers.
+var (
+	_ = approval.Approve
+)
 
 func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *config.Config, srv *api.Server, logger *slog.Logger, limiter *ratelimit.Limiter, spans *trace.SQLite, collector *metrics.Collector) {
 	handler := api.ChainHTTP(srv,
