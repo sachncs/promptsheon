@@ -43,6 +43,9 @@ type Config struct {
 
 	// CORS
 	CORSOrigins string // Comma-separated allowed origins, or "*" to allow all (insecure)
+
+	// Approval policy: "maker_checker" (default) or "majority".
+	ApprovalPolicy string
 }
 
 const defaultAddr = ":8080"
@@ -77,6 +80,10 @@ func DefaultConfig() Config {
 		// must explicitly set PROMPTSHEON_CORS_ORIGINS to a list of
 		// origins or "*" (for trusted local development only).
 		CORSOrigins: "",
+
+		// Approval policy defaults to maker-checker (creator may not
+		// approve their own release; at least one other identity must).
+		ApprovalPolicy: "maker_checker",
 	}
 }
 
@@ -109,6 +116,7 @@ func LoadConfig() Config {
 	cfg.OTelEndpoint = getEnvString("PROMPTSHEON_OTEL_ENDPOINT", cfg.OTelEndpoint)
 	cfg.OTelInsecure = getEnvBool("PROMPTSHEON_OTEL_INSECURE", cfg.OTelInsecure)
 	cfg.CORSOrigins = getEnvString("PROMPTSHEON_CORS_ORIGINS", cfg.CORSOrigins)
+	cfg.ApprovalPolicy = getEnvString("PROMPTSHEON_APPROVAL_POLICY", cfg.ApprovalPolicy)
 
 	sanitizeConfig(&cfg)
 	return cfg
