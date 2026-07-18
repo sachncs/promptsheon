@@ -1,4 +1,8 @@
-package testutil
+// Package testdata provides shared, zero-dependency test fixtures
+// used by _test.go files in any package. The package intentionally
+// imports only the capability domain types so consumers can link
+// it without dragging in the storage layer or other dependencies.
+package testdata
 
 import "github.com/sachncs/promptsheon/internal/capability"
 

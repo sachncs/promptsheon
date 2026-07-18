@@ -9,6 +9,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/release"
 	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/internal/testdata"
 )
 
 // fixture provides a populated workspace/project/capability/version so
@@ -22,16 +23,7 @@ type releaseFixture struct {
 	manifestHash  string
 }
 
-func validManifest() capability.Manifest {
-	h := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	return capability.Manifest{
-		Prompt:        capability.ArtifactRef{Kind: capability.ArtifactPrompt, Hash: h},
-		ModelPolicy:   capability.ArtifactRef{Kind: capability.ArtifactModelPolicy, Hash: h},
-		RuntimePolicy: capability.ArtifactRef{Kind: capability.ArtifactRuntimePolicy, Hash: h},
-		Context:       capability.ArtifactRef{Kind: capability.ArtifactContext, Hash: h},
-		Memory:        capability.ArtifactRef{Kind: capability.ArtifactMemory, Hash: h},
-	}
-}
+func validManifest() capability.Manifest { return testdata.NewManifest() }
 
 func newReleaseFixture(t *testing.T) *releaseFixture {
 	t.Helper()
