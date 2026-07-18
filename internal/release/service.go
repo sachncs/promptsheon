@@ -53,6 +53,22 @@ func NewServiceFromKind(db Repository, app approval.Repository, kind PolicyKind,
 	}
 }
 
+// runner is the public surface that api.Server depends on; it lets
+// the compile-time assertion below catch signature drift.
+type runner interface {
+	Get(ctx context.Context, id string) (*Release, error)
+	ListForCapability(ctx context.Context, capabilityID string) ([]*Release, error)
+	ListActiveForEnvironment(ctx context.Context, env Environment) ([]*Release, error)
+	Create(ctx context.Context, capabilityID string, capabilityVersion int, manifest capability.Manifest, environment Environment, createdBy string) (*Release, error)
+	Vote(ctx context.Context, releaseID string, vote approval.Vote) (*approval.Approval, error)
+	Activate(ctx context.Context, releaseID string) (*Release, error)
+	Rollback(ctx context.Context, releaseID string) (*Release, error)
+	Approval(ctx context.Context, releaseID string) (*approval.Approval, error)
+}
+
+// Service satisfies the runner interface used by api.Server.
+var _ runner = (*Service)(nil)
+
 // Create constructs a Pending Release for the given Capability Version
 // and target environment. versionID is looked up; releaseID is server-
 // generated.
