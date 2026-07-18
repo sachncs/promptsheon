@@ -46,30 +46,45 @@ The OpenAPI spec is the authoritative list. The high-level groups, with the numb
 
 | Group | Routes | Description |
 |---|---|---|
-| `prompts` | 14 | Prompt CRUD, version history, run, stream, preview, similarity. |
-| `agents` | 17 | Agent CRUD, import/export, execute, fork, deploy, archive, version history. |
-| `contexts` | 8 | Conversation context CRUD, append/clear messages, assemble for LLM. |
-| `datasets` | 8 | Dataset CRUD, CSV import, NDJSON export. |
-| `eval` | 5 | Run evaluations, list results, compare runs, generate reports. |
-| `guardrails` | 8 | Rule CRUD, content checks, violation tracking. |
+| `workspaces` | 5 | Tenant workspace CRUD. |
+| `projects` | 5 | Project CRUD scoped to a workspace. |
+| `capabilities` | 5 | Capability CRUD scoped to a project. |
+| `versions` | 4 | Immutable Version CRUD; Manifest is content-addressed. |
+| `releases` | 8 | Release lifecycle: create, vote, activate (atomic), rollback, invoke, approval trail. See [release.md](release.md) for the full lifecycle. |
+| `executions` | 3 | Read-only Execution history. |
 | `alerts` | 8 | Alert rule CRUD, active alerts, resolve. |
-| `reviews` | 5 | Pending reviews, approve, reject, comment. |
 | `audit` | 3 | List, export, verify the hash chain. |
 | `providers` | 3 | List, get, test LLM providers. |
 | `vault` | 3 | Save, list, delete provider keys. |
-| `workflows` | 5 | Run, list, get, list steps, cancel. |
 | `traces` | 3 | List spans, get by ID, get full tree. |
 | `logs` | 2 | Search spans, stream via SSE. |
-| `metrics` | 5 | Summary, top prompts, top agents, dashboard, JSON metrics. |
+| `metrics` | 5 | Summary, top capabilities, dashboard, JSON metrics. |
 | `users` | 5 | User CRUD. |
 | `webhooks` | 3 | List, create, delete endpoints. |
 | `auth` | 4 | API key CRUD, OAuth callbacks. |
-| `abtesting` | ~6 | A/B test CRUD, run, results. |
-| `optimizer` | ~3 | Prompt analysis, improvement suggestions. |
-| `playground` | ~3 | Interactive prompt testing. |
-| `collab` | ~3 | Real-time collaborative editing sessions. |
 
 > Counts are derived from `internal/api/server.go` and `internal/api/handlers_*.go`. They drift as the codebase evolves. For the canonical list, see [`api/openapi.yaml`](../api/openapi.yaml).
+
+## Releases (v0.1.0 headline feature)
+
+The release routes are the canonical v0.1.0 flow. See
+[release.md](release.md) for the lifecycle narrative; the route
+table below is the wire-format summary.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/capabilities/{capability_id}/releases` | List Releases for a Capability. |
+| `POST` | `/api/v1/versions/{version_id}/releases` | Create a Pending Release. Body: `{"environment":"dev\|staging\|prod"}`. |
+| `GET` | `/api/v1/releases/{id}` | Fetch a single Release. |
+| `POST` | `/api/v1/releases/{id}/votes` | Record a vote. Body: `{"identity":"...","decision":"approve\|reject\|abstain","reason":"..."}`. Identity defaults to the authenticated caller. |
+| `POST` | `/api/v1/releases/{id}/activate` | Move a Pending Release to Active. The MakerChecker policy is consulted; the creator's own vote is rejected. Supersedes any prior Active Release in the same `(Capability, Environment)` atomically. |
+| `POST` | `/api/v1/releases/{id}/rollback` | Move an Active or Approved Release to `rolled_back`. |
+| `POST` | `/api/v1/releases/{id}/invoke` | Invoke the LLM through the Release's Manifest. Returns 201 with an Execution row populated with `outputs`, `latency_ms`, `prompt_tokens`, `completion_tokens`, `cost_usd`. |
+| `GET` | `/api/v1/releases/{id}/approval` | Read the Approval trail (votes + timestamps). |
+
+Activation and Invoke return 409 when the Release is not in the
+required state (Pending for activate; Active for invoke). Quorum
+failures and creator-vote rejections also return 409.
 
 ## Pagination
 
