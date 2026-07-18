@@ -183,25 +183,37 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
-	// Produce an Execution row even when no LLM provider is configured,
-	// matching the existing /versions/{id}/executions stub behaviour.
-	now := time.Now()
+	manifestHash := manifestHashForRelease(rel)
 	exec := &capability.Execution{
 		ID:                  generateID(),
 		CapabilityVersionID: rel.CapabilityID + "@" + fmt.Sprintf("%d", rel.CapabilityVersion),
-		Timestamp:           now,
+		Timestamp:           time.Now(),
 		Inputs:              req.Inputs,
 		Model:               req.Model,
 		Provider:            req.Provider,
+		Environment:         string(rel.Environment),
 	}
-	if err := s.invokeOneWithManifest(r, rel, req.Inputs, req.Model, req.Provider); err != nil {
-		return err
+	rec, invErr, latency := s.invokeOneWithManifest(r, rel, req.Inputs, req.Model, req.Provider)
+	exec.LatencyMs = latency.Milliseconds()
+	if invErr != nil {
+		exec.Error = invErr.Error()
+	} else if rec != nil {
+		if len(rec.Output) > 0 {
+			exec.Outputs = map[string]any{"content": string(rec.Output)}
+		}
+		exec.PromptTokens = rec.PromptTokens
+		exec.CompletionTokens = rec.OutputTokens
+		exec.TotalTokens = rec.PromptTokens + rec.OutputTokens
+		exec.Model = rec.Model
+		exec.CostUSD = rec.CostUSD
 	}
 	if err := s.db.CreateExecution(r.Context(), exec); err != nil {
 		return err
 	}
 	s.audit(r.Context(), "invoke", "release:"+releaseID, map[string]any{
-		"manifest_hash": manifestHashForRelease(rel),
+		"manifest_hash": manifestHash,
+		"tokens":        exec.TotalTokens,
+		"cost_usd":      exec.CostUSD,
 	})
 	writeJSON(w, http.StatusCreated, exec)
 	return nil
@@ -210,14 +222,17 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 // invokeOneWithManifest is the release-side equivalent of invokeOne;
 // it uses the Release's loaded Manifest to derive a stable manifest
 // hash rather than the placeholder hash used by the existing
-// /versions/{id}/executions route.
-func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, inputs map[string]any, model, provider string) error {
+// /versions/{id}/executions route. Returns the ExecutionRecord (or nil
+// when no invoker is configured), the invocation error (or nil on
+// success), and the wall-clock latency so the handler can populate
+// the Execution row.
+func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, inputs map[string]any, model, provider string) (*executor.ExecutionRecord, error, time.Duration) {
 	if s.invoker == nil {
-		return nil
+		return nil, nil, 0
 	}
 	input, err := marshalNoArgs(inputs)
 	if err != nil {
-		return err
+		return nil, err, 0
 	}
 	manifestHash, _ := computeManifestHash(rel.Manifest)
 	req := executor.InvokeRequest{
@@ -229,8 +244,9 @@ func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, in
 		Model:         model,
 		ModelRevision: modelRevision(model, provider),
 	}
-	_, err = s.invoker.Invoke(r.Context(), req)
-	return err
+	start := time.Now()
+	rec, err := s.invoker.Invoke(r.Context(), req)
+	return &rec, err, time.Since(start)
 }
 
 func (s *Server) handleGetReleaseApproval(w http.ResponseWriter, r *http.Request) error {
