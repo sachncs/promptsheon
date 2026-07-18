@@ -245,6 +245,66 @@ func TestInvokeRoundTrip(t *testing.T) {
 	}
 }
 
+func TestHarnessSDKE2E(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == "POST" && r.URL.Path == "/api/v1/capabilities/c1/datasets":
+			_, _ = w.Write([]byte(`{"id":"ds1","capability_id":"c1","name":"g"}`))
+		case r.Method == "GET" && r.URL.Path == "/api/v1/datasets/ds1":
+			_, _ = w.Write([]byte(`{"id":"ds1","capability_id":"c1","name":"g","cases":[{"id":"ca1","dataset_id":"ds1","seq":0,"inputs":"hi","expected":"hi"}]}`))
+		case r.Method == "PUT" && r.URL.Path == "/api/v1/datasets/ds1/cases":
+			_, _ = w.Write([]byte(`{"cases":[{"id":"ca1"}]}`))
+		case r.Method == "POST" && r.URL.Path == "/api/v1/capabilities/c1/preconditions":
+			_, _ = w.Write([]byte(`{"id":"p1","capability_id":"c1","name":"go-test","command":"go test ./...","timeout_sec":60,"enabled":true}`))
+		case r.Method == "POST" && r.URL.Path == "/api/v1/releases/r1/evals":
+			_, _ = w.Write([]byte(`{"id":"erun1","release_id":"r1","dataset_id":"ds1","scorer":"exact_match","score":1.0,"passed":1,"failed":0,"total":1,"status":"passed"}`))
+		default:
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	c := New(srv.URL, "")
+	d, err := c.CreateDataset(context.Background(), "c1", CreateDatasetRequest{Name: "g"})
+	if err != nil {
+		t.Fatalf("CreateDataset: %v", err)
+	}
+	if d.ID != "ds1" {
+		t.Fatalf("dataset id = %q", d.ID)
+	}
+
+	got, err := c.GetDataset(context.Background(), "ds1")
+	if err != nil {
+		t.Fatalf("GetDataset: %v", err)
+	}
+	if len(got.Cases) != 1 {
+		t.Fatalf("expected 1 case, got %d", len(got.Cases))
+	}
+
+	if err := c.PutCases(context.Background(), "ds1", []DatasetCase{{Seq: 0}}); err != nil {
+		t.Fatalf("PutCases: %v", err)
+	}
+
+	p, err := c.CreatePrecondition(context.Background(), "c1", CreatePreconditionRequest{
+		Name: "go-test", Command: "go test ./...", TimeoutSec: 60,
+	})
+	if err != nil {
+		t.Fatalf("CreatePrecondition: %v", err)
+	}
+	if p.Command != "go test ./..." {
+		t.Fatalf("command = %q", p.Command)
+	}
+
+	run, err := c.RunEval(context.Background(), "r1", RunEvalRequest{DatasetID: "ds1", Scorer: "exact_match"})
+	if err != nil {
+		t.Fatalf("RunEval: %v", err)
+	}
+	if run.Status != "passed" || run.Score != 1.0 {
+		t.Fatalf("run = %+v", run)
+	}
+}
+
 func TestApproveAndInvokeConvenience(t *testing.T) {
 	var calls []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
