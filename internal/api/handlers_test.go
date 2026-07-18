@@ -19,6 +19,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/approval"
 	"github.com/sachncs/promptsheon/internal/auth"
 	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/harness"
 	"github.com/sachncs/promptsheon/internal/llm"
 	"github.com/sachncs/promptsheon/internal/metrics"
 	"github.com/sachncs/promptsheon/internal/models"
@@ -51,6 +52,11 @@ type mockRepo struct {
 	releases      map[string]*release.Release
 	releasesByCap map[string][]*release.Release
 	approvals     map[string]*approval.Approval
+	datasets      map[string]*harness.Dataset
+	datasetCases  map[string][]harness.DatasetCase
+	preconditions map[string]*harness.Precondition
+	evalRuns      map[string]*harness.EvalRun
+	evalResults   []harness.EvalResult
 	pingErr       error
 	closeErr      error
 }
@@ -70,6 +76,10 @@ func newMockRepo() *mockRepo {
 		releases:      make(map[string]*release.Release),
 		releasesByCap: make(map[string][]*release.Release),
 		approvals:     make(map[string]*approval.Approval),
+		datasets:      make(map[string]*harness.Dataset),
+		datasetCases:  make(map[string][]harness.DatasetCase),
+		preconditions: make(map[string]*harness.Precondition),
+		evalRuns:      make(map[string]*harness.EvalRun),
 	}
 }
 
@@ -579,6 +589,144 @@ func (m *mockRepo) DeleteApproval(_ context.Context, releaseID string) error {
 	defer m.mu.Unlock()
 	delete(m.approvals, releaseID)
 	return nil
+}
+
+// Datasets
+func (m *mockRepo) CreateDataset(_ context.Context, d *harness.Dataset) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := *d
+	m.datasets[d.ID] = &cp
+	return nil
+}
+func (m *mockRepo) GetDataset(_ context.Context, id string) (*harness.Dataset, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	d, ok := m.datasets[id]
+	if !ok {
+		return nil, store.ErrNotFound
+	}
+	cp := *d
+	return &cp, nil
+}
+func (m *mockRepo) ListDatasetsForCapability(_ context.Context, capabilityID string) ([]*harness.Dataset, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []*harness.Dataset
+	for _, d := range m.datasets {
+		if d.CapabilityID == capabilityID {
+			cp := *d
+			out = append(out, &cp)
+		}
+	}
+	return out, nil
+}
+func (m *mockRepo) DeleteDataset(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.datasets, id)
+	return nil
+}
+func (m *mockRepo) UpsertDatasetCases(_ context.Context, datasetID string, cases []harness.DatasetCase) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cs := make([]harness.DatasetCase, len(cases))
+	copy(cs, cases)
+	m.datasetCases[datasetID] = cs
+	return nil
+}
+func (m *mockRepo) ListDatasetCases(_ context.Context, datasetID string) ([]harness.DatasetCase, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cs := m.datasetCases[datasetID]
+	out := make([]harness.DatasetCase, len(cs))
+	copy(out, cs)
+	return out, nil
+}
+
+// Preconditions
+func (m *mockRepo) CreatePrecondition(_ context.Context, p *harness.Precondition) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := *p
+	m.preconditions[p.ID] = &cp
+	return nil
+}
+func (m *mockRepo) ListPreconditionsForCapability(_ context.Context, capabilityID string) ([]*harness.Precondition, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []*harness.Precondition
+	for _, p := range m.preconditions {
+		if p.CapabilityID == capabilityID {
+			cp := *p
+			out = append(out, &cp)
+		}
+	}
+	return out, nil
+}
+func (m *mockRepo) DeletePrecondition(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.preconditions, id)
+	return nil
+}
+
+// EvalRuns
+func (m *mockRepo) CreateEvalRun(_ context.Context, r *harness.EvalRun) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := *r
+	m.evalRuns[r.ID] = &cp
+	return nil
+}
+func (m *mockRepo) UpdateEvalRun(_ context.Context, r *harness.EvalRun) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := *r
+	m.evalRuns[r.ID] = &cp
+	return nil
+}
+func (m *mockRepo) GetEvalRun(_ context.Context, id string) (*harness.EvalRun, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	r, ok := m.evalRuns[id]
+	if !ok {
+		return nil, store.ErrNotFound
+	}
+	cp := *r
+	return &cp, nil
+}
+func (m *mockRepo) ListEvalRunsForRelease(_ context.Context, releaseID string) ([]*harness.EvalRun, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []*harness.EvalRun
+	for _, r := range m.evalRuns {
+		if r.ReleaseID == releaseID {
+			cp := *r
+			out = append(out, &cp)
+		}
+	}
+	return out, nil
+}
+func (m *mockRepo) CreateEvalResults(_ context.Context, results []harness.EvalResult) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, r := range results {
+		cp := r
+		m.evalResults = append(m.evalResults, cp)
+	}
+	return nil
+}
+func (m *mockRepo) ListEvalResultsForRun(_ context.Context, runID string) ([]harness.EvalResult, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []harness.EvalResult
+	for _, r := range m.evalResults {
+		if r.RunID == runID {
+			out = append(out, r)
+		}
+	}
+	return out, nil
 }
 
 // ---------------------------------------------------------------------------

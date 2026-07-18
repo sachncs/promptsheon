@@ -6,6 +6,7 @@ import (
 
 	"github.com/sachncs/promptsheon/internal/approval"
 	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/harness"
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/release"
 )
@@ -23,6 +24,7 @@ type Repository interface {
 	capability.Repository
 	release.Repository
 	approval.Repository
+	harness.Repository
 
 	// Users
 	CreateUser(ctx context.Context, u *models.User) error
