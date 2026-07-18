@@ -21,6 +21,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/metrics"
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/ratelimit"
+	"github.com/sachncs/promptsheon/internal/release"
 	"github.com/sachncs/promptsheon/internal/rollups"
 	"github.com/sachncs/promptsheon/internal/search"
 	"github.com/sachncs/promptsheon/internal/store"
@@ -56,6 +57,7 @@ type Server struct {
 	providers        *llm.Registry
 	rollupAgg        *rollups.Aggregator
 	invoker          *invoke.Invoker
+	releaseSvc       *release.Service
 
 	// auditQueue is a bounded channel feeding the audit worker pool.
 	auditQueue chan *models.AuditEntry
@@ -229,6 +231,17 @@ func WithInvoker(i *invoke.Invoker) Option {
 	}
 }
 
+// WithReleaseService attaches the release.Service used by the
+// /releases routes. When nil, those routes are not registered
+// and a release-aware request returns 404. This mirrors the
+// pattern used by WithInvoker so callers can opt into release
+// support incrementally.
+func WithReleaseService(svc *release.Service) Option {
+	return func(s *Server) {
+		s.releaseSvc = svc
+	}
+}
+
 // WithServerConfig sets the server configuration.
 func WithServerConfig(cfg *ServerConfig) Option {
 	return func(s *Server) {
@@ -284,6 +297,7 @@ func (s *Server) routes() {
 	s.registerCapabilityRoutes()
 	s.registerVersionRoutes()
 	s.registerExecutionRoutes()
+	s.registerReleaseRoutes()
 }
 
 func (s *Server) registerHealthRoutes() {
