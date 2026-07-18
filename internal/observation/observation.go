@@ -19,6 +19,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/beorn7/perks/quantile"
+
 	"github.com/sachncs/promptsheon/internal/executor"
 	"github.com/sachncs/promptsheon/internal/optimizer/rules"
 )
@@ -37,6 +39,12 @@ const (
 	WindowHour        Window = Window(time.Hour)
 )
 
+// HallucinationFunc classifies an ExecutionRecord as a hallucination
+// (true) or not (false). The guardrail manager supplies one at
+// construction; when nil, hallucination rate is reported as zero
+// (the conservative reading is "no signal").
+type HallucinationFunc func(executor.ExecutionRecord) bool
+
 // Aggregator rolls a window of ExecutionRecord values into
 // Observation values keyed by (capability_id, version_id, environment).
 //
@@ -45,8 +53,9 @@ const (
 // ExecutionRecord. The consumer goroutine should call Aggregate
 // once per window tick.
 type Aggregator struct {
-	mu      sync.Mutex
-	records map[windowKey][]executor.ExecutionRecord
+	mu             sync.Mutex
+	records        map[windowKey][]executor.ExecutionRecord
+	hallucinationF HallucinationFunc
 }
 
 // windowKey is the dimension over which observations are aggregated.
@@ -56,9 +65,14 @@ type windowKey struct {
 	Environment  string
 }
 
-// NewAggregator constructs an empty Aggregator.
-func NewAggregator() *Aggregator {
-	return &Aggregator{records: map[windowKey][]executor.ExecutionRecord{}}
+// NewAggregator constructs an empty Aggregator. The supplied
+// HallucinationFunc classifies records for the hallucination-rate
+// field; pass nil to report a zero rate.
+func NewAggregator(hallucinationF HallucinationFunc) *Aggregator {
+	return &Aggregator{
+		records:        map[windowKey][]executor.ExecutionRecord{},
+		hallucinationF: hallucinationF,
+	}
 }
 
 // Add records one execution. The caller may continue to mutate
@@ -79,6 +93,12 @@ func (a *Aggregator) Add(r executor.ExecutionRecord) {
 
 // Aggregate returns one Observation per (capability, version, env)
 // tuple. RulesEngine consumes them.
+//
+// P95 latency is computed via a streaming CKMS quantile sketch
+// (github.com/beorn7/perks/quantile) so the aggregator runs in
+// O(log epsilon^-1) per insertion. Hallucination rate is the
+// proportion of records classified as hallucinations by the
+// HallucinationFunc supplied at construction.
 func (a *Aggregator) Aggregate(now time.Time) []rules.Observation {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -87,44 +107,44 @@ func (a *Aggregator) Aggregate(now time.Time) []rules.Observation {
 		if len(recs) == 0 {
 			continue
 		}
-		out = append(out, summarise(k, recs))
+		out = append(out, summarise(a.hallucinationF, k, recs))
 	}
 	return out
 }
 
 // summarise projects the records slice into the scalar shape the
-// rules engine reads. P95 latency is approximated by the maximum in
-// the window; the rule engine treats it as a coarse trigger.
-func summarise(k windowKey, recs []executor.ExecutionRecord) rules.Observation {
+// rules engine reads. P95 is computed via the streaming quantile
+// sketch, not the maximum, so a single outlier no longer
+// dominates the trigger.
+func summarise(halluF HallucinationFunc, k windowKey, recs []executor.ExecutionRecord) rules.Observation {
+	q := quantile.NewTargeted(map[float64]float64{0.95: 0.001}) // p95 with 0.1% error
 	var (
 		totalCostMicro int64
-		latencyMax     int64
-		halluSum       float64
+		halluCount     int64
 		failures       int64
 		successes      int64
 	)
 	for _, r := range recs {
+		q.Insert(float64(r.LatencyMS))
 		totalCostMicro += int64(r.CostUSD * 1e6)
-		if r.LatencyMS > latencyMax {
-			latencyMax = r.LatencyMS
-		}
 		if r.Status == "ok" {
 			successes++
 		} else {
 			failures++
 		}
-		// Hallucination rate is not yet measured by the executor; the
-		// Observation struct carries it as zero today. The
-		// guardrail evaluator (M2 follow-on) will populate it.
+		if halluF != nil && halluF(r) {
+			halluCount++
+		}
 	}
+	p95 := int64(q.Query(0.95))
 	return rules.Observation{
 		CapabilityID:      k.CapabilityID,
 		CapabilityVersion: k.VersionID,
 		Environment:       k.Environment,
 		WindowExecutions:  int64(len(recs)),
-		P95LatencyMS:      latencyMax,
+		P95LatencyMS:      p95,
 		AvgCostUSDMicro:   totalCostMicro / int64(len(recs)),
-		HallucinationRate: halluSum / float64(len(recs)),
+		HallucinationRate: float64(halluCount) / float64(len(recs)),
 		SuccessRate:       float64(successes) / float64(len(recs)),
 	}
 }
