@@ -14,7 +14,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/alerting"
 	"github.com/sachncs/promptsheon/internal/auth"
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
-	"github.com/sachncs/promptsheon/internal/eval"
+	_ "github.com/sachncs/promptsheon/internal/eval" // Scorer registry (no Server dep yet)
 	"github.com/sachncs/promptsheon/internal/guardrail"
 	"github.com/sachncs/promptsheon/internal/invoke"
 	"github.com/sachncs/promptsheon/internal/llm"
@@ -42,7 +42,6 @@ type Server struct {
 	cfg              *ServerConfig
 	authn            *auth.Authenticator
 	requireAuth      bool
-	evalRunner       *eval.Runner
 	spans            *trace.SQLite
 	collector        *metrics.Collector
 	webhooks         *webhook.Dispatcher
@@ -121,12 +120,7 @@ func WithAuth(db store.Repository) Option {
 	}
 }
 
-// WithEvalRunner attaches an eval runner to the server.
-func WithEvalRunner(runner *eval.Runner) Option {
-	return func(s *Server) {
-		s.evalRunner = runner
-	}
-}
+// WithTracing attaches a trace store and metrics collector to the server.
 
 // WithTracing attaches a trace store and metrics collector to the server.
 func WithTracing(spans *trace.SQLite, collector *metrics.Collector) Option {
