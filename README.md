@@ -89,16 +89,26 @@ curl -X POST http://localhost:8080/api/v1/projects/p1/capabilities \
   -H "Content-Type: application/json" \
   -d '{"name":"greeting","description":"Friendly greeting"}'
 
-# Add a Version to the Capability with a Manifest of artifacts
+# Add an immutable Version with a Manifest of content-addressed artifacts
 curl -X POST http://localhost:8080/api/v1/capabilities/c1/versions \
   -H "Content-Type: application/json" \
-  -d '{"version":1, "manifest":{"prompt":"Sachin", ...}}'
+  -d '{"version":1, "manifest":{"prompt":{"kind":"prompt","hash":"<sha256>"}, ...}}'
 
-# Approve the Version into a Release, then invoke the Release
-curl -X POST http://localhost:8080/api/v1/releases/r1/approve -d '{}'
-curl -X POST http://localhost:8080/api/v1/releases/r1/invoke \
-  -H "Content-Type: application/json" \
-  -d '{"inputs":{"q":"hello"}}'
+# Drive the Release lifecycle end-to-end:
+# 1. Create a Pending Release pointing the Version at the prod env.
+REL=$(curl -sS -X POST http://localhost:8080/api/v1/versions/v1/releases \
+        -H "Content-Type: application/json" \
+        -d '{"environment":"prod"}' | jq -r .id)
+# 2. A non-creator identity casts an Approve vote.
+curl -sS -X POST http://localhost:8080/api/v1/releases/$REL/votes \
+     -H "Content-Type: application/json" \
+     -d '{"identity":"alice","decision":"approve"}'
+# 3. Activate (consults MakerChecker policy; 409 if quorum not satisfied).
+curl -sS -X POST http://localhost:8080/api/v1/releases/$REL/activate
+# 4. Invoke through the configured LLM provider.
+curl -sS -X POST http://localhost:8080/api/v1/releases/$REL/invoke \
+     -H "Content-Type: application/json" \
+     -d '{"inputs":{"q":"hello"},"model":"claude-opus-4"}'
 ```
 
 ### Go SDK
@@ -106,20 +116,24 @@ curl -X POST http://localhost:8080/api/v1/releases/r1/invoke \
 ```go
 import "github.com/sachncs/promptsheon/sdk"
 
-client, err := sdk.NewClient(sdk.Config{Addr: "http://localhost:8080"})
+client := sdk.New("http://localhost:8080", "ps_...")
+ctx := context.Background()
+
+rel, err := client.CreateRelease(ctx, "v1", sdk.CreateReleaseRequest{
+    Environment: "prod",
+})
 if err != nil { return err }
 
-cap, err := client.CreateCapability(ctx, "p1", sdk.CreateCapabilityRequest{
-    Name:        "greeting",
-    Description: "Friendly greeting",
-})
-ver, err := client.AddVersion(ctx, cap.ID, sdk.AddVersionRequest{
-    Version: 1,
-    Manifest: sdk.Manifest{Prompt: "Sachin"},
-})
-rel, err := client.CreateRelease(ctx, ver.ID)
-out, err := client.ApproveAndInvoke(ctx, rel.ID, sdk.InvokeRequest{
+if _, err := client.Vote(ctx, rel.ID, sdk.VoteRequest{
+    Identity: "alice",
+    Decision: "approve",
+}); err != nil { return err }
+
+if _, err := client.Activate(ctx, rel.ID); err != nil { return err }
+
+out, err := client.Invoke(ctx, rel.ID, sdk.InvokeRequest{
     Inputs: map[string]any{"q": "hello"},
+    Model:  "claude-opus-4",
 })
 ```
 
@@ -132,13 +146,16 @@ Promptsheon is configured via environment variables or a config file. Key settin
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PROMPTSHEON_ADDR` | `:8080` | Listen address |
-| `PROMPTSHEON_DB_BACKEND` | `sqlite` | `sqlite` (default) or `postgres` |
-| `PROMPTSHEON_DB_PATH` | `promptsheon.db` | SQLite database path |
-| `PROMPTSHEON_DB_DSN` | (none) | Postgres connection string when DB_BACKEND=postgres |
+| `PROMPTSHEON_DB_PATH` | `promptsheon.db` | SQLite database file. v0.1.x is SQLite-only; the Postgres backend was removed. |
 | `PROMPTSHEON_LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
 | `PROMPTSHEON_AUTH` | `false` | Enable authentication |
-| `PROMPTSHEON_PLUGINS_FILE` | (none) | Path to the plugin manifest (Tier 2.32) |
-| `PROMPTSHEON_VAULT_KEY` | (none) | Master key for AES-256-GCM vault; override with KMS-backed KeyProvider for production |
+| `PROMPTSHEON_APPROVAL_POLICY` | `maker_checker` | Approval policy: `maker_checker` (creator cannot approve their own release; at least one other identity must) or `majority` (flat count-based). See [docs/release.md](docs/release.md). |
+| `PROMPTSHEON_OPENAI_API_KEY` | (none) | OpenAI API key. Required to invoke OpenAI-backed Releases. |
+| `PROMPTSHEON_OPENAI_BASE_URL` | (none) | OpenAI base URL override (for proxies). Defaults to `https://api.openai.com`. |
+| `PROMPTSHEON_ANTHROPIC_API_KEY` | (none) | Anthropic API key. Required to invoke Anthropic-backed Releases. |
+| `PROMPTSHEON_ANTHROPIC_BASE_URL` | (none) | Anthropic base URL override. Defaults to `https://api.anthropic.com`. |
+| `PROMPTSHEON_PLUGINS_FILE` | (none) | Path to the plugin manifest. |
+| `PROMPTSHEON_VAULT_KEY` | (none) | Master key for AES-256-GCM vault; override with KMS-backed KeyProvider for production. |
 
 See [docs/configuration.md](docs/configuration.md) for the full reference.
 
