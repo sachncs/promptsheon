@@ -28,7 +28,8 @@ Welcome to the Promptsheon documentation. This is the master index. The full sou
 | [SDK](sdk.md) | The Go client library. |
 | [API Reference](api-reference.md) | Human summary of the REST API. The [OpenAPI spec](../api/openapi.yaml) is the source of truth. |
 | [Workflows](workflows.md) | DAG-based multi-step agents. |
-| [Evaluations](evaluations.md) | Test datasets, scoring, hallucination detection. |
+| [Harness engineering](harness.md) | Why the harness surface exists; the Capability / Version / Release / Eval stack. |
+| [Evaluations (v0.1.0)](eval.md) | Datasets, preconditions, eval runs — the harness loop. |
 | [Guardrails](guardrails.md) | Content policy enforcement. |
 | [FAQ](faq.md) | Frequently asked questions. |
 | [Glossary](glossary.md) | Terminology reference. |

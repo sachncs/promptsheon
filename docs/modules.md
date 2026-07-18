@@ -24,7 +24,8 @@ One-line descriptions of every Go package in the repository, grouped by layer. T
 | `workflow` | `internal/workflow/` | DAG-based execution engine for multi-step agents. See [Workflows](workflows.md). |
 | `context` | `internal/context/` | Context assembly, token estimation, and truncation strategies. |
 | `snapshot` | `internal/snapshot/` | Output snapshot persistence for LLM calls. |
-| `eval` | `internal/eval/` | Evaluation engine, scorers, hallucination detector, batch runner. See [Evaluations](evaluations.md). |
+| `eval` | `internal/eval/` | Scorer interface (`exact_match`, `contains`, `regex`, `json_schema` placeholder) + per-case eval runner. See [Eval](eval.md). |
+| `harness` | `internal/harness/` | Dataset, Precondition, EvalRun domain types; PreconditionRunner (sh -c with timeouts); harness.Repository interface. See [harness.md](harness.md). |
 | `guardrail` | `internal/guardrail/` | Static (pre-LLM) and runtime (post-LLM) guardrail enforcement. See [Guardrails](guardrails.md). |
 
 ### Resilience and observability
