@@ -811,9 +811,8 @@ func TestNewServerOptions(t *testing.T) {
 	_ = newTestServer(t,
 		WithServerConfig(&ServerConfig{CircuitBreakerFailureThreshold: 10}),
 	)
-	// Verify WithEvalRunner, WithSnapshotStore etc don't panic with nils
+	// Verify options-with-nil don't panic
 	_ = newTestServer(t,
-		WithEvalRunner(nil),
 		WithTracing(nil, nil),
 		WithWebhooks(nil),
 		WithVault(nil),
