@@ -137,7 +137,7 @@ curl -X POST http://localhost:8080/api/v1/agents \
 - [API Reference](api-reference.md) — Full endpoint documentation
 - [LLM Providers](llm-providers.md) — Set up OpenAI, Anthropic, Azure, or Ollama
 - [Workflows](workflows.md) — Build multi-step agent workflows
-- [Evaluations](evaluations.md) — Test prompts against datasets
+- [Harness engineering](harness.md) and [Evaluations (v0.1.0)](eval.md) — datasets, preconditions, eval runs
 - [Guardrails](guardrails.md) — Enforce content policies
 - [Security](security.md) — the threat model and the operator checklist
 - [Architecture](architecture.md) — the system diagram and package layout

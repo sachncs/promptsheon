@@ -100,10 +100,16 @@ A periodic sweep that deletes trace spans, audit entries, and snapshots older th
 A single (input, expected) pair in a test dataset. Inputs are substituted into the prompt template; expectations are matched against the LLM output.
 
 **Scorer**
-A registered function that scores an LLM output for a test case on a 0.0–1.0 scale. Built-in: exact-match, contains, hallucination. See [Evaluations](evaluations.md).
+A registered function that scores an LLM output for a test case on a 0.0–1.0 scale. Built-in: exact_match, contains, regex (json_schema placeholder). See [Eval](eval.md).
 
-**Hallucination score**
-A 0.0–1.0 measure of how much of the LLM output is unsupported by the prompt and inputs. Higher means more hallucinated. See [Evaluations](evaluations.md).
+**Dataset**
+A named collection of `(inputs, expected)` test cases attached to a Capability. The ground truth that drives the harness eval loop. See [Eval](eval.md).
+
+**Precondition**
+A named command hook attached to a Capability. Run on every Activate; a non-zero exit blocks the Release with HTTP 409 and the per-hook output. See [Eval](eval.md).
+
+**Eval run (EvalRun)**
+A recorded scoring of a Release against a Dataset using a chosen Scorer. Score = `passed / total`. Persists per-case EvalResults. See [Eval](eval.md).
 
 **BM25**
 The ranking function used by `internal/search`. BM25 is the standard Okapi BM25 with `k1=1.2`, `b=0.75`, unigrams and bigrams, light suffix stripping, and per-document length normalisation. See [Algorithms — BM25](algorithms.md#bm25).
