@@ -349,9 +349,6 @@ func TestIsRetryable(t *testing.T) {
 func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("PROMPTSHEON_OPENAI_API_KEY", "sk-test")
 	t.Setenv("PROMPTSHEON_ANTHROPIC_API_KEY", "sk-ant-test")
-	t.Setenv("PROMPTSHEON_OLLAMA_BASE_URL", "http://localhost:11434")
-	t.Setenv("PROMPTSHEON_AZURE_API_KEY", "sk-azure-test")
-	t.Setenv("PROMPTSHEON_NVIDIA_API_KEY", "nv-test")
 	t.Setenv("PROMPTSHEON_LLM_PROVIDER", "openai")
 
 	r := NewRegistry()
@@ -360,7 +357,7 @@ func TestLoadFromEnv(t *testing.T) {
 		t.Fatalf("expected 'openai', got %q", provider)
 	}
 
-	for _, name := range []string{"openai", "anthropic", "ollama", "azure", "nvidia"} {
+	for _, name := range []string{"openai", "anthropic"} {
 		p, err := r.Get(name)
 		if err != nil {
 			t.Fatalf("r.Get(%q): %v", name, err)

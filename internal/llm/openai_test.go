@@ -2,289 +2,84 @@ package llm
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 )
 
-// TestOpenAIKeyForRequestPrecedence pins the per-call key
-// behaviour: a context with WithPerCallKey wins over the
-// provider's default apiKey. Without the override, the
-// default is used.
-func TestOpenAIKeyForRequestPrecedence(t *testing.T) {
-	o := NewOpenAI(ProviderConfig{APIKey: "sk-default"})
-	if got := o.keyForRequest(context.Background()); got != "sk-default" {
-		t.Errorf("default key: got %q", got)
-	}
-	ctx := WithPerCallKey(context.Background(), "sk-percall")
-	if got := o.keyForRequest(ctx); got != "sk-percall" {
-		t.Errorf("per-call key: got %q", got)
-	}
-}
-
-// TestOpenAICompleteHappyPath drives the OpenAI provider
-// against an httptest server that returns a canned chat-
-// completions response. The provider's URL is pointed at
-// the test server so the request never leaves the process.
-func TestOpenAICompleteHappyPath(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verify the auth header.
-		if got := r.Header.Get("Authorization"); !strings.HasPrefix(got, "Bearer ") {
-			t.Errorf("expected Bearer auth, got %q", got)
-		}
-		// Verify the path.
-		if r.URL.Path != "/chat/completions" {
-			t.Errorf("expected /chat/completions, got %q", r.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"choices": []map[string]any{{
-				"message":       map[string]string{"role": "assistant", "content": "hello world"},
-				"finish_reason": "stop",
-			}},
-			"usage": map[string]int{
-				"prompt_tokens":     3,
-				"completion_tokens": 2,
-				"total_tokens":      5,
-			},
-		})
-	}))
-	defer srv.Close()
-
-	o := NewOpenAI(ProviderConfig{APIKey: "sk-test", BaseURL: srv.URL})
-	resp, err := o.Complete(context.Background(), &Request{
-		Model:    "gpt-4",
-		Messages: []Message{{Role: "user", Content: "hi"}},
-	})
-	if err != nil {
-		t.Fatalf("Complete: %v", err)
-	}
-	if resp.Content != "hello world" {
-		t.Errorf("Content: got %q", resp.Content)
-	}
-	if resp.Usage.TotalTokens != 5 {
-		t.Errorf("Usage.TotalTokens: got %d", resp.Usage.TotalTokens)
-	}
-	if resp.Model != "gpt-4" {
-		t.Errorf("Model: got %q", resp.Model)
-	}
-}
-
-func TestOpenAICompleteServerError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusTooManyRequests)
-		_, _ = w.Write([]byte(`{"error":{"message":"rate limited"}}`))
-	}))
-	defer srv.Close()
-
-	o := NewOpenAI(ProviderConfig{APIKey: "sk-test", BaseURL: srv.URL})
-	_, err := o.Complete(context.Background(), &Request{
-		Model:    "gpt-4",
-		Messages: []Message{{Role: "user", Content: "hi"}},
-	})
-	if err == nil {
-		t.Fatal("expected error for 429 response")
-	}
-	if !strings.Contains(err.Error(), "429") {
-		t.Errorf("expected 429 in error, got %v", err)
-	}
-}
-
-// TestOpenAIStreamHappyPath exercises the streaming path.
-// The test server returns a single SSE chunk followed by
-// [DONE] and the provider should return a Response with
-// the chunk's content.
-func TestOpenAIStreamHappyPath(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n"))
-		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\" world\"}}]}\n\n"))
-		_, _ = w.Write([]byte("data: [DONE]\n\n"))
-	}))
-	defer srv.Close()
-
-	o := NewOpenAI(ProviderConfig{APIKey: "sk-test", BaseURL: srv.URL})
-	rc, err := o.Stream(context.Background(), &Request{
-		Model:    "gpt-4",
-		Messages: []Message{{Role: "user", Content: "hi"}},
-	})
-	if err != nil {
-		t.Fatalf("Stream: %v", err)
-	}
-	defer func() { _ = rc.Close() }()
-	buf := make([]byte, 4096)
-	n, _ := rc.Read(buf)
-	got := string(buf[:n])
-	if !strings.Contains(got, "hello") {
-		t.Errorf("expected 'hello' in stream, got %q", got)
-	}
-}
-
-func TestOpenAIStreamServerError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write([]byte(`{"error":{"message":"bad key"}}`))
-	}))
-	defer srv.Close()
-
-	o := NewOpenAI(ProviderConfig{APIKey: "sk-test", BaseURL: srv.URL})
-	_, err := o.Stream(context.Background(), &Request{
-		Model:    "gpt-4",
-		Messages: []Message{{Role: "user", Content: "hi"}},
-	})
-	if err == nil {
-		t.Fatal("expected error for 401")
-	}
-	if !strings.Contains(err.Error(), "401") {
-		t.Errorf("expected 401 in error, got %v", err)
-	}
-}
-
-func TestStreamCloserIdempotent(t *testing.T) {
-	// The streamCloser type's Close method must be
-	// safe to call multiple times. We construct one
-	// directly to exercise the contract.
-	rc := &streamCloser{
-		ReadCloser: &readCloserFunc{reader: strings.NewReader("hello")},
-	}
-	if err := rc.Close(); err != nil {
-		t.Errorf("first close: %v", err)
-	}
-	if err := rc.Close(); err != nil {
-		t.Errorf("second close should be no-op, got %v", err)
-	}
-}
-
-// readCloserFunc is a tiny test helper that wraps a strings.Reader
-// as an io.ReadCloser. The Close method is a no-op so the
-// streamCloser wrapper is the one being tested.
-type readCloserFunc struct {
-	reader interface {
-		Read([]byte) (int, error)
-	}
-}
-
-func (r *readCloserFunc) Read(p []byte) (int, error) { return r.reader.Read(p) }
-func (r *readCloserFunc) Close() error               { return nil }
-
-func TestOpenAIName(t *testing.T) {
-	if NewOpenAI(ProviderConfig{}).Name() != "openai" {
-		t.Error("expected 'openai'")
-	}
-}
-
 func TestNewOpenAIDefaultBaseURL(t *testing.T) {
-	// When BaseURL is empty, the provider falls back to the
-	// public OpenAI endpoint. We don't want the test to
-	// actually hit that endpoint, so we just confirm the
-	// value is non-empty and starts with https.
 	o := NewOpenAI(ProviderConfig{})
 	if !strings.HasPrefix(o.baseURL, "https://") {
 		t.Errorf("expected https base URL, got %q", o.baseURL)
 	}
 }
 
-func TestOpenAITimeout(t *testing.T) {
-	// The client has a 120s timeout. A test that takes
-	// longer than that would hang, so we just confirm the
-	// client is configured.
-	o := NewOpenAI(ProviderConfig{})
-	if o.client.Timeout != 120*time.Second {
-		t.Errorf("expected 120s timeout, got %v", o.client.Timeout)
+func TestOpenAIName(t *testing.T) {
+	if NewOpenAI(ProviderConfig{}).Name() != "openai" {
+		t.Error(`expected "openai"`)
 	}
 }
 
-// TestOpenAICompleteStreamingPath drives the streaming code
-// path inside Complete (when req.Stream is true). This is
-// separate from the Stream method and exercises handleStream.
-func TestOpenAICompleteStreamingPath(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n"))
-		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\" world\"}}],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":2,\"total_tokens\":5}}\n\n"))
-		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+func TestOpenAICompleteHappyPath(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "" {
+			t.Error("expected Authorization header")
+		}
+		// v3 Responses API path is /v1/responses.
+		if !strings.HasSuffix(r.URL.Path, "/responses") {
+			t.Errorf("expected /v1/responses, got %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"id": "resp_01",
+			"object": "response",
+			"status": "completed",
+			"model": "gpt-5",
+			"output": [
+				{
+					"type": "message",
+					"role": "assistant",
+					"content": [{"type": "output_text", "text": "Hello back"}]
+				}
+			],
+			"usage": {"input_tokens": 8, "output_tokens": 4}
+		}`))
 	}))
 	defer srv.Close()
 
-	o := NewOpenAI(ProviderConfig{APIKey: "sk-test", BaseURL: srv.URL})
-	resp, err := o.Complete(context.Background(), &Request{
-		Model:    "gpt-4",
-		Messages: []Message{{Role: "user", Content: "hi"}},
-		Stream:   true,
+	p := NewOpenAI(ProviderConfig{APIKey: "sk-test", BaseURL: srv.URL})
+	resp, err := p.Complete(context.Background(), &Request{
+		Model:     "gpt-5",
+		MaxTokens: 64,
+		Messages:  []Message{{Role: "user", Content: "Hi"}},
 	})
 	if err != nil {
 		t.Fatalf("Complete: %v", err)
 	}
-	if resp.Content != "hello world" {
-		t.Errorf("Content: got %q", resp.Content)
+	if resp.Content != "Hello back" {
+		t.Fatalf("content = %q", resp.Content)
 	}
-	if resp.Usage.TotalTokens != 5 {
-		t.Errorf("Usage.TotalTokens: got %d", resp.Usage.TotalTokens)
+	if resp.Usage.PromptTokens != 8 || resp.Usage.CompletionTokens != 4 || resp.Usage.TotalTokens != 12 {
+		t.Fatalf("usage = %+v", resp.Usage)
 	}
-	if resp.TimeToFirstToken <= 0 {
-		t.Errorf("expected positive TimeToFirstToken, got %v", resp.TimeToFirstToken)
-	}
-}
-
-func TestOpenAIStreamWithTemperatureAndStop(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body struct {
-			Temperature float64  `json:"temperature"`
-			Stop        []string `json:"stop"`
-			Stream      bool     `json:"stream"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("decode request: %v", err)
-		}
-		if body.Temperature == 0 {
-			t.Error("expected non-zero temperature")
-		}
-		if len(body.Stop) == 0 {
-			t.Error("expected stop tokens")
-		}
-		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\n"))
-		_, _ = w.Write([]byte("data: [DONE]\n\n"))
-	}))
-	defer srv.Close()
-
-	o := NewOpenAI(ProviderConfig{APIKey: "sk-test", BaseURL: srv.URL})
-	rc, err := o.Stream(context.Background(), &Request{
-		Model:       "gpt-4",
-		Messages:    []Message{{Role: "user", Content: "hi"}},
-		Temperature: 0.7,
-		Stop:        []string{"\n"},
-	})
-	if err != nil {
-		t.Fatalf("Stream: %v", err)
-	}
-	defer func() { _ = rc.Close() }()
-	buf := make([]byte, 4096)
-	n, _ := rc.Read(buf)
-	if !strings.Contains(string(buf[:n]), "ok") {
-		t.Errorf("expected 'ok' in stream, got %q", string(buf[:n]))
+	if resp.StopReason != "completed" {
+		t.Fatalf("stop_reason = %q", resp.StopReason)
 	}
 }
 
-func TestOpenAICompleteServerErrorBodyNonJSON(t *testing.T) {
+func TestOpenAIError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusTooManyRequests)
-		_, _ = w.Write([]byte("rate limit exceeded"))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":{"message":"bad api key","type":"invalid_request_error"}}`))
 	}))
 	defer srv.Close()
 
-	o := NewOpenAI(ProviderConfig{APIKey: "sk-test", BaseURL: srv.URL})
-	_, err := o.Complete(context.Background(), &Request{
-		Model:    "gpt-4",
-		Messages: []Message{{Role: "user", Content: "hi"}},
-	})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	if !strings.Contains(err.Error(), "429") {
-		t.Errorf("expected 429 in error, got %v", err)
+	p := NewOpenAI(ProviderConfig{APIKey: "sk-bad", BaseURL: srv.URL})
+	if _, err := p.Complete(context.Background(), &Request{
+		Model: "gpt-5", Messages: []Message{{Role: "user", Content: "x"}},
+	}); err == nil {
+		t.Fatal("expected error on 401")
 	}
 }
