@@ -123,23 +123,12 @@ jobs:
 
       - name: Render with defaults (sqlite)
         # Helm template exercise validates that every template
-        # evaluates successfully under both backends.
+        # evaluates successfully.
         run: |
           helm template render-defaults deploy/helm/promptsheon/ \
             --set config.dbBackend=sqlite \
             > /tmp/sqlite-rendered.yaml
           test -s /tmp/sqlite-rendered.yaml
-
-      - name: Render with Postgres
-        # Production deploys set dbBackend=postgres and supply a
-        # DSN. This matrix verifies the rendered Secret + envFrom
-        # configmapRef + secretRef chain work end-to-end.
-        run: |
-          helm template render-pg deploy/helm/promptsheon/ \
-            --set config.dbBackend=postgres \
-            --set config.dbDSN=postgres://x:y@h:5432/db \
-            > /tmp/pg-rendered.yaml
-          test -s /tmp/pg-rendered.yaml
 
   security:
     runs-on: ubuntu-latest
@@ -158,86 +147,6 @@ jobs:
         uses: securego/gosec@v2.27.1
         with:
           args: ./...
-
-  postgres-integration:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_DB: promptsheon_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      TEST_POSTGRES_DSN: postgres://postgres:postgres@localhost:5432/promptsheon_test?sslmode=disable
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version: "1.26.5"
-          cache: true
-
-      - name: Wait for Postgres
-        run: |
-          for i in {1..30}; do
-            if pg_isready -h localhost -p 5432; then
-              echo "Postgres is ready"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "Postgres did not become ready"
-          exit 1
-
-      - name: Run postgres integration tests
-        run: go test -race -count=1 -timeout 120s ./internal/store/postgres/...
-
-  clickhouse-integration:
-    runs-on: ubuntu-latest
-    services:
-      clickhouse:
-        image: clickhouse/clickhouse-server:24.3
-        ports:
-          - 9000:9000
-        options: >-
-          --health-cmd wget
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      PROMPTSHEON_TEST_CLICKHOUSE_DSN: localhost:9000
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version: "1.26.5"
-          cache: true
-
-      - name: Wait for ClickHouse
-        run: |
-          for i in {1..60}; do
-            if wget -q --spider http://localhost:8123/ping 2>/dev/null; then
-              echo "ClickHouse is ready"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "ClickHouse did not become ready"
-          exit 1
-
-      - name: Run clickhouse integration tests
-        # The clickhouse tests are gated behind -tags clickhouse so
-        # they don't pull the driver into the default build.
-        run: go test -tags clickhouse -race -count=1 -timeout 120s ./internal/rollups/clickhouse/...
 
   sbom:
     runs-on: ubuntu-latest

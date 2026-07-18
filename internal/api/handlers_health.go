@@ -15,9 +15,9 @@ var startTime = time.Now()
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) error {
 	info := buildinfo.Get()
 	writeJSON(w, http.StatusOK, map[string]any{
-		auditKeyStatus: "healthy",
+		auditKeyStatus:  "healthy",
 		auditKeyVersion: info.Version,
-		"uptime":       time.Since(startTime).String(),
+		"uptime":        time.Since(startTime).String(),
 	})
 	return nil
 }

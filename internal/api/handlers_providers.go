@@ -77,22 +77,22 @@ func (s *Server) handleTestProvider(w http.ResponseWriter, r *http.Request) erro
 
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
-			keyProvider:   name,
-			fieldModel:    req.Model,
+			keyProvider:    name,
+			fieldModel:     req.Model,
 			auditKeyStatus: valError,
-			valError:      err.Error(),
-			"latency_ms":  latency.Milliseconds(),
+			valError:       err.Error(),
+			"latency_ms":   latency.Milliseconds(),
 		})
 		return nil
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		keyProvider:   name,
-		fieldModel:    resp.Model,
+		keyProvider:    name,
+		fieldModel:     resp.Model,
 		auditKeyStatus: dbStatusOK,
-		"content":     resp.Content,
-		"usage":       resp.Usage,
-		"latency_ms":  latency.Milliseconds(),
+		"content":      resp.Content,
+		"usage":        resp.Usage,
+		"latency_ms":   latency.Milliseconds(),
 	})
 	return nil
 }

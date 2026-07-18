@@ -16,12 +16,12 @@ import (
 // fixture provides a populated workspace/project/capability/version so
 // the release tests have something to point at.
 type releaseFixture struct {
-	db            *store.SQLite
-	workspaceID   string
-	projectID     string
-	capabilityID  string
-	versionID     string
-	manifestHash  string
+	db           *store.SQLite
+	workspaceID  string
+	projectID    string
+	capabilityID string
+	versionID    string
+	manifestHash string
 }
 
 func validManifest() capability.Manifest { return testdata.NewManifest() }
@@ -90,7 +90,7 @@ func TestReleaseCreateGetRoundTrip(t *testing.T) {
 		t.Fatalf("status = %q want pending", got.Status)
 	}
 	// SQLite stores times at second precision; allow a 2s window.
-	if got.CreatedAt.Before(before.Add(-2 * time.Second)) || got.CreatedAt.After(time.Now().UTC().Add(2*time.Second)) {
+	if got.CreatedAt.Before(before.Add(-2*time.Second)) || got.CreatedAt.After(time.Now().UTC().Add(2*time.Second)) {
 		t.Fatalf("created_at = %v out of expected window", got.CreatedAt)
 	}
 }

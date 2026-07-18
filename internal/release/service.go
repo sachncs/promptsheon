@@ -29,12 +29,12 @@ const (
 // conventions. Callers construct it once with NewService and inject
 // it into HTTP handlers.
 type Service struct {
-	DB         Repository
-	App        approval.Repository
-	HarnessDB  harness.Repository
-	Policy     approval.Policy
-	Harness    *harness.PreconditionRunner
-	Clock      func() time.Time
+	DB        Repository
+	App       approval.Repository
+	HarnessDB harness.Repository
+	Policy    approval.Policy
+	Harness   *harness.PreconditionRunner
+	Clock     func() time.Time
 }
 
 // NewService constructs a Service with the supplied policy. Callers

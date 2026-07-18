@@ -98,8 +98,13 @@ func TestPreconditionRunnerRunAllContinuesPastFailure(t *testing.T) {
 
 func TestPreconditionRunnerTimeout(t *testing.T) {
 	r := harness.NewPreconditionRunner()
+	// Use a sleep that's much longer than the timeout so the test
+	// proves the runner killed the process rather than the sleep
+	// returning on its own. CI runs with shared / loaded runners and
+	// can fork+exec a few hundred ms slower than a dev laptop, so
+	// the upper bound is 1s of timeout + 4s of CI slack.
 	precs := []harness.Precondition{
-		{ID: "p1", CapabilityID: "c1", Name: "sleep", Command: "sleep 5", TimeoutSec: 1, Enabled: true},
+		{ID: "p1", CapabilityID: "c1", Name: "sleep", Command: "sleep 30", TimeoutSec: 1, Enabled: true},
 	}
 	start := time.Now()
 	results, err := r.Run(context.Background(), precs)
@@ -107,7 +112,9 @@ func TestPreconditionRunnerTimeout(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected timeout error")
 	}
-	if elapsed > 3*time.Second {
+	// 1s timeout + 4s slack. If the timeout didn't fire, the sleep
+	// alone would take 30s and the assertion catches it.
+	if elapsed > 5*time.Second {
 		t.Fatalf("timeout took too long: %v", elapsed)
 	}
 	if results[0].Passed {

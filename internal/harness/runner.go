@@ -35,9 +35,9 @@ type EvalRunOptions struct {
 // for each case, score via the chosen Scorer, persist per-case
 // results and the aggregate EvalRun.
 type EvalRunner struct {
-	Repo    Repository
-	Inv     ReleaseInvoker
-	Clock   func() time.Time
+	Repo  Repository
+	Inv   ReleaseInvoker
+	Clock func() time.Time
 }
 
 // NewEvalRunner constructs a runner. Pass a Repository (for

@@ -30,7 +30,7 @@ v0.0.7 prompts/agents tables are gone (see
 - **Recommendation Engine** — The deterministic rules engine (Tier 2.35) plus the bandit Thompson Sampling selector (Tier 2.36) close the loop
 - **Approval Workflow** — `MajorityPolicy` and `MakerCheckerPolicy` with separation of duties
 - **Harness Engineering** — Preconditions gate Activate; eval runs score a Release against a Dataset. The fast iteration loop the OpenAI [harness engineering article](docs/harness.md) prescribes.
-- **LLM Provider Abstraction** — Unified interface for Anthropic and OpenAI (the official SDKs)
+- **LLM Provider Abstraction** — Unified interface for Anthropic and OpenAI via the official SDKs (`anthropics/anthropic-sdk-go`, `openai/openai-go/v3` Responses API)
 - **Workflow DAG** — Topological execution with tool integration
 - **Observability** — OpenTelemetry tracing, Prometheus metrics, audit logging
 - **Built-in Guardrails** — PII redaction (Tier 2.47) and prompt-injection detection (Tier 2.48) ship as in-process plugins through the supervisor (Tier 2.46)
@@ -188,14 +188,13 @@ See [docs/eval.md](docs/eval.md) for the eval primitive, [docs/harness.md](docs/
 | `Capability` | struct | A named logical capability with N immutable Versions |
 | `Version` | struct | A specific immutable build of a Capability Manifest |
 | `Release` | struct | A pointer to a Version inside a tenant Environment |
-| `Manifest` | struct | Composes Prompt, ModelPolicy, RuntimePolicy, ContextContract, Memory, Guardrails, Tools, MCP, EvalSuite |
-| `CapabilityService` | type | Server interface for capability/manifest/recommendation operations |
-| `WorkflowEngine` | type | DAG-based workflow executor with shell policy |
+| `Manifest` | struct | Content-addressed composition of Prompt, ModelPolicy, RuntimePolicy, ContextContract, Memory, Guardrails, Tools, MCP, EvalSuite |
 | `CAS` | type | Content-addressable store (Merkle DAG) |
 | `Vault` | type | AES-256-GCM vault (or KMS-backed `KeyProvider`) |
 | `PluginSupervisor` | type | gRPC-over-UDS supervisor for in-process and remote plugins |
-| `EvalEngine` | type | Runs a Version against a dataset and scores the output |
-| `RecommendationEngine` | type | Tier-2.35 rules + Tier-2.36 Thompson-sampling selector |
+| `Dataset` | struct | Named collection of `(inputs, expected)` test cases. The ground truth for harness eval. |
+| `Precondition` | struct | Named command hook on a Capability; Activate runs every enabled precondition. |
+| `EvalRun` | struct | Recorded scoring of a Release against a Dataset using a chosen Scorer. |
 | `OpenAPI` | resource | Auto-generated OpenAPI spec at `api/openapi.yaml` |
 
 ---
@@ -206,40 +205,64 @@ See [docs/eval.md](docs/eval.md) for the eval primitive, [docs/harness.md](docs/
 # 1. End-to-end capability lifecycle against a local server.
 ./promptsheond &  # in another shell
 
+curl -X POST http://localhost:8080/api/v1/workspaces \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"acme"}'
+
+curl -X POST http://localhost:8080/api/v1/workspaces/w1/projects \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"summariser"}'
+
 curl -X POST http://localhost:8080/api/v1/projects/p1/capabilities \
   -H 'Content-Type: application/json' \
-  -d '{"name":"greeting","description":"Friendly greeting"}'
+  -d '{"name":"summariser","description":"Summarise long docs"}'
 
+# Add a Version with a content-addressed Manifest. Use the SampleManifestHash
+# (or your own sha256) for each leaf artifact. The hash becomes the
+# deduplication key in the CAS store.
 curl -X POST http://localhost:8080/api/v1/capabilities/c1/versions \
   -H 'Content-Type: application/json' \
-  -d '{"version":1, "manifest":{"prompt":"Sachin"}}'
+  -d '{"version":1,"manifest":{"prompt":{"kind":"prompt","hash":"<sha256>"}, ...}}'
 
-curl -X POST http://localhost:8080/api/v1/releases/r1/approve -d '{}'
-curl -X POST http://localhost:8080/api/v1/releases/r1/invoke \
-  -H 'Content-Type: application/json' \
-  -d '{"inputs":{"q":"hello"}}'
+# Drive the Release lifecycle end-to-end:
+REL=$(curl -sS -X POST http://localhost:8080/api/v1/versions/v1/releases \
+       -H 'Content-Type: application/json' \
+       -d '{"environment":"prod"}' | jq -r .id)
+curl -sS -X POST http://localhost:8080/api/v1/releases/$REL/votes \
+     -H 'Content-Type: application/json' \
+     -d '{"identity":"alice","decision":"approve"}'
+curl -sS -X POST http://localhost:8080/api/v1/releases/$REL/activate
+curl -sS -X POST http://localhost:8080/api/v1/releases/$REL/invoke \
+     -H 'Content-Type: application/json' \
+     -d '{"inputs":{"text":"long document..."},"model":"claude-opus-4"}'
 ```
 
 ```go
 // 2. Programmatic Go SDK lifecycle
-client, _ := sdk.NewClient(sdk.Config{Addr: "http://localhost:8080"})
+client := sdk.New("http://localhost:8080", "ps_...")
+ctx := context.Background()
 
 cap, _ := client.CreateCapability(ctx, "p1", sdk.CreateCapabilityRequest{
     Name: "summariser",
 })
 ver, _ := client.AddVersion(ctx, cap.ID, sdk.AddVersionRequest{
-    Version:  1,
-    Manifest: sdk.Manifest{Prompt: "Sachin"},
+    Version: 1,
+    Manifest: sdk.Manifest{Prompt: "<sha256-of-prompt-blob>"},
 })
-rel, _ := client.CreateRelease(ctx, ver.ID)
-out, _ := client.ApproveAndInvoke(ctx, rel.ID, sdk.InvokeRequest{
+rel, _ := client.CreateRelease(ctx, ver.ID, sdk.CreateReleaseRequest{Environment: "prod"})
+client.Vote(ctx, rel.ID, sdk.VoteRequest{Identity: "alice", Decision: "approve"})
+activated, _ := client.Activate(ctx, rel.ID)
+out, _ := client.Invoke(ctx, activated.ID, sdk.InvokeRequest{
     Inputs: map[string]any{"text": "long document..."},
+    Model:  "claude-opus-4",
 })
-fmt.Println(out.Output)
+fmt.Println(out.Outputs["content"])
 ```
 
-The [`examples/`](examples/) directory has more end-to-end recipes for
-policy-based approvals, plugin manifests, and rate-limit configuration.
+The [`examples/`](examples/) directory has more end-to-end recipes,
+including a harness-engineering eval example. See
+[docs/harness.md](docs/harness.md) for the full surface and
+[docs/eval.md](docs/eval.md) for the eval primitive.
 
 ---
 
@@ -253,14 +276,17 @@ policy-based approvals, plugin manifests, and rate-limit configuration.
 │  Auth      │  Rate Limit  │  Audit Log  │  CORS   │
 │  Middleware │  Middleware  │  Middleware │         │
 ├─────────────┴──────────────┴─────────────┴───────┤
-│  Capability Mgr  │  Workflow Engine  │  Eval   │
-│  Manifests       │  DAG              │  Engine  │
+│  Capability Mgr  │  Harness   │  Recommendation │  │
+│  Manifests       │  Datasets, │  Engine       │  │
+│  Releases        │  Precond,  │  (rules +     │  │
+│  Approvals       │  Eval Runs │  bandit)      │  │
 ├──────────────────────────────────────────────────┤
-│  Content-Addressable Store  │  SQLite/Postgres  │
-│  (Merkle DAG)               │  (with RLS)        │
+│  Content-Addressable Store  │  SQLite (only)    │
+│  (Merkle DAG)               │                   │
 ├──────────────────────────────────────────────────┤
 │  LLM Providers  │  Observability  │  Webhooks     │
 │  OpenAI/Anthro  │  OTel+Tracing   │  Event-Driven │
+│  (official SDKs)│  Prometheus     │  HMAC-signed  │
 ├──────────────────────────────────────────────────┤
 │  Plugin Supervisor  │  Vault  │  KeyProvider     │
 │  (gRPC over UDS)   │  (KMS)  │  (BYOK)          │
@@ -272,10 +298,10 @@ The server is composed of layered modules:
 | Layer | Description |
 |-------|-------------|
 | **API** | HTTP handlers, middleware (auth, rate-limit, audit, CORS) |
-| **Capabilities** | Manifests, Releases, Approvals, Recommendations, Lineage |
-| **Workflow** | DAG-based execution engine with shell policy |
-| **Storage** | CAS (Merkle DAG) + SQLite or Postgres with RLS |
-| **Providers** | Unified LLM provider abstraction layer |
+| **Capabilities** | Manifests, Releases, Approvals, Datasets, Preconditions, Evals |
+| **Harness** | The harness-engineering loop: datasets, preconditions, eval runs. See [docs/harness.md](docs/harness.md). |
+| **Storage** | CAS (Merkle DAG) + SQLite (v0.1.x is SQLite-only) |
+| **Providers** | Unified LLM provider abstraction layer (Anthropic + OpenAI) |
 | **Observability** | OpenTelemetry tracing, metrics collection, retention |
 | **Security** | AuthN/AuthZ, vault, guardrails, SSRF protection |
 | **Plugins** | gRPC over loopback; supervisor-managed lifecycle |
@@ -288,20 +314,23 @@ The server is composed of layered modules:
 promptsheon/
 ├── cmd/
 │   ├── promptsheond/   # Server binary
-│   └── promptsheon/    # CLI binary
+│   └── promptsheon/    # CLI binary (cas + http + harness + per-command files)
 ├── api/                # OpenAPI spec and codegen
 ├── internal/           # Server-side implementation modules
 │   ├── capabilities/
-│   ├── workflow/
+│   ├── harness/        # Dataset / Precondition / EvalRun types + runner
+│   ├── eval/           # Scorer registry (exact_match, contains, regex)
+│   ├── release/        # Release aggregate + application service
+│   ├── approval/      # MakerChecker + Majority policies
 │   ├── cas/            # Content-addressable store (Merkle DAG)
 │   ├── vault/          # AES-256-GCM + KMS KeyProvider
 │   ├── observability/  # OTel tracing and Prometheus metrics
-│   ├── providers/      # OpenAI, Anthropic, Azure, Ollama, NVIDIA NIM
+│   ├── llm/            # Anthropic + OpenAI provider implementations
 │   ├── plugins/        # Plugin supervisor + RPC bridge
 │   ├── guardrails/     # PII redaction, prompt-injection detection
 │   └── ...
 ├── pkg/                # Stable public packages consumable by other Go projects
-├── sdk/                # Go SDK for embedding Promptsheon
+├── sdk/                # Go SDK for embedding Promptsheon (also python/, typescript/)
 ├── deploy/             # systemd, docker, kubernetes manifests
 ├── docs/               # Architecture, deployment, ADRs, troubleshooting, FAQ
 ├── examples/           # End-to-end recipes
@@ -388,10 +417,11 @@ See [docs/release.md](docs/release.md) for the full process.
 | Category | Technology |
 |----------|------------|
 | Language | Go 1.26 |
-| HTTP Routing | [chi](https://github.com/go-chi/chi) (or stdlib `http.ServeMux`) |
-| CLI | [cobra](https://github.com/spf13/cobra) |
-| Storage | [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) (CGo-free SQLite), [pgx/v5](https://github.com/jackc/pgx) (Postgres) |
-| RPC | [google.golang.org/grpc](https://grpc.io/docs/languages/go/) |
+| HTTP Routing | stdlib `net/http.ServeMux` (Go 1.22+ pattern matching) |
+| CLI | Hand-rolled command dispatcher under `cmd/promptsheon/main.go` |
+| Storage | [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) (CGo-free SQLite). v0.1.x is SQLite-only; the Postgres backend was removed. |
+| LLM SDKs | [`anthropics/anthropic-sdk-go`](https://github.com/anthropics/anthropic-sdk-go), [`openai/openai-go/v3`](https://github.com/openai/openai-go) (Responses API) |
+| RPC | [google.golang.org/grpc](https://grpc.io/docs/languages/go/) (plugin transport; not wired into the request path in v0.1.x) |
 | Observability | [OpenTelemetry](https://opentelemetry.io/), Prometheus |
 | Auth | OIDC, static API keys |
 | Vault | AES-256-GCM via [crypto/aes](https://pkg.go.dev/crypto/aes); KMS via pluggable `KeyProvider` |
@@ -409,6 +439,11 @@ Full documentation lives in **[docs/](docs/)**:
 - [Configuration](docs/configuration.md)
 - [API Reference](docs/api-reference.md) — [OpenAPI spec](api/openapi.yaml)
 - [Architecture](docs/architecture.md) — [Modules](docs/modules.md)
+- [Harness engineering](docs/harness.md) — why the eval/precondition/dataset surface exists
+- [Eval primitive](docs/eval.md) — datasets, preconditions, eval runs in detail
+- [Release lifecycle](docs/release.md) — Capability → Release with MakerChecker approval
+- [SDKs](docs/sdk.md) — Go / Python / TypeScript clients
+- [LLM providers](docs/llm-providers.md) — Anthropic + OpenAI
 - [Design Decisions](docs/design-decisions.md) and [ADRs](docs/adr/)
 - [Security](docs/security.md)
 - [Troubleshooting](docs/troubleshooting.md) — [FAQ](docs/faq.md)
@@ -417,10 +452,16 @@ Full documentation lives in **[docs/](docs/)**:
 
 ## Roadmap
 
-- **v0.1.x** — Current: forward-only manifest + release model, CAS + Merkle DAG, approval policies, REST API
-- **v0.2.0** — Multi-region replication, configurable retention, Prometheus exporter
-- **v0.3.0** — Webhook delivery retries + dead-letter queue
-- **v1.0.0** — Stable API, gRPC streaming for real-time updates, additional KMS integrations
+- **v0.1.x** — Current: forward-only Capability / Version / Release
+  model, CAS + Merkle DAG, MakerChecker approval, harness
+  engineering (datasets / preconditions / evals), Anthropic + OpenAI
+  via official SDKs, REST API. SQLite-only.
+- **v0.2.0** — Multi-region replication, configurable retention,
+  Prometheus exporter, json_schema scorer for evals
+- **v0.3.0** — Webhook delivery retries + dead-letter queue,
+  LLM-judge scorer for evals
+- **v1.0.0** — Stable API, gRPC streaming for real-time updates,
+  additional KMS integrations, Postgres parity (currently deleted)
 
 ---
 

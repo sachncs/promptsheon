@@ -40,11 +40,11 @@ func TestHarnessMigration025(t *testing.T) {
 	defer db.Close()
 
 	want := map[string]bool{
-		"datasets":       false,
-		"dataset_cases":  false,
-		"preconditions":  false,
-		"eval_runs":      false,
-		"eval_results":   false,
+		"datasets":      false,
+		"dataset_cases": false,
+		"preconditions": false,
+		"eval_runs":     false,
+		"eval_results":  false,
 	}
 	rows, err := db.DB().Query(
 		"SELECT name FROM sqlite_master WHERE type='table' AND name IN ('datasets','dataset_cases','preconditions','eval_runs','eval_results')")
