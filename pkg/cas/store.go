@@ -41,29 +41,6 @@ func ObjectHash(obj *Object) (string, error) {
 	return canonicalHash(obj)
 }
 
-// canonicalSerialize returns the canonical JSON encoding of obj.
-// The encoding uses Go's json.Marshal with struct fields in declaration order,
-// which combined with sorted slices in the caller produces deterministic output.
-func canonicalSerialize(obj *Object) ([]byte, error) {
-	return json.Marshal(obj)
-}
-
-// canonicalHash computes the SHA-256 hash of the canonical JSON encoding of obj.
-// L-11 fix: returns an error instead of panicking on marshal
-// failure. The previous implementation panicked, which is
-// appropriate for a CLI that owns its process but inappropriate for
-// a library that may be embedded in a long-running daemon. Callers
-// that genuinely cannot recover can wrap the result with a panic
-// at the call site.
-func canonicalHash(obj *Object) (string, error) {
-	data, err := canonicalSerialize(obj)
-	if err != nil {
-		return "", fmt.Errorf("canonical hash serialize: %w", err)
-	}
-	h := sha256.Sum256(data)
-	return hex.EncodeToString(h[:]), nil
-}
-
 // WriteObject serializes obj to canonical JSON, gzip-compresses it, and writes
 // it to the content-addressable store under .promptsheon/objects/.
 //
@@ -385,4 +362,27 @@ func validateRefName(name string) error {
 		return fmt.Errorf("invalid ref name: %q", name)
 	}
 	return nil
+}
+
+// canonicalSerialize returns the canonical JSON encoding of obj.
+// The encoding uses Go's json.Marshal with struct fields in declaration order,
+// which combined with sorted slices in the caller produces deterministic output.
+func canonicalSerialize(obj *Object) ([]byte, error) {
+	return json.Marshal(obj)
+}
+
+// canonicalHash computes the SHA-256 hash of the canonical JSON encoding of obj.
+// L-11 fix: returns an error instead of panicking on marshal
+// failure. The previous implementation panicked, which is
+// appropriate for a CLI that owns its process but inappropriate for
+// a library that may be embedded in a long-running daemon. Callers
+// that genuinely cannot recover can wrap the result with a panic
+// at the call site.
+func canonicalHash(obj *Object) (string, error) {
+	data, err := canonicalSerialize(obj)
+	if err != nil {
+		return "", fmt.Errorf("canonical hash serialize: %w", err)
+	}
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:]), nil
 }

@@ -1,4 +1,5 @@
-// Package promptsheon implements the core Promptsheon engine.
+// Package cas implements a Git-like content-addressable object
+// store with commits, branches, refs, and verification.
 package cas
 
 import (
