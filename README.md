@@ -29,8 +29,8 @@ v0.0.7 prompts/agents tables are gone (see
 - **Manifest** — Content-addressed composition of Prompt, Model Policy, Runtime Policy, Context Contract, Memory, Guardrails, Tools, MCP servers, and Evaluation Suite
 - **Recommendation Engine** — The deterministic rules engine (Tier 2.35) plus the bandit Thompson Sampling selector (Tier 2.36) close the loop
 - **Approval Workflow** — `MajorityPolicy` and `MakerCheckerPolicy` with separation of duties
-- **Evaluation Engine** — Run Versions against test datasets with automated scoring
-- **LLM Provider Abstraction** — Unified interface for OpenAI, Anthropic, Azure OpenAI, Ollama, NVIDIA NIM
+- **Harness Engineering** — Preconditions gate Activate; eval runs score a Release against a Dataset. The fast iteration loop the OpenAI [harness engineering article](docs/harness.md) prescribes.
+- **LLM Provider Abstraction** — Unified interface for Anthropic and OpenAI (the official SDKs)
 - **Workflow DAG** — Topological execution with tool integration
 - **Observability** — OpenTelemetry tracing, Prometheus metrics, audit logging
 - **Built-in Guardrails** — PII redaction (Tier 2.47) and prompt-injection detection (Tier 2.48) ship as in-process plugins through the supervisor (Tier 2.46)
@@ -158,6 +158,26 @@ Promptsheon is configured via environment variables or a config file. Key settin
 | `PROMPTSHEON_VAULT_KEY` | (none) | Master key for AES-256-GCM vault; override with KMS-backed KeyProvider for production. |
 
 See [docs/configuration.md](docs/configuration.md) for the full reference.
+
+---
+
+## Harness engineering
+
+Promptsheon's headline surface is the [harness engineering](docs/harness.md) loop: Datasets (ground-truth `{inputs, expected}` pairs), Preconditions (named command hooks), and Evals (recorded scoring runs of a Release against a Dataset). Activate runs the Capability's preconditions; a failing hook returns 409 and leaves the Release in `pending`. Eval runs return 200 (passed) or 422 (failed) with per-case outcomes persisted.
+
+```bash
+# 1. Add a dataset + a precondition to your capability
+promptsheon dataset create c1 --name greeting --file cases.json
+promptsheon precondition add c1 --name go-test --cmd "go test ./..." --timeout 60
+
+# 2. Drive the iteration loop
+promptsheon release create <vid> '{"environment":"prod"}'
+promptsheon release vote <rid> bob approve
+promptsheon release activate <rid>      # 409 if preconditions fail
+promptsheon eval run <rid> --dataset <dataset_id>
+```
+
+See [docs/eval.md](docs/eval.md) for the eval primitive, [docs/harness.md](docs/harness.md) for the surface rationale, and the [OpenAI article](https://openai.com/index/harness-engineering/) that inspired the design.
 
 ---
 

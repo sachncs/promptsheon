@@ -51,6 +51,9 @@ The OpenAPI spec is the authoritative list. The high-level groups, with the numb
 | `capabilities` | 5 | Capability CRUD scoped to a project. |
 | `versions` | 4 | Immutable Version CRUD; Manifest is content-addressed. |
 | `releases` | 8 | Release lifecycle: create, vote, activate (atomic), rollback, invoke, approval trail. See [release.md](release.md) for the full lifecycle. |
+| `datasets` | 5 | Eval dataset CRUD: list, create (with optional cases), get (returns cases), put-cases (atomic replace), delete. See [eval.md](eval.md). |
+| `preconditions` | 3 | Harness precondition hooks attached to a Capability; gated on Activate. |
+| `evals` | 3 | Eval run CRUD: run (records score), list, get (returns run + per-case results). |
 | `executions` | 3 | Read-only Execution history. |
 | `alerts` | 8 | Alert rule CRUD, active alerts, resolve. |
 | `audit` | 3 | List, export, verify the hash chain. |
