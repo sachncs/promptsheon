@@ -39,6 +39,9 @@ func NewInstrumented(p Provider, collector MetricsCollector, logger *slog.Logger
 // Name returns the wrapped provider name.
 func (i *Instrumented) Name() string { return i.inner.Name() }
 
+// Instrumented satisfies the Provider interface.
+var _ Provider = (*Instrumented)(nil)
+
 // Complete delegates to the inner provider, then records metrics.
 func (i *Instrumented) Complete(ctx context.Context, req *Request) (*Response, error) {
 	start := time.Now()

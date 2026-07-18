@@ -186,3 +186,6 @@ func (cbm *CircuitBreakerMiddleware) Complete(ctx context.Context, req *Request)
 func (cbm *CircuitBreakerMiddleware) Name() string {
 	return cbm.provider.Name()
 }
+
+// CircuitBreakerMiddleware satisfies the Provider interface.
+var _ Provider = (*CircuitBreakerMiddleware)(nil)
