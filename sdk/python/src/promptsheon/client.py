@@ -63,9 +63,9 @@ class Client(_BaseClient):
     def list_capabilities(self, project_id: str) -> list[dict]:
         """List Capabilities in a Project.
 
-        GET /v1/projects/{project_id}/capabilities
+        GET /api/v1/projects/{project_id}/capabilities
         """
-        url = f"/v1/projects/{project_id}/capabilities"
+        url = f"/api/v1/projects/{project_id}/capabilities"
         r = self._http.get(url, headers=self._headers())
         if r.status_code != 200:
             raise PromptsheonAPIError(r.status_code, "GET", url, r.text)
@@ -76,9 +76,9 @@ class Client(_BaseClient):
     ) -> dict:
         """Invoke a Release: bind input -> Provider -> Output.
 
-        POST /v1/releases/{release_id}/invoke
+        POST /api/v1/releases/{release_id}/invoke
         """
-        url = f"/v1/releases/{release_id}/invoke"
+        url = f"/api/v1/releases/{release_id}/invoke"
         body = {"inputs": inputs}
         headers = self._headers()
         headers["Content-Type"] = "application/json"
@@ -108,7 +108,7 @@ class AsyncClient(_BaseClient):
         await self.aclose()
 
     async def list_capabilities(self, project_id: str) -> list[dict]:
-        url = f"/v1/projects/{project_id}/capabilities"
+        url = f"/api/v1/projects/{project_id}/capabilities"
         r = await self._http.get(url, headers=self._headers())
         if r.status_code != 200:
             raise PromptsheonAPIError(r.status_code, "GET", url, r.text)
@@ -117,7 +117,7 @@ class AsyncClient(_BaseClient):
     async def invoke_release(
         self, release_id: str, inputs: dict[str, Any]
     ) -> dict:
-        url = f"/v1/releases/{release_id}/invoke"
+        url = f"/api/v1/releases/{release_id}/invoke"
         body = {"inputs": inputs}
         headers = self._headers()
         headers["Content-Type"] = "application/json"
