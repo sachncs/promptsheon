@@ -479,7 +479,7 @@ func (m *mockRepo) GetRelease(_ context.Context, id string) (*release.Release, e
 	defer m.mu.Unlock()
 	r, ok := m.releases[id]
 	if !ok {
-		return nil, store.ErrNotFound
+		return nil, release.ErrNotFound
 	}
 	cp := *r
 	return &cp, nil
@@ -510,7 +510,7 @@ func (m *mockRepo) UpdateRelease(_ context.Context, r *release.Release) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.releases[r.ID]; !ok {
-		return store.ErrNotFound
+		return release.ErrNotFound
 	}
 	cp := *r
 	m.releases[r.ID] = &cp
@@ -542,7 +542,7 @@ func (m *mockRepo) GetApproval(_ context.Context, releaseID string) (*approval.A
 	defer m.mu.Unlock()
 	a, ok := m.approvals[releaseID]
 	if !ok {
-		return nil, store.ErrNotFound
+		return nil, approval.ErrNotFound
 	}
 	cp := *a
 	return &cp, nil
@@ -551,7 +551,7 @@ func (m *mockRepo) UpdateApproval(_ context.Context, a *approval.Approval) error
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.approvals[a.ReleaseID]; !ok {
-		return store.ErrNotFound
+		return approval.ErrNotFound
 	}
 	cp := *a
 	m.approvals[a.ReleaseID] = &cp
