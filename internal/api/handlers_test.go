@@ -16,12 +16,14 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/alerting"
+	"github.com/sachncs/promptsheon/internal/approval"
 	"github.com/sachncs/promptsheon/internal/auth"
 	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/llm"
 	"github.com/sachncs/promptsheon/internal/metrics"
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/ratelimit"
+	"github.com/sachncs/promptsheon/internal/release"
 	"github.com/sachncs/promptsheon/internal/store"
 	"github.com/sachncs/promptsheon/internal/trace"
 	"github.com/sachncs/promptsheon/internal/vault"
@@ -46,6 +48,9 @@ type mockRepo struct {
 	versions      map[string]*capability.Version
 	executions    map[string]*capability.Execution
 	versionsByCap map[string][]*capability.Version
+	releases      map[string]*release.Release
+	releasesByCap map[string][]*release.Release
+	approvals     map[string]*approval.Approval
 	pingErr       error
 	closeErr      error
 }
@@ -62,6 +67,9 @@ func newMockRepo() *mockRepo {
 		versions:      make(map[string]*capability.Version),
 		executions:    make(map[string]*capability.Execution),
 		versionsByCap: make(map[string][]*capability.Version),
+		releases:      make(map[string]*release.Release),
+		releasesByCap: make(map[string][]*release.Release),
+		approvals:     make(map[string]*approval.Approval),
 	}
 }
 
@@ -455,6 +463,105 @@ func (m *mockRepo) ListExecutions(_ context.Context, filter capability.Execution
 		}
 	}
 	return execs, nil
+}
+
+// Releases
+func (m *mockRepo) CreateRelease(_ context.Context, r *release.Release) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := *r
+	m.releases[r.ID] = &cp
+	m.releasesByCap[r.CapabilityID] = append(m.releasesByCap[r.CapabilityID], &cp)
+	return nil
+}
+func (m *mockRepo) GetRelease(_ context.Context, id string) (*release.Release, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	r, ok := m.releases[id]
+	if !ok {
+		return nil, store.ErrNotFound
+	}
+	cp := *r
+	return &cp, nil
+}
+func (m *mockRepo) ListReleasesForCapability(_ context.Context, capabilityID string) ([]*release.Release, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]*release.Release, 0, len(m.releasesByCap[capabilityID]))
+	for _, r := range m.releasesByCap[capabilityID] {
+		cp := *r
+		out = append(out, &cp)
+	}
+	return out, nil
+}
+func (m *mockRepo) ListActiveReleasesForEnvironment(_ context.Context, env release.Environment) ([]*release.Release, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []*release.Release
+	for _, r := range m.releases {
+		if r.Environment == env && r.Status == release.StatusActive {
+			cp := *r
+			out = append(out, &cp)
+		}
+	}
+	return out, nil
+}
+func (m *mockRepo) UpdateRelease(_ context.Context, r *release.Release) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.releases[r.ID]; !ok {
+		return store.ErrNotFound
+	}
+	cp := *r
+	m.releases[r.ID] = &cp
+	for i, existing := range m.releasesByCap[r.CapabilityID] {
+		if existing.ID == r.ID {
+			m.releasesByCap[r.CapabilityID][i] = &cp
+			break
+		}
+	}
+	return nil
+}
+func (m *mockRepo) DeleteRelease(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.releases, id)
+	return nil
+}
+
+// Approvals
+func (m *mockRepo) CreateApproval(_ context.Context, a *approval.Approval) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := *a
+	m.approvals[a.ReleaseID] = &cp
+	return nil
+}
+func (m *mockRepo) GetApproval(_ context.Context, releaseID string) (*approval.Approval, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	a, ok := m.approvals[releaseID]
+	if !ok {
+		return nil, store.ErrNotFound
+	}
+	cp := *a
+	return &cp, nil
+}
+func (m *mockRepo) UpdateApproval(_ context.Context, a *approval.Approval) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.approvals[a.ReleaseID]; !ok {
+		return store.ErrNotFound
+	}
+	cp := *a
+	m.approvals[a.ReleaseID] = &cp
+	return nil
+}
+func (m *mockRepo) DeleteApproval(_ context.Context, releaseID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.approvals, releaseID)
+	return nil
 }
 
 // ---------------------------------------------------------------------------

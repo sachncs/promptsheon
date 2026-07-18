@@ -5,7 +5,15 @@
 // this interface.
 package approval
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+// ErrNotFound is returned by Repository implementations when a row is
+// missing. It is package-local so callers do not need to import a
+// storage-specific sentinel.
+var ErrNotFound = errors.New("approval: not found")
 
 // Repository persists Approval rows and their votes.
 type Repository interface {
