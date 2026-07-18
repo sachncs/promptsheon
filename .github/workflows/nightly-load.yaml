@@ -1,0 +1,126 @@
+name: Nightly Load Test
+
+on:
+  schedule:
+    # Run at 02:00 UTC every day; cheap enough that daily is fine.
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    # Allow on-demand runs from the Actions tab.
+    inputs:
+      duration:
+        description: "Override k6 scenario duration suffix (e.g. '30s')"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      K6_BASE_URL: http://127.0.0.1:8080
+      # Build a fresh API key at setup time; the daemon with
+      # PROMPTSHEON_AUTH=false accepts unauthenticated requests so
+      # this is just metadata for k6.
+      K6_API_KEY: nightly_load_test
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: promptsheon_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.5"
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build daemon
+        run: go build -o promptsheond ./cmd/promptsheond
+
+      - name: Build CLI
+        run: go build -o promptsheon ./cmd/promptsheon
+
+      - name: Install k6
+        run: |
+          curl -fsSL https://github.com/grafana/k6/releases/download/v0.55.0/k6-v0.55.0-linux-amd64.tar.gz \
+            | tar -xz --strip-components=1 -C /usr/local/bin k6-v0.55.0-linux-amd64/k6
+          k6 version
+
+      - name: Start daemon
+        # The daemon listens on 8080. PROMPTSHEON_AUTH=false keeps
+        # the load test simple; the SQLite backend is fine for
+        # short bursts.
+        run: |
+          PROMPTSHEON_ADDR=127.0.0.1:8080 \
+          PROMPTSHEON_DB_PATH=/tmp/nightly.db \
+          PROMPTSHEON_AUTH=false \
+          PROMPTSHEON_LOG_LEVEL=warn \
+            ./promptsheond &
+          echo $! > /tmp/daemon.pid
+          for i in {1..30}; do
+            if curl -sf http://127.0.0.1:8080/health > /dev/null; then
+              echo "Daemon is ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run load scenarios
+        run: |
+          mkdir -p /tmp/load-results
+          for scenario in tests/load/scenarios/*.js; do
+            name=$(basename "$scenario" .js)
+            echo "=== Running $name ==="
+            # Honour optional duration override.
+            duration_arg=""
+            if [ -n "${{ github.event.inputs.duration }}" ]; then
+              duration_arg="--duration ${{ github.event.inputs.duration }}"
+            fi
+            k6 run "$scenario" $duration_arg \
+              --out json=/tmp/load-results/$name.json \
+              --summary-trend-stats="avg,min,med,p(95),p(99),max" \
+              || echo "scenario $name failed; continuing so other scenarios run"
+          done
+
+      - name: Summarise results
+        # Print the summary lines from each scenario so the job
+        # log is human-readable without needing to download the
+        # JSON artefacts.
+        run: |
+          echo "==================== Load Test Summary ===================="
+          for f in /tmp/load-results/*.json; do
+            echo
+            echo "----- $(basename $f .json) -----"
+            # k6's JSON output is line-delimited; the summary line
+            # has the scenario-level metrics under `data.metrics`.
+            grep -E '"metric":"http_req_duration"|"metric":"http_reqs"|"metric":"http_req_failed"' "$f" | tail -20
+          done
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: k6-results
+          path: /tmp/load-results/
+
+      - name: Stop daemon
+        if: always()
+        run: kill $(cat /tmp/daemon.pid) 2>/dev/null || true
