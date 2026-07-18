@@ -77,6 +77,9 @@ func (f *Fallback) Name() string {
 	return fmt.Sprintf("fallback(%s)", strings.Join(names, ","))
 }
 
+// Fallback satisfies the Provider interface.
+var _ Provider = (*Fallback)(nil)
+
 // ParseFallbackProviders parses a comma-separated list of provider names
 // and returns them as a slice. Empty strings are filtered out.
 func ParseFallbackProviders(names string) []string {

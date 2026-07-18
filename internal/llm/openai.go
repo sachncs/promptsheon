@@ -37,6 +37,9 @@ func NewOpenAI(cfg ProviderConfig) *OpenAI {
 // Name returns the provider name.
 func (o *OpenAI) Name() string { return ProviderOpenAI.String() }
 
+// OpenAI satisfies the Provider interface.
+var _ Provider = (*OpenAI)(nil)
+
 // Complete sends a prompt to the OpenAI Responses API and returns
 // the response. The Responses API accepts a single Input string and
 // returns OutputText directly. Multi-message transcripts are joined

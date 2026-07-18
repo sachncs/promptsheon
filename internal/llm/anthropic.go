@@ -10,7 +10,7 @@ import (
 )
 
 // Anthropic implements Provider for the Anthropic Messages API using
-// the official anthropic-sdk-go. The provider name is "anthropic".
+// the official anthropic-sdk-go.
 type Anthropic struct {
 	client  anthropic.Client
 	baseURL string
@@ -35,6 +35,9 @@ func NewAnthropic(cfg ProviderConfig) *Anthropic {
 
 // Name returns the provider name.
 func (a *Anthropic) Name() string { return string(ProviderAnthropic) }
+
+// Anthropic satisfies the Provider interface.
+var _ Provider = (*Anthropic)(nil)
 
 // Complete sends a prompt to the Anthropic API and returns the response.
 func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, error) {

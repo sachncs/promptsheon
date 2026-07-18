@@ -130,6 +130,12 @@ func NewRetrying(p Provider, cfg RetryConfig) *Retrying {
 // Name returns the wrapped provider name.
 func (r *Retrying) Name() string { return r.inner.Name() }
 
+// Retrying satisfies the Provider interface.
+var _ Provider = (*Retrying)(nil)
+
+// Timeouting satisfies the Provider interface.
+var _ Provider = (*Timeouting)(nil)
+
 // Complete sends a request with exponential-backoff retry logic.
 func (r *Retrying) Complete(ctx context.Context, req *Request) (*Response, error) {
 	var lastErr error

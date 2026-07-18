@@ -25,6 +25,9 @@ func NewMock(content string) *Mock {
 // Name returns the provider name.
 func (m *Mock) Name() string { return providerMock }
 
+// Mock satisfies the Provider interface.
+var _ Provider = (*Mock)(nil)
+
 // Complete returns the configured response and records the call.
 func (m *Mock) Complete(_ context.Context, req *Request) (*Response, error) {
 	m.mu.Lock()
