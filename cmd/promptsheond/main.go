@@ -18,6 +18,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/api"
 	"github.com/sachncs/promptsheon/internal/buildinfo"
 	"github.com/sachncs/promptsheon/internal/config"
+	"github.com/sachncs/promptsheon/internal/harness"
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
 	"github.com/sachncs/promptsheon/internal/eventbus"
 	"github.com/sachncs/promptsheon/internal/executor"
@@ -314,6 +315,18 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	if releaseSvc != nil {
 		opts = append(opts, api.WithReleaseService(releaseSvc))
 	}
+
+	// Harness engineering surface (datasets, preconditions, evals).
+	// When a ReleaseInvoker is available (i.e. an LLM provider is
+	// configured), we wire the EvalRunner into the daemon. The
+	// PreconditionRunner gates Activate; failures surface as 409.
+	if releaseSvc != nil {
+		precondRunner := harness.NewPreconditionRunner()
+		releaseSvc.WithHarness(precondRunner, db)
+		evalRunner := harness.NewEvalRunner(db, &apiReleaseInvoker{db: db, inv: inv, svc: releaseSvc})
+		opts = append(opts, api.WithHarnessRunner(evalRunner))
+	}
+
 	srv := api.NewServer(db, logger, opts...)
 	return srv, limiter, spans, collector
 }
