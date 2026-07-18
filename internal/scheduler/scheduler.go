@@ -48,15 +48,16 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case now := <-t.C:
-			s.tickOnce(ctx, now)
+			s.TickOnce(ctx, now)
 		}
 	}
 }
 
-// tickOnce reads due Schedules and publishes an event per fired
+// TickOnce reads due Schedules and publishes an event per fired
 // schedule. Errors are logged by the caller; we never abort the
-// loop on a single bad schedule.
-func (s *Scheduler) tickOnce(ctx context.Context, now time.Time) {
+// loop on a single bad schedule. TickOnce is exported so tests can
+// drive a single iteration without spinning the ticker.
+func (s *Scheduler) TickOnce(ctx context.Context, now time.Time) {
 	due, err := s.schedules.ListDueSchedules(ctx, now, 64)
 	if err != nil {
 		return

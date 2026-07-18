@@ -25,6 +25,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -95,7 +96,7 @@ func (s Schedule) Validate() error {
 		return nil
 	}
 	if _, err := nextCron(s.Cron, time.Now().UTC()); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidCron, err)
+		return fmt.Errorf("%w: %w", ErrInvalidCron, err)
 	}
 	return nil
 }
@@ -190,8 +191,10 @@ func nextCron(expr string, from time.Time) (time.Time, error) {
 	return time.Time{}, ErrInvalidCron
 }
 
-// parseField accepts "*", "n", "n,m,...". Returns a slice indexed
-// by the field's natural integer range for fast membership tests.
+// parseField accepts "*", "n", "n,m,...", "a-b", and "*/n" step
+// expressions. Returns a slice indexed by the field's natural
+// integer range for fast membership tests. All errors wrap
+// ErrInvalidCron so callers can errors.Is against the sentinel.
 func parseField(s string, lo, hi int) ([]bool, error) {
 	out := make([]bool, hi+1)
 	if s == "*" {
@@ -202,15 +205,74 @@ func parseField(s string, lo, hi int) ([]bool, error) {
 	}
 	for _, raw := range splitCSV(s) {
 		if raw == "" {
-			return nil, fmt.Errorf("empty token")
+			return nil, fmt.Errorf("%w: empty token", ErrInvalidCron)
+		}
+		if strings.Contains(raw, "/") {
+			if err := applyStep(out, raw, lo, hi); err != nil {
+				return nil, fmt.Errorf("%w: %w", ErrInvalidCron, err)
+			}
+			continue
+		}
+		if strings.Contains(raw, "-") {
+			if err := applyRange(out, raw, lo, hi); err != nil {
+				return nil, fmt.Errorf("%w: %w", ErrInvalidCron, err)
+			}
+			continue
 		}
 		v, err := atoiStrict(raw, lo, hi)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: %w", ErrInvalidCron, err)
 		}
 		out[v] = true
 	}
 	return out, nil
+}
+
+// applyStep sets every Nth value from start (or lo) up to hi.
+// Accepts "a/n" (start at a, every n) and "*/n" (every n from lo).
+func applyStep(out []bool, raw string, lo, hi int) error {
+	parts := strings.SplitN(raw, "/", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("malformed step %q", raw)
+	}
+	step, err := atoiStrict(parts[1], 1, hi-lo+1)
+	if err != nil {
+		return fmt.Errorf("step %q: %w", raw, err)
+	}
+	start := lo
+	if parts[0] != "*" {
+		start, err = atoiStrict(parts[0], lo, hi)
+		if err != nil {
+			return fmt.Errorf("start %q: %w", raw, err)
+		}
+	}
+	for v := start; v <= hi; v += step {
+		out[v] = true
+	}
+	return nil
+}
+
+// applyRange sets every value in [a, b].
+func applyRange(out []bool, raw string, lo, hi int) error {
+	parts := strings.SplitN(raw, "-", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("malformed range %q", raw)
+	}
+	a, err := atoiStrict(parts[0], lo, hi)
+	if err != nil {
+		return fmt.Errorf("range start %q: %w", raw, err)
+	}
+	b, err := atoiStrict(parts[1], lo, hi)
+	if err != nil {
+		return fmt.Errorf("range end %q: %w", raw, err)
+	}
+	if a > b {
+		return fmt.Errorf("range %q is descending", raw)
+	}
+	for v := a; v <= b; v++ {
+		out[v] = true
+	}
+	return nil
 }
 
 func splitCSV(s string) []string {
