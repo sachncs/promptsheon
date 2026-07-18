@@ -16,6 +16,7 @@ import (
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
 	_ "github.com/sachncs/promptsheon/internal/eval" // Scorer registry (no Server dep yet)
 	"github.com/sachncs/promptsheon/internal/guardrail"
+	"github.com/sachncs/promptsheon/internal/harness"
 	"github.com/sachncs/promptsheon/internal/invoke"
 	"github.com/sachncs/promptsheon/internal/llm"
 	"github.com/sachncs/promptsheon/internal/metrics"
@@ -57,6 +58,7 @@ type Server struct {
 	rollupAgg        *rollups.Aggregator
 	invoker          *invoke.Invoker
 	releaseSvc       *release.Service
+	harnessSvc       *harness.EvalRunner
 
 	// auditQueue is a bounded channel feeding the audit worker pool.
 	auditQueue chan *models.AuditEntry
@@ -236,6 +238,15 @@ func WithReleaseService(svc *release.Service) Option {
 	}
 }
 
+// WithHarnessRunner attaches the harness eval runner used by the
+// /datasets, /preconditions, and /evals routes. When nil, those
+// routes are not registered.
+func WithHarnessRunner(runner *harness.EvalRunner) Option {
+	return func(s *Server) {
+		s.harnessSvc = runner
+	}
+}
+
 // WithServerConfig sets the server configuration.
 func WithServerConfig(cfg *ServerConfig) Option {
 	return func(s *Server) {
@@ -292,6 +303,7 @@ func (s *Server) routes() {
 	s.registerVersionRoutes()
 	s.registerExecutionRoutes()
 	s.registerReleaseRoutes()
+	s.registerHarnessRoutes()
 }
 
 func (s *Server) registerHealthRoutes() {
