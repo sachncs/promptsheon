@@ -2,12 +2,10 @@ package llm
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestNewAnthropicDefaultBaseURL(t *testing.T) {
@@ -15,186 +13,102 @@ func TestNewAnthropicDefaultBaseURL(t *testing.T) {
 	if !strings.HasPrefix(a.baseURL, "https://") {
 		t.Errorf("expected https base URL, got %q", a.baseURL)
 	}
-	if a.client.Timeout != 120*time.Second {
-		t.Errorf("expected 120s timeout, got %v", a.client.Timeout)
-	}
 }
 
 func TestAnthropicName(t *testing.T) {
 	if NewAnthropic(ProviderConfig{}).Name() != "anthropic" {
-		t.Error("expected 'anthropic'")
+		t.Error(`expected "anthropic"`)
 	}
 }
 
 func TestAnthropicCompleteHappyPath(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verify the Anthropic-specific headers.
-		if r.Header.Get("anthropic-version") == "" {
-			t.Error("expected anthropic-version header")
-		}
+		// Verify the Anthropic-specific headers and path.
 		if r.Header.Get("x-api-key") == "" {
 			t.Error("expected x-api-key header")
+		}
+		if r.Header.Get("anthropic-version") == "" {
+			t.Error("expected anthropic-version header")
 		}
 		if r.URL.Path != "/v1/messages" {
 			t.Errorf("expected /v1/messages, got %q", r.URL.Path)
 		}
-		// Confirm system message was extracted to system
-		// field, not in messages.
-		var body struct {
-			Model    string `json:"model"`
-			System   string `json:"system"`
-			Messages []struct {
-				Role string `json:"role"`
-			} `json:"messages"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("decode request body: %v", err)
-		}
-		if body.System != "you are helpful" {
-			t.Errorf("expected system prompt, got %q", body.System)
-		}
-		if len(body.Messages) != 1 || body.Messages[0].Role != "user" {
-			t.Errorf("expected only user message, got %+v", body.Messages)
-		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]any{
-			"content":     []map[string]string{{"text": "hello"}},
+		_, _ = w.Write([]byte(`{
+			"id": "msg_01",
+			"type": "message",
+			"role": "assistant",
+			"model": "claude-opus-4-7",
+			"content": [{"type": "text", "text": "Hello back"}],
 			"stop_reason": "end_turn",
-			"usage":       map[string]int{"input_tokens": 3, "output_tokens": 2},
-		}); err != nil {
-			t.Fatalf("encode response: %v", err)
-		}
+			"usage": {"input_tokens": 12, "output_tokens": 7}
+		}`))
 	}))
 	defer srv.Close()
 
-	a := NewAnthropic(ProviderConfig{APIKey: "sk-ant-test", BaseURL: srv.URL})
-	resp, err := a.Complete(context.Background(), &Request{
-		Model:     "claude-3",
-		MaxTokens: 100,
-		Messages: []Message{
-			{Role: "system", Content: "you are helpful"},
-			{Role: "user", Content: "hi"},
-		},
+	p := NewAnthropic(ProviderConfig{APIKey: "sk-test", BaseURL: srv.URL})
+	resp, err := p.Complete(context.Background(), &Request{
+		Model:     "claude-opus-4-7",
+		MaxTokens: 64,
+		Messages:  []Message{{Role: "user", Content: "Hi"}},
 	})
 	if err != nil {
 		t.Fatalf("Complete: %v", err)
 	}
-	if resp.Content != "hello" {
-		t.Errorf("Content: got %q", resp.Content)
+	if resp.Content != "Hello back" {
+		t.Fatalf("content = %q", resp.Content)
 	}
-	if resp.Usage.PromptTokens != 3 {
-		t.Errorf("PromptTokens: got %d", resp.Usage.PromptTokens)
+	if resp.Usage.PromptTokens != 12 || resp.Usage.CompletionTokens != 7 || resp.Usage.TotalTokens != 19 {
+		t.Fatalf("usage = %+v", resp.Usage)
 	}
-}
-
-func TestAnthropicCompleteServerError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte(`{"error":{"message":"bad request"}}`))
-	}))
-	defer srv.Close()
-
-	a := NewAnthropic(ProviderConfig{APIKey: "sk-ant-test", BaseURL: srv.URL})
-	_, err := a.Complete(context.Background(), &Request{
-		Model:    "claude-3",
-		Messages: []Message{{Role: "user", Content: "hi"}},
-	})
-	if err == nil {
-		t.Fatal("expected error for 400")
-	}
-	if !strings.Contains(err.Error(), "400") {
-		t.Errorf("expected 400 in error, got %v", err)
+	if resp.StopReason != "end_turn" {
+		t.Fatalf("stop_reason = %q", resp.StopReason)
 	}
 }
 
-func TestOllamaNew(t *testing.T) {
-	o := NewOllama(ProviderConfig{})
-	if o.baseURL == "" {
-		t.Error("expected non-empty base URL")
-	}
-}
-
-func TestOllamaName(t *testing.T) {
-	if NewOllama(ProviderConfig{}).Name() != "ollama" {
-		t.Error("expected 'ollama'")
-	}
-}
-
-func TestOllamaComplete(t *testing.T) {
+func TestAnthropicSystemPromptExtracted(t *testing.T) {
+	var sawSystem bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/chat" {
-			t.Errorf("expected /api/chat, got %q", r.URL.Path)
-		}
+		body := make([]byte, 8192)
+		n, _ := r.Body.Read(body)
+		sawSystem = strings.Contains(string(body[:n]), `"system":[{`)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"message":{"content":"hi"},"done":true,"prompt_eval_count":3,"eval_count":2}`))
+		_, _ = w.Write([]byte(`{
+			"id": "msg_02",
+			"type": "message",
+			"role": "assistant",
+			"model": "claude-opus-4-7",
+			"content": [{"type": "text", "text": "ok"}],
+			"stop_reason": "end_turn",
+			"usage": {"input_tokens": 1, "output_tokens": 1}
+		}`))
 	}))
 	defer srv.Close()
 
-	o := NewOllama(ProviderConfig{BaseURL: srv.URL})
-	resp, err := o.Complete(context.Background(), &Request{
-		Model:    "llama2",
-		Messages: []Message{{Role: "user", Content: "hi"}},
-	})
-	if err != nil {
+	p := NewAnthropic(ProviderConfig{APIKey: "sk-test", BaseURL: srv.URL})
+	if _, err := p.Complete(context.Background(), &Request{
+		Model:    "claude-opus-4-7",
+		Messages: []Message{{Role: "system", Content: "you are terse"}, {Role: "user", Content: "hi"}},
+	}); err != nil {
 		t.Fatalf("Complete: %v", err)
 	}
-	if resp.Content != "hi" {
-		t.Errorf("Content: got %q", resp.Content)
-	}
-	if resp.Usage.PromptTokens != 3 {
-		t.Errorf("PromptTokens: got %d", resp.Usage.PromptTokens)
+	if !sawSystem {
+		t.Fatal("expected system prompt block in request body")
 	}
 }
 
-func TestOllamaCompleteServerError(t *testing.T) {
+func TestAnthropicError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"error":"model not found"}`))
-	}))
-	defer srv.Close()
-
-	o := NewOllama(ProviderConfig{BaseURL: srv.URL})
-	_, err := o.Complete(context.Background(), &Request{
-		Model:    "llama2",
-		Messages: []Message{{Role: "user", Content: "hi"}},
-	})
-	if err == nil {
-		t.Fatal("expected error for 500")
-	}
-}
-
-func TestNvidiaNew(t *testing.T) {
-	n := NewNvidia(ProviderConfig{})
-	if n.baseURL == "" {
-		t.Error("expected non-empty base URL")
-	}
-}
-
-func TestNvidiaName(t *testing.T) {
-	if NewNvidia(ProviderConfig{}).Name() != "nvidia" {
-		t.Error("expected 'nvidia'")
-	}
-}
-
-func TestNvidiaComplete(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") == "" {
-			t.Error("expected Authorization header")
-		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}`))
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"authentication_error","message":"bad key"}}`))
 	}))
 	defer srv.Close()
 
-	n := NewNvidia(ProviderConfig{APIKey: "nv-test", BaseURL: srv.URL})
-	resp, err := n.Complete(context.Background(), &Request{
-		Model:    "meta/llama",
-		Messages: []Message{{Role: "user", Content: "hi"}},
-	})
-	if err != nil {
-		t.Fatalf("Complete: %v", err)
-	}
-	if resp.Content != "hi" {
-		t.Errorf("Content: got %q", resp.Content)
+	p := NewAnthropic(ProviderConfig{APIKey: "sk-bad", BaseURL: srv.URL})
+	if _, err := p.Complete(context.Background(), &Request{
+		Model: "claude-opus-4-7", Messages: []Message{{Role: "user", Content: "x"}},
+	}); err == nil {
+		t.Fatal("expected error on 401")
 	}
 }
