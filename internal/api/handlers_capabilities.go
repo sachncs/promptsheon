@@ -435,30 +435,58 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 	// Today's commit ships the API surface; the Invoker call is
 	// M3 follow-on (see internal/invoke/invoke.go's NewInvoker +
 	// DefaultEnforcer wiring).
-	if err := s.invokeOne(r, capabilityVersionID, req.Inputs, req.Model, req.Provider); err != nil {
-		if errors.Is(err, invoke.ErrQuotaExceeded) {
-			return &HTTPError{Status: http.StatusTooManyRequests, Message: err.Error()}
-		}
-		if errors.Is(err, invoke.ErrBudgetExceeded) {
-			return &HTTPError{Status: http.StatusPaymentRequired, Message: err.Error()}
-		}
+	rec, invErr, latency := s.invokeOne(r, capabilityVersionID, req.Inputs, req.Model, req.Provider)
+	if err := classifyInvokeError(invErr); err != nil {
 		return err
 	}
-	now := time.Now()
 	exec := &capability.Execution{
 		ID:                  generateID(),
 		CapabilityVersionID: capabilityVersionID,
-		Timestamp:           now,
+		Timestamp:           time.Now(),
 		Inputs:              req.Inputs,
 		Model:               req.Model,
 		Provider:            req.Provider,
+		LatencyMs:           latency.Milliseconds(),
+	}
+	if invErr != nil {
+		exec.Error = invErr.Error()
+	} else if rec != nil {
+		if len(rec.Output) > 0 {
+			exec.Outputs = map[string]any{"content": string(rec.Output)}
+		}
+		exec.PromptTokens = rec.PromptTokens
+		exec.CompletionTokens = rec.OutputTokens
+		exec.TotalTokens = rec.PromptTokens + rec.OutputTokens
+		exec.Model = rec.Model
+		exec.CostUSD = rec.CostUSD
 	}
 	if err := s.db.CreateExecution(r.Context(), exec); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "execution:"+exec.ID, map[string]any{"version_id": capabilityVersionID})
+	s.audit(r.Context(), "create", "execution:"+exec.ID, map[string]any{
+		"version_id": capabilityVersionID,
+		"tokens":     exec.TotalTokens,
+		"cost_usd":   exec.CostUSD,
+	})
 	writeJSON(w, http.StatusCreated, exec)
 	return nil
+}
+
+// classifyInvokeError maps an invoke.Invoker error to the appropriate
+// HTTP status. Returns nil when the error is nil or not worth
+// translating (the caller should still record the error in the
+// Execution row).
+func classifyInvokeError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, invoke.ErrQuotaExceeded) {
+		return &HTTPError{Status: http.StatusTooManyRequests, Message: err.Error()}
+	}
+	if errors.Is(err, invoke.ErrBudgetExceeded) {
+		return &HTTPError{Status: http.StatusPaymentRequired, Message: err.Error()}
+	}
+	return err
 }
 
 // invokeOne is the per-request invocation entry point. It is
@@ -473,17 +501,21 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 // hash. Otherwise the handler falls back to the placeholder hash so
 // the route stays observable even for versions that pre-date the
 // Manifest schema.
-func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]any, model, provider string) error {
+//
+// Returns the ExecutionRecord (or nil when no invoker is configured),
+// the invocation error (or nil on success), and the wall-clock
+// latency so callers can populate the Execution row.
+func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]any, model, provider string) (*executor.ExecutionRecord, error, time.Duration) {
 	if s.invoker == nil {
 		// No Invoker configured (today's build). The handler
 		// records the stub execution and returns nil; the route
 		// is observable while the M3 follow-on wires the
 		// production Caller chain.
-		return nil
+		return nil, nil, 0
 	}
 	input, err := marshalNoArgs(inputs)
 	if err != nil {
-		return err
+		return nil, err, 0
 	}
 	mh := manifestHash(versionID, model, provider)
 	if v, err := s.db.GetVersion(r.Context(), versionID); err == nil {
@@ -500,8 +532,9 @@ func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]
 		Model:         model,
 		ModelRevision: modelRevision(model, provider),
 	}
-	_, err = s.invoker.Invoke(r.Context(), req)
-	return err
+	start := time.Now()
+	rec, err := s.invoker.Invoke(r.Context(), req)
+	return &rec, err, time.Since(start)
 }
 
 func (s *Server) handleGetExecution(w http.ResponseWriter, r *http.Request) error {
