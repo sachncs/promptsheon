@@ -1,151 +1,71 @@
-# Go SDK
+# SDKs
 
-The `sdk` package provides a Go client for the Promptsheon REST API.
+Promptsheon ships three SDKs that all target the same REST API
+documented in [`api/openapi.yaml`](../../api/openapi.yaml):
 
-## Installation
+| SDK | Path | Status |
+|---|---|---|
+| Go | `sdk/` | First-class; tracked with the server |
+| Python | `sdk/python/` | Beta; mirrors the Go surface |
+| TypeScript | `sdk/typescript/` | Beta; hand-written until codegen lands |
 
-```bash
-go get github.com/sachncs/promptsheon/sdk
-```
+All three expose the same surface — workspace, project, capability,
+version, release, approval, execution — and talk to the daemon over
+`/api/v1/...`. The Go SDK is the source of truth; the Python and
+TypeScript SDKs follow.
 
-## Usage
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "log"
-
-    "github.com/sachncs/promptsheon/sdk"
-)
-
-func main() {
-    client := sdk.New("http://localhost:8080", "ps_your_api_key")
-    ctx := context.Background()
-
-    // List prompts
-    prompts, err := client.ListPrompts(ctx)
-    if err != nil {
-        log.Fatal(err)
-    }
-    for _, p := range prompts {
-        fmt.Printf("%s (v%d, %s)\n", p.Name, p.Version, p.Status)
-    }
-}
-```
-
-## Types
-
-### Client
+## Go SDK
 
 ```go
-client := sdk.New(baseURL, apiKey)
+import "github.com/sachncs/promptsheon/sdk"
+
+client := sdk.New("http://localhost:8080", "ps_...")
+rel, _ := client.CreateRelease(ctx, "v1", sdk.CreateReleaseRequest{Environment: "prod"})
+client.Vote(ctx, rel.ID, sdk.VoteRequest{Identity: "alice", Decision: "approve"})
+client.Activate(ctx, rel.ID)
+out, _ := client.Invoke(ctx, rel.ID, sdk.InvokeRequest{Model: "claude-opus-4"})
 ```
 
-- `baseURL` — Server address (e.g., `http://localhost:8080`)
-- `apiKey` — API key for authentication (empty string disables auth)
+See `sdk/README.md` for the full surface and `examples/basic/main.go`
+for an end-to-end demo.
 
-### Prompt
+## Python SDK
 
-```go
-type Prompt struct {
-    ID          string            `json:"id"`
-    Name        string            `json:"name"`
-    Description string            `json:"description"`
-    Content     string            `json:"content"`
-    Variables   []Variable        `json:"variables"`
-    Tags        []string          `json:"tags"`
-    ModelHint   string            `json:"model_hint"`
-    Binding     *ProviderBinding  `json:"binding,omitempty"`
-    Version     int               `json:"version"`
-    Status      string            `json:"status"`
-    CreatedBy   string            `json:"created_by"`
-    CreatedAt   time.Time         `json:"created_at"`
-    UpdatedAt   time.Time         `json:"updated_at"`
-    Metadata    map[string]string `json:"metadata"`
-}
+```python
+from promptsheon import Client, ClientConfig
+
+client = Client(ClientConfig(base_url="http://localhost:8080", api_key="ps_..."))
+caps = client.list_capabilities("proj-1")
+result = client.invoke_release("rel-1", inputs={"q": "hello"})
 ```
 
-### Variable
+See `sdk/python/README.md`.
 
-```go
-type Variable struct {
-    Name        string `json:"name"`
-    Type        string `json:"type"`
-    Required    bool   `json:"required"`
-    Default     string `json:"default,omitempty"`
-    Description string `json:"description"`
-}
+## TypeScript SDK
+
+```typescript
+import { PromptsheonClient } from "@promptsheon/typescript";
+
+const client = new PromptsheonClient({ baseUrl: "http://localhost:8080", apiKey: "ps_..." });
+await client.listCapabilities("proj-1");
+await client.invokeRelease("rel-1", { inputs: { q: "hello" } });
 ```
 
-### Agent
+See `sdk/typescript/README.md`.
 
-```go
-type Agent struct {
-    ID          string      `json:"id"`
-    Name        string      `json:"name"`
-    Description string      `json:"description"`
-    Steps       []AgentStep `json:"steps"`
-    Tools       []ToolRef   `json:"tools"`
-    Status      string      `json:"status"`
-}
-```
+## Common conventions
 
-### RunPromptRequest / RunPromptResponse
+- All SDKs add `Authorization: Bearer <api-key>` when an api key is
+  configured.
+- 4xx and 5xx responses are surfaced as `*APIError` (Go),
+  `PromptsheonAPIError` (Python), or thrown `Error` (TypeScript).
+- Successful response bodies are decoded into the SDK's typed
+  structs (Go) or `dict`/`unknown` (Python/TS until codegen lands).
 
-```go
-req := &sdk.RunPromptRequest{
-    Variables: map[string]string{"name": "World"},
-    Provider:  "openai",
-    Model:     "gpt-4",
-}
-resp, err := client.RunPrompt(ctx, promptID, req)
-fmt.Println(resp.Content)
-fmt.Printf("Tokens: %d, Latency: %dms\n", resp.Usage.TotalTokens, resp.LatencyMs)
-```
+## Regenerating from OpenAPI
 
-## Methods
-
-| Method | Description |
-|---|---|
-| `Health(ctx)` | Health check |
-| `ListPrompts(ctx)` | List all prompts |
-| `GetPrompt(ctx, id)` | Get a prompt by ID |
-| `CreatePrompt(ctx, req)` | Create a prompt |
-| `UpdatePrompt(ctx, id, req)` | Update a prompt |
-| `DeletePrompt(ctx, id)` | Delete a prompt |
-| `RunPrompt(ctx, id, req)` | Execute a prompt |
-| `DeployPrompt(ctx, id)` | Deploy a prompt |
-| `ArchivePrompt(ctx, id)` | Archive a prompt |
-| `ListAgents(ctx)` | List all agents |
-| `GetAgent(ctx, id)` | Get an agent by ID |
-| `ListProviders(ctx)` | List LLM providers |
-
-The method set is the public surface of `sdk/client.go`. Adding a method to the SDK is a one-line change in `client.go` plus a doc-comment update.
-
-## Error Handling
-
-All methods return errors. API errors are typed as `*sdk.APIError`:
-
-```go
-resp, err := client.GetPrompt(ctx, "nonexistent")
-if err != nil {
-    var apiErr *sdk.APIError
-    if errors.As(err, &apiErr) {
-        fmt.Printf("API error %d: %s\n", apiErr.Status, apiErr.Message)
-    }
-}
-```
-
-## Context Support
-
-All methods accept a `context.Context` for cancellation and timeouts:
-
-```go
-ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-defer cancel()
-
-prompt, err := client.GetPrompt(ctx, id)
-```
+The TypeScript SDK ships a placeholder `src/openapi.ts` until
+`openapi-typescript` codegen lands (M3 follow-on). The Python SDK
+is hand-mirrored from the Go surface. The Go SDK is the source of
+truth — when the server gains a route, add the matching Go method
+first and let the other SDKs follow in their own commits.
