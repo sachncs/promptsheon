@@ -7,18 +7,10 @@ import (
 
 	"github.com/sachncs/promptsheon/internal/approval"
 	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/testdata"
 )
 
-func goodManifest() capability.Manifest {
-	h := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	return capability.Manifest{
-		Prompt:        capability.ArtifactRef{Kind: capability.ArtifactPrompt, Hash: h},
-		ModelPolicy:   capability.ArtifactRef{Kind: capability.ArtifactModelPolicy, Hash: h},
-		RuntimePolicy: capability.ArtifactRef{Kind: capability.ArtifactRuntimePolicy, Hash: h},
-		Context:       capability.ArtifactRef{Kind: capability.ArtifactContext, Hash: h},
-		Memory:        capability.ArtifactRef{Kind: capability.ArtifactMemory, Hash: h},
-	}
-}
+func goodManifest() capability.Manifest { return testdata.NewManifest() }
 
 func TestNew(t *testing.T) {
 	t.Parallel()
