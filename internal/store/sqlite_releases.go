@@ -142,7 +142,7 @@ func (s *SQLite) UpdateRelease(ctx context.Context, r *release.Release) error {
 		return fmt.Errorf("rows affected: %w", err)
 	}
 	if n == 0 {
-		return ErrNotFound
+		return release.ErrNotFound
 	}
 	return nil
 }
@@ -171,7 +171,7 @@ func scanRelease(scanner interface {
 		&r.CreatedAt, &createdBy, &activatedAt, &supersededAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, release.ErrNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan release: %w", err)
@@ -248,7 +248,7 @@ func (s *SQLite) UpdateApproval(ctx context.Context, a *approval.Approval) error
 		return fmt.Errorf("rows affected: %w", err)
 	}
 	if n == 0 {
-		return ErrNotFound
+		return approval.ErrNotFound
 	}
 	return nil
 }
@@ -268,7 +268,7 @@ func scanApproval(scanner interface {
 	var votesJSON string
 	err := scanner.Scan(&a.ReleaseID, &votesJSON, &a.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, approval.ErrNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan approval: %w", err)
