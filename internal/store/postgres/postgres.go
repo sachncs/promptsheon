@@ -99,6 +99,14 @@ func (p *Postgres) withWorkspace(ctx context.Context, workspaceID string, fn fun
 	return tx.Commit(ctx)
 }
 
+// WithWorkspaceForTest exposes withWorkspace to integration tests
+// in the postgres_test package. Production code MUST NOT call
+// this; per-workspace queries go through the typed Repository
+// methods which wrap withWorkspace automatically.
+func (p *Postgres) WithWorkspaceForTest(ctx context.Context, workspaceID string, fn func(pgx.Tx) error) error {
+	return p.withWorkspace(ctx, workspaceID, fn)
+}
+
 // -- Capability Repository (subset; ships in this commit) --
 
 // CreateWorkspace implements capability.Repository.

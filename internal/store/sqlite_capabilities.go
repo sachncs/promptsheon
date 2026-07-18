@@ -7,10 +7,15 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/schedule"
 )
 
-// ensure SQLite implements the consumer-defined capability.Repository interface.
-var _ capability.Repository = (*SQLite)(nil)
+// ensure SQLite implements the consumer-defined capability.Repository
+// and schedule.Repository interfaces.
+var (
+	_ capability.Repository = (*SQLite)(nil)
+	_ schedule.Repository   = (*SQLite)(nil)
+)
 
 // ---------------------------------------------------------------------------
 // Workspaces
@@ -244,7 +249,13 @@ func scanCapability(scanner interface {
 }) (*capability.Capability, error) {
 	var c capability.Capability
 	var tagsStr string
-	err := scanner.Scan(&c.ID, &c.ProjectID, &c.Name, &c.Description, &c.Owner, &tagsStr, &c.CreatedAt, &c.UpdatedAt)
+	// state and currentVersionID remain in the schema for forward
+	// compatibility; Capability derives both at read time from
+	// Release state, so the columns are read into discard vars.
+	var derivedState string
+	var derivedCurrentVersionID string
+	err := scanner.Scan(&c.ID, &c.ProjectID, &c.Name, &c.Description, &c.Owner,
+		&tagsStr, &derivedState, &derivedCurrentVersionID, &c.CreatedAt, &c.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
@@ -323,8 +334,7 @@ func (s *SQLite) ListVersions(ctx context.Context, capabilityID string) ([]*capa
 
 func (s *SQLite) GetLatestVersion(ctx context.Context, capabilityID string) (*capability.Version, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, capability_id, version, manifest, manifest_hash, prompt, model_policy, context_contract, knowledge,
-		 memory, guardrails, tools, mcp_servers, runtime_policy, evaluation_suite, created_at, created_by
+		`SELECT id, capability_id, version, manifest, manifest_hash, created_at, created_by
 		 FROM capability_versions WHERE capability_id = ? ORDER BY version DESC LIMIT 1`, capabilityID,
 	)
 	return scanCapabilityVersion(row)
@@ -458,4 +468,113 @@ func scanExecution(scanner interface {
 	}
 
 	return &e, nil
+}
+
+// ---------------------------------------------------------------------------
+// Schedules
+// ---------------------------------------------------------------------------
+
+func (s *SQLite) CreateSchedule(ctx context.Context, sc *schedule.Schedule) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO schedules (id, workspace_id, release_id, kind, cron, webhook_path, next_fire_at, last_fire_at, fired_count, enabled, created_at, created_by)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		sc.ID, sc.WorkspaceID, sc.ReleaseID, string(sc.Kind), sc.Cron, sc.WebhookPath,
+		sc.NextFireAt, sc.LastFireAt, sc.FiredCount, sc.Enabled, sc.CreatedAt, sc.CreatedBy,
+	)
+	if err != nil {
+		return fmt.Errorf("insert schedule: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLite) GetSchedule(ctx context.Context, id string) (*schedule.Schedule, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, workspace_id, release_id, kind, cron, webhook_path, next_fire_at, last_fire_at, fired_count, enabled, created_at, created_by
+		 FROM schedules WHERE id = ?`, id,
+	)
+	return scanSchedule(row)
+}
+
+func (s *SQLite) ListSchedulesForRelease(ctx context.Context, releaseID string) ([]*schedule.Schedule, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, workspace_id, release_id, kind, cron, webhook_path, next_fire_at, last_fire_at, fired_count, enabled, created_at, created_by
+		 FROM schedules WHERE release_id = ? ORDER BY created_at DESC`, releaseID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list schedules: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []*schedule.Schedule
+	for rows.Next() {
+		sc, err := scanSchedule(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, sc)
+	}
+	return out, rows.Err()
+}
+
+func (s *SQLite) ListDueSchedules(ctx context.Context, now time.Time, limit int) ([]*schedule.Schedule, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, workspace_id, release_id, kind, cron, webhook_path, next_fire_at, last_fire_at, fired_count, enabled, created_at, created_by
+		 FROM schedules WHERE enabled = 1 AND next_fire_at <= ? ORDER BY next_fire_at ASC LIMIT ?`,
+		now, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list due schedules: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []*schedule.Schedule
+	for rows.Next() {
+		sc, err := scanSchedule(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, sc)
+	}
+	return out, rows.Err()
+}
+
+func (s *SQLite) UpdateSchedule(ctx context.Context, sc *schedule.Schedule) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE schedules SET next_fire_at = ?, last_fire_at = ?, fired_count = ?, enabled = ?
+		 WHERE id = ?`,
+		sc.NextFireAt, sc.LastFireAt, sc.FiredCount, sc.Enabled, sc.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("update schedule: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLite) DeleteSchedule(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM schedules WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("delete schedule: %w", err)
+	}
+	return nil
+}
+
+func scanSchedule(scanner interface {
+	Scan(dest ...any) error
+}) (*schedule.Schedule, error) {
+	var sc schedule.Schedule
+	var kindStr string
+	err := scanner.Scan(
+		&sc.ID, &sc.WorkspaceID, &sc.ReleaseID, &kindStr, &sc.Cron, &sc.WebhookPath,
+		&sc.NextFireAt, &sc.LastFireAt, &sc.FiredCount, &sc.Enabled,
+		&sc.CreatedAt, &sc.CreatedBy,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("scan schedule: %w", err)
+	}
+	sc.Kind = schedule.Kind(kindStr)
+	return &sc, nil
 }
