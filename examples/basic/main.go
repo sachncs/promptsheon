@@ -9,8 +9,6 @@ import (
 	"github.com/sachncs/promptsheon/sdk"
 )
 
-const sampleHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-
 func main() {
 	client := sdk.New("http://localhost:8080", "your-api-key-here")
 	ctx := context.Background()
@@ -22,9 +20,10 @@ func main() {
 	}
 	fmt.Printf("Server status: %s\n", health.Status)
 
-	// Assume the workspace + project + capability + version already exist
-	// (curl created them in the README quickstart). Drive the Release +
-	// Approval lifecycle through the SDK.
+	// Drive the Release + Approval lifecycle through the SDK.
+	// Workspace, project, capability, and version are assumed to
+	// already exist (curl or CreateWorkspace/CreateCapability/AddVersion
+	// from this SDK).
 	const versionID = "v1"
 	const releaseVoter = "alice"
 
@@ -49,6 +48,3 @@ func main() {
 	}
 	fmt.Printf("invoked: %s\n", out.ID)
 }
-
-// keep sampleHash referenced so vet stays quiet when example is run.
-var _ = sampleHash
