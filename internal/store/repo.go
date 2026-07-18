@@ -4,8 +4,10 @@ package store
 import (
 	"context"
 
+	"github.com/sachncs/promptsheon/internal/approval"
 	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/internal/release"
 )
 
 // Repository defines the data access interface for all persistence operations.
@@ -19,6 +21,8 @@ import (
 // storage satisfies it.
 type Repository interface {
 	capability.Repository
+	release.Repository
+	approval.Repository
 
 	// Users
 	CreateUser(ctx context.Context, u *models.User) error
