@@ -467,6 +467,12 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 // default Caller and AggregatorConsumer with a workspace-scoped
 // Caller chain. Today's commit ships the wrapper; the production
 // wiring lands in M3 follow-on.
+//
+// When the versionID resolves to a Capability Version with a stored
+// Manifest, that Manifest's canonical SHA-256 is used as the manifest
+// hash. Otherwise the handler falls back to the placeholder hash so
+// the route stays observable even for versions that pre-date the
+// Manifest schema.
 func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]any, model, provider string) error {
 	if s.invoker == nil {
 		// No Invoker configured (today's build). The handler
@@ -479,10 +485,16 @@ func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]
 	if err != nil {
 		return err
 	}
+	mh := manifestHash(versionID, model, provider)
+	if v, err := s.db.GetVersion(r.Context(), versionID); err == nil {
+		if v.ManifestHash != "" {
+			mh = v.ManifestHash
+		}
+	}
 	req := executor.InvokeRequest{
 		WorkspaceID:   r.PathValue("workspace_id"),
 		ReleaseID:     versionID,
-		ManifestHash:  manifestHash(versionID, model, provider),
+		ManifestHash:  mh,
 		InputHash:     inputHash(input),
 		Input:         input,
 		Model:         model,
