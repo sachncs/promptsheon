@@ -12,6 +12,7 @@ import (
 
 	"github.com/sachncs/promptsheon/internal/approval"
 	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/harness"
 )
 
 // PolicyKind selects the quorum policy at construction time.
@@ -28,10 +29,12 @@ const (
 // conventions. Callers construct it once with NewService and inject
 // it into HTTP handlers.
 type Service struct {
-	DB     Repository
-	App    approval.Repository
-	Policy approval.Policy
-	Clock  func() time.Time
+	DB         Repository
+	App        approval.Repository
+	HarnessDB  harness.Repository
+	Policy     approval.Policy
+	Harness    *harness.PreconditionRunner
+	Clock      func() time.Time
 }
 
 // NewService constructs a Service with the supplied policy. Callers
@@ -51,6 +54,16 @@ func NewServiceFromKind(db Repository, app approval.Repository, kind PolicyKind,
 	default:
 		return NewService(db, app, approval.MakerCheckerPolicy{RequiredApprovers: required})
 	}
+}
+
+// WithHarness attaches a PreconditionRunner + the harness
+// repository it reads preconditions from. When set, Activate runs
+// the registered preconditions for the Release's Capability; a
+// failing precondition returns a *harness.PreconditionError.
+func (s *Service) WithHarness(h *harness.PreconditionRunner, db harness.Repository) *Service {
+	s.Harness = h
+	s.HarnessDB = db
+	return s
 }
 
 // runner is the public surface that api.Server depends on; it lets
@@ -138,6 +151,26 @@ func (s *Service) Activate(ctx context.Context, releaseID string) (*Release, err
 	approved, err := r.ApproveWith(*a, s.Policy)
 	if err != nil {
 		return nil, err
+	}
+
+	// Harness engineering gate: if a PreconditionRunner is wired
+	// in, run the registered preconditions for the Capability
+	// before promoting. A failing precondition blocks Activate and
+	// surfaces a 409 with the per-hook output.
+	if s.Harness != nil && s.HarnessDB != nil {
+		precs, err := s.HarnessDB.ListPreconditionsForCapability(ctx, r.CapabilityID)
+		if err != nil {
+			return nil, fmt.Errorf("harness: list preconditions: %w", err)
+		}
+		if len(precs) > 0 {
+			precsVal := make([]harness.Precondition, len(precs))
+			for i, p := range precs {
+				precsVal[i] = *p
+			}
+			if _, err := s.Harness.Run(ctx, precsVal); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	now := s.Clock()
