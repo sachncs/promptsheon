@@ -1,12 +1,12 @@
 // Package harness defines the harness-engineering domain types:
 //
 //   - Dataset:     a collection of test cases (input + expected output)
-//                  attached to a Capability. The ground truth for evals.
+//     attached to a Capability. The ground truth for evals.
 //   - Precondition: a named command hook attached to a Capability.
-//                  The harness runner executes them on Activate; a
-//                  failing precondition blocks the Release.
+//     The harness runner executes them on Activate; a
+//     failing precondition blocks the Release.
 //   - EvalRun:     a recorded eval invocation against a Release.
-//                  Per-case outcomes + aggregate score.
+//     Per-case outcomes + aggregate score.
 //   - EvalResult:  per-case outcome within an EvalRun.
 //
 // These types are value-immutable: mutations produce a new value
@@ -60,12 +60,12 @@ type Failure struct {
 
 // Dataset is a named collection of test cases.
 type Dataset struct {
-	ID           string    `json:"id"`
-	CapabilityID string    `json:"capability_id"`
-	Name         string    `json:"name"`
-	Description  string    `json:"description,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID           string        `json:"id"`
+	CapabilityID string        `json:"capability_id"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description,omitempty"`
+	CreatedAt    time.Time     `json:"created_at"`
+	UpdatedAt    time.Time     `json:"updated_at"`
 	Cases        []DatasetCase `json:"cases,omitempty"`
 }
 
@@ -112,17 +112,17 @@ func (p Precondition) Validate() error {
 // Run-time fields (Score, Passed, Failed, Total, Status,
 // FinishedAt) are populated as the run progresses.
 type EvalRun struct {
-	ID          string     `json:"id"`
-	ReleaseID   string     `json:"release_id"`
-	DatasetID   string     `json:"dataset_id"`
-	Scorer      Scorer     `json:"scorer"`
-	Score       float64    `json:"score"`
-	Passed      int        `json:"passed"`
-	Failed      int        `json:"failed"`
-	Total        int        `json:"total"`
-	Status      RunStatus  `json:"status"`
-	StartedAt   time.Time  `json:"started_at"`
-	FinishedAt  *time.Time `json:"finished_at,omitempty"`
+	ID         string     `json:"id"`
+	ReleaseID  string     `json:"release_id"`
+	DatasetID  string     `json:"dataset_id"`
+	Scorer     Scorer     `json:"scorer"`
+	Score      float64    `json:"score"`
+	Passed     int        `json:"passed"`
+	Failed     int        `json:"failed"`
+	Total      int        `json:"total"`
+	Status     RunStatus  `json:"status"`
+	StartedAt  time.Time  `json:"started_at"`
+	FinishedAt *time.Time `json:"finished_at,omitempty"`
 }
 
 // EvalResult is the per-case outcome within an EvalRun.
@@ -134,5 +134,5 @@ type EvalResult struct {
 	Passed    bool            `json:"passed"`
 	Actual    json.RawMessage `json:"actual"`
 	Error     string          `json:"error,omitempty"`
-	LatencyMs  int64           `json:"latency_ms"`
+	LatencyMs int64           `json:"latency_ms"`
 }

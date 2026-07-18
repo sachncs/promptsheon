@@ -242,17 +242,17 @@ type Version struct {
 
 // Release is the approved pointer from a Capability Version to a target Environment.
 type Release struct {
-	ID                string    `json:"id"`
-	CapabilityID      string    `json:"capability_id"`
-	CapabilityVersion int       `json:"capability_version"`
-	Manifest          Manifest  `json:"manifest"`
-	Environment       string    `json:"environment"`
-	Status            string    `json:"status"`
-	ApprovedBy        []string  `json:"approved_by,omitempty"`
-	SupersededBy      string    `json:"superseded_by,omitempty"`
-	ReplacesReleaseID string    `json:"replaces_release_id,omitempty"`
-	CreatedAt         time.Time `json:"created_at"`
-	CreatedBy         string    `json:"created_by"`
+	ID                string     `json:"id"`
+	CapabilityID      string     `json:"capability_id"`
+	CapabilityVersion int        `json:"capability_version"`
+	Manifest          Manifest   `json:"manifest"`
+	Environment       string     `json:"environment"`
+	Status            string     `json:"status"`
+	ApprovedBy        []string   `json:"approved_by,omitempty"`
+	SupersededBy      string     `json:"superseded_by,omitempty"`
+	ReplacesReleaseID string     `json:"replaces_release_id,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	CreatedBy         string     `json:"created_by"`
 	ActivatedAt       *time.Time `json:"activated_at,omitempty"`
 	SupersededAt      *time.Time `json:"superseded_at,omitempty"`
 }
@@ -274,13 +274,13 @@ type Approval struct {
 
 // Execution is the recorded outcome of a single Release invocation.
 type Execution struct {
-	ID                  string    `json:"id"`
-	CapabilityVersionID string    `json:"capability_version_id"`
-	Timestamp           time.Time `json:"timestamp"`
+	ID                  string         `json:"id"`
+	CapabilityVersionID string         `json:"capability_version_id"`
+	Timestamp           time.Time      `json:"timestamp"`
 	Inputs              map[string]any `json:"inputs,omitempty"`
 	Outputs             map[string]any `json:"outputs,omitempty"`
-	Model               string    `json:"model"`
-	Provider            string    `json:"provider"`
+	Model               string         `json:"model"`
+	Provider            string         `json:"provider"`
 }
 
 // CreateWorkspaceRequest is the request body for creating a Workspace.
@@ -483,12 +483,12 @@ func (c *Client) ApproveAndInvoke(ctx context.Context, releaseID, voterIdentity 
 
 // Dataset mirrors the server's harness.Dataset.
 type Dataset struct {
-	ID           string   `json:"id"`
-	CapabilityID string   `json:"capability_id"`
-	Name         string   `json:"name"`
-	Description  string   `json:"description,omitempty"`
-	CreatedAt    string   `json:"created_at"`
-	UpdatedAt    string   `json:"updated_at"`
+	ID           string `json:"id"`
+	CapabilityID string `json:"capability_id"`
+	Name         string `json:"name"`
+	Description  string `json:"description,omitempty"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
 }
 
 // DatasetCase mirrors harness.DatasetCase.
@@ -529,9 +529,9 @@ type PreconditionFailure struct {
 // CreateDatasetRequest is the request body for creating a Dataset.
 // Cases may be omitted; callers can add them via PutCases.
 type CreateDatasetRequest struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description,omitempty"`
-	Cases       []DatasetCase   `json:"cases,omitempty"`
+	Name        string        `json:"name"`
+	Description string        `json:"description,omitempty"`
+	Cases       []DatasetCase `json:"cases,omitempty"`
 }
 
 // CreateDataset creates a Dataset (optionally seeded with cases).
@@ -648,7 +648,7 @@ type EvalResult struct {
 	Passed    bool            `json:"passed"`
 	Actual    json.RawMessage `json:"actual"`
 	Error     string          `json:"error,omitempty"`
-	LatencyMs  int64          `json:"latency_ms"`
+	LatencyMs int64           `json:"latency_ms"`
 }
 
 // EvalRunWithResults is the GET /evals/{id} response shape: run + results.

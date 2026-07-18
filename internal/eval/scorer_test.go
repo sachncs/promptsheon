@@ -110,9 +110,9 @@ func TestJSONSchemaPlaceholder(t *testing.T) {
 func TestRegisteredScorers(t *testing.T) {
 	names := eval.Names()
 	want := map[eval.Scorer]bool{
-		eval.ScorerExactMatch:  false,
-		eval.ScorerContains:    false,
-		eval.ScorerRegex:       false,
+		eval.ScorerExactMatch: false,
+		eval.ScorerContains:   false,
+		eval.ScorerRegex:      false,
 		eval.ScorerJSONSchema: false,
 	}
 	for _, n := range names {

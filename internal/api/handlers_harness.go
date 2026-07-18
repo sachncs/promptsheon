@@ -35,9 +35,9 @@ func (s *Server) registerHarnessRoutes() {
 }
 
 type createDatasetRequest struct {
-	Name        string                   `json:"name"`
-	Description string                   `json:"description,omitempty"`
-	Cases       []harness.DatasetCase    `json:"cases,omitempty"`
+	Name        string                `json:"name"`
+	Description string                `json:"description,omitempty"`
+	Cases       []harness.DatasetCase `json:"cases,omitempty"`
 }
 
 func (s *Server) handleCreateDataset(w http.ResponseWriter, r *http.Request) error {

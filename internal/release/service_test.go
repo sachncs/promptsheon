@@ -18,13 +18,13 @@ import (
 // here we exercise the Service's branching (Create, Vote, Activate,
 // supersede, Rollback) against a fake.
 type memStore struct {
-	releases     map[string]*release.Release
-	approvals    map[string]*approval.Approval
-	preconds     map[string]*harness.Precondition
-	datasets     map[string]*harness.Dataset
-	cases        map[string][]harness.DatasetCase
-	evalRuns     map[string]*harness.EvalRun
-	evalResults  []harness.EvalResult
+	releases    map[string]*release.Release
+	approvals   map[string]*approval.Approval
+	preconds    map[string]*harness.Precondition
+	datasets    map[string]*harness.Dataset
+	cases       map[string][]harness.DatasetCase
+	evalRuns    map[string]*harness.EvalRun
+	evalResults []harness.EvalResult
 }
 
 func newMemStore() *memStore {
