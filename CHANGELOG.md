@@ -6,6 +6,121 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Release + Approval lifecycle (v0.1.0)
+
+The headline v0.1.0 feature: a Capability Version can be promoted
+to a Release in a target Environment via the new
+`/api/v1/releases/*` routes, with MakerChecker separation-of-duties
+governing activation.
+
+- **`feat(store):` migration 024** — `releases` and `approvals`
+  tables. Schema for the Release aggregate (Pending → Approved →
+  Active → Superseded/RolledBack) and the per-Release vote trail.
+- **`feat(store):` SQLite repository impls** — `CreateRelease` /
+  `GetRelease` / `ListReleasesForCapability` /
+  `ListActiveReleasesForEnvironment` / `UpdateRelease` /
+  `DeleteRelease` plus the matching approval methods, plus the
+  new `ActivateAtomic(prior, next)` that persists both writes
+  inside a single `*sql.Tx` so the "exactly one Active per
+  (Capability, Environment)" invariant holds even under partial
+  failure.
+- **`feat(release):` application service** — `release.Service` with
+  Create / Vote / Activate / Rollback / Get / List / Approval
+  methods; the Activate path is the single place that consults the
+  approval policy and supersedes the prior Active Release.
+- **`feat(api):` release + approval routes** —
+  `GET  /api/v1/capabilities/{capability_id}/releases`
+  `POST /api/v1/versions/{version_id}/releases`
+  `GET  /api/v1/releases/{id}`
+  `POST /api/v1/releases/{id}/votes`
+  `POST /api/v1/releases/{id}/activate`
+  `POST /api/v1/releases/{id}/rollback`
+  `POST /api/v1/releases/{id}/invoke`
+  `GET  /api/v1/releases/{id}/approval`
+- **`feat(api):` Execution fidelity** — both invoke paths
+  (`/versions/{id}/executions` and `/releases/{id}/invoke`) now
+  populate the full Execution row: `outputs`, `latency_ms`,
+  `prompt_tokens`, `completion_tokens`, `total_tokens`, `cost_usd`,
+  `model`, `error`, `environment`. The Execution struct's
+  previously-empty fields are now populated.
+- **`feat(daemon):` release service wiring** — `cmd/promptsheond`
+  constructs the `release.Service` from
+  `PROMPTSHEON_APPROVAL_POLICY` (default `maker_checker`).
+- **`feat(sdk):` release + approval methods** — Go SDK exposes
+  `CreateRelease`, `GetRelease`, `ListReleases`, `Vote`,
+  `Activate`, `Rollback`, `Invoke`, `Approval`,
+  `ApproveAndInvoke`. Python and TypeScript SDKs updated to use
+  the correct `/api/v1/` URL prefix.
+- **`feat(cli):` release subcommand** — `promptsheon release
+  <list|create|get|vote|activate|rollback|invoke|approval>`.
+
+### LLM SDK migration (v0.1.0)
+
+The hand-rolled OpenAI and Anthropic HTTP clients are replaced by
+their official SDKs. Ollama, Azure OpenAI, and NVIDIA NIM are
+removed.
+
+- **`refactor(llm):` Anthropic on `anthropics/anthropic-sdk-go`**.
+- **`refactor(llm):` OpenAI on `openai/openai-go/v3` Responses API**.
+- **`chore(llm):` drop Azure / Ollama / NVIDIA NIM providers**.
+- **`chore(llm):` remove Ollama pricing entries** in `PricingTable`.
+
+### Codebase cleanup (this pass)
+
+- **`refactor(testutil):` `NewManifest` helper** — shared capability
+  manifest fixture.
+- **`refactor(release):` consume `testdata.NewManifest`** in unit
+  tests.
+- **`fix(release):` transactional Activate** — Repository gains
+  `ActivateAtomic(prior, next)`. New round-trip + rollback test.
+- **`feat(release):` Service interface compliance assertion** —
+  catches signature drift.
+- **`refactor(llm):` provider compliance assertions + drop
+  redundant `providerAnthropic` const**.
+- **`refactor(store):` drop `CapabilityExists` + unused-import
+  workarounds**.
+- **`refactor(api):` hoist `auditKeyName` / `auditKeyStatus` /
+  `auditKeyVersion` to `middleware.go`**.
+- **`chore(cmd):` drop `approval.Approve` unused-import workaround**.
+- **`feat(cli):` split `cmd/promptsheon/main.go` into
+  `cas.go` + `http.go`** — main.go drops from 1274 to 513 lines.
+- **`docs(examples):` remove `sampleHash` dead reference**.
+
+### SQLite-only (forward-only)
+
+- **`chore(store):` delete `internal/store/postgres`** (the Postgres
+  backend was half-implemented against the new release/approval
+  aggregates and would not satisfy `store.Repository`).
+- **`chore(store):` delete `internal/store/migrations/postgres`**.
+- **`chore(banditstore):` delete `internal/banditstore/postgres`**.
+- **`chore(config):` drop `DBBackend` / `DBDSN`** fields and the
+  `PROMPTSHEON_DB_BACKEND` / `PROMPTSHEON_DB_DSN` env lookups.
+- **`docs:` delete `docs/adr/0015-postgres-backend-with-rls.md`**.
+
+### SDK path fixes
+
+- **`fix(sdk/python):` `/v1/` → `/api/v1/`** so the Python client
+  hits the actual server routes.
+- **`fix(sdk/typescript):` `/v1/` → `/api/v1/` + regenerate
+  `openapi.ts` placeholder.
+
+### Documentation
+
+- **`docs:` rewrite `docs/sdk.md`** for the three SDKs (Go, Python,
+  TypeScript).
+- **`docs:` rewrite `docs/llm-providers.md`** for the Anthropic +
+  OpenAI pair.
+- **`docs:` add `docs/release.md`** — Capability → Release lifecycle
+  walkthrough with curl and Go SDK examples.
+- **`docs:` extend `docs/api-reference.md`** with the seven release
+  routes.
+- **`docs:` fix README quickstart + config table** — the curl
+  sequence was using the legacy `POST /releases/{id}/approve`
+  route and a non-existent `sdk.NewClient(sdk.Config{...})`
+  constructor.
+
+## [Unreleased]
+
 ### Re-review closure (F-18, F-19, F-20 follow-on after v0.1.0)
 
 The Engineering Completion Protocol's "Final Verification" step
