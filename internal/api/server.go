@@ -319,17 +319,26 @@ func (s *Server) registerAuthRoutes() {
 	createKey := s.handleCreateAPIKey
 	listKeys := s.handleListAPIKeys
 	revokeKey := s.handleRevokeAPIKey
+	oauthLogin := s.handleOAuthLogin
+	oauthCallback := s.handleOAuthCallback
+	bootstrap := s.handleBootstrap
 	if s.rateLimiter != nil {
 		createKey = s.rateLimit(createKey)
 		listKeys = s.rateLimit(listKeys)
 		revokeKey = s.rateLimit(revokeKey)
+		// Throttle auth and bootstrap too: these are unauthenticated
+		// routes that an attacker can spam to provoke DB queries,
+		// upstream IdP lookups, or admin-key mint races.
+		oauthLogin = s.rateLimit(oauthLogin)
+		oauthCallback = s.rateLimit(oauthCallback)
+		bootstrap = s.rateLimit(bootstrap)
 	}
 	s.mux.HandleFunc("POST /api/v1/apikeys", s.wrapHandler(createKey))
 	s.mux.HandleFunc("GET /api/v1/apikeys", s.wrapHandler(listKeys))
 	s.mux.HandleFunc("DELETE /api/v1/apikeys/{id}", s.wrapHandler(revokeKey))
-	s.mux.HandleFunc("GET /api/v1/auth/{provider}/login", s.wrapHandler(s.handleOAuthLogin))
-	s.mux.HandleFunc("GET /api/v1/auth/{provider}/callback", s.wrapHandler(s.handleOAuthCallback))
-	s.mux.HandleFunc("POST /api/v1/setup", s.wrapHandler(s.handleBootstrap))
+	s.mux.HandleFunc("GET /api/v1/auth/{provider}/login", s.wrapHandler(oauthLogin))
+	s.mux.HandleFunc("GET /api/v1/auth/{provider}/callback", s.wrapHandler(oauthCallback))
+	s.mux.HandleFunc("POST /api/v1/setup", s.wrapHandler(bootstrap))
 	s.mux.HandleFunc("GET /api/v1/users", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleListUsers)))
 	s.mux.HandleFunc("POST /api/v1/users", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleCreateUser)))
 	s.mux.HandleFunc("GET /api/v1/users/{id}", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleGetUser)))
