@@ -256,22 +256,25 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	enforcer := invoke.NewDefaultEnforcer(nil)
 	agg := observation.NewAggregator(nil)
 	inv := invoke.New(enforcer, agg, executor.New(nil, func(ctx context.Context, req executor.InvokeRequest) (executor.InvokeResult, error) {
+		// Provider routing: the canonical request now carries an
+		// explicit Provider field (set by the release Resolver).
+		// We look up the provider by that field rather than by
+		// req.Model, so a request that names a model registered
+		// under multiple providers lands on the one the release
+		// actually approved. The previous "fall back to the first
+		// registered provider" was the source of the wrong-provider
+		// bug: an unconfigured or upstream-error call would land
+		// on a random provider, then be recorded as a successful
+		// "stub execution" because the Caller swallowed the error.
+		if req.Provider == "" {
+			return executor.InvokeResult{Status: "error", Error: "no provider specified in invocation"}, nil
+		}
+		p, err := providers.Get(req.Provider)
+		if err != nil {
+			return executor.InvokeResult{Status: "error", Error: "provider not registered: " + req.Provider}, nil
+		}
 		if req.Model == "" || req.Model == "<unspecified>" {
 			return executor.InvokeResult{Status: "error", Error: "no model configured"}, nil
-		}
-		p, err := providers.Get(req.Model)
-		if err != nil {
-			// Fall back to the first registered provider when
-			// the model name is unrecognized; production wiring
-			// fills the canonical name from the active Release.
-			names := providers.Providers()
-			if len(names) == 0 {
-				return executor.InvokeResult{Status: "error", Error: "no provider registered"}, nil
-			}
-			p, err = providers.Get(names[0])
-			if err != nil {
-				return executor.InvokeResult{Status: "error", Error: err.Error()}, nil
-			}
 		}
 		llmReq := &llm.Request{
 			Messages: []llm.Message{{Role: "user", Content: string(req.Input)}},
