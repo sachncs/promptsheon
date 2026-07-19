@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -289,6 +291,18 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 		return forbidden("bootstrap is disabled when authentication is enabled (PROMPTSHEON_AUTH=true)")
 	}
 
+	// Bootstrap token: when PROMPTSHEON_BOOTSTRAP_TOKEN is set the
+	// caller must present it via X-Bootstrap-Token. Without this
+	// gate, a misconfigured deployment with auth=false would mint
+	// an admin key to the first network-adjacent caller. The token
+	// is a deliberate operational safety net, not a replacement
+	// for proper authentication.
+	if token, want := r.Header.Get("X-Bootstrap-Token"), os.Getenv("PROMPTSHEON_BOOTSTRAP_TOKEN"); want != "" {
+		if subtle.ConstantTimeCompare([]byte(token), []byte(want)) != 1 {
+			return forbidden("invalid or missing X-Bootstrap-Token")
+		}
+	}
+
 	// Check whether the system has any users yet. We do this
 	// before any state mutation so a second concurrent caller
 	// races safely — the second one will see at least one user
@@ -548,6 +562,17 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 
 	existing, err := s.db.GetUserByEmail(r.Context(), user.Email)
 	if err == sql.ErrNoRows {
+		// OAuth auto-provision is gated behind an explicit env var
+		// (PROMPTSHEON_OAUTH_AUTO_PROVISION=true, default false). With
+		// auto-provision off, unknown emails are rejected: the
+		// caller is told an admin must approve before they can
+		// retry. This stops an IdP with self-service signup from
+		// polluting the user table; it also stops a misconfigured
+		// IdP client_id from authenticating arbitrary external
+		// users into a corporate deployment.
+		if os.Getenv("PROMPTSHEON_OAUTH_AUTO_PROVISION") != "true" {
+			return forbidden("OAuth auto-provision is disabled; an admin must create your account first")
+		}
 		newUser := &models.User{
 			ID:        generateID(),
 			Email:     user.Email,
