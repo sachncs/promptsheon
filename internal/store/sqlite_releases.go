@@ -14,6 +14,18 @@ import (
 // Releases
 // ---------------------------------------------------------------------------
 
+// emptyAsNull returns sql.NullString{} when s is empty, otherwise
+// sql.NullString{String: s, Valid: true}. The releases self-FK
+// (superseded_by, replaces_release_id) requires the column to
+// be either a valid id or NULL; empty string is not a valid
+// reference.
+func emptyAsNull(s string) sql.NullString {
+	if s == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: s, Valid: true}
+}
+
 func (s *SQLite) CreateRelease(ctx context.Context, r *release.Release) error {
 	manifestJSON, err := marshalOrErr(r.Manifest)
 	if err != nil {
@@ -39,7 +51,7 @@ func (s *SQLite) CreateRelease(ctx context.Context, r *release.Release) error {
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		r.ID, r.CapabilityID, r.CapabilityVersion, string(manifestJSON),
 		string(r.Environment), string(r.Status), string(approvedByJSON),
-		r.SupersededBy, r.ReplacesReleaseID,
+		emptyAsNull(r.SupersededBy), emptyAsNull(r.ReplacesReleaseID),
 		r.CreatedAt, r.CreatedBy, activatedAt, supersededAt,
 	)
 	if err != nil {
@@ -129,7 +141,7 @@ func (s *SQLite) UpdateRelease(ctx context.Context, r *release.Release) error {
 			activated_at = ?, superseded_at = ?
 		 WHERE id = ?`,
 		r.CapabilityID, r.CapabilityVersion, string(manifestJSON), string(r.Environment),
-		string(r.Status), string(approvedByJSON), r.SupersededBy, r.ReplacesReleaseID,
+		string(r.Status), string(approvedByJSON), emptyAsNull(r.SupersededBy), emptyAsNull(r.ReplacesReleaseID),
 		activatedAt, supersededAt, r.ID,
 	)
 	if err != nil {
@@ -187,7 +199,7 @@ func (s *SQLite) ActivateAtomic(ctx context.Context, prior, next *release.Releas
 				activated_at = ?, superseded_at = ?
 			 WHERE id = ?`,
 			prior.CapabilityID, prior.CapabilityVersion, string(priorManifestJSON), string(prior.Environment),
-			string(prior.Status), string(priorApprovedByJSON), prior.SupersededBy, prior.ReplacesReleaseID,
+			string(prior.Status), string(priorApprovedByJSON), emptyAsNull(prior.SupersededBy), emptyAsNull(prior.ReplacesReleaseID),
 			activatedAt, supersededAt, prior.ID,
 		)
 		if err != nil {
@@ -222,7 +234,7 @@ func (s *SQLite) ActivateAtomic(ctx context.Context, prior, next *release.Releas
 			activated_at = ?, superseded_at = ?
 		 WHERE id = ?`,
 		next.CapabilityID, next.CapabilityVersion, string(nextManifestJSON), string(next.Environment),
-		string(next.Status), string(nextApprovedByJSON), next.SupersededBy, next.ReplacesReleaseID,
+		string(next.Status), string(nextApprovedByJSON), emptyAsNull(next.SupersededBy), emptyAsNull(next.ReplacesReleaseID),
 		activatedAt, supersededAt, next.ID,
 	)
 	if err != nil {
