@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sachncs/promptsheon/helm/values.schema.json",
+  "title": "Promptsheon Helm values",
+  "description": "Schema that rejects configurations the daemon cannot honour. Keep this list small and explicit; the schema is the install-time safety net.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["replicaCount"],
+  "properties": {
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1,
+      "description": "SQLite is single-writer; multi-replica is unsupported. The Postgres backend was removed."
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "dbBackend": {
+          "type": "string",
+          "enum": ["sqlite"],
+          "description": "Only sqlite is supported; the postgres backend was removed in favour of sqlite-vec."
+        },
+        "auth": {
+          "type": "string",
+          "enum": ["true", "false"],
+          "description": "Must be true unless insecureLoopback=true."
+        },
+        "logLevel": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"]
+        }
+      }
+    },
+    "insecureLoopback": {
+      "type": "boolean"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "insecureLoopback": { "const": true } },
+        "required": ["insecureLoopback"]
+      },
+      "then": {
+        "properties": { "config": { "properties": { "auth": { "const": "false" } } } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "config": { "properties": { "auth": { "const": "false" } } } }
+      },
+      "then": {
+        "required": ["insecureLoopback"],
+        "properties": { "insecureLoopback": { "const": true } }
+      }
+    }
+  ]
+}
