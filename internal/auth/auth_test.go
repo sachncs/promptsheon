@@ -106,7 +106,12 @@ func TestExtractAPIKey(t *testing.T) {
 		{
 			name: "bearer header",
 			req:  httptest.NewRequest("GET", "/", nil),
-			want: "ps_abc123",
+			want: "ps_" + strings.Repeat("a", 64), // ValidateAPIKeyFormat requires 67 chars
+		},
+		{
+			name: "malformed bearer header",
+			req:  httptest.NewRequest("GET", "/", nil),
+			want: "",
 		},
 		{
 			name: "query param ignored",
@@ -121,7 +126,10 @@ func TestExtractAPIKey(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.name == "bearer header" {
+			switch tt.name {
+			case "bearer header":
+				tt.req.Header.Set("Authorization", "Bearer "+tt.want)
+			case "malformed bearer header":
 				tt.req.Header.Set("Authorization", "Bearer ps_abc123")
 			}
 			if got := extractAPIKey(tt.req); got != tt.want {
@@ -386,8 +394,8 @@ func TestNewAuthenticatorWithLogger(t *testing.T) {
 	if len(logger.failures) != 1 {
 		t.Fatalf("expected 1 logged failure, got %d", len(logger.failures))
 	}
-	if logger.failures[0].reason != "missing api key" {
-		t.Errorf("reason = %q, want %q", logger.failures[0].reason, "missing api key")
+	if logger.failures[0].reason != "missing or malformed api key" {
+		t.Errorf("reason = %q, want %q", logger.failures[0].reason, "missing or malformed api key")
 	}
 	a.Stop()
 }
