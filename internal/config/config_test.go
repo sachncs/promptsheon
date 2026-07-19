@@ -55,8 +55,8 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.CircuitBreakerCooldown != 30 {
 		t.Errorf("CircuitBreakerCooldown = %d, want 30", cfg.CircuitBreakerCooldown)
 	}
-	if cfg.CORSOrigins != "" {
-		t.Errorf("CORSOrigins = %q, want %q", cfg.CORSOrigins, "")
+	if len(cfg.CORSOrigins) != 0 {
+		t.Errorf("CORSOrigins = %v, want empty", cfg.CORSOrigins)
 	}
 }
 
@@ -222,8 +222,8 @@ func TestLoadConfig_AdditionalEnvs(t *testing.T) {
 	if !cfg.OTelInsecure {
 		t.Error("OTelInsecure should be true")
 	}
-	if cfg.CORSOrigins != "*" {
-		t.Errorf("CORSOrigins = %q, want %q", cfg.CORSOrigins, "*")
+	if len(cfg.CORSOrigins) != 1 || cfg.CORSOrigins[0] != "*" {
+		t.Errorf("CORSOrigins = %v, want [*]", cfg.CORSOrigins)
 	}
 }
 

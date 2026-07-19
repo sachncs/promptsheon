@@ -496,7 +496,7 @@ func TestStartHTTPServerAndWait_WithCORS(t *testing.T) {
 	cfg.Addr = ":0"
 	cfg.LogLevel = "warn"
 	cfg.Auth = false
-	cfg.CORSOrigins = "https://example.com"
+	cfg.CORSOrigins = []string{"https://example.com"}
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	ctx, cancel := context.WithCancel(context.Background())

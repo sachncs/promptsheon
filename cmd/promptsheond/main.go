@@ -366,7 +366,7 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 		limiter.Middleware,
 		metrics.HTTPMiddleware(collector, spans, logger),
 		api.Logging(logger),
-		api.CORS(cfg.CORSOrigins),
+		api.CORS(cfg.CORSOrigins...),
 	)
 
 	writeTimeout := time.Duration(cfg.WriteTimeout) * time.Second
