@@ -134,6 +134,14 @@ func (s *Service) Vote(ctx context.Context, releaseID string, vote approval.Vote
 //
 // Activate returns the activated Release. It is the only place where
 // Status moves from Pending to Active.
+//
+// Atomicity: the prior-supersede and next-activate are persisted in
+// a single SQLite transaction via Repository.ActivateAtomic. The
+// partial unique index on (capability_id, environment) WHERE
+// status='active' makes the "exactly one active release per
+// (capability, env)" invariant a hard database-level constraint:
+// a concurrent Activate on the same capability+env returns
+// SQLITE_CONSTRAINT and the caller sees a 409.
 func (s *Service) Activate(ctx context.Context, releaseID string) (*Release, error) {
 	r, err := s.DB.GetRelease(ctx, releaseID)
 	if err != nil {
@@ -184,18 +192,17 @@ func (s *Service) Activate(ctx context.Context, releaseID string) (*Release, err
 	if err != nil {
 		return nil, err
 	}
+	var superseded *Release
 	if prior != nil {
-		superseded, err := prior.Supersede(activated.ID, now)
+		s, err := prior.Supersede(activated.ID, now)
 		if err != nil {
 			return nil, err
 		}
+		superseded = &s
 		activated.ReplacesReleaseID = prior.ID
-		if err := s.DB.UpdateRelease(ctx, &superseded); err != nil {
-			return nil, err
-		}
 	}
 
-	if err := s.DB.UpdateRelease(ctx, &activated); err != nil {
+	if err := s.DB.ActivateAtomic(ctx, superseded, &activated); err != nil {
 		return nil, err
 	}
 	return &activated, nil
