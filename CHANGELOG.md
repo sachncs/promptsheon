@@ -6,6 +6,107 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Production-readiness hardening (v0.1.x)
+
+A 50+ commit audit and remediation pass. Highlights:
+
+#### Deploy
+
+- **`fix(helm):` real probe + scrape paths** — `/health` and
+  `/ready` (not `/v1/healthz`); `/metrics` (not `/v1/metrics`).
+  The default install could not become healthy before this.
+- **`feat(helm):` values.schema.json** — rejects
+  `replicaCount>1` (SQLite is single-writer), `dbBackend=postgres`
+  (removed backend), and `auth=false` without `insecureLoopback`.
+- **`feat(helm):` default auth=true, vault Secret, PDB,
+  ConfigMap checksum, seccomp Profile** — production-safe defaults.
+- **`fix(dockerfile):` writable /data, multi-arch, ldflags**.
+- **`feat(ci):` tag-trigger release** with Helm render assertions
+  for the values schema.
+
+#### Trust boundaries
+
+- **`feat(config):` refuse non-loopback bind when `PROMPTSHEON_AUTH=false`** — closes the bootstrap admin-key-mint attack.
+- **`feat(config):` refuse non-loopback bind without TLS**.
+- **`feat(daemon):` in-process TLS termination** via
+  `PROMPTSHEON_TLS_CERT_FILE` / `PROMPTSHEON_TLS_KEY_FILE`.
+- **`feat(auth):` X-Bootstrap-Token gate** + OAuth auto-provision
+  off by default.
+- **`fix(config):` `CORSOrigins` is now `[]string`**; wildcard
+  `*` rejected on non-loopback bind.
+- **`fix(ratelimit):` trust X-Forwarded-For only from
+  `PROMPTSHEON_TRUSTED_PROXIES` CIDRs**.
+- **`fix(api):` require `PermAuditRead` on `/logs/stream` and
+  `/metrics`; rate-limit `/setup`, `/login`, `/callback`**.
+- **`fix(auth):` validate `ps_` prefix; never log raw key bytes**.
+- **`fix(api):` `*http.MaxBytesError` → 413 instead of 500**.
+- **`fix(api):` Idempotency-Key middleware** for POST handlers.
+- **`fix(webhooks):` per-endpoint `AllowPrivate`; remove global
+  `PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE` SSRF toggle**.
+- **`feat(daemon):` wire alert delivery to webhook dispatcher** —
+  alerts now actually fire instead of being silently dropped.
+
+#### Lifecycle
+
+- **`fix(audit):` dedicated worker context; drain barrier
+  before cancel** — never drop entries on SIGTERM.
+- **`fix(store):` drop `auditMu`; serialisable SQLite tx is the
+  ordering primitive**.
+- **`fix(observability):` never delete audit rows** — chain
+  integrity. Trace-only retention.
+- **`fix(lifecycle):` `Stop()` for webhook dispatcher, ws Hub,
+  authenticator** — no goroutine/FD leak on rolling restart.
+- **`fix(store):` enable SQLite `foreign_keys` on every
+  connection**.
+
+#### Release runtime
+
+- **`feat(release):` canonical `Resolver`**; release invoke
+  ignores request model/provider.
+- **`feat(release):` atomic activation; partial unique index on
+  active releases**.
+- **`fix(release):` bind vote identity to authenticated
+  principal** — closes maker-checker one-person quorum.
+- **`feat(eval):` implement `json_schema` scorer**.
+- **`fix(harness):` precondition runner gated + env scrubbed +
+  process-group kill**.
+- **`fix(llm):` preserve role + TopP in OpenAI `Complete`**.
+
+#### Misc
+
+- **`feat(workflow):` `Engine.Run` with sequential steps and
+  cross-step data flow**; wired into `/api/v1/workflows/run`.
+- **`fix(redactor):` thread-safe `Enable`/`Disable`; Luhn
+  check in `Matches`**.
+- **`fix(injection):` snapshot-semantic `Enable` +
+  `OverrideThreshold`**.
+- **`fix(guardrail):` credit-card regex now Luhn-verified**.
+- **`fix(schedule):` POSIX DOM/DOW semantics — wildcard means
+  'other field wins'**.
+- **`fix(observation):` bound window record list to 4096
+  entries**.
+- **`fix(experiment):` validate variants; document Confidence =
+  sample ratio**.
+- **`fix(trace):` OTel provider lives for the daemon lifetime;
+  sample 5% by default**.
+- **`fix(ratelimit):` exempt `/health`, `/ready`, `/metrics`**.
+- **`feat(recommendation):` SQLite-backed repository +
+  migration 042**.
+- **`feat(store):` migration 041** — partial unique index on
+  active releases.
+- **`feat(store):` migration 025 destructive gate** —
+  `PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true` required.
+- **`feat(e2e):` authenticated canonical lifecycle test** —
+  bootstrap-token path; audit chain verification.
+- **`refactor(api):` remove dead `ServerConfig` /
+  `WithServerConfig`**.
+- **`fix(models):` `json:"-"` on `EncryptedKey` and
+  `WebhookEndpointRecord.Secret`**.
+- **`fix(daemon):` persist failed executions; surface provider
+  errors as 5xx**.
+- **`chore(store):` delete `internal/store/migrations/postgres/`**.
+- **`feat(eval):` bandit RNG from entropy; honour injected RNG**.
+
 ### Harness engineering surface
 
 Inspired by the OpenAI [harness engineering](https://openai.com/index/harness-engineering/)
