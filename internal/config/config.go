@@ -46,6 +46,12 @@ type Config struct {
 
 	// Approval policy: "maker_checker" (default) or "majority".
 	ApprovalPolicy string
+
+	// TLS configuration. When TLSCertFile and TLSKeyFile are both
+	// non-empty the daemon calls ListenAndServeTLS. The pair MUST be
+	// set when the bind address is non-loopback; Validate() enforces.
+	TLSCertFile string
+	TLSKeyFile  string
 }
 
 const defaultAddr = ":8080"
@@ -114,6 +120,8 @@ func LoadConfig() Config {
 	cfg.OTelInsecure = getEnvBool("PROMPTSHEON_OTEL_INSECURE", cfg.OTelInsecure)
 	cfg.CORSOrigins = parseCORSOrigins(getEnvString("PROMPTSHEON_CORS_ORIGINS", ""))
 	cfg.ApprovalPolicy = getEnvString("PROMPTSHEON_APPROVAL_POLICY", cfg.ApprovalPolicy)
+	cfg.TLSCertFile = getEnvString("PROMPTSHEON_TLS_CERT_FILE", cfg.TLSCertFile)
+	cfg.TLSKeyFile = getEnvString("PROMPTSHEON_TLS_KEY_FILE", cfg.TLSKeyFile)
 
 	sanitizeConfig(&cfg)
 	return cfg
@@ -214,6 +222,17 @@ func (c *Config) Validate() error {
 				)
 			}
 		}
+	}
+	if !isLoopbackAddr(c.Addr) && c.TLSCertFile == "" && c.TLSKeyFile == "" {
+		return fmt.Errorf(
+			"config: non-loopback bind %q requires TLS — set PROMPTSHEON_TLS_CERT_FILE and "+
+				"PROMPTSHEON_TLS_KEY_FILE to terminate TLS in the daemon. (Bearer keys and audit "+
+				"details must not cross the wire in clear.)",
+			c.Addr,
+		)
+	}
+	if (c.TLSCertFile == "") != (c.TLSKeyFile == "") {
+		return errors.New("config: PROMPTSHEON_TLS_CERT_FILE and PROMPTSHEON_TLS_KEY_FILE must both be set or both be empty")
 	}
 	return nil
 }
