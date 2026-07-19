@@ -175,15 +175,10 @@ func scanProject(scanner interface {
 // ---------------------------------------------------------------------------
 
 func (s *SQLite) CreateCapability(ctx context.Context, c *capability.Capability) error {
-	tags, err := marshalOrErr(c.Tags)
-	if err != nil {
-		return err
-	}
-	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO capabilities (id, project_id, name, description, owner, tags, state, current_version_id, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.ID, c.ProjectID, c.Name, c.Description, c.Owner, string(tags),
-		string(capability.StateDraft), "", c.CreatedAt, c.UpdatedAt,
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO capabilities (id, project_id, name, description, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		c.ID, c.ProjectID, c.Name, c.Description, c.CreatedAt, c.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("insert capability: %w", err)
@@ -193,7 +188,7 @@ func (s *SQLite) CreateCapability(ctx context.Context, c *capability.Capability)
 
 func (s *SQLite) GetCapability(ctx context.Context, id string) (*capability.Capability, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, project_id, name, description, owner, tags, state, current_version_id, created_at, updated_at
+		`SELECT id, project_id, name, description, created_at, updated_at
 		 FROM capabilities WHERE id = ?`, id,
 	)
 	return scanCapability(row)
@@ -201,7 +196,7 @@ func (s *SQLite) GetCapability(ctx context.Context, id string) (*capability.Capa
 
 func (s *SQLite) ListCapabilities(ctx context.Context, projectID string) ([]*capability.Capability, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, project_id, name, description, owner, tags, state, current_version_id, created_at, updated_at
+		`SELECT id, project_id, name, description, created_at, updated_at
 		 FROM capabilities WHERE project_id = ? ORDER BY name`, projectID,
 	)
 	if err != nil {
@@ -221,14 +216,10 @@ func (s *SQLite) ListCapabilities(ctx context.Context, projectID string) ([]*cap
 }
 
 func (s *SQLite) UpdateCapability(ctx context.Context, c *capability.Capability) error {
-	tags, err := marshalOrErr(c.Tags)
-	if err != nil {
-		return err
-	}
-	_, err = s.db.ExecContext(ctx,
-		`UPDATE capabilities SET name = ?, description = ?, owner = ?, tags = ?, state = ?, current_version_id = ?, updated_at = ?
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE capabilities SET name = ?, description = ?, updated_at = ?
 		 WHERE id = ?`,
-		c.Name, c.Description, c.Owner, string(tags), string(capability.StateDraft), "", c.UpdatedAt, c.ID,
+		c.Name, c.Description, c.UpdatedAt, c.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update capability: %w", err)
@@ -248,24 +239,17 @@ func scanCapability(scanner interface {
 	Scan(dest ...any) error
 }) (*capability.Capability, error) {
 	var c capability.Capability
-	var tagsStr string
-	// state and currentVersionID remain in the schema for forward
-	// compatibility; Capability derives both at read time from
-	// Release state, so the columns are read into discard vars.
-	var derivedState string
-	var derivedCurrentVersionID string
-	err := scanner.Scan(&c.ID, &c.ProjectID, &c.Name, &c.Description, &c.Owner,
-		&tagsStr, &derivedState, &derivedCurrentVersionID, &c.CreatedAt, &c.UpdatedAt)
+	err := scanner.Scan(&c.ID, &c.ProjectID, &c.Name, &c.Description, &c.CreatedAt, &c.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan capability: %w", err)
 	}
-	mustUnmarshal([]byte(tagsStr), &c.Tags)
-	// State and CurrentVersionID are derived from Release state, not
-	// stored on Capability. The columns remain in the schema for
-	// forward compatibility; callers should use capability.DeriveState.
+	// State and CurrentVersionID are derived from Release state
+	// (capability.DeriveState). Migration 044 dropped the
+	// vestigial columns; callers that need them should call
+	// DeriveState explicitly.
 	return &c, nil
 }
 
