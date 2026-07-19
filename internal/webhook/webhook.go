@@ -98,6 +98,8 @@ type Dispatcher struct {
 	deliveriesLen  int
 	maxRetries     int
 	maxDeliveries  int
+	wg             sync.WaitGroup
+	stop           chan struct{}
 }
 
 // NewDispatcher creates a webhook dispatcher.
@@ -108,8 +110,26 @@ func NewDispatcher(logger *slog.Logger) *Dispatcher {
 		logger:        logger,
 		maxRetries:    3,
 		maxDeliveries: 1000,
+		stop:          make(chan struct{}),
 	}
 	return d
+}
+
+// Stop signals Emit/EmitContext to refuse new deliveries and waits
+// for in-flight deliveries to finish. Safe to call more than once.
+// Without Stop, the dispatcher's per-event goroutines leak across
+// daemon restarts (k8s rolling deploy, dev iteration).
+func (d *Dispatcher) Stop() {
+	d.mu.Lock()
+	select {
+	case <-d.stop:
+		d.mu.Unlock()
+		return
+	default:
+		close(d.stop)
+	}
+	d.mu.Unlock()
+	d.wg.Wait()
 }
 
 // WithEndpointStore attaches a persistence backend. When set, Register
@@ -216,6 +236,16 @@ func (d *Dispatcher) Emit(evt *Event) {
 // is the parent of all per-endpoint delivery goroutines; cancelling it
 // aborts in-flight deliveries.
 func (d *Dispatcher) EmitContext(ctx context.Context, evt *Event) {
+	select {
+	case <-d.stop:
+		// Refuse new deliveries after Stop so callers do not
+		// silently drop events by racing shutdown.
+		if d.logger != nil {
+			d.logger.Warn("webhook: emit refused; dispatcher stopped", "event_id", evt.ID)
+		}
+		return
+	default:
+	}
 	d.mu.RLock()
 	var targets []*Endpoint
 	for _, ep := range d.endpoints {
@@ -232,7 +262,11 @@ func (d *Dispatcher) EmitContext(ctx context.Context, evt *Event) {
 	d.mu.RUnlock()
 
 	for _, ep := range targets {
-		go d.deliver(ctx, ep, evt)
+		d.wg.Add(1)
+		go func(ep *Endpoint) {
+			defer d.wg.Done()
+			d.deliver(ctx, ep, evt)
+		}(ep)
 	}
 }
 

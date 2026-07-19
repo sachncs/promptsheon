@@ -42,6 +42,8 @@ type Hub struct {
 	mu         sync.RWMutex
 	logger     *slog.Logger
 	nextID     int
+	stop       chan struct{}
+	done       chan struct{}
 }
 
 // NewHub creates a new SSE hub.
@@ -52,13 +54,18 @@ func NewHub(logger *slog.Logger) *Hub {
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		logger:     logger,
+		stop:       make(chan struct{}),
+		done:       make(chan struct{}),
 	}
 }
 
 // Run starts the hub's main loop.
 func (h *Hub) Run() {
+	defer close(h.done)
 	for {
 		select {
+		case <-h.stop:
+			return
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client.id] = client
@@ -95,6 +102,18 @@ func (h *Hub) Run() {
 			}
 		}
 	}
+}
+
+// Stop signals the hub goroutine to exit and waits for it. Safe to
+// call more than once.
+func (h *Hub) Stop() {
+	select {
+	case <-h.stop:
+		return
+	default:
+		close(h.stop)
+	}
+	<-h.done
 }
 
 // BroadcastLog sends a log entry to all connected clients.
