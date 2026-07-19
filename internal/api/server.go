@@ -29,6 +29,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/trace"
 	"github.com/sachncs/promptsheon/internal/vault"
 	"github.com/sachncs/promptsheon/internal/webhook"
+	"github.com/sachncs/promptsheon/internal/workflow"
 	"github.com/sachncs/promptsheon/internal/ws"
 )
 
@@ -89,7 +90,8 @@ type Server struct {
 	// searchManager owns the in-memory semantic search index.
 	// M-1: built once on Server construction, refreshed on
 	// prompt create/update/delete via RefreshSearchIndex.
-	searchManager *search.Manager
+	searchManager     *search.Manager
+	workflowEngine    *workflow.Engine
 }
 
 // httpRequestKey is the context key used by the request middleware
@@ -250,6 +252,14 @@ func WithReleaseResolver(r *release.Resolver) Option {
 	return func(s *Server) { s.releaseResolver = r }
 }
 
+// WithWorkflowEngine attaches the workflow.Engine used by
+// POST /api/v1/workflows/run. When nil the route returns 503
+// (engine not configured) rather than 404, so callers can
+// distinguish "missing" from "disabled".
+func WithWorkflowEngine(e *workflow.Engine) Option {
+	return func(s *Server) { s.workflowEngine = e }
+}
+
 // WithReleaseService attaches the release.Service used by the
 // /releases routes. When nil, those routes are not registered
 // and a release-aware request returns 404. This mirrors the
@@ -328,6 +338,7 @@ func (s *Server) registerHealthRoutes() {
 	s.mux.HandleFunc("GET /health", s.wrapHandler(s.handleHealth))
 	s.mux.HandleFunc("GET /ready", s.wrapHandler(s.handleReady))
 	s.mux.HandleFunc("GET /api/v1/version", s.wrapHandler(s.handleVersion))
+	s.mux.HandleFunc("POST /api/v1/workflows/run", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleRunWorkflow)))
 	if s.collector != nil {
 		// /metrics is the Prometheus scrape endpoint. It exposes
 		// token and cost counters. Two protections:

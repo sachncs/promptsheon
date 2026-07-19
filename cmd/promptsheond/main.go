@@ -368,6 +368,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		api.WithProviders(providers),
 		api.WithWorkspaceRollups(rollupAgg),
 		api.WithInvoker(inv),
+		api.WithWorkflowEngine(workflow.NewEngine(workflow.DefaultRegistry())),
 	)
 
 	// releaseSvc is the application layer for the Release + Approval
