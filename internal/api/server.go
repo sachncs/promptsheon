@@ -507,7 +507,15 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 func writeError(w http.ResponseWriter, err error) {
 	status := http.StatusInternalServerError
 	var httpErr *HTTPError
+	var maxBytesErr *http.MaxBytesError
 	switch {
+	case errors.As(err, &maxBytesErr):
+		// http.MaxBytesReader returns *http.MaxBytesError when the
+		// body exceeds the configured limit. Map that to 413 so
+		// the client sees the actual problem (oversize body)
+		// rather than the generic 500 that previously leaked the
+		// wrapped decode error.
+		status = http.StatusRequestEntityTooLarge
 	case errors.As(err, &httpErr):
 		status = httpErr.Status
 	case errors.Is(err, ErrNotFound):
