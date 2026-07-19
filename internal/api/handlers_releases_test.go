@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/sachncs/promptsheon/internal/approval"
+	"github.com/sachncs/promptsheon/internal/auth"
 	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/release"
 	"github.com/sachncs/promptsheon/internal/testdata"
@@ -45,10 +46,11 @@ func TestReleaseRoutesCreateVoteActivateInvoke(t *testing.T) {
 	svc := release.NewServiceFromKind(repo, repo, release.PolicyMakerChecker, 1)
 	srv := newReleaseTestServer(repo, svc)
 
-	// 1. Create release
+	// 1. Create release (as "alice" per the fixture)
 	body, _ := json.Marshal(map[string]string{"environment": "prod"})
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", "/api/v1/versions/v1/releases", bytes.NewReader(body))
+	req = req.WithContext(auth.WithUserContext(req.Context(), &auth.User{ID: "alice", Role: auth.RoleAdmin}))
 	srv.ServeHTTP(w, req)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("create release: status=%d body=%s", w.Code, w.Body.String())
@@ -59,10 +61,12 @@ func TestReleaseRoutesCreateVoteActivateInvoke(t *testing.T) {
 		t.Fatalf("status = %q want pending", rel.Status)
 	}
 
-	// 2. Vote
+	// 2. Vote (as "bob" via the authenticated user context; the
+	// request body's "identity" field is now ignored)
 	body, _ = json.Marshal(map[string]string{"identity": "bob", "decision": "approve"})
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest("POST", "/api/v1/releases/"+rel.ID+"/votes", bytes.NewReader(body))
+	req = req.WithContext(auth.WithUserContext(req.Context(), &auth.User{ID: "bob", Role: auth.RoleAdmin}))
 	srv.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("vote: status=%d body=%s", w.Code, w.Body.String())

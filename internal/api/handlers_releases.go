@@ -101,12 +101,24 @@ func (s *Server) handleVoteOnRelease(w http.ResponseWriter, r *http.Request) err
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
-	if req.Identity == "" {
-		// Default to the authenticated caller when no explicit identity
-		// is supplied. This matches the user/team mental model used
-		// elsewhere in the API.
-		req.Identity = callerID(r)
+	// SECURITY: vote identity is bound to the authenticated
+	// principal. The previous implementation accepted an
+	// arbitrary `identity` from the request body and defaulted to
+	// the caller only when blank — which let the release creator
+	// vote under another name to satisfy maker-checker quorum.
+	// The authenticated principal is now the only allowed source.
+	//
+	// If delegated voting is ever required, expose it as a
+	// separate admin-only operation that records both the
+	// delegator and the represented identity in the audit log.
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok || user == nil || user.ID == "" {
+		return &HTTPError{Status: http.StatusUnauthorized, Message: "no authenticated user in context"}
 	}
+	if req.Identity != "" && req.Identity != user.ID {
+		return &HTTPError{Status: http.StatusForbidden, Message: "vote identity must match the authenticated principal"}
+	}
+	req.Identity = user.ID
 	decision := approval.Decision(req.Decision)
 	switch decision {
 	case approval.Approve, approval.Reject, approval.Abstain:
