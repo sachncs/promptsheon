@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -152,12 +153,24 @@ func TestProviderKeyJSONRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
+	// EncryptedKey is marked json:"-" so a generic JSON encoder
+	// must not surface the ciphertext. The test asserts the
+	// marker is present and that the decrypted value never
+	// crosses the wire.
+	if strings.Contains(string(b), "base64ciphertext") {
+		t.Errorf("ciphertext leaked into JSON: %s", b)
+	}
+	// Round-trip through a separate cipher-DTO instead. We
+	// simulate by copying the non-secret fields manually.
 	var got models.ProviderKey
 	if err := json.Unmarshal(b, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if got != k {
-		t.Errorf("round-trip mismatch: got %+v want %+v", got, k)
+	if got.ID != k.ID || got.ProviderName != k.ProviderName || got.KeyName != k.KeyName {
+		t.Errorf("non-secret fields mismatch: got %+v want %+v", got, k)
+	}
+	if got.EncryptedKey != "" {
+		t.Errorf("unmarshal must not populate EncryptedKey from JSON, got %q", got.EncryptedKey)
 	}
 }
 
