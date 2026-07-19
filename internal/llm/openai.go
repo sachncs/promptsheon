@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	openai "github.com/openai/openai-go/v3"
@@ -41,17 +42,30 @@ func (o *OpenAI) Name() string { return ProviderOpenAI.String() }
 var _ Provider = (*OpenAI)(nil)
 
 // Complete sends a prompt to the OpenAI Responses API and returns
-// the response. The Responses API accepts a single Input string and
-// returns OutputText directly. Multi-message transcripts are joined
-// with newlines; richer message types can be added later through a
-// helper if the call site needs them.
+// the response. The previous implementation flattened every
+// message into a single input string, which collapsed system,
+// user, and assistant roles into a single user turn. The new path
+// preserves the role of each message by:
+//   - prepending a literal "[SYSTEM]\n" / "[USER]\n" / "[ASSISTANT]\n"
+//     marker to each block (the v3 Responses API does not
+//     directly expose role-tagged input helpers in this binding),
+//   - joining with blank lines, and
+//   - preserving TopP (previously dropped on the floor).
+//
+// req.Stop is still not surfaced through the Responses API in v3;
+// the parameter is silently dropped. Callers that need
+// deterministic truncation should set max_tokens instead.
 func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) {
 	var input string
 	for _, m := range req.Messages {
-		if input != "" {
-			input += "\n"
+		role := strings.ToLower(strings.TrimSpace(m.Role))
+		if role == "" {
+			role = "user"
 		}
-		input += m.Content
+		if input != "" {
+			input += "\n\n"
+		}
+		input += "[" + strings.ToUpper(role) + "]\n" + m.Content
 	}
 
 	maxTokens := int64(req.MaxTokens)
@@ -66,6 +80,9 @@ func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) 
 	}
 	if req.Temperature > 0 {
 		params.Temperature = openai.Float(req.Temperature)
+	}
+	if req.TopP > 0 {
+		params.TopP = openai.Float(req.TopP)
 	}
 	// req.Stop is not surfaced through the Responses API in v3; the
 	// parameter is silently dropped. Callers that need deterministic
