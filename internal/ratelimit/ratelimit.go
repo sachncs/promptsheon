@@ -2,6 +2,7 @@
 package ratelimit
 
 import (
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -11,6 +12,70 @@ import (
 
 	"github.com/sachncs/promptsheon/internal/auth"
 )
+
+// trustedProxies is the set of CIDRs that may set X-Forwarded-For
+// or X-Real-IP. Configured once at process start from
+// PROMPTSHEON_TRUSTED_PROXIES. A nil value disables trust
+// entirely.
+var trustedProxies *net.IPNet
+
+// ConfigureTrustedProxies parses a comma-separated CIDR list and
+// installs it as the trusted-proxy set. Exposed so tests can build
+// their own configuration without re-running init().
+func ConfigureTrustedProxies(raw string) {
+	if raw == "" {
+		trustedProxies = nil
+		return
+	}
+	var combined *net.IPNet
+	for _, c := range strings.Split(raw, ",") {
+		c = strings.TrimSpace(c)
+		if c == "" {
+			continue
+		}
+		_, n, err := net.ParseCIDR(c)
+		if err != nil {
+			continue
+		}
+		if combined == nil {
+			combined = n
+		} else if smallerMask(n, combined) {
+			combined = n
+		}
+	}
+	trustedProxies = combined
+}
+
+func smallerMask(a, b *net.IPNet) bool {
+	am, _ := a.Mask.Size()
+	bm, _ := b.Mask.Size()
+	return am < bm
+}
+
+func init() {
+	ConfigureTrustedProxies(os.Getenv("PROMPTSHEON_TRUSTED_PROXIES"))
+}
+
+func mergeCIDRs(a, b *net.IPNet) *net.IPNet {
+	// Both a and b are valid CIDRs; produce a single IPNet that
+	// covers the union by widening to the smaller mask. The
+	// limiter only needs Contains() to work.
+	if mask, _ := a.Mask.Size(); mask > 0 {
+		bits, _ := b.Mask.Size()
+		if bits < mask {
+			return b
+		}
+	}
+	return a
+}
+
+func realRemoteAddr(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
 
 // Limiter enforces rate limits per API key using a token bucket.
 type Limiter struct {
@@ -170,20 +235,30 @@ func (l *Limiter) Middleware(next http.Handler) http.Handler {
 // the authenticated user ID when auth has run, and the client IP
 // otherwise. Using the validated user ID (not the raw token) means
 // changing tokens for the same user still hits the same bucket.
+//
+// PROMPTSHEON_TRUSTED_PROXIES is a comma-separated list of CIDRs.
+// When set, X-Forwarded-For and X-Real-IP are honoured only when
+// the request's RemoteAddr falls inside one of the configured
+// networks. Without a configured list, forwarded headers are
+// ignored (the request's direct RemoteAddr is used) so an exposed
+// daemon cannot be tricked into per-attacker buckets.
 func extractKey(r *http.Request) string {
 	if u, ok := auth.UserFromContext(r.Context()); ok && u != nil && u.ID != "" {
 		return "user:" + u.ID
 	}
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if i := strings.IndexByte(xff, ','); i >= 0 {
-			return "ip:" + strings.TrimSpace(xff[:i])
+	remote := realRemoteAddr(r)
+	if trustedProxies != nil && trustedProxies.Contains(net.ParseIP(remote)) {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			if i := strings.IndexByte(xff, ','); i >= 0 {
+				return "ip:" + strings.TrimSpace(xff[:i])
+			}
+			return "ip:" + strings.TrimSpace(xff)
 		}
-		return "ip:" + strings.TrimSpace(xff)
+		if rip := r.Header.Get("X-Real-IP"); rip != "" {
+			return "ip:" + strings.TrimSpace(rip)
+		}
 	}
-	if rip := r.Header.Get("X-Real-IP"); rip != "" {
-		return "ip:" + strings.TrimSpace(rip)
-	}
-	return "ip:" + r.RemoteAddr
+	return "ip:" + remote
 }
 
 // Reset clears all buckets.

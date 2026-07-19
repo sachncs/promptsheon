@@ -241,8 +241,8 @@ func TestExtractKeyUserContextEmptyID(t *testing.T) {
 	req.RemoteAddr = "10.0.0.1:5678"
 	req = req.WithContext(ctx)
 	got := extractKey(req)
-	if got != "ip:10.0.0.1:5678" {
-		t.Fatalf("expected ip:10.0.0.1:5678, got %s", got)
+	if got != "ip:10.0.0.1" {
+		t.Fatalf("expected ip:10.0.0.1, got %s", got)
 	}
 }
 
@@ -255,13 +255,15 @@ func TestExtractKeyUserContextNilUser(t *testing.T) {
 	req.RemoteAddr = "10.0.0.2:5678"
 	req = req.WithContext(ctx)
 	got := extractKey(req)
-	if got != "ip:10.0.0.2:5678" {
-		t.Fatalf("expected ip:10.0.0.2:5678, got %s", got)
+	if got != "ip:10.0.0.2" {
+		t.Fatalf("expected ip:10.0.0.2, got %s", got)
 	}
 }
 
 func TestExtractKeyXForwardedForComma(t *testing.T) {
+	ConfigureTrustedProxies("192.0.2.0/24")
 	req := httptest.NewRequest("GET", "/", nil)
+	req.RemoteAddr = "192.0.2.10:1234"
 	req.Header.Set("X-Forwarded-For", "1.2.3.4, 5.6.7.8")
 	got := extractKey(req)
 	if got != "ip:1.2.3.4" {
@@ -270,7 +272,9 @@ func TestExtractKeyXForwardedForComma(t *testing.T) {
 }
 
 func TestExtractKeyXForwardedFor(t *testing.T) {
+	ConfigureTrustedProxies("192.0.2.0/24")
 	req := httptest.NewRequest("GET", "/", nil)
+	req.RemoteAddr = "192.0.2.10:1234"
 	req.Header.Set("X-Forwarded-For", "1.2.3.4")
 	got := extractKey(req)
 	if got != "ip:1.2.3.4" {
@@ -279,7 +283,9 @@ func TestExtractKeyXForwardedFor(t *testing.T) {
 }
 
 func TestExtractKeyXRealIP(t *testing.T) {
+	ConfigureTrustedProxies("192.0.2.0/24")
 	req := httptest.NewRequest("GET", "/", nil)
+	req.RemoteAddr = "192.0.2.10:1234"
 	req.Header.Set("X-Real-IP", "5.6.7.8")
 	got := extractKey(req)
 	if got != "ip:5.6.7.8" {
@@ -288,17 +294,19 @@ func TestExtractKeyXRealIP(t *testing.T) {
 }
 
 func TestExtractKeyRemoteAddr(t *testing.T) {
+	ConfigureTrustedProxies("")
 	req := httptest.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "9.10.11.12:8080"
 	got := extractKey(req)
-	if got != "ip:9.10.11.12:8080" {
-		t.Fatalf("expected ip:9.10.11.12:8080, got %s", got)
+	if got != "ip:9.10.11.12" {
+		t.Fatalf("expected ip:9.10.11.12, got %s", got)
 	}
 }
 
 func TestExtractKeyXForwardedForPreferred(t *testing.T) {
-	// X-Forwarded-For should be preferred over X-Real-IP
+	ConfigureTrustedProxies("192.0.2.0/24")
 	req := httptest.NewRequest("GET", "/", nil)
+	req.RemoteAddr = "192.0.2.10:1234"
 	req.Header.Set("X-Forwarded-For", "1.2.3.4")
 	req.Header.Set("X-Real-IP", "5.6.7.8")
 	got := extractKey(req)
@@ -308,10 +316,10 @@ func TestExtractKeyXForwardedForPreferred(t *testing.T) {
 }
 
 func TestExtractKeyXRealIPFallback(t *testing.T) {
-	// X-Real-IP should be used when X-Forwarded-For is not present
+	ConfigureTrustedProxies("192.0.2.0/24")
 	req := httptest.NewRequest("GET", "/", nil)
+	req.RemoteAddr = "192.0.2.10:1234"
 	req.Header.Set("X-Real-IP", "5.6.7.8")
-	req.RemoteAddr = "9.10.11.12:8080"
 	got := extractKey(req)
 	if got != "ip:5.6.7.8" {
 		t.Fatalf("expected ip:5.6.7.8, got %s", got)
