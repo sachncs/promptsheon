@@ -1,32 +1,51 @@
-# Build stage
-FROM golang:1.26-alpine AS builder
+# syntax=docker/dockerfile:1.7
+# Multi-arch build: pass --platform=linux/amd64,linux/arm64 to buildx.
+ARG GO_VERSION=1.26
+ARG ALPINE_VERSION=3.20
+
+# --- Build stage -----------------------------------------------------------
+FROM golang:${GO_VERSION}-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o promptsheond ./cmd/promptsheond
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o promptsheon ./cmd/promptsheon
+ARG TARGETOS
+ARG TARGETARCH
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_TIME=unknown
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath \
+      -ldflags="-s -w -X github.com/sachncs/promptsheon/internal/buildinfo.Version=${VERSION} -X github.com/sachncs/promptsheon/internal/buildinfo.Commit=${COMMIT} -X github.com/sachncs/promptsheon/internal/buildinfo.BuildTime=${BUILD_TIME}" \
+      -o /out/promptsheond ./cmd/promptsheond && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath \
+      -ldflags="-s -w -X github.com/sachncs/promptsheon/internal/buildinfo.Version=${VERSION} -X github.com/sachncs/promptsheon/internal/buildinfo.Commit=${COMMIT} -X github.com/sachncs/promptsheon/internal/buildinfo.BuildTime=${BUILD_TIME}" \
+      -o /out/promptsheon ./cmd/promptsheon
 
-# Runtime stage
-FROM alpine:3.20
-# L-8 fix: install wget explicitly for HEALTHCHECK. The base
-# alpine image does not bundle wget (the busybox version is
-# unreliable across versions), and the previous HEALTHCHECK
-# silently failed on minimal images.
+# --- Runtime stage ---------------------------------------------------------
+FROM alpine:${ALPINE_VERSION}
 RUN apk add --no-cache ca-certificates tzdata wget
-RUN adduser -D -u 1000 promptsheon
-COPY --from=builder /app/promptsheond /usr/local/bin/promptsheond
-COPY --from=builder /app/promptsheon  /usr/local/bin/promptsheon
+RUN addgroup -g 1000 promptsheon && adduser -D -u 1000 -G promptsheon promptsheon
+
+# /data holds the SQLite database and is the volume target. The
+# binary runs as UID 1000 so the directory must be owned by the
+# same user. The chart mounts a PVC at the same path.
+WORKDIR /data
+RUN chown -R promptsheon:promptsheon /data
+COPY --from=builder /out/promptsheond /usr/local/bin/promptsheond
+COPY --from=builder /out/promptsheon  /usr/local/bin/promptsheon
+
 USER promptsheon
-# Default to 8080 to match the documented PROMPTSHEON_ADDR
-# default. Operators who set PROMPTSHEON_ADDR to a different
-# port must also pass HEALTHCHECK_PORT at runtime (e.g.
-# '--env HEALTHCHECK_PORT=9090') so the container healthcheck
-# still hits the right endpoint.
-ENV PROMPTSHEON_ADDR=:8080
-ENV HEALTHCHECK_PORT=8080
+
+ENV PROMPTSHEON_ADDR=:8080 \
+    PROMPTSHEON_DB_PATH=/data/promptsheon.db \
+    HEALTHCHECK_PORT=8080
+
 EXPOSE 8080
 VOLUME ["/data"]
+
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -qO- http://localhost:${HEALTHCHECK_PORT}/health || exit 1
+
 ENTRYPOINT ["promptsheond"]
