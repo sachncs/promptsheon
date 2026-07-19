@@ -392,13 +392,20 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 			"db_path", cfg.DBPath,
 			"auth", cfg.Auth,
 			"otel_endpoint", cfg.OTelEndpoint,
+			"tls", cfg.TLSCertFile != "",
 		)
 		if !cfg.Auth {
 			logger.Warn("authentication is DISABLED; POST /api/v1/setup will mint an admin key to the first caller. Set PROMPTSHEON_AUTH=true before exposing this server.",
 				"setup_endpoint", "POST /api/v1/setup")
 		}
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("server error", "err", err)
+		var serveErr error
+		if cfg.TLSCertFile != "" && cfg.TLSKeyFile != "" {
+			serveErr = httpServer.ListenAndServeTLS(cfg.TLSCertFile, cfg.TLSKeyFile)
+		} else {
+			serveErr = httpServer.ListenAndServe()
+		}
+		if serveErr != nil && serveErr != http.ErrServerClosed {
+			logger.Error("server error", "err", serveErr)
 			os.Exit(1)
 		}
 	}()
