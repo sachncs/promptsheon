@@ -377,6 +377,7 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 		api.Recovery(logger),
 		api.MaxBytesReader(10<<20),
 		api.SecurityHeaders,
+		api.IdempotencyMiddleware(),
 		limiter.Middleware,
 		metrics.HTTPMiddleware(collector, spans, logger),
 		api.Logging(logger),
