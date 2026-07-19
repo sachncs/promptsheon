@@ -1,0 +1,51 @@
+-- Migration 048a (audit normalize schema): add resource_kind and
+-- resource_id columns to audit_entries so the most common
+-- audit query — "events for resource X in the last hour" —
+-- can use a structural filter rather than substring-matching
+-- a JSON-encoded resource string.
+--
+-- DO NOT MODIFY under this migration (or any subsequent):
+--   * audit_entries.previous_hash / entry_hash / timestamp_str chain format
+--   * audit_chain_state single-row layout
+--   * harness tables: datasets, dataset_cases, preconditions, eval_runs, eval_results
+--   * provider_keys (vault, AES-GCM ciphertext)
+--   * releases.status enum and uniq_releases_active_capability_env partial unique index
+--   * OpenAI / Anthropic provider contracts
+--
+-- The existing audit_entries.resource column carries a string like
+-- "workspace:abc", "release:r1", or "user:u1". Querying "show every
+-- event for workspace abc" was a LIKE 'workspace:%' scan (full
+-- table) or a btree probe on the entire string. Adding the split
+-- kind + id columns lets the query planner use the new
+-- (resource_kind, resource_id, timestamp DESC) composite
+-- (added in 047) for an O(log n) probe + an O(1) scan over a
+-- small result set.
+--
+-- The chain format (previous_hash / entry_hash / timestamp_str)
+-- is unchanged. The two new columns are NOT part of the audit
+-- hash; they are structural metadata for query routing. Existing
+-- 042 audit-chain verifications continue to work without change.
+--
+-- 048a adds the columns. The 048b backfill is an operator-scripted
+-- batched UPDATE (documented in 048b_up.sql's README) that
+-- populates resource_kind / resource_id for existing rows. Until
+-- 048b runs, the new columns are empty and queries fall back
+-- to the old LIKE-on-resource pattern.
+--
+-- The Go-side AppendAudit now writes both old + new columns
+-- (resource + resource_kind + resource_id) in a single INSERT.
+-- Old handlers that still write only the legacy resource column
+-- see the new columns as empty strings; the existing chain
+-- format covers this case (the new columns are not hashed).
+
+ALTER TABLE audit_entries ADD COLUMN resource_kind TEXT NOT NULL DEFAULT '';
+ALTER TABLE audit_entries ADD COLUMN resource_id   TEXT NOT NULL DEFAULT '';
+
+-- The (resource_kind, resource_id, timestamp DESC) composite is
+-- added in 047_covering_indexes. The 047 migration pre-creates
+-- the index for the post-043 schema, but at the time 047 ran
+-- this column did not exist (DEFAULT '' on a new column is
+-- fine for the index to land; an empty-string kind+id is a
+-- valid composite key). Now that 048a adds the columns, the
+-- index is immediately useful for new rows; existing rows
+-- (with kind='', id='') land at the front of the btree.
