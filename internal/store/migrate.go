@@ -4,9 +4,18 @@ import (
 	"database/sql"
 	"fmt"
 	"io/fs"
+	"os"
 	"sort"
 	"strings"
 )
+
+// DestructiveMigrationEnv is the env var an operator sets to opt into
+// a migration that drops tables or columns. The default is refusal:
+// the daemon prints a clear error and refuses to boot rather than
+// silently destroying data. The daemon philosophy is to fail
+// successfully, never to hide destructive operations behind an
+// upgrade.
+const DestructiveMigrationEnv = "PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS"
 
 // migrate runs all SQL migration files in order against the database.
 // Migrations are expected in the migrations/ directory with names like
@@ -15,7 +24,13 @@ import (
 // Safety features:
 //   - Each migration runs in its own transaction (rollback on failure)
 //   - Forward-only: no down migrations, migrations are idempotent
+//   - Destructive migrations (file name contains "_destructive_") require
+//     PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true to apply. Without
+//     the flag, the daemon refuses to start. This is the operational
+//     gate per the production-readiness review: the daemon never silently
+//     drops tables or columns during a routine upgrade.
 func migrate(db *sql.DB, migrationsFS fs.FS) error {
+	destructiveAllowed := os.Getenv(DestructiveMigrationEnv) == "true"
 	// Ensure the schema_migrations table exists.
 	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -70,6 +85,14 @@ func migrate(db *sql.DB, migrationsFS fs.FS) error {
 			continue
 		}
 
+		if isDestructiveMigration(f.Name()) && !destructiveAllowed {
+			return fmt.Errorf(
+				"migration %s is destructive and requires %s=true; "+
+					"refusing to start. Take a backup of %s before retrying",
+				f.Name(), DestructiveMigrationEnv, "<db path>",
+			)
+		}
+
 		content, err := fs.ReadFile(migrationsFS, "migrations/"+f.Name())
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", f.Name(), err)
@@ -109,4 +132,14 @@ func applyMigration(db *sql.DB, version int, sqlStr string) error {
 	}
 
 	return nil
+}
+
+// isDestructiveMigration reports whether a migration file is
+// destructive (drops tables or columns) by its file name. The
+// convention is the substring "destructive" in the file name; this
+// is intentionally cheap to grep and audit. The convention is
+// "_destructive_<rest>" where <rest> is anything including the file
+// extension, so we match on "destructive" alone.
+func isDestructiveMigration(name string) bool {
+	return strings.Contains(name, "destructive")
 }

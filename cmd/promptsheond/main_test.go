@@ -22,6 +22,13 @@ import (
 	"github.com/sachncs/promptsheon/internal/webhook"
 )
 
+func init() {
+	// Tests in this package exercise the full migration set from a
+	// fresh DB, including the destructive 025 cleanup migration.
+	// Production refuses by default; the test binary opts in.
+	os.Setenv(store.DestructiveMigrationEnv, "true")
+}
+
 // ---------------------------------------------------------------------------
 // serverHelpText
 // ---------------------------------------------------------------------------
