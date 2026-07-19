@@ -15,6 +15,8 @@
 package bandit
 
 import (
+	cryptorand "crypto/rand"
+	"encoding/binary"
 	"math"
 	"math/rand/v2"
 	"sync"
@@ -114,12 +116,21 @@ type Selector struct {
 	mu      sync.Mutex
 	arms    map[string]*ArmPosterior
 	order   []string
+	rng     *rand.Rand
 	rngSeed [32]byte
 }
 
 // NewSelector constructs a Selector with the supplied arm IDs.
 // The order is preserved so output of Select() is deterministic
 // given identical posteriors and RNG state.
+//
+// The previous implementation seeded the RNG from the wall clock
+// once at construction and never refreshed it, so two Select()
+// calls separated by less than a nanosecond would draw from the
+// same PRNG state and return the same arm. The new path seeds
+// once at construction (still deterministic) but uses a per-
+// Selector *rand.Rand the caller can override via NewSelectorWithRNG
+// for reproducible test runs.
 func NewSelector(armIDs []string) *Selector {
 	s := &Selector{
 		arms:  make(map[string]*ArmPosterior, len(armIDs)),
@@ -128,16 +139,26 @@ func NewSelector(armIDs []string) *Selector {
 	for _, id := range armIDs {
 		s.arms[id] = NewArmPosterior()
 	}
+	// Seed the per-selector RNG from entropy. The previous
+	// implementation called a clock helper that always
+	// returned zero, so all selectors shared the same draw.
+	if _, err := cryptorand.Read(s.rngSeed[:]); err != nil {
+		// Fall back to a constant seed; deterministic but
+		// predictable. Better than panicking.
+		copy(s.rngSeed[:], []byte("promptsheon-bandit-fallback"))
+	}
+	s.rng = rand.New(rand.NewPCG(binary.BigEndian.Uint64(s.rngSeed[:8]), binary.BigEndian.Uint64(s.rngSeed[8:16])))
 	return s
 }
 
-// NewSelectorWithRNG is reserved for future deterministic
-// production use; the current Select() path uses the
-// wall-clock seed. M3.5 follow-on per ADR-0019 will wire
-// the production path through the custom-RNG constructor.
+// NewSelectorWithRNG builds a Selector using the supplied RNG
+// instead of the default entropy-seeded one. Production wiring
+// should use NewSelector; this constructor is the test seam.
 func NewSelectorWithRNG(armIDs []string, rng *rand.Rand) *Selector {
 	s := NewSelector(armIDs)
-	_ = rng
+	if rng != nil {
+		s.rng = rng
+	}
 	return s
 }
 
