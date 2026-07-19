@@ -811,6 +811,41 @@ func (s *SQLite) ListNotificationGroups(ctx context.Context) ([]*models.Notifica
 	return groups, rows.Err()
 }
 
+// GetChannelsForAlertRule returns the union of channels across
+// all notification groups wired to the rule. Returns nil if the
+// rule has no M2M rows. The channels column is JSON-encoded
+// (e.g. '["webhook"]'); each row contributes its decoded
+// channels to the result. The caller is the alerting manager,
+// which is the only place the M2M is queried.
+func (s *SQLite) GetChannelsForAlertRule(ctx context.Context, ruleID string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT ng.channels
+		   FROM alert_rule_notification_groups m2m
+		   JOIN notification_groups ng ON ng.id = m2m.notification_group_id
+		  WHERE m2m.alert_rule_id = ?`,
+		ruleID)
+	if err != nil {
+		return nil, fmt.Errorf("channels for alert rule: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var channels []string
+	for rows.Next() {
+		var ch string
+		if err := rows.Scan(&ch); err != nil {
+			return nil, fmt.Errorf("scan channels: %w", err)
+		}
+		// Each row's channels is a JSON array. We do not parse
+		// it here; the alerting manager gets the raw string and
+		// the dispatcher interprets it. Empty arrays stay empty.
+		if ch == "" || ch == "[]" {
+			continue
+		}
+		channels = append(channels, ch)
+	}
+	return channels, rows.Err()
+}
+
 func scanNotificationGroup(row scannable) (*models.NotificationGroupRecord, error) {
 	var g models.NotificationGroupRecord
 	var channelsJSON string

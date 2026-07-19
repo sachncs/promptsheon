@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 	"time"
 
@@ -376,42 +375,35 @@ func (m *Manager) ResolveAlert(id string) bool {
 }
 
 // getNotificationChannels returns the channels that should receive
-// notifications for the given rule. Selection order:
+// notifications for the given rule. Post-045c the routing is
+// driven by the alert_rule_notification_groups M2M table (added
+// in migration 045a and backfilled by 045b). The legacy name-match
+// heuristic is gone; the M2M table is the single source of
+// truth for which groups fire on a given rule.
 //
-//  1. A group whose Name matches the rule's Severity (case-insensitive)
-//  2. A group whose Name matches the rule's Type
-//  3. The first group whose ID is "default"
-//  4. A hard-coded ["webhook"] fallback so alerts are never silently dropped
-//
-// The previous implementation always returned the first group in the
-// map, which meant severity-based routing was broken as soon as more
-// than one group was registered.
+// The function falls back to []string{channelWebhook} when the
+// rule has no M2M row at all. The 046 backfill seeds the M2M
+// with the legacy default-group fallback, so an alert without
+// an M2M row is the rare case where the operator has explicitly
+// opted out of routing for that rule.
 func (m *Manager) getNotificationChannels(rule *AlertRule) []string {
-	severityKey := strings.ToLower(string(rule.Severity))
-	typeKey := strings.ToLower(rule.Type)
-	var (
-		typeMatch    []string
-		defaultGroup *NotificationGroup
-	)
-	for _, group := range m.groups {
-		name := strings.ToLower(group.Name)
-		if name == severityKey {
-			return group.Channels
-		}
-		if name == typeKey && typeMatch == nil {
-			typeMatch = group.Channels
-		}
-		if group.ID == "default" {
-			defaultGroup = group
-		}
+	if m.db == nil {
+		// In-memory mode (no DB). The M2M is empty. Fall back
+		// to the webhook channel so alerts are never silently
+		// dropped in tests that don't wire a DB.
+		return []string{channelWebhook}
 	}
-	if typeMatch != nil {
-		return typeMatch
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	groups, err := m.db.GetChannelsForAlertRule(ctx, rule.ID)
+	if err != nil {
+		m.logger.Error("alerting: load M2M for rule", "rule_id", rule.ID, "err", err)
+		return []string{channelWebhook}
 	}
-	if defaultGroup != nil {
-		return defaultGroup.Channels
+	if len(groups) == 0 {
+		return []string{channelWebhook}
 	}
-	return []string{channelWebhook}
+	return groups
 }
 
 // AddNotificationGroup adds a notification group.
