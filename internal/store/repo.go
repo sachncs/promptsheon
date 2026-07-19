@@ -73,6 +73,12 @@ type Repository interface {
 	DeleteNotificationGroup(ctx context.Context, id string) error
 	ListNotificationGroups(ctx context.Context) ([]*models.NotificationGroupRecord, error)
 
+	// Alert rule / notification group M2M (migration 045).
+	// Returns the union of channels across all groups wired to the
+	// given rule. The order is unspecified; consumers do not rely
+	// on it.
+	GetChannelsForAlertRule(ctx context.Context, ruleID string) ([]string, error)
+
 	// Webhook Endpoints
 	SaveWebhookEndpoint(ctx context.Context, ep *models.WebhookEndpointRecord) error
 	GetWebhookEndpoint(ctx context.Context, id string) (*models.WebhookEndpointRecord, error)

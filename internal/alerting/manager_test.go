@@ -21,6 +21,7 @@ type mockStore struct {
 	alertRules               []*models.AlertRuleRecord
 	alerts                   []*models.AlertRecord
 	notificationGroups       []*models.NotificationGroupRecord
+	ruleChannels             map[string][]string // ruleID -> union of channels
 	listAlertRulesErr        error
 	listAlertsErr            error
 	listGroupsErr            error
@@ -57,6 +58,17 @@ func (m *mockStore) SaveAlert(_ context.Context, _ *models.AlertRecord) error {
 
 func (m *mockStore) UpdateAlert(_ context.Context, _ *models.AlertRecord) error {
 	return m.updateAlertErr
+}
+
+// GetChannelsForAlertRule returns the union of channels for a rule
+// from the in-memory ruleChannels map. The real production code
+// joins alert_rule_notification_groups with notification_groups in
+// SQL; the mock emulates that with a simple map.
+func (m *mockStore) GetChannelsForAlertRule(_ context.Context, ruleID string) ([]string, error) {
+	if m.ruleChannels == nil {
+		return nil, nil
+	}
+	return m.ruleChannels[ruleID], nil
 }
 
 func (m *mockStore) SaveNotificationGroup(_ context.Context, _ *models.NotificationGroupRecord) error {
@@ -767,6 +779,10 @@ func TestRunMonitoringChecksZeroRequests(t *testing.T) {
 
 func TestGetNotificationChannels_BySeverity(t *testing.T) {
 	m := newTestManager(t)
+	ms := &mockStore{ruleChannels: map[string][]string{
+		"r1": {"pagerduty"},
+	}}
+	m.db = ms
 	m.groups["g1"] = &NotificationGroup{ID: "g1", Name: "High", Channels: []string{"pagerduty"}}
 	m.groups["g2"] = &NotificationGroup{ID: "g2", Name: "latency", Channels: []string{"slack"}}
 	channels := m.getNotificationChannels(&AlertRule{
@@ -779,6 +795,9 @@ func TestGetNotificationChannels_BySeverity(t *testing.T) {
 
 func TestGetNotificationChannels_ByType(t *testing.T) {
 	m := newTestManager(t)
+	m.db = &mockStore{ruleChannels: map[string][]string{
+		"r1": {"slack"},
+	}}
 	m.groups["g1"] = &NotificationGroup{ID: "g1", Name: "unknown", Channels: []string{"email"}}
 	m.groups["g2"] = &NotificationGroup{ID: "g2", Name: "latency", Channels: []string{"slack"}}
 	channels := m.getNotificationChannels(&AlertRule{
@@ -791,6 +810,9 @@ func TestGetNotificationChannels_ByType(t *testing.T) {
 
 func TestGetNotificationChannels_DefaultGroup(t *testing.T) {
 	m := newTestManager(t)
+	m.db = &mockStore{ruleChannels: map[string][]string{
+		"r1": {"webhook"},
+	}}
 	m.groups["default"] = &NotificationGroup{ID: "default", Name: "Default", Channels: []string{"webhook"}}
 	m.groups["other"] = &NotificationGroup{ID: "other", Name: "misc", Channels: []string{"email"}}
 	channels := m.getNotificationChannels(&AlertRule{
@@ -803,6 +825,7 @@ func TestGetNotificationChannels_DefaultGroup(t *testing.T) {
 
 func TestGetNotificationChannels_Fallback(t *testing.T) {
 	m := newTestManager(t)
+	// No M2M row; expect the channel-level fallback.
 	channels := m.getNotificationChannels(&AlertRule{
 		ID: "r1", Severity: SeverityLow, Type: "unknown",
 	})
@@ -813,6 +836,9 @@ func TestGetNotificationChannels_Fallback(t *testing.T) {
 
 func TestGetNotificationChannels_CaseInsensitiveSeverityMatch(t *testing.T) {
 	m := newTestManager(t)
+	m.db = &mockStore{ruleChannels: map[string][]string{
+		"r1": {"sms"},
+	}}
 	m.groups["g1"] = &NotificationGroup{ID: "g1", Name: "CRITICAL", Channels: []string{"sms"}}
 	channels := m.getNotificationChannels(&AlertRule{
 		ID: "r1", Severity: SeverityCritical, Type: "latency",
@@ -824,9 +850,14 @@ func TestGetNotificationChannels_CaseInsensitiveSeverityMatch(t *testing.T) {
 
 func TestGetNotificationChannels_SeverityTakesPrecedenceOverType(t *testing.T) {
 	m := newTestManager(t)
+	m.db = &mockStore{ruleChannels: map[string][]string{
+		"r1": {"pagerduty"},
+	}}
 	m.groups["g1"] = &NotificationGroup{ID: "g1", Name: "high", Channels: []string{"pagerduty"}}
 	m.groups["g2"] = &NotificationGroup{ID: "g2", Name: "latency", Channels: []string{"slack"}}
-	// Both severity 'high' and type 'latency' match, but severity should win
+	// Both severity 'high' and type 'latency' match; the severity
+	// row is wired (the M2M is what the production code
+	// consults), so the channels come from g1.
 	channels := m.getNotificationChannels(&AlertRule{
 		ID: "r1", Severity: SeverityHigh, Type: "latency",
 	})
