@@ -18,8 +18,13 @@ type OpenAI struct {
 	baseURL string
 }
 
-// NewOpenAI creates an OpenAI provider. cfg.APIKey is required;
-// cfg.BaseURL defaults to https://api.openai.com when empty.
+// NewOpenAI creates an OpenAI provider. cfg.APIKey is the
+// registry-level fallback key; the per-call key
+// (PerCallKeyFromContext) overrides it for a single request
+// when set. The OpenAI client is constructed once at provider
+// creation; per-call requests that need a different key
+// construct a transient client on the fly. This is the
+// per-prompt / per-workspace key binding the vault exposes.
 func NewOpenAI(cfg ProviderConfig) *OpenAI {
 	base := cfg.BaseURL
 	if base == "" {
@@ -33,6 +38,23 @@ func NewOpenAI(cfg ProviderConfig) *OpenAI {
 		client:  openai.NewClient(opts...),
 		baseURL: base,
 	}
+}
+
+// clientFor returns the SDK client authenticated with the
+// per-call key when set, or the registry-level client
+// otherwise. The transient client is built on every call;
+// v3 client construction is allocation-light (one HTTP
+// transport) and the per-call key must not be cached in the
+// receiver for security reasons.
+func (o *OpenAI) clientFor(ctx context.Context) openai.Client {
+	if k := PerCallKeyFromContext(ctx); k != "" {
+		opts := []option.RequestOption{
+			option.WithBaseURL(o.baseURL),
+			option.WithAPIKey(k),
+		}
+		return openai.NewClient(opts...)
+	}
+	return o.client
 }
 
 // Name returns the provider name.
@@ -89,7 +111,8 @@ func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) 
 	// truncation should set max_tokens instead.
 
 	start := time.Now()
-	resp, err := o.client.Responses.New(ctx, params)
+	c := o.clientFor(ctx)
+	resp, err := c.Responses.New(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("%s request: %w", ProviderOpenAI, err)
 	}
