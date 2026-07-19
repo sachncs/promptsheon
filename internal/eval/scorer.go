@@ -2,9 +2,8 @@
 // eval runs. Each Scorer receives the case's expected value and the
 // actual value the LLM produced and reports pass/fail.
 //
-// Built-in scorers today: exact_match, contains, regex, json_schema
-// (the last is a placeholder; M3 follow-on). New scorers can be
-// registered at runtime via Register.
+// Built-in scorers: exact_match, contains, regex, json_schema. New
+// scorers can be registered at runtime via Register.
 package eval
 
 import (
@@ -12,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 	"sync"
@@ -123,15 +123,163 @@ func (Regex) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 	return re.MatchString(stringof(actual)), nil
 }
 
-// JSONSchema is a placeholder. The M3 follow-on will replace it
-// with a JSON-Schema validator backed by a small embedded schema
-// engine; today it returns false so callers see the failure rather
-// than a silent pass.
+// JSONSchema validates actual against a JSON Schema supplied via
+// expected. The implementation supports the JSON Schema Draft 7
+// subset operators that cover the eval use cases:
+//
+//   - type (string|number|integer|boolean|array|object|null)
+//   - required (array of property names; only meaningful for object)
+//   - properties (map of property name to subschema)
+//   - enum (array of allowed values)
+//
+// Anything not in the supported subset is ignored: a schema that
+// uses only unsupported keywords (e.g. allOf without any of the
+// above) will accept every value. This is documented in
+// docs/eval.md; the user is expected to keep schemas simple.
+//
+// The implementation does not pull in a full JSON-Schema library:
+// the supported subset is small enough that a focused validator is
+// cheaper to audit than a vendored copy of santhosh-tekuri or
+// xeipuuv/gojsonschema.
 type JSONSchema struct{}
 
 func (JSONSchema) Name() Scorer { return ScorerJSONSchema }
 func (JSONSchema) ScoreCase(actual, expected json.RawMessage) (bool, error) {
-	return false, errors.New("json_schema scorer not yet implemented (M3 follow-on)")
+	if len(expected) == 0 {
+		return false, errors.New("json_schema: expected (schema) is empty")
+	}
+	var schema map[string]any
+	if err := json.Unmarshal(expected, &schema); err != nil {
+		return false, fmt.Errorf("json_schema: schema is not an object: %w", err)
+	}
+	var doc any
+	if err := json.Unmarshal(actual, &doc); err != nil {
+		return false, fmt.Errorf("json_schema: actual is not JSON: %w", err)
+	}
+	return validateSchema(doc, schema, "")
+}
+
+// validateSchema is the recursive validator. The path argument
+// identifies the JSON path inside the document for error messages.
+func validateSchema(doc any, schema map[string]any, path string) (bool, error) {
+	if t, ok := schema["type"].(string); ok {
+		if !matchesType(doc, t) {
+			return false, nil
+		}
+	}
+	if enum, ok := schema["enum"].([]any); ok {
+		if !enumContains(doc, enum) {
+			return false, nil
+		}
+	}
+	if required, ok := schema["required"].([]any); ok {
+		m, isObj := doc.(map[string]any)
+		if !isObj {
+			return false, nil
+		}
+		for _, k := range required {
+			name, ok := k.(string)
+			if !ok {
+				continue
+			}
+			if _, present := m[name]; !present {
+				return false, nil
+			}
+		}
+	}
+	if props, ok := schema["properties"].(map[string]any); ok {
+		m, isObj := doc.(map[string]any)
+		if isObj {
+			for name, sub := range props {
+				subSchema, ok := sub.(map[string]any)
+				if !ok {
+					continue
+				}
+				if v, present := m[name]; present {
+					subPath := path
+					if subPath == "" {
+						subPath = name
+					} else {
+						subPath = subPath + "." + name
+					}
+					ok, err := validateSchema(v, subSchema, subPath)
+					if err != nil {
+						return false, err
+					}
+					if !ok {
+						return false, nil
+					}
+				}
+			}
+		}
+	}
+	return true, nil
+}
+
+// matchesType reports whether doc satisfies the supplied JSON Schema
+// "type" value. The "number" type matches both float and integer Go
+// values; "integer" requires a whole number.
+func matchesType(doc any, t string) bool {
+	if doc == nil {
+		return t == "null"
+	}
+	switch t {
+	case "string":
+		_, ok := doc.(string)
+		return ok
+	case "number":
+		switch doc.(type) {
+		case float64, float32, int, int32, int64:
+			return true
+		}
+		return false
+	case "integer":
+		v, ok := toFloat(doc)
+		if !ok {
+			return false
+		}
+		return v == float64(int64(v))
+	case "boolean":
+		_, ok := doc.(bool)
+		return ok
+	case "array":
+		_, ok := doc.([]any)
+		return ok
+	case "object":
+		_, ok := doc.(map[string]any)
+		return ok
+	case "null":
+		return doc == nil
+	}
+	return true
+}
+
+func toFloat(v any) (float64, bool) {
+	switch x := v.(type) {
+	case float64:
+		return x, true
+	case float32:
+		return float64(x), true
+	case int:
+		return float64(x), true
+	case int64:
+		return float64(x), true
+	case json.Number:
+		f, err := x.Float64()
+		return f, err == nil
+	}
+	return 0, false
+}
+
+// enumContains reports whether doc appears in enum. JSON equality is
+// implemented via reflect.DeepEqual.
+func enumContains(doc any, enum []any) bool {
+	for _, e := range enum {
+		if reflect.DeepEqual(doc, e) {
+			return true
+		}
+	}
+	return false
 }
 
 // canonicalise decodes v as JSON and re-encodes it compactly so

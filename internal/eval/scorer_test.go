@@ -97,13 +97,17 @@ func TestRegexInvalid(t *testing.T) {
 }
 
 func TestJSONSchemaPlaceholder(t *testing.T) {
+	// The json_schema scorer is implemented; an empty schema
+	// `{}` accepts every value (per Draft 7). The test now
+	// confirms a positive pass for an empty schema instead of
+	// the previous "not yet implemented" error.
 	s := eval.JSONSchema{}
 	got, err := s.ScoreCase(raw(`"x"`), raw(`{}`))
-	if err == nil {
-		t.Fatal("expected error from placeholder scorer")
+	if err != nil {
+		t.Fatalf("empty schema must not error, got: %v", err)
 	}
-	if got {
-		t.Fatal("placeholder scorer must return passed=false")
+	if !got {
+		t.Fatal("empty schema must accept any value")
 	}
 }
 
