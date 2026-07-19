@@ -41,13 +41,18 @@ type NotificationGroupRecord struct {
 // WebhookEndpointRecord represents a persisted webhook subscription.
 // Mirrors webhook.Endpoint but lives in the models package so the store
 // does not import the webhook package (which would create a cycle).
+//
+// Secret is a credential; it is marked json:"-" so generic JSON
+// encoders (audit log, error responses, debug dumps) cannot leak
+// the webhook HMAC key. Endpoints that need to surface the
+// ciphertext over the wire use a dedicated DTO.
 type WebhookEndpointRecord struct {
-	ID             string    `json:"id"`
-	URL            string    `json:"url"`
-	Secret         string    `json:"secret,omitempty"`
-	AllowInsecure  bool      `json:"allow_insecure"`
-	AllowPrivate   bool      `json:"allow_private"`
-	Events         []string  `json:"events"`
-	Active         bool      `json:"active"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID            string    `json:"id"`
+	URL           string    `json:"url"`
+	Secret        string    `json:"-"`
+	AllowInsecure bool      `json:"allow_insecure"`
+	AllowPrivate  bool      `json:"allow_private"`
+	Events        []string  `json:"events"`
+	Active        bool      `json:"active"`
+	CreatedAt     time.Time `json:"created_at"`
 }
