@@ -808,9 +808,7 @@ func TestServer_ServeHTTP(t *testing.T) {
 }
 
 func TestNewServerOptions(t *testing.T) {
-	_ = newTestServer(t,
-		WithServerConfig(&ServerConfig{CircuitBreakerFailureThreshold: 10}),
-	)
+	_ = newTestServer(t)
 	// Verify options-with-nil don't panic
 	_ = newTestServer(t,
 		WithTracing(nil, nil),

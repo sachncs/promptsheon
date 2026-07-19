@@ -40,7 +40,6 @@ type Server struct {
 	mux              *http.ServeMux
 	db               store.Repository
 	logger           *slog.Logger
-	cfg              *ServerConfig
 	authn            *auth.Authenticator
 	requireAuth      bool
 	spans            *trace.SQLite
@@ -100,13 +99,6 @@ type httpRequestKey struct{}
 // WithRequest returns a context that carries the current request.
 func WithRequest(ctx context.Context, r *http.Request) context.Context {
 	return context.WithValue(ctx, httpRequestKey{}, r)
-}
-
-// ServerConfig holds configuration for the API server.
-type ServerConfig struct {
-	CircuitBreakerFailureThreshold int
-	CircuitBreakerSuccessThreshold int
-	CircuitBreakerCooldown         int
 }
 
 // auditQueueBackpressure is the maximum time audit() waits for the
@@ -278,24 +270,19 @@ func WithHarnessRunner(runner *harness.EvalRunner) Option {
 	}
 }
 
-// WithServerConfig sets the server configuration.
-func WithServerConfig(cfg *ServerConfig) Option {
-	return func(s *Server) {
-		s.cfg = cfg
-	}
-}
-
 // NewServer creates a new API server with the given dependencies.
+//
+// The legacy WithServerConfig / *ServerConfig options were removed:
+// the fields they exposed (circuit breaker thresholds) are
+// declared but never read by any code path. The breaker is
+// configured per-provider via internal/llm.WithCircuitBreaker
+// instead; if the production wiring wants a server-wide
+// override, expose it through a fresh Option.
 func NewServer(db store.Repository, logger *slog.Logger, opts ...Option) *Server {
 	s := &Server{
-		mux:    http.NewServeMux(),
-		db:     db,
-		logger: logger,
-		cfg: &ServerConfig{
-			CircuitBreakerFailureThreshold: 5,
-			CircuitBreakerSuccessThreshold: 3,
-			CircuitBreakerCooldown:         30,
-		},
+		mux:           http.NewServeMux(),
+		db:            db,
+		logger:        logger,
 		oauthStates:   newOAuthStateStore(),
 		searchManager: search.NewManager(),
 	}
