@@ -145,15 +145,12 @@ func TestReleaseActivateSupersedes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("activate r2: %v", err)
 	}
-	if err := fx.db.UpdateRelease(ctx, &r2Active); err != nil {
-		t.Fatalf("update r2: %v", err)
-	}
 	r1Superseded, err := r1Active.Supersede("r2", now)
 	if err != nil {
 		t.Fatalf("supersede: %v", err)
 	}
-	if err := fx.db.UpdateRelease(ctx, &r1Superseded); err != nil {
-		t.Fatalf("update r1 superseded: %v", err)
+	if err := fx.db.ActivateAtomic(ctx, &r1Superseded, &r2Active); err != nil {
+		t.Fatalf("activate atomic: %v", err)
 	}
 
 	active, err := fx.db.ListActiveReleasesForEnvironment(ctx, release.EnvProd)
