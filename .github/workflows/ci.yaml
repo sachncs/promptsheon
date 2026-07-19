@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [master]
+    tags: ["v*"]
   pull_request:
     branches: [master]
 
@@ -123,12 +124,39 @@ jobs:
 
       - name: Render with defaults (sqlite)
         # Helm template exercise validates that every template
-        # evaluates successfully.
+        # evaluates successfully. SQLite is the only backend; the
+        # values schema rejects dbBackend=postgres and replicaCount>1.
         run: |
           helm template render-defaults deploy/helm/promptsheon/ \
-            --set config.dbBackend=sqlite \
             > /tmp/sqlite-rendered.yaml
           test -s /tmp/sqlite-rendered.yaml
+
+      - name: Render with vault Secret enabled
+        run: |
+          helm template render-vault deploy/helm/promptsheon/ \
+            --set vault.enabled=true \
+            --set vault.key=$(printf '%064x' 1) \
+            > /tmp/vault-rendered.yaml
+          grep -q "kind: Secret" /tmp/vault-rendered.yaml
+          grep -q "PROMPTSHEON_VAULT_KEY" /tmp/vault-rendered.yaml
+
+      - name: Render must reject replicaCount=3
+        run: |
+          if helm template render-fail deploy/helm/promptsheon/ --set replicaCount=3 2>/dev/null; then
+            echo "schema should have rejected replicaCount=3"; exit 1
+          fi
+
+      - name: Render must reject dbBackend=postgres
+        run: |
+          if helm template render-fail deploy/helm/promptsheon/ --set config.dbBackend=postgres 2>/dev/null; then
+            echo "schema should have rejected dbBackend=postgres"; exit 1
+          fi
+
+      - name: Render must reject auth=false without insecureLoopback
+        run: |
+          if helm template render-fail deploy/helm/promptsheon/ --set config.auth=false 2>/dev/null; then
+            echo "schema should have rejected auth=false without insecureLoopback"; exit 1
+          fi
 
   security:
     runs-on: ubuntu-latest
