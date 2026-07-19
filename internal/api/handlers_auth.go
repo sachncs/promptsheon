@@ -287,8 +287,16 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPost {
 		return badRequest("POST required")
 	}
-	if s.requireAuth {
-		return forbidden("bootstrap is disabled when authentication is enabled (PROMPTSHEON_AUTH=true)")
+	// Bootstrap is the documented "first caller wins" path. The
+	// standard configuration is PROMPTSHEON_AUTH=false so the
+	// first caller can mint an admin key without credentials. The
+	// e2e harness and a small number of human operators want the
+	// same first-call behaviour even with auth=true: the
+	// PROMPTSHEON_BOOTSTRAP_TOKEN env var gates the path. When
+	// the env var is set we honour the token; otherwise we
+	// require auth=false (the standard production path).
+	if s.requireAuth && os.Getenv("PROMPTSHEON_BOOTSTRAP_TOKEN") == "" {
+		return forbidden("bootstrap is disabled when authentication is enabled and no PROMPTSHEON_BOOTSTRAP_TOKEN is set")
 	}
 
 	// Bootstrap token: when PROMPTSHEON_BOOTSTRAP_TOKEN is set the

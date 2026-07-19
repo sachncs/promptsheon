@@ -213,8 +213,18 @@ func (l *Limiter) Allow(key string) bool {
 }
 
 // Middleware returns HTTP middleware that enforces rate limiting per API key.
+//
+// Probes (/health, /ready) and the Prometheus scrape path
+// (/metrics) are exempt: a busy deployment would otherwise
+// 429 its own health checks under load and Kubernetes would
+// restart the pod.
 func (l *Limiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/health", "/ready", "/metrics":
+			next.ServeHTTP(w, r)
+			return
+		}
 		key := extractKey(r)
 		if !l.Allow(key) {
 			w.Header().Set("Content-Type", "application/json")
