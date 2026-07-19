@@ -126,11 +126,19 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 	entry.PreviousHash = prevHash
 	entry.EntryHash = computeAuditHash(entry, string(details), timestampStr)
 
+	// Split the resource string ("workspace:abc") into kind + id
+	// for the structural query path (migration 048a). The legacy
+	// `resource` column is preserved for backward compatibility;
+	// the new columns are not part of the audit hash (the chain
+	// format is unchanged).
+	resourceKind, resourceID := splitResource(entry.Resource)
+
 	insertRes, err := tx.ExecContext(ctx,
-		`INSERT INTO audit_entries (id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO audit_entries (id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str, resource_kind, resource_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		entry.ID, entry.UserID, entry.Action, entry.Resource,
 		string(details), entry.Timestamp, entry.PreviousHash, entry.EntryHash, timestampStr,
+		resourceKind, resourceID,
 	)
 	if err != nil {
 		return fmt.Errorf("insert audit: %w", err)
