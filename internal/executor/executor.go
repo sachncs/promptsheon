@@ -43,6 +43,7 @@ type InvokeRequest struct {
 	Input         json.RawMessage
 	Model         string
 	ModelRevision string
+	Provider      string
 }
 
 // InvokeResult is the Caller's response.

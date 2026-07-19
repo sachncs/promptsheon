@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -189,9 +190,12 @@ func (s *Server) handleRollbackRelease(w http.ResponseWriter, r *http.Request) e
 }
 
 type invokeReleaseRequest struct {
-	Inputs   map[string]any `json:"inputs,omitempty"`
-	Model    string         `json:"model"`
-	Provider string         `json:"provider"`
+	Inputs map[string]any `json:"inputs,omitempty"`
+	// Model and Provider are intentionally NOT exposed on the
+	// invoke-release request. The release runtime is the
+	// authoritative source for both (via the Manifest's
+	// ModelPolicy artifact). The previous design let the
+	// caller pick either, which made the approval a fiction.
 }
 
 func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) error {
@@ -208,16 +212,24 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 		return ErrBadRequest
 	}
 	manifestHash := manifestHashForRelease(rel)
+	plan, _ := s.resolveRelease(r.Context(), rel)
 	exec := &capability.Execution{
 		ID:                  generateID(),
 		CapabilityVersionID: rel.CapabilityID + "@" + fmt.Sprintf("%d", rel.CapabilityVersion),
 		Timestamp:           time.Now(),
 		Inputs:              req.Inputs,
-		Model:               req.Model,
-		Provider:            req.Provider,
 		Environment:         string(rel.Environment),
 	}
-	rec, invErr, latency := s.invokeOneWithManifest(r, rel, req.Inputs, req.Model, req.Provider)
+	if plan != nil {
+		exec.Model = plan.Model
+		exec.Provider = plan.Provider
+	}
+	// Model and provider are now derived from the release, not
+	// from the request. If the release has a Resolver wired, we
+	// use the Resolver's plan; otherwise we use the placeholder
+	// derived from the manifest hash, which surfaces as a 502
+	// at the provider call site.
+	rec, invErr, latency := s.invokeOneWithManifest(r, rel, req.Inputs, plan)
 	exec.LatencyMs = latency.Milliseconds()
 	if invErr != nil {
 		exec.Error = invErr.Error()
@@ -243,6 +255,16 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 	return nil
 }
 
+// resolveRelease builds a ResolvedInvocation for a release. It is
+// a no-op (returns nil plan) when no Resolver is configured; the
+// invoke path then falls back to the placeholder model name.
+func (s *Server) resolveRelease(ctx context.Context, rel *release.Release) (*release.ResolvedInvocation, error) {
+	if s.releaseResolver == nil {
+		return nil, nil
+	}
+	return s.releaseResolver.Resolve(ctx, rel.ID)
+}
+
 // invokeOneWithManifest is the release-side equivalent of invokeOne;
 // it uses the Release's loaded Manifest to derive a stable manifest
 // hash rather than the placeholder hash used by the existing
@@ -250,7 +272,11 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 // when no invoker is configured), the invocation error (or nil on
 // success), and the wall-clock latency so the handler can populate
 // the Execution row.
-func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, inputs map[string]any, model, provider string) (*executor.ExecutionRecord, error, time.Duration) {
+//
+// Model and provider are taken from plan (the ResolvedInvocation),
+// not from the HTTP request, so the request cannot override the
+// approved release's runtime.
+func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, inputs map[string]any, plan *release.ResolvedInvocation) (*executor.ExecutionRecord, error, time.Duration) {
 	if s.invoker == nil {
 		return nil, nil, 0
 	}
@@ -259,6 +285,12 @@ func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, in
 		return nil, err, 0
 	}
 	manifestHash, _ := computeManifestHash(rel.Manifest)
+	model := ""
+	provider := ""
+	if plan != nil {
+		model = plan.Model
+		provider = plan.Provider
+	}
 	req := executor.InvokeRequest{
 		WorkspaceID:   r.PathValue("workspace_id"),
 		ReleaseID:     rel.ID,
@@ -267,6 +299,7 @@ func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, in
 		Input:         input,
 		Model:         model,
 		ModelRevision: modelRevision(model, provider),
+		Provider:      provider,
 	}
 	start := time.Now()
 	rec, err := s.invoker.Invoke(r.Context(), req)
