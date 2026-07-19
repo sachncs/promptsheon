@@ -949,17 +949,7 @@ paths:
           description: Internal server error
   /api/v1/setup:
     post:
-      summary: "handleBootstrap is the first-run endpoint that mints an admin\nuser and an admin API key when the deployment is brand-new and\nrunning with authentication disabled."
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              email:
-                type: string
-              name:
-                type: string
+      summary: "POST setup"
       responses:
         "200":
           description: OK
@@ -1384,6 +1374,10 @@ paths:
                 type: array
               secret:
                 type: string
+              allowPrivate:
+                type: boolean
+              allowInsecure:
+                type: boolean
       responses:
         "200":
           description: OK
@@ -1408,6 +1402,24 @@ paths:
           required: true
           schema:
             type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+  /api/v1/workflows/run:
+    post:
+      summary: "handleRunWorkflow accepts a workflow Definition and runs it\nthrough the configured workflow.Engine."
       responses:
         "200":
           description: OK
@@ -1644,6 +1656,22 @@ paths:
           description: Unauthorized
         "404":
           description: Not found
+  /metrics:
+    get:
+      summary: "GET metrics"
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
   /ready:
     get:
       summary: "GET ready"
@@ -1659,152 +1687,5 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
-        "404":
-          description: Not found
-  /metrics:
-    GET:
-      summary: "TODO: M-15 generated stub, flesh out"
-      responses:
-        "200":
-          description: "OK"
-  /api/v1/capabilities/{capability_id}/releases:
-    get:
-      summary: "List Releases for a Capability"
-      parameters:
-        - name: capability_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-  /api/v1/versions/{version_id}/releases:
-    post:
-      summary: "Create a Pending Release for a Version"
-      parameters:
-        - name: version_id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                environment:
-                  type: string
-                  enum: [dev, staging, prod]
-      responses:
-        "201":
-          description: Created
-  /api/v1/releases/{id}:
-    get:
-      summary: "Get a Release"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "404":
-          description: Not found
-  /api/v1/releases/{id}/votes:
-    post:
-      summary: "Record a vote on a Release"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                identity:
-                  type: string
-                decision:
-                  type: string
-                  enum: [approve, reject, abstain]
-                reason:
-                  type: string
-      responses:
-        "200":
-          description: OK
-  /api/v1/releases/{id}/activate:
-    post:
-      summary: "Activate a Pending Release"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-        "409":
-          description: Quorum not satisfied or already activated
-  /api/v1/releases/{id}/rollback:
-    post:
-      summary: "Rollback a Release"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-  /api/v1/releases/{id}/invoke:
-    post:
-      summary: "Invoke an Active Release"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                inputs:
-                  type: object
-                model:
-                  type: string
-                provider:
-                  type: string
-      responses:
-        "201":
-          description: Created
-        "409":
-          description: Release is not active
-  /api/v1/releases/{id}/approval:
-    get:
-      summary: "Get the Approval trail for a Release"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
         "404":
           description: Not found
