@@ -34,8 +34,13 @@ type Config struct {
 	CircuitBreakerSuccessThreshold int // Successes to close the circuit (default: 3)
 	CircuitBreakerCooldown         int // Cooldown in seconds (default: 30)
 
-	// LLM fallback
-	LLMFallback string // Comma-separated fallback providers (e.g., "anthropic,openai")
+	// LLM fallback chain. Retained as a struct field for
+	// backwards compatibility; the LLM registry does not
+	// consume it (the per-call wiring is what chooses the
+	// fallback). Set via PROMPTSHEON_LLM_FALLBACK for callers
+	// that read the field; production code should treat this
+	// as documentation only.
+	LLMFallback string
 
 	// OpenTelemetry
 	OTelEndpoint string // OTLP gRPC endpoint (e.g., "jaeger:4317")
