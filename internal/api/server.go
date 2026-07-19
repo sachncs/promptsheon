@@ -57,6 +57,7 @@ type Server struct {
 	providers        *llm.Registry
 	rollupAgg        *rollups.Aggregator
 	invoker          *invoke.Invoker
+	releaseResolver  *release.Resolver
 	releaseSvc       *release.Service
 	harnessSvc       *harness.EvalRunner
 
@@ -247,6 +248,14 @@ func WithInvoker(i *invoke.Invoker) Option {
 	return func(s *Server) {
 		s.invoker = i
 	}
+}
+
+// WithReleaseResolver attaches the canonical release Resolver.
+// When set, the invoke-release handler builds a
+// ResolvedInvocation from the release's manifest and uses its
+// Provider/Model rather than honouring request-supplied values.
+func WithReleaseResolver(r *release.Resolver) Option {
+	return func(s *Server) { s.releaseResolver = r }
 }
 
 // WithReleaseService attaches the release.Service used by the
