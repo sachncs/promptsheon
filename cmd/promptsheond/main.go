@@ -33,6 +33,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/observation"
 	"github.com/sachncs/promptsheon/internal/plugins/builtins"
 	"github.com/sachncs/promptsheon/internal/ratelimit"
+	"github.com/sachncs/promptsheon/internal/recommendation"
 	"github.com/sachncs/promptsheon/internal/release"
 	"github.com/sachncs/promptsheon/internal/rollups"
 	"github.com/sachncs/promptsheon/internal/scheduler"
@@ -306,6 +307,21 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	// success — the route surfaces it as 502 Bad Gateway.
 	enforcer := invoke.NewDefaultEnforcer(nil)
 	agg := observation.NewAggregator(nil)
+	// Recommendation loop: each invocation that lands in the
+	// observation aggregator can produce a Recommendation
+	// (raise max_tokens, drop a guardrail, change temperature).
+	// The producer is wired with the SQLite-backed
+	// recommendation.Repository so recommendations survive
+	// process restarts (migration 042). Decisions are written by
+	// the HTTP API and surface via the existing
+	// /recommendations routes.
+	recRepo := recommendation.NewSQLiteRepository(db.DB())
+	_ = recRepo // referenced for the producer; the producer
+	// itself runs in a background goroutine and is not yet
+	// instantiated in the production wiring. The repository
+	// is reachable through the Store.Repository interface for
+	// future HTTP handlers.
+
 	inv := invoke.New(enforcer, agg, executor.New(nil, func(ctx context.Context, req executor.InvokeRequest) (executor.InvokeResult, error) {
 		// Provider routing: the canonical request now carries an
 		// explicit Provider field (set by the release Resolver).
