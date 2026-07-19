@@ -4,11 +4,9 @@ package observability
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log/slog"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -93,10 +91,18 @@ func (m *RetentionManager) Start(ctx context.Context) {
 	}()
 }
 
-// protectedAuditActions is the set of audit actions that are never
-// purged by retention, regardless of age. The previous implementation
-// only protected 3 actions which meant almost every audit row
-// (create, update, delete, restore, etc.) was deleted after AuditTTL.
+// protectedAuditActions is retained as a documented invariant even
+// though audit retention is now a no-op: the set names every action
+// that the security review classified as "must never be lost". The
+// table is exported through this variable so future audit-archive
+// tooling can read it.
+//
+// The previous implementation tried to honour this list by deleting
+// only non-protected actions, but deletion still broke the audit
+// chain (VerifyAuditChain walks the table from rowid 1 forward,
+// chaining by previous_hash). Removing rows from the middle of the
+// chain is unrecoverable. The current policy is therefore: never
+// delete audit rows. Operators archive externally.
 var protectedAuditActions = map[string]bool{
 	"auth_failure":     true,
 	"auto_approve":     true,
@@ -113,6 +119,13 @@ var protectedAuditActions = map[string]bool{
 }
 
 // Enforce deletes expired data based on the retention policy.
+//
+// SECURITY: audit rows are NOT deleted, regardless of age or action.
+// The audit chain walks from rowid 1 forward, chaining entries by
+// previous_hash. Deleting entries in the middle of the chain breaks
+// verification even though the surviving rows are intact. The chain
+// is the security boundary; we keep it whole and let operators
+// archive it externally (e.g. snapshotting the database).
 func (m *RetentionManager) Enforce(ctx context.Context) error {
 	var totalDeleted int
 
@@ -128,42 +141,9 @@ func (m *RetentionManager) Enforce(ctx context.Context) error {
 		}
 	}
 
-	// Audit retention: never purge "important" actions, no matter
-	// how old. For everything else, delete only after AuditTTL.
-	// We build the NOT IN list from the protected set so the
-	// exclusion policy lives in one place.
-	if m.policy.AuditTTL > 0 {
-		cutoff := time.Now().Add(-m.policy.AuditTTL)
-		actions := make([]string, 0, len(protectedAuditActions))
-		for a := range protectedAuditActions {
-			actions = append(actions, a)
-		}
-		placeholders := make([]string, len(actions))
-		for i := range placeholders {
-			placeholders[i] = "?"
-		}
-		// #nosec G201 -- fully parameterized query; the dynamic part is only
-		// the number of ? placeholders. All data values are passed via args.
-		query := fmt.Sprintf("DELETE FROM audit_entries WHERE timestamp < ? AND action NOT IN (%s)",
-			strings.Join(placeholders, ","))
-		args := make([]any, 0, 1+len(actions))
-		args = append(args, cutoff)
-		for _, a := range actions {
-			args = append(args, a)
-		}
-		result, err := m.db.ExecContext(ctx, query, args...)
-		if err != nil {
-			m.logger.Warn("failed to clean audit entries", "err", err)
-		} else {
-			n, _ := result.RowsAffected()
-			totalDeleted += int(n)
-		}
-	}
-
 	if totalDeleted > 0 {
 		m.logger.Info("retention cleanup completed", "deleted", totalDeleted,
-			"trace_ttl", m.policy.TraceTTL,
-			"audit_ttl", m.policy.AuditTTL)
+			"trace_ttl", m.policy.TraceTTL)
 	}
 
 	return nil
