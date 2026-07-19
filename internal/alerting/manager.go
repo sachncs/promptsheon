@@ -194,7 +194,19 @@ func (m *Manager) loadFromDB() {
 	}
 }
 
-// SetDeliveryFunc sets the function used to deliver alerts.
+// SetDeliveryFunc sets the function used to deliver alerts. The
+// function is responsible for honouring the channel list: a
+// "webhook" channel must produce an HTTP POST to the configured
+// endpoints (see internal/webhook); a "log" channel writes to
+// slog; future "slack"/"pagerduty" channels can be added without
+// touching this file.
+//
+// If SetDeliveryFunc is never called, alerts persist to the
+// database (visible via ListAlerts) and the channel list is
+// recorded in the alert's Details. No notification is sent. This
+// is the documented default; silent dropping was the previous
+// behaviour, but persisting means the alert is at least visible
+// to operators who look.
 func (m *Manager) SetDeliveryFunc(fn func(alert *Alert, channels []string) error) {
 	m.deliveryFunc = fn
 }
