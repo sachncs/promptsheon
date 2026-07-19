@@ -90,6 +90,7 @@ func TestHarnessDatasetCRUD(t *testing.T) {
 }
 
 func TestHarnessPreconditionBlocksActivate(t *testing.T) {
+	t.Setenv("PROMPTSHEON_HARNESS_PRECONDITIONS", "true")
 	repo := newMockRepo()
 	svc := release.NewService(repo, repo, approval.MakerCheckerPolicy{RequiredApprovers: 1}).
 		WithHarness(harness.NewPreconditionRunner(), repo)
