@@ -311,7 +311,19 @@ func (s *Server) registerHealthRoutes() {
 	s.mux.HandleFunc("GET /ready", s.wrapHandler(s.handleReady))
 	s.mux.HandleFunc("GET /api/v1/version", s.wrapHandler(s.handleVersion))
 	if s.collector != nil {
-		s.mux.Handle("GET /metrics", s.collector.Handler())
+		// /metrics is the Prometheus scrape endpoint. It exposes
+		// token and cost counters. Two protections:
+		//   1. require PermAuditRead when auth is enabled.
+		//   2. serve only on the optional METRICS_ADDR loopback
+		//      listener (handled by main.go). When the daemon
+		//      listens on a public address but METRICS_ADDR is
+		//      unset, /metrics is bound to the public mux but is
+		//      still protected by requirePerm.
+		h := s.collector.Handler()
+		s.mux.HandleFunc("GET /metrics", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(func(w http.ResponseWriter, r *http.Request) error {
+			h.ServeHTTP(w, r)
+			return nil
+		})))
 	}
 }
 
