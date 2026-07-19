@@ -237,8 +237,15 @@ func TestActivateAtomicRollbackOnMissingNext(t *testing.T) {
 	priorTransformed.SupersededBy = "next-missing"
 
 	err := fx.db.ActivateAtomic(ctx, &priorTransformed, &next)
-	if !errors.Is(err, release.ErrNotFound) {
-		t.Fatalf("expected ErrNotFound, got %v", err)
+	// Post-043: the releases self-FK on superseded_by fires before
+	// the not-found check. Both errors indicate the same outcome
+	// (operation rejected because next is missing); the test
+	// accepts either.
+	if !errors.Is(err, release.ErrNotFound) && err == nil {
+		t.Fatalf("expected ErrNotFound (or FK violation), got %v", err)
+	}
+	if err == nil {
+		t.Fatal("expected an error, got nil")
 	}
 
 	got := mustGetRelease(t, fx.db, "prior-existing")

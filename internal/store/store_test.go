@@ -11,6 +11,7 @@ import (
 
 	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/internal/release"
 	"github.com/sachncs/promptsheon/internal/schedule"
 	"github.com/sachncs/promptsheon/internal/store"
 )
@@ -28,7 +29,76 @@ func newTestSQLite(t *testing.T) *store.SQLite {
 		t.Fatalf("NewSQLite: %v", err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
+	// Seed the three default users ("u1", "u2", "u3") that the
+	// legacy test fixtures expect. The post-043 FK on
+	// audit_entries.user_id and guardrail_violations.user_id
+	// rejects writes for unknown users. The seed is idempotent:
+	// it leaves a user row alone if the test created it first.
+	seedDefaultUsers(t, s)
 	return s
+}
+
+// seedDefaultUsers creates "u1", "u2", "u3" if they don't already
+// exist. Tests that supply their own "u1" record (with a specific
+// email or role) are not stomped: the seed is a no-op for that id.
+func seedDefaultUsers(t *testing.T, s *store.SQLite) {
+	t.Helper()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	for _, id := range []string{"u1", "u2", "u3"} {
+		if _, err := s.GetUser(ctx, id); err == nil {
+			continue
+		}
+		if err := s.CreateUser(ctx, &models.User{
+			ID:        id,
+			Email:     id + "@test.local",
+			Name:      "Test User " + id,
+			Role:      "admin",
+			CreatedAt: now,
+			UpdatedAt: now,
+		}); err != nil {
+			t.Fatalf("seed user %s: %v", id, err)
+		}
+	}
+}
+
+// seedScheduleFixture inserts the minimum workspace + capability +
+// version + release needed to satisfy the post-043 schedules FKs.
+// TestScheduleCRUD is the only caller today; other tests that
+// touch schedules should call this helper explicitly.
+func seedScheduleFixture(t *testing.T, s *store.SQLite) {
+	t.Helper()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	if err := s.CreateWorkspace(ctx, &capability.Workspace{
+		ID: "w1", Name: "test", CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("seed workspace: %v", err)
+	}
+	if err := s.CreateProject(ctx, &capability.Project{
+		ID: "p1", WorkspaceID: "w1", Name: "test", CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("seed project: %v", err)
+	}
+	if err := s.CreateCapability(ctx, &capability.Capability{
+		ID: "c1", ProjectID: "p1", Name: "test", CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("seed capability: %v", err)
+	}
+	manifest := capability.Manifest{}
+	if err := s.CreateVersion(ctx, &capability.Version{
+		ID: "v1", CapabilityID: "c1", Version: 1, Manifest: manifest,
+		ManifestHash: "h1", CreatedAt: now, CreatedBy: "u1",
+	}); err != nil {
+		t.Fatalf("seed version: %v", err)
+	}
+	if err := s.CreateRelease(ctx, &release.Release{
+		ID: "r1", CapabilityID: "c1", CapabilityVersion: 1, Manifest: manifest,
+		Environment: release.EnvProd, Status: release.StatusActive,
+		ApprovedBy:  []string{"u1"}, CreatedAt: now, CreatedBy: "u1",
+	}); err != nil {
+		t.Fatalf("seed release: %v", err)
+	}
 }
 
 func TestNewSQLiteAndClose(t *testing.T) {
@@ -68,8 +138,12 @@ func TestUserRoundTrip(t *testing.T) {
 	s := newTestSQLite(t)
 	ctx := context.Background()
 	now := time.Now().UTC().Truncate(time.Second)
+	// Use a unique user id; the post-043 seedDefaultUsers pre-creates
+	// "u1", "u2", "u3" so other tests can write audit / schedule rows
+	// that FK against users. This test exercises the round-trip
+	// lifecycle for a single user and is OK with any non-seeded id.
 	u := &models.User{
-		ID:        "u1",
+		ID:        "alice",
 		Email:     "alice@example.com",
 		Name:      "Alice",
 		Role:      "admin",
@@ -80,7 +154,7 @@ func TestUserRoundTrip(t *testing.T) {
 		t.Fatalf("CreateUser: %v", err)
 	}
 
-	got, err := s.GetUser(ctx, "u1")
+	got, err := s.GetUser(ctx, "alice")
 	if err != nil {
 		t.Fatalf("GetUser: %v", err)
 	}
@@ -92,16 +166,29 @@ func TestUserRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUserByEmail: %v", err)
 	}
-	if byMail.ID != "u1" {
-		t.Errorf("GetUserByEmail id = %q, want u1", byMail.ID)
+	if byMail.ID != "alice" {
+		t.Errorf("GetUserByEmail id = %q, want alice", byMail.ID)
 	}
 
 	users, err := s.ListUsers(ctx)
 	if err != nil {
 		t.Fatalf("ListUsers: %v", err)
 	}
-	if len(users) != 1 {
-		t.Errorf("ListUsers count = %d, want 1", len(users))
+	// The post-043 seedDefaultUsers pre-creates three users
+	// ("u1", "u2", "u3") for tests that need FK-respecting
+	// parents. We expect at least 4: the three seeds + alice.
+	if len(users) < 4 {
+		t.Errorf("ListUsers count = %d, want >= 4 (3 seeds + alice)", len(users))
+	}
+	var found *models.User
+	for _, x := range users {
+		if x.ID == "alice" {
+			found = x
+			break
+		}
+	}
+	if found == nil {
+		t.Errorf("ListUsers did not return alice")
 	}
 
 	u.Name = "AliceUpdated"
@@ -109,15 +196,15 @@ func TestUserRoundTrip(t *testing.T) {
 	if err := s.UpdateUser(ctx, u); err != nil {
 		t.Fatalf("UpdateUser: %v", err)
 	}
-	got, _ = s.GetUser(ctx, "u1")
+	got, _ = s.GetUser(ctx, "alice")
 	if got.Name != "AliceUpdated" {
 		t.Errorf("after UpdateUser name = %q, want AliceUpdated", got.Name)
 	}
 
-	if err := s.DeleteUser(ctx, "u1"); err != nil {
+	if err := s.DeleteUser(ctx, "alice"); err != nil {
 		t.Fatalf("DeleteUser: %v", err)
 	}
-	_, err = s.GetUser(ctx, "u1")
+	_, err = s.GetUser(ctx, "alice")
 	if !errors.Is(err, store.ErrNotFound) {
 		t.Errorf("GetUser after delete: err = %v, want ErrNotFound", err)
 	}
@@ -460,6 +547,10 @@ func TestScheduleCRUD(t *testing.T) {
 	s := newTestSQLite(t)
 	ctx := context.Background()
 	now := time.Now().UTC()
+	// Seed the parent rows that schedules FKs reference. The
+	// fixture used to rely on the absence of FKs; the post-043
+	// schema enforces the references.
+	seedScheduleFixture(t, s)
 	due := &schedule.Schedule{
 		ID:          "sc1",
 		WorkspaceID: "w1",

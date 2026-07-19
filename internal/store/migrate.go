@@ -67,9 +67,16 @@ func migrate(db *sql.DB, migrationsFS fs.FS) error {
 
 	var files []fs.DirEntry
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql") {
-			files = append(files, e)
+		// Skip .down.sql: those are recovery scripts, not forward
+		// migrations. They are loaded by the production-runner on
+		// explicit operator request, not by migrate().
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
+			continue
 		}
+		if strings.HasSuffix(e.Name(), ".down.sql") {
+			continue
+		}
+		files = append(files, e)
 	}
 	sort.Slice(files, func(i, j int) bool {
 		return files[i].Name() < files[j].Name()
