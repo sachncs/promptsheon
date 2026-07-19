@@ -72,6 +72,9 @@ func startDaemon(dir string) (string, func()) {
 		"PROMPTSHEON_DB_PATH="+dbPath,
 		"PROMPTSHEON_AUTH=false",
 		"PROMPTSHEON_LOG_LEVEL=error",
+		// The e2e harness exercises migration 025_destructive from a
+		// clean DB; production refuses without this flag.
+		"PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true",
 	)
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard

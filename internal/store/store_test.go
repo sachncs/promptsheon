@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +14,12 @@ import (
 	"github.com/sachncs/promptsheon/internal/schedule"
 	"github.com/sachncs/promptsheon/internal/store"
 )
+
+func init() {
+	// Test runs apply every migration including the destructive one.
+	// Production refuses by default; the test environment opts in.
+	os.Setenv(store.DestructiveMigrationEnv, "true")
+}
 
 func newTestSQLite(t *testing.T) *store.SQLite {
 	t.Helper()

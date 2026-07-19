@@ -211,18 +211,23 @@ func (c *Config) Validate() error {
 // "[ipv6]:port", and bare path-style values. It does NOT do DNS
 // resolution (operators must use a literal IP).
 //
+// ":0" is treated as loopback because it means "any free port"
+// (the kernel binds to 127.0.0.1 by default for unspecified host).
 // The empty host (":8080") is treated as NON-loopback because it
-// means "all interfaces". Refusing it is the whole point of this
-// check: ":8080" is the dangerous default that allows any
+// means "all interfaces". Refusing ":8080" is the whole point of
+// this check: ":8080" is the dangerous default that allows any
 // network-adjacent caller to hit /api/v1/setup.
 func isLoopbackAddr(addr string) bool {
-	host, _, err := net.SplitHostPort(addr)
+	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		switch addr {
 		case "localhost", "127.0.0.1", "::1":
 			return true
 		}
 		return false
+	}
+	if host == "" && port == "0" {
+		return true
 	}
 	switch host {
 	case "localhost", "127.0.0.1", "::1":
