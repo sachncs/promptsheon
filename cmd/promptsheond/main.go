@@ -14,6 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
 	"github.com/sachncs/promptsheon/internal/alerting"
 	"github.com/sachncs/promptsheon/internal/api"
 	"github.com/sachncs/promptsheon/internal/buildinfo"
@@ -79,6 +81,26 @@ func main() {
 		os.Exit(2)
 	}
 
+	// OTel tracer must outlive buildServer. The previous
+	// implementation deferred tp.Shutdown inside buildServer,
+	// which means it fired at the end of buildServer — before the
+	// HTTP server accepted a single request. The result: every
+	// span was a no-op even with a configured endpoint.
+	var tp *sdktrace.TracerProvider
+	if cfg.OTelEndpoint != "" {
+		var terr error
+		tp, terr = trace.InitTracerProvider("promptsheond", cfg.OTelEndpoint, cfg.OTelInsecure)
+		if terr != nil {
+			fmt.Fprintf(os.Stderr, "OTel tracer init failed: %v\n", terr)
+		} else {
+			defer func() {
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				_ = tp.Shutdown(shutdownCtx)
+			}()
+		}
+	}
+
 	// SECURITY: shell tool policy must be configured at startup, not
 	// mutated at runtime. An empty allowlist disables the tool
 	// regardless of the enabled flag.
@@ -121,7 +143,7 @@ func main() {
 		}
 	}()
 
-	srv, limiter, spans, collector := buildServer(rootCtx, &cfg, db, logger)
+	srv, limiter, spans, collector := buildServer(rootCtx, &cfg, db, logger, tp)
 
 	srv.StartAuditWorkers(rootCtx, 2)
 
@@ -181,27 +203,15 @@ func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
 	return db
 }
 
-func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger) (*api.Server, *ratelimit.Limiter, *trace.SQLite, *metrics.Collector) {
+func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider) (*api.Server, *ratelimit.Limiter, *trace.SQLite, *metrics.Collector) {
 	spans, err := trace.NewSQLite(db.DB())
 	if err != nil {
 		logger.Warn("tracing disabled", "err", err)
 	}
 	collector := metrics.NewCollector()
 
-	if cfg.OTelEndpoint != "" {
-		tp, terr := trace.InitTracerProvider("promptsheond", cfg.OTelEndpoint, cfg.OTelInsecure)
-		if terr != nil {
-			logger.Warn("OTel tracer init failed", "endpoint", cfg.OTelEndpoint, "err", terr)
-		} else {
-			logger.Info("OTel tracer initialised", "endpoint", cfg.OTelEndpoint, "insecure", cfg.OTelInsecure)
-			defer func() {
-				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				if e := tp.Shutdown(shutdownCtx); e != nil {
-					logger.Warn("OTel tracer shutdown failed", "err", e)
-				}
-			}()
-		}
+	if cfg.OTelEndpoint != "" && tp != nil {
+		logger.Info("OTel tracer initialised", "endpoint", cfg.OTelEndpoint, "insecure", cfg.OTelInsecure)
 	}
 
 	retentionPolicy := observability.LoadRetentionPolicyFromEnv()

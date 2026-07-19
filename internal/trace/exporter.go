@@ -53,7 +53,13 @@ func InitTracerProvider(serviceName, endpoint string, insecureConn bool) (*sdktr
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter),
 		sdktrace.WithResource(res),
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		// Default to ParentBased(TraceIDRatioBased(0.05)) so a
+		// single noisy deployment does not ship every span to the
+		// collector. Operators can override with the OTEL_TRACES_SAMPLER
+		// env var. The previous default of AlwaysSample() meant
+		// production traffic generated 100% of spans, which is the
+		// single biggest cost on most OTel deployments.
+		sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(0.05))),
 	)
 
 	// Set global TracerProvider
