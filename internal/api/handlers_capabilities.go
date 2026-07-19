@@ -434,9 +434,6 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 	// M3 follow-on (see internal/invoke/invoke.go's NewInvoker +
 	// DefaultEnforcer wiring).
 	rec, invErr, latency := s.invokeOne(r, capabilityVersionID, req.Inputs, req.Model, req.Provider)
-	if err := classifyInvokeError(invErr); err != nil {
-		return err
-	}
 	exec := &capability.Execution{
 		ID:                  generateID(),
 		CapabilityVersionID: capabilityVersionID,
@@ -446,9 +443,13 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 		Provider:            req.Provider,
 		LatencyMs:           latency.Milliseconds(),
 	}
-	if invErr != nil {
-		exec.Error = invErr.Error()
-	} else if rec != nil {
+	// The previous implementation bailed on classifyInvokeError
+	// before persisting the failed execution, so a 5xx-class
+	// invoke was invisible in audit and the execution table.
+	// The new contract: always persist (success or failure),
+	// return 5xx on failure. A failed execution IS an event we
+	// want in the audit chain.
+	if rec != nil {
 		if len(rec.Output) > 0 {
 			exec.Outputs = map[string]any{"content": string(rec.Output)}
 		}
@@ -458,6 +459,9 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 		exec.Model = rec.Model
 		exec.CostUSD = rec.CostUSD
 	}
+	if invErr != nil {
+		exec.Error = invErr.Error()
+	}
 	if err := s.db.CreateExecution(r.Context(), exec); err != nil {
 		return err
 	}
@@ -465,7 +469,13 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 		"version_id": capabilityVersionID,
 		"tokens":     exec.TotalTokens,
 		"cost_usd":   exec.CostUSD,
+		"error":      exec.Error,
 	})
+	if invErr != nil {
+		if err := classifyInvokeError(invErr); err != nil {
+			return err
+		}
+	}
 	writeJSON(w, http.StatusCreated, exec)
 	return nil
 }
