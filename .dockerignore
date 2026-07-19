@@ -1,0 +1,32 @@
+# Build artifacts
+bin/
+dist/
+out/
+
+# Vendored deps (rebuild via go mod vendor if needed)
+vendor/
+
+# Go test artifacts
+coverage.out
+coverage.html
+*.test
+
+# Local config / secrets
+.env
+.env.local
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+
+# OS noise
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Documentation build
+node_modules/
+site/
