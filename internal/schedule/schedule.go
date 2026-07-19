@@ -172,19 +172,42 @@ func nextCron(expr string, from time.Time) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, fmt.Errorf("month: %w", err)
 	}
-	dow, err := parseField(parts[4], 0, 6)
+	dow, dowWild, err := parseFieldWithWildcard(parts[4], 0, 6)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("dow: %w", err)
 	}
+	dom, domWild, err := parseFieldWithWildcard(parts[2], 1, 31)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("dom: %w", err)
+	}
 
 	// Walk minute-by-minute from `from+1min` up to a 366-day cap.
+	// POSIX cron DOM/DOW semantics: when EITHER field is a
+	// literal wildcard ("*"), use the OTHER field as the only
+	// day constraint. When BOTH are restricted, use OR. The
+	// previous implementation always OR'd the two, which
+	// meant "0 0 * * 1" matched every day whose weekday mask
+	// was OR'd with the dom mask — in practice any cron
+	// expression with one wildcard fired daily.
 	t := from.UTC().Truncate(time.Minute).Add(time.Minute)
 	for i := 0; i < 366*24*60; i++ {
 		if minute[t.Minute()] &&
 			hour[t.Hour()] &&
-			month[int(t.Month())] &&
-			(dom[int(t.Day())] || dow[int(t.Weekday())]) {
-			return t, nil
+			month[int(t.Month())] {
+			dayMatch := false
+			switch {
+			case domWild && dowWild:
+				dayMatch = true
+			case domWild:
+				dayMatch = dow[int(t.Weekday())]
+			case dowWild:
+				dayMatch = dom[int(t.Day())]
+			default:
+				dayMatch = dom[int(t.Day())] || dow[int(t.Weekday())]
+			}
+			if dayMatch {
+				return t, nil
+			}
 		}
 		t = t.Add(time.Minute)
 	}
@@ -196,36 +219,48 @@ func nextCron(expr string, from time.Time) (time.Time, error) {
 // integer range for fast membership tests. All errors wrap
 // ErrInvalidCron so callers can errors.Is against the sentinel.
 func parseField(s string, lo, hi int) ([]bool, error) {
+	out, _, err := parseFieldWithWildcard(s, lo, hi)
+	return out, err
+}
+
+// parseFieldWithWildcard returns the boolean mask plus a flag
+// indicating whether the input was the literal "*". The flag is
+// used by the DOM/DOW logic in nextCron to apply the correct
+// POSIX "either-field-wildcard means the other field wins"
+// rule. A comma list like "1,2,3" sets several bits to true
+// and is NOT a wildcard, even though the resulting mask is
+// similar to "*".
+func parseFieldWithWildcard(s string, lo, hi int) ([]bool, bool, error) {
 	out := make([]bool, hi+1)
 	if s == "*" {
 		for i := lo; i <= hi; i++ {
 			out[i] = true
 		}
-		return out, nil
+		return out, true, nil
 	}
 	for _, raw := range splitCSV(s) {
 		if raw == "" {
-			return nil, fmt.Errorf("%w: empty token", ErrInvalidCron)
+			return nil, false, fmt.Errorf("%w: empty token", ErrInvalidCron)
 		}
 		if strings.Contains(raw, "/") {
 			if err := applyStep(out, raw, lo, hi); err != nil {
-				return nil, fmt.Errorf("%w: %w", ErrInvalidCron, err)
+				return nil, false, fmt.Errorf("%w: %w", ErrInvalidCron, err)
 			}
 			continue
 		}
 		if strings.Contains(raw, "-") {
 			if err := applyRange(out, raw, lo, hi); err != nil {
-				return nil, fmt.Errorf("%w: %w", ErrInvalidCron, err)
+				return nil, false, fmt.Errorf("%w: %w", ErrInvalidCron, err)
 			}
 			continue
 		}
 		v, err := atoiStrict(raw, lo, hi)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrInvalidCron, err)
+			return nil, false, fmt.Errorf("%w: %w", ErrInvalidCron, err)
 		}
 		out[v] = true
 	}
-	return out, nil
+	return out, false, nil
 }
 
 // applyStep sets every Nth value from start (or lo) up to hi.
