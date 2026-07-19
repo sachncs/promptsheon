@@ -49,10 +49,10 @@ type SQLite struct {
 
 // NewSQLite opens or creates a SQLite database at dbPath and runs migrations.
 func NewSQLite(dbPath string) (*SQLite, error) {
-	pragmas := "_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)"
+	pragmas := "_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)"
 	var dsn string
 	if dbPath == ":memory:" {
-		dsn = "file::memory:?cache=shared&_pragma=journal_mode(MEMORY)&_pragma=busy_timeout(5000)"
+		dsn = "file::memory:?cache=shared&_pragma=journal_mode(MEMORY)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)"
 	} else {
 		dsn = dbPath + "?" + pragmas
 	}
