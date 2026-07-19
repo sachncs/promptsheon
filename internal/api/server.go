@@ -342,7 +342,7 @@ func (s *Server) registerAuditRoutes() {
 	s.mux.HandleFunc("GET /api/v1/audit/export", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleExportAudit)))
 	s.mux.HandleFunc("GET /api/v1/audit/verify", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleVerifyAuditChain)))
 	s.mux.HandleFunc("GET /api/v1/logs/search", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleSearchSpans)))
-	s.mux.HandleFunc("GET /api/v1/logs/stream", s.wrapHandler(s.handleLogsStream))
+	s.mux.HandleFunc("GET /api/v1/logs/stream", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleLogsStream)))
 }
 
 func (s *Server) registerTracingRoutes() {
