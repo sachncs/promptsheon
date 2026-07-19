@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/sachncs/promptsheon/internal/webhook"
@@ -27,9 +26,11 @@ func (s *Server) handleCreateWebhook(w http.ResponseWriter, r *http.Request) err
 		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "webhook dispatcher not configured"}
 	}
 	var req struct {
-		URL    string              `json:"url"`
-		Events []webhook.EventType `json:"events"`
-		Secret string              `json:"secret,omitempty"`
+		URL           string              `json:"url"`
+		Events        []webhook.EventType `json:"events"`
+		Secret        string              `json:"secret,omitempty"`
+		AllowPrivate  bool                `json:"allow_private,omitempty"`
+		AllowInsecure bool                `json:"allow_insecure,omitempty"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return &HTTPError{Status: http.StatusBadRequest, Message: "invalid request body"}
@@ -40,15 +41,17 @@ func (s *Server) handleCreateWebhook(w http.ResponseWriter, r *http.Request) err
 	if len(req.Events) == 0 {
 		return &HTTPError{Status: http.StatusBadRequest, Message: "at least one event is required"}
 	}
-	if err := ValidateWebhookURL(req.URL); err != nil {
+	if err := ValidateWebhookURL(req.URL, req.AllowPrivate); err != nil {
 		return &HTTPError{Status: http.StatusBadRequest, Message: fmt.Sprintf("invalid url: %v", err)}
 	}
 	ep := &webhook.Endpoint{
-		ID:     generateID(),
-		URL:    req.URL,
-		Secret: req.Secret,
-		Events: req.Events,
-		Active: true,
+		ID:            generateID(),
+		URL:           req.URL,
+		Secret:        req.Secret,
+		AllowPrivate:  req.AllowPrivate,
+		AllowInsecure: req.AllowInsecure,
+		Events:        req.Events,
+		Active:        true,
 	}
 	s.webhooks.Register(ep)
 	writeJSON(w, http.StatusCreated, ep)
@@ -76,10 +79,12 @@ func (s *Server) handleDeleteWebhook(w http.ResponseWriter, r *http.Request) err
 //     (including cloud metadata endpoints like 169.254.169.254)
 //   - hosts that are themselves loopback names
 //
-// Operators can opt-in to allowing private/loopback targets for local
-// development by setting PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE=true. The
-// default is fail-closed.
-func ValidateWebhookURL(rawURL string) error {
+// The previous global PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE env var was
+// removed: SSRF protection is now per-endpoint. Callers that
+// legitimately need to deliver to loopback or RFC1918 hosts set
+// AllowPrivate=true on the request; the value is recorded in the
+// audit log.
+func ValidateWebhookURL(rawURL string, allowPrivate bool) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return fmt.Errorf("parse url: %w", err)
@@ -97,7 +102,7 @@ func ValidateWebhookURL(rawURL string) error {
 	lower := strings.ToLower(host)
 	if lower == "localhost" || strings.HasSuffix(lower, ".localhost") ||
 		lower == "metadata.google.internal" || strings.HasSuffix(lower, ".internal") {
-		if !webhookAllowPrivate() {
+		if !allowPrivate {
 			return fmt.Errorf("loopback / metadata hostnames are not allowed")
 		}
 	}
@@ -112,7 +117,7 @@ func ValidateWebhookURL(rawURL string) error {
 	if len(ips) == 0 {
 		return fmt.Errorf("host did not resolve")
 	}
-	if webhookAllowPrivate() {
+	if allowPrivate {
 		return nil
 	}
 	for _, ip := range ips {
@@ -123,14 +128,10 @@ func ValidateWebhookURL(rawURL string) error {
 	return nil
 }
 
-func webhookAllowPrivate() bool {
-	return os.Getenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE") == "true"
-}
-
 // ResolveAndValidateWebhook is the same as ValidateWebhookURL but is
 // intended to be called at delivery time as a DNS-rebinding defence: the
 // IP set can change between registration and invocation.
-func ResolveAndValidateWebhook(ctx context.Context, rawURL string) error {
+func ResolveAndValidateWebhook(ctx context.Context, rawURL string, allowPrivate bool) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return err
@@ -144,7 +145,7 @@ func ResolveAndValidateWebhook(ctx context.Context, rawURL string) error {
 	if err != nil {
 		return err
 	}
-	if webhookAllowPrivate() {
+	if allowPrivate {
 		return nil
 	}
 	for _, ip := range ips {
