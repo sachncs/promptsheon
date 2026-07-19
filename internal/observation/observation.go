@@ -67,6 +67,12 @@ type windowKey struct {
 
 // NewAggregator constructs an empty Aggregator. The supplied
 // HallucinationFunc classifies records for the hallucination-rate
+// maxRecordsPerWindow caps the per-window record list so a busy
+// deployment cannot OOM the daemon. 4096 is roughly an hour at
+// 1 invocation/second per window; the recompute is O(N) so this
+// is the ceiling above which Aggregate becomes expensive.
+const maxRecordsPerWindow = 4096
+
 // field; pass nil to report a zero rate.
 func NewAggregator(hallucinationF HallucinationFunc) *Aggregator {
 	return &Aggregator{
@@ -77,6 +83,12 @@ func NewAggregator(hallucinationF HallucinationFunc) *Aggregator {
 
 // Add records one execution. The caller may continue to mutate
 // the record after this call; Aggregator copies the fields it needs.
+//
+// The window's record list is bounded to maxRecordsPerWindow;
+// once the cap is hit the oldest record is dropped on every
+// insert. The previous implementation append-unbounded grew the
+// map with every invocation and never pruned, leaking memory
+// until the daemon was restarted.
 func (a *Aggregator) Add(r executor.ExecutionRecord) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -88,7 +100,12 @@ func (a *Aggregator) Add(r executor.ExecutionRecord) {
 		// available discriminator.
 		k.VersionID = r.ReleaseID
 	}
-	a.records[k] = append(a.records[k], r)
+	recs := append(a.records[k], r)
+	if len(recs) > maxRecordsPerWindow {
+		// Drop oldest entries. O(N) copy; N is bounded.
+		recs = recs[len(recs)-maxRecordsPerWindow:]
+	}
+	a.records[k] = recs
 }
 
 // Aggregate returns one Observation per (capability, version, env)
