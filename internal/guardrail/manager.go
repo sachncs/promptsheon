@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/metrics"
+	"github.com/sachncs/promptsheon/internal/redactor"
 )
 
 const keyTerm = "term"
@@ -320,19 +321,34 @@ func (m *Manager) CheckResponseFormat(response, formatSpec string) *ViolationRes
 }
 
 // CheckContentPolicy checks content against defined content policies.
+//
+// Each policy here is a hard-coded heuristic. Production deployments
+// should use a policy.Bundle; the heuristics below are the
+// default-on safety net.
 func (m *Manager) CheckContentPolicy(content string, policies []string) *ViolationResult {
 	contentLower := strings.ToLower(content)
 
 	for _, policy := range policies {
 		switch policy {
 		case policyNoPII:
-			piiPatterns := []string{
-				`\b\d{3}-\d{2}-\d{4}\b`,
-				`\b\d{16}\b`,
-				`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b`,
+			// The credit-card regex matches 13-19 digit runs;
+			// without a Luhn check it also matches phone numbers
+			// and order IDs, so we verify each candidate with
+			// redactor.LuhnValid before flagging.
+			piiPatterns := []struct {
+				pat   *regexp.Regexp
+				luhn  bool
+				label string
+			}{
+				{pat: regexp.MustCompile(`\b\d{3}-\d{2}-\d{4}\b`), label: "ssn"},
+				{pat: regexp.MustCompile(`\b(?:\d[ -]?){12,18}\d\b`), luhn: true, label: "cc"},
+				{pat: regexp.MustCompile(`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b`), label: "email"},
 			}
-			for _, pattern := range piiPatterns {
-				if matched, _ := regexp.MatchString(pattern, content); matched {
+			for _, p := range piiPatterns {
+				for _, m := range p.pat.FindAllString(content, -1) {
+					if p.luhn && !redactor.LuhnValid(m) {
+						continue
+					}
 					return &ViolationResult{
 						Passed: false,
 						Violation: &Violation{
@@ -340,7 +356,7 @@ func (m *Manager) CheckContentPolicy(content string, policies []string) *Violati
 							Type:      ViolationContentPolicy,
 							Severity:  SeverityHigh,
 							Message:   "PII detected in response",
-							Details:   map[string]any{"policy": policyNoPII},
+							Details:   map[string]any{"policy": policyNoPII, keyTerm: p.label},
 							Timestamp: time.Now(),
 						},
 					}
