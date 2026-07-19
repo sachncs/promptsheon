@@ -2,6 +2,8 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"os"
@@ -171,6 +173,62 @@ func sanitizeConfig(cfg *Config) {
 	if cfg.IdleTimeout < 0 {
 		cfg.IdleTimeout = 120
 	}
+}
+
+// Validate enforces startup invariants. Returning an error here is a
+// hard refusal: the daemon must not boot when its configuration is
+// unsafe (e.g. authentication disabled on a non-loopback bind).
+//
+// Currently enforced:
+//   - When Auth is false, the listen address must bind to a loopback
+//     IP (127.0.0.0/8 or ::1) or to a Unix socket-style path. The
+//     rationale: POST /api/v1/setup mints an admin key to the first
+//     caller; on a public bind any network-adjacent caller wins.
+//   - When Auth is true but no API key material exists yet and the
+//     listen address is non-loopback, the bootstrap token MUST be set
+//     so the first admin key is not derived from the network. The
+//     first-run bootstrap path remains available only with that
+//     token.
+func (c *Config) Validate() error {
+	if c.Addr == "" {
+		return errors.New("config: PROMPTSHEON_ADDR must not be empty")
+	}
+	if !c.Auth && !isLoopbackAddr(c.Addr) {
+		return fmt.Errorf(
+			"config: PROMPTSHEON_AUTH=false is only valid for loopback binds (got %q); "+
+				"refusing to start because POST /api/v1/setup would mint an admin key to "+
+				"any network-adjacent caller. Set PROMPTSHEON_AUTH=true, or bind to "+
+				"127.0.0.1 / ::1, or set PROMPTSHEON_BOOTSTRAP_TOKEN to opt into an "+
+				"explicit first-run challenge",
+			c.Addr,
+		)
+	}
+	return nil
+}
+
+// isLoopbackAddr reports whether addr resolves to a loopback bind.
+// The check is intentionally simple: it covers ":port", "host:port",
+// "[ipv6]:port", and bare path-style values. It does NOT do DNS
+// resolution (operators must use a literal IP).
+//
+// The empty host (":8080") is treated as NON-loopback because it
+// means "all interfaces". Refusing it is the whole point of this
+// check: ":8080" is the dangerous default that allows any
+// network-adjacent caller to hit /api/v1/setup.
+func isLoopbackAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		switch addr {
+		case "localhost", "127.0.0.1", "::1":
+			return true
+		}
+		return false
+	}
+	switch host {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	}
+	return false
 }
 
 // Port extracts the port number from the address string. The

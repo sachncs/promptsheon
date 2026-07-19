@@ -70,6 +70,15 @@ func main() {
 
 	cfg := config.LoadConfig()
 
+	// Fail loudly on unsafe configurations. The most common case is
+	// PROMPTSHEON_AUTH=false on a non-loopback bind — the bootstrap
+	// endpoint would mint an admin key to the first caller. Refuse
+	// to start instead of warning and continuing.
+	if err := cfg.Validate(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+
 	// SECURITY: shell tool policy must be configured at startup, not
 	// mutated at runtime. An empty allowlist disables the tool
 	// regardless of the enabled flag.
