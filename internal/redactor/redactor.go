@@ -30,8 +30,11 @@ import (
 	"github.com/sachncs/promptsheon/internal/recommendation"
 )
 
-// Redactor is the pre/post PII Guardrail. It is value-typed and
-// concurrency-safe (no mutable state).
+// Redactor is the pre/post PII Guardrail. It is concurrency-safe:
+// rules is a slice that is only mutated at construction and through
+// the snapshot methods (Enable/Disable), which return a new
+// Redactor rather than mutating the receiver. Concurrent Redact
+// and Matches calls from different goroutines are allowed.
 type Redactor struct {
 	rules []rule
 }
