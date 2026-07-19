@@ -97,11 +97,16 @@ func TestOverrideThreshold(t *testing.T) {
 func TestEnableCustomPattern(t *testing.T) {
 	t.Parallel()
 	d := NewDetector()
-	if err := d.Enable("custom_dan", "(?i)ultra ?dan", 0.99); err != nil {
+	d2, err := d.Enable("custom_marker", "(?i)completely unique marker phrase", 0.99)
+	if err != nil {
 		t.Fatalf("enable: %v", err)
 	}
-	if got := d.Score("ultra dan mode please"); got < 0.99 {
+	if got := d2.Score("please follow this completely unique marker phrase now"); got < 0.99 {
 		t.Fatalf("expected match, got %f", got)
+	}
+	// The original d must be unchanged (snapshot semantics).
+	if got := d.Score("please follow this completely unique marker phrase now"); got > 0.01 {
+		t.Fatalf("original detector leaked enabled pattern, got %f", got)
 	}
 }
 

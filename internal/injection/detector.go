@@ -22,7 +22,11 @@ import (
 	"github.com/sachncs/promptsheon/internal/recommendation"
 )
 
-// Detector is the Guardrail. It is value-typed and concurrency-safe.
+// Detector is the Guardrail. It is concurrency-safe: the
+// patterns slice is only mutated at construction and through
+// the snapshot methods (Enable), which return a new Detector
+// rather than mutating the receiver. Concurrent Score and
+// CheckGuardrail calls from different goroutines are allowed.
 type Detector struct {
 	patterns  []rule
 	threshold float64
@@ -47,22 +51,24 @@ func NewDetector() *Detector {
 	return &Detector{patterns: builtinPatterns(), threshold: 0.6}
 }
 
-// OverrideThreshold replaces the trigger threshold. Returns the
-// receiver so it can be chained.
+// OverrideThreshold replaces the trigger threshold and returns
+// a new Detector.
 func (d *Detector) OverrideThreshold(t float64) *Detector {
-	d.threshold = t
-	return d
+	return &Detector{patterns: d.patterns, threshold: t}
 }
 
-// Enable adds a pattern. Mostly useful for tests and for ops to
-// extend the heuristic set in a Workspace policy bundle.
-func (d *Detector) Enable(name, pattern string, weight float64) error {
+// Enable adds a pattern and returns a new Detector. The previous
+// implementation appended to the receiver's slice under no lock,
+// racing concurrent Score calls.
+func (d *Detector) Enable(name, pattern string, weight float64) (*Detector, error) {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	d.patterns = append(d.patterns, rule{name: name, pat: re, weight: weight})
-	return nil
+	out := make([]rule, len(d.patterns), len(d.patterns)+1)
+	copy(out, d.patterns)
+	out = append(out, rule{name: name, pat: re, weight: weight})
+	return &Detector{patterns: out, threshold: d.threshold}, nil
 }
 
 // Score returns the aggregate injection score in the [0, 1]
