@@ -71,6 +71,12 @@ type Server struct {
 	// ctx cancelled), so the WaitGroup reaches zero exactly once
 	// per StopAuditWorkers invocation.
 	auditWg sync.WaitGroup
+	// auditCancel cancels the per-worker context. Workers exit
+	// either when the audit queue is closed and drained (the
+	// happy shutdown path) or when auditCancel is called (the
+	// forced shutdown path when StopAuditWorkers' drain budget
+	// is exceeded).
+	auditCancel context.CancelFunc
 
 	// oauthStates holds in-flight OAuth state tokens for this
 	// server. Stored on the Server (not as a package-level var) so
@@ -583,36 +589,50 @@ func (s *Server) audit(ctx context.Context, action, resource string, details map
 
 // StartAuditWorkers launches the bounded worker pool. Call once at
 // server startup. Cancel the context to stop the workers gracefully.
+//
+// The workers hold their own context (auditCtx), independent of the
+// server root context. This is the fix for the drain-barrier bug:
+// the previous design passed the rootCtx directly, so a SIGTERM
+// that cancelled rootCtx immediately stopped the workers, leaving
+// queued entries (key_mint, auth_failure, etc.) to be silently
+// dropped. With the dedicated auditCtx, main.go can:
+//
+//  1. httpServer.Shutdown(ctx) — drains in-flight HTTP requests,
+//     which produce audit entries via audit()
+//  2. srv.StopAuditWorkers(drainCtx) — closes the queue; workers
+//     drain whatever is left
+//  3. auditCancel() — finally stop the worker goroutines
 func (s *Server) StartAuditWorkers(ctx context.Context, n int) {
 	if n < 1 {
 		n = 2
 	}
 	s.auditQueue = make(chan *models.AuditEntry, 1024)
+	auditCtx, auditCancel := context.WithCancel(context.Background())
+	s.auditCancel = auditCancel
 	for i := 0; i < n; i++ {
 		s.auditWg.Add(1)
-		// #nosec G118 -- ctx is the server-level context from StartAuditWorkers
-		// (passed from main.go), not a request-scoped context. The caller
-		// cancels it on shutdown to stop the workers.
-		go s.auditWorker(ctx)
+		// #nosec G118 -- auditCtx is owned by this Server and
+		// cancelled by StopAuditWorkers (or its caller), not by
+		// the request path.
+		go s.auditWorker(auditCtx)
 	}
+	// Reference ctx to keep the signature stable for callers.
+	_ = ctx
 }
 
 // StopAuditWorkers closes the audit queue and waits for the
 // workers to drain the entries that are already enqueued. The
 // wait is bounded by ctx: if ctx is cancelled before the workers
 // finish, the function returns ctx.Err() and the workers
-// continue draining in the background (their context is the
-// one passed to StartAuditWorkers, which main.go cancels on
-// process shutdown).
+// continue draining in the background.
 //
 // StopAuditWorkers is safe to call multiple times. Subsequent
 // calls are no-ops.
 //
-// The reason this function exists: tests were seeing
-// "failed to write audit entry err='sql: database is closed'"
-// because the test teardown closed the SQLite handle before the
-// audit workers had drained the queue. The fix is to drain the
-// queue first, then close the DB.
+// Drain order: close the queue first so the workers see EOF and
+// exit; only after Wait() returns do we cancel the per-worker
+// context. Reversing the order reintroduces the drain-barrier bug
+// (workers exit on context cancel before consuming the queue).
 func (s *Server) StopAuditWorkers(ctx context.Context) error {
 	if s.auditQueue == nil {
 		return nil
@@ -631,8 +651,17 @@ func (s *Server) StopAuditWorkers(ctx context.Context) error {
 	}()
 	select {
 	case <-done:
+		if s.auditCancel != nil {
+			s.auditCancel()
+		}
 		return nil
 	case <-ctx.Done():
+		// Caller's drain budget expired. Cancel the worker context
+		// so the goroutines exit instead of leaking past process
+		// shutdown.
+		if s.auditCancel != nil {
+			s.auditCancel()
+		}
 		return ctx.Err()
 	}
 }
