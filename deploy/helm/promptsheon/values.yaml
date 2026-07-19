@@ -23,10 +23,9 @@ resources:
 config:
   dbBackend: sqlite
   dbPath: /var/lib/promptsheon/promptsheon.db
-  # dbDSN: ""  # set only when dbBackend=postgres
   addr: ":8080"
   logLevel: info
-  auth: "false"
+  auth: "true"
   rateLimitRate: 100
   rateLimitInterval: 60
   # corsOrigins: ""  # blank is deny-all; set to "*" only for trusted local
@@ -41,3 +40,9 @@ persistence:
 # Operator CRDs).
 serviceMonitor:
   enabled: false
+
+# Insecure loopback mode. ONLY set to true for single-replica,
+# loopback-bound development deployments. Production must leave
+# this false and rely on PROMPTSHEON_AUTH=true. The values schema
+# rejects replicaCount>1 when this is enabled.
+insecureLoopback: false
