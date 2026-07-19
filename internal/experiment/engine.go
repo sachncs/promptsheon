@@ -111,14 +111,38 @@ func (e *Engine) CreateTest(test *Test) error {
 	if _, exists := e.tests[test.ID]; exists {
 		return fmt.Errorf("test already exists: %s", test.ID)
 	}
+	if test.ID == "" {
+		return fmt.Errorf("test id is required")
+	}
+	if test.MinSamples < 0 {
+		return fmt.Errorf("min_samples must be non-negative, got %d", test.MinSamples)
+	}
 
-	// Validate traffic distribution
+	// Validate variants: non-empty, unique IDs, non-negative
+	// weights, finite weights that sum to ~100.
+	if len(test.Variants) == 0 {
+		return fmt.Errorf("at least one variant is required")
+	}
+	seen := make(map[string]struct{}, len(test.Variants))
 	var totalTraffic float64
-	for _, v := range test.Variants {
+	for i, v := range test.Variants {
+		if v.ID == "" {
+			return fmt.Errorf("variant[%d]: id is required", i)
+		}
+		if _, dup := seen[v.ID]; dup {
+			return fmt.Errorf("variant[%d]: duplicate id %q", i, v.ID)
+		}
+		seen[v.ID] = struct{}{}
+		if v.TrafficPct < 0 {
+			return fmt.Errorf("variant[%d] %q: traffic_pct must be non-negative, got %f", i, v.ID, v.TrafficPct)
+		}
 		totalTraffic += v.TrafficPct
 	}
 	if totalTraffic > 100.01 { // small epsilon for float precision
 		return fmt.Errorf("traffic distribution exceeds 100%%")
+	}
+	if totalTraffic < 99.99 {
+		return fmt.Errorf("traffic distribution sums to %f%%, must be ~100%%", totalTraffic)
 	}
 
 	// Calculate weights
@@ -285,12 +309,28 @@ func (e *Engine) GetResults(testID string) (*TestResults, error) {
 		}
 	}
 
-	// Check if we have enough samples for significance
+	// Check if we have enough samples for significance. The
+	// "Confidence" field is renamed SampleTargetMet to make
+	// the semantics explicit: it is the ratio of observed
+	// samples to MinSamples, NOT a statistical confidence
+	// interval. Callers that need real confidence must compute
+	// one from the variant metrics (e.g. a Bayesian
+	// credible interval on the difference of conversion
+	// rates); the framework does not pretend to ship a
+	// significance test it does not implement.
 	results.Winner = bestVariant
 	results.IsSignificant = totalSamples >= test.MinSamples
-	results.Confidence = float64(totalSamples) / float64(test.MinSamples)
-	if results.Confidence > 1.0 {
-		results.Confidence = 1.0
+	if test.MinSamples > 0 {
+		results.Confidence = float64(totalSamples) / float64(test.MinSamples)
+		if results.Confidence > 1.0 {
+			results.Confidence = 1.0
+		}
+	} else {
+		// MinSamples=0 means "no minimum"; the test is
+		// IsSignificant as soon as one variant has at least
+		// one observation, which the operator probably did
+		// not intend. Treat 0 as a misconfiguration.
+		results.Confidence = 0
 	}
 
 	// Rank variants
