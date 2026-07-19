@@ -35,7 +35,7 @@ import (
 
 var (
 	daemonBaseURL string
-	daemonAPIKey  = "psn_e2e_test_key"
+	daemonAPIKey  string
 	testClient    *sdk.Client
 )
 
@@ -56,9 +56,45 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	daemonBaseURL = "http://" + addr
+
+	// PROMPTSHEON_AUTH=true requires the admin key be minted
+	// via POST /api/v1/setup with the bootstrap token. The
+	// legacy `psn_e2e_test_key` literal is gone; tests that
+	// want an auth header read daemonAPIKey after TestMain
+	// populated it.
+	daemonAPIKey = bootstrapAdminKey(daemonBaseURL, "e2e-bootstrap-secret")
 	testClient = sdk.New(daemonBaseURL, daemonAPIKey)
 	code := m.Run()
 	os.Exit(code)
+}
+
+// bootstrapAdminKey calls POST /api/v1/setup with the supplied
+// bootstrap token and returns the admin key the daemon returns.
+// The daemon is empty (no users) at this point, so the
+// bootstrap endpoint is the only way in.
+func bootstrapAdminKey(baseURL, token string) string {
+	req, err := http.NewRequest(http.MethodPost, baseURL+"/api/v1/setup", strings.NewReader(`{"email":"e2e@local","name":"e2e"}`))
+	if err != nil {
+		panic(fmt.Sprintf("bootstrap req: %v", err))
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Bootstrap-Token", token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(fmt.Sprintf("bootstrap do: %v", err))
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		panic(fmt.Sprintf("bootstrap status %d body %s", resp.StatusCode, b))
+	}
+	var out struct {
+		Key string `json:"key"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		panic(fmt.Sprintf("bootstrap decode: %v", err))
+	}
+	return out.Key
 }
 
 func startDaemon(dir string) (string, func()) {
@@ -67,14 +103,26 @@ func startDaemon(dir string) (string, func()) {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	bin := buildDaemon(dir)
 	cmd := exec.Command(bin)
+	// PROMPTSHEON_AUTH=true is the production-shaped default.
+	// The legacy unauth flow is exercised by separate tests
+	// that opt in via PROMPTSHEON_E2E_AUTH_OFF=1; the
+	// authenticated lifecycle test below requires the
+	// authenticated path. PROMPTSHEON_BOOTSTRAP_TOKEN gates
+	// POST /api/v1/setup so the e2e harness can mint its admin
+	// key without leaving a hole for an opportunistic attacker
+	// on a shared CI runner.
 	cmd.Env = append(os.Environ(),
 		"PROMPTSHEON_ADDR="+addr,
 		"PROMPTSHEON_DB_PATH="+dbPath,
-		"PROMPTSHEON_AUTH=false",
+		"PROMPTSHEON_AUTH=true",
+		"PROMPTSHEON_BOOTSTRAP_TOKEN=e2e-bootstrap-secret",
+		"PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true",
+		"PROMPTSHEON_HARNESS_PRECONDITIONS=false",
 		"PROMPTSHEON_LOG_LEVEL=error",
 		// The e2e harness exercises migration 025_destructive from a
 		// clean DB; production refuses without this flag.
 		"PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true",
+		"PROMPTSHEON_HARNESS_PRECONDITIONS=false",
 	)
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
