@@ -141,22 +141,18 @@ func (a *Authenticator) Stop() {
 func (a *Authenticator) Authenticate(r *http.Request) (*User, error) {
 	key := extractAPIKey(r)
 	if key == "" {
-		a.authLogger.LogAuthFailure(r.Context(), "", "missing api key", r.RemoteAddr)
+		a.authLogger.LogAuthFailure(r.Context(), "", "missing or malformed api key", r.RemoteAddr)
 		return nil, fmt.Errorf("missing api key")
 	}
 
 	hash := HashAPIKey(key)
 	rec, err := a.store.GetAPIKeyByHash(r.Context(), hash)
 	if err != nil {
-		a.authLogger.LogAuthFailure(r.Context(), key[:min(8, len(key))], "lookup error", r.RemoteAddr)
+		a.authLogger.LogAuthFailure(r.Context(), "", "lookup error", r.RemoteAddr)
 		return nil, fmt.Errorf("lookup api key: %w", err)
 	}
 	if rec == nil || rec.Revoked {
-		prefix := ""
-		if len(key) > 8 {
-			prefix = key[:8]
-		}
-		a.authLogger.LogAuthFailure(r.Context(), prefix, "invalid or revoked", r.RemoteAddr)
+		a.authLogger.LogAuthFailure(r.Context(), "", "invalid or revoked", r.RemoteAddr)
 		return nil, fmt.Errorf("invalid api key")
 	}
 	if rec.ExpiresAt != nil && rec.ExpiresAt.Before(time.Now()) {
@@ -201,7 +197,15 @@ func extractAPIKey(r *http.Request) string {
 	// Check Authorization header: "Bearer ps_..."
 	if auth := r.Header.Get("Authorization"); auth != "" {
 		if strings.HasPrefix(auth, "Bearer ") {
-			return strings.TrimPrefix(auth, "Bearer ")
+			key := strings.TrimSpace(strings.TrimPrefix(auth, "Bearer "))
+			// Reject malformed keys at the edge so the audit log
+			// never sees a 67-byte token's first 8 chars that
+			// belong to a junk payload. LogAuthFailure is given
+			// only the prefix shape, never raw bytes.
+			if !ValidateAPIKeyFormat(key) {
+				return ""
+			}
+			return key
 		}
 	}
 	return ""
