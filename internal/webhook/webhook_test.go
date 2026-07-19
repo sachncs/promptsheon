@@ -134,8 +134,6 @@ func TestDispatcherSuccessfulDelivery(t *testing.T) {
 	// work around. We exercise the success path by
 	// confirming the test server saw the request, without
 	// asserting on the delivery record contents.
-	t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
-	defer t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "")
 
 	hit := make(chan struct{}, 1)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -150,7 +148,7 @@ func TestDispatcherSuccessfulDelivery(t *testing.T) {
 	d := NewDispatcher(slog.Default()).WithMaxRetries(0)
 	d.Register(&Endpoint{
 		ID:     "ep-ok",
-		URL:    srv.URL,
+		URL: srv.URL, AllowPrivate: true,
 		Events: []EventType{EventEvalCompleted},
 		Active: true,
 	})
@@ -164,8 +162,6 @@ func TestDispatcherSuccessfulDelivery(t *testing.T) {
 }
 
 func TestDispatcherServerErrorTriggersRetry(t *testing.T) {
-	t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
-	defer t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "")
 
 	var calls int
 	var mu sync.Mutex
@@ -180,7 +176,7 @@ func TestDispatcherServerErrorTriggersRetry(t *testing.T) {
 	d := NewDispatcher(slog.Default()).WithMaxRetries(2)
 	d.Register(&Endpoint{
 		ID:     "ep-500",
-		URL:    srv.URL,
+		URL: srv.URL, AllowPrivate: true,
 		Events: []EventType{EventEvalCompleted},
 		Active: true,
 	})
@@ -209,8 +205,6 @@ func TestValidateURLRejectsBadSchemes(t *testing.T) {
 }
 
 func TestValidateURLAllowsHTTPAndHTTPS(t *testing.T) {
-	t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
-	defer t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "")
 	for _, raw := range []string{
 		"http://example.com",
 		"https://example.com",
@@ -244,8 +238,6 @@ func TestWithHTTPClientReplacesDefault(t *testing.T) {
 	// A custom http.Client round-trip is observable by
 	// pointing the dispatcher at a server and verifying
 	// the call lands.
-	t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
-	defer t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "")
 
 	var hit bool
 	var mu sync.Mutex
@@ -260,7 +252,7 @@ func TestWithHTTPClientReplacesDefault(t *testing.T) {
 	d := NewDispatcher(slog.Default()).WithMaxRetries(0).WithHTTPClient(http.DefaultClient)
 	d.Register(&Endpoint{
 		ID:     "ep-custom",
-		URL:    srv.URL,
+		URL: srv.URL, AllowPrivate: true,
 		Events: []EventType{EventEvalCompleted},
 		Active: true,
 	})
@@ -336,8 +328,6 @@ func TestValidateURLMissingHost(t *testing.T) {
 }
 
 func TestDeliverHMACSigning(t *testing.T) {
-	t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
-	defer t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "")
 
 	var mu sync.Mutex
 	var gotSignature string
@@ -352,7 +342,8 @@ func TestDeliverHMACSigning(t *testing.T) {
 	d := NewDispatcher(slog.Default()).WithMaxRetries(0)
 	d.Register(&Endpoint{
 		ID: "ep-hmac", URL: srv.URL, Secret: "my-secret",
-		Events: []EventType{EventEvalCompleted}, Active: true,
+		AllowPrivate: true,
+		Events:       []EventType{EventEvalCompleted}, Active: true,
 	})
 	d.Emit(&Event{ID: "evt-hmac", Type: EventEvalCompleted})
 	time.Sleep(500 * time.Millisecond)
@@ -369,8 +360,6 @@ func TestDeliverHMACSigning(t *testing.T) {
 }
 
 func TestDeliverContextCancellation(t *testing.T) {
-	t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
-	defer t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -408,8 +397,6 @@ func TestValidateURLRejectsPrivateIP(t *testing.T) {
 }
 
 func TestDeliverWithSecretAnd500(t *testing.T) {
-	t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
-	defer t.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)

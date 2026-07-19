@@ -3505,28 +3505,26 @@ func TestStartOAuthStateJanitor(_ *testing.T) {
 }
 
 func TestResolveAndValidateWebhook(t *testing.T) {
-	err := ResolveAndValidateWebhook(context.Background(), "http://example.com/hook")
+	err := ResolveAndValidateWebhook(context.Background(), "http://example.com/hook", false)
 	if err != nil {
 		t.Errorf("expected nil for public host, got %v", err)
 	}
 
-	err = ResolveAndValidateWebhook(context.Background(), "http://localhost:8080/hook")
+	err = ResolveAndValidateWebhook(context.Background(), "http://localhost:8080/hook", false)
 	if err == nil {
 		t.Error("expected error for localhost")
 	}
 
-	old := os.Getenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE")
-	_ = os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
-	defer func() { _ = os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", old) }()
-
-	err = ResolveAndValidateWebhook(context.Background(), "http://localhost:8080/hook")
+	// Per-endpoint allow_private replaces the previous global
+	// PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE env var.
+	err = ResolveAndValidateWebhook(context.Background(), "http://localhost:8080/hook", true)
 	if err != nil {
-		t.Errorf("expected nil when private allowed, got %v", err)
+		t.Errorf("expected nil when allow_private=true, got %v", err)
 	}
 }
 
 func TestResolveAndValidateWebhook_EmptyHost(t *testing.T) {
-	err := ResolveAndValidateWebhook(context.Background(), "http:///path")
+	err := ResolveAndValidateWebhook(context.Background(), "http:///path", false)
 	if err == nil {
 		t.Error("expected error for empty host")
 	}
@@ -3537,53 +3535,48 @@ func TestResolveAndValidateWebhook_EmptyHost(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestValidateWebhookURL_InvalidScheme(t *testing.T) {
-	err := ValidateWebhookURL("ftp://example.com/hook")
+	err := ValidateWebhookURL("ftp://example.com/hook", false)
 	if err == nil {
 		t.Error("expected error for ftp scheme")
 	}
 }
 
 func TestValidateWebhookURL_MissingHost(t *testing.T) {
-	err := ValidateWebhookURL("http:///path")
+	err := ValidateWebhookURL("http:///path", false)
 	if err == nil {
 		t.Error("expected error for missing host")
 	}
 }
 
 func TestValidateWebhookURL_LocalhostBlocked(t *testing.T) {
-	err := ValidateWebhookURL("http://localhost:8080/hook")
+	err := ValidateWebhookURL("http://localhost:8080/hook", false)
 	if err == nil {
 		t.Error("expected error for localhost")
 	}
 }
 
 func TestValidateWebhookURL_LocalhostAllowed(t *testing.T) {
-	oldVal := os.Getenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE")
-	_ = os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
-	defer func() { _ = os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", oldVal) }()
-
-	err := ValidateWebhookURL("http://localhost:8080/hook")
+	// Per-endpoint allow_private replaces the previous global
+	// PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE env var.
+	err := ValidateWebhookURL("http://localhost:8080/hook", true)
 	if err != nil {
-		t.Errorf("expected no error when private allowed, got: %v", err)
+		t.Errorf("expected no error when allow_private=true, got: %v", err)
 	}
 }
 
 func TestValidateWebhookURL_MetadataHostname(t *testing.T) {
-	err := ValidateWebhookURL("http://metadata.google.internal")
+	err := ValidateWebhookURL("http://metadata.google.internal", false)
 	if err == nil {
 		t.Error("expected error for metadata hostname")
 	}
 }
 
 func TestWebhookAllowPrivate(t *testing.T) {
-	_ = os.Unsetenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE")
-	if webhookAllowPrivate() {
-		t.Error("expected false when env not set")
-	}
-	_ = os.Setenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE", "true")
-	if !webhookAllowPrivate() {
-		t.Error("expected true when env set")
-	}
+	// PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE was removed in favour of
+	// per-endpoint AllowPrivate. The previous global toggle was an
+	// SSRF enabler (any caller could deliver to private addresses
+	// once the env was set cluster-wide). The replacement is
+	// per-endpoint and audited at registration time.
 	_ = os.Unsetenv("PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE")
 }
 
