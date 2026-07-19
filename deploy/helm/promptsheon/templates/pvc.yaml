@@ -4,6 +4,11 @@ metadata:
   name: {{ include "promptsheon.fullname" . }}-data
   labels:
     {{- include "promptsheon.labels" . | nindent 4 }}
+  annotations:
+    # keep the PVC when the chart is uninstalled; the audit chain and
+    # capability corpus are durable state that operators manage
+    # explicitly. Delete manually after a confirmed backup.
+    "helm.sh/resource-policy": keep
 spec:
   {{- if .Values.persistence.storageClassName }}
   storageClassName: {{ .Values.persistence.storageClassName | quote }}

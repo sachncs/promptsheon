@@ -1,23 +1,35 @@
-# Promptsheon
+# Helm chart for Promptsheon.
 
-The Open-Source Control Plane for AI Capabilities.
+This chart deploys a single-replica `promptsheond` daemon with a
+PVC-backed SQLite database. Vector search is provided by the
+[sqlite-vec](https://github.com/asg017/sqlite-vec) extension loaded
+on startup.
 
-This directory holds the production deployment artefacts:
+## Constraints
 
-- `deploy/helm/promptsheon/` — Helm chart for k8s deployment
-- `Dockerfile` — multi-stage build for the daemon image
-- `Dockerfile.cli` (recommended addition) — slim CLI image
+- **Single replica.** SQLite is single-writer; `values.schema.json`
+  rejects `replicaCount>1`.
+- **SQLite only.** Postgres support was removed; the chart no longer
+  accepts `dbBackend=postgres`.
+- **Auth default `true`.** Setting `auth=false` requires the
+  `insecureLoopback=true` opt-in (the schema enforces this).
 
-The chart defaults to a single-replica deployment with an
-8Gi PVC-backed SQLite database. Production deployments should
-switch to Postgres:
+## Required values
 
-```sh
-helm install promptsheon deploy/helm/promptsheon \
-  --set config.dbBackend=postgres \
-  --set config.dbDSN="postgres://promptsheon:CHANGE_ME@postgres:5432/promptsheon?sslmode=require"
+```yaml
+replicaCount: 1
+config:
+  auth: "true"
+vault:
+  enabled: true
+  key: "<32-byte hex from your secrets store>"
 ```
 
-The Postgres RLS migrations in
-`internal/store/migrations/postgres/100_rls.sql` enable per-
-workspace row-level security automatically on first boot.
+The vault key Secret is rendered only when `vault.enabled=true`.
+Plaintext DSNs and other credentials never appear in the ConfigMap.
+
+## Uninstall
+
+The PVC carries `helm.sh/resource-policy: keep` so the data volume
+outlives `helm uninstall`. Delete it explicitly only after a confirmed
+backup.
