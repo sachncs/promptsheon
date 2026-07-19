@@ -16,6 +16,6 @@ spec:
       {{- include "promptsheon.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: http
-      path: /v1/metrics
+      path: /metrics
       interval: 30s
 {{- end }}
