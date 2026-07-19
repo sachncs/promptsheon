@@ -132,17 +132,43 @@ func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
 
 // CORS returns middleware that handles CORS preflight requests.
 // The allowedOrigins parameter controls Access-Control-Allow-Origin.
-// Pass specific origins for production, or "*" to allow all origins (insecure).
-// Default behavior (no origins) denies all cross-origin requests.
+//
+// Semantics:
+//   - Empty list: deny all cross-origin requests. No CORS headers
+//     are emitted.
+//   - "*" as the single element: echo "*" back. This is insecure
+//     and is rejected at config-load time when the bind is
+//     non-loopback; the only legitimate use is local development.
+//   - Multiple specific origins: the request's Origin is echoed
+//     back only when it matches one of the configured values.
+//     Otherwise no CORS header is set and the browser blocks the
+//     response.
+//
+// Access-Control-Allow-Credentials is intentionally never emitted:
+// the daemon uses Authorization headers, not cookies, so credentialed
+// CORS is not needed.
 func CORS(allowedOrigins ...string) func(http.Handler) http.Handler {
-	origin := "" // Default: deny all origins
-	if len(allowedOrigins) > 0 {
-		origin = allowedOrigins[0]
+	wildcard := len(allowedOrigins) == 1 && allowedOrigins[0] == "*"
+	allow := make(map[string]struct{}, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		if o == "*" {
+			continue
+		}
+		allow[o] = struct{}{}
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if origin != "" {
-				w.Header().Set("Access-Control-Allow-Origin", origin)
+			requestOrigin := r.Header.Get("Origin")
+			if wildcard {
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Vary", "Origin")
+			} else if requestOrigin != "" {
+				if _, ok := allow[requestOrigin]; ok {
+					w.Header().Set("Access-Control-Allow-Origin", requestOrigin)
+					w.Header().Set("Vary", "Origin")
+				}
+			}
+			if w.Header().Get("Access-Control-Allow-Origin") != "" {
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID, X-Trace-ID")
 				w.Header().Set("Access-Control-Max-Age", "86400")

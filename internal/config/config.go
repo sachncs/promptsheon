@@ -42,7 +42,7 @@ type Config struct {
 	OTelInsecure bool   // Use insecure connection to OTel collector
 
 	// CORS
-	CORSOrigins string // Comma-separated allowed origins, or "*" to allow all (insecure)
+	CORSOrigins []string // Allowed origins; "*" is a single-element list and is rejected unless the bind is loopback.
 
 	// Approval policy: "maker_checker" (default) or "majority".
 	ApprovalPolicy string
@@ -78,7 +78,7 @@ func DefaultConfig() Config {
 		// Default CORS policy: deny all cross-origin requests. Operators
 		// must explicitly set PROMPTSHEON_CORS_ORIGINS to a list of
 		// origins or "*" (for trusted local development only).
-		CORSOrigins: "",
+		CORSOrigins: nil,
 
 		// Approval policy defaults to maker-checker (creator may not
 		// approve their own release; at least one other identity must).
@@ -112,7 +112,7 @@ func LoadConfig() Config {
 	cfg.LLMFallback = getEnvString("PROMPTSHEON_LLM_FALLBACK", cfg.LLMFallback)
 	cfg.OTelEndpoint = getEnvString("PROMPTSHEON_OTEL_ENDPOINT", cfg.OTelEndpoint)
 	cfg.OTelInsecure = getEnvBool("PROMPTSHEON_OTEL_INSECURE", cfg.OTelInsecure)
-	cfg.CORSOrigins = getEnvString("PROMPTSHEON_CORS_ORIGINS", cfg.CORSOrigins)
+	cfg.CORSOrigins = parseCORSOrigins(getEnvString("PROMPTSHEON_CORS_ORIGINS", ""))
 	cfg.ApprovalPolicy = getEnvString("PROMPTSHEON_APPROVAL_POLICY", cfg.ApprovalPolicy)
 
 	sanitizeConfig(&cfg)
@@ -203,6 +203,18 @@ func (c *Config) Validate() error {
 			c.Addr,
 		)
 	}
+	if !isLoopbackAddr(c.Addr) {
+		for _, o := range c.CORSOrigins {
+			if o == "*" {
+				return fmt.Errorf(
+					"config: PROMPTSHEON_CORS_ORIGINS=* is not allowed for non-loopback binds (got %q); "+
+						"the wildcard allows any browser to make credentialed cross-origin "+
+						"requests. Set an explicit list of origins, or bind to 127.0.0.1 / ::1",
+					c.Addr,
+				)
+			}
+		}
+	}
 	return nil
 }
 
@@ -234,6 +246,27 @@ func isLoopbackAddr(addr string) bool {
 		return true
 	}
 	return false
+}
+
+// parseCORSOrigins splits a comma-separated origins list into a
+// normalised slice. Whitespace is trimmed, empty entries are dropped,
+// and "*" is preserved as a single literal element (the CORS
+// middleware decides what to do with it). Returns nil for an empty
+// input — the middleware treats nil as "deny all cross-origin".
+func parseCORSOrigins(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 // Port extracts the port number from the address string. The

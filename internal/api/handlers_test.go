@@ -933,6 +933,7 @@ func TestCORSWithOrigin(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Origin", "https://example.com")
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -945,6 +946,7 @@ func TestCORSWithOrigin(t *testing.T) {
 
 	// OPTIONS preflight
 	req2 := httptest.NewRequest("OPTIONS", "/test", nil)
+	req2.Header.Set("Origin", "https://example.com")
 	rr2 := httptest.NewRecorder()
 	handler.ServeHTTP(rr2, req2)
 
