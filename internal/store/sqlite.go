@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
 	"time"
 
 	_ "modernc.org/sqlite" // sqlite driver
@@ -45,8 +44,7 @@ func mustUnmarshal(data []byte, v any) {
 
 // SQLite implements Repository backed by a SQLite database.
 type SQLite struct {
-	db      *sql.DB
-	auditMu sync.Mutex
+	db *sql.DB
 }
 
 // NewSQLite opens or creates a SQLite database at dbPath and runs migrations.
@@ -92,9 +90,10 @@ func (s *SQLite) DB() *sql.DB {
 // ---------------------------------------------------------------------------
 
 func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) error {
-	s.auditMu.Lock()
-	defer s.auditMu.Unlock()
-
+	// The previous auditMu serialised every audit write through
+	// Go-land, which defeated the 2-worker pool. The serialisable
+	// SQLite transaction below is the actual ordering primitive;
+	// SQLite serialises writers at the file level.
 	details, err := json.Marshal(entry.Details)
 	if err != nil {
 		return fmt.Errorf("marshal audit details: %w", err)
