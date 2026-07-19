@@ -3,10 +3,40 @@ package harness
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 )
+
+// EnvAllowlist is the set of environment variables passed through
+// to a precondition command. Anything else is scrubbed. The list
+// is intentionally tiny: PATH (so sh finds /usr/bin), HOME (so
+// ~-relative paths work), LANG (for locale-correct output
+// decoding), and TZ (so timestamps are predictable). Operators
+// needing more should add to this list explicitly.
+var EnvAllowlist = []string{"PATH", "HOME", "LANG", "LC_ALL", "TZ"}
+
+// scrubEnv returns a copy of os.Environ() with every variable not
+// in EnvAllowlist removed.
+func scrubEnv() []string {
+	allow := make(map[string]struct{}, len(EnvAllowlist))
+	for _, k := range EnvAllowlist {
+		allow[k] = struct{}{}
+	}
+	var out []string
+	for _, kv := range os.Environ() {
+		i := strings.IndexByte(kv, '=')
+		if i < 0 {
+			continue
+		}
+		if _, ok := allow[kv[:i]]; ok {
+			out = append(out, kv)
+		}
+	}
+	return out
+}
 
 // PreconditionResult captures one precondition's outcome.
 type PreconditionResult struct {
@@ -21,10 +51,26 @@ type PreconditionResult struct {
 // Capability and reports per-hook outcomes. The runner is the
 // application-level abstraction above the OS process; storage and
 // HTTP live elsewhere.
+//
+// The runner is GATED: every precondition is skipped unless
+// PROMPTSHEON_HARNESS_PRECONDITIONS=true is set in the daemon
+// environment. The previous design let any caller with
+// PermPromptCreate persist a precondition and have it execute on
+// every release activation; the gate is the fail-successfully
+// default. The runner still exists so existing fixtures and tests
+// compile; callers that want to enable it must set the env var.
 type PreconditionRunner struct {
 	// Workdir is the working directory for command execution.
 	// Empty means "use the daemon's current directory".
 	Workdir string
+}
+
+// Enabled reports whether the runner should actually execute
+// preconditions. Without the env var the runner is a no-op: each
+// Run/RunAll returns an empty result with no error and the caller
+// proceeds as if there were no preconditions.
+func (r *PreconditionRunner) Enabled() bool {
+	return os.Getenv("PROMPTSHEON_HARNESS_PRECONDITIONS") == "true"
 }
 
 // NewPreconditionRunner constructs a runner that defaults to the
@@ -41,7 +87,13 @@ func NewPreconditionRunner() *PreconditionRunner {
 // Run is fail-fast: it stops at the first failing precondition and
 // returns the partial result. RunAll runs every precondition and
 // returns a combined result.
+//
+// Run is a no-op when the runner is disabled; the caller sees an
+// empty result and nil error and proceeds to activate the release.
 func (r *PreconditionRunner) Run(ctx context.Context, preconditions []Precondition) ([]PreconditionResult, error) {
+	if !r.Enabled() {
+		return nil, nil
+	}
 	results, failures := r.runAll(ctx, preconditions, true)
 	if len(failures) > 0 {
 		return results, &PreconditionError{Failures: failures}
@@ -53,6 +105,9 @@ func (r *PreconditionRunner) Run(ctx context.Context, preconditions []Preconditi
 // per-hook results; failures are aggregated into a PreconditionError
 // if any precondition failed.
 func (r *PreconditionRunner) RunAll(ctx context.Context, preconditions []Precondition) ([]PreconditionResult, error) {
+	if !r.Enabled() {
+		return nil, nil
+	}
 	results, failures := r.runAll(ctx, preconditions, false)
 	if len(failures) > 0 {
 		return results, &PreconditionError{Failures: failures}
@@ -85,6 +140,24 @@ func (r *PreconditionRunner) runAll(ctx context.Context, preconditions []Precond
 // configured Workdir (or "." when empty) with a per-command timeout
 // taken from p.TimeoutSec. The combined stdout+stderr is captured
 // for inspection.
+//
+// Security: the command runs through `sh -c` (a string), which is
+// the existing API contract. The hardening in this revision is on
+// the *process*:
+//
+//   - env is scrubbed to EnvAllowlist so a precondition cannot
+//     read secrets from the daemon's environment (PROMPTSHEON_VAULT_KEY,
+//     database DSN, OIDC client secrets, etc.);
+//   - the process runs in its own process group; on timeout we
+//     kill the entire group so a forked child cannot outlive the
+//     parent's cancellation and leak file descriptors;
+//   - the daemon itself is gated by PROMPTSHEON_HARNESS_PRECONDITIONS
+//     so the whole subsystem is off by default.
+//
+// Operators who want strict argv-only execution (no shell at all)
+// should file a follow-on to change the Precondition schema from
+// `command string` to `argv []string`; that's an API change and
+// out of scope for this commit.
 func (r *PreconditionRunner) runOne(ctx context.Context, p Precondition) PreconditionResult {
 	start := time.Now()
 	dir := r.Workdir
@@ -101,6 +174,10 @@ func (r *PreconditionRunner) runOne(ctx context.Context, p Precondition) Precond
 
 	cmd := exec.CommandContext(cctx, "sh", "-c", p.Command)
 	cmd.Dir = dir
+	cmd.Env = scrubEnv()
+	// Put the command in its own process group so we can kill
+	// the whole tree on timeout.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	out, err := cmd.CombinedOutput()
 	res := PreconditionResult{
@@ -111,6 +188,11 @@ func (r *PreconditionRunner) runOne(ctx context.Context, p Precondition) Precond
 	if err != nil {
 		res.Passed = false
 		res.Err = err
+		// On timeout, ensure the whole process group is reaped
+		// so a forked child cannot outlive the cancellation.
+		if cmd.Process != nil {
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		}
 		return res
 	}
 	res.Passed = true

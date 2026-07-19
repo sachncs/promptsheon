@@ -10,6 +10,7 @@ import (
 )
 
 func TestPreconditionRunnerPasses(t *testing.T) {
+	t.Setenv("PROMPTSHEON_HARNESS_PRECONDITIONS", "true")
 	r := harness.NewPreconditionRunner()
 	precs := []harness.Precondition{
 		{ID: "p1", CapabilityID: "c1", Name: "true", Command: "true", TimeoutSec: 5, Enabled: true},
@@ -27,6 +28,7 @@ func TestPreconditionRunnerPasses(t *testing.T) {
 }
 
 func TestPreconditionRunnerFails(t *testing.T) {
+	t.Setenv("PROMPTSHEON_HARNESS_PRECONDITIONS", "true")
 	r := harness.NewPreconditionRunner()
 	precs := []harness.Precondition{
 		{ID: "p1", CapabilityID: "c1", Name: "exit1", Command: "exit 1", TimeoutSec: 5, Enabled: true},
@@ -50,6 +52,7 @@ func TestPreconditionRunnerFails(t *testing.T) {
 }
 
 func TestPreconditionRunnerSkipDisabled(t *testing.T) {
+	t.Setenv("PROMPTSHEON_HARNESS_PRECONDITIONS", "true")
 	r := harness.NewPreconditionRunner()
 	precs := []harness.Precondition{
 		{ID: "p1", CapabilityID: "c1", Name: "skip", Command: "exit 1", TimeoutSec: 5, Enabled: false},
@@ -64,6 +67,7 @@ func TestPreconditionRunnerSkipDisabled(t *testing.T) {
 }
 
 func TestPreconditionRunnerFailFastStopsAtFirst(t *testing.T) {
+	t.Setenv("PROMPTSHEON_HARNESS_PRECONDITIONS", "true")
 	r := harness.NewPreconditionRunner()
 	precs := []harness.Precondition{
 		{ID: "p1", CapabilityID: "c1", Name: "exit1", Command: "exit 1", TimeoutSec: 5, Enabled: true},
@@ -79,6 +83,7 @@ func TestPreconditionRunnerFailFastStopsAtFirst(t *testing.T) {
 }
 
 func TestPreconditionRunnerRunAllContinuesPastFailure(t *testing.T) {
+	t.Setenv("PROMPTSHEON_HARNESS_PRECONDITIONS", "true")
 	r := harness.NewPreconditionRunner()
 	precs := []harness.Precondition{
 		{ID: "p1", CapabilityID: "c1", Name: "exit1", Command: "exit 1", TimeoutSec: 5, Enabled: true},
@@ -97,6 +102,7 @@ func TestPreconditionRunnerRunAllContinuesPastFailure(t *testing.T) {
 }
 
 func TestPreconditionRunnerTimeout(t *testing.T) {
+	t.Setenv("PROMPTSHEON_HARNESS_PRECONDITIONS", "true")
 	r := harness.NewPreconditionRunner()
 	// Use a sleep that's much longer than the timeout so the test
 	// proves the runner killed the process rather than the sleep

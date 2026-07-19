@@ -243,6 +243,7 @@ func TestServiceRollback(t *testing.T) {
 }
 
 func TestServiceActivateRunsPreconditions(t *testing.T) {
+	t.Setenv("PROMPTSHEON_HARNESS_PRECONDITIONS", "true")
 	svc, db := newService(t, release.PolicyMakerChecker, 1)
 	svc.WithHarness(harness.NewPreconditionRunner(), db)
 
