@@ -1,31 +1,26 @@
 # Promptsheon production values example.
 #
-# Activate Postgres-backed deployments by setting dbBackend=postgres
-# and providing a DSN. The Postgres migration files in
-# internal/store/migrations/postgres/ run automatically on first
-# boot when the daemon detects the DSN.
+# The chart ships only the SQLite backend. Vector search is provided by
+# the sqlite-vec extension loaded at startup. Multi-replica and HA are
+# unsupported; SQLite is single-writer. Replica count and backend
+# selection are gated by values.schema.json.
 
-replicaCount: 3
+replicaCount: 1
 
 image:
   repository: registry.example.com/promptsheon/promptsheon
-  tag: "0.0.7"
+  tag: "0.1.0"
   pullPolicy: Always
 
 service:
-  type: LoadBalancer
-  port: 443
+  type: ClusterIP
+  port: 80
 
 resources:
-  cpuLimit: "4"
-  memoryLimit: 4Gi
+  cpuLimit: "2"
+  memoryLimit: 1Gi
 
 config:
-  dbBackend: postgres
-  # dbDSN is mandatory when dbBackend=postgres. The chart ships a
-  # Secret that backs a project_secret_ref via External Secrets
-  # Operator; rotate via ESO, not by editing the Secret.
-  dbDSN: "postgres://promptsheon:CHANGE_ME@promptsheon-pg.promptsheon.svc:5432/promptsheon?sslmode=require"
   addr: ":8080"
   logLevel: info
   auth: "true"
@@ -34,6 +29,12 @@ config:
   corsOrigins: "https://app.example.com"
   otelEndpoint: "otel-collector.observability.svc:4317"
 
+vault:
+  enabled: true
+  # Production: provide a 32-byte hex key from a sealed-secret store
+  # (ESO, ExternalSecrets, Vault, etc.). Do not commit a real key here.
+  key: ""
+
 persistence:
   size: 50Gi
   accessMode: ReadWriteOnce
@@ -41,3 +42,5 @@ persistence:
 
 serviceMonitor:
   enabled: true
+
+insecureLoopback: false

@@ -14,7 +14,16 @@ spec:
     metadata:
       labels:
         {{- include "promptsheon.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Force a rollout when the ConfigMap changes so the new env
+        # actually takes effect on the running pods.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: promptsheond
           image: "{{ .Values.image.repository | default "promptsheon/promptsheon" }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -26,9 +35,9 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "promptsheon.fullname" . }}-config
-            {{- if eq (.Values.config.dbBackend | default "sqlite") "postgres" }}
+            {{- if .Values.vault.enabled }}
             - secretRef:
-                name: {{ include "promptsheon.fullname" . }}-db
+                name: {{ include "promptsheon.fullname" . }}-vault
             {{- end }}
           livenessProbe:
             httpGet:
@@ -56,24 +65,16 @@ spec:
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000
+            runAsGroup: 1000
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
           volumeMounts:
-            {{- if eq (.Values.config.dbBackend | default "sqlite") "sqlite" }}
             - name: data
               mountPath: /var/lib/promptsheon
-            {{- end }}
-      securityContext:
-        fsGroup: 1000
-      {{- if eq (.Values.config.dbBackend | default "sqlite") "sqlite" }}
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "promptsheon.fullname" . }}-data
-      {{- end }}
-  {{- if .Values.persistence.storageClassName }}
-  volumeClaimTemplates: []
-  {{- end }}

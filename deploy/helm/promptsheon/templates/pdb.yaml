@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "promptsheon.fullname" . }}
+  labels:
+    {{- include "promptsheon.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "promptsheon.selectorLabels" . | nindent 6 }}

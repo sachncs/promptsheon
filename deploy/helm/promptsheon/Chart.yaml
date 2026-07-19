@@ -2,10 +2,10 @@ apiVersion: v2
 name: promptsheon
 description: |
   Promptsheon is the Control Plane for AI Capabilities. This chart
-  deploys a single-replica daemon with a PVC-backed SQLite database
-  by default; production deployments should switch to Postgres
-  (PROMPTSHEON_DB_BACKEND=postgres, RLS migrations in
-  internal/store/migrations/postgres/).
+  deploys a single-replica daemon with a PVC-backed SQLite database;
+  vector search is provided by the sqlite-vec extension loaded at
+  startup. Multi-replica and Postgres-backed deployments are
+  intentionally unsupported until a shared backend is added.
 type: application
 version: 0.1.0
 appVersion: 0.1.0

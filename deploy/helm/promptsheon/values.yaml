@@ -41,6 +41,13 @@ persistence:
 serviceMonitor:
   enabled: false
 
+# Vault key Secret. When enabled=true the chart renders a Secret
+# containing PROMPTSHEON_VAULT_KEY, sourced from .Values.vault.key
+# (set this from a sealed-secret/ESO/Vault pipeline, never inline).
+vault:
+  enabled: false
+  key: ""
+
 # Insecure loopback mode. ONLY set to true for single-replica,
 # loopback-bound development deployments. Production must leave
 # this false and rely on PROMPTSHEON_AUTH=true. The values schema
