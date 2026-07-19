@@ -118,6 +118,22 @@ const auditQueueBackpressure = 200 * time.Millisecond
 // Option configures the Server.
 type Option func(*Server)
 
+// Authenticator returns the authenticator instance so the caller
+// (e.g. main.go) can call Stop() at shutdown. Returns nil if
+// authentication is disabled.
+func (s *Server) Authenticator() *auth.Authenticator { return s.authn }
+
+// StopDependents stops the lifecycle-managed dependencies that the
+// server owns. main.go calls this after httpServer.Shutdown has
+// drained in-flight HTTP requests, so any in-flight webhook Emit
+// has already enqueued. The dispatcher drains those queued
+// deliveries and then exits.
+func (s *Server) StopDependents() {
+	if s.webhooks != nil {
+		s.webhooks.Stop()
+	}
+}
+
 // WithAuth enables authentication and authorization on the server.
 func WithAuth(db store.Repository) Option {
 	return func(s *Server) {

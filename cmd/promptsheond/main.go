@@ -227,6 +227,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 
 	logHub := ws.NewHub(logger)
 	go logHub.Run()
+	defer logHub.Stop()
 
 	contextMgr := contextpkg.NewManager()
 	usageTracker := api.NewUsageTracker()
@@ -432,8 +433,17 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 	}
 	cancelAuditStop()
 
+	// Stop the webhook dispatcher AFTER HTTP shutdown so in-flight
+	// handler-triggered Emit calls have a chance to enqueue. The
+	// dispatcher's WaitGroup drains in-flight HTTP deliveries before
+	// the goroutine returns.
+	srv.StopDependents()
+
 	limiter.Stop()
 	api.StopOAuthStateJanitor()
+	if srv.Authenticator() != nil {
+		srv.Authenticator().Stop()
+	}
 	logger.Info("server exited")
 }
 
