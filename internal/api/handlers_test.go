@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -789,16 +790,36 @@ func newVault(t *testing.T) *vault.Vault {
 
 func newSpanStore(t *testing.T) *trace.SQLite {
 	t.Helper()
-	db, err := sql.Open("sqlite", ":memory:")
+	path := filepath.Join(t.TempDir(), "spans.db")
+	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := db.Exec(`PRAGMA journal_mode=WAL`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`PRAGMA busy_timeout=5000`); err != nil {
+		t.Fatal(err)
+	}
+	db.SetMaxOpenConns(2)
 	t.Cleanup(func() { _ = db.Close() })
 	store, err := trace.NewSQLite(db)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = store.Close() })
 	return store
+}
+
+// flushSpans waits for the asynchronous trace worker to drain
+// any queued spans. Required because the SQLite tracer batches
+// inserts on a 250 ms ticker; tests that read after Finish must
+// wait for the write.
+func flushSpans(t *testing.T, s *trace.SQLite) {
+	t.Helper()
+	if err := s.Flush(context.Background()); err != nil {
+		t.Fatalf("flush spans: %v", err)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -2030,6 +2051,7 @@ func TestHandleListSpans_WithSpans(t *testing.T) {
 	if err := store.Finish(sp); err != nil {
 		t.Fatal(err)
 	}
+	flushSpans(t, store)
 
 	s := newTestServer(t)
 	s.spans = store
@@ -2058,6 +2080,7 @@ func TestHandleGetSpan_Found(t *testing.T) {
 	if err := store.Finish(sp); err != nil {
 		t.Fatal(err)
 	}
+	flushSpans(t, store)
 
 	s := newTestServer(t)
 	s.spans = store
@@ -2086,6 +2109,7 @@ func TestHandleGetTraceTree_Found(t *testing.T) {
 	if err := store.Finish(sp); err != nil {
 		t.Fatal(err)
 	}
+	flushSpans(t, store)
 
 	s := newTestServer(t)
 	s.spans = store

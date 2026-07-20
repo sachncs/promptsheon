@@ -499,6 +499,14 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 		logger.Error("server forced to shutdown", "err", err)
 	}
 
+	// Drain the trace queue before audit workers so the trace
+	// table is flushed before we lose access to the DB.
+	if spans != nil {
+		if err := spans.Close(); err != nil {
+			logger.Warn("trace store did not drain cleanly", "err", err)
+		}
+	}
+
 	auditStopCtx, cancelAuditStop := context.WithTimeout(context.Background(), 10*time.Second)
 	if err := srv.StopAuditWorkers(auditStopCtx); err != nil {
 		logger.Warn("audit workers did not drain in time", "err", err)
