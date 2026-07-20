@@ -117,9 +117,15 @@ func (r *SQLiteRepository) UpdateRecommendation(ctx context.Context, rec *capabi
 }
 
 // CreateDecision persists a Decision against a Recommendation.
+// The Decision.ID must be supplied by the caller (Decision
+// constructors always set it). SQLite's nullable text PK would
+// otherwise silently store NULL.
 func (r *SQLiteRepository) CreateDecision(ctx context.Context, d *Decision) error {
 	if d == nil {
 		return errors.New("decision: nil")
+	}
+	if d.ID == "" {
+		return errors.New("decision: id is required")
 	}
 	if d.RecommendationID == "" {
 		return errors.New("decision: recommendation_id is required")
@@ -129,9 +135,9 @@ func (r *SQLiteRepository) CreateDecision(ctx context.Context, d *Decision) erro
 		return err
 	}
 	_, err = r.db.ExecContext(ctx,
-		`INSERT INTO decisions (recommendation_id, payload, created_at)
-		 VALUES (?, ?, ?)`,
-		d.RecommendationID, string(payload), d.DecidedAt,
+		`INSERT INTO decisions (id, recommendation_id, payload, created_at)
+		 VALUES (?, ?, ?, ?)`,
+		d.ID, d.RecommendationID, string(payload), d.DecidedAt,
 	)
 	if err != nil {
 		return err
