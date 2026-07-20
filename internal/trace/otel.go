@@ -33,7 +33,7 @@ func NewOTelTracer(serviceName string) *OTelTracer {
 
 // Start creates a new root span using OpenTelemetry.
 func (t *OTelTracer) Start(ctx context.Context, operation string) *Span {
-	_, otelSpan := t.tracer.Start(ctx, operation,
+	ctx, otelSpan := t.tracer.Start(ctx, operation,
 		oteltrace.WithSpanKind(oteltrace.SpanKindInternal),
 	)
 
@@ -44,6 +44,7 @@ func (t *OTelTracer) Start(ctx context.Context, operation string) *Span {
 		Service:   t.serviceName,
 		Status:    StatusUnset,
 		StartedAt: time.Now(),
+		otelSpan:  otelSpan,
 	}
 
 	return span
@@ -73,6 +74,7 @@ func (t *OTelTracer) StartChild(ctx context.Context, parent *Span, operation str
 		Service:   t.serviceName,
 		Status:    StatusUnset,
 		StartedAt: time.Now(),
+		otelSpan:  otelSpan,
 	}
 
 	// Store OTel span in context for child span linking so
@@ -84,13 +86,28 @@ func (t *OTelTracer) StartChild(ctx context.Context, parent *Span, operation str
 	return span
 }
 
-// Finish records a completed span in OpenTelemetry.
+// Finish records a completed span in OpenTelemetry. This is the
+// fix for the OBS-3 issue: the previous implementation never
+// called otelSpan.End(), so the OTel exporter saw no span at
+// all even when the daemon was configured with an OTLP endpoint.
 func (t *OTelTracer) Finish(span *Span) error {
 	if span == nil {
 		return nil
 	}
 
 	span.Finish()
+	if span.otelSpan != nil {
+		for k, v := range span.Attributes {
+			span.otelSpan.SetAttributes(attribute.String(k, v))
+		}
+		if span.Error != "" {
+			span.otelSpan.SetStatus(otelcodes.Error, span.Error)
+			span.otelSpan.RecordError(fmt.Errorf("%s", span.Error))
+		} else {
+			span.otelSpan.SetStatus(otelcodes.Ok, "")
+		}
+		span.otelSpan.End()
+	}
 	return nil
 }
 
@@ -104,8 +121,7 @@ func (t *OTelTracer) FinishWithError(span *Span, err error) error {
 		span.SetError(err)
 	}
 
-	span.Finish()
-	return nil
+	return t.Finish(span)
 }
 
 // RecordSpan records a span to the OTel exporter. This is a helper method
