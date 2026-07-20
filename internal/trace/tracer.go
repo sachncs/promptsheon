@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sync/atomic"
 	"time"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 // Status represents the outcome of a span.
@@ -34,6 +36,12 @@ type Span struct {
 	StartedAt  time.Time         `json:"started_at"`
 	EndedAt    *time.Time        `json:"ended_at,omitempty"`
 	DurationMs int64             `json:"duration_ms"`
+
+	// otelSpan is the OpenTelemetry span handle when this
+	// Span was created by an OTelTracer. The field is
+	// unexported because it carries a non-serialisable
+	// runtime value; OTelTracer.Finish calls End() on it.
+	otelSpan oteltrace.Span
 }
 
 // Finish completes a span and records the end time.
