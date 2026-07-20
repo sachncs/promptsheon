@@ -37,12 +37,12 @@ func TestMigration050StatusChecks(t *testing.T) {
 	// constraints, not plain CHECKs. So the test checks the
 	// table's SQL text.
 	want := map[string]string{
-		"executions":   "chk_executions_env",
-		"releases":     "chk_releases_env",
-		"alerts":       "chk_alert_status",
-		"eval_results": "chk_er_passed",
+		"executions":   "environment IN ('dev','staging','prod','')",
+		"releases":     "environment IN ('dev','staging','prod')",
+		"alerts":       "status IN ('active','resolved')",
+		"eval_results": "passed IN (0, 1)",
 	}
-	for table, wantName := range want {
+	for table, wantFragment := range want {
 		var sqlText string
 		err := db.QueryRow(
 			`SELECT sql FROM sqlite_master WHERE type='table' AND name=?`,
@@ -51,8 +51,11 @@ func TestMigration050StatusChecks(t *testing.T) {
 		if err != nil {
 			t.Errorf("query %s: %v", table, err)
 		}
-		if !strings.Contains(sqlText, wantName) {
-			t.Errorf("expected %s table SQL to contain %q, got %q", table, wantName, sqlText)
+		if !strings.Contains(sqlText, "CHECK") {
+			t.Errorf("expected %s table SQL to contain a CHECK constraint, got %q", table, sqlText)
+		}
+		if !strings.Contains(sqlText, wantFragment) {
+			t.Errorf("expected %s table SQL to contain CHECK(%s), got %q", table, wantFragment, sqlText)
 		}
 	}
 
