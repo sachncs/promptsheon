@@ -255,6 +255,13 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 		return err
 	}
 
+	s.audit(r.Context(), "apikey_create", "api_key:"+apiKey.ID, map[string]any{
+		"key_prefix":  apiKey.KeyPrefix,
+		"target_user": apiKey.UserID,
+		"role":        apiKey.Role,
+		"name":        apiKey.Name,
+	})
+
 	type response struct {
 		*models.APIKey
 		Key string `json:"key"`
@@ -427,7 +434,10 @@ func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) erro
 	if !hasCaller && s.requireAuth {
 		return unauthorized()
 	}
-	id := strings.TrimPrefix(r.URL.Path, "/api/v1/apikeys/")
+	id := r.PathValue("id")
+	if id == "" {
+		id = strings.TrimPrefix(r.URL.Path, "/api/v1/apikeys/")
+	}
 	if id == "" {
 		return badRequest("key id is required")
 	}
@@ -451,6 +461,11 @@ func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) erro
 	if err := s.db.DeleteAPIKey(r.Context(), id); err != nil {
 		return err
 	}
+
+	s.audit(r.Context(), "apikey_revoke", "api_key:"+id, map[string]any{
+		"key_prefix":  key.KeyPrefix,
+		"target_user": key.UserID,
+	})
 
 	writeJSON(w, http.StatusOK, map[string]string{auditKeyStatus: "revoked"})
 	return nil
