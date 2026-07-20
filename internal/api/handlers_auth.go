@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/auth"
+	"github.com/sachncs/promptsheon/internal/store"
 	"github.com/sachncs/promptsheon/internal/models"
 )
 
@@ -311,20 +312,6 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	// Check whether the system has any users yet. We do this
-	// before any state mutation so a second concurrent caller
-	// races safely — the second one will see at least one user
-	// (the first one) and fail with 404. The race window is
-	// small (one SQL roundtrip) and the worst case is two admin
-	// keys, not zero.
-	users, err := s.db.ListUsers(r.Context())
-	if err != nil {
-		return fmt.Errorf("bootstrap: list users: %w", err)
-	}
-	if len(users) > 0 {
-		return notFound("bootstrap is no longer available; the server already has users")
-	}
-
 	var req struct {
 		Email string `json:"email"`
 		Name  string `json:"name"`
@@ -339,18 +326,6 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 		req.Name = "Bootstrap Admin"
 	}
 
-	// Re-check inside the same request after a brief settle so a
-	// concurrent caller that just won the race doesn't slip
-	// through. ListUsers is cheap on an empty table; doing it
-	// twice keeps the bootstrap endpoint trivially correct.
-	users, err = s.db.ListUsers(r.Context())
-	if err != nil {
-		return fmt.Errorf("bootstrap: list users: %w", err)
-	}
-	if len(users) > 0 {
-		return notFound("bootstrap is no longer available; the server already has users")
-	}
-
 	now := time.Now()
 	admin := &models.User{
 		ID:        generateID(),
@@ -359,9 +334,6 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 		Role:      string(auth.RoleAdmin),
 		CreatedAt: now,
 		UpdatedAt: now,
-	}
-	if e := s.db.CreateUser(r.Context(), admin); e != nil {
-		return fmt.Errorf("bootstrap: create user: %w", e)
 	}
 
 	key, hash, err := auth.GenerateAPIKey()
@@ -377,8 +349,16 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 		Role:      string(auth.RoleAdmin),
 		CreatedAt: now,
 	}
-	if err := s.db.CreateAPIKey(r.Context(), apiKey); err != nil {
-		return fmt.Errorf("bootstrap: create key: %w", err)
+
+	// Atomic bootstrap: the empty-users check + user insert +
+	// API-key insert run in one transaction. SQLite serialises
+	// the writes, so two concurrent callers cannot both win:
+	// the second one sees ErrConflict and returns 409.
+	if err := s.db.BootstrapAdmin(r.Context(), admin, apiKey); err != nil {
+		if errors.Is(err, store.ErrConflict) {
+			return &HTTPError{Status: http.StatusConflict, Message: "bootstrap is no longer available; the server already has users"}
+		}
+		return fmt.Errorf("bootstrap: %w", err)
 	}
 
 	// Log loudly. The warning is the operator's signal that the
