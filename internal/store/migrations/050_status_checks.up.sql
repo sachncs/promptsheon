@@ -68,6 +68,7 @@ DROP TABLE executions;
 ALTER TABLE executions_new RENAME TO executions;
 CREATE INDEX idx_executions_version   ON executions(capability_version_id);
 CREATE INDEX idx_executions_timestamp ON executions(timestamp);
+CREATE INDEX idx_executions_version_recent ON executions(capability_version_id, timestamp DESC);
 
 -- 3. Rebuild releases with the CHECK baked into CREATE TABLE.
 CREATE TABLE releases_new (
@@ -97,6 +98,7 @@ ALTER TABLE releases_new RENAME TO releases;
 CREATE INDEX idx_releases_capability          ON releases(capability_id);
 CREATE INDEX idx_releases_environment_status  ON releases(environment, status);
 CREATE INDEX idx_releases_status              ON releases(status);
+CREATE INDEX idx_releases_capability_recent   ON releases(capability_id, created_at DESC);
 CREATE UNIQUE INDEX uniq_releases_active_capability_env
   ON releases (capability_id, environment) WHERE status = 'active';
 
@@ -119,6 +121,7 @@ DROP TABLE alerts;
 ALTER TABLE alerts_new RENAME TO alerts;
 CREATE INDEX idx_alerts_rule_triggered ON alerts(rule_id, triggered_at DESC);
 CREATE INDEX idx_alerts_status         ON alerts(status);
+CREATE INDEX idx_alerts_rule_recent    ON alerts(rule_id, triggered_at DESC);
 
 -- 5. Rebuild eval_results with the CHECK baked into CREATE TABLE.
 CREATE TABLE eval_results_new (

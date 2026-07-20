@@ -116,29 +116,85 @@ func migrate(db *sql.DB, migrationsFS fs.FS) error {
 
 // applyMigration applies a single migration within a transaction.
 // If the migration fails, the transaction is rolled back.
+//
+// SQLite has a quirk: PRAGMA foreign_keys cannot be changed inside a
+// transaction. Migrations that need to flip the pragma off during a
+// table rebuild must do it outside the surrounding transaction.
+// We detect that pattern by looking for a leading or trailing
+// PRAGMA foreign_keys line and running it on the connection
+// before/after the transaction. The pragma is a no-op when
+// foreign_keys is already in the requested state.
 func applyMigration(db *sql.DB, version int, sqlStr string) error {
+	pre, body := splitLeadingPragma(sqlStr)
+	body, post := splitTrailingPragma(body)
+	if pre != "" {
+		if _, err := db.Exec(pre); err != nil {
+			return fmt.Errorf("execute pre-tx pragma: %w", err)
+		}
+		sqlStr = body
+	} else {
+		sqlStr = body
+	}
+
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Execute the migration SQL.
 	if _, err := tx.Exec(sqlStr); err != nil {
 		return fmt.Errorf("execute migration: %w", err)
 	}
 
-	// Record the migration version.
 	if _, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
 		return fmt.Errorf("record migration version: %w", err)
 	}
 
-	// Commit the transaction.
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit transaction: %w", err)
 	}
 
+	if post != "" {
+		if _, err := db.Exec(post); err != nil {
+			return fmt.Errorf("execute post-tx pragma: %w", err)
+		}
+	}
 	return nil
+}
+
+// splitLeadingPragma returns (prefix, body) where prefix is a
+// leading "PRAGMA foreign_keys = ..." directive (if present)
+// and body is the remainder. Returns ("", sqlStr) if no pragma
+// leads the file.
+func splitLeadingPragma(sqlStr string) (string, string) {
+	trimmed := strings.TrimLeft(sqlStr, " \t\r\n")
+	upper := strings.ToUpper(trimmed)
+	if !strings.HasPrefix(upper, "PRAGMA FOREIGN_KEYS") {
+		return "", sqlStr
+	}
+	end := strings.IndexAny(trimmed, ";\n")
+	if end < 0 {
+		return "", sqlStr
+	}
+	prefix := strings.TrimSpace(trimmed[:end+1])
+	body := strings.TrimSpace(trimmed[end+1:])
+	return prefix, body
+}
+
+// splitTrailingPragma returns (body, post) where post is a
+// trailing "PRAGMA foreign_keys = ..." directive (if present)
+// and body is the remainder.
+func splitTrailingPragma(sqlStr string) (string, string) {
+	idx := strings.LastIndex(strings.ToUpper(sqlStr), "PRAGMA FOREIGN_KEYS")
+	if idx < 0 {
+		return sqlStr, ""
+	}
+	body := strings.TrimSpace(sqlStr[:idx])
+	post := strings.TrimSpace(sqlStr[idx:])
+	if end := strings.IndexAny(post, ";\n"); end >= 0 {
+		post = strings.TrimSpace(post[:end+1])
+	}
+	return body, post
 }
 
 // isDestructiveMigration reports whether a migration file is

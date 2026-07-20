@@ -52,3 +52,58 @@ func TestDestructiveGateNames(t *testing.T) {
 		})
 	}
 }
+
+// TestSplitLeadingPragma: migration 043 relies on a leading
+// PRAGMA foreign_keys = OFF line being hoisted out of the
+// surrounding transaction (SQLite cannot change the pragma
+// inside a tx). Verify the splitter.
+func TestSplitLeadingPragma(t *testing.T) {
+	cases := []struct {
+		name     string
+		in       string
+		wantPre  string
+		wantBody string
+	}{
+		{"leading pragma", "PRAGMA foreign_keys = OFF;\nCREATE TABLE x (id INT);", "PRAGMA foreign_keys = OFF;", "CREATE TABLE x (id INT);"},
+		{"no pragma", "CREATE TABLE x (id INT);", "", "CREATE TABLE x (id INT);"},
+		{"lowercase pragma", "pragma foreign_keys=off;\nSELECT 1;", "pragma foreign_keys=off;", "SELECT 1;"},
+		{"unrelated pragma", "PRAGMA journal_mode = WAL;\nSELECT 1;", "", "PRAGMA journal_mode = WAL;\nSELECT 1;"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			pre, body := splitLeadingPragma(c.in)
+			if pre != c.wantPre {
+				t.Errorf("pre = %q, want %q", pre, c.wantPre)
+			}
+			if body != c.wantBody {
+				t.Errorf("body = %q, want %q", body, c.wantBody)
+			}
+		})
+	}
+}
+
+// TestSplitTrailingPragma: migration 043 relies on a trailing
+// PRAGMA foreign_keys = ON line being run after the transaction.
+func TestSplitTrailingPragma(t *testing.T) {
+	cases := []struct {
+		name     string
+		in       string
+		wantBody string
+		wantPost string
+	}{
+		{"trailing pragma", "CREATE TABLE x (id INT);\nPRAGMA foreign_keys = ON;", "CREATE TABLE x (id INT);", "PRAGMA foreign_keys = ON;"},
+		{"no pragma", "CREATE TABLE x (id INT);", "CREATE TABLE x (id INT);", ""},
+		{"both", "CREATE TABLE x (id INT);\nPRAGMA foreign_keys = ON;", "CREATE TABLE x (id INT);", "PRAGMA foreign_keys = ON;"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			body, post := splitTrailingPragma(c.in)
+			if body != c.wantBody {
+				t.Errorf("body = %q, want %q", body, c.wantBody)
+			}
+			if post != c.wantPost {
+				t.Errorf("post = %q, want %q", post, c.wantPost)
+			}
+		})
+	}
+}
