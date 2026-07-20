@@ -143,6 +143,7 @@ func TestSQLiteStartChildAndFinish(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLite: %v", err)
 	}
+	t.Cleanup(func() { _ = s.Close() })
 
 	root := s.Start(context.Background(), "root")
 	if root.ID == "" {
@@ -169,6 +170,9 @@ func TestSQLiteStartChildAndFinish(t *testing.T) {
 	if e := s.Finish(root); e != nil {
 		t.Fatalf("Finish root: %v", e)
 	}
+	if err := s.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
 
 	got, err := s.GetSpan(context.Background(), root.ID)
 	if err != nil {
@@ -192,12 +196,16 @@ func TestSQLiteListSpansFilters(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLite: %v", err)
 	}
+	t.Cleanup(func() { _ = s.Close() })
 
 	// Insert three spans: two with operation "a", one with
 	// operation "b".
 	for _, op := range []string{"a", "a", "b"} {
 		span := s.Start(context.Background(), op)
 		_ = s.Finish(span)
+	}
+	if err := s.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush: %v", err)
 	}
 
 	all, err := s.ListSpans(context.Background(), &SpanFilter{})
@@ -231,9 +239,13 @@ func TestSQLiteListSpansTimeRange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLite: %v", err)
 	}
+	t.Cleanup(func() { _ = s.Close() })
 
 	span := s.Start(context.Background(), "x")
 	_ = s.Finish(span)
+	if err := s.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
 
 	since := time.Now().Add(-time.Hour)
 	future := time.Now().Add(time.Hour)
@@ -270,6 +282,7 @@ func TestSQLiteGetTraceTree(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLite: %v", err)
 	}
+	t.Cleanup(func() { _ = s.Close() })
 
 	root := s.Start(context.Background(), "root")
 	childA := s.StartChild(context.Background(), root, "child-a")
@@ -277,6 +290,9 @@ func TestSQLiteGetTraceTree(t *testing.T) {
 	grandchild := s.StartChild(context.Background(), childA, "grandchild")
 	for _, sp := range []*Span{grandchild, childB, childA, root} {
 		_ = s.Finish(sp)
+	}
+	if err := s.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush: %v", err)
 	}
 
 	spans, err := s.GetTraceTree(context.Background(), root.TraceID)
@@ -298,14 +314,25 @@ func TestSQLiteGetTraceTree(t *testing.T) {
 	}
 }
 
-// openTestDB returns an in-memory sqlite database. The
-// database is closed when the test ends.
+// openTestDB returns a temporary on-disk sqlite database in WAL
+// mode with two connections. ":memory:" gives every connection
+// its own private DB; without WAL, separate connections to the
+// same file see different page caches. Two connections let the
+// worker hold one while the test reads through the other.
 func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := sql.Open("sqlite", ":memory:")
+	path := filepath.Join(t.TempDir(), "trace.db")
+	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
+	if _, err := db.Exec(`PRAGMA journal_mode=WAL`); err != nil {
+		t.Fatalf("wal pragma: %v", err)
+	}
+	if _, err := db.Exec(`PRAGMA busy_timeout=5000`); err != nil {
+		t.Fatalf("busy_timeout pragma: %v", err)
+	}
+	db.SetMaxOpenConns(2)
 	t.Cleanup(func() { _ = db.Close() })
 	return db
 }
@@ -649,10 +676,13 @@ func TestSQLiteFinish_ClosedDB(t *testing.T) {
 	_ = db.Close()
 
 	span := s.Start(context.Background(), "test")
-	err = s.Finish(span)
-	if err == nil {
-		t.Fatal("expected error with closed DB")
+	if err := s.Finish(span); err != nil {
+		t.Fatalf("Finish: %v", err)
 	}
+	// Async Finish enqueues and returns nil; the worker surfaces
+	// the failure via slog but the request goroutine is not
+	// blocked. Drain so the worker attempts the insert and exits.
+	_ = s.Close()
 }
 
 func TestSQLiteListSpans_Error(t *testing.T) {
@@ -719,6 +749,7 @@ func TestSQLiteFinishWithAttributes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLite: %v", err)
 	}
+	t.Cleanup(func() { _ = s.Close() })
 
 	span := s.Start(context.Background(), "attr-test")
 	span.SetAttribute("color", "blue")
@@ -726,6 +757,22 @@ func TestSQLiteFinishWithAttributes(t *testing.T) {
 	if err = s.Finish(span); err != nil {
 		t.Fatalf("Finish: %v", err)
 	}
+	if err := s.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+
+	// Diagnostic: query through the same handle but use a fresh
+	// connection (Conn) to bypass any prepared-statement cache.
+	conn, err := db.Conn(context.Background())
+	if err != nil {
+		t.Fatalf("Conn: %v", err)
+	}
+	defer conn.Close()
+	var n int
+	if err := conn.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM traces`).Scan(&n); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	t.Logf("fresh-conn count: %d rows", n)
 
 	got, err := s.GetSpan(context.Background(), span.ID)
 	if err != nil {
@@ -748,6 +795,7 @@ func TestSQLiteListSpansExtraFilters(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLite: %v", err)
 	}
+	t.Cleanup(func() { _ = s.Close() })
 
 	span1 := s.Start(context.Background(), "op1")
 	span1.Service = "service-a"
@@ -758,6 +806,10 @@ func TestSQLiteListSpansExtraFilters(t *testing.T) {
 	span2.Service = "service-b"
 	span2.Status = StatusError
 	_ = s.Finish(span2)
+
+	if err := s.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
 
 	// Filter by service
 	out, err := s.ListSpans(context.Background(), &SpanFilter{Service: "service-a"})
