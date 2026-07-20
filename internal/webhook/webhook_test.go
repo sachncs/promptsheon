@@ -13,7 +13,18 @@ import (
 	"time"
 )
 
+// enableTestBypassSSRF flips the process-wide BypassSSRF flag so
+// dispatch tests can deliver to httptest loopback servers. The
+// flag is reset between tests.
+func enableTestBypassSSRF(t *testing.T) {
+	t.Helper()
+	prev := BypassSSRF
+	BypassSSRF = true
+	t.Cleanup(func() { BypassSSRF = prev })
+}
+
 func TestDispatcherEmit(t *testing.T) {
+	enableTestBypassSSRF(t)
 	d := NewDispatcher(slog.Default()).WithMaxRetries(0)
 
 	ep := &Endpoint{
@@ -129,6 +140,7 @@ func TestDispatcherConcurrentEmit(t *testing.T) {
 }
 
 func TestDispatcherSuccessfulDelivery(t *testing.T) {
+	enableTestBypassSSRF(t)
 	// Note: the ring-buffer indexing in ListDeliveries has
 	// a pre-existing off-by-one that the existing tests
 	// work around. We exercise the success path by
@@ -148,7 +160,7 @@ func TestDispatcherSuccessfulDelivery(t *testing.T) {
 	d := NewDispatcher(slog.Default()).WithMaxRetries(0)
 	d.Register(&Endpoint{
 		ID:     "ep-ok",
-		URL: srv.URL, AllowPrivate: true,
+		URL: srv.URL, 
 		Events: []EventType{EventEvalCompleted},
 		Active: true,
 	})
@@ -162,6 +174,7 @@ func TestDispatcherSuccessfulDelivery(t *testing.T) {
 }
 
 func TestDispatcherServerErrorTriggersRetry(t *testing.T) {
+	enableTestBypassSSRF(t)
 
 	var calls int
 	var mu sync.Mutex
@@ -176,7 +189,7 @@ func TestDispatcherServerErrorTriggersRetry(t *testing.T) {
 	d := NewDispatcher(slog.Default()).WithMaxRetries(2)
 	d.Register(&Endpoint{
 		ID:     "ep-500",
-		URL: srv.URL, AllowPrivate: true,
+		URL: srv.URL, 
 		Events: []EventType{EventEvalCompleted},
 		Active: true,
 	})
@@ -205,12 +218,27 @@ func TestValidateURLRejectsBadSchemes(t *testing.T) {
 }
 
 func TestValidateURLAllowsHTTPAndHTTPS(t *testing.T) {
+	t.Setenv("PROMPTSHEON_TEST_BYPASS_SSRF", "true")
+	BypassSSRF = true
+	t.Cleanup(func() { BypassSSRF = false })
 	for _, raw := range []string{
 		"http://example.com",
 		"https://example.com",
 	} {
 		if err := ValidateURL(raw); err != nil {
 			t.Errorf("expected no error for %q, got %v", raw, err)
+		}
+	}
+}
+
+func TestValidateURLRejectsHTTP(t *testing.T) {
+	// Production wiring: BypassSSRF is false. http:// is rejected.
+	for _, raw := range []string{
+		"http://example.com",
+		"ftp://example.com",
+	} {
+		if err := ValidateURL(raw); err == nil {
+			t.Errorf("expected error for %q", raw)
 		}
 	}
 }
@@ -235,6 +263,7 @@ func TestWithEndpointStoreAndLoad(t *testing.T) {
 }
 
 func TestWithHTTPClientReplacesDefault(t *testing.T) {
+	enableTestBypassSSRF(t)
 	// A custom http.Client round-trip is observable by
 	// pointing the dispatcher at a server and verifying
 	// the call lands.
@@ -252,7 +281,7 @@ func TestWithHTTPClientReplacesDefault(t *testing.T) {
 	d := NewDispatcher(slog.Default()).WithMaxRetries(0).WithHTTPClient(http.DefaultClient)
 	d.Register(&Endpoint{
 		ID:     "ep-custom",
-		URL: srv.URL, AllowPrivate: true,
+		URL: srv.URL, 
 		Events: []EventType{EventEvalCompleted},
 		Active: true,
 	})
@@ -321,13 +350,14 @@ func TestLoadFromStoreNoStore(t *testing.T) {
 }
 
 func TestValidateURLMissingHost(t *testing.T) {
-	err := ValidateURL("http://")
+	err := ValidateURL("https://")
 	if err == nil {
 		t.Error("expected error for missing host")
 	}
 }
 
 func TestDeliverHMACSigning(t *testing.T) {
+	enableTestBypassSSRF(t)
 
 	var mu sync.Mutex
 	var gotSignature string
@@ -342,7 +372,7 @@ func TestDeliverHMACSigning(t *testing.T) {
 	d := NewDispatcher(slog.Default()).WithMaxRetries(0)
 	d.Register(&Endpoint{
 		ID: "ep-hmac", URL: srv.URL, Secret: "my-secret",
-		AllowPrivate: true,
+		
 		Events:       []EventType{EventEvalCompleted}, Active: true,
 	})
 	d.Emit(&Event{ID: "evt-hmac", Type: EventEvalCompleted})
@@ -390,13 +420,15 @@ func TestSleepBackoffContextCancel(t *testing.T) {
 }
 
 func TestValidateURLRejectsPrivateIP(t *testing.T) {
-	err := ValidateURL("http://localhost")
+	BypassSSRF = false
+	err := ValidateURL("https://localhost")
 	if err == nil {
 		t.Error("expected error for private IP without ALLOW_PRIVATE")
 	}
 }
 
 func TestDeliverWithSecretAnd500(t *testing.T) {
+	enableTestBypassSSRF(t)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
