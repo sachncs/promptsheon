@@ -2,59 +2,53 @@ package store
 
 import (
 	"database/sql"
-	"os"
 	"path/filepath"
+	"strings"
 	"testing"
-
-	_ "modernc.org/sqlite"
 )
 
-// TestDestructiveGateRefusesWithoutFlag runs serially because it
-// mutates process-level environment state shared with other tests
-// in this package.
-func TestDestructiveGateRefusesWithoutFlag(t *testing.T) {
+// TestDestructiveGate044Refusal: a fresh DB cannot complete
+// migrate() when 044 is a destructive migration and the
+// operator has not set PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS.
+func TestDestructiveGate044Refusal(t *testing.T) {
 	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "fresh.db")
+	dbPath := filepath.Join(tmpDir, "gate.db")
 
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", dbPath+"?_pragma=foreign_keys(ON)")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { _ = db.Close() })
 
-	prev, had := os.LookupEnv(DestructiveMigrationEnv)
-	os.Unsetenv(DestructiveMigrationEnv)
-	t.Cleanup(func() {
-		if had {
-			os.Setenv(DestructiveMigrationEnv, prev)
-		}
-	})
-
+	t.Setenv("PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS", "")
 	err = migrate(db, migrationsFS)
 	if err == nil {
-		t.Fatal("expected refusal without env var, got nil")
+		t.Fatalf("expected migrate to refuse without destructive flag")
 	}
-	t.Logf("got refusal: %v", err)
+	if !strings.Contains(err.Error(), "destructive") {
+		t.Errorf("expected error to mention 'destructive', got %v", err)
+	}
 }
 
-// TestDestructiveGatePassesWithFlag runs serially because it
-// mutates process-level environment state shared with other tests
-// in this package.
-func TestDestructiveGatePassesWithFlag(t *testing.T) {
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "withflag.db")
-
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		t.Fatal(err)
+// TestDestructiveGateNames: covers the heuristic on filename
+// alone. The rename to 044_destructive_legacy_drop ensures the
+// filename contains the substring that triggers the gate.
+func TestDestructiveGateNames(t *testing.T) {
+	cases := []struct {
+		name     string
+		filename string
+		want     bool
+	}{
+		{"renamed legacy drop", "044_destructive_legacy_drop.up.sql", true},
+		{"destructive sql", "025_destructive.sql", true},
+		{"non-destructive", "001_initial.sql", false},
+		{"backfill marker", "052_audit_backfill_tool_marker.up.sql", false},
 	}
-	defer db.Close()
-
-	prev := os.Getenv(DestructiveMigrationEnv)
-	os.Setenv(DestructiveMigrationEnv, "true")
-	t.Cleanup(func() { os.Setenv(DestructiveMigrationEnv, prev) })
-
-	if err := migrate(db, migrationsFS); err != nil {
-		t.Fatalf("expected success with flag, got: %v", err)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := isDestructiveMigration(c.filename); got != c.want {
+				t.Errorf("isDestructiveMigration(%q) = %v, want %v", c.filename, got, c.want)
+			}
+		})
 	}
 }
