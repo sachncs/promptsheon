@@ -18,6 +18,7 @@ import (
 
 	"github.com/sachncs/promptsheon/internal/alerting"
 	"github.com/sachncs/promptsheon/internal/api"
+	"github.com/sachncs/promptsheon/internal/auth"
 	"github.com/sachncs/promptsheon/internal/buildinfo"
 	"github.com/sachncs/promptsheon/internal/config"
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
@@ -385,6 +386,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		api.WithWorkspaceRollups(rollupAgg),
 		api.WithInvoker(inv),
 		api.WithWorkflowEngine(workflow.NewEngine(workflow.DefaultRegistry())),
+		api.WithOAuth(buildOAuthManager(cfg)),
 	)
 
 	// releaseSvc is the application layer for the Release + Approval
@@ -410,6 +412,61 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 
 	srv := api.NewServer(db, logger, opts...)
 	return srv, limiter, spans, collector
+}
+
+// buildOAuthManager constructs an *auth.OAuthManager from
+// environment variables. Google and GitHub providers are
+// registered when all three of their env vars (CLIENT_ID,
+// CLIENT_SECRET, REDIRECT_URL) are present; otherwise they are
+// silently skipped. The login/callback routes work for any
+// provider that is registered.
+func buildOAuthManager(cfg *config.Config) *auth.OAuthManager {
+	mgr := auth.NewOAuthManager()
+	if google := buildGoogleOAuth(cfg); google != nil {
+		mgr.RegisterProvider("google", google)
+	}
+	if github := buildGitHubOAuth(cfg); github != nil {
+		mgr.RegisterProvider("github", github)
+	}
+	return mgr
+}
+
+func buildGoogleOAuth(cfg *config.Config) *auth.OAuthProvider {
+	clientID := os.Getenv("PROMPTSHEON_OAUTH_GOOGLE_CLIENT_ID")
+	clientSecret := os.Getenv("PROMPTSHEON_OAUTH_GOOGLE_CLIENT_SECRET")
+	redirectURL := os.Getenv("PROMPTSHEON_OAUTH_GOOGLE_REDIRECT_URL")
+	if clientID == "" || clientSecret == "" || redirectURL == "" {
+		return nil
+	}
+	return &auth.OAuthProvider{
+		Name:         "google",
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		RedirectURL:  redirectURL,
+		AuthURL:      "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:     "https://oauth2.googleapis.com/token",
+		UserInfoURL:  "https://openidconnect.googleapis.com/v1/userinfo",
+		Scopes:       []string{"openid", "email", "profile"},
+	}
+}
+
+func buildGitHubOAuth(cfg *config.Config) *auth.OAuthProvider {
+	clientID := os.Getenv("PROMPTSHEON_OAUTH_GITHUB_CLIENT_ID")
+	clientSecret := os.Getenv("PROMPTSHEON_OAUTH_GITHUB_CLIENT_SECRET")
+	redirectURL := os.Getenv("PROMPTSHEON_OAUTH_GITHUB_REDIRECT_URL")
+	if clientID == "" || clientSecret == "" || redirectURL == "" {
+		return nil
+	}
+	return &auth.OAuthProvider{
+		Name:         "github",
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		RedirectURL:  redirectURL,
+		AuthURL:      "https://github.com/login/oauth/authorize",
+		TokenURL:     "https://github.com/login/oauth/access_token",
+		UserInfoURL:  "https://api.github.com/user",
+		Scopes:       []string{"read:user", "user:email"},
+	}
 }
 
 // buildReleaseService constructs the application-layer release.Service
