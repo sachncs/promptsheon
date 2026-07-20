@@ -54,7 +54,9 @@ func TestMigration043FKHygieneApplies(t *testing.T) {
 		"schedules":            {"workspaces": true, "releases": true},
 		"releases":             {"releases": true},
 		"audit_entries":        {"users": true},
-		"guardrail_violations": {"guardrail_rules": true, "users": true},
+		"eval_results":         {"eval_runs": true},
+		"alert_rule_notification_groups": {"alert_rules": true, "notification_groups": true},
+		// guardrail_violations was dropped in migration 054.
 	}
 	got := map[string]map[string]bool{}
 	for rows.Next() {
@@ -92,8 +94,7 @@ func TestMigration043FKHygieneApplies(t *testing.T) {
 		`SELECT COUNT(*) FROM releases r1 LEFT JOIN releases r2 ON r2.id = r1.replaces_release_id WHERE r1.replaces_release_id != '' AND r2.id IS NULL`,
 		`SELECT COUNT(*) FROM releases r1 LEFT JOIN releases r2 ON r2.id = r1.superseded_by WHERE r1.superseded_by != '' AND r2.id IS NULL`,
 		`SELECT COUNT(*) FROM audit_entries a LEFT JOIN users u ON u.id = a.user_id WHERE u.id IS NULL`,
-		`SELECT COUNT(*) FROM guardrail_violations gv LEFT JOIN guardrail_rules gr ON gr.id = gv.rule_id WHERE gv.rule_id != '' AND gr.id IS NULL`,
-		`SELECT COUNT(*) FROM guardrail_violations gv LEFT JOIN users u ON u.id = gv.user_id WHERE gv.user_id != '' AND u.id IS NULL`,
+		// guardrail_violations was dropped in migration 054.
 	}
 	for _, q := range preflight {
 		var n int
