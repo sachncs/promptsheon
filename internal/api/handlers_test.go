@@ -93,6 +93,16 @@ func (m *mockRepo) CreateUser(_ context.Context, u *models.User) error {
 	m.users[u.ID] = u
 	return nil
 }
+func (m *mockRepo) BootstrapAdmin(_ context.Context, u *models.User, key *models.APIKey) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.users) > 0 {
+		return store.ErrConflict
+	}
+	m.users[u.ID] = u
+	m.apiKeys[key.ID] = key
+	return nil
+}
 func (m *mockRepo) GetUser(_ context.Context, id string) (*models.User, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -1576,8 +1586,8 @@ func TestHandleBootstrap_AlreadyUsers(t *testing.T) {
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusNotFound {
-		t.Errorf("expected 404, got %d: %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 

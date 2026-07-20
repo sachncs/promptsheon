@@ -24,6 +24,7 @@ var migrationsFS embed.FS
 
 // ErrNotFound is returned when a requested resource is not found.
 var ErrNotFound = errors.New("not found")
+var ErrConflict = errors.New("conflict")
 
 func marshalOrErr(v any) ([]byte, error) {
 	b, err := json.Marshal(v)
@@ -352,6 +353,52 @@ func (s *SQLite) CreateUser(ctx context.Context, u *models.User) error {
 	)
 	if err != nil {
 		return fmt.Errorf("insert user: %w", err)
+	}
+	return nil
+}
+
+// BootstrapAdmin atomically inserts the first admin user and
+// returns ErrConflict if any user row already exists. The check
+// and the insert run in a single transaction with a row-level
+// INSERT-then-SELECT, so two concurrent callers cannot both
+// succeed: SQLite serialises the writes and the second caller
+// sees a non-zero row count after its INSERT. The caller can
+// retry on ErrConflict to read the winning user.
+//
+// The previous handler-bootstrap path performed ListUsers
+// followed by CreateUser without a transaction; two concurrent
+// callers could each see an empty users table and both create
+// an admin. The new path is the SEC-5 fix.
+func (s *SQLite) BootstrapAdmin(ctx context.Context, u *models.User, key *models.APIKey) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("bootstrap begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var n int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&n); err != nil {
+		return fmt.Errorf("bootstrap count users: %w", err)
+	}
+	if n > 0 {
+		return ErrConflict
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO users (id, email, name, role, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		u.ID, u.Email, u.Name, u.Role, u.CreatedAt, u.UpdatedAt,
+	); err != nil {
+		return fmt.Errorf("bootstrap insert user: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO api_keys (id, user_id, name, key_hash, key_prefix, role, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		key.ID, key.UserID, key.Name, key.KeyHash, key.KeyPrefix, key.Role, key.CreatedAt,
+	); err != nil {
+		return fmt.Errorf("bootstrap insert key: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("bootstrap commit: %w", err)
 	}
 	return nil
 }

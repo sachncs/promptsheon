@@ -33,6 +33,7 @@ type Repository interface {
 	ListUsers(ctx context.Context) ([]*models.User, error)
 	UpdateUser(ctx context.Context, u *models.User) error
 	DeleteUser(ctx context.Context, id string) error
+	BootstrapAdmin(ctx context.Context, u *models.User, key *models.APIKey) error
 
 	// API Keys
 	CreateAPIKey(ctx context.Context, key *models.APIKey) error
