@@ -55,14 +55,12 @@ type Event struct {
 
 // Endpoint represents a configured webhook destination.
 type Endpoint struct {
-	ID            string      `json:"id"`
-	URL           string      `json:"url"`
-	Secret        string      `json:"secret,omitempty"` // for HMAC signing
-	AllowInsecure bool        `json:"allow_insecure"`
-	AllowPrivate  bool        `json:"allow_private"`
-	Events        []EventType `json:"events"`
-	Active        bool        `json:"active"`
-	CreatedAt     time.Time   `json:"created_at"`
+	ID        string      `json:"id"`
+	URL       string      `json:"url"`
+	Secret    string      `json:"secret,omitempty"` // for HMAC signing
+	Events    []EventType `json:"events"`
+	Active    bool        `json:"active"`
+	CreatedAt time.Time   `json:"created_at"`
 }
 
 // Delivery records the outcome of a webhook delivery attempt.
@@ -270,35 +268,36 @@ func (d *Dispatcher) EmitContext(ctx context.Context, evt *Event) {
 	}
 }
 
-// ValidateURL is the dispatcher-side SSRF check. The previous
-// implementation honoured PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE as a
-// global env-var override; that toggle was an SSRF enabler (any
-// caller could trigger webhook deliveries to private addresses once
-// the env was set). The new model is per-endpoint: callers that
-// legitimately need to deliver to loopback or RFC1918 hosts set
-// AllowPrivate=true on the endpoint at registration, which is
-// recorded in the audit log.
+// ValidateURL is the dispatcher-side SSRF check. Only https
+// is accepted and the host must resolve to a non-private,
+// non-loopback address. The previous per-endpoint allow_private
+// and allow_insecure flags were removed (SEC-4, SEC-11); no
+// caller can dial a private address through this surface.
 //
 // handlers_webhooks.go runs the same check at registration time.
-// The dispatcher re-runs ValidateURLFor every delivery to defeat
+// The dispatcher re-runs ValidateURL every delivery to defeat
 // DNS rebinding between registration and delivery.
-func ValidateURL(rawURL string) error { return ValidateURLFor(rawURL, false) }
+//
+// BypassSSRF is a process-wide escape hatch used by tests that
+// deliver to a loopback httptest server. Production wiring MUST
+// NOT set it; the dispatcher's default is to reject every
+// private, loopback, link-local, multicast, and unspecified
+// destination.
+var BypassSSRF = false
 
-// ValidateURLFor mirrors ValidateURL but lets the caller pass the
-// per-endpoint AllowPrivate flag.
-func ValidateURLFor(rawURL string, allowPrivate bool) error {
+func ValidateURL(rawURL string) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return err
 	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return fmt.Errorf("unsupported scheme %q", u.Scheme)
+	if u.Scheme != "https" && !(BypassSSRF && (u.Scheme == "http" || u.Scheme == "https")) {
+		return fmt.Errorf("unsupported scheme %q (only https is accepted)", u.Scheme)
 	}
 	host := u.Hostname()
 	if host == "" {
 		return fmt.Errorf("missing host")
 	}
-	if allowPrivate {
+	if BypassSSRF {
 		return nil
 	}
 	ips, err := net.LookupIP(host)
@@ -315,7 +314,7 @@ func ValidateURLFor(rawURL string, allowPrivate bool) error {
 
 func (d *Dispatcher) deliver(ctx context.Context, ep *Endpoint, evt *Event) {
 	// Re-validate the URL at delivery time to defeat DNS rebinding.
-	if err := ValidateURLFor(ep.URL, ep.AllowPrivate); err != nil {
+	if err := ValidateURL(ep.URL); err != nil {
 		d.recordDelivery(&Delivery{
 			ID:         generateID(),
 			EndpointID: ep.ID,
