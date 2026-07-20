@@ -400,13 +400,23 @@ func (s *SQLite) ListExecutions(ctx context.Context, filter capability.Execution
 
 	query += " ORDER BY timestamp DESC"
 
-	if filter.Limit > 0 {
-		query += " LIMIT ?"
-		args = append(args, filter.Limit)
+	limit := filter.Limit
+	if limit < 0 {
+		limit = 0
 	}
-	if filter.Offset > 0 {
-		query += " OFFSET ?"
+	if filter.Offset > 0 && limit == 0 {
+		limit = -1
+		query += " LIMIT -1 OFFSET ?"
 		args = append(args, filter.Offset)
+	} else {
+		if limit > 0 {
+			query += " LIMIT ?"
+			args = append(args, limit)
+		}
+		if filter.Offset > 0 {
+			query += " OFFSET ?"
+			args = append(args, filter.Offset)
+		}
 	}
 
 	rows, err := s.db.QueryContext(ctx, query, args...)

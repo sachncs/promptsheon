@@ -279,13 +279,26 @@ func (s *SQLite) ListAudit(ctx context.Context, filter *models.AuditFilter) ([]*
 
 	query += " ORDER BY timestamp DESC"
 
-	if filter.Limit > 0 {
-		query += " LIMIT ?"
-		args = append(args, filter.Limit)
+	// SQLite requires LIMIT before OFFSET and rejects an OFFSET
+	// clause without a LIMIT. Use LIMIT -1 (no row cap) when the
+	// caller asked for offset-only pagination.
+	limit := filter.Limit
+	if limit < 0 {
+		limit = 0
 	}
-	if filter.Offset > 0 {
-		query += " OFFSET ?"
+	if filter.Offset > 0 && limit == 0 {
+		limit = -1
+		query += " LIMIT -1 OFFSET ?"
 		args = append(args, filter.Offset)
+	} else {
+		if limit > 0 {
+			query += " LIMIT ?"
+			args = append(args, limit)
+		}
+		if filter.Offset > 0 {
+			query += " OFFSET ?"
+			args = append(args, filter.Offset)
+		}
 	}
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
