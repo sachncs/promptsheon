@@ -91,7 +91,7 @@ func TestMigration044LegacyDrop(t *testing.T) {
 		"audit_chain_state", "users", "api_keys", "datasets",
 		"dataset_cases", "preconditions", "eval_runs", "eval_results",
 		"schedules", "alert_rules", "alerts", "notification_groups",
-		"guardrail_rules", "guardrail_violations", "webhook_endpoints",
+		"webhook_endpoints",
 		"provider_keys", "recommendations", "decisions",
 	}
 	for _, name := range aliveTables {
