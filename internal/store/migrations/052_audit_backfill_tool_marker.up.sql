@@ -1,0 +1,46 @@
+-- Migration 048b (audit backfill): documentation marker.
+--
+-- The 048a migration added resource_kind and resource_id columns
+-- to audit_entries. 048a was a schema-only change; populating
+-- those columns for historical rows is an operator task that
+-- does NOT live in a regular .up.sql because the work depends
+-- on operational concerns (maintenance window, batch size,
+-- progress reporting) that don't belong in a single ALTER
+-- statement.
+--
+-- DO NOT MODIFY under this migration (or any subsequent):
+--   * audit_entries.previous_hash / entry_hash / timestamp_str chain format
+--   * audit_chain_state single-row layout
+--   * harness tables: datasets, dataset_cases, preconditions, eval_runs, eval_results
+--   * provider_keys (vault, AES-GCM ciphertext)
+--   * releases.status enum and uniq_releases_active_capability_env partial unique index
+--   * OpenAI / Anthropic provider contracts
+--
+-- Operator workflow:
+--   1. Schedule a maintenance window. The backfill is
+--      non-blocking (it batches with LIMIT/OFFSET and yields
+--      between batches), but on a 100M-row audit table it
+--      takes minutes to hours.
+--   2. Take a database backup. The migration is reversible
+--      (drop the columns; see 048_audit_normalize_schema.down.sql)
+--      but a backup is the safer rollback.
+--   3. Run the backfill tool:
+--         promptsheon audit-backfill --batch-size 10000
+--      The tool splits the resource string on the first ':'
+--      and writes kind + id to the new columns. Rows with no
+--      ':' separator get empty strings (which is what 048a
+--      inserts for new rows too).
+--   4. Verify the count of populated rows matches SELECT
+--      COUNT(*) FROM audit_entries.
+--   5. Re-run 048a is a no-op (the columns already exist).
+--
+-- The tool is implemented in cmd/promptsheon-auditbackfill/. It
+-- is invoked manually by operators; it is NOT a migration. The
+-- schema_migrations table does NOT record 048b because no
+-- schema change happens here.
+
+-- This file is intentionally empty of DDL so that the
+-- migration loader treats it as a no-op. The 048 prefix
+-- documents that this file belongs with the audit-normalize
+-- migration set.
+SELECT 1;

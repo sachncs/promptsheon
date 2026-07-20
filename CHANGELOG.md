@@ -74,6 +74,13 @@ A 50+ commit audit and remediation pass. Highlights:
 
 #### Misc
 
+- **`feat(store):` migration 048b (audit backfill tool)** —
+  the historical-row backfill for `resource_kind` /
+  `resource_id` added by 048a is now an operator command
+  (`cmd/promptsheon-auditbackfill`). Batched, idempotent,
+  signal-safe; the migration file itself is a no-op marker
+  documenting the operator workflow. See the 052 migration
+  header for the runbook.
 - **`feat(workflow):` `Engine.Run` with sequential steps and
   cross-step data flow**; wired into `/api/v1/workflows/run`.
 - **`fix(redactor):` thread-safe `Enable`/`Disable`; Luhn
