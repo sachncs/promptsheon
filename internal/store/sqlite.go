@@ -789,13 +789,47 @@ func (s *SQLite) SaveNotificationGroup(ctx context.Context, g *models.Notificati
 	if err != nil {
 		return fmt.Errorf("marshal notification channels: %w", err)
 	}
+	// INSERT ... ON CONFLICT DO UPDATE preserves any child rows in
+	// alert_rule_notification_groups that reference this group's
+	// primary key. INSERT OR REPLACE deletes + reinserts and would
+	// cascade the M2M link into oblivion.
 	_, err = s.db.ExecContext(ctx, `
-		INSERT OR REPLACE INTO notification_groups (id, name, channels)
-		VALUES (?, ?, ?)`,
+		INSERT INTO notification_groups (id, name, channels)
+		VALUES (?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET name=excluded.name, channels=excluded.channels`,
 		g.ID, g.Name, channelsJSON,
 	)
 	if err != nil {
 		return fmt.Errorf("save notification group: %w", err)
+	}
+	return nil
+}
+
+// LinkRuleToGroup creates a row in the alert_rule_notification_groups
+// M2M table. Idempotent: re-linking an existing pair is a no-op.
+func (s *SQLite) LinkRuleToGroup(ctx context.Context, ruleID, groupID string) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT OR IGNORE INTO alert_rule_notification_groups (alert_rule_id, notification_group_id)
+		VALUES (?, ?)`,
+		ruleID, groupID,
+	)
+	if err != nil {
+		return fmt.Errorf("link rule to group: %w", err)
+	}
+	return nil
+}
+
+// UnlinkRuleFromGroup removes a row from the
+// alert_rule_notification_groups M2M table. Returns nil whether
+// or not the row existed.
+func (s *SQLite) UnlinkRuleFromGroup(ctx context.Context, ruleID, groupID string) error {
+	_, err := s.db.ExecContext(ctx, `
+		DELETE FROM alert_rule_notification_groups
+		 WHERE alert_rule_id = ? AND notification_group_id = ?`,
+		ruleID, groupID,
+	)
+	if err != nil {
+		return fmt.Errorf("unlink rule from group: %w", err)
 	}
 	return nil
 }
@@ -835,9 +869,9 @@ func (s *SQLite) ListNotificationGroups(ctx context.Context) ([]*models.Notifica
 // GetChannelsForAlertRule returns the union of channels across
 // all notification groups wired to the rule. Returns nil if the
 // rule has no M2M rows. The channels column is JSON-encoded
-// (e.g. '["webhook"]'); each row contributes its decoded
-// channels to the result. The caller is the alerting manager,
-// which is the only place the M2M is queried.
+// (e.g. '["webhook","log"]'); each value is decoded and the
+// union is deduplicated and sorted so the alerting manager gets
+// a stable list rather than a JSON-encoded blob per group.
 func (s *SQLite) GetChannelsForAlertRule(ctx context.Context, ruleID string) ([]string, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT ng.channels
@@ -850,21 +884,32 @@ func (s *SQLite) GetChannelsForAlertRule(ctx context.Context, ruleID string) ([]
 	}
 	defer func() { _ = rows.Close() }()
 
+	seen := make(map[string]struct{})
 	var channels []string
 	for rows.Next() {
-		var ch string
-		if err := rows.Scan(&ch); err != nil {
+		var chJSON string
+		if err := rows.Scan(&chJSON); err != nil {
 			return nil, fmt.Errorf("scan channels: %w", err)
 		}
-		// Each row's channels is a JSON array. We do not parse
-		// it here; the alerting manager gets the raw string and
-		// the dispatcher interprets it. Empty arrays stay empty.
-		if ch == "" || ch == "[]" {
+		if chJSON == "" || chJSON == "[]" {
 			continue
 		}
-		channels = append(channels, ch)
+		var perGroup []string
+		if err := json.Unmarshal([]byte(chJSON), &perGroup); err != nil {
+			return nil, fmt.Errorf("decode channels %q: %w", chJSON, err)
+		}
+		for _, c := range perGroup {
+			if _, ok := seen[c]; ok {
+				continue
+			}
+			seen[c] = struct{}{}
+			channels = append(channels, c)
+		}
 	}
-	return channels, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return channels, nil
 }
 
 func scanNotificationGroup(row scannable) (*models.NotificationGroupRecord, error) {
