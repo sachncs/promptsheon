@@ -173,6 +173,10 @@ func (s *Server) handleAddNotificationGroup(w http.ResponseWriter, r *http.Reque
 	}
 
 	s.alertingManager.AddNotificationGroup(group)
+	s.audit(r.Context(), "notification_group_create", "notification_group:"+group.ID, map[string]any{
+		"name":     group.Name,
+		"channels": group.Channels,
+	})
 	writeJSON(w, http.StatusCreated, group)
 	return nil
 }
