@@ -28,32 +28,114 @@
 -- code already validates these fields at the Go level. The
 -- constraint catches typos that escape the validation (e.g. a
 -- raw string from a test fixture).
+--
+-- SQLite does not support ALTER TABLE ... ADD CONSTRAINT, so
+-- each rebuild follows: data cleanup -> create new table with
+-- CHECK -> INSERT SELECT -> drop old -> rename new.
 
--- executions.environment: closed set of environments.
-UPDATE executions SET environment = 'dev'
- WHERE environment NOT IN ('dev', 'staging', 'prod', '');
-ALTER TABLE executions ADD CONSTRAINT chk_executions_env
-  CHECK (environment IN ('dev', 'staging', 'prod', ''));
+PRAGMA foreign_keys=OFF;
 
--- releases.environment: same closed set, no empty.
-UPDATE releases SET environment = 'dev'
- WHERE environment NOT IN ('dev', 'staging', 'prod');
-ALTER TABLE releases ADD CONSTRAINT chk_releases_env
-  CHECK (environment IN ('dev', 'staging', 'prod'));
+-- 1. Truncate bad data first.
+UPDATE executions  SET environment = 'dev' WHERE environment NOT IN ('dev', 'staging', 'prod', '');
+UPDATE releases    SET environment = 'dev' WHERE environment NOT IN ('dev', 'staging', 'prod');
+UPDATE alerts      SET status      = 'active' WHERE status NOT IN ('active', 'resolved');
+UPDATE eval_results SET passed     = 0     WHERE passed NOT IN (0, 1);
 
--- alerts.status: active | resolved.
-UPDATE alerts SET status = 'active'
- WHERE status NOT IN ('active', 'resolved');
-ALTER TABLE alerts ADD CONSTRAINT chk_alert_status
-  CHECK (status IN ('active', 'resolved'));
+-- 2. Rebuild executions with the CHECK baked into CREATE TABLE.
+CREATE TABLE executions_new (
+    id                   TEXT PRIMARY KEY,
+    capability_version_id TEXT NOT NULL REFERENCES capability_versions(id),
+    timestamp            DATETIME NOT NULL,
+    inputs                TEXT DEFAULT '{}',
+    outputs               TEXT DEFAULT '{}',
+    model                 TEXT DEFAULT '',
+    provider              TEXT DEFAULT '',
+    latency_ms            INTEGER DEFAULT 0,
+    cost_usd              REAL DEFAULT 0.0,
+    prompt_tokens         INTEGER DEFAULT 0,
+    completion_tokens     INTEGER DEFAULT 0,
+    total_tokens          INTEGER DEFAULT 0,
+    error                 TEXT DEFAULT '',
+    trace_id              TEXT DEFAULT '',
+    environment           TEXT DEFAULT '' CHECK (environment IN ('dev','staging','prod',''))
+);
+INSERT INTO executions_new
+    SELECT id, capability_version_id, timestamp, inputs, outputs, model, provider,
+           latency_ms, cost_usd, prompt_tokens, completion_tokens, total_tokens,
+           error, trace_id, environment
+      FROM executions;
+DROP TABLE executions;
+ALTER TABLE executions_new RENAME TO executions;
+CREATE INDEX idx_executions_version   ON executions(capability_version_id);
+CREATE INDEX idx_executions_timestamp ON executions(timestamp);
 
--- eval_results.passed: 0 | 1.
-UPDATE eval_results SET passed = 0 WHERE passed NOT IN (0, 1);
-ALTER TABLE eval_results ADD CONSTRAINT chk_er_passed
-  CHECK (passed IN (0, 1));
+-- 3. Rebuild releases with the CHECK baked into CREATE TABLE.
+CREATE TABLE releases_new (
+    id                  TEXT    PRIMARY KEY,
+    capability_id       TEXT    NOT NULL REFERENCES capabilities(id) ON DELETE CASCADE,
+    capability_version  INTEGER NOT NULL,
+    manifest            TEXT    NOT NULL DEFAULT '{}',
+    environment         TEXT    NOT NULL CHECK (environment IN ('dev','staging','prod')),
+    status              TEXT    NOT NULL DEFAULT 'pending',
+    approved_by         TEXT    NOT NULL DEFAULT '[]',
+    superseded_by       TEXT             DEFAULT NULL REFERENCES releases(id) ON DELETE SET NULL,
+    replaces_release_id TEXT             DEFAULT NULL REFERENCES releases(id) ON DELETE SET NULL,
+    created_at          DATETIME NOT NULL,
+    created_by          TEXT    NOT NULL DEFAULT '',
+    activated_at        DATETIME,
+    superseded_at       DATETIME
+);
+INSERT INTO releases_new
+    SELECT id, capability_id, capability_version, manifest, environment, status,
+           approved_by,
+           NULLIF(superseded_by, ''),
+           NULLIF(replaces_release_id, ''),
+           created_at, created_by, activated_at, superseded_at
+      FROM releases;
+DROP TABLE releases;
+ALTER TABLE releases_new RENAME TO releases;
+CREATE INDEX idx_releases_capability          ON releases(capability_id);
+CREATE INDEX idx_releases_environment_status  ON releases(environment, status);
+CREATE INDEX idx_releases_status              ON releases(status);
+CREATE UNIQUE INDEX uniq_releases_active_capability_env
+  ON releases (capability_id, environment) WHERE status = 'active';
 
--- schedules has no environment column (the cron / webhook
--- fields are environment-agnostic; the associated release's
--- environment is what matters). No CHECK for schedules.kind
--- either — the closed set is enforced in Go via
--- schedule.KindCron / schedule.KindManual / etc.
+-- 4. Rebuild alerts with the CHECK baked into CREATE TABLE.
+CREATE TABLE alerts_new (
+    id            TEXT PRIMARY KEY,
+    rule_id       TEXT NOT NULL REFERENCES alert_rules(id),
+    rule_name     TEXT NOT NULL,
+    severity      TEXT NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','resolved')),
+    message       TEXT NOT NULL,
+    details       TEXT,
+    triggered_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    resolved_at   DATETIME
+);
+INSERT INTO alerts_new
+    SELECT id, rule_id, rule_name, severity, status, message, details, triggered_at, resolved_at
+      FROM alerts;
+DROP TABLE alerts;
+ALTER TABLE alerts_new RENAME TO alerts;
+CREATE INDEX idx_alerts_rule_triggered ON alerts(rule_id, triggered_at DESC);
+CREATE INDEX idx_alerts_status         ON alerts(status);
+
+-- 5. Rebuild eval_results with the CHECK baked into CREATE TABLE.
+CREATE TABLE eval_results_new (
+    id         TEXT PRIMARY KEY,
+    run_id     TEXT NOT NULL REFERENCES eval_runs(id) ON DELETE CASCADE,
+    case_id    TEXT NOT NULL,
+    seq        INTEGER NOT NULL,
+    passed     INTEGER NOT NULL DEFAULT 0 CHECK (passed IN (0, 1)),
+    actual     TEXT NOT NULL DEFAULT '{}',
+    error      TEXT NOT NULL DEFAULT '',
+    latency_ms INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO eval_results_new
+    SELECT id, run_id, case_id, seq, passed, actual, error, latency_ms
+      FROM eval_results;
+DROP TABLE eval_results;
+ALTER TABLE eval_results_new RENAME TO eval_results;
+CREATE INDEX idx_eval_results_run ON eval_results(run_id, seq);
+
+PRAGMA foreign_keys=ON;
