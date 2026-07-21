@@ -1000,43 +1000,35 @@ func (s *SQLite) ListNotificationGroups(ctx context.Context) ([]*models.Notifica
 
 // GetChannelsForAlertRule returns the union of channels across
 // all notification groups wired to the rule. Returns nil if the
-// rule has no M2M rows. The channels column is JSON-encoded
-// (e.g. '["webhook","log"]'); each value is decoded and the
-// union is deduplicated and sorted so the alerting manager gets
-// a stable list rather than a JSON-encoded blob per group.
+// rule has no M2M rows.
+//
+// DB-10a: the channels column is JSON-encoded (e.g.
+// '["webhook","log"]'). The query flattens the JSON array into
+// rows via SQLite's json_each so each channel arrives as its
+// own row, dedup happens at the SQL level (DISTINCT), and the
+// alerting manager receives a stable sorted list. No Go-side
+// JSON unmarshal of the channel blob.
 func (s *SQLite) GetChannelsForAlertRule(ctx context.Context, ruleID string) ([]string, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT ng.channels
+		`SELECT DISTINCT json_each.value
 		   FROM alert_rule_notification_groups m2m
 		   JOIN notification_groups ng ON ng.id = m2m.notification_group_id
-		  WHERE m2m.alert_rule_id = ?`,
+		   JOIN json_each(ng.channels)
+		  WHERE m2m.alert_rule_id = ?
+		  ORDER BY json_each.value`,
 		ruleID)
 	if err != nil {
 		return nil, fmt.Errorf("channels for alert rule: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
-	seen := make(map[string]struct{})
 	var channels []string
 	for rows.Next() {
-		var chJSON string
-		if err := rows.Scan(&chJSON); err != nil {
+		var c string
+		if err := rows.Scan(&c); err != nil {
 			return nil, fmt.Errorf("scan channels: %w", err)
 		}
-		if chJSON == "" || chJSON == "[]" {
-			continue
-		}
-		var perGroup []string
-		if err := json.Unmarshal([]byte(chJSON), &perGroup); err != nil {
-			return nil, fmt.Errorf("decode channels %q: %w", chJSON, err)
-		}
-		for _, c := range perGroup {
-			if _, ok := seen[c]; ok {
-				continue
-			}
-			seen[c] = struct{}{}
-			channels = append(channels, c)
-		}
+		channels = append(channels, c)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
