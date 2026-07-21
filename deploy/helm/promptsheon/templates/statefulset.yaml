@@ -74,6 +74,16 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/promptsheon
+          # Startup probe: gives a fresh pod generous headroom for
+          # first-boot migrations and audit-chain verification. The
+          # liveness probe only fires after startup succeeds.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 60
       volumes:
         - name: data
           persistentVolumeClaim:

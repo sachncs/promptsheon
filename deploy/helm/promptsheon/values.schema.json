@@ -10,8 +10,8 @@
     "replicaCount": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 1,
-      "description": "SQLite is single-writer; multi-replica is unsupported. The Postgres backend was removed."
+      "maximum": 3,
+      "description": "Up to 3 replicas are supported when the SQLite WAL writer-leader-election layer is enabled. Single-replica is the default; multi-replica requires a writable PVC per pod. The Postgres backend was removed."
     },
     "config": {
       "type": "object",
@@ -35,6 +35,25 @@
     },
     "insecureLoopback": {
       "type": "boolean"
+    },
+    "autoscaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "minReplicas": {"type": "integer", "minimum": 1, "maximum": 10},
+        "maxReplicas": {"type": "integer", "minimum": 1, "maximum": 10},
+        "targetCPUUtilizationPercentage": {"type": "integer", "minimum": 10, "maximum": 100},
+        "targetMemoryUtilizationPercentage": {"type": "integer", "minimum": 10, "maximum": 100}
+      }
+    },
+    "leaderElection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "ttlSeconds": {"type": "integer", "minimum": 1, "maximum": 600}
+      }
     }
   },
   "allOf": [
@@ -54,6 +73,15 @@
       "then": {
         "required": ["insecureLoopback"],
         "properties": { "insecureLoopback": { "const": true } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "autoscaling": { "properties": { "enabled": { "const": true } } } }
+      },
+      "then": {
+        "required": ["leaderElection"],
+        "properties": { "leaderElection": { "properties": { "enabled": { "const": true } } } }
       }
     }
   ]

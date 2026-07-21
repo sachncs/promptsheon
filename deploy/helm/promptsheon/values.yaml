@@ -53,3 +53,23 @@ vault:
 # this false and rely on PROMPTSHEON_AUTH=true. The values schema
 # rejects replicaCount>1 when this is enabled.
 insecureLoopback: false
+
+# Horizontal Pod Autoscaler. Disabled by default because the
+# StatefulSet runs a single SQLite writer; multi-replica requires
+# leader election on top of a writable PVC per pod. Enable with
+# autoscaling.enabled=true once the leader-election layer is
+# shipped.
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Leader election. When enabled the daemon uses an advisory lock
+# in SQLite to elect a single writer; non-leaders stay online
+# for reads but refuse writes. Required for replicaCount>1.
+leaderElection:
+  enabled: false
+  ttlSeconds: 30
+
