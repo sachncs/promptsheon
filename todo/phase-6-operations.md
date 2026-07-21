@@ -4,13 +4,13 @@ All operations findings. Fast forward: replace, don't shim.
 
 ## Replicas and scaling
 
-- [ ] **OPS-1a** Remove the `replicaCount == 1` constraint from `values.schema.json`.
+- [x] **OPS-1a** Remove the `replicaCount == 1` constraint from `values.schema.json`.
   - **Where**: `deploy/helm/promptsheon/values.schema.json:13`.
 
-- [ ] **OPS-1b** Add a leader-election layer (e.g. SQLite advisory lock via `PRAGMA user_version` swap) so multi-replica is safe.
+- [x] **OPS-1b** Add a leader-election layer (e.g. SQLite advisory lock via `PRAGMA user_version` swap) so multi-replica is safe.
   - **Where**: new file `internal/election/sqlite.go` and `cmd/promptsheond/main.go`.
 
-- [ ] **OPS-2a** Add an HPA template scaled on `promptsheon_http_requests_total` rate.
+- [x] **OPS-2a** Add an HPA template scaled on `promptsheon_http_requests_total` rate.
   - **Where**: `deploy/helm/promptsheon/templates/hpa.yaml` (new).
 
 - [ ] **OPS-2b** Add a `PodDisruptionBudget` (already present at `pdb.yaml`) — verify `minAvailable` is sane.
@@ -18,12 +18,12 @@ All operations findings. Fast forward: replace, don't shim.
 - [ ] **OPS-2c** Add `topologySpreadConstraints` and `priorityClassName` for production-grade scheduling.
   - **Where**: `deploy/helm/promptsheon/templates/statefulset.yaml`.
 
-- [ ] **OPS-2d** Add a `startupProbe` with a generous failure threshold for first-boot migrations.
+- [x] **OPS-2d** Add a `startupProbe` with a generous failure threshold for first-boot migrations.
   - **Where**: `deploy/helm/promptsheon/templates/statefulset.yaml:42-57`.
 
 ## Health and probes
 
-- [ ] **OPS-12** Add a `startupProbe` to the Helm chart.
+- [x] **OPS-12** Add a `startupProbe` to the Helm chart.
 
 - [ ] **OPS-13** Replace `wget` in the Dockerfile's `HEALTHCHECK` with a Go probe binary.
 

@@ -4,7 +4,7 @@ All API findings. Fast forward: replace, don't deprecate.
 
 ## OpenAPI
 
-- [ ] **API-1** Extend `scripts/genopenapi` to walk every `register*Routes()` method. (See Phase 0.)
+- [x] **API-1** Extend `scripts/genopenapi` to walk every `register*Routes()` method. (See Phase 0.)
 - [ ] **DOC-2** Set `api/openapi.yaml:version` to match the product. (See Phase 0.)
 
 - [ ] **API-5a** Generate real request/response schemas for every route, not `type: object` placeholders.
@@ -23,13 +23,13 @@ All API findings. Fast forward: replace, don't deprecate.
 
 ## Pagination
 
-- [ ] **API-3a** Add a `Limit/Offset` query-param helper and apply to: workspace list, project list, capability list, version list, execution list, alert rule list, alert list, webhook list, dataset list, precondition list, eval run list, vault key list, user list.
+- [x] **API-3a** Add a `Limit/Offset` query-param helper and apply to: workspace list, project list, capability list, version list, execution list, alert rule list, alert list, webhook list, dataset list, precondition list, eval run list, vault key list, user list.
   - **Where**: `internal/api/handlers_capabilities.go`, `handlers_alerting.go`, `handlers_webhooks.go`, `handlers_harness.go`, `handlers_users.go`, `handlers_vault.go`, `internal/api/pagination.go` (new).
 
 - [ ] **API-3b** Add a `Link` header (RFC 5988) on every paginated list endpoint.
   - **Where**: new helper `internal/api/pagination.go`.
 
-- [ ] **API-3c** Standardise on limit cap 1000, default 50, error on `limit<1` or `limit>1000`.
+- [x] **API-3c** Standardise on limit cap 1000, default 50, error on `limit<1` or `limit>1000`.
   - **Where**: every list handler.
 
 ## Error model
@@ -57,7 +57,7 @@ All API findings. Fast forward: replace, don't deprecate.
 - [ ] **API-VAL-5** Validate `req.Threshold > 0` for alert rules.
   - **Where**: `internal/api/handlers_alerting.go:24`.
 
-- [ ] **API-VAL-6** Validate `req.Email` format and `req.Role` against the closed set on user create/update.
+- [x] **API-VAL-6** Validate `req.Email` format and `req.Role` against the closed set on user create/update.
   - **Where**: `internal/api/handlers_users.go`.
 
 - [ ] **API-VAL-7** Validate `req.Events` against registered event types on webhook create.
@@ -83,7 +83,7 @@ All API findings. Fast forward: replace, don't deprecate.
 
 ## Manager-not-configured consistency
 
-- [ ] **API-CONS-1** Standardise the "manager not configured" response across alerting/webhook/health. Pick one: always 503.
+- [x] **API-CONS-1** Standardise the "manager not configured" response across alerting/webhook/health. Pick one: always 503.
   - **Where**: `internal/api/handlers_alerting.go`, `handlers_webhooks.go`, `handlers_workflow.go`.
 
 - [ ] **API-CONS-2** Standardise DELETE behaviour: always `204 No Content`. Remove `200 OK` with `{"deleted": id}` from webhook delete.

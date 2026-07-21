@@ -4,15 +4,15 @@ Hot-path and allocation improvements. Fast forward.
 
 ## Trace writes (Critical)
 
-- [ ] **PERF-1** Move trace writes off the request path. (See Phase 0 OBS-1a.)
+- [x] **PERF-1** Move trace writes off the request path. (See Phase 0 OBS-1a.)
 
 ## Audit pipeline
 
-- [ ] **PERF-2** Export `auditDropped` and `traceDropped` counters to Prometheus. (See Phase 3 OBS-7.)
+- [x] **PERF-2** Export `auditDropped` and `traceDropped` counters to Prometheus. (See Phase 3 OBS-7.)
 
 ## Histogram quantiles
 
-- [ ] **PERF-3a** Replace `Percentile`'s O(N log N) sort with a fixed-bucket t-digest.
+- [x] **PERF-3a** Replace `Percentile`'s O(N log N) sort with a fixed-bucket t-digest.
   - **Where**: `internal/metrics/collector.go:97-114`.
 
 - [ ] **PERF-3b** Add a benchmark that pins the percentile cost at p99 of < 1 ms for 10k samples.
@@ -27,7 +27,7 @@ Hot-path and allocation improvements. Fast forward.
 
 ## Lock contention
 
-- [ ] **PERF-4a** Shard `DefaultEnforcer` by workspace hash so the global mutex becomes per-shard.
+- [x] **PERF-4a** Shard `DefaultEnforcer` by workspace hash so the global mutex becomes per-shard.
   - **Where**: `internal/invoke/invoke.go:118-183`.
 
 - [ ] **PERF-4b** Replace `observation.Aggregator`'s global mutex with per-key locks.

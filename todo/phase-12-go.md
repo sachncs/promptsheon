@@ -11,10 +11,10 @@ Code-quality and idiomatic Go improvements. Fast forward.
 
 ## Context propagation
 
-- [ ] **GO-2** Add a `context.Context` parameter to `migrate()` and propagate cancellation through `applyMigration`.
+- [x] **GO-2** Add a `context.Context` parameter to `migrate()` and propagate cancellation through `applyMigration`.
   - **Where**: `internal/store/migrate.go:32-142`.
 
-- [ ] **GO-3** Have `*trace.SQLite.Finish` honour the passed `ctx` (currently always uses `context.Background()`).
+- [x] **GO-3** Have `*trace.SQLite.Finish` honour the passed `ctx` (currently always uses `context.Background()`).
   - **Where**: `internal/trace/sqlite.go:93, 98`.
 
 - [ ] **GO-CTX-1** Replace `context.Background()` with a cancellable context in `alerting/manager.go` (alert persistence).

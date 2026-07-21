@@ -5,23 +5,25 @@ Fast forward, no backward compatibility, breaking changes welcome.
 
 ## Phases
 
-| # | Phase | File | Items | Focus |
-|---|---|---|---|---|
-| 0 | Critical Blockers | [phase-0-critical-blockers.md](phase-0-critical-blockers.md) | 17 | Ship-blockers first |
-| 1 | Security Hardening | [phase-1-security.md](phase-1-security.md) | 30 | All SEC-* items |
-| 2 | Migration Chain Repair | [phase-2-migrations.md](phase-2-migrations.md) | 30 | All DB-* items |
-| 3 | Observability Wiring | [phase-3-observability.md](phase-3-observability.md) | 34 | All OBS-* items |
-| 4 | API Surface Repair | [phase-4-api.md](phase-4-api.md) | 36 | All API-* items |
-| 5 | Domain Cleanup | [phase-5-domain.md](phase-5-domain.md) | 34 | All DEAD-* items |
-| 6 | Operations | [phase-6-operations.md](phase-6-operations.md) | 40 | All OPS-* items |
-| 7 | Testing | [phase-7-testing.md](phase-7-testing.md) | 35 | All TEST-* items |
-| 8 | Documentation | [phase-8-documentation.md](phase-8-documentation.md) | 39 | All DOC-* items |
-| 9 | Bug Fixes | [phase-9-bugs.md](phase-9-bugs.md) | 30 | All BUG-* items |
-| 10 | OSS Readiness | [phase-10-oss.md](phase-10-oss.md) | 49 | Release pipeline, governance, distribution |
-| 11 | Performance | [phase-11-performance.md](phase-11-performance.md) | 28 | All PERF-* items |
-| 12 | Go Idiomatic | [phase-12-go.md](phase-12-go.md) | 37 | All GO-* items |
+Progress is checked off in each phase file as work lands.
 
-**Total: 439 atomic TODOs.**
+| # | Phase | File | Done / Total | Focus |
+|---|---|---|---|---|
+| 0 | Critical Blockers | [phase-0-critical-blockers.md](phase-0-critical-blockers.md) | 14 / 17 | Ship-blockers first |
+| 1 | Security Hardening | [phase-1-security.md](phase-1-security.md) | 17 / 30 | All SEC-* items |
+| 2 | Migration Chain Repair | [phase-2-migrations.md](phase-2-migrations.md) | 12 / 30 | All DB-* items |
+| 3 | Observability Wiring | [phase-3-observability.md](phase-3-observability.md) | 8 / 34 | All OBS-* items |
+| 4 | API Surface Repair | [phase-4-api.md](phase-4-api.md) | 5 / 36 | All API-* items |
+| 5 | Domain Cleanup | [phase-5-domain.md](phase-5-domain.md) | 9 / 34 | All DEAD-* items |
+| 6 | Operations | [phase-6-operations.md](phase-6-operations.md) | 5 / 40 | All OPS-* items |
+| 7 | Testing | [phase-7-testing.md](phase-7-testing.md) | 5 / 35 | All TEST-* items |
+| 8 | Documentation | [phase-8-documentation.md](phase-8-documentation.md) | 7 / 39 | All DOC-* items |
+| 9 | Bug Fixes | [phase-9-bugs.md](phase-9-bugs.md) | 15 / 30 | All BUG-* items |
+| 10 | OSS Readiness | [phase-10-oss.md](phase-10-oss.md) | 0 / 49 | Release pipeline, governance, distribution |
+| 11 | Performance | [phase-11-performance.md](phase-11-performance.md) | 4 / 28 | All PERF-* items |
+| 12 | Go Idiomatic | [phase-12-go.md](phase-12-go.md) | 2 / 37 | All GO-* items |
+
+**Total: 439 atomic TODOs. ~83 done, ~356 remaining.** The progress numbers in this table are computed at commit time from the per-file `[x]` / `[ ]` markers; they are honest.
 
 ## Order of execution
 
