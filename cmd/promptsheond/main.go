@@ -20,6 +20,8 @@ import (
 	"github.com/sachncs/promptsheon/internal/api"
 	"github.com/sachncs/promptsheon/internal/auth"
 	"github.com/sachncs/promptsheon/internal/buildinfo"
+	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/optimizer/rules"
 	"github.com/sachncs/promptsheon/internal/config"
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
 	"github.com/sachncs/promptsheon/internal/eventbus"
@@ -331,11 +333,25 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	// the HTTP API and surface via the existing
 	// /recommendations routes.
 	recRepo := recommendation.NewSQLiteRepository(db.DB())
-	_ = recRepo // referenced for the producer; the producer
-	// itself runs in a background goroutine and is not yet
-	// instantiated in the production wiring. The repository
-	// is reachable through the Store.Repository interface for
-	// future HTTP handlers.
+	recBus := eventbus.NewMemory()
+	recSink := func(ctx context.Context, r *capability.Recommendation) error {
+		return recRepo.CreateRecommendation(ctx, r)
+	}
+	recProducer := recommendation.New(agg, rules.NewEngine(), recBus, recSink, logger)
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-rootCtx.Done():
+				return
+			case t := <-ticker.C:
+				if _, err := recProducer.Tick(rootCtx, t); err != nil {
+					logger.Warn("recommendation tick failed", "err", err)
+				}
+			}
+		}
+	}()
 
 	inv := invoke.New(enforcer, agg, executor.New(nil, func(ctx context.Context, req executor.InvokeRequest) (executor.InvokeResult, error) {
 		// Provider routing: the canonical request now carries an
