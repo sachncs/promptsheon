@@ -2522,8 +2522,8 @@ func TestHandleListAlertRules_NilManager(t *testing.T) {
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -2556,8 +2556,8 @@ func TestHandleCreateAlertRule_NilManager(t *testing.T) {
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -2617,8 +2617,8 @@ func TestHandleGetAlertRule_NilManager(t *testing.T) {
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -2684,8 +2684,8 @@ func TestHandleListAlerts_NilManager(t *testing.T) {
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -2709,8 +2709,8 @@ func TestHandleResolveAlert_NilManager(t *testing.T) {
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -2743,8 +2743,8 @@ func TestHandleAddNotificationGroup_NilManager(t *testing.T) {
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 

@@ -9,8 +9,7 @@ import (
 
 func (s *Server) handleListAlertRules(w http.ResponseWriter, r *http.Request) error {
 	if s.alertingManager == nil {
-		writeJSON(w, http.StatusOK, []*alerting.AlertRule{})
-		return nil
+		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
 	}
 	limit, offset, err := parsePagination(r)
 	if err != nil {
@@ -26,7 +25,7 @@ func (s *Server) handleListAlertRules(w http.ResponseWriter, r *http.Request) er
 
 func (s *Server) handleCreateAlertRule(w http.ResponseWriter, r *http.Request) error {
 	if s.alertingManager == nil {
-		return badRequest("alerting manager not configured")
+		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
 	}
 
 	var req struct {
@@ -70,7 +69,7 @@ func (s *Server) handleCreateAlertRule(w http.ResponseWriter, r *http.Request) e
 func (s *Server) handleGetAlertRule(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if s.alertingManager == nil {
-		return badRequest("alerting manager not configured")
+		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
 	}
 	rule, ok := s.alertingManager.GetRule(id)
 	if !ok {
@@ -83,7 +82,7 @@ func (s *Server) handleGetAlertRule(w http.ResponseWriter, r *http.Request) erro
 func (s *Server) handleUpdateAlertRule(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if s.alertingManager == nil {
-		return badRequest("alerting manager not configured")
+		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
 	}
 
 	existing, ok := s.alertingManager.GetRule(id)
@@ -124,7 +123,7 @@ func (s *Server) handleUpdateAlertRule(w http.ResponseWriter, r *http.Request) e
 func (s *Server) handleDeleteAlertRule(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if s.alertingManager == nil {
-		return badRequest("alerting manager not configured")
+		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
 	}
 	s.alertingManager.RemoveRule(id)
 	s.audit(r.Context(), "delete", "alert_rule:"+id, nil)
@@ -134,8 +133,7 @@ func (s *Server) handleDeleteAlertRule(w http.ResponseWriter, r *http.Request) e
 
 func (s *Server) handleListAlerts(w http.ResponseWriter, r *http.Request) error {
 	if s.alertingManager == nil {
-		writeJSON(w, http.StatusOK, []*alerting.Alert{})
-		return nil
+		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
 	}
 	limit, offset, err := parsePagination(r)
 	if err != nil {
@@ -152,7 +150,7 @@ func (s *Server) handleListAlerts(w http.ResponseWriter, r *http.Request) error 
 func (s *Server) handleResolveAlert(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if s.alertingManager == nil {
-		return badRequest("alerting manager not configured")
+		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
 	}
 	if !s.alertingManager.ResolveAlert(id) {
 		return ErrNotFound
@@ -163,7 +161,7 @@ func (s *Server) handleResolveAlert(w http.ResponseWriter, r *http.Request) erro
 
 func (s *Server) handleAddNotificationGroup(w http.ResponseWriter, r *http.Request) error {
 	if s.alertingManager == nil {
-		return badRequest("alerting manager not configured")
+		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
 	}
 
 	var req struct {
