@@ -452,6 +452,14 @@ func (s *Server) handleListExecutions(w http.ResponseWriter, r *http.Request) er
 	return nil
 }
 
+// errProviderMissing is the sentinel returned when the
+// invoke.Invoker could not find a provider for the requested
+// model. classifyInvokeError maps it to 502 Bad Gateway with a
+// provider_missing detail so operators can distinguish "no
+// provider" from "provider failed" without reading the daemon
+// log.
+var errProviderMissing = errors.New("invoke: provider missing")
+
 func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) error {
 	capabilityVersionID := r.PathValue("version_id")
 	var req struct {
@@ -508,6 +516,16 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 		"error":      exec.Error,
 	})
 	if invErr != nil {
+		// BUG-19: distinguish provider-missing from generic 5xx so
+		// the operator can tell at a glance whether the LLM provider
+		// was unregistered or the request simply failed.
+		if errors.Is(invErr, errProviderMissing) {
+			return &HTTPError{
+				Status:  http.StatusBadGateway,
+				Message: "no LLM provider configured for this invocation",
+				Details: map[string]any{"provider_missing": true},
+			}
+		}
 		if err := classifyInvokeError(invErr); err != nil {
 			return err
 		}
