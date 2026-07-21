@@ -132,10 +132,12 @@ func (Regex) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 //   - properties (map of property name to subschema)
 //   - enum (array of allowed values)
 //
-// Anything not in the supported subset is ignored: a schema that
-// uses only unsupported keywords (e.g. allOf without any of the
-// above) will accept every value. This is documented in
-// docs/eval.md; the user is expected to keep schemas simple.
+// Anything outside this supported subset is rejected with
+// ErrUnsupportedSchema (SEC-3): a schema that uses only unsupported
+// keywords (e.g. allOf without any of the above) used to be
+// silently accepted. The new behaviour surfaces the unsupported
+// keyword in the error so users know to add type/required/
+// properties/enum or to switch scorers.
 //
 // The implementation does not pull in a full JSON-Schema library:
 // the supported subset is small enough that a focused validator is
@@ -152,11 +154,52 @@ func (JSONSchema) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 	if err := json.Unmarshal(expected, &schema); err != nil {
 		return false, fmt.Errorf("json_schema: schema is not an object: %w", err)
 	}
+	if u := unsupportedSchemaKeywords(schema); u != "" {
+		return false, fmt.Errorf("%w: %s", ErrUnsupportedSchema, u)
+	}
 	var doc any
 	if err := json.Unmarshal(actual, &doc); err != nil {
 		return false, fmt.Errorf("json_schema: actual is not JSON: %w", err)
 	}
 	return validateSchema(doc, schema, "")
+}
+
+// ErrUnsupportedSchema is returned by JSONSchema.ScoreCase when
+// the supplied schema uses only keywords outside the supported
+// subset. Callers should switch to a different scorer or add
+// one of the supported keywords to their schema.
+var ErrUnsupportedSchema = errors.New("json_schema: schema uses unsupported keywords")
+
+// supportedSchemaKeywords is the closed set of JSON Schema keys
+// this scorer honours. Anything outside the set is rejected.
+var supportedSchemaKeywords = map[string]struct{}{
+	"type":       {},
+	"required":   {},
+	"properties": {},
+	"enum":       {},
+}
+
+// unsupportedSchemaKeywords returns the first unsupported key
+// found in schema (depth-first). Returns "" when every key is in
+// the supported set. The check is structural: it inspects the
+// schema's own keys plus every nested subschema under properties,
+// required values, and enum values.
+func unsupportedSchemaKeywords(schema map[string]any) string {
+	for k := range schema {
+		if _, ok := supportedSchemaKeywords[k]; !ok {
+			return k
+		}
+	}
+	if props, ok := schema["properties"].(map[string]any); ok {
+		for _, sub := range props {
+			if m, ok := sub.(map[string]any); ok {
+				if u := unsupportedSchemaKeywords(m); u != "" {
+					return u
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // validateSchema is the recursive validator. The path argument
