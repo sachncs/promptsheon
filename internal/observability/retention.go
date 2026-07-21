@@ -4,6 +4,7 @@ package observability
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"os"
 	"strconv"
@@ -58,9 +59,10 @@ func LoadRetentionPolicyFromEnv() RetentionPolicy {
 
 // RetentionManager handles periodic cleanup of expired data.
 type RetentionManager struct {
-	db     *sql.DB
-	policy RetentionPolicy
-	logger *slog.Logger
+	db      *sql.DB
+	policy  RetentionPolicy
+	logger  *slog.Logger
+	lastErr error
 }
 
 // NewRetentionManager creates a retention manager.
@@ -128,6 +130,7 @@ var protectedAuditActions = map[string]bool{
 // archive it externally (e.g. snapshotting the database).
 func (m *RetentionManager) Enforce(ctx context.Context) error {
 	var totalDeleted int
+	m.lastErr = nil
 
 	if m.policy.TraceTTL > 0 {
 		cutoff := time.Now().Add(-m.policy.TraceTTL)
@@ -135,6 +138,7 @@ func (m *RetentionManager) Enforce(ctx context.Context) error {
 			"DELETE FROM traces WHERE started_at < ?", cutoff)
 		if err != nil {
 			m.logger.Warn("failed to clean trace spans", "err", err)
+			m.lastErr = err
 		} else {
 			n, _ := result.RowsAffected()
 			totalDeleted += int(n)
@@ -146,6 +150,12 @@ func (m *RetentionManager) Enforce(ctx context.Context) error {
 			"trace_ttl", m.policy.TraceTTL)
 	}
 
+	// OPS-3: surface DELETE failures so the metrics collector can
+	// alert on retention drift. The previous version logged and
+	// returned nil, masking persistent SQLite errors as success.
+	if m.lastErr != nil {
+		return fmt.Errorf("retention: %w", m.lastErr)
+	}
 	return nil
 }
 

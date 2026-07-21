@@ -98,16 +98,14 @@ func TestGetPolicyReturnsConstructorValue(t *testing.T) {
 
 func TestEnforceCancelsOnContext(t *testing.T) {
 	// With an in-memory sqlite, the DELETE will fail because
-	// the tables don't exist. We just want to confirm Enforce
-	// returns without panic and respects a cancelled context.
+	// the tables don't exist. The function should now return the
+	// error so callers can alert on retention drift (OPS-3).
 	m := newTestManager(t, DefaultRetentionPolicy())
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	// Enforce swallows the error and returns nil; the goal is
-	// to confirm the function doesn't deadlock on a cancelled
-	// context.
-	if err := m.Enforce(ctx); err != nil {
-		t.Errorf("Enforce: expected nil even with cancelled context, got %v", err)
+	err := m.Enforce(ctx)
+	if err == nil {
+		t.Error("Enforce: expected error after context cancellation, got nil")
 	}
 }
 
