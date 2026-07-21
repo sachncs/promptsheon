@@ -7,16 +7,20 @@ import (
 	"github.com/sachncs/promptsheon/internal/alerting"
 )
 
-func (s *Server) handleListAlertRules(w http.ResponseWriter, _ *http.Request) error {
+func (s *Server) handleListAlertRules(w http.ResponseWriter, r *http.Request) error {
 	if s.alertingManager == nil {
 		writeJSON(w, http.StatusOK, []*alerting.AlertRule{})
 		return nil
+	}
+	limit, offset, err := parsePagination(r)
+	if err != nil {
+		return err
 	}
 	rules := s.alertingManager.ListRules()
 	if rules == nil {
 		rules = []*alerting.AlertRule{}
 	}
-	writeJSON(w, http.StatusOK, rules)
+	writeJSON(w, http.StatusOK, applyOffsetLimit(rules, offset, limit))
 	return nil
 }
 
@@ -128,16 +132,20 @@ func (s *Server) handleDeleteAlertRule(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
-func (s *Server) handleListAlerts(w http.ResponseWriter, _ *http.Request) error {
+func (s *Server) handleListAlerts(w http.ResponseWriter, r *http.Request) error {
 	if s.alertingManager == nil {
 		writeJSON(w, http.StatusOK, []*alerting.Alert{})
 		return nil
+	}
+	limit, offset, err := parsePagination(r)
+	if err != nil {
+		return err
 	}
 	alerts := s.alertingManager.ListAlerts()
 	if alerts == nil {
 		alerts = []*alerting.Alert{}
 	}
-	writeJSON(w, http.StatusOK, alerts)
+	writeJSON(w, http.StatusOK, applyOffsetLimit(alerts, offset, limit))
 	return nil
 }
 

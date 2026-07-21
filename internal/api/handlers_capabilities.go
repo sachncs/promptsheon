@@ -30,6 +30,10 @@ func computeManifestHash(m capability.Manifest) (string, error) {
 var _ = fmt.Sprintf
 
 func (s *Server) handleListWorkspaces(w http.ResponseWriter, r *http.Request) error {
+	limit, offset, err := parsePagination(r)
+	if err != nil {
+		return err
+	}
 	workspaces, err := s.db.ListWorkspaces(r.Context())
 	if err != nil {
 		return err
@@ -37,7 +41,7 @@ func (s *Server) handleListWorkspaces(w http.ResponseWriter, r *http.Request) er
 	if workspaces == nil {
 		workspaces = []*capability.Workspace{}
 	}
-	writeJSON(w, http.StatusOK, workspaces)
+	writeJSON(w, http.StatusOK, applyOffsetLimit(workspaces, offset, limit))
 	return nil
 }
 
@@ -117,6 +121,10 @@ func (s *Server) handleDeleteWorkspace(w http.ResponseWriter, r *http.Request) e
 }
 
 func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) error {
+	limit, offset, err := parsePagination(r)
+	if err != nil {
+		return err
+	}
 	workspaceID := r.PathValue("workspace_id")
 	projects, err := s.db.ListProjects(r.Context(), workspaceID)
 	if err != nil {
@@ -125,7 +133,7 @@ func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) erro
 	if projects == nil {
 		projects = []*capability.Project{}
 	}
-	writeJSON(w, http.StatusOK, projects)
+	writeJSON(w, http.StatusOK, applyOffsetLimit(projects, offset, limit))
 	return nil
 }
 
@@ -207,6 +215,10 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) err
 }
 
 func (s *Server) handleListCapabilities(w http.ResponseWriter, r *http.Request) error {
+	limit, offset, err := parsePagination(r)
+	if err != nil {
+		return err
+	}
 	projectID := r.PathValue("project_id")
 	caps, err := s.db.ListCapabilities(r.Context(), projectID)
 	if err != nil {
@@ -215,7 +227,7 @@ func (s *Server) handleListCapabilities(w http.ResponseWriter, r *http.Request) 
 	if caps == nil {
 		caps = []*capability.Capability{}
 	}
-	writeJSON(w, http.StatusOK, caps)
+	writeJSON(w, http.StatusOK, applyOffsetLimit(caps, offset, limit))
 	return nil
 }
 
@@ -309,6 +321,10 @@ func (s *Server) handleDeleteCapability(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request) error {
+	limit, offset, err := parsePagination(r)
+	if err != nil {
+		return err
+	}
 	capabilityID := r.PathValue("capability_id")
 	versions, err := s.db.ListVersions(r.Context(), capabilityID)
 	if err != nil {
@@ -317,7 +333,7 @@ func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request) erro
 	if versions == nil {
 		versions = []*capability.Version{}
 	}
-	writeJSON(w, http.StatusOK, versions)
+	writeJSON(w, http.StatusOK, applyOffsetLimit(versions, offset, limit))
 	return nil
 }
 
@@ -395,10 +411,15 @@ func (s *Server) handleGetLatestVersion(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleListExecutions(w http.ResponseWriter, r *http.Request) error {
+	limit, offset, err := parsePagination(r)
+	if err != nil {
+		return err
+	}
 	capabilityVersionID := r.PathValue("version_id")
 	filter := capability.ExecutionFilter{
 		CapabilityVersionID: capabilityVersionID,
-		Limit:               100,
+		Limit:               limit,
+		Offset:              offset,
 	}
 	execs, err := s.db.ListExecutions(r.Context(), filter)
 	if err != nil {
