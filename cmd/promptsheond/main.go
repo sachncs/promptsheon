@@ -740,13 +740,17 @@ func (a *webhookStoreAdapter) SaveWebhookEndpoint(ctx context.Context, ep *webho
 	for _, e := range ep.Events {
 		events = append(events, string(e))
 	}
+	// SEC-7a: persist the ciphertext, never the plaintext. The
+	// plaintext Secret lives only in the in-memory Endpoint
+	// during this process's lifetime.
 	return a.db.SaveWebhookEndpoint(ctx, &models.WebhookEndpointRecord{
-		ID:        ep.ID,
-		URL:       ep.URL,
-		Secret:    ep.Secret,
-		Events:    events,
-		Active:    ep.Active,
-		CreatedAt: ep.CreatedAt,
+		ID:               ep.ID,
+		URL:              ep.URL,
+		Secret:           "",
+		SecretCiphertext: ep.SecretCiphertext,
+		Events:           events,
+		Active:           ep.Active,
+		CreatedAt:        ep.CreatedAt,
 	})
 }
 
@@ -766,12 +770,12 @@ func (a *webhookStoreAdapter) ListWebhookEndpoints(ctx context.Context) ([]*webh
 			evs = append(evs, webhook.EventType(e))
 		}
 		eps = append(eps, &webhook.Endpoint{
-			ID:        r.ID,
-			URL:       r.URL,
-			Secret:    r.Secret,
-			Events:    evs,
-			Active:    r.Active,
-			CreatedAt: r.CreatedAt,
+			ID:               r.ID,
+			URL:              r.URL,
+			SecretCiphertext: r.SecretCiphertext,
+			Events:           evs,
+			Active:           r.Active,
+			CreatedAt:        r.CreatedAt,
 		})
 	}
 	return eps, nil
