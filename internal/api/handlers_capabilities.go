@@ -500,17 +500,28 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 // HTTP status. Returns nil when the error is nil or not worth
 // translating (the caller should still record the error in the
 // Execution row).
+//
+// BUG-15: the previous version returned the raw err.Error() to
+// the client on every 5xx. Upstream provider failures frequently
+// embed the request URL, including the bearer-token query-string
+// fallback (if an operator ever configured one), or internal
+// stack traces. Sanitise by returning a generic message and
+// relying on the audit log to preserve the full error.
 func classifyInvokeError(err error) error {
 	if err == nil {
 		return nil
 	}
 	if errors.Is(err, invoke.ErrQuotaExceeded) {
-		return &HTTPError{Status: http.StatusTooManyRequests, Message: err.Error()}
+		return &HTTPError{Status: http.StatusTooManyRequests, Message: "quota exceeded"}
 	}
 	if errors.Is(err, invoke.ErrBudgetExceeded) {
-		return &HTTPError{Status: http.StatusPaymentRequired, Message: err.Error()}
+		return &HTTPError{Status: http.StatusPaymentRequired, Message: "budget exceeded"}
 	}
-	return err
+	return &HTTPError{
+		Status:  http.StatusBadGateway,
+		Message: "invoke failed",
+		Details: map[string]any{"error": err.Error()},
+	}
 }
 
 // invokeOne is the per-request invocation entry point. It is
