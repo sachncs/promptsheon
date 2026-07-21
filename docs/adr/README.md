@@ -29,6 +29,13 @@ ADRs are immutable. When a decision is superseded, the original ADR is updated w
 | [0021](0021-bandit-foundation.md) | Multi-armed bandit recommender foundation (Thompson Sampling) | Accepted |
 | [0022](0022-plugin-manifest.md) | Plugin manifest (PROMPTSHEON_PLUGINS_FILE) | Accepted |
 | [0023](0023-forward-only-cleanup.md) | Forward-only cleanup of the legacy bundle model | Accepted |
+| [0024](0024-plugin-transport-uds.md) | Plugin transport — net/rpc over Unix-domain-socket for v0.1.x, gRPC for the M3.5 cut | Accepted |
+| [0025](0025-plugin-transport-grpc.md) | Plugin transport — gRPC over loopback UDS for v1.x | Accepted |
+| [0026](0026-https-only-webhooks.md) | Webhooks accept only HTTPS; per-endpoint allow_private removed | Accepted |
+| [0027](0027-webhook-secret-encryption.md) | Webhook HMAC secret encrypted at rest in the vault | Accepted |
+| [0028](0028-maker-checker-self-enforcing.md) | MakerCheckerPolicy self-enforces separation of duties | Accepted |
+| [0029](0029-otel-sqlite-fanout.md) | HTTP spans fan out to both SQLite and OTel via trace.Multi | Accepted |
+| [0030](0030-leader-election-sqlite.md) | Multi-replica deployments elect a single writer via a SQLite advisory lock | Accepted |
 
 ## Status legend
 
