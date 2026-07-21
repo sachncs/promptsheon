@@ -67,6 +67,44 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
+# SEC-16a: sign every release artefact with cosign keyless
+# (Sigstore Fulcio + Rekor). The identity-token subject is
+# `https://github.com/<owner>/<repo>/.github/workflows/release.yml@refs/tags/<tag>`
+# so consumers can pin provenance to the exact release tag.
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    output: []
+    env:
+      - COSIGN_EXPERIMENTAL=1
+
+# Publish a multi-arch Docker image to GHCR on every tagged
+# release. The Dockerfile is multi-stage; this just wires the
+# build hook.
+docker_images:
+  - image_templates:
+      - ghcr.io/{{ .Env.GITHUB_REPOSITORY }}/promptsheond:v{{ .Version }}
+      - ghcr.io/{{ .Env.GITHUB_REPOSITORY }}/promptsheond:latest
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - --platform=linux/amd64
+      - --platform=linux/arm64
+    extra_files:
+      - cmd/promptsheond
+      - cmd/promptsheon
+
+# Attach the SBOM to the GitHub release (SEC-16b). The CI
+# workflow already produces a CycloneDX document via syft; the
+# release step uploads it as a release asset.
+release:
+  github:
+    owner: sachncs
+    name: promptsheon
+  extra_files:
+    - glob: ./dist/sbom/*.cdx.json
+
 changelog:
   sort: asc
   filters:
