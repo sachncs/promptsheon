@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/capability"
@@ -198,14 +199,19 @@ func deriveManifestHash(workspaceID, releaseID string) string {
 // ReplayBuf is a tiny in-memory implementation of replay.Repository
 // used by the tests and as a default in single-node deployments.
 // Real deployments wire the SQLite/Postgres Repository.
-func ReplayBuf() *replayBuf { return &replayBuf{records: map[string]replay.Record{}} }
+func ReplayBuf() *replayBuf {
+	return &replayBuf{records: map[string]replay.Record{}}
+}
 
 type replayBuf struct {
+	mu      sync.RWMutex
 	records map[string]replay.Record
 }
 
 // Put implements replay.Repository for the in-memory buffer.
 func (r *replayBuf) Put(_ context.Context, rec *replay.Record) (*replay.Record, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if existing, ok := r.records[rec.ExecutionHash]; ok {
 		return &existing, false, nil
 	}
@@ -215,6 +221,8 @@ func (r *replayBuf) Put(_ context.Context, rec *replay.Record) (*replay.Record, 
 
 // Get implements replay.Repository for the in-memory buffer.
 func (r *replayBuf) Get(_ context.Context, hash string) (*replay.Record, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	if v, ok := r.records[hash]; ok {
 		return &v, nil
 	}
@@ -224,6 +232,8 @@ func (r *replayBuf) Get(_ context.Context, hash string) (*replay.Record, error) 
 // ListForWorkspace implements replay.Repository for the in-memory
 // buffer.
 func (r *replayBuf) ListForWorkspace(_ context.Context, _ string, _, _ int) ([]*replay.Record, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	out := make([]*replay.Record, 0, len(r.records))
 	for i := range r.records {
 		v := r.records[i]
