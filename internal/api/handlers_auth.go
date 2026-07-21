@@ -624,6 +624,35 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 		return err
 	}
 
+	// SEC-9 follow-up: audit the OAuth login. Previous code
+	// logged auth failures but skipped successes; an audit log
+	// that records only failures is the worst kind — it confirms
+	// an attacker is on a successful path without recording it.
+	var newUser *models.User
+	if err == sql.ErrNoRows && os.Getenv("PROMPTSHEON_OAUTH_AUTO_PROVISION") == "true" {
+		newUser = &models.User{
+			ID:        generateID(),
+			Email:     user.Email,
+			Name:      user.Name,
+			Role:      string(auth.RoleReader),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+		if e := s.db.CreateUser(r.Context(), newUser); e != nil {
+			return e
+		}
+		existing = newUser
+	} else if err != nil {
+		return err
+	}
+	autoProvisioned := existing == newUser
+	s.audit(r.Context(), "oauth_login", "user:"+existing.ID, map[string]any{
+		"provider":       providerName,
+		"email":          user.Email,
+		"key_prefix":     apiKeyModel.KeyPrefix,
+		"auto_provision": autoProvisioned,
+	})
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     oauthStateCookie,
 		Value:    "",
