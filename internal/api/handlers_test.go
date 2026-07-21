@@ -3370,17 +3370,24 @@ func TestRateLimit(t *testing.T) {
 }
 
 func TestRateLimit_Exceeded(t *testing.T) {
-	limiter := ratelimit.NewLimiter(ratelimit.Config{Rate: 0, Interval: time.Minute, Burst: 0})
+	// SEC-RL-2: rate=0 disables the limiter (always-allow). To
+	// exercise the deny path we need a non-zero Rate that the
+	// bucket can exhaust. Burst=0 with a single request means
+	// the second call hits the bucket drain.
+	limiter := ratelimit.NewLimiter(ratelimit.Config{Rate: 1, Interval: time.Hour, Burst: 0})
 	t.Cleanup(limiter.Stop)
 
 	s := newTestServer(t, WithRateLimiter(limiter))
-	var called bool
+	var called int
 	handler := s.rateLimit(func(w http.ResponseWriter, _ *http.Request) error {
-		called = true
+		called++
 		w.WriteHeader(http.StatusOK)
 		return nil
 	})
 
+	// First call: bucket starts at burst=0, the maths below
+	// gives tokens=0, the request is denied without the inner
+	// handler running.
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 	err := handler(rr, req)
@@ -3390,7 +3397,7 @@ func TestRateLimit_Exceeded(t *testing.T) {
 	if rr.Code != http.StatusTooManyRequests {
 		t.Errorf("expected 429, got %d", rr.Code)
 	}
-	if called {
+	if called != 0 {
 		t.Error("inner handler should not be called when rate limited")
 	}
 	if rr.Header().Get("Retry-After") != "60" {
@@ -3669,6 +3676,17 @@ func TestValidateWebhookURL_MetadataHostname(t *testing.T) {
 	err := ValidateWebhookURL("https://metadata.google.internal")
 	if err == nil {
 		t.Error("expected error for metadata hostname")
+	}
+}
+
+// TestValidateWebhookURL_AWSMetadataIP locks in the SEC-4a
+// acceptance literal: https://169.254.169.254/... must be
+// rejected as a link-local address. The hostname form was
+// already covered by TestValidateWebhookURL_MetadataHostname.
+func TestValidateWebhookURL_AWSMetadataIP(t *testing.T) {
+	err := ValidateWebhookURL("https://169.254.169.254/latest/meta-data/")
+	if err == nil {
+		t.Error("expected error for AWS IMDS link-local address")
 	}
 }
 

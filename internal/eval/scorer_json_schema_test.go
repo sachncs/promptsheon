@@ -2,6 +2,7 @@ package eval
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -148,5 +149,28 @@ func TestJSONSchema_EmptySchema(t *testing.T) {
 	_, err := (JSONSchema{}).ScoreCase(json.RawMessage(`"x"`), json.RawMessage(``))
 	if err == nil {
 		t.Errorf("expected empty-schema error")
+	}
+}
+
+// TestJSONSchema_RejectsUnsupportedKeywords locks in the SEC-3a
+// acceptance: a schema that uses only unsupported keywords
+// (allOf, $ref, oneOf) returns ErrUnsupportedSchema from
+// ScoreCase.
+func TestJSONSchema_RejectsUnsupportedKeywords(t *testing.T) {
+	cases := []struct {
+		name   string
+		schema string
+	}{
+		{"allOf", `{"allOf": [{"type": "string"}]}`},
+		{"$ref", `{"$ref": "#/definitions/foo"}`},
+		{"oneOf", `{"oneOf": [{"type": "string"}, {"type": "integer"}]}`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := (JSONSchema{}).ScoreCase(json.RawMessage(`"x"`), json.RawMessage(c.schema))
+			if !errors.Is(err, ErrUnsupportedSchema) {
+				t.Errorf("expected ErrUnsupportedSchema, got %v", err)
+			}
+		})
 	}
 }
