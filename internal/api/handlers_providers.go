@@ -57,7 +57,11 @@ func (s *Server) handleTestProvider(w http.ResponseWriter, r *http.Request) erro
 		return ErrBadRequest
 	}
 	if req.Model == "" {
-		req.Model = "gpt-3.5-turbo"
+		// BUG-15: refuse to silently pick a default model. The
+		// operator must say which model they want to test; an
+		// implicit gpt-3.5-turbo would surprise providers that
+		// only have Anthropic or custom endpoints configured.
+		return badRequest("model is required")
 	}
 
 	provider, err := s.providers.Get(name)
