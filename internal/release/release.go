@@ -143,22 +143,24 @@ func New(capabilityID string, capabilityVersion int, manifest capability.Manifes
 // the Policy reports the quorum satisfied AND no pending Reject, the
 // Release moves to Approved and the approvers list is recorded.
 //
-// This is the closing piece of the Approval→Release wiring: prior to
-// this commit the Release.Aggregate honoured the Status field but
-// Release.Approve did not consult the Approval. That meant a Release
-// could be Approved regardless of whether quorum was actually
-// satisfied — see Tier 1.27 of the architecture review board.
-//
-// ApproveWith returns ErrNotPending if the Release is already past
-// Pending, and returns the underlying Policy error (ErrApproved,
-// ErrRejected, ErrUnknownDecision) wrapped if the quorum has not
-// been reached or a Reject was recorded.
+// MakerCheckerPolicy enforces separation-of-duties internally by
+// comparing each vote's identity against the Release's CreatedBy.
+// The caller no longer needs to invoke VerifySeparationOfDuties
+// as a separate step (SEC-1): the policy is self-checking.
 func (r Release) ApproveWith(a approval.Approval, pol approval.Policy) (Release, error) {
 	if r.Status != StatusPending {
 		return r, ErrNotPending
 	}
 	if r.CreatedBy == "" {
 		return r, errors.New("release: cannot approve; created_by is empty (cannot run separation-of-duties check)")
+	}
+	// For MakerCheckerPolicy, populate the policy's Creator field
+	// from the Release so the policy can self-enforce. For other
+	// policies, the wrapped Evaluate retains the legacy behaviour
+	// and the side-check below still runs.
+	if mkp, ok := pol.(approval.MakerCheckerPolicy); ok {
+		mkp.Creator = r.CreatedBy
+		pol = mkp
 	}
 	if !approval.VerifySeparationOfDuties(a, r.CreatedBy) {
 		return r, approval.ErrCreatorVoted

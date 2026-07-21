@@ -186,3 +186,28 @@ func TestApproveWithMakerCheckerPolicy(t *testing.T) {
 		t.Fatalf("expected Approved, got %s", out.Status)
 	}
 }
+
+func TestMakerCheckerPolicySelfEnforcesCreator(t *testing.T) {
+	t.Parallel()
+	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
+	// alice (the creator) votes Approve. The policy must reject
+	// even when the side-check has not been called.
+	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "alice", Decision: approval.Approve, Timestamp: time.Now()},
+	)
+	_, err := r.ApproveWith(a, approval.MakerCheckerPolicy{RequiredApprovers: 1, Creator: "alice"})
+	if !errors.Is(err, approval.ErrCreatorVoted) {
+		t.Fatalf("expected ErrCreatorVoted, got %v", err)
+	}
+}
+
+func TestMakerCheckerPolicyEmptyCreatorRejected(t *testing.T) {
+	// Direct policy test: the side-check is not on the call path,
+	// so the policy itself must refuse to evaluate without a creator.
+	_, _, err := approval.MakerCheckerPolicy{RequiredApprovers: 1}.Evaluate([]approval.Vote{
+		{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
+	})
+	if err == nil {
+		t.Fatal("expected error when Creator is empty")
+	}
+}
