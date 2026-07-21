@@ -19,6 +19,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/alerting"
 	"github.com/sachncs/promptsheon/internal/api"
 	"github.com/sachncs/promptsheon/internal/auth"
+	"github.com/sachncs/promptsheon/internal/election"
 	"github.com/sachncs/promptsheon/internal/buildinfo"
 	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/optimizer/rules"
@@ -60,6 +61,7 @@ func main() {
 	// confirm a deployment, and we don't want a missing or invalid
 	// env var to mask the simple cases.
 	showVersion := flag.Bool("version", false, "print version information and exit")
+	_ = showVersion // referenced via flag.Parse below
 	showHelp := flag.Bool("help", false, "print configuration and runtime flags and exit")
 	flag.Parse()
 
@@ -155,7 +157,36 @@ func main() {
 		}
 	}()
 
-	srv, limiter, tracer, collector := buildServer(rootCtx, &cfg, db, logger, tp, logHub)
+	// Leader election for multi-replica deployments. Construct
+	// the elector here (before buildServer) so the option can be
+	// attached to the API server. The elector is only started
+	// when PROMPTSHEON_LEADER_ELECTION=true; the default is
+	// single-replica, where the daemon holds the lock itself
+	// the moment it starts.
+	var elector *election.Elector
+	if os.Getenv("PROMPTSHEON_LEADER_ELECTION") == "true" {
+		podName := os.Getenv("POD_NAME")
+		if podName == "" {
+			podName, _ = os.Hostname()
+		}
+		elector = election.New(db.DB(), podName, 30*time.Second)
+		if err := elector.EnsureTable(rootCtx); err != nil {
+			logger.Warn("leader-election table init failed", "err", err)
+		}
+		go func() {
+			errs := make(chan error, 8)
+			go elector.Run(rootCtx, errs)
+			for e := range errs {
+				logger.Warn("leader-election error", "err", e)
+			}
+		}()
+		if err := elector.Acquire(rootCtx); err != nil && !errors.Is(err, election.ErrNotLeader) {
+			logger.Warn("initial leader acquire failed", "err", err)
+		}
+		logger.Info("leader-election active", "pod", podName)
+	}
+
+	srv, limiter, tracer, collector := buildServer(rootCtx, &cfg, db, logger, tp, logHub, elector)
 
 	srv.StartAuditWorkers(rootCtx, 2)
 
@@ -223,7 +254,7 @@ func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
 	return db
 }
 
-func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub) (*api.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector) {
+func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub, elector *election.Elector) (*api.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector) {
 	sqliteTracer, err := trace.NewSQLite(db.DB())
 	if err != nil {
 		logger.Warn("SQLite tracer disabled", "err", err)
@@ -420,6 +451,9 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	}
 	if tracer != nil {
 		opts = append(opts, api.WithTracing(tracer, collector))
+	}
+	if elector != nil {
+		opts = append(opts, api.WithElector(elector))
 	}
 	opts = append(opts, api.WithWebhooks(webhookDispatcher))
 	if v != nil {
