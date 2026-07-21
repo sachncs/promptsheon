@@ -216,6 +216,12 @@ jobs:
           go-version: "1.26.5"
           cache: true
 
+      - name: Download SBOM
+        uses: actions/download-artifact@v7
+        with:
+          name: sbom
+          path: ./dist/sbom
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
