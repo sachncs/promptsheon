@@ -145,16 +145,17 @@ func (p MajorityPolicy) Evaluate(votes []Vote) (State, bool, error) {
 }
 
 // MakerCheckerPolicy requires the creator to abstain and at least one
-// other identity to Approve. This is the smallest maker-checker
-// enforcement: the person who built the Release cannot also approve
-// it.
+// other identity to Approve. The separation-of-duties rule is
+// enforced inside Evaluate itself: any vote whose identity matches
+// Creator is rejected with ErrCreatorVoted. Callers no longer need
+// to invoke a side-check helper.
 //
-// The check is name-based: the policy compares the recorded vote
-// identity against a creator identity supplied at evaluation time.
-// Passing an empty creator bypasses the check, so callers must supply
-// a non-empty creator for the policy to enforce separation of duties.
+// Empty Creator is treated conservatively (the policy refuses to
+// evaluate) so a misconfigured caller cannot accidentally bypass the
+// rule. This is the SEC-1 fix.
 type MakerCheckerPolicy struct {
 	RequiredApprovers int
+	Creator           string
 }
 
 // Evaluate implements Policy.
@@ -162,7 +163,13 @@ func (p MakerCheckerPolicy) Evaluate(votes []Vote) (State, bool, error) {
 	if p.RequiredApprovers <= 0 {
 		return "", false, errors.New("approval: MakerCheckerPolicy.RequiredApprovers must be positive")
 	}
+	if p.Creator == "" {
+		return "", false, errors.New("approval: MakerCheckerPolicy.Creator is required for maker-checker enforcement")
+	}
 	for _, v := range votes {
+		if v.Identity == p.Creator {
+			return "", false, ErrCreatorVoted
+		}
 		if v.Decision == Reject {
 			return StateRejected, false, nil
 		}
@@ -179,13 +186,9 @@ func (p MakerCheckerPolicy) Evaluate(votes []Vote) (State, bool, error) {
 	return StatePending, false, nil
 }
 
-// VerifySeparationOfDuties reports whether the given creator identity
-// has cast any Decision on the Approval.
-//
-// This is the protection against the maker approving their own work:
-// the Policy alone is too generic to encode "the maker may not vote";
-// the caller must check this function explicitly before invoking a
-// policy that has the maker's identity as a vote.
+// VerifySeparationOfDuties is retained for backward compatibility
+// with callers that already check before Evaluate. New code should
+// pass Creator into MakerCheckerPolicy and let Evaluate decide.
 func VerifySeparationOfDuties(a Approval, creator string) bool {
 	if creator == "" {
 		return false
