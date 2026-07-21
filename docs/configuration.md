@@ -13,7 +13,7 @@ Promptsheon is configured entirely through environment variables. There are no c
 | `PROMPTSHEON_AUTH` | `true` | Enable API key authentication. Set to `false` (or `0`, `no`) only for local development. |
 | `PROMPTSHEON_LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `warn`, `error`. |
 | `PROMPTSHEON_LOG_FORMAT` | `json` | `json` (default) or `text`. |
-| `PROMPTSHEON_CORS_ORIGINS` | `*` | Comma-separated list of allowed origins. `*` is the dev default; production should set an explicit list. |
+| `PROMPTSHEON_CORS_ORIGINS` | *(empty / deny-all)* | Comma-separated list of allowed origins. Empty (the production default) denies every cross-origin request; set to `*` only for trusted local development. |
 | `PROMPTSHEON_VAULT_KEY` | *(empty)* | 64-character hex (32 bytes) encryption key for provider API keys. The all-zero key is rejected. |
 | `PROMPTSHEON_AUTHOR` | *(empty)* | Default `author` field for CLI commits. |
 | `PROMPTSHEON_SERVER_READ_TIMEOUT` | `30` | `http.Server.ReadTimeout` in seconds. |
@@ -89,10 +89,10 @@ See [Algorithms — Circuit breaker](algorithms.md#circuit-breaker) and [Algorit
 
 | Variable | Default | Description |
 |---|---|---|
-| `PROMPTSHEON_RATE_LIMIT` | `60` | Tokens per interval. `0` disables rate limiting. |
-| `PROMPTSHEON_RATE_LIMIT_RATE` | *(unset)* | Alias for `PROMPTSHEON_RATE_LIMIT`. |
-| `PROMPTSHEON_RATE_BURST` | `10` | Token-bucket burst capacity. |
-| `PROMPTSHEON_RATE_LIMIT_BURST` | `10` | Alias for `PROMPTSHEON_RATE_BURST`. |
+| `PROMPTSHEON_RATE_LIMIT` | `100` | Tokens per interval. `0` disables rate limiting cleanly (no implicit 1M-token burst). |
+| `PROMPTSHEON_RATE_LIMIT_RATE` | `100` | Alias for `PROMPTSHEON_RATE_LIMIT`. |
+| `PROMPTSHEON_RATE_BURST` | `50` | Token-bucket burst capacity. Set explicitly when `RATE_LIMIT=0` to grant a specific large burst. |
+| `PROMPTSHEON_RATE_LIMIT_BURST` | `50` | Alias for `PROMPTSHEON_RATE_BURST`. |
 | `PROMPTSHEON_RATE_LIMIT_INTERVAL` | `60` | Interval in seconds. |
 
 ## Shell tool (workflow engine)

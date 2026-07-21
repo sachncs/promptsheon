@@ -28,7 +28,7 @@ Out of scope (and not provided): defence against a compromised host, defence aga
 | `WriteTimeout` | `http.Server` | 60s | Bound the response write window. |
 | `IdleTimeout` | `http.Server` | 120s | Bound the keep-alive idle window. |
 | Request body size limit | `MaxBytesReader` middleware | 10 MB | Bound the per-request body to reject OOM attempts. |
-| CORS | `CORS` middleware | `*` (configurable) | Default `*` is for ease of local use; production should set `PROMPTSHEON_CORS_ORIGINS` to an explicit list. |
+| CORS | `CORS` middleware | deny-all (empty) (configurable) | Production default is to deny every cross-origin request. `*` is only acceptable on loopback binds and is rejected by `cfg.Validate()` on a public bind. |
 | Security headers | `SecurityHeaders` middleware | always | Adds `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and a strict CSP. |
 | Panic recovery | `Recovery` middleware | always | Recovers panics in handlers, logs them, returns `500`. |
 | Structured logging | `Logging` middleware | always | One `slog` line per request with method, path, status, latency, request ID. |
@@ -63,8 +63,8 @@ The workflow engine has a `shell` tool that can execute commands. The policy is 
 
 ## Rate limiting
 
-- Per-API-key token bucket. Configurable via `PROMPTSHEON_RATE_LIMIT`, `PROMPTSHEON_RATE_BURST`, `PROMPTSHEON_RATE_LIMIT_INTERVAL`.
-- `0` disables rate limiting. This is **not** recommended in production; use it only for local development.
+- Per-API-key token bucket. Configurable via `PROMPTSHEON_RATE_LIMIT` (default 100), `PROMPTSHEON_RATE_BURST` (default 50), `PROMPTSHEON_RATE_LIMIT_INTERVAL` (default 60).
+- `0` disables rate limiting cleanly (no implicit 1M-token burst). This is **not** recommended in production; use it only for local development.
 - The limiter is per-process. With multiple server instances, each one applies its own limit; the effective per-key limit is `N_instances * limit`.
 
 ## SQL injection
