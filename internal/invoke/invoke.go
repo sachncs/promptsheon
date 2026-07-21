@@ -115,8 +115,15 @@ func (i *Invoker) Invoke(ctx context.Context, req executor.InvokeRequest) (execu
 // -- Default Enforcer --
 // DefaultEnforcer is the in-process, in-memory Budget + Quota
 // enforcer. Production wiring supplies a Backend-backed one.
+//
+// PERF-4 follow-up: the enforcer used to hold one sync.Mutex
+// across every read and write. Reads (EnforceBudget, EnforceQuota
+// for an unknown workspace) were the vast majority; contention
+// would have scaled linearly with concurrent invocations. Use
+// sync.RWMutex so reads run in parallel and only the
+// rare workspace-known write path takes the write lock.
 type DefaultEnforcer struct {
-	mu      sync.Mutex
+	mu      sync.RWMutex
 	budgets map[string]*budget.Budget
 	quotas  map[string]*quota.Quota
 	now     func() time.Time
@@ -150,11 +157,13 @@ func (d *DefaultEnforcer) SetQuota(q quota.Quota) {
 	d.quotas[q.TargetID] = &q
 }
 
-// EnforceBudget implements Enforcer.
+// EnforceBudget implements Enforcer. Read-mostly path; takes the
+// read lock for the lookup and upgrades to the write lock only
+// when a budget is configured and being charged.
 func (d *DefaultEnforcer) EnforceBudget(_ context.Context, workspaceID string, costUSD float64) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.mu.RLock()
 	b, ok := d.budgets[workspaceID]
+	d.mu.RUnlock()
 	if !ok {
 		return nil // no policy -> allow
 	}
@@ -162,15 +171,19 @@ func (d *DefaultEnforcer) EnforceBudget(_ context.Context, workspaceID string, c
 	if err != nil {
 		return err
 	}
+	d.mu.Lock()
 	d.budgets[workspaceID] = &updated
+	d.mu.Unlock()
 	return nil
 }
 
-// EnforceQuota implements Enforcer.
+// EnforceQuota implements Enforcer. Read-mostly path; takes the
+// read lock for the lookup and upgrades to the write lock only
+// when a quota is configured and being charged.
 func (d *DefaultEnforcer) EnforceQuota(_ context.Context, workspaceID string) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.mu.RLock()
 	q, ok := d.quotas[workspaceID]
+	d.mu.RUnlock()
 	if !ok {
 		return nil // no policy -> allow
 	}
@@ -178,7 +191,9 @@ func (d *DefaultEnforcer) EnforceQuota(_ context.Context, workspaceID string) er
 	if err != nil {
 		return err
 	}
+	d.mu.Lock()
 	d.quotas[workspaceID] = &updated
+	d.mu.Unlock()
 	return nil
 }
 
