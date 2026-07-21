@@ -72,7 +72,13 @@ See [LLM Providers](llm-providers.md) for per-provider setup. See [Algorithms �
 | `PROMPTSHEON_CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5` | Consecutive failures before the breaker opens. |
 | `PROMPTSHEON_CIRCUIT_BREAKER_SUCCESS_THRESHOLD` | `3` | Consecutive successes in half-open before the breaker closes. |
 | `PROMPTSHEON_CIRCUIT_BREAKER_COOLDOWN` | `30` | Seconds the breaker stays open before half-open. |
-| `PROMPTSHEON_LLM_FALLBACK` | *(empty)* | Comma-separated fallback provider list (e.g. `anthropic,ollama`). |
+| `PROMPTSHEON_LLM_FALLBACK` | *(empty)* | Comma-separated fallback provider list (e.g. `anthropic,openai`). Documented for future use; the per-call fallback chain is not wired into the production invocation path in v0.1.x. |
+
+## Rollups (ClickHouse)
+
+| Variable | Description |
+|---|---|
+| `PROMPTSHEON_CLICKHOUSE_DSN` | ClickHouse DSN. When set AND the binary is built with `-tags clickhouse`, the per-workspace rollup aggregator forwards summaries to ClickHouse. Without the build tag the env var surfaces a clear diagnostic at startup. |
 
 See [Algorithms — Circuit breaker](algorithms.md#circuit-breaker) and [Algorithms — Fallback chain](algorithms.md#fallback-chain).
 
