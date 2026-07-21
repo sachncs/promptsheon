@@ -114,6 +114,81 @@ func migrate(db *sql.DB, migrationsFS fs.FS) error {
 	return nil
 }
 
+// migrateUpTo applies every migration whose version is <= target.
+// DB-17: the per-migration test pattern. The caller starts from
+// a fresh DB, runs migrateUpTo(N-1), then asserts the state at
+// version N-1, then runs migrateUpTo(N), and asserts the
+// post-state. Each test isolates a single migration's effect
+// rather than bulk-applying every migration and asserting end
+// state.
+func migrateUpTo(db *sql.DB, target int) error {
+	if err := ensureMigrationsTable(db); err != nil {
+		return err
+	}
+	applied, err := appliedVersions(db)
+	if err != nil {
+		return err
+	}
+	entries, err := fs.ReadDir(migrationsFS, "migrations")
+	if err != nil {
+		return fmt.Errorf("read migrations dir: %w", err)
+	}
+	var files []fs.DirEntry
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") || strings.HasSuffix(e.Name(), ".down.sql") {
+			continue
+		}
+		files = append(files, e)
+	}
+	sort.Slice(files, func(i, j int) bool { return files[i].Name() < files[j].Name() })
+	for _, f := range files {
+		var v int
+		if _, err := fmt.Sscanf(f.Name(), "%d_", &v); err != nil || v > target {
+			continue
+		}
+		if applied[v] {
+			continue
+		}
+		content, err := fs.ReadFile(migrationsFS, "migrations/"+f.Name())
+		if err != nil {
+			return fmt.Errorf("read migration %s: %w", f.Name(), err)
+		}
+		if err := applyMigration(db, v, string(content)); err != nil {
+			return fmt.Errorf("apply migration %s: %w", f.Name(), err)
+		}
+	}
+	return nil
+}
+
+func ensureMigrationsTable(db *sql.DB) error {
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version INTEGER PRIMARY KEY,
+			applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`)
+	if err != nil {
+		return fmt.Errorf("create migrations table: %w", err)
+	}
+	return nil
+}
+
+func appliedVersions(db *sql.DB) (map[int]bool, error) {
+	rows, err := db.Query("SELECT version FROM schema_migrations")
+	if err != nil {
+		return nil, fmt.Errorf("query migrations: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := make(map[int]bool)
+	for rows.Next() {
+		var v int
+		if e := rows.Scan(&v); e != nil {
+			return nil, fmt.Errorf("scan migration version: %w", e)
+		}
+		out[v] = true
+	}
+	return out, rows.Err()
+}
+
 // applyMigration applies a single migration within a transaction.
 // If the migration fails, the transaction is rolled back.
 //
