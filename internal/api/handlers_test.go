@@ -1628,8 +1628,10 @@ func TestHandleBootstrap_AuthEnabled(t *testing.T) {
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusForbidden {
-		t.Errorf("expected 403, got %d: %s", rr.Code, rr.Body.String())
+	// SEC-5b: /api/v1/setup is unregistered when requireAuth=true.
+	// mux returns 404 for unregistered paths.
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected 404 (route not registered), got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 

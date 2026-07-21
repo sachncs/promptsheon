@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -387,7 +388,6 @@ func (s *Server) registerAuthRoutes() {
 	revokeKey := s.handleRevokeAPIKey
 	oauthLogin := s.handleOAuthLogin
 	oauthCallback := s.handleOAuthCallback
-	bootstrap := s.handleBootstrap
 	if s.rateLimiter != nil {
 		createKey = s.rateLimit(createKey)
 		listKeys = s.rateLimit(listKeys)
@@ -397,14 +397,20 @@ func (s *Server) registerAuthRoutes() {
 		// upstream IdP lookups, or admin-key mint races.
 		oauthLogin = s.rateLimit(oauthLogin)
 		oauthCallback = s.rateLimit(oauthCallback)
-		bootstrap = s.rateLimit(bootstrap)
 	}
 	s.mux.HandleFunc("POST /api/v1/apikeys", s.wrapHandler(createKey))
 	s.mux.HandleFunc("GET /api/v1/apikeys", s.wrapHandler(listKeys))
 	s.mux.HandleFunc("DELETE /api/v1/apikeys/{id}", s.wrapHandler(revokeKey))
 	s.mux.HandleFunc("GET /api/v1/auth/{provider}/login", s.wrapHandler(oauthLogin))
 	s.mux.HandleFunc("GET /api/v1/auth/{provider}/callback", s.wrapHandler(oauthCallback))
-	s.mux.HandleFunc("POST /api/v1/setup", s.wrapHandler(bootstrap))
+	// SEC-5b: /api/v1/setup is registered when either auth is off
+	// (the documented first-caller-wins path) or the operator
+	// explicitly set PROMPTSHEON_BOOTSTRAP_TOKEN (which gates the
+	// authenticated bootstrap path). Without both, the route
+	// returns 404 — the unauthenticated form is unreachable.
+	if !s.requireAuth || os.Getenv("PROMPTSHEON_BOOTSTRAP_TOKEN") != "" {
+		s.mux.HandleFunc("POST /api/v1/setup", s.wrapHandler(s.rateLimit(s.handleBootstrap)))
+	}
 	s.mux.HandleFunc("GET /api/v1/users", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleListUsers)))
 	s.mux.HandleFunc("POST /api/v1/users", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleCreateUser)))
 	s.mux.HandleFunc("GET /api/v1/users/{id}", s.wrapHandler(s.requirePerm(auth.PermUserManage)(s.handleGetUser)))
