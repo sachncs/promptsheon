@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -1006,11 +1007,38 @@ func TestSecurityHeaders(t *testing.T) {
 	if rr.Header().Get("X-Frame-Options") != "DENY" {
 		t.Error("expected X-Frame-Options header")
 	}
-	if rr.Header().Get("Strict-Transport-Security") == "" {
-		t.Error("expected Strict-Transport-Security header")
+	// BUG-24: HSTS is now TLS-only. Plain HTTP requests must NOT
+	// receive the header because it would train the browser to
+	// expect HTTPS on a connection that isn't using it.
+	if got := rr.Header().Get("Strict-Transport-Security"); got != "" {
+		t.Errorf("did not expect HSTS on plain HTTP, got %q", got)
 	}
 	if rr.Header().Get("Content-Security-Policy") == "" {
 		t.Error("expected Content-Security-Policy header")
+	}
+}
+
+func TestSecurityHeadersHSTSOverTLS(t *testing.T) {
+	handler := SecurityHeaders(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// 1) r.TLS set (real TLS connection).
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.TLS = &tls.ConnectionState{}
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Header().Get("Strict-Transport-Security") == "" {
+		t.Error("expected HSTS when r.TLS is set")
+	}
+
+	// 2) X-Forwarded-Proto: https (TLS-terminating proxy).
+	req2 := httptest.NewRequest("GET", "/test", nil)
+	req2.Header.Set("X-Forwarded-Proto", "https")
+	rr2 := httptest.NewRecorder()
+	handler.ServeHTTP(rr2, req2)
+	if rr2.Header().Get("Strict-Transport-Security") == "" {
+		t.Error("expected HSTS when X-Forwarded-Proto=https")
 	}
 }
 
