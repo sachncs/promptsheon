@@ -1,4 +1,4 @@
--- Migration 048b (audit backfill): documentation marker.
+-- Migration 052 (audit backfill tool marker): documentation marker.
 --
 -- The 048a migration added resource_kind and resource_id columns
 -- to audit_entries. 048a was a schema-only change; populating

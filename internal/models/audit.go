@@ -15,12 +15,16 @@ type AuditEntry struct {
 }
 
 // AuditFilter defines criteria for listing audit entries.
+// ResourceKind / ResourceID take precedence over the legacy
+// Resource string when both are supplied.
 type AuditFilter struct {
-	UserID   string
-	Resource string
-	Action   string
-	Since    *time.Time
-	Until    *time.Time
-	Limit    int
-	Offset   int
+	UserID       string
+	Resource     string
+	ResourceKind string
+	ResourceID   string
+	Action       string
+	Since        *time.Time
+	Until        *time.Time
+	Limit        int
+	Offset       int
 }

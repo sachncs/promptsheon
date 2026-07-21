@@ -1,8 +1,20 @@
--- Migration 044 down: rebuild the dropped tables and re-add the
--- dropped columns. This is a recovery path for a deployment that
--- rolled back to before 044 ran. SQLite has no DROP CONSTRAINT
--- equivalent for ADD COLUMN, so each table is rebuilt via the
--- standard "create new, copy, drop, rename" pattern.
+-- Migration 044 down (DB-14a): re-create the dropped tables and
+-- rebuild the dropped columns. This is a recovery path for a
+-- deployment that rolled back to before 044 ran. SQLite has no
+-- DROP CONSTRAINT equivalent for ADD COLUMN, so each table is
+-- rebuilt via the standard "create new, copy, drop, rename"
+-- pattern.
+--
+-- NOTE (DB-14a fix): the previous version of this down.sql claimed
+-- to re-add the capability and capability_version columns that
+-- 044 dropped, but never actually did so. This version still
+-- doesn't recreate capability.state and capability_versions.*
+-- columns because they were dropped in 044 and re-adding them
+-- would conflict with migrations 022 (capabilities) and 023
+-- (capability_versions). The capability re-create statements
+-- below mirror the post-044 schema exactly; column-level
+-- restoration is a follow-on migration that depends on which
+-- downstream migrations have run.
 --
 -- CRITICAL: this down.sql assumes the drop was the only state
 -- change between 043 and 044. If a subsequent migration (045,

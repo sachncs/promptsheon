@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 A 50+ commit audit and remediation pass. Highlights:
 
+- **Migration numbering 028–040**: the gap is a numbering mistake,
+  not a reserved block. Future migrations continue from 060
+  onward; if a schema change requires slots in the gap, file a
+  dedicated renumbering migration. DB-GAP-1.
+- **Down migrations** ship behind a `LoadDown(ctx, db, version)`
+  helper; destructive down files still require
+  `PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true`. DB-13.
+
 #### Deploy
 
 - **`fix(helm):` real probe + scrape paths** — `/health` and
