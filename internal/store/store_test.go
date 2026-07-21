@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -604,5 +605,53 @@ func TestScheduleCRUD(t *testing.T) {
 
 	if err := s.UpdateSchedule(ctx, future); err != nil {
 		t.Fatalf("UpdateSchedule: %v", err)
+	}
+}
+
+// TestAuditChainDetectsTailDeletion exercises DB-7 / SEC-CHAIN-1:
+// VerifyAuditChain must cross-check the walked rowid against
+// audit_chain_state and report "chain tail mismatch" when an
+// operator deletes the last N rows out from under the chain.
+func TestAuditChainDetectsTailDeletion(t *testing.T) {
+	t.Parallel()
+	s := newTestSQLite(t)
+	ctx := context.Background()
+
+	for i := 0; i < 10; i++ {
+		id := fmt.Sprintf("td-%02d", i)
+		if err := s.AppendAudit(ctx, &models.AuditEntry{
+			ID: id, UserID: "u1", Action: "noop", Resource: "x", Details: map[string]any{"i": i},
+		}); err != nil {
+			t.Fatalf("AppendAudit(%s): %v", id, err)
+		}
+	}
+
+	// Sanity: chain is intact before any tampering.
+	ok, reason, err := s.VerifyAuditChain(ctx)
+	if err != nil {
+		t.Fatalf("VerifyAuditChain (clean): %v", err)
+	}
+	if !ok {
+		t.Fatalf("clean chain failed verification: %s", reason)
+	}
+
+	// Delete the last 5 audit rows directly, bypassing AppendAudit
+	// so audit_chain_state is NOT updated. The verifier must catch
+	// the rowid mismatch.
+	if _, err := s.DB().ExecContext(ctx,
+		`DELETE FROM audit_entries WHERE id IN ('td-05','td-06','td-07','td-08','td-09')`,
+	); err != nil {
+		t.Fatalf("delete tail: %v", err)
+	}
+
+	ok, reason, err = s.VerifyAuditChain(ctx)
+	if err != nil {
+		t.Fatalf("VerifyAuditChain (tampered): %v", err)
+	}
+	if ok {
+		t.Fatalf("expected verifier to flag tail deletion; reason=%q", reason)
+	}
+	if !strings.Contains(reason, "tail mismatch") {
+		t.Errorf("expected reason to mention tail mismatch; got %q", reason)
 	}
 }
