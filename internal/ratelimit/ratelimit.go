@@ -189,6 +189,14 @@ func (l *Limiter) cleanup() {
 
 // Allow checks if a request from the given key is allowed.
 func (l *Limiter) Allow(key string) bool {
+	// SEC-RL-2: rate=0 means rate limiting is disabled. Without
+	// this short-circuit the bucket maths below sees
+	// burst=0, tokens=0, and refuses every request — the
+	// opposite of what an operator setting PROMPTSHEON_RATE_LIMIT=0
+	// expects.
+	if l.rate == 0 {
+		return true
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 

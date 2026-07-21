@@ -172,6 +172,17 @@ func TestLoadConfigFromEnv(t *testing.T) {
 		if cfg.Burst != 0 {
 			t.Fatalf("expected burst 0 when disabled, got %d", cfg.Burst)
 		}
+		// SEC-RL-2: with rate=0 Allow must always return true.
+		// The previous short-circuit gap (rate=0 → burst=0 →
+		// tokens=0 → deny every request) made operators who
+		// set PROMPTSHEON_RATE_LIMIT=0 see a hard-locked daemon.
+		l := NewLimiter(cfg)
+		defer l.Stop()
+		for i := 0; i < 1000; i++ {
+			if !l.Allow("any-key") {
+				t.Fatalf("Allow denied request %d with rate=0; should always allow", i)
+			}
+		}
 	})
 
 	t.Run("custom burst", func(t *testing.T) {
