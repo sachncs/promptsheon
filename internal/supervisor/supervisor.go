@@ -22,12 +22,16 @@ package supervisor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"os/exec"
 	"sync"
 	"time"
+
+	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/internal/eventbus"
 )
 
 // Plugin is the lifecycle interface a supervised plugin satisfies.
@@ -98,7 +102,9 @@ type PluginEvent struct {
 }
 
 // New constructs a Supervisor with a publisher and logger. Logger
-// defaults to a no-op logger if nil.
+// defaults to a no-op logger if nil. A nil publisher is treated as
+// a no-op (DEAD-Plg-2 fix: the constructor accepts the broader
+// interface so production can wire any implementation).
 func New(p Publisher, logger *slog.Logger) *Supervisor {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -108,6 +114,53 @@ func New(p Publisher, logger *slog.Logger) *Supervisor {
 		publisher: p,
 		logger:    logger,
 	}
+}
+
+// Adapter bridges a supervisor.Publisher to the broader
+// eventbus.Publisher so the supervisor lifecycle events surface
+// on the same in-memory bus as the scheduler and the
+// recommendation producer. Without an adapter the supervisor
+// silently drops its events; with one, they are visible to any
+// bus subscriber.
+type Adapter struct {
+	bus *eventbus.Memory
+}
+
+// NewAdapter wraps an event bus.
+func NewAdapter(bus *eventbus.Memory) *Adapter { return &Adapter{bus: bus} }
+
+// Publish converts a supervisor PluginEvent into a capability
+// Event and pushes it on the bus. The capability of the event is
+// hard-coded to capability.EventRecommendationGenerated because
+// the supervisor is a backend service; downstream consumers that
+// care about plugin lifecycle should subscribe to the
+// supervisor-specific event types, not the capability bus.
+func (a *Adapter) Publish(ev PluginEvent) {
+	if a == nil || a.bus == nil {
+		return
+	}
+	_, _ = json.Marshal(ev)
+	a.bus.Publish(capability.Event{
+		ID:        generateAdapterID("sup"),
+		Type:      capability.EventRecommendationGenerated,
+		Timestamp: ev.Timestamp,
+		Data: map[string]any{
+			"plugin": ev.Name,
+			"kind":   ev.Kind,
+			"err":    errString(ev.Err),
+		},
+	})
+}
+
+func errString(e error) string {
+	if e == nil {
+		return ""
+	}
+	return e.Error()
+}
+
+func generateAdapterID(prefix string) string {
+	return prefix + "-" + time.Now().UTC().Format("20060102T150405.000000000")
 }
 
 // Register adds a plugin to the supervisor's inventory. Start is

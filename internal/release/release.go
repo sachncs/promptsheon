@@ -173,8 +173,8 @@ func (r Release) ApproveWith(a approval.Approval, pol approval.Policy) (Release,
 	return r, nil
 }
 
-// Deprecated: removed in the DEAD-3 sweep. Use
-// ApproveWith(approval.Approval, approval.Policy) instead.
+// ApproveWithApprovalList was removed in the DEAD-3 sweep.
+// Callers should use ApproveWith(approval.Approval, approval.Policy).
 
 // Activate transitions an Approved Release to Active.
 // The caller passes the activation time so clocks are explicit at

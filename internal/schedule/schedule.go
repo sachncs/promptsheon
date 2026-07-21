@@ -377,9 +377,6 @@ func atoiStrict(s string, lo, hi int) (int, error) {
 // Schedules.
 type Repository interface {
 	CreateSchedule(ctx context.Context, s *Schedule) error
-	GetSchedule(ctx context.Context, id string) (*Schedule, error)
-	ListSchedulesForRelease(ctx context.Context, releaseID string) ([]*Schedule, error)
 	ListDueSchedules(ctx context.Context, now time.Time, limit int) ([]*Schedule, error)
 	UpdateSchedule(ctx context.Context, s *Schedule) error
-	DeleteSchedule(ctx context.Context, id string) error
 }

@@ -23,7 +23,6 @@ type Repository interface {
 	ListReleasesForCapability(ctx context.Context, capabilityID string) ([]*Release, error)
 	ListActiveReleasesForEnvironment(ctx context.Context, env Environment) ([]*Release, error)
 	UpdateRelease(ctx context.Context, r *Release) error
-	DeleteRelease(ctx context.Context, id string) error
 
 	// ActivateAtomic supersedes the prior Release (if non-nil) and
 	// persists the next Release in a single transaction. The

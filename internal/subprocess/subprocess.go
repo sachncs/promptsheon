@@ -168,15 +168,22 @@ func (b *Binary) Health(_ context.Context) error {
 
 // Stop sends a graceful shutdown signal to the plugin via the UDS
 // RPC, then kills the process if it does not exit in 2 seconds.
+//
+// DEAD-Plg-1 fix: Stop does NOT flip b.stopped to true on a
+// best-effort path. The previous implementation set stopped=true
+// unconditionally, which made Restart a no-op even after the
+// underlying process had exited. Stop now only marks the
+// binary stopped when the kill path actually fires; a clean
+// RPC shutdown leaves the binary reusable for Restart.
 func (b *Binary) Stop(_ context.Context) error {
 	b.mu.Lock()
 	if b.stopped {
 		b.mu.Unlock()
 		return nil
 	}
-	b.stopped = true
 	c := b.client
 	cmd := b.cmd
+	hard := false
 	b.mu.Unlock()
 
 	if c != nil {
@@ -190,17 +197,25 @@ func (b *Binary) Stop(_ context.Context) error {
 	}
 	if cmd != nil && cmd.Process != nil {
 		// Best-effort graceful termination; SIGKILL after 2s.
-		// ponytail: process cleanup is best-effort; the daemon
-		// records the failed shutdown via metrics if needed.
 		_ = cmd.Process.Signal(syscall.SIGTERM)
 		done := make(chan struct{})
 		go func() { _ = cmd.Wait(); close(done) }()
 		select {
 		case <-done:
 		case <-time.After(2 * time.Second):
+			hard = true
 			_ = cmd.Process.Kill()
 			<-done
 		}
+	}
+
+	// DEAD-Plg-1: only flip stopped=true when the kill path
+	// actually fires. A clean RPC shutdown leaves the binary
+	// reusable for Restart.
+	if hard {
+		b.mu.Lock()
+		b.stopped = true
+		b.mu.Unlock()
 	}
 	return nil
 }

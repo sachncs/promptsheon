@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/manifest"
+	"github.com/sachncs/promptsheon/internal/pluginmanifest"
 	"github.com/sachncs/promptsheon/internal/subprocess"
 	"github.com/sachncs/promptsheon/internal/supervisor"
 )

@@ -126,15 +126,20 @@ func (m *memStore) DeleteApproval(_ context.Context, releaseID string) error {
 
 func validManifest() capability.Manifest { return testdata.NewManifest() }
 
-func newService(t *testing.T, kind release.PolicyKind, required int) (*release.Service, *memStore) {
+// newServiceWithPolicy constructs a Service backed by the in-memory
+// memStore and a caller-supplied approval policy. This replaces
+// the PolicyKind-based constructor (DEAD-Rel-3): callers that
+// want a Maker-Checker or Majority policy use the package-level
+// helper functions.
+func newService(t *testing.T, policy approval.Policy) (*release.Service, *memStore) {
 	t.Helper()
 	db := newMemStore()
-	svc := release.NewServiceFromKind(db, db, kind, required)
+	svc := release.NewService(db, db, policy)
 	return svc, db
 }
 
 func TestServiceCreateVoteActivate(t *testing.T) {
-	svc, _ := newService(t, release.PolicyMakerChecker, 1)
+	svc, _ := newService(t, approval.MakerCheckerPolicy{RequiredApprovers: 1})
 	ctx := context.Background()
 
 	r, err := svc.Create(ctx, "c1", 1, validManifest(), release.EnvProd, "alice")
@@ -164,7 +169,7 @@ func TestServiceCreateVoteActivate(t *testing.T) {
 }
 
 func TestServiceActivateSupersedesPrior(t *testing.T) {
-	svc, _ := newService(t, release.PolicyMakerChecker, 1)
+	svc, _ := newService(t, approval.MakerCheckerPolicy{RequiredApprovers: 1})
 	ctx := context.Background()
 
 	r1, err := svc.Create(ctx, "c1", 1, validManifest(), release.EnvProd, "alice")
@@ -207,7 +212,7 @@ func TestServiceActivateSupersedesPrior(t *testing.T) {
 }
 
 func TestServiceActivateQuorumNotMet(t *testing.T) {
-	svc, _ := newService(t, release.PolicyMakerChecker, 1)
+	svc, _ := newService(t, approval.MakerCheckerPolicy{RequiredApprovers: 1})
 	ctx := context.Background()
 
 	r, err := svc.Create(ctx, "c1", 1, validManifest(), release.EnvProd, "alice")
@@ -221,7 +226,7 @@ func TestServiceActivateQuorumNotMet(t *testing.T) {
 }
 
 func TestServiceRollback(t *testing.T) {
-	svc, _ := newService(t, release.PolicyMakerChecker, 1)
+	svc, _ := newService(t, approval.MakerCheckerPolicy{RequiredApprovers: 1})
 	ctx := context.Background()
 	r, _ := svc.Create(ctx, "c1", 1, validManifest(), release.EnvProd, "alice")
 	if _, err := svc.Vote(ctx, r.ID, approval.Vote{Identity: "bob", Decision: approval.Approve}); err != nil {
@@ -244,7 +249,7 @@ func TestServiceRollback(t *testing.T) {
 
 func TestServiceActivateRunsPreconditions(t *testing.T) {
 	t.Setenv("PROMPTSHEON_HARNESS_PRECONDITIONS", "true")
-	svc, db := newService(t, release.PolicyMakerChecker, 1)
+	svc, db := newService(t, approval.MakerCheckerPolicy{RequiredApprovers: 1})
 	svc.WithHarness(harness.NewPreconditionRunner(), db)
 
 	ctx := context.Background()
@@ -295,7 +300,7 @@ func TestServiceActivateRunsPreconditions(t *testing.T) {
 }
 
 func TestServiceActivatePassesWhenAllPreconditionsPass(t *testing.T) {
-	svc, db := newService(t, release.PolicyMakerChecker, 1)
+	svc, db := newService(t, approval.MakerCheckerPolicy{RequiredApprovers: 1})
 	svc.WithHarness(harness.NewPreconditionRunner(), db)
 
 	ctx := context.Background()
@@ -329,7 +334,7 @@ func TestServiceActivatePassesWhenAllPreconditionsPass(t *testing.T) {
 }
 
 func TestServiceClockSeam(t *testing.T) {
-	svc, _ := newService(t, release.PolicyMakerChecker, 1)
+	svc, _ := newService(t, approval.MakerCheckerPolicy{RequiredApprovers: 1})
 	fixed := time.Date(2030, 1, 2, 3, 4, 5, 0, time.UTC)
 	svc.Clock = func() time.Time { return fixed }
 	ctx := context.Background()

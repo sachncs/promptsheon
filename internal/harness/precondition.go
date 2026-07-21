@@ -15,14 +15,25 @@ import (
 // is intentionally tiny: PATH (so sh finds /usr/bin), HOME (so
 // ~-relative paths work), LANG (for locale-correct output
 // decoding), and TZ (so timestamps are predictable). Operators
-// needing more should add to this list explicitly.
-var EnvAllowlist = []string{"PATH", "HOME", "LANG", "LC_ALL", "TZ"}
+// needing more can extend the list at startup via
+// SetEnvAllowlist; the precondition runner reads the global
+// list on every invocation, so a SetEnvAllowlist call before
+// constructing the runner takes effect immediately.
+var envAllowlist = []string{"PATH", "HOME", "LANG", "LC_ALL", "TZ"}
+
+// SetEnvAllowlist replaces the global environment allowlist.
+// The replacement applies to subsequent runs of the
+// PreconditionRunner. Pass nil to disable all passthrough
+// (preconditions see an empty environment).
+func SetEnvAllowlist(keys []string) {
+	envAllowlist = append([]string(nil), keys...)
+}
 
 // scrubEnv returns a copy of os.Environ() with every variable not
-// in EnvAllowlist removed.
+// in envAllowlist removed.
 func scrubEnv() []string {
-	allow := make(map[string]struct{}, len(EnvAllowlist))
-	for _, k := range EnvAllowlist {
+	allow := make(map[string]struct{}, len(envAllowlist))
+	for _, k := range envAllowlist {
 		allow[k] = struct{}{}
 	}
 	var out []string
