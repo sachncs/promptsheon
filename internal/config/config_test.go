@@ -196,8 +196,6 @@ func TestLoadConfig_AdditionalEnvs(t *testing.T) {
 	defer func() { _ = os.Unsetenv("PROMPTSHEON_CIRCUIT_BREAKER_SUCCESS_THRESHOLD") }()
 	_ = os.Setenv("PROMPTSHEON_CIRCUIT_BREAKER_COOLDOWN", "60")
 	defer func() { _ = os.Unsetenv("PROMPTSHEON_CIRCUIT_BREAKER_COOLDOWN") }()
-	_ = os.Setenv("PROMPTSHEON_LLM_FALLBACK", "anthropic,ollama")
-	defer func() { _ = os.Unsetenv("PROMPTSHEON_LLM_FALLBACK") }()
 	_ = os.Setenv("PROMPTSHEON_OTEL_INSECURE", "true")
 	defer func() { _ = os.Unsetenv("PROMPTSHEON_OTEL_INSECURE") }()
 	_ = os.Setenv("PROMPTSHEON_CORS_ORIGINS", "*")
@@ -215,9 +213,6 @@ func TestLoadConfig_AdditionalEnvs(t *testing.T) {
 	}
 	if cfg.CircuitBreakerCooldown != 60 {
 		t.Errorf("CircuitBreakerCooldown = %d, want 60", cfg.CircuitBreakerCooldown)
-	}
-	if cfg.LLMFallback != "anthropic,ollama" {
-		t.Errorf("LLMFallback = %q, want %q", cfg.LLMFallback, "anthropic,ollama")
 	}
 	if !cfg.OTelInsecure {
 		t.Error("OTelInsecure should be true")

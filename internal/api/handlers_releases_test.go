@@ -43,7 +43,7 @@ func decodeJSON(t *testing.T, r io.Reader, dst any) {
 func TestReleaseRoutesCreateVoteActivateInvoke(t *testing.T) {
 	repo := newMockRepo()
 	seedReleaseFixture(repo)
-	svc := release.NewServiceFromKind(repo, repo, release.PolicyMakerChecker, 1)
+	svc := release.NewService(repo, repo, approval.MakerCheckerPolicy{RequiredApprovers: 1})
 	srv := newReleaseTestServer(repo, svc)
 
 	// 1. Create release (as "alice" per the fixture)
@@ -110,7 +110,7 @@ func TestReleaseRoutesCreateVoteActivateInvoke(t *testing.T) {
 func TestReleaseActivateQuorumConflict(t *testing.T) {
 	repo := newMockRepo()
 	seedReleaseFixture(repo)
-	svc := release.NewServiceFromKind(repo, repo, release.PolicyMakerChecker, 1)
+	svc := release.NewService(repo, repo, approval.MakerCheckerPolicy{RequiredApprovers: 1})
 	srv := newReleaseTestServer(repo, svc)
 
 	body, _ := json.Marshal(map[string]string{"environment": "prod"})
@@ -134,7 +134,7 @@ func TestReleaseActivateQuorumConflict(t *testing.T) {
 func TestReleaseInvokeNotActiveConflict(t *testing.T) {
 	repo := newMockRepo()
 	seedReleaseFixture(repo)
-	svc := release.NewServiceFromKind(repo, repo, release.PolicyMakerChecker, 1)
+	svc := release.NewService(repo, repo, approval.MakerCheckerPolicy{RequiredApprovers: 1})
 	srv := newReleaseTestServer(repo, svc)
 
 	body, _ := json.Marshal(map[string]string{"environment": "prod"})

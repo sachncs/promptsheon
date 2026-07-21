@@ -100,8 +100,10 @@ func TestStopOnUnstartedBinary(t *testing.T) {
 	if err := b.Stop(context.Background()); err != nil {
 		t.Fatalf("Stop on unstarted: %v", err)
 	}
-	if !b.stopped {
-		t.Errorf("expected stopped=true")
+	// DEAD-Plg-1: an unstarted binary has nothing to kill; the
+	// stopped flag stays false so Restart can still start it.
+	if b.stopped {
+		t.Errorf("expected stopped=false on unstarted binary")
 	}
 }
 

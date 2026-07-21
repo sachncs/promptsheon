@@ -157,14 +157,6 @@ func (s *SQLite) UpdateRelease(ctx context.Context, r *release.Release) error {
 	return nil
 }
 
-func (s *SQLite) DeleteRelease(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM releases WHERE id = ?`, id)
-	if err != nil {
-		return fmt.Errorf("delete release: %w", err)
-	}
-	return nil
-}
-
 // ActivateAtomic supersedes the prior Release (if non-nil) and
 // persists the next Release in a single SQLite transaction. The
 // invariant "exactly one Active Release per (Capability, Environment)"
@@ -350,13 +342,6 @@ func (s *SQLite) UpdateApproval(ctx context.Context, a *approval.Approval) error
 	return nil
 }
 
-func (s *SQLite) DeleteApproval(ctx context.Context, releaseID string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM approvals WHERE release_id = ?`, releaseID)
-	if err != nil {
-		return fmt.Errorf("delete approval: %w", err)
-	}
-	return nil
-}
 
 func scanApproval(scanner interface {
 	Scan(dest ...any) error

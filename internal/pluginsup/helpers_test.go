@@ -3,7 +3,7 @@ package pluginsup
 import (
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/manifest"
+	"github.com/sachncs/promptsheon/internal/pluginmanifest"
 	"github.com/sachncs/promptsheon/internal/supervisor"
 )
 

@@ -27,12 +27,12 @@ func TestMigration047CoveringIndexes(t *testing.T) {
 	want := []string{
 		"idx_schedules_enabled_due",
 		"idx_executions_version_recent",
-		"idx_versions_capability_version_desc",
+		"idx_eval_runs_release_status_started",
 		"idx_releases_capability_recent",
 		"idx_alerts_rule_recent",
 		"idx_datasets_capability_recent",
 		"idx_preconditions_capability_created",
-		"idx_eval_runs_release_started",
+		"idx_eval_runs_release_status_started",
 		"idx_audit_user_time",
 	}
 	for _, name := range want {

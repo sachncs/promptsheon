@@ -20,5 +20,4 @@ type Repository interface {
 	CreateApproval(ctx context.Context, a *Approval) error
 	GetApproval(ctx context.Context, releaseID string) (*Approval, error)
 	UpdateApproval(ctx context.Context, a *Approval) error
-	DeleteApproval(ctx context.Context, releaseID string) error
 }

@@ -481,34 +481,10 @@ func (s *SQLite) CreateSchedule(ctx context.Context, sc *schedule.Schedule) erro
 	return nil
 }
 
-func (s *SQLite) GetSchedule(ctx context.Context, id string) (*schedule.Schedule, error) {
-	row := s.db.QueryRowContext(ctx,
-		`SELECT id, workspace_id, release_id, kind, cron, webhook_path, next_fire_at, last_fire_at, fired_count, enabled, created_at, created_by
-		 FROM schedules WHERE id = ?`, id,
-	)
-	return scanSchedule(row)
-}
-
-func (s *SQLite) ListSchedulesForRelease(ctx context.Context, releaseID string) ([]*schedule.Schedule, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, workspace_id, release_id, kind, cron, webhook_path, next_fire_at, last_fire_at, fired_count, enabled, created_at, created_by
-		 FROM schedules WHERE release_id = ? ORDER BY created_at DESC`, releaseID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("list schedules: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	var out []*schedule.Schedule
-	for rows.Next() {
-		sc, err := scanSchedule(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, sc)
-	}
-	return out, rows.Err()
-}
-
+// ListDueSchedules returns schedules due to fire at-or-before now.
+// DEAD-Store-2 removed the unused Create/Get/List/Delete
+// variants; ListDueSchedules + UpdateSchedule is the only path
+// the scheduler needs.
 func (s *SQLite) ListDueSchedules(ctx context.Context, now time.Time, limit int) ([]*schedule.Schedule, error) {
 	if limit <= 0 {
 		limit = 100
@@ -541,14 +517,6 @@ func (s *SQLite) UpdateSchedule(ctx context.Context, sc *schedule.Schedule) erro
 	)
 	if err != nil {
 		return fmt.Errorf("update schedule: %w", err)
-	}
-	return nil
-}
-
-func (s *SQLite) DeleteSchedule(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM schedules WHERE id = ?`, id)
-	if err != nil {
-		return fmt.Errorf("delete schedule: %w", err)
 	}
 	return nil
 }

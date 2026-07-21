@@ -307,12 +307,12 @@ func WithHarnessRunner(runner *harness.EvalRunner) Option {
 
 // NewServer creates a new API server with the given dependencies.
 //
-// The legacy WithServerConfig / *ServerConfig options were removed:
-// the fields they exposed (circuit breaker thresholds) are
-// declared but never read by any code path. The breaker is
+// FC-2: the legacy WithServerConfig / *ServerConfig options were
+// removed. The fields they exposed (circuit breaker thresholds)
+// are declared but never read by any code path. The breaker is
 // configured per-provider via internal/llm.WithCircuitBreaker
-// instead; if the production wiring wants a server-wide
-// override, expose it through a fresh Option.
+// instead; if the production wiring wants a server-wide override,
+// expose it through a fresh Option.
 func NewServer(db store.Repository, logger *slog.Logger, opts ...Option) *Server {
 	s := &Server{
 		mux:           http.NewServeMux(),

@@ -40,7 +40,11 @@ type Config struct {
 	// fallback). Set via PROMPTSHEON_LLM_FALLBACK for callers
 	// that read the field; production code should treat this
 	// as documentation only.
-	LLMFallback string
+	// LLMFallback string // FC-3: removed — the per-call fallback chain
+	//   is not wired into the production invocation path; the
+	//   env var was kept for backward compatibility but had no
+	//   consumer. Callers wanting a fallback list should configure
+	//   the LLM registry with multiple providers per model.
 
 	// OpenTelemetry
 	OTelEndpoint string // OTLP gRPC endpoint (e.g., "jaeger:4317")
@@ -120,7 +124,8 @@ func LoadConfig() Config {
 	cfg.CircuitBreakerSuccessThreshold = getEnvInt("PROMPTSHEON_CIRCUIT_BREAKER_SUCCESS_THRESHOLD", cfg.CircuitBreakerSuccessThreshold)
 	cfg.CircuitBreakerCooldown = getEnvInt("PROMPTSHEON_CIRCUIT_BREAKER_COOLDOWN", cfg.CircuitBreakerCooldown)
 
-	cfg.LLMFallback = getEnvString("PROMPTSHEON_LLM_FALLBACK", cfg.LLMFallback)
+	// FC-3: LLMFallback removed. The env var is no longer read;
+	// callers wanting a fallback chain configure the LLM registry.
 	cfg.OTelEndpoint = getEnvString("PROMPTSHEON_OTEL_ENDPOINT", cfg.OTelEndpoint)
 	cfg.OTelInsecure = getEnvBool("PROMPTSHEON_OTEL_INSECURE", cfg.OTelInsecure)
 	cfg.CORSOrigins = parseCORSOrigins(getEnvString("PROMPTSHEON_CORS_ORIGINS", ""))
