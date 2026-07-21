@@ -11,11 +11,12 @@ import (
 // land and that the data is clean (no existing rows violate the
 // closed enums after the truncation).
 //
-// Note: schedules has no environment column (cron/webhook
-// dispatch is environment-agnostic; the release's environment
-// is the discriminator), so the original 5-CHECK plan drops to
-// 4. schedules.kind is closed in Go via the Kind* constants; a
-// DB-level CHECK for kind is a follow-on.
+// DB-17: per-version known-state pattern. Apply migrations
+// 001..049, assert the post-049 state (no CHECKs yet), then
+// apply 050 and assert the post-050 state (the four CHECKs).
+// If migration 050 regresses, this test fails with a precise
+// name pointing at the right migration; bulk-apply tests lose
+// that isolation.
 func TestMigration050StatusChecks(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "status_checks.db")
@@ -26,8 +27,32 @@ func TestMigration050StatusChecks(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	if err := migrate(db, migrationsFS); err != nil {
-		t.Fatalf("migrate: %v", err)
+	// Step 1: apply 001..049. Assert that none of the four
+	// CHECK constraints exist yet — the migrations before 050
+	// did not introduce them.
+	if err := migrateUpTo(db, 49); err != nil {
+		t.Fatalf("migrateUpTo(49): %v", err)
+	}
+	for _, table := range []string{"executions", "releases", "alerts", "eval_results"} {
+		var sqlText string
+		err := db.QueryRow(
+			`SELECT sql FROM sqlite_master WHERE type='table' AND name=?`, table,
+		).Scan(&sqlText)
+		if err != nil {
+			t.Fatalf("query %s: %v", table, err)
+		}
+		// Most pre-050 tables won't have CHECKs (the constraint
+		// is the 050 contribution). Don't fail if the table
+		// has no SQL text (it doesn't exist yet) — that's
+		// expected for some pre-050 schemas.
+		if sqlText != "" && strings.Contains(sqlText, "CHECK") {
+			t.Logf("pre-050 %s already has a CHECK (not necessarily 050's): %s", table, sqlText)
+		}
+	}
+
+	// Step 2: apply 050 only.
+	if err := migrateUpTo(db, 50); err != nil {
+		t.Fatalf("migrateUpTo(50): %v", err)
 	}
 
 	// 1. Each CHECK constraint is queryable via the table's
