@@ -26,6 +26,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -57,9 +58,9 @@ func main() {
 		*outPath = filepath.Join(repoRoot, *outPath)
 	}
 
-	routes, err := collectRoutes(repoRoot + "/internal/api/server.go")
+	routes, err := collectRoutesDir(repoRoot + "/internal/api")
 	if err != nil {
-		fail("collect routes: %v", err)
+		log.Fatalf("collect routes: %v", err)
 	}
 	if len(routes) == 0 {
 		fail("no routes collected; refusing to write an empty spec")
@@ -174,50 +175,81 @@ func collectRoutes(path string) ([]route, error) {
 	}
 	var routes []route
 	ast.Inspect(file, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return true
-		}
-		if sel.Sel.Name != "HandleFunc" {
-			return true
-		}
-		// sel.X should be "s.mux"
-		x, ok := sel.X.(*ast.SelectorExpr)
-		if !ok || x.Sel.Name != "mux" {
-			return true
-		}
-		// call.Args[0] is a string literal: "METHOD /path"
-		// call.Args[1] is the handler expression
-		if len(call.Args) < 2 {
-			return true
-		}
-		lit, ok := call.Args[0].(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING {
-			return true
-		}
-		mp := strings.Trim(lit.Value, `"`)
-		parts := strings.SplitN(mp, " ", 2)
-		if len(parts) != 2 {
-			return true
-		}
-		method, p := parts[0], parts[1]
-		// call.Args[1] is the handler. It may be:
-		//   s.handleX
-		//   createKey (an alias)
-		//   s.wrapHandler(s.handleX)
-		handlerName := extractHandlerName(call.Args[1])
-		routes = append(routes, route{
-			Method:      method,
-			Path:        p,
-			handlerName: handlerName,
-		})
+		routes = append(routes, collectHandleFuncCalls(n)...)
 		return true
 	})
 	return routes, nil
+}
+
+// collectRoutesDir walks every .go file in dir and returns every
+// s.mux.HandleFunc call. The previous implementation only walked
+// server.go; release and harness routes are registered in
+// helper methods that live in handlers_releases.go and
+// handlers_harness.go respectively. Walking every file in the
+// package is the simplest way to capture them.
+func collectRoutesDir(dir string) ([]route, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("read dir %s: %w", dir, err)
+	}
+	fset := token.NewFileSet()
+	var routes []route
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") {
+			continue
+		}
+		if strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+		if err != nil {
+			return nil, fmt.Errorf("parse %s: %w", path, err)
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			routes = append(routes, collectHandleFuncCalls(n)...)
+			return true
+		})
+	}
+	return routes, nil
+}
+
+// collectHandleFuncCalls returns every s.mux.HandleFunc call
+// found in the supplied AST node. Centralised so both
+// collectRoutes (single file) and collectRoutesDir (whole
+// package) share the matching logic.
+func collectHandleFuncCalls(n ast.Node) []route {
+	call, ok := n.(*ast.CallExpr)
+	if !ok {
+		return nil
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != "HandleFunc" {
+		return nil
+	}
+	x, ok := sel.X.(*ast.SelectorExpr)
+	if !ok || x.Sel.Name != "mux" {
+		return nil
+	}
+	if len(call.Args) < 2 {
+		return nil
+	}
+	lit, ok := call.Args[0].(*ast.BasicLit)
+	if !ok || lit.Kind != token.STRING {
+		return nil
+	}
+	mp := strings.Trim(lit.Value, `"`)
+	parts := strings.SplitN(mp, " ", 2)
+	if len(parts) != 2 {
+		return nil
+	}
+	method, p := parts[0], parts[1]
+	handlerName := extractHandlerName(call.Args[1])
+	return []route{{
+		Method:      method,
+		Path:        p,
+		handlerName: handlerName,
+	}}
 }
 
 // extractHandlerName pulls the function name out of a handler
