@@ -54,13 +54,13 @@ These are read by the provider constructors. Two forms are accepted: the upstrea
 | `OPENAI_BASE_URL` (or `PROMPTSHEON_OPENAI_BASE_URL`) | Override the OpenAI base URL. |
 | `ANTHROPIC_API_KEY` (or `PROMPTSHEON_ANTHROPIC_API_KEY`) | Anthropic API key (`sk-ant-...`). |
 | `ANTHROPIC_BASE_URL` (or `PROMPTSHEON_ANTHROPIC_BASE_URL`) | Override the Anthropic base URL. |
-| `AZURE_OPENAI_API_KEY` (or `PROMPTSHEON_AZURE_API_KEY`) | Azure OpenAI API key. |
-| `AZURE_OPENAI_ENDPOINT` (or `PROMPTSHEON_AZURE_RESOURCE`) | Azure OpenAI endpoint URL. |
-| `AZURE_OPENAI_API_VERSION` (or `PROMPTSHEON_AZURE_API_VERSION`) | Azure OpenAI API version (e.g. `2024-02-15-preview`). |
-| `AZURE_OPENAI_DEPLOYMENT` (or `PROMPTSHEON_AZURE_DEPLOYMENT`) | Azure OpenAI deployment name. |
-| `OLLAMA_BASE_URL` (or `PROMPTSHEON_OLLAMA_BASE_URL`) | Ollama server URL (default: `http://localhost:11434`). |
-| `NVIDIA_API_KEY` (or `PROMPTSHEON_NVIDIA_API_KEY`) | NVIDIA NIM API key. |
-| `NVIDIA_BASE_URL` (or `PROMPTSHEON_NVIDIA_BASE_URL`) | Override the NVIDIA NIM base URL. |
+| `PROMPTSHEON_AZURE_API_KEY` | Azure OpenAI API key. (Documented for future use; no Azure provider is wired into the registry in v0.1.x.) |
+| `PROMPTSHEON_AZURE_RESOURCE` | Azure OpenAI endpoint URL. |
+| `PROMPTSHEON_AZURE_API_VERSION` | Azure OpenAI API version (e.g. `2024-02-15-preview`). |
+| `PROMPTSHEON_AZURE_DEPLOYMENT` | Azure OpenAI deployment name. |
+| `PROMPTSHEON_OLLAMA_BASE_URL` | Ollama server URL (default: `http://localhost:11434`). Read-only; no Ollama provider is wired into the registry in v0.1.x. |
+| `PROMPTSHEON_NVIDIA_API_KEY` | NVIDIA NIM API key. (Documented for future use; no NVIDIA provider is wired into the registry in v0.1.x.) |
+| `PROMPTSHEON_NVIDIA_BASE_URL` | Override the NVIDIA NIM base URL. |
 | `PROMPTSHEON_LLM_PROVIDER` | Default provider name to use when a request does not specify one. |
 
 See [LLM Providers](llm-providers.md) for per-provider setup. See [Algorithms — Vault](algorithms.md#vault-aes-256-gcm) for storing keys in the encrypted vault.
