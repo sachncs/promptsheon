@@ -19,7 +19,19 @@ func (s *Server) handleListWebhooks(w http.ResponseWriter, _ *http.Request) erro
 		return nil
 	}
 	eps := s.webhooks.ListEndpoints()
-	writeJSON(w, http.StatusOK, eps)
+	// SEC-7b: redact the secret field on the read path. The
+	// endpoint may carry a ciphertext blob (post-migration 055)
+	// but never the plaintext. We project a SecretSet bool only.
+	type publicEndpoint struct {
+		*webhook.Endpoint
+		Secret    string `json:"-"`
+		SecretSet bool   `json:"secret_set"`
+	}
+	out := make([]publicEndpoint, 0, len(eps))
+	for _, ep := range eps {
+		out = append(out, publicEndpoint{Endpoint: ep, SecretSet: ep.Secret != "" || len(ep.Secret) == 0})
+	}
+	writeJSON(w, http.StatusOK, out)
 	return nil
 }
 
