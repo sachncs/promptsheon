@@ -132,7 +132,7 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 	// `resource` column is preserved for backward compatibility;
 	// the new columns are not part of the audit hash (the chain
 	// format is unchanged).
-	resourceKind, resourceID := splitResource(entry.Resource)
+	resourceKind, resourceID := splitAuditResource(entry.Resource)
 
 	insertRes, err := tx.ExecContext(ctx,
 		`INSERT INTO audit_entries (id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str, resource_kind, resource_id)
@@ -212,6 +212,18 @@ func (s *SQLite) VerifyAuditChain(ctx context.Context) (ok bool, reason string, 
 		lastRowID = res.lastRowID
 	}
 	return true, "", nil
+}
+
+// splitAuditResource splits "kind:id" into (kind, id). Inputs
+// without a colon return ("", input) so the structural columns
+// are simply empty rather than wrong.
+func splitAuditResource(s string) (string, string) {
+	for i := 0; i < len(s); i++ {
+		if s[i] == ':' {
+			return s[:i], s[i+1:]
+		}
+	}
+	return "", s
 }
 
 func (s *SQLite) verifyAuditPage(ctx context.Context, prevHash string, afterRowID int64, limit int) auditPageResult {
