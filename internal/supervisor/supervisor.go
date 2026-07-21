@@ -22,7 +22,6 @@ package supervisor
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -130,19 +129,20 @@ type Adapter struct {
 func NewAdapter(bus *eventbus.Memory) *Adapter { return &Adapter{bus: bus} }
 
 // Publish converts a supervisor PluginEvent into a capability
-// Event and pushes it on the bus. The capability of the event is
-// hard-coded to capability.EventRecommendationGenerated because
-// the supervisor is a backend service; downstream consumers that
-// care about plugin lifecycle should subscribe to the
-// supervisor-specific event types, not the capability bus.
+// Event of type EventPluginLifecycle and pushes it on the bus.
+// DEAD-Plg-2: the previous adapter mapped every event to
+// EventRecommendationGenerated (a recommendation event), which
+// was both semantically wrong and invisible to anything
+// listening for plugin lifecycle. Subscribers filter on the
+// type and read Data for the plugin name, lifecycle kind, and
+// any error.
 func (a *Adapter) Publish(ev PluginEvent) {
 	if a == nil || a.bus == nil {
 		return
 	}
-	_, _ = json.Marshal(ev)
 	a.bus.Publish(capability.Event{
 		ID:        generateAdapterID("sup"),
-		Type:      capability.EventRecommendationGenerated,
+		Type:      capability.EventPluginLifecycle,
 		Timestamp: ev.Timestamp,
 		Data: map[string]any{
 			"plugin": ev.Name,

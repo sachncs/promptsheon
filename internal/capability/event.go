@@ -17,6 +17,12 @@ const (
 	EventExecutionFinished EventType = "execution_finished"
 	// EventRecommendationGenerated is emitted when a recommendation is generated.
 	EventRecommendationGenerated EventType = "recommendation_generated"
+	// EventPluginLifecycle is emitted by the supervisor when a
+	// plugin transitions state (started, stopped, crashed, ...).
+	// Data carries the plugin name, the lifecycle kind, and any
+	// error. Subscribers that care about plugin health filter on
+	// this type rather than parsing a generic event payload.
+	EventPluginLifecycle EventType = "plugin_lifecycle"
 )
 
 // Event represents a domain event — something notable that happened.
