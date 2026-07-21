@@ -140,7 +140,14 @@ func main() {
 	// EventBus adapter in a follow-on), and start the supervisor in
 	// a goroutine that observes rootCtx for shutdown. The supervisor
 	// owns plugin lifecycle; the daemon owns the supervisor.
-	sup := supervisor.New(nil, logger)
+	// DEAD-Plg-2: wire the supervisor lifecycle events through
+	// the same in-memory eventbus the scheduler uses. The
+	// supervisor.NewAdapter bridges the supervisor.Publisher
+	// interface to the broader eventbus.Memory. Without the
+	// adapter, lifecycle events are no-ops; with one, they
+	// surface on the bus for downstream subscribers.
+	supBus := eventbus.NewMemory()
+	sup := supervisor.New(supervisor.NewAdapter(supBus), logger)
 	builtins.Register(sup)
 	go func() {
 		if err := sup.Run(rootCtx); err != nil && !errors.Is(err, context.Canceled) {
