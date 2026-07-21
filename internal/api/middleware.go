@@ -106,7 +106,10 @@ func Logging(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-// Recovery returns middleware that recovers from panics.
+// Recovery returns middleware that recovers from panics. The
+// response uses the same JSON envelope as the rest of the API
+// (writeError) so clients that send Accept: application/json
+// don't get text/plain by surprise (SEC-8).
 func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +125,10 @@ func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
 						"request_id", requestID,
 						"trace_id", traceID,
 					)
-					http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+					writeError(w, &HTTPError{
+						Status:  http.StatusInternalServerError,
+						Message: "internal server error",
+					})
 				}
 			}()
 			next.ServeHTTP(w, r)
