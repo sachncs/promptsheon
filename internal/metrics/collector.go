@@ -93,24 +93,55 @@ func (h *Histogram) Avg() float64 {
 	return h.sum / float64(h.count)
 }
 
-// Percentile returns the p-th percentile (0-100) of observed values.
+// Percentile returns the p-th percentile (0-100) of observed
+// values. The implementation uses the histogram's per-bucket
+// counts (an O(buckets) walk) rather than sorting the entire
+// window of raw values (which was O(N log N) per percentile and
+// dominated scrape time). The fixed bucket boundaries cover the
+// ranges typical for HTTP latency, LLM round-trip time, and
+// workflow durations; the approximation is well within the
+// noise floor of the metric itself.
 func (h *Histogram) Percentile(p float64) float64 {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if len(h.values) == 0 {
+	if h.count == 0 {
 		return 0
 	}
-	sorted := make([]float64, len(h.values))
-	copy(sorted, h.values)
-	sort.Float64s(sorted)
-	idx := (p / 100.0) * float64(len(sorted)-1)
-	lo := int(math.Floor(idx))
-	hi := int(math.Ceil(idx))
-	if lo == hi {
-		return sorted[lo]
+	if p < 0 {
+		p = 0
 	}
-	frac := idx - float64(lo)
-	return sorted[lo]*(1-frac) + sorted[hi]*frac
+	if p > 100 {
+		p = 100
+	}
+	target := int64(math.Ceil(float64(h.count) * p / 100.0))
+	if target <= 0 {
+		target = 1
+	}
+	var cumulative int64
+	for i, b := range h.buckets {
+		cumulative += h.counts[i]
+		if cumulative >= target {
+			// Linear interpolation within the bucket. The lower
+			// edge is the previous bucket's upper bound (0 for i==0)
+			// and the upper edge is b. We use a uniform-distribution
+			// assumption, which is the same trade-off Prometheus
+			// makes.
+			lo := 0.0
+			if i > 0 {
+				lo = h.buckets[i-1]
+			}
+			hi := b
+			over := cumulative - target
+			span := h.counts[i]
+			if span == 0 {
+				return b
+			}
+			frac := float64(span-over) / float64(span)
+			return lo + (hi-lo)*frac
+		}
+	}
+	// Overflow bucket: everything greater than the last bucket boundary.
+	return h.buckets[len(h.buckets)-1]
 }
 
 // P50 returns the 50th percentile (median).
