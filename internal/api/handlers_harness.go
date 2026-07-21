@@ -1,7 +1,8 @@
 package api
 
 import (
-	"encoding/json"
+	"database/sql"
+	"errors"
 	"net/http"
 	"time"
 
@@ -270,17 +271,21 @@ func (s *Server) handleListEvals(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) handleGetEval(w http.ResponseWriter, r *http.Request) error {
+	// BUG-26: distinguish 404 from 500 on DB failure. The
+	// previous form returned ErrNotFound for any error,
+	// masking DB outages as "run not found".
 	run, err := s.db.GetEvalRun(r.Context(), r.PathValue("id"))
 	if err != nil {
-		return ErrNotFound
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return &HTTPError{Status: http.StatusInternalServerError, Message: "eval run lookup failed"}
 	}
 	results, err := s.db.ListEvalResultsForRun(r.Context(), run.ID)
 	if err != nil {
-		return err
+		return &HTTPError{Status: http.StatusInternalServerError, Message: "eval results lookup failed"}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"run": run, "results": results})
 	return nil
 }
 
-// silence unused import warnings for json if no handler uses it.
-var _ = json.Marshal
