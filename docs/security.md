@@ -48,7 +48,7 @@ The chain is **tamper-evident, not tamper-proof.** An attacker with write access
 ## Webhook security
 
 - **HMAC-SHA256 signature.** Every delivery carries `X-Promptsheon-Signature: sha256=<hex>` where `<hex>` is `HMAC-SHA256(secret, body)`. The secret is per-endpoint, generated at registration, and shown to the user once.
-- **SSRF policy.** By default, loopback (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`, `fe80::/10`), and private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`) destinations are refused at registration and at every delivery. Set `PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE=true` to opt in (logged at startup).
+- **SSRF policy.** By default, loopback (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`, `fe80::/10`), and private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`) destinations are refused at registration and at every delivery. The per-endpoint `allow_private` flag was removed in v0.1.1 (SEC-4); there is no opt-in. Tenant deployments that need loopback destinations must expose a dedicated webhook sink on a public address.
 - **Constant-time comparison on the receiver side.** Receivers must verify the signature with `hmac.Equal` or equivalent.
 
 See ADR [0005](adr/0005-hmac-webhooks-with-ssrf-allowlist.md) and [Algorithms — Webhook HMAC signing](algorithms.md#webhook-hmac-signing).
@@ -92,7 +92,7 @@ We will acknowledge within 48 hours, give an initial assessment within 1 week, a
 - [ ] `PROMPTSHEON_AUTH=true` (default).
 - [ ] `PROMPTSHEON_VAULT_KEY` is set to a 32-byte hex string from a real source of entropy. **Not** all zeros.
 - [ ] `PROMPTSHEON_CORS_ORIGINS` is an explicit list, not `*`.
-- [ ] `PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE` is `false` unless this is a local development environment.
+- [ ] `PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE` is not set. The env var no longer exists; the previous per-endpoint flag was removed in SEC-4.
 - [ ] The shell tool is enabled only if the allowlist is non-empty.
 - [ ] The database file is owned by the server user with mode `0640` or stricter.
 - [ ] The vault key is not stored in the same place as the database.
