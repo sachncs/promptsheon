@@ -172,7 +172,6 @@ func (s *SQLite) worker() {
 				select {
 				case span := <-s.queue:
 					batch = append(batch, span)
-					s.flushPending(1)
 					if len(batch) >= traceBatchSize {
 						s.flush(batch)
 						s.donePending(len(batch))
@@ -189,7 +188,6 @@ func (s *SQLite) worker() {
 			}
 		case span := <-s.queue:
 			batch = append(batch, span)
-			s.flushPending(1)
 			if len(batch) >= traceBatchSize {
 				s.flush(batch)
 				s.donePending(len(batch))
@@ -262,12 +260,20 @@ func (s *SQLite) StartChild(_ context.Context, parent *Span, operation string) *
 // request goroutine never blocks on the SQLite write; under a
 // burst the queue absorbs and the worker batches. When the queue
 // is full the span is dropped and SQLite.Dropped is incremented.
+//
+// The pending counter is incremented by the SUBMITTER (not the
+// worker) so Flush can observe a span the moment it is enqueued.
+// Previously the worker incremented pending after dequeuing, which
+// left a window in which the span was in the worker's local batch
+// but pending == 0 — Flush could return before the row was
+// written. BUG-9 follow-up.
 func (s *SQLite) Finish(span *Span) error {
 	if span == nil {
 		return errors.New("trace: nil span")
 	}
 	select {
 	case s.queue <- span:
+		s.flushPending(1)
 		return nil
 	default:
 		s.dropped.Add(1)
