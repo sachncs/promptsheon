@@ -722,3 +722,52 @@ func TestListExecutionsOffsetOnly(t *testing.T) {
 		t.Errorf("expected 3 rows past offset 2, got %d", len(out))
 	}
 }
+
+// TestBootstrapAdminConcurrent exercises SEC-5a: 100 goroutines
+// all hit BootstrapAdmin at the same time with the same email.
+// Exactly one must succeed; the rest must see ErrConflict.
+func TestBootstrapAdminConcurrent(t *testing.T) {
+	t.Parallel()
+	s := newTestSQLite(t)
+	ctx := context.Background()
+
+	const N = 100
+	results := make(chan error, N)
+	start := make(chan struct{})
+	for i := 0; i < N; i++ {
+		go func(i int) {
+			u := &models.User{
+				ID: fmt.Sprintf("u-%03d", i), Email: "admin@local",
+				Name: "admin", Role: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now(),
+			}
+			k := &models.APIKey{
+				ID: fmt.Sprintf("k-%03d", i), UserID: u.ID,
+				Name: "bootstrap", KeyHash: fmt.Sprintf("hash-%03d", i),
+				KeyPrefix: "pk", Role: "admin", CreatedAt: time.Now(),
+			}
+			<-start
+			results <- s.BootstrapAdmin(ctx, u, k)
+		}(i)
+	}
+	close(start)
+
+	wins, conflicts, other := 0, 0, 0
+	for i := 0; i < N; i++ {
+		err := <-results
+		switch {
+		case err == nil:
+			wins++
+		case errors.Is(err, store.ErrConflict):
+			conflicts++
+		default:
+			other++
+			t.Errorf("unexpected error: %v", err)
+		}
+	}
+	if wins != 1 {
+		t.Errorf("expected exactly 1 winner, got %d (conflicts=%d, other=%d)", wins, conflicts, other)
+	}
+	if conflicts+other != N-1 {
+		t.Errorf("expected %d non-winners, got conflicts=%d other=%d", N-1, conflicts, other)
+	}
+}
