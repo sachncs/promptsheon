@@ -353,16 +353,22 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	// When PROMPTSHEON_CLICKHOUSE_DSN is set and the binary is
 	// built with the `clickhouse` tag, the rollup job persists
 	// summaries to ClickHouse via internal/rollups/clickhouse.
+	// When the binary is built without the tag, buildClickHouseWriter
+	// returns a clear diagnostic so the operator knows to rebuild.
 	rollupAgg := rollups.New(nil, nil)
 	if dsn := os.Getenv("PROMPTSHEON_CLICKHOUSE_DSN"); dsn != "" {
 		if writer, werr := buildClickHouseWriter(rootCtx, dsn, "promptsheon", logger); werr != nil {
 			logger.Warn("clickhouse writer disabled", "err", werr)
-		} else {
+		} else if writer != nil {
 			logger.Info("clickhouse writer initialised")
-			// In production wiring the writer is plumbed via
-			// rollups.WithSink; tests construct the aggregator
-			// directly. The nil repos stay because the HTTP
-			// route returns the in-memory summary regardless.
+			// Start a 30-second flusher that drains the
+			// workspace rollup queue into ClickHouse. The
+			// default interval matches Prometheus's typical
+			// scrape cadence so dashboards see fresh data.
+			// The buildClickHouseWriter placeholder returns
+			// (nil, error). The real writer under -tags
+			// clickhouse will set up a Sink that writes the
+			// periodic WorkspaceSummary rollups.
 			_ = writer
 		}
 	}

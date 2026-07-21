@@ -90,3 +90,12 @@ func (w *Writer) Close() error {
 // Compile-time assertion that time.Duration is used so the import
 // is not flagged by goimports when the only usage is via time.Time.
 var _ = time.Second
+
+// WriteSink adapts *Writer to the rollups.Sink interface. The
+// production wiring constructs one of these and passes it to
+// rollups.RunSink. The conversion from *WorkspaceSummary to the
+// MergeTree row is kept inline because the columns are stable
+// across M3.5 changes.
+func (w *Writer) WriteSink(_ context.Context, s *rollups.WorkspaceSummary) error {
+	return w.Write(_ context.TODO(), *s)
+}

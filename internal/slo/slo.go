@@ -164,6 +164,7 @@ type Repository interface {
 	CreateSLO(ctx context.Context, s *SLO) error
 	GetSLO(ctx context.Context, id string) (*SLO, error)
 	ListSLOsForCapability(ctx context.Context, capabilityID string) ([]*SLO, error)
+	ListSLOs(ctx context.Context, workspaceID string) ([]*SLO, error)
 	UpdateSLO(ctx context.Context, s *SLO) error
 	DeleteSLO(ctx context.Context, id string) error
 }

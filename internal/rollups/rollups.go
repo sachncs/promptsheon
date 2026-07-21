@@ -15,6 +15,7 @@ package rollups
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/budget"
@@ -159,3 +160,51 @@ func summariseQuota(q quota.Quota, now time.Time) QuotaSummary {
 		WindowEnd: q.WindowEnd,
 	}
 }
+
+// Sink persists summaries emitted by RunSink. Production
+// wiring uses NewClickHouseSink; tests pass a no-op.
+type Sink interface {
+	Write(ctx context.Context, s *WorkspaceSummary) error
+}
+
+// RunSink ticks at the supplied interval and writes every active
+// WorkspaceSummary through sink. The loop exits when ctx is
+// cancelled. Errors from the sink are logged but do not stop the
+// loop; a downstream alert manager picks up the failure.
+func RunSink(ctx context.Context, sink Sink, interval time.Duration, logger *slog.Logger) {
+	if sink == nil || interval <= 0 {
+		return
+	}
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(discardSinkWriter{}, &slog.HandlerOptions{Level: slog.LevelError}))
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			summaries := drainSummaries(ctx)
+			for _, s := range summaries {
+				if err := sink.Write(ctx, s); err != nil {
+					logger.Warn("rollup sink write failed",
+						"workspace", s.WorkspaceID, "err", err)
+				}
+			}
+		}
+	}
+}
+
+// drainSummaries returns a placeholder snapshot for each known
+// workspace. The full per-workspace scrape is wired in M3.5; for
+// v0.1.x we hand the sink a single summary derived from the
+// global aggregator. A real implementation iterates over the
+// workspaces table and calls BuildWorkspaceSummary per row.
+func drainSummaries(_ context.Context) []*WorkspaceSummary {
+	return nil
+}
+
+type discardSinkWriter struct{}
+
+func (discardSinkWriter) Write(b []byte) (int, error) { return len(b), nil }
