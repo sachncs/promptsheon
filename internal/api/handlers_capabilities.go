@@ -15,6 +15,21 @@ import (
 	"github.com/sachncs/promptsheon/internal/invoke"
 )
 
+// translateGetError turns a store error from a single-row GET into
+// the appropriate HTTP response. A missing row is a 404; any
+// other error is a 500 with a generic message. This centralises
+// the pattern used across the GET handlers in this file and
+// keeps each handler to one line.
+func translateGetError(err error, resource string) error {
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	return &HTTPError{
+		Status:  http.StatusInternalServerError,
+		Message: resource + " lookup failed",
+	}
+}
+
 // computeManifestHash returns the canonical SHA-256 hex of a Manifest
 // in its JSON serialisation. It is used to set Version.ManifestHash,
 // which becomes the deduplication key on the CAS table that the
