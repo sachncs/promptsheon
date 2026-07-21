@@ -17,7 +17,6 @@ package api
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
@@ -177,7 +176,3 @@ func (r *recordingResponseWriter) Write(b []byte) (int, error) {
 	r.body.Write(b)
 	return r.ResponseWriter.Write(b)
 }
-
-// Make sure IdempotencyMiddleware is wired even when the package
-// is imported by side effect (test packages).
-var _ = context.Background

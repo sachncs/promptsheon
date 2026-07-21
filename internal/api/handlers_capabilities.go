@@ -43,8 +43,6 @@ func computeManifestHash(m capability.Manifest) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
-var _ = fmt.Sprintf
-
 func (s *Server) handleListWorkspaces(w http.ResponseWriter, r *http.Request) error {
 	limit, offset, err := parsePagination(r)
 	if err != nil {
