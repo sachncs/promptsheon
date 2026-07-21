@@ -42,6 +42,12 @@ type KMSClient interface {
 // Provider is the in-process KMS-backed KeyProvider. It is
 // concurrency-safe; the underlying KMSClient is responsible for
 // thread-safety.
+//
+// The plaintext key is held in process memory only; on restart
+// the cache is empty and the next Key() call re-fetches from
+// KMS. There is no disk-backed wrapped-blob cache to invalidate;
+// if you rotate the KMS key you must also restart every
+// Promptsheon process (or call Rotate). SEC-10.
 type Provider struct {
 	mu    sync.Mutex
 	cfg   Config
@@ -65,6 +71,11 @@ func New(cfg Config) (*Provider, error) {
 // the first call. Subsequent calls return the cached value
 // without re-contacting KMS; Rotate invalidates the cache so the
 // next call re-fetches.
+//
+// SEC-10: there is no persistent wrapped-blob cache to go stale.
+// The cache is process-local; restart forces a fresh
+// GenerateDataKey call, which means rotated KMS keys are
+// picked up automatically on the next process boot.
 func (p *Provider) Key(ctx context.Context) ([]byte, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
