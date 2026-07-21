@@ -655,3 +655,70 @@ func TestAuditChainDetectsTailDeletion(t *testing.T) {
 		t.Errorf("expected reason to mention tail mismatch; got %q", reason)
 	}
 }
+
+// TestListAuditOffsetOnly exercises DB-9b: with Limit=0 and
+// Offset>0 the repo must emit LIMIT -1 OFFSET ? and return
+// every remaining row. Before DB-9a this produced a SQL
+// syntax error.
+func TestListAuditOffsetOnly(t *testing.T) {
+	t.Parallel()
+	s := newTestSQLite(t)
+	ctx := context.Background()
+	for i := 0; i < 6; i++ {
+		id := fmt.Sprintf("off-%02d", i)
+		if err := s.AppendAudit(ctx, &models.AuditEntry{
+			ID: id, UserID: "u1", Action: "noop", Resource: "x", Details: map[string]any{"i": i},
+		}); err != nil {
+			t.Fatalf("AppendAudit(%s): %v", id, err)
+		}
+	}
+	out, err := s.ListAudit(ctx, &models.AuditFilter{Offset: 2})
+	if err != nil {
+		t.Fatalf("ListAudit offset-only: %v", err)
+	}
+	if len(out) != 4 {
+		t.Errorf("expected 4 rows past offset 2, got %d", len(out))
+	}
+}
+
+// TestListExecutionsOffsetOnly exercises DB-9b for the
+// executions path. With Limit=0 and Offset>0 the query must
+// skip the first N rows and return the tail.
+func TestListExecutionsOffsetOnly(t *testing.T) {
+	t.Parallel()
+	s := newTestSQLite(t)
+	ctx := context.Background()
+	now := time.Now()
+	if err := s.CreateWorkspace(ctx, &capability.Workspace{ID: "w1", Name: "Acme", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatalf("seed workspace: %v", err)
+	}
+	if err := s.CreateProject(ctx, &capability.Project{ID: "p1", WorkspaceID: "w1", Name: "Greetings", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatalf("seed project: %v", err)
+	}
+	if err := s.CreateCapability(ctx, &capability.Capability{
+		ID: "c1", ProjectID: "p1", Name: "c", CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("seed capability: %v", err)
+	}
+	if err := s.CreateVersion(ctx, &capability.Version{
+		ID: "v1", CapabilityID: "c1", Version: 1,
+		ManifestHash: "h1", CreatedAt: now, CreatedBy: "u1",
+	}); err != nil {
+		t.Fatalf("seed version: %v", err)
+	}
+	for i := 0; i < 5; i++ {
+		id := fmt.Sprintf("exec-%02d", i)
+		if err := s.CreateExecution(ctx, &capability.Execution{
+			ID: id, CapabilityVersionID: "v1", Error: "",
+		}); err != nil {
+			t.Fatalf("CreateExecution(%s): %v", id, err)
+		}
+	}
+	out, err := s.ListExecutions(ctx, capability.ExecutionFilter{Offset: 2})
+	if err != nil {
+		t.Fatalf("ListExecutions offset-only: %v", err)
+	}
+	if len(out) != 3 {
+		t.Errorf("expected 3 rows past offset 2, got %d", len(out))
+	}
+}
