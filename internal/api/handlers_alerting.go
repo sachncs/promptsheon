@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -190,5 +191,42 @@ func (s *Server) handleAddNotificationGroup(w http.ResponseWriter, r *http.Reque
 		"channels": group.Channels,
 	})
 	writeJSON(w, http.StatusCreated, group)
+	return nil
+}
+
+// handleLinkAlertRuleGroup wires an alert rule to a notification
+// group. DB-11b: closes the loop so operators don't have to write
+// to alert_rule_notification_groups by hand.
+func (s *Server) handleLinkAlertRuleGroup(w http.ResponseWriter, r *http.Request) error {
+	ruleID := r.PathValue("rule_id")
+	groupID := r.PathValue("group_id")
+	if ruleID == "" || groupID == "" {
+		return &HTTPError{Status: http.StatusBadRequest, Message: "rule_id and group_id are required"}
+	}
+	if err := s.db.LinkRuleToGroup(r.Context(), ruleID, groupID); err != nil {
+		return fmt.Errorf("link rule to group: %w", err)
+	}
+	s.audit(r.Context(), "alert_link", "alert_rule:"+ruleID, map[string]any{
+		"notification_group_id": groupID,
+	})
+	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+// handleUnlinkAlertRuleGroup removes the wire between an alert
+// rule and a notification group. DB-11b.
+func (s *Server) handleUnlinkAlertRuleGroup(w http.ResponseWriter, r *http.Request) error {
+	ruleID := r.PathValue("rule_id")
+	groupID := r.PathValue("group_id")
+	if ruleID == "" || groupID == "" {
+		return &HTTPError{Status: http.StatusBadRequest, Message: "rule_id and group_id are required"}
+	}
+	if err := s.db.UnlinkRuleFromGroup(r.Context(), ruleID, groupID); err != nil {
+		return fmt.Errorf("unlink rule from group: %w", err)
+	}
+	s.audit(r.Context(), "alert_unlink", "alert_rule:"+ruleID, map[string]any{
+		"notification_group_id": groupID,
+	})
+	w.WriteHeader(http.StatusNoContent)
 	return nil
 }
