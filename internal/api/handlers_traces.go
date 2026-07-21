@@ -29,9 +29,14 @@ func (s *Server) handleListSpans(w http.ResponseWriter, r *http.Request) error {
 
 	// Parse limit parameter
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 1000 {
-			filter.Limit = n
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return badRequest("invalid limit: must be an integer")
 		}
+		if n < 1 || n > 1000 {
+			return badRequest("invalid limit: must be between 1 and 1000")
+		}
+		filter.Limit = n
 	}
 
 	spans, err := s.spans.ListSpans(r.Context(), &filter)
@@ -46,6 +51,9 @@ func (s *Server) handleListSpans(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) handleGetSpan(w http.ResponseWriter, r *http.Request) error {
+	if s.spans == nil {
+		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "tracing not configured"}
+	}
 	id := r.PathValue("id")
 	span, err := s.spans.GetSpan(r.Context(), id)
 	if err != nil {
@@ -56,6 +64,9 @@ func (s *Server) handleGetSpan(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) handleGetTraceTree(w http.ResponseWriter, r *http.Request) error {
+	if s.spans == nil {
+		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "tracing not configured"}
+	}
 	traceID := r.PathValue("trace_id")
 	spans, err := s.spans.GetTraceTree(r.Context(), traceID)
 	if err != nil {

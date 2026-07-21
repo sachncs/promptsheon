@@ -38,15 +38,23 @@ func (s *Server) handleListAudit(w http.ResponseWriter, r *http.Request) error {
 	}
 	if v := r.URL.Query().Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
-		if err == nil && n > 0 && n <= 1000 {
-			filter.Limit = n
+		if err != nil {
+			return badRequest("invalid limit: must be an integer")
 		}
+		if n < 1 || n > 1000 {
+			return badRequest("invalid limit: must be between 1 and 1000")
+		}
+		filter.Limit = n
 	}
 	if v := r.URL.Query().Get("offset"); v != "" {
 		n, err := strconv.Atoi(v)
-		if err == nil && n >= 0 {
-			filter.Offset = n
+		if err != nil {
+			return badRequest("invalid offset: must be an integer")
 		}
+		if n < 0 {
+			return badRequest("invalid offset: must be non-negative")
+		}
+		filter.Offset = n
 	}
 
 	entries, err := s.db.ListAudit(r.Context(), &filter)
