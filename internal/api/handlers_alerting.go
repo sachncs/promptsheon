@@ -125,6 +125,12 @@ func (s *Server) handleDeleteAlertRule(w http.ResponseWriter, r *http.Request) e
 	if s.alertingManager == nil {
 		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
 	}
+	// BUG-17: distinguish 204 (deleted) from 404 (never existed).
+	// The previous form returned 204 unconditionally, so operators
+	// could not tell whether their DELETE actually removed a row.
+	if _, ok := s.alertingManager.GetRule(id); !ok {
+		return ErrNotFound
+	}
 	s.alertingManager.RemoveRule(id)
 	s.audit(r.Context(), "delete", "alert_rule:"+id, nil)
 	w.WriteHeader(http.StatusNoContent)
