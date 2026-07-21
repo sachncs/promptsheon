@@ -626,6 +626,11 @@ func (s *Server) audit(ctx context.Context, action, resource string, details map
 		// fall through to drop path
 	}
 	s.auditDropped.Add(1)
+	// OBS-7: surface the drop count to the metrics collector so
+	// /metrics/summary and the Prometheus scrape expose it.
+	if s.collector != nil {
+		s.collector.SetAuditDropped(s.auditDropped.Load())
+	}
 	if s.logger != nil {
 		s.logger.Warn("audit queue full, entry dropped",
 			"action", action, "resource", resource, "user_id", userID)
