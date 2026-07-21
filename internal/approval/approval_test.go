@@ -10,6 +10,15 @@ func vote(identity string, d Decision, reason string) Vote {
 	return Vote{Identity: identity, Decision: d, Reason: reason, Timestamp: time.Now()}
 }
 
+func mustRecord(t *testing.T, a Approval, v Vote) Approval {
+	t.Helper()
+	out, err := a.Record(v)
+	if err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	return out
+}
+
 func TestRecordRejectsEmptyIdentity(t *testing.T) {
 	t.Parallel()
 	a := Approval{}
@@ -97,15 +106,21 @@ func TestMajorityPolicyRejectsNonPositiveRequired(t *testing.T) {
 
 func TestMakerCheckerRequiresSeparation(t *testing.T) {
 	t.Parallel()
+	// SEC-1b: VerifySeparationOfDuties is gone; MakerCheckerPolicy
+	// self-enforces against the Creator field. Replicate the test
+	// here to lock in the new contract.
 	a := Approval{ReleaseID: "rel-1"}
-	a, _ = a.Record(vote("alice", Approve, ""))
-	if VerifySeparationOfDuties(a, "alice") {
-		t.Fatalf("expected maker to fail separation check")
+	a = mustRecord(t, a, vote("alice", Approve, ""))
+	_, _, err := MakerCheckerPolicy{RequiredApprovers: 1, Creator: "alice"}.Evaluate(a.Votes)
+	if err == nil {
+		t.Fatalf("expected maker-checker to reject creator's own vote")
 	}
-	if !VerifySeparationOfDuties(a, "bob") {
-		t.Fatalf("expected non-maker to pass separation check")
+	_, _, err = MakerCheckerPolicy{RequiredApprovers: 1, Creator: "bob"}.Evaluate(a.Votes)
+	if err != nil {
+		t.Fatalf("expected maker-checker to accept non-creator vote: %v", err)
 	}
-	if VerifySeparationOfDuties(a, "") {
-		t.Fatalf("expected empty creator to fail separation check")
+	_, _, err = MakerCheckerPolicy{RequiredApprovers: 1}.Evaluate(a.Votes)
+	if err == nil {
+		t.Fatalf("expected maker-checker to refuse empty Creator")
 	}
 }

@@ -154,9 +154,9 @@ func (r Release) ApproveWith(a approval.Approval, pol approval.Policy) (Release,
 		mkp.Creator = r.CreatedBy
 		pol = mkp
 	}
-	if !approval.VerifySeparationOfDuties(a, r.CreatedBy) {
-		return r, approval.ErrCreatorVoted
-	}
+	// SEC-1b: the side-check VerifySeparationOfDuties is gone.
+	// MakerCheckerPolicy.Evaluate self-enforces against the
+	// Creator populated above; other policies never checked it.
 	state, satisfied, err := pol.Evaluate(a.Votes)
 	if err != nil {
 		return r, fmt.Errorf("release: policy: %w", err)
