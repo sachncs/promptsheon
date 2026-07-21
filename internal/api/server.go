@@ -821,10 +821,15 @@ func callerID(r *http.Request) string {
 
 // --- Rate Limiting ---
 
-// rateLimit wraps a Func with rate limiting.
+// rateLimit wraps a Func with rate limiting. The bucket key is
+// derived from the authenticated user when auth has populated
+// the context, and from the client IP otherwise (see
+// ratelimit.extractKey for the trusted-proxy rules). SEC-RL-1:
+// per-user-or-IP keying so a single attacker IP cannot exhaust
+// a global bucket shared across every tenant.
 func (s *Server) rateLimit(next Func) Func {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		if s.rateLimiter != nil && !s.rateLimiter.Allow(r.RemoteAddr) {
+		if s.rateLimiter != nil && !s.rateLimiter.Allow(ratelimit.ExtractKey(r)) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Retry-After", "60")
 			w.WriteHeader(http.StatusTooManyRequests)
