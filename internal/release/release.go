@@ -147,9 +147,8 @@ func (r Release) ApproveWith(a approval.Approval, pol approval.Policy) (Release,
 		return r, errors.New("release: cannot approve; created_by is empty (cannot run separation-of-duties check)")
 	}
 	// For MakerCheckerPolicy, populate the policy's Creator field
-	// from the Release so the policy can self-enforce. For other
-	// policies, the wrapped Evaluate retains the legacy behaviour
-	// and the side-check below still runs.
+	// from the Release so the policy can self-enforce separation-
+	// of-duties. Other policies never checked it.
 	if mkp, ok := pol.(approval.MakerCheckerPolicy); ok {
 		mkp.Creator = r.CreatedBy
 		pol = mkp
