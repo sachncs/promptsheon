@@ -55,14 +55,6 @@ const (
 	EnvProd    Environment = "prod"
 )
 
-// AllEnvironments returns the closed set of supported environments, in
-// the order they appear in a typical promotion pipeline. It is a
-// function (not a package-level variable) so the slice is constructed
-// at call time and the package declares no mutable state.
-func AllEnvironments() []Environment {
-	return []Environment{EnvDev, EnvStaging, EnvProd}
-}
-
 // Valid reports whether the environment is one of the supported
 // closed-set values.
 func (e Environment) Valid() bool {
@@ -201,15 +193,8 @@ func (r Release) ApproveWithApprovalList(approvers []string) (Release, error) {
 	)
 }
 
-// Approve is retained as a thin wrapper over ApproveWithApprovalList
-// so existing tests and call sites compile. New callers should use
-// ApproveWith against a configured Policy. The wrapper accepts a
-// flat list of approver identities for backwards compatibility.
-//
-// Deprecated: use ApproveWith(approval.Approval, approval.Policy).
-func (r Release) Approve(approvers []string) (Release, error) {
-	return r.ApproveWithApprovalList(approvers)
-}
+// Deprecated: removed in the DEAD-3 sweep. Use
+// ApproveWith(approval.Approval, approval.Policy) instead.
 
 func castApprovesToVotes(identities []string) []approval.Vote {
 	out := make([]approval.Vote, 0, len(identities))

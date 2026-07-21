@@ -51,7 +51,14 @@ func TestNewRejectsBadInput(t *testing.T) {
 func TestApproveAdvancesPending(t *testing.T) {
 	t.Parallel()
 	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
-	got, err := r.Approve([]string{"bob", "carol"})
+	a, err := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
+	)
+	if err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	a, _ = a.Record(approval.Vote{Identity: "carol", Decision: approval.Approve, Timestamp: time.Now()})
+	got, err := r.ApproveWith(a, approval.MajorityPolicy{Required: 2})
 	if err != nil {
 		t.Fatalf("approve: %v", err)
 	}
@@ -66,8 +73,11 @@ func TestApproveAdvancesPending(t *testing.T) {
 func TestApproveRejectsWrongState(t *testing.T) {
 	t.Parallel()
 	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
-	r, _ = r.Approve([]string{"bob"})
-	if _, err := r.Approve([]string{"carol"}); !errors.Is(err, ErrNotPending) {
+	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
+	)
+	r, _ = r.ApproveWith(a, approval.MajorityPolicy{Required: 1})
+	if _, err := r.ApproveWith(a, approval.MajorityPolicy{Required: 1}); !errors.Is(err, ErrNotPending) {
 		t.Fatalf("expected ErrNotPending, got %v", err)
 	}
 }
@@ -75,10 +85,10 @@ func TestApproveRejectsWrongState(t *testing.T) {
 func TestApproveRejectsEmptyApprovers(t *testing.T) {
 	t.Parallel()
 	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
-	if _, err := r.Approve(nil); err == nil {
-		t.Fatalf("expected error for empty approvers")
-	}
-	if _, err := r.Approve([]string{""}); err == nil {
+	empty, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "", Decision: approval.Approve, Timestamp: time.Now()},
+	)
+	if _, err := r.ApproveWith(empty, approval.MajorityPolicy{Required: 1}); err == nil {
 		t.Fatalf("expected error for empty approver identity")
 	}
 }
@@ -89,7 +99,10 @@ func TestActivateRequiresApproved(t *testing.T) {
 	if _, err := r.Activate(time.Now()); err == nil {
 		t.Fatalf("expected error activating Pending release")
 	}
-	r, _ = r.Approve([]string{"bob"})
+	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
+	)
+	r, _ = r.ApproveWith(a, approval.MajorityPolicy{Required: 1})
 	got, err := r.Activate(time.Now())
 	if err != nil {
 		t.Fatalf("activate: %v", err)
@@ -110,7 +123,10 @@ func TestSupersedeRequiresActive(t *testing.T) {
 func TestRollbackFromActiveOrApproved(t *testing.T) {
 	t.Parallel()
 	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
-	r, _ = r.Approve([]string{"bob"})
+	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
+	)
+	r, _ = r.ApproveWith(a, approval.MajorityPolicy{Required: 1})
 	got, err := r.Rollback(time.Now())
 	if err != nil {
 		t.Fatalf("rollback from Approved: %v", err)

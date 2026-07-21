@@ -16,16 +16,16 @@ func TestPublisherFiltersByType(t *testing.T) {
 	gotCh := make(chan capability.Event, 4)
 	sub, err := p.Subscribe(func(e capability.Event) {
 		gotCh <- e
-	}, capability.EventVersionCreated)
+	}, capability.EventExecutionFinished)
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
 	defer sub.Cancel()
 
-	if err := p.Publish(capability.Event{Type: capability.EventVersionCreated, ID: "1"}); err != nil {
+	if err := p.Publish(capability.Event{Type: capability.EventExecutionFinished, ID: "1"}); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
-	if err := p.Publish(capability.Event{Type: capability.EventCapabilityCreated, ID: "2"}); err != nil {
+	if err := p.Publish(capability.Event{Type: capability.EventRecommendationGenerated, ID: "2"}); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
 
@@ -35,7 +35,7 @@ func TestPublisherFiltersByType(t *testing.T) {
 			t.Fatalf("expected event 1, got %s", got.ID)
 		}
 	default:
-		t.Fatalf("expected a VersionCreated event")
+		t.Fatalf("expected an ExecutionFinished event")
 	}
 }
 
@@ -55,8 +55,8 @@ func TestPublisherReceivesAllWhenFilterEmpty(t *testing.T) {
 	})
 	defer sub.Cancel()
 
-	_ = p.Publish(capability.Event{Type: capability.EventVersionCreated, ID: "1"})
-	_ = p.Publish(capability.Event{Type: capability.EventExecutionFinished, ID: "2"})
+	_ = p.Publish(capability.Event{Type: capability.EventExecutionFinished, ID: "1"})
+	_ = p.Publish(capability.Event{Type: capability.EventRecommendationGenerated, ID: "2"})
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -90,7 +90,7 @@ func TestCancelStopsDelivery(t *testing.T) {
 	})
 
 	sub.Cancel()
-	_ = p.Publish(capability.Event{Type: capability.EventVersionCreated})
+	_ = p.Publish(capability.Event{Type: capability.EventExecutionFinished})
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -119,7 +119,7 @@ func TestPublishPanicRecovered(t *testing.T) {
 	}
 	defer sub.Cancel()
 
-	if err := p.Publish(capability.Event{Type: capability.EventVersionCreated}); err != nil {
+	if err := p.Publish(capability.Event{Type: capability.EventExecutionFinished}); err != nil {
 		t.Fatalf("publish should swallow subscriber panic, got %v", err)
 	}
 }
