@@ -46,23 +46,35 @@ func New(hexKey string) (*Vault, error) {
 
 // Encrypt encrypts plaintext using AES-256-GCM and returns a hex-encoded string.
 func (v *Vault) Encrypt(plaintext string) (string, error) {
+	ct, err := v.EncryptBytes([]byte(plaintext))
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(ct), nil
+}
+
+// EncryptBytes encrypts raw bytes using AES-256-GCM and returns
+// the nonce-prefixed ciphertext as a byte slice. Useful for
+// callers that want to store the result in a BLOB column
+// rather than a TEXT column.
+func (v *Vault) EncryptBytes(plaintext []byte) ([]byte, error) {
 	block, err := aes.NewCipher(v.key)
 	if err != nil {
-		return "", fmt.Errorf("create cipher: %w", err)
+		return nil, fmt.Errorf("create cipher: %w", err)
 	}
 
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", fmt.Errorf("create GCM: %w", err)
+		return nil, fmt.Errorf("create GCM: %w", err)
 	}
 
 	nonce := make([]byte, aesGCM.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return "", fmt.Errorf("generate nonce: %w", err)
+		return nil, fmt.Errorf("generate nonce: %w", err)
 	}
 
-	ciphertext := aesGCM.Seal(nonce, nonce, []byte(plaintext), nil)
-	return hex.EncodeToString(ciphertext), nil
+	ciphertext := aesGCM.Seal(nonce, nonce, plaintext, nil)
+	return ciphertext, nil
 }
 
 // Decrypt decrypts a hex-encoded AES-256-GCM ciphertext.

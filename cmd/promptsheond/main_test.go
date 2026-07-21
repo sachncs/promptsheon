@@ -813,8 +813,11 @@ func TestWebhookStoreAdapter_SaveWebhookEndpoint(t *testing.T) {
 	if list[0].URL != "https://example.com/hook" {
 		t.Errorf("expected URL https://example.com/hook, got %s", list[0].URL)
 	}
-	if list[0].Secret != "secret123" {
-		t.Errorf("expected secret secret123, got %s", list[0].Secret)
+	// SEC-7: the plaintext secret must not be persisted; the
+	// adapter stores only ciphertext. The plaintext form lives
+	// only on the wire.
+	if list[0].Secret != "" {
+		t.Errorf("expected empty plaintext secret, got %q (must be ciphertext-only)", list[0].Secret)
 	}
 	if len(list[0].Events) != 2 {
 		t.Errorf("expected 2 events, got %d", len(list[0].Events))

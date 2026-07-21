@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
+	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/webhook"
 )
 
@@ -42,12 +44,38 @@ func (s *Server) handleCreateWebhook(w http.ResponseWriter, r *http.Request) err
 	if err := ValidateWebhookURL(req.URL); err != nil {
 		return &HTTPError{Status: http.StatusBadRequest, Message: fmt.Sprintf("invalid url: %v", err)}
 	}
+	var secretCiphertext []byte
+	if req.Secret != "" {
+		if s.vault == nil {
+			return &HTTPError{Status: http.StatusServiceUnavailable, Message: "vault not configured; cannot store webhook secret"}
+		}
+		ct, err := s.vault.EncryptBytes([]byte(req.Secret))
+		if err != nil {
+			return fmt.Errorf("encrypt webhook secret: %w", err)
+		}
+		secretCiphertext = ct
+	}
 	ep := &webhook.Endpoint{
-		ID:     generateID(),
-		URL:    req.URL,
-		Secret: req.Secret,
-		Events: req.Events,
-		Active: true,
+		ID:        generateID(),
+		URL:       req.URL,
+		Secret:    req.Secret,
+		Events:    req.Events,
+		Active:    true,
+	}
+	eventStrs := make([]string, 0, len(ep.Events))
+	for _, e := range ep.Events {
+		eventStrs = append(eventStrs, string(e))
+	}
+	if err := s.db.SaveWebhookEndpoint(r.Context(), &models.WebhookEndpointRecord{
+		ID:               ep.ID,
+		URL:              ep.URL,
+		Secret:           "", // plaintext never persisted
+		SecretCiphertext: secretCiphertext,
+		Events:           eventStrs,
+		Active:           ep.Active,
+		CreatedAt:        time.Now(),
+	}); err != nil {
+		return fmt.Errorf("save webhook endpoint: %w", err)
 	}
 	s.webhooks.Register(ep)
 	s.audit(r.Context(), "webhook_create", "webhook", map[string]any{
