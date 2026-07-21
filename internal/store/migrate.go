@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -25,11 +26,20 @@ const DestructiveMigrationEnv = "PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS"
 // Safety features:
 //   - Each migration runs in its own transaction (rollback on failure)
 //   - Forward-only: no down migrations, migrations are idempotent
-//   - Destructive migrations (file name contains "_destructive_") require
+//   - Destructive migrations (file name matches ^\d+_destructive) require
 //     PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true to apply. Without
 //     the flag, the daemon refuses to start. This is the operational
 //     gate per the production-readiness review: the daemon never silently
 //     drops tables or columns during a routine upgrade.
+//
+// Migration layout: after consolidation the directory holds 8 .up.sql
+// files (no .down.sql). Existing deployments upgrading from versions
+// up to 64 must run a one-time shim before starting the new daemon:
+//
+//   INSERT OR IGNORE INTO schema_migrations(version) VALUES
+//     (1),(2),(3),(4),(5),(6),(7),(8);
+//
+// See migrations/README.md and CHANGELOG for the upgrade procedure.
 func migrate(db *sql.DB, migrationsFS fs.FS) error {
 	destructiveAllowed := os.Getenv(DestructiveMigrationEnv) == "true"
 	// Ensure the schema_migrations table exists.
@@ -274,22 +284,32 @@ func splitTrailingPragma(sqlStr string) (string, string) {
 
 // isDestructiveMigration reports whether a migration file is
 // destructive (drops tables or columns) by its file name. The
-// convention is the substring "destructive" in the file name; this
-// is intentionally cheap to grep and audit. The convention is
-// "_destructive_<rest>" where <rest> is anything including the file
-// extension, so we match on "destructive" alone.
+// convention is anchored: the filename must start with a numeric
+// prefix followed by `_destructive` (e.g. 001_destructive_*.sql).
+// This is stricter than the prior substring match so a
+// non-destructive migration with "destructive" elsewhere in the
+// name (e.g. 015_destructive_state_change.sql) runs unprotected,
+// while every drop-table / drop-column migration triggers the gate.
 func isDestructiveMigration(name string) bool {
-	return strings.Contains(name, "destructive")
+	return destructiveNameRE.MatchString(name)
 }
+
+var destructiveNameRE = regexp.MustCompile(`^\d+_destructive`)
 
 // LoadDown reads and applies a single .down.sql file by version.
 // The caller is the production recovery flow: an operator who
 // wants to roll back a migration calls this with the version
 // number (e.g. 046 to undo the alert M2M backfill).
 //
-// Destructive down migrations are gated on the same env var as
-// forward destructive migrations; a request to undo a destructive
-// migration without the env var returns an error.
+// After the consolidation (commit that replaced 51 + 17 .sql files
+// with 8 .up.sql files) no .down.sql ships with the codebase.
+// LoadDown remains in the runner for explicit operator recovery;
+// it returns "no down migration for version N" for any version
+// because the directory has no matching file.
+//
+// Destructive down migrations (filename matches ^\d+_destructive
+// .down.sql, were any to exist) are gated on the same env var as
+// forward destructive migrations.
 func LoadDown(ctx context.Context, db *sql.DB, version int) error {
 	entries, err := fs.ReadDir(migrationsFS, "migrations")
 	if err != nil {
