@@ -7,6 +7,12 @@
 //
 // Every other artifact expresses how the system currently achieves that
 // outcome, and every other artifact is replaceable.
+//
+// DEAD-1 sweep: ReleaseProbe, ReleaseStatusValue, DeriveState,
+// Observation, EvaluationResult, and the 11 unused EventType
+// constants were removed in this commit. DeriveState had no
+// production caller; the capability state lives implicitly in
+// the Release.Status field that drives every read path.
 package capability
 
 import "time"
@@ -32,20 +38,6 @@ type Project struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-// State represents the lifecycle state of a capability.
-type State string
-
-const (
-	// StateDraft is a draft state.
-	StateDraft State = "draft"
-	// StateActive is an active state.
-	StateActive State = "active"
-	// StateDeprecated is a deprecated state.
-	StateDeprecated State = "deprecated"
-	// StateArchived is an archived state.
-	StateArchived State = "archived"
-)
-
 // Capability represents one business outcome.
 //
 // A capability NEVER contains implementation. It only has identity.
@@ -53,11 +45,10 @@ const (
 // while Promptsheon is free to evolve the implementation behind that
 // capability based on evidence from evaluations and production telemetry.
 //
-// Per M0.8 / ADR-0011-follow-on, State and CurrentVersionID are
-// DERIVED from Release state, not stored. A Capability moves through
-// StateDraft when no Release exists for any Environment; StateActive
-// when at least one Release is Active; StateDeprecated when all
-// Environments are Superseded. Use DeriveState to compute.
+// State is no longer a field on Capability; the derived state lives
+// implicitly in the Releases that point at this Capability.
+// Queries that need a Capability's effective state should join
+// against the releases table.
 type Capability struct {
 	ID          string    `json:"id"`
 	ProjectID   string    `json:"project_id"`
@@ -68,47 +59,3 @@ type Capability struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
-
-// DeriveState computes the Capability's lifecycle state from a set of
-// Releases. The empty slice (no Releases) yields StateDraft; a
-// mix with at least one Active Release yields StateActive; all
-// Releases Superseded yields StateDeprecated.
-func (c Capability) DeriveState(releases []ReleaseProbe) State {
-	active := 0
-	superseded := 0
-	for _, r := range releases {
-		switch r.Status {
-		case ReleaseStatusActive:
-			active++
-		case ReleaseStatusSuperseded, ReleaseStatusRolledBack:
-			superseded++
-		}
-	}
-	switch {
-	case active == 0 && superseded == 0:
-		return StateDraft
-	case active > 0:
-		return StateActive
-	default:
-		return StateDeprecated
-	}
-}
-
-// ReleaseProbe is the minimal shape DeriveState needs; the type
-// lives here (not in the release package) so the capability package
-// stays free of an import cycle. Callers construct values from
-// release.Release values.
-type ReleaseProbe struct {
-	Status ReleaseStatusValue
-}
-
-// ReleaseStatusValue is the small closed set of states the
-// Capability cares about. Anything not in this set is treated as
-// StateDraft.
-type ReleaseStatusValue string
-
-const (
-	ReleaseStatusActive     ReleaseStatusValue = "active"
-	ReleaseStatusSuperseded ReleaseStatusValue = "superseded"
-	ReleaseStatusRolledBack ReleaseStatusValue = "rolled_back"
-)

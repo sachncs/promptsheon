@@ -222,20 +222,16 @@ func (s *Server) handleListCapabilities(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleCreateCapability(w http.ResponseWriter, r *http.Request) error {
 	projectID := r.PathValue("project_id")
 	var req struct {
-		Name        string           `json:"name"`
-		Description string           `json:"description,omitempty"`
-		Owner       string           `json:"owner,omitempty"`
-		Tags        []string         `json:"tags,omitempty"`
-		State       capability.State `json:"state,omitempty"`
+		Name        string   `json:"name"`
+		Description string   `json:"description,omitempty"`
+		Owner       string   `json:"owner,omitempty"`
+		Tags        []string `json:"tags,omitempty"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
 	if req.Name == "" {
 		return ErrBadRequest
-	}
-	if req.State == "" {
-		req.State = capability.StateDraft
 	}
 	now := time.Now()
 	capab := &capability.Capability{
@@ -273,11 +269,10 @@ func (s *Server) handleUpdateCapability(w http.ResponseWriter, r *http.Request) 
 		return ErrNotFound
 	}
 	var req struct {
-		Name        *string           `json:"name"`
-		Description *string           `json:"description,omitempty"`
-		Owner       *string           `json:"owner,omitempty"`
-		Tags        *[]string         `json:"tags,omitempty"`
-		State       *capability.State `json:"state,omitempty"`
+		Name        *string   `json:"name"`
+		Description *string   `json:"description,omitempty"`
+		Owner       *string   `json:"owner,omitempty"`
+		Tags        *[]string `json:"tags,omitempty"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
