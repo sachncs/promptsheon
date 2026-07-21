@@ -1,10 +1,12 @@
 package api
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
+	"net"
 	"net/http"
 	"runtime/debug"
 	"time"
@@ -152,6 +154,12 @@ func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
 // makes the second write a silent no-op so the recover path
 // does not corrupt the response when the original handler
 // had already started streaming.
+//
+// SSE / WebSocket handlers type-assert the ResponseWriter to
+// http.Flusher / http.Hijacker. Forwarding via
+// http.NewResponseController keeps the original behaviour for
+// any optional interface the underlying writer supports
+// (BUG-9).
 type recoveryWriter struct {
 	http.ResponseWriter
 	wrote bool
@@ -170,6 +178,26 @@ func (r *recoveryWriter) Write(b []byte) (int, error) {
 		r.wrote = true
 	}
 	return r.ResponseWriter.Write(b)
+}
+
+func (r *recoveryWriter) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (r *recoveryWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if h, ok := r.ResponseWriter.(http.Hijacker); ok {
+		return h.Hijack()
+	}
+	return nil, nil, http.ErrNotSupported
+}
+
+func (r *recoveryWriter) Push(target string, opts *http.PushOptions) error {
+	if p, ok := r.ResponseWriter.(http.Pusher); ok {
+		return p.Push(target, opts)
+	}
+	return http.ErrNotSupported
 }
 
 func (r *recoveryWriter) alive() bool {
