@@ -186,17 +186,7 @@ func (p MakerCheckerPolicy) Evaluate(votes []Vote) (State, bool, error) {
 	return StatePending, false, nil
 }
 
-// VerifySeparationOfDuties is retained for backward compatibility
-// with callers that already check before Evaluate. New code should
-// pass Creator into MakerCheckerPolicy and let Evaluate decide.
-func VerifySeparationOfDuties(a Approval, creator string) bool {
-	if creator == "" {
-		return false
-	}
-	for _, v := range a.Votes {
-		if v.Identity == creator {
-			return false
-		}
-	}
-	return true
-}
+// VerifySeparationOfDuties was removed in SEC-1b. MakerCheckerPolicy
+// now self-enforces against the Creator field at Evaluate time;
+// callers should populate Creator on the policy before passing
+// it to Evaluate.

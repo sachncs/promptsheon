@@ -166,13 +166,16 @@ func TestApproveWithEnforcesQuorum(t *testing.T) {
 
 func TestApproveWithRejectsCreatorVote(t *testing.T) {
 	t.Parallel()
+	// SEC-1b: separation-of-duties lives on MakerCheckerPolicy, not
+	// on the release layer. MajorityPolicy intentionally allows the
+	// creator's own vote.
 	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
 	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
 		approval.Vote{Identity: "alice", Decision: approval.Approve, Timestamp: time.Now()},
 	)
-	_, err := r.ApproveWith(a, approval.MajorityPolicy{Required: 1})
+	_, err := r.ApproveWith(a, approval.MakerCheckerPolicy{RequiredApprovers: 1})
 	if err == nil {
-		t.Fatalf("expected separation-of-duties rejection")
+		t.Fatalf("expected maker-checker to reject creator's own vote")
 	}
 }
 
