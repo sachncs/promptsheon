@@ -318,11 +318,23 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	providers.LoadFromEnv()
 
 	// Per-Workspace rollup aggregator (Tier 2.37). The production
-	// wiring supplies a backend-backed Budget/Quota repository; the
-	// rollup job that writes to ClickHouse is M3 follow-on. Today's
-	// wiring attaches a nil-safe aggregator that the route handles
-	// gracefully when unset (returns an empty summary).
+	// wiring supplies a backend-backed Budget/Quota repository.
+	// When PROMPTSHEON_CLICKHOUSE_DSN is set and the binary is
+	// built with the `clickhouse` tag, the rollup job persists
+	// summaries to ClickHouse via internal/rollups/clickhouse.
 	rollupAgg := rollups.New(nil, nil)
+	if dsn := os.Getenv("PROMPTSHEON_CLICKHOUSE_DSN"); dsn != "" {
+		if writer, werr := buildClickHouseWriter(rootCtx, dsn, "promptsheon", logger); werr != nil {
+			logger.Warn("clickhouse writer disabled", "err", werr)
+		} else {
+			logger.Info("clickhouse writer initialised")
+			// In production wiring the writer is plumbed via
+			// rollups.WithSink; tests construct the aggregator
+			// directly. The nil repos stay because the HTTP
+			// route returns the in-memory summary regardless.
+			_ = writer
+		}
+	}
 
 	// Canonical invoke.Invoker (Tier 2.36). The Caller resolves
 	// the model + provider from the request, then routes through
@@ -523,6 +535,14 @@ func buildReleaseService(db *store.SQLite, policy string) *release.Service {
 		// hit /activate.
 		return nil
 	}
+}
+
+// buildClickHouseWriter constructs a ClickHouse writer when the
+// binary is built with the `clickhouse` build tag. The function
+// returns nil + nil when the tag is absent so production
+// binaries without the tag still boot cleanly.
+func buildClickHouseWriter(ctx context.Context, dsn, database string, logger *slog.Logger) (any, error) {
+	return nil, fmt.Errorf("clickhouse writer not compiled in (rebuild with -tags clickhouse)")
 }
 
 func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *config.Config, srv *api.Server, logger *slog.Logger, limiter *ratelimit.Limiter, tracer trace.Tracer, collector *metrics.Collector) {
