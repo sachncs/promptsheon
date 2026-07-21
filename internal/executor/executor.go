@@ -35,6 +35,14 @@ import (
 // implementation that talks to the right plugin / built-in.
 type Caller func(ctx context.Context, req InvokeRequest) (InvokeResult, error)
 
+// ErrProviderMissing is returned by a Caller when the request names
+// a model whose provider is not registered, or names no provider at
+// all. The handler maps this to a 502 Bad Gateway so operators can
+// distinguish "no provider configured" from "provider failed"
+// without reading the daemon log. RunRequest propagates it as a Go
+// error so the handler's errors.Is check fires (BUG-19).
+var ErrProviderMissing = errors.New("executor: provider missing")
+
 // InvokeRequest is the payload passed to Caller.
 type InvokeRequest struct {
 	WorkspaceID   string
@@ -173,6 +181,14 @@ func (e *Executor) RunRequest(ctx context.Context, req InvokeRequest, environmen
 	if err != nil {
 		rec.Status = "error"
 		rec.Error = err.Error()
+		// Propagate ErrProviderMissing so the HTTP layer can
+		// distinguish a missing provider from a provider that
+		// failed. Other errors are intentionally swallowed: the
+		// record carries them, the API returns 201 with the
+		// error in the body. BUG-19.
+		if errors.Is(err, ErrProviderMissing) {
+			return rec, err
+		}
 		return rec, nil
 	}
 	rec.Output = res.Output
