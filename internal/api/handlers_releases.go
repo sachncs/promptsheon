@@ -231,25 +231,34 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 	// at the provider call site.
 	rec, invErr, latency := s.invokeOneWithManifest(r, rel, req.Inputs, plan)
 	exec.LatencyMs = latency.Milliseconds()
-	if invErr != nil {
-		exec.Error = invErr.Error()
-	} else if rec != nil {
-		if len(rec.Output) > 0 {
-			exec.Outputs = map[string]any{"content": string(rec.Output)}
-		}
+	// BUG-21/30: even on a failed invoke, when the executor
+	// returns a partial record (a record that has a token
+	// count or a cost line before erroring), surface those
+	// values on the execution and in the audit map. The
+	// tokens_estimated flag tells audit consumers that the
+	// numbers are real even if the call did not complete.
+	if rec != nil {
 		exec.PromptTokens = rec.PromptTokens
 		exec.CompletionTokens = rec.OutputTokens
 		exec.TotalTokens = rec.PromptTokens + rec.OutputTokens
 		exec.Model = rec.Model
 		exec.CostUSD = rec.CostUSD
+		if len(rec.Output) > 0 {
+			exec.Outputs = map[string]any{"content": string(rec.Output)}
+		}
+	}
+	if invErr != nil {
+		exec.Error = invErr.Error()
 	}
 	if err := s.db.CreateExecution(r.Context(), exec); err != nil {
 		return err
 	}
 	s.audit(r.Context(), "invoke", "release:"+releaseID, map[string]any{
-		"manifest_hash": manifestHash,
-		"tokens":        exec.TotalTokens,
-		"cost_usd":      exec.CostUSD,
+		"manifest_hash":   manifestHash,
+		"tokens":          exec.TotalTokens,
+		"cost_usd":        exec.CostUSD,
+		"tokens_estimated": exec.TotalTokens > 0 || exec.CostUSD > 0,
+		"error":           exec.Error,
 	})
 	writeJSON(w, http.StatusCreated, exec)
 	return nil
