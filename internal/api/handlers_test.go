@@ -1778,6 +1778,39 @@ func TestHandleCreateUser_MissingFields(t *testing.T) {
 	}
 }
 
+func TestHandleCreateUser_RejectsInvalidRole(t *testing.T) {
+	// API-VAL-6: reject roles outside the closed admin/writer/reader set.
+	s := newTestServer(t)
+	body := mustMarshal(t, map[string]string{
+		"email": "u@test.com", "name": "U", "role": "superuser",
+	})
+	req := httptest.NewRequest("POST", "/api/v1/users", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	s.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown role, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestHandleUpdateUser_RejectsInvalidRole(t *testing.T) {
+	s := newTestServer(t)
+	repo := newMockRepo()
+	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "u@t.com", Name: "U", Role: "reader"})
+	s.db = repo
+
+	body := mustMarshal(t, map[string]string{"role": "superuser"})
+	req := httptest.NewRequest("PUT", "/api/v1/users/u1", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	s.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown role, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestHandleGetUser(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "a@b.com", Name: "A", Role: "admin"})
