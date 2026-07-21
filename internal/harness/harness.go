@@ -92,6 +92,13 @@ type Precondition struct {
 }
 
 // Validate enforces the precondition invariants.
+//
+// BUG-2: the previous Validate rejected TimeoutSec <= 0, while
+// runOne defaulted it to 60s in the same situation. The two
+// policies made it impossible to define a precondition with
+// the default timeout via the JSON API without first calling
+// Validate and patching the value back. Accept TimeoutSec == 0
+// (meaning "use the default") and document the default.
 func (p Precondition) Validate() error {
 	if p.CapabilityID == "" {
 		return errors.New("harness: precondition capability_id is required")
@@ -102,11 +109,16 @@ func (p Precondition) Validate() error {
 	if p.Command == "" {
 		return errors.New("harness: precondition command is required")
 	}
-	if p.TimeoutSec <= 0 {
-		return errors.New("harness: precondition timeout_sec must be positive")
+	if p.TimeoutSec < 0 {
+		return errors.New("harness: precondition timeout_sec must be non-negative (0 means use the default)")
 	}
 	return nil
 }
+
+// DefaultPreconditionTimeout is the fallback timeout when a
+// Precondition's TimeoutSec is zero. One minute is a generous
+// ceiling for typical CI-style gates (test, lint, format).
+const DefaultPreconditionTimeout = 60 * time.Second
 
 // EvalRun is a recorded invocation of an eval against a Release.
 // Run-time fields (Score, Passed, Failed, Total, Status,

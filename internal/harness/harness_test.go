@@ -52,9 +52,13 @@ func TestPreconditionValidate(t *testing.T) {
 			errMsg: "command is required",
 		},
 		{
-			name:   "zero timeout",
-			pre:    harness.Precondition{CapabilityID: "c", Name: "n", Command: "c", TimeoutSec: 0},
-			errMsg: "timeout_sec must be positive",
+			name: "zero timeout is allowed (means default)",
+			pre:  harness.Precondition{CapabilityID: "c", Name: "n", Command: "c", TimeoutSec: 0},
+		},
+		{
+			name:   "negative timeout rejected",
+			pre:    harness.Precondition{CapabilityID: "c", Name: "n", Command: "c", TimeoutSec: -1},
+			errMsg: "timeout_sec must be non-negative",
 		},
 	}
 	for _, tc := range cases {

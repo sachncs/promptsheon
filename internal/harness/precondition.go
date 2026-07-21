@@ -166,7 +166,7 @@ func (r *PreconditionRunner) runOne(ctx context.Context, p Precondition) Precond
 	}
 	timeout := time.Duration(p.TimeoutSec) * time.Second
 	if timeout <= 0 {
-		timeout = 60 * time.Second
+		timeout = DefaultPreconditionTimeout
 	}
 
 	cctx, cancel := context.WithTimeout(ctx, timeout)
