@@ -416,6 +416,118 @@ paths:
           description: Unauthorized
         "404":
           description: Not found
+  /api/v1/capabilities/{capability_id}/datasets:
+    get:
+      summary: "GET capabilities/{capability_id}/datasets"
+      parameters:
+        - name: capability_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+    post:
+      summary: "POST capabilities/{capability_id}/datasets"
+      parameters:
+        - name: capability_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+  /api/v1/capabilities/{capability_id}/preconditions:
+    get:
+      summary: "GET capabilities/{capability_id}/preconditions"
+      parameters:
+        - name: capability_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+    post:
+      summary: "POST capabilities/{capability_id}/preconditions"
+      parameters:
+        - name: capability_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+  /api/v1/capabilities/{capability_id}/releases:
+    get:
+      summary: "GET capabilities/{capability_id}/releases"
+      parameters:
+        - name: capability_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
   /api/v1/capabilities/{capability_id}/versions:
     get:
       summary: "GET capabilities/{capability_id}/versions"
@@ -577,6 +689,97 @@ paths:
           description: Not found
         "500":
           description: Internal server error
+  /api/v1/datasets/{id}:
+    get:
+      summary: "GET datasets/{id}"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+    delete:
+      summary: "DELETE datasets/{id}"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+  /api/v1/datasets/{id}/cases:
+    put:
+      summary: "PUT datasets/{id}/cases"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+  /api/v1/evals/{id}:
+    get:
+      summary: "GET evals/{id}"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
   /api/v1/executions/{id}:
     get:
       summary: "GET executions/{id}"
@@ -731,6 +934,30 @@ paths:
           description: Unauthorized
         "404":
           description: Not found
+  /api/v1/preconditions/{id}:
+    delete:
+      summary: "DELETE preconditions/{id}"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
   /api/v1/projects/{id}:
     get:
       summary: "GET projects/{id}"
@@ -931,6 +1158,191 @@ paths:
               type: object
               model:
                 type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+  /api/v1/releases/{id}:
+    get:
+      summary: "GET releases/{id}"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+  /api/v1/releases/{id}/activate:
+    post:
+      summary: "POST releases/{id}/activate"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+  /api/v1/releases/{id}/approval:
+    get:
+      summary: "GET releases/{id}/approval"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+  /api/v1/releases/{id}/invoke:
+    post:
+      summary: "POST releases/{id}/invoke"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+  /api/v1/releases/{id}/rollback:
+    post:
+      summary: "POST releases/{id}/rollback"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+  /api/v1/releases/{id}/votes:
+    post:
+      summary: "POST releases/{id}/votes"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+  /api/v1/releases/{release_id}/evals:
+    get:
+      summary: "GET releases/{release_id}/evals"
+      parameters:
+        - name: release_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+    post:
+      summary: "POST releases/{release_id}/evals"
+      parameters:
+        - name: release_id
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: OK
@@ -1337,6 +1749,30 @@ paths:
           description: Not found
         "500":
           description: Internal server error
+  /api/v1/versions/{version_id}/releases:
+    post:
+      summary: "POST versions/{version_id}/releases"
+      parameters:
+        - name: version_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
   /api/v1/webhooks:
     get:
       summary: "GET webhooks"
@@ -1373,10 +1809,6 @@ paths:
                 type: array
               secret:
                 type: string
-              allowPrivate:
-                type: boolean
-              allowInsecure:
-                type: boolean
       responses:
         "200":
           description: OK
