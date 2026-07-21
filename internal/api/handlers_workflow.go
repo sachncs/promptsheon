@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/sachncs/promptsheon/internal/workflow"
@@ -40,6 +39,4 @@ func (s *Server) handleRunWorkflow(w http.ResponseWriter, r *http.Request) error
 	return nil
 }
 
-// ensure the import of context is preserved if the file ends up
-// with no other context references.
-var _ = context.Background
+// (no leftover comments needed — context import removed)
