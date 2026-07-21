@@ -4,12 +4,28 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/sachncs/promptsheon/internal/auth"
 	"github.com/sachncs/promptsheon/internal/models"
 )
 
 const roleReader = "reader"
 const fieldEmail = "email"
 const fieldRole = "role"
+
+// knownRoles is the closed set of valid user roles. Accepting
+// anything outside this set lets a caller grant themselves an
+// ad-hoc role (e.g. "superuser") that no downstream code maps
+// to a permission set — a privilege-escalation foot-gun.
+var knownRoles = map[string]struct{}{
+	string(auth.RoleAdmin):  {},
+	string(auth.RoleWriter): {},
+	string(auth.RoleReader): {},
+}
+
+func validRole(r string) bool {
+	_, ok := knownRoles[r]
+	return ok
+}
 
 func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) error {
 	users, err := s.db.ListUsers(r.Context())
@@ -37,6 +53,9 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) error 
 	}
 	if req.Role == "" {
 		req.Role = roleReader
+	}
+	if !validRole(req.Role) {
+		return badRequest("role must be one of admin, writer, reader")
 	}
 
 	now := time.Now()
@@ -90,6 +109,9 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) error 
 		existing.Name = *req.Name
 	}
 	if req.Role != nil {
+		if !validRole(*req.Role) {
+			return badRequest("role must be one of admin, writer, reader")
+		}
 		existing.Role = *req.Role
 	}
 	existing.UpdatedAt = time.Now()
