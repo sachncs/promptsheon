@@ -8,9 +8,9 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
   - **Where**: `internal/api/handlers_auth.go:286-381` and a new `BootstrapOnce(ctx) (apiKey, error)` method on `*SQLite`.
   - **Accept**: 100 concurrent `POST /api/v1/setup` calls produce exactly one admin key; the rest get `409 Conflict`.
 
-- [ ] **SEC-5b** Remove the unauthenticated `/api/v1/setup` route entirely when `PROMPTSHEON_AUTH=true`.
+- [x] **SEC-5b** Remove the unauthenticated `/api/v1/setup` route entirely when `PROMPTSHEON_AUTH=true`.
   - **Where**: `internal/api/server.go:382` and `internal/api/handlers_auth.go`.
-  - **Accept**: With auth enabled, `POST /api/v1/setup` returns `404 Not Found`.
+  - **Accept**: With auth enabled, `POST /api/v1/setup` returns `404 Not Found` (and `403` if a stale path is reached).
 
 ## API-key role on user update
 
@@ -25,7 +25,7 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
   - **Where**: new `internal/store/migrations/053_webhook_secret_ciphertext.up.sql`; `internal/store/sqlite.go:879-890`; `internal/webhook/webhook.go:57-66`.
   - **Accept**: `SELECT secret FROM webhook_endpoints` returns ciphertext; outbound webhook delivery still verifies correctly.
 
-- [ ] **SEC-7b** Drop the `GET /api/v1/webhooks` response's `secret` field; only return `secret_set bool`.
+- [x] **SEC-7b** Drop the `GET /api/v1/webhooks` response's `secret` field; only return `secret_set bool`.
   - **Where**: `internal/api/handlers_webhooks.go:14-22` and `internal/models`.
 
 ## Webhook SSRF
@@ -34,7 +34,7 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
   - **Where**: `internal/api/handlers_webhooks.go:28-56`, `internal/webhook/webhook.go:289-303`, `internal/models/alert.go:49-57`.
   - **Accept**: A webhook URL of `http://169.254.169.254/...` is rejected with `400 Bad Request` from any caller without `PermWebhookAdmin`.
 
-- [ ] **SEC-4b** Add `PermWebhookAdmin` role permission; route `POST /api/v1/webhooks` through it.
+- [x] **SEC-4b** Add `PermWebhookAdmin` role permission; route `POST /api/v1/webhooks` through it.
   - **Where**: `internal/auth/auth.go`, `internal/api/server.go:434-438`.
   - **Accept**: A `writer` role key gets 403 on webhook creation unless the role has `webhook:admin`.
 
@@ -59,7 +59,7 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
   - **Where**: `internal/approval/approval.go:161-180, 189-199`.
   - **Accept**: A release created by `alice` with `alice`'s approve vote returns `ErrCreatorVoted`; the old call-site `VerifySeparationOfDuties` invocation is deleted.
 
-- [ ] **SEC-1b** Remove the side-check helper `VerifySeparationOfDuties` and the doc comment that contradicts the code at `approval.go:152-155`.
+- [x] **SEC-1b** Remove the side-check helper `VerifySeparationOfDuties` and the doc comment that contradicts the code at `approval.go:152-155`.
   - **Where**: `internal/approval/approval.go:185-199`.
 
 ## Audit completeness
@@ -92,7 +92,7 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
 
 ## Precondition sandbox
 
-- [ ] **SEC-2a** Replace the env allowlist with a denylist: pass through every env var except `AWS_*`, `*_KEY`, `*_TOKEN`, `*_SECRET`, `VAULT_ADDR`, `KUBERNETES_*`.
+- [x] **SEC-2a** Replace the env allowlist with a denylist: pass through every env var except `AWS_*`, `*_KEY`, `*_TOKEN`, `*_SECRET`, `VAULT_ADDR`, `KUBERNETES_*`.
   - **Where**: `internal/harness/precondition.go:13-39`.
   - **Accept**: A precondition can read `HOME`/`PATH`/`LANG`; reading `AWS_ACCESS_KEY_ID` returns empty.
 
@@ -112,11 +112,11 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
 
 ## Supply chain
 
-- [ ] **SEC-16a** Add cosign signing to the release pipeline.
+- [x] **SEC-16a** Add cosign signing to the release pipeline.
   - **Where**: `.github/workflows/ci.yaml:205-225` and `.goreleaser.yml`.
   - **Accept**: Every release artefact carries a cosign signature; `cosign verify` succeeds.
 
-- [ ] **SEC-16b** Attach the SBOM to the GitHub Release (not just the workflow artefact).
+- [x] **SEC-16b** Attach the SBOM to the GitHub Release (not just the workflow artefact).
   - **Where**: `.goreleaser.yml` and `.github/workflows/ci.yaml:179-203`.
 
 - [ ] **SEC-16c** Add SLSA provenance attestation via `slsa-github-generator`.
