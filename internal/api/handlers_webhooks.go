@@ -19,17 +19,27 @@ func (s *Server) handleListWebhooks(w http.ResponseWriter, _ *http.Request) erro
 		return nil
 	}
 	eps := s.webhooks.ListEndpoints()
-	// SEC-7b: redact the secret field on the read path. The
-	// endpoint may carry a ciphertext blob (post-migration 055)
-	// but never the plaintext. We project a SecretSet bool only.
+	// SEC-7b: redact the secret on the read path. The endpoint in
+	// memory may carry a plaintext Secret (set at registration
+	// before the encryption pass), but the API must never echo
+	// it back. Project a stable response shape that only exposes
+	// a SecretSet boolean.
 	type publicEndpoint struct {
-		*webhook.Endpoint
-		Secret    string `json:"-"`
-		SecretSet bool   `json:"secret_set"`
+		ID        string              `json:"id"`
+		URL       string              `json:"url"`
+		Events    []webhook.EventType `json:"events"`
+		Active    bool                `json:"active"`
+		SecretSet bool                `json:"secret_set"`
 	}
 	out := make([]publicEndpoint, 0, len(eps))
 	for _, ep := range eps {
-		out = append(out, publicEndpoint{Endpoint: ep, SecretSet: ep.Secret != "" || len(ep.Secret) == 0})
+		out = append(out, publicEndpoint{
+			ID:        ep.ID,
+			URL:       ep.URL,
+			Events:    ep.Events,
+			Active:    ep.Active,
+			SecretSet: ep.Secret != "",
+		})
 	}
 	writeJSON(w, http.StatusOK, out)
 	return nil
@@ -68,11 +78,11 @@ func (s *Server) handleCreateWebhook(w http.ResponseWriter, r *http.Request) err
 		secretCiphertext = ct
 	}
 	ep := &webhook.Endpoint{
-		ID:        generateID(),
-		URL:       req.URL,
-		Secret:    req.Secret,
-		Events:    req.Events,
-		Active:    true,
+		ID:     generateID(),
+		URL:    req.URL,
+		Secret: req.Secret,
+		Events: req.Events,
+		Active: true,
 	}
 	eventStrs := make([]string, 0, len(ep.Events))
 	for _, e := range ep.Events {
@@ -148,7 +158,7 @@ func ValidateWebhookURL(rawURL string) error {
 	// mitigation: validate at registration time AND at delivery time.
 	ips, err := net.LookupIP(host)
 	if err != nil {
-		return fmt.Errorf("resolve host: %w", err)
+		return fmt.Errorf("resolve host: %v", err)
 	}
 	if len(ips) == 0 {
 		return fmt.Errorf("host did not resolve")
