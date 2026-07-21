@@ -592,9 +592,9 @@ func buildGitHubOAuth(cfg *config.Config) *auth.OAuthProvider {
 func buildReleaseService(db *store.SQLite, policy string) *release.Service {
 	switch policy {
 	case "majority":
-		return release.NewServiceFromKind(db, db, release.PolicyMajority, 1)
+		return release.NewServiceMajority(db, db, 1)
 	case "", "maker_checker":
-		return release.NewServiceFromKind(db, db, release.PolicyMakerChecker, 1)
+		return release.NewServiceMakerChecker(db, db, 1)
 	default:
 		// unknown policy: log nothing here; the daemon's job is to
 		// keep running. Operators see the misconfiguration when they
