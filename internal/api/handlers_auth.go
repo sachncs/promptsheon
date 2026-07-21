@@ -524,7 +524,11 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 	if err != nil {
 		return badRequest("missing OAuth state")
 	}
-	if stateCookie.Value != r.URL.Query().Get("state") {
+	// SEC-12: constant-time compare for OAuth state. Without it the
+	// comparison leaks timing information about how many bytes of
+	// the cookie match the supplied query parameter; a remote
+	// attacker can iterate to recover the state one byte at a time.
+	if subtle.ConstantTimeCompare([]byte(stateCookie.Value), []byte(r.URL.Query().Get("state"))) != 1 {
 		return badRequest("invalid OAuth state")
 	}
 	if !validateOAuthState(stateCookie.Value) {
@@ -561,6 +565,15 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 				"provider", providerName, "err", err)
 		}
 		return badRequest("oauth user lookup failed")
+	}
+
+	// SEC-13: require email_verified from the IdP. A handful of
+	// providers (older GitHub orgs, self-issued Microsoft accounts)
+	// return unverified email addresses that the caller controls;
+	// trusting those would let any IdP-side actor log in to
+	// Promptsheon as a known user.
+	if !user.EmailVerified {
+		return forbidden("OAuth provider did not verify the email address; ask your IdP admin to verify your email")
 	}
 
 	existing, err := s.db.GetUserByEmail(r.Context(), user.Email)
