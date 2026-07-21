@@ -37,7 +37,10 @@ func getRecentTraceCount(spans []*trace.Span, within time.Duration) int {
 	cutoff := time.Now().Add(-within)
 	count := 0
 	for _, s := range spans {
-		if s.StartedAt.After(cutoff) {
+		// OBS-9 follow-up: skip spans whose EndedAt is
+		// zero (the span never completed) so the recent-trace
+		// count reflects finished work.
+		if s.StartedAt.After(cutoff) && s.EndedAt != nil {
 			count++
 		}
 	}

@@ -3780,10 +3780,15 @@ func TestAuthAuditLogger_LogAuthFailure(t *testing.T) {
 
 func TestGetRecentTraceCount(t *testing.T) {
 	now := time.Now()
+	end := now
 	spans := []*trace.Span{
-		{StartedAt: now.Add(-30 * time.Minute)},
-		{StartedAt: now.Add(-2 * time.Hour)},
-		{StartedAt: now.Add(-10 * time.Minute)},
+		{StartedAt: now.Add(-30 * time.Minute), EndedAt: &end},
+		{StartedAt: now.Add(-2 * time.Hour), EndedAt: &end},
+		{StartedAt: now.Add(-10 * time.Minute), EndedAt: &end},
+		// A span that started recently but never ended must NOT
+		// be counted as a recent trace — getRecentTraceCount
+		// reports completed work.
+		{StartedAt: now.Add(-5 * time.Minute)},
 	}
 	count := getRecentTraceCount(spans, 1*time.Hour)
 	if count != 2 {
