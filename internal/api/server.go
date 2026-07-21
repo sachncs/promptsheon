@@ -43,7 +43,8 @@ type Server struct {
 	logger           *slog.Logger
 	authn            *auth.Authenticator
 	requireAuth      bool
-	spans            *trace.SQLite
+	spans            trace.Tracer
+	spanStore        *trace.SQLite // read-side store used by /api/v1/traces
 	collector        *metrics.Collector
 	webhooks         *webhook.Dispatcher
 	vault            *vault.Vault
@@ -140,12 +141,25 @@ func WithAuth(db store.Repository) Option {
 }
 
 // WithTracing attaches a trace store and metrics collector to the server.
-
-// WithTracing attaches a trace store and metrics collector to the server.
-func WithTracing(spans *trace.SQLite, collector *metrics.Collector) Option {
+//
+// The spans parameter is the write-side Tracer (used by the
+// HTTP middleware to start/finish spans). The optional
+// traceStore parameter is the SQLite-backed read store used by
+// /api/v1/traces; when nil, those endpoints return 503.
+func WithTracing(spans trace.Tracer, collector *metrics.Collector) Option {
 	return func(s *Server) {
 		s.spans = spans
 		s.collector = collector
+	}
+}
+
+// WithTraceStore attaches the SQLite-backed span reader used
+// by /api/v1/traces. Production wiring calls this with the same
+// handle that was passed to WithTracing; tests that don't
+// expose the read API can omit it.
+func WithTraceStore(store *trace.SQLite) Option {
+	return func(s *Server) {
+		s.spanStore = store
 	}
 }
 

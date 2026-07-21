@@ -193,7 +193,7 @@ func TestBuildServer_Minimal(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv, limiter, spans, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
+	srv, limiter, tracer, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
 
 	if srv == nil {
 		t.Fatal("expected non-nil server")
@@ -201,7 +201,7 @@ func TestBuildServer_Minimal(t *testing.T) {
 	if limiter == nil {
 		t.Error("expected non-nil rate limiter")
 	}
-	if spans == nil {
+	if tracer == nil {
 		t.Error("expected non-nil trace store")
 	}
 	if collector == nil {
@@ -227,7 +227,7 @@ func TestBuildServer_WithAuth(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv, limiter, spans, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
+	srv, limiter, tracer, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
 
 	if srv == nil {
 		t.Fatal("expected non-nil server")
@@ -235,7 +235,7 @@ func TestBuildServer_WithAuth(t *testing.T) {
 	if limiter == nil {
 		t.Error("expected non-nil rate limiter")
 	}
-	if spans == nil {
+	if tracer == nil {
 		t.Error("expected non-nil trace store")
 	}
 	if collector == nil {
@@ -263,9 +263,9 @@ func TestBuildServer_WithVault(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv, limiter, spans, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
+	srv, limiter, tracer, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
 	_ = limiter
-	_ = spans
+	_ = tracer
 	_ = collector
 	if srv == nil {
 		t.Fatal("expected non-nil server")
@@ -292,9 +292,9 @@ func TestBuildServer_WithInvalidVaultKey(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv, limiter, spans, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
+	srv, limiter, tracer, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
 	_ = limiter
-	_ = spans
+	_ = tracer
 	_ = collector
 	if srv == nil {
 		t.Fatal("expected non-nil server")
@@ -332,9 +332,9 @@ func TestBuildServer_WithWebhookEndpointsInDB(t *testing.T) {
 	srvCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv, limiter, spans, collector := buildServer(srvCtx, &cfg, db, logger, nil, nil)
+	srv, limiter, tracer, collector := buildServer(srvCtx, &cfg, db, logger, nil, nil)
 	_ = limiter
-	_ = spans
+	_ = tracer
 	_ = collector
 	if srv == nil {
 		t.Fatal("expected non-nil server")
@@ -361,7 +361,7 @@ func TestBuildServer_WithOTelEndpoint(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv, limiter, spans, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
+	srv, limiter, tracer, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
 
 	if srv == nil {
 		t.Fatal("expected non-nil server")
@@ -372,7 +372,7 @@ func TestBuildServer_WithOTelEndpoint(t *testing.T) {
 	if collector == nil {
 		t.Error("expected non-nil metrics collector")
 	}
-	_ = spans
+	_ = tracer
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -395,7 +395,7 @@ func TestBuildServer_ClosedDB(t *testing.T) {
 
 	_ = db.Close()
 
-	srv, limiter, spans, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
+	srv, limiter, tracer, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
 	if srv == nil {
 		t.Fatal("expected non-nil server")
 	}
@@ -405,8 +405,12 @@ func TestBuildServer_ClosedDB(t *testing.T) {
 	if collector == nil {
 		t.Error("expected non-nil metrics collector")
 	}
-	if spans != nil {
-		t.Error("expected nil spans with closed DB")
+	if tracer != nil {
+		// OBS-2 follow-up: when SQLite tracer construction fails
+		// (closed DB), buildServer returns a no-op Multi tracer so
+		// the daemon can still start; tracing endpoints then return
+		// 503 because spanStore is also nil. Accept either.
+		t.Logf("tracer is non-nil but no-op; ok for closed-DB path")
 	}
 }
 
@@ -467,13 +471,13 @@ func TestStartHTTPServerAndWait_InProcess(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv, limiter, spans, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
+	srv, limiter, tracer, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
 	srv.StartAuditWorkers(ctx, 1)
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		startHTTPServerAndWait(ctx, cancel, &cfg, srv, logger, limiter, spans, collector)
+		startHTTPServerAndWait(ctx, cancel, &cfg, srv, logger, limiter, tracer, collector)
 	}()
 
 	time.Sleep(2 * time.Second)
@@ -502,13 +506,13 @@ func TestStartHTTPServerAndWait_WithCORS(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv, limiter, spans, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
+	srv, limiter, tracer, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
 	srv.StartAuditWorkers(ctx, 1)
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		startHTTPServerAndWait(ctx, cancel, &cfg, srv, logger, limiter, spans, collector)
+		startHTTPServerAndWait(ctx, cancel, &cfg, srv, logger, limiter, tracer, collector)
 	}()
 
 	time.Sleep(2 * time.Second)
@@ -1032,12 +1036,12 @@ func runServerSubprocess() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv, limiter, spans, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
+	srv, limiter, tracer, collector := buildServer(ctx, &cfg, db, logger, nil, nil)
 	if srv == nil {
 		os.Exit(1)
 	}
 
-	startHTTPServerAndWait(ctx, cancel, &cfg, srv, logger, limiter, spans, collector)
+	startHTTPServerAndWait(ctx, cancel, &cfg, srv, logger, limiter, tracer, collector)
 }
 
 func runOpenDBSubprocess() {

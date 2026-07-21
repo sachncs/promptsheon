@@ -2016,7 +2016,7 @@ func TestHandleVerifyAuditChain(t *testing.T) {
 
 func TestHandleListSpans_NoSpans(t *testing.T) {
 	s := newTestServer(t)
-	s.spans = newSpanStore(t)
+	s.spanStore = newSpanStore(t)
 	req := httptest.NewRequest("GET", "/api/v1/traces", nil)
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
@@ -2028,7 +2028,7 @@ func TestHandleListSpans_NoSpans(t *testing.T) {
 
 func TestHandleGetSpan_NotFound(t *testing.T) {
 	s := newTestServer(t)
-	s.spans = newSpanStore(t)
+	s.spanStore = newSpanStore(t)
 	req := httptest.NewRequest("GET", "/api/v1/traces/nonexistent", nil)
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
@@ -2040,7 +2040,7 @@ func TestHandleGetSpan_NotFound(t *testing.T) {
 
 func TestHandleGetTraceTree_NotFound(t *testing.T) {
 	s := newTestServer(t)
-	s.spans = newSpanStore(t)
+	s.spanStore = newSpanStore(t)
 	req := httptest.NewRequest("GET", "/api/v1/traces/tree/nonexistent", nil)
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
@@ -2063,7 +2063,7 @@ func TestHandleListSpans_WithSpans(t *testing.T) {
 	flushSpans(t, store)
 
 	s := newTestServer(t)
-	s.spans = store
+	s.spanStore = store
 
 	req := httptest.NewRequest("GET", "/api/v1/traces", nil)
 	rr := httptest.NewRecorder()
@@ -2092,7 +2092,7 @@ func TestHandleGetSpan_Found(t *testing.T) {
 	flushSpans(t, store)
 
 	s := newTestServer(t)
-	s.spans = store
+	s.spanStore = store
 
 	req := httptest.NewRequest("GET", "/api/v1/traces/"+sp.ID, nil)
 	rr := httptest.NewRecorder()
@@ -2121,7 +2121,7 @@ func TestHandleGetTraceTree_Found(t *testing.T) {
 	flushSpans(t, store)
 
 	s := newTestServer(t)
-	s.spans = store
+	s.spanStore = store
 
 	req := httptest.NewRequest("GET", "/api/v1/traces/tree/trace-tree-1", nil)
 	rr := httptest.NewRecorder()
@@ -2212,7 +2212,7 @@ func TestHandleMetricsPrometheus_NotConfigured(t *testing.T) {
 func TestHandleDashboardSummary(t *testing.T) {
 	s := newTestServer(t)
 	s.collector = metrics.NewCollector()
-	s.spans = newSpanStore(t)
+	s.spanStore = newSpanStore(t)
 
 	req := httptest.NewRequest("GET", "/api/v1/metrics/dashboard", nil)
 	rr := httptest.NewRecorder()
@@ -2225,7 +2225,7 @@ func TestHandleDashboardSummary(t *testing.T) {
 
 func TestHandleSearchSpans(t *testing.T) {
 	s := newTestServer(t)
-	s.spans = newSpanStore(t)
+	s.spanStore = newSpanStore(t)
 
 	req := httptest.NewRequest("GET", "/api/v1/logs/search", nil)
 	rr := httptest.NewRecorder()
@@ -2238,7 +2238,7 @@ func TestHandleSearchSpans(t *testing.T) {
 
 func TestHandleSearchSpans_WithFilters(t *testing.T) {
 	s := newTestServer(t)
-	s.spans = newSpanStore(t)
+	s.spanStore = newSpanStore(t)
 
 	req := httptest.NewRequest("GET", "/api/v1/logs/search?operation=test&service=myapp&since=2024-01-01T00:00:00Z&until=2024-12-31T23:59:59Z", nil)
 	rr := httptest.NewRecorder()

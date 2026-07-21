@@ -5,6 +5,7 @@ package trace
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -78,6 +79,101 @@ type Tracer interface {
 	// Finish records a completed span.
 	Finish(span *Span) error
 }
+
+// Multi dispatches every Span to a list of wrapped Tracers. The
+// Span returned to the caller is the primary tracer's span;
+// each wrapped tracer also receives the same operation so they
+// can independently export. OBS-2 uses Multi to forward HTTP
+// spans to BOTH the SQLite tracer (for local /api/v1/traces
+// browsing) AND the OTel tracer (for OTLP export). One tracer
+// failure does not affect the others.
+type Multi struct {
+	primary Tracer
+	others  []Tracer
+}
+
+// NewMulti returns a Multi that calls primary first, then every
+// tracer in others. If primary is nil, NewMulti returns the first
+// non-nil tracer in others; if all are nil, NewMulti returns a
+// no-op tracer that drops spans.
+func NewMulti(primary Tracer, others ...Tracer) Tracer {
+	seen := false
+	if primary != nil {
+		seen = true
+	}
+	live := make([]Tracer, 0, len(others))
+	for _, o := range others {
+		if o != nil {
+			live = append(live, o)
+		}
+	}
+	if !seen {
+		switch len(live) {
+		case 0:
+			return noopTracer{}
+		case 1:
+			return live[0]
+		}
+		return &Multi{primary: live[0], others: live[1:]}
+	}
+	return &Multi{primary: primary, others: live}
+}
+
+// Start creates a new root span on the primary and mirrors the
+// operation across every wrapped tracer. The returned Span is
+// owned by the primary; attribute setters propagate to the
+// wrapped spans via the otelSpan field populated by OTelTracer.
+func (m *Multi) Start(ctx context.Context, operation string) *Span {
+	primary := m.primary.Start(ctx, operation)
+	for _, t := range m.others {
+		_ = t.Start(ctx, operation)
+	}
+	return primary
+}
+
+// StartChild creates a child span on the primary and every
+// wrapped tracer.
+func (m *Multi) StartChild(ctx context.Context, parent *Span, operation string) *Span {
+	primary := m.primary.StartChild(ctx, parent, operation)
+	for _, t := range m.others {
+		_ = t.StartChild(ctx, parent, operation)
+	}
+	return primary
+}
+
+// Finish calls Finish on the primary and every wrapped tracer.
+func (m *Multi) Finish(span *Span) error {
+	var firstErr error
+	if err := m.primary.Finish(span); err != nil {
+		firstErr = err
+	}
+	for _, t := range m.others {
+		if err := t.Finish(span); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+// noopTracer is the Tracer returned by NewMulti when every
+// argument is nil. Useful in tests and when both SQLite and
+// OTel are disabled.
+type noopTracer struct{}
+
+func (noopTracer) Start(_ context.Context, _ string) *Span {
+	return &Span{ID: "noop", TraceID: "noop", StartedAt: time.Now()}
+}
+func (noopTracer) StartChild(_ context.Context, parent *Span, operation string) *Span {
+	if parent == nil {
+		return noopTracer{}.Start(context.Background(), operation)
+	}
+	return &Span{ID: "noop-child", TraceID: parent.TraceID, ParentID: parent.ID, StartedAt: time.Now()}
+}
+func (noopTracer) Finish(_ *Span) error { return nil }
+
+// Avoid unused-import lint when the package compiles without
+// referencing sync below.
+var _ = sync.Mutex{}
 
 // contextKey is the unexported type for context keys in this package.
 type contextKey string
