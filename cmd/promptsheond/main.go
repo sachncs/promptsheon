@@ -389,6 +389,13 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		return recRepo.CreateRecommendation(ctx, r)
 	}
 	recProducer := recommendation.New(agg, rules.NewEngine(), recBus, recSink, logger)
+	// OBS-12 follow-up: subscribe the producer to the
+	// execution.finished events on the same bus so it reacts to
+	// live invocations instead of only running on the periodic
+	// ticker. The ticker still runs every 5 minutes as a backstop.
+	if _, err := recProducer.Subscribe(recBus, capability.EventExecutionFinished); err != nil {
+		logger.Warn("recommendation subscription failed", "err", err)
+	}
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
