@@ -36,6 +36,18 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 		}
 		ready["database"] = dbStatusOK
 	}
+	// Leader election: report the current holder so operators
+	// can tell which replica is the writer.
+	if s.elector != nil {
+		leader, _ := s.elector.Current(r.Context())
+		ready["leader"] = leader.Identity
+		ready["leader_expires_at"] = leader.ExpiresAt.UTC().Format(time.RFC3339)
+		if leader.IsLeader {
+			ready["role"] = "leader"
+		} else {
+			ready["role"] = "follower"
+		}
+	}
 	writeJSON(w, http.StatusOK, ready)
 	return nil
 }

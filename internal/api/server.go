@@ -14,6 +14,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/alerting"
 	"github.com/sachncs/promptsheon/internal/auth"
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
+	"github.com/sachncs/promptsheon/internal/election"
 	_ "github.com/sachncs/promptsheon/internal/eval" // Scorer registry (no Server dep yet)
 	"github.com/sachncs/promptsheon/internal/guardrail"
 	"github.com/sachncs/promptsheon/internal/harness"
@@ -50,6 +51,7 @@ type Server struct {
 	vault            *vault.Vault
 	oauth            *auth.OAuthManager
 	logHub           *ws.Hub
+	elector         *election.Elector
 	usageTracker     *UsageTracker
 	guardrailManager *guardrail.Manager
 	alertingManager  *alerting.Manager
@@ -188,6 +190,15 @@ func WithOAuth(o *auth.OAuthManager) Option {
 func WithLogHub(h *ws.Hub) Option {
 	return func(s *Server) {
 		s.logHub = h
+	}
+}
+
+// WithElector attaches a leader-election Elector. When set, the
+// readiness handler reports the current leader and the role of
+// this replica; writes are not gated yet (they will be in M3.5).
+func WithElector(e *election.Elector) Option {
+	return func(s *Server) {
+		s.elector = e
 	}
 }
 
