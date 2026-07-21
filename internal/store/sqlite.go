@@ -216,17 +216,21 @@ func (s *SQLite) VerifyAuditChain(ctx context.Context) (ok bool, reason string, 
 	// The chain walk only sees committed rows; if the operator
 	// deleted the tail (e.g. via DELETE without updating the
 	// state row), the walker finishes silently on a smaller
-	// window. Compare the highest rowid we saw to the state
-	// pointer; any mismatch is a tail deletion.
+	// window. Compare both the highest rowid AND the final
+	// entry_hash to the state pointer; any mismatch is tampering.
 	var stateLastRowID int64
+	var stateLastHash string
 	if err := s.db.QueryRowContext(ctx,
-		`SELECT last_rowid FROM audit_chain_state LIMIT 1`).Scan(&stateLastRowID); err != nil {
+		`SELECT last_rowid, last_hash FROM audit_chain_state LIMIT 1`).Scan(&stateLastRowID, &stateLastHash); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return false, "", fmt.Errorf("audit chain state: %w", err)
 		}
 	}
 	if stateLastRowID != 0 && lastRowID != stateLastRowID {
 		return false, fmt.Sprintf("audit chain tail mismatch: walked=%d, state=%d", lastRowID, stateLastRowID), nil
+	}
+	if stateLastHash != "" && prevHash != stateLastHash {
+		return false, fmt.Sprintf("audit chain tail hash mismatch: walked=%s, state=%s", prevHash, stateLastHash), nil
 	}
 	return true, "", nil
 }
