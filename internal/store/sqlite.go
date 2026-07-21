@@ -1083,7 +1083,7 @@ func (s *SQLite) SaveWebhookEndpoint(ctx context.Context, ep *models.WebhookEndp
 
 func (s *SQLite) GetWebhookEndpoint(ctx context.Context, id string) (*models.WebhookEndpointRecord, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, url, secret, events, active, created_at FROM webhook_endpoints WHERE id = ?`, id)
+		`SELECT id, url, secret, secret_ciphertext, events, active, created_at FROM webhook_endpoints WHERE id = ?`, id)
 	ep, err := scanWebhookEndpoint(row)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -1101,7 +1101,7 @@ func (s *SQLite) DeleteWebhookEndpoint(ctx context.Context, id string) error {
 
 func (s *SQLite) ListWebhookEndpoints(ctx context.Context) ([]*models.WebhookEndpointRecord, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, url, secret, events, active, created_at FROM webhook_endpoints ORDER BY created_at DESC`)
+		`SELECT id, url, secret, secret_ciphertext, events, active, created_at FROM webhook_endpoints ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("list webhook endpoints: %w", err)
 	}
@@ -1120,7 +1120,7 @@ func (s *SQLite) ListWebhookEndpoints(ctx context.Context) ([]*models.WebhookEnd
 func scanWebhookEndpoint(row scannable) (*models.WebhookEndpointRecord, error) {
 	var ep models.WebhookEndpointRecord
 	var events string
-	err := row.Scan(&ep.ID, &ep.URL, &ep.Secret, &events, &ep.Active, &ep.CreatedAt)
+	err := row.Scan(&ep.ID, &ep.URL, &ep.Secret, &ep.SecretCiphertext, &events, &ep.Active, &ep.CreatedAt)
 	if err != nil {
 		return nil, err
 	}

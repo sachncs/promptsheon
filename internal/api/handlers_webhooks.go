@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/webhook"
 )
 
@@ -78,27 +77,19 @@ func (s *Server) handleCreateWebhook(w http.ResponseWriter, r *http.Request) err
 		secretCiphertext = ct
 	}
 	ep := &webhook.Endpoint{
-		ID:     generateID(),
-		URL:    req.URL,
-		Secret: req.Secret,
-		Events: req.Events,
-		Active: true,
-	}
-	eventStrs := make([]string, 0, len(ep.Events))
-	for _, e := range ep.Events {
-		eventStrs = append(eventStrs, string(e))
-	}
-	if err := s.db.SaveWebhookEndpoint(r.Context(), &models.WebhookEndpointRecord{
-		ID:               ep.ID,
-		URL:              ep.URL,
-		Secret:           "", // plaintext never persisted
+		ID:               generateID(),
+		URL:              req.URL,
+		Secret:           req.Secret,
 		SecretCiphertext: secretCiphertext,
-		Events:           eventStrs,
-		Active:           ep.Active,
+		Events:           req.Events,
+		Active:           true,
 		CreatedAt:        time.Now(),
-	}); err != nil {
-		return fmt.Errorf("save webhook endpoint: %w", err)
 	}
+	// Persistence is the dispatcher's responsibility (it knows
+	// the store). The handler used to write here and then
+	// re-write via Register, which silently overwrote the
+	// ciphertext with the plaintext column. Single write path
+	// now: dispatcher.Register -> store -> DB.
 	s.webhooks.Register(ep)
 	s.audit(r.Context(), "webhook_create", "webhook", map[string]any{
 		"id":     ep.ID,
