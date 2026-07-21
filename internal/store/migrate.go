@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io/fs"
@@ -67,9 +68,8 @@ func migrate(db *sql.DB, migrationsFS fs.FS) error {
 
 	var files []fs.DirEntry
 	for _, e := range entries {
-		// Skip .down.sql: those are recovery scripts, not forward
-		// migrations. They are loaded by the production-runner on
-		// explicit operator request, not by migrate().
+		// Skip .down.sql by default; LoadDown loads them on
+		// explicit operator request.
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
 			continue
 		}
@@ -205,4 +205,38 @@ func splitTrailingPragma(sqlStr string) (string, string) {
 // extension, so we match on "destructive" alone.
 func isDestructiveMigration(name string) bool {
 	return strings.Contains(name, "destructive")
+}
+
+// LoadDown reads and applies a single .down.sql file by version.
+// The caller is the production recovery flow: an operator who
+// wants to roll back a migration calls this with the version
+// number (e.g. 046 to undo the alert M2M backfill).
+//
+// Destructive down migrations are gated on the same env var as
+// forward destructive migrations; a request to undo a destructive
+// migration without the env var returns an error.
+func LoadDown(ctx context.Context, db *sql.DB, version int) error {
+	entries, err := fs.ReadDir(migrationsFS, "migrations")
+	if err != nil {
+		return fmt.Errorf("read migrations dir: %w", err)
+	}
+	target := fmt.Sprintf("%03d", version) + "_"
+	for _, e := range entries {
+		name := e.Name()
+		if !strings.HasPrefix(name, target) || !strings.HasSuffix(name, ".down.sql") {
+			continue
+		}
+		if isDestructiveMigration(name) && os.Getenv(DestructiveMigrationEnv) != "true" {
+			return fmt.Errorf("down %s is destructive and requires %s=true", name, DestructiveMigrationEnv)
+		}
+		content, err := fs.ReadFile(migrationsFS, "migrations/"+name)
+		if err != nil {
+			return fmt.Errorf("read down %s: %w", name, err)
+		}
+		if _, err := db.ExecContext(ctx, string(content)); err != nil {
+			return fmt.Errorf("apply down %s: %w", name, err)
+		}
+		return nil
+	}
+	return fmt.Errorf("no down migration for version %d", version)
 }

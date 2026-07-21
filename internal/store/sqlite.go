@@ -211,6 +211,23 @@ func (s *SQLite) VerifyAuditChain(ctx context.Context) (ok bool, reason string, 
 		prevHash = res.nextPrevHash
 		lastRowID = res.lastRowID
 	}
+
+	// BUG-3 / SEC-CHAIN-1: cross-check against audit_chain_state.
+	// The chain walk only sees committed rows; if the operator
+	// deleted the tail (e.g. via DELETE without updating the
+	// state row), the walker finishes silently on a smaller
+	// window. Compare the highest rowid we saw to the state
+	// pointer; any mismatch is a tail deletion.
+	var stateLastRowID int64
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT last_rowid FROM audit_chain_state LIMIT 1`).Scan(&stateLastRowID); err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return false, "", fmt.Errorf("audit chain state: %w", err)
+		}
+	}
+	if stateLastRowID != 0 && lastRowID != stateLastRowID {
+		return false, fmt.Sprintf("audit chain tail mismatch: walked=%d, state=%d", lastRowID, stateLastRowID), nil
+	}
 	return true, "", nil
 }
 
@@ -273,7 +290,13 @@ func (s *SQLite) ListAudit(ctx context.Context, filter *models.AuditFilter) ([]*
 		query += " AND user_id = ?"
 		args = append(args, filter.UserID)
 	}
-	if filter.Resource != "" {
+	if filter.ResourceKind != "" && filter.ResourceID != "" {
+		// DB-8b: when the new structural columns are supplied,
+		// use them in preference to the legacy "kind:id" string
+		// in the `resource` column.
+		query += " AND resource_kind = ? AND resource_id = ?"
+		args = append(args, filter.ResourceKind, filter.ResourceID)
+	} else if filter.Resource != "" {
 		query += " AND resource = ?"
 		args = append(args, filter.Resource)
 	}

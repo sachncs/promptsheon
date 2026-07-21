@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"flag"
 	"fmt"
@@ -274,7 +275,18 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	}
 
 	retentionPolicy := observability.LoadRetentionPolicyFromEnv()
-	retention := observability.NewRetentionManager(db.DB(), retentionPolicy, logger)
+	// DB-CONC-2: open a separate *sql.DB for the retention loop so
+	// the DELETE on traces never competes for the same write
+	// connection as the request path. SQLite serialises writers,
+	// so the cleanup must not share the main pool.
+	retentionDB, err := sql.Open("sqlite", cfg.DBPath+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
+	if err != nil {
+		logger.Warn("retention: open dedicated db failed", "err", err)
+		retentionDB = db.DB()
+	} else {
+		defer func() { _ = retentionDB.Close() }()
+	}
+	retention := observability.NewRetentionManager(retentionDB, retentionPolicy, logger)
 	retention.Start(rootCtx)
 
 	webhookDispatcher := webhook.NewDispatcher(logger).
