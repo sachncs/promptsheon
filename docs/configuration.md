@@ -11,6 +11,7 @@ Promptsheon is configured entirely through environment variables. There are no c
 | `PROMPTSHEON_ADDR` | `:8080` | TCP address for the HTTP server (`host:port`). |
 | `PROMPTSHEON_DB_PATH` | `promptsheon.db` | Path to the SQLite database file. |
 | `PROMPTSHEON_AUTH` | `true` | Enable API key authentication. Set to `false` (or `0`, `no`) only for local development. |
+| `PROMPTSHEON_BOOTSTRAP_TOKEN` | *(empty)* | When set, `POST /api/v1/setup` is reachable even with `PROMPTSHEON_AUTH=true`. The caller must send the same value in the `X-Bootstrap-Token` header; the daemon compares it with `subtle.ConstantTimeCompare`. Empty (the default) keeps the route unregistered when auth is on, so the only way to mint the first admin key is to start the daemon with auth off, mint, then restart with auth on. |
 | `PROMPTSHEON_LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `warn`, `error`. |
 | `PROMPTSHEON_LOG_FORMAT` | `json` | `json` (default) or `text`. |
 | `PROMPTSHEON_CORS_ORIGINS` | *(empty / deny-all)* | Comma-separated list of allowed origins. Empty (the production default) denies every cross-origin request; set to `*` only for trusted local development. |
