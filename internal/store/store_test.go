@@ -543,6 +543,49 @@ func TestWebhookEndpointRoundTrip(t *testing.T) {
 	}
 }
 
+// TestWebhookSecretCiphertextOnDisk exercises SEC-7a: the
+// plaintext `secret` column must never appear on disk after a
+// SaveWebhookEndpoint call. SaveWebhookEndpoint writes
+// `secret = ''` for new rows; migration 064 wipes any
+// pre-064 plaintext. Combined, SELECT secret returns empty
+// for every persisted endpoint, while the actual ciphertext
+// lives in secret_ciphertext.
+func TestWebhookSecretCiphertextOnDisk(t *testing.T) {
+	t.Parallel()
+	s := newTestSQLite(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	ep := &models.WebhookEndpointRecord{
+		ID: "w-sec", URL: "https://example.com/hook",
+		Secret:           "", // plaintext never persisted
+		SecretCiphertext: []byte("ciphertext-blob"),
+		Events:           []string{"capability.created"},
+		Active:           true,
+		CreatedAt:        now,
+	}
+	if err := s.SaveWebhookEndpoint(ctx, ep); err != nil {
+		t.Fatalf("SaveWebhookEndpoint: %v", err)
+	}
+	var plain string
+	if err := s.DB().QueryRowContext(ctx,
+		`SELECT secret FROM webhook_endpoints WHERE id = 'w-sec'`,
+	).Scan(&plain); err != nil {
+		t.Fatalf("scan secret: %v", err)
+	}
+	if plain != "" {
+		t.Errorf("plaintext secret leaked: got %q, want empty", plain)
+	}
+	var ct []byte
+	if err := s.DB().QueryRowContext(ctx,
+		`SELECT secret_ciphertext FROM webhook_endpoints WHERE id = 'w-sec'`,
+	).Scan(&ct); err != nil {
+		t.Fatalf("scan ciphertext: %v", err)
+	}
+	if string(ct) != "ciphertext-blob" {
+		t.Errorf("ciphertext mismatch: got %q", ct)
+	}
+}
+
 func TestScheduleCRUD(t *testing.T) {
 	t.Parallel()
 	s := newTestSQLite(t)

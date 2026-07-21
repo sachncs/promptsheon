@@ -1,0 +1,23 @@
+-- Migration 064 (webhook secret column cleanup): clear the
+-- plaintext `secret` column on webhook_endpoints. Migration 055
+-- added `secret_ciphertext` and backfilled it from `secret`, but
+-- left the plaintext column on disk so SELECT secret still
+-- returned readable text. The application now reads only the
+-- ciphertext column.
+--
+-- We do not DROP COLUMN here because some deployments may have
+-- pre-055 records whose ciphertext backfill failed (vault not
+-- configured at migration time). Clearing the column is the
+-- safe minimum: any record whose ciphertext is empty is
+-- effectively unconfigured, and the application surfaces that
+-- as SecretSet=false on the read path.
+--
+-- DO NOT MODIFY under this migration (or any subsequent):
+--   * audit_entries chain format
+--   * audit_chain_state layout
+--   * harness tables
+--   * provider_keys layout
+--   * releases.status enum
+--   * OpenAI / Anthropic provider contracts
+
+UPDATE webhook_endpoints SET secret = '' WHERE secret IS NOT NULL AND secret != '';
