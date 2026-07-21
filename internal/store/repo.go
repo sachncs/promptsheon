@@ -79,6 +79,11 @@ type Repository interface {
 	// given rule. The order is unspecified; consumers do not rely
 	// on it.
 	GetChannelsForAlertRule(ctx context.Context, ruleID string) ([]string, error)
+	// LinkRuleToGroup wires an alert rule to a notification group.
+	// Idempotent. DB-11b.
+	LinkRuleToGroup(ctx context.Context, ruleID, groupID string) error
+	// UnlinkRuleFromGroup removes the M2M wire. Idempotent. DB-11b.
+	UnlinkRuleFromGroup(ctx context.Context, ruleID, groupID string) error
 
 	// Webhook Endpoints
 	SaveWebhookEndpoint(ctx context.Context, ep *models.WebhookEndpointRecord) error

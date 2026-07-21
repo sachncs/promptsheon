@@ -460,6 +460,11 @@ func (s *Server) registerAlertRoutes() {
 	s.mux.HandleFunc("POST /api/v1/alerts/notifications", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleAddNotificationGroup)))
 	s.mux.HandleFunc("GET /api/v1/alerts/active", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListAlerts)))
 	s.mux.HandleFunc("PUT /api/v1/alerts/active/{id}/resolve", s.wrapHandler(s.requirePerm(auth.PermReviewApprove)(s.handleResolveAlert)))
+	// DB-11b: HTTP surface for alert M2M link/unlink. Operators
+	// can now wire a notification group to a rule via the API
+	// rather than only via direct DB writes.
+	s.mux.HandleFunc("POST /api/v1/alerts/rules/{rule_id}/groups/{group_id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleLinkAlertRuleGroup)))
+	s.mux.HandleFunc("DELETE /api/v1/alerts/rules/{rule_id}/groups/{group_id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUnlinkAlertRuleGroup)))
 }
 
 func (s *Server) registerWebhookRoutes() {

@@ -736,6 +736,14 @@ func (m *mockRepo) GetChannelsForAlertRule(_ context.Context, _ string) ([]strin
 	return nil, nil
 }
 
+func (m *mockRepo) LinkRuleToGroup(_ context.Context, _, _ string) error {
+	return nil
+}
+
+func (m *mockRepo) UnlinkRuleFromGroup(_ context.Context, _, _ string) error {
+	return nil
+}
+
 func (m *mockRepo) ListEvalResultsForRun(_ context.Context, runID string) ([]harness.EvalResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
