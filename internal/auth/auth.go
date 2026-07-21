@@ -64,6 +64,14 @@ const (
 	PermAuditRead Permission = "audit:read"
 	// PermAPIKeyManage is the permission to manage API keys.
 	PermAPIKeyManage Permission = "apikey:manage"
+
+	// SEC-4b: PermWebhookAdmin gates the webhook create / delete
+	// endpoints. Without it, a holder of PermPromptUpdate can
+	// register a webhook destination that the SSRF guard rejects,
+	// but with it they can register loopback / private addresses
+	// via the tenant-wide SSRF allowlist. The default admin role
+	// carries the permission; writer/reader do not.
+	PermWebhookAdmin Permission = "webhook:admin"
 	// PermUserManage is the permission to manage users.
 	PermUserManage Permission = "user:manage"
 )
@@ -77,7 +85,7 @@ var rolePermissions = map[Role][]Permission{
 		PermEvalRun, PermEvalRead,
 		PermReviewCreate, PermReviewApprove,
 		PermAuditRead,
-		PermAPIKeyManage, PermUserManage,
+		PermAPIKeyManage, PermUserManage, PermWebhookAdmin,
 	},
 	RoleWriter: {
 		PermPromptCreate, PermPromptRead, PermPromptUpdate,

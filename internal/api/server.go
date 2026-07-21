@@ -457,9 +457,14 @@ func (s *Server) registerAlertRoutes() {
 }
 
 func (s *Server) registerWebhookRoutes() {
+	// SEC-4b: webhook write endpoints require PermWebhookAdmin.
+	// Holders of PermPromptUpdate can read webhooks (audit trail)
+	// but cannot register new ones — registering a destination is
+	// the only way to coax the daemon into dialing outbound URLs,
+	// so the operation is locked behind a dedicated permission.
 	s.mux.HandleFunc("GET /api/v1/webhooks", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListWebhooks)))
-	s.mux.HandleFunc("POST /api/v1/webhooks", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleCreateWebhook)))
-	s.mux.HandleFunc("DELETE /api/v1/webhooks/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleDeleteWebhook)))
+	s.mux.HandleFunc("POST /api/v1/webhooks", s.wrapHandler(s.requirePerm(auth.PermWebhookAdmin)(s.handleCreateWebhook)))
+	s.mux.HandleFunc("DELETE /api/v1/webhooks/{id}", s.wrapHandler(s.requirePerm(auth.PermWebhookAdmin)(s.handleDeleteWebhook)))
 }
 
 func (s *Server) registerWorkspaceRoutes() {
