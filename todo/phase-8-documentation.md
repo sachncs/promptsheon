@@ -4,14 +4,14 @@ All documentation drift. Fast forward: rewrite, don't deprecate.
 
 ## Version and defaults
 
-- [ ] **DOC-2** Single source of truth for the version string. (See Phase 4.)
-- [ ] **DOC-3** Update `docs/configuration.md` and `docs/security.md` to say rate-limit default is 100 (matches code + chart).
+- [x] **DOC-2** Single source of truth for the version string. (See Phase 4.)
+- [x] **DOC-3** Update `docs/configuration.md` and `docs/security.md` to say rate-limit default is 100 (matches code + chart).
   - **Where**: `docs/configuration.md:92`, `docs/security.md:67`.
 
-- [ ] **DOC-4** Update `docs/configuration.md` and `docs/security.md` to say CORS default is deny-all (matches code + chart).
+- [x] **DOC-4** Update `docs/configuration.md` and `docs/security.md` to say CORS default is deny-all (matches code + chart).
   - **Where**: `docs/configuration.md:16`, `docs/security.md:31`.
 
-- [ ] **DOC-5** Delete env-var references to Azure, Ollama, NVIDIA from `docs/configuration.md:54-64`.
+- [x] **DOC-5** Delete env-var references to Azure, Ollama, NVIDIA from `docs/configuration.md:54-64`.
   - **Accept**: A grep for `AZURE`, `OLLAMA`, `NVIDIA` returns no hits in `docs/`.
 
 ## Coverage and CI
@@ -32,8 +32,8 @@ All documentation drift. Fast forward: rewrite, don't deprecate.
 
 - [ ] **DOC-9a** Delete `ADR 0015` and `ADR 0017` entries from `docs/adr/README.md`.
 - [ ] **DOC-9b** Add stub `docs/adr/0013-...md`, `0014-...md`, `0015-...md`, `0017-...md` documenting the topics the index claims they cover.
-- [ ] **DOC-10** Add `ADR 0024` and `ADR 0025` to `docs/adr/README.md`.
-- [ ] **DOC-11** Rewrite `docs/adr/0016-plugins-over-grpc.md` as Markdown (currently `//`-prefixed).
+- [x] **DOC-10** Add `ADR 0024` and `ADR 0025` to `docs/adr/README.md`.
+- [x] **DOC-11** Rewrite `docs/adr/0016-plugins-over-grpc.md` as Markdown (currently `//`-prefixed).
 - [ ] **DOC-12** Pick one of `ADR 0024` or `ADR 0025` to keep; delete the other. Or merge them.
 - [ ] **DOC-ADR-1** Add ADRs for: SQLite trace removal (Phase 3 OBS-TR-1), idempotency SQLite backend (Phase 4 API-IDEMP-1), leader election (Phase 6 OPS-1b), HTTPS-only webhook URLs (Phase 1 SEC-4c).
 - [ ] **DOC-ADR-2** Add a "Superseded" footer convention enforcement: every ADR carries a `Status: Accepted | Superseded by NNNN | Deprecated` line.
@@ -52,7 +52,7 @@ All documentation drift. Fast forward: rewrite, don't deprecate.
 - [ ] **DOC-FRESH-1** Add a "Last reviewed" footer to every doc in `docs/`; CI fails when any doc is older than 90 days without review.
   - **Where**: `docs/README.md:86` already documents the rule; make it executable.
 
-- [ ] **DOC-FRESH-2** Add a `docs/llm-providers.md` table that lists only the providers present in `internal/llm/registry.go` (Anthropic + OpenAI today). Drop Azure/Ollama/NVIDIA references.
+- [x] **DOC-FRESH-2** Add a `docs/llm-providers.md` table that lists only the providers present in `internal/llm/registry.go` (Anthropic + OpenAI today). Drop Azure/Ollama/NVIDIA references.
 
 ## CHANGELOG discipline
 

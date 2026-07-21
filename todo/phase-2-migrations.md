@@ -4,10 +4,10 @@ All schema issues. Fast forward: rewrite or drop, no compatibility shims.
 
 ## Critical
 
-- [ ] **DB-1** Rewrite migration 050 in SQLite-compatible form. (See Phase 0.)
-- [ ] **DB-2** Replace destructive-migration heuristic so 044 is caught. (See Phase 0.)
-- [ ] **DB-3** Rebuild migration 043 outside transactions. (See Phase 0.)
-- [ ] **DB-4** Update `recommendation.SQLiteRepository.CreateDecision` to supply a UUID `id` and remove the nullable `TEXT PRIMARY KEY` from `decisions`.
+- [x] **DB-1** Rewrite migration 050 in SQLite-compatible form. (See Phase 0.)
+- [x] **DB-2** Replace destructive-migration heuristic so 044 is caught. (See Phase 0.)
+- [x] **DB-3** Rebuild migration 043 outside transactions. (See Phase 0.)
+- [x] **DB-4** Update `recommendation.SQLiteRepository.CreateDecision` to supply a UUID `id` and remove the nullable `TEXT PRIMARY KEY` from `decisions`.
   - **Where**: `internal/recommendation/sqlite.go:131-135` and `internal/store/migrations/049_decisions_uuid_pk.up.sql`.
   - **Accept**: After `CreateDecision`, the row's `id` matches the value passed in.
 
@@ -16,14 +16,14 @@ All schema issues. Fast forward: rewrite or drop, no compatibility shims.
 - [ ] **DB-5a** Add `api_keys(user_id, created_at DESC)` index.
   - **Where**: new migration `internal/store/migrations/055_api_keys_user_index.up.sql`.
 
-- [ ] **DB-6** Seed system user `id="api"`. (See Phase 1 SEC-DB-1.)
+- [x] **DB-6** Seed system user `id="api"`. (See Phase 1 SEC-DB-1.)
 
 - [ ] **DB-7** Have `VerifyAuditChain` cross-check against `audit_chain_state` and `audit_entries` rowid sequence. (See Phase 1 SEC-CHAIN-1.)
 
-- [ ] **DB-15** Drop unused tables `guardrail_rules` and `guardrail_violations` (manager is in-memory).
+- [x] **DB-15** Drop unused tables `guardrail_rules` and `guardrail_violations` (manager is in-memory).
   - **Where**: new migration `internal/store/migrations/056_drop_guardrail_tables.up.sql`.
 
-- [ ] **DB-19** Add FK `releases.capability_id, capability_version → capability_versions(capability_id, version)`.
+- [x] **DB-19** Add FK `releases.capability_id, capability_version → capability_versions(capability_id, version)`.
   - **Where**: new migration `internal/store/migrations/057_releases_version_fk.up.sql`.
 
 - [ ] **DB-20** Add FK `eval_results.case_id → dataset_cases.id` with `ON DELETE SET NULL`.
@@ -42,22 +42,22 @@ All schema issues. Fast forward: rewrite or drop, no compatibility shims.
 
 ## Hot-path SQL
 
-- [ ] **DB-9a** Cap `Limit` to at least 1 before building the SQL; emit `LIMIT -1 OFFSET ?` for `Offset > 0, Limit == 0` cases.
+- [x] **DB-9a** Cap `Limit` to at least 1 before building the SQL; emit `LIMIT -1 OFFSET ?` for `Offset > 0, Limit == 0` cases.
   - **Where**: `internal/store/sqlite.go:282-288` and `internal/store/sqlite_capabilities.go:403-409`.
   - **Accept**: A repository call with `Offset=10, Limit=0` runs without SQL syntax error.
 
-- [ ] **DB-9b** Add tests covering the offset-only case for `ListAudit` and `ListExecutions`.
+- [x] **DB-9b** Add tests covering the offset-only case for `ListAudit` and `ListExecutions`.
 
 ## Alert routing
 
-- [ ] **DB-10a** Change `GetChannelsForAlertRule` to `SELECT json_each.value FROM alert_notification_groups ang JOIN json_each(ang.channels)` (flatten the JSON array into rows).
+- [x] **DB-10a** Change `GetChannelsForAlertRule` to `SELECT json_each.value FROM alert_notification_groups ang JOIN json_each(ang.channels)` (flatten the JSON array into rows).
   - **Where**: `internal/store/sqlite.go:840-853`.
   - **Accept**: An alert rule with `channels: ["webhook", "log"]` returns two rows, one per channel.
 
-- [ ] **DB-10b** Deduplicate and reorder the channel union on the manager side.
+- [x] **DB-10b** Deduplicate and reorder the channel union on the manager side.
   - **Where**: `internal/alerting/manager.go:398-406`.
 
-- [ ] **DB-11a** Replace `INSERT OR REPLACE` on `notification_groups` with `INSERT ... ON CONFLICT (id) DO UPDATE SET name=excluded.name, channels=excluded.channels`.
+- [x] **DB-11a** Replace `INSERT OR REPLACE` on `notification_groups` with `INSERT ... ON CONFLICT (id) DO UPDATE SET name=excluded.name, channels=excluded.channels`.
   - **Where**: `internal/store/sqlite.go:774-783`.
   - **Accept**: Updating a group's name does not cascade-delete its M2M links.
 

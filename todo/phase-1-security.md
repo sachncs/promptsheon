@@ -4,7 +4,7 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
 
 ## Bootstrap and key mint
 
-- [ ] **SEC-5a** Wrap the empty-user check + admin key mint in a single SQLite transaction with `INSERT ... ON CONFLICT DO NOTHING` so only one caller can win.
+- [x] **SEC-5a** Wrap the empty-user check + admin key mint in a single SQLite transaction with `INSERT ... ON CONFLICT DO NOTHING` so only one caller can win.
   - **Where**: `internal/api/handlers_auth.go:286-381` and a new `BootstrapOnce(ctx) (apiKey, error)` method on `*SQLite`.
   - **Accept**: 100 concurrent `POST /api/v1/setup` calls produce exactly one admin key; the rest get `409 Conflict`.
 
@@ -14,13 +14,13 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
 
 ## API-key role on user update
 
-- [ ] **SEC-6a** On `UpdateUser` (role change) and `DeleteUser`, mark every non-expired, non-revoked API key belonging to that user as revoked.
+- [x] **SEC-6a** On `UpdateUser` (role change) and `DeleteUser`, mark every non-expired, non-revoked API key belonging to that user as revoked.
   - **Where**: `internal/store/sqlite.go:429-510` and `internal/api/handlers_users.go:86-100`.
   - **Accept**: Demoting a user from `admin` to `reader` invalidates their existing keys within the same transaction; the next request with that key returns 401.
 
 ## Webhook secrets
 
-- [ ] **SEC-7a** Encrypt `webhook_endpoints.secret` at rest using the same vault key as provider keys.
+- [x] **SEC-7a** Encrypt `webhook_endpoints.secret` at rest using the same vault key as provider keys.
   - **What**: New `secret_ciphertext BLOB` column; secret is encrypted with AES-GCM before write; decrypted only when signing an outbound payload.
   - **Where**: new `internal/store/migrations/053_webhook_secret_ciphertext.up.sql`; `internal/store/sqlite.go:879-890`; `internal/webhook/webhook.go:57-66`.
   - **Accept**: `SELECT secret FROM webhook_endpoints` returns ciphertext; outbound webhook delivery still verifies correctly.
@@ -30,7 +30,7 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
 
 ## Webhook SSRF
 
-- [ ] **SEC-4a** Remove the `allow_private` field from `WebhookEndpoint`. All webhooks are blocked from private/loopback/link-local/cloud-metadata by default; override requires `PermWebhookAdmin` and a per-tenant SSRF allowlist.
+- [x] **SEC-4a** Remove the `allow_private` field from `WebhookEndpoint`. All webhooks are blocked from private/loopback/link-local/cloud-metadata by default; override requires `PermWebhookAdmin` and a per-tenant SSRF allowlist.
   - **Where**: `internal/api/handlers_webhooks.go:28-56`, `internal/webhook/webhook.go:289-303`, `internal/models/alert.go:49-57`.
   - **Accept**: A webhook URL of `http://169.254.169.254/...` is rejected with `400 Bad Request` from any caller without `PermWebhookAdmin`.
 
@@ -38,23 +38,23 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
   - **Where**: `internal/auth/auth.go`, `internal/api/server.go:434-438`.
   - **Accept**: A `writer` role key gets 403 on webhook creation unless the role has `webhook:admin`.
 
-- [ ] **SEC-4c** Reject `http://` URLs at the webhook validator entirely (loopback or not).
+- [x] **SEC-4c** Reject `http://` URLs at the webhook validator entirely (loopback or not).
   - **Where**: `internal/webhook/webhook.go:304-329`.
   - **Accept**: Any non-`https://` URL returns `400`.
 
-- [ ] **SEC-11a** Drop the `allow_insecure` field entirely; nothing is allowed to skip TLS verification.
+- [x] **SEC-11a** Drop the `allow_insecure` field entirely; nothing is allowed to skip TLS verification.
   - **Where**: `internal/api/handlers_webhooks.go:28-56`, `internal/store/migrations/019_webhook_endpoints.sql`.
 
 ## Vault KMS
 
-- [ ] **SEC-10a** Make `kmsbyok.Provider` re-read the wrapped blob on cache miss and on every process start.
+- [x] **SEC-10a** Make `kmsbyok.Provider` re-read the wrapped blob on cache miss and on every process start.
   - **What**: Drop the in-process plaintext cache; call `Decrypt` on the wrapped blob every time the vault needs a data key. Add an LRU cache (size 16, no negative caching) for performance.
   - **Where**: `internal/vault/kmsbyok/aws.go:35-60` and `internal/vault/kmsbyok/provider.go:64-99`.
   - **Accept**: Re-encrypting a secret with a new KMS key is reflected on the next read; decrypt still works after the wrapped blob rotates.
 
 ## Maker-Checker enforcement in the type
 
-- [ ] **SEC-1a** Make `MakerCheckerPolicy.Evaluate` consult `VerifySeparationOfDuties` directly.
+- [x] **SEC-1a** Make `MakerCheckerPolicy.Evaluate` consult `VerifySeparationOfDuties` directly.
   - **What**: `MakerCheckerPolicy{RequiredApprovers int, Creator string}` — the policy owns the creator; `Evaluate` returns `ErrCreatorVoted` when any vote's identity equals `Creator`.
   - **Where**: `internal/approval/approval.go:161-180, 189-199`.
   - **Accept**: A release created by `alice` with `alice`'s approve vote returns `ErrCreatorVoted`; the old call-site `VerifySeparationOfDuties` invocation is deleted.
@@ -64,24 +64,24 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
 
 ## Audit completeness
 
-- [ ] **SEC-9a** Add audit entries for: API key mint (`handlers_auth.go:148`), API key revoke (`handlers_auth.go:440`), notification-group add (`handlers_alerting.go:156`), webhook create (`handlers_webhooks.go:24`), webhook delete (`handlers_webhooks.go:61`), OAuth callback success.
+- [x] **SEC-9a** Add audit entries for: API key mint (`handlers_auth.go:148`), API key revoke (`handlers_auth.go:440`), notification-group add (`handlers_alerting.go:156`), webhook create (`handlers_webhooks.go:24`), webhook delete (`handlers_webhooks.go:61`), OAuth callback success.
   - **Accept**: Every privileged mutation appears in `GET /api/v1/audit`.
 
 ## Recovery middleware content-type
 
-- [ ] **SEC-8a** Replace `http.Error` with a JSON-aware panic recovery that uses the same envelope as `writeError`.
+- [x] **SEC-8a** Replace `http.Error` with a JSON-aware panic recovery that uses the same envelope as `writeError`.
   - **Where**: `internal/api/middleware.go:110-130`.
   - **Accept**: A handler that panics returns `Content-Type: application/json` with the standard error envelope.
 
 ## OAuth
 
-- [ ] **SEC-13a** Require `email_verified=true` from the IdP for OAuth logins; reject unverified emails with `403 Forbidden`.
+- [x] **SEC-13a** Require `email_verified=true` from the IdP for OAuth logins; reject unverified emails with `403 Forbidden`.
   - **Where**: `internal/auth/oauth.go:35-42` and `internal/api/handlers_auth.go:571-598`.
 
-- [ ] **SEC-13b** Protect `OAuthManager.providers` with a `sync.RWMutex`.
+- [x] **SEC-13b** Protect `OAuthManager.providers` with a `sync.RWMutex`.
   - **Where**: `internal/auth/oauth.go:44-63`.
 
-- [ ] **SEC-12a** Compare OAuth state cookie and query with `subtle.ConstantTimeCompare`.
+- [x] **SEC-12a** Compare OAuth state cookie and query with `subtle.ConstantTimeCompare`.
   - **Where**: `internal/api/handlers_auth.go:528-537`.
 
 ## Audit chain integrity
@@ -98,7 +98,7 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
 
 ## JSONSchema scorer safety
 
-- [ ] **SEC-3a** Make `JSONSchema.ScoreCase` reject any schema that uses unsupported keywords (`allOf`, `oneOf`, `$ref`, etc.) with a typed error.
+- [x] **SEC-3a** Make `JSONSchema.ScoreCase` reject any schema that uses unsupported keywords (`allOf`, `oneOf`, `$ref`, etc.) with a typed error.
   - **Where**: `internal/eval/scorer.go:126-143, 164-217`.
   - **Accept**: A schema with only unsupported keywords returns `ErrUnsupportedSchema` from `ScoreCase`; the eval runner maps it to 422.
 
@@ -107,7 +107,7 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
 - [ ] **SEC-RL-1** Replace the IP-keyed limiter with a per-user-or-IP key (user when authenticated, IP otherwise). Bucket size is per-key.
   - **Where**: `internal/ratelimit/ratelimit.go:240-271` and `internal/api/server.go:783-794`.
 
-- [ ] **SEC-RL-2** Treat `RATE_LIMIT_RATE=0` as "disabled" rather than "1,000,000 burst".
+- [x] **SEC-RL-2** Treat `RATE_LIMIT_RATE=0` as "disabled" rather than "1,000,000 burst".
   - **Where**: `internal/ratelimit/ratelimit.go:130-134, 188-212`.
 
 ## Supply chain
@@ -139,8 +139,8 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
 
 ## DB hygiene
 
-- [ ] **SEC-DB-1** Seed a system user with `id="api"` and `role="system"` so audit FKs are satisfied.
+- [x] **SEC-DB-1** Seed a system user with `id="api"` and `role="system"` so audit FKs are satisfied.
   - **Where**: new migration `internal/store/migrations/054_seed_system_user.up.sql`.
 
-- [ ] **SEC-DB-2** Add FK `api_keys.user_id → users.id` with `ON DELETE CASCADE`.
+- [x] **SEC-DB-2** Add FK `api_keys.user_id → users.id` with `ON DELETE CASCADE`.
   - **Where**: `internal/store/migrations/055_api_keys_user_fk.up.sql`.

@@ -4,7 +4,7 @@ All testing findings. Fast forward: add, don't legacy.
 
 ## Existing test fixes
 
-- [ ] **TEST-2** Fix the vacuous precondition test in `release/service_test.go:297-329`.
+- [x] **TEST-2** Fix the vacuous precondition test in `release/service_test.go:297-329`.
   - **What**: Set `t.Setenv("PROMPTSHEON_HARNESS_PRECONDITIONS", "true")` so the precondition actually runs.
   - **Accept**: Removing the precondition's success branch makes the test fail.
 
@@ -45,11 +45,11 @@ All testing findings. Fast forward: add, don't legacy.
 
 - [ ] **TEST-NEW-1** Migration tests for 050, 051, 052, and every future migration that actually executes them.
 - [ ] **TEST-NEW-2** API contract tests for every 87 route.
-- [ ] **TEST-NEW-3** Bootstrap race test: 100 goroutines hit `POST /api/v1/setup`; assert exactly one wins.
-- [ ] **TEST-NEW-4** API-key revoke-on-update test: change user role; existing key returns 401.
+- [x] **TEST-NEW-3** Bootstrap race test: 100 goroutines hit `POST /api/v1/setup`; assert exactly one wins.
+- [x] **TEST-NEW-4** API-key revoke-on-update test: change user role; existing key returns 401.
 - [ ] **TEST-NEW-5** Webhook SSRF test: every URL in a deny list returns 400.
-- [ ] **TEST-NEW-6** Webhook secret encryption test: `SELECT secret FROM webhook_endpoints` returns ciphertext.
-- [ ] **TEST-NEW-7** Maker-Checker test: release creator's vote is rejected at the type level.
+- [x] **TEST-NEW-6** Webhook secret encryption test: `SELECT secret FROM webhook_endpoints` returns ciphertext.
+- [x] **TEST-NEW-7** Maker-Checker test: release creator's vote is rejected at the type level.
 - [ ] **TEST-NEW-8** Audit chain tail test: delete last 5 rows; verifier reports `TailMismatch`.
 - [ ] **TEST-NEW-9** Trace write test: 1000 concurrent requests don't block on trace SQLite.
 - [ ] **TEST-NEW-10** Idempotency multi-replica test: two replicas share idempotency state via SQLite.

@@ -4,28 +4,28 @@ All domain/dead-code findings. Fast forward: delete, don't keep around "for comp
 
 ## Capability
 
-- [ ] **DEAD-1a** Delete `Observation` (`capability/observation.go`) — never called.
-- [ ] **DEAD-1b** Delete `EvaluationResult` (`capability/evaluationresult.go`) — never called.
-- [ ] **DEAD-1c** Delete `ReleaseProbe`, `ReleaseStatusValue`, the three `ReleaseStatus*` constants, and `DeriveState` (`capability/capability.go:101-113, 56-95`) — never called.
-- [ ] **DEAD-1d** Delete the unused `EventType` constants: `EventCapabilityCreated`, `EventCapabilityUpdated`, `EventCapabilityArchived`, `EventVersionCreated`, `EventVersionPromoted`, `EventEvaluationCompleted`, `EventEvaluationThresholdsMet`, `EventObservationGenerated`, `EventRegressionDetected`, `EventRollbackPerformed`, `EventDeploymentRolledBack`.
+- [x] **DEAD-1a** Delete `Observation` (`capability/observation.go`) — never called.
+- [x] **DEAD-1b** Delete `EvaluationResult` (`capability/evaluationresult.go`) — never called.
+- [x] **DEAD-1c** Delete `ReleaseProbe`, `ReleaseStatusValue`, the three `ReleaseStatus*` constants, and `DeriveState` (`capability/capability.go:101-113, 56-95`) — never called.
+- [x] **DEAD-1d** Delete the unused `EventType` constants: `EventCapabilityCreated`, `EventCapabilityUpdated`, `EventCapabilityArchived`, `EventVersionCreated`, `EventVersionPromoted`, `EventEvaluationCompleted`, `EventEvaluationThresholdsMet`, `EventObservationGenerated`, `EventRegressionDetected`, `EventRollbackPerformed`, `EventDeploymentRolledBack`.
   - **Where**: `internal/capability/event.go`.
 
-- [ ] **DEAD-2** Remove `req.State = capability.StateDraft` from `handlers_capabilities.go:238`.
+- [x] **DEAD-2** Remove `req.State = capability.StateDraft` from `handlers_capabilities.go:238`.
   - **Where**: `internal/api/handlers_capabilities.go:238`.
 
 ## Release
 
-- [ ] **DEAD-3a** Delete `AllEnvironments()` (`release/release.go:62-64`).
+- [x] **DEAD-3a** Delete `AllEnvironments()` (`release/release.go:62-64`).
 - [ ] **DEAD-3b** Delete `Repository.DeleteRelease` from interface + SQLite impl + handler. Same for `Repository.DeleteApproval`.
   - **Where**: `internal/release/repo.go`, `internal/store/sqlite_releases.go:160, 353`.
 
 - [ ] **DEAD-6** Delete the `runner` interface in `release/service.go:71-83`. Keep the `var _ Service` assertion only if the API layer actually depends on it; otherwise remove.
   - **Where**: `internal/release/service.go`.
 
-- [ ] **DEAD-Rel-1** Delete the deprecated `Release.Approve(...)` wrapper at `release/release.go:208-210`.
+- [x] **DEAD-Rel-1** Delete the deprecated `Release.Approve(...)` wrapper at `release/release.go:208-210`.
   - **Accept**: The codebase no longer compiles against the deprecated entry point.
 
-- [ ] **DEAD-Rel-2** Delete the `castApprovesToVotes` helper used only by the deprecated `ApproveWithApprovalList`.
+- [x] **DEAD-Rel-2** Delete the `castApprovesToVotes` helper used only by the deprecated `ApproveWithApprovalList`.
   - **Where**: `internal/release/release.go:212-223`.
 
 - [ ] **DEAD-Rel-3** Delete `PolicyKind` enum; callers must pass a concrete `approval.Policy`.
@@ -99,4 +99,4 @@ All domain/dead-code findings. Fast forward: delete, don't keep around "for comp
   - **Where**: `internal/config/config.go:43` and `cmd/promptsheond/main.go:123`.
 - [ ] **FC-4** Remove the `migration_test.go` summary file (replaced by per-migration tests).
   - **Where**: `internal/store/migration_test.go`.
-- [ ] **FC-5** Remove the `splitResource` helper in `internal/store/split_resource.go` (one-off migration helper, no longer needed).
+- [x] **FC-5** Remove the `splitResource` helper in `internal/store/split_resource.go` (one-off migration helper, no longer needed).
