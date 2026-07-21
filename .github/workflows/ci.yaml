@@ -222,6 +222,18 @@ jobs:
           name: sbom
           path: ./dist/sbom
 
+      # SEC-16c: emit a SLSA build provenance attestation alongside
+      # the release. The generator action runs after GoReleaser so
+      # the attestation can pin the exact binary digests.
+      - name: SLSA provenance
+        if: success()
+        uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+        with:
+          image: goreleaser-action-runner
+          digest: ""
+          tag: release-${{ github.ref_name }}
+          build-config-path: .github/slsa-build.config.json
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:

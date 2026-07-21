@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "name": "build",
+      "command": [
+        "goreleaser", "release", "--clean", "--skip=publish"
+      ],
+      "env": [
+        { "name": "GITHUB_REF", "value": "${{ github.ref }}" },
+        { "name": "GITHUB_REPOSITORY", "value": "${{ github.repository }}" }
+      ]
+    }
+  ]
+}
