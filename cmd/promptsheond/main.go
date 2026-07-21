@@ -113,7 +113,15 @@ func main() {
 	rootCtx, rootCancel := context.WithCancel(context.Background())
 	defer rootCancel()
 
-	logger := setupLogger(&cfg)
+	// Log hub is created early so the slog chain can broadcast
+	// every daemon log line over the SSE /api/v1/logs/stream
+	// endpoint (OBS-4). The hub is also passed to api.NewServer
+	// via WithLogHub so handlers can subscribe.
+	logHub := ws.NewHub(slog.Default())
+	go logHub.Run()
+	defer logHub.Stop()
+
+	logger := setupLogger(&cfg, logHub)
 
 	db := openDB(&cfg, logger)
 	defer func() {
@@ -145,7 +153,7 @@ func main() {
 		}
 	}()
 
-	srv, limiter, spans, collector := buildServer(rootCtx, &cfg, db, logger, tp)
+	srv, limiter, spans, collector := buildServer(rootCtx, &cfg, db, logger, tp, logHub)
 
 	srv.StartAuditWorkers(rootCtx, 2)
 
@@ -176,7 +184,7 @@ func configureShellTool(_ *config.Config) {
 	workflow.SetShellToolPolicy(enabled, allow)
 }
 
-func setupLogger(cfg *config.Config) *slog.Logger {
+func setupLogger(cfg *config.Config, hub *ws.Hub) *slog.Logger {
 	var logLevel slog.Level
 	switch cfg.LogLevel {
 	case logLevelDebug:
@@ -190,7 +198,15 @@ func setupLogger(cfg *config.Config) *slog.Logger {
 	default:
 		logLevel = slog.LevelInfo
 	}
-	return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel}))
+	// OBS-4: chain the JSON stderr handler through a StreamHandler
+	// that broadcasts every log line to the SSE hub. The hub has
+	// its own broadcast loop and is concurrency-safe.
+	var base slog.Handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
+	if hub != nil {
+		streamer := &ws.LogStreamer{Hub: hub}
+		base = streamer.StreamHandler(base)
+	}
+	return slog.New(base)
 }
 
 func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
@@ -205,7 +221,7 @@ func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
 	return db
 }
 
-func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider) (*api.Server, *ratelimit.Limiter, *trace.SQLite, *metrics.Collector) {
+func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub) (*api.Server, *ratelimit.Limiter, *trace.SQLite, *metrics.Collector) {
 	spans, err := trace.NewSQLite(db.DB())
 	if err != nil {
 		logger.Warn("tracing disabled", "err", err)
@@ -237,9 +253,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		}
 	}
 
-	logHub := ws.NewHub(logger)
-	go logHub.Run()
-	defer logHub.Stop()
+	_ = logHub
 
 	contextMgr := contextpkg.NewManager()
 	usageTracker := api.NewUsageTracker()
