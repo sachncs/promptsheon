@@ -110,30 +110,70 @@ func Logging(logger *slog.Logger) func(http.Handler) http.Handler {
 // response uses the same JSON envelope as the rest of the API
 // (writeError) so clients that send Accept: application/json
 // don't get text/plain by surprise (SEC-8).
+//
+// BUG-9 fix: when a handler panics after it has already written
+// the response status, recovering here and writing again would
+// log a spurious "superfluous WriteHeader" warning and double-
+// encode the body. Wrap the response writer with a once-only
+// guard so the second writeError is a no-op.
 func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			rec := &recoveryWriter{ResponseWriter: w}
 			defer func() {
-				if rec := recover(); rec != nil {
+				if p := recover(); p != nil {
 					requestID, _ := trace.RequestIDFromContext(r.Context())
 					traceID, _ := trace.IDFromContext(r.Context())
 					logger.Error("panic recovered",
-						"err", rec,
+						"err", p,
 						"stack", string(debug.Stack()),
 						"method", r.Method,
 						"path", r.URL.Path,
 						"request_id", requestID,
 						"trace_id", traceID,
 					)
-					writeError(w, &HTTPError{
-						Status:  http.StatusInternalServerError,
-						Message: "internal server error",
-					})
+					if rec.alive() {
+						writeError(rec, &HTTPError{
+							Status:  http.StatusInternalServerError,
+							Message: "internal server error",
+						})
+					}
 				}
 			}()
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(rec, r)
 		})
 	}
+}
+
+// recoveryWriter wraps a ResponseWriter and records whether a
+// write has already started. After a WriteHeader call the
+// underlying connection is committed; subsequent writes are
+// fatal in the stdlib (they log a warning). recoveryWriter
+// makes the second write a silent no-op so the recover path
+// does not corrupt the response when the original handler
+// had already started streaming.
+type recoveryWriter struct {
+	http.ResponseWriter
+	wrote bool
+}
+
+func (r *recoveryWriter) WriteHeader(code int) {
+	if r.wrote {
+		return
+	}
+	r.wrote = true
+	r.ResponseWriter.WriteHeader(code)
+}
+
+func (r *recoveryWriter) Write(b []byte) (int, error) {
+	if !r.wrote {
+		r.wrote = true
+	}
+	return r.ResponseWriter.Write(b)
+}
+
+func (r *recoveryWriter) alive() bool {
+	return !r.wrote
 }
 
 // CORS returns middleware that handles CORS preflight requests.
