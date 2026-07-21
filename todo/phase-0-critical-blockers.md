@@ -23,7 +23,7 @@ Ship-blockers. Fix these before anything else. Fast forward, no backward compat,
   - **Where**: `internal/store/migrate.go:117-142` and `internal/store/migrations/043_fk_hygiene.up.sql`.
   - **Accept**: Running 043 on a DB with parent rows preserves all child rows; running it on a DB whose parents were deleted directly still cascades as expected.
 
-- [ ] **DB-3b** Add a migration test that populates parent+child rows, applies 043, asserts no cascade loss.
+- [x] **DB-3b** Add a migration test that populates parent+child rows, applies 043, asserts no cascade loss.
   - **Where**: new test in `internal/store/043_fk_hygiene_test.go`.
 
 ## Trace write on hot path
@@ -62,7 +62,7 @@ Ship-blockers. Fix these before anything else. Fast forward, no backward compat,
 
 ## ClickHouse wiring
 
-- [ ] **OBS-CH-1** Wire `rollups/clickhouse.Writer` into the aggregator when `PROMPTSHEON_CLICKHOUSE_DSN` is set.
+- [x] **OBS-CH-1** Wire `rollups/clickhouse.Writer` into the aggregator when `PROMPTSHEON_CLICKHOUSE_DSN` is set.
   - **What**: `cmd/promptsheond/main.go:300` constructs `clickhouse.Writer` if DSN is non-empty; passes it to `rollups.Aggregator` as the backend.
   - **Where**: `cmd/promptsheond/main.go:300`, `internal/rollups/clickhouse/writer.go`, `internal/rollups/rollups.go`.
   - **Accept**: With `PROMPTSHEON_CLICKHOUSE_DSN=clickhouse://...`, rollup rows land in the `workspace_rollups` table; without it, in-memory aggregation continues.
@@ -86,7 +86,7 @@ Ship-blockers. Fix these before anything else. Fast forward, no backward compat,
   - **Where**: `cmd/promptsheond/main.go:318-323`.
   - **Accept**: After a successful invoke, a recommendation row appears in the `recommendations` table within one producer tick (5 s default).
 
-- [ ] **OBS-10a** Add an SLO evaluator goroutine that periodically calls `Evaluate` against the metrics collector.
+- [x] **OBS-10a** Add an SLO evaluator goroutine that periodically calls `Evaluate` against the metrics collector.
   - **Where**: new file `internal/slo/evaluator.go`; wired in `cmd/promptsheond/main.go`.
   - **Accept**: A breach on `promptsheon_review_pending` produces a `BreachEvent` within one tick; the bridge turns it into a Recommendation.
 

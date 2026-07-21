@@ -64,14 +64,14 @@ All observability findings. Fast forward: replace dead surfaces, no deprecation 
 
 ## SLO
 
-- [ ] **OBS-10** Implement the SLO evaluator goroutine. (See Phase 0.)
+- [x] **OBS-10** Implement the SLO evaluator goroutine. (See Phase 0.)
 
-- [ ] **OBS-SLO-1** Implement `slo.Repository` against SQLite.
+- [x] **OBS-SLO-1** Implement `slo.Repository` against SQLite.
   - **Where**: `internal/slo/sqlite.go` (new) and `internal/store/migrations/064_slo_tables.up.sql`.
 
 ## Rollups / lineage / recommendation
 
-- [ ] **OBS-CH-1** Wire ClickHouse writer. (See Phase 0.)
+- [x] **OBS-CH-1** Wire ClickHouse writer. (See Phase 0.)
 - [x] **OBS-12** Wire recommendation producer. (See Phase 0.)
 - [x] **OBS-Lineage-1** Implement `lineage.Repository` against SQLite. (See Phase 0.)
 
