@@ -1009,8 +1009,7 @@ func setupTestDB(t *testing.T) *store.SQLite {
 func testWebhookEndpoint(id string, now time.Time) *models.WebhookEndpointRecord {
 	return &models.WebhookEndpointRecord{
 		ID:        id,
-		URL:       "https://example.com/webhook",
-		Secret:    "test-secret",
+		URL:       "https://example.com/webhook-" + id,
 		Events:    []string{"prompt.created", "prompt.updated"},
 		Active:    true,
 		CreatedAt: now,

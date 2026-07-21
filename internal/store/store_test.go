@@ -129,8 +129,9 @@ func TestNewSQLiteRunsAllMigrations(t *testing.T) {
 	if err := rows.Scan(&n); err != nil {
 		t.Fatalf("scan: %v", err)
 	}
-	if n < 20 {
-		t.Errorf("migrations applied = %d, want at least 20", n)
+	// After consolidation the migration count is 8.
+	if n != 8 {
+		t.Errorf("migrations applied = %d, want 8", n)
 	}
 }
 
@@ -336,24 +337,27 @@ func TestAuditChainDetectsTampering(t *testing.T) {
 		}
 	}
 
-	// Tamper with the action column of the second entry.
-	if _, err := s.DB().ExecContext(ctx,
-		`UPDATE audit_entries SET action = 'tampered' WHERE id = 'a2'`); err != nil {
-		t.Fatalf("tamper update: %v", err)
+	// After consolidation the audit chain is append-only at the
+	// database level (BEFORE UPDATE trigger in 002_audit_chain).
+	// The tamper-detection path (UPDATE a row, re-verify) is no
+	// longer reachable in production. We exercise the append-only
+	// invariant here instead.
+	_, err := s.DB().ExecContext(ctx,
+		`UPDATE audit_entries SET action = 'tampered' WHERE id = 'a2'`)
+	if err == nil {
+		t.Fatal("expected audit_entries_no_update trigger to reject UPDATE")
+	}
+	if !strings.Contains(err.Error(), "append-only") {
+		t.Errorf("expected 'append-only' in error, got %v", err)
 	}
 
-	ok, reason, err := s.VerifyAuditChain(ctx)
+	// Verify the chain is still intact (UPDATE was rolled back).
+	ok, _, err := s.VerifyAuditChain(ctx)
 	if err != nil {
 		t.Fatalf("VerifyAuditChain: %v", err)
 	}
-	if ok {
-		t.Error("verification should have failed after tampering")
-	}
-	if reason == "" {
-		t.Error("reason should describe the tampering")
-	}
-	if !strings.Contains(reason, "a2") {
-		t.Errorf("reason should mention tampered entry a2, got %q", reason)
+	if !ok {
+		t.Error("chain should still verify; the tamper UPDATE was rejected")
 	}
 }
 
@@ -514,7 +518,6 @@ func TestWebhookEndpointRoundTrip(t *testing.T) {
 	ep := &models.WebhookEndpointRecord{
 		ID:        "w1",
 		URL:       "https://example.com/hook",
-		Secret:    "secret",
 		Events:    []string{"capability.created"},
 		Active:    true,
 		CreatedAt: now,
@@ -544,20 +547,17 @@ func TestWebhookEndpointRoundTrip(t *testing.T) {
 }
 
 // TestWebhookSecretCiphertextOnDisk exercises SEC-7a: the
-// plaintext `secret` column must never appear on disk after a
-// SaveWebhookEndpoint call. SaveWebhookEndpoint writes
-// `secret = ''` for new rows; migration 064 wipes any
-// pre-064 plaintext. Combined, SELECT secret returns empty
-// for every persisted endpoint, while the actual ciphertext
-// lives in secret_ciphertext.
+// plaintext `secret` column must not exist on disk after the
+// consolidated 001_core_schema. SaveWebhookEndpoint writes
+// SecretCiphertext and the column never had a plaintext sibling.
 func TestWebhookSecretCiphertextOnDisk(t *testing.T) {
 	t.Parallel()
 	s := newTestSQLite(t)
 	ctx := context.Background()
 	now := time.Now().UTC()
 	ep := &models.WebhookEndpointRecord{
-		ID: "w-sec", URL: "https://example.com/hook",
-		Secret:           "", // plaintext never persisted
+		ID:               "w-sec",
+		URL:              "https://example.com/hook",
 		SecretCiphertext: []byte("ciphertext-blob"),
 		Events:           []string{"capability.created"},
 		Active:           true,
@@ -566,14 +566,15 @@ func TestWebhookSecretCiphertextOnDisk(t *testing.T) {
 	if err := s.SaveWebhookEndpoint(ctx, ep); err != nil {
 		t.Fatalf("SaveWebhookEndpoint: %v", err)
 	}
-	var plain string
+	// The plaintext `secret` column must not exist in the schema.
+	var n int
 	if err := s.DB().QueryRowContext(ctx,
-		`SELECT secret FROM webhook_endpoints WHERE id = 'w-sec'`,
-	).Scan(&plain); err != nil {
-		t.Fatalf("scan secret: %v", err)
+		`SELECT COUNT(*) FROM pragma_table_info('webhook_endpoints') WHERE name='secret'`,
+	).Scan(&n); err != nil {
+		t.Fatalf("pragma_table_info: %v", err)
 	}
-	if plain != "" {
-		t.Errorf("plaintext secret leaked: got %q, want empty", plain)
+	if n != 0 {
+		t.Errorf("plaintext secret column still exists; want absent")
 	}
 	var ct []byte
 	if err := s.DB().QueryRowContext(ctx,

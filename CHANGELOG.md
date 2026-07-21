@@ -18,6 +18,21 @@ A 50+ commit audit and remediation pass. Highlights:
   helper; destructive down files still require
   `PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true`. DB-13.
 
+- **Migration directory consolidated**: 51 .up.sql + 17 .down.sql
+  files replaced with 8 .up.sql files (no .down.sql). Phase 1.x
+  fixes (url UNIQUE, secret column drop, updated_at / last_used_at,
+  enabled CHECKs, typed lineage_edges parent/child, alerts
+  acknowledgement, ON DELETE SET NULL) are folded into
+  `001_core_schema.up.sql`. The destructive gate is tightened
+  from substring match to anchored regex `^\d+_destructive`.
+
+  Upgrade path for existing deployments: run the one-time shim
+  before starting the new daemon —
+  `INSERT OR IGNORE INTO schema_migrations (version) VALUES
+   (1),(2),(3),(4),(5),(6),(7),(8);` — which records the
+  consolidated versions as applied and lets the runner skip
+  the rebuild on next start.
+
 #### Deploy
 
 - **`fix(helm):` real probe + scrape paths** — `/health` and
