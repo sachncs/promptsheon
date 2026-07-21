@@ -189,6 +189,15 @@ func CORS(allowedOrigins ...string) func(http.Handler) http.Handler {
 }
 
 // SecurityHeaders returns middleware that adds security-related HTTP headers.
+//
+// BUG-24: Strict-Transport-Security is only useful over an
+// encrypted channel; setting it on a plain HTTP deployment
+// has no security benefit and trains operators to ignore the
+// header. The middleware now inspects r.TLS (set by the
+// stdlib server when ListenAndServeTLS is in play) and the
+// X-Forwarded-Proto header (set by a trusted TLS-terminating
+// proxy). HSTS is sent only when at least one of those
+// signals a TLS connection.
 func SecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -196,7 +205,9 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("X-XSS-Protection", "0")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'")
-		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
 		next.ServeHTTP(w, r)
 	})
 }

@@ -173,41 +173,8 @@ func (r Release) ApproveWith(a approval.Approval, pol approval.Policy) (Release,
 	return r, nil
 }
 
-// ApproveWithApprovalList is a convenience for callers that have not
-// (yet) wired up the full Approval package. It accepts a flat list of
-// approver identities and uses the built-in MajorityPolicy with
-// Required=len(approvers). Empty identities are rejected before the
-// Approval is constructed so a release cannot be Approved with a
-// blank voter.
-//
-// Approve returns ErrNotPending if the Release is already past Pending.
-func (r Release) ApproveWithApprovalList(approvers []string) (Release, error) {
-	for _, a := range approvers {
-		if a == "" {
-			return r, errors.New("release: approver identity must not be empty")
-		}
-	}
-	return r.ApproveWith(
-		approval.Approval{ReleaseID: r.ID, Votes: castApprovesToVotes(approvers)},
-		approval.MajorityPolicy{Required: len(approvers)},
-	)
-}
-
 // Deprecated: removed in the DEAD-3 sweep. Use
 // ApproveWith(approval.Approval, approval.Policy) instead.
-
-func castApprovesToVotes(identities []string) []approval.Vote {
-	out := make([]approval.Vote, 0, len(identities))
-	now := time.Now().UTC()
-	for _, id := range identities {
-		out = append(out, approval.Vote{
-			Identity:  id,
-			Decision:  approval.Approve,
-			Timestamp: now,
-		})
-	}
-	return out
-}
 
 // Activate transitions an Approved Release to Active.
 // The caller passes the activation time so clocks are explicit at
