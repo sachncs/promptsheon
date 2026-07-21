@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -34,15 +35,17 @@ type OAuthToken struct {
 
 // OAuthUser represents user info from OAuth provider.
 type OAuthUser struct {
-	ID       string `json:"id"`
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	Picture  string `json:"picture"`
-	Provider string `json:"provider"`
+	ID            string `json:"id"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+	Name          string `json:"name"`
+	Picture       string `json:"picture"`
+	Provider      string `json:"provider"`
 }
 
 // OAuthManager handles OAuth flows for multiple providers.
 type OAuthManager struct {
+	mu        sync.RWMutex
 	providers map[string]*OAuthProvider
 	client    *http.Client
 }
@@ -59,11 +62,15 @@ func NewOAuthManager() *OAuthManager {
 
 // RegisterProvider registers an OAuth provider.
 func (m *OAuthManager) RegisterProvider(name string, provider *OAuthProvider) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.providers[name] = provider
 }
 
 // GetAuthURL returns the authorization URL for a provider.
 func (m *OAuthManager) GetAuthURL(providerName, state string) (string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	provider, ok := m.providers[providerName]
 	if !ok {
 		return "", fmt.Errorf("provider %s not registered", providerName)
@@ -87,6 +94,8 @@ func (m *OAuthManager) GetAuthURL(providerName, state string) (string, error) {
 
 // ExchangeCode exchanges an authorization code for tokens.
 func (m *OAuthManager) ExchangeCode(ctx context.Context, providerName, code string) (*OAuthToken, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	provider, ok := m.providers[providerName]
 	if !ok {
 		return nil, fmt.Errorf("provider %s not registered", providerName)
@@ -137,6 +146,8 @@ func (m *OAuthManager) ExchangeCode(ctx context.Context, providerName, code stri
 
 // GetUserInfo fetches user info from the provider.
 func (m *OAuthManager) GetUserInfo(ctx context.Context, providerName string, token *OAuthToken) (*OAuthUser, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	provider, ok := m.providers[providerName]
 	if !ok {
 		return nil, fmt.Errorf("provider %s not registered", providerName)
