@@ -155,11 +155,11 @@ func main() {
 		}
 	}()
 
-	srv, limiter, spans, collector := buildServer(rootCtx, &cfg, db, logger, tp, logHub)
+	srv, limiter, tracer, collector := buildServer(rootCtx, &cfg, db, logger, tp, logHub)
 
 	srv.StartAuditWorkers(rootCtx, 2)
 
-	startHTTPServerAndWait(rootCtx, rootCancel, &cfg, srv, logger, limiter, spans, collector)
+	startHTTPServerAndWait(rootCtx, rootCancel, &cfg, srv, logger, limiter, tracer, collector)
 }
 
 // configureShellTool loads the shell tool policy from environment. The
@@ -223,14 +223,22 @@ func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
 	return db
 }
 
-func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub) (*api.Server, *ratelimit.Limiter, *trace.SQLite, *metrics.Collector) {
-	spans, err := trace.NewSQLite(db.DB())
+func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub) (*api.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector) {
+	sqliteTracer, err := trace.NewSQLite(db.DB())
 	if err != nil {
-		logger.Warn("tracing disabled", "err", err)
+		logger.Warn("SQLite tracer disabled", "err", err)
 	}
 	collector := metrics.NewCollector()
 
+	// OBS-2: combine the SQLite tracer (always-on, used by the
+	// /api/v1/traces/{id} browse surface) with the OTel tracer
+	// (OTLP export) when PROMPTSHEON_OTEL_ENDPOINT is configured.
+	// Spans are mirrored to both backends so local queries see
+	// them regardless of OTel availability.
+	var tracer trace.Tracer = sqliteTracer
 	if cfg.OTelEndpoint != "" && tp != nil {
+		otel := trace.NewOTelTracer("promptsheond")
+		tracer = trace.NewMulti(sqliteTracer, otel)
 		logger.Info("OTel tracer initialised", "endpoint", cfg.OTelEndpoint, "insecure", cfg.OTelInsecure)
 	}
 
@@ -398,8 +406,8 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		opts = append(opts, api.WithAuth(db))
 		logger.Info("authentication enabled")
 	}
-	if spans != nil {
-		opts = append(opts, api.WithTracing(spans, collector))
+	if tracer != nil {
+		opts = append(opts, api.WithTracing(tracer, collector))
 	}
 	opts = append(opts, api.WithWebhooks(webhookDispatcher))
 	if v != nil {
@@ -441,7 +449,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	}
 
 	srv := api.NewServer(db, logger, opts...)
-	return srv, limiter, spans, collector
+	return srv, limiter, tracer, collector
 }
 
 // buildOAuthManager constructs an *auth.OAuthManager from
@@ -517,14 +525,14 @@ func buildReleaseService(db *store.SQLite, policy string) *release.Service {
 	}
 }
 
-func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *config.Config, srv *api.Server, logger *slog.Logger, limiter *ratelimit.Limiter, spans *trace.SQLite, collector *metrics.Collector) {
+func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *config.Config, srv *api.Server, logger *slog.Logger, limiter *ratelimit.Limiter, tracer trace.Tracer, collector *metrics.Collector) {
 	handler := api.ChainHTTP(srv,
 		api.Recovery(logger),
 		api.MaxBytesReader(10<<20),
 		api.SecurityHeaders,
 		api.IdempotencyMiddleware(),
 		limiter.Middleware,
-		metrics.HTTPMiddleware(collector, spans, logger),
+		metrics.HTTPMiddleware(collector, tracer, logger),
 		api.Logging(logger),
 		api.CORS(cfg.CORSOrigins...),
 	)
@@ -588,9 +596,11 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 
 	// Drain the trace queue before audit workers so the trace
 	// table is flushed before we lose access to the DB.
-	if spans != nil {
-		if err := spans.Close(); err != nil {
-			logger.Warn("trace store did not drain cleanly", "err", err)
+	if tracer != nil {
+		if sqlite, ok := tracer.(*trace.SQLite); ok {
+			if err := sqlite.Close(); err != nil {
+				logger.Warn("trace store did not drain cleanly", "err", err)
+			}
 		}
 	}
 

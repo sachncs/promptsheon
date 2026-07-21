@@ -39,7 +39,7 @@ func (s *Server) handleListSpans(w http.ResponseWriter, r *http.Request) error {
 		filter.Limit = n
 	}
 
-	spans, err := s.spans.ListSpans(r.Context(), &filter)
+	spans, err := s.spanStore.ListSpans(r.Context(), &filter)
 	if err != nil {
 		return err
 	}
@@ -51,11 +51,11 @@ func (s *Server) handleListSpans(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) handleGetSpan(w http.ResponseWriter, r *http.Request) error {
-	if s.spans == nil {
+	if s.spanStore == nil {
 		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "tracing not configured"}
 	}
 	id := r.PathValue("id")
-	span, err := s.spans.GetSpan(r.Context(), id)
+	span, err := s.spanStore.GetSpan(r.Context(), id)
 	if err != nil {
 		return ErrNotFound
 	}
@@ -64,11 +64,11 @@ func (s *Server) handleGetSpan(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) handleGetTraceTree(w http.ResponseWriter, r *http.Request) error {
-	if s.spans == nil {
+	if s.spanStore == nil {
 		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "tracing not configured"}
 	}
 	traceID := r.PathValue("trace_id")
-	spans, err := s.spans.GetTraceTree(r.Context(), traceID)
+	spans, err := s.spanStore.GetTraceTree(r.Context(), traceID)
 	if err != nil {
 		return ErrNotFound
 	}
