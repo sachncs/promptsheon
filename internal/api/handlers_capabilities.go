@@ -510,10 +510,11 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 		return err
 	}
 	s.audit(r.Context(), "create", "execution:"+exec.ID, map[string]any{
-		"version_id": capabilityVersionID,
-		"tokens":     exec.TotalTokens,
-		"cost_usd":   exec.CostUSD,
-		"error":      exec.Error,
+		"version_id":       capabilityVersionID,
+		"tokens":           exec.TotalTokens,
+		"cost_usd":         exec.CostUSD,
+		"tokens_estimated": exec.TotalTokens > 0 || exec.CostUSD > 0,
+		"error":            exec.Error,
 	})
 	if invErr != nil {
 		// BUG-19: distinguish provider-missing from generic 5xx so
