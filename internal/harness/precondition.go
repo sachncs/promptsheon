@@ -21,20 +21,44 @@ import (
 // constructing the runner takes effect immediately.
 var envAllowlist = []string{"PATH", "HOME", "LANG", "LC_ALL", "TZ"}
 
-// SetEnvAllowlist replaces the global environment allowlist.
-// The replacement applies to subsequent runs of the
-// PreconditionRunner. Pass nil to disable all passthrough
-// (preconditions see an empty environment).
-func SetEnvAllowlist(keys []string) {
-	envAllowlist = append([]string(nil), keys...)
+// envDenylist is the SEC-2a inverted form: rather than listing
+// every allowed key, we list prefixes that must NEVER reach a
+// precondition. This catches the typical credential-leak shape
+// (AWS_*, *_KEY, *_TOKEN, *_SECRET) without requiring a
+// per-deployment audit of which exact key names are sensitive.
+var envDenylist = []string{
+	"AWS_",
+	"GOOGLE_",
+	"AZURE_",
+	"VAULT_",
+	"KUBERNETES_",
+	"HELM_",
+	"OTEL_",
+	"DATADOG_",
+	"SENTRY_",
 }
 
-// scrubEnv returns a copy of os.Environ() with every variable not
-// in envAllowlist removed.
+// envDenylistSuffixes catches credentials stored as *_KEY / *_TOKEN
+// / *_SECRET regardless of vendor (e.g. STRIPE_SECRET_KEY,
+// GITHUB_TOKEN). The match is "ends with" so OPENAI_KEY is caught
+// but MY_KEYNAME is not.
+var envDenylistSuffixes = []string{"_KEY", "_TOKEN", "_SECRET", "_PASSWORD", "_PASS", "_API_KEY", "_TOKEN_ID"}
+
+// scrubEnv returns a copy of os.Environ() with every variable
+// whose name matches the denylist removed. The allowlist still
+// wins for keys explicitly added via SetEnvAllowlist.
 func scrubEnv() []string {
 	allow := make(map[string]struct{}, len(envAllowlist))
 	for _, k := range envAllowlist {
 		allow[k] = struct{}{}
+	}
+	denyPrefix := make(map[string]struct{}, len(envDenylist))
+	for _, p := range envDenylist {
+		denyPrefix[p] = struct{}{}
+	}
+	denySuffix := make(map[string]struct{}, len(envDenylistSuffixes))
+	for _, s := range envDenylistSuffixes {
+		denySuffix[s] = struct{}{}
 	}
 	var out []string
 	for _, kv := range os.Environ() {
@@ -42,9 +66,31 @@ func scrubEnv() []string {
 		if i < 0 {
 			continue
 		}
-		if _, ok := allow[kv[:i]]; ok {
+		name := kv[:i]
+		if _, ok := allow[name]; ok {
 			out = append(out, kv)
+			continue
 		}
+		drop := false
+		for p := range denyPrefix {
+			if strings.HasPrefix(name, p) {
+				drop = true
+				break
+			}
+		}
+		if drop {
+			continue
+		}
+		for s := range denySuffix {
+			if strings.HasSuffix(name, s) {
+				drop = true
+				break
+			}
+		}
+		if drop {
+			continue
+		}
+		out = append(out, kv)
 	}
 	return out
 }
