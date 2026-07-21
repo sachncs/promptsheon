@@ -166,8 +166,11 @@ func TestLoadConfigFromEnv(t *testing.T) {
 		if cfg.Rate != 0 {
 			t.Fatalf("expected rate 0, got %d", cfg.Rate)
 		}
-		if cfg.Burst != 1_000_000 {
-			t.Fatalf("expected burst 1000000 when disabled, got %d", cfg.Burst)
+		// SEC-RL-2: rate=0 no longer implies a 1M-token burst.
+		// The bucket is disabled (Rate=0, Burst=0); callers can
+		// still set an explicit large burst when needed.
+		if cfg.Burst != 0 {
+			t.Fatalf("expected burst 0 when disabled, got %d", cfg.Burst)
 		}
 	})
 
