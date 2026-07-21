@@ -366,6 +366,13 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 
 	providers := llm.NewRegistry()
 	providers.LoadFromEnv()
+	// SEC-LLM-1: refuse to start when an LLM base URL is http://
+	// but the daemon binds a non-loopback address. Production
+	// deployments must talk to LLM providers over TLS.
+	if err := providers.ValidateBaseURLs(cfg.Addr, config.IsLoopbackAddr); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 
 	// Per-Workspace rollup aggregator (Tier 2.37). The production
 	// wiring supplies a backend-backed Budget/Quota repository.
