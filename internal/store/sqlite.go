@@ -402,11 +402,19 @@ func (s *SQLite) CreateUser(ctx context.Context, u *models.User) error {
 // ignored so the bootstrap endpoint stays available even when
 // the audit FK has been satisfied.
 //
-// The check and the insert run in a single transaction with a
-// row-level INSERT-then-SELECT, so two concurrent callers
-// cannot both succeed: SQLite serialises the writes and the
-// second caller sees a non-zero row count after its INSERT.
-// The caller can retry on ErrConflict to read the winning user.
+// BootstrapAdmin is the single-caller bootstrap. SEC-5a: 100
+// concurrent POST /api/v1/setup calls must produce exactly one
+// admin key, with the rest seeing ErrConflict. The race-free
+// path is INSERT ... ON CONFLICT (email) DO NOTHING: SQLite
+// resolves the conflict at write time, so even under a
+// DEFERRED transaction the second writer's INSERT silently
+// drops and RowsAffected returns 0. We then check the rows-
+// affected count and return ErrConflict for the loser.
+//
+// The previous implementation used a SELECT COUNT(*) then a
+// plain INSERT; under DEFERRED locking both writers could read
+// the same empty count and both insert successfully, minting
+// two admin keys.
 func (s *SQLite) BootstrapAdmin(ctx context.Context, u *models.User, key *models.APIKey) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -414,20 +422,23 @@ func (s *SQLite) BootstrapAdmin(ctx context.Context, u *models.User, key *models
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var n int
-	if err := tx.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM users WHERE id != 'api'`).Scan(&n); err != nil {
-		return fmt.Errorf("bootstrap count users: %w", err)
-	}
-	if n > 0 {
-		return ErrConflict
-	}
-	if _, err := tx.ExecContext(ctx,
+	res, err := tx.ExecContext(ctx,
 		`INSERT INTO users (id, email, name, role, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?, ?)
+		 ON CONFLICT (email) DO NOTHING`,
 		u.ID, u.Email, u.Name, u.Role, u.CreatedAt, u.UpdatedAt,
-	); err != nil {
+	)
+	if err != nil {
 		return fmt.Errorf("bootstrap insert user: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("bootstrap rows affected: %w", err)
+	}
+	if n == 0 {
+		// Another caller won the race. Roll back the key insert
+		// (we never get there) and surface a typed conflict.
+		return ErrConflict
 	}
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO api_keys (id, user_id, name, key_hash, key_prefix, role, created_at)
