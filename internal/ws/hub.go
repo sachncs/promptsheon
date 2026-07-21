@@ -182,15 +182,15 @@ func (h *Hub) HandleSSE(w http.ResponseWriter, r *http.Request) {
 
 // LogStreamer wraps slog.Logger to stream logs via SSE.
 type LogStreamer struct {
-	logger *slog.Logger
-	hub    *Hub
+	Logger *slog.Logger
+	Hub    *Hub
 }
 
 // NewLogStreamer creates a new log streamer.
 func NewLogStreamer(logger *slog.Logger, hub *Hub) *LogStreamer {
 	return &LogStreamer{
-		logger: logger,
-		hub:    hub,
+		Logger: logger,
+		Hub:    hub,
 	}
 }
 
@@ -198,7 +198,7 @@ func NewLogStreamer(logger *slog.Logger, hub *Hub) *LogStreamer {
 func (ls *LogStreamer) StreamHandler(next slog.Handler) slog.Handler {
 	return &streamHandler{
 		next:  next,
-		hub:   ls.hub,
+		hub:   ls.Hub,
 		attrs: make([]slog.Attr, 0),
 	}
 }

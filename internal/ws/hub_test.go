@@ -193,10 +193,10 @@ func TestNewLogStreamer(t *testing.T) {
 	if streamer == nil {
 		t.Fatal("expected streamer to be non-nil")
 	}
-	if streamer.logger != logger {
+	if streamer.Logger != logger {
 		t.Error("expected logger to be set")
 	}
-	if streamer.hub != hub {
+	if streamer.Hub != hub {
 		t.Error("expected hub to be set")
 	}
 }
