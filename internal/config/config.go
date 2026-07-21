@@ -258,6 +258,11 @@ func (c *Config) Validate() error {
 // means "all interfaces". Refusing ":8080" is the whole point of
 // this check: ":8080" is the dangerous default that allows any
 // network-adjacent caller to hit /api/v1/setup.
+// IsLoopbackAddr reports whether addr is a loopback bind. Exported so
+// the LLM registry can validate PROMPTSHEON_*_BASE_URL against the
+// same definition of "loopback" the rest of the config uses.
+func IsLoopbackAddr(addr string) bool { return isLoopbackAddr(addr) }
+
 func isLoopbackAddr(addr string) bool {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {

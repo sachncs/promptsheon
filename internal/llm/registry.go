@@ -2,6 +2,7 @@ package llm
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"sync"
 )
@@ -120,4 +121,36 @@ func (r *Registry) LoadFromEnv() string {
 	}
 
 	return os.Getenv("PROMPTSHEON_LLM_PROVIDER")
+}
+
+// ValidateBaseURLs enforces SEC-LLM-1: PROMPTSHEON_OPENAI_BASE_URL
+// and PROMPTSHEON_ANTHROPIC_BASE_URL may be http:// only when the
+// daemon is bound to a loopback address. Otherwise the URL must
+// be https:// (or unset, in which case the provider's default
+// applies). bindAddr is the value of cfg.Addr; isLoopback tells
+// us whether bindAddr is a loopback bind. The check runs at
+// startup, before any provider call, so a misconfigured base URL
+// fails fast.
+func (r *Registry) ValidateBaseURLs(bindAddr string, isLoopback func(string) bool) error {
+	if isLoopback == nil {
+		isLoopback = func(string) bool { return true }
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for name, cfg := range r.configs {
+		if cfg.BaseURL == "" {
+			continue
+		}
+		u, err := url.Parse(cfg.BaseURL)
+		if err != nil {
+			return fmt.Errorf("provider %q base url: %w", name, err)
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			return fmt.Errorf("provider %q base url scheme %q is not http or https", name, u.Scheme)
+		}
+		if u.Scheme == "http" && !isLoopback(bindAddr) {
+			return fmt.Errorf("provider %q base url %q uses http but daemon binds %q (non-loopback); http base URLs are only allowed on loopback binds", name, cfg.BaseURL, bindAddr)
+		}
+	}
+	return nil
 }
