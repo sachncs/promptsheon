@@ -984,14 +984,15 @@ func scanNotificationGroup(row scannable) (*models.NotificationGroupRecord, erro
 func (s *SQLite) SaveWebhookEndpoint(ctx context.Context, ep *models.WebhookEndpointRecord) error {
 	events := strings.Join(ep.Events, ",")
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO webhook_endpoints (id, url, secret, events, active, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO webhook_endpoints (id, url, secret, secret_ciphertext, events, active, created_at)
+		VALUES (?, ?, '', ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			url = excluded.url,
-			secret = excluded.secret,
+			secret = '',
+			secret_ciphertext = excluded.secret_ciphertext,
 			events = excluded.events,
 			active = excluded.active`,
-		ep.ID, ep.URL, ep.Secret, events, ep.Active, ep.CreatedAt,
+		ep.ID, ep.URL, ep.SecretCiphertext, events, ep.Active, ep.CreatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("save webhook endpoint: %w", err)
