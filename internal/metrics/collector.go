@@ -9,9 +9,10 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/buildinfo"
+	bi "github.com/sachncs/promptsheon/internal/buildinfo"
 )
 
 // Counter is a monotonically increasing metric.
@@ -197,7 +198,31 @@ type Collector struct {
 
 	// Hallucination score histogram
 	HallucinationScores *Histogram
+
+	// Pipeline drop counters (OBS-7). These reflect the
+	// number of entries that the audit / trace pipeline
+	// rejected because its in-process queue was full. The
+	// values are written from outside via SetAuditDropped
+	// and SetTraceDropped; the collector reads them on every
+	// scrape.
+	auditDropped atomic.Int64
+	traceDropped atomic.Int64
 }
+
+// SetAuditDropped updates the cumulative audit-pipeline drop
+// count. The collector exposes this through /metrics so the
+// dashboard can alert on sustained drops.
+func (c *Collector) SetAuditDropped(n int64) { c.auditDropped.Store(n) }
+
+// SetTraceDropped updates the cumulative trace-pipeline drop
+// count.
+func (c *Collector) SetTraceDropped(n int64) { c.traceDropped.Store(n) }
+
+// AuditDropped returns the latest audit drop count.
+func (c *Collector) AuditDropped() int64 { return c.auditDropped.Load() }
+
+// TraceDropped returns the latest trace drop count.
+func (c *Collector) TraceDropped() int64 { return c.traceDropped.Load() }
 
 // Gauge is a metric that can go up and down.
 type Gauge struct {
@@ -255,7 +280,7 @@ func (c *Collector) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		// Use the live build version so the Prometheus scrape
 		// always matches the version /api/v1/version reports.
-		w.Header().Set("Content-Type", "text/plain; version="+buildinfo.Version)
+		w.Header().Set("Content-Type", "text/plain; version="+bi.Version)
 		_, _ = fmt.Fprint(w, c.prometheusFormat())
 	})
 }
@@ -271,6 +296,15 @@ type Summary struct {
 		TotalErrors   int64   `json:"total_errors"`
 		ErrorRate     float64 `json:"error_rate"`
 	} `json:"api_metrics"`
+	// PipelineMetrics exposes the audit + trace back-pressure
+	// counters. OBS-7: these used to be tracked only inside the
+	// API server's atomic.Int64; the metrics collector now
+	// receives them via SetAuditDropped / SetTraceDropped so the
+	// values surface in /metrics and /api/v1/metrics/summary.
+	PipelineMetrics struct {
+		AuditDropped int64 `json:"audit_dropped"`
+		TraceDropped int64 `json:"trace_dropped"`
+	} `json:"pipeline_metrics"`
 	LLMMetrics struct {
 		TotalCalls   int64   `json:"total_calls"`
 		TotalTokens  int64   `json:"total_tokens"`
@@ -357,6 +391,13 @@ func (c *Collector) GetSummary() *Summary {
 	s.HallucinationMetrics.AvgScore = c.HallucinationScores.Avg()
 	s.HallucinationMetrics.P95Score = c.HallucinationScores.P95()
 
+	// OBS-7 / OBS-1b: surface the audit-pipeline drop and trace-pipeline
+	// drop counts as summary fields so /api/v1/metrics/summary can
+	// report them. The Prometheus exposition is emitted by
+	// prometheusFormat below.
+	s.PipelineMetrics.AuditDropped = c.auditDropped.Load()
+	s.PipelineMetrics.TraceDropped = c.traceDropped.Load()
+
 	return s
 }
 
@@ -416,6 +457,9 @@ func (c *Collector) prometheusFormat() string {
 
 	writeCounter("promptsheon_guardrail_violations_total", "Guardrail violations", c.GuardrailViolations.Value())
 	writeCounter("promptsheon_guardrail_blocks_total", "Guardrail blocks", c.GuardrailBlocks.Value())
+	writeCounter("promptsheon_audit_dropped_total", "Audit entries dropped because the worker queue was full", float64(c.auditDropped.Load()))
+	writeCounter("promptsheon_trace_dropped_total", "Trace spans dropped because the worker queue was full", float64(c.traceDropped.Load()))
+
 	writeCounter("promptsheon_guardrail_passes_total", "Guardrail passes", c.GuardrailPasses.Value())
 
 	writeHistogram("promptsheon_hallucination_scores", "Hallucination scores", c.HallucinationScores)

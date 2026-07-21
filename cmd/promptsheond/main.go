@@ -600,6 +600,26 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 
 	api.StartOAuthStateJanitor(rootCtx)
 
+	// OBS-1b: surface trace-pipeline drop counts to the metrics
+	// collector every 10 s. The trace store lives behind the
+	// Multi tracer; the SQLite implementation is reached via
+	// type assertion so a future secondary backend doesn't
+	// require new wiring here.
+	if sqlite, ok := tracer.(*trace.SQLite); ok {
+		go func() {
+			ticker := time.NewTicker(10 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-rootCtx.Done():
+					return
+				case <-ticker.C:
+					collector.SetTraceDropped(sqlite.Dropped())
+				}
+			}
+		}()
+	}
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
