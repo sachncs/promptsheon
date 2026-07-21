@@ -227,7 +227,7 @@ func (l *Limiter) Middleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		key := extractKey(r)
+		key := ExtractKey(r)
 		if !l.Allow(key) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Retry-After", "60")
@@ -239,7 +239,9 @@ func (l *Limiter) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-// extractKey derives the rate-limit bucket key from the request.
+// ExtractKey derives the rate-limit bucket key from the request.
+// Exposed so the api server's rateLimit wrapper can call it
+// directly without re-implementing the user/IP precedence.
 //
 // SECURITY: the previous implementation keyed off the raw bearer token
 // value, which meant an attacker spamming with random tokens could grow
@@ -254,7 +256,7 @@ func (l *Limiter) Middleware(next http.Handler) http.Handler {
 // networks. Without a configured list, forwarded headers are
 // ignored (the request's direct RemoteAddr is used) so an exposed
 // daemon cannot be tricked into per-attacker buckets.
-func extractKey(r *http.Request) string {
+func ExtractKey(r *http.Request) string {
 	if u, ok := auth.UserFromContext(r.Context()); ok && u != nil && u.ID != "" {
 		return "user:" + u.ID
 	}
