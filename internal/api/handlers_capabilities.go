@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -76,7 +77,11 @@ func (s *Server) handleGetWorkspace(w http.ResponseWriter, r *http.Request) erro
 	id := r.PathValue("id")
 	wksp, err := s.db.GetWorkspace(r.Context(), id)
 	if err != nil {
-		return ErrNotFound
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		// BUG-4: distinguish DB failures from missing rows.
+		return &HTTPError{Status: http.StatusInternalServerError, Message: "workspace lookup failed"}
 	}
 	writeJSON(w, http.StatusOK, wksp)
 	return nil
