@@ -127,9 +127,11 @@ func LoadConfigFromEnv() Config {
 			cfg.Burst = n
 		}
 	}
-	// If rate is 0, set burst to a large value so the bucket never blocks.
+	// SEC-RL-2: rate=0 means rate limiting is disabled. Reset
+	// Burst to 0 so the bucket is fully open; callers wanting a
+	// large burst must set PROMPTSHEON_RATE_BURST explicitly.
 	if cfg.Rate == 0 {
-		cfg.Burst = 1_000_000
+		cfg.Burst = 0
 	}
 	return cfg
 }
