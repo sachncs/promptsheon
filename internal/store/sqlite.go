@@ -358,17 +358,16 @@ func (s *SQLite) CreateUser(ctx context.Context, u *models.User) error {
 }
 
 // BootstrapAdmin atomically inserts the first admin user and
-// returns ErrConflict if any user row already exists. The check
-// and the insert run in a single transaction with a row-level
-// INSERT-then-SELECT, so two concurrent callers cannot both
-// succeed: SQLite serialises the writes and the second caller
-// sees a non-zero row count after its INSERT. The caller can
-// retry on ErrConflict to read the winning user.
+// returns ErrConflict if any non-system user row already
+// exists. The system user 'api' (seeded by migration 057) is
+// ignored so the bootstrap endpoint stays available even when
+// the audit FK has been satisfied.
 //
-// The previous handler-bootstrap path performed ListUsers
-// followed by CreateUser without a transaction; two concurrent
-// callers could each see an empty users table and both create
-// an admin. The new path is the SEC-5 fix.
+// The check and the insert run in a single transaction with a
+// row-level INSERT-then-SELECT, so two concurrent callers
+// cannot both succeed: SQLite serialises the writes and the
+// second caller sees a non-zero row count after its INSERT.
+// The caller can retry on ErrConflict to read the winning user.
 func (s *SQLite) BootstrapAdmin(ctx context.Context, u *models.User, key *models.APIKey) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -377,7 +376,8 @@ func (s *SQLite) BootstrapAdmin(ctx context.Context, u *models.User, key *models
 	defer func() { _ = tx.Rollback() }()
 
 	var n int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&n); err != nil {
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM users WHERE id != 'api'`).Scan(&n); err != nil {
 		return fmt.Errorf("bootstrap count users: %w", err)
 	}
 	if n > 0 {
@@ -438,7 +438,24 @@ func (s *SQLite) ListUsers(ctx context.Context) ([]*models.User, error) {
 }
 
 func (s *SQLite) UpdateUser(ctx context.Context, u *models.User) error {
-	result, err := s.db.ExecContext(ctx,
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("update user begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Look up the existing role so we only revoke API keys when
+	// the role actually changed. Without this, every PUT on the
+	// user record would invalidate live keys.
+	var oldRole string
+	if err := tx.QueryRowContext(ctx, `SELECT role FROM users WHERE id=?`, u.ID).Scan(&oldRole); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("user not found: %s", u.ID)
+		}
+		return fmt.Errorf("update user lookup: %w", err)
+	}
+
+	result, err := tx.ExecContext(ctx,
 		`UPDATE users SET email=?, name=?, role=?, updated_at=? WHERE id=?`,
 		u.Email, u.Name, u.Role, u.UpdatedAt, u.ID,
 	)
@@ -449,17 +466,46 @@ func (s *SQLite) UpdateUser(ctx context.Context, u *models.User) error {
 	if n == 0 {
 		return fmt.Errorf("user not found: %s", u.ID)
 	}
+
+	// SEC-6: when the user's role changes (typically a demotion
+	// from admin to reader), revoke every non-expired, non-revoked
+	// API key issued to that user. The holder's existing session
+	// tokens stop working on the next request because the
+	// authenticator re-reads the role on every call.
+	if oldRole != u.Role {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE api_keys SET revoked = 1 WHERE user_id = ? AND revoked = 0`,
+			u.ID,
+		); err != nil {
+			return fmt.Errorf("revoke stale api keys: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("update user commit: %w", err)
+	}
 	return nil
 }
 
 func (s *SQLite) DeleteUser(ctx context.Context, id string) error {
-	result, err := s.db.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("delete user begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `UPDATE api_keys SET revoked = 1 WHERE user_id = ? AND revoked = 0`, id); err != nil {
+		return fmt.Errorf("revoke keys on delete: %w", err)
+	}
+	result, err := tx.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id)
 	if err != nil {
 		return fmt.Errorf("delete user: %w", err)
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
 		return fmt.Errorf("user not found: %s", id)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("delete user commit: %w", err)
 	}
 	return nil
 }
