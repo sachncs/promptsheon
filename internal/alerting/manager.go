@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 	"sync"
 	"time"
 
@@ -403,7 +404,22 @@ func (m *Manager) getNotificationChannels(rule *AlertRule) []string {
 	if len(groups) == 0 {
 		return []string{channelWebhook}
 	}
-	return groups
+	// DB-10b: dedupe and sort on the manager side. The store
+	// also dedupes (DISTINCT in the json_each SQL), but we
+	// cannot trust every storage backend to do that; the
+	// alerting manager is the last mile before dispatch and
+	// must guarantee a stable, unique list.
+	seen := make(map[string]struct{}, len(groups))
+	out := make([]string, 0, len(groups))
+	for _, g := range groups {
+		if _, ok := seen[g]; ok {
+			continue
+		}
+		seen[g] = struct{}{}
+		out = append(out, g)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // AddNotificationGroup adds a notification group.
