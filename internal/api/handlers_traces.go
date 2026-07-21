@@ -1,6 +1,8 @@
 package api
 
 import (
+	"database/sql"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -70,7 +72,15 @@ func (s *Server) handleGetTraceTree(w http.ResponseWriter, r *http.Request) erro
 	traceID := r.PathValue("trace_id")
 	spans, err := s.spanStore.GetTraceTree(r.Context(), traceID)
 	if err != nil {
-		return ErrNotFound
+		// BUG-25: distinguish DB errors from empty trace IDs.
+		// The previous implementation conflated "trace missing"
+		// (404) with "database unreachable" (5xx) by always
+		// returning 404; operators couldn't tell why a known
+		// trace stopped appearing.
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return &HTTPError{Status: http.StatusInternalServerError, Message: "trace store error"}
 	}
 	if len(spans) == 0 {
 		return ErrNotFound
