@@ -72,8 +72,10 @@ type Approval struct {
 // vote twice on the same Release.
 var ErrDuplicateIdentity = errors.New("approval: duplicate voter")
 
-// ErrCreatorVoted is returned by VerifySeparationOfDuties when the
-// Release creator is found in the votes list.
+// ErrCreatorVoted is returned by MakerCheckerPolicy.Evaluate when
+// the Release creator is found in the votes list. The policy
+// owns the separation-of-duties check; no separate helper is
+// required.
 var ErrCreatorVoted = errors.New("approval: creator voted on own release (separation of duties)")
 
 // ErrQuorumNotSatisfied is returned when the Policy reports the
@@ -187,6 +189,6 @@ func (p MakerCheckerPolicy) Evaluate(votes []Vote) (State, bool, error) {
 }
 
 // VerifySeparationOfDuties was removed in SEC-1b. MakerCheckerPolicy
-// now self-enforces against the Creator field at Evaluate time;
+// self-enforces against the Creator field at Evaluate time;
 // callers should populate Creator on the policy before passing
 // it to Evaluate.
