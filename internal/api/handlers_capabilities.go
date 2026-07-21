@@ -452,13 +452,13 @@ func (s *Server) handleListExecutions(w http.ResponseWriter, r *http.Request) er
 	return nil
 }
 
-// errProviderMissing is the sentinel returned when the
-// invoke.Invoker could not find a provider for the requested
-// model. classifyInvokeError maps it to 502 Bad Gateway with a
-// provider_missing detail so operators can distinguish "no
-// provider" from "provider failed" without reading the daemon
-// log.
-var errProviderMissing = errors.New("invoke: provider missing")
+// errProviderMissing is an alias for the executor's typed
+// sentinel. We map the executor's ErrProviderMissing (returned
+// by the daemon when no provider is registered for the
+// requested model) to 502 Bad Gateway with a provider_missing
+// detail so operators can distinguish "no provider" from
+// "provider failed" without reading the daemon log. BUG-19.
+var errProviderMissing = executor.ErrProviderMissing
 
 func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) error {
 	capabilityVersionID := r.PathValue("version_id")
