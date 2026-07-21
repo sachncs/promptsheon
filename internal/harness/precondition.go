@@ -11,14 +11,13 @@ import (
 )
 
 // EnvAllowlist is the set of environment variables passed through
-// to a precondition command. Anything else is scrubbed. The list
-// is intentionally tiny: PATH (so sh finds /usr/bin), HOME (so
-// ~-relative paths work), LANG (for locale-correct output
-// decoding), and TZ (so timestamps are predictable). Operators
-// needing more can extend the list at startup via
-// SetEnvAllowlist; the precondition runner reads the global
-// list on every invocation, so a SetEnvAllowlist call before
-// constructing the runner takes effect immediately.
+// to a precondition command. The list is intentionally tiny: PATH
+// (so sh finds /usr/bin), HOME (so ~-relative paths work), LANG
+// (for locale-correct output decoding), and TZ (so timestamps are
+// predictable). The denylist below runs before the allowlist: a
+// variable on the allowlist that ALSO matches a denylist pattern
+// is still dropped, so a future extension of the allowlist cannot
+// accidentally re-introduce a credential leak. SEC-2a.
 var envAllowlist = []string{"PATH", "HOME", "LANG", "LC_ALL", "TZ"}
 
 // envDenylist is the SEC-2a inverted form: rather than listing
@@ -45,13 +44,10 @@ var envDenylist = []string{
 var envDenylistSuffixes = []string{"_KEY", "_TOKEN", "_SECRET", "_PASSWORD", "_PASS", "_API_KEY", "_TOKEN_ID"}
 
 // scrubEnv returns a copy of os.Environ() with every variable
-// whose name matches the denylist removed. The allowlist still
-// wins for keys explicitly added via SetEnvAllowlist.
+// whose name matches the denylist removed. The allowlist is
+// checked first for fast-path and readability, but a name that
+// matches BOTH allowlist and denylist is dropped (denylist wins).
 func scrubEnv() []string {
-	allow := make(map[string]struct{}, len(envAllowlist))
-	for _, k := range envAllowlist {
-		allow[k] = struct{}{}
-	}
 	denyPrefix := make(map[string]struct{}, len(envDenylist))
 	for _, p := range envDenylist {
 		denyPrefix[p] = struct{}{}
@@ -60,6 +56,10 @@ func scrubEnv() []string {
 	for _, s := range envDenylistSuffixes {
 		denySuffix[s] = struct{}{}
 	}
+	allow := make(map[string]struct{}, len(envAllowlist))
+	for _, k := range envAllowlist {
+		allow[k] = struct{}{}
+	}
 	var out []string
 	for _, kv := range os.Environ() {
 		i := strings.IndexByte(kv, '=')
@@ -67,10 +67,6 @@ func scrubEnv() []string {
 			continue
 		}
 		name := kv[:i]
-		if _, ok := allow[name]; ok {
-			out = append(out, kv)
-			continue
-		}
 		drop := false
 		for p := range denyPrefix {
 			if strings.HasPrefix(name, p) {
@@ -78,16 +74,18 @@ func scrubEnv() []string {
 				break
 			}
 		}
-		if drop {
-			continue
-		}
-		for s := range denySuffix {
-			if strings.HasSuffix(name, s) {
-				drop = true
-				break
+		if !drop {
+			for s := range denySuffix {
+				if strings.HasSuffix(name, s) {
+					drop = true
+					break
+				}
 			}
 		}
 		if drop {
+			continue
+		}
+		if _, ok := allow[name]; !ok {
 			continue
 		}
 		out = append(out, kv)
