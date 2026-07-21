@@ -37,7 +37,7 @@ All domain/dead-code findings. Fast forward: delete, don't keep around "for comp
 ## Approval
 
 - [x] **DEAD-4** Delete `Repository.DeleteApproval` from interface + SQLite impl.
-- [ ] **SEC-1** Make `MakerCheckerPolicy` enforce separation-of-duties internally. (See Phase 1.)
+- [x] **SEC-1** Make `MakerCheckerPolicy` enforce separation-of-duties internally. (See Phase 1.)
 - [ ] **DOC-1** Fix the doc comment at `approval.go:152-155` to describe the actual fail-closed behaviour.
 
 ## Harness
@@ -53,7 +53,7 @@ All domain/dead-code findings. Fast forward: delete, don't keep around "for comp
 
 ## Eval
 
-- [ ] **SEC-3** Make `JSONSchema.ScoreCase` reject unsupported keywords. (See Phase 1.)
+- [x] **SEC-3** Make `JSONSchema.ScoreCase` reject unsupported keywords. (See Phase 1.)
 
 ## Manifest
 

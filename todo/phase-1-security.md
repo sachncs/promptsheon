@@ -86,7 +86,7 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
 
 ## Audit chain integrity
 
-- [ ] **SEC-CHAIN-1** Have `VerifyAuditChain` cross-check the final row count and `entry_hash` against `audit_chain_state`; report tampering if they diverge.
+- [x] **SEC-CHAIN-1** Have `VerifyAuditChain` cross-check the final row count and `entry_hash` against `audit_chain_state`; report tampering if they diverge.
   - **Where**: `internal/store/sqlite.go:190-214`.
   - **Accept**: Deleting the last 5 audit rows and re-running the verifier returns "chain tail mismatch".
 
@@ -104,7 +104,7 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
 
 ## Rate limiter hardening
 
-- [ ] **SEC-RL-1** Replace the IP-keyed limiter with a per-user-or-IP key (user when authenticated, IP otherwise). Bucket size is per-key.
+- [x] **SEC-RL-1** Replace the IP-keyed limiter with a per-user-or-IP key (user when authenticated, IP otherwise). Bucket size is per-key.
   - **Where**: `internal/ratelimit/ratelimit.go:240-271` and `internal/api/server.go:783-794`.
 
 - [x] **SEC-RL-2** Treat `RATE_LIMIT_RATE=0` as "disabled" rather than "1,000,000 burst".
@@ -119,21 +119,21 @@ All security findings, atomic. Fast forward: no deprecation shims; old code path
 - [x] **SEC-16b** Attach the SBOM to the GitHub Release (not just the workflow artefact).
   - **Where**: `.goreleaser.yml` and `.github/workflows/ci.yaml:179-203`.
 
-- [ ] **SEC-16c** Add SLSA provenance attestation via `slsa-github-generator`.
+- [x] **SEC-16c** Add SLSA provenance attestation via `slsa-github-generator`.
   - **Where**: `.github/workflows/ci.yaml:205-225`.
 
 ## Container
 
-- [ ] **SEC-CONTAINER-1** Add OCI labels to the Dockerfile (`org.opencontainers.image.source`, `.revision`, `.created`, `.version`).
+- [x] **SEC-CONTAINER-1** Add OCI labels to the Dockerfile (`org.opencontainers.image.source`, `.revision`, `.created`, `.version`).
   - **Where**: `Dockerfile`.
   - **Accept**: `docker inspect promptsheon` shows the labels.
 
-- [ ] **SEC-CONTAINER-2** Drop `wget` from the runtime image; use a Go-based healthcheck binary or `curl --fail`.
+- [x] **SEC-CONTAINER-2** Drop `wget` from the runtime image; use a Go-based healthcheck binary or `curl --fail`.
   - **Where**: `Dockerfile:28, 48-49`.
 
 ## LLM provider base URL
 
-- [ ] **SEC-LLM-1** Allow `PROMPTSHEON_OPENAI_BASE_URL` and `PROMPTSHEON_ANTHROPIC_BASE_URL` to be `http://` only when the daemon is bound to a loopback address; reject otherwise.
+- [x] **SEC-LLM-1** Allow `PROMPTSHEON_OPENAI_BASE_URL` and `PROMPTSHEON_ANTHROPIC_BASE_URL` to be `http://` only when the daemon is bound to a loopback address; reject otherwise.
   - **Where**: `internal/llm/openai.go:28-36`, `internal/llm/anthropic.go:21-29`, `cmd/promptsheond/main.go:cfg.Validate`.
   - **Accept**: Setting an `http://` base URL on a non-loopback bind fails startup.
 

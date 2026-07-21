@@ -79,7 +79,7 @@ All API findings. Fast forward: replace, don't deprecate.
 
 ## Audit on auth-relevant mutations
 
-- [ ] **SEC-9a** Add audit entries for API key mint, revoke, notification-group add, webhook create/delete, OAuth callback success. (See Phase 1.)
+- [x] **SEC-9a** Add audit entries for API key mint, revoke, notification-group add, webhook create/delete, OAuth callback success. (See Phase 1.)
 
 ## Manager-not-configured consistency
 
