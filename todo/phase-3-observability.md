@@ -92,8 +92,9 @@ All observability findings. Fast forward: replace dead surfaces, no deprecation 
 - [ ] **OPS-3** Have `RetentionManager.Enforce` return errors so callers can log them and surface a metric.
   - **Where**: `internal/observability/retention.go:137, 149`.
 
-- [ ] **OPS-4** Move retention to a separate `*sql.DB` so cleanup never blocks request-path writes.
+- [x] **OPS-4** Move retention to a separate `*sql.DB` so cleanup never blocks request-path writes.
   - **Where**: `cmd/promptsheond/main.go:195-204, 218-220`.
+  - Shipped in commit `15374e0 fix(daemon): DB-CONC-2 — retention DB outlives buildServer`. The dedicated `*sql.DB` is opened in `main()` (not `buildServer`) and `defer`-closed at main() level so the handle lives as long as the daemon; the background retention loop can keep ticking.
 
 - [ ] **OBS-RET-1** Actually delete audit rows older than `AuditTTL` after verifying the chain suffix.
   - **Where**: `internal/observability/retention.go:76-150`.
