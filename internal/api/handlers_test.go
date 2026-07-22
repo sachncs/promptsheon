@@ -754,6 +754,14 @@ func (m *mockRepo) SaveVaultState(_ context.Context, _ *models.VaultState) error
 	return nil
 }
 
+func (m *mockRepo) GetWSNextID(_ context.Context) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockRepo) SetWSNextID(_ context.Context, _ int64) error {
+	return nil
+}
+
 func (m *mockRepo) ListEvalResultsForRun(_ context.Context, runID string) ([]harness.EvalResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -98,6 +98,11 @@ type Repository interface {
 	GetVaultState(ctx context.Context) (*models.VaultState, error)
 	SaveVaultState(ctx context.Context, vs *models.VaultState) error
 
+	// WS State (singleton). Persists the SSE hub's nextID so
+	// client IDs survive restarts. OBS-LOG-3.
+	GetWSNextID(ctx context.Context) (int64, error)
+	SetWSNextID(ctx context.Context, n int64) error
+
 	// Lifecycle
 	Ping(ctx context.Context) error
 	Close() error

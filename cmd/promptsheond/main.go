@@ -127,8 +127,14 @@ func main() {
 	defer logHub.Stop()
 
 	logger := setupLogger(&cfg, logHub)
-
 	db := openDB(&cfg, logger)
+	// OBS-LOG-3: load the persisted SSE client-id counter
+	// once the DB is open. The hub runs with nextID=1 until
+	// SetStore completes; the next HandleSSE call gets the
+	// correct value.
+	if err := logHub.SetStore(rootCtx, db); err != nil {
+		logger.Warn("ws: load nextID failed; using process-local counter", "err", err)
+	}
 	defer func() {
 		if db != nil {
 			_ = db.Close()

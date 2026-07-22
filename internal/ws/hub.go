@@ -71,6 +71,15 @@ func (f LogFilter) matches(entry *LogEntry) bool {
 	return true
 }
 
+// HubStore is the persistence surface the Hub needs for
+// OBS-LOG-3 (nextID restart-resilience). It matches a subset of
+// store.Repository methods so tests don't have to satisfy the
+// full Repository interface.
+type HubStore interface {
+	GetWSNextID(ctx context.Context) (int64, error)
+	SetWSNextID(ctx context.Context, n int64) error
+}
+
 // Hub manages SSE connections for log streaming.
 type Hub struct {
 	clients    map[string]*Client
@@ -79,13 +88,16 @@ type Hub struct {
 	unregister chan *Client
 	mu         sync.RWMutex
 	logger     *slog.Logger
-	nextID     int
+	nextID     int64
 	stop       chan struct{}
 	done       chan struct{}
 	dropped    atomic.Int64
+	store      HubStore // nil = no persistence (legacy behaviour)
 }
 
-// NewHub creates a new SSE hub.
+// NewHub creates a new SSE hub. The store is optional; if nil,
+// the hub uses process-local counters and the nextID resets on
+// restart. OBS-LOG-3 wires a real store via SetStore.
 func NewHub(logger *slog.Logger) *Hub {
 	return &Hub{
 		clients:    make(map[string]*Client),
@@ -96,6 +108,27 @@ func NewHub(logger *slog.Logger) *Hub {
 		stop:       make(chan struct{}),
 		done:       make(chan struct{}),
 	}
+}
+
+// SetStore wires a persistence layer so the hub's nextID
+// survives process restarts. The hub loads the persisted value
+// synchronously so callers see a correct nextID from the first
+// HandleSSE call.
+func (h *Hub) SetStore(ctx context.Context, s HubStore) error {
+	h.store = s
+	if s == nil {
+		return nil
+	}
+	n, err := s.GetWSNextID(ctx)
+	if err != nil {
+		return err
+	}
+	h.mu.Lock()
+	if n > h.nextID {
+		h.nextID = n
+	}
+	h.mu.Unlock()
+	return nil
 }
 
 // Run starts the hub's main loop.
@@ -157,6 +190,18 @@ func (h *Hub) Stop() {
 		close(h.stop)
 	}
 	<-h.done
+	// OBS-LOG-3: persist the final nextID so the next daemon
+	// boot continues from the same point.
+	if h.store != nil {
+		h.mu.RLock()
+		n := h.nextID
+		h.mu.RUnlock()
+		// Use a fresh context for persistence so a cancelled
+		// request context doesn't block the save.
+		if err := h.store.SetWSNextID(context.Background(), n); err != nil && h.logger != nil {
+			h.logger.Warn("ws: persist nextID failed", "err", err)
+		}
+	}
 }
 
 // BroadcastLog sends a log entry to all connected clients. The
