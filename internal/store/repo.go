@@ -47,7 +47,7 @@ type Repository interface {
 	AppendAudit(ctx context.Context, entry *models.AuditEntry) error
 	ListAudit(ctx context.Context, filter *models.AuditFilter) ([]*models.AuditEntry, error)
 	ExportAudit(ctx context.Context, filter *models.AuditFilter) ([]*models.AuditEntry, error)
-	VerifyAuditChain(ctx context.Context) (bool, string, error)
+	VerifyAuditChain(ctx context.Context) (*AuditVerifyResult, error)
 
 	// Provider Keys (LLM API key vaulting)
 	SaveProviderKey(ctx context.Context, pk *models.ProviderKey) error

@@ -137,7 +137,7 @@ func TestE2E_AuditChain(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("verify audit: status %d body %s", resp.StatusCode, body)
 	}
-	if !strings.Contains(string(body), `"valid":true`) {
+	if !strings.Contains(string(body), `"ok":true`) {
 		t.Fatalf("audit chain invalid: %s", body)
 	}
 }
