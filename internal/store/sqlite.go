@@ -215,7 +215,12 @@ type auditPageResult struct {
 	err          error
 }
 
-func (s *SQLite) VerifyAuditChain(ctx context.Context) (*AuditVerifyResult, error) {
+// VerifyAuditChainOnDB runs the chain walk against an arbitrary
+// *sql.DB. Used by RetentionManager to verify the chain before
+// archiving audit rows. The function is package-level so the
+// observability package can call it without importing the
+// store's Repository surface.
+func VerifyAuditChainOnDB(ctx context.Context, db *sql.DB) (*AuditVerifyResult, error) {
 	const pageSize = 1000
 	var prevHash string
 	var lastRowID int64
@@ -225,7 +230,7 @@ func (s *SQLite) VerifyAuditChain(ctx context.Context) (*AuditVerifyResult, erro
 			return nil, ctx.Err()
 		default:
 		}
-		res := s.verifyAuditPage(ctx, prevHash, lastRowID, pageSize)
+		res := verifyAuditPageOnDB(ctx, db, prevHash, lastRowID, pageSize)
 		if res.err != nil {
 			return nil, res.err
 		}
@@ -240,14 +245,9 @@ func (s *SQLite) VerifyAuditChain(ctx context.Context) (*AuditVerifyResult, erro
 	}
 
 	// BUG-3 / SEC-CHAIN-1: cross-check against audit_chain_state.
-	// The chain walk only sees committed rows; if the operator
-	// deleted the tail (e.g. via DELETE without updating the
-	// state row), the walker finishes silently on a smaller
-	// window. Compare both the highest rowid AND the final
-	// entry_hash to the state pointer; any mismatch is tampering.
 	var stateLastRowID int64
 	var stateLastHash string
-	if err := s.db.QueryRowContext(ctx,
+	if err := db.QueryRowContext(ctx,
 		`SELECT last_rowid, last_hash FROM audit_chain_state LIMIT 1`).Scan(&stateLastRowID, &stateLastHash); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("audit chain state: %w", err)
@@ -278,6 +278,57 @@ func (s *SQLite) VerifyAuditChain(ctx context.Context) (*AuditVerifyResult, erro
 	}, nil
 }
 
+func (s *SQLite) VerifyAuditChain(ctx context.Context) (*AuditVerifyResult, error) {
+	return VerifyAuditChainOnDB(ctx, s.db)
+}
+
+func verifyAuditPageOnDB(ctx context.Context, db *sql.DB, prevHash string, afterRowID int64, limit int) auditPageResult {
+	const q = `SELECT rowid, id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str
+	           FROM audit_entries
+	           WHERE rowid > ?
+	           ORDER BY rowid ASC
+	           LIMIT ?`
+	rows, err := db.QueryContext(ctx, q, afterRowID, limit)
+	if err != nil {
+		return auditPageResult{err: fmt.Errorf("audit chain page query: %w", err)}
+	}
+	defer func() { _ = rows.Close() }()
+	var nextPrev string
+	var lastRowID int64
+	for rows.Next() {
+		var rowID int64
+		var id, userID, action, resource, detailsJSON, storedPrev, storedHash, timestampStr string
+		var ts time.Time
+		if err := rows.Scan(&rowID, &id, &userID, &action, &resource, &detailsJSON, &ts, &storedPrev, &storedHash, &timestampStr); err != nil {
+			return auditPageResult{err: fmt.Errorf("audit chain scan: %w", err)}
+		}
+		if storedPrev != prevHash {
+			return auditPageResult{
+				ok:     false,
+				reason: fmt.Sprintf("chain break at entry %s: expected prev_hash %q, got %q", id, prevHash, storedPrev),
+			}
+		}
+		if timestampStr == "" {
+			timestampStr = ts.UTC().Format(time.RFC3339Nano)
+		}
+		e := &models.AuditEntry{ID: id, UserID: userID, Action: action, Resource: resource, PreviousHash: storedPrev, Timestamp: ts}
+		expected := computeAuditHash(e, detailsJSON, timestampStr)
+		if expected != storedHash {
+			return auditPageResult{
+				ok:     false,
+				reason: fmt.Sprintf("tampered entry %s: expected hash %q, got %q", id, expected, storedHash),
+			}
+		}
+		prevHash = storedHash
+		nextPrev = storedHash
+		lastRowID = rowID
+	}
+	if err := rows.Err(); err != nil {
+		return auditPageResult{err: err}
+	}
+	return auditPageResult{nextPrevHash: nextPrev, ok: true, lastRowID: lastRowID}
+}
+
 // splitAuditResource splits "kind:id" into (kind, id). Inputs
 // without a colon return ("", input) so the structural columns
 // are simply empty rather than wrong.
@@ -288,45 +339,6 @@ func splitAuditResource(s string) (string, string) {
 		}
 	}
 	return "", s
-}
-
-func (s *SQLite) verifyAuditPage(ctx context.Context, prevHash string, afterRowID int64, limit int) auditPageResult {
-	var lastRowID int64
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT rowid, id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str
-		 FROM audit_entries
-		 WHERE rowid > ?
-		 ORDER BY rowid ASC
-		 LIMIT ?`,
-		afterRowID, limit,
-	)
-	if err != nil {
-		return auditPageResult{err: fmt.Errorf("query audit chain page: %w", err)}
-	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var rowID int64
-		var id, userID, action, resource, detailsJSON, storedPrev, storedHash, timestampStr string
-		var ts time.Time
-		if err := rows.Scan(&rowID, &id, &userID, &action, &resource, &detailsJSON, &ts, &storedPrev, &storedHash, &timestampStr); err != nil {
-			return auditPageResult{err: fmt.Errorf("scan audit chain: %w", err)}
-		}
-		if storedPrev != prevHash {
-			return auditPageResult{nextPrevHash: prevHash, ok: false, reason: fmt.Sprintf("chain break at entry %s: expected prev_hash %q, got %q", id, prevHash, storedPrev)}
-		}
-		if timestampStr == "" {
-			timestampStr = ts.UTC().Format(time.RFC3339Nano)
-		}
-		e := &models.AuditEntry{ID: id, UserID: userID, Action: action, Resource: resource, PreviousHash: storedPrev, Timestamp: ts}
-		expected := computeAuditHash(e, detailsJSON, timestampStr)
-		if expected != storedHash {
-			return auditPageResult{nextPrevHash: prevHash, ok: false, reason: fmt.Sprintf("tampered entry %s: expected hash %q, got %q", id, expected, storedHash)}
-		}
-		prevHash = storedHash
-		lastRowID = rowID
-	}
-	return auditPageResult{nextPrevHash: prevHash, ok: true, lastRowID: lastRowID, err: rows.Err()}
 }
 
 func (s *SQLite) ListAudit(ctx context.Context, filter *models.AuditFilter) ([]*models.AuditEntry, error) {
