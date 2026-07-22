@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -689,5 +691,82 @@ func TestHubBroadcastNonBlockingDrops(t *testing.T) {
 	hub.BroadcastLog(&LogEntry{Timestamp: time.Now(), Level: "INFO", Message: "m3"})
 	if got := hub.Dropped(); got != 1 {
 		t.Errorf("expected 1 drop after channel full, got %d", got)
+	}
+}
+
+// fakeHubStore is the minimal HubStore stub for OBS-LOG-3 tests.
+type fakeHubStore struct {
+	mu       sync.Mutex
+	nextID   int64
+	failGet  bool
+	failSet  bool
+}
+
+func (f *fakeHubStore) GetWSNextID(_ context.Context) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.failGet {
+		return 0, errors.New("fake get error")
+	}
+	return f.nextID, nil
+}
+
+func (f *fakeHubStore) SetWSNextID(_ context.Context, n int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.failSet {
+		return errors.New("fake set error")
+	}
+	f.nextID = n
+	return nil
+}
+
+// TestHubSetStoreLoadsPersistedNextID locks in OBS-LOG-3:
+// SetStore reads the persisted counter synchronously so the
+// hub's nextID reflects the persisted value before the first
+// HandleSSE call.
+func TestHubSetStoreLoadsPersistedNextID(t *testing.T) {
+	store := &fakeHubStore{nextID: 7}
+	h := NewHub(silentLogger())
+	if err := h.SetStore(context.Background(), store); err != nil {
+		t.Fatalf("SetStore: %v", err)
+	}
+	if h.nextID != 7 {
+		t.Errorf("expected nextID=7 after SetStore, got %d", h.nextID)
+	}
+}
+
+// TestHubStopPersistsNextID exercises the Stop path: the final
+// nextID is written back via SetWSNextID.
+func TestHubStopPersistsNextID(t *testing.T) {
+	store := &fakeHubStore{}
+	h := NewHub(silentLogger())
+	if err := h.SetStore(context.Background(), store); err != nil {
+		t.Fatalf("SetStore: %v", err)
+	}
+	go h.Run()
+	h.mu.Lock()
+	h.nextID = 42
+	h.mu.Unlock()
+	h.Stop()
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if store.nextID != 42 {
+		t.Errorf("expected persisted nextID=42, got %d", store.nextID)
+	}
+}
+
+// TestHubSetStoreErrorDoesNotPanic ensures SetStore tolerates
+// store failures: the hub falls back to process-local counters
+// rather than crashing on startup.
+func TestHubSetStoreErrorDoesNotPanic(t *testing.T) {
+	h := NewHub(silentLogger())
+	store := &fakeHubStore{failGet: true}
+	if err := h.SetStore(context.Background(), store); err == nil {
+		t.Fatal("expected error from SetStore when GetWSNextID fails")
+	}
+	// nextID stays at 1 (default).
+	if h.nextID != 0 {
+		t.Errorf("expected nextID=0 after failed SetStore, got %d", h.nextID)
 	}
 }

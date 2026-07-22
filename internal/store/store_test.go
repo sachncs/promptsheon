@@ -129,10 +129,11 @@ func TestNewSQLiteRunsAllMigrations(t *testing.T) {
 	if err := rows.Scan(&n); err != nil {
 		t.Fatalf("scan: %v", err)
 	}
-	// After consolidation the migration count is 9
-	// (001-008 + 009 vault_state for SEC-10a).
-	if n != 9 {
-		t.Errorf("migrations applied = %d, want 9", n)
+	// After consolidation the migration count is 10
+	// (001-008 + 009 vault_state for SEC-10a + 010 ws_state
+	// for OBS-LOG-3).
+	if n != 10 {
+		t.Errorf("migrations applied = %d, want 10", n)
 	}
 }
 
