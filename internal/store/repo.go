@@ -91,6 +91,13 @@ type Repository interface {
 	DeleteWebhookEndpoint(ctx context.Context, id string) error
 	ListWebhookEndpoints(ctx context.Context) ([]*models.WebhookEndpointRecord, error)
 
+	// Vault State (singleton). Persists the KMS-wrapped data key
+	// so a process restart (or a fresh daemon process) can recover
+	// the same data key by calling Decrypt on the persisted blob.
+	// SEC-10a.
+	GetVaultState(ctx context.Context) (*models.VaultState, error)
+	SaveVaultState(ctx context.Context, vs *models.VaultState) error
+
 	// Lifecycle
 	Ping(ctx context.Context) error
 	Close() error
