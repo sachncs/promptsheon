@@ -540,58 +540,6 @@ func DurationSec(d time.Duration) float64 {
 	return d.Seconds()
 }
 
-// LabeledCounter is a counter that supports label-based dimensions.
-type LabeledCounter struct {
-	mu       sync.Mutex
-	counters map[string]*Counter
-}
-
-// NewLabeledCounter creates a new labeled counter.
-func NewLabeledCounter() *LabeledCounter {
-	return &LabeledCounter{
-		counters: make(map[string]*Counter),
-	}
-}
-
-// With returns a counter for the given labels, creating it if necessary.
-func (lc *LabeledCounter) With(labels map[string]string) *Counter {
-	key := SortLabels(labels)
-	lc.mu.Lock()
-	defer lc.mu.Unlock()
-	if c, ok := lc.counters[key]; ok {
-		return c
-	}
-	c := newCounter(labels)
-	lc.counters[key] = c
-	return c
-}
-
-// LabeledHistogram is a histogram that supports label-based dimensions.
-type LabeledHistogram struct {
-	mu         sync.Mutex
-	histograms map[string]*Histogram
-}
-
-// NewLabeledHistogram creates a new labeled histogram.
-func NewLabeledHistogram() *LabeledHistogram {
-	return &LabeledHistogram{
-		histograms: make(map[string]*Histogram),
-	}
-}
-
-// With returns a histogram for the given labels, creating it if necessary.
-func (lh *LabeledHistogram) With(labels map[string]string) *Histogram {
-	key := SortLabels(labels)
-	lh.mu.Lock()
-	defer lh.mu.Unlock()
-	if h, ok := lh.histograms[key]; ok {
-		return h
-	}
-	h := newHistogram(labels)
-	lh.histograms[key] = h
-	return h
-}
-
 // Quantile computes the q-th quantile from a sorted slice.
 func Quantile(sorted []float64, q float64) float64 {
 	if len(sorted) == 0 {
