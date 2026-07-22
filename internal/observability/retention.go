@@ -9,6 +9,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/sachncs/promptsheon/internal/store"
 )
 
 // RetentionPolicy defines TTL for different log types.
@@ -122,15 +124,22 @@ var protectedAuditActions = map[string]bool{
 
 // Enforce deletes expired data based on the retention policy.
 //
-// SECURITY: audit rows are NOT deleted, regardless of age or action.
-// The audit chain walks from rowid 1 forward, chaining entries by
-// previous_hash. Deleting entries in the middle of the chain breaks
-// verification even though the surviving rows are intact. The chain
-// is the security boundary; we keep it whole and let operators
-// archive it externally (e.g. snapshotting the database).
+// OPS-3: every error path returns the wrapped error so callers
+// can log + surface a metric. The previous version logged and
+// returned nil, masking persistent SQLite errors as success.
+//
+// OBS-RET-1: audit rows are NOT deleted from audit_entries.
+// The chain walks from rowid 1 forward and chains by
+// previous_hash; deleting a row in the middle breaks
+// verification. Instead, expired audit rows are copied into
+// audit_archive (created by migration 011). The source row is
+// preserved so the chain survives; operators archive externally
+// and may then truncate the source table out of band.
+//
+// Returns the wrapped error from any failure.
 func (m *RetentionManager) Enforce(ctx context.Context) error {
-	var totalDeleted int
 	m.lastErr = nil
+	var traceDeleted, auditArchived int
 
 	if m.policy.TraceTTL > 0 {
 		cutoff := time.Now().Add(-m.policy.TraceTTL)
@@ -138,25 +147,69 @@ func (m *RetentionManager) Enforce(ctx context.Context) error {
 			"DELETE FROM traces WHERE started_at < ?", cutoff)
 		if err != nil {
 			m.logger.Warn("failed to clean trace spans", "err", err)
-			m.lastErr = err
+			m.lastErr = fmt.Errorf("trace cleanup: %w", err)
 		} else {
 			n, _ := result.RowsAffected()
-			totalDeleted += int(n)
+			traceDeleted = int(n)
 		}
 	}
 
-	if totalDeleted > 0 {
-		m.logger.Info("retention cleanup completed", "deleted", totalDeleted,
-			"trace_ttl", m.policy.TraceTTL)
+	if m.policy.AuditTTL > 0 {
+		cutoff := time.Now().Add(-m.policy.AuditTTL)
+		// Verify the chain BEFORE the copy. If verification fails,
+		// skip the archive this cycle; the operator should investigate.
+		if _, err := m.verifyChainForRetention(ctx); err != nil {
+			m.logger.Warn("retention: chain verification failed; skipping audit archive",
+				"err", err)
+			m.lastErr = fmt.Errorf("audit chain verify: %w", err)
+		} else {
+			result, err := m.db.ExecContext(ctx, `
+				INSERT INTO audit_archive
+				    (id, user_id, action, resource, details, timestamp,
+				     previous_hash, entry_hash, timestamp_str,
+				     resource_kind, resource_id, archived_at)
+				SELECT id, user_id, action, resource, details, timestamp,
+				       previous_hash, entry_hash, timestamp_str,
+				       resource_kind, resource_id, CURRENT_TIMESTAMP
+				FROM audit_entries
+				WHERE timestamp < ?`, cutoff)
+			if err != nil {
+				m.logger.Warn("failed to archive audit rows", "err", err)
+				m.lastErr = fmt.Errorf("audit archive: %w", err)
+			} else {
+				n, _ := result.RowsAffected()
+				auditArchived = int(n)
+			}
+		}
 	}
 
-	// OPS-3: surface DELETE failures so the metrics collector can
-	// alert on retention drift. The previous version logged and
-	// returned nil, masking persistent SQLite errors as success.
+	if traceDeleted > 0 || auditArchived > 0 {
+		m.logger.Info("retention cleanup completed",
+			"traces_deleted", traceDeleted,
+			"audit_archived", auditArchived,
+			"trace_ttl", m.policy.TraceTTL,
+			"audit_ttl", m.policy.AuditTTL)
+	}
+
 	if m.lastErr != nil {
 		return fmt.Errorf("retention: %w", m.lastErr)
 	}
 	return nil
+}
+
+// verifyChainForRetention runs VerifyAuditChainOnDB and treats any
+// failure as a blocker. Used by Enforce before copying audit
+// rows to audit_archive — if the chain is broken we leave the
+// source rows alone so the operator can investigate.
+func (m *RetentionManager) verifyChainForRetention(ctx context.Context) (string, error) {
+	res, err := store.VerifyAuditChainOnDB(ctx, m.db)
+	if err != nil {
+		return "", err
+	}
+	if !res.Ok {
+		return "", fmt.Errorf("chain verify failed: %s", res.Reason)
+	}
+	return "ok", nil
 }
 
 // GetPolicy returns the current retention policy.
