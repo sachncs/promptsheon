@@ -283,6 +283,11 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		logger.Warn("SQLite tracer disabled", "err", err)
 	}
 	collector := metrics.NewCollector()
+	// OBS-LOG-2: wire the SSE hub's drop counter into the
+	// collector so the Prometheus scrape and the
+	// /api/v1/metrics/summary JSON expose it as
+	// promptsheon_log_hub_drops_total.
+	collector.SetLogHub(logHub)
 
 	// OBS-2: combine the SQLite tracer (always-on, used by the
 	// /api/v1/traces/{id} browse surface) with the OTel tracer
