@@ -418,7 +418,9 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	// go through the same path. When no provider is configured
 	// the Caller returns an explicit error rather than a fake
 	// success — the route surfaces it as 502 Bad Gateway.
-	enforcer := invoke.NewDefaultEnforcer(nil)
+	// OBS-13: persisted enforcer. Budget + quota state survives
+	// process restarts via the enforcer_state table (migration 012).
+	enforcer := invoke.NewPersistedEnforcer(rootCtx, db, nil, logger)
 	agg := observation.NewAggregator(nil)
 	// Recommendation loop: each invocation that lands in the
 	// observation aggregator can produce a Recommendation

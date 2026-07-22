@@ -760,6 +760,22 @@ func (m *mockRepo) SetWSNextID(_ context.Context, _ int64) error {
 	return nil
 }
 
+func (m *mockRepo) GetEnforcerBudget(_ context.Context, _ string) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *mockRepo) SetEnforcerBudget(_ context.Context, _ string, _ []byte) error {
+	return nil
+}
+
+func (m *mockRepo) GetEnforcerQuota(_ context.Context, _ string) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *mockRepo) SetEnforcerQuota(_ context.Context, _ string, _ []byte) error {
+	return nil
+}
+
 func (m *mockRepo) ListEvalResultsForRun(_ context.Context, runID string) ([]harness.EvalResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
