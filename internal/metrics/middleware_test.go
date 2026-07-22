@@ -149,22 +149,23 @@ func TestWorkflowMiddleware(t *testing.T) {
 	c := NewCollector()
 	tr := &noopTracer{}
 
-	mw := WorkflowMiddleware(c, tr)
+	mw := WorkflowMiddleware(c, tr, nil)
 	called := false
-	inner := mw(func(_ string, _ map[string]any) (map[string]any, error) {
+	inner := mw(func(_ context.Context, _ any, _ map[string]any) (any, error) {
 		called = true
 		return map[string]any{"ok": true}, nil
 	})
 
-	out, err := inner("agent-1", map[string]any{"x": 1})
+	out, err := inner(context.Background(), "agent-1", map[string]any{"x": 1})
 	if err != nil {
 		t.Fatalf("inner: %v", err)
 	}
 	if !called {
 		t.Error("expected inner to be called")
 	}
-	if out["ok"] != true {
-		t.Errorf("output: got %v", out)
+	m, ok := out.(map[string]any)
+	if !ok || m["ok"] != true {
+		t.Errorf("output: got %v (%T)", out, out)
 	}
 	if c.WorkflowRunsTotal.Value() != 1 {
 		t.Errorf("WorkflowRunsTotal: got %v", c.WorkflowRunsTotal.Value())

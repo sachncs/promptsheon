@@ -128,17 +128,31 @@ func LLMMiddleware(collector *Collector, tracer trace.Tracer, _ *slog.Logger) fu
 // LLMMiddlewareFunc is the function signature for instrumented LLM calls.
 type LLMMiddlewareFunc func(operation string, req any) (any, error)
 
-// WorkflowMiddleware instruments workflow executions.
-func WorkflowMiddleware(collector *Collector, tracer trace.Tracer) func(next WorkflowFunc) WorkflowFunc {
-	return func(next WorkflowFunc) WorkflowFunc {
-		return func(agentID string, input map[string]any) (map[string]any, error) {
+// WorkflowMiddleware instruments workflow executions. The
+// wrapped function matches workflow.Engine.Run's signature
+// (context, Definition, initial map) → (*workflow.Result, error)
+// so the middleware can be applied directly to Engine.Run.
+//
+// OBS-5b: the middleware records workflow total / active counts,
+// duration histogram, and an OTel span per workflow execution.
+func WorkflowMiddleware(
+	collector *Collector,
+	tracer trace.Tracer,
+	_ *slog.Logger,
+) func(next WorkflowRunFunc) WorkflowRunFunc {
+	return func(next WorkflowRunFunc) WorkflowRunFunc {
+		return func(ctx context.Context, def any, initial map[string]any) (any, error) {
 			start := time.Now()
 			collector.WorkflowActive.Inc()
 
-			span := tracer.Start(context.Background(), "workflow.execute")
-			span.SetAttribute("workflow.agent_id", agentID)
+			span := tracer.Start(ctx, "workflow.execute")
+			if id, ok := def.(interface{ GetID() string }); ok {
+				span.SetAttribute("workflow.id", id.GetID())
+			} else {
+				span.SetAttribute("workflow.id", fmt.Sprintf("%T", def))
+			}
 
-			output, err := next(agentID, input)
+			out, err := next(ctx, def, initial)
 
 			latency := time.Since(start)
 			collector.WorkflowRunsTotal.Inc()
@@ -152,13 +166,16 @@ func WorkflowMiddleware(collector *Collector, tracer trace.Tracer) func(next Wor
 			span.Finish()
 			_ = tracer.Finish(span)
 
-			return output, err
+			return out, err
 		}
 	}
 }
 
-// WorkflowFunc is the function signature for instrumented workflow runs.
-type WorkflowFunc func(agentID string, input map[string]any) (map[string]any, error)
+// WorkflowRunFunc is the function signature for instrumented
+// workflow.Engine.Run calls. def is the workflow Definition
+// (typed as any to avoid an import cycle; workflow.Engine uses
+// workflow.Definition).
+type WorkflowRunFunc func(ctx context.Context, def any, initial map[string]any) (any, error)
 
 // statusRecorder wraps http.ResponseWriter to capture the status code.
 type statusRecorder struct {
