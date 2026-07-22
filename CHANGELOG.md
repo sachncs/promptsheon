@@ -33,6 +33,21 @@ A 50+ commit audit and remediation pass. Highlights:
   consolidated versions as applied and lets the runner skip
   the rebuild on next start.
 
+- **DB-CONC-2 / OPS-4**: dedicated retention `*sql.DB` lives in
+  `main()` scope (not `buildServer`), so its lifetime matches the
+  daemon. Previously the `defer Close` inside `buildServer` ran
+  before the retention goroutine's first tick, causing
+  `database is closed` panics. OPS-4 is now effectively shipped
+  in `15374e0`.
+
+- **SEC-10a**: KMS `Provider` persists the wrapped data key
+  (`CiphertextBlob`) on first use and reads it on cache miss
+  via `KMSClient.Decrypt`. The plaintext cache is an LRU of size
+  16 keyed by `sha256(wrapped_data_key)`. On rotation, the
+  wrapped blob changes, the LRU key changes, and the next read
+  Decrypts the new blob. Migration `009_vault_state.up.sql`
+  creates the singleton `vault_state` table.
+
 #### Deploy
 
 - **`fix(helm):` real probe + scrape paths** — `/health` and
