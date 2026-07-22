@@ -49,16 +49,15 @@ type NotificationGroupRecord struct {
 // the AES-GCM ciphertext (SecretCiphertext). Endpoints that need
 // to surface the ciphertext over the wire use a dedicated DTO.
 //
-// AllowInsecure and AllowPrivate are retained as deprecated fields
-// for backward compatibility with stored records but are no longer
-// honoured by the dispatcher (SEC-4, SEC-11).
+// SEC-11 / SEC-4: there is no AllowInsecure / AllowPrivate flag.
+// HTTPS is mandatory at registration; loopback / private /
+// link-local destinations are refused at registration and at
+// every delivery. There is no opt-in.
 type WebhookEndpointRecord struct {
 	ID               string    `json:"id"`
 	URL              string    `json:"url"`
 	Secret           string    `json:"-"`
 	SecretCiphertext []byte    `json:"-"`
-	AllowInsecure    bool      `json:"allow_insecure,omitempty"`
-	AllowPrivate     bool      `json:"allow_private,omitempty"`
 	Events           []string  `json:"events"`
 	Active           bool      `json:"active"`
 	CreatedAt        time.Time `json:"created_at"`
