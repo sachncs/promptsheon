@@ -103,6 +103,14 @@ type Repository interface {
 	GetWSNextID(ctx context.Context) (int64, error)
 	SetWSNextID(ctx context.Context, n int64) error
 
+	// Enforcer state (budget + quota persistence). OBS-13.
+	// Loads persisted SetBudget / SetQuota values on startup so
+	// budget counters and quota counters survive a restart.
+	GetEnforcerBudget(ctx context.Context, workspaceID string) ([]byte, error)
+	SetEnforcerBudget(ctx context.Context, workspaceID string, payload []byte) error
+	GetEnforcerQuota(ctx context.Context, workspaceID string) ([]byte, error)
+	SetEnforcerQuota(ctx context.Context, workspaceID string, payload []byte) error
+
 	// Lifecycle
 	Ping(ctx context.Context) error
 	Close() error
