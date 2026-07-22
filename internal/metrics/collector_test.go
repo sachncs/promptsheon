@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -66,6 +67,33 @@ func TestCollectorSummary(t *testing.T) {
 	}
 	if summary.LLMMetrics.TotalTokens != 100 {
 		t.Fatalf("expected 100 tokens, got %d", summary.LLMMetrics.TotalTokens)
+	}
+}
+
+// TestCollectorAuditQueueLatency locks in OBS-AUDIT-2: the
+// histogram is wired through NewCollector and observations
+// surface in the summary's pipeline_metrics block.
+func TestCollectorAuditQueueLatency(t *testing.T) {
+	c := NewCollector()
+	c.ObserveAuditQueue(0.001)
+	c.ObserveAuditQueue(0.010)
+	c.ObserveAuditQueue(0.100)
+
+	summary := c.GetSummary()
+	if summary.PipelineMetrics.AuditQueueAvgSecs <= 0 {
+		t.Errorf("expected positive AuditQueueAvgSecs, got %f", summary.PipelineMetrics.AuditQueueAvgSecs)
+	}
+	if summary.PipelineMetrics.AuditQueueP95Secs < summary.PipelineMetrics.AuditQueueAvgSecs {
+		t.Errorf("p95 %f should be >= avg %f", summary.PipelineMetrics.AuditQueueP95Secs, summary.PipelineMetrics.AuditQueueAvgSecs)
+	}
+	if summary.PipelineMetrics.AuditQueueP99Secs < summary.PipelineMetrics.AuditQueueP95Secs {
+		t.Errorf("p99 %f should be >= p95 %f", summary.PipelineMetrics.AuditQueueP99Secs, summary.PipelineMetrics.AuditQueueP95Secs)
+	}
+
+	// Prometheus exposition contains the histogram.
+	format := c.prometheusFormat()
+	if !strings.Contains(format, "promptsheon_audit_queue_latency_seconds") {
+		t.Errorf("expected histogram metric in Prometheus output, got:\n%s", format)
 	}
 }
 

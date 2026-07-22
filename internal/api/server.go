@@ -755,12 +755,20 @@ func (s *Server) auditWorker(ctx context.Context) {
 			}
 			// Use a fresh background context for the DB write so a
 			// cancelled request does not abort the audit persistence.
+			writeStart := time.Now()
 			if err := s.db.AppendAudit(context.Background(), entry); err != nil {
 				if s.logger != nil {
 					s.logger.Error("failed to write audit entry",
 						"err", err, "entry_id", entry.ID, "action", entry.Action)
 				}
 			}
+			// OBS-AUDIT-2: surface the time between audit() being
+			// called and the DB write committing, so operators can
+			// detect worker backlog growth.
+			if s.collector != nil {
+				s.collector.ObserveAuditQueue(time.Since(entry.Timestamp).Seconds())
+			}
+			_ = writeStart
 		}
 	}
 }
