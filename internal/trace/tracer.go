@@ -60,6 +60,20 @@ func (s *Span) SetError(err error) {
 	}
 }
 
+// SpanFilter narrows the result set for ListSpans / GetTraceTree.
+// OBS-TR-1: the read-side store keeps this filter contract so
+// the API handler signature is unchanged after the SQLite
+// writer was removed.
+type SpanFilter struct {
+	TraceID   string
+	UserID    string
+	Operation string
+	Service   string
+	Since     *time.Time
+	Until     *time.Time
+	Limit     int
+}
+
 // SetAttribute adds a key-value attribute to the span.
 func (s *Span) SetAttribute(key, value string) {
 	if s.Attributes == nil {
@@ -118,6 +132,10 @@ func NewMulti(primary Tracer, others ...Tracer) Tracer {
 	}
 	return &Multi{primary: primary, others: live}
 }
+
+// NewNoopTracer returns a Tracer that drops every span. Used
+// when OTel is not configured (OBS-TR-1).
+func NewNoopTracer() Tracer { return noopTracer{} }
 
 // Start creates a new root span on the primary and mirrors the
 // operation across every wrapped tracer. The returned Span is

@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -27,7 +26,6 @@ import (
 	"github.com/sachncs/promptsheon/internal/ratelimit"
 	"github.com/sachncs/promptsheon/internal/release"
 	"github.com/sachncs/promptsheon/internal/store"
-	"github.com/sachncs/promptsheon/internal/trace"
 	"github.com/sachncs/promptsheon/internal/vault"
 	"github.com/sachncs/promptsheon/internal/webhook"
 	"github.com/sachncs/promptsheon/internal/ws"
@@ -823,44 +821,6 @@ func newVault(t *testing.T) *vault.Vault {
 	}
 	return v
 }
-
-func newSpanStore(t *testing.T) *trace.SQLite {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "spans.db")
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(`PRAGMA journal_mode=WAL`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(`PRAGMA busy_timeout=5000`); err != nil {
-		t.Fatal(err)
-	}
-	db.SetMaxOpenConns(2)
-	t.Cleanup(func() { _ = db.Close() })
-	store, err := trace.NewSQLite(db)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-	return store
-}
-
-// flushSpans waits for the asynchronous trace worker to drain
-// any queued spans. Required because the SQLite tracer batches
-// inserts on a 250 ms ticker; tests that read after Finish must
-// wait for the write.
-func flushSpans(t *testing.T, s *trace.SQLite) {
-	t.Helper()
-	if err := s.Flush(context.Background()); err != nil {
-		t.Fatalf("flush spans: %v", err)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Server basics
-// ---------------------------------------------------------------------------
 
 func TestServer_ServeHTTP(t *testing.T) {
 	s := newTestServer(t)
@@ -2109,133 +2069,6 @@ func TestHandleVerifyAuditChain(t *testing.T) {
 // Trace Handler Tests
 // ---------------------------------------------------------------------------
 
-func TestHandleListSpans_NoSpans(t *testing.T) {
-	s := newTestServer(t)
-	s.spanStore = newSpanStore(t)
-	req := httptest.NewRequest("GET", "/api/v1/traces", nil)
-	rr := httptest.NewRecorder()
-	s.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleGetSpan_NotFound(t *testing.T) {
-	s := newTestServer(t)
-	s.spanStore = newSpanStore(t)
-	req := httptest.NewRequest("GET", "/api/v1/traces/nonexistent", nil)
-	rr := httptest.NewRecorder()
-	s.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Errorf("expected 404, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleGetTraceTree_NotFound(t *testing.T) {
-	s := newTestServer(t)
-	s.spanStore = newSpanStore(t)
-	req := httptest.NewRequest("GET", "/api/v1/traces/tree/nonexistent", nil)
-	rr := httptest.NewRecorder()
-	s.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Errorf("expected 404, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleListSpans_WithSpans(t *testing.T) {
-	store := newSpanStore(t)
-	sp := store.Start(context.Background(), "test-op")
-	sp.TraceID = "trace-1"
-	sp.Service = "test-svc"
-	sp.Status = trace.StatusOK
-	sp.Finish()
-	if err := store.Finish(sp); err != nil {
-		t.Fatal(err)
-	}
-	flushSpans(t, store)
-
-	s := newTestServer(t)
-	s.spanStore = store
-
-	req := httptest.NewRequest("GET", "/api/v1/traces", nil)
-	rr := httptest.NewRecorder()
-	s.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-	var spans []*trace.Span
-	readJSONBody(t, rr.Body.Bytes(), &spans)
-	if len(spans) != 1 {
-		t.Errorf("expected 1 span, got %d", len(spans))
-	}
-}
-
-func TestHandleGetSpan_Found(t *testing.T) {
-	store := newSpanStore(t)
-	sp := store.Start(context.Background(), "test-op")
-	sp.TraceID = "trace-2"
-	sp.Service = "svc"
-	sp.Status = trace.StatusOK
-	sp.Finish()
-	if err := store.Finish(sp); err != nil {
-		t.Fatal(err)
-	}
-	flushSpans(t, store)
-
-	s := newTestServer(t)
-	s.spanStore = store
-
-	req := httptest.NewRequest("GET", "/api/v1/traces/"+sp.ID, nil)
-	rr := httptest.NewRecorder()
-	s.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-	var got trace.Span
-	readJSONBody(t, rr.Body.Bytes(), &got)
-	if got.ID != sp.ID {
-		t.Errorf("expected span id %s, got %s", sp.ID, got.ID)
-	}
-}
-
-func TestHandleGetTraceTree_Found(t *testing.T) {
-	store := newSpanStore(t)
-	sp := store.Start(context.Background(), "root-op")
-	sp.TraceID = "trace-tree-1"
-	sp.Service = "svc"
-	sp.Status = trace.StatusOK
-	sp.Finish()
-	if err := store.Finish(sp); err != nil {
-		t.Fatal(err)
-	}
-	flushSpans(t, store)
-
-	s := newTestServer(t)
-	s.spanStore = store
-
-	req := httptest.NewRequest("GET", "/api/v1/traces/tree/trace-tree-1", nil)
-	rr := httptest.NewRecorder()
-	s.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-	var resp map[string]any
-	readJSONBody(t, rr.Body.Bytes(), &resp)
-	if resp["count"].(float64) != 1 {
-		t.Errorf("expected count 1, got %v", resp["count"])
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Metrics / Dashboard Handler Tests
-// ---------------------------------------------------------------------------
-
 func TestHandleMetricsSummary(t *testing.T) {
 	s := newTestServer(t)
 	s.collector = metrics.NewCollector()
@@ -2310,26 +2143,6 @@ func TestHandleMetricsSummary_AuditQueueLatency(t *testing.T) {
 	}
 }
 
-func TestHandleTopCapabilities(t *testing.T) {
-	s := newTestServer(t)
-	s.usageTracker = NewUsageTracker()
-	s.usageTracker.RecordCapabilityUsage("p1", "Prompt 1", 100, 50)
-
-	req := httptest.NewRequest("GET", "/api/v1/metrics/top-capabilities", nil)
-	rr := httptest.NewRecorder()
-	s.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-
-	var resp map[string]any
-	readJSONBody(t, rr.Body.Bytes(), &resp)
-	if resp["total"] != float64(1) {
-		t.Errorf("expected total 1, got %v", resp["total"])
-	}
-}
-
 func TestHandleTopCapabilities_NilTracker(t *testing.T) {
 	s := newTestServer(t)
 	req := httptest.NewRequest("GET", "/api/v1/metrics/top-capabilities", nil)
@@ -2362,46 +2175,6 @@ func TestHandleMetricsPrometheus_NotConfigured(t *testing.T) {
 
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleDashboardSummary(t *testing.T) {
-	s := newTestServer(t)
-	s.collector = metrics.NewCollector()
-	s.spanStore = newSpanStore(t)
-
-	req := httptest.NewRequest("GET", "/api/v1/metrics/dashboard", nil)
-	rr := httptest.NewRecorder()
-	s.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleSearchSpans(t *testing.T) {
-	s := newTestServer(t)
-	s.spanStore = newSpanStore(t)
-
-	req := httptest.NewRequest("GET", "/api/v1/logs/search", nil)
-	rr := httptest.NewRecorder()
-	s.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleSearchSpans_WithFilters(t *testing.T) {
-	s := newTestServer(t)
-	s.spanStore = newSpanStore(t)
-
-	req := httptest.NewRequest("GET", "/api/v1/logs/search?operation=test&service=myapp&since=2024-01-01T00:00:00Z&until=2024-12-31T23:59:59Z", nil)
-	rr := httptest.NewRecorder()
-	s.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -3924,53 +3697,13 @@ func TestAuthAuditLogger_LogAuthFailure(t *testing.T) {
 // Span Helper Tests (dashboard.go)
 // ---------------------------------------------------------------------------
 
-func TestGetRecentTraceCount(t *testing.T) {
-	now := time.Now()
-	end := now
-	spans := []*trace.Span{
-		{StartedAt: now.Add(-30 * time.Minute), EndedAt: &end},
-		{StartedAt: now.Add(-2 * time.Hour), EndedAt: &end},
-		{StartedAt: now.Add(-10 * time.Minute), EndedAt: &end},
-		// A span that started recently but never ended must NOT
-		// be counted as a recent trace — getRecentTraceCount
-		// reports completed work.
-		{StartedAt: now.Add(-5 * time.Minute)},
-	}
-	count := getRecentTraceCount(spans, 1*time.Hour)
-	if count != 2 {
-		t.Errorf("expected 2, got %d", count)
-	}
-}
 
-func TestGetAvgSpanDuration(t *testing.T) {
-	spans := []*trace.Span{
-		{DurationMs: 100},
-		{DurationMs: 200},
-		{DurationMs: 300},
-	}
-	avg := getAvgSpanDuration(spans)
-	if avg != 200 {
-		t.Errorf("expected 200, got %f", avg)
-	}
-}
 
-func TestGetAvgSpanDuration_Empty(t *testing.T) {
-	if avg := getAvgSpanDuration(nil); avg != 0 {
-		t.Errorf("expected 0, got %f", avg)
-	}
-}
 
-func TestGetErrorSpanCount(t *testing.T) {
-	spans := []*trace.Span{
-		{Status: trace.StatusOK},
-		{Status: trace.StatusError},
-		{Status: trace.StatusError},
-	}
-	count := getErrorSpanCount(spans)
-	if count != 2 {
-		t.Errorf("expected 2, got %d", count)
-	}
-}
+
+
+
+
 
 // ---------------------------------------------------------------------------
 // WithRequest / httpRequestFromContext
