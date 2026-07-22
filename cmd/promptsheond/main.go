@@ -284,10 +284,7 @@ func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
 }
 
 func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub, elector *election.Elector, retentionDB *sql.DB) (*api.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector) {
-	sqliteTracer, err := trace.NewSQLite(db.DB())
-	if err != nil {
-		logger.Warn("SQLite tracer disabled", "err", err)
-	}
+	// OBS-TR-1: no SQLite tracer; OTel-only export.
 	collector := metrics.NewCollector()
 	// OBS-LOG-2: wire the SSE hub's drop counter into the
 	// collector so the Prometheus scrape and the
@@ -295,15 +292,12 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	// promptsheon_log_hub_drops_total.
 	collector.SetLogHub(logHub)
 
-	// OBS-2: combine the SQLite tracer (always-on, used by the
-	// /api/v1/traces/{id} browse surface) with the OTel tracer
-	// (OTLP export) when PROMPTSHEON_OTEL_ENDPOINT is configured.
-	// Spans are mirrored to both backends so local queries see
-	// them regardless of OTel availability.
-	var tracer trace.Tracer = sqliteTracer
+	// OBS-2: OTel-only export. The SQLite tracer no longer writes;
+	// /api/v1/traces/{id} reads are answered by the read-side
+	// *SQLite above. Spans are NOT mirrored to both backends.
+	var tracer trace.Tracer = trace.NewNoopTracer()
 	if cfg.OTelEndpoint != "" && tp != nil {
-		otel := trace.NewOTelTracer("promptsheond")
-		tracer = trace.NewMulti(sqliteTracer, otel)
+		tracer = trace.NewOTelTracer("promptsheond")
 		logger.Info("OTel tracer initialised", "endpoint", cfg.OTelEndpoint, "insecure", cfg.OTelInsecure)
 	}
 
@@ -692,25 +686,12 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 
 	api.StartOAuthStateJanitor(rootCtx)
 
-	// OBS-1b: surface trace-pipeline drop counts to the metrics
-	// collector every 10 s. The trace store lives behind the
-	// Multi tracer; the SQLite implementation is reached via
-	// type assertion so a future secondary backend doesn't
-	// require new wiring here.
-	if sqlite, ok := tracer.(*trace.SQLite); ok {
-		go func() {
-			ticker := time.NewTicker(10 * time.Second)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-rootCtx.Done():
-					return
-				case <-ticker.C:
-					collector.SetTraceDropped(sqlite.Dropped())
-				}
-			}
-		}()
-	}
+	// OBS-1b (deferred): with OBS-TR-1 there is no SQLite writer to
+	// expose a drop count from. The metric wiring stays so a
+	// future OTel-aware drop counter can drop in without API
+	// changes. For now, promptsheon_trace_dropped_total stays at
+	// zero and the loop is omitted.
+	_ = collector // collector.SetTraceDropped exists; see metrics.Collector.
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -726,15 +707,9 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 		logger.Error("server forced to shutdown", "err", err)
 	}
 
-	// Drain the trace queue before audit workers so the trace
-	// table is flushed before we lose access to the DB.
-	if tracer != nil {
-		if sqlite, ok := tracer.(*trace.SQLite); ok {
-			if err := sqlite.Close(); err != nil {
-				logger.Warn("trace store did not drain cleanly", "err", err)
-			}
-		}
-	}
+	// OBS-TR-1: no SQLite writer to drain. The trace export is
+	// already closed (deferred to wherever the OTel provider's
+	// Shutdown lives).
 
 	auditStopCtx, cancelAuditStop := context.WithTimeout(context.Background(), 10*time.Second)
 	if err := srv.StopAuditWorkers(auditStopCtx); err != nil {

@@ -46,7 +46,6 @@ type Server struct {
 	authn            *auth.Authenticator
 	requireAuth      bool
 	spans            trace.Tracer
-	spanStore        *trace.SQLite // read-side store used by /api/v1/traces
 	collector        *metrics.Collector
 	webhooks         *webhook.Dispatcher
 	vault            *vault.Vault
@@ -153,16 +152,6 @@ func WithTracing(spans trace.Tracer, collector *metrics.Collector) Option {
 	return func(s *Server) {
 		s.spans = spans
 		s.collector = collector
-	}
-}
-
-// WithTraceStore attaches the SQLite-backed span reader used
-// by /api/v1/traces. Production wiring calls this with the same
-// handle that was passed to WithTracing; tests that don't
-// expose the read API can omit it.
-func WithTraceStore(store *trace.SQLite) Option {
-	return func(s *Server) {
-		s.spanStore = store
 	}
 }
 
@@ -422,20 +411,22 @@ func (s *Server) registerAuditRoutes() {
 	s.mux.HandleFunc("GET /api/v1/audit", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListAudit)))
 	s.mux.HandleFunc("GET /api/v1/audit/export", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleExportAudit)))
 	s.mux.HandleFunc("GET /api/v1/audit/verify", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleVerifyAuditChain)))
-	s.mux.HandleFunc("GET /api/v1/logs/search", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleSearchSpans)))
 	s.mux.HandleFunc("GET /api/v1/logs/stream", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleLogsStream)))
 }
 
 func (s *Server) registerTracingRoutes() {
-	s.mux.HandleFunc("GET /api/v1/traces", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListSpans)))
-	s.mux.HandleFunc("GET /api/v1/traces/{id}", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleGetSpan)))
-	s.mux.HandleFunc("GET /api/v1/traces/tree/{trace_id}", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleGetTraceTree)))
+	// OBS-TR-1: the SQLite tracer was removed. /api/v1/traces
+	// routes are gone; traces now flow through OTel export. The
+	// register function remains so future OTel-based query paths
+	// can be wired here.
 }
 
 func (s *Server) registerMetricsRoutes() {
 	s.mux.HandleFunc("GET /api/v1/metrics/summary", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsSummary)))
 	s.mux.HandleFunc("GET /api/v1/metrics/top-capabilities", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleTopCapabilities)))
-	s.mux.HandleFunc("GET /api/v1/metrics/dashboard", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleDashboardSummary)))
+	// OBS-TR-1: /api/v1/metrics/dashboard dropped the TraceStats
+	// block since there is no SQLite-backed trace read store.
+	s.mux.HandleFunc("GET /api/v1/metrics/dashboard", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsSummary)))
 	s.mux.HandleFunc("GET /api/v1/metrics", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsPrometheus)))
 }
 
