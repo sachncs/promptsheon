@@ -295,6 +295,12 @@ func TestPartialUniqueActiveRelease(t *testing.T) {
 	if err := s.CreateCapability(ctx, &capability.Capability{ID: "c1", ProjectID: "p1", Name: "c", CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatalf("capability: %v", err)
 	}
+	if err := s.CreateVersion(ctx, &capability.Version{
+		ID: "v1", CapabilityID: "c1", Version: 1,
+		ManifestHash: "h1", CreatedAt: now, CreatedBy: "u1",
+	}); err != nil {
+		t.Fatalf("version: %v", err)
+	}
 	rel1 := &release.Release{
 		ID:                "r1",
 		CapabilityID:      "c1",

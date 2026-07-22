@@ -42,14 +42,31 @@ func (s *SQLite) CreateRelease(ctx context.Context, r *release.Release) error {
 	if r.SupersededAt != nil {
 		supersededAt = sql.NullTime{Time: *r.SupersededAt, Valid: true}
 	}
+	// DB-19: derive capability_version_id from (capability_id,
+	// capability_version). The capability_versions table has a
+	// UNIQUE(capability_id, version) index, so this lookup
+	// returns the row's TEXT id. New releases are required to
+	// carry a (capability_id, capability_version) pair that
+	// resolves to an existing capability_versions row.
+	var capabilityVersionID string
+	err = s.db.QueryRowContext(ctx,
+		`SELECT id FROM capability_versions
+		   WHERE capability_id = ? AND version = ?`,
+		r.CapabilityID, r.CapabilityVersion,
+	).Scan(&capabilityVersionID)
+	if err != nil {
+		return fmt.Errorf("resolve capability_version_id: %w", err)
+	}
 
 	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO releases
-		 (id, capability_id, capability_version, manifest, environment, status,
+		 (id, capability_id, capability_version, capability_version_id,
+		  manifest, environment, status,
 		  approved_by, superseded_by, replaces_release_id,
 		  created_at, created_by, activated_at, superseded_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.ID, r.CapabilityID, r.CapabilityVersion, string(manifestJSON),
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.CapabilityID, r.CapabilityVersion, capabilityVersionID,
+		string(manifestJSON),
 		string(r.Environment), string(r.Status), string(approvedByJSON),
 		emptyAsNull(r.SupersededBy), emptyAsNull(r.ReplacesReleaseID),
 		r.CreatedAt, r.CreatedBy, activatedAt, supersededAt,
