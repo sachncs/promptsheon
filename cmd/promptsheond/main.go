@@ -494,7 +494,11 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 			CostUSDMicro: int64(costUSD * 1e6),
 			Status:       "ok",
 		}, nil
-	}))
+	})).
+		// OBS-5a: wire the metrics collector + OTel tracer into the
+		// invoker so every LLM call records latency / errors via
+		// the LLMMiddleware. The wiring is safe to call after New.
+		WithObservability(collector, tracer, logger)
 
 	var opts []api.Option
 	if cfg.Auth {
