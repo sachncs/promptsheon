@@ -17,10 +17,13 @@ func HTTPMiddleware(collector *Collector, tracer trace.Tracer, logger *slog.Logg
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 
-			// Skip metrics for liveness/readiness probes so the
-			// request count is meaningful. (Cheap to do, common
-			// monitoring pitfall.)
-			isProbe := r.URL.Path == "/health" || r.URL.Path == "/ready"
+			// Skip metrics for liveness/readiness probes and the
+			// Prometheus scrape so the request count is meaningful.
+			// (Cheap to do, common monitoring pitfall.) OBS-6
+			// extends the skip set to /metrics.
+			isProbe := r.URL.Path == "/health" ||
+				r.URL.Path == "/ready" ||
+				r.URL.Path == "/metrics"
 
 			// Start trace span (if tracer available)
 			var span *trace.Span
