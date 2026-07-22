@@ -194,7 +194,22 @@ func main() {
 		logger.Info("leader-election active", "pod", podName)
 	}
 
-	srv, limiter, tracer, collector := buildServer(rootCtx, &cfg, db, logger, tp, logHub, elector)
+	// DB-CONC-2: open a separate *sql.DB for the retention loop so
+	// the DELETE on traces never competes for the same write
+	// connection as the request path. SQLite serialises writers,
+	// so the cleanup must not share the main pool. The lifetime
+	// of this handle matches the daemon: opened before buildServer
+	// (so the background retention loop outlives buildServer's
+	// stack), closed in main's defer after the server shuts down.
+	retentionDB, err := sql.Open("sqlite", cfg.DBPath+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
+	if err != nil {
+		logger.Warn("retention: open dedicated db failed; falling back to main db", "err", err)
+		retentionDB = db.DB()
+	} else {
+		defer func() { _ = retentionDB.Close() }()
+	}
+
+	srv, limiter, tracer, collector := buildServer(rootCtx, &cfg, db, logger, tp, logHub, elector, retentionDB)
 
 	srv.StartAuditWorkers(rootCtx, 2)
 
@@ -262,7 +277,7 @@ func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
 	return db
 }
 
-func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub, elector *election.Elector) (*api.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector) {
+func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub, elector *election.Elector, retentionDB *sql.DB) (*api.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector) {
 	sqliteTracer, err := trace.NewSQLite(db.DB())
 	if err != nil {
 		logger.Warn("SQLite tracer disabled", "err", err)
@@ -282,17 +297,10 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	}
 
 	retentionPolicy := observability.LoadRetentionPolicyFromEnv()
-	// DB-CONC-2: open a separate *sql.DB for the retention loop so
-	// the DELETE on traces never competes for the same write
-	// connection as the request path. SQLite serialises writers,
-	// so the cleanup must not share the main pool.
-	retentionDB, err := sql.Open("sqlite", cfg.DBPath+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
-	if err != nil {
-		logger.Warn("retention: open dedicated db failed", "err", err)
-		retentionDB = db.DB()
-	} else {
-		defer func() { _ = retentionDB.Close() }()
-	}
+	// DB-CONC-2: retentionDB is passed in from main() so its
+	// lifetime matches the daemon lifetime, not buildServer's.
+	// Closing it inside buildServer would tear down the DB
+	// before the retention goroutine ever runs a tick.
 	retention := observability.NewRetentionManager(retentionDB, retentionPolicy, logger)
 	retention.Start(rootCtx)
 
