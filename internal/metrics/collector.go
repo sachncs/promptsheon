@@ -381,7 +381,6 @@ type Summary struct {
 		AvgScore float64 `json:"avg_score"`
 		P95Score float64 `json:"p95_score"`
 	} `json:"hallucination_metrics"`
-	TraceStats any `json:"trace_stats,omitempty"`
 }
 
 // GetSummary returns a snapshot of all metrics for the dashboard.
