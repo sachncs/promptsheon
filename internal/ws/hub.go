@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -22,15 +23,51 @@ type LogEntry struct {
 
 // Client represents an SSE client connection.
 type Client struct {
-	id   string
-	send chan []byte
-	hub  *Hub
+	id     string
+	send   chan []byte
+	hub    *Hub
+	filter LogFilter
 }
 
-// LogFilter defines filtering for log subscription.
+// LogFilter defines filtering for log subscription. An empty
+// slice (or nil) means "no filter on this dimension" — match
+// anything. A non-empty slice means "match if the entry's level
+// is in this set" (case-sensitive on the level name) or "match
+// if the entry's source is in this set".
 type LogFilter struct {
 	Levels  []string `json:"levels,omitempty"`
 	Sources []string `json:"sources,omitempty"`
+}
+
+// matches reports whether the entry passes every non-empty
+// filter dimension. An empty Levels / Sources means the
+// dimension is unconstrained.
+func (f LogFilter) matches(entry *LogEntry) bool {
+	if len(f.Levels) > 0 {
+		matched := false
+		for _, l := range f.Levels {
+			if l == entry.Level {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	if len(f.Sources) > 0 {
+		matched := false
+		for _, s := range f.Sources {
+			if s == entry.Source {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	return true
 }
 
 // Hub manages SSE connections for log streaming.
@@ -81,8 +118,12 @@ func (h *Hub) Run() {
 
 		case message := <-h.broadcast:
 			var disconnected []string
+			entry, ok := decodeLogEntry(message)
 			h.mu.RLock()
 			for id, client := range h.clients {
+				if ok && !client.filter.matches(entry) {
+					continue
+				}
 				select {
 				case client.send <- message:
 				default:
@@ -126,6 +167,41 @@ func (h *Hub) BroadcastLog(entry *LogEntry) {
 	h.broadcast <- data
 }
 
+// splitCSV splits a comma-separated value into a slice of
+// trimmed non-empty strings. Returns nil when the input is
+// empty. Used to parse the ?level and ?source query parameters
+// on /api/v1/logs/stream.
+func splitCSV(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// decodeLogEntry reverses the JSON marshal in BroadcastLog so the
+// broadcast loop can apply per-client filters without keeping a
+// parallel channel of typed entries. Returns ok=false on parse
+// error; the broadcast then delivers the raw message to every
+// client (filters are best-effort).
+func decodeLogEntry(data []byte) (*LogEntry, bool) {
+	var e LogEntry
+	if err := json.Unmarshal(data, &e); err != nil {
+		return nil, false
+	}
+	return &e, true
+}
+
 // ClientCount returns the number of connected clients.
 func (h *Hub) ClientCount() int {
 	h.mu.RLock()
@@ -133,7 +209,10 @@ func (h *Hub) ClientCount() int {
 	return len(h.clients)
 }
 
-// HandleSSE handles Server-Sent Events connections.
+// HandleSSE handles Server-Sent Events connections. OBS-LOG-1:
+// clients may filter the stream by ?level=info,warn&source=auth
+// query parameters. Empty values mean "no filter on that
+// dimension".
 func (h *Hub) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -141,12 +220,18 @@ func (h *Hub) HandleSSE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	filter := LogFilter{
+		Levels:  splitCSV(r.URL.Query().Get("level")),
+		Sources: splitCSV(r.URL.Query().Get("source")),
+	}
+
 	h.mu.Lock()
 	h.nextID++
 	client := &Client{
-		id:   fmt.Sprintf("client-%d", h.nextID),
-		send: make(chan []byte, 256),
-		hub:  h,
+		id:     fmt.Sprintf("client-%d", h.nextID),
+		send:   make(chan []byte, 256),
+		hub:    h,
+		filter: filter,
 	}
 	h.mu.Unlock()
 
