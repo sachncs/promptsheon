@@ -147,13 +147,14 @@ func main() {
 	// a goroutine that observes rootCtx for shutdown. The supervisor
 	// owns plugin lifecycle; the daemon owns the supervisor.
 	// DEAD-Plg-2: wire the supervisor lifecycle events through
-	// the same in-memory eventbus the scheduler uses. The
-	// supervisor.NewAdapter bridges the supervisor.Publisher
-	// interface to the broader eventbus.Memory. Without the
-	// adapter, lifecycle events are no-ops; with one, they
-	// surface on the bus for downstream subscribers.
-	supBus := eventbus.NewMemory()
-	sup := supervisor.New(supervisor.NewAdapter(supBus), logger)
+	// OBS-5a: share one eventbus.Memory between the supervisor,
+	// scheduler, and executor. The supervisor's plugin-lifecycle
+	// events, scheduler's schedule.fired events, and the
+	// executor's HandleScheduleEvent subscriber all see the same
+	// shared bus, so a scheduler tick reaches the executor without
+	// a separate bridge.
+	sharedBus := eventbus.NewMemory()
+	sup := supervisor.New(supervisor.NewAdapter(sharedBus), logger)
 	builtins.Register(sup)
 	go func() {
 		if err := sup.Run(rootCtx); err != nil && !errors.Is(err, context.Canceled) {
@@ -164,7 +165,7 @@ func main() {
 	// Schedule ticker: poll the schedules table for due rows and
 	// publish schedule.fired events. The scheduler runs alongside
 	// the supervisor and exits cleanly when rootCtx is cancelled.
-	sched := scheduler.New(db, eventbus.NewMemory(), 5*time.Second)
+	sched := scheduler.New(db, sharedBus, 5*time.Second)
 	go func() {
 		if err := sched.Start(rootCtx); err != nil && !errors.Is(err, context.Canceled) {
 			logger.Warn("scheduler exited with error", "err", err)
@@ -215,7 +216,7 @@ func main() {
 		defer func() { _ = retentionDB.Close() }()
 	}
 
-	srv, limiter, tracer, collector := buildServer(rootCtx, &cfg, db, logger, tp, logHub, elector, retentionDB)
+	srv, limiter, tracer, collector := buildServer(rootCtx, &cfg, db, logger, tp, logHub, elector, retentionDB, sharedBus)
 
 	srv.StartAuditWorkers(rootCtx, 2)
 
@@ -283,7 +284,7 @@ func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
 	return db
 }
 
-func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub, elector *election.Elector, retentionDB *sql.DB) (*api.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector) {
+func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub, elector *election.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*api.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector) {
 	// OBS-TR-1: no SQLite tracer; OTel-only export.
 	collector := metrics.NewCollector()
 	// OBS-LOG-2: wire the SSE hub's drop counter into the
@@ -458,7 +459,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		}
 	}()
 
-	inv := invoke.New(enforcer, agg, executor.New(nil, func(ctx context.Context, req executor.InvokeRequest) (executor.InvokeResult, error) {
+	exec := executor.New(sharedBus, func(ctx context.Context, req executor.InvokeRequest) (executor.InvokeResult, error) {
 		// Provider routing: the canonical request now carries an
 		// explicit Provider field (set by the release Resolver).
 		// We look up the provider by that field rather than by
@@ -496,10 +497,23 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 			CostUSDMicro: int64(costUSD * 1e6),
 			Status:       "ok",
 		}, nil
-	})).
-		// OBS-5a: wire the metrics collector + OTel tracer into the
-		// invoker so every LLM call records latency / errors via
-		// the LLMMiddleware. The wiring is safe to call after New.
+	})
+
+	// OBS-5a: subscribe the executor to schedule.fired events on
+	// the shared bus so scheduler ticks route through it without
+	// needing a separate bridge. The sharedBus may be nil in unit
+	// tests that don't wire observability; skip the subscription in
+	// that case.
+	if sharedBus != nil {
+		if _, err := sharedBus.Subscribe(
+			func(ev capability.Event) { _ = exec.HandleScheduleEvent(rootCtx, ev) },
+			capability.EventType("schedule.fired"),
+		); err != nil {
+			logger.Warn("executor: subscribe schedule.fired failed", "err", err)
+		}
+	}
+
+	inv := invoke.New(enforcer, agg, exec).
 		WithObservability(collector, tracer, logger)
 
 	var opts []api.Option
