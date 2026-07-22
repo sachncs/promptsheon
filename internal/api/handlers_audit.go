@@ -142,13 +142,16 @@ func (s *Server) writeAuditCSV(w http.ResponseWriter, entries []*models.AuditEnt
 }
 
 func (s *Server) handleVerifyAuditChain(w http.ResponseWriter, r *http.Request) error {
-	ok, reason, err := s.db.VerifyAuditChain(r.Context())
+	res, err := s.db.VerifyAuditChain(r.Context())
 	if err != nil {
 		return err
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"valid":  ok,
-		"reason": reason,
+		"ok":            res.Ok,
+		"tail_mismatch": res.TailMismatch,
+		"last_row_id":   res.LastRowID,
+		"last_hash":     res.LastHash,
+		"reason":        res.Reason,
 	})
 	return nil
 }

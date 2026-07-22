@@ -180,6 +180,33 @@ func computeAuditHash(e *models.AuditEntry, detailsJSON, timestampStr string) st
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+// AuditVerifyResult is the structured outcome of VerifyAuditChain
+// (OBS-AUDIT-3). A UI can show the chain status without having
+// to re-walk the chain itself.
+//
+// Ok is true only when the chain walk completed without an
+// internal error AND the audit_chain_state rowid+hash cross-
+// check matched the walked rowid+hash.
+//
+// TailMismatch is true when the walk completed but the
+// audit_chain_state row points to a rowid or hash that the
+// walk did not reach. This is the canonical tamper signal:
+// a row was deleted out from under the chain state pointer.
+//
+// LastRowID / LastHash are the rowid and entry_hash of the
+// last walked row. They match audit_chain_state.last_rowid /
+// audit_chain_state.last_hash when Ok is true.
+//
+// Reason is a human-readable summary suitable for the audit
+// log / SSE stream. It is non-empty whenever Ok is false.
+type AuditVerifyResult struct {
+	Ok            bool
+	TailMismatch  bool
+	LastRowID     int64
+	LastHash      string
+	Reason        string
+}
+
 type auditPageResult struct {
 	nextPrevHash string
 	ok           bool
@@ -188,22 +215,22 @@ type auditPageResult struct {
 	err          error
 }
 
-func (s *SQLite) VerifyAuditChain(ctx context.Context) (ok bool, reason string, err error) {
+func (s *SQLite) VerifyAuditChain(ctx context.Context) (*AuditVerifyResult, error) {
 	const pageSize = 1000
 	var prevHash string
 	var lastRowID int64
 	for {
 		select {
 		case <-ctx.Done():
-			return false, "", ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 		res := s.verifyAuditPage(ctx, prevHash, lastRowID, pageSize)
 		if res.err != nil {
-			return false, "", res.err
+			return nil, res.err
 		}
 		if !res.ok {
-			return false, res.reason, nil
+			return &AuditVerifyResult{Ok: false, Reason: res.reason}, nil
 		}
 		if res.lastRowID == 0 {
 			break
@@ -223,16 +250,32 @@ func (s *SQLite) VerifyAuditChain(ctx context.Context) (ok bool, reason string, 
 	if err := s.db.QueryRowContext(ctx,
 		`SELECT last_rowid, last_hash FROM audit_chain_state LIMIT 1`).Scan(&stateLastRowID, &stateLastHash); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			return false, "", fmt.Errorf("audit chain state: %w", err)
+			return nil, fmt.Errorf("audit chain state: %w", err)
 		}
 	}
 	if stateLastRowID != 0 && lastRowID != stateLastRowID {
-		return false, fmt.Sprintf("audit chain tail mismatch: walked=%d, state=%d", lastRowID, stateLastRowID), nil
+		return &AuditVerifyResult{
+			Ok:           false,
+			TailMismatch: true,
+			LastRowID:    lastRowID,
+			LastHash:     prevHash,
+			Reason:       fmt.Sprintf("audit chain tail mismatch: walked=%d, state=%d", lastRowID, stateLastRowID),
+		}, nil
 	}
 	if stateLastHash != "" && prevHash != stateLastHash {
-		return false, fmt.Sprintf("audit chain tail hash mismatch: walked=%s, state=%s", prevHash, stateLastHash), nil
+		return &AuditVerifyResult{
+			Ok:           false,
+			TailMismatch: true,
+			LastRowID:    lastRowID,
+			LastHash:     prevHash,
+			Reason:       fmt.Sprintf("audit chain tail hash mismatch: walked=%s, state=%s", prevHash, stateLastHash),
+		}, nil
 	}
-	return true, "", nil
+	return &AuditVerifyResult{
+		Ok:        true,
+		LastRowID: lastRowID,
+		LastHash:  prevHash,
+	}, nil
 }
 
 // splitAuditResource splits "kind:id" into (kind, id). Inputs

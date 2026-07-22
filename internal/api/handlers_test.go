@@ -216,7 +216,9 @@ func (m *mockRepo) ExportAudit(_ context.Context, _ *models.AuditFilter) ([]*mod
 	defer m.mu.Unlock()
 	return m.auditEntries, nil
 }
-func (m *mockRepo) VerifyAuditChain(_ context.Context) (bool, string, error) { return true, "", nil }
+func (m *mockRepo) VerifyAuditChain(_ context.Context) (*store.AuditVerifyResult, error) {
+	return &store.AuditVerifyResult{Ok: true}, nil
+}
 
 // Provider Keys
 func (m *mockRepo) SaveProviderKey(_ context.Context, pk *models.ProviderKey) error {
@@ -2084,8 +2086,14 @@ func TestHandleVerifyAuditChain(t *testing.T) {
 
 	var resp map[string]any
 	readJSONBody(t, rr.Body.Bytes(), &resp)
-	if resp["valid"] != true {
-		t.Errorf("expected valid true, got %v", resp["valid"])
+	if resp["ok"] != true {
+		t.Errorf("expected ok true, got %v", resp["ok"])
+	}
+	if resp["tail_mismatch"] != false {
+		t.Errorf("expected tail_mismatch false, got %v", resp["tail_mismatch"])
+	}
+	if resp["last_row_id"] == nil {
+		t.Error("expected last_row_id to be present")
 	}
 }
 

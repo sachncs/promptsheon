@@ -294,7 +294,7 @@ func TestAppendAndVerifyAuditChain(t *testing.T) {
 		}
 	}
 
-	ok, reason, err := s.VerifyAuditChain(ctx)
+	ok, reason, err := verifyAuditChainForTest(ctx, s)
 	if err != nil {
 		t.Fatalf("VerifyAuditChain: %v", err)
 	}
@@ -353,7 +353,7 @@ func TestAuditChainDetectsTampering(t *testing.T) {
 	}
 
 	// Verify the chain is still intact (UPDATE was rolled back).
-	ok, _, err := s.VerifyAuditChain(ctx)
+	ok, _, err := verifyAuditChainForTest(ctx, s)
 	if err != nil {
 		t.Fatalf("VerifyAuditChain: %v", err)
 	}
@@ -672,7 +672,7 @@ func TestAuditChainDetectsTailDeletion(t *testing.T) {
 	}
 
 	// Sanity: chain is intact before any tampering.
-	ok, reason, err := s.VerifyAuditChain(ctx)
+	ok, reason, err := verifyAuditChainForTest(ctx, s)
 	if err != nil {
 		t.Fatalf("VerifyAuditChain (clean): %v", err)
 	}
@@ -689,7 +689,7 @@ func TestAuditChainDetectsTailDeletion(t *testing.T) {
 		t.Fatalf("delete tail: %v", err)
 	}
 
-	ok, reason, err = s.VerifyAuditChain(ctx)
+	ok, reason, err = verifyAuditChainForTest(ctx, s)
 	if err != nil {
 		t.Fatalf("VerifyAuditChain (tampered): %v", err)
 	}
@@ -814,5 +814,74 @@ func TestBootstrapAdminConcurrent(t *testing.T) {
 	}
 	if conflicts+other != N-1 {
 		t.Errorf("expected %d non-winners, got conflicts=%d other=%d", N-1, conflicts, other)
+	}
+}
+
+// verifyAuditChainForTest unwraps the structured AuditVerifyResult
+// to the legacy (ok, reason, error) tuple that earlier test
+// bodies were written against. The structured fields are exercised
+// by TestAuditChainReturnsStructuredResult elsewhere; this helper
+// exists so the existing chain tests keep reading.
+func verifyAuditChainForTest(ctx context.Context, s *store.SQLite) (bool, string, error) {
+	res, err := s.VerifyAuditChain(ctx)
+	if err != nil {
+		return false, "", err
+	}
+	return res.Ok, res.Reason, nil
+}
+
+// TestAuditChainReturnsStructuredResult locks in OBS-AUDIT-3:
+// VerifyAuditChain returns an AuditVerifyResult with the
+// expected fields populated.
+func TestAuditChainReturnsStructuredResult(t *testing.T) {
+	t.Parallel()
+	s := newTestSQLite(t)
+	ctx := context.Background()
+	for i := 0; i < 3; i++ {
+		id := fmt.Sprintf("sr-%02d", i)
+		if err := s.AppendAudit(ctx, &models.AuditEntry{
+			ID: id, UserID: "u1", Action: "noop", Resource: "x", Details: map[string]any{"i": i},
+		}); err != nil {
+			t.Fatalf("AppendAudit(%s): %v", id, err)
+		}
+	}
+
+	res, err := s.VerifyAuditChain(ctx)
+	if err != nil {
+		t.Fatalf("VerifyAuditChain: %v", err)
+	}
+	if res == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if !res.Ok {
+		t.Errorf("expected Ok=true, got false; reason=%q", res.Reason)
+	}
+	if res.TailMismatch {
+		t.Error("expected TailMismatch=false on a clean chain")
+	}
+	if res.LastRowID == 0 {
+		t.Error("expected non-zero LastRowID")
+	}
+	if res.LastHash == "" {
+		t.Error("expected non-empty LastHash")
+	}
+	if res.Reason != "" {
+		t.Errorf("expected empty Reason on clean chain, got %q", res.Reason)
+	}
+
+	// Tamper: delete the last row. State row still points to it.
+	if _, err := s.DB().ExecContext(ctx,
+		`DELETE FROM audit_entries WHERE id='sr-02'`); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	res2, err := s.VerifyAuditChain(ctx)
+	if err != nil {
+		t.Fatalf("VerifyAuditChain after tamper: %v", err)
+	}
+	if res2.Ok {
+		t.Error("expected Ok=false after tamper")
+	}
+	if !res2.TailMismatch {
+		t.Error("expected TailMismatch=true after tamper")
 	}
 }
