@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -81,6 +82,7 @@ type Hub struct {
 	nextID     int
 	stop       chan struct{}
 	done       chan struct{}
+	dropped    atomic.Int64
 }
 
 // NewHub creates a new SSE hub.
@@ -157,14 +159,29 @@ func (h *Hub) Stop() {
 	<-h.done
 }
 
-// BroadcastLog sends a log entry to all connected clients.
+// BroadcastLog sends a log entry to all connected clients. The
+// broadcast channel is bounded at 256 messages; if the hub's Run
+// loop is slow, BroadcastLog drops with a non-blocking send and
+// increments Dropped. OBS-LOG-2: a non-blocking send with a
+// drop counter prevents a slow consumer from back-pressuring the
+// slog chain (and therefore the request handler).
 func (h *Hub) BroadcastLog(entry *LogEntry) {
 	data, err := json.Marshal(entry)
 	if err != nil {
 		h.logger.Error("failed to marshal log entry", "err", err)
 		return
 	}
-	h.broadcast <- data
+	select {
+	case h.broadcast <- data:
+	default:
+		h.dropped.Add(1)
+	}
+}
+
+// Dropped returns the cumulative number of log entries the hub
+// dropped because its broadcast channel was full.
+func (h *Hub) Dropped() int64 {
+	return h.dropped.Load()
 }
 
 // splitCSV splits a comma-separated value into a slice of

@@ -212,7 +212,27 @@ type Collector struct {
 	// between audit() being called and the entry being
 	// persisted by the worker. Updated via ObserveAuditQueue.
 	AuditQueueLatency *Histogram
+
+	// LogHubDrops (OBS-LOG-2): the cumulative number of
+	// log entries the SSE hub dropped because its broadcast
+	// channel was full. Set by SetLogHub.
+	LogHubDrops atomic.Int64
+
+	// hub is the live SSE hub. The Prometheus exposition
+	// reads its current drop count on every scrape so the
+	// counter stays accurate without a sync loop.
+	hub HubDropper
 }
+
+// HubDropper is the subset of *ws.Hub the metrics collector
+// uses. Defined as an interface to avoid an import cycle.
+type HubDropper interface {
+	Dropped() int64
+}
+
+// SetLogHub wires the live SSE hub into the collector so the
+// Prometheus scrape can read the cumulative drop count. OBS-LOG-2.
+func (c *Collector) SetLogHub(h HubDropper) { c.hub = h }
 
 // ObserveAuditQueue records a single audit-queue latency
 // observation in seconds. Called by the audit worker once the
@@ -322,6 +342,7 @@ type Summary struct {
 		AuditQueueP95Secs   float64 `json:"audit_queue_p95_secs"`
 		AuditQueueP99Secs   float64 `json:"audit_queue_p99_secs"`
 		TraceDropped        int64   `json:"trace_dropped"`
+		LogHubDrops         int64   `json:"log_hub_drops"`
 	} `json:"pipeline_metrics"`
 	LLMMetrics struct {
 		TotalCalls   int64   `json:"total_calls"`
@@ -418,6 +439,9 @@ func (c *Collector) GetSummary() *Summary {
 	s.PipelineMetrics.AuditQueueP95Secs = c.AuditQueueLatency.P95()
 	s.PipelineMetrics.AuditQueueP99Secs = c.AuditQueueLatency.P99()
 	s.PipelineMetrics.TraceDropped = c.traceDropped.Load()
+	if c.hub != nil {
+		s.PipelineMetrics.LogHubDrops = c.hub.Dropped()
+	}
 
 	return s
 }
@@ -481,6 +505,9 @@ func (c *Collector) prometheusFormat() string {
 	writeCounter("promptsheon_audit_dropped_total", "Audit entries dropped because the worker queue was full", float64(c.auditDropped.Load()))
 	writeHistogram("promptsheon_audit_queue_latency_seconds", "Time between audit() being called and the entry being persisted by the worker", c.AuditQueueLatency)
 	writeCounter("promptsheon_trace_dropped_total", "Trace spans dropped because the worker queue was full", float64(c.traceDropped.Load()))
+	if c.hub != nil {
+		writeCounter("promptsheon_log_hub_drops_total", "Log entries dropped because the SSE broadcast channel was full", float64(c.hub.Dropped()))
+	}
 
 	writeCounter("promptsheon_guardrail_passes_total", "Guardrail passes", c.GuardrailPasses.Value())
 

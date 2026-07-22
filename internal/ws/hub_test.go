@@ -672,3 +672,22 @@ func equalStringSlice(a, b []string) bool {
 func silentLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
 }
+
+// TestHubBroadcastNonBlockingDrops exercises OBS-LOG-2: when
+// the broadcast channel is full, BroadcastLog returns without
+// blocking and increments Dropped().
+func TestHubBroadcastNonBlockingDrops(t *testing.T) {
+	hub := NewHub(silentLogger())
+	hub.broadcast = make(chan []byte, 2)
+	// Don't start hub.Run; the broadcast channel is full and
+	// nothing drains it.
+	hub.BroadcastLog(&LogEntry{Timestamp: time.Now(), Level: "INFO", Message: "m1"})
+	hub.BroadcastLog(&LogEntry{Timestamp: time.Now(), Level: "INFO", Message: "m2"})
+	if got := hub.Dropped(); got != 0 {
+		t.Errorf("expected 0 drops while channel had room, got %d", got)
+	}
+	hub.BroadcastLog(&LogEntry{Timestamp: time.Now(), Level: "INFO", Message: "m3"})
+	if got := hub.Dropped(); got != 1 {
+		t.Errorf("expected 1 drop after channel full, got %d", got)
+	}
+}
