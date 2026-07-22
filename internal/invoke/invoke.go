@@ -14,13 +14,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/budget"
 	"github.com/sachncs/promptsheon/internal/executor"
+	"github.com/sachncs/promptsheon/internal/metrics"
 	"github.com/sachncs/promptsheon/internal/observation"
 	"github.com/sachncs/promptsheon/internal/quota"
+	"github.com/sachncs/promptsheon/internal/trace"
 )
 
 // Caller is the actual LLM provider invocation. It is the same
@@ -60,12 +63,29 @@ type Invoker struct {
 	enforcer Enforcer
 	agg      AggregatorConsumer
 	exec     *executor.Executor
+
+	// OBS-5a: optional metrics/tracer wiring. When non-nil, every
+	// Invoke call goes through metrics.LLMMiddleware which records
+	// the per-call latency, success/error counts, and span.
+	llmCollector *metrics.Collector
+	tracer       trace.Tracer
+	logger      *slog.Logger
 }
 
 // New constructs an Invoker. The Executor is supplied by the caller
 // so production wiring decides what the bus looks like.
 func New(enforcer Enforcer, agg AggregatorConsumer, exec *executor.Executor) *Invoker {
 	return &Invoker{enforcer: enforcer, agg: agg, exec: exec}
+}
+
+// WithObservability wires the metrics collector + tracer used by
+// the LLMMiddleware wrapper. OBS-5a. May be called once at
+// construction; passing nil values is a no-op.
+func (i *Invoker) WithObservability(c *metrics.Collector, t trace.Tracer, l *slog.Logger) *Invoker {
+	i.llmCollector = c
+	i.tracer = t
+	i.logger = l
+	return i
 }
 
 // Errors returned by Invoke.
@@ -95,7 +115,7 @@ func (i *Invoker) Invoke(ctx context.Context, req executor.InvokeRequest) (execu
 		}
 		return executor.ExecutionRecord{}, fmt.Errorf("%w: %w", ErrQuotaEnforcer, err)
 	}
-	rec, err := i.exec.RunRequest(ctx, req, "prod")
+	rec, err := i.invokeLLM(ctx, req, "prod")
 	if err != nil {
 		return rec, err
 	}
@@ -195,6 +215,30 @@ func (d *DefaultEnforcer) EnforceQuota(_ context.Context, workspaceID string) er
 	d.quotas[workspaceID] = &updated
 	d.mu.Unlock()
 	return nil
+}
+
+// invokeLLM wraps i.exec.RunRequest in the LLMMiddleware when
+// observability is wired. Without observability the call goes
+// straight through. OBS-5a: every LLM call now records
+// latency, success/error counts, and an OTel span.
+func (i *Invoker) invokeLLM(ctx context.Context, req executor.InvokeRequest, env string) (executor.ExecutionRecord, error) {
+	if i.llmCollector == nil || i.tracer == nil {
+		return i.exec.RunRequest(ctx, req, env)
+	}
+	wrapped := metrics.LLMMiddleware(i.llmCollector, i.tracer, i.logger)(
+		func(operation string, r any) (any, error) {
+			return i.exec.RunRequest(ctx, r.(executor.InvokeRequest), operation)
+		},
+	)
+	rec, err := wrapped(env, req)
+	if err != nil {
+		return executor.ExecutionRecord{}, err
+	}
+	typed, ok := rec.(executor.ExecutionRecord)
+	if !ok {
+		return executor.ExecutionRecord{}, fmt.Errorf("invoke: middleware returned %T, want ExecutionRecord", rec)
+	}
+	return typed, nil
 }
 
 // Verify interface compliance at compile time.
