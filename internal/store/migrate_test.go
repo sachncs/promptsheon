@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -78,12 +79,16 @@ func TestMigrateDestructiveAllowed(t *testing.T) {
 }
 
 // TestMigrateUpToTargets exercises the per-version DB-17 helper
-// against the consolidated 8-file layout.
+// against the consolidated 8-file layout. Each case opens a
+// fresh database (no NewSQLite, no full migration) and calls
+// migrateUpTo with a specific target. The test verifies that
+// migrations 1..N-1 do NOT apply (their tables are absent) and
+// that migration N does apply.
 func TestMigrateUpToTargets(t *testing.T) {
 	t.Setenv("PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS", "true")
 	cases := []struct {
-		target    int
-		wantTables []string
+		target     int
+		wantTables []string // tables expected after migrateUpTo(target)
 	}{
 		{1, []string{"schema_migrations"}},
 		{2, []string{"users", "api_keys", "provider_keys",
@@ -102,17 +107,17 @@ func TestMigrateUpToTargets(t *testing.T) {
 		t.Run("", func(t *testing.T) {
 			tmpDir := t.TempDir()
 			dbPath := filepath.Join(tmpDir, "upto.db")
-			repo, err := NewSQLite(dbPath)
+			db, err := sql.Open("sqlite", dbPath+"?_pragma=foreign_keys(ON)")
 			if err != nil {
-				t.Fatalf("NewSQLite: %v", err)
+				t.Fatalf("sql.Open: %v", err)
 			}
-			t.Cleanup(func() { _ = repo.Close() })
-			if err := migrateUpTo(repo.DB(), c.target); err != nil {
+			t.Cleanup(func() { _ = db.Close() })
+			if err := migrateUpTo(db, c.target); err != nil {
 				t.Fatalf("migrateUpTo(%d): %v", c.target, err)
 			}
 			for _, table := range c.wantTables {
 				var n int
-				if err := repo.DB().QueryRow(
+				if err := db.QueryRow(
 					`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?`,
 					table,
 				).Scan(&n); err != nil {
@@ -121,6 +126,16 @@ func TestMigrateUpToTargets(t *testing.T) {
 				if n == 0 {
 					t.Errorf("expected table %s after migrateUpTo(%d)", table, c.target)
 				}
+			}
+			// Verify the recorded migration count matches the target.
+			var recorded int
+			if err := db.QueryRow(
+				`SELECT COUNT(*) FROM schema_migrations`,
+			).Scan(&recorded); err != nil {
+				t.Fatalf("count migrations: %v", err)
+			}
+			if recorded != c.target {
+				t.Errorf("schema_migrations count = %d, want %d", recorded, c.target)
 			}
 		})
 	}
