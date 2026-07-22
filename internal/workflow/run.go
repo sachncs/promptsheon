@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/sachncs/promptsheon/internal/metrics"
 )
 
 // Step is one node in a workflow DAG. The Engine runs steps in
@@ -35,7 +37,40 @@ type Definition struct {
 // The engine is concurrency-safe and stateless: a new Engine
 // instance can be created per request, or the same Engine can
 // serve many concurrent requests.
+//
+// OBS-5b: when observability is wired (llmCollector +
+// tracer), Run goes through the WorkflowMiddleware which records
+// per-call duration, success/error counts, and an OTel span.
+// Without wiring the call goes straight through.
 func (e *Engine) Run(ctx context.Context, def Definition, initial map[string]any) (*Result, error) {
+	if e.llmCollector != nil && e.tracer != nil {
+		return e.runInstrumented(ctx, def, initial)
+	}
+	return e.runRaw(ctx, def, initial)
+}
+
+// runInstrumented wraps runRaw in the WorkflowMiddleware. The
+// middleware signature takes `def any` and `result any` so we
+// type-assert on the way out.
+func (e *Engine) runInstrumented(ctx context.Context, def Definition, initial map[string]any) (*Result, error) {
+	wrapped := metrics.WorkflowMiddleware(e.llmCollector, e.tracer, nil)(
+		func(ctx context.Context, d any, init map[string]any) (any, error) {
+			r, err := e.runRaw(ctx, d.(Definition), init)
+			return r, err
+		},
+	)
+	out, err := wrapped(ctx, def, initial)
+	if err != nil {
+		return nil, err
+	}
+	typed, ok := out.(*Result)
+	if !ok {
+		return nil, fmt.Errorf("workflow: middleware returned %T, want *Result", out)
+	}
+	return typed, nil
+}
+
+func (e *Engine) runRaw(ctx context.Context, def Definition, initial map[string]any) (*Result, error) {
 	if def.ID == "" {
 		return nil, fmt.Errorf("workflow: definition id is required")
 	}
