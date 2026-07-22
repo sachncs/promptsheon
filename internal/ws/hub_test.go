@@ -531,3 +531,144 @@ func TestStreamHandler_WithAttrsHandle(t *testing.T) {
 		t.Fatal("timeout waiting for streamed log with builtin attrs")
 	}
 }
+
+// TestLogFilterMatches locks in OBS-LOG-1: empty filters match
+// anything; non-empty filters require membership.
+func TestLogFilterMatches(t *testing.T) {
+	cases := []struct {
+		name   string
+		filter LogFilter
+		entry  LogEntry
+		want   bool
+	}{
+		{"empty-all", LogFilter{}, LogEntry{Level: "INFO", Source: "x"}, true},
+		{"level-match", LogFilter{Levels: []string{"INFO"}}, LogEntry{Level: "INFO"}, true},
+		{"level-miss", LogFilter{Levels: []string{"INFO"}}, LogEntry{Level: "WARN"}, false},
+		{"source-match", LogFilter{Sources: []string{"auth"}}, LogEntry{Source: "auth"}, true},
+		{"source-miss", LogFilter{Sources: []string{"auth"}}, LogEntry{Source: "vault"}, false},
+		{"both-match", LogFilter{Levels: []string{"INFO"}, Sources: []string{"auth"}}, LogEntry{Level: "INFO", Source: "auth"}, true},
+		{"both-half-miss", LogFilter{Levels: []string{"INFO"}, Sources: []string{"auth"}}, LogEntry{Level: "INFO", Source: "vault"}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := c.filter.matches(&c.entry); got != c.want {
+				t.Errorf("matches(%+v, %+v) = %v, want %v", c.filter, c.entry, got, c.want)
+			}
+		})
+	}
+}
+
+// TestSplitCSV exercises the OBS-LOG-1 query-param parser.
+func TestSplitCSV(t *testing.T) {
+	cases := []struct {
+		in   string
+		want []string
+	}{
+		{"", nil},
+		{",,,", nil},
+		{"info", []string{"info"}},
+		{"info,warn", []string{"info", "warn"}},
+		{" info , warn ", []string{"info", "warn"}},
+		{"info,,warn", []string{"info", "warn"}},
+	}
+	for _, c := range cases {
+		if got := splitCSV(c.in); !equalStringSlice(got, c.want) {
+			t.Errorf("splitCSV(%q) = %v, want %v", c.in, got, c.want)
+		}
+	}
+}
+
+// TestHubBroadcastFiltersByLevel exercises the broadcast loop's
+// per-client filter path: two clients, one with ?level=info
+// filter, one without; only the unfiltered client sees the WARN
+// entry.
+func TestHubBroadcastFiltersByLevel(t *testing.T) {
+	hub := NewHub(silentLogger())
+	go hub.Run()
+	defer hub.Stop()
+
+	clientUnfiltered := hub.newTestClient(LogFilter{})
+	clientInfoOnly := hub.newTestClient(LogFilter{Levels: []string{"INFO"}})
+	hub.register <- clientUnfiltered
+	hub.register <- clientInfoOnly
+	// Allow register to drain.
+	time.Sleep(10 * time.Millisecond)
+
+	hub.BroadcastLog(&LogEntry{Timestamp: time.Now(), Level: "WARN", Source: "auth", Message: "warn-1"})
+	hub.BroadcastLog(&LogEntry{Timestamp: time.Now(), Level: "INFO", Source: "auth", Message: "info-1"})
+
+	// Unfiltered client: receives both, in order.
+	got1 := tryReceive(clientUnfiltered, time.Second)
+	got2 := tryReceive(clientUnfiltered, time.Second)
+	if !((got1 == "warn-1" && got2 == "info-1") || (got1 == "info-1" && got2 == "warn-1")) {
+		t.Errorf("unfiltered client should see warn-1 and info-1, got %q %q", got1, got2)
+	}
+	// Info-only client: receives only info-1, not warn-1.
+	got := tryReceive(clientInfoOnly, 500*time.Millisecond)
+	if got != "info-1" {
+		t.Errorf("info-only client should see info-1, got %q", got)
+	}
+	if extra := tryReceive(clientInfoOnly, 200*time.Millisecond); extra != "" {
+		t.Errorf("info-only client should not see WARN, got %q", extra)
+	}
+}
+
+// helpers --------------------------------------------------------------
+
+func (h *Hub) newTestClient(filter LogFilter) *Client {
+	h.mu.Lock()
+	h.nextID++
+	c := &Client{
+		id:     fmt.Sprintf("test-client-%d", h.nextID),
+		send:   make(chan []byte, 256),
+		hub:    h,
+		filter: filter,
+	}
+	h.mu.Unlock()
+	return c
+}
+
+func assertMessage(t *testing.T, c *Client, want string) {
+	t.Helper()
+	select {
+	case msg := <-c.send:
+		var entry LogEntry
+		if err := json.Unmarshal(msg, &entry); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+		if entry.Message != want {
+			t.Errorf("expected message %q, got %q", want, entry.Message)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timeout waiting for %q", want)
+	}
+}
+
+func tryReceive(c *Client, d time.Duration) string {
+	select {
+	case msg := <-c.send:
+		var entry LogEntry
+		if err := json.Unmarshal(msg, &entry); err != nil {
+			return ""
+		}
+		return entry.Message
+	case <-time.After(d):
+		return ""
+	}
+}
+
+func equalStringSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func silentLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
+}
