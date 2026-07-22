@@ -207,6 +207,20 @@ type Collector struct {
 	// scrape.
 	auditDropped atomic.Int64
 	traceDropped atomic.Int64
+
+	// AuditQueueLatency (OBS-AUDIT-2): histogram of time
+	// between audit() being called and the entry being
+	// persisted by the worker. Updated via ObserveAuditQueue.
+	AuditQueueLatency *Histogram
+}
+
+// ObserveAuditQueue records a single audit-queue latency
+// observation in seconds. Called by the audit worker once the
+// DB write commits.
+func (c *Collector) ObserveAuditQueue(seconds float64) {
+	if c.AuditQueueLatency != nil {
+		c.AuditQueueLatency.Observe(seconds)
+	}
 }
 
 // SetAuditDropped updates the cumulative audit-pipeline drop
@@ -272,6 +286,7 @@ func NewCollector() *Collector {
 		AgentExecutionsTotal:  newCounter(nil),
 		AgentExecutionLatency: newHistogram(nil),
 		HallucinationScores:   newHistogram(nil),
+		AuditQueueLatency:     newHistogram(nil),
 	}
 }
 
@@ -302,8 +317,11 @@ type Summary struct {
 	// receives them via SetAuditDropped / SetTraceDropped so the
 	// values surface in /metrics and /api/v1/metrics/summary.
 	PipelineMetrics struct {
-		AuditDropped int64 `json:"audit_dropped"`
-		TraceDropped int64 `json:"trace_dropped"`
+		AuditDropped        int64   `json:"audit_dropped"`
+		AuditQueueAvgSecs   float64 `json:"audit_queue_avg_secs"`
+		AuditQueueP95Secs   float64 `json:"audit_queue_p95_secs"`
+		AuditQueueP99Secs   float64 `json:"audit_queue_p99_secs"`
+		TraceDropped        int64   `json:"trace_dropped"`
 	} `json:"pipeline_metrics"`
 	LLMMetrics struct {
 		TotalCalls   int64   `json:"total_calls"`
@@ -396,6 +414,9 @@ func (c *Collector) GetSummary() *Summary {
 	// report them. The Prometheus exposition is emitted by
 	// prometheusFormat below.
 	s.PipelineMetrics.AuditDropped = c.auditDropped.Load()
+	s.PipelineMetrics.AuditQueueAvgSecs = c.AuditQueueLatency.Avg()
+	s.PipelineMetrics.AuditQueueP95Secs = c.AuditQueueLatency.P95()
+	s.PipelineMetrics.AuditQueueP99Secs = c.AuditQueueLatency.P99()
 	s.PipelineMetrics.TraceDropped = c.traceDropped.Load()
 
 	return s
@@ -458,6 +479,7 @@ func (c *Collector) prometheusFormat() string {
 	writeCounter("promptsheon_guardrail_violations_total", "Guardrail violations", c.GuardrailViolations.Value())
 	writeCounter("promptsheon_guardrail_blocks_total", "Guardrail blocks", c.GuardrailBlocks.Value())
 	writeCounter("promptsheon_audit_dropped_total", "Audit entries dropped because the worker queue was full", float64(c.auditDropped.Load()))
+	writeHistogram("promptsheon_audit_queue_latency_seconds", "Time between audit() being called and the entry being persisted by the worker", c.AuditQueueLatency)
 	writeCounter("promptsheon_trace_dropped_total", "Trace spans dropped because the worker queue was full", float64(c.traceDropped.Load()))
 
 	writeCounter("promptsheon_guardrail_passes_total", "Guardrail passes", c.GuardrailPasses.Value())
