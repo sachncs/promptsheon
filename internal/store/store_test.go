@@ -129,11 +129,12 @@ func TestNewSQLiteRunsAllMigrations(t *testing.T) {
 	if err := rows.Scan(&n); err != nil {
 		t.Fatalf("scan: %v", err)
 	}
-	// After consolidation the migration count is 12
+	// After consolidation the migration count is 13
 	// (001-008 + 009 vault_state + 010 ws_state +
-	// 011 audit_archive + 012 enforcer_state for OBS-13).
-	if n != 12 {
-		t.Errorf("migrations applied = %d, want 12", n)
+	// 011 audit_archive + 012 enforcer_state +
+	// 013 idempotency_cache for API-IDEMP-1).
+	if n != 13 {
+		t.Errorf("migrations applied = %d, want 13", n)
 	}
 }
 
