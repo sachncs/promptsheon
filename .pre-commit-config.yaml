@@ -1,0 +1,43 @@
+# OPS-CI-1: pre-commit hooks. We keep the surface tight:
+# the hooks that match every commit land in pre-commit; the
+# periodic checks (markdownlint, vale, Dependabot) live in CI
+# so the local hook time stays under a second. Operators can
+# install with `pip install pre-commit && pre-commit install`.
+#
+# Note: the `gofmt` and `goimports` hooks need a working Go
+# toolchain. Production CI has it; this config is a no-op on
+# dev machines that don't.
+
+repos:
+  - repo: local
+    hooks:
+      - id: gofmt
+        name: gofmt
+        description: Format Go source files (gofmt -s -w .).
+        language: system
+        entry: gofmt -s -w
+        args: []
+        files: \.go$
+        pass_filenames: true
+
+      - id: goimports
+        name: goimports
+        description: Tidy Go imports.
+        language: system
+        entry: goimports -w
+        args: []
+        files: \.go$
+        pass_filenames: true
+
+      - id: golangci-fix
+        # OPS-CI-1: golangci-lint --fix on the touched files
+        # only (the full lint run is in CI; this is the cheap
+        # local autofix loop). Operators who don't have
+        # golangci-lint installed can `go install` it; the
+        # hook is a no-op in that case.
+        name: golangci-lint --fix
+        description: Auto-fix linter issues on the changed files.
+        language: system
+        entry: bash -c 'changed=$(git diff --cached --name-only --diff-filter=ACM | grep -E "\.go$" || true); if [ -n "$changed" ]; then golangci-lint run --fix $changed || true; fi'
+        files: \.go$
+        pass_filenames: false
