@@ -2,7 +2,6 @@ package api
 
 import (
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -15,19 +14,12 @@ import (
 	"github.com/sachncs/promptsheon/internal/invoke"
 )
 
-// translateGetError turns a store error from a single-row GET into
-// the appropriate HTTP response. A missing row is a 404; any
-// other error is a 500 with a generic message. This centralises
-// the pattern used across the GET handlers in this file and
-// keeps each handler to one line.
+// translateGetError is retained as a thin wrapper over the
+// shared translateDBError helper (API-4a) so existing call
+// sites in this file don't have to be renamed. New code should
+// call translateDBError directly.
 func translateGetError(err error, resource string) error {
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
-	}
-	return &HTTPError{
-		Status:  http.StatusInternalServerError,
-		Message: resource + " lookup failed",
-	}
+	return translateDBError(err, resource)
 }
 
 // computeManifestHash returns the canonical SHA-256 hex of a Manifest
@@ -55,7 +47,9 @@ func (s *Server) handleListWorkspaces(w http.ResponseWriter, r *http.Request) er
 	if workspaces == nil {
 		workspaces = []*capability.Workspace{}
 	}
-	writeJSON(w, http.StatusOK, applyOffsetLimit(workspaces, offset, limit))
+	paged := applyOffsetLimit(workspaces, offset, limit)
+	writePaginationHeaders(w, r, limit, offset, len(workspaces), len(paged))
+	writeJSON(w, http.StatusOK, paged)
 	return nil
 }
 
@@ -67,8 +61,8 @@ func (s *Server) handleCreateWorkspace(w http.ResponseWriter, r *http.Request) e
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
-	if req.Name == "" {
-		return ErrBadRequest
+	if err := validateNonEmpty("name", req.Name); err != nil {
+		return err
 	}
 	now := time.Now()
 	wksp := &capability.Workspace{
@@ -90,11 +84,7 @@ func (s *Server) handleGetWorkspace(w http.ResponseWriter, r *http.Request) erro
 	id := r.PathValue("id")
 	wksp, err := s.db.GetWorkspace(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrNotFound
-		}
-		// BUG-4: distinguish DB failures from missing rows.
-		return &HTTPError{Status: http.StatusInternalServerError, Message: "workspace lookup failed"}
+		return translateDBError(err, "workspace")
 	}
 	writeJSON(w, http.StatusOK, wksp)
 	return nil
@@ -104,7 +94,7 @@ func (s *Server) handleUpdateWorkspace(w http.ResponseWriter, r *http.Request) e
 	id := r.PathValue("id")
 	existing, err := s.db.GetWorkspace(r.Context(), id)
 	if err != nil {
-		return ErrNotFound
+		return translateDBError(err, "workspace")
 	}
 	var req struct {
 		Name         *string `json:"name"`
@@ -131,7 +121,7 @@ func (s *Server) handleUpdateWorkspace(w http.ResponseWriter, r *http.Request) e
 func (s *Server) handleDeleteWorkspace(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if err := s.db.DeleteWorkspace(r.Context(), id); err != nil {
-		return ErrNotFound
+		return translateDBError(err, "workspace")
 	}
 	s.audit(r.Context(), "delete", "workspace:"+id, nil)
 	w.WriteHeader(http.StatusNoContent)
@@ -151,7 +141,9 @@ func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) erro
 	if projects == nil {
 		projects = []*capability.Project{}
 	}
-	writeJSON(w, http.StatusOK, applyOffsetLimit(projects, offset, limit))
+	paged := applyOffsetLimit(projects, offset, limit)
+	writePaginationHeaders(w, r, limit, offset, len(projects), len(paged))
+	writeJSON(w, http.StatusOK, paged)
 	return nil
 }
 
@@ -164,8 +156,8 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) err
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
-	if req.Name == "" {
-		return ErrBadRequest
+	if err := validateNonEmpty("name", req.Name); err != nil {
+		return err
 	}
 	now := time.Now()
 	proj := &capability.Project{
@@ -188,7 +180,7 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) error 
 	id := r.PathValue("id")
 	proj, err := s.db.GetProject(r.Context(), id)
 	if err != nil {
-		return ErrNotFound
+		return translateDBError(err, "project")
 	}
 	writeJSON(w, http.StatusOK, proj)
 	return nil
@@ -198,7 +190,7 @@ func (s *Server) handleUpdateProject(w http.ResponseWriter, r *http.Request) err
 	id := r.PathValue("id")
 	existing, err := s.db.GetProject(r.Context(), id)
 	if err != nil {
-		return ErrNotFound
+		return translateDBError(err, "project")
 	}
 	var req struct {
 		Name        *string `json:"name"`
@@ -225,7 +217,7 @@ func (s *Server) handleUpdateProject(w http.ResponseWriter, r *http.Request) err
 func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if err := s.db.DeleteProject(r.Context(), id); err != nil {
-		return ErrNotFound
+		return translateDBError(err, "project")
 	}
 	s.audit(r.Context(), "delete", "project:"+id, nil)
 	w.WriteHeader(http.StatusNoContent)
@@ -245,7 +237,9 @@ func (s *Server) handleListCapabilities(w http.ResponseWriter, r *http.Request) 
 	if caps == nil {
 		caps = []*capability.Capability{}
 	}
-	writeJSON(w, http.StatusOK, applyOffsetLimit(caps, offset, limit))
+	paged := applyOffsetLimit(caps, offset, limit)
+	writePaginationHeaders(w, r, limit, offset, len(caps), len(paged))
+	writeJSON(w, http.StatusOK, paged)
 	return nil
 }
 
@@ -260,8 +254,15 @@ func (s *Server) handleCreateCapability(w http.ResponseWriter, r *http.Request) 
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
-	if req.Name == "" {
-		return ErrBadRequest
+	if err := validateNonEmpty("name", req.Name); err != nil {
+		return err
+	}
+	// API-VAL-3: Owner must reference an existing user when
+	// supplied. An empty Owner is allowed (means "no owner").
+	if req.Owner != "" {
+		if _, err := s.db.GetUser(r.Context(), req.Owner); err != nil {
+			return badRequest("owner: " + translateDBError(err, "user").Error())
+		}
 	}
 	now := time.Now()
 	capab := &capability.Capability{
@@ -286,7 +287,7 @@ func (s *Server) handleGetCapability(w http.ResponseWriter, r *http.Request) err
 	id := r.PathValue("id")
 	c, err := s.db.GetCapability(r.Context(), id)
 	if err != nil {
-		return ErrNotFound
+		return translateDBError(err, "capability")
 	}
 	writeJSON(w, http.StatusOK, c)
 	return nil
@@ -296,7 +297,7 @@ func (s *Server) handleUpdateCapability(w http.ResponseWriter, r *http.Request) 
 	id := r.PathValue("id")
 	existing, err := s.db.GetCapability(r.Context(), id)
 	if err != nil {
-		return ErrNotFound
+		return translateDBError(err, "capability")
 	}
 	var req struct {
 		Name        *string   `json:"name"`
@@ -331,7 +332,7 @@ func (s *Server) handleUpdateCapability(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleDeleteCapability(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if err := s.db.DeleteCapability(r.Context(), id); err != nil {
-		return ErrNotFound
+		return translateDBError(err, "capability")
 	}
 	s.audit(r.Context(), "delete", "capability:"+id, nil)
 	w.WriteHeader(http.StatusNoContent)
@@ -351,7 +352,9 @@ func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request) erro
 	if versions == nil {
 		versions = []*capability.Version{}
 	}
-	writeJSON(w, http.StatusOK, applyOffsetLimit(versions, offset, limit))
+	paged := applyOffsetLimit(versions, offset, limit)
+	writePaginationHeaders(w, r, limit, offset, len(versions), len(paged))
+	writeJSON(w, http.StatusOK, paged)
 	return nil
 }
 
@@ -364,7 +367,11 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
-
+	// API-VAL-2: reject non-positive version numbers so the
+	// caller can't insert a phantom "v0" or "v-1".
+	if err := validatePositiveInt("version", req.Version); err != nil {
+		return err
+	}
 	// Forward-only: every request MUST supply a Manifest. The
 	// legacy synthesis helper is gone; clients that still pass
 	// the old bundle shape get 400 with a manifest-required error.
@@ -412,7 +419,7 @@ func (s *Server) handleGetVersion(w http.ResponseWriter, r *http.Request) error 
 	id := r.PathValue("id")
 	v, err := s.db.GetVersion(r.Context(), id)
 	if err != nil {
-		return ErrNotFound
+		return translateDBError(err, "version")
 	}
 	writeJSON(w, http.StatusOK, v)
 	return nil
@@ -422,7 +429,7 @@ func (s *Server) handleGetLatestVersion(w http.ResponseWriter, r *http.Request) 
 	capabilityID := r.PathValue("capability_id")
 	v, err := s.db.GetLatestVersion(r.Context(), capabilityID)
 	if err != nil {
-		return ErrNotFound
+		return translateDBError(err, "version")
 	}
 	writeJSON(w, http.StatusOK, v)
 	return nil
@@ -613,7 +620,7 @@ func (s *Server) handleGetExecution(w http.ResponseWriter, r *http.Request) erro
 	id := r.PathValue("id")
 	e, err := s.db.GetExecution(r.Context(), id)
 	if err != nil {
-		return ErrNotFound
+		return translateDBError(err, "execution")
 	}
 	writeJSON(w, http.StatusOK, e)
 	return nil

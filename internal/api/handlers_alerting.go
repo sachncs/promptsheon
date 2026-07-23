@@ -8,6 +8,17 @@ import (
 	"github.com/sachncs/promptsheon/internal/alerting"
 )
 
+// validSeverities is the closed set for AlertRule.Severity.
+// API-VAL-4: any value outside this set is a 400, so the
+// downstream alerting pipeline never has to default or
+// branch on an unknown label.
+var validSeverities = []string{
+	string(alerting.SeverityLow),
+	string(alerting.SeverityMedium),
+	string(alerting.SeverityHigh),
+	string(alerting.SeverityCritical),
+}
+
 func (s *Server) handleListAlertRules(w http.ResponseWriter, r *http.Request) error {
 	if s.alertingManager == nil {
 		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
@@ -20,7 +31,9 @@ func (s *Server) handleListAlertRules(w http.ResponseWriter, r *http.Request) er
 	if rules == nil {
 		rules = []*alerting.AlertRule{}
 	}
-	writeJSON(w, http.StatusOK, applyOffsetLimit(rules, offset, limit))
+	paged := applyOffsetLimit(rules, offset, limit)
+	writePaginationHeaders(w, r, limit, offset, len(rules), len(paged))
+	writeJSON(w, http.StatusOK, paged)
 	return nil
 }
 
@@ -42,8 +55,21 @@ func (s *Server) handleCreateAlertRule(w http.ResponseWriter, r *http.Request) e
 		return ErrBadRequest
 	}
 
-	if req.Name == "" || req.Type == "" {
-		return badRequest("name and type are required")
+	if err := validateNonEmpty("name", req.Name); err != nil {
+		return err
+	}
+	if err := validateNonEmpty("type", req.Type); err != nil {
+		return err
+	}
+	// API-VAL-4: severity must be a member of the closed set.
+	if req.Severity != "" && !validateEnum(req.Severity, validSeverities) {
+		return badRequest("severity must be one of info, warning, critical")
+	}
+	// API-VAL-5: threshold must be strictly positive. A
+	// non-positive threshold would fire on every sample and
+	// is almost certainly a caller error.
+	if err := validatePositiveFloat("threshold", req.Threshold); err != nil {
+		return err
 	}
 
 	now := time.Now()
@@ -94,6 +120,7 @@ func (s *Server) handleUpdateAlertRule(w http.ResponseWriter, r *http.Request) e
 	var req struct {
 		Name      *string        `json:"name"`
 		Enabled   *bool          `json:"enabled"`
+		Severity  *string        `json:"severity"`
 		Threshold *float64       `json:"threshold"`
 		Config    map[string]any `json:"config,omitempty"`
 	}
@@ -107,7 +134,16 @@ func (s *Server) handleUpdateAlertRule(w http.ResponseWriter, r *http.Request) e
 	if req.Enabled != nil {
 		existing.Enabled = *req.Enabled
 	}
+	if req.Severity != nil && !validateEnum(*req.Severity, validSeverities) {
+		return badRequest("severity must be one of info, warning, critical")
+	}
+	if req.Severity != nil {
+		existing.Severity = alerting.Severity(*req.Severity)
+	}
 	if req.Threshold != nil {
+		if err := validatePositiveFloat("threshold", *req.Threshold); err != nil {
+			return err
+		}
 		existing.Threshold = *req.Threshold
 	}
 	if req.Config != nil {
@@ -150,7 +186,9 @@ func (s *Server) handleListAlerts(w http.ResponseWriter, r *http.Request) error 
 	if alerts == nil {
 		alerts = []*alerting.Alert{}
 	}
-	writeJSON(w, http.StatusOK, applyOffsetLimit(alerts, offset, limit))
+	paged := applyOffsetLimit(alerts, offset, limit)
+	writePaginationHeaders(w, r, limit, offset, len(alerts), len(paged))
+	writeJSON(w, http.StatusOK, paged)
 	return nil
 }
 

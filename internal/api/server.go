@@ -352,6 +352,12 @@ func (s *Server) routes() {
 func (s *Server) registerHealthRoutes() {
 	s.mux.HandleFunc("GET /health", s.wrapHandler(s.handleHealth))
 	s.mux.HandleFunc("GET /ready", s.wrapHandler(s.handleReady))
+	// API-HEALTH-1 / API-HEALTH-2: Kubernetes-style aliases.
+	// K8s probes conventionally hit /livez and /readyz; the
+	// legacy /health and /ready paths remain so existing
+	// tooling (and the curl examples in docs/) keeps working.
+	s.mux.HandleFunc("GET /livez", s.wrapHandler(s.handleHealth))
+	s.mux.HandleFunc("GET /readyz", s.wrapHandler(s.handleReady))
 	s.mux.HandleFunc("GET /api/v1/version", s.wrapHandler(s.handleVersion))
 	s.mux.HandleFunc("POST /api/v1/workflows/run", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleRunWorkflow)))
 	if s.collector != nil {

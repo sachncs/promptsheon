@@ -91,7 +91,7 @@ func (s *Server) handleListVaultKeys(w http.ResponseWriter, r *http.Request) err
 func (s *Server) handleDeleteVaultKey(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if err := s.db.DeleteProviderKey(r.Context(), id); err != nil {
-		return ErrNotFound
+		return translateDBError(err, "vault_key")
 	}
 	s.audit(r.Context(), "delete", "vault_key:"+id, nil)
 	w.WriteHeader(http.StatusNoContent)
