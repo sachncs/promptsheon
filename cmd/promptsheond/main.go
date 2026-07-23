@@ -572,6 +572,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		precondRunner := harness.NewPreconditionRunner()
 		releaseSvc.WithHarness(precondRunner, db)
 		evalRunner := harness.NewEvalRunner(db, &apiReleaseInvoker{db: db, inv: inv, svc: releaseSvc})
+		evalRunner.Metrics = collector
 		opts = append(opts, api.WithHarnessRunner(evalRunner))
 	}
 
@@ -652,13 +653,10 @@ func buildReleaseService(db *store.SQLite, policy string) *release.Service {
 	}
 }
 
-// buildClickHouseWriter constructs a ClickHouse writer when the
-// binary is built with the `clickhouse` build tag. The function
-// returns nil + nil when the tag is absent so production
-// binaries without the tag still boot cleanly.
-func buildClickHouseWriter(ctx context.Context, dsn, database string, logger *slog.Logger) (any, error) {
-	return nil, fmt.Errorf("clickhouse writer not compiled in (rebuild with -tags clickhouse)")
-}
+// buildClickHouseWriter — see main_clickhouse.go (the clickhouse-
+// tagged build) and main_noclickhouse.go (the default build).
+// The tag-split lives in two separate files so the placeholder
+// doesn't ship with the production binary.
 
 func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *config.Config, srv *api.Server, logger *slog.Logger, limiter *ratelimit.Limiter, tracer trace.Tracer, collector *metrics.Collector, idempStore store.IdempotencyStore) {
 	handler := api.ChainHTTP(srv,

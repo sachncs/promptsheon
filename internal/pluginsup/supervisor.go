@@ -95,36 +95,58 @@ func (p *PluginSupervisor) LoadFromEnv(ctx context.Context) error {
 }
 
 // Remote is the Plugin adapter for a manifest entry that has no
-// `binary:` line. It is a registration stub. The real
-// subprocess path uses internal/subprocess.Binary which is
-// constructed in LoadFromEnv.
+// `binary:` line. The previous form was a no-op stub that
+// silently stayed "healthy" — operators couldn't tell from
+// health checks that the entry wasn't actually serving. Remote
+// now fail-closes: Start returns an error explaining the
+// configuration is incomplete, and Health surfaces the same
+// error on every poll so the supervisor can record the failure
+// in its metrics and restart the entry.
+//
+// To make a Remote entry actually do work, the manifest row
+// must declare a `binary:` line (which produces a
+// internal/subprocess.Binary) or the entry must be replaced
+// with a built-in. The supervisor keeps the failed Remote
+// registered so the operator sees the failure in
+// /metrics, not in silent absence.
 type Remote struct {
 	Entry  manifest.Entry
 	Logger *slog.Logger
 }
 
-// Start is a no-op for the stub: the entry has no binary to
-// launch. Production tenants extend the stub by implementing
-// the Plugin interface.
+// errRemoteNotConfigured is the sentinel Remote returns from
+// Start/Health/Stop. The supervisor treats it as a restartable
+// failure: the entry stays registered, every Health poll
+// fails, the operator sees the gap in /metrics, and the
+// restart budget gives the entry time to recover (e.g. the
+// operator adding a binary: line and reloading the manifest).
+var errRemoteNotConfigured = fmt.Errorf("pluginsup: manifest entry has no binary line")
+
+// Start returns errRemoteNotConfigured; the supervisor treats
+// this as a restartable failure (subject to RestartPolicy).
 func (r *Remote) Start(_ context.Context) error {
 	if r.Logger != nil {
-		r.Logger.Info("remote plugin: Start stub (no binary)",
-			"name", r.Entry.Name)
+		r.Logger.Warn("remote plugin: manifest entry has no binary line",
+			"name", r.Entry.Name,
+			"hint", "add a binary: line to the manifest entry or implement the service as a built-in")
 	}
-	return nil
+	return errRemoteNotConfigured
 }
 
-// Stop is a no-op for the stub.
+// Stop is a no-op: there is nothing running to stop.
 func (r *Remote) Stop(_ context.Context) error {
 	if r.Logger != nil {
-		r.Logger.Info("remote plugin: Stop stub (no binary)",
+		r.Logger.Info("remote plugin: Stop (no binary to stop)",
 			"name", r.Entry.Name)
 	}
 	return nil
 }
 
-// Health is a no-op for the stub.
-func (r *Remote) Health(_ context.Context) error { return nil }
+// Health surfaces errRemoteNotConfigured so the supervisor
+// records a Health failure on every poll.
+func (r *Remote) Health(_ context.Context) error {
+	return errRemoteNotConfigured
+}
 
 var _ supervisor.Plugin = (*Remote)(nil)
 

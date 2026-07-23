@@ -8,14 +8,24 @@ import (
 func TestRemoteLifecycle(t *testing.T) {
 	t.Parallel()
 	r := &Remote{Entry: manifestEntry(t, "alpha")}
-	if err := r.Start(context.Background()); err != nil {
-		t.Fatalf("Start: %v", err)
+
+	// Remote now fail-closes: a manifest entry without a
+	// binary: line is a configuration error, not a no-op.
+	// Start returns errRemoteNotConfigured so the supervisor
+	// records the failure and the operator sees the gap in
+	// /metrics instead of a silent healthy stub.
+	if err := r.Start(context.Background()); err == nil {
+		t.Fatalf("Start: expected error for binary-less entry, got nil")
 	}
+
+	// Stop is still a no-op (there's nothing running).
 	if err := r.Stop(context.Background()); err != nil {
 		t.Fatalf("Stop: %v", err)
 	}
-	if err := r.Health(context.Background()); err != nil {
-		t.Fatalf("Health: %v", err)
+
+	// Health surfaces the same error on every poll.
+	if err := r.Health(context.Background()); err == nil {
+		t.Fatalf("Health: expected error for binary-less entry, got nil")
 	}
 }
 

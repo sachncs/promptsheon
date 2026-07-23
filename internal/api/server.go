@@ -155,6 +155,16 @@ func WithTracing(spans trace.Tracer, collector *metrics.Collector) Option {
 	}
 }
 
+// WithCollector attaches only the metrics collector. Tests use
+// this when they want to assert on counter increments without
+// pulling in a Tracer. Production callers should prefer
+// WithTracing so OTel spans also flow.
+func WithCollector(c *metrics.Collector) Option {
+	return func(s *Server) {
+		s.collector = c
+	}
+}
+
 // WithWebhooks attaches a webhook dispatcher.
 func WithWebhooks(d *webhook.Dispatcher) Option {
 	return func(s *Server) {

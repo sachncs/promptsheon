@@ -67,10 +67,7 @@ func (w *Writer) ensureSchema(ctx context.Context) error {
 // The call is idempotent on (workspace_id, generated_at) only
 // when called with the same generated_at; the daemon should
 // generate one summary per minute per workspace.
-func (w *Writer) Write(ctx context.Context, s *rollups.WorkspaceSummary) error {
-	if s == nil {
-		return fmt.Errorf("clickhouse: nil summary")
-	}
+func (w *Writer) Write(ctx context.Context, s rollups.WorkspaceSummary) error {
 	return w.conn.Exec(ctx,
 		`INSERT INTO `+w.db+`.workspace_rollups
 		 (workspace_id, generated_at, total_spend_usd, overall_health)
@@ -96,6 +93,10 @@ var _ = time.Second
 // rollups.RunSink. The conversion from *WorkspaceSummary to the
 // MergeTree row is kept inline because the columns are stable
 // across M3.5 changes.
-func (w *Writer) WriteSink(_ context.Context, s *rollups.WorkspaceSummary) error {
-	return w.Write(_ context.TODO(), *s)
+func (w *Writer) WriteSink(ctx context.Context, s *rollups.WorkspaceSummary) error {
+	if s == nil {
+		return fmt.Errorf("clickhouse: nil summary")
+	}
+	cp := *s
+	return w.Write(ctx, cp)
 }
