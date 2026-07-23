@@ -220,7 +220,13 @@ func main() {
 
 	srv.StartAuditWorkers(rootCtx, 2)
 
-	startHTTPServerAndWait(rootCtx, rootCancel, &cfg, srv, logger, limiter, tracer, collector)
+	// API-IDEMP-1: wire the SQLite-backed IdempotencyStore so
+	// multi-replica deployments see the same Idempotency-Key
+	// replay window. Falls back to the in-process cache when
+	// the store can't be opened (e.g. read-only filesystem);
+	// the middleware degrades gracefully in that case.
+	idempStore := store.NewSQLiteIdempotencyStore(db.DB())
+	startHTTPServerAndWait(rootCtx, rootCancel, &cfg, srv, logger, limiter, tracer, collector, idempStore)
 }
 
 // configureShellTool loads the shell tool policy from environment. The
@@ -654,12 +660,12 @@ func buildClickHouseWriter(ctx context.Context, dsn, database string, logger *sl
 	return nil, fmt.Errorf("clickhouse writer not compiled in (rebuild with -tags clickhouse)")
 }
 
-func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *config.Config, srv *api.Server, logger *slog.Logger, limiter *ratelimit.Limiter, tracer trace.Tracer, collector *metrics.Collector) {
+func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *config.Config, srv *api.Server, logger *slog.Logger, limiter *ratelimit.Limiter, tracer trace.Tracer, collector *metrics.Collector, idempStore store.IdempotencyStore) {
 	handler := api.ChainHTTP(srv,
 		api.Recovery(logger),
 		api.MaxBytesReader(10<<20),
 		api.SecurityHeaders,
-		api.IdempotencyMiddleware(),
+		api.IdempotencyMiddleware(idempStore),
 		limiter.Middleware,
 		metrics.HTTPMiddleware(collector, tracer, logger),
 		api.Logging(logger),

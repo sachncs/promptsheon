@@ -477,7 +477,7 @@ func TestStartHTTPServerAndWait_InProcess(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		startHTTPServerAndWait(ctx, cancel, &cfg, srv, logger, limiter, tracer, collector)
+		startHTTPServerAndWait(ctx, cancel, &cfg, srv, logger, limiter, tracer, collector, nil)
 	}()
 
 	time.Sleep(2 * time.Second)
@@ -512,7 +512,7 @@ func TestStartHTTPServerAndWait_WithCORS(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		startHTTPServerAndWait(ctx, cancel, &cfg, srv, logger, limiter, tracer, collector)
+		startHTTPServerAndWait(ctx, cancel, &cfg, srv, logger, limiter, tracer, collector, nil)
 	}()
 
 	time.Sleep(2 * time.Second)
@@ -1040,7 +1040,7 @@ func runServerSubprocess() {
 		os.Exit(1)
 	}
 
-	startHTTPServerAndWait(ctx, cancel, &cfg, srv, logger, limiter, tracer, collector)
+	startHTTPServerAndWait(ctx, cancel, &cfg, srv, logger, limiter, tracer, collector, nil)
 }
 
 func runOpenDBSubprocess() {
