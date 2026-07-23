@@ -800,9 +800,12 @@ func cleanPath(path string) string {
 	return p
 }
 
-// writePathParams emits a parameter entry for each "{name}"
-// segment of the path.
+// writePathParams emits a single `parameters:` block whose
+// list contains every `{name}` segment of the path. The
+// previous implementation emitted one `parameters:` block per
+// param, producing YAML with duplicate keys.
 func writePathParams(buf *bytes.Buffer, path string) {
+	var names []string
 	i := 0
 	for i < len(path) {
 		j := strings.Index(path[i:], "{")
@@ -815,14 +818,19 @@ func writePathParams(buf *bytes.Buffer, path string) {
 			break
 		}
 		k += j
-		name := path[j+1 : k]
-		fmt.Fprintf(buf, "      parameters:\n")
+		names = append(names, path[j+1:k])
+		i = k + 1
+	}
+	if len(names) == 0 {
+		return
+	}
+	fmt.Fprintf(buf, "      parameters:\n")
+	for _, name := range names {
 		fmt.Fprintf(buf, "        - name: %s\n", name)
 		fmt.Fprintf(buf, "          in: path\n")
 		fmt.Fprintf(buf, "          required: true\n")
 		fmt.Fprintf(buf, "          schema:\n")
 		fmt.Fprintf(buf, "            type: string\n")
-		i = k + 1
 	}
 }
 
@@ -830,6 +838,15 @@ func writePathParams(buf *bytes.Buffer, path string) {
 // non-GET/DELETE handler. Uses a top-level `$ref: ...` if the
 // request struct is a named type, otherwise emits a $ref to an
 // inline schema.
+//
+// Fields whose JSON name collides with a reserved OpenAPI
+// schema key (type, properties, required, $ref, additionalProperties,
+// description, nullable, format, example, enum, items, allOf,
+// anyOf, oneOf) are SKIPPED. The handler's input had a struct
+// field literally named `type` or similar; emitting it under
+// the schema produces a duplicate-key YAML error and a
+// malformed spec. The standard library callers can rename the
+// field if they need it round-tripped via the spec.
 func writeRequestBody(buf *bytes.Buffer, rt *requestStruct) {
 	fmt.Fprintf(buf, "      requestBody:\n")
 	fmt.Fprintf(buf, "        required: true\n")
@@ -838,6 +855,9 @@ func writeRequestBody(buf *bytes.Buffer, rt *requestStruct) {
 	fmt.Fprintf(buf, "            schema:\n")
 	fmt.Fprintf(buf, "              type: object\n")
 	for _, f := range rt.Fields {
+		if isReservedSchemaKey(f.JSONName) {
+			continue
+		}
 		yt, isRef := yamlType(f.GoType)
 		if isRef {
 			fmt.Fprintf(buf, "              %s:\n", f.JSONName)
@@ -847,6 +867,21 @@ func writeRequestBody(buf *bytes.Buffer, rt *requestStruct) {
 		fmt.Fprintf(buf, "              %s:\n", f.JSONName)
 		fmt.Fprintf(buf, "                type: %s\n", yt)
 	}
+}
+
+// isReservedSchemaKey reports whether name collides with a
+// fixed OpenAPI Schema Object key. A handler struct field
+// json-tagged with any of these names produces an invalid
+// schema (duplicate keys); the generator drops them.
+func isReservedSchemaKey(name string) bool {
+	switch name {
+	case "type", "properties", "required", "$ref", "additionalProperties",
+		"description", "nullable", "format", "example", "enum", "items",
+		"allOf", "anyOf", "oneOf", "not", "title", "default", "readOnly",
+		"writeOnly", "deprecated", "discriminator":
+		return true
+	}
+	return false
 }
 
 // isListPath returns true if the handler is conventionally a

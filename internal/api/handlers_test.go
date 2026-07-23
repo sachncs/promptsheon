@@ -675,6 +675,26 @@ func (m *mockRepo) ListPreconditionsForCapability(_ context.Context, capabilityI
 	}
 	return out, nil
 }
+func (m *mockRepo) GetPrecondition(_ context.Context, id string) (*harness.Precondition, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p, ok := m.preconditions[id]
+	if !ok {
+		return nil, store.ErrNotFound
+	}
+	cp := *p
+	return &cp, nil
+}
+func (m *mockRepo) UpdatePrecondition(_ context.Context, p *harness.Precondition) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.preconditions[p.ID]; !ok {
+		return store.ErrNotFound
+	}
+	cp := *p
+	m.preconditions[p.ID] = &cp
+	return nil
+}
 func (m *mockRepo) DeletePrecondition(_ context.Context, id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

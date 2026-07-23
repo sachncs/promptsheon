@@ -44,6 +44,32 @@ const (
 	EventPromptArchived EventType = "prompt.archived"
 )
 
+// knownEvents is the closed set the dispatcher accepts. API-VAL-7
+// uses this to reject typos at registration time rather than
+// silently never firing. The "*" wildcard is a dispatcher
+// convention (subscribe to every event); it is also a member of
+// the closed set.
+var knownEvents = map[EventType]struct{}{
+	EventEvalCompleted:     {},
+	EventReviewApproved:    {},
+	EventReviewRejected:    {},
+	EventWorkflowCompleted: {},
+	EventWorkflowFailed:    {},
+	EventPromptCreated:     {},
+	EventPromptUpdated:     {},
+	EventPromptDeployed:    {},
+	EventPromptArchived:    {},
+	"*":                    {},
+}
+
+// IsKnownEvent reports whether name matches a registered event
+// type or the "*" wildcard. Callers in the api package use
+// this for request validation (API-VAL-7).
+func IsKnownEvent(name string) bool {
+	_, ok := knownEvents[EventType(name)]
+	return ok
+}
+
 // Event is the payload sent to webhook endpoints.
 type Event struct {
 	ID        string         `json:"id"`

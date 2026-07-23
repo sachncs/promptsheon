@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -601,7 +602,32 @@ func (c *Client) CreatePrecondition(ctx context.Context, capabilityID string, re
 	}
 	var p Precondition
 	if err := json.Unmarshal(data, &p); err != nil {
+		return nil, fmt.Errorf("decode precondition: %w", err)
+	}
+	return &p, nil
+}
+
+// UpdatePreconditionRequest is the partial-update body for
+// PUT /api/v1/preconditions/{id}. Only the fields present in
+// the body are touched; missing fields keep their previous
+// value. capability_id is immutable on update.
+type UpdatePreconditionRequest struct {
+	Name       *string `json:"name,omitempty"`
+	Command    *string `json:"command,omitempty"`
+	TimeoutSec *int    `json:"timeout_sec,omitempty"`
+	Enabled    *bool   `json:"enabled,omitempty"`
+}
+
+// UpdatePrecondition applies a partial mutation to an
+// existing precondition. Returns 404 when the id is unknown.
+func (c *Client) UpdatePrecondition(ctx context.Context, id string, req UpdatePreconditionRequest) (*Precondition, error) {
+	data, err := c.do(ctx, "PUT", "/api/v1/preconditions/"+id, req)
+	if err != nil {
 		return nil, err
+	}
+	var p Precondition
+	if err := json.Unmarshal(data, &p); err != nil {
+		return nil, fmt.Errorf("decode precondition: %w", err)
 	}
 	return &p, nil
 }
@@ -709,4 +735,91 @@ func (c *Client) GetEval(ctx context.Context, id string) (*EvalRunWithResults, e
 func (c *Client) delete(path string) error {
 	_, err := c.do(context.Background(), "DELETE", path, nil)
 	return err
+}
+
+// --- API Keys (API-SDK-1) ---
+//
+// The endpoints exist in the OpenAPI spec but were missing from
+// the Go SDK before this commit. Add them so SDK consumers can
+// manage keys without dropping down to raw HTTP.
+
+// APIKey mirrors models.APIKey. The server returns the key
+// value (one-time) on create; SDK callers MUST persist it
+// before the response goes out of scope.
+type APIKey struct {
+	ID        string     `json:"id"`
+	UserID    string     `json:"user_id"`
+	Name      string     `json:"name"`
+	Key       string     `json:"key,omitempty"`
+	KeyPrefix string     `json:"key_prefix,omitempty"`
+	Role      string     `json:"role"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+// CreateAPIKeyRequest is the request body for POST /api/v1/apikeys.
+type CreateAPIKeyRequest struct {
+	Name      string     `json:"name"`
+	UserID    string     `json:"user_id,omitempty"`
+	Role      string     `json:"role,omitempty"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+}
+
+// CreateAPIKey mints a new API key. The returned APIKey.Key is
+// the only time the plaintext key is ever returned; SDK callers
+// should store it immediately and surface it to the user.
+func (c *Client) CreateAPIKey(ctx context.Context, req CreateAPIKeyRequest) (*APIKey, error) {
+	data, err := c.do(ctx, "POST", "/api/v1/apikeys", req)
+	if err != nil {
+		return nil, err
+	}
+	var k APIKey
+	if err := json.Unmarshal(data, &k); err != nil {
+		return nil, fmt.Errorf("decode api key: %w", err)
+	}
+	return &k, nil
+}
+
+// ListAPIKeys returns the API keys for a user. userID may be
+// empty to list every key (admin-only).
+func (c *Client) ListAPIKeys(ctx context.Context, userID string) ([]*APIKey, error) {
+	path := "/api/v1/apikeys"
+	if userID != "" {
+		path += "?user_id=" + url.QueryEscape(userID)
+	}
+	data, err := c.do(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	var ks []*APIKey
+	if err := json.Unmarshal(data, &ks); err != nil {
+		return nil, fmt.Errorf("decode api keys: %w", err)
+	}
+	return ks, nil
+}
+
+// RevokeAPIKey removes a key by id. Idempotent on already-revoked
+// keys (the server returns 400; SDK callers can ignore that case).
+func (c *Client) RevokeAPIKey(ctx context.Context, id string) error {
+	return c.delete("/api/v1/apikeys/" + id)
+}
+
+// --- OAuth (API-SDK-1) ---
+//
+// The server handles the OAuth flow in two steps: GET
+// /api/v1/auth/{provider}/login (sets the state cookie and
+// returns a redirect), and GET /api/v1/auth/{provider}/callback
+// (consumes the state, exchanges the code, mints a key). The
+// SDK exposes the login URL so a CLI / UI can open the user's
+// browser; the callback exchange is normally handled by the
+// browser hitting the server directly.
+
+// OAuthLoginURL returns the URL a browser should be redirected
+// to in order to begin the OAuth flow for `provider`. The
+// caller must follow the redirect (or open it in a browser);
+// the SDK cannot complete the flow on the caller's behalf
+// because the state cookie has to be set on the daemon's
+// domain.
+func (c *Client) OAuthLoginURL(provider string) string {
+	return c.baseURL + "/api/v1/auth/" + provider + "/login"
 }

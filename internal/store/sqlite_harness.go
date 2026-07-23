@@ -156,6 +156,46 @@ func (s *SQLite) CreatePrecondition(ctx context.Context, p *harness.Precondition
 	return nil
 }
 
+// GetPrecondition fetches a single precondition by id. Returns
+// ErrNotFound when the row does not exist so the API handler can
+// translate it into a 404 via translateDBError.
+func (s *SQLite) GetPrecondition(ctx context.Context, id string) (*harness.Precondition, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, capability_id, name, command, timeout_sec, enabled, created_at
+		 FROM preconditions WHERE id = ?`, id,
+	)
+	return scanPrecondition(row)
+}
+
+// UpdatePrecondition replaces the mutable fields of an existing
+// precondition. The (id, capability_id, created_at) tuple is
+// immutable: callers cannot move a precondition to a different
+// capability or rewrite its creation time. Returns ErrNotFound
+// when no row matched the id so the API can return 404.
+func (s *SQLite) UpdatePrecondition(ctx context.Context, p *harness.Precondition) error {
+	enabledInt := 0
+	if p.Enabled {
+		enabledInt = 1
+	}
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE preconditions
+		 SET name = ?, command = ?, timeout_sec = ?, enabled = ?
+		 WHERE id = ?`,
+		p.Name, p.Command, p.TimeoutSec, enabledInt, p.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("update precondition: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("update precondition rows affected: %w", err)
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *SQLite) ListPreconditionsForCapability(ctx context.Context, capabilityID string) ([]*harness.Precondition, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, capability_id, name, command, timeout_sec, enabled, created_at
