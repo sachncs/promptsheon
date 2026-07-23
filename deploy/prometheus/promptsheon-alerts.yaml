@@ -1,0 +1,105 @@
+groups:
+  - name: promptsheon.slo
+    interval: 30s
+    rules:
+      - alert: PromptsheonInvokeLatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(promptsheon_llm_latency_seconds_bucket[5m]))
+          ) > 5
+        for: 10m
+        labels:
+          severity: warning
+          slo: invoke_p95_latency
+        annotations:
+          summary: "LLM invoke p95 latency above 5s"
+          description: |
+            The 95th percentile LLM invocation latency has exceeded 5 seconds
+            for 10 minutes. SLO target: p95 < 5s over a 30-day window.
+            Check upstream provider status and circuit-breaker state.
+
+      - alert: PromptsheonAuditChainBroken
+        expr: increase(promptsheon_audit_dropped_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          slo: audit_chain_integrity
+        annotations:
+          summary: "Audit chain is dropping entries"
+          description: |
+            The audit queue has dropped entries in the last 5 minutes. The
+            hash-chained audit log cannot tolerate gaps; investigate the
+            audit worker pool and DB write latency.
+
+      - alert: PromptsheonHarnessEvalFailureRateHigh
+        expr: |
+          (
+            sum(rate(promptsheon_eval_cases_total{result="fail"}[1h]))
+            /
+            clamp_min(sum(rate(promptsheon_eval_cases_total[1h])), 1)
+          ) > 0.10
+        for: 30m
+        labels:
+          severity: warning
+          slo: harness_eval_success_rate
+        annotations:
+          summary: "Harness eval failure rate above 10%"
+          description: |
+            More than 10% of harness eval cases are failing over the last
+            hour. SLO target: >= 90% pass rate.
+            Check the eval scorer output and recent prompt changes.
+
+  - name: promptsheon.health
+    interval: 30s
+    rules:
+      - alert: PromptsheonHighErrorRate
+        expr: |
+          (
+            sum(rate(promptsheon_http_errors_total[5m]))
+            /
+            clamp_min(sum(rate(promptsheon_http_requests_total[5m])), 1)
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTP error rate above 5%"
+          description: |
+            More than 5% of HTTP requests returned a 5xx in the last 5
+            minutes. Check logs for repeated errors.
+
+      - alert: PromptsheonTraceDrops
+        expr: increase(promptsheon_trace_dropped_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Trace pipeline dropping spans"
+          description: |
+            Trace spans are being dropped because the OTLP queue is
+            saturated. Check collector reachability and
+            PROMPTSHEON_OTEL_SAMPLE_RATIO.
+
+      - alert: PromptsheonLogHubDrops
+        expr: increase(promptsheon_log_hub_drops_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSE log hub dropping entries"
+          description: |
+            The log streaming hub has dropped entries because the broadcast
+            channel was full. Likely cause: a slow SSE consumer.
+
+      - alert: PromptsheonCircuitBreakerOpen
+        expr: promptsheon_llm_circuit_breaker_state > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM circuit breaker open"
+          description: |
+            The circuit breaker for an upstream LLM provider is open. New
+            requests to that provider will short-circuit until the breaker
+            closes.
