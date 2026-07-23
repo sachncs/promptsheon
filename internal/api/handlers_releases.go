@@ -278,16 +278,19 @@ func (s *Server) resolveRelease(ctx context.Context, rel *release.Release) (*rel
 // it uses the Release's loaded Manifest to derive a stable manifest
 // hash rather than the placeholder hash used by the existing
 // /versions/{id}/executions route. Returns the ExecutionRecord (or nil
-// when no invoker is configured), the invocation error (or nil on
-// success), and the wall-clock latency so the handler can populate
-// the Execution row.
+// when the invoker has nothing to record), the invocation error (or
+// nil on success), and the wall-clock latency so the handler can
+// populate the Execution row.
 //
 // Model and provider are taken from plan (the ResolvedInvocation),
 // not from the HTTP request, so the request cannot override the
 // approved release's runtime.
+//
+// Like invokeOne, requires s.invoker to be wired. A missing invoker
+// returns an error rather than a silent no-op.
 func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, inputs map[string]any, plan *release.ResolvedInvocation) (*executor.ExecutionRecord, error, time.Duration) {
 	if s.invoker == nil {
-		return nil, nil, 0
+		return nil, errors.New("api: invoke.Invoker not wired on this server"), 0
 	}
 	input, err := marshalNoArgs(inputs)
 	if err != nil {

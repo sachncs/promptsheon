@@ -32,12 +32,29 @@ groups:
             hash-chained audit log cannot tolerate gaps; investigate the
             audit worker pool and DB write latency.
 
+      - alert: PromptsheonAuditChainVerificationFailing
+        expr: increase(promptsheon_audit_chain_verifications_total[5m]) == 0
+        for: 30m
+        labels:
+          severity: warning
+          slo: audit_chain_integrity
+        annotations:
+          summary: "Audit chain not being verified"
+          description: |
+            GET /api/v1/audit/verify has not been called in 30 minutes.
+            A healthy deployment should be running periodic verifications
+            (e.g. via a cron job hitting the endpoint).
+
       - alert: PromptsheonHarnessEvalFailureRateHigh
         expr: |
           (
-            sum(rate(promptsheon_eval_cases_total{result="fail"}[1h]))
+            sum(rate(promptsheon_eval_cases_failed_total[1h]))
             /
-            clamp_min(sum(rate(promptsheon_eval_cases_total[1h])), 1)
+            clamp_min(
+              sum(rate(promptsheon_eval_cases_passed_total))
+              + sum(rate(promptsheon_eval_cases_failed_total)),
+              1
+            )
           ) > 0.10
         for: 30m
         labels:
@@ -50,7 +67,7 @@ groups:
             hour. SLO target: >= 90% pass rate.
             Check the eval scorer output and recent prompt changes.
 
-  - name: promptsheon.health
+      - name: promptsheon.health
     interval: 30s
     rules:
       - alert: PromptsheonHighErrorRate
@@ -91,15 +108,3 @@ groups:
           description: |
             The log streaming hub has dropped entries because the broadcast
             channel was full. Likely cause: a slow SSE consumer.
-
-      - alert: PromptsheonCircuitBreakerOpen
-        expr: promptsheon_llm_circuit_breaker_state > 1
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: "LLM circuit breaker open"
-          description: |
-            The circuit breaker for an upstream LLM provider is open. New
-            requests to that provider will short-circuit until the breaker
-            closes.

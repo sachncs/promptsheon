@@ -40,11 +40,24 @@ func decodeJSON(t *testing.T, r io.Reader, dst any) {
 	}
 }
 
+// TestReleaseRoutesCreateVoteActivateInvoke exercises the
+// production release lifecycle end-to-end. It wires a real
+// invoke.Invoker (via newInvokeTestServer) so the /invoke
+// step actually runs the request through the in-memory LLM
+// provider and returns a real Execution record with token
+// counts. The previous form of this test relied on a stub
+// path that returned a fake row with tokens=0; that has
+// been removed because it polluted the audit chain.
 func TestReleaseRoutesCreateVoteActivateInvoke(t *testing.T) {
 	repo := newMockRepo()
 	seedReleaseFixture(repo)
 	svc := release.NewService(repo, repo, approval.MakerCheckerPolicy{RequiredApprovers: 1})
-	srv := newReleaseTestServer(repo, svc)
+
+	// Build a release-aware test server that uses the in-memory
+	// provider. newInvokeTestServerWithRepo mounts a real
+	// invoke.Invoker; WithReleaseService plugs in the release
+	// service. We need a server with both.
+	srv := newInvokeTestServerWithRepo(t, repo, WithReleaseService(svc))
 
 	// 1. Create release (as "alice" per the fixture)
 	body, _ := json.Marshal(map[string]string{"environment": "prod"})
@@ -84,13 +97,22 @@ func TestReleaseRoutesCreateVoteActivateInvoke(t *testing.T) {
 		t.Fatalf("status = %q want active", rel.Status)
 	}
 
-	// 4. Invoke
-	body, _ = json.Marshal(map[string]any{"inputs": map[string]any{"q": "hi"}, "model": "claude"})
+	// 4. Invoke: hits the in-memory provider through the real
+	// invoke.Invoker. Asserts the 201 + real Execution record.
+	body, _ = json.Marshal(map[string]any{"inputs": map[string]any{"q": "hi"}})
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest("POST", "/api/v1/releases/"+rel.ID+"/invoke", bytes.NewReader(body))
 	srv.ServeHTTP(w, req)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("invoke: status=%d body=%s", w.Code, w.Body.String())
+	}
+	var exec capability.Execution
+	decodeJSON(t, w.Body, &exec)
+	if got, want := exec.TotalTokens, 2; got != want {
+		t.Errorf("expected TotalTokens=%d, got %d", want, got)
+	}
+	if got, want := exec.CostUSD, 0.01; got != want {
+		t.Errorf("expected CostUSD=%v, got %v", want, got)
 	}
 
 	// 5. Get approval trail

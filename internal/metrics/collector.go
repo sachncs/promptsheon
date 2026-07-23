@@ -170,10 +170,24 @@ type Collector struct {
 	LLMCostUSD      *Counter
 	LLMTTFT         *Histogram
 
-	// Eval metrics
-	EvalRunsTotal  *Counter
-	EvalCasesTotal *Counter
-	EvalDuration   *Histogram
+	// Eval metrics. EvalCasesTotal is the unconditional
+	// sum; EvalCasesPassed and EvalCasesFailed split that
+	// total by outcome. The split counters are what the SLO
+	// alert in deploy/prometheus/promptsheon-alerts.yaml
+	// queries; the prior implementation created a single
+	// `promptsheon_eval_cases_total` counter with a `result`
+	// label that was never attached, so the alert never fired.
+	EvalRunsTotal      *Counter
+	EvalCasesTotal     *Counter
+	EvalCasesPassed    *Counter
+	EvalCasesFailed    *Counter
+	EvalDuration       *Histogram
+
+	// Audit-chain verifications. Incremented on every
+	// VerifyAuditChain call from handlers_audit.go and the
+	// retention sweep. The /audit/verify handler emits the
+	// pass/tail-mismatch counter separately.
+	AuditChainVerifications *Counter
 
 	// Workflow metrics
 	WorkflowRunsTotal *Counter
@@ -243,6 +257,33 @@ func (c *Collector) ObserveAuditQueue(seconds float64) {
 	}
 }
 
+// RecordEvalCaseOutcome increments the eval-case counters. The
+// passed argument must be true (the case passed the scorer) or
+// false (the case failed). A nil collector is a no-op so test
+// code can call RecordEvalCaseOutcome without initialising a
+// collector.
+func (c *Collector) RecordEvalCaseOutcome(passed bool) {
+	if c == nil {
+		return
+	}
+	c.EvalCasesTotal.Inc()
+	if passed {
+		c.EvalCasesPassed.Inc()
+	} else {
+		c.EvalCasesFailed.Inc()
+	}
+}
+
+// RecordAuditChainVerification increments the audit-chain
+// verification counter. Called by the /audit/verify handler and
+// by the retention sweep before archiving rows.
+func (c *Collector) RecordAuditChainVerification() {
+	if c == nil {
+		return
+	}
+	c.AuditChainVerifications.Inc()
+}
+
 // SetAuditDropped updates the cumulative audit-pipeline drop
 // count. The collector exposes this through /metrics so the
 // dashboard can alert on sustained drops.
@@ -291,7 +332,10 @@ func NewCollector() *Collector {
 		LLMTTFT:               newHistogram(nil),
 		EvalRunsTotal:         newCounter(nil),
 		EvalCasesTotal:        newCounter(nil),
+		EvalCasesPassed:       newCounter(nil),
+		EvalCasesFailed:       newCounter(nil),
 		EvalDuration:          newHistogram(nil),
+		AuditChainVerifications: newCounter(nil),
 		WorkflowRunsTotal:     newCounter(nil),
 		WorkflowDuration:      newHistogram(nil),
 		WorkflowActive:        &Gauge{},
@@ -487,6 +531,8 @@ func (c *Collector) prometheusFormat() string {
 
 	writeCounter("promptsheon_eval_runs_total", "Total eval runs", c.EvalRunsTotal.Value())
 	writeCounter("promptsheon_eval_cases_total", "Total eval cases executed", c.EvalCasesTotal.Value())
+	writeCounter("promptsheon_eval_cases_passed_total", "Eval cases that passed the scorer", c.EvalCasesPassed.Value())
+	writeCounter("promptsheon_eval_cases_failed_total", "Eval cases that failed the scorer", c.EvalCasesFailed.Value())
 	writeHistogram("promptsheon_eval_duration_seconds", "Eval run duration", c.EvalDuration)
 
 	writeCounter("promptsheon_workflow_runs_total", "Total workflow runs", c.WorkflowRunsTotal.Value())
@@ -502,6 +548,7 @@ func (c *Collector) prometheusFormat() string {
 	writeCounter("promptsheon_guardrail_violations_total", "Guardrail violations", c.GuardrailViolations.Value())
 	writeCounter("promptsheon_guardrail_blocks_total", "Guardrail blocks", c.GuardrailBlocks.Value())
 	writeCounter("promptsheon_audit_dropped_total", "Audit entries dropped because the worker queue was full", float64(c.auditDropped.Load()))
+	writeCounter("promptsheon_audit_chain_verifications_total", "Total audit-chain verifications (pass + tail-mismatch)", c.AuditChainVerifications.Value())
 	writeHistogram("promptsheon_audit_queue_latency_seconds", "Time between audit() being called and the entry being persisted by the worker", c.AuditQueueLatency)
 	writeCounter("promptsheon_trace_dropped_total", "Trace spans dropped because the worker queue was full", float64(c.traceDropped.Load()))
 	if c.hub != nil {
