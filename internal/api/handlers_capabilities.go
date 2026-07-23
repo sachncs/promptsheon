@@ -475,13 +475,6 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
-	// Tier 2.36 / Tier 2.44 follow-on: the production wiring
-	// constructs an invoke.Invoker per request, runs it through
-	// the Budget/Quota enforcer, and maps the resulting errors to
-	// HTTP 402 (Payment Required) and 429 (Too Many Requests).
-	// Today's commit ships the API surface; the Invoker call is
-	// M3 follow-on (see internal/invoke/invoke.go's NewInvoker +
-	// DefaultEnforcer wiring).
 	rec, invErr, latency := s.invokeOne(r, capabilityVersionID, req.Inputs, req.Model, req.Provider)
 	exec := &capability.Execution{
 		ID:                  generateID(),
@@ -572,8 +565,7 @@ func classifyInvokeError(err error) error {
 // introduced as a method on Server rather than a package-level
 // function so that the production wiring can override the
 // default Caller and AggregatorConsumer with a workspace-scoped
-// Caller chain. Today's commit ships the wrapper; the production
-// wiring lands in M3 follow-on.
+// Caller chain.
 //
 // When the versionID resolves to a Capability Version with a stored
 // Manifest, that Manifest's canonical SHA-256 is used as the manifest
@@ -581,16 +573,18 @@ func classifyInvokeError(err error) error {
 // the route stays observable even for versions that pre-date the
 // Manifest schema.
 //
-// Returns the ExecutionRecord (or nil when no invoker is configured),
-// the invocation error (or nil on success), and the wall-clock
-// latency so callers can populate the Execution row.
+// Returns the ExecutionRecord (or nil when the invoker has nothing
+// to record), the invocation error (or nil on success), and the
+// wall-clock latency so callers can populate the Execution row.
+//
+// The function requires s.invoker to be set; tests and the daemon
+// entry point must construct an invoke.Invoker. There is no
+// "stub" path — a missing invoker is a programming error and
+// returns a clear error rather than a silent no-op so misconfigured
+// deployments fail loudly.
 func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]any, model, provider string) (*executor.ExecutionRecord, error, time.Duration) {
 	if s.invoker == nil {
-		// No Invoker configured (today's build). The handler
-		// records the stub execution and returns nil; the route
-		// is observable while the M3 follow-on wires the
-		// production Caller chain.
-		return nil, nil, 0
+		return nil, errors.New("api: invoke.Invoker not wired on this server"), 0
 	}
 	input, err := marshalNoArgs(inputs)
 	if err != nil {
@@ -610,6 +604,7 @@ func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]
 		Input:         input,
 		Model:         model,
 		ModelRevision: modelRevision(model, provider),
+		Provider:      provider,
 	}
 	start := time.Now()
 	rec, err := s.invoker.Invoke(r.Context(), req)

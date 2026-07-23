@@ -35,9 +35,21 @@ type EvalRunOptions struct {
 // for each case, score via the chosen Scorer, persist per-case
 // results and the aggregate EvalRun.
 type EvalRunner struct {
-	Repo  Repository
-	Inv   ReleaseInvoker
-	Clock func() time.Time
+	Repo     Repository
+	Inv      ReleaseInvoker
+	Clock    func() time.Time
+	// Metrics is optional. When non-nil, the runner increments
+	// promptsheon_eval_cases_{passed,failed}_total per case so
+	// the SLO alert at deploy/prometheus/promptsheon-alerts.yaml
+	// can fire.
+	Metrics EvalMetricsRecorder
+}
+
+// EvalMetricsRecorder is the narrow interface the runner
+// needs from a metrics.Collector. Defined here so the harness
+// package does not depend on internal/metrics.
+type EvalMetricsRecorder interface {
+	RecordEvalCaseOutcome(passed bool)
 }
 
 // NewEvalRunner constructs a runner. Pass a Repository (for
@@ -85,14 +97,20 @@ func (r *EvalRunner) Run(ctx context.Context, opts EvalRunOptions) (*EvalRun, er
 
 	var results []EvalResult
 	for _, c := range cases {
-		r := r.runCase(ctx, run, opts.Scorer, c)
-		results = append(results, r)
-		if r.Passed {
+		res := r.runCase(ctx, run, opts.Scorer, c)
+		results = append(results, res)
+		if res.Passed {
 			run.Passed++
 		} else {
 			run.Failed++
 		}
 		run.Total++
+		// Surface per-case outcomes to the metrics layer so
+		// the harness-eval SLO alert can fire. nil recorder is
+		// fine — most callers (tests, smoke tests) skip wiring.
+		if r.Metrics != nil {
+			r.Metrics.RecordEvalCaseOutcome(res.Passed)
+		}
 	}
 
 	finishedAt := r.Clock()

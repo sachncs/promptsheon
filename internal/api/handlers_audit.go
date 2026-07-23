@@ -146,6 +146,12 @@ func (s *Server) handleVerifyAuditChain(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		return err
 	}
+	// Surface the verification so the SLO alert in
+	// deploy/prometheus/promptsheon-alerts.yaml can fire on
+	// `audit_chain_verifications_total{result="fail"} > 0`.
+	if s.collector != nil {
+		s.collector.RecordAuditChainVerification()
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":            res.Ok,
 		"tail_mismatch": res.TailMismatch,

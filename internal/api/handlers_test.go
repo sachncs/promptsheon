@@ -3192,8 +3192,14 @@ func TestHandleListExecutions(t *testing.T) {
 	}
 }
 
+// TestHandleCreateExecution exercises the production invoke
+// path end-to-end. newInvokeTestServer wires a real
+// invoke.Invoker backed by an in-memory LLM provider, so the
+// handler actually runs the request and persists a real
+// Execution row with deterministic token counts (1 prompt / 1
+// completion token / $0.01 cost).
 func TestHandleCreateExecution(t *testing.T) {
-	s := newTestServer(t)
+	s := newInvokeTestServer(t)
 	body := mustMarshal(t, map[string]any{
 		"inputs":   map[string]any{"query": "hello"},
 		"model":    "gpt-4",
@@ -3205,13 +3211,19 @@ func TestHandleCreateExecution(t *testing.T) {
 	s.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusCreated {
-		t.Errorf("expected 201, got %d: %s", rr.Code, rr.Body.String())
+		t.Fatalf("expected 201, got %d: %s", rr.Code, rr.Body.String())
 	}
 
 	var resp map[string]any
 	readJSONBody(t, rr.Body.Bytes(), &resp)
 	if resp["model"] != "gpt-4" {
 		t.Errorf("expected gpt-4, got %v", resp["model"])
+	}
+	if got, want := resp["total_tokens"].(float64), float64(2); got != want {
+		t.Errorf("expected total_tokens=%v, got %v", want, got)
+	}
+	if got, want := resp["cost_usd"].(float64), 0.01; got != want {
+		t.Errorf("expected cost_usd=%v, got %v", want, got)
 	}
 }
 
