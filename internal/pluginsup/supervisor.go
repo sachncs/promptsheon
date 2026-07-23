@@ -18,10 +18,17 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
+
+	pluginv1 "github.com/sachncs/promptsheon/internal/pluginproto/pluginv1"
 	"github.com/sachncs/promptsheon/internal/pluginmanifest"
 	"github.com/sachncs/promptsheon/internal/subprocess"
 	"github.com/sachncs/promptsheon/internal/supervisor"
@@ -121,6 +128,128 @@ type Remote struct {
 // restart budget gives the entry time to recover (e.g. the
 // operator adding a binary: line and reloading the manifest).
 var errRemoteNotConfigured = fmt.Errorf("pluginsup: manifest entry has no binary line")
+
+// GRPCPlugin is the supervisor.Plugin adapter for a remote
+// plugin served over gRPC (typically over a UDS socket). The
+// plugin binary implements the pluginv1.PluginServer contract;
+// the supervisor is the client.
+//
+// Each supervisor-Plugin call (Start/Health/Stop) dials the
+// UDS if not already connected, then invokes the corresponding
+// gRPC method. On any transport error the connection is reset
+// so the next call re-dials. The dial uses an insecure
+// credentials bundle because UDS traffic is kernel-local.
+type GRPCPlugin struct {
+	Addr string
+	Name string
+	Log  *slog.Logger
+
+	mu   sync.Mutex
+	conn *grpc.ClientConn
+}
+
+// Start dials the gRPC endpoint. The supervisor's RestartPolicy
+// drives retries on failure.
+func (g *GRPCPlugin) Start(ctx context.Context) error {
+	return g.dial(ctx)
+}
+
+// Stop closes the underlying gRPC connection.
+func (g *GRPCPlugin) Stop(_ context.Context) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.conn != nil {
+		err := g.conn.Close()
+		g.conn = nil
+		return err
+	}
+	return nil
+}
+
+// Health calls gRPC pluginv1.PluginServer.Health. Any transport
+// or gRPC error is returned to the supervisor; the supervisor
+// records the failure and triggers a restart.
+func (g *GRPCPlugin) Health(ctx context.Context) error {
+	if err := g.dial(ctx); err != nil {
+		return err
+	}
+	g.mu.Lock()
+	conn := g.conn
+	g.mu.Unlock()
+	if conn == nil {
+		return fmt.Errorf("pluginsup: gRPC client not connected")
+	}
+	client := pluginv1.NewPluginClient(conn)
+	resp, err := client.Health(ctx, &pluginv1.HealthRequest{})
+	if err != nil {
+		// Reset the connection so the next call re-dials.
+		g.resetConn()
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("pluginsup: plugin %q reports not OK", g.Name)
+	}
+	_ = status.Code(err)
+	return nil
+}
+
+// Ping is exposed for operator diagnostics (not part of the
+// supervisor.Plugin surface). It calls the gRPC Ping method
+// and returns the plugin's reported identity.
+func (g *GRPCPlugin) Ping(ctx context.Context) (name, version string, err error) {
+	if err := g.dial(ctx); err != nil {
+		return "", "", err
+	}
+	g.mu.Lock()
+	conn := g.conn
+	g.mu.Unlock()
+	if conn == nil {
+		return "", "", fmt.Errorf("pluginsup: gRPC client not connected")
+	}
+	client := pluginv1.NewPluginClient(conn)
+	resp, err := client.Ping(ctx, &pluginv1.PingRequest{})
+	if err != nil {
+		g.resetConn()
+		return "", "", err
+	}
+	return resp.Name, resp.Version, nil
+}
+
+func (g *GRPCPlugin) dial(ctx context.Context) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.conn != nil {
+		return nil
+	}
+	if g.Addr == "" {
+		return fmt.Errorf("pluginsup: gRPC plugin %q has empty addr", g.Name)
+	}
+	conn, err := grpc.NewClient(
+		"unix://"+g.Addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return fmt.Errorf("pluginsup: gRPC dial %s: %w", g.Addr, err)
+	}
+	g.conn = conn
+	if g.Log != nil {
+		g.Log.Info("grpc plugin: dial ok", "name", g.Name, "addr", g.Addr)
+	}
+	_ = ctx
+	_ = net.Conn(nil)
+	return nil
+}
+
+func (g *GRPCPlugin) resetConn() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.conn != nil {
+		_ = g.conn.Close()
+		g.conn = nil
+	}
+}
+
+var _ supervisor.Plugin = (*GRPCPlugin)(nil)
 
 // Start returns errRemoteNotConfigured; the supervisor treats
 // this as a restartable failure (subject to RestartPolicy).
