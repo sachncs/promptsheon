@@ -1,91 +1,98 @@
 # Modules
 
-One-line descriptions of every Go package in the repository, grouped by layer. The package name is the directory under `internal/`, `sdk/`, or `cmd/`. Use this as a lookup when reading source.
+The internal package tree maps to the layered architecture.
+Domain packages declare consumer-defined interfaces; storage
+and HTTP packages implement them. The split is enforced by
+the `lint-domain` and `lint-deps` Makefile targets — domain
+packages must not import from `internal/api`, `internal/store`,
+or `cmd/`.
 
-## Server packages (`internal/`)
+| Package | Path | Layer | Purpose |
+|---------|------|-------|---------|
+| `api` | `internal/api/` | HTTP | Handlers, middleware, server wiring, request/response shapes. |
+| `auth` | `internal/auth/` | Security | API key authentication + permission model. |
+| `observation` | `internal/observation/` | Domain | Execution-windowed aggregator. |
+| `optimization` (rules + bandit) | `internal/optimizer/`, `internal/bandit/` | Domain | Recommendation engine (deterministic rules + Thompson Sampling). |
+| `recommendation` | `internal/recommendation/` | Domain | Producer that consumes Observations and emits Recommendations. |
+| `banditstore` | `internal/banditstore/` | Domain | Persistent arm-posterior store. |
+| `abtesting` | `internal/experiment/` | Domain | A/B test scaffolding around `bandit`. |
+| `invocation` | `internal/invoke/` | Domain | Canonical entry point for one invocation; Budget + Quota enforcement. |
+| `execution` | `internal/executor/` | Domain | Schedule + webhook → Execution record. |
+| `release` | `internal/release/` | Domain | Release aggregate + application service. |
+| `approval` | `internal/approval/` | Domain | MakerChecker + Majority policies. |
+| `capability` | `internal/capability/` | Domain | Workspace, Project, Capability, Version, Manifest value types. |
+| `harness` | `internal/harness/` | Domain | Dataset, Precondition, EvalRun types + runner. |
+| `eval` | `internal/eval/` | Domain | Scorer registry. |
+| `lineage` | `internal/lineage/` | Domain | Decision + lineage persistence. |
+| `adoption` | `internal/adoption/` | Domain | Per-Workspace Recommendation adoption history. |
+| `vault` | `internal/vault/` | Domain | AES-256-GCM + KMS-backed KeyProvider. |
+| `llm` | `internal/llm/` | Domain | Anthropic + OpenAI provider implementations. |
+| `webhook` | `internal/webhook/` | Domain | Event delivery with HMAC signing + SSRF protection. |
+| `rollups` | `internal/rollups/` | Domain | Per-Workspace Budget/Quota rollup aggregator. |
+| `rollups/clickhouse` | `internal/rollups/clickhouse/` | Storage | ClickHouse writer (build tag `clickhouse`). |
+| `budget` | `internal/budget/` | Domain | USD-cap enforcement. |
+| `quota` | `internal/quota/` | Domain | Rate-cap enforcement. |
+| `mcplist` | `internal/mcplist/` | Domain | Per-Workspace MCP allowlist. |
+| `slo` | `internal/slo/` | Domain | Capability-level SLOs + Repository contract. |
+| `slo/evaluator` | `internal/slo/evaluator.go` | Domain | SLO burn-rate evaluator. |
+| `redactor` | `internal/redactor/` | Plugin | PII redaction default Guardrail. |
+| `injection` | `internal/injection/` | Plugin | Prompt-injection detection default Guardrail. |
+| `pluginsup` | `internal/pluginsup/` | Plugin | Plugin supervisor (in-process + subprocess). |
+| `subprocess` | `internal/subprocess/` | Plugin | net/rpc-over-UDS subprocess plugin transport. |
+| `pluginproto` | `internal/pluginproto/` | Plugin | gRPC over UDS plugin transport (proto + stubs). |
+| `pluginmanifest` | `internal/pluginmanifest/` | Plugin | Plugin manifest parser. |
+| `plugins/builtins` | `internal/plugins/builtins/` | Plugin | Default in-process plugins. |
+| `replay` | `internal/replay/` | Domain | Replay buffer for hash-stable round-trip reproducibility. |
+| `schedule` | `internal/schedule/` | Domain | Schedule aggregate. |
+| `scheduler` | `internal/scheduler/` | Domain | The tick loop. |
+| `config` | `internal/config/` | Config | Env-var loader + Validate. |
+| `metrics` | `internal/metrics/` | Observability | Prometheus collector + HTTP middlewares. |
+| `trace` | `internal/trace/` | Observability | OTLP-only trace export. |
+| `observability` | `internal/observability/` | Observability | OTel tracing, Prometheus metrics, retention sweep. |
+| `ws` | `internal/ws/` | HTTP | SSE log stream hub. |
+| `ratelimit` | `internal/ratelimit/` | HTTP | Per-client rate limiting. |
+| `bridge` | `internal/bridge/` | Adapter | Cross-package adapters. |
+| `context` | `internal/context/` | Domain | Context assembly manager. |
+| `eventbus` | `internal/eventbus/` | Domain | In-process pub/sub. |
+| `policy` | `internal/policy/` | Domain | Policy decision framework. |
+| `alerting` | `internal/alerting/` | Domain | Alert rule + notification groups. |
+| `redactor` | `internal/redactor/` | Domain | PII redaction default Guardrail. |
+| `cli` | `cmd/promptsheon/` | CLI | Hand-rolled command dispatcher. |
+| `daemon` | `cmd/promptsheond/` | HTTP | Server binary. |
+| `auditbackfill` | `cmd/promptsheon-auditbackfill/` | Tool | One-shot audit replay. |
+| `healthcheck` | `cmd/promptsheon-healthcheck/` | Tool | Container health probe. |
+| `cas` (public) | `pkg/cas/` | Public | Content-addressable store. Stable public API. |
+| `plugin` (public) | `pkg/plugin/` | Public | Stable plugin SDK. |
+| `client` (Go SDK) | `sdk/` | SDK | Go SDK; see [docs/sdk.md](sdk.md). |
+| `client` (Py SDK) | `sdk/python/src/promptsheon/` | SDK | Python SDK; generated. |
+| `client` (TS SDK) | `sdk/typescript/src/` | SDK | TypeScript SDK; generated. |
 
-### HTTP and entry points
+## Stable public packages
 
-| Package | Path | Purpose |
-|---|---|---|
-| `api` | `internal/api/` | HTTP REST API, middleware (CORS, security headers, recovery, logging), SSE streaming, OpenAPI generator glue. |
-| `auth` | `internal/auth/` | API key authentication, RBAC, OAuth (Google, GitHub). |
-| `config` | `internal/config/` | Loads and validates all environment variables. Single source of truth for runtime configuration. See [Configuration](configuration.md). |
-| `observability` | `internal/observability/` | Retention sweep (trace / snapshot / audit TTLs) and operational policies. |
+The `pkg/` directory hosts packages with stable APIs intended
+to be importable by external Go projects:
 
-### Core domain and execution
+- `pkg/cas/` — content-addressable storage.
+- `pkg/plugin/` — plugin SDK.
 
-| Package | Path | Purpose |
-|---|---|---|
-| `models` | `internal/models/` | Domain structs (`Prompt`, `Agent`, `Workflow`, `EvalRun`, `AuditEntry`, etc.). |
-| `store` | `internal/store/` | `Repository` interface and the SQLite implementation. Owns the migration runner and the audit chain. See ADR [0003](adr/0003-hash-chained-audit-log.md). |
-| `promptsheon` | `internal/promptsheon/` | The CAS engine. Blobs, trees, commits, refs. Used by the CLI; not currently exposed to the HTTP server. See ADR [0001](adr/0001-use-cas-for-prompt-history.md). |
-| `search` | `internal/search/` | BM25 index for prompt search and similarity. See [Algorithms — BM25](algorithms.md#bm25). |
-| `workflow` | `internal/workflow/` | DAG-based execution engine for multi-step agents. See [Workflows](workflows.md). |
-| `context` | `internal/context/` | Context assembly, token estimation, and truncation strategies. |
-| `snapshot` | `internal/snapshot/` | Output snapshot persistence for LLM calls. |
-| `eval` | `internal/eval/` | Scorer interface (`exact_match`, `contains`, `regex`, `json_schema` placeholder) + per-case eval runner. See [Eval](eval.md). |
-| `harness` | `internal/harness/` | Dataset, Precondition, EvalRun domain types; PreconditionRunner (sh -c with timeouts); harness.Repository interface. See [harness.md](harness.md). |
-| `guardrail` | `internal/guardrail/` | Static (pre-LLM) and runtime (post-LLM) guardrail enforcement. See [Guardrails](guardrails.md). |
+The `sdk/` directory hosts the language SDKs.
 
-### Resilience and observability
+## Domain-package purity
 
-| Package | Path | Purpose |
-|---|---|---|
-| `llm` | `internal/llm/` | Provider abstraction (`Provider` interface), per-provider implementations, retry, circuit breaker, fallback, cost, instrumentation. See [LLM Providers](llm-providers.md) and [Algorithms](algorithms.md#retry). |
-| `ratelimit` | `internal/ratelimit/` | Token-bucket rate limiter, per API key. |
-| `trace` | `internal/trace/` | In-memory distributed tracing. Pluggable backend (OTel). |
-| `metrics` | `internal/metrics/` | Prometheus-compatible metrics collector and `/metrics` endpoint. |
-| `alerting` | `internal/alerting/` | Alert rules, threshold monitoring, and notification groups. |
-| `ws` | `internal/ws/` | WebSocket / SSE hub for real-time log streaming. |
+`make lint-domain` enforces that every domain package
+(declared via the `domain:` Makefile target) does not import
+from `internal/api`, `internal/store`, or `cmd/`. This is the
+core architectural rule: domain logic does not know about
+HTTP, storage, or wiring.
 
-### Security and integration
+`make lint-deps` enforces the broader rule that domain
+packages may only depend on other domain packages, the
+standard library, and explicitly-allowed third-party
+packages (see `.golangci.yml`).
 
-| Package | Path | Purpose |
-|---|---|---|
-| `vault` | `internal/vault/` | AES-256-GCM encryption for provider API keys. See [Algorithms — Vault](algorithms.md#vault-aes-256-gcm). |
-| `webhook` | `internal/webhook/` | Event delivery to external HTTP endpoints. HMAC signing, SSRF policy, retry. See ADR [0005](adr/0005-hmac-webhooks-with-ssrf-allowlist.md). |
-| `abtesting` | `internal/abtesting/` | A/B testing engine for prompt versions. |
-| `optimizer` | `internal/optimizer/` | AI-powered prompt analysis and improvement suggestions. |
-| `playground` | `internal/playground/` | Interactive prompt testing environment (server-side state). |
-| `collab` | `internal/collab/` | Real-time collaborative editing over WebSockets. |
+## See also
 
-## Client packages
-
-| Package | Path | Purpose |
-|---|---|---|
-| `sdk` | `sdk/` | Go client library for the REST API. See [SDK](sdk.md). |
-| `promptsheon` (cmd) | `cmd/promptsheon/` | CLI client. Operates on a `.promptsheon` repository. See [CLI](cli.md). |
-| `promptsheond` (cmd) | `cmd/promptsheond/` | Server daemon. Entry point: `main.go` in `cmd/promptsheond/`. |
-
-## Tooling
-
-| Package | Path | Purpose |
-|---|---|---|
-| `genopenapi` | `scripts/genopenapi/` | Walks `internal/api/server.go` for routes and `internal/api/handlers_*.go` for request schemas, then emits `api/openapi.yaml`. Idempotent. See [API Reference — Generator](api-reference.md#generator). |
-
-## Where to start reading
-
-If you are new to the codebase:
-
-1. `cmd/promptsheond/main.go` — server startup, wiring, graceful shutdown.
-2. `internal/api/server.go` — route table, middleware chain, the `Func` signature (exported as `api.Func`).
-3. `internal/config/config.go` — every env var and its default.
-4. `internal/store/sqlite.go` — the `Repository` interface and its SQLite implementation.
-5. `internal/llm/provider.go` — the `Provider` interface, the `Request`/`Response` shapes.
-
-If you are adding a new feature:
-
-1. Pick the package closest to the concern (above).
-2. Add the public type and method.
-3. Wire it into `internal/api/server.go` and write the handler in a `handlers_*.go` file.
-4. Run `make openapi` to regenerate the spec.
-5. Add tests under the same directory.
-
-## Naming conventions
-
-- Package names are short, lowercase, singular (`store`, not `stores`).
-- One package per directory.
-- Tests live in the same package as the code they test (`store_test` is in `internal/store/`).
-- Handler files are named `handlers_<topic>.go`.
-- Internal-only types are unexported; everything that crosses a package boundary is exported.
+- [docs/architecture.md](architecture.md) — the system
+  diagram and migration timeline.
+- [docs/algorithms.md](algorithms.md) — the algorithms
+  inside each domain package.

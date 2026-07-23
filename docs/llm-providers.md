@@ -1,85 +1,125 @@
 # LLM Providers
 
-Promptsheon ships two first-class LLM providers in v0.1.x, each
-implemented against the official SDK:
+Promptsheon ships with two LLM providers in v0.1.x:
+**OpenAI** and **Anthropic**. Both implement the
+`internal/llm.Provider` interface and register a factory on
+the `llm.Registry` at boot.
 
-| Provider | SDK | Env vars |
-|---|---|---|
-| Anthropic | [`anthropics/anthropic-sdk-go`](https://github.com/anthropics/anthropic-sdk-go) | `PROMPTSHEON_ANTHROPIC_API_KEY`, `PROMPTSHEON_ANTHROPIC_BASE_URL` |
-| OpenAI | [`openai/openai-go/v3`](https://github.com/openai/openai-go) (Responses API) | `PROMPTSHEON_OPENAI_API_KEY`, `PROMPTSHEON_OPENAI_BASE_URL` |
+## Wiring a provider
 
-The provider registry in `internal/llm/registry.go` registers both by
-default. Add a new provider by calling `r.Register("name", factory)`
-on the registry — no daemon restart is needed if you swap factories
-in code.
-
-## Anthropic
+Set the API key env var and the daemon picks the provider
+up automatically:
 
 ```bash
+# OpenAI.
+export PROMPTSHEON_OPENAI_API_KEY="sk-..."
+
+# Anthropic.
 export PROMPTSHEON_ANTHROPIC_API_KEY="sk-ant-..."
-# Optional: override the base URL for a proxy or self-hosted gateway
-# export PROMPTSHEON_ANTHROPIC_BASE_URL="https://api.anthropic.com"
+
+# Optional base URL overrides (for proxies).
+export PROMPTSHEON_OPENAI_BASE_URL="https://my-proxy.openai.local"
+export PROMPTSHEON_ANTHROPIC_BASE_URL="https://my-proxy.anthropic.local"
+
+./promptsheond
 ```
 
-Supported models: `claude-opus-4-*`, `claude-sonnet-4-*`,
-`claude-3-5-sonnet-*`, `claude-3-5-haiku-*`, and any other model the
-Anthropic Messages API accepts.
+The daemon reads the env vars at boot; reload to pick up new
+keys.
 
-The provider translates `llm.Request.Messages` into the
-Anthropic Messages format, extracting a single `system` prompt when
-present and mapping user/assistant messages to the corresponding
-blocks.
+## Selecting a provider at runtime
+
+A Release's Manifest resolves the provider name from the
+`model_policy` artifact. The `invoke` path looks up the
+resolved name on the `llm.Registry`; an unknown name returns
+`502 Bad Gateway` with `{"provider_missing": true}` so
+operators can tell the difference between "no provider
+registered" and "provider call failed".
+
+The request body for `/api/v1/versions/{id}/executions` and
+`/api/v1/releases/{id}/invoke` carries the *inputs* only; the
+provider + model come from the release's resolved plan.
+Operators wanting to pick a different provider update the
+Release's Manifest and create a new Version + Release.
 
 ## OpenAI
 
-```bash
-export PROMPTSHEON_OPENAI_API_KEY="sk-..."
-# Optional: override the base URL for a proxy or the Azure-compatible
-# /openai/v1 Responses endpoint
-# export PROMPTSHEON_OPENAI_BASE_URL="https://api.openai.com"
-```
+| Field | Value |
+|-------|-------|
+| SDK | `openai/openai-go/v3` (Responses API) |
+| Env var | `PROMPTSHEON_OPENAI_API_KEY` |
+| Base URL override | `PROMPTSHEON_OPENAI_BASE_URL` |
+| Smoke test | `promptsheon provider test openai --model gpt-4o-mini` |
 
-Supported models: any model that the OpenAI Responses API accepts
-(`gpt-5`, `gpt-5.2`, `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`,
-`gpt-4`, `gpt-3.5-turbo`, …).
+The Responses API is the supported surface; the older
+Chat Completions API is not used.
 
-The provider uses the v3 Responses API (not Chat Completions) and
-joins `Request.Messages` into a single `Input` string; richer
-message types can be added by introducing a per-message `Input`
-list-builder if a call site needs them.
+## Anthropic
 
-`Request.Stop` is intentionally not surfaced: the Responses API in
-v3 only accepts a single stop sequence and the field is documented
-as silently dropped. Callers that need deterministic truncation
-should set `max_tokens` instead.
+| Field | Value |
+|-------|-------|
+| SDK | `anthropics/anthropic-sdk-go` |
+| Env var | `PROMPTSHEON_ANTHROPIC_API_KEY` |
+| Base URL override | `PROMPTSHEON_ANTHROPIC_BASE_URL` |
+| Smoke test | `promptsheon provider test anthropic --model claude-haiku-4-5` |
 
-## Adding a new provider
+## Removed providers
 
-Implement `llm.Provider`:
-
-```go
-type MyProvider struct{ ... }
-func (p *MyProvider) Complete(ctx context.Context, req *llm.Request) (*llm.Response, error) { ... }
-func (p *MyProvider) Name() string { return "my-provider" }
-```
-
-Then register it:
+Azure OpenAI, Ollama, and NVIDIA NIM were removed in v0.1.0.
+To re-introduce any of them, implement the
+`internal/llm.Provider` interface (one method,
+`Complete(ctx, *Request) (*Response, error)`) and register a
+factory on the `Registry` in `cmd/promptsheond/main.go`. The
+registry is the integration boundary — no domain code needs
+to change.
 
 ```go
 r := llm.NewRegistry()
-r.Register("my-provider", func(cfg llm.ProviderConfig) llm.Provider {
-    return &MyProvider{cfg: cfg}
+r.Register("myprovider", func(cfg llm.ProviderConfig) llm.Provider {
+    return myProvider{cfg: cfg}
 })
-r.Configure("my-provider", llm.ProviderConfig{APIKey: "..."})
 ```
 
-The provider participates in the same flow as Anthropic and
-OpenAI: the daemon's `WithInvoker` path consumes `llm.Provider`,
-the CLI's `provider test` exercises it directly.
+## Provider configuration
 
-## Removed providers (v0.0.x)
+The `ProviderConfig` struct carries:
 
-Azure OpenAI, Ollama, and NVIDIA NIM were removed in v0.1.0
-(forward-only cleanup). Operators who need an Ollama-compatible
-local endpoint should run a proxy that exposes the OpenAI Responses
-API and set `PROMPTSHEON_OPENAI_BASE_URL` accordingly.
+| Field | Type | Description |
+|-------|------|-------------|
+| `APIKey` | string | Provider API key. |
+| `BaseURL` | string | Provider base URL. |
+| `Extra` | map[string]string | Provider-specific config (e.g. Azure deployment, API version). |
+
+The `llm.Registry` keeps a cache keyed by provider name; a
+provider is constructed once per process. Tests that want to
+reset the cache call `Registry.Configure(name, cfg)` which
+invalidates the cached instance.
+
+## Circuit breaker
+
+`internal/llm/circuitbreaker.go` ships a circuit breaker
+that wraps any `Provider` with success/failure tracking and
+state transitions (`closed` / `open` / `half-open`). The
+daemon doesn't wire it into the default providers in v0.1.x
+because the OpenAI and Anthropic SDKs already retry on
+transient errors; production tenants who need their own
+policy wrap a `Provider` with `NewCircuitBreakerMiddleware` at
+startup.
+
+## Per-call API key override
+
+A request that needs a per-call API key (different from the
+registry-level one) calls `llm.WithPerCallKey(ctx, key)` on
+the context. Providers that support per-call key injection
+honour this; providers that don't fall back to the
+registry-level key.
+
+## See also
+
+- [docs/configuration.md](configuration.md) — full env-var
+  reference including TLS, leader-election, and OTel settings.
+- [docs/security.md](security.md) — Vault + KMS-backed
+  `KeyProvider` for the master key, plus the audit chain
+  contract.
+- [docs/getting-started.md](getting-started.md) — the 10-step
+  walkthrough.

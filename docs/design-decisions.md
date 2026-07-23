@@ -1,59 +1,130 @@
 # Design Decisions
 
-This page is the user-facing summary of the significant engineering decisions behind Promptsheon. Each section points to the full [Architecture Decision Record (ADR)](adr/README.md) for the rationale, options considered, and consequences.
+This page is a curated, user-facing index of the design
+decisions behind Promptsheon. The full set of architectural
+decision records (ADRs) lives in [docs/adr/](adr/) and is
+authoritative; this page is the summary you read first.
 
-> **Note on tone.** The decisions below are recorded because they shape the public surface of the system. The goal is to make it possible for a new contributor to understand *why* a piece of code looks the way it does, not to relitigate past debates.
+## Capability-as-immutable-Manifest
 
-## Storage and data model
+A Capability is a name. A Version is an immutable Manifest.
+A Release points a Version at an Environment. The Manifest is
+the single source of truth for the bytes of every artifact
+the Capability consumes.
 
-| Decision | One-line summary | ADR |
-|---|---|---|
-| Content-addressable storage for prompt history | Prompts, agents, and tool specs are stored in a Git-style Merkle DAG with SHA-256 content addressing. | [0001](adr/0001-use-cas-for-prompt-history.md) |
-| Prompt-binding schema version 0.3.0 | Prompts carry an explicit `binding` block (`provider`, `model`, `parameters`, `api_key_ref`) and a `schema_version` field. | [0009](adr/0009-prompt-binding-version-0-3-0.md) |
-| Pure-Go SQLite driver | The only direct dependency is `modernc.org/sqlite`. No CGO, fully static binary. | [0006](adr/0006-modernc-sqlite-no-cgo.md) |
+[ADR 0010](adr/0010-version-is-a-manifest-not-a-bundle.md) is
+the design record. The legacy "bundle" model (a Version
+carried inline JSON for every artifact) was removed in
+v0.1.0; today's Version is a Manifest of `(kind, hash)`
+references.
 
-## Search and retrieval
+[ADR 0023](adr/0023-forward-only-cleanup.md) is the migration
+record — what was removed, what replaced it, and the rationale
+for not keeping a deprecation shim.
 
-| Decision | One-line summary | ADR |
-|---|---|---|
-| BM25 over vector search for prompt retrieval | Lexical in-process BM25 (`k1=1.2`, `b=0.75`) with unigrams and bigrams. No embedding model. | [0002](adr/0002-bm25-over-vector-search.md) |
+## Content-addressed storage
 
-## Security
+Every artifact is keyed by its SHA-256. Two Capabilities
+that share the same Manifest share the same underlying
+artifacts; the CAS is a hash table. [ADR 0001](adr/0001-use-cas-for-prompt-history.md)
+is the rationale.
 
-| Decision | One-line summary | ADR |
-|---|---|---|
-| Hash-chained audit log | Each `audit_entries` row stores the SHA-256 of itself and its predecessor. Verifiable with `GET /api/v1/audit/verify`. | [0003](adr/0003-hash-chained-audit-log.md) |
-| AES-256-GCM for the provider-key vault | Single env-var key (`PROMPTSHEON_VAULT_KEY`), 96-bit random nonce per encryption, all-zero key rejected. | [0004](adr/0004-aes-256-gcm-vault.md) |
-| HMAC-signed webhooks with conservative SSRF defaults | `X-Promptsheon-Signature: HMAC-SHA256(secret, body)`. Loopback and private ranges are refused unless `PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE=true`. | [0005](adr/0005-hmac-webhooks-with-ssrf-allowlist.md) |
+The CAS lives at `pkg/cas/`, a stable public package
+intended to be importable by external Go projects.
 
-## Observability
+## Hash-chained audit log
 
-| Decision | One-line summary | ADR |
-|---|---|---|
-| `log/slog` as the single observability foundation | One `*slog.Logger` per process, JSON to stderr. OTel SDK for traces/metrics when `PROMPTSHEON_OTEL_ENDPOINT` is set. | [0007](adr/0007-slog-as-observability-foundation.md) |
+The audit log is a hash chain, not an append-only list.
+[ADR 0003](adr/0003-hash-chained-audit-log.md) is the design
+record. `GET /api/v1/audit/verify` walks the chain from
+rowid 1 forward and asserts the invariant.
 
-## Execution model
+The retention manager copies expired rows to `audit_archive`
+rather than deleting them; the chain survives because the
+source row is preserved. See [docs/security.md](security.md#audit-chain).
 
-| Decision | One-line summary | ADR |
-|---|---|---|
-| Topological DAG with level-by-level concurrency | Cycles are rejected. Independent steps in a level run in parallel. Failure propagates to descendants. | [0008](adr/0008-workflow-dag-with-topological-execution.md) |
+## Vault
 
-## Why a separate docs/adr/ directory?
+API keys for upstream LLM providers live in an AES-256-GCM
+vault with the master key sourced from
+`PROMPTSHEON_VAULT_KEY` (or a `KeyProvider` backed by AWS
+KMS, HashiCorp Vault, etc. for production).
+[ADR 0004](adr/0004-aes-256-gcm-vault.md) is the rationale.
 
-ADRs are immutable, slow-moving, and reference each other. They live in a flat, numbered directory so that the order in which a decision was made is obvious from the file name. The `docs/design-decisions.md` page is the table-of-contents that points into `docs/adr/` from the user-facing docs.
+## Webhook hardening
 
-## When to write a new ADR
+Webhooks are signed with HMAC + a timestamp (5-minute replay
+window). The URL is validated to refuse non-HTTPS to
+non-private / non-loopback / non-link-local / non-multicast /
+non-unspecified addresses. [ADR 0005](adr/0005-hmac-webhooks-with-ssrf-allowlist.md)
+is the design record.
 
-Write an ADR when a decision:
+## Modernc SQLite
 
-- Introduces a new dependency or removes an existing one.
-- Changes a public schema (the prompt-binding schema, the audit-chain format, the vault envelope).
-- Establishes a security control or threat-model assumption.
-- Replaces one algorithm with another (e.g. swapping BM25 for vector search, or AES-GCM for ChaCha20-Poly1305).
-- Bounds a resource (request body size, rate limit, retention TTL).
+`modernc.org/sqlite` is the SQLite driver — pure Go, no CGo.
+[ADR 0006](adr/0006-modernc-sqlite-no-cgo.md) is the
+rationale. v0.1.x is SQLite-only.
 
-Do **not** write an ADR for: a refactor that does not change behaviour, a bug fix with a clear cause, or the choice of a variable name.
+## slog as observability foundation
 
-## When to supersede an ADR
+Every log line is JSON via `log/slog`. [ADR 0007](adr/0007-slog-as-observability-foundation.md)
+is the design record. The SSE log stream hub (`internal/ws`)
+uses the same slog chain so `slog.Default()` flows to both
+stderr and `/api/v1/logs/stream`.
 
-When a decision is reversed, do not delete the original. Mark its status `Superseded by NNNN`, add a `Superseded by:` footer, and write the new ADR. The history is the value.
+## Workflow DAG
+
+Workflows are sequences of `Step`s executed in declaration
+order. [ADR 0008](adr/0008-workflow-dag-with-topological-execution.md)
+is the design record. Each step is `{ID, Tool, Input, Output?}`;
+the Workflow runtime is in `internal/workflow`.
+
+## Capability Service Level Objectives
+
+Three first-class SLOs ship with the project. [ADR 0020](adr/0020-capability-slos.md)
+is the design record; [docs/slos.md](slos.md) is the user
+guide. The Prometheus alert definitions live in
+`deploy/prometheus/promptsheon-alerts.yaml`.
+
+## Approval workflow
+
+`MakerCheckerPolicy` (default) self-enforces separation of
+duties: the Release's creator cannot vote to approve their
+own release. [ADR 0028](adr/0028-maker-checker-self-enforcing.md)
+is the design record. The alternative `MajorityPolicy` is a
+flat count-based threshold.
+
+## Recommendation engine
+
+A deterministic rules engine (`internal/optimizer/rules`)
+plus a Thompson Sampling bandit (`internal/bandit`). Two
+phases: v0.1.x ships the rules engine; the bandit selector
+is a follow-on. [ADR 0021](adr/0021-bandit-foundation.md) is
+the bandit design record.
+
+## Plugin supervisor
+
+In-process plugins (PII redactor, prompt-injection detection)
+ship as built-ins; remote plugins are subprocess binaries that
+implement the gRPC-over-UDS `PluginServer` contract
+([ADR 0025](adr/0025-pluginproto.md)) or the net/rpc-over-UDS
+fallback for v0.1.x
+([ADR 0024](adr/0024-plugin-transport-uds.md)).
+[ADR 0022](adr/0022-plugin-manifest.md) is the manifest
+format.
+
+## Deferred items
+
+The architecture review board's deferred work
+([ADR 0019](adr/0019-deferred-items.md)) includes the
+Postgres backend (removed in v0.1.0), the bandit
+recommender (v0.4), and the full DAG workflow runtime with
+parallel branches and `depends_on`. Items in this ADR are
+informational only — operators wanting them can track the
+GitHub issues.
+
+## See also
+
+- [docs/architecture.md](architecture.md) — the system
+  diagram.
+- [docs/adr/](adr/) — the full ADR index.

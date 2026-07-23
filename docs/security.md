@@ -1,100 +1,169 @@
 # Security
 
-This page is the user-facing summary of the security model. For rationale and trade-offs see the ADRs listed in [Design Decisions](design-decisions.md). For the implementation details of individual algorithms (vault, audit chain, HMAC), see [Algorithms](algorithms.md).
+This page covers the threat model, the auth model, the audit
+chain, the vault, and the SSRF + webhook hardening. The
+contribution policy for security issues is in
+[`SECURITY.md`](../SECURITY.md); report vulnerabilities via
+GitHub Security Advisories — **do not open a public issue**.
 
 ## Threat model
 
-The system assumes the following:
+Promptsheon is a control plane: it stores customer prompts,
+manages API keys to upstream LLM providers, and emits audit
+events. The threat model is:
 
-- **The host running `promptsheond` is trusted.** The server process and the database file are inside the trust boundary. An attacker with read/write access to the database file can rewrite the audit chain.
-- **The network is hostile.** API requests come from untrusted clients. Webhook destinations are attacker-controllable URLs.
-- **LLM providers are partially trusted.** They will sometimes fail, return errors, and occasionally return malformed or hostile content. They are not relied on for confidentiality.
+| Threat | Mitigation |
+|--------|------------|
+| **Credential theft** — an attacker with access to the daemon host reads `promptsheon.db` and harvests provider API keys. | AES-256-GCM vault (or KMS-backed `KeyProvider` for production). TLS on every non-loopback bind. |
+| **Tamper of audit chain** — an attacker modifies a past audit row to hide a malicious action. | Hash chain (each row records the previous row's `entry_hash`; tampering breaks the chain). `VerifyAuditChain` walks the chain on demand. |
+| **Privilege escalation** — a non-admin user creates an admin release or approves their own. | `MakerCheckerPolicy` self-enforces separation of duties (no vote from the creator, configurable RequiredApprovers). `mature_creator_can_vote` is closed-set. |
+| **SSRF via webhook URL** — an attacker registers a webhook to `http://169.254.169.254/latest/meta-data/` and harvests IAM credentials. | Webhooks refuse non-HTTPS URLs to non-private / non-loopback / non-link-local / non-multicast / non-unspecified addresses. The `allow_private` per-endpoint flag was removed (SEC-4). |
+| **BOLA / IDOR** — a user accesses another Workspace's data. | The auth model is workspace-scoped; permission checks happen at every handler. Per-workspace budgets + quotas are the billing boundary. |
+| **Prompt injection** — a user message tricks the LLM into exfiltrating data. | Built-in `injection` Guardrail. Heuristics catch the obvious cases ("ignore all previous instructions", role-confusion attacks); production deployments layer an LLM-judge behind the same Guardrail interface. |
+| **PII exfiltration** — a user submits PII in a prompt and the LLM provider ingests it. | Built-in `redactor` Guardrail strips email addresses, US SSNs, and other patterns at the pre-LLM and post-LLM boundaries. |
+| **Webhook replay** — an attacker captures a signed webhook and replays it. | `X-Promptsheon-Signature: sha256=<hex>` HMAC includes a timestamp; the daemon rejects signatures older than 5 minutes. |
 
-Out of scope (and not provided): defence against a compromised host, defence against a compromised OS package, and key management. The vault key is a single env-var and is the operator's responsibility.
+## Authentication
 
-## Authentication and authorisation
+The daemon expects an `Authorization: Bearer <api_key>` header
+on every authenticated endpoint. The OpenAPI spec lists the
+permission required for each route; the SDK and CLI pass
+those permissions through the key's role.
 
-- **API key authentication.** When `PROMPTSHEON_AUTH=true` (the default), every request except `/health`, `/ready`, `/metrics`, and the OAuth callback paths must carry `Authorization: Bearer <api_key>`. The key is checked against the `api_keys` table; the suffix of the key is the lookup index. The full key is returned once at creation time and is never stored.
-- **Role-based access control.** API keys are bound to a user and a role. The roles are `admin`, `editor`, and `viewer`. See `internal/auth/`.
-- **OAuth (Google, GitHub).** OAuth flow is supported for browser-based admin. The OAuth client credentials live in `PROMPTSHEON_OAUTH_*` env vars.
-- **No API key in query string.** The `?api_key=` query parameter is disabled. Use the `Authorization` header.
+Three roles ship in v0.1.x:
 
-## Transport and HTTP hardening
+| Role | Permissions |
+|------|-------------|
+| `admin` | All permissions including audit read, key manage, user manage, release activate. |
+| `writer` | Capability create/update/delete, version add, release create, vote, activate, rollback, eval run, dataset/precondition create. |
+| `reader` | All GETs (capability list/get, release get, etc.). Cannot mutate. |
 
-| Control | Where | Default | Why |
-|---|---|---|---|
-| `ReadHeaderTimeout` | `http.Server` | 10s | Slowloris defence. |
-| `ReadTimeout` | `http.Server` | 30s | Bound the request read window. |
-| `WriteTimeout` | `http.Server` | 60s | Bound the response write window. |
-| `IdleTimeout` | `http.Server` | 120s | Bound the keep-alive idle window. |
-| Request body size limit | `MaxBytesReader` middleware | 10 MB | Bound the per-request body to reject OOM attempts. |
-| CORS | `CORS` middleware | deny-all (empty) (configurable) | Production default is to deny every cross-origin request. `*` is only acceptable on loopback binds and is rejected by `cfg.Validate()` on a public bind. |
-| Security headers | `SecurityHeaders` middleware | always | Adds `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and a strict CSP. |
-| Panic recovery | `Recovery` middleware | always | Recovers panics in handlers, logs them, returns `500`. |
-| Structured logging | `Logging` middleware | always | One `slog` line per request with method, path, status, latency, request ID. |
+The `admin` role is also the bootstrap role: the first caller
+of `POST /api/v1/setup` (when auth is off or when
+`PROMPTSHEON_BOOTSTRAP_TOKEN` is set) gets an admin key.
 
-## Encryption at rest
+When `PROMPTSHEON_AUTH=false` is set with a non-loopback bind,
+the daemon **refuses to start** with a clear error. This closes
+the SEC-CONTAINER-1 foot-gun (a public bind with auth off
+would mint an admin key to the first network-adjacent caller).
 
-- **Provider API keys** are encrypted with **AES-256-GCM** before they touch the database. The key is the 32-byte value of `PROMPTSHEON_VAULT_KEY` (64 hex chars). See [Algorithms — Vault](algorithms.md#vault-aes-256-gcm) and ADR [0004](adr/0004-aes-256-gcm-vault.md).
-- **The all-zero key is rejected at startup.** A misconfigured key with no entropy would otherwise produce ciphertexts that are trivially decryptable.
-- **Rotation** is manual. There is no KMS integration. Re-encrypting stored keys requires a one-off script that decrypts with the old key and re-encrypts with the new one.
+## Audit chain
 
-## Audit log integrity
+The audit log is a **hash chain**, not an append-only list.
+Each row records `previous_hash` (the previous row's
+`entry_hash`) and `entry_hash` (sha256 of the row's canonical
+JSON). `store.VerifyAuditChain` walks the chain from rowid 1
+forward and asserts the invariant.
 
-Every state-changing request writes an entry to `audit_entries`. The table is hash-chained: each row's `entry_hash` is the SHA-256 of a canonical representation of itself and the previous row's `entry_hash`. The chain is verifiable with `GET /api/v1/audit/verify`.
+### Verify
 
-The chain is **tamper-evident, not tamper-proof.** An attacker with write access to the database can rewrite the chain. The threat model assumes the database itself is not compromised. See ADR [0003](adr/0003-hash-chained-audit-log.md) and [Algorithms — Audit chain](algorithms.md#audit-chain).
+`GET /api/v1/audit/verify` (admin-only) returns:
 
-## Webhook security
+```json
+{
+  "ok": true,
+  "tail_mismatch": false,
+  "last_row_id": 42,
+  "last_hash": "abc123...",
+  "reason": ""
+}
+```
 
-- **HMAC-SHA256 signature.** Every delivery carries `X-Promptsheon-Signature: sha256=<hex>` where `<hex>` is `HMAC-SHA256(secret, body)`. The secret is per-endpoint, generated at registration, and shown to the user once.
-- **SSRF policy.** By default, loopback (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`, `fe80::/10`), and private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`) destinations are refused at registration and at every delivery. The per-endpoint `allow_private` flag was removed in v0.1.1 (SEC-4); there is no opt-in. Tenant deployments that need loopback destinations must expose a dedicated webhook sink on a public address.
-- **Constant-time comparison on the receiver side.** Receivers must verify the signature with `hmac.Equal` or equivalent.
+A failed verification (`ok: false`, `tail_mismatch: true`)
+indicates that rows were removed out-of-order. The audit
+archive (`audit_archive` table, migration 011) is the
+retention target: expired rows are copied there and the
+source row is preserved so the chain survives.
 
-See ADR [0005](adr/0005-hmac-webhooks-with-ssrf-allowlist.md) and [Algorithms — Webhook HMAC signing](algorithms.md#webhook-hmac-signing).
+### Retention
 
-## Shell tool policy
+The retention manager (`internal/observability`) runs on a
+configurable interval (default 60 minutes). It enforces
+`PROMPTSHEON_TRACE_TTL_DAYS` (min 30) and
+`PROMPTSHEON_AUDIT_TTL_DAYS` (default 90). On a chain mismatch
+the archive is skipped that cycle so the operator can
+investigate.
 
-The workflow engine has a `shell` tool that can execute commands. The policy is fail-closed:
+`promptsheon_audit_dropped_total` and
+`promptsheon_audit_queue_latency_seconds` surface the worker
+pool's health. Drops are a 5xx-class event; the
+`PromptsheonAuditChainBroken` alert fires on any drop.
 
-- The tool is enabled only if **both** `PROMPTSHEON_SHELL_ENABLED=true` **and** `PROMPTSHEON_SHELL_ALLOWLIST` contains at least one command.
-- An empty allowlist with the tool "enabled" is treated as disabled (the server logs a warning and forces the enabled flag to `false`). This is deliberate: an empty allowlist that behaves as enabled is the foot-gun case.
-- The allowlist is matched against the first token of the command (the program name). Arguments are not constrained — wrap the allowed program in a script if you need argument constraints.
+## Vault
+
+API keys for upstream LLM providers live in the vault
+(`internal/vault`). The default implementation is AES-256-GCM
+with a master key from `PROMPTSHEON_VAULT_KEY` (32-byte hex).
+Production deployments should use a `KeyProvider` backed by a
+managed-key service (AWS KMS, HashiCorp Vault, etc.) via the
+`PROMPTSHEON_VAULT_KEY_PROVIDER` interface.
+
+The vault never holds plaintext keys in the database; only
+ciphertext + the key version + the algorithm identifier.
+
+## Webhooks
+
+Webhook secrets are encrypted at rest in the vault
+(ADR-0027). Each delivery is signed with
+`X-Promptsheon-Signature: sha256=<hex>` and includes a
+timestamp; the daemon rejects signatures older than 5 minutes.
+
+URL validation refuses:
+
+- non-HTTPS schemes (SEC-4 removed the `allow_insecure` flag);
+- loopback / private / link-local / multicast / unspecified
+  addresses;
+- hostnames that resolve to any of the above (DNS-rebinding
+  mitigation).
+
+The validation runs at registration AND at delivery time.
+
+## Guardrails
+
+Two built-in Guardrails ship in v0.1.x:
+
+- `internal/redactor` — strips PII patterns (emails, US SSNs,
+  phone numbers, etc.) at the pre-LLM and post-LLM boundaries.
+- `internal/injection` — flags role-confusion attacks and
+  common injection patterns. Heuristic today; production
+  deployments layer an LLM-judge behind the same Guardrail
+  interface.
+
+Both ship via the plugin supervisor and can be disabled by
+removing their entries from `PROMPTSHEON_PLUGINS_FILE`.
 
 ## Rate limiting
 
-- Per-API-key token bucket. Configurable via `PROMPTSHEON_RATE_LIMIT` (default 100), `PROMPTSHEON_RATE_BURST` (default 50), `PROMPTSHEON_RATE_LIMIT_INTERVAL` (default 60).
-- `0` disables rate limiting cleanly (no implicit 1M-token burst). This is **not** recommended in production; use it only for local development.
-- The limiter is per-process. With multiple server instances, each one applies its own limit; the effective per-key limit is `N_instances * limit`.
+The `ratelimit` middleware enforces a per-client rate cap
+(per-User or per-IP, configurable via `RATELIMIT_TRUSTED_PROXIES`).
+The default is 100 req / 60s with a burst of 50. Rate-exceeded
+responses include a `Retry-After: 60` header.
 
-## SQL injection
+## CSRF / CORS
 
-All queries use parameterised statements via the `database/sql` package. There are no string-concatenated SQL paths in the server. The audit chain SHA-256 inputs are typed and separated by `0x1f` bytes, so hash collisions across columns are not possible.
+The daemon enforces CORS via the `cors` middleware. Operators
+set `PROMPTSHEON_CORS_ORIGINS` to a comma-separated allowlist;
+the wildcard `*` is rejected on non-loopback binds (it would
+allow any browser to make credentialed cross-origin requests).
+No origin == no CORS headers == the browser blocks the
+response.
 
-## Secret management
+State-changing endpoints require the same `Authorization`
+header regardless of origin. The `Sec-Fetch-Site` header is
+inspected for additional hardening; `same-origin` and
+`same-site` requests are allowed without question, and
+`cross-site` requests are rejected unless explicitly
+allowlisted.
 
-- **Do not** commit `.env` files. The repository ships `.env.example` only.
-- **Do not** log API keys. The server masks the `Authorization` header in the structured log output (the value is replaced with `Bearer ***`).
-- **Do not** log full webhook secrets. Only the secret's ID is logged.
+## Operator checklist
 
-## Vulnerability reporting
-
-If you discover a security vulnerability:
-
-- **Do not** open a public GitHub issue.
-- Use the GitHub Security Advisory workflow: `https://github.com/sachncs/promptsheon/security/advisories/new`.
-- Or email the maintainers at the address in `CODEOWNERS`.
-
-We will acknowledge within 48 hours, give an initial assessment within 1 week, and aim to ship a fix within 2 weeks depending on severity.
-
-## Security checklist for operators
-
-- [ ] `PROMPTSHEON_AUTH=true` (default).
-- [ ] `PROMPTSHEON_VAULT_KEY` is set to a 32-byte hex string from a real source of entropy. **Not** all zeros.
-- [ ] `PROMPTSHEON_CORS_ORIGINS` is an explicit list, not `*`.
-- [ ] `PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE` is not set. The env var no longer exists; the previous per-endpoint flag was removed in SEC-4.
-- [ ] The shell tool is enabled only if the allowlist is non-empty.
-- [ ] The database file is owned by the server user with mode `0640` or stricter.
-- [ ] The vault key is not stored in the same place as the database.
-- [ ] HTTPS is terminated upstream (nginx, Caddy, a load balancer).
-- [ ] Logs are shipped to a separate aggregator and retained per the data-retention policy.
+1. `curl /api/v1/audit/verify` — returns `{ok: true, last_row_id,
+   last_hash}`. Schedule this on a cron.
+2. `curl /metrics | grep promptsheon_audit` — drop counter is
+   zero; queue-latency histogram is bounded.
+3. `PROMPTSHEON_AUTH=true`, `PROMPTSHEON_TLS_CERT_FILE` and
+   `PROMPTSHEON_TLS_KEY_FILE` set on every non-loopback bind.
+4. `PROMPTSHEON_VAULT_KEY` rotated quarterly; secrets read
+   through a KMS-backed `KeyProvider` for production.
+5. `PROMPTSHEON_HARNESS_PRECONDITIONS=true` only after
+   preconditions have been audited. Default is `false`.

@@ -1,163 +1,143 @@
-# Harness engineering
+# Eval Primitive
 
-Promptsheon's headline surface for the harness engineering loop
-that the [OpenAI harness engineering article](https://openai.com/index/harness-engineering/)
-describes. Three primitives compose:
+The Eval primitive is the workhorse of the harness
+engineering loop. An Eval Run is a recorded scoring of a
+Release against a Dataset using a chosen Scorer.
 
-| Primitive | Role |
-|---|---|
-| **Dataset** | Ground truth: `{inputs, expected}` pairs that the LLM must satisfy. |
-| **Precondition** | A named command hook run on every Activate. Failing hooks block the release. |
-| **Eval** | A recorded scoring run of a Release against a Dataset. Score is `passed / total`. |
+## Lifecycle
 
-The daemon wires all three into the existing release lifecycle.
-A Release that fails its preconditions returns `409 Precondition
-Failed`; an Eval Run that fails its scorer returns `422 Unprocessable
-Entity`.
-
-## Datasets
-
-A Dataset is a collection of test cases attached to a Capability.
-Stored as JSON; the LLM output for each case is compared against
-the `expected` value using the Scorer selected at run time.
-
-```bash
-# Create from a JSON file
-promptsheon dataset create c1 --name greeting --file cases.json
-
-# cases.json shape (array form):
-# [
-#   {"inputs": "hi",  "expected": "hi"},
-#   {"inputs": "bye", "expected": "bye"}
-# ]
-
-# Or wrapped form:
-# {"cases": [{"inputs": "hi", "expected": "hi"}]}
-
-# List, get, replace cases, delete
-promptsheon dataset list c1
-promptsheon dataset get <dataset_id>
-promptsheon dataset put-cases <dataset_id> cases.json
-promptsheon dataset delete <dataset_id>
+```
+   create
+    │
+    ▼
+  running  ─── scorer fails ───▶ error
+    │
+    ▼
+  passed (no case failed)  OR  failed (any case failed)
 ```
 
-## Preconditions
+Status values:
 
-A Precondition is a named shell command attached to a Capability.
-The daemon runs every enabled precondition when a Release is
-activated; a non-zero exit blocks the release and surfaces the
-captured output to the operator.
+| Status | When |
+|--------|------|
+| `running` | Eval Run created; cases being invoked. |
+| `passed` | All cases passed the scorer. |
+| `failed` | At least one case failed. |
+| `error` | The runner itself errored (e.g. unknown scorer, dataset missing). |
 
-```bash
-promptsheon precondition add c1 --name go-test --cmd "go test ./..." --timeout 60
-promptsheon precondition list c1
-promptsheon precondition delete <id>
-```
+When a Run finishes (passed/failed/error), the per-case
+`EvalResult` rows are persisted and the aggregate counters
+increment `promptsheon_eval_cases_passed_total` or
+`promptsheon_eval_cases_failed_total` accordingly.
 
-A 409 response on Activate has the shape:
+## Endpoints
 
-```json
-{
-  "error": "harness: precondition failed: go-test",
-  "failures": [
-    {"name": "go-test", "output": "FAIL\t...\n"}
-  ]
-}
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/releases/{release_id}/evals` | Run an Eval. Body: `{dataset_id, scorer}`. |
+| `GET`  | `/api/v1/releases/{release_id}/evals` | List EvalRuns for a Release. |
+| `GET`  | `/api/v1/evals/{id}` | Get an EvalRun with per-case results. |
 
-## Evals
+## Run a Scorer
 
-An Eval Run invokes the Release once per Dataset case and scores
-the actual output against `expected`. The Run persists per-case
-outcomes and an aggregate `score = passed / total`. Built-in
-scorers today:
+`runCase(ctx, run, scorer, case)`:
+
+1. Decode `case.Inputs` (JSON) into a `map[string]any`.
+2. Call `r.Inv.Invoke(ctx, run.ReleaseID, inputs)`.
+3. Score `actual` against `case.Expected` using the Scorer.
+4. Record the result; return.
+
+Failures (scorer error or LLM call error) are recorded on
+the case's `EvalResult.Error` field and the case is marked
+`Passed: false`.
+
+## Scorers
+
+v0.1.x ships four scorers. Each is registered in
+`internal/eval` and discoverable via `eval.ValidScorers`:
 
 | Scorer | Behaviour |
-|---|---|
-| `exact_match` | byte-equal after JSON canonicalisation |
-| `contains` | substring match (case-sensitive) |
-| `regex` | Go regex; `expected` is the pattern, `actual` is matched |
-| `json_schema` | placeholder (M3 follow-on) |
+|--------|-----------|
+| `exact_match` | `actual == expected` (byte-equal). |
+| `contains` | `strings.Contains(actual, expected)`. |
+| `regex` | `regexp.MatchString(expected, actual)`. |
+| `json_schema` | `expected` is a JSON Schema document; `actual` must be a valid JSON value that conforms to the schema. |
 
-```bash
-promptsheon eval run <release_id> --dataset <dataset_id> [--scorer exact_match]
-promptsheon eval list <release_id>
-promptsheon eval get <eval_id>
-```
+The `json_schema` scorer is gated by an allow-list of
+JSON Schema keywords (SEC-3). Unsupported keywords cause
+the schema to be rejected at validation time, not silently
+ignored.
 
-A failing run returns `422`; the response body is the `EvalRun`
-with `Status = "failed"` and `Score = passed/total`. Callers drive
-their own UI off `Passed`, `Failed`, and `Score`.
+## Case record
 
-## The iteration loop
+`EvalResult`:
 
-The fast feedback loop the harness engineering article prizes:
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Server-generated unique ID. |
+| `run_id` | string | The parent `EvalRun.ID`. |
+| `case_id` | string | The `DatasetCase.ID` that produced this result. |
+| `seq` | int | The case's position in the dataset. |
+| `passed` | bool | Whether the scorer accepted the output. |
+| `actual` | json.RawMessage | The model's actual output. |
+| `error` | string | Empty on pass; populated on scorer or invoke failure. |
+| `latency_ms` | int64 | Wall-clock per case. |
 
-```text
-1. write dataset + add preconditions
-2. (loop)
-   a. write a new Version
-   b. CreateRelease + Vote + Activate
-      → Activate runs preconditions; 409 if any fail
-   c. EvalRun against the Release
-      → 422 if any case fails the scorer
-   d. read the per-case EvalResult; iterate
-3. promote the version that passes
-```
+## Aggregate record
 
-This is the same loop as for traditional unit tests: write a test,
-run it, see red, fix, run again. The Score column in the EvalRun
-is the green/red signal.
+`EvalRun`:
 
-## Programmatic surface
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Server-generated. |
+| `release_id` | string | The Release that was evaluated. |
+| `dataset_id` | string | The Dataset the cases came from. |
+| `scorer` | string | The Scorer name (e.g. `exact_match`). |
+| `score` | float64 | `passed / total` if `total > 0`, else `0`. |
+| `passed`, `failed`, `total` | int | Per-case counts. |
+| `status` | string | `running` / `passed` / `failed` / `error`. |
+| `started_at`, `finished_at` | timestamp | Wall-clock. |
 
-The same surfaces are exposed via the Go SDK:
+## Serial execution
+
+v0.1.x runs cases serially. Each case invokes the Release
+through the configured LLM provider; the next case doesn't
+start until the previous finishes. Parallel execution
+ships in a follow-on.
+
+## SLOs
+
+`promptsheon_eval_cases_passed_total` and
+`promptsheon_eval_cases_failed_total` are the metrics the
+SLO alert in
+`deploy/prometheus/promptsheon-alerts.yaml` queries. The
+alert fires when the failure rate exceeds 10% over 30
+minutes.
+
+## SDK
 
 ```go
-ds, _ := client.CreateDataset(ctx, "c1", sdk.CreateDatasetRequest{
-    Name: "greeting",
+run, err := client.RunEval(ctx, rel.ID, sdk.RunEvalRequest{
+    DatasetID: datasetID,
+    Scorer:    "exact_match",
 })
-client.PutCases(ctx, ds.ID, []sdk.DatasetCase{
-    {Seq: 0, Inputs: json.RawMessage(`"hi"`), Expected: json.RawMessage(`"hi"`)},
-})
-
-p, _ := client.CreatePrecondition(ctx, "c1", sdk.CreatePreconditionRequest{
-    Name: "go-test", Command: "go test ./...", TimeoutSec: 60,
-})
-
-run, _ := client.RunEval(ctx, "<release_id>", sdk.RunEvalRequest{
-    DatasetID: ds.ID, Scorer: "exact_match",
-})
-fmt.Printf("score=%v status=%s\n", run.Score, run.Status)
 ```
 
-And via the REST API:
+`run.Status` is one of `"running"`, `"passed"`, `"failed"`,
+`"error"`. The per-case results are available via
+`client.GetEval(ctx, run.ID)`.
 
-```
-POST   /api/v1/capabilities/{capability_id}/datasets
-GET    /api/v1/capabilities/{capability_id}/datasets
-GET    /api/v1/datasets/{id}
-PUT    /api/v1/datasets/{id}/cases
-DELETE /api/v1/datasets/{id}
+## CLI
 
-POST   /api/v1/capabilities/{capability_id}/preconditions
-GET    /api/v1/capabilities/{capability_id}/preconditions
-DELETE /api/v1/preconditions/{id}
-
-POST   /api/v1/releases/{release_id}/evals
-GET    /api/v1/releases/{release_id}/evals
-GET    /api/v1/evals/{id}
+```bash
+promptsheon eval run <release_id> <dataset_id> [scorer]
+promptsheon eval list <release_id>
+promptsheon eval get <id>
 ```
 
-See [api-reference.md](api-reference.md) for full request/response
-shapes.
+## See also
 
-## What this is not
-
-- Not a training pipeline. Promptsheon does evals at deploy time,
-  not during model fine-tuning.
-- Not an LLM-as-judge scorer (yet). The `json_schema` scorer is
-  a placeholder; an LLM-judge variant lands in a follow-on commit.
-- Not a parallel eval orchestrator. Cases run serially today;
-  parallel runners ship when the harness eval corpus gets large
-  enough to warrant the complexity.
+- [docs/harness.md](harness.md) — Datasets, Preconditions,
+  Eval Runs as a single loop.
+- [docs/observability.md](observability.md) — the metric
+  inventory.

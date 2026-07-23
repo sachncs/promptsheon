@@ -28,13 +28,19 @@ if [[ ! -x ./promptsheond ]]; then
   go build -o ./promptsheond ./cmd/promptsheond
 fi
 
-# Boot in the background. PROMPTSHEON_AUTH=false skips the
-# bootstrap path so the smoke test can run unattended.
+# Boot in the background. The daemon's config.Validate() refuses
+# to start with PROMPTSHEON_AUTH=false on a non-loopback bind
+# (the empty host would mean "all interfaces"), so we bind
+# explicitly to 127.0.0.1. Migration 008 is a destructive
+# pre-v0.1.0 cleanup that's gated on the destructive-migrations
+# env var; the smoke test runs on a fresh DB so we set the gate
+# to true (the test is responsible for its own clean state).
 echo "smoke: starting daemon on $BASE_URL"
 PROMPTSHEON_AUTH=false \
-  PROMPTSHEON_ADDR=":${PORT}" \
+  PROMPTSHEON_ADDR="127.0.0.1:${PORT}" \
   PROMPTSHEON_DB_PATH="$DB" \
   PROMPTSHEON_LOG_LEVEL=info \
+  PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true \
   ./promptsheond >"$LOG" 2>&1 &
 DAEMON_PID=$!
 
