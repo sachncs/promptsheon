@@ -4,11 +4,9 @@
 // history; operators can audit the loop end-to-end by reading this
 // list.
 //
-// This is Tier 2.55 of the architecture review board. Production
-// wiring supplies a backend-backed Repository; the M4 follow-on
-// wires the Recommendation engine to read the prior adoption record
-// and avoid re-recommending a Decision the Workspace already
-// rejected.
+// Production wiring supplies a backend-backed Repository; the
+// Recommendation engine reads the prior adoption record and avoids
+// re-recommending a Decision the Workspace already rejected.
 package adoption
 
 import (

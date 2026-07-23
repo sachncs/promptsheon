@@ -11,14 +11,14 @@
 //
 // All three converge on a single tick that produces an Execution
 // record referencing the Release; the ExecutionHash then closes
-// against the Replay buffer (M2-2) for hash-stable round-trip
+// against the Replay buffer for hash-stable round-trip
 // reproducibility.
 //
 // Schedules are immutable identities. To change a schedule, create
 // a new one and Supersede the previous.
 //
-// Following M0.6, the Repository interface lives with the
-// consumer-defined package; this file declares it.
+// The Repository interface lives with the consumer-defined package;
+// this file declares it.
 package schedule
 
 import (

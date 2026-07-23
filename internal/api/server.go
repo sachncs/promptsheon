@@ -142,12 +142,9 @@ func WithAuth(db store.Repository) Option {
 	}
 }
 
-// WithTracing attaches a trace store and metrics collector to the server.
-//
-// The spans parameter is the write-side Tracer (used by the
-// HTTP middleware to start/finish spans). The optional
-// traceStore parameter is the SQLite-backed read store used by
-// /api/v1/traces; when nil, those endpoints return 503.
+// WithTracing attaches a trace.Tracer (used by the HTTP
+// middleware to start/finish spans) and the metrics collector
+// to the server.
 func WithTracing(spans trace.Tracer, collector *metrics.Collector) Option {
 	return func(s *Server) {
 		s.spans = spans
@@ -195,7 +192,7 @@ func WithLogHub(h *ws.Hub) Option {
 
 // WithElector attaches a leader-election Elector. When set, the
 // readiness handler reports the current leader and the role of
-// this replica; writes are not gated yet (they will be in M3.5).
+// this replica.
 func WithElector(e *election.Elector) Option {
 	return func(s *Server) {
 		s.elector = e
@@ -248,10 +245,10 @@ func WithRateLimiter(l *ratelimit.Limiter) Option {
 }
 
 // WithWorkspaceRollups attaches the per-Workspace rollup
-// aggregator. The Tier 2.37 GET /v1/workspaces/{id}/observation
-// route queries this aggregator; when nil, the route returns
-// an empty summary so the route is observable while the
-// production rollup job ships in M3 follow-on.
+// aggregator. The GET /v1/workspaces/{id}/observation route
+// queries this aggregator; when nil, the route returns an empty
+// summary so the route is observable while the production rollup
+// job is wired.
 func WithWorkspaceRollups(a *rollups.Aggregator) Option {
 	return func(s *Server) {
 		s.rollupAgg = a
@@ -259,10 +256,9 @@ func WithWorkspaceRollups(a *rollups.Aggregator) Option {
 }
 
 // WithInvoker attaches the canonical invoke.Invoker that
-// production wiring supplies. The Tier 2.36 follow-on route
-// /v1/versions/{id}/executions calls the Invoker per request
-// for Budget / Quota enforcement; when nil, the route records
-// the execution as a stub.
+// production wiring supplies. The /v1/versions/{id}/executions
+// route calls the Invoker per request for Budget / Quota
+// enforcement; when nil, the route records the execution as a stub.
 func WithInvoker(i *invoke.Invoker) Option {
 	return func(s *Server) {
 		s.invoker = i
@@ -307,8 +303,8 @@ func WithHarnessRunner(runner *harness.EvalRunner) Option {
 
 // NewServer creates a new API server with the given dependencies.
 //
-// FC-2: the legacy WithServerConfig / *ServerConfig options were
-// removed. The fields they exposed (circuit breaker thresholds)
+// The legacy WithServerConfig / *ServerConfig options were
+// removed; the fields they exposed (circuit breaker thresholds)
 // are declared but never read by any code path. The breaker is
 // configured per-provider via internal/llm.WithCircuitBreaker
 // instead; if the production wiring wants a server-wide override,
@@ -431,17 +427,17 @@ func (s *Server) registerAuditRoutes() {
 }
 
 func (s *Server) registerTracingRoutes() {
-	// OBS-TR-1: the SQLite tracer was removed. /api/v1/traces
-	// routes are gone; traces now flow through OTel export. The
-	// register function remains so future OTel-based query paths
-	// can be wired here.
+	// The SQLite tracer was removed; /api/v1/traces routes are
+	// gone and traces now flow through OTel export. The register
+	// function remains so future OTel-based query paths can be
+	// wired here.
 }
 
 func (s *Server) registerMetricsRoutes() {
 	s.mux.HandleFunc("GET /api/v1/metrics/summary", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsSummary)))
 	s.mux.HandleFunc("GET /api/v1/metrics/top-capabilities", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleTopCapabilities)))
-	// OBS-TR-1: /api/v1/metrics/dashboard dropped the TraceStats
-	// block since there is no SQLite-backed trace read store.
+	// /api/v1/metrics/dashboard dropped the TraceStats block since
+	// there is no SQLite-backed trace read store.
 	s.mux.HandleFunc("GET /api/v1/metrics/dashboard", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsSummary)))
 	s.mux.HandleFunc("GET /api/v1/metrics", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsPrometheus)))
 }
@@ -491,10 +487,10 @@ func (s *Server) registerWorkspaceRoutes() {
 	s.mux.HandleFunc("GET /api/v1/workspaces/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetWorkspace)))
 	s.mux.HandleFunc("PUT /api/v1/workspaces/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateWorkspace)))
 	s.mux.HandleFunc("DELETE /api/v1/workspaces/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptDelete)(s.handleDeleteWorkspace)))
-	// Per-Workspace rollup (Tier 2.37): Budget / Quota consumption
-	// aggregated at the current moment. The handler returns an
-	// empty summary if no Aggregator is configured; production
-	// wiring sets rollupAgg via WithWorkspaceRollups in a follow-on.
+// Per-Workspace rollup: Budget / Quota consumption aggregated
+// at the current moment. The handler returns an empty summary
+// if no Aggregator is configured; production wiring sets
+// rollupAgg via WithWorkspaceRollups.
 	s.mux.HandleFunc("GET /api/v1/workspaces/{id}/observation", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetWorkspaceObservation)))
 }
 

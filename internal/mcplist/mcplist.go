@@ -4,11 +4,10 @@
 // MCP server outside the allowlist are rejected at validation
 // time.
 //
-// This is Tier 2.49 follow-on: per-Workspace MCP allowlist. The
-// scope here is the value type, the closed-set validation, and the
+// The scope here is the value type, the closed-set validation, and the
 // Repository interface. Runtime enforcement is in the invoke path;
-// the MCP server SDK ships in M3 follow-on (gRPC over UDS plus
-// the server manifest).
+// the MCP server SDK (gRPC over UDS plus the server manifest) ships in a
+// follow-on.
 package mcplist
 
 import (

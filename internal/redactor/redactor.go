@@ -4,8 +4,7 @@
 // boundary to strip recognised patterns before they leave the
 // workspace boundary.
 //
-// This is the Tier 2.47 "PII redaction default Guardrail" item from
-// the architecture review board.
+// This is the "PII redaction default Guardrail" built-in plugin.
 //
 // Detected patterns (US-anchored defaults):
 //

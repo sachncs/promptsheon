@@ -4,8 +4,7 @@
 // patterns. The Guardrail returns Reject when the score crosses the
 // configurable threshold.
 //
-// This is the Tier 2.48 "prompt injection runtime detector" item
-// from the architecture review board.
+// This is the "prompt injection runtime detector" built-in plugin.
 //
 // Scope: heuristic, not LLM-driven. Heuristics catch the obvious
 // cases ("ignore all previous instructions", "you are now

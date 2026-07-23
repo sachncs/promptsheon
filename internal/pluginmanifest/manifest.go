@@ -5,9 +5,8 @@
 // (for gRPC over UDS) the UDS socket path. The supervisor reads the
 // manifest at boot and spawns one process per entry.
 //
-// This is Tier 2.32 of the architecture review board. The
-// subprocess-execution path (gRPC over UDS, health gate, restart
-// budget) is the M3 follow-on; today's commit ships the manifest
+// The subprocess-execution path (gRPC over UDS, health gate,
+// restart budget) is the follow-on; this package ships the manifest
 // parser and the Manifest / Entry value types.
 package manifest
 

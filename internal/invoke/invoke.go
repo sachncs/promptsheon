@@ -7,7 +7,7 @@
 // The Invoke path is the single place where Budget.Charge and
 // Quota.Charge are consulted. Today the aggregations are in-memory;
 // production scale moves them to ClickHouse and the Budget/Quota
-// stores to the same backend (Tier 3 follow-on).
+// stores to the same backend.
 package invoke
 
 import (

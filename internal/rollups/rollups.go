@@ -4,11 +4,10 @@
 // total USD spent in the current period, the per-scope budgets
 // and the per-window quota utilisation.
 //
-// This is Tier 2.37 of the architecture review board. Rollups
-// are computed in-process from the Budget and Quota stores; the
-// production path moves them to a background job that ticks
+// Rollups are computed in-process from the Budget and Quota stores;
+// the production path moves them to a background job that ticks
 // every minute and writes a single aggregate row to ClickHouse.
-// Today's commit ships the value type and the consumer-defined
+// This package ships the value type and the consumer-defined
 // RollupRepository; the actual rollup job lands in a follow-on
 // commit.
 package rollups
@@ -197,8 +196,8 @@ func RunSink(ctx context.Context, sink Sink, interval time.Duration, logger *slo
 }
 
 // drainSummaries returns a placeholder snapshot for each known
-// workspace. The full per-workspace scrape is wired in M3.5; for
-// v0.1.x we hand the sink a single summary derived from the
+// workspace. The full per-workspace scrape is wired in a follow-on;
+// for v0.1.x we hand the sink a single summary derived from the
 // global aggregator. A real implementation iterates over the
 // workspaces table and calls BuildWorkspaceSummary per row.
 func drainSummaries(_ context.Context) []*WorkspaceSummary {
