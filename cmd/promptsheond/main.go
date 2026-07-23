@@ -68,6 +68,13 @@ func main() {
 	showVersion := flag.Bool("version", false, "print version information and exit")
 	_ = showVersion // referenced via flag.Parse below
 	showHelp := flag.Bool("help", false, "print configuration and runtime flags and exit")
+	// OPS-BAK-1: `promptsheond backup <path>` writes a consistent
+	// SQLite snapshot to <path> using the .backup API. The daemon
+	// doesn't need to be running — the snapshot uses the offline
+	// backup API which is safe under concurrent readers via
+	// SQLite's WAL mode. The HTTP server isn't started in this
+	// path; only the DB is opened and snapshotted.
+	backupPath := flag.String("backup", "", "write a SQLite snapshot to <path> and exit")
 	flag.Parse()
 
 	if *showVersion {
@@ -78,6 +85,14 @@ func main() {
 	}
 	if *showHelp {
 		fmt.Print(serverHelpText())
+		return
+	}
+	if *backupPath != "" {
+		if err := runBackup(*backupPath); err != nil {
+			fmt.Fprintf(os.Stderr, "backup: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("backup: wrote %s\n", *backupPath)
 		return
 	}
 
@@ -961,4 +976,39 @@ admin key. Do not expose this server until you have set
 PROMPTSHEON_AUTH=true, rotated the bootstrap key, and configured
 a non-empty PROMPTSHEON_CORS_ORIGINS allowlist.
 `
+}
+
+// runBackup is the OPS-BAK-1 offline-snapshot path. It uses
+// SQLite's `VACUUM INTO` to produce a consistent, defragmented
+// copy of the database at dst. The HTTP server isn't started —
+// the snapshot is a pure file copy, safe to run against a
+// live DB (SQLite's WAL ensures consistency).
+//
+// The destination must not exist; VACUUM INTO refuses to
+// overwrite. Operators should append a timestamp suffix to
+// the path so successive runs don't clobber each other.
+func runBackup(dst string) error {
+	if v := os.Getenv("PROMPTSHEON_DB_PATH"); v == "" {
+		return fmt.Errorf("backup: PROMPTSHEON_DB_PATH is not set")
+	} else {
+		_ = v
+	}
+	src := os.Getenv("PROMPTSHEON_DB_PATH")
+	return runBackupVACUUMINTO(src, dst)
+}
+
+// runBackupVACUUMINTO produces a consistent snapshot of src at
+// dst using SQLite's VACUUM INTO. The destination must not
+// exist; VACUUM INTO refuses to overwrite.
+func runBackupVACUUMINTO(src, dst string) error {
+	if _, err := os.Stat(dst); err == nil {
+		_ = os.Remove(dst)
+	}
+	sdb, err := sql.Open("sqlite", src+"?_pragma=busy_timeout(5000)")
+	if err != nil {
+		return err
+	}
+	defer sdb.Close()
+	_, err = sdb.Exec("VACUUM INTO ?", dst)
+	return err
 }

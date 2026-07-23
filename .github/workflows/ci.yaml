@@ -1,5 +1,13 @@
 name: CI
 
+# OPS-9: cancel any in-flight run for the same PR / branch.
+# Without this, a fast-followup push triggers a second run
+# while the first is still going; the second waits and the
+# build matrix doubles. Concurrency cancels the older run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [master]
@@ -7,12 +15,21 @@ on:
   pull_request:
     branches: [master]
 
+# OPS-8: default token scopes. Per-job overrides live below
+# where a job needs write access (e.g. release:packages).
+permissions:
+  contents: read
+
 jobs:
   test:
+    # OPS-CI-2: run the test matrix against the current
+    # go.mod minimum (1.26.5) AND the latest 1.27 minor. New
+    # behaviour introduced by 1.27 is caught here before a
+    # 1.27 upgrade commit lands on master.
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ["1.26.5"]
+        go-version: ["1.26.5", "1.27"]
 
     steps:
       - uses: actions/checkout@v7

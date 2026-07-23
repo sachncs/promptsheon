@@ -5,6 +5,11 @@ metadata:
   labels:
     {{- include "promptsheon.labels" . | nindent 4 }}
 spec:
+  # OPS-2b: minAvailable=1 keeps at least one replica up
+  # during voluntary disruptions. For multi-replica
+  # deployments (replicaCount >= 2) consider switching to
+  # maxUnavailable so a rolling restart can proceed
+  # without blocking on a single straggler.
   minAvailable: 1
   selector:
     matchLabels:

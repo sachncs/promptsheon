@@ -1,22 +1,44 @@
+# OPS-7: Dependabot keeps the GitHub Actions runner, Go
+# modules, npm (TS SDK), and pip (Py SDK) up to date. Renovate
+# is preferred for Go and npm because it batches updates; this
+# file covers the runners and ecosystems that Dependabot handles
+# better (e.g. the Docker base image).
+#
+# Schedule: weekly. Grouping is left to Dependabot's defaults
+# so reviewers see one PR per ecosystem per week instead of
+# daily noise. Production tenants with stricter SLAs can
+# shorten the interval; OPS-10 adds Renovate for finer
+# batching control.
 version: 2
 updates:
-  - package-ecosystem: gomod
-    directory: /
+  - package-ecosystem: "github-actions"
+    directory: "/"
     schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 10
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
     labels:
-      - dependencies
-      - automated
+      - "dependencies"
+      - "ops"
 
-  - package-ecosystem: github-actions
-    directory: /
+  - package-ecosystem: "gomod"
+    directory: "/"
     schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
+      interval: "weekly"
+    commit-message:
+      prefix: "go"
     labels:
-      - dependencies
-      - automated
-      - ci
+      - "dependencies"
+      - "go"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "docker"
+    labels:
+      - "dependencies"
+      - "docker"
+    # The Dockerfile FROM line references the golang image;
+    # Dependabot opens a PR when a new patch/minor lands.

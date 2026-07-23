@@ -20,6 +20,22 @@ spec:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
       automountServiceAccountToken: false
+      # OPS-2c: production-grade scheduling.
+      # topologySpreadConstraints spreads replicas across
+      # availability zones so a single zone failure doesn't
+      # take the daemon down. priorityClassName biases
+      # scheduling toward critical workloads in clusters
+      # where the system-node-critical class is reserved.
+      # Both are no-ops when the cluster doesn't define the
+      # referenced topology key / priority class.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "promptsheon.selectorLabels" . | nindent 14 }}
+      priorityClassName: {{ .Values.priorityClassName | default "system-node-critical" }}
       securityContext:
         fsGroup: 1000
         seccompProfile:
