@@ -191,11 +191,17 @@ func (s *Service) Activate(ctx context.Context, releaseID string) (*Release, err
 	}
 	var superseded *Release
 	if prior != nil {
-		s, err := prior.Supersede(activated.ID, now)
+		// BUG-1: rename the local to `succeeded` so the outer
+		// `s *Service` receiver isn't shadowed inside the
+		// branch. The previous form assigned `&s` to
+		// `superseded`, which read like a pointer-to-receiver
+		// at a glance and tripped every static-analysis tool
+		// that flags shadowed identifiers.
+		succeeded, err := prior.Supersede(activated.ID, now)
 		if err != nil {
 			return nil, err
 		}
-		superseded = &s
+		superseded = &succeeded
 		activated.ReplacesReleaseID = prior.ID
 	}
 

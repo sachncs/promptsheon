@@ -128,6 +128,48 @@ func TestPreconditionRunnerTimeout(t *testing.T) {
 	}
 }
 
+// TestPreconditionRunnerZeroTimeoutUsesDefault locks in the
+// BUG-2 policy: TimeoutSec == 0 is accepted by Validate AND
+// resolved by runOne to DefaultPreconditionTimeout (60s).
+// The runner must NOT crash on zero; the command must execute
+// with the default budget. The harness.go comment at line 96
+// documents the same policy so a future refactor that
+// re-tightens Validate (e.g. rejects zero) fails the test
+// and forces a coordinated update.
+func TestPreconditionRunnerZeroTimeoutUsesDefault(t *testing.T) {
+	t.Setenv("PROMPTSHEON_HARNESS_PRECONDITIONS", "true")
+	r := harness.NewPreconditionRunner()
+	precs := []harness.Precondition{
+		{ID: "p1", CapabilityID: "c1", Name: "zero-timeout", Command: "true", TimeoutSec: 0, Enabled: true},
+	}
+	// Validate should pass — this is the precondition for the
+	// runner path.
+	for _, p := range precs {
+		if err := p.Validate(); err != nil {
+			t.Fatalf("Validate: zero TimeoutSec must be accepted (BUG-2 policy): %v", err)
+		}
+	}
+	results, err := r.Run(context.Background(), precs)
+	if err != nil {
+		t.Fatalf("zero TimeoutSec must not cause the runner to error: %v", err)
+	}
+	if len(results) != 1 || !results[0].Passed {
+		t.Fatalf("expected one passing result, got %+v", results)
+	}
+	if results[0].DurationMS < 0 {
+		t.Fatalf("duration_ms should be non-negative, got %d", results[0].DurationMS)
+	}
+	// Belt-and-braces: the duration must NOT exceed the default
+	// timeout plus a small slack. A regression that mistakenly
+	// applied zero seconds to context.WithTimeout would still
+	// pass `true` quickly; we want the test to fail loudly when
+	// someone wires a wrong default. Use 65s as the upper bound
+	// (5s slack above the documented 60s default).
+	if results[0].DurationMS > 65_000 {
+		t.Fatalf("DurationMS=%d exceeds DefaultPreconditionTimeout + slack — likely regression of BUG-2 fix", results[0].DurationMS)
+	}
+}
+
 func TestTruncate(t *testing.T) {
 	if got := harness.TruncateOutput("hello", 1024); got != "hello" {
 		t.Fatalf("short input should pass through: %q", got)
