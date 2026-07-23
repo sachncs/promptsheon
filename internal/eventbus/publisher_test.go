@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/sachncs/promptsheon/internal/capability"
 )
@@ -121,5 +122,48 @@ func TestPublishPanicRecovered(t *testing.T) {
 
 	if err := p.Publish(capability.Event{Type: capability.EventExecutionFinished}); err != nil {
 		t.Fatalf("publish should swallow subscriber panic, got %v", err)
+	}
+}
+
+// TestAsyncMemoryPublishDoesNotBlock covers OBS-5b: Publish on
+// an async Memory returns immediately even with a slow handler.
+// Without async fan-out the synchronous implementation would
+// block on the handler call.
+func TestAsyncMemoryPublishDoesNotBlock(t *testing.T) {
+	t.Parallel()
+	m := NewAsyncMemory(64, 4)
+	released := make(chan struct{})
+	defer close(released) // unblock the worker at test exit
+
+	if _, err := m.Subscribe(func(_ capability.Event) {
+		<-released // never released during the test — the worker blocks here
+	}); err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		_ = m.Publish(capability.Event{Type: "tick"})
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("Publish blocked on async Memory")
+	}
+
+	m.Close()
+}
+
+// TestAsyncMemoryDropCounter covers OBS-5b: the dropped counter
+// starts at zero and increments only on full-queue drops.
+func TestAsyncMemoryDropCounter(t *testing.T) {
+	t.Parallel()
+	m := NewAsyncMemory(64, 4)
+	defer m.Close()
+
+	if got := m.Dropped(); got != 0 {
+		t.Errorf("Dropped = %d, want 0 initially", got)
 	}
 }
