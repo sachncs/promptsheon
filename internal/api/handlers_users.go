@@ -48,8 +48,18 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) error 
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
-	if req.Email == "" || req.Name == "" {
-		return ErrBadRequest
+	if err := validateNonEmpty("email", req.Email); err != nil {
+		return err
+	}
+	if err := validateNonEmpty("name", req.Name); err != nil {
+		return err
+	}
+	// API-VAL-6: enforce RFC 5322 syntax. The previous form
+	// accepted any string with an "@" in it; tightening this
+	// blocks obvious typos and invalid addresses that the
+	// downstream OAuth flows would reject anyway.
+	if !validEmail(req.Email) {
+		return badRequest("email is not a valid address")
 	}
 	if req.Role == "" {
 		req.Role = roleReader
@@ -80,7 +90,7 @@ func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	u, err := s.db.GetUser(r.Context(), id)
 	if err != nil {
-		return ErrNotFound
+		return translateDBError(err, "user")
 	}
 	writeJSON(w, http.StatusOK, u)
 	return nil
@@ -90,7 +100,7 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) error 
 	id := r.PathValue("id")
 	existing, err := s.db.GetUser(r.Context(), id)
 	if err != nil {
-		return ErrNotFound
+		return translateDBError(err, "user")
 	}
 
 	var req struct {
@@ -103,6 +113,12 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) error 
 	}
 
 	if req.Email != nil {
+		// API-VAL-6: same email-shape check on update. A typo
+		// here is harder to spot than on create (no GET-then-PUT
+		// round-trip in the standard flow).
+		if !validEmail(*req.Email) {
+			return badRequest("email is not a valid address")
+		}
 		existing.Email = *req.Email
 	}
 	if req.Name != nil {
@@ -127,7 +143,7 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) error 
 func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if err := s.db.DeleteUser(r.Context(), id); err != nil {
-		return ErrNotFound
+		return translateDBError(err, "user")
 	}
 	s.audit(r.Context(), "delete", "user:"+id, nil)
 	w.WriteHeader(http.StatusNoContent)

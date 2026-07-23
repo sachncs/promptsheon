@@ -1,7 +1,9 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 )
 
@@ -54,4 +56,85 @@ func applyOffsetLimit[T any](rows []T, offset, limit int) []T {
 		rows = rows[:limit]
 	}
 	return rows
+}
+
+// writePaginationHeaders sets the RFC 5988 Link header on a
+// paginated response. API-3b: the Link header lets clients
+// discover the next / previous pages without parsing the body.
+//
+//	<url?limit=&offset=>; rel="next"   — when a next page may exist
+//	<url?limit=&offset=>; rel="prev"   — when a previous page exists
+//	<url?limit=&offset=>; rel="first"  — always
+//	<url?limit=&offset=>; rel="last"   — when the total is known
+//
+// `total` is the unpaginated row count; pass -1 when unknown.
+// `returned` is the number of rows actually serialised in the
+// current page (so the "next" link is omitted when the current
+// page was the last one).
+func writePaginationHeaders(w http.ResponseWriter, r *http.Request, limit, offset, total, returned int) {
+	if total >= 0 {
+		base := paginationBaseURL(r)
+		var links []string
+		if offset > 0 {
+			prev := offset - limit
+			if prev < 0 {
+				prev = 0
+			}
+			links = append(links, fmt.Sprintf(`<%s>; rel="prev"`, paginationLink(base, limit, prev)))
+		}
+		if offset > 0 {
+			links = append(links, fmt.Sprintf(`<%s>; rel="first"`, paginationLink(base, limit, 0)))
+		}
+		if returned == limit && offset+limit < total {
+			next := offset + limit
+			links = append(links, fmt.Sprintf(`<%s>; rel="next"`, paginationLink(base, limit, next)))
+		}
+		last := total - limit
+		if last < 0 {
+			last = 0
+		}
+		links = append(links, fmt.Sprintf(`<%s>; rel="last"`, paginationLink(base, limit, last)))
+		if len(links) > 0 {
+			w.Header().Set("Link", joinLinkRel(links))
+		}
+	}
+	w.Header().Set("X-Total-Count", strconv.Itoa(total))
+}
+
+// paginationBaseURL returns the request URL minus pagination
+// query parameters. We rebuild the URL instead of using
+// r.URL.RequestURI() so the link is human-grep-able in logs.
+func paginationBaseURL(r *http.Request) string {
+	u := *r.URL
+	q := u.Query()
+	q.Del("limit")
+	q.Del("offset")
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+// paginationLink formats a single Link target with limit + offset.
+func paginationLink(base string, limit, offset int) string {
+	u, err := url.Parse(base)
+	if err != nil {
+		return base
+	}
+	q := u.Query()
+	q.Set("limit", strconv.Itoa(limit))
+	q.Set("offset", strconv.Itoa(offset))
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+// joinLinkRel joins multiple `<url>; rel="..."` segments with
+// ", " as RFC 5988 requires.
+func joinLinkRel(parts []string) string {
+	out := ""
+	for i, p := range parts {
+		if i > 0 {
+			out += ", "
+		}
+		out += p
+	}
+	return out
 }

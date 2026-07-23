@@ -24,6 +24,16 @@ func (s *Server) handleRunWorkflow(w http.ResponseWriter, r *http.Request) error
 	if err := readJSON(r, &def); err != nil {
 		return badRequest("invalid request body")
 	}
+	// API-VAL-8: reject empty workflow definitions at the API
+	// boundary. The engine would have rejected them anyway, but
+	// emitting a structured 400 with "steps required" lets the
+	// caller fix the request without reading the engine error.
+	if err := validateNonEmpty("id", def.ID); err != nil {
+		return err
+	}
+	if len(def.Steps) == 0 {
+		return badRequest("steps is required and must be non-empty")
+	}
 	res, err := s.workflowEngine.Run(r.Context(), def, map[string]any{})
 	if err != nil {
 		s.audit(r.Context(), "workflow.fail", "workflow:"+def.ID, map[string]any{"error": err.Error()})
@@ -38,5 +48,3 @@ func (s *Server) handleRunWorkflow(w http.ResponseWriter, r *http.Request) error
 	writeJSON(w, http.StatusOK, res)
 	return nil
 }
-
-// (no leftover comments needed — context import removed)

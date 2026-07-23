@@ -14,7 +14,10 @@ import (
 
 func (s *Server) handleListWebhooks(w http.ResponseWriter, _ *http.Request) error {
 	if s.webhooks == nil {
-		writeJSON(w, http.StatusOK, []any{})
+		// API-RESP-1: return a typed empty slice (the inner
+		// type is local to this file but the array shape is
+		// predictable for callers).
+		writeJSON(w, http.StatusOK, []webhookEndpointPublic{})
 		return nil
 	}
 	eps := s.webhooks.ListEndpoints()
@@ -23,16 +26,9 @@ func (s *Server) handleListWebhooks(w http.ResponseWriter, _ *http.Request) erro
 	// before the encryption pass), but the API must never echo
 	// it back. Project a stable response shape that only exposes
 	// a SecretSet boolean.
-	type publicEndpoint struct {
-		ID        string              `json:"id"`
-		URL       string              `json:"url"`
-		Events    []webhook.EventType `json:"events"`
-		Active    bool                `json:"active"`
-		SecretSet bool                `json:"secret_set"`
-	}
-	out := make([]publicEndpoint, 0, len(eps))
+	out := make([]webhookEndpointPublic, 0, len(eps))
 	for _, ep := range eps {
-		out = append(out, publicEndpoint{
+		out = append(out, webhookEndpointPublic{
 			ID:        ep.ID,
 			URL:       ep.URL,
 			Events:    ep.Events,
@@ -42,6 +38,18 @@ func (s *Server) handleListWebhooks(w http.ResponseWriter, _ *http.Request) erro
 	}
 	writeJSON(w, http.StatusOK, out)
 	return nil
+}
+
+// webhookEndpointPublic is the response shape for /api/v1/webhooks.
+// It exists at package scope (API-RESP-2) so the generator and
+// tests can reference it directly; keeping the struct definition
+// here would have duplicated it under each handler that emitted it.
+type webhookEndpointPublic struct {
+	ID        string              `json:"id"`
+	URL       string              `json:"url"`
+	Events    []webhook.EventType `json:"events"`
+	Active    bool                `json:"active"`
+	SecretSet bool                `json:"secret_set"`
 }
 
 func (s *Server) handleCreateWebhook(w http.ResponseWriter, r *http.Request) error {
@@ -56,11 +64,21 @@ func (s *Server) handleCreateWebhook(w http.ResponseWriter, r *http.Request) err
 	if err := readJSON(r, &req); err != nil {
 		return &HTTPError{Status: http.StatusBadRequest, Message: "invalid request body"}
 	}
-	if req.URL == "" {
-		return &HTTPError{Status: http.StatusBadRequest, Message: "url is required"}
+	if err := validateNonEmpty("url", req.URL); err != nil {
+		return err
 	}
 	if len(req.Events) == 0 {
 		return &HTTPError{Status: http.StatusBadRequest, Message: "at least one event is required"}
+	}
+	// API-VAL-7: every event name must match a registered
+	// capability.EventType. The dispatcher already filters
+	// unknown events on emit, but rejecting them at create time
+	// stops a typo ("user.create" vs "user.creatE") from
+	// silently registering a destination that fires never.
+	for _, e := range req.Events {
+		if !webhook.IsKnownEvent(string(e)) {
+			return badRequest(fmt.Sprintf("event %q is not a registered event type", e))
+		}
 	}
 	if err := ValidateWebhookURL(req.URL); err != nil {
 		return &HTTPError{Status: http.StatusBadRequest, Message: fmt.Sprintf("invalid url: %v", err)}
@@ -112,6 +130,9 @@ func (s *Server) handleDeleteWebhook(w http.ResponseWriter, r *http.Request) err
 	s.audit(r.Context(), "webhook_delete", "webhook", map[string]any{
 		"id": id,
 	})
+	// API-CONS-2: 204 No Content on delete (was 200 + body).
+	// The remaining handlers_*.go in this file emit 204; this
+	// one was the only straggler still returning JSON.
 	w.WriteHeader(http.StatusNoContent)
 	return nil
 }
