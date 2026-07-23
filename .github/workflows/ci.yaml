@@ -62,24 +62,28 @@ jobs:
           fi
 
       - name: Check coverage threshold
+        # TEST-COV-1 + TEST-COV-2. The global floor is 60%
+        # (was 60% aspirational in M-14; the docs/testing.md
+        # target was 70% but the realistic bar is 60% because
+        # the cmd entry points, examples/, and the OpenAPI
+        # generator aren't unit-testable in the conventional
+        # sense). We also enforce per-package floors for the
+        # testable layers: domain packages (internal/...,
+        # excluding cmd/api/store) >= 50%, infrastructure
+        # (internal/api + internal/store) >= 40%, api handlers
+        # (internal/api) >= 60%. The per-package floors catch
+        # silent regressions in the testable surface; the global
+        # floor catches regressions in the testable aggregate.
         run: |
+          set -e
           COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | tr -d '%')
-          echo "Coverage: ${COVERAGE}%"
-          # The 70% floor set in M-14 was aspirational; the
-          # 60% floor here is the realistic bar given the
-          # current structure of the codebase. The cmd/prompt*
-          # entry points, examples/, and the OpenAPI generator
-          # are not unit-testable in the conventional sense,
-          # so they drag the total down regardless of how
-          # much test coverage the testable packages have.
-          # Each point below 60% is a regression in a
-          # package that *can* be tested; the bar is high
-          # enough to catch silent breakage but realistic
-          # for the codebase as it stands.
+          echo "Total coverage: ${COVERAGE}%"
           if [ $(echo "$COVERAGE < 60" | bc -l) -eq 1 ]; then
             echo "Coverage ${COVERAGE}% is below 60% threshold"
             exit 1
           fi
+          # Per-package floors: domain, infrastructure, api.
+          bash scripts/check-coverage.sh coverage.out
 
       - name: Build
         run: go build ./...
@@ -138,6 +142,25 @@ jobs:
 
       - name: Run smoke tests
         run: bash tests/smoke/run.sh
+
+  e2e:
+    # TEST-5: end-to-end suite (in-process daemon, real HTTP).
+    # The suite exercises the auth + bootstrap paths and
+    # lives in tests/e2e/; it runs in ~4s on a clean runner.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26.5"
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run e2e suite
+        run: go test -race -count=1 -timeout 300s ./tests/e2e/...
 
   lint:
     runs-on: ubuntu-latest
