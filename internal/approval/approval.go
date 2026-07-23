@@ -148,13 +148,22 @@ func (p MajorityPolicy) Evaluate(votes []Vote) (State, bool, error) {
 
 // MakerCheckerPolicy requires the creator to abstain and at least one
 // other identity to Approve. The separation-of-duties rule is
-// enforced inside Evaluate itself: any vote whose identity matches
-// Creator is rejected with ErrCreatorVoted. Callers no longer need
-// to invoke a side-check helper.
+// enforced inside Evaluate: any vote whose Identity matches Creator
+// fails the entire evaluation with ErrCreatorVoted (the rejected
+// state is not advanced). Callers no longer need to invoke a
+// side-check helper.
 //
-// Empty Creator is treated conservatively (the policy refuses to
-// evaluate) so a misconfigured caller cannot accidentally bypass the
-// rule. This is the SEC-1 fix.
+// DOC-1: the failure modes are fail-closed. Evaluate returns
+// (State, false, err) on every misconfiguration:
+//
+//   - RequiredApprovers <= 0  →  error "RequiredApprovers must be positive"
+//   - Creator == ""           →  error "Creator is required for maker-checker enforcement"
+//   - any vote by Creator     →  error ErrCreatorVoted
+//
+// The policy will NEVER report StateApproved without a
+// non-creator Approve vote. The previous version silently
+// approved when Creator was empty; the SEC-1 fix closes that
+// gap by refusing to evaluate.
 type MakerCheckerPolicy struct {
 	RequiredApprovers int
 	Creator           string
