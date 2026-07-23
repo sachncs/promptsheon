@@ -27,6 +27,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/release"
 	"github.com/sachncs/promptsheon/internal/rollups"
 	"github.com/sachncs/promptsheon/internal/search"
+	"github.com/sachncs/promptsheon/internal/settings"
 	"github.com/sachncs/promptsheon/internal/store"
 	"github.com/sachncs/promptsheon/internal/trace"
 	"github.com/sachncs/promptsheon/internal/vault"
@@ -62,6 +63,12 @@ type Server struct {
 	invoker          *invoke.Invoker
 	releaseResolver  *release.Resolver
 	releaseSvc       *release.Service
+
+	// settingsMode + settingsNotif back the /api/v1/settings
+	// surface. settingsMode is "mutable" by default; "env-only"
+	// disables writes (operator can still read).
+	settingsMode  string
+	settingsNotif *settings.Notifier
 	harnessSvc       *harness.EvalRunner
 
 	// auditQueue is a bounded channel feeding the audit worker pool.
@@ -338,6 +345,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) routes() {
 	s.registerHealthRoutes()
+	s.registerSettingsRoutes()
 	s.registerAuthRoutes()
 	s.registerAuditRoutes()
 	s.registerTracingRoutes()
