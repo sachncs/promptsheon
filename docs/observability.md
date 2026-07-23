@@ -1,167 +1,150 @@
 # Observability
 
-The server exposes three orthogonal observability surfaces: **structured logs**, **traces**, and **metrics**. Each is independent; you can use any one without the others. A **hash-chained audit log** is the fourth, security-oriented surface — see [Security](security.md) and ADR [0003](adr/0003-hash-chained-audit-log.md).
+Promptsheon exposes three surfaces:
 
-## At a glance
+1. **Structured logs** on stderr (always JSON).
+2. **Prometheus metrics** at `GET /metrics` (PermAuditRead-gated).
+3. **OpenTelemetry traces** exported to an OTLP gRPC endpoint
+   (when `PROMPTSHEON_OTEL_ENDPOINT` is set).
 
-| Surface | Source of truth | When to use | Where to read |
-|---|---|---|---|
-| Logs | `log/slog` JSON to stderr | Ad-hoc debugging, audit, alerting via log pipeline | `kubectl logs`, journald, CloudWatch, etc. |
-| Traces | `internal/trace` (in-memory) + OTel SDK | Finding slow paths, correlating work across components | `GET /api/v1/traces/tree/{trace_id}` or your OTel collector |
-| Metrics | `internal/metrics` (Prometheus) | Dashboards, SLOs, alerting | `GET /metrics` |
-| Audit | `audit_entries` table, hash-chained | "Who did what, when?" — compliance | `GET /api/v1/audit`, `GET /api/v1/audit/verify` |
-| Retention | `internal/observability/retention.go` | TTLs for trace / snapshot / audit rows | env vars below |
+The audit chain (`GET /api/v1/audit`, `GET /api/v1/audit/verify`)
+is a fourth surface — it lives in [docs/security.md](security.md)
+because the chain is a security artefact.
 
-## Logging
+## Logs
 
-One `*slog.Logger` per process, set up in `cmd/promptsheond/main.go`. The default handler is JSON to stderr. The log level is controlled by `PROMPTSHEON_LOG_LEVEL` (`debug`, `info`, `warn`, `error`).
+Every log line is JSON. The shape:
 
-```bash
-# Pretty-print live logs
-./promptsheond 2>&1 | jq .
+```json
+{
+  "time": "2026-07-23T10:11:12.345Z",
+  "level": "INFO",
+  "msg": "http request",
+  "request_id": "...",
+  "trace_id": "...",
+  "user_id": "alice",
+  "method": "POST",
+  "path": "/api/v1/versions/v1/releases",
+  "status": 201,
+  "duration": "12.3ms"
+}
 ```
 
-### Fields
+`request_id` is either the inbound `X-Request-ID` header or a
+generated random ID; `trace_id` comes from the OTel span context
+when tracing is enabled.
 
-Every line carries the standard slog fields: `time`, `level`, `msg`. HTTP requests are logged with `method`, `path`, `status`, `latency`, `request_id`. LLM calls log `provider`, `model`, `latency`, `usage`, `cost_usd`, and a `trace_id` so they can be joined to a span.
-
-### Correlation
-
-Every request gets a request ID. The ID is propagated to the response (`X-Request-ID` header), to every log line written during the request, to every span, and to the audit entry. To trace a request end-to-end, take the `X-Request-ID` and grep your log aggregator.
-
-## Tracing
-
-Spans are recorded for every HTTP request and every LLM call. The default backend is the in-process `internal/trace` package, which keeps the last N spans in memory and exposes them via the REST API. Set `PROMPTSHEON_OTEL_ENDPOINT` to export to a real OTel collector instead.
-
-### Span fields
-
-| Field | Description |
-|---|---|
-| `trace_id` | The request's trace ID (also in `X-Request-ID`). |
-| `span_id` | Unique per span within a trace. |
-| `parent_id` | Empty for the root span; the parent's `span_id` otherwise. |
-| `operation` | E.g. `http.request`, `llm.complete`, `db.query`. |
-| `service` | The component (`api`, `llm`, `eval`, `workflow`, ...). |
-| `status` | `ok`, `error`, or unset. |
-| `attributes` | Free-form key-value pairs. |
-| `error` | Error message, set when `status=error`. |
-
-### API
-
-```bash
-# List recent spans
-curl "http://localhost:8080/api/v1/traces?limit=100"
-
-# Get a span by ID
-curl "http://localhost:8080/api/v1/traces/{id}"
-
-# Get the full tree for a trace
-curl "http://localhost:8080/api/v1/traces/tree/{trace_id}"
-```
-
-### OpenTelemetry export
-
-```bash
-PROMPTSHEON_OTEL_ENDPOINT=otel-collector:4317
-PROMPTSHEON_OTEL_INSECURE=true   # only for non-TLS collectors
-```
-
-Spans are exported via OTLP gRPC. The server keeps recording in-process even when the export is enabled, so the in-process API continues to work.
+The default level is `info`. Set `PROMPTSHEON_LOG_LEVEL=debug` for
+verbose output during development.
 
 ## Metrics
 
-Prometheus-compatible. Exposed at `GET /metrics` (unauthenticated by default, but intended to be scraped from inside a trusted network). A JSON summary is also available at `GET /api/v1/metrics/summary`.
+The daemon emits `promptsheon_*` metrics under the
+`internal/metrics` package. The full inventory:
 
-### Key metrics
+### API
 
-| Metric | Type | Labels | Description |
-|---|---|---|---|
-| `http_requests_total` | counter | `method`, `path`, `status` | Total HTTP requests. |
-| `http_request_duration_seconds` | histogram | `method`, `path` | Request latency. |
-| `llm_calls_total` | counter | `provider`, `model`, `status` | Total LLM calls. |
-| `llm_call_duration_seconds` | histogram | `provider`, `model` | LLM call latency. |
-| `llm_call_cost_usd_total` | counter | `provider`, `model` | Cumulative USD cost. |
-| `llm_call_tokens_total` | counter | `provider`, `model`, `direction` | Token usage (`prompt`/`completion`). |
-| `guardrail_violations_total` | counter | `rule_type`, `severity` | Total guardrail violations. |
-| `guardrail_blocks_total` | counter | `rule_type` | Total blocked requests. |
-| `eval_runs_total` | counter | `dataset_id` | Total evaluation runs. |
-| `audit_chain_writes_total` | counter | – | Total audit entries written. |
-| `audit_chain_verifications_total` | counter | `result` | Total verifications (`ok`/`fail`). |
-| `circuit_breaker_state` | gauge | `provider` | `0`=closed, `1`=half-open, `2`=open. |
-| `workflow_runs_total` | counter | `status` | Total workflow runs by terminal status. |
-| `workflow_step_duration_seconds` | histogram | `step_id` | Per-step duration. |
+| Metric | Type | Notes |
+|--------|------|-------|
+| `promptsheon_http_requests_total` | counter | Excludes `/health`, `/ready`, `/livez`, `/readyz`, `/metrics`. |
+| `promptsheon_http_request_duration_seconds` | histogram | Same exclusions. |
+| `promptsheon_http_errors_total` | counter | 5xx responses only. |
 
-### Scrape config
+### LLM
 
-```yaml
-scrape_configs:
-  - job_name: promptsheon
-    static_configs:
-      - targets: ["localhost:8080"]
-    metrics_path: /metrics
-```
+| Metric | Type | Notes |
+|--------|------|-------|
+| `promptsheon_llm_calls_total` | counter | Increments on every LLM call. |
+| `promptsheon_llm_latency_seconds` | histogram | Wall-clock per call. |
+| `promptsheon_llm_tokens_total` | counter | prompt + completion. |
+| `promptsheon_llm_input_tokens_total` | counter | |
+| `promptsheon_llm_output_tokens_total` | counter | |
+| `promptsheon_llm_cost_usd_total` | counter | |
+| `promptsheon_llm_ttft_seconds` | histogram | time-to-first-token (streaming). |
 
-## Audit log
+### Harness
 
-The audit log records every state-changing request. It is hash-chained; see ADR [0003](adr/0003-hash-chained-audit-log.md) and [Algorithms — Audit chain](algorithms.md#audit-chain).
+| Metric | Type | Notes |
+|--------|------|-------|
+| `promptsheon_eval_runs_total` | counter | |
+| `promptsheon_eval_cases_total` | counter | Total per-case count (passed + failed). |
+| `promptsheon_eval_cases_passed_total` | counter | Used by the SLO alert in `deploy/prometheus/promptsheon-alerts.yaml`. |
+| `promptsheon_eval_cases_failed_total` | counter | Used by the SLO alert. |
+| `promptsheon_eval_duration_seconds` | histogram | |
 
-### Querying
+### Audit + trace pipelines
 
-```bash
-# List entries with filters
-curl "http://localhost:8080/api/v1/audit?user_id=u-1&since=2024-01-01T00:00:00Z&limit=200"
+| Metric | Type | Notes |
+|--------|------|-------|
+| `promptsheon_audit_dropped_total` | counter | Entries dropped because the worker queue was full. |
+| `promptsheon_audit_queue_latency_seconds` | histogram | Time between `audit()` and DB write. |
+| `promptsheon_audit_chain_verifications_total` | counter | Increments on every `/audit/verify` call. |
+| `promptsheon_trace_dropped_total` | counter | Spans dropped (currently 0 in v0.1.x; reserved). |
+| `promptsheon_log_hub_drops_total` | counter | SSE log stream drops. |
 
-# Export
-curl "http://localhost:8080/api/v1/audit/export?format=csv" > audit.csv
+### Workflow
 
-# Verify the chain
-curl "http://localhost:8080/api/v1/audit/verify"
-# {"ok": true}  or  {"ok": false, "reason": "..."}
-```
+| Metric | Type | Notes |
+|--------|------|-------|
+| `promptsheon_workflow_runs_total` | counter | |
+| `promptsheon_workflow_duration_seconds` | histogram | |
+| `promptsheon_workflow_active` | gauge | Currently running. |
 
-The verifier paginates the chain in chunks of 1000 rows. A long chain does not hold a single connection for the full duration.
+### Guardrail
 
-## Retention
+| Metric | Type | Notes |
+|--------|------|-------|
+| `promptsheon_guardrail_violations_total` | counter | |
+| `promptsheon_guardrail_blocks_total` | counter | |
+| `promptsheon_guardrail_passes_total` | counter | |
 
-A background goroutine (`internal/observability/retention.go`) wakes every `CheckInterval` and deletes rows older than the per-table TTL.
+### Review + hallucination
 
-### TTLs and env vars
-
-| Resource | Default | Env var | Minimum |
-|---|---|---|---|
-| Trace spans | 30 days | `PROMPTSHEON_TRACE_TTL_DAYS` | 30 days (regulatory floor) |
-| Snapshots | 30 days | `PROMPTSHEON_SNAPSHOT_TTL_DAYS` | 1 day |
-| Audit entries | 90 days | `PROMPTSHEON_AUDIT_TTL_DAYS` | 1 day |
-| Sweep interval | 60 minutes | `PROMPTSHEON_RETENTION_CHECK_MINUTES` | 1 minute |
-
-The minimum trace retention of 30 days is enforced even if a smaller value is configured. This is a regulatory floor, not a knob.
-
-### What is *not* affected
-
-The retention sweep does not touch:
-
-- Prompt, agent, or workflow definitions.
-- API keys (in the vault).
-- Webhook endpoints.
-- Alert rules.
-
-These are managed by the user and are not auto-deleted.
+| Metric | Type | Notes |
+|--------|------|-------|
+| `promptsheon_review_pending` | gauge | |
+| `promptsheon_review_total` | counter | |
+| `promptsheon_review_approved_total` | counter | |
+| `promptsheon_review_rejected_total` | counter | |
+| `promptsheon_review_duration_seconds` | histogram | |
+| `promptsheon_hallucination_scores` | histogram | |
 
 ## SLOs and alerts
 
-Suggested starter alerts when you set up your monitoring:
+Three first-class SLOs ship with the project. The Prometheus
+alert definitions live in `deploy/prometheus/promptsheon-alerts.yaml`
+and the Grafana dashboard in `deploy/grafana/promptsheon-dashboard.json`.
+See [docs/slos.md](slos.md) for the targets, queries, and
+operating notes.
 
-- **Error budget burn.** `rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.01`
-- **Latency.** `histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m])) > 2`
-- **Audit chain break.** `audit_chain_verifications_total{result="fail"} > 0`
-- **Circuit breaker open.** `circuit_breaker_state > 1`
-- **Cost spike.** `rate(llm_call_cost_usd_total[1h]) > 1.0` (adjust threshold to your budget)
-- **Retention sweep stalled.** absence of writes for more than 2× the configured `CheckInterval` is suspicious; check the sweeper goroutine.
+## Tracing
 
-## See also
+When `PROMPTSHEON_OTEL_ENDPOINT` is set, the daemon exports
+spans over OTLP gRPC. The default sampler is `ParentBased(
+TraceIDRatioBased(PROMPTSHEON_OTEL_SAMPLE_RATIO))` so upstream
+sampling decisions are honoured and root spans are sampled at
+the configured ratio (default 1.0).
 
-- [Security](security.md) — the threat model and the controls in this page
-- [Algorithms — Audit chain](algorithms.md#audit-chain)
-- [Algorithms — Retention sweep](algorithms.md#retention-sweep)
-- [Deployment — Monitoring](deployment.md#monitoring)
-- ADR [0003](adr/0003-hash-chained-audit-log.md), [0007](adr/0007-slog-as-observability-foundation.md)
+Production deployments with high request volume typically set
+`PROMPTSHEON_OTEL_SAMPLE_RATIO=0.1` (10%) or below; downstream
+queries with `probability` samplers can upsample for specific
+investigations.
+
+## Audit chain
+
+See [docs/security.md](security.md#audit-chain) for the chain
+shape, the `VerifyAuditChain` endpoint, and the retention
+enforcement (the chain is never deleted; rows that exceed
+`PROMPTSHEON_AUDIT_TTL_DAYS` are copied to `audit_archive`
+and the source row is preserved).
+
+## Operator checklist
+
+1. `curl /metrics | grep promptsheon_` confirms the daemon is
+   exporting.
+2. `curl /api/v1/audit/verify` returns `{ok: true, last_row_id,
+   last_hash}`. Run on a schedule.
+3. `PROMPTSHEON_LOG_LEVEL=debug` on a single replica during
+   incident response — every log line carries `request_id` and
+   `trace_id` so you can pivot from a trace into the request
+   log.
