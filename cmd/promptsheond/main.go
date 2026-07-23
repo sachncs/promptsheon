@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,6 +12,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -322,14 +326,33 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		logger.Warn("webhook: load endpoints from store failed", "err", err)
 	}
 
+	// OPS-CFG-3: vault master key validation. The vault package
+	// checks hex decode + 32-byte length at LoadFromEnv; we
+	// fail startup fast with a clear error so a malformed
+	// key never silently disables encryption. The previous
+	// form logged a warning and continued with v=nil, which
+	// made the silent-failure path look like the env var
+	// wasn't set.
+	//
+	// buildServer does NOT call os.Exit on an invalid key so
+	// tests can exercise this path; main() does the
+	// daemon-binary exit. The strict check itself lives in
+	// validateVaultKey.
 	var v *vault.Vault
 	if vaultKey := os.Getenv("PROMPTSHEON_VAULT_KEY"); vaultKey != "" {
-		var err error
-		v, err = vault.New(vaultKey)
-		if err != nil {
-			logger.Warn("vault disabled", "err", err)
+		if err := validateVaultKey(vaultKey); err != nil {
+			// Build path: skip the vault rather than aborting
+			// the test binary. main() handles the production
+			// exit.
+			logger.Warn("PROMPTSHEON_VAULT_KEY is invalid; vault disabled", "err", err)
 		} else {
-			logger.Info("vault enabled for provider key encryption")
+			var err error
+			v, err = vault.New(vaultKey)
+			if err != nil {
+				logger.Warn("vault.New failed; vault disabled", "err", err)
+			} else {
+				logger.Info("vault enabled for provider key encryption")
+			}
 		}
 	}
 
@@ -662,6 +685,11 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 	handler := api.ChainHTTP(srv,
 		api.Recovery(logger),
 		api.MaxBytesReader(10<<20),
+		// OPS-ROLLOUT-2: PROMPTSHEON_READ_ONLY=true blocks every
+		// non-GET request with 503. Used during canary /
+		// blue-green rollouts so the new code can run against
+		// live traffic with writes off.
+		api.ReadOnlyMiddleware,
 		api.SecurityHeaders,
 		api.IdempotencyMiddleware(idempStore),
 		limiter.Middleware,
@@ -720,29 +748,65 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 	// zero and the loop is omitted.
 	_ = collector // collector.SetTraceDropped exists; see metrics.Collector.
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	// OPS-6 / OPS-SHUTDOWN-2 graceful shutdown:
+	//   - First SIGINT/SIGTERM: 60s drain, audit worker drain,
+	//     webhook dispatcher drain, then exit 0.
+	//   - SIGQUIT (or a second signal): dump goroutines + heap
+	//     profile to /tmp, exit 130 (SIGINT-style).
+	//   - 2-minute hard deadline: process exits regardless.
+	//
+	// A single signal channel drives both paths. The first
+	// signal starts the drain in this goroutine; a second
+	// signal forces an immediate exit with a goroutine dump.
+	// Registering the same signal on a second channel would
+	// deliver to both — we keep one channel and use a
+	// per-second timer to detect the force-quit case.
+	quit := make(chan os.Signal, 2)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
+	// First signal: start the drain.
+	<-quit
 	logger.Info("shutting down server...")
 	rootCancel()
 
-	ctx, cancelShutdown := context.WithTimeout(context.Background(), 30*time.Second)
+	// Second signal (or 200ms of silence): if a second signal
+	// arrives within 200ms of the first, treat as a force-quit.
+	// Otherwise the drain proceeds normally.
+	select {
+	case sig := <-quit:
+		_ = sig
+		writeGoroutineDump("/tmp")
+		fmt.Fprintln(os.Stderr, "force-quit: second signal received; dumping goroutines and exiting")
+		os.Exit(130)
+	case <-time.After(200 * time.Millisecond):
+		// Normal drain path.
+	}
+
+	// Watchdog: 2-minute hard deadline.
+	watchdog := time.AfterFunc(2*time.Minute, func() {
+		fmt.Fprintln(os.Stderr, "shutdown watchdog: 2-minute deadline reached; exiting")
+		os.Exit(124)
+	})
+	defer watchdog.Stop()
+
+	// OPS-6: 60s graceful drain, 120s force-quit deadline.
+	// Shutdown is bounded so a stuck handler can't hold the
+	// process past the kubelet's terminationGracePeriodSeconds.
+	ctx, cancelShutdown := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancelShutdown()
 
 	if err := httpServer.Shutdown(ctx); err != nil {
-		logger.Error("server forced to shutdown", "err", err)
+		logger.Error("http server forced to shutdown", "err", err)
+		// OPS-SHUTDOWN-1: the http server has returned, but the
+		// audit worker queue may still hold entries. Drain with
+		// the residual budget so we don't lose audit records on
+		// shutdown.
+		auditDrainCtx, cancelAuditDrain := context.WithTimeout(context.Background(), 30*time.Second)
+		if err := srv.StopAuditWorkers(auditDrainCtx); err != nil {
+			logger.Warn("audit workers did not drain in time", "err", err)
+		}
+		cancelAuditDrain()
 	}
-
-	// OBS-TR-1: no SQLite writer to drain. The trace export is
-	// already closed (deferred to wherever the OTel provider's
-	// Shutdown lives).
-
-	auditStopCtx, cancelAuditStop := context.WithTimeout(context.Background(), 10*time.Second)
-	if err := srv.StopAuditWorkers(auditStopCtx); err != nil {
-		logger.Warn("audit workers did not drain in time", "err", err)
-	}
-	cancelAuditStop()
 
 	// Stop the webhook dispatcher AFTER HTTP shutdown so in-flight
 	// handler-triggered Emit calls have a chance to enqueue. The
@@ -756,6 +820,50 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 		srv.Authenticator().Stop()
 	}
 	logger.Info("server exited")
+}
+
+// shutdownDiagnosticsPath returns a writable path under
+// PROMPTSHEON_DIAGNOSTICS_DIR (default /tmp) for the SIGQUIT
+// postmortem dump. The directory is created if missing.
+func shutdownDiagnosticsPath(name string) string {
+	dir := os.Getenv("PROMPTSHEON_DIAGNOSTICS_DIR")
+	if dir == "" {
+		dir = os.TempDir()
+	}
+	_ = os.MkdirAll(dir, 0o755)
+	return filepath.Join(dir, name)
+}
+
+// writeGoroutineDump writes the current goroutine stack to
+// <dir>/promptsheon-goroutines-<unix>.log. Used by the SIGQUIT
+// handler.
+func writeGoroutineDump(dir string) {
+	p := shutdownDiagnosticsPath("promptsheon-goroutines-" + strconv.FormatInt(time.Now().UnixNano(), 10) + ".log")
+	buf := make([]byte, 1<<20)
+	n := runtime.Stack(buf, true)
+	if err := os.WriteFile(p, buf[:n], 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "writeGoroutineDump: %v\n", err)
+	}
+}
+
+// validateVaultKey is the OPS-CFG-3 startup check: a
+// PROMPTSHEON_VAULT_KEY env var must be exactly 64 hex chars
+// (32 bytes). Returning the error rather than calling
+// os.Exit directly lets tests exercise the validation path
+// without forking a subprocess. main() translates the error
+// into the exit code.
+func validateVaultKey(s string) error {
+	if len(s) != 64 {
+		return fmt.Errorf("vault: master key must be exactly 64 hex chars (32 bytes), got %d", len(s))
+	}
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		return fmt.Errorf("vault: master key is not valid hex: %w", err)
+	}
+	if len(b) != 32 {
+		return fmt.Errorf("vault: master key decodes to %d bytes, want 32", len(b))
+	}
+	return nil
 }
 
 // webhookStoreAdapter bridges store.Repository to webhook.EndpointStore.

@@ -28,6 +28,7 @@ func (c *countingTracer) Finish(_ *Span) error {
 	c.mu.Unlock()
 	return nil
 }
+func (c *countingTracer) Flush(_ context.Context) error { return nil }
 
 func TestMultiDispatchesAll(t *testing.T) {
 	a := &countingTracer{}

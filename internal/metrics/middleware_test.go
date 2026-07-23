@@ -34,6 +34,7 @@ func (n *noopTracer) Finish(_ *trace.Span) error {
 	n.finished++
 	return n.finishErr
 }
+func (n *noopTracer) Flush(_ context.Context) error { return nil }
 
 func TestHTTPMiddlewareRecordsRequest(t *testing.T) {
 	c := NewCollector()

@@ -1,12 +1,25 @@
 // Package config manages configuration for the Promptsheon server.
+//
+// Loading order (later wins):
+//
+//  1. The DefaultConfig() baseline.
+//  2. The YAML file at $PROMPTSHEON_CONFIG (if set).
+//  3. Environment variables (PROMPTSHEON_*).
+//
+// This means a deployment can ship a `promptsheon.yaml` with
+// sensible defaults and let env vars override the per-instance
+// values (db path, tls cert, etc.) without editing the file.
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"os"
+
+	"gopkg.in/yaml.v3"
 	"strconv"
 	"strings"
 )
@@ -17,6 +30,27 @@ type Config struct {
 	DBPath   string // SQLite database file path
 	LogLevel string // Log level: debug, info, warn, error
 	Auth     bool   // Enable authentication and authorization
+
+	// OPS-CFG-4: SQLite connection pool size. Default 1
+	// (SQLite serialises writers anyway; a bigger pool buys
+	// nothing on a single connection). Production tenants
+	// moving to Postgres raise this to match the connection
+	// budget.
+	DBPoolSize int
+
+	// OPS-CFG-4: retention worker count. Default 1; the
+	// retention sweep is I/O-bound on the audit archive
+	// copy, so production tenants with large audit tables
+	// raise this to fan out across the SQLite pool.
+	RetentionWorkerCount int
+
+	// OPS-ROLLOUT-2: read-only mode. When true, every non-GET
+	// request returns 503. Used during canary / blue-green
+	// rollouts so the new code can run against live traffic
+	// with writes off. Read at request time by
+	// ReadOnlyMiddleware, so toggling the env var doesn't
+	// require a restart.
+	ReadOnly bool
 
 	// Server timeouts
 	WriteTimeout      int // Write timeout in seconds (default: 30)
@@ -77,6 +111,10 @@ func DefaultConfig() Config {
 		LogLevel: "info",
 		Auth:     true,
 
+		DBPoolSize:           1,
+		RetentionWorkerCount: 1,
+		ReadOnly:             false,
+
 		WriteTimeout:      30,
 		ReadTimeout:       30,
 		ReadHeaderTimeout: 10,
@@ -103,8 +141,24 @@ func DefaultConfig() Config {
 
 // LoadConfig reads configuration from environment variables, falling back
 // to defaults.
+//
+// OPS-CFG-1: if $PROMPTSHEON_CONFIG points to a YAML file, the file
+// is read first and provides the baseline; env vars then override
+// any field the operator sets in the shell. The file format is
+// the same flat struct as Config — the YAML keys match the Go
+// field names exactly.
 func LoadConfig() Config {
 	cfg := DefaultConfig()
+	if path := os.Getenv("PROMPTSHEON_CONFIG"); path != "" {
+		if err := loadYAMLFile(&cfg, path); err != nil {
+			// The file is required when PROMPTSHEON_CONFIG is set
+			// (the operator set it expecting a config); a missing
+			// or malformed file is a deployment error, not a
+			// soft fallback. Fail fast.
+			fmt.Fprintf(os.Stderr, "config: failed to load %q: %v\n", path, err)
+			os.Exit(1)
+		}
+	}
 
 	cfg.Addr = getEnvString("PROMPTSHEON_ADDR", cfg.Addr)
 	cfg.DBPath = getEnvString("PROMPTSHEON_DB_PATH", cfg.DBPath)
@@ -132,6 +186,20 @@ func LoadConfig() Config {
 	cfg.ApprovalPolicy = getEnvString("PROMPTSHEON_APPROVAL_POLICY", cfg.ApprovalPolicy)
 	cfg.TLSCertFile = getEnvString("PROMPTSHEON_TLS_CERT_FILE", cfg.TLSCertFile)
 	cfg.TLSKeyFile = getEnvString("PROMPTSHEON_TLS_KEY_FILE", cfg.TLSKeyFile)
+	// OPS-CFG-4: SQLite pool size. Default 1 (SQLite serialises
+	// writers anyway; a bigger pool buys nothing on a single
+	// connection). Production tenants that have moved to
+	// Postgres raise this to match the connection budget.
+	cfg.DBPoolSize = getEnvInt("PROMPTSHEON_DB_POOL_SIZE", cfg.DBPoolSize)
+	// OPS-CFG-4: retention worker count. Default 1; the
+	// retention sweep is I/O-bound on the audit archive copy,
+	// so production tenants with large audit tables raise
+	// this to fan out across the SQLite pool.
+	cfg.RetentionWorkerCount = getEnvInt("PROMPTSHEON_RETENTION_WORKER_COUNT", cfg.RetentionWorkerCount)
+	// OPS-ROLLOUT-2: read-only mode flag. Read at request
+	// time by ReadOnlyMiddleware (no restart required to
+	// toggle).
+	cfg.ReadOnly = getEnvBool("PROMPTSHEON_READ_ONLY", cfg.ReadOnly)
 
 	sanitizeConfig(&cfg)
 	return cfg
@@ -332,4 +400,22 @@ func (c *Config) Port() int {
 	// hot path; return the default and let the caller
 	// override via configuration.
 	return 8080
+}
+
+// loadYAMLFile reads path into *cfg. Used by LoadConfig when
+// $PROMPTSHEON_CONFIG is set. The file is a flat YAML mapping
+// whose keys match the Config field names. We use a strict
+// YAML decoder so a typo (e.g. `db_path:` vs `DBPath:`) fails
+// the boot rather than silently loading defaults.
+func loadYAMLFile(cfg *Config, path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read: %w", err)
+	}
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true) // strict: unknown keys are a config error
+	if err := dec.Decode(cfg); err != nil {
+		return fmt.Errorf("decode: %w", err)
+	}
+	return nil
 }
