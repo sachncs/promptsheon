@@ -32,9 +32,8 @@ import (
 	"github.com/sachncs/promptsheon/internal/observation"
 	"github.com/sachncs/promptsheon/internal/release"
 	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/internal/testutil"
 )
-
-const _invokeTestHelpersFileOK = true
 
 // inMemoryProvider is a deterministic llm.Provider used by the
 // test helpers. It echoes the first user message back as the
@@ -204,3 +203,24 @@ func newInvokeTestServerWithRepo(t *testing.T, repo store.Repository, opts ...Op
 
 // silence the unused import linter when we trim imports later.
 var _ = context.Background
+
+// NewTestServer is the TEST-INFRA-2 canonical entry point for
+// tests that need an *api.Server. It pairs with internal/testutil
+// .NewTestDB: the helper here wraps the api.Server construction
+// so the test layer can be found in one place (internal/testutil
+// for stores, internal/api for the server). The repo is
+// automatically closed via t.Cleanup.
+//
+// Callers that need a custom repo (e.g. seeded release fixtures)
+// use newInvokeTestServerWithRepo above; the no-arg form is
+// for the common case.
+func NewTestServer(t *testing.T, opts ...Option) *Server {
+	t.Helper()
+	db := testutil.NewTestDB(t)
+	logger := testutil.DiscardLogger()
+	defaults := []Option{WithProviders(llm.NewRegistry())}
+	allOpts := append(defaults, opts...)
+	s := NewServer(db, logger, allOpts...)
+	t.Cleanup(func() { _ = db.Close() })
+	return s
+}

@@ -110,6 +110,35 @@ func Unsetenv(t *testing.T, key string) {
 	})
 }
 
+// NewTestDB returns a fresh, migrated SQLite database for one
+// test. It's the canonical entry point for any test that needs
+// the store layer; the migration order is the production order,
+// the path is in t.TempDir(), and t.Cleanup closes the DB so
+// parallel tests don't leak. TEST-INFRA-1.
+//
+// The returned *store.SQLite can be used directly OR via the
+// *sql.DB returned by (*store.SQLite).DB(). It's an alias for
+// TempSQLite kept here so the new-testutil test layer is
+// discoverable in one place.
+func NewTestDB(t *testing.T) *store.SQLite {
+	t.Helper()
+	return TempSQLite(t)
+}
+
+// ClockFunc is the TEST-INFRA-3 test seam: tests that need a
+// deterministic time use the supplied func instead of time.Now().
+// Production code uses time.Now directly; the seam only takes
+// effect when a test substitutes the package-level var.
+var ClockFunc = time.Now
+
+// Now is a drop-in replacement for time.Now that honours the
+// ClockFunc test seam. Tests that need deterministic time set
+// ClockFunc; production code calls Now() through this seam so
+// the substitution is transparent.
+func Now() time.Time {
+	return ClockFunc()
+}
+
 // Counter is a concurrency-safe int counter useful for verifying
 // "callback fired N times" assertions.
 type Counter struct {

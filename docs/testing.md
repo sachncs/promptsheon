@@ -1,24 +1,45 @@
 # Testing
 
-Promptsheon has four test layers. The Makefile target `test`
-runs the first three; the smoke layer runs against a freshly
-booted daemon.
+Promptsheon has nine test layers. The Makefile target `test`
+runs the first three; the rest are wired into CI as separate
+jobs so the default PR path stays fast.
 
 | Layer | What it covers | How to run |
 |-------|----------------|------------|
 | **Unit** | Every package's internal types and helpers. | `go test ./internal/...` |
-| **Contract** | The OpenAPI spec parses, every registered route is reachable, the Go SDK surface is in sync. | `go test ./tests/contract/...` |
-| **End-to-end** | A real daemon boots, the auth and bootstrap paths round-trip. | `go test ./tests/e2e/...` |
-| **Smoke** | Boots a real daemon, runs every `examples/bash/*.sh` against it. | `bash tests/smoke/run.sh` |
+| **Integration** | A small set of cross-package tests in `tests/integration/` (the API + store round-trip). | `go test ./tests/integration/...` |
+| **Contract** | OpenAPI spec parses, every route is reachable on the mux, Go SDK surface is in sync. | `go test ./tests/contract/...` |
+| **End-to-end** | In-process daemon + real HTTP; auth + bootstrap paths. | `go test ./tests/e2e/...` |
+| **Smoke** | Boots a real daemon, runs every `examples/bash/*.sh`, tears down. | `bash tests/smoke/run.sh` |
+| **Chaos** | SQLite file-delete mid-query doesn't panic. | `go test ./tests/chaos/...` |
+| **Load** | k6 scenarios in `tests/load/scenarios/*.js` (nightly). | `make load-test` |
+| **Property** | (future) `testing/quick` for the CAS layer. | non-goal for v0.1.x |
+| **Mutation** | (future) `go-mutesting` for domain packages. | non-goal for v0.1.x |
+
+## Layer-to-CI-job mapping
+
+| Layer | CI job | Trigger |
+|-------|--------|---------|
+| Unit + contract + e2e | `test` (matrix go 1.26.5, 1.27) | every PR + master |
+| Smoke | `smoke` | every PR + master |
+| End-to-end | `e2e` | every PR + master |
+| Docs / lints | `docs-lint`, `lint`, `helm` | every PR + master |
+| Vulnerability scan | `security` (govulncheck + gosec) | every PR + master |
+| SBOM | `sbom` (syft) | tags only |
+| Load | `nightly-load` (nightly schedule) | nightly |
+| Fuzz | (future) `nightly-fuzz` | non-goal for v0.1.x |
 
 ## Layout
 
 ```
-internal/<pkg>/*_test.go       # Unit tests for each package.
-tests/contract/contract_test.go  # OpenAPI ↔ SDK contract.
-tests/e2e/                     # In-process daemon, real HTTP.
-tests/smoke/run.sh             # Bash smoke against a fresh daemon.
-sdk/...                        # SDK has its own tests under each lang.
+internal/<pkg>/*_test.go            # Unit tests for each package.
+internal/testutil/                 # Shared test helpers (logger, sqlite, env, harness repo).
+internal/testutil/harnessrepo/     # Shared in-memory harness.Repository fixture.
+tests/contract/contract_test.go   # OpenAPI ↔ SDK contract.
+tests/e2e/                         # In-process daemon, real HTTP.
+tests/smoke/run.sh                 # Bash smoke against a fresh daemon.
+tests/chaos/                       # Failure-mode tests (SQLite kill, etc.).
+tests/load/scenarios/*.js          # k6 load scenarios (nightly).
 ```
 
 ## Conventions
@@ -34,58 +55,59 @@ sdk/...                        # SDK has its own tests under each lang.
 - Fakes (in-memory providers, repositories) live under
   `internal/testutil/` so cross-package tests can link them
   without dragging in the storage layer.
+- Use `testutil.NewTestDB(t)` for every test that needs the
+  store layer. No test creates its own `*sql.DB` directly.
+- Use `api.NewTestServer(t, opts...)` for every test that
+  needs an `*api.Server`. No test instantiates the server
+  directly.
 
-## Helpers
-
-The test helpers below are the canonical entry points. Reach
-for these before writing your own setup.
+## Test helpers
 
 | Helper | Where | Purpose |
 |--------|-------|---------|
 | `testutil.DiscardLogger` | `internal/testutil/testutil.go` | Logger that writes to `io.Discard`. |
-| `testutil.TempSQLite` | same | On-disk SQLite in `t.TempDir()` with migrations applied. |
-| `testutil.ContextWithTimeout` | same | Context cancelled at `d` + auto-cleanup. |
+| `testutil.TempSQLite` / `testutil.NewTestDB` | same | On-disk SQLite in `t.TempDir()` with migrations applied. |
 | `testutil.MemoryBus` | same | In-memory `eventbus.Memory` with cleanup. |
-| `testutil.Setenv` | same | Env-var mutation scoped to a single test. |
+| `testutil.ContextWithTimeout` | same | Context cancelled at `d` + auto-cleanup. |
+| `testutil.Setenv` / `Unsetenv` | same | Env-var mutation scoped to a single test. |
+| `testutil.ClockFunc` / `testutil.Now` | same | Test seam: substitute a deterministic time source. |
 | `testutil.harnessrepo.New` | `internal/testutil/harnessrepo/` | `harness.Repository` fixture (datasets, preconditions, eval runs). |
+| `api.NewTestServer` | `internal/api/invoke_test_helpers_test.go` | Canonical entry point for an `*api.Server` with an in-memory store. |
 
-## SDK contract test
+## Coverage
 
-The contract test in `tests/contract/contract_test.go` is the
-guard between the OpenAPI spec and the Go SDK surface.
+The CI gate enforces **60% total coverage** plus per-package
+floors:
 
-```
-go test ./tests/contract/...
-```
+- Domain packages (most of `internal/<pkg>/`): >= 50%
+- Infrastructure (`internal/api/`, `internal/store/`): >= 40%
+- API handlers (`internal/api/handlers*`): >= 60%
 
-- `TestSpecIsValid` — `api/openapi.yaml` parses, has at least one
-  path. Catches malformed YAML, missing schemas, and accidental
-  schema regressions in the generator.
-- `TestEveryRouteReachable` — every GET route is wired on the
-  mux (not the mux fallback). Catches routes registered on a
-  server that isn't built into the test mux.
-- `TestSDKExposesMandatoryMethods` — the Go SDK exposes the
-  documented method surface (Health, ListProviders, CreateWorkspace,
-  CreateCapability, AddVersion, CreateRelease, GetRelease,
-  ListReleases, Vote, Activate, Rollback, Invoke, Approval,
-  ApproveAndInvoke, CreateDataset, ListDatasets, GetDataset,
-  PutCases, DeleteDataset, CreatePrecondition, ListPreconditions,
-  UpdatePrecondition, DeletePrecondition, RunEval, ListEvals,
-  GetEval, CreateAPIKey, ListAPIKeys, RevokeAPIKey,
-  OAuthLoginURL). Catches accidental deletions during refactors.
-- `TestSDKEndpointsCovered` — every OpenAPI path is either wired
-  in the SDK or on the `knownGapRoutes` list (with a justification
-  comment). New gaps fail the build.
+The script `scripts/check-coverage.sh` reads the same
+`coverage.out` produced by `go test -coverprofile` and
+enforces both the global and per-package floors. The global
+floor is intentionally low (60%) because the cmd entry points
+and the OpenAPI generator aren't unit-testable in the
+conventional sense; the per-package floors catch silent
+regressions in the testable surface.
 
-When you add a new SDK method, add it to `sdkMandatoryMethods`
-in the contract test. When you add a new endpoint, either wire
-it in the SDK or add it to `knownGapRoutes` with a comment
-explaining why.
+A per-PR coverage delta is a follow-on; the current gate
+fails the build on a coverage drop, but doesn't surface the
+delta. The Makefile target `coverage` produces an HTML report
+for local debugging.
+
+## Contract test
+
+`tests/contract/contract_test.go` is the gate that catches
+drift between `api/openapi.yaml` and the Go SDK. The test
+parses the spec, walks every registered route, and asserts
+the documented SDK surface. It's wired into CI as a step
+on the default `test` job.
 
 ## Smoke test
 
 The smoke test boots a fresh daemon, runs every
-`examples/bash/*.sh` against it, and tears it down. It's
+`examples/bash/*.sh` against it, and tears down. It's
 intentionally not part of `make test` because it adds ~6s of
 wall-clock and depends on building `promptsheond`.
 
@@ -102,22 +124,36 @@ The script:
 4. Iterates `examples/bash/*.sh` with a fixture ID.
 5. Tears the daemon down on EXIT.
 
-The smoke layer is wired into CI as a separate `smoke:` job so
-the default `test` job stays fast.
-
 ## End-to-end test
 
-The end-to-end layer (`tests/e2e/`) boots an in-process
-`promptsheond` and exercises the auth + bootstrap paths
-through the real HTTP handlers. It's a smaller surface than the
-smoke layer — the smoke layer runs the actual bash examples,
-while the e2e layer tests scenarios that the bash examples
-don't reach (e.g. expired API keys, malformed JSON bodies,
-CSRF, CORS preflight).
+`tests/e2e/` boots an in-process `promptsheond` and exercises
+the auth + bootstrap paths through the real HTTP handlers.
+It's a smaller surface than the smoke layer; the smoke layer
+runs the actual bash examples, while the e2e layer tests
+scenarios the bash examples don't reach (expired API keys,
+malformed JSON bodies, CSRF, CORS preflight).
 
 ```
 go test ./tests/e2e/...
 ```
+
+## Chaos test
+
+`tests/chaos/` exercises failure modes the smoke layer can't
+simulate. The current suite has `TestSQLiteSurvivesFileDelete`
+which verifies the production contract: a held SQLite query
+against a deleted file does NOT panic and returns within the
+timeout. The suite is gated behind
+`PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true` so the
+destructive-migration gate doesn't block test setup.
+
+## SDK CI
+
+The Go SDK has its own tests under `sdk/client_test.go`; the
+Python SDK has `sdk/python/tests/` and the TypeScript SDK has
+`sdk/typescript/src/`. SDK CI is wired into the default `test`
+job (Go SDK) plus separate steps in the existing CI (Python
+and TypeScript) where their toolchains are available.
 
 ## Adding a new test
 
@@ -126,7 +162,7 @@ go test ./tests/e2e/...
   `testing` package.
 - For cross-package coverage (a real daemon + real HTTP),
   drop a `*_test.go` in `tests/e2e/` and use the helpers in
-  `internal/testutil`.
+  `internal/testutil` + `internal/api`.
 - For OpenAPI / SDK drift detection, extend
   `tests/contract/contract_test.go`.
 
@@ -136,3 +172,21 @@ If your test needs a fixture that doesn't exist, add it to
 implements the consumer-defined interface, safe for
 concurrent use, exported (so cross-package tests can link
 it).
+
+## Migration tests
+
+`internal/store/002_core_schema_test.go` covers the schema
+migrations applied at boot (tables, indexes, foreign keys,
+unique constraints). Each migration is applied to a fresh
+in-memory DB by `TestNewSQLiteRunsAllMigrations`; the
+per-migration tests cover the schema changes (column
+additions, data migrations) and are the regression net for
+forward-only schema evolution.
+
+## See also
+
+- [docs/operations.md](operations.md) — backup / restore.
+- [docs/slos.md](slos.md) — SLO targets + the RPO / RTO
+  table that motivates the chaos + smoke layers.
+- [docs/architecture.md](architecture.md) — the package
+  table the test layer maps onto.
