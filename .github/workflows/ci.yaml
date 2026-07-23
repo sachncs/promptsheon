@@ -213,6 +213,27 @@ jobs:
         # before they hit a real cluster.
         run: helm lint deploy/helm/promptsheon/
 
+      - name: Validate rendered manifests with kubeconform
+        # OPS-HELM-2: kubeconform checks the rendered manifest
+        # against the Kubernetes OpenAPI schema. We render
+        # twice (default + vault) and validate each. kubeconform
+        # is the successor to the now-archived kubeval; the
+        # invocation is a single-shot, no server required.
+        run: |
+          set -e
+          helm template render-defaults deploy/helm/promptsheon/ > /tmp/render-defaults.yaml
+          helm template render-vault deploy/helm/promptsheon/ \
+            --set vault.enabled=true \
+            --set vault.key=$(printf '%064x' 1) > /tmp/render-vault.yaml
+          docker run --rm \
+            -v /tmp:/tmp:ro \
+            ghcr.io/yannh/kubeconform:latest-alpine \
+            -strict -summary /tmp/render-defaults.yaml
+          docker run --rm \
+            -v /tmp:/tmp:ro \
+            ghcr.io/yannh/kubeconform:latest-alpine \
+            -strict -summary /tmp/render-vault.yaml
+
       - name: Render with defaults (sqlite)
         # Helm template exercise validates that every template
         # evaluates successfully. SQLite is the only backend; the

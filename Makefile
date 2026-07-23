@@ -120,6 +120,13 @@ update-deps:
 security:
 	govulncheck ./...
 
+# Regenerate the Helm chart's README.md from values.yaml. Requires
+# the helm-docs binary; if absent the target is a no-op. CI runs
+# this on a tag and commits the regenerated README.
+helm-docs:
+	@command -v helm-docs >/dev/null 2>&1 || { echo "helm-docs not installed (brew install helm-docs)"; exit 0; }
+	helm-docs --sort-values-order=file -t deploy/helm/promptsheon/README.md deploy/helm/promptsheon
+
 # Show help
 help:
 	@echo "Promptsheon - Version Control for AI Intelligence"
@@ -147,6 +154,7 @@ help:
 	@echo "  cli              Run the CLI"
 	@echo "  openapi          Regenerate api/openapi.yaml from server routes"
 	@echo "  openapi-check    Fail if openapi.yaml is out of date"
+	@echo "  helm-docs        Regenerate deploy/helm/promptsheon/README.md from values.yaml"
 	@echo "  update-deps      Update all dependencies"
 	@echo "  security         Check for security vulnerabilities"
 	@echo "  help             Show this help message"

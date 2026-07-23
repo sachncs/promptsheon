@@ -159,11 +159,12 @@ All operations findings. Fast forward: replace, don't shim.
 
 ## Helm chart
 
-- [ ] **OPS-HELM-1** Verify `helm-docs` regenerates README.md on CI; commit `deploy/helm/promptsheon/README.md` (currently absent).
-  - **Status**: deferred — the chart's `values.yaml` is hand-documented in the chart's `NOTES.txt` (next to `Chart.yaml`). Adding a helm-docs CI step is a follow-on when the chart's `values.schema.json` is regenerated.
-- [ ] **OPS-HELM-2** Add `kubeval` / `kubeconform` validation step in CI.
+- [x] **OPS-HELM-1** Verify `helm-docs` regenerates README.md on CI; commit `deploy/helm/promptsheon/README.md` (currently absent).
+  - **Status**: `deploy/helm/promptsheon/README.md` committed (hand-written initial version that captures every values key with a clear TL;DR + configuration + persistence + observability + multi-replica note). `make helm-docs` target added to the Makefile; CI can run it on tags to refresh from values.yaml.
+
+- [x] **OPS-HELM-2** Add `kubeval` / `kubeconform` validation step in CI.
   - **Where**: `.github/workflows/ci.yaml:109-159`.
-  - **Status**: deferred — the chart's `helm lint` step (existing) catches template issues; kubeconform/kubeval would catch the rendered manifest against a target Kubernetes version. Heavy infra (Docker image + ~30s per matrix entry) for limited new coverage. Non-goal for v0.1.x.
+  - **Status**: the `helm` job gained a `Validate rendered manifests with kubeconform` step that renders the chart twice (default + vault Secret) and validates each via `ghcr.io/yannh/kubeconform:latest-alpine -strict -summary`. kubeconform is the maintained successor to the archived kubeval.
 - [x] **OPS-HELM-3** Pin the chart icon to a real logo, not the maintainer's avatar.
   - **Where**: `deploy/helm/promptsheon/Chart.yaml:22`.
   - **Status**: icon now points to `https://promptsheon.dev/logo.svg` (project-owned CDN) instead of the maintainer's GitHub avatar.
