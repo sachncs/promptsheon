@@ -20,14 +20,37 @@ type otelSpanKey struct{}
 type OTelTracer struct {
 	tracer      oteltrace.Tracer
 	serviceName string
+	// provider is the SDK TracerProvider; Flush uses it to
+	// force the export pipeline to drain. nil when the
+	// Tracer was constructed without an SDK (rare in
+	// production; tests use the noop tracer).
+	provider any // sdktrace.TracerProvider; type-erased to avoid the SDK import
 }
 
-// NewOTelTracer creates a new OpenTelemetry-backed tracer.
+// Flush forces any buffered spans to the export pipeline.
+// Implemented via the SDK TracerProvider.ForceFlush; returns
+// nil when the provider isn't an SDK provider (which is the
+// noop case). The interface is type-asserted to keep the
+// import surface small.
+func (t *OTelTracer) Flush(ctx context.Context) error {
+	if t.provider == nil {
+		return nil
+	}
+	if p, ok := t.provider.(interface{ ForceFlush(context.Context) error }); ok {
+		return p.ForceFlush(ctx)
+	}
+	return nil
+}
+
+// NewOTelTracer creates a new OpenTelemetry-backed tracer that
+// uses the global OTel TracerProvider. The Flush call is a
+// no-op when the global provider is the noop (test/dev).
 func NewOTelTracer(serviceName string) *OTelTracer {
 	tracer := otel.Tracer(serviceName)
 	return &OTelTracer{
 		tracer:      tracer,
 		serviceName: serviceName,
+		provider:    otel.GetTracerProvider(),
 	}
 }
 

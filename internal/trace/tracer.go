@@ -92,6 +92,12 @@ type Tracer interface {
 
 	// Finish records a completed span.
 	Finish(span *Span) error
+
+	// Flush forces any buffered spans to the export pipeline. The
+	// /ready handler calls this with a short timeout to verify the
+	// OTel collector is accepting spans. Implementations that
+	// don't buffer (the noop tracer) return nil.
+	Flush(ctx context.Context) error
 }
 
 // Multi dispatches every Span to a list of wrapped Tracers. The
@@ -173,6 +179,22 @@ func (m *Multi) Finish(span *Span) error {
 	return firstErr
 }
 
+// Flush forwards to every wrapped tracer. The first error
+// wins; the rest are still attempted. Used by the /ready
+// handler to verify the OTel pipeline is accepting spans.
+func (m *Multi) Flush(ctx context.Context) error {
+	var firstErr error
+	if err := m.primary.Flush(ctx); err != nil {
+		firstErr = err
+	}
+	for _, t := range m.others {
+		if err := t.Flush(ctx); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
 // noopTracer is the Tracer returned by NewMulti when every
 // argument is nil. Useful in tests and when both SQLite and
 // OTel are disabled.
@@ -188,6 +210,7 @@ func (noopTracer) StartChild(_ context.Context, parent *Span, operation string) 
 	return &Span{ID: "noop-child", TraceID: parent.TraceID, ParentID: parent.ID, StartedAt: time.Now()}
 }
 func (noopTracer) Finish(_ *Span) error { return nil }
+func (noopTracer) Flush(_ context.Context) error { return nil }
 
 // Avoid unused-import lint when the package compiles without
 // referencing sync below.

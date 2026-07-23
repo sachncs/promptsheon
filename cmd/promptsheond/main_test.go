@@ -279,6 +279,42 @@ func TestBuildServer_WithVault(t *testing.T) {
 	}
 }
 
+// TestValidateVaultKey exercises the OPS-CFG-3 startup check
+// directly (no os.Exit, no subprocess). The function is the
+// unit that main() calls before constructing the vault; a
+// separate test verifies the daemon binary exits on failure
+// via the end-to-end harness in tests/smoke.
+func TestValidateVaultKey(t *testing.T) {
+	cases := []struct {
+		name    string
+		key     string
+		wantErr bool
+	}{
+		{"valid-64-hex", "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789", false},
+		{"non-hex", "not-a-valid-hex-key", true},
+		{"too-short", "abcdef", true},
+		{"too-long", "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab", true},
+		{"empty", "", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateVaultKey(tc.key)
+			if tc.wantErr && err == nil {
+				t.Fatalf("expected error for key %q, got nil", tc.key)
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("expected no error for key %q, got %v", tc.key, err)
+			}
+		})
+	}
+}
+
+// TestBuildServer_WithInvalidVaultKey covers the legacy
+// path: the build used to silently disable the vault on an
+// invalid key. With OPS-CFG-3, the build now exits; that
+// path is covered by the smoke harness. Here we verify
+// buildServer itself returns a server (the os.Exit happens
+// in main, after buildServer).
 func TestBuildServer_WithInvalidVaultKey(t *testing.T) {
 	db := setupTestDB(t)
 
