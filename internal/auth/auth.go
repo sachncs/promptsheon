@@ -74,6 +74,16 @@ const (
 	PermWebhookAdmin Permission = "webhook:admin"
 	// PermUserManage is the permission to manage users.
 	PermUserManage Permission = "user:manage"
+
+	// PermSettingsRead is the permission to read operator-tunable
+	// runtime settings (OTel endpoint, LLM key references, ...).
+	// Held by every role so dashboards can read; writes require
+	// PermSettingsWrite.
+	PermSettingsRead Permission = "settings:read"
+	// PermSettingsWrite is the permission to mutate operator-tunable
+	// runtime settings. Admin-only by default; held by writer /
+	// reader only when the tenant explicitly opts in.
+	PermSettingsWrite Permission = "settings:write"
 )
 
 // rolePermissions maps roles to their allowed permissions.
@@ -86,6 +96,7 @@ var rolePermissions = map[Role][]Permission{
 		PermReviewCreate, PermReviewApprove,
 		PermAuditRead,
 		PermAPIKeyManage, PermUserManage, PermWebhookAdmin,
+		PermSettingsRead, PermSettingsWrite,
 	},
 	RoleWriter: {
 		PermPromptCreate, PermPromptRead, PermPromptUpdate,
@@ -93,12 +104,14 @@ var rolePermissions = map[Role][]Permission{
 		PermDatasetCreate, PermDatasetRead, PermDatasetUpdate,
 		PermEvalRun, PermEvalRead,
 		PermReviewCreate,
+		PermSettingsRead,
 	},
 	RoleReader: {
 		PermPromptRead,
 		PermAgentRead,
 		PermDatasetRead,
 		PermEvalRead,
+		PermSettingsRead,
 	},
 }
 

@@ -84,6 +84,18 @@ type Config struct {
 	OTelEndpoint string // OTLP gRPC endpoint (e.g., "jaeger:4317")
 	OTelInsecure bool   // Use insecure connection to OTel collector
 
+	// SettingsMode controls the operator-tunable runtime config
+	// (system_config table). Default "mutable": env is the floor,
+	// settings-DB is the ceiling; deletes reassert the env. Set
+	// "env-only" for the immutable-baseline story (writes 403).
+	// Read via PROMPTSHEON_SETTINGS_MODE.
+	SettingsMode string
+
+	// SettingsInit seeds the system_config table on first boot
+	// from a YAML map. Read via PROMPTSHEON_SETTINGS_INIT_<KEY>.
+	// Empty by default; the chart sets it for the helm install.
+	SettingsInit map[string]string
+
 	// CORS
 	CORSOrigins []string // Allowed origins; "*" is a single-element list and is rejected unless the bind is loopback.
 
@@ -136,6 +148,12 @@ func DefaultConfig() Config {
 		// Approval policy defaults to maker-checker (creator may not
 		// approve their own release; at least one other identity must).
 		ApprovalPolicy: "maker_checker",
+
+		// SettingsMode is "mutable" by default (env-floor /
+		// settings-DB-ceiling). Operators who need the locked-baseline
+		// story set PROMPTSHEON_SETTINGS_MODE=env-only.
+		SettingsMode: "mutable",
+		SettingsInit: map[string]string{},
 	}
 }
 
@@ -182,6 +200,28 @@ func LoadConfig() Config {
 	// callers wanting a fallback chain configure the LLM registry.
 	cfg.OTelEndpoint = getEnvString("PROMPTSHEON_OTEL_ENDPOINT", cfg.OTelEndpoint)
 	cfg.OTelInsecure = getEnvBool("PROMPTSHEON_OTEL_INSECURE", cfg.OTelInsecure)
+	cfg.SettingsMode = getEnvString("PROMPTSHEON_SETTINGS_MODE", cfg.SettingsMode)
+	// SettingsInit reads the PROMPTSHEON_SETTINGS_INIT_<KEY>
+	// env-var family. The keys are uppercased; underscores in
+	// the key are kept. Empty by default; the helm chart sets
+	// it via values.yaml. Tests can populate directly.
+	if cfg.SettingsInit == nil {
+		cfg.SettingsInit = map[string]string{}
+	}
+	for _, kv := range os.Environ() {
+		const prefix = "PROMPTSHEON_SETTINGS_INIT_"
+		if !strings.HasPrefix(kv, prefix) {
+			continue
+		}
+		rest := strings.TrimPrefix(kv, prefix)
+		eq := strings.IndexByte(rest, '=')
+		if eq < 0 {
+			continue
+		}
+		key := rest[:eq]
+		val := rest[eq+1:]
+		cfg.SettingsInit[key] = val
+	}
 	cfg.CORSOrigins = parseCORSOrigins(getEnvString("PROMPTSHEON_CORS_ORIGINS", ""))
 	cfg.ApprovalPolicy = getEnvString("PROMPTSHEON_APPROVAL_POLICY", cfg.ApprovalPolicy)
 	cfg.TLSCertFile = getEnvString("PROMPTSHEON_TLS_CERT_FILE", cfg.TLSCertFile)
