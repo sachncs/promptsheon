@@ -109,3 +109,29 @@ actually regressing; pair this SLO with a manual spot-check.
 - Alert routing should target the on-call channel for
   `severity=critical` alerts (`PromptsheonAuditChainBroken`) and
   the engineering channel for `severity=warning`.
+## RPO and RTO
+
+The recovery point objective (RPO) and recovery time objective
+(RTO) for the daemon's data layer. The numbers depend on the
+deployment tier; pick the row that matches your service-level
+commitment.
+
+| Tier | RPO | RTO | Notes |
+|------|-----|-----|-------|
+| Hot (SLA-bound) | 1 hour | 30 minutes | Hourly snapshots + 30-minute restore drill quarterly. |
+| Standard | 24 hours | 4 hours | Daily offsite copy + restore drill quarterly. |
+| Cold (dev / staging) | 7 days | next business day | Weekly snapshot; restore drill as needed. |
+
+RPO is bounded by the snapshot interval: data written between
+the last snapshot and the crash is lost. RTO is bounded by
+the restore time: snapshot fetch + SQLite replay (a few
+seconds for a 1 GB database) + audit chain verify.
+
+The audit chain verify on boot is part of RTO: if a
+restored snapshot has a corrupt chain, the operator must
+investigate before serving traffic. Alert on
+`promptsheon_audit_chain_verifications_total` going flat for
+more than 30 minutes.
+
+See [operations.md](operations.md#disaster-recovery-targets)
+for the full backup / restore playbook.

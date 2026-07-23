@@ -167,3 +167,31 @@ allowlisted.
    through a KMS-backed `KeyProvider` for production.
 5. `PROMPTSHEON_HARNESS_PRECONDITIONS=true` only after
    preconditions have been audited. Default is `false`.
+
+## Production secret layout
+
+The recommended secret layout for production tenants. Every
+secret lives in the operator's secret manager; the daemon
+reads them at boot, never from disk.
+
+| Secret | Where it lives | How the daemon gets it |
+|--------|----------------|------------------------|
+| TLS cert + key (`PROMPTSHEON_TLS_CERT_FILE`, `PROMPTSHEON_TLS_KEY_FILE`) | cert-manager `Certificate` resource; mounted as a `Secret` in the pod. | `volumeMounts` in the chart. |
+| `PROMPTSHEON_VAULT_KEY` | AWS KMS / HashiCorp Vault / GCP Secret Manager. Sealed-secrets in-cluster. | `envFrom.secretRef` in the chart. Rotated quarterly. |
+| `PROMPTSHEON_BOOTSTRAP_TOKEN` | Same secret store as `VAULT_KEY`. | `envFrom.secretRef`. Set once at install; the bootstrap endpoint issues the first admin key, then the operator rotates. |
+| `PROMPTSHEON_OPENAI_API_KEY` / `PROMPTSHEON_ANTHROPIC_API_KEY` | LLM provider's dashboard. | `envFrom.secretRef`. Rotated by the operator when an employee with access leaves. |
+| OIDC client secret (`PROMPTSHEON_OAUTH_GOOGLE_CLIENT_SECRET`, `PROMPTSHEON_OAUTH_GITHUB_CLIENT_SECRET`) | OIDC provider's console. | `envFrom.secretRef`. |
+| Audit DB | PVC (regional block storage). | The StatefulSet mounts a `volumeClaim` for `/data`. |
+
+The rule: no secret is ever committed to git, and no secret
+lives in plaintext in the cluster. Sealed-secrets, External
+Secrets, or a CSI driver for the secret manager are all
+acceptable. The chart's `values.yaml` documents the
+`secretStore` integration for the cert-manager and KMS
+providers.
+
+## See also
+
+- [docs/configuration.md](configuration.md) — full env-var
+  reference.
+- [docs/operations.md](operations.md) — backup / restore.

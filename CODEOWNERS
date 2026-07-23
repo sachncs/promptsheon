@@ -36,9 +36,36 @@
 /cmd/                           @sachncs
 /scripts/genopenapi/            @sachncs
 
-# CI, build, and release.
-/.github/                       @sachncs
-/.github/workflows/             @sachncs
+# Release / harness / scheduler / subprocess paths are
+# high-blast-radius: a wrong change can take the daemon down
+# or lose audit records. Each gets its own owner.
+# (OPS-CODEOWNERS-1)
+# Note that /.github/ (line above) already covers
+# /.github/workflows/ via the glob, so we don't need a
+# separate line. (OPS-CODEOWNERS-2)
+/internal/release/              @sachncs
+/internal/harness/              @sachncs
+/internal/llm/                  @sachncs
+/internal/rollups/              @sachncs
+/internal/scheduler/            @sachncs
+/internal/subprocess/           @sachncs
+/internal/supervisor/           @sachncs
+/internal/webhook/              @sachncs
+
+# Tests, docs, scripts.
+/tests/                         @sachncs
+/docs/                          @sachncs
+/scripts/                       @sachncs
+
+# CI, build, release. /.github/ already covers
+# /.github/workflows/ via the directory glob, so the explicit
+# `/.github/workflows/` line was redundant and is dropped
+# (OPS-CODEOWNERS-2).
 /Dockerfile                     @sachncs
 /.goreleaser.yml                @sachncs
 /Makefile                       @sachncs
+/SECURITY.md                    @sachncs
+/CONTRIBUTING.md                @sachncs
+
+# Helm chart + deploy manifests.
+/deploy/                        @sachncs

@@ -58,6 +58,14 @@ ENV PROMPTSHEON_ADDR=:8080 \
 EXPOSE 8080
 VOLUME ["/data"]
 
+# OPS-CON-1: defense in depth. The chart already drops all
+# capabilities + sets no-new-privileges via the
+# securityContext in templates/statefulset.yaml. Operators
+# running the image directly (e.g. `docker run`) should add
+# `--cap-drop=ALL --security-opt=no-new-privileges` to the
+# docker command. We can't enforce that from inside the
+# image; the chart is the production path.
+
 # SEC-CONTAINER-2: Go-based healthcheck replaces wget. The
 # healthcheck binary honours PROMPTSHEON_HEALTHCHECK_HOST /
 # _PORT and exits 0 on 200, non-zero otherwise. No shell, no
