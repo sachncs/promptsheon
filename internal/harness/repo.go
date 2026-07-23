@@ -18,7 +18,9 @@ type Repository interface {
 
 	// Preconditions.
 	CreatePrecondition(ctx context.Context, p *Precondition) error
+	GetPrecondition(ctx context.Context, id string) (*Precondition, error)
 	ListPreconditionsForCapability(ctx context.Context, capabilityID string) ([]*Precondition, error)
+	UpdatePrecondition(ctx context.Context, p *Precondition) error
 	DeletePrecondition(ctx context.Context, id string) error
 
 	// EvalRuns.

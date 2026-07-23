@@ -27,6 +27,12 @@ func (s *Server) registerHarnessRoutes() {
 
 	s.mux.HandleFunc("POST /api/v1/capabilities/{capability_id}/preconditions", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreatePrecondition)))
 	s.mux.HandleFunc("GET /api/v1/capabilities/{capability_id}/preconditions", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListPreconditions)))
+	// API-SDK-1: PUT /api/v1/preconditions/{id} was missing; the
+	// SDK's UpdatePrecondition now hits a real route. The
+	// handler validates the same invariants as create so a
+	// PUT cannot weaken a precondition below the floor
+	// (e.g. timeout_sec < 0).
+	s.mux.HandleFunc("PUT /api/v1/preconditions/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdatePrecondition)))
 	s.mux.HandleFunc("DELETE /api/v1/preconditions/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptDelete)(s.handleDeletePrecondition)))
 
 	s.mux.HandleFunc("POST /api/v1/releases/{release_id}/evals", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleRunEval)))
@@ -206,6 +212,62 @@ func (s *Server) handleDeletePrecondition(w http.ResponseWriter, r *http.Request
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+// handleUpdatePrecondition applies a partial mutation to an
+// existing precondition. Only the fields present in the body
+// are touched; missing fields keep their previous value. The
+// (id, capability_id, created_at) tuple is immutable: the
+// handler ignores any attempt to change those via the body.
+//
+// API-SDK-1: this route completes the precondition lifecycle
+// (create / read / update / delete) that the OpenAPI spec
+// already advertises.
+func (s *Server) handleUpdatePrecondition(w http.ResponseWriter, r *http.Request) error {
+	id := r.PathValue("id")
+	existing, err := s.db.GetPrecondition(r.Context(), id)
+	if err != nil {
+		return translateDBError(err, "precondition")
+	}
+	var req struct {
+		Name       *string `json:"name,omitempty"`
+		Command    *string `json:"command,omitempty"`
+		TimeoutSec *int    `json:"timeout_sec,omitempty"`
+		Enabled    *bool   `json:"enabled,omitempty"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		return ErrBadRequest
+	}
+	if req.Name != nil {
+		if err := validateNonEmpty("name", *req.Name); err != nil {
+			return err
+		}
+		existing.Name = *req.Name
+	}
+	if req.Command != nil {
+		if err := validateNonEmpty("command", *req.Command); err != nil {
+			return err
+		}
+		existing.Command = *req.Command
+	}
+	if req.TimeoutSec != nil {
+		if *req.TimeoutSec < 0 {
+			return badRequest("timeout_sec must be non-negative (0 means use the default)")
+		}
+		existing.TimeoutSec = *req.TimeoutSec
+	}
+	if req.Enabled != nil {
+		existing.Enabled = *req.Enabled
+	}
+	if err := existing.Validate(); err != nil {
+		return badRequest(err.Error())
+	}
+	if err := s.db.UpdatePrecondition(r.Context(), existing); err != nil {
+		return err
+	}
+	s.audit(r.Context(), "update", "precondition:"+existing.ID, map[string]any{auditKeyName: existing.Name})
+	writeJSON(w, http.StatusOK, existing)
 	return nil
 }
 

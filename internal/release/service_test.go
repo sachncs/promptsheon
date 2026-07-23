@@ -11,30 +11,43 @@ import (
 	"github.com/sachncs/promptsheon/internal/harness"
 	"github.com/sachncs/promptsheon/internal/release"
 	"github.com/sachncs/promptsheon/internal/testdata"
+	"github.com/sachncs/promptsheon/internal/testutil/harnessrepo"
 )
+
+// errMemStoreNotFound stands in for store.ErrNotFound in this
+// test fixture. The release_test package cannot import
+// internal/store (store imports harness via its Repository
+// surface, and harness is reachable from release via its
+// Service.WithHarness hook). Each precondition/approval/etc.
+// store fixture defines its own sentinel and the test
+// translates at the boundary.
+var errMemStoreNotFound = errors.New("memstore: not found")
 
 // memStore is a tiny in-memory Repository for service-level tests.
 // SQLite-backed behaviour is covered in internal/store/sqlite_releases_test.go;
 // here we exercise the Service's branching (Create, Vote, Activate,
 // supersede, Rollback) against a fake.
+//
+// TEST-3: the harness-engineering aggregates (datasets,
+// preconditions, eval runs, eval results) are delegated to the
+// shared harnessrepo.MemRepo fixture. The release-side methods
+// (releases, approvals) stay local because no other package
+// needs them.
 type memStore struct {
-	releases    map[string]*release.Release
-	approvals   map[string]*approval.Approval
-	preconds    map[string]*harness.Precondition
-	datasets    map[string]*harness.Dataset
-	cases       map[string][]harness.DatasetCase
-	evalRuns    map[string]*harness.EvalRun
-	evalResults []harness.EvalResult
+	releases  map[string]*release.Release
+	approvals map[string]*approval.Approval
+
+	// harnessRepo embeds the shared harness.Repository fixture
+	// so duplicate boilerplate (CreateDataset, GetPrecondition,
+	// etc.) doesn't recur in this file.
+	harnessRepo *harnessrepo.MemRepo
 }
 
 func newMemStore() *memStore {
 	return &memStore{
-		releases:  make(map[string]*release.Release),
-		approvals: make(map[string]*approval.Approval),
-		preconds:  make(map[string]*harness.Precondition),
-		datasets:  make(map[string]*harness.Dataset),
-		cases:     make(map[string][]harness.DatasetCase),
-		evalRuns:  make(map[string]*harness.EvalRun),
+		releases:    make(map[string]*release.Release),
+		approvals:   make(map[string]*approval.Approval),
+		harnessRepo: harnessrepo.New(),
 	}
 }
 
@@ -351,88 +364,56 @@ func TestServiceClockSeam(t *testing.T) {
 	}
 }
 
-// ----- harness.Repository methods on memStore -----
+// ----- harness.Repository methods on memStore (delegated to harnessrepo) -----
 
-func (m *memStore) CreateDataset(_ context.Context, d *harness.Dataset) error {
-	m.datasets[d.ID] = d
-	return nil
+func (m *memStore) CreateDataset(ctx context.Context, d *harness.Dataset) error {
+	return m.harnessRepo.CreateDataset(ctx, d)
 }
-func (m *memStore) GetDataset(_ context.Context, id string) (*harness.Dataset, error) {
-	if d, ok := m.datasets[id]; ok {
-		return d, nil
-	}
-	return nil, errors.New("not found")
+func (m *memStore) GetDataset(ctx context.Context, id string) (*harness.Dataset, error) {
+	return m.harnessRepo.GetDataset(ctx, id)
 }
-func (m *memStore) ListDatasetsForCapability(_ context.Context, capabilityID string) ([]*harness.Dataset, error) {
-	var out []*harness.Dataset
-	for _, d := range m.datasets {
-		if d.CapabilityID == capabilityID {
-			out = append(out, d)
-		}
-	}
-	return out, nil
+func (m *memStore) ListDatasetsForCapability(ctx context.Context, capabilityID string) ([]*harness.Dataset, error) {
+	return m.harnessRepo.ListDatasetsForCapability(ctx, capabilityID)
 }
-func (m *memStore) DeleteDataset(_ context.Context, id string) error {
-	delete(m.datasets, id)
-	return nil
+func (m *memStore) DeleteDataset(ctx context.Context, id string) error {
+	return m.harnessRepo.DeleteDataset(ctx, id)
 }
-func (m *memStore) UpsertDatasetCases(_ context.Context, datasetID string, cases []harness.DatasetCase) error {
-	m.cases[datasetID] = cases
-	return nil
+func (m *memStore) UpsertDatasetCases(ctx context.Context, datasetID string, cases []harness.DatasetCase) error {
+	return m.harnessRepo.UpsertDatasetCases(ctx, datasetID, cases)
 }
-func (m *memStore) ListDatasetCases(_ context.Context, datasetID string) ([]harness.DatasetCase, error) {
-	return m.cases[datasetID], nil
+func (m *memStore) ListDatasetCases(ctx context.Context, datasetID string) ([]harness.DatasetCase, error) {
+	return m.harnessRepo.ListDatasetCases(ctx, datasetID)
 }
-func (m *memStore) CreatePrecondition(_ context.Context, p *harness.Precondition) error {
-	m.preconds[p.ID] = p
-	return nil
+func (m *memStore) CreatePrecondition(ctx context.Context, p *harness.Precondition) error {
+	return m.harnessRepo.CreatePrecondition(ctx, p)
 }
-func (m *memStore) ListPreconditionsForCapability(_ context.Context, capabilityID string) ([]*harness.Precondition, error) {
-	var out []*harness.Precondition
-	for _, p := range m.preconds {
-		if p.CapabilityID == capabilityID {
-			out = append(out, p)
-		}
-	}
-	return out, nil
+func (m *memStore) ListPreconditionsForCapability(ctx context.Context, capabilityID string) ([]*harness.Precondition, error) {
+	return m.harnessRepo.ListPreconditionsForCapability(ctx, capabilityID)
 }
-func (m *memStore) DeletePrecondition(_ context.Context, id string) error {
-	delete(m.preconds, id)
-	return nil
+func (m *memStore) GetPrecondition(ctx context.Context, id string) (*harness.Precondition, error) {
+	return m.harnessRepo.GetPrecondition(ctx, id)
 }
-func (m *memStore) CreateEvalRun(_ context.Context, r *harness.EvalRun) error {
-	m.evalRuns[r.ID] = r
-	return nil
+func (m *memStore) UpdatePrecondition(ctx context.Context, p *harness.Precondition) error {
+	return m.harnessRepo.UpdatePrecondition(ctx, p)
 }
-func (m *memStore) UpdateEvalRun(_ context.Context, r *harness.EvalRun) error {
-	m.evalRuns[r.ID] = r
-	return nil
+func (m *memStore) DeletePrecondition(ctx context.Context, id string) error {
+	return m.harnessRepo.DeletePrecondition(ctx, id)
 }
-func (m *memStore) GetEvalRun(_ context.Context, id string) (*harness.EvalRun, error) {
-	if r, ok := m.evalRuns[id]; ok {
-		return r, nil
-	}
-	return nil, errors.New("not found")
+func (m *memStore) CreateEvalRun(ctx context.Context, r *harness.EvalRun) error {
+	return m.harnessRepo.CreateEvalRun(ctx, r)
 }
-func (m *memStore) ListEvalRunsForRelease(_ context.Context, releaseID string) ([]*harness.EvalRun, error) {
-	var out []*harness.EvalRun
-	for _, r := range m.evalRuns {
-		if r.ReleaseID == releaseID {
-			out = append(out, r)
-		}
-	}
-	return out, nil
+func (m *memStore) UpdateEvalRun(ctx context.Context, r *harness.EvalRun) error {
+	return m.harnessRepo.UpdateEvalRun(ctx, r)
 }
-func (m *memStore) CreateEvalResults(_ context.Context, results []harness.EvalResult) error {
-	m.evalResults = append(m.evalResults, results...)
-	return nil
+func (m *memStore) GetEvalRun(ctx context.Context, id string) (*harness.EvalRun, error) {
+	return m.harnessRepo.GetEvalRun(ctx, id)
 }
-func (m *memStore) ListEvalResultsForRun(_ context.Context, runID string) ([]harness.EvalResult, error) {
-	var out []harness.EvalResult
-	for _, r := range m.evalResults {
-		if r.RunID == runID {
-			out = append(out, r)
-		}
-	}
-	return out, nil
+func (m *memStore) ListEvalRunsForRelease(ctx context.Context, releaseID string) ([]*harness.EvalRun, error) {
+	return m.harnessRepo.ListEvalRunsForRelease(ctx, releaseID)
+}
+func (m *memStore) CreateEvalResults(ctx context.Context, results []harness.EvalResult) error {
+	return m.harnessRepo.CreateEvalResults(ctx, results)
+}
+func (m *memStore) ListEvalResultsForRun(ctx context.Context, runID string) ([]harness.EvalResult, error) {
+	return m.harnessRepo.ListEvalResultsForRun(ctx, runID)
 }
