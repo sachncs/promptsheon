@@ -167,6 +167,36 @@ jobs:
         with:
           version: latest
 
+  docs-lint:
+    # OPS-CI-3: keep markdownlint + vale as a soft gate on
+    # docs/. The default configs (.markdownlint.json + .vale.ini)
+    # are permissive — they catch structural issues (heading
+    # order, broken links, line length) without nitpicking
+    # prose. Operators who want stricter prose style can
+    # add custom .vale/styles/.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v19
+        with:
+          globs: |
+            docs/**/*.md
+            README.md
+            CHANGELOG.md
+
+      - name: vale
+        uses: errata-ai/vale-action@reviewdog
+        with:
+          files: |
+            docs
+            README.md
+            CHANGELOG.md
+          args: "--config=.vale.ini --minAlertLevel=error"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   helm:
     runs-on: ubuntu-latest
     steps:
