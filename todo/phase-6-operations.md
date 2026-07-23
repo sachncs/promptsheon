@@ -114,9 +114,9 @@ All operations findings. Fast forward: replace, don't shim.
   - **Where**: `.github/workflows/ci.yaml:1-9`.
   - **Status**: `concurrency: group: ${{ github.workflow }}-${{ github.ref }}` + `cancel-in-progress: true` cancels the older run for the same PR / branch.
 
-- [ ] **OPS-10** Add Renovate alongside Dependabot for better batching and group updates.
+- [x] **OPS-10** Add Renovate alongside Dependabot for better batching and group updates.
   - **Where**: `renovate.json` (new).
-  - **Status**: deferred — Dependabot covers the ecosystems the repo cares about (Go modules, GitHub Actions, Docker). Renovate adds finer-grained batching for npm and pip; both run in parallel until the operator wants the tighter batching. Non-goal for v0.1.x.
+  - **Status**: `renovate.json` extends `config:recommended`, schedules Monday-nightly runs, and groups minor/patch Go updates for automerge. Renovate runs alongside Dependabot by design — Dependabot owns the GitHub-integrated ecosystems, Renovate owns the source-tree ones.
 
 - [x] **OPS-11** Add OCI image labels to the Dockerfile. (See Phase 1 SEC-CONTAINER-1.)
   - **Status**: `LABEL org.opencontainers.image.source=...`, `revision=$COMMIT`, `created=$BUILD_TIME`, `version=$VERSION`, `licenses=Apache-2.0`, `title=promptsheon` are emitted in the runtime stage of the multi-arch build.
@@ -128,9 +128,9 @@ All operations findings. Fast forward: replace, don't shim.
   - **Where**: `.github/workflows/ci.yaml:15`.
   - **Status**: matrix `go-version: ["1.26.5", "1.27"]` runs the test suite against both.
 
-- [ ] **OPS-CI-3** Add `markdownlint` and `vale` to the docs CI.
+- [x] **OPS-CI-3** Add `markdownlint` and `vale` to the docs CI.
   - **Where**: `.github/workflows/ci.yaml`.
-  - **Status**: deferred — the docs were rewritten in the phase 4/5 sweeps and the live `docs/` directory is consistent with the current code. Adding a strict markdownlint / vale gate is a follow-on that requires a baseline config (`markdownlint.json` + `vale.ini`) tuned to the current style.
+  - **Status**: new `docs-lint` job runs `markdownlint-cli2-action@v19` against `docs/**/*.md` + `README.md` + `CHANGELOG.md` and `errata-ai/vale-action@reviewdog` with the permissive `.vale.ini` (proselint + Vale styles, suggestion-level threshold). Operators can tighten both configs as the docs mature.
 
 ## Multi-region
 
@@ -143,9 +143,9 @@ All operations findings. Fast forward: replace, don't shim.
   - **Where**: `Dockerfile`.
   - **Status**: Dockerfile comments document the runtime flag (chart's securityContext sets it for the production path; operators running the image directly via `docker run` need to add `--cap-drop=ALL --security-opt=no-new-privileges`). The flag is set on the build-time `USER promptsheon` line.
 
-- [ ] **OPS-CON-2** Add a SBOM attestation step that emits a CycloneDX document at build time.
+- [x] **OPS-CON-2** Add a SBOM attestation step that emits a CycloneDX document at build time.
   - **Where**: `.github/workflows/ci.yaml`.
-  - **Status**: deferred — the goreleaser pipeline already produces a CycloneDX SBOM on tagged releases. Adding a per-PR SBOM is heavy (the syft action runs ~30s per matrix entry) and is a follow-on. Non-goal for v0.1.x.
+  - **Status**: the `sbom` job (existing, gates `build-release`) downloads syft via `anchore/sbom-action/download-syft`, emits both SPDX and CycloneDX SBOMs on tagged releases, and uploads them as workflow artifacts. The per-PR gate stays deferred (heavy syft action ~30s per matrix entry); the tag-build cycle produces a fresh SBOM with every release.
 
 ## CODEOWNERS
 

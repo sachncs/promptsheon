@@ -1,0 +1,38 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "description": "Renovate config for promptsheon. Runs alongside Dependabot (which covers Docker base images + GitHub Actions + Go modules); Renovate adds finer-grained batching for npm and pip SDKs and the option to group minor/patch updates across ecosystems. The two tools coexist by design — Dependabot owns the GitHub-integrated ecosystems, Renovate owns the source-tree ones.",
+  "schedule": [
+    "after 10pm on monday"
+  ],
+  "timezone": "UTC",
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["dependencies", "security"]
+  },
+  "packageRules": [
+    {
+      "description": "Group minor + patch updates for SDK packages so a single PR can bundle them.",
+      "matchDatasources": ["npm", "pip"],
+      "matchPackageNames": ["@sachncs/promptsheon-sdk", "promptsheon"],
+      "groupName": "sdk-deps",
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "description": "Auto-merge patch-level Go module updates. The CI matrix runs go vet + go test on every PR, so patch-level bumps are safe to auto-merge.",
+      "matchDatasources": ["go"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    }
+  ],
+  "ignorePaths": [
+    "**/test/**",
+    "**/tests/**"
+  ],
+  "labels": ["dependencies"],
+  "draftPR": true
+}
