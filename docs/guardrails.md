@@ -1,156 +1,74 @@
 # Guardrails
 
-Guardrails enforce content policies, safety rules, and operational limits on prompts and LLM outputs. They run both statically (before LLM calls) and at runtime (on responses).
+Guardrails are a `Provider` plugin that wraps a Capability's
+LLM call. Two Guardrails ship in v0.1.x as built-in
+plugins through the supervisor; production tenants can add
+custom Guardrails via the plugin manifest.
 
-## Rule Types
+The two built-in Guardrails:
 
-| Type | Description |
-|---|---|
-| `prompt_length` | Blocks prompts exceeding a character limit |
-| `restricted_term` | Blocks content containing banned terms |
-| `model_access` | Restricts which models can be used per environment |
-| `hallucination_high` | Flags outputs with high hallucination scores |
-| `format_invalid` | Validates output format (JSON, markdown, regex) |
-| `cost_limit` | Blocks calls exceeding estimated cost |
-| `latency_limit` | Flags responses exceeding latency threshold |
-| `content_policy` | Enforces PII detection, harmful content blocking |
+- **`redactor`** (`internal/redactor`) — strips PII patterns
+  (emails, US SSNs, phone numbers, etc.) at the pre-LLM and
+  post-LLM boundaries.
+- **`injection`** (`internal/injection`) — flags
+  role-confusion attacks and common prompt-injection patterns.
+  Heuristic today; production deployments layer an LLM-judge
+  behind the same Guardrail interface.
 
-## Severity Levels
+## Plugin contract
 
-| Level | Description |
-|---|---|
-| `low` | Informational — logged but not blocking |
-| `medium` | Warning — logged and may block in strict mode |
-| `high` | Blocking — request is rejected |
-| `critical` | Immediate block — logged as security event |
+A Guardrail plugin implements the `Provider` interface
+(`Complete(ctx, *Request) (*Response, error)`); the daemon
+chains Guardrails around the base LLM `Provider` so the
+response flows through every registered Guardrail before
+returning to the caller.
 
-## Static Guardrails
+The plugin supervisor wires built-in Guardrails the same
+way it wires remote plugins: through the manifest. Built-ins
+declare `binary: <builtin>` and the supervisor resolves that
+to the in-process handler.
 
-Run before the LLM call. Check prompt content for violations:
+## Endpoints
 
-### Prompt Length
-
-```bash
-curl -X POST http://localhost:8080/api/v1/guardrails/check \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "your prompt content here...",
-    "model": "gpt-4o",
-    "environment": "prod"
-  }'
-```
-
-### Restricted Terms
-
-Banned terms are checked case-insensitively against prompt content.
-
-### Model Access Control
-
-Restrict models by environment:
-
-```json
-{
-  "prod": ["gpt-4", "claude-3-opus"],
-  "dev": ["gpt-3.5-turbo", "gpt-4", "claude-3-haiku"]
-}
-```
-
-Requests for disallowed models return a `model_access` violation.
-
-## Runtime Guardrails
-
-Run on LLM output after the call completes:
-
-### Response Format Validation
-
-Validates output matches expected format:
-
-| Format | Check |
-|---|---|
-| `json` | Response starts with `{` or `[` |
-| `markdown` | Response contains markdown structure characters |
-| regex | Response matches the provided regex pattern |
-
-### Content Policy
-
-| Policy | Description |
-|---|---|
-| `no_pii` | Detects SSNs, credit card numbers, email addresses |
-| `no_harmful` | Blocks content with harmful terms |
-
-### Cost and Latency Limits
-
-Block or flag calls exceeding configured thresholds:
-
-```bash
-# Cost limit: $0.05 per call
-curl -X POST http://localhost:8080/api/v1/guardrails/check \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "...",
-    "cost_limit": 0.05,
-    "latency_limit": 5000
-  }'
-```
-
-## Managing Rules
-
-### Create a Rule
-
-```bash
-curl -X POST http://localhost:8080/api/v1/guardrails/rules \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "block-profanity",
-    "type": "restricted_term",
-    "severity": "high",
-    "enabled": true,
-    "config": {
-      "terms": ["badword1", "badword2"]
-    }
-  }'
-```
-
-### List Rules
-
-```bash
-curl http://localhost:8080/api/v1/guardrails/rules
-```
-
-### Update a Rule
-
-```bash
-curl -X PUT http://localhost:8080/api/v1/guardrails/rules/{id} \
-  -H "Content-Type: application/json" \
-  -d '{"enabled": false}'
-```
-
-### Delete a Rule
-
-```bash
-curl -X DELETE http://localhost:8080/api/v1/guardrails/rules/{id}
-```
-
-## Violations
-
-### List Violations
-
-```bash
-curl http://localhost:8080/api/v1/guardrails/violations
-```
-
-### Resolve a Violation
-
-```bash
-curl -X PUT http://localhost:8080/api/v1/guardrails/violations/{id}/resolve
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/api/v1/plugins` | List registered plugins. |
+| `POST` | `/api/v1/plugins` | Register a plugin (manifest entry). |
+| `GET`  | `/api/v1/plugins/{name}` | Get a registered plugin. |
+| `DELETE` | `/api/v1/plugins/{name}` | Remove a plugin. Returns 204. |
 
 ## Metrics
 
-Guardrail activity is tracked via Prometheus metrics:
+The two built-in Guardrails emit metrics through the
+`promptsheon_guardrail_*` series:
 
-| Metric | Description |
-|---|---|
-| `guardrail_violations_total` | Total violations recorded |
-| `guardrail_blocks_total` | Total blocked requests |
-| `guardrail_passes_total` | Total passing checks |
+| Metric | Type | Notes |
+|--------|------|-------|
+| `promptsheon_guardrail_violations_total` | counter | Every Guardrail rejection. |
+| `promptsheon_guardrail_blocks_total` | counter | Every block. |
+| `promptsheon_guardrail_passes_total` | counter | Every pass. |
+
+`promptsheon_guardrail_violations_total` is what you alert on
+in production. A non-zero rate over 5 minutes indicates the
+Guardrail is catching things — a 0 rate over 24h is a
+stronger signal that the Guardrail isn't being invoked at
+all (probably misconfigured).
+
+## Operator guide
+
+- The `redactor` Guardrail is heuristic; production
+  deployments should layer an LLM-judge Guardrail behind the
+  same interface for sensitive use cases.
+- The `injection` Guardrail runs every user message through a
+  small set of canonical patterns. To add a new pattern,
+  edit `internal/injection/detector.go` and add the regex
+  plus a test.
+- Custom Guardrails register a `Provider` factory on the
+  manifest; see [docs/development.md](development.md) for the
+  plugin manifest format.
+
+The `promptsheon` v0.1.x does **not** expose a
+`/api/v1/guardrails/check` endpoint — Guardrail evaluation
+happens inline on the LLM call, not via a separate HTTP
+route. The metrics above are the only surface for Guardrail
+activity.

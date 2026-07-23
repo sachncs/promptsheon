@@ -1,199 +1,209 @@
 # Deployment
 
-## Production Build
+This page covers building, packaging, and running Promptsheon
+in production. The dev walkthrough is in
+[`docs/getting-started.md`](getting-started.md); the threat
+model + auth is in [`docs/security.md`](security.md).
+
+## Binaries
+
+Three binaries ship from this repo:
+
+| Binary | Path | Purpose |
+|--------|------|---------|
+| `promptsheond` | `cmd/promptsheond/` | Long-running server. |
+| `promptsheon` | `cmd/promptsheon/` | CLI dispatcher. |
+| `promptsheon-healthcheck` | `cmd/promptsheon-healthcheck/` | Container health probe. |
+
+Build:
 
 ```bash
-# Build optimized binaries
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o promptsheond ./cmd/promptsheond
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o promptsheon ./cmd/promptsheon
+go build -o promptsheond ./cmd/promptsheond
+go build -o promptsheon  ./cmd/promptsheon
+go build -o promptsheon-healthcheck ./cmd/promptsheon-healthcheck
+
+# ClickHouse rollup writer (optional build tag).
+go build -tags clickhouse -o promptsheond ./cmd/promptsheond
 ```
 
-## Systemd Service
+## Container
 
-Create `/etc/systemd/system/promptsheon.service`:
+The Dockerfile is a multi-stage build:
+
+1. `golang:1.26-alpine` — build stage.
+2. `gcr.io/distroless/static-debian12:nonroot` — runtime.
+
+Run:
+
+```bash
+docker run -d \
+  --name promptsheond \
+  -p 8080:8080 \
+  -v /var/lib/promptsheon:/data \
+  -e PROMPTSHEON_ADDR=:8080 \
+  -e PROMPTSHEON_AUTH=true \
+  -e PROMPTSHEON_TLS_CERT_FILE=/etc/promptsheon/tls.crt \
+  -e PROMPTSHEON_TLS_KEY_FILE=/etc/promptsheon/tls.key \
+  -e PROMPTSHEON_OPENAI_API_KEY="${OPENAI_API_KEY}" \
+  -e PROMPTSHEON_ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
+  ghcr.io/sachncs/promptsheon:latest
+```
+
+The container healthcheck uses `promptsheon-healthcheck` to
+hit `/health`:
+
+```yaml
+healthcheck:
+  test: ["/usr/local/bin/promptsheon-healthcheck", "--addr=http://localhost:8080"]
+  interval: 30s
+  timeout: 5s
+  retries: 3
+```
+
+## Helm chart
+
+`deploy/helm/promptsheon/` ships a single-replica chart
+(SQLite is the v0.1.x constraint; a Postgres parity follows).
+The chart renders ConfigMap, Secret, Service, Deployment,
+Ingress, and ServiceMonitor.
+
+Install:
+
+```bash
+helm repo add promptsheon https://sachncs.github.io/promptsheon
+helm install promptsheon promptsheon/promptsheon \
+  --set config.openaiApiKey="${OPENAI_API_KEY}" \
+  --set config.anthropicApiKey="${ANTHROPIC_API_KEY}"
+```
+
+The chart ships a PodDisruptionBudget and a ServiceMonitor
+for Prometheus scraping.
+
+## systemd unit
 
 ```ini
 [Unit]
-Description=Promptsheon Server
+Description=Promptsheon daemon
 After=network.target
 
 [Service]
 Type=simple
 User=promptsheon
 Group=promptsheon
+EnvironmentFile=/etc/promptsheon/env
 ExecStart=/usr/local/bin/promptsheond
 Restart=on-failure
-RestartSec=5
-
-Environment=PROMPTSHEON_ADDR=:8080
-Environment=PROMPTSHEON_DB_PATH=/var/lib/promptsheon/promptsheon.db
-Environment=PROMPTSHEON_AUTH=true
-Environment=PROMPTSHEON_LOG_LEVEL=info
-Environment=PROMPTSHEON_VAULT_KEY=your-vault-key-here
-Environment=OPENAI_API_KEY=sk-...
-
-ProtectSystem=strict
-ReadWritePaths=/var/lib/promptsheon
-NoNewPrivileges=true
-PrivateTmp=true
+RestartSec=5s
+LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
 ```
 
+The unit reads `PROMPTSHEON_*` env vars from
+`/etc/promptsheon/env`. Drop TLS cert + key into
+`/etc/promptsheon/tls.{crt,key}` with mode 0640 owned by
+`promptsheon:promptsheon`.
+
+## Reverse proxy
+
+Production tenants typically run the daemon behind a reverse
+proxy (nginx, Caddy, Envoy) that terminates TLS and forwards
+to the daemon over loopback. The daemon's
+`PROMPTSHEON_TLS_CERT_FILE` and `PROMPTSHEON_TLS_KEY_FILE`
+are only required when the daemon itself terminates TLS;
+behind a reverse proxy they're omitted.
+
+The reverse proxy must forward the client's source IP via
+`X-Forwarded-For`; the rate limiter and audit chain honour
+the header (set `RATELIMIT_TRUSTED_PROXIES` to the proxy's
+CIDR to prevent header-spoofing bypasses).
+
+## Health probes
+
+| Probe | Endpoint | Use |
+|-------|----------|-----|
+| Liveness | `GET /health` (or `GET /livez`) | Restart the container if the daemon becomes unresponsive. |
+| Readiness | `GET /ready` (or `GET /readyz`) | Stop sending traffic until the daemon's DB is reachable. |
+
+`promptsheon-healthcheck <addr>` returns `0` for healthy and
+`1` for unhealthy, so it works as a direct
+`ExecStartCommand` argument.
+
+## Observability integration
+
+The daemon's `GET /metrics` endpoint exposes the full
+Prometheus inventory. Pair it with:
+
+- `deploy/grafana/promptsheon-dashboard.json` — 10-panel
+  dashboard for the live metrics.
+- `deploy/prometheus/promptsheon-alerts.yaml` — three
+  first-class SLOs + four health alerts.
+
+The Grafana dashboard and the Prometheus rule file import
+via:
+
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable promptsheon
-sudo systemctl start promptsheon
+# Grafana
+curl -X POST http://grafana/api/dashboards/import \
+  -H 'Content-Type: application/json' \
+  -d @deploy/grafana/promptsheon-dashboard.json
+
+# Prometheus
+cp deploy/prometheus/promptsheon-alerts.yaml /etc/prometheus/
+prometheus reload
 ```
 
-## Docker
+## Multi-replica
 
-Create `Dockerfile`:
+v0.1.x is **single-replica** because of the SQLite constraint.
+The leader-election work (ADR-0030) ships in v0.3.0; the
+SLO dashboard has a "stale chain verification" alert that
+catches multi-replica misconfigurations (the leader should
+be running `/audit/verify` every minute).
 
-```dockerfile
-FROM golang:1.23-alpine AS builder
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o promptsheond ./cmd/promptsheond
+## Upgrades
 
-FROM alpine:3.19
-RUN apk add --no-cache ca-certificates
-COPY --from=builder /app/promptsheond /usr/local/bin/
-RUN adduser -D promptsheon
-USER promptsheon
-EXPOSE 8080
-VOLUME ["/data"]
-ENTRYPOINT ["promptsheond"]
-ENV PROMPTSHEON_DB_PATH=/data/promptsheon.db
-```
+Tagged `vX.Y.Z` releases are produced by `.goreleaser.yml`:
 
-```bash
-# Build
-docker build -t promptsheon:latest .
+- Multi-platform binaries (Linux, macOS, Windows; amd64, arm64).
+- A Docker image published to the configured registry.
+- `promptsheon_${VERSION}_checksums.txt` SBOM and `.deb` /
+  `.rpm` packages (when enabled).
+- A Git tag.
 
-# Run
-docker run -d \
-  --name promptsheon \
-  -p 8080:8080 \
-  -v promptsheon-data:/data \
-  -e PROMPTSHEON_AUTH=true \
-  -e PROMPTSHEON_VAULT_KEY=your-key \
-  -e OPENAI_API_KEY=sk-... \
-  promptsheon:latest
-```
+To upgrade:
 
-## Docker Compose
+1. Pull the new image / binary.
+2. Run `./promptsheond` against a copy of the data directory;
+   the next boot applies pending migrations.
+3. Cut over by restarting the production daemon with the
+   new binary.
+
+Rollback is `git checkout` on the old image tag; migrations
+are forward-only.
+
+## Persistent volume
+
+The daemon writes the SQLite database to
+`$PROMPTSHEON_DB_PATH` (default `promptsheon.db`). Mount a
+persistent volume at that path in containerised deployments:
 
 ```yaml
-version: "3.8"
-services:
-  promptsheon:
-    build: .
-    ports:
-      - "8080:8080"
-    volumes:
-      - promptsheon-data:/data
-    environment:
-      PROMPTSHEON_DB_PATH: /data/promptsheon.db
-      PROMPTSHEON_AUTH: "true"
-      PROMPTSHEON_VAULT_KEY: ${VAULT_KEY}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
 volumes:
-  promptsheon-data:
+  - name: db
+    persistentVolumeClaim:
+      claimName: promptsheon-db
 ```
 
-## Reverse Proxy (nginx)
+The vault's master key and the LLM API keys are stored in
+env vars, not in the database. Rotating the database
+(volumes) does not lose the keys.
 
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name promptsheon.example.com;
+## More
 
-    ssl_certificate     /etc/ssl/certs/promptsheon.pem;
-    ssl_certificate_key /etc/ssl/private/promptsheon.key;
-
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # SSE streaming endpoint
-    location /api/v1/logs/stream {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
-        proxy_buffering off;
-        proxy_cache off;
-        proxy_read_timeout 86400s;
-    }
-}
-```
-
-## Health Checks
-
-Use the health and readiness endpoints for load balancer configuration:
-
-| Endpoint | Purpose | Response |
-|---|---|---|
-| `GET /health` | Liveness — is the server running? | `200 {"status":"ok"}` |
-| `GET /ready` | Readiness — is the database accessible? | `200` when ready |
-
-## Backup
-
-SQLite database backup:
-
-```bash
-# Hot backup (safe while server is running)
-sqlite3 promptsheon.db ".backup backup.db"
-
-# Or stop server, copy, restart
-cp promptsheon.db promptsheon.db.bak
-```
-
-## Monitoring
-
-### Prometheus
-
-Scrape the metrics endpoint:
-
-```yaml
-scrape_configs:
-  - job_name: "promptsheon"
-    static_configs:
-      - targets: ["localhost:8080"]
-    metrics_path: "/metrics"
-```
-
-Key metrics to monitor:
-
-| Metric | Description |
-|---|---|
-| `http_requests_total` | Total HTTP requests by endpoint |
-| `http_request_duration_seconds` | Request latency histogram |
-| `llm_calls_total` | Total LLM provider calls |
-| `llm_call_duration_seconds` | LLM call latency |
-| `guardrail_violations_total` | Total guardrail violations |
-| `eval_runs_total` | Total evaluation runs |
-
-### Log Aggregation
-
-Logs are emitted as JSON to stderr. Pipe to your log aggregator:
-
-```bash
-./promptsheond 2>&1 | jq .
-```
-
-Log fields: `time`, `level`, `msg`, `err`, `method`, `path`.
+- [docs/configuration.md](configuration.md) — full env-var
+  reference.
+- [docs/observability.md](observability.md) — metrics, logs,
+  and traces.
+- [docs/security.md](security.md) — auth, audit chain, vault.

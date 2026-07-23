@@ -1,189 +1,192 @@
 # Development
 
-This page is the contributor's handbook. It assumes you have read [Architecture](architecture.md) and [Modules](modules.md) and have a passing familiarity with the package layout.
+This page covers the day-to-day development workflow: how to
+build, test, regenerate the OpenAPI spec, and run the daemon
+locally. The contribution policy is in
+[`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
-## Prerequisites
+## Requirements
 
-- **Go 1.26 or later.** Earlier versions will not compile.
-- **golangci-lint v1.60+.** Optional in the strictest sense (CI runs it) but expected on every developer machine.
-- **k6.** For load testing. See [Load testing](#load-testing).
-- **govulncheck.** For the `make security` target. `go install golang.org/x/vuln/cmd/govulncheck@latest`.
+- **Go 1.26+** (see `go.mod`).
+- A POSIX shell (the smoke test is bash).
+- `make` (the Makefile is the entry point for the common
+  workflows).
+- `golangci-lint` (see `.golangci.yml`).
 
-The Go module has one direct dependency: `modernc.org/sqlite`. There is no `go.sum` churn to manage by hand; `go mod tidy` is enough.
-
-## Clone and build
+## Build
 
 ```bash
-git clone https://github.com/sachncs/promptsheon.git
-cd promptsheon
-go build -o promptsheond ./cmd/promptsheond
-go build -o promptsheon  ./cmd/promptsheon
+# Build all three binaries.
+make build
+
+# Or build individually.
+go build -o promptsheond     ./cmd/promptsheond
+go build -o promptsheon      ./cmd/promptsheon
+go build -o promptsheon-healthcheck ./cmd/promptsheon-healthcheck
+
+# Build with the optional ClickHouse rollup writer.
+go build -tags clickhouse -o promptsheond ./cmd/promptsheond
 ```
 
-Both binaries are statically linked and need no C toolchain. Cross-compilation works with the standard `GOOS`/`GOARCH` env vars.
+## Test
 
-## Repository layout
+```bash
+# Run unit + contract + e2e tests.
+make test
+
+# Run with coverage.
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+
+# Run the contract test alone.
+go test ./tests/contract/...
+
+# Run the smoke test (boots a real daemon).
+bash tests/smoke/run.sh
+```
+
+The CI pipeline runs `go test -race -count=1 -coverprofile` plus
+the smoke layer. Coverage floor is 60%; PRs that drop below are
+flagged.
+
+## Lint
+
+```bash
+# Format, vet, lint in one shot.
+make check
+
+# Or individually.
+gofmt -w .
+go vet ./...
+golangci-lint run
+```
+
+The project enforces a gofmt-clean tree (`gofmt -l .` must
+return no files) and a `go vet` pass on every commit. Domain
+packages are kept infra-free (no imports from `internal/api`,
+`internal/store`, or `cmd/`); `make lint-domain` and
+`make lint-deps` enforce that.
+
+## Run the daemon locally
+
+```bash
+# Run on the default address.
+make run
+
+# Or with explicit env vars.
+PROMPTSHEON_ADDR=":8080" \
+PROMPTSHEON_AUTH=false \
+PROMPTSHEON_LOG_LEVEL=debug \
+./promptsheond
+```
+
+The first run creates `promptsheon.db` in the current
+directory. `rm -f promptsheon.db*` to start fresh.
+
+## Regenerate the OpenAPI spec
+
+```bash
+make openapi
+# Equivalent:
+go run ./scripts/genopenapi
+```
+
+The generator walks every `register*Routes()` method on
+`api.Server` and emits a per-route entry with the request
+struct fields (when extractable from the AST). The output is
+deterministic; running it twice produces byte-identical
+output. CI fails if the committed `api/openapi.yaml` is
+stale.
+
+When you add a new handler:
+
+1. Implement the handler.
+2. Register it in the appropriate `register*Routes()`.
+3. Run `make openapi`.
+4. Commit the regenerated `api/openapi.yaml` alongside the
+   handler.
+
+The contract test (`tests/contract/contract_test.go`) catches
+the case where the spec is out of date.
+
+## Project structure
 
 ```
 promptsheon/
 ├── cmd/
-│   ├── promptsheond/          # server daemon (main.go, e2e_test.go)
-│   └── promptsheon/           # CLI client
-├── internal/                  # server code, see docs/modules.md
-│   ├── api/                   # HTTP handlers, middleware, server.go
-│   ├── ...                    # see modules.md
-│   └── promptsheon/           # CAS engine used by the CLI
-├── sdk/                       # Go client SDK
-├── scripts/
-│   └── genopenapi/            # OpenAPI generator (AST-based)
-├── api/
-│   └── openapi.yaml           # generated, do not hand-edit
-├── test/                      # integration tests
-├── tests/
-│   └── load/                  # k6 load tests
-├── docs/                      # this documentation
-├── .github/
-│   └── workflows/ci.yaml      # CI
-├── .golangci.yml
+│   ├── promptsheond/   # Server binary
+│   ├── promptsheon/    # CLI binary
+│   ├── promptsheon-healthcheck/   # Container health probe
+│   └── promptsheon-auditbackfill/ # One-shot audit replay tool
+├── api/                # Generated OpenAPI spec
+├── internal/           # Server-side implementation
+│   └── ...             # (see docs/architecture.md for the package table)
+├── pkg/cas/            # Stable public CAS package
+├── sdk/                # Go SDK (plus python/, typescript/)
+├── deploy/             # Helm chart, Grafana dashboard, Prometheus alerts
+├── docs/               # Markdown documentation + ADRs
+├── examples/           # End-to-end recipes
+├── tests/              # contract/, e2e/, smoke/
+├── scripts/            # genopenapi, sync-version, ...
 ├── Makefile
-└── go.mod
+└── go.mod / go.sum
 ```
 
-## Code style
+## Adding a new handler
 
-- Follow [Effective Go](https://go.dev/doc/effective_go) and the [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments).
-- `gofmt -s` and `goimports` are mandatory. CI rejects PRs with unformatted code.
-- `golangci-lint run` must pass. The enabled linters are listed in `.golangci.yml`.
-- Every exported type and function must have a GoDoc comment.
-- Tests are table-driven where it makes sense. Use `t.Run` subtests.
-- Error wrapping: `fmt.Errorf("context: %w", err)`. Never `errors.New(fmt.Sprintf(...))` to wrap.
+1. Add the handler function in `internal/api/handlers_*.go`
+   (match the existing file's domain — capability, release,
+   harness, webhooks, etc.).
+2. Register the route in the corresponding `register*Routes()`
+   method on `internal/api/server.go`.
+3. Add validation rules if the body has required fields
+   (see `internal/api/validate.go`).
+4. Wire error responses to `HTTPError` so the daemon's
+   consistent shape (`{error, details?}`) is preserved.
+5. Run `make openapi` to regenerate the spec.
+6. Add a contract test entry if the SDK exposes the new
+   endpoint.
 
-## Test helpers
+## Adding a new SDK method
 
-The HTTP-server tests share a small set of helpers in `internal/api/`:
+1. Add the method to `sdk/client.go`.
+2. Add the method name to `sdkMandatoryMethods` in
+   `tests/contract/contract_test.go`.
+3. If the method hits an endpoint that wasn't previously
+   covered, either add it to the SDK or add it to
+   `knownGapRoutes` with a justification comment.
 
-| Helper | Where | Purpose |
-|---|---|---|
-| `setupTestServer(t)` | `internal/api/api_test.go` | Builds a `*Server` backed by a temp-dir SQLite, with a `*slog.Logger` at error level and a `llm.Mock` provider. Starts the audit worker pool. |
-| `setupTestServerWithDeps(t)` | `internal/api/api_comprehensive_test.go` | Same as `setupTestServer` but with extra collaborators (guardrails, search index) wired in. |
-| `setupTestServerMinimal(t)` | `internal/api/api_comprehensive_test.go` | Bare-bones server for handler-only tests; no workers, no mock LLM. |
-| `srv.StopAuditWorkers(ctx)` | `internal/api/server.go` | Drains the in-process audit queue and stops the worker goroutines. Call this before the SQLite handle is closed to avoid a race. |
+## Adding a new metric
 
-A minimal test:
+1. Add the field to `internal/metrics/collector.go` (counter,
+   histogram, or gauge).
+2. Initialise it in `NewCollector()`.
+3. Emit it in `prometheusFormat()`.
+4. Wire any counter/histogram increments in the producer code.
+5. If a new SLO alert depends on the metric, add it to
+   `deploy/prometheus/promptsheon-alerts.yaml`.
+6. If the metric is user-facing, add it to
+   `docs/observability.md`.
 
-```go
-func TestCreatePrompt(t *testing.T) {
-    srv, db := setupTestServer(t)
-    defer srv.StopAuditWorkers(context.Background())
-    defer db.Close()
+## Adding a new migration
 
-    body := `{"name":"greeting","content":"hi {{name}}"}`
-    req := httptest.NewRequest("POST", "/api/v1/prompts", strings.NewReader(body))
-    w := httptest.NewRecorder()
-    srv.ServeHTTP(w, req)
-    if w.Code != http.StatusCreated { t.Fatalf("got %d", w.Code) }
-}
-```
+1. Drop a `014_your_migration.up.sql` (and a `.down.sql`) in
+   `internal/store/migrations/`.
+2. Update the migration count in
+   `internal/store/store_test.go` (`TestNewSQLiteRunsAllMigrations`).
+3. Update the migration table in `docs/architecture.md`.
+4. The next `./promptsheond` boot applies it.
 
-## Testing strategy
+## Troubleshooting
 
-We use a layered approach. The full taxonomy is in [Testing](testing.md); the short version:
-
-| Layer | What | Where |
-|---|---|---|
-| Unit | Pure functions, no I/O | `internal/<pkg>/*_test.go` |
-| Integration | Full server, in-memory DB | `internal/api/api_test.go` |
-| End-to-end | CLI and server together | `cmd/promptsheond/e2e_test.go` |
-| Race | All tests with `-race` | `make test` |
-| Load | k6 scenarios | `tests/load/` |
-| Security | govulncheck, gosec | `make security` |
-
-The CI matrix runs `go test -race -count=1 -timeout 120s -coverprofile=coverage.out ./...` and fails if coverage drops below 70%.
-
-## Make targets
-
-| Target | What |
-|---|---|
-| `build` | Build both binaries. |
-| `build-server`, `build-cli` | Build one binary. |
-| `test` | `go test -race -count=1 ./...` |
-| `test-verbose` | Same, with `-v`. |
-| `test-integration` | `go test -v -race ./test/...` |
-| `lint` | `golangci-lint run` |
-| `fmt` | `gofmt -s -w .` and `goimports -w .` |
-| `vet` | `go vet ./...` |
-| `deps` | `go mod download` and `go mod verify` |
-| `clean` | Remove built binaries and `*.db` files. |
-| `coverage` | Generate HTML coverage report. |
-| `coverage-raw` | Show coverage per function in the terminal. |
-| `run` | `go run ./cmd/promptsheond` |
-| `cli` | `go run ./cmd/promptsheon` |
-| `openapi` | Regenerate `api/openapi.yaml` from the server routes. |
-| `openapi-check` | Same, then `git diff --exit-code`. Used in CI. |
-| `update-deps` | `go get -u ./...` and `go mod tidy` |
-| `security` | `govulncheck ./...` |
-| `help` | List targets. |
-
-## OpenAPI generator
-
-`scripts/genopenapi/` is a small Go program that walks the server's `internal/api/server.go` for `mux.HandleFunc` calls and the corresponding handler functions in `internal/api/handlers_*.go`. For each route, it emits an OpenAPI 3.0 path entry with a real request body schema (extracted from the handler's first argument via the `go/parser` AST).
-
-### Usage
-
-```bash
-make openapi          # writes api/openapi.yaml
-make openapi-check    # writes it and fails if the file is dirty
-
-# Or run the tool directly
-go run ./scripts/genopenapi -out api/openapi.yaml
-go run ./scripts/genopenapi -dry-run
-```
-
-### What it does not do
-
-- It does not read runtime routes. Only routes that are registered as `mux.HandleFunc("METHOD", "/path", handlerName)` are captured.
-- It does not introspect response types. Each route gets a default `200` response with a generic `application/json` body. This is deliberate — response shapes are documented in [API Reference](api-reference.md) and verified by integration tests.
-- It does not require running the server. The tool is a pure AST consumer and is trivially testable.
-
-When you add a new route:
-
-1. Register it in `internal/api/server.go`.
-2. Implement the handler in the appropriate `handlers_<topic>.go` file.
-3. Run `make openapi` and commit the regenerated `api/openapi.yaml`.
-4. Add an integration test in `internal/api/api_test.go` or a `handlers_<topic>_test.go`.
-
-CI runs `make openapi-check` on every PR. If the spec is out of date, the PR fails.
-
-## Migrations
-
-Database schema is in `internal/store/migrations/`, applied by the migration runner in `internal/store/sqlite.go` at server startup. Each migration is a single SQL file with the format `NNN_description.sql`. The runner records applied migrations in the `schema_migrations` table and skips already-applied ones.
-
-To add a migration:
-
-1. Create `internal/store/migrations/NNN_description.sql` with the next available number.
-2. Use `IF NOT EXISTS` clauses for any `CREATE TABLE` / `CREATE INDEX` so re-running a partially-applied migration is safe.
-3. For destructive changes (column drop, type change), add a new migration and keep both schemas working until the previous one is fully drained.
-4. Never edit a migration that has shipped. Write a new one.
-
-## Continuous integration
-
-`.github/workflows/ci.yaml` runs on every push and PR:
-
-1. `go vet ./...`
-2. `go test -race -count=1 -timeout 120s -coverprofile=coverage.out ./...`
-3. `gofmt -l .` — fails the build if any file is unformatted.
-4. Coverage threshold check (≥ 70%).
-5. `make openapi-check` — fails the build if the spec is out of date.
-6. (Future) `make security` — `govulncheck ./...`.
-
-## Release process
-
-Releases are cut with GoReleaser (`.goreleaser.yml` at the repo root). The version is taken from the most recent semver tag. The `CHANGELOG.md` entry is the only manual step; everything else is automated.
-
-## See also
-
-- [Testing](testing.md) — full test taxonomy
-- [Architecture](architecture.md) — system overview
-- [Modules](modules.md) — package map
-- [Security](security.md) — threat model and checklist
-- ADR [0006](adr/0006-modernc-sqlite-no-cgo.md), [0007](adr/0007-slog-as-observability-foundation.md)
+- **`go vet ./...` fails on a fresh checkout** — make sure
+  you're on Go 1.26+ (`go version`).
+- **The OpenAPI spec is out of date after a route change** —
+  run `make openapi` and commit the regenerated file.
+- **The contract test fails with a missing method** — add the
+  method to `sdk/client.go` (if the SDK should expose it) or
+  add it to `knownGapRoutes` with a comment explaining why
+  it's intentionally absent.
+- **The smoke layer fails to bind to `:18080`** — another
+  process is using the port. Stop it or set
+  `PROMPTSHEON_SMOKE_PORT=28080` before running.

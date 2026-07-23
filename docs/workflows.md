@@ -1,168 +1,83 @@
 # Workflows
 
-Promptsheon's workflow engine executes multi-step agent pipelines as a Directed Acyclic Graph (DAG). Steps with no dependencies run in parallel; dependent steps wait for their inputs.
+A Workflow is a sequence of named `Step`s. Each Step is
+executed in declaration order; a step failure short-circuits
+the remaining steps and the Workflow returns 422. The
+Workflow runs in-process (no external executor) and shares
+the daemon's context (request ID, user ID, audit chain).
 
-## Concepts
-
-### Agent
-
-An agent is a named collection of steps and tool references. Each step references a prompt and declares which other steps it depends on.
-
-### Step
-
-A single unit of work in a workflow:
+The current Step model is `{ID, Tool, Input, Output}`:
 
 ```json
 {
-  "id": "summarize",
-  "prompt_id": "prompt-abc123",
-  "depends_on": ["research"],
-  "tool_calls": [],
-  "output_key": "summary",
-  "condition": {
-    "field": "research.quality",
-    "operator": "gt",
-    "value": "0.5"
-  }
+  "id": "summarise-then-translate",
+  "steps": [
+    {
+      "id": "summarise",
+      "tool": "http",
+      "input": {
+        "method": "POST",
+        "url": "https://summariser.local/run",
+        "body": {"text": "{{input.doc}}"}
+      }
+    },
+    {
+      "id": "translate",
+      "tool": "shell",
+      "input": {
+        "command": "translate --target {{input.target_lang}} --in /tmp/summary.txt --out /tmp/translated.txt"
+      },
+      "output": "translated_path"
+    }
+  ]
 }
 ```
 
-| Field | Description |
-|---|---|
-| `id` | Unique step identifier |
-| `prompt_id` | Prompt to execute (or use tool_calls instead) |
-| `depends_on` | Step IDs that must complete before this step runs |
-| `tool_calls` | Tool invocations to execute |
-| `output_key` | Key under which this step's output is stored |
-| `condition` | Optional branching condition |
+When `output` is set, the step's result is written into the
+Workflow's outputs under that key, so a later step's input can
+reference `{{outputs.translated_path}}`.
 
-### Tool Calls
+## Endpoints
 
-Steps can invoke registered tools (HTTP, shell, JSON transform, prompt call):
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/workflows/run` | Run a workflow. Body: `Workflow.Definition`. Returns the Workflow Result with per-step outcomes. |
 
-```json
-{
-  "tool": "search",
-  "input": {"query": "{{input.topic}}"}
-}
-```
+## Built-in tools
 
-Tool output is stored under the step's `output_key` or the tool name.
+| Tool | Inputs | Output |
+|------|--------|--------|
+| `http` | `method`, `url`, `body?`, `headers?` | `body`, `status_code` |
+| `shell` | `command`, `env?`, `timeout_sec?` | `stdout`, `stderr`, `exit_code` |
+| `json_transform` | `input`, `expr` | the value of `expr` evaluated against `input` |
+| `prompt_call` | `release_id`, `inputs?` | the LLM's `output` field |
 
-### Conditions
+Tool invocations are sandboxed:
 
-Branching conditions allow steps to be skipped based on previous outputs:
+- The `shell` tool runs in a scrubbed environment — the
+  daemon's process env is filtered to a `PROMPTSHEON_*`
+  allowlist before exec.
+- The `shell` tool times out via `context.WithTimeout`; the
+  process group is killed on timeout (no forked children
+  outlive the cancellation).
+- The `http` tool refuses non-HTTPS to private / loopback
+  addresses — same SSRF rules as webhooks.
 
-```json
-{
-  "field": "research.confidence",
-  "operator": "gt",
-  "value": "0.7"
-}
-```
+## Operator guide
 
-Supported operators: `eq`, `neq`, `contains`, `gt`, `lt`, `exists`.
-
-### Template Variables
-
-Tool inputs support template interpolation:
-
-- `{{input.xxx}}` — reference workflow input
-- `{{step_context.yyy.zzz}}` — reference previous step output
-
-## Execution Model
-
-1. **DAG validation** — cycles are detected and rejected before execution. The validator uses a depth-first search and rejects on the first back-edge.
-2. **Topological sort** — steps are grouped into levels of independent steps (Kahn's algorithm). A step with no dependencies is on level 0; a step whose dependencies are all on level ≤ N-1 is on level N.
-3. **Level-by-level execution** — all steps in a level run concurrently. The next level starts only when the previous level is fully resolved.
-4. **Failure propagation** — if a step fails, all transitive descendants are marked `skipped` and never start.
-5. **Cancellation** — a cancelled `context.Context` is honoured by every step. In-flight steps are given a chance to clean up, then marked `cancelled`.
-
-See [Algorithms — Workflow DAG execution](algorithms.md#workflow-dag-execution) and ADR [0008](adr/0008-workflow-dag-with-topological-execution.md).
-
-### Status Values
-
-| Status | Description |
-|---|---|
-| `pending` | Waiting for dependencies |
-| `running` | Currently executing |
-| `completed` | Finished successfully |
-| `failed` | Encountered an error |
-| `skipped` | Dependency failed or condition not met |
-| `cancelled` | Workflow was cancelled |
-
-## API Usage
-
-### Execute a Workflow
+The `internal/workflow` package is the Workflow runtime. It
+is gated behind `PROMPTSHEON_HARNESS_PRECONDITIONS=true` —
+precondition execution is off by default so an unconfigured
+Workflow never runs any step.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/agents/{id}/execute \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input": {"topic": "quantum computing", "style": "technical"},
-    "provider": "openai",
-    "model": "gpt-4o"
-  }'
+# Enable preconditions + workflow execution.
+export PROMPTSHEON_HARNESS_PRECONDITIONS=true
+./promptsheond
 ```
 
-### Run a Standalone Workflow
-
-```bash
-curl -X POST http://localhost:8080/api/v1/workflows/run \
-  -H "Content-Type: application/json" \
-  -d '{
-    "steps": [
-      {"id": "step1", "prompt_id": "p1", "depends_on": []},
-      {"id": "step2", "prompt_id": "p2", "depends_on": ["step1"]}
-    ],
-    "input": {"query": "hello"}
-  }'
-```
-
-### Validate a Workflow
-
-```bash
-curl -X POST http://localhost:8080/api/v1/agents/validate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "steps": [
-      {"id": "a", "depends_on": ["b"]},
-      {"id": "b", "depends_on": ["a"]}
-    ]
-  }'
-```
-
-Returns an error if cycles are detected.
-
-### Cancel a Running Workflow
-
-```bash
-curl -X PUT http://localhost:8080/api/v1/workflows/{id}/cancel
-```
-
-## Tools
-
-Register tools in the tool registry before execution. Built-in tool types:
-
-| Type | Description |
-|---|---|
-| `http` | Make HTTP requests to external services |
-| `shell` | Execute shell commands. **Disabled by default.** See policy below. |
-| `json_transform` | Transform JSON data between steps |
-| `prompt_call` | Call another prompt as a sub-workflow |
-
-### Shell tool policy
-
-The `shell` tool can execute arbitrary commands. It is therefore disabled by default and the policy is **fail-closed**:
-
-- `PROMPTSHEON_SHELL_ENABLED=true` enables the tool only if `PROMPTSHEON_SHELL_ALLOWLIST` contains at least one command.
-- An empty allowlist with the tool "enabled" is coerced to disabled (the server logs a warning and forces the enabled flag to `false`).
-- The allowlist matches the **first token** of the command (the program name). Arguments are not constrained.
-
-```bash
-# Enable only `ls` and `cat` (no arguments constrained)
-PROMPTSHEON_SHELL_ENABLED=true
-PROMPTSHEON_SHELL_ALLOWLIST=ls,cat
-```
-
-See [Security](security.md#shell-tool-policy) for the rationale.
+Production tenants that want full DAG execution (DAG with
+`depends_on` between Steps, parallel branches, error
+retries) ship that as a follow-on. Today's `Step` is a
+linear sequence; the Workflow's `steps` field is the
+authoritative order.

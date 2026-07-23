@@ -1,120 +1,109 @@
-# CLI
+# CLI Reference
 
-The `promptsheon` binary is a Git-style client for a local `.promptsheon/` repository. It does not talk to the server. For server-side operations (creating prompts, running agents, evaluations) use the HTTP API or the [SDK](sdk.md).
+The `promptsheon` CLI is a hand-rolled command dispatcher under
+`cmd/promptsheon/main.go`. It talks to a running daemon over
+HTTP — it is **not** a standalone binary. Start the daemon
+first (`./promptsheond`), then run CLI commands.
+
+## Invocation
 
 ```bash
-promptsheon --help
+promptsheon [global flags] <command> [subcommand] [args]
 ```
 
-## Repository commands
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--base-url` | `http://127.0.0.1:8080` | Daemon base URL. |
+| `--api-key` | (none) | API key for `Authorization: Bearer`. Falls back to `PROMPTSHEON_API_KEY`. |
+| `--json` | `false` | Emit machine-readable JSON instead of the default human output. |
+| `--help` | | Show per-command help. |
 
-| Command | What it does |
-|---|---|
-| `init` | Initialize a new `.promptsheon/` directory in the current working directory. Idempotent: errors if already initialized. |
-| `status` | Show a one-line summary of the current branch, the head commit, and the working state. |
-| `log [n]` | Show the last `n` commit hashes and messages (default `10`). |
-| `graph` | Render the commit DAG as ASCII art. Useful for understanding branches. |
-| `stats` | Print repository counts (objects, refs, total bytes on disk). |
-| `verify` | Walk every object and confirm that each one's on-disk content hashes to its filename. Catches disk corruption. |
+## Commands
 
-## Object commands
-
-The CLI is content-addressable. You can write a blob and read it back by hash.
-
-| Command | What it does |
-|---|---|
-| `hash-object <data>` | Compute the SHA-256 hash of a blob. Does **not** write it. |
-| `write-object <data>` | Compute the hash, write the blob to `.promptsheon/objects/`, print the hash. |
-| `read-object <hash>` | Read an object from the store. |
-| `cat-file <hash>` | Output a blob's content to stdout. |
-| `ls-tree <hash>` | List the entries of a tree object. |
-| `show <hash>` | Pretty-print any object (blob / tree / commit). |
-
-## Branch and ref commands
-
-| Command | What it does |
-|---|---|
-| `branch` | List all branches. The current one is marked `*`. |
-| `branch <name> [hash]` | Create a branch pointing at `hash` (or the current head). |
-| `delete-branch <name>` | Delete a branch. Refuses to delete the current branch. |
-| `checkout <ref\|hash>` | Switch the HEAD to a branch or a detached commit. |
-| `commit <tree> [msg]` | Create a commit on the current branch. `tree` is the hash of a tree object. |
-
-## Diff and inspection
-
-| Command | What it does |
-|---|---|
-| `diff <hashA> <hashB>` | Diff two states. Reports prompt content, telemetry, and any structural changes. |
-| `diff` (no args) | Diff the working tree against the current head. |
-
-## Server-side helpers
-
-These commands talk to the configured LLM provider via environment variables. They do **not** require the server to be running.
-
-| Command | What it does |
-|---|---|
-| `run --provider <p> --model <m> --prompt <text>` | Run a one-shot prompt against an LLM provider. Useful for testing connectivity and the fallback chain. |
-| `provider list` | List registered providers (those with credentials in the environment). |
-| `provider test <name>` | Send a tiny test prompt and report latency. |
-
-## Exit codes
-
-| Code | Meaning |
-|---|---|
-| `0` | Success. |
-| `1` | Command error or unknown command. |
-| non-zero | Reserved for future use. |
-
-The error message is written to stderr in the form `error: <message>`.
+| Command | Description |
+|---------|-------------|
+| `promptsheon workspace list` | List Workspaces. |
+| `promptsheon workspace get <id>` | Get one Workspace. |
+| `promptsheon workspace create <name>` | Create a Workspace. |
+| `promptsheon project list <workspace_id>` | List Projects under a Workspace. |
+| `promptsheon project create <workspace_id> <name>` | Create a Project. |
+| `promptsheon capability list <project_id>` | List Capabilities under a Project. |
+| `promptsheon capability get <id>` | Get one Capability. |
+| `promptsheon capability create <project_id> <name>` | Create a Capability. |
+| `promptsheon version list <capability_id>` | List Versions. |
+| `promptsheon version get <id>` | Get one Version. |
+| `promptsheon version add <capability_id> <manifest.json>` | Add a Version from a manifest JSON file. |
+| `promptsheon release create <version_id> '<json>'` | Create a Pending Release. JSON: `{"environment":"prod"}`. |
+| `promptsheon release vote <release_id> <identity> <decision>` | Cast a vote. `<decision>` is `approve` or `reject`. |
+| `promptsheon release activate <release_id>` | Transition Pending → Active. 409 if MakerChecker quorum not satisfied. |
+| `promptsheon release rollback <release_id>` | Transition Active → RolledBack. |
+| `promptsheon release approval <release_id>` | Show the vote trail. |
+| `promptsheon release invoke <release_id> '<inputs-json>'` | Invoke a Release. JSON: `{"inputs": {...}}`. |
+| `promptsheon dataset create <capability_id> <name> [cases.json]` | Create a Dataset. |
+| `promptsheon dataset list <capability_id>` | List Datasets. |
+| `promptsheon dataset get <id>` | Get one Dataset (with cases). |
+| `promptsheon dataset put-cases <dataset_id> [cases.json]` | Replace cases atomically. |
+| `promptsheon dataset delete <id>` | Delete a Dataset. |
+| `promptsheon precondition add <capability_id> <name> <command> [timeout_sec]` | Add a Precondition. |
+| `promptsheon precondition list <capability_id>` | List Preconditions. |
+| `promptsheon precondition update <id> '<json>'` | Update a Precondition (partial fields). |
+| `promptsheon precondition delete <id>` | Delete a Precondition. |
+| `promptsheon eval run <release_id> <dataset_id> [scorer]` | Run an Eval. `<scorer>` is `exact_match`, `contains`, `regex`, or `json_schema`. |
+| `promptsheon eval list <release_id>` | List EvalRuns for a Release. |
+| `promptsheon eval get <id>` | Get an EvalRun with per-case results. |
+| `promptsheon provider list` | List registered LLM provider names. |
+| `promptsheon provider test <name> --model <model>` | Smoke-test a provider. `--model` is required. |
+| `promptsheon webhook list` | List webhook endpoints. |
+| `promptsheon webhook add '<json>'` | Register a webhook. JSON: `{"url":"https://...","events":["eval.completed",...],"secret?":"..."}`. |
+| `promptsheon webhook delete <id>` | Remove a webhook. |
+| `promptsheon vault add '<json>'` | Save a provider key. JSON: `{"provider_name":"openai","key_name":"prod","key":"sk-..."}`. |
+| `promptsheon vault list` | List provider keys. |
+| `promptsheon vault delete <id>` | Delete a provider key. |
+| `promptsheon user list` | List users. |
+| `promptsheon user create '<json>'` | Create a user. |
+| `promptsheon user get <id>` | Get a user. |
+| `promptsheon user update <id> '<json>'` | Update a user. |
+| `promptsheon user delete <id>` | Delete a user. |
+| `promptsheon alert list-rules` | List alert rules. |
+| `promptsheon alert add-rule '<json>'` | Create an alert rule. |
+| `promptsheon alert list-active` | List active (firing) alerts. |
+| `promptsheon alert resolve <id>` | Resolve an active alert. |
+| `promptsheon audit list [filters]` | List audit entries. Filters: `--user-id`, `--resource`, `--action`, `--since`, `--until`, `--limit`. |
+| `promptsheon audit verify` | Verify the chain. |
+| `promptsheon health` | Daemon liveness. |
+| `promptsheon version` | Daemon build version. |
 
 ## Examples
 
-### Bootstrap a repository
-
 ```bash
-mkdir my-agent && cd my-agent
-promptsheon init
-# initialized empty promptsheon repository in .promptsheon/
+# 1. Health probe.
+promptsheon health
+# healthy
+
+# 2. Drive a full Release lifecycle.
+promptsheon workspace create acme
+promptsheon project create w1 summariser
+promptsheon capability create p1 summariser
+promptsheon version add c1 manifest.json
+REL=$(promptsheon release create v1 '{"environment":"prod"}' | jq -r .id)
+promptsheon release vote $REL bob approve
+promptsheon release activate $REL
+promptsheon release invoke $REL '{"q":"hello"}'
+
+# 3. Run an Eval.
+promptsheon dataset create c1 greeting cases.json
+promptsheon eval run $REL <dataset_id> exact_match
+
+# 4. Audit chain.
+promptsheon audit verify
+# {"ok":true, "last_row_id":42, "last_hash":"..."}
 ```
 
-### Stage a prompt and commit
+## Scripting
+
+Every command supports `--json` for machine-readable output.
+Combine with `jq` for ad-hoc filtering:
 
 ```bash
-PROMPT='You are a concise assistant. Answer: {{question}}'
-HASH=$(promptsheon write-object "$PROMPT")
-TREE=$(promptsheon commit-tree $HASH)   # pseudo; use the helper you have
-promptsheon commit $TREE "initial prompt"
+promptsheon --json capability list p1 | jq '.[] | {id, name}'
 ```
-
-### Inspect the DAG
-
-```bash
-promptsheon log
-# a1b2c3d  initial prompt
-# 9f8e7d6  add evaluation step
-
-promptsheon graph
-```
-
-### Verify integrity
-
-```bash
-promptsheon verify
-# 1342 objects checked, 0 errors
-```
-
-## Environment
-
-| Variable | Purpose |
-|---|---|
-| `PROMPTSHEON_AUTHOR` | Default author name and email for commits. |
-| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc. | Provider credentials for `run` and `provider test`. |
-| `PROMPTSHEON_OLLAMA_BASE_URL` | Override the default Ollama URL (`http://localhost:11434`). |
-
-The CLI does **not** read `PROMPTSHEON_DB_PATH`, `PROMPTSHEON_ADDR`, or any of the server-only env vars. It operates on a local directory.
-
-## See also
-
-- [Architecture](architecture.md) — the object model
-- [Algorithms — CAS](algorithms.md#cas-content-addressable-storage) (in the broader algorithms page)
-- ADR [0001](adr/0001-use-cas-for-prompt-history.md) — why CAS
