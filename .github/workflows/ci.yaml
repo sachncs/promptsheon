@@ -78,6 +78,50 @@ jobs:
           git diff --exit-code api/openapi.yaml || \
             (echo "api/openapi.yaml is out of date. Run 'make openapi' and commit the result."; exit 1)
 
+      - name: Contract test
+        # API-9: the contract test walks every registered
+        # OpenAPI route and verifies the SDK surface aligns
+        # with the daemon. Fails CI on drift.
+        run: go test -count=1 -timeout 60s ./tests/contract/...
+
+      - name: SDK Python codegen + compile
+        # API-7a: openapi-python-client regenerates the Python
+        # SDK from api/openapi.yaml. compileall catches
+        # syntax errors that codegen might emit.
+        run: bash sdk/python/scripts/codegen.sh
+
+      - name: SDK TypeScript codegen + typecheck
+        # API-7b: openapi-typescript regenerates the TS SDK
+        # from api/openapi.yaml. tsc --noEmit catches type
+        # errors that codegen might emit.
+        run: bash sdk/typescript/scripts/codegen.sh
+
+  smoke:
+    # API-6b: smoke-test the example bash scripts against a
+    # freshly-started daemon. The job is intentionally its
+    # own target (not part of the `test` job) because it
+    # builds promptsheond, boots it on a loopback port,
+    # runs every examples/bash/*.sh, and tears it down —
+    # 6s of wall clock per PR is too much to bolt onto the
+    # default test path.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26.5"
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build promptsheond
+        run: go build -o ./promptsheond ./cmd/promptsheond
+
+      - name: Run smoke tests
+        run: bash tests/smoke/run.sh
+
   lint:
     runs-on: ubuntu-latest
     steps:
