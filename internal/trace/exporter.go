@@ -72,12 +72,12 @@ func InitTracerProvider(serviceName, endpoint string, insecureConn bool) (*sdktr
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter),
 		sdktrace.WithResource(res),
-		// Default to ParentBased(TraceIDRatioBased(0.05)) so a
-		// single noisy deployment does not ship every span to the
-		// collector. PROMPTSHEON_OTEL_SAMPLE_RATIO overrides this.
-		// The previous default of AlwaysSample() meant production
-		// traffic generated 100% of spans, which is the single
-		// biggest cost on most OTel deployments.
+		// OBS-TR-3: PROMPTSHEON_OTEL_SAMPLE_RATIO (default 1.0)
+		// controls the sampling ratio. ParentBased ensures a span
+		// sampled by an upstream caller is kept; TraceIDRatioBased
+		// applies the ratio at root. Operators with noisy
+		// deployments can dial the ratio down without restarting
+		// the collector (e.g. PROMPTSHEON_OTEL_SAMPLE_RATIO=0.05).
 		sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(sampleRatio))),
 	)
 
