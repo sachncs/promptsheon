@@ -85,6 +85,20 @@ func newMockRepo() *mockRepo {
 func (m *mockRepo) Close() error                 { return m.closeErr }
 func (m *mockRepo) Ping(_ context.Context) error { return m.pingErr }
 
+// Settings (operator-tunable runtime config, A1).
+func (m *mockRepo) GetSystemConfig(_ context.Context, key string) (string, time.Time, error) {
+	return "", time.Time{}, sql.ErrNoRows
+}
+func (m *mockRepo) SetSystemConfig(_ context.Context, _, _, _ string) error {
+	return nil
+}
+func (m *mockRepo) DeleteSystemConfig(_ context.Context, _ string) error {
+	return sql.ErrNoRows
+}
+func (m *mockRepo) ListSystemConfig(_ context.Context) ([]models.SystemConfig, error) {
+	return nil, nil
+}
+
 // Users
 func (m *mockRepo) CreateUser(_ context.Context, u *models.User) error {
 	m.mu.Lock()

@@ -1286,3 +1286,80 @@ func (s *SQLite) setEnforcerPayload(ctx context.Context, workspaceID, kind strin
 	}
 	return nil
 }
+
+// GetSystemConfig returns the value + updated_at for one key. If
+// the row doesn't exist, sql.ErrNoRows is returned; the
+// settings resolver treats ErrNoRows as "use the env default".
+// The mode-agnostic store layer doesn't read Config.SettingsMode;
+// the API layer enforces the env-only write gate before calling
+// SetSystemConfig / DeleteSystemConfig.
+func (s *SQLite) GetSystemConfig(ctx context.Context, key string) (string, time.Time, error) {
+	var (
+		value     string
+		updatedAt time.Time
+	)
+	err := s.db.QueryRowContext(ctx,
+		`SELECT value, updated_at FROM system_config WHERE key = ?`, key,
+	).Scan(&value, &updatedAt)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return value, updatedAt, nil
+}
+
+// SetSystemConfig upserts one key. The (value, updated_by) pair
+// is the canonical record; updated_at is auto-set by the column
+// default.
+func (s *SQLite) SetSystemConfig(ctx context.Context, key, value, updatedBy string) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO system_config (key, value, updated_at, updated_by)
+		 VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+		 ON CONFLICT(key) DO UPDATE SET
+		   value = excluded.value,
+		   updated_at = excluded.updated_at,
+		   updated_by = excluded.updated_by`,
+		key, value, updatedBy,
+	)
+	if err != nil {
+		return fmt.Errorf("set system_config %q: %w", key, err)
+	}
+	return nil
+}
+
+// DeleteSystemConfig removes one row. sql.ErrNoRows is returned
+// when the key was never set; the API layer treats that as 404.
+func (s *SQLite) DeleteSystemConfig(ctx context.Context, key string) error {
+	res, err := s.db.ExecContext(ctx,
+		`DELETE FROM system_config WHERE key = ?`, key,
+	)
+	if err != nil {
+		return fmt.Errorf("delete system_config %q: %w", key, err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// ListSystemConfig returns every row. The settings resolver
+// subscribes to the Notifier (commit A2) so a write to one key
+// doesn't require a full reload.
+func (s *SQLite) ListSystemConfig(ctx context.Context) ([]models.SystemConfig, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT key, value, updated_at, updated_by FROM system_config ORDER BY key`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list system_config: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []models.SystemConfig
+	for rows.Next() {
+		var sc models.SystemConfig
+		if err := rows.Scan(&sc.Key, &sc.Value, &sc.UpdatedAt, &sc.UpdatedBy); err != nil {
+			return nil, err
+		}
+		out = append(out, sc)
+	}
+	return out, rows.Err()
+}

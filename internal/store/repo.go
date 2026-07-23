@@ -3,6 +3,7 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/sachncs/promptsheon/internal/approval"
 	"github.com/sachncs/promptsheon/internal/capability"
@@ -114,4 +115,13 @@ type Repository interface {
 	// Lifecycle
 	Ping(ctx context.Context) error
 	Close() error
+
+	// Settings (operator-tunable runtime config). SettingsMode
+	// is enforced at the API layer; the store layer is mode-agnostic
+	// so tests can drive GetSystemConfig / SetSystemConfig /
+	// DeleteSystemConfig directly.
+	GetSystemConfig(ctx context.Context, key string) (string, time.Time, error)
+	SetSystemConfig(ctx context.Context, key, value, updatedBy string) error
+	DeleteSystemConfig(ctx context.Context, key string) error
+	ListSystemConfig(ctx context.Context) ([]models.SystemConfig, error)
 }
