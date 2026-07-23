@@ -7,10 +7,9 @@
 // that have not been pulled have wide posteriors (high variance)
 // which is the natural exploration mechanism.
 //
-// This is the Tier 2.35 foundation of the M4 bandit recommender.
 // The full bandit engine (with persistent posteriors, restarts,
 // and bandit-aware Recommendations) ships in a follow-on commit;
-// today's commit adds the selection algorithm and unit tests so
+// this package adds the selection algorithm and unit tests so
 // the abtesting.Engine is the only consumer.
 package bandit
 

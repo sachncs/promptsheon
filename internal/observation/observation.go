@@ -10,9 +10,9 @@
 //
 // Aggregation is in-memory and runs in the same goroutine as the
 // executor's caller; for production scale the aggregator will be
-// backed by ClickHouse (Tier 3 follow-on). For v1 the aggregator is
-// the right shape for unit tests and for self-hosted single-node
-// deployments where petabytes per day is not the target.
+// backed by ClickHouse. For v1 the aggregator is the right shape
+// for unit tests and for self-hosted single-node deployments where
+// petabytes per day is not the target.
 package observation
 
 import (

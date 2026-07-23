@@ -6,9 +6,8 @@
 // and a burn-rate alert helper used by the policy bundle and
 // Recommendation engine v2.
 //
-// This is Tier 2.49 of the architecture review board; the
-// Recommendation engine v2 (bandit) is in M4 follow-on work
-// (ADR-0019).
+// The Recommendation engine v2 (bandit) is a follow-on to the v1
+// rules-based engine.
 package slo
 
 import (

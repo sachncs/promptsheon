@@ -1,18 +1,15 @@
 // Package executor consumes schedule.fired events and webhook
 // invocations and produces Execution records.
 //
-// The Executor is the missing runtime link of M2 — the Scheduler
-// publishes events but nothing consumed them. This package closes
-// that loop. Each invocation is a function of (Release, input)
-// plus provider-side randomness; the ReplayBuffer (internal/replay)
+// Each invocation is a function of (Release, input) plus
+// provider-side randomness; the ReplayBuffer (internal/replay)
 // keys the resulting Record on ExecutionHash so identical inputs
 // reproduce identically.
 //
-// Persistence is intentionally not wired in this commit. The
-// Executor returns an ExecutionRecord value; a follow-on commit
-// wires the SQLite / Postgres Repository and adds the audit chain
-// adapter. Today's commit ships the value type, the gated caller
-// path, and the unit tests.
+// Persistence is not wired here. The Executor returns an
+// ExecutionRecord value; a follow-on commit wires the Repository
+// and adds the audit chain adapter. This package ships the value
+// type, the gated caller path, and the unit tests.
 package executor
 
 import (

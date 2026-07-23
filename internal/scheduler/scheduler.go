@@ -3,9 +3,8 @@
 // One Scheduler instance ticks every TickInterval; on each tick it
 // reads due Schedules (NextFireAt <= now) from the store and emits
 // execution.started events for each. The handler that turns events
-// into actual Executions lives in pkg/executor (M2 follow-on; for
-// now the Scheduler publishes a *replay.Record shape that the
-// Execution path picks up).
+// into actual Executions lives in internal/executor; the Scheduler
+// publishes a *replay.Record shape that the Execution path picks up.
 //
 // The Scheduler lives in cmd/promptsheond; production wires it into
 // the daemon at boot via WithScheduler().
