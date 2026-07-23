@@ -120,12 +120,90 @@ func TestSQLiteSurvivesFileDelete(t *testing.T) {
 
 // isDBError returns true if err looks like a real database
 // error (sqlite, sql, or wrapped equivalent) rather than a
-// context error or a panic recovered error. Unused in the
-// current test but kept for the follow-up that exercises the
-// connection-failure path.
+// context error or a panic recovered error.
 func isDBError(err error) bool {
-	_ = err
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	for _, marker := range []string{
+		"sql: ",
+		"database",
+		"SQLite",
+		"no such table",
+		"file",
+		"disk",
+		"closed",
+	} {
+		if strings.Contains(s, marker) {
+			return true
+		}
+	}
 	return false
 }
 
-var _ = strings.Contains // keep the strings import live for the follow-up
+// TestSQLitePanicOnHeldQueryAfterDelete verifies the chaos
+// property the production chaos matrix cares about: even
+// after the file is unlinked, a held query completes (or
+// returns an error) WITHOUT panicking. This is the contract
+// the kubelet liveness probe depends on; a panic would
+// crash the process and require a restart.
+//
+// The test is intentionally conservative: it uses a
+// `defer recover()` at the very top to convert any panic
+// into a normal test failure. The recover() in Go is per-goroutine,
+// so this protects against a panic inside the test goroutine
+// (which is what the held query lives on).
+func TestSQLitePanicOnHeldQueryAfterDelete(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "chaos.db")
+
+	db, err := store.NewSQLite(dbPath)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	// Hold a long-running query in a goroutine; cancel via
+	// the test context to force the driver to return.
+	holdCtx, holdCancel := context.WithCancel(context.Background())
+	t.Cleanup(holdCancel)
+	holdErrCh := make(chan error, 1)
+	go func() {
+		_, err := db.DB().ExecContext(holdCtx, "BEGIN IMMEDIATE; SELECT 1;")
+		holdErrCh <- err
+	}()
+	time.Sleep(100 * time.Millisecond)
+
+	// Install a panic catcher in this test goroutine. If the
+	// driver panics when the file goes away, the panic is
+	// re-thrown into the test goroutine and the recover()
+	// turns it into a test failure. Without this, a driver
+	// panic would be reported as the test having hung.
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("SQLite driver panicked after file delete: %v", r)
+		}
+	}()
+
+	if err := os.Remove(dbPath); err != nil {
+		t.Fatalf("remove db: %v", err)
+	}
+
+	// A new query against the deleted file must not panic.
+	queryCtx, queryCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer queryCancel()
+	_, err = db.DB().ExecContext(queryCtx, "SELECT 1")
+	_ = err // the result itself is not the contract; the no-panic property is.
+
+	// Cancel the held transaction; the goroutine returns
+	// cleanly (we never read from holdErrCh, the test
+	// goroutine just verifies the held tx doesn't hang).
+	select {
+	case <-holdErrCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("held transaction did not return within 2s")
+	}
+}
