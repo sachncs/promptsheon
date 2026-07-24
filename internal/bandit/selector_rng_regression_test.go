@@ -60,6 +60,39 @@ func TestSelectAdvancesRNGState(t *testing.T) {
 	}
 }
 
+// TestSelectWithSameSeedIsReproducible locks in BANDIT-RNG-1:
+// two Selectors built with the same RNG seed produce identical
+// draw sequences. The previous bug (fresh per-call PCG from
+// time.Now) made reproducibility impossible; the current
+// selector-owned PCG is deterministic across construction.
+//
+// Two selectors with the same arms and the same RNG produce
+// the same sequence of arm picks. This is the property the
+// bandit store relies on for replay — given a known seed,
+// the arm sequence is reconstructible.
+func TestSelectWithSameSeedIsReproducible(t *testing.T) {
+	t.Parallel()
+	arms := []string{"a", "b", "c", "d", "e"}
+	rng1 := rand.New(rand.NewPCG(42, 99))
+	rng2 := rand.New(rand.NewPCG(42, 99))
+	s1 := NewSelectorWithRNG(arms, rng1)
+	s2 := NewSelectorWithRNG(arms, rng2)
+	const N = 64
+	for i := 0; i < N; i++ {
+		a1, err := s1.Select()
+		if err != nil {
+			t.Fatalf("s1 Select: %v", err)
+		}
+		a2, err := s2.Select()
+		if err != nil {
+			t.Fatalf("s2 Select: %v", err)
+		}
+		if a1 != a2 {
+			t.Fatalf("seeded determinism broken at i=%d: s1=%s s2=%s", i, a1, a2)
+		}
+	}
+}
+
 // TestSelectConcurrentDiffer guards the concurrent path. Two
 // goroutines hammering Select with no observations must each
 // see a sequence of draws (i.e. Select does not hold a per-call
