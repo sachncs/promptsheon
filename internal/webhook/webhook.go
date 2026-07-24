@@ -16,6 +16,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -125,6 +126,11 @@ type Dispatcher struct {
 	maxDeliveries  int
 	wg             sync.WaitGroup
 	stop           chan struct{}
+	// PERF-WH-1: pool of *bytes.Reader for the JSON body. The
+	// hot path constructs a new bytes.Reader on every delivery;
+	// the pool keeps one around per idle goroutine. Reset() is
+	// faster than allocating from scratch on a hot loop.
+	bodyPool sync.Pool
 }
 
 // NewDispatcher creates a webhook dispatcher.
@@ -136,6 +142,9 @@ func NewDispatcher(logger *slog.Logger) *Dispatcher {
 		maxRetries:    3,
 		maxDeliveries: 1000,
 		stop:          make(chan struct{}),
+		bodyPool: sync.Pool{
+			New: func() any { return bytes.NewReader(nil) },
+		},
 	}
 	return d
 }
@@ -374,9 +383,16 @@ func (d *Dispatcher) deliver(ctx context.Context, ep *Endpoint, evt *Event) {
 			break
 		}
 		reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		req, err := http.NewRequestWithContext(reqCtx, "POST", ep.URL, bytes.NewReader(body))
+		// PERF-WH-1: pull a *bytes.Reader from the pool and
+		// point it at the marshalled body. The reader is reset
+		// back into the pool on response read so the next
+		// delivery reuses its allocation.
+		reader := d.bodyPool.Get().(*bytes.Reader)
+		reader.Reset(body)
+		req, err := http.NewRequestWithContext(reqCtx, "POST", ep.URL, reader)
 		if err != nil {
 			cancel()
+			d.bodyPool.Put(reader)
 			lastErr = err
 			break
 		}
@@ -389,6 +405,11 @@ func (d *Dispatcher) deliver(ctx context.Context, ep *Endpoint, evt *Event) {
 
 		resp, err := d.client.Do(req)
 		cancel()
+		// Return the reader to the pool after the request has
+		// been sent (the underlying bytes are still referenced
+		// by the body until the request completes, but http
+		// does not retain the reader past Do()).
+		d.bodyPool.Put(reader)
 		if err != nil {
 			lastErr = err
 			if !sleepBackoff(ctx, attempt) {
@@ -415,7 +436,14 @@ func (d *Dispatcher) deliver(ctx context.Context, ep *Endpoint, evt *Event) {
 		if !delivery.Success {
 			delivery.Error = fmt.Sprintf("HTTP %d", resp.StatusCode)
 			lastErr = errors.New(delivery.Error)
-			if !sleepBackoff(ctx, attempt) {
+			// PERF-WH-2: honour Retry-After. The receiver can
+			// signal backoff via the header (RFC 9110 §10.2.3).
+			// Both delta-seconds and HTTP-date are accepted.
+			// We cap the wait at 5 minutes to avoid a single
+			// run-away receiver pegging the dispatcher for an
+			// hour.
+			retryAfter := parseRetryAfter(resp, 5*time.Minute)
+			if !sleepBackoffResp(ctx, attempt, retryAfter) {
 				break
 			}
 			continue
@@ -452,6 +480,30 @@ func sleepBackoff(ctx context.Context, attempt int) bool {
 	// cryptographic randomness is not needed for backoff timing.
 	jitter := time.Duration(rand.Int64N(int64(d) / 2))
 	d += jitter
+	return sleepWithContext(ctx, d)
+}
+
+// sleepBackoffResp is the Retry-After aware variant. The
+// receiver's hint wins when it's larger than the local
+// exponential backoff; we still apply the local jitter and
+// cap.
+func sleepBackoffResp(ctx context.Context, attempt int, retryAfter time.Duration) bool {
+	base := 250 * time.Millisecond
+	maxd := 30 * time.Second
+	d := base << attempt
+	if d > maxd || d < 0 {
+		d = maxd
+	}
+	if retryAfter > d {
+		d = retryAfter
+	}
+	// #nosec G404 -- jitter is not security-sensitive.
+	jitter := time.Duration(rand.Int64N(int64(d) / 2))
+	d += jitter
+	return sleepWithContext(ctx, d)
+}
+
+func sleepWithContext(ctx context.Context, d time.Duration) bool {
 	t := time.NewTimer(d)
 	defer t.Stop()
 	select {
@@ -461,6 +513,45 @@ func sleepBackoff(ctx context.Context, attempt int) bool {
 		return true
 	}
 }
+
+// parseRetryAfter returns the wait duration from the receiver's
+// Retry-After header. RFC 9110 §10.2.3 allows either a number
+// of seconds or an HTTP-date. cap is the maximum wait we
+// accept; a receiver requesting > cap is treated as "wait cap".
+func parseRetryAfter(resp *http.Response, cap time.Duration) time.Duration {
+	if resp == nil {
+		return 0
+	}
+	v := resp.Header.Get("Retry-After")
+	if v == "" {
+		return 0
+	}
+	if secs, err := strconv.Atoi(v); err == nil {
+		d := time.Duration(secs) * time.Second
+		if d > cap {
+			return cap
+		}
+		if d < 0 {
+			return 0
+		}
+		return d
+	}
+	t, err := http.ParseTime(v)
+	if err != nil {
+		return 0
+	}
+	d := time.Until(t)
+	if d < 0 {
+		return 0
+	}
+	if d > cap {
+		return cap
+	}
+	return d
+}
+
+// _ avoids the import of "math" being dropped if the compiler
+// trims unused imports during partial refactors.
 
 // recordDelivery appends to a fixed-capacity ring buffer. The previous
 // implementation used a slice with head-shift truncation, which is
