@@ -1,6 +1,7 @@
 package buildinfo
 
 import (
+	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
@@ -70,5 +71,25 @@ func TestGetIsJSONSerializable(t *testing.T) {
 	}
 	if !strings.HasPrefix(json.GoVersion, "go") {
 		t.Errorf("expected GoVersion to start with 'go', got %q", json.GoVersion)
+	}
+}
+
+// TestDomainPurityScriptExists pins PURITY-1: the
+// scripts/check-domain-purity.sh script must exist and exit 0.
+// Domain packages (alerting, capability, etc.) must not import
+// internal/store, internal/llm, internal/api, or cmd — those
+// dependencies belong in adapters, not in domain logic.
+//
+// This Go test runs the bash script and asserts the exit code,
+// so a CI failure here is a clear signal that the purity rule
+// was violated.
+func TestDomainPurityScriptExists(t *testing.T) {
+	cmd := exec.Command("bash", "../../scripts/check-domain-purity.sh")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("domain purity script failed: %v\n%s", err, string(out))
+	}
+	if !strings.Contains(string(out), "domain package purity verified") {
+		t.Errorf("purity script output unexpected: %s", string(out))
 	}
 }
