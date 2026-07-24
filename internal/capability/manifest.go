@@ -19,10 +19,12 @@ const (
 	ArtifactRuntimePolicy ArtifactKind = "runtime_policy"
 	ArtifactContext       ArtifactKind = "context_contract"
 	ArtifactMemory        ArtifactKind = "memory"
-	ArtifactKnowledge     ArtifactKind = "knowledge_source"
-	ArtifactGuardrail     ArtifactKind = "guardrail"
-	ArtifactTool          ArtifactKind = "tool"
-	ArtifactMCPServer     ArtifactKind = "mcp_server"
+	// ArtifactGuardrail / ArtifactTool / ArtifactMCPServer are
+	// the live optional artifact kinds; their refs are loaded
+	// by the Resolver when present.
+	ArtifactGuardrail ArtifactKind = "guardrail"
+	ArtifactTool      ArtifactKind = "tool"
+	ArtifactMCPServer ArtifactKind = "mcp_server"
 )
 
 // ArtifactRef is a content-addressed pointer to an immutable artifact.
@@ -39,7 +41,7 @@ type ArtifactRef struct {
 func (r ArtifactRef) Valid() error {
 	switch r.Kind {
 	case ArtifactPrompt, ArtifactModelPolicy, ArtifactRuntimePolicy,
-		ArtifactContext, ArtifactMemory, ArtifactKnowledge,
+		ArtifactContext, ArtifactMemory,
 		ArtifactGuardrail, ArtifactTool, ArtifactMCPServer:
 	default:
 		return fmt.Errorf("artifact: unknown kind %q", r.Kind)
