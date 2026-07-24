@@ -2,7 +2,9 @@ package observability
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"log/slog"
 	"os"
 	"testing"
@@ -10,6 +12,29 @@ import (
 
 	_ "modernc.org/sqlite"
 )
+
+// computeTestAuditHash mirrors internal/store.computeAuditHash
+// for tests. The chain verifier walks from rowid 1 forward and
+// compares each row's stored entry_hash against the recomputed
+// hash; tests need to seed rows whose stored hash matches the
+// real computation or the walk fails before the archive step.
+func computeTestAuditHash(id, userID, action, resource, detailsJSON, timestampStr, prevHash string) string {
+	h := sha256.New()
+	h.Write([]byte(id))
+	h.Write([]byte{0x1f})
+	h.Write([]byte(userID))
+	h.Write([]byte{0x1f})
+	h.Write([]byte(action))
+	h.Write([]byte{0x1f})
+	h.Write([]byte(resource))
+	h.Write([]byte{0x1f})
+	h.Write([]byte(detailsJSON))
+	h.Write([]byte{0x1f})
+	h.Write([]byte(timestampStr))
+	h.Write([]byte{0x1f})
+	h.Write([]byte(prevHash))
+	return hex.EncodeToString(h.Sum(nil))
+}
 
 func newTestManager(t *testing.T, policy RetentionPolicy) *RetentionManager {
 	t.Helper()
@@ -251,6 +276,61 @@ func TestEnforceNoAuditOnEmptyTable(t *testing.T) {
 	})
 	if err := m.Enforce(context.Background()); err != nil {
 		t.Fatalf("Enforce: %v", err)
+	}
+}
+
+// TestEnforceArchiveIsIdempotent pins QW#1: running Enforce a
+// second time on the same expired audit row must be a no-op,
+// not a duplicate-id error. The fix is INSERT OR IGNORE on
+// audit_archive (id is the PK); this test exercises the
+// duplicate-key path explicitly.
+func TestEnforceArchiveIsIdempotent(t *testing.T) {
+	m := newTestManagerWithAuditArchive(t, RetentionPolicy{
+		TraceTTL:      0,
+		AuditTTL:      24 * time.Hour,
+		CheckInterval: time.Hour,
+	})
+	cutoff := time.Now().UTC().Add(-48 * time.Hour)
+	// Seed a chain so verifyChainForRetention succeeds. The
+	// hash is sha256 over the canonical fields (0x1f-separated)
+	// per internal/store/sqlite.go computeAuditHash. The test
+	// helper already inserted the chain-state singleton; we
+	// only update it to reflect the new tail.
+	const ts = "2025-01-01T00:00:00Z"
+	hash := computeTestAuditHash("a", "u1", "create", "workspace:w1", `{}`, ts, "")
+	if _, err := m.db.Exec(`INSERT INTO audit_entries
+		(id, user_id, action, resource, timestamp, previous_hash, entry_hash, timestamp_str)
+		VALUES ('a', 'u1', 'create', 'workspace:w1', ?, '', ?, ?)`,
+		cutoff, hash, ts); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if _, err := m.db.Exec(`UPDATE audit_chain_state SET last_hash=?, last_rowid=1 WHERE id=0`, hash); err != nil {
+		t.Fatalf("seed state: %v", err)
+	}
+
+	// First sweep archives the row.
+	if err := m.Enforce(context.Background()); err != nil {
+		t.Fatalf("first Enforce: %v", err)
+	}
+	var n1 int
+	if err := m.db.QueryRow(`SELECT COUNT(*) FROM audit_archive`).Scan(&n1); err != nil {
+		t.Fatalf("count after first: %v", err)
+	}
+	if n1 != 1 {
+		t.Fatalf("first sweep: expected 1 archived, got %d", n1)
+	}
+
+	// Second sweep is a no-op (the row already exists in
+	// audit_archive; INSERT OR IGNORE swallows the duplicate).
+	if err := m.Enforce(context.Background()); err != nil {
+		t.Fatalf("second Enforce: %v", err)
+	}
+	var n2 int
+	if err := m.db.QueryRow(`SELECT COUNT(*) FROM audit_archive`).Scan(&n2); err != nil {
+		t.Fatalf("count after second: %v", err)
+	}
+	if n2 != 1 {
+		t.Fatalf("second sweep: expected 1 archived (no duplicate), got %d", n2)
 	}
 }
 
