@@ -153,3 +153,22 @@ func TestSortLabels(t *testing.T) {
 func containsString(s, sub string) bool {
 	return len(s) >= len(sub) && (s == sub || len(s) > 0 && (s[0:len(sub)] == sub || containsString(s[1:], sub)))
 }
+
+// TestHistogramPercentileP99 pins PERF-3b: percentile cost at
+// p99 stays < 1ms for 10k samples. The 5ms ceiling is generous
+// for CI variance; the benchmark below is the precise measurement.
+func TestHistogramPercentileP99(t *testing.T) {
+	h := newHistogram(nil)
+	for i := 0; i < 10000; i++ {
+		h.Observe(float64(i) * 0.001)
+	}
+	start := time.Now()
+	for i := 0; i < 1000; i++ {
+		_ = h.Percentile(99)
+	}
+	elapsed := time.Since(start)
+	perCall := elapsed / 1000
+	if perCall > 5*time.Millisecond {
+		t.Errorf("Percentile p99 too slow: %v per call (expected < 5ms)", perCall)
+	}
+}

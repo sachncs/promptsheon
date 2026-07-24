@@ -29,14 +29,17 @@ func BenchmarkHistogramObserve(b *testing.B) {
 	}
 }
 
+// BenchmarkHistogramPercentile pins PERF-3b: Percentile on a
+// 10k-sample histogram stays under 1ms p99. The implementation
+// walks the fixed-bucket counts (O(buckets)), not the raw values.
 func BenchmarkHistogramPercentile(b *testing.B) {
 	h := newHistogram(nil)
-	for i := 0; i < 1000; i++ {
-		h.Observe(float64(i) / 1000.0)
+	for i := 0; i < 10000; i++ {
+		h.Observe(float64(i) * 0.001)
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		h.P95()
+		_ = h.Percentile(99)
 	}
 }
 
