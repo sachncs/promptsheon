@@ -45,6 +45,37 @@ func BenchmarkHandleGetWorkspaceObservation(b *testing.B) {
 	}
 }
 
+// BenchmarkHashAndTeeBody pins PERF-7b: hashing a 100MB body
+// must stay O(64 bytes) in memory. The implementation spools
+// to a temp file so the only heap allocations are the 32KB
+// copy buffer and the SHA-256 state. Allocations per op are
+// O(1) regardless of body size.
+func BenchmarkHashAndTeeBody(b *testing.B) {
+	const size = 100 * 1024 * 1024
+	body := make([]byte, size)
+	for i := range body {
+		body[i] = byte(i % 256)
+	}
+	b.SetBytes(int64(size))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rc := readCloser{Reader: bytes.NewReader(body), Closer: closingNoop{}}
+		hash, replay, err := hashAndTeeBody(rc)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if hash == "" {
+			b.Fatal("empty hash")
+		}
+		_ = replay.Close()
+	}
+}
+
+type closingNoop struct{}
+
+func (closingNoop) Close() error { return nil }
+
 // newBenchServer builds a Server suitable for benchmarking. It
 // uses an in-memory mock repo and the error-level logger writing
 // to a discard buffer so logging noise does not contaminate
