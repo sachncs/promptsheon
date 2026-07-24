@@ -328,6 +328,54 @@ func TestAppendAndVerifyAuditChain(t *testing.T) {
 	}
 }
 
+// TestAuditVerifyCacheInvalidatedOnAppend pins PERF-AUDIT-2:
+// AppendAudit must invalidate the verify cache so a
+// write-then-verify sequence walks the chain from the new
+// tail, not from a stale cached checkpoint. Without
+// invalidation, the verify returns "ok" against the
+// pre-append tail and silently misses the new row.
+func TestAuditVerifyCacheInvalidatedOnAppend(t *testing.T) {
+	t.Parallel()
+	s := newTestSQLite(t)
+	ctx := context.Background()
+	for _, id := range []string{"a1", "a2"} {
+		if err := s.AppendAudit(ctx, &models.AuditEntry{
+			ID: id, UserID: "u1", Action: "noop", Resource: "x", Details: nil,
+		}); err != nil {
+			t.Fatalf("AppendAudit(%s): %v", id, err)
+		}
+	}
+	// Prime the cache with a successful verify.
+	res, err := s.VerifyAuditChain(ctx)
+	if err != nil {
+		t.Fatalf("VerifyAuditChain: %v", err)
+	}
+	if !res.Ok {
+		t.Fatalf("first verify failed: %s", res.Reason)
+	}
+	if res.LastRowID != 2 {
+		t.Fatalf("first verify LastRowID=%d, want 2", res.LastRowID)
+	}
+	// Append a new row. Without invalidation, the next verify
+	// would return the cached (rowid=2, hash=h2) and skip the
+	// new entry's verification — the LastRowID would stay at 2.
+	if err := s.AppendAudit(ctx, &models.AuditEntry{
+		ID: "a3", UserID: "u1", Action: "noop", Resource: "x", Details: nil,
+	}); err != nil {
+		t.Fatalf("AppendAudit(a3): %v", err)
+	}
+	res2, err := s.VerifyAuditChain(ctx)
+	if err != nil {
+		t.Fatalf("VerifyAuditChain post-append: %v", err)
+	}
+	if !res2.Ok {
+		t.Fatalf("post-append verify failed: %s", res2.Reason)
+	}
+	if res2.LastRowID != 3 {
+		t.Fatalf("post-append verify LastRowID=%d, want 3 (cache was stale)", res2.LastRowID)
+	}
+}
+
 func TestAuditChainDetectsTampering(t *testing.T) {
 	t.Parallel()
 	s := newTestSQLite(t)
