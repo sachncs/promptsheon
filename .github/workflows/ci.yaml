@@ -406,6 +406,11 @@ jobs:
     # artifact attestations (attestations:write). The
     # workflow-level default is `contents: read`; per-job
     # overrides here are the minimum required.
+    # PINNED (RELEASE-TOKEN-1): the previous bug was a
+    # workflow-level `contents: read` that prevented
+    # GoReleaser from publishing the GitHub Release. The
+    # per-job permissions block below is the minimum
+    # required; CI fails if any of them is downgraded.
     permissions:
       contents: write
       packages: write
