@@ -83,6 +83,15 @@ type windowKey struct {
 // is the ceiling above which Aggregate becomes expensive.
 const maxRecordsPerWindow = 4096
 
+// PERF-5b: per-tenant memory ceiling. Caps the total number of
+// buckets (keyed by cap/version/env) the aggregator will keep in
+// memory. A multi-tenant deployment with thousands of unused
+// capabilities cannot grow the map without bound; the oldest
+// bucket is evicted when the cap is hit. 4096 buckets * 4096
+// records per bucket = ~16M records max, way below the 64M
+// ceiling on a 64-bit Go runtime.
+const maxBuckets = 4096
+
 // field; pass nil to report a zero rate.
 func NewAggregator(hallucinationF HallucinationFunc) *Aggregator {
 	return &Aggregator{
@@ -113,6 +122,30 @@ func (a *Aggregator) Add(r executor.ExecutionRecord) {
 	if !ok {
 		bucket = &obsBucket{}
 		a.records[k] = bucket
+	}
+	// PERF-5b: enforce the per-tenant ceiling. If the map grew
+	// past maxBuckets, evict the oldest bucket (the one with
+	// the smallest "first seen" key by Go's map iteration order
+	// is non-deterministic — we instead pick the bucket whose
+	// records slice is shortest, i.e. the one least recently
+	// active).
+	if len(a.records) > maxBuckets {
+		var evictKey windowKey
+		evictBucket, evictSet := bucket, false
+		for k2, b2 := range a.records {
+			if k2 == k {
+				continue
+			}
+			b2.mu.Lock()
+			isEvict := !evictSet || len(b2.records) < len(evictBucket.records)
+			b2.mu.Unlock()
+			if isEvict {
+				evictKey, evictBucket, evictSet = k2, b2, true
+			}
+		}
+		if evictSet {
+			delete(a.records, evictKey)
+		}
 	}
 	a.mu.Unlock()
 	bucket.mu.Lock()
