@@ -4,12 +4,10 @@ package optimizer
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/llm"
 	"github.com/sachncs/promptsheon/internal/optimizer/rules"
 )
 
@@ -50,20 +48,14 @@ type PromptMetrics struct {
 	HasSystemPrompt bool    `json:"has_system_prompt"`
 }
 
-// Optimizer provides prompt optimization and analysis. The
-// Analyze method runs the deterministic rules engine against
-// observations and an optional LLM critique on the resulting
-// suggestion list.
+// Optimizer provides deterministic prompt optimization and analysis.
 type Optimizer struct {
-	provider llm.Provider
-	rules    *rules.Engine
+	rules *rules.Engine
 }
 
-// NewOptimizer creates a new Optimizer with the given provider.
-// The rules engine is the default v2.36 deterministic set; pass
-// nil for the default.
-func NewOptimizer(provider llm.Provider) *Optimizer {
-	return &Optimizer{provider: provider, rules: rules.NewEngine()}
+// NewOptimizer creates an Optimizer with the default rules engine.
+func NewOptimizer() *Optimizer {
+	return &Optimizer{rules: rules.NewEngine()}
 }
 
 // GetOptimizationTips returns general tips for writing effective prompts.
@@ -131,7 +123,7 @@ func clarityScore(text string) float64 {
 // optional; production paths run Analyze with observations
 // only and skip the critique for cost reasons.
 func (o *Optimizer) Analyze(ctx context.Context, promptID, promptName, text string, observations []rules.Observation) (*OptimizationReport, error) {
-	var recs []capability.Recommendation
+	recs := make([]capability.Recommendation, 0, len(observations))
 	for _, obs := range observations {
 		recs = append(recs, o.rules.Evaluate(ctx, obs)...)
 	}
@@ -156,16 +148,6 @@ func (o *Optimizer) Analyze(ctx context.Context, promptID, promptName, text stri
 		report.Suggestions = append(report.Suggestions, s)
 	}
 	report.Score = scoreFromSuggestions(report.Suggestions)
-	// Best-effort LLM critique: only when a provider is wired
-	// and at least one suggestion exists. Failure does not
-	// poison the report; the rules-engine output stands.
-	if o.provider != nil && len(report.Suggestions) > 0 {
-		if err := o.llmCritique(ctx, text, report); err != nil {
-			// Log via context cancellation only; production
-			// surfaces this through the audit chain when wired.
-			_ = ctx.Err()
-		}
-	}
 	return report, nil
 }
 
@@ -216,39 +198,6 @@ func scoreFromSuggestions(suggestions []*OptimizationSuggestion) float64 {
 	return score
 }
 
-// llmCritique is a best-effort LLM pass that adjusts the
-// Confidence-equivalent (here: Score) based on the LLM's read of
-// the prompt. The critique is intentionally lightweight; it adds
-// at most one round-trip and never blocks the rules-engine
-// output.
-func (o *Optimizer) llmCritique(ctx context.Context, text string, report *OptimizationReport) error {
-	req := &llm.Request{
-		Messages: []llm.Message{
-			{Role: "system", Content: "You rate prompt clarity from 0 to 1."},
-			{Role: "user", Content: "Rate this prompt's clarity: " + text},
-		},
-	}
-	resp, err := o.provider.Complete(ctx, req)
-	if err != nil {
-		return fmt.Errorf("optimizer: llm critique: %w", err)
-	}
-	// Mix the LLM score (0.0-1.0) with the rules-engine score.
-	// The exact blend is 70/30 favoring rules, so a poorly
-	// written prompt that the rules engine flags is not
-	// rescued by a confident LLM.
-	var llmScore float64
-	if _, err := fmt.Sscanf(strings.TrimSpace(resp.Content), "%f", &llmScore); err != nil {
-		return fmt.Errorf("optimizer: parse llm score: %w", err)
-	}
-	if llmScore < 0 {
-		llmScore = 0
-	} else if llmScore > 1 {
-		llmScore = 1
-	}
-	report.Score = 0.7*report.Score + 0.3*llmScore
-	return nil
-}
-
 // MarshalJSON returns a stable JSON encoding of the report.
 func (r OptimizationReport) MarshalJSON() ([]byte, error) {
 	type wire struct {
@@ -260,13 +209,5 @@ func (r OptimizationReport) MarshalJSON() ([]byte, error) {
 		OptimizedText string                    `json:"optimized_text,omitempty"`
 		CreatedAt     time.Time                 `json:"created_at"`
 	}
-	return json.Marshal(wire{
-		PromptID:      r.PromptID,
-		PromptName:    r.PromptName,
-		Score:         r.Score,
-		Suggestions:   r.Suggestions,
-		Metrics:       r.Metrics,
-		OptimizedText: r.OptimizedText,
-		CreatedAt:     r.CreatedAt,
-	})
+	return json.Marshal(wire(r))
 }

@@ -104,9 +104,9 @@ type Memory struct {
 	// async: nil for synchronous Memory (NewMemory);
 	// non-nil for async Memory (NewAsyncMemory). When set,
 	// Publish hands the event to queue and returns immediately.
-	queue  chan capability.Event
-	stop   chan struct{}
-	wg     sync.WaitGroup
+	queue   chan capability.Event
+	stop    chan struct{}
+	wg      sync.WaitGroup
 	dropped uint64
 }
 

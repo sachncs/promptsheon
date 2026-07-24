@@ -29,9 +29,9 @@ import (
 // Leader carries the identity of the current leader plus the
 // expiry of its lease.
 type Leader struct {
-	Identity   string
-	ExpiresAt  time.Time
-	IsLeader   bool
+	Identity  string
+	ExpiresAt time.Time
+	IsLeader  bool
 }
 
 // Elector manages a single SQL advisory lock on the

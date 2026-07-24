@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/llm"
 	"github.com/sachncs/promptsheon/internal/optimizer"
 	"github.com/sachncs/promptsheon/internal/optimizer/rules"
 )
@@ -42,7 +41,7 @@ func TestComputeMetrics(t *testing.T) {
 
 func TestAnalyzeProducesReport(t *testing.T) {
 	t.Parallel()
-	o := optimizer.NewOptimizer(nil)
+	o := optimizer.NewOptimizer()
 	report, err := o.Analyze(context.Background(), "p1", "greeting", "Be helpful.", nil)
 	if err != nil {
 		t.Fatalf("Analyze: %v", err)
@@ -57,7 +56,7 @@ func TestAnalyzeProducesReport(t *testing.T) {
 
 func TestAnalyzeUsesObservations(t *testing.T) {
 	t.Parallel()
-	o := optimizer.NewOptimizer(nil)
+	o := optimizer.NewOptimizer()
 	obs := []rules.Observation{{
 		CapabilityID:      "c1",
 		CapabilityVersion: "v1",
@@ -77,20 +76,6 @@ func TestAnalyzeUsesObservations(t *testing.T) {
 	}
 	if report.Score >= 1.0 {
 		t.Errorf("Score = %f, expected less than 1.0 when suggestions present", report.Score)
-	}
-}
-
-func TestAnalyzeWithLLMCritique(t *testing.T) {
-	t.Parallel()
-	mock := llm.NewMock("0.95")
-	o := optimizer.NewOptimizer(mock)
-	obs := []rules.Observation{{CapabilityID: "c1", WindowExecutions: 100, P95LatencyMS: 10000}}
-	report, err := o.Analyze(context.Background(), "p1", "p", "Be helpful.", obs)
-	if err != nil {
-		t.Fatalf("Analyze: %v", err)
-	}
-	if report.Score <= 0 {
-		t.Errorf("Score should be positive after LLM critique, got %f", report.Score)
 	}
 }
 

@@ -11,7 +11,6 @@ import (
 
 	"github.com/sachncs/promptsheon/internal/metrics"
 	"github.com/sachncs/promptsheon/internal/models"
-	"github.com/sachncs/promptsheon/internal/store"
 )
 
 // Severity levels for alerts.
@@ -80,6 +79,18 @@ type NotificationGroup struct {
 // unboundedly spawning goroutines.
 const MaxConcurrentDeliveries = 100
 
+type repository interface {
+	ListAlertRules(context.Context) ([]*models.AlertRuleRecord, error)
+	ListAlerts(context.Context, string) ([]*models.AlertRecord, error)
+	ListNotificationGroups(context.Context) ([]*models.NotificationGroupRecord, error)
+	SaveAlertRule(context.Context, *models.AlertRuleRecord) error
+	DeleteAlertRule(context.Context, string) error
+	SaveAlert(context.Context, *models.AlertRecord) error
+	UpdateAlert(context.Context, *models.AlertRecord) error
+	GetChannelsForAlertRule(context.Context, string) ([]string, error)
+	SaveNotificationGroup(context.Context, *models.NotificationGroupRecord) error
+}
+
 // Manager manages alert rules and alerts.
 type Manager struct {
 	mu           sync.RWMutex
@@ -88,7 +99,7 @@ type Manager struct {
 	groups       map[string]*NotificationGroup
 	logger       *slog.Logger
 	metrics      *metrics.Collector
-	db           store.Repository
+	db           repository
 	deliveryFunc func(alert *Alert, channels []string) error
 	deliverySem  chan struct{}
 	monitoringWg sync.WaitGroup
@@ -107,7 +118,7 @@ func NewManager(logger *slog.Logger, collector *metrics.Collector) *Manager {
 }
 
 // NewManagerWithDB creates a new alerting manager with database persistence.
-func NewManagerWithDB(logger *slog.Logger, collector *metrics.Collector, db store.Repository) *Manager {
+func NewManagerWithDB(logger *slog.Logger, collector *metrics.Collector, db repository) *Manager {
 	m := &Manager{
 		rules:   make(map[string]*AlertRule),
 		alerts:  []*Alert{},

@@ -69,7 +69,7 @@ type Invoker struct {
 	// the per-call latency, success/error counts, and span.
 	llmCollector *metrics.Collector
 	tracer       trace.Tracer
-	logger      *slog.Logger
+	logger       *slog.Logger
 }
 
 // New constructs an Invoker. The Executor is supplied by the caller

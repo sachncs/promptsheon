@@ -21,11 +21,11 @@ import (
 // understand every Signal. Production sources know which SLO they
 // drive and project their metric into a comparable float.
 type Evaluator struct {
-	repo    Repository
-	source  SourceFunc
-	logger  *slog.Logger
+	repo     Repository
+	source   SourceFunc
+	logger   *slog.Logger
 	interval time.Duration
-	now     func() time.Time
+	now      func() time.Time
 
 	mu      sync.Mutex
 	lastRun time.Time
@@ -40,9 +40,9 @@ type SourceFunc func(ctx context.Context, s *SLO) (float64, error)
 // Downstream consumers (alerting manager, recommendation loop)
 // receive it through the callback registered via OnBreach.
 type BreachEvent struct {
-	SLO       *SLO
-	Actual    float64
-	BurnRate  float64
+	SLO        *SLO
+	Actual     float64
+	BurnRate   float64
 	ObservedAt time.Time
 }
 

@@ -7,8 +7,6 @@ import (
 	"math/rand/v2"
 	"sync"
 	"time"
-
-	"github.com/sachncs/promptsheon/internal/llm"
 )
 
 // Variant represents an A/B test variant.
@@ -88,18 +86,16 @@ type VariantResult struct {
 
 // Engine manages A/B tests.
 type Engine struct {
-	mu       sync.RWMutex
-	tests    map[string]*Test
-	metrics  map[string]map[string]*Metric // testID -> variantID -> metrics
-	provider llm.Provider
+	mu      sync.RWMutex
+	tests   map[string]*Test
+	metrics map[string]map[string]*Metric // testID -> variantID -> metrics
 }
 
 // NewEngine creates a new A/B testing engine.
-func NewEngine(provider llm.Provider) *Engine {
+func NewEngine() *Engine {
 	return &Engine{
-		tests:    make(map[string]*Test),
-		metrics:  make(map[string]map[string]*Metric),
-		provider: provider,
+		tests:   make(map[string]*Test),
+		metrics: make(map[string]map[string]*Metric),
 	}
 }
 

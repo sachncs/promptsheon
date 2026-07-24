@@ -35,9 +35,9 @@ type EvalRunOptions struct {
 // for each case, score via the chosen Scorer, persist per-case
 // results and the aggregate EvalRun.
 type EvalRunner struct {
-	Repo     Repository
-	Inv      ReleaseInvoker
-	Clock    func() time.Time
+	Repo  Repository
+	Inv   ReleaseInvoker
+	Clock func() time.Time
 	// Metrics is optional. When non-nil, the runner increments
 	// promptsheon_eval_cases_{passed,failed}_total per case so
 	// the SLO alert at deploy/prometheus/promptsheon-alerts.yaml

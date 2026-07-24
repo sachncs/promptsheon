@@ -28,8 +28,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
-	pluginv1 "github.com/sachncs/promptsheon/internal/pluginproto/pluginv1"
 	"github.com/sachncs/promptsheon/internal/pluginmanifest"
+	pluginv1 "github.com/sachncs/promptsheon/internal/pluginproto/pluginv1"
 	"github.com/sachncs/promptsheon/internal/subprocess"
 	"github.com/sachncs/promptsheon/internal/supervisor"
 )

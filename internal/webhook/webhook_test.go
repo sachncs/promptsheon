@@ -160,7 +160,7 @@ func TestDispatcherSuccessfulDelivery(t *testing.T) {
 	d := NewDispatcher(slog.Default()).WithMaxRetries(0)
 	d.Register(&Endpoint{
 		ID:     "ep-ok",
-		URL: srv.URL, 
+		URL:    srv.URL,
 		Events: []EventType{EventEvalCompleted},
 		Active: true,
 	})
@@ -189,7 +189,7 @@ func TestDispatcherServerErrorTriggersRetry(t *testing.T) {
 	d := NewDispatcher(slog.Default()).WithMaxRetries(2)
 	d.Register(&Endpoint{
 		ID:     "ep-500",
-		URL: srv.URL, 
+		URL:    srv.URL,
 		Events: []EventType{EventEvalCompleted},
 		Active: true,
 	})
@@ -281,7 +281,7 @@ func TestWithHTTPClientReplacesDefault(t *testing.T) {
 	d := NewDispatcher(slog.Default()).WithMaxRetries(0).WithHTTPClient(http.DefaultClient)
 	d.Register(&Endpoint{
 		ID:     "ep-custom",
-		URL: srv.URL, 
+		URL:    srv.URL,
 		Events: []EventType{EventEvalCompleted},
 		Active: true,
 	})
@@ -372,8 +372,8 @@ func TestDeliverHMACSigning(t *testing.T) {
 	d := NewDispatcher(slog.Default()).WithMaxRetries(0)
 	d.Register(&Endpoint{
 		ID: "ep-hmac", URL: srv.URL, Secret: "my-secret",
-		
-		Events:       []EventType{EventEvalCompleted}, Active: true,
+
+		Events: []EventType{EventEvalCompleted}, Active: true,
 	})
 	d.Emit(&Event{ID: "evt-hmac", Type: EventEvalCompleted})
 	time.Sleep(500 * time.Millisecond)

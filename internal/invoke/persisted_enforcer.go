@@ -12,7 +12,7 @@ import (
 )
 
 // EnforcerStore is the persistence surface the persisted enforcer
-// needs. OBS-13: matches a subset of store.Repository methods so
+// needs. OBS-13: matches a subset of store repositories methods so
 // tests don't have to satisfy the full Repository interface.
 type EnforcerStore interface {
 	GetEnforcerBudget(ctx context.Context, workspaceID string) ([]byte, error)

@@ -8,6 +8,15 @@ import (
 	"testing"
 )
 
+func mustLoadConfig(t *testing.T) Config {
+	t.Helper()
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cfg
+}
+
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
 
@@ -60,6 +69,13 @@ func TestDefaultConfig(t *testing.T) {
 	}
 }
 
+func TestLoadConfigReturnsFileError(t *testing.T) {
+	t.Setenv("PROMPTSHEON_CONFIG", t.TempDir()+"/missing.yaml")
+	if _, err := LoadConfig(); err == nil {
+		t.Fatal("expected missing config error")
+	}
+}
+
 func TestLoadConfigFromEnv(t *testing.T) {
 	// Set environment variables
 	_ = os.Setenv("PROMPTSHEON_ADDR", ":9090")
@@ -77,7 +93,7 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	defer func() { _ = os.Unsetenv("PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT") }()
 	defer func() { _ = os.Unsetenv("PROMPTSHEON_RATE_LIMIT_RATE") }()
 
-	cfg := LoadConfig()
+	cfg := mustLoadConfig(t)
 
 	if cfg.Addr != ":9090" {
 		t.Errorf("Addr = %q, want %q", cfg.Addr, ":9090")
@@ -122,7 +138,7 @@ func TestLoadConfigAuthValues(t *testing.T) {
 			_ = os.Setenv("PROMPTSHEON_AUTH", tt.value)
 			defer func() { _ = os.Unsetenv("PROMPTSHEON_AUTH") }()
 
-			cfg := LoadConfig()
+			cfg := mustLoadConfig(t)
 			if cfg.Auth != tt.expected {
 				t.Errorf("Auth = %v, want %v for value %q", cfg.Auth, tt.expected, tt.value)
 			}
@@ -144,7 +160,7 @@ func TestLoadConfig_InvalidNumericWarns(t *testing.T) {
 
 	_ = os.Setenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT", "abc")
 	defer func() { _ = os.Unsetenv("PROMPTSHEON_SERVER_WRITE_TIMEOUT") }()
-	cfg := LoadConfig()
+	cfg := mustLoadConfig(t)
 	if cfg.WriteTimeout != 30 {
 		t.Fatalf("expected default 30, got %d", cfg.WriteTimeout)
 	}
@@ -201,7 +217,7 @@ func TestLoadConfig_AdditionalEnvs(t *testing.T) {
 	_ = os.Setenv("PROMPTSHEON_CORS_ORIGINS", "*")
 	defer func() { _ = os.Unsetenv("PROMPTSHEON_CORS_ORIGINS") }()
 
-	cfg := LoadConfig()
+	cfg := mustLoadConfig(t)
 	if cfg.RateLimitInterval != 30 {
 		t.Errorf("RateLimitInterval = %d, want 30", cfg.RateLimitInterval)
 	}
@@ -241,7 +257,7 @@ func TestSanitizeConfigClampsNegative(t *testing.T) {
 	_ = os.Setenv("PROMPTSHEON_SERVER_IDLE_TIMEOUT", "-1")
 	defer func() { _ = os.Unsetenv("PROMPTSHEON_SERVER_IDLE_TIMEOUT") }()
 
-	cfg := LoadConfig()
+	cfg := mustLoadConfig(t)
 	if cfg.RateLimitRate != 0 {
 		t.Errorf("RateLimitRate = %d, want 0", cfg.RateLimitRate)
 	}
