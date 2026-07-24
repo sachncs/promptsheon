@@ -8,7 +8,7 @@ Concrete bugs. Each is a one-line or one-function change.
 - [x] **BUG-2** Single policy on `Precondition.TimeoutSec`. Pick: `Validate` accepts 0 as "default 60s"; `runOne` no longer defaults.
   - **Where**: `internal/harness/precondition.go:167-170` and `internal/harness/harness.go:95-109`.
 
-- [ ] **BUG-3** `VerifyAuditChain` cross-checks against `audit_chain_state` and rowid sequence. (See Phase 1 SEC-CHAIN-1.)
+- [x] **BUG-3** `VerifyAuditChain` cross-checks against `audit_chain_state` and rowid sequence. (See Phase 1 SEC-CHAIN-1.)
 
 - [x] **BUG-4** Seed system user `id="api"` for audit FKs. (See Phase 1 SEC-DB-1.)
 
@@ -28,7 +28,7 @@ Concrete bugs. Each is a one-line or one-function change.
 - [x] **BUG-10** Add nil-guards on `s.spans` in `handlers_traces.go:37,50,60` and `handlers_dashboard.go:15`.
   - **Accept**: Calling any trace handler with `WithTracing` not set returns 503.
 
-- [ ] **BUG-11** Add nil-guard on `s.invoker` in every handler that calls it.
+- [x] **BUG-11** Add nil-guard on `s.invoker` in every handler that calls it.
   - **Where**: `internal/api/handlers_capabilities.go:529, 544`.
 
 - [x] **BUG-12** Drop the `var _ = fmt.Sprintf` / `var _ = context.Background` / `var _ = json.Marshal` import workarounds; either use the symbols or drop the imports.
@@ -42,7 +42,7 @@ Concrete bugs. Each is a one-line or one-function change.
 - [x] **BUG-15** `handleTestProvider` requires explicit `model`; drop the `gpt-3.5-turbo` default.
   - **Where**: `internal/api/handlers_providers.go:60`.
 
-- [ ] **BUG-16** `handleDeleteWebhook` returns `204 No Content` (not `200 OK` with `{"deleted": id}`).
+- [x] **BUG-16** `handleDeleteWebhook` returns `204 No Content` (not `200 OK` with `{"deleted": id}`).
   - **Where**: `internal/api/handlers_webhooks.go:70`.
 
 - [x] **BUG-17** `handleDeleteAlertRule` distinguishes 204 (deleted) from 404 (never existed).
@@ -53,7 +53,7 @@ Concrete bugs. Each is a one-line or one-function change.
 - [x] **BUG-19** `cmd/promptsheond/main.go:330-350` silently swallows `inv.Provider == ""` with a generic error — make the error type and the route's response specific (502 Bad Gateway with a `provider_missing` detail).
   - **Where**: `cmd/promptsheond/main.go:336-345` and `internal/api/handlers_releases.go:201`.
 
-- [ ] **BUG-20** `manifestHashForRelease` returns `""` on marshal failure — log the failure and return an error to the handler instead of silently dropping audit data.
+- [x] **BUG-20** `manifestHashForRelease` returns `""` on marshal failure — log the failure and return an error to the handler instead of silently dropping audit data.
   - **Where**: `internal/api/handlers_releases.go:320` and `internal/api/handlers_capabilities.go:287`.
 
 - [x] **BUG-21** `invokeOneWithManifest` records `exec.TotalTokens = 0` and `exec.CostUSD = 0` on failed invokes. Add a `tokens_estimated` field that's populated even on failure when possible.
@@ -74,10 +74,10 @@ Concrete bugs. Each is a one-line or one-function change.
 - [x] **BUG-26** `handleGetEval` and similar return `ErrNotFound` for any DB error — split via `translateDBError`.
   - **Where**: `internal/api/handlers_harness.go:272`.
 
-- [ ] **BUG-27** Drop `handleBootstrap`'s manual `r.Method != http.MethodPost` check — `mux.HandleFunc("POST ...")` already enforces it.
+- [x] **BUG-27** Drop `handleBootstrap`'s manual `r.Method != http.MethodPost` check — `mux.HandleFunc("POST ...")` already enforces it.
   - **Where**: `internal/api/handlers_auth.go:286-287`.
 
-- [ ] **BUG-28** `handleObservation`'s defensive `if id == ""` check is unreachable (`{id}` never matches empty). Delete it.
+- [x] **BUG-28** `handleObservation`'s defensive `if id == ""` check is unreachable (`{id}` never matches empty). Delete it.
   - **Where**: `internal/api/handler_observation.go:21`.
 
 - [x] **BUG-29** `handleWorkflowRun` returns 503 when engine nil; match that pattern across alerting/webhook/health instead of the inconsistent 200/empty and 400/error mix.
