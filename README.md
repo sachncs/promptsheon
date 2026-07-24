@@ -9,15 +9,38 @@
   </p>
 </p>
 
-Promptsheon is the control plane for AI Capabilities. Every
-Capability — its Prompt, Model Policy, Runtime Policy, Context
-Contract, Memory, Guardrails, Tools, MCP servers, and
+Promptsheon is the **AI Capability Control Plane** — the
+operating system for versioning, deploying, governing,
+observing, and optimising AI Capabilities at enterprise scale.
+
+Every Capability — its Prompt, Model Policy, Runtime Policy,
+Context Contract, Memory, Guardrails, Tools, MCP servers, and
 Evaluation Suite — is an immutable, content-addressed Manifest
 recorded as a Directed Acyclic Graph. Production tenants manage
 their Capabilities the way engineers manage code: with versions,
-reviews, releases, canary deployments, and rollbacks. v0.1.0 is
-the forward-only baseline; the legacy bundle model and the
-v0.0.7 prompts/agents tables are gone (see
+reviews, releases, canary deployments, and rollbacks.
+
+Beyond the deployment surface, Promptsheon ships:
+
+- **Capability Contract** — input/output schema, SLO target,
+  blast radius. The unit of governance; the contract gates
+  auto-promotion by the Recommendation engine.
+- **Capability Diff** — semantic diff between two Versions;
+  reports added, removed, and changed artifact references.
+- **Capability Catalog** — search across Workspaces.
+- **Capability Reputation** — derived trust score from eval
+  history, SLO adherence, and decision adoption.
+- **Recommendation Loop** — production telemetry → Observation
+  → Rules/Bandit → Recommendation → Decision → next Version.
+  The loop is closed end-to-end and persists across restarts.
+- **CRDT-backed Settings** — last-write-wins with version
+  vectors + deterministic tie-break; convergence is pinned by
+  property tests.
+- **Audit Chain** — hash-chained with TLA+ spec for the
+  ordering invariant; every state transition is recorded.
+
+v0.1.0 is the forward-only baseline; the legacy bundle model
+and the v0.0.7 prompts/agents tables are gone (see
 [CHANGELOG.md](CHANGELOG.md) for the migration path).
 
 The v0.2.0 release adds the audit-chain TLA+ spec,
