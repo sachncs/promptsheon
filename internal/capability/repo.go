@@ -50,6 +50,12 @@ type Repository interface {
 	// computed from observations and decision history.
 	GetCapabilityReputation(ctx context.Context, capabilityID string) (Reputation, error)
 
+	// Catalog search. Find returns Capabilities whose name
+	// contains the query string (case-insensitive substring
+	// match) scoped to the supplied workspace. Empty query
+	// returns all Capabilities in the workspace.
+	CatalogSearch(ctx context.Context, workspaceID, query string, limit int) ([]*Capability, error)
+
 	// Capability Versions.
 	CreateVersion(ctx context.Context, v *Version) error
 	GetVersion(ctx context.Context, id string) (*Version, error)

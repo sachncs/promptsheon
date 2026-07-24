@@ -184,6 +184,7 @@ func (s *Server) registerCapabilityRoutes() {
 	s.mux.HandleFunc("GET /api/v1/capabilities/{id}/contract", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetCapabilityContract)))
 	s.mux.HandleFunc("GET /api/v1/capabilities/{id}/diff", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleDiffVersions)))
 	s.mux.HandleFunc("GET /api/v1/capabilities/{id}/reputation", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetCapabilityReputation)))
+	s.mux.HandleFunc("GET /api/v1/catalog/capabilities", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleCatalogSearch)))
 }
 
 func (s *Server) registerVersionRoutes() {

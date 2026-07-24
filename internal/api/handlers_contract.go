@@ -166,3 +166,27 @@ func parseVersionDiffArgs(r *http.Request) (int, int, error) {
 	}
 	return from, to, nil
 }
+
+// handleCatalogSearch returns the Capabilities in the
+// supplied workspace whose name matches the query string.
+// Empty query returns every Capability in the workspace.
+//
+// GET /api/v1/catalog/capabilities?workspace_id=ws1&q=foo&limit=100
+func (s *Server) handleCatalogSearch(w http.ResponseWriter, r *http.Request) error {
+	ws := r.URL.Query().Get("workspace_id")
+	if ws == "" {
+		return &HTTPError{Status: http.StatusBadRequest, Message: "workspace_id is required"}
+	}
+	q := r.URL.Query().Get("q")
+	limit := 0
+	if v := r.URL.Query().Get("limit"); v != "" {
+		_, _ = fmt.Sscanf(v, "%d", &limit)
+	}
+	caps, err := s.capabilityRepo().CatalogSearch(r.Context(), ws, q, limit)
+	if err != nil {
+		s.logger.Error("catalog search failed", "workspace_id", ws, "err", err)
+		return &HTTPError{Status: http.StatusInternalServerError, Message: "internal error"}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(caps)
+}

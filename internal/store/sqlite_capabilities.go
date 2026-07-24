@@ -230,6 +230,38 @@ func (s *SQLite) ListCapabilities(ctx context.Context, projectID string) ([]*cap
 	return result, rows.Err()
 }
 
+// CatalogSearch returns Capabilities whose name matches the
+// query within the supplied workspace. Empty query returns all
+// Capabilities in the workspace. Pagination via limit (0 means
+// no limit, capped at 1000).
+func (s *SQLite) CatalogSearch(ctx context.Context, workspaceID, query string, limit int) ([]*capability.Capability, error) {
+	if limit <= 0 || limit > 1000 {
+		limit = 1000
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT c.id, c.project_id, c.name, c.description, c.created_at, c.updated_at
+		FROM capabilities c
+		JOIN projects p ON c.project_id = p.id
+		WHERE p.workspace_id = ?
+		  AND (? = '' OR LOWER(c.name) LIKE '%' || LOWER(?) || '%')
+		ORDER BY c.name
+		LIMIT ?`, workspaceID, query, query, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("catalog search: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var result []*capability.Capability
+	for rows.Next() {
+		c, err := scanCapability(rows)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, c)
+	}
+	return result, rows.Err()
+}
+
 func (s *SQLite) UpdateCapability(ctx context.Context, c *capability.Capability) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE capabilities SET name = ?, description = ?, updated_at = ?
