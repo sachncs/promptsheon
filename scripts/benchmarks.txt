@@ -1,0 +1,50 @@
+# scripts/benchmarks.txt
+#
+# PERF-BENCH-1: the canonical set of trustworthy Go benchmarks
+# the maintainers run in CI nightly and on workflow_dispatch.
+# Eight names, one per line, picked for cross-layer coverage
+# of the hot paths that matter for v0.2.0:
+#
+#   - pkg/cas/Commit       (the write path; CAS is the spine)
+#   - pkg/cas/Verify       (the read path; verification is the
+#                          bottleneck for replay tooling)
+#   - pkg/cas/WriteObject  (the dedup path; SHA-256 streaming)
+#   - internal/vault/Encrypt       (the on-disk path; AES-GCM)
+#   - internal/vault/EncryptDecrypt (the round-trip path)
+#   - internal/bandit/Select       (Thompson sampling; hot on
+#                                  every recommendation)
+#   - internal/metrics/BenchmarkHistogramPercentile (the
+#                          p95/p99 reporting path; SLOs live
+#                          on top of this)
+#   - internal/metrics/BenchmarkSortLabels (the label sort
+#                          used in every scrape; bounds the
+#                          Prometheus exposition path)
+#
+# `make bench` runs `go test -bench=<name|...> -benchmem
+# -benchtime=1s ./...` against the union of these names.
+# The Go -bench flag matches names as a regex with implicit
+# anchors at the start, so "BenchmarkSelect" matches every
+# benchmark that starts with that substring (e.g. both
+# BenchmarkSelect and BenchmarkSelectSmall). We pick the
+# 10-arm BenchmarkSelect variant because that is the
+# realistic load; the suite also has BenchmarkSelectSmall
+# (a degenerate case for the algorithm's edge cases) which
+# is intentionally excluded.
+#
+# The p99 latency gate is NOT here — it lives in the existing
+# k6 scenario tests/load/scenarios/10-sustained-load.js, which
+# uses k6's native p(99) threshold. Go's testing.B has no
+# notion of p99 and we do not pretend otherwise.
+#
+# When a benchmark is renamed or removed, edit this file and
+# PR. The nightly bench run will fail loudly until the list
+# is back in sync.
+
+BenchmarkCommit
+BenchmarkVerify
+BenchmarkWriteObject
+BenchmarkEncrypt
+BenchmarkEncryptDecrypt
+BenchmarkSelect
+BenchmarkSortLabels
+BenchmarkHistogramPercentile

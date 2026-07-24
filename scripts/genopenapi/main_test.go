@@ -34,6 +34,17 @@ func TestGenerator_NoStubsInOutput(t *testing.T) {
 		t.Fatalf("read: %v", err)
 	}
 	s := string(data)
+	versionData, err := os.ReadFile(filepath.Join(repoRoot(t), "VERSION"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := strings.TrimSpace(string(versionData))
+	if !strings.Contains(s, "# Version "+version+" is the production surface.") || !strings.Contains(s, `version: "`+version+`"`) {
+		t.Fatalf("output does not use VERSION %q", version)
+	}
+	if !strings.Contains(s, "    object:\n      type: object\n      additionalProperties: true") {
+		t.Fatal("output does not define the generic object schema")
+	}
 	if strings.Contains(s, "TODO: M-15") {
 		t.Fatalf("output still contains TODO stubs; the generator must produce real entries\n%s", s)
 	}
@@ -176,6 +187,12 @@ func TestGenerator_RequestBodyOnWrites(t *testing.T) {
 	s := string(data)
 	if !strings.Contains(s, "requestBody:") {
 		t.Fatalf("output contains no requestBody section; write-handlers are missing schemas")
+	}
+	if !strings.Contains(s, "              type: object\n              properties:\n") {
+		t.Fatal("request body fields are not nested under properties")
+	}
+	if !strings.Contains(s, "                  type: array\n                  items: {}") {
+		t.Fatal("request body arrays do not define items")
 	}
 }
 

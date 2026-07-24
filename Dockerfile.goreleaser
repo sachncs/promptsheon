@@ -1,0 +1,51 @@
+# Dockerfile.goreleaser
+#
+# Minimal runtime image consumed by GoReleaser's `dockers_v2:`
+# block. Goreleaser pre-builds the binaries (see builds: in
+# .goreleaser.yml) and mounts them at the build context path
+# matching the TARGETPLATFORM (e.g. `linux/amd64/promptsheond`).
+# This Dockerfile therefore only COPYs the right binary for the
+# platform goreleaser is currently building — it does NOT
+# rebuild from source.
+#
+# The full multi-stage source build lives in `Dockerfile` next
+# to this file; that is the `docker build` path. The two have
+# different build contexts (Dockerfile works from a GitHub
+# checkout; Dockerfile.goreleaser works from goreleaser's
+# synthetic binary-only context) and the conditional complexity
+# of a "build source if available, else COPY" Dockerfile is
+# not worth the savings — keep the two files distinct.
+#
+# Required ARGs (goreleaser supplies them via buildkit):
+#   TARGETPLATFORM  — linux/amd64, linux/arm64, etc.
+# Optional ARGs (operators override for re-builds):
+#   ALPINE_VERSION  — runtime base image tag (default 3.20).
+
+# syntax=docker/dockerfile:1.7
+ARG ALPINE_VERSION=3.20
+
+FROM alpine:${ALPINE_VERSION}
+ARG TARGETPLATFORM
+
+RUN apk add --no-cache ca-certificates tzdata \
+ && addgroup -g 1000 promptsheon \
+ && adduser -D -u 1000 -G promptsheon promptsheon
+
+# TARGETPLATFORM is the multi-arch key goreleaser uses to
+# place binaries in the build context. For linux/amd64 the
+# COPY source resolves to `linux/amd64/promptsheond`; for
+# linux/arm64 it resolves to `linux/arm64/promptsheond`.
+COPY ${TARGETPLATFORM}/promptsheond /usr/local/bin/promptsheond
+
+WORKDIR /data
+RUN chown -R promptsheon:promptsheon /data
+
+USER promptsheon
+
+ENV PROMPTSHEON_ADDR=:8080 \
+    PROMPTSHEON_DB_PATH=/data/promptsheon.db
+
+EXPOSE 8080
+VOLUME ["/data"]
+
+ENTRYPOINT ["promptsheond"]
