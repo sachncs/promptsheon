@@ -3,6 +3,8 @@ package llm
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"time"
 
 	anthropic "github.com/anthropics/anthropic-sdk-go"
@@ -18,12 +20,20 @@ type Anthropic struct {
 
 // NewAnthropic creates an Anthropic provider. cfg.APIKey is required;
 // cfg.BaseURL defaults to https://api.anthropic.com when empty.
+//
+// PERF-LLM-1: tuned http.Transport (shared with OpenAI).
 func NewAnthropic(cfg ProviderConfig) *Anthropic {
 	base := cfg.BaseURL
 	if base == "" {
 		base = "https://api.anthropic.com"
 	}
-	opts := []option.RequestOption{option.WithBaseURL(base)}
+	opts := []option.RequestOption{
+		option.WithBaseURL(base),
+		option.WithHTTPClient(&http.Client{
+			Transport: tunedTransport(),
+			Timeout:   60 * time.Second,
+		}),
+	}
 	if cfg.APIKey != "" {
 		opts = append(opts, option.WithAPIKey(cfg.APIKey))
 	}
@@ -76,6 +86,16 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 
 	start := time.Now()
 	msg, err := a.client.Messages.New(ctx, params)
+	duration := time.Since(start)
+	// PERF-LLM-2: log slow calls.
+	if duration > slowCallLogThreshold {
+		slog.Debug("slow LLM call",
+			"provider", a.Name(),
+			"model", req.Model,
+			"duration", duration,
+			"err", err,
+		)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%s request: %w", ProviderAnthropic, err)
 	}
@@ -98,6 +118,6 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 		},
 		Model:      string(msg.Model),
 		StopReason: string(msg.StopReason),
-		Latency:    time.Since(start),
+		Latency:    duration,
 	}, nil
 }
