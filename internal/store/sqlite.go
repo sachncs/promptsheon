@@ -58,6 +58,13 @@ type SQLite struct {
 	stmtGetAPIKeyByHash  *sql.Stmt
 	stmtListExecutionsCV *sql.Stmt
 
+	// PERF-AUDIT-1: cache the last verified (rowid, hash) pair
+	// so repeat VerifyAuditChain calls only walk the new rows.
+	// The cache is invalidated on every AppendAudit (the fresh
+	// rowid is below the cached checkpoint, so the walk still
+	// covers it). On the first call we walk the full chain.
+	auditVerifyCache atomic.Pointer[auditVerifyEntry]
+
 	// auditTail caches the (last_rowid, last_hash) pair that
 	// AppendAudit must chain against. Reading from the cache
 	// removes one SELECT per append; the cache is initialised
@@ -79,6 +86,13 @@ type SQLite struct {
 		rowid atomic.Uint64
 		hash  string
 	}
+}
+
+// auditVerifyEntry is the cached (rowid, hash) pair from the
+// last successful VerifyAuditChain call.
+type auditVerifyEntry struct {
+	rowid int64
+	hash  string
 }
 
 // NewSQLite opens or creates a SQLite database at dbPath and runs migrations.
@@ -356,9 +370,40 @@ type auditPageResult struct {
 // observability package can call it without importing the
 // store's Repository surface.
 func VerifyAuditChainOnDB(ctx context.Context, db *sql.DB) (*AuditVerifyResult, error) {
+	return verifyAuditChainOnDB(ctx, db, nil)
+}
+
+// verifyAuditChainOnDB is the inner implementation. The cache
+// parameter is the optional PERF-AUDIT-1 checkpoint: when set,
+// the walk starts after the cached rowid and verifies the
+// cached hash matches the row at that checkpoint before
+// continuing. cache may be nil for callers that don't have it
+// (RetentionManager does not).
+func verifyAuditChainOnDB(ctx context.Context, db *sql.DB, cache *auditVerifyEntry) (*AuditVerifyResult, error) {
 	const pageSize = 1000
 	var prevHash string
 	var lastRowID int64
+	// PERF-AUDIT-1: seed the walk from the cached checkpoint.
+	if cache != nil && cache.rowid > 0 {
+		// Verify the cached rowid still maps to the cached hash.
+		// If it does, the prefix is intact and we only walk new
+		// rows. If it doesn't, the cache is stale (someone
+		// tampered or appended out-of-band) — fall back to a
+		// full walk.
+		var cachedHash string
+		if err := db.QueryRowContext(ctx,
+			`SELECT entry_hash FROM audit_entries WHERE rowid = ?`,
+			cache.rowid,
+		).Scan(&cachedHash); err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				return nil, fmt.Errorf("audit cache lookup: %w", err)
+			}
+			// Cached rowid is gone; full walk.
+		} else if cachedHash == cache.hash {
+			prevHash = cache.hash
+			lastRowID = cache.rowid
+		} // else: cache hash mismatch -> full walk from rowid 0
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -414,7 +459,20 @@ func VerifyAuditChainOnDB(ctx context.Context, db *sql.DB) (*AuditVerifyResult, 
 }
 
 func (s *SQLite) VerifyAuditChain(ctx context.Context) (*AuditVerifyResult, error) {
-	return VerifyAuditChainOnDB(ctx, s.db)
+	// PERF-AUDIT-1: read the cached checkpoint. A fresh snapshot
+	// (atomic.Pointer.Load) gives a consistent (rowid, hash) pair.
+	cached := s.auditVerifyCache.Load()
+	res, err := verifyAuditChainOnDB(ctx, s.db, cached)
+	if err != nil {
+		return nil, err
+	}
+	if res.Ok && res.LastRowID > 0 {
+		s.auditVerifyCache.Store(&auditVerifyEntry{
+			rowid: res.LastRowID,
+			hash:  res.LastHash,
+		})
+	}
+	return res, nil
 }
 
 func verifyAuditPageOnDB(ctx context.Context, db *sql.DB, prevHash string, afterRowID int64, limit int) auditPageResult {
