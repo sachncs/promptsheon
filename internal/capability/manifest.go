@@ -96,6 +96,14 @@ var ErrEmptyManifest = errors.New("manifest is empty")
 // identify its three core artifacts (prompt, model policy, runtime
 // policy) and may not contain duplicate hashes within a single slice.
 func (m Manifest) Validate() error {
+	// MAN-1: Manifest.Validate requires only the artifacts the
+	// Resolver actually loads today (Prompt, ModelPolicy,
+	// RuntimePolicy). ContextContract and Memory remain valid
+	// ArtifactKinds — operators may still attach them — but a
+	// Manifest that omits them is acceptable because no
+	// production code path reads them. The previous design
+	// required all five, which forced every test fixture to
+	// fabricate empty hashes for fields the system never used.
 	if err := m.Prompt.Valid(); err != nil {
 		return fmt.Errorf("manifest: prompt: %w", err)
 	}
@@ -104,12 +112,6 @@ func (m Manifest) Validate() error {
 	}
 	if err := m.RuntimePolicy.Valid(); err != nil {
 		return fmt.Errorf("manifest: runtime_policy: %w", err)
-	}
-	if err := m.Context.Valid(); err != nil {
-		return fmt.Errorf("manifest: context_contract: %w", err)
-	}
-	if err := m.Memory.Valid(); err != nil {
-		return fmt.Errorf("manifest: memory: %w", err)
 	}
 	if err := validateSlice(m.Guardrails, "guardrails"); err != nil {
 		return err
@@ -125,9 +127,7 @@ func (m Manifest) Validate() error {
 	}
 	if m.Prompt.Hash == "" &&
 		m.ModelPolicy.Hash == "" &&
-		m.RuntimePolicy.Hash == "" &&
-		m.Context.Hash == "" &&
-		m.Memory.Hash == "" {
+		m.RuntimePolicy.Hash == "" {
 		return ErrEmptyManifest
 	}
 	return nil
