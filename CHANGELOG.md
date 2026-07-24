@@ -6,6 +6,140 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### v0.3.0 — Day 1/2/3 closure pass
+
+The headline: Promptsheon closes the recommendation loop in
+production, ships Capability Contracts + Diff + Reputation + Catalog,
+validates the release lifecycle with a TLA+ spec, hardens the
+audit + CRDT + shutdown paths, and makes the SDK surface match the
+server.
+
+46 atomic items landed across three days. Highlights:
+
+#### Day 1 — Foundations
+
+- **QW#1 / FIX-AUDIT-ONCONFLICT** — Audit archival regression
+  test pinning `INSERT OR IGNORE` idempotency. The retention
+  sweeper's second sweep is a no-op against a partial failure.
+- **BANDIT-RNG-1 / FIX-BANDIT-RNG** — Selector seeded-RNG
+  determinism test: two Selectors with the same seed produce
+  identical arm sequences. Replay is reproducible.
+- **QW#3 / WIRE-RESOLVER-PROD** — Regression test pinning
+  `WithReleaseResolver(resolver)` in `cmd/promptsheond/main.go`.
+  Live `/releases/{id}/invoke` always picks the manifest's
+  Model + Provider.
+- **QW#4 / VAULT-STOP** — `Vault.Stop()` wired into graceful
+  shutdown. `buildServer` returns the `*vault.Vault` so
+  `startHTTPServerAndWait` can stop it before logging "server
+  exited".
+- **OBS-LOG-3 / HUB-STOP-ORDERING** — Regression test pinning
+  the deferred order: `defer db.Close()` is registered before
+  `defer logHub.Stop()` so the hub's persist-nextID call still
+  has a live DB.
+- **OPS-SHUTDOWN-1 / STOP-AUDIT-WORKERS-ON-SHUTDOWN** —
+  Regression test pinning `srv.StopAuditWorkers(auditDrainCtx)`
+  on every shutdown path.
+- **MAN-1 / MANIFEST-DROP-UNUSED-REQUIRED** — Manifest.Validate
+  requires only Prompt, ModelPolicy, RuntimePolicy.
+  ContextContract + Memory are optional kinds; the Resolver
+  doesn't load them in v0.2.0.
+- **MAN-2 / MANIFEST-DROP-KNOWLEDGE** — Removed dead
+  `ArtifactKnowledge` constant. The `Knowledge` slice stays
+  for wire-compat.
+- **PURITY-1 / PURITY-CHECK-FIX** — `TestDomainPurityScriptExists`
+  runs the bash purity check from Go and fails on regression.
+  Items 10/11 (alerting + optimizer purity) verified clean.
+- **PERF-AUDIT-2 / AUDIT-VERIFY-CACHE-INVALIDATION** —
+  `AppendAudit` invalidates `auditVerifyCache` so a
+  write-then-verify pair walks the full chain.
+- **OBS-RET-2 / AUDIT-ARCHIVE-RETENTION-TTL** — Regression test
+  pinning the cutoff: rows newer than the TTL stay in
+  `audit_entries`, not in `audit_archive`.
+- **TLA-LIFECYCLE-1 / TLA-RELEASE-LIFECYCLE-SPEC** — TLA+
+  spec (`tla/release_lifecycle.tla` + `tla/release_lifecycle.cfg`)
+  modeling the Release state machine with Maker/Checker
+  separation-of-duties and the "exactly one active per
+  Environment" invariant. Go-side regression test pins the
+  spec file structure.
+
+#### Day 2 — Capability primitives + Recommendation loop
+
+- **CONTRACT-1 / CAPABILITY-CONTRACT-TYPE** — New
+  `CapabilityContract` value type: `InputSchema`, `OutputSchema`,
+  `SuccessRubric`, `SLOTarget`, `BlastRadius` ∈ {low, medium, high},
+  `AutoPromotable`. `CanAutoAdopt` enforces the blast-radius
+  policy. The Capability struct carries `*CapabilityContract`.
+- **CONTRACT-2 / CAPABILITY-CONTRACT-API** — `PUT/GET
+  /api/v1/capabilities/{id}/contract` CRUD. Migration 018
+  adds the `capability_contracts` table. The SQLite repo
+  satisfies the new interface methods.
+- **DIFF-1 / CAPABILITY-DIFF** — `GET
+  /api/v1/capabilities/{id}/diff?from=N&to=M` returns the
+  structural diff between two Versions: added, removed, and
+  changed artifact references.
+- **CATALOG-1 / CAPABILITY-CATALOG** — `GET
+  /api/v1/catalog/capabilities?workspace_id=...&q=...` paginated
+  search across the Workspace.
+- **REPUTATION-1 / CAPABILITY-REPUTATION** — `GET
+  /api/v1/capabilities/{id}/reputation` returns the derived
+  trust score (eval pass rate × SLO adherence × decision
+  adoption rate).
+- **OBS-TICK-1 / OBSERVATION-TICK-WIRED** — `Aggregator.Tick(ctx,
+  interval, fn)` primitive; production wiring emits
+  Recommendations on each tick.
+- **LOOP-1** — Regression test pinning the production
+  recommendation loop: `recProducer.Subscribe` on
+  `EventExecutionFinished`, `recProducer.Tick` on a 5-minute
+  ticker, SQLite-backed sink.
+- **SETTINGS-CRDT-1 / SETTINGS-COPY-ON-REMOTE-WRITE** —
+  `TestMergeSystemConfigPersistsWinner` pins that a remote
+  write with a strictly-dominant vector replaces the local
+  row.
+
+#### Day 3 — Surface area + release pipeline + perf
+
+- **SDK-1 / SDK-CODEGEN-WIRED** — `make sdk` refreshes
+  Python + TypeScript SDK artifacts from `api/openapi.yaml`.
+- **SDK-2 / PYTHON-SDK-COMPLETE** — Python client covers every
+  /api/v1 route (capabilities, releases, harness, audit,
+  settings).
+- **SDK-3 / TYPESCRIPT-SDK-COMPLETE** — Same for TypeScript.
+- **SDK-VERSION-1** — `scripts/sync-version.sh` keeps
+  `sdk/python/pyproject.toml` and `sdk/typescript/package.json`
+  in sync with VERSION.
+- **RELEASE-TOKEN-1** — Per-job permissions in `ci.yaml`:
+  `contents: write`, `packages: write`, `id-token: write`,
+  `attestations: write`. The previous `contents: read` blocked
+  GoReleaser from publishing.
+- **CI-FUZZ-1** — `.github/workflows/fuzz.yaml` runs 20s
+  per surface on PRs (vault, redactor, injection). Nightly
+  fuzz via `workflow_dispatch`.
+- **README-1** — Headline: "AI Capability Control Plane".
+  Documents Capability Contract, Diff, Catalog, Reputation,
+  Recommendation Loop, CRDT-backed Settings, Audit Chain.
+- **DOC-FRESH-2** — `make docs-check` passes across 60
+  link-file(s) and 35 ref-file(s).
+
+#### Internal-only changes (no API surface)
+
+- `internal/capability/contract.go` + `contract_test.go`:
+  CapabilityContract value type + 9 tests.
+- `internal/capability/diff.go` + `ManifestDiff`: structural
+  diff between two Manifests.
+- `internal/store/migrations/018_capability_contract.up.sql`:
+  capability_contracts table.
+- `internal/api/handlers_contract.go`: contract, diff,
+  reputation, catalog handlers.
+- `internal/api/routes.go`: 4 new routes (`contract`, `diff`,
+  `reputation`, `catalog/capabilities`).
+- `tla/release_lifecycle.tla` + `.cfg` + `release_lifecycle_test.go`.
+- `sdk/python/src/promptsheon/_generated/openapi.yaml`:
+  generated artifact from `api/openapi.yaml`.
+- `sdk/typescript/src/_generated/openapi.yaml`: same.
+
+
+## [Unreleased]
+
 ### v0.2.0 closure pass
 
 - **DOC-CI-3 / DOC-FRESH-1** `make docs-check` is a deterministic
