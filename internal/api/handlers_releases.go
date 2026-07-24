@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -211,7 +212,10 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
-	manifestHash := manifestHashForRelease(rel)
+	manifestHash, err := manifestHashForRelease(rel)
+	if err != nil {
+		return fmt.Errorf("manifest hash: %w", err)
+	}
 	plan, err := s.resolveRelease(r.Context(), rel)
 	if err != nil {
 		return &HTTPError{Status: http.StatusBadGateway, Message: err.Error()}
@@ -330,10 +334,16 @@ func (s *Server) handleGetReleaseApproval(w http.ResponseWriter, r *http.Request
 	return nil
 }
 
-func manifestHashForRelease(rel *release.Release) string {
+func manifestHashForRelease(rel *release.Release) (string, error) {
 	h, err := computeManifestHash(rel.Manifest)
 	if err != nil {
-		return ""
+		// BUG-20: previously this returned "" and the caller
+		// stored the empty hash in the audit row, silently
+		// dropping tamper-evidence. Surface the error so the
+		// handler returns 500 and the operator can see what
+		// happened.
+		slog.Error("manifest hash failed", "release_id", rel.ID, "err", err)
+		return "", err
 	}
-	return h
+	return h, nil
 }
