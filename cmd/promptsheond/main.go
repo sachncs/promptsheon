@@ -251,7 +251,7 @@ func main() {
 		defer func() { _ = retentionDB.Close() }()
 	}
 
-	srv, limiter, tracer, collector := buildServer(rootCtx, &cfg, db, logger, tp, logHub, elector, retentionDB, sharedBus)
+	srv, limiter, tracer, collector, v := buildServer(rootCtx, &cfg, db, logger, tp, logHub, elector, retentionDB, sharedBus)
 
 	srv.StartAuditWorkers(rootCtx, 2)
 
@@ -261,7 +261,7 @@ func main() {
 	// the store can't be opened (e.g. read-only filesystem);
 	// the middleware degrades gracefully in that case.
 	idempStore := store.NewSQLiteIdempotencyStore(db.DB())
-	startHTTPServerAndWait(rootCtx, rootCancel, &cfg, srv, logger, limiter, tracer, collector, idempStore)
+	startHTTPServerAndWait(rootCtx, rootCancel, &cfg, srv, logger, limiter, tracer, collector, idempStore, v)
 }
 
 // configureShellTool loads the shell tool policy from environment. The
@@ -325,7 +325,7 @@ func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
 	return db
 }
 
-func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub, elector *election.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*api.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector) {
+func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub, elector *election.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*api.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector, *vault.Vault) {
 	// OBS-TR-1: no SQLite tracer; OTel-only export.
 	collector := metrics.NewCollector()
 	// OBS-LOG-2: wire the SSE hub's drop counter into the
@@ -650,7 +650,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	}
 
 	srv := apiserver.New(repos, logger, opts...)
-	return srv, limiter, tracer, collector
+	return srv, limiter, tracer, collector, v
 }
 
 // buildOAuthManager constructs an *auth.OAuthManager from
@@ -757,7 +757,7 @@ func (l *defaultArtifactLoader) Load(ctx context.Context, _ capability.ArtifactK
 // The tag-split lives in two separate files so the placeholder
 // doesn't ship with the production binary.
 
-func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *config.Config, srv *api.Server, logger *slog.Logger, limiter *ratelimit.Limiter, tracer trace.Tracer, collector *metrics.Collector, idempStore store.IdempotencyStore) {
+func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *config.Config, srv *api.Server, logger *slog.Logger, limiter *ratelimit.Limiter, tracer trace.Tracer, collector *metrics.Collector, idempStore store.IdempotencyStore, v *vault.Vault) {
 	handler := api.ChainHTTP(srv,
 		api.Recovery(logger),
 		api.MaxBytesReader(10<<20),
@@ -945,6 +945,9 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 	api.StopOAuthStateJanitor()
 	if srv.Authenticator() != nil {
 		srv.Authenticator().Stop()
+	}
+	if v != nil {
+		v.Stop()
 	}
 	logger.Info("server exited")
 }
