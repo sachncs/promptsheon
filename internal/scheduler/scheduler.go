@@ -61,15 +61,43 @@ func (s *Scheduler) TickOnce(ctx context.Context, now time.Time) {
 	if err != nil {
 		return
 	}
+	// PERF-SCH-1: collect all fired schedules and bulk-update
+	// them in a single transaction. The per-row UPDATE loop
+	// cost N round-trips; the bulk path is one.
+	published := make([]*schedule.Schedule, 0, len(due))
+	fired := make([]*schedule.Schedule, 0, len(due))
 	for i := range due {
 		sc := due[i]
 		if !sc.Enabled {
 			continue
 		}
-		fired := sc.MarkFired(now)
-		if err := s.schedules.UpdateSchedule(ctx, &fired); err != nil {
-			continue
+		u := sc.MarkFired(now)
+		fired = append(fired, &u)
+	}
+	if bulk, ok := s.schedules.(interface {
+		BulkUpdateSchedules(ctx context.Context, scs []*schedule.Schedule) error
+	}); ok {
+		if err := bulk.BulkUpdateSchedules(ctx, fired); err == nil {
+			published = fired
+		} else {
+			// Fall back to per-row on bulk failure. The per-row
+			// path tracks which rows actually persisted so the
+			// publish loop only fires for successfully updated
+			// schedules.
+			for _, f := range fired {
+				if err := s.schedules.UpdateSchedule(ctx, f); err == nil {
+					published = append(published, f)
+				}
+			}
 		}
+	} else {
+		for i := range fired {
+			if err := s.schedules.UpdateSchedule(ctx, fired[i]); err == nil {
+				published = append(published, fired[i])
+			}
+		}
+	}
+	for _, sc := range published {
 		_ = s.publisher.Publish(capability.Event{
 			Type:          capability.EventType("schedule.fired"),
 			AggregateID:   sc.ID,
