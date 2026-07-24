@@ -163,8 +163,11 @@ func (m *RetentionManager) Enforce(ctx context.Context) error {
 				"err", err)
 			m.lastErr = fmt.Errorf("audit chain verify: %w", err)
 		} else {
+			// INSERT OR IGNORE: audit_archive.id is the PK, so a
+			// re-run after a partial failure would otherwise
+			// abort the entire sweep on a duplicate-id error.
 			result, err := m.db.ExecContext(ctx, `
-				INSERT INTO audit_archive
+				INSERT OR IGNORE INTO audit_archive
 				    (id, user_id, action, resource, details, timestamp,
 				     previous_hash, entry_hash, timestamp_str,
 				     resource_kind, resource_id, archived_at)

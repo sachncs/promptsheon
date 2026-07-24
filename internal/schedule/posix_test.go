@@ -15,10 +15,10 @@ func TestPOSIX_Cron_DOM_DOW_Semantics(t *testing.T) {
 	day1 := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC) // Wed
 
 	cases := []struct {
-		name   string
-		expr   string
-		from   time.Time
-		want   time.Time
+		name string
+		expr string
+		from time.Time
+		want time.Time
 	}{
 		{"DOM wildcard, DOW=Monday", "0 0 * * 1", tuesday, time.Date(2025, 1, 13, 0, 0, 0, 0, time.UTC)},
 		{"DOW wildcard, DOM=1", "0 0 1 * *", day1.AddDate(0, 0, 1), time.Date(2025, 2, 1, 0, 0, 0, 0, time.UTC)},
