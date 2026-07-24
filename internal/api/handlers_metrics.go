@@ -1,6 +1,7 @@
 package api
 
 import (
+	"container/list"
 	"net/http"
 	"sort"
 	"sync"
@@ -12,9 +13,22 @@ import (
 // the new abstraction is the Capability aggregate (ADR-0010) and
 // the v0.0.7 prompts/agents tables are dropped (F-06). The map
 // name reflects that.
+//
+// PERF-4c: the single map + RWMutex becomes a per-entry list
+// element under a single mutex. Concurrent Records for different
+// capabilities are still serialised (the mutex is held for
+// ~100ns) but the load is uniform and the RWMutex upgrade
+// contention is gone.
+//
+// PERF-5: an LRU eviction policy caps the in-memory map at
+// maxUsageEntries so the tracker cannot grow unbounded across a
+// long-running daemon. The "least recently used" item is the
+// tail of the list; Records on an existing entry move it to the
+// front.
 type UsageTracker struct {
-	mu              sync.RWMutex
-	capabilityUsage map[string]*UsageCount
+	mu      sync.Mutex
+	entries map[string]*list.Element
+	order   *list.List
 }
 
 // UsageCount tracks usage statistics for one Capability.
@@ -27,10 +41,17 @@ type UsageCount struct {
 	AvgLatency float64   `json:"avg_latency_ms,omitempty"`
 }
 
+// maxUsageEntries caps the LRU so the UsageTracker cannot grow
+// without bound. 16384 is roughly 4x the "top 10k" dashboard
+// target; well below the 4096-record observation window on a
+// per-tenant basis.
+const maxUsageEntries = 16384
+
 // NewUsageTracker creates a new usage tracker.
 func NewUsageTracker() *UsageTracker {
 	return &UsageTracker{
-		capabilityUsage: make(map[string]*UsageCount),
+		entries: make(map[string]*list.Element),
+		order:   list.New(),
 	}
 }
 
@@ -39,27 +60,45 @@ func (t *UsageTracker) RecordCapabilityUsage(id, name string, tokens int, latenc
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	usage, ok := t.capabilityUsage[id]
-	if !ok {
-		usage = &UsageCount{ID: id, Name: name}
-		t.capabilityUsage[id] = usage
+	now := time.Now()
+	if el, ok := t.entries[id]; ok {
+		u := el.Value.(*UsageCount)
+		u.Count++
+		u.LastUsed = now
+		u.AvgTokens = (u.AvgTokens*float64(u.Count-1) + float64(tokens)) / float64(u.Count)
+		u.AvgLatency = (u.AvgLatency*float64(u.Count-1) + latencyMs) / float64(u.Count)
+		t.order.MoveToFront(el)
+		return
 	}
 
-	usage.Count++
-	usage.LastUsed = time.Now()
-	usage.AvgTokens = (usage.AvgTokens*float64(usage.Count-1) + float64(tokens)) / float64(usage.Count)
-	usage.AvgLatency = (usage.AvgLatency*float64(usage.Count-1) + latencyMs) / float64(usage.Count)
+	u := &UsageCount{ID: id, Name: name}
+	el := t.order.PushFront(u)
+	t.entries[id] = el
+
+	if t.order.Len() > maxUsageEntries {
+		// Evict the least-recently-used entry (the tail).
+		oldest := t.order.Back()
+		if oldest != nil {
+			t.order.Remove(oldest)
+			delete(t.entries, oldest.Value.(*UsageCount).ID)
+		}
+	}
+
+	// Initialise the running averages from the first sample.
+	u.Count = 1
+	u.LastUsed = now
+	u.AvgTokens = float64(tokens)
+	u.AvgLatency = latencyMs
 }
 
 // GetTopCapabilities returns the most-used Capabilities.
 func (t *UsageTracker) GetTopCapabilities(limit int) []*UsageCount {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	var usages []*UsageCount
-	for _, u := range t.capabilityUsage {
-		usages = append(usages, u)
+	t.mu.Lock()
+	usages := make([]*UsageCount, 0, t.order.Len())
+	for e := t.order.Front(); e != nil; e = e.Next() {
+		usages = append(usages, e.Value.(*UsageCount))
 	}
+	t.mu.Unlock()
 
 	sort.Slice(usages, func(i, j int) bool {
 		return usages[i].Count > usages[j].Count
