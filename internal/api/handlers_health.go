@@ -19,11 +19,27 @@ var startTime = time.Now()
 // alive" not "is it healthy". Deeper checks live in /ready.
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
 	info := buildinfo.Get()
-	writeJSON(w, http.StatusOK, map[string]any{
+	body := map[string]any{
 		auditKeyStatus:  "healthy",
 		auditKeyVersion: info.Version,
 		"uptime":        time.Since(startTime).String(),
-	})
+	}
+	// PERF-MEM-1: include runtime.MemStats on /health when the
+	// caller asks for it via ?debug=1. Production probes do not
+	// include the query string so the MemStats read is skipped.
+	if r.URL.Query().Get("debug") == "1" {
+		var ms runtime.MemStats
+		runtime.ReadMemStats(&ms)
+		body["memory"] = map[string]any{
+			"alloc_bytes":       ms.Alloc,
+			"sys_bytes":         ms.Sys,
+			"heap_objects":      ms.HeapObjects,
+			"num_goroutine":     runtime.NumGoroutine(),
+			"num_gc":            ms.NumGC,
+			"gc_pause_total_ns": ms.PauseTotalNs,
+		}
+	}
+	writeJSON(w, http.StatusOK, body)
 	// Best-effort: flush any buffered spans so a health probe
 	// that happens to double as a trace-flush gets the data
 	// out the door. A failure here is not fatal — /health

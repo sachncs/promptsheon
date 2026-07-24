@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -805,6 +806,36 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 		WriteTimeout:      writeTimeout,
 		IdleTimeout:       idleTimeout,
 		MaxHeaderBytes:    maxHeaderBytes,
+	}
+
+	// PERF-MEM-2: optional pprof listener on a separate
+	// loopback port. Disabled by default; the runtime cost of
+	// the pprof endpoints is non-zero. Operators enable via
+	// PROMPTSHEON_PPROF=true; the default loopback port is
+	// 6060 (the convention Go itself uses).
+	if os.Getenv("PROMPTSHEON_PPROF") == "true" {
+		pprofAddr := os.Getenv("PROMPTSHEON_PPROF_ADDR")
+		if pprofAddr == "" {
+			pprofAddr = "127.0.0.1:6060"
+		}
+		pprofServer := &http.Server{
+			Addr:              pprofAddr,
+			Handler:           http.DefaultServeMux,
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+		go func() {
+			logger.Info("pprof listener enabled", "addr", pprofAddr)
+			if err := pprofServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				logger.Warn("pprof listener exited", "err", err)
+			}
+		}()
+		// Best-effort stop on daemon shutdown.
+		go func() {
+			<-rootCtx.Done()
+			shutdown, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			_ = pprofServer.Shutdown(shutdown)
+		}()
 	}
 
 	go func() {
