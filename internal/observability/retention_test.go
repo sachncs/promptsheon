@@ -265,6 +265,41 @@ func TestEnforceArchivesExpiredAuditRows(t *testing.T) {
 	}
 }
 
+// TestEnforceRespectsAuditTTL pins OBS-RET-2: Enforce only
+// archives audit rows older than the configured TTL. A row
+// newer than the TTL stays in audit_entries, not in
+// audit_archive.
+func TestEnforceRespectsAuditTTL(t *testing.T) {
+	m := newTestManagerWithAuditArchive(t, RetentionPolicy{
+		TraceTTL:      0,
+		AuditTTL:      24 * time.Hour,
+		CheckInterval: time.Hour,
+	})
+	// Seed a recent row (within TTL) with a valid chain hash.
+	recent := time.Now().UTC()
+	const rts = "2026-07-25T00:00:00Z"
+	rhash := computeTestAuditHash("recent", "u1", "create", "workspace:w1", `{}`, rts, "")
+	if _, err := m.db.Exec(`INSERT INTO audit_entries
+		(id, user_id, action, resource, timestamp, previous_hash, entry_hash, timestamp_str)
+		VALUES ('recent', 'u1', 'create', 'workspace:w1', ?, '', ?, ?)`,
+		recent, rhash, rts); err != nil {
+		t.Fatalf("seed recent: %v", err)
+	}
+	if _, err := m.db.Exec(`UPDATE audit_chain_state SET last_hash=?, last_rowid=1 WHERE id=0`, rhash); err != nil {
+		t.Fatalf("seed state: %v", err)
+	}
+	if err := m.Enforce(context.Background()); err != nil {
+		t.Fatalf("Enforce: %v", err)
+	}
+	var n int
+	if err := m.db.QueryRow(`SELECT COUNT(*) FROM audit_archive`).Scan(&n); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("recent row should not be archived, got %d", n)
+	}
+}
+
 // TestEnforceNoAuditOnEmptyTable confirms that when AuditTTL is
 // 0, Enforce does not touch the audit path at all (even if
 // audit_entries is empty).
