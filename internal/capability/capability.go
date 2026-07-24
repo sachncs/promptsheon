@@ -58,4 +58,12 @@ type Capability struct {
 	Tags        []string  `json:"tags,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+
+	// Contract is the typed contract this Capability promises
+	// to operators. A Capability without a Contract cannot be
+	// auto-promoted by the Recommendation engine. The field is
+	// optional for back-compat with v0.2.0 Capabilities that
+	// predate the Contract primitive; new Capabilities SHOULD
+	// attach one.
+	Contract *CapabilityContract `json:"contract,omitempty"`
 }
