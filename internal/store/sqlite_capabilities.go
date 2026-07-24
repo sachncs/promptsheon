@@ -540,6 +540,39 @@ func (s *SQLite) UpdateSchedule(ctx context.Context, sc *schedule.Schedule) erro
 	return nil
 }
 
+// BulkUpdateSchedules persists a batch of schedule updates in a
+// single transaction. PERF-SCH-1: TickOnce uses this instead of
+// looping per-row UPDATE, dropping the round-trip count from N
+// to 1.
+func (s *SQLite) BulkUpdateSchedules(ctx context.Context, scs []*schedule.Schedule) error {
+	if len(scs) == 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin bulk update tx: %w", err)
+	}
+	stmt, err := tx.PrepareContext(ctx,
+		`UPDATE schedules SET next_fire_at = ?, last_fire_at = ?, fired_count = ?, enabled = ?
+		 WHERE id = ?`,
+	)
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("prepare bulk update: %w", err)
+	}
+	defer stmt.Close()
+	for _, sc := range scs {
+		if _, err := stmt.ExecContext(ctx, sc.NextFireAt, sc.LastFireAt, sc.FiredCount, sc.Enabled, sc.ID); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("bulk update %s: %w", sc.ID, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit bulk update: %w", err)
+	}
+	return nil
+}
+
 func scanSchedule(scanner interface {
 	Scan(dest ...any) error
 }) (*schedule.Schedule, error) {

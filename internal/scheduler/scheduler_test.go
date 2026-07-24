@@ -81,6 +81,26 @@ func (f *fakeScheduleRepo) UpdateSchedule(_ context.Context, s *schedule.Schedul
 	return nil
 }
 
+// BulkUpdateSchedules implements the PERF-SCH-1 bulk path on
+// the test fake. Stores only the last write if a schedule is
+// updated twice; the production path is one transaction.
+func (f *fakeScheduleRepo) BulkUpdateSchedules(_ context.Context, scs []*schedule.Schedule) error {
+	if f.updErr != nil {
+		return f.updErr
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, s := range scs {
+		for i, cur := range f.all {
+			if cur.ID == s.ID {
+				f.all[i] = s
+				break
+			}
+		}
+	}
+	return nil
+}
+
 func (f *fakeScheduleRepo) DeleteSchedule(_ context.Context, id string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
