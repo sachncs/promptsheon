@@ -184,6 +184,11 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 	}
 
 	entry.Timestamp = entry.Timestamp.UTC()
+	// PERF-AUDIT-2: invalidate the verify cache so the next
+	// VerifyAuditChain walks the full chain including this row.
+	// Without this, a write-then-verify pair returns a stale
+	// "ok" verdict that omits the just-appended entry.
+	s.auditVerifyCache.Store(nil)
 	timestampStr := entry.Timestamp.Format(time.RFC3339Nano)
 	resourceKind, resourceID := splitAuditResource(entry.Resource)
 
