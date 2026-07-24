@@ -828,6 +828,31 @@ func TestMain_AuditDrainOnEveryShutdown(t *testing.T) {
 	}
 }
 
+// TestMain_RecommendationLoopWired pins LOOP-1: the production
+// main.go must wire the recommendation loop end-to-end:
+// (a) the producer subscribes to EventExecutionFinished,
+// (b) a periodic tick calls producer.Tick, and
+// (c) recommendations are persisted via a SQLite-backed sink.
+func TestMain_RecommendationLoopWired(t *testing.T) {
+	src, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatalf("read main.go: %v", err)
+	}
+	contents := string(src)
+	required := []string{
+		"recProducer.Subscribe(recBus, capability.EventExecutionFinished)",
+		"recProducer.Tick(rootCtx, t)",
+		"NewRecommendationRepository(db.DB())",
+		"recSink := func(ctx context.Context, r *capability.Recommendation) error",
+		"recommendation.New(agg,",
+	}
+	for _, fragment := range required {
+		if !strings.Contains(contents, fragment) {
+			t.Errorf("main.go must contain %q for the recommendation loop to be live", fragment)
+		}
+	}
+}
+
 // TestMain_HubStopBeforeDBClose pins OBS-LOG-3: the deferred
 // order in main() must close the SSE log hub BEFORE the database.
 // Defers run LIFO; the test reads main.go and asserts that the
