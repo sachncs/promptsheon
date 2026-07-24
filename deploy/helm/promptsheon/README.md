@@ -28,7 +28,7 @@ helm repo add promptsheon https://sachncs.github.io/promptsheon
 helm install promptsheon promptsheon/promptsheon \
   --set config.openaiApiKey="${OPENAI_API_KEY}" \
   --set config.anthropicApiKey="${ANTHROPIC_API_KEY}" \
-  --set image.tag=0.1.0
+  --set image.tag=0.2.0
 ```
 
 The chart defaults to a single-replica StatefulSet with a
