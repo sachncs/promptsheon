@@ -21,6 +21,9 @@ import (
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
+
 	"github.com/sachncs/promptsheon/internal/alerting"
 	"github.com/sachncs/promptsheon/internal/api"
 	apiserver "github.com/sachncs/promptsheon/internal/api/server"
@@ -774,14 +777,34 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 	readTimeout := time.Duration(cfg.ReadTimeout) * time.Second
 	readHeaderTimeout := time.Duration(cfg.ReadHeaderTimeout) * time.Second
 	idleTimeout := time.Duration(cfg.IdleTimeout) * time.Second
+	maxHeaderBytes := cfg.MaxHeaderBytes
+
+	// PERF-HTTP-2: h2c (HTTP/2 cleartext) is opt-in for
+	// development. The production daemon fronted by a TLS
+	// terminator uses HTTP/1.1; the h2c path's only purpose is
+	// streaming / pprof endpoints inside a developer shell.
+	// Enabled when PROMPTSHEON_H2C=true (default off — the
+	// middleware cost is non-zero and we don't want to pay it
+	// in production).
+	h2cEnabled := os.Getenv("PROMPTSHEON_H2C") == "true"
+
+	finalHandler := handler
+	if h2cEnabled {
+		finalHandler = h2c.NewHandler(handler, &http2.Server{
+			MaxConcurrentStreams: 250,
+			IdleTimeout:          idleTimeout,
+		})
+		logger.Info("h2c enabled", "addr", cfg.Addr)
+	}
 
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           handler,
+		Handler:           finalHandler,
 		ReadTimeout:       readTimeout,
 		ReadHeaderTimeout: readHeaderTimeout,
 		WriteTimeout:      writeTimeout,
 		IdleTimeout:       idleTimeout,
+		MaxHeaderBytes:    maxHeaderBytes,
 	}
 
 	go func() {

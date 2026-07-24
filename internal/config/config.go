@@ -57,6 +57,10 @@ type Config struct {
 	ReadTimeout       int // Read timeout in seconds (default: 30)
 	ReadHeaderTimeout int // ReadHeader timeout in seconds (default: 10)
 	IdleTimeout       int // Idle timeout in seconds (default: 120)
+	// PERF-HTTP-1: MaxHeaderBytes caps the total request header
+	// size. Default 1 MiB matches the Go stdlib default; the
+	// operator can lower it to harden against header-bomb attacks.
+	MaxHeaderBytes int // Max request header size (default: 1 MiB)
 
 	// Rate limiting
 	RateLimitRate     int // Requests per interval (default: 100)
@@ -131,6 +135,7 @@ func DefaultConfig() Config {
 		ReadTimeout:       30,
 		ReadHeaderTimeout: 10,
 		IdleTimeout:       120,
+		MaxHeaderBytes:    1 << 20, // 1 MiB
 
 		RateLimitRate:     100,
 		RateLimitInterval: 60,
@@ -182,6 +187,7 @@ func LoadConfig() (Config, error) {
 	cfg.ReadTimeout = getEnvInt("PROMPTSHEON_SERVER_READ_TIMEOUT", cfg.ReadTimeout)
 	cfg.ReadHeaderTimeout = getEnvInt("PROMPTSHEON_SERVER_READ_HEADER_TIMEOUT", cfg.ReadHeaderTimeout)
 	cfg.IdleTimeout = getEnvInt("PROMPTSHEON_SERVER_IDLE_TIMEOUT", cfg.IdleTimeout)
+	cfg.MaxHeaderBytes = getEnvInt("PROMPTSHEON_SERVER_MAX_HEADER_BYTES", cfg.MaxHeaderBytes)
 
 	cfg.RateLimitRate = getEnvInt("PROMPTSHEON_RATE_LIMIT_RATE", cfg.RateLimitRate)
 	cfg.RateLimitInterval = getEnvInt("PROMPTSHEON_RATE_LIMIT_INTERVAL", cfg.RateLimitInterval)
@@ -293,6 +299,9 @@ func sanitizeConfig(cfg *Config) {
 	}
 	if cfg.IdleTimeout < 0 {
 		cfg.IdleTimeout = 120
+	}
+	if cfg.MaxHeaderBytes < 0 {
+		cfg.MaxHeaderBytes = 1 << 20
 	}
 }
 
