@@ -11,4 +11,4 @@ in a follow-on commit. Codegen target:
 from .client import Client, ClientConfig, AsyncClient
 
 __all__ = ["Client", "ClientConfig", "AsyncClient"]
-__version__ = "0.1.0"
+__version__ = "0.2.0"
