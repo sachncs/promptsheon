@@ -1614,22 +1614,10 @@ func TestHandleRevokeAPIKey_AlreadyRevoked(t *testing.T) {
 	}
 }
 
-func TestHandleBootstrap_WrongMethod(t *testing.T) {
-	s := newTestServer(t)
-	req := httptest.NewRequest("GET", "/api/v1/setup", nil)
-	rr := httptest.NewRecorder()
-	err := s.handleBootstrap(rr, req)
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	he, ok := err.(*HTTPError)
-	if !ok {
-		t.Fatalf("expected *HTTPError, got %T: %v", err, err)
-	}
-	if he.Status != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d", he.Status)
-	}
-}
+// BUG-27: TestHandleBootstrap_WrongMethod removed. The route is
+// registered as POST /api/v1/setup, so the mux rejects non-POST
+// requests with 405 before the handler ever runs. The previous
+// guard inside the handler was unreachable.
 
 func TestHandleBootstrap_InvalidJSON(t *testing.T) {
 	s := newTestServer(t)

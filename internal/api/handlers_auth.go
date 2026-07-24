@@ -293,9 +293,9 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 // deployment — operators must set PROMPTSHEON_AUTH=true before
 // exposing the port.
 func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
-	if r.Method != http.MethodPost {
-		return badRequest("POST required")
-	}
+	// BUG-27: dropped the manual r.Method != POST check. The
+	// route is registered as POST /api/v1/setup, so the mux
+	// already enforces the method and the guard was unreachable.
 	// Bootstrap is the documented "first caller wins" path. The
 	// standard configuration is PROMPTSHEON_AUTH=false so the
 	// first caller can mint an admin key without credentials. The
