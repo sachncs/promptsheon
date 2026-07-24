@@ -510,6 +510,13 @@ func (m *mockRepo) GetCapabilityReputation(_ context.Context, capabilityID strin
 	return capability.Reputation{CapabilityID: capabilityID, TrustScore: 0.5, EvalPassRate: 0.5, SLOAdherenceRate: 0.5, DecisionAdoptionRate: 0.5, SampleSize: 1}, nil
 }
 
+func (m *mockRepo) CatalogSearch(_ context.Context, _ string, query string, _ int) ([]*capability.Capability, error) {
+	if query == "" {
+		return nil, nil
+	}
+	return []*capability.Capability{{ID: "c1", Name: "matching"}}, nil
+}
+
 func (m *mockRepo) GetLatestVersion(_ context.Context, capabilityID string) (*capability.Version, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
