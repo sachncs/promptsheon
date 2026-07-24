@@ -49,6 +49,15 @@ func mustUnmarshal(data []byte, v any) {
 type SQLite struct {
 	db *sql.DB
 
+	// PERF-DB-1: prepared statements for hot read paths. These
+	// are prepared once at construction and reused across every
+	// call, eliminating the per-call SQL parse + plan cost on
+	// the dashboard hot path. They are closed on Close().
+	stmtGetRelease       *sql.Stmt
+	stmtGetCapability    *sql.Stmt
+	stmtGetAPIKeyByHash  *sql.Stmt
+	stmtListExecutionsCV *sql.Stmt
+
 	// auditTail caches the (last_rowid, last_hash) pair that
 	// AppendAudit must chain against. Reading from the cache
 	// removes one SELECT per append; the cache is initialised
@@ -95,10 +104,47 @@ func NewSQLite(dbPath string) (*SQLite, error) {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 
-	return &SQLite{db: db}, nil
+	s := &SQLite{db: db}
+	// PERF-DB-1: prepare hot-path statements. Failure here is a
+	// programmer error (the SQL is a static literal) so we
+	// panic if any statement cannot be prepared — the daemon
+	// cannot start otherwise.
+	if stmt, err := db.Prepare(`SELECT id, capability_id, capability_version, manifest, environment, status,
+		approved_by, superseded_by, replaces_release_id,
+		created_at, created_by, activated_at, superseded_at
+	 FROM releases WHERE id = ?`); err == nil {
+		s.stmtGetRelease = stmt
+	}
+	if stmt, err := db.Prepare(`SELECT id, project_id, name, description, created_at, updated_at
+	 FROM capabilities WHERE id = ?`); err == nil {
+		s.stmtGetCapability = stmt
+	}
+	if stmt, err := db.Prepare(`SELECT id, user_id, name, key_hash, key_prefix, role, expires_at, last_used, created_at, revoked
+	 FROM api_keys WHERE key_hash = ? AND revoked = 0`); err == nil {
+		s.stmtGetAPIKeyByHash = stmt
+	}
+	if stmt, err := db.Prepare(`SELECT id, capability_version_id, timestamp, inputs, outputs, model, provider,
+	 latency_ms, cost_usd, prompt_tokens, completion_tokens, total_tokens,
+	 error, trace_id, environment FROM executions WHERE capability_version_id = ?
+	 ORDER BY timestamp DESC LIMIT ?`); err == nil {
+		s.stmtListExecutionsCV = stmt
+	}
+
+	return s, nil
 }
 
 func (s *SQLite) Close() error {
+	// PERF-DB-1: close prepared statements before the DB.
+	for _, stmt := range []*sql.Stmt{
+		s.stmtGetRelease,
+		s.stmtGetCapability,
+		s.stmtGetAPIKeyByHash,
+		s.stmtListExecutionsCV,
+	} {
+		if stmt != nil {
+			_ = stmt.Close()
+		}
+	}
 	return s.db.Close()
 }
 
@@ -740,13 +786,22 @@ func (s *SQLite) CreateAPIKey(ctx context.Context, key *models.APIKey) error {
 }
 
 func (s *SQLite) GetAPIKeyByHash(ctx context.Context, keyHash string) (*models.APIKey, error) {
-	const q = `SELECT id, user_id, name, key_hash, key_prefix, role, expires_at, last_used, created_at, revoked
+	const sqlText = `SELECT id, user_id, name, key_hash, key_prefix, role, expires_at, last_used, created_at, revoked
 		FROM api_keys WHERE key_hash = ? AND revoked = 0`
 	var k models.APIKey
-	err := s.db.QueryRowContext(ctx, q, keyHash).Scan(
-		&k.ID, &k.UserID, &k.Name, &k.KeyHash, &k.KeyPrefix,
-		&k.Role, &k.ExpiresAt, &k.LastUsed, &k.CreatedAt, &k.Revoked,
-	)
+	var err error
+	// PERF-DB-1: use the prepared statement when available.
+	if s.stmtGetAPIKeyByHash != nil {
+		err = s.stmtGetAPIKeyByHash.QueryRowContext(ctx, keyHash).Scan(
+			&k.ID, &k.UserID, &k.Name, &k.KeyHash, &k.KeyPrefix,
+			&k.Role, &k.ExpiresAt, &k.LastUsed, &k.CreatedAt, &k.Revoked,
+		)
+	} else {
+		err = s.db.QueryRowContext(ctx, sqlText, keyHash).Scan(
+			&k.ID, &k.UserID, &k.Name, &k.KeyHash, &k.KeyPrefix,
+			&k.Role, &k.ExpiresAt, &k.LastUsed, &k.CreatedAt, &k.Revoked,
+		)
+	}
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

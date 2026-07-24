@@ -78,12 +78,22 @@ func (s *SQLite) CreateRelease(ctx context.Context, r *release.Release) error {
 }
 
 func (s *SQLite) GetRelease(ctx context.Context, id string) (*release.Release, error) {
-	row := s.db.QueryRowContext(ctx,
-		`SELECT id, capability_id, capability_version, manifest, environment, status,
-		        approved_by, superseded_by, replaces_release_id,
-		        created_at, created_by, activated_at, superseded_at
-		 FROM releases WHERE id = ?`, id,
-	)
+	// PERF-DB-1: use the prepared statement when available.
+	// Falls back to the inline query so unit tests that build
+	// a SQLite without NewSQLite (rare) still work.
+	var row interface {
+		Scan(...any) error
+	}
+	if s.stmtGetRelease != nil {
+		row = s.stmtGetRelease.QueryRowContext(ctx, id)
+	} else {
+		row = s.db.QueryRowContext(ctx,
+			`SELECT id, capability_id, capability_version, manifest, environment, status,
+			        approved_by, superseded_by, replaces_release_id,
+			        created_at, created_by, activated_at, superseded_at
+			 FROM releases WHERE id = ?`, id,
+		)
+	}
 	return scanRelease(row)
 }
 
