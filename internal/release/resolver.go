@@ -24,16 +24,16 @@ import (
 // rendering, safety, and limits comes from the release's manifest
 // (which itself is content-addressed), not from the HTTP request.
 type ResolvedInvocation struct {
-	ReleaseID        string
-	CapabilityID     string
+	ReleaseID         string
+	CapabilityID      string
 	CapabilityVersion int
-	Environment      Environment
+	Environment       Environment
 
 	// Provider + model + revision come from the Manifest's
 	// ModelPolicy artifact. The request MUST NOT override these.
-	Provider  string
-	Model     string
-	Revision  string
+	Provider string
+	Model    string
+	Revision string
 
 	// Prompt is the bytes of the Manifest's Prompt artifact.
 	// Empty when the artifact has not been loaded from the CAS;
@@ -56,9 +56,9 @@ type ResolvedInvocation struct {
 	// ContextRefs, MemoryRefs, ToolRefs, MCPServerRefs are
 	// informational; the actual loading of these artifacts is
 	// the responsibility of the caller's invoke pipeline.
-	ContextRefs  []capability.ArtifactRef
-	MemoryRefs   []capability.ArtifactRef
-	ToolRefs     []capability.ArtifactRef
+	ContextRefs   []capability.ArtifactRef
+	MemoryRefs    []capability.ArtifactRef
+	ToolRefs      []capability.ArtifactRef
 	MCPServerRefs []capability.ArtifactRef
 
 	// ResolvedAt is when this plan was built. Recorded for
@@ -88,9 +88,9 @@ type ArtifactLoader interface {
 // ModelPolicy artifact hash. Only the fields used by the resolver
 // are decoded; the rest of the document is opaque.
 type ModelPolicyRecord struct {
-	Provider string  `json:"provider"`
-	Model    string  `json:"model"`
-	Revision string  `json:"revision,omitempty"`
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+	Revision string `json:"revision,omitempty"`
 	Defaults struct {
 		MaxOutputTokens int     `json:"max_output_tokens,omitempty"`
 		Temperature     float64 `json:"temperature,omitempty"`

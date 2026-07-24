@@ -122,7 +122,7 @@ func TestHarnessPreconditionBlocksActivate(t *testing.T) {
 func newServerWithHarness(t *testing.T, repo *mockRepo, runner *harness.EvalRunner) *Server {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
-	return NewServer(repo, logger,
+	return NewServer(newRepositories(repo), logger,
 		WithReleaseService(nil),
 		WithHarnessRunner(runner),
 	)

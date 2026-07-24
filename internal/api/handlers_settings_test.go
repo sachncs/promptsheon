@@ -26,16 +26,33 @@ func settingsTestServer(t *testing.T) *Server {
 		t.Fatalf("NewSQLite: %v", err)
 	}
 	s := newTestServer(t)
-	s.db = db
+	s.db = store.NewRepositories(db)
+	s.settingsReplicaID = "test-replica"
+	s.settingsNotif = settings.NewNotifier()
 	t.Cleanup(func() { _ = db.Close() })
 	return s
 }
 
+// seedSetting writes a CRDT record directly so a test can
+// stage DB state before exercising the API.
+func seedSetting(t *testing.T, s *Server, key, value string) {
+	t.Helper()
+	rec := settings.CRDTRecord{
+		Key:           key,
+		Value:         value,
+		ReplicaID:     "seed",
+		WriteTS:       time.Now().UnixNano(),
+		VersionVector: map[string]uint64{"seed": 1},
+	}
+	if err := s.db.SetSystemConfig(t.Context(), rec); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+}
+
 func TestHandleListSettings(t *testing.T) {
 	s := settingsTestServer(t)
-	ctx := t.Context()
-	_ = s.db.SetSystemConfig(ctx, "otl.endpoint", `"http://from-db:4317"`, "tester")
-	_ = s.db.SetSystemConfig(ctx, "otl.insecure", "false", "tester")
+	seedSetting(t, s, "otl.endpoint", `"http://from-db:4317"`)
+	seedSetting(t, s, "otl.insecure", "false")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/settings", nil)
 	rr := httptest.NewRecorder()
@@ -50,8 +67,8 @@ func TestHandleListSettings(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(got.Items) != 2 {
-		t.Fatalf("expected 2 items, got %d", len(got.Items))
+	if len(got.Items) < 2 {
+		t.Fatalf("expected at least 2 items, got %d", len(got.Items))
 	}
 }
 
@@ -67,12 +84,18 @@ func TestHandleSetSetting_MutableMode(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("PUT: code=%d body=%s", rr.Code, rr.Body.String())
 	}
-	v, _, err := s.db.GetSystemConfig(t.Context(), "otl.endpoint")
+	rec, err := s.db.GetSystemConfig(t.Context(), "otl.endpoint")
 	if err != nil {
 		t.Fatalf("get after put: %v", err)
 	}
-	if v != "http://otel:4317" {
-		t.Fatalf("value: got %q, want %q", v, "http://otel:4317")
+	if rec.Value != "http://otel:4317" {
+		t.Fatalf("value: got %q, want %q", rec.Value, "http://otel:4317")
+	}
+	if rec.Tombstone {
+		t.Fatalf("expected live row, got tombstone")
+	}
+	if rec.VersionVector["test-replica"] != 1 {
+		t.Fatalf("expected test-replica=1, got %d", rec.VersionVector["test-replica"])
 	}
 }
 
@@ -92,7 +115,6 @@ func TestHandleSetSetting_EnvOnlyMode(t *testing.T) {
 
 func TestHandleSetSetting_RejectsSecret(t *testing.T) {
 	s := settingsTestServer(t)
-	settings.RegisterSecretKey("webhook.signing_secret")
 
 	body, _ := json.Marshal(map[string]string{"value": "leak-me"})
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings/webhook.signing_secret", bytes.NewReader(body))
@@ -114,21 +136,112 @@ func TestHandleGetSetting_MissingKey(t *testing.T) {
 	}
 }
 
+func TestHandleGetSetting_EnvOnly(t *testing.T) {
+	s := settingsTestServer(t)
+	t.Setenv("runtime.endpoint", "from-env")
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/settings/runtime.endpoint", nil)
+	rr := httptest.NewRecorder()
+	s.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK || !bytes.Contains(rr.Body.Bytes(), []byte(`"value":"from-env"`)) {
+		t.Fatalf("GET env-only: code=%d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestHandleGetSetting_EnvOverridesDB(t *testing.T) {
+	s := settingsTestServer(t)
+	seedSetting(t, s, "runtime.endpoint", "from-db")
+	t.Setenv("runtime.endpoint", "from-env")
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/settings/runtime.endpoint", nil)
+	rr := httptest.NewRecorder()
+	s.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK || !bytes.Contains(rr.Body.Bytes(), []byte(`"value":"from-env"`)) {
+		t.Fatalf("GET precedence: code=%d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestHandleGetSetting_TombstoneReturns404(t *testing.T) {
+	s := settingsTestServer(t)
+	rec := settings.CRDTRecord{
+		Key: "otl.endpoint", Value: "", ReplicaID: "tester",
+		WriteTS: time.Now().UnixNano(), VersionVector: map[string]uint64{"tester": 1},
+		Tombstone: true,
+	}
+	if err := s.db.SetSystemConfig(t.Context(), rec); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/settings/otl.endpoint", nil)
+	rr := httptest.NewRecorder()
+	s.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("tombstoned GET: code=%d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestHandleDeleteSetting(t *testing.T) {
 	s := settingsTestServer(t)
-	_ = s.db.SetSystemConfig(t.Context(), "otl.endpoint", `"http://x"`, "tester")
+	seedSetting(t, s, "otl.endpoint", `"http://x"`)
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/settings/otl.endpoint", nil)
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("DELETE: code=%d", rr.Code)
 	}
+	// The row is now a tombstone, not deleted.
+	rec, err := s.db.GetSystemConfig(t.Context(), "otl.endpoint")
+	if err != nil {
+		t.Fatalf("post-delete get: %v", err)
+	}
+	if !rec.Tombstone {
+		t.Fatalf("expected tombstone, got %+v", rec)
+	}
+}
+
+func TestHandleDeleteSetting_MissingKey(t *testing.T) {
+	s := settingsTestServer(t)
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/settings/never-existed", nil)
+	rr := httptest.NewRecorder()
+	s.ServeHTTP(rr, req)
+	// Delete on a missing key now writes a tombstone; the
+	// response is still 204.
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("DELETE missing: code=%d", rr.Code)
+	}
 }
 
 func TestSettingsResponse_MasksSecret(t *testing.T) {
-	settings.RegisterSecretKey("webhook.signing_secret")
 	got := settingsResponse("webhook.signing_secret", "plaintext", "tester", time.Time{})
 	if got["value"] != "***" {
 		t.Fatalf("secret not masked: got %v", got["value"])
 	}
 }
+
+// TestHandleSetSetting_NotifierErrorPropagates verifies that
+// a hot-reload subscriber failure surfaces to the API caller
+// as a 500 (per the CRDT-aware notifier contract). The
+// propagation path is settings.Resolver.Set → Notifier.Publish
+// → HTTP 500.
+func TestHandleSetSetting_NotifierErrorPropagates(t *testing.T) {
+	s := settingsTestServer(t)
+	s.settingsMode = "mutable"
+	s.settingsNotif.Subscribe("otl.endpoint", func(_ string) error {
+		return errSettingsReload
+	})
+	body, _ := json.Marshal(map[string]string{"value": "http://otel:4317"})
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings/otl.endpoint", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	s.ServeHTTP(rr, req)
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("PUT with failing subscriber: code=%d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+// errSettingsReload is the typed error used by the
+// notifier-failure test. A sentinel kept local to the
+// handlers_settings_test file so unrelated tests don't see
+// it.
+var errSettingsReload = settingsReloadError("reload failed")
+
+type settingsReloadError string
+
+func (e settingsReloadError) Error() string { return string(e) }

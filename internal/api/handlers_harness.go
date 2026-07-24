@@ -353,4 +353,3 @@ func (s *Server) handleGetEval(w http.ResponseWriter, r *http.Request) error {
 	writeJSON(w, http.StatusOK, map[string]any{"run": run, "results": results})
 	return nil
 }
-

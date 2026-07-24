@@ -56,16 +56,14 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 		auditKeyStatus: "ready",
 		"go":           runtime.Version(),
 	}
-	if s.db != nil {
-		if err := s.db.Ping(r.Context()); err != nil {
-			ready[auditKeyStatus] = "not_ready"
-			ready["database"] = "unreachable"
-			ready["reason"] = "database ping failed: " + err.Error()
-			writeJSON(w, http.StatusServiceUnavailable, ready)
-			return nil
-		}
-		ready["database"] = dbStatusOK
+	if err := s.db.Ping(r.Context()); err != nil {
+		ready[auditKeyStatus] = "not_ready"
+		ready["database"] = "unreachable"
+		ready["reason"] = "database ping failed: " + err.Error()
+		writeJSON(w, http.StatusServiceUnavailable, ready)
+		return nil
 	}
+	ready["database"] = dbStatusOK
 	// Leader election: report the current holder so operators
 	// can tell which replica is the writer.
 	if s.elector != nil {

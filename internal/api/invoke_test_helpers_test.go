@@ -23,10 +23,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/eventbus"
 	"github.com/sachncs/promptsheon/internal/executor"
 	"github.com/sachncs/promptsheon/internal/invoke"
-	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/llm"
 	"github.com/sachncs/promptsheon/internal/metrics"
 	"github.com/sachncs/promptsheon/internal/observation"
@@ -123,13 +123,13 @@ func (inMemoryArtifactLoader) Load(ctx context.Context, kind capability.Artifact
 	return nil, fmt.Errorf("inMemoryArtifactLoader: unknown kind %q", kind)
 }
 
-func newInvokeTestServerWithRepo(t *testing.T, repo store.Repository, opts ...Option) *Server {
+func newInvokeTestServerWithRepo(t *testing.T, repo *mockRepo, opts ...Option) *Server {
 	t.Helper()
 
 	// Wire a real release.Resolver backed by the in-memory
 	// ArtifactLoader so /releases/{id}/invoke resolves
 	// Provider+Model from the Manifest (mirroring production).
-	resolver := release.NewResolver(repo.(release.Repository), inMemoryArtifactLoader{})
+	resolver := release.NewResolver(repo, inMemoryArtifactLoader{})
 
 	providers := llm.NewRegistry()
 	openai := &inMemoryProvider{name: "openai"}
@@ -198,7 +198,7 @@ func newInvokeTestServerWithRepo(t *testing.T, repo store.Repository, opts ...Op
 	allOpts := append(defaults, opts...)
 
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError}))
-	return NewServer(repo, logger, allOpts...)
+	return NewServer(newRepositories(repo), logger, allOpts...)
 }
 
 // silence the unused import linter when we trim imports later.
@@ -220,7 +220,7 @@ func NewTestServer(t *testing.T, opts ...Option) *Server {
 	logger := testutil.DiscardLogger()
 	defaults := []Option{WithProviders(llm.NewRegistry())}
 	allOpts := append(defaults, opts...)
-	s := NewServer(db, logger, allOpts...)
+	s := NewServer(store.NewRepositories(db), logger, allOpts...)
 	t.Cleanup(func() { _ = db.Close() })
 	return s
 }

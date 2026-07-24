@@ -212,7 +212,10 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 		return ErrBadRequest
 	}
 	manifestHash := manifestHashForRelease(rel)
-	plan, _ := s.resolveRelease(r.Context(), rel)
+	plan, err := s.resolveRelease(r.Context(), rel)
+	if err != nil {
+		return &HTTPError{Status: http.StatusBadGateway, Message: err.Error()}
+	}
 	exec := &capability.Execution{
 		ID:                  generateID(),
 		CapabilityVersionID: rel.CapabilityID + "@" + fmt.Sprintf("%d", rel.CapabilityVersion),
@@ -254,11 +257,11 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 		return err
 	}
 	s.audit(r.Context(), "invoke", "release:"+releaseID, map[string]any{
-		"manifest_hash":   manifestHash,
-		"tokens":          exec.TotalTokens,
-		"cost_usd":        exec.CostUSD,
+		"manifest_hash":    manifestHash,
+		"tokens":           exec.TotalTokens,
+		"cost_usd":         exec.CostUSD,
 		"tokens_estimated": exec.TotalTokens > 0 || exec.CostUSD > 0,
-		"error":           exec.Error,
+		valError:           exec.Error,
 	})
 	writeJSON(w, http.StatusCreated, exec)
 	return nil
