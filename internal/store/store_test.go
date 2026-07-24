@@ -96,7 +96,7 @@ func seedScheduleFixture(t *testing.T, s *store.SQLite) {
 	if err := s.CreateRelease(ctx, &release.Release{
 		ID: "r1", CapabilityID: "c1", CapabilityVersion: 1, Manifest: manifest,
 		Environment: release.EnvProd, Status: release.StatusActive,
-		ApprovedBy:  []string{"u1"}, CreatedAt: now, CreatedBy: "u1",
+		ApprovedBy: []string{"u1"}, CreatedAt: now, CreatedBy: "u1",
 	}); err != nil {
 		t.Fatalf("seed release: %v", err)
 	}
@@ -129,11 +129,13 @@ func TestNewSQLiteRunsAllMigrations(t *testing.T) {
 	if err := rows.Scan(&n); err != nil {
 		t.Fatalf("scan: %v", err)
 	}
-	// After consolidation + 014 system_config (014b is a
-	// data insert, not a schema migration, so it doesn't
-	// bump the count) the count is 14.
-	if n != 14 {
-		t.Errorf("migrations applied = %d, want 14", n)
+	// After consolidation (001..008) + 009 vault_state +
+	// 010 ws_state + 011 audit_archive + 012 enforcer_state +
+	// 013 idempotency_cache + 014 system_config +
+	// 015 seed_settings + 016 bandit_arm_counters +
+	// 017 system_config_crdt, the count is 17.
+	if n != 17 {
+		t.Errorf("migrations applied = %d, want 17", n)
 	}
 }
 

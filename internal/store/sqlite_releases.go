@@ -359,7 +359,6 @@ func (s *SQLite) UpdateApproval(ctx context.Context, a *approval.Approval) error
 	return nil
 }
 
-
 func scanApproval(scanner interface {
 	Scan(dest ...any) error
 }) (*approval.Approval, error) {

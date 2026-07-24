@@ -33,11 +33,16 @@ const DestructiveMigrationEnv = "PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS"
 //     drops tables or columns during a routine upgrade.
 //
 // Migration layout: after consolidation the directory holds 8 .up.sql
-// files (no .down.sql). Existing deployments upgrading from versions
-// up to 64 must run a one-time shim before starting the new daemon:
+// files (no .down.sql) at versions 001..008, then individual
+// .up.sql / .down.sql files at versions 009..017. Each version
+// has a unique strict-integer prefix; legacy 014b-style suffixed
+// names were removed because the runner only parses the leading
+// integer (so 014 and 014b collided on the schema_migrations PK).
+// Existing deployments upgrading from versions up to 64 must run
+// a one-time shim before starting the new daemon:
 //
-//   INSERT OR IGNORE INTO schema_migrations(version) VALUES
-//     (1),(2),(3),(4),(5),(6),(7),(8);
+//	INSERT OR IGNORE INTO schema_migrations(version) VALUES
+//	  (1),(2),(3),(4),(5),(6),(7),(8);
 //
 // See migrations/README.md and CHANGELOG for the upgrade procedure.
 func migrate(db *sql.DB, migrationsFS fs.FS) error {

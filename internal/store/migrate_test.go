@@ -2,7 +2,10 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
+	"io/fs"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -12,8 +15,8 @@ import (
 // the destructive gate; everything else runs unprotected.
 func TestDestructiveGateAnchored(t *testing.T) {
 	cases := []struct {
-		name      string
-		gated     bool
+		name  string
+		gated bool
 	}{
 		// Gated (anchored match).
 		{"001_destructive_cleanup.up.sql", true},
@@ -21,11 +24,11 @@ func TestDestructiveGateAnchored(t *testing.T) {
 		{"999_destructive_anything.sql", true},
 
 		// Not gated.
-		{"destructive_initial.up.sql", false},          // no leading digits
-		{"100_destruct.sql", false},                   // missing "_destructive" anchor
-		{"001_cleanup.up.sql", false},                 // no destructive segment
-		{"001_initial.up.sql", false},                 // no destructive segment
-		{"200_cleanup.sql", false},                    // no destructive segment
+		{"destructive_initial.up.sql", false}, // no leading digits
+		{"100_destruct.sql", false},           // missing "_destructive" anchor
+		{"001_cleanup.up.sql", false},         // no destructive segment
+		{"001_initial.up.sql", false},         // no destructive segment
+		{"200_cleanup.sql", false},            // no destructive segment
 	}
 	for _, c := range cases {
 		if got := isDestructiveMigration(c.name); got != c.gated {
@@ -156,4 +159,172 @@ func TestMigrateUpToContextCancel(t *testing.T) {
 	// migrateUpTo uses db.Exec which doesn't honour ctx; the test
 	// just confirms the migration completes without panicking.
 	_ = migrateUpTo(repo.DB(), 8)
+}
+
+// TestEmbeddedMigrationsParseableUniqueApplied is the canonical
+// invariant test for the migration directory: every embedded
+// .up.sql must
+//
+//  1. have a strict-integer version prefix (the Sscanf("%d_")
+//     parser must accept the entire numeric run);
+//  2. be unique on that version (no two files share the same
+//     integer — 014b is the historical bug this pins against);
+//  3. be parseable as a non-empty SQL payload that the runner
+//     can apply;
+//  4. actually be applied during NewSQLite (no file is silently
+//     skipped because the runner rejected its name).
+//
+// The runner previously used fmt.Sscanf("%d_", &version), which
+// silently truncated "014b" to 14 and collided with 014. This
+// test fails loudly if a future change reintroduces a suffixed
+// name, an empty file, or a duplicate version.
+func TestEmbeddedMigrationsParseableUniqueApplied(t *testing.T) {
+	t.Setenv("PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS", "true")
+
+	entries, err := fs.ReadDir(migrationsFS, "migrations")
+	if err != nil {
+		t.Fatalf("read migrations dir: %v", err)
+	}
+	seen := make(map[int]string)
+	var versions []int
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".up.sql") {
+			continue
+		}
+		// Strict-integer prefix: the leading run of digits MUST
+		// be followed by '_' (no inline letter like 'b'). This
+		// rejects "014b_seed_settings.up.sql" but accepts
+		// "015_seed_settings.up.sql".
+		var version int
+		cut := -1
+		for i, r := range name {
+			if r < '0' || r > '9' {
+				cut = i
+				break
+			}
+		}
+		if cut <= 0 || name[cut] != '_' {
+			t.Errorf("migration %q has no strict-integer prefix; use NNN_*.up.sql", name)
+			continue
+		}
+		n, err := fmt.Sscanf(name, "%d_", &version)
+		if err != nil || n != 1 {
+			t.Errorf("migration %q failed Sscanf: n=%d err=%v", name, n, err)
+			continue
+		}
+		if version <= 0 {
+			t.Errorf("migration %q: version %d must be positive", name, version)
+			continue
+		}
+		if prev, ok := seen[version]; ok {
+			t.Errorf("migration %q and %q share version %d (runner uses leading integer as PK)", name, prev, version)
+		}
+		seen[version] = name
+
+		// Non-empty payload: a zero-byte .up.sql would silently
+		// succeed and waste a slot in schema_migrations.
+		content, err := fs.ReadFile(migrationsFS, "migrations/"+name)
+		if err != nil {
+			t.Errorf("read %s: %v", name, err)
+			continue
+		}
+		if len(strings.TrimSpace(string(content))) == 0 {
+			t.Errorf("migration %q has an empty body", name)
+		}
+		versions = append(versions, version)
+	}
+	if len(versions) == 0 {
+		t.Fatal("no .up.sql migrations found")
+	}
+	sort.Ints(versions)
+	for i := 1; i < len(versions); i++ {
+		if versions[i] == versions[i-1] {
+			t.Errorf("duplicate version %d in sorted set", versions[i])
+		}
+	}
+
+	// End-to-end: NewSQLite must record every parsed version.
+	tmpDir := t.TempDir()
+	repo, err := NewSQLite(filepath.Join(tmpDir, "all.db"))
+	if err != nil {
+		t.Fatalf("NewSQLite: %v", err)
+	}
+	t.Cleanup(func() { _ = repo.Close() })
+	rows, err := repo.DB().Query(`SELECT version FROM schema_migrations ORDER BY version`)
+	if err != nil {
+		t.Fatalf("query applied versions: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var applied []int
+	for rows.Next() {
+		var v int
+		if err := rows.Scan(&v); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		applied = append(applied, v)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("rows.Err: %v", err)
+	}
+	if !intSlicesEqual(applied, versions) {
+		t.Errorf("applied versions %v != parsed versions %v", applied, versions)
+	}
+}
+
+func intSlicesEqual(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// TestSeedSettingsMigration015 isolates 015_seed_settings so the
+// data-only INSERT runs against an empty system_config and the
+// expected default keys appear.
+func TestSeedSettingsMigration015(t *testing.T) {
+	t.Setenv("PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS", "true")
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "seed.db")
+	db, err := sql.Open("sqlite", dbPath+"?_pragma=foreign_keys(ON)")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := migrateUpTo(db, 15); err != nil {
+		t.Fatalf("migrateUpTo(15): %v", err)
+	}
+	rows, err := db.Query(`SELECT key FROM system_config ORDER BY key`)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var keys []string
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		keys = append(keys, k)
+	}
+	want := []string{
+		"llm.anthropic.api_key_ref",
+		"llm.openai.api_key_ref",
+		"otl.endpoint",
+		"otl.insecure",
+		"otl.sample_ratio",
+	}
+	if len(keys) != len(want) {
+		t.Fatalf("seed keys count = %d, want %d (got %v)", len(keys), len(want), keys)
+	}
+	for i, k := range want {
+		if keys[i] != k {
+			t.Errorf("seed key %d = %q, want %q", i, keys[i], k)
+		}
+	}
 }

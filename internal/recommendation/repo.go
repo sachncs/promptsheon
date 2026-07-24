@@ -9,6 +9,7 @@ package recommendation
 
 import (
 	"context"
+	"errors"
 
 	"github.com/sachncs/promptsheon/internal/capability"
 )
@@ -24,3 +25,5 @@ type Repository interface {
 	GetDecision(ctx context.Context, recommendationID string) (*Decision, error)
 	ListDecisions(ctx context.Context) ([]*Decision, error)
 }
+
+var ErrNotFound = errors.New("recommendation: not found")

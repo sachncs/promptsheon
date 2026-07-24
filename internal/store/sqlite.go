@@ -12,11 +12,14 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "modernc.org/sqlite" // sqlite driver
 
 	"github.com/sachncs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/internal/settings"
 )
 
 //go:embed migrations/*.sql
@@ -43,9 +46,30 @@ func mustUnmarshal(data []byte, v any) {
 	}
 }
 
-// SQLite implements Repository backed by a SQLite database.
 type SQLite struct {
 	db *sql.DB
+
+	// auditTail caches the (last_rowid, last_hash) pair that
+	// AppendAudit must chain against. Reading from the cache
+	// removes one SELECT per append; the cache is initialised
+	// read-through on first use and updated after every
+	// successful append. Concurrency:
+	//
+	//   - auditTail.rowid is an atomic.Uint64 used as both the
+	//     initialised sentinel (0 = unknown) and the published
+	//     rowid value.
+	//   - auditTail.hash is protected by auditTail.mu because
+	//     the (rowid, hash) pair must be read/written together
+	//     and Go strings cannot be assigned atomically.
+	//
+	// AppendAudit takes auditTail.mu for the duration of its
+	// chain + insert, so two concurrent appends serialise the
+	// cache mutation the same way SQLite serialises writers.
+	auditTail struct {
+		mu    sync.Mutex
+		rowid atomic.Uint64
+		hash  string
+	}
 }
 
 // NewSQLite opens or creates a SQLite database at dbPath and runs migrations.
@@ -91,10 +115,6 @@ func (s *SQLite) DB() *sql.DB {
 // ---------------------------------------------------------------------------
 
 func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) error {
-	// The previous auditMu serialised every audit write through
-	// Go-land, which defeated the 2-worker pool. The serialisable
-	// SQLite transaction below is the actual ordering primitive;
-	// SQLite serialises writers at the file level.
 	details, err := json.Marshal(entry.Details)
 	if err != nil {
 		return fmt.Errorf("marshal audit details: %w", err)
@@ -105,61 +125,130 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 
 	entry.Timestamp = entry.Timestamp.UTC()
 	timestampStr := entry.Timestamp.Format(time.RFC3339Nano)
-
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
-	if err != nil {
-		return fmt.Errorf("begin audit tx: %w", err)
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
-	var prevHash string
-	err = tx.QueryRowContext(ctx,
-		`SELECT last_hash FROM audit_chain_state WHERE id = 0`,
-	).Scan(&prevHash)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("fetch previous audit hash: %w", err)
-	}
-
-	entry.PreviousHash = prevHash
-	entry.EntryHash = computeAuditHash(entry, string(details), timestampStr)
-
-	// Split the resource string ("workspace:abc") into kind + id
-	// for the structural query path (migration 048a). The legacy
-	// `resource` column is preserved for backward compatibility;
-	// the new columns are not part of the audit hash (the chain
-	// format is unchanged).
 	resourceKind, resourceID := splitAuditResource(entry.Resource)
 
-	insertRes, err := tx.ExecContext(ctx,
-		`INSERT INTO audit_entries (id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str, resource_kind, resource_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		entry.ID, entry.UserID, entry.Action, entry.Resource,
-		string(details), entry.Timestamp, entry.PreviousHash, entry.EntryHash, timestampStr,
-		resourceKind, resourceID,
-	)
-	if err != nil {
-		return fmt.Errorf("insert audit: %w", err)
+	// Serialise the chain-link read + insert against any other
+	// AppendAudit in this process. SQLite's serialisable
+	// transaction below is the actual cross-process ordering
+	// primitive; the cache mutex is the in-process companion
+	// that keeps the cached (rowid, hash) pair consistent.
+	s.auditTail.mu.Lock()
+	defer s.auditTail.mu.Unlock()
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("append audit: %w", err)
+		}
+
+		tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+		if err != nil {
+			return fmt.Errorf("begin audit tx: %w", err)
+		}
+
+		prevRowID, prevHash, err := s.tailHashLocked(ctx, tx)
+		if err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+
+		entry.PreviousHash = prevHash
+		entry.EntryHash = computeAuditHash(entry, string(details), timestampStr)
+
+		insertRes, err := tx.ExecContext(ctx,
+			`INSERT INTO audit_entries (id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str, resource_kind, resource_id)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			entry.ID, entry.UserID, entry.Action, entry.Resource,
+			string(details), entry.Timestamp, entry.PreviousHash, entry.EntryHash, timestampStr,
+			resourceKind, resourceID,
+		)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("insert audit: %w", err)
+		}
+		rowID, err := insertRes.LastInsertId()
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("last insert id: %w", err)
+		}
+
+		var stateRes sql.Result
+		if prevRowID == 0 {
+			stateRes, err = tx.ExecContext(ctx,
+				`INSERT INTO audit_chain_state (id, last_hash, last_rowid)
+				 VALUES (0, ?, ?)
+				 ON CONFLICT(id) DO NOTHING`,
+				entry.EntryHash, rowID,
+			)
+		} else {
+			stateRes, err = tx.ExecContext(ctx,
+				`UPDATE audit_chain_state
+				 SET last_hash = ?, last_rowid = ?
+				 WHERE id = 0 AND last_rowid = ? AND last_hash = ?`,
+				entry.EntryHash, rowID, prevRowID, prevHash,
+			)
+		}
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("update audit chain state: %w", err)
+		}
+		affected, err := stateRes.RowsAffected()
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("audit chain state rows affected: %w", err)
+		}
+		if affected == 0 {
+			rollbackErr := tx.Rollback()
+			s.auditTail.hash = ""
+			s.auditTail.rowid.Store(0)
+			if rollbackErr != nil {
+				return fmt.Errorf("rollback stale audit append: %w", rollbackErr)
+			}
+			continue
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit audit: %w", err)
+		}
+		s.auditTail.hash = entry.EntryHash
+		s.auditTail.rowid.Store(uint64(rowID))
+		return nil
 	}
-	rowID, err := insertRes.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("last insert id: %w", err)
+}
+
+// tailHashLocked returns the previous_hash for the next audit
+// entry, populating the cache from audit_chain_state on first
+// use. The caller must hold s.auditTail.mu.
+//
+// Read-through: the first AppendAudit (or any caller that bypassed
+// the cache) initialises from the DB; subsequent calls take the
+// fast path. The first query always re-reads the chain state
+// row so a writer that bypassed AppendAudit (e.g. an admin SQL
+// fix) is still chained correctly — the cached rowid is treated
+// as a hint, not as the source of truth.
+//
+// The fast-path check happens UNDER the mutex so two concurrent
+// first-time AppendAudits cannot both observe rowid=0 and chain
+// against an empty previous_hash. atomic.Uint64 is used so the
+// cross-package callers (e.g. diagnostics) can read the published
+// rowid cheaply without taking the cache mutex.
+func (s *SQLite) tailHashLocked(ctx context.Context, tx *sql.Tx) (rowID int64, hash string, err error) {
+	if cached := s.auditTail.rowid.Load(); cached != 0 && s.auditTail.hash != "" {
+		return int64(cached), s.auditTail.hash, nil
 	}
-	if _, e := tx.ExecContext(ctx,
-		`INSERT INTO audit_chain_state (id, last_hash, last_rowid)
-		 VALUES (0, ?, ?)
-		 ON CONFLICT(id) DO UPDATE SET last_hash = excluded.last_hash, last_rowid = excluded.last_rowid`,
-		entry.EntryHash, rowID,
-	); e != nil {
-		return fmt.Errorf("update audit chain state: %w", e)
+	queryErr := tx.QueryRowContext(ctx,
+		`SELECT last_hash, last_rowid FROM audit_chain_state WHERE id = 0`,
+	).Scan(&hash, &rowID)
+	if queryErr != nil {
+		if !errors.Is(queryErr, sql.ErrNoRows) {
+			return 0, "", fmt.Errorf("fetch previous audit hash: %w", queryErr)
+		}
 	}
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("commit audit: %w", err)
+	if hash != "" {
+		s.auditTail.hash = hash
 	}
-	return nil
+	if rowID != 0 {
+		s.auditTail.rowid.Store(uint64(rowID))
+	}
+	return rowID, hash, nil
 }
 
 func computeAuditHash(e *models.AuditEntry, detailsJSON, timestampStr string) string {
@@ -200,11 +289,11 @@ func computeAuditHash(e *models.AuditEntry, detailsJSON, timestampStr string) st
 // Reason is a human-readable summary suitable for the audit
 // log / SSE stream. It is non-empty whenever Ok is false.
 type AuditVerifyResult struct {
-	Ok            bool
-	TailMismatch  bool
-	LastRowID     int64
-	LastHash      string
-	Reason        string
+	Ok           bool
+	TailMismatch bool
+	LastRowID    int64
+	LastHash     string
+	Reason       string
 }
 
 type auditPageResult struct {
@@ -1287,79 +1376,215 @@ func (s *SQLite) setEnforcerPayload(ctx context.Context, workspaceID, kind strin
 	return nil
 }
 
-// GetSystemConfig returns the value + updated_at for one key. If
-// the row doesn't exist, sql.ErrNoRows is returned; the
-// settings resolver treats ErrNoRows as "use the env default".
-// The mode-agnostic store layer doesn't read Config.SettingsMode;
-// the API layer enforces the env-only write gate before calling
-// SetSystemConfig / DeleteSystemConfig.
-func (s *SQLite) GetSystemConfig(ctx context.Context, key string) (string, time.Time, error) {
-	var (
-		value     string
-		updatedAt time.Time
+// GetSystemConfig returns the CRDT record for one key. If the
+// row doesn't exist, sql.ErrNoRows is returned; the settings
+// resolver treats ErrNoRows as "use the env default".
+//
+// The full record (including the tombstone flag, version
+// vector, replica id, and monotonic timestamp) is returned so
+// downstream merges see the exact LWW state.
+func (s *SQLite) GetSystemConfig(ctx context.Context, key string) (settings.CRDTRecord, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT value, updated_at, updated_by, replica_id, version_vector, tombstone, write_ts
+		 FROM system_config WHERE key = ?`, key,
 	)
-	err := s.db.QueryRowContext(ctx,
-		`SELECT value, updated_at FROM system_config WHERE key = ?`, key,
-	).Scan(&value, &updatedAt)
+	rec, err := scanSystemConfigRow(row)
 	if err != nil {
-		return "", time.Time{}, err
+		return settings.CRDTRecord{}, err
 	}
-	return value, updatedAt, nil
+	rec.Key = key
+	return rec, nil
 }
 
-// SetSystemConfig upserts one key. The (value, updated_by) pair
-// is the canonical record; updated_at is auto-set by the column
-// default.
-func (s *SQLite) SetSystemConfig(ctx context.Context, key, value, updatedBy string) error {
-	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO system_config (key, value, updated_at, updated_by)
-		 VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+// SetSystemConfig upserts one key's full CRDT record. The
+// resolver supplies the bumped vector; the store just
+// persists it.
+//
+//nolint:gocritic // ponytail: CRDT records stay value types across the store boundary.
+func (s *SQLite) SetSystemConfig(ctx context.Context, rec settings.CRDTRecord) error {
+	vecJSON, err := encodeVersionVector(rec.VersionVector)
+	if err != nil {
+		return fmt.Errorf("set system_config %q: encode vector: %w", rec.Key, err)
+	}
+	_, err = s.db.ExecContext(ctx,
+		`INSERT INTO system_config
+		   (key, value, updated_at, updated_by, replica_id, version_vector, tombstone, write_ts)
+		 VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?)
 		 ON CONFLICT(key) DO UPDATE SET
-		   value = excluded.value,
-		   updated_at = excluded.updated_at,
-		   updated_by = excluded.updated_by`,
-		key, value, updatedBy,
+		   value          = excluded.value,
+		   updated_at     = excluded.updated_at,
+		   updated_by     = excluded.updated_by,
+		   replica_id     = excluded.replica_id,
+		   version_vector = excluded.version_vector,
+		   tombstone      = excluded.tombstone,
+		   write_ts       = excluded.write_ts`,
+		rec.Key, rec.Value, rec.UpdatedBy, rec.ReplicaID, vecJSON, boolToInt(rec.Tombstone), rec.WriteTS,
 	)
 	if err != nil {
-		return fmt.Errorf("set system_config %q: %w", key, err)
+		return fmt.Errorf("set system_config %q: %w", rec.Key, err)
 	}
 	return nil
 }
 
-// DeleteSystemConfig removes one row. sql.ErrNoRows is returned
-// when the key was never set; the API layer treats that as 404.
-func (s *SQLite) DeleteSystemConfig(ctx context.Context, key string) error {
-	res, err := s.db.ExecContext(ctx,
-		`DELETE FROM system_config WHERE key = ?`, key,
-	)
-	if err != nil {
-		return fmt.Errorf("delete system_config %q: %w", key, err)
-	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return sql.ErrNoRows
-	}
-	return nil
-}
-
-// ListSystemConfig returns every row. The settings resolver
-// subscribes to the Notifier (commit A2) so a write to one key
-// doesn't require a full reload.
-func (s *SQLite) ListSystemConfig(ctx context.Context) ([]models.SystemConfig, error) {
+// ListSystemConfig returns every row (including tombstones).
+// The resolver filters tombstones out of the Get/List surface
+// — see settings.Resolver.List.
+func (s *SQLite) ListSystemConfig(ctx context.Context) ([]settings.CRDTRecord, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT key, value, updated_at, updated_by FROM system_config ORDER BY key`,
+		`SELECT value, updated_at, updated_by, replica_id, version_vector, tombstone, write_ts, key
+		 FROM system_config ORDER BY key`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list system_config: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
-	var out []models.SystemConfig
+	var out []settings.CRDTRecord
 	for rows.Next() {
-		var sc models.SystemConfig
-		if err := rows.Scan(&sc.Key, &sc.Value, &sc.UpdatedAt, &sc.UpdatedBy); err != nil {
+		var rec settings.CRDTRecord
+		var vecJSON string
+		var tombstone int
+		if err := rows.Scan(&rec.Value, &rec.UpdatedAt, &rec.UpdatedBy, &rec.ReplicaID, &vecJSON, &tombstone, &rec.WriteTS, &rec.Key); err != nil {
 			return nil, err
 		}
-		out = append(out, sc)
+		rec.Tombstone = tombstone != 0
+		vv, err := decodeVersionVector(vecJSON)
+		if err != nil {
+			return nil, fmt.Errorf("list system_config %q: decode vector: %w", rec.Key, err)
+		}
+		rec.VersionVector = vv
+		out = append(out, rec)
 	}
 	return out, rows.Err()
+}
+
+// MergeSystemConfig folds a batch of remote records into the
+// local store. The per-key merge is the LWW semantics in
+// settings.Merge; the resulting record replaces the local row.
+// Records with the local replica as the writer are still
+// applied (the CRDT is symmetric).
+func (s *SQLite) MergeSystemConfig(ctx context.Context, _ string, records []settings.CRDTRecord) error {
+	if len(records) == 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("merge system_config: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, remote := range records {
+		if remote.Key == "" {
+			continue
+		}
+		var local settings.CRDTRecord
+		row := tx.QueryRowContext(ctx,
+			`SELECT value, updated_at, updated_by, replica_id, version_vector, tombstone, write_ts
+			 FROM system_config WHERE key = ?`, remote.Key,
+		)
+		var vecJSON string
+		var tombstone int
+		err := row.Scan(&local.Value, &local.UpdatedAt, &local.UpdatedBy, &local.ReplicaID, &vecJSON, &tombstone, &local.WriteTS)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("merge system_config %q: scan: %w", remote.Key, err)
+		}
+		local.Tombstone = tombstone != 0
+		if err == nil {
+			vv, derr := decodeVersionVector(vecJSON)
+			if derr != nil {
+				return fmt.Errorf("merge system_config %q: decode vector: %w", remote.Key, derr)
+			}
+			local.VersionVector = vv
+		}
+		merged := settings.Merge(local, remote)
+		if merged.Key == "" {
+			merged.Key = remote.Key
+		}
+		vecJSON, err = encodeVersionVector(merged.VersionVector)
+		if err != nil {
+			return fmt.Errorf("merge system_config %q: encode vector: %w", merged.Key, err)
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO system_config
+			   (key, value, updated_at, updated_by, replica_id, version_vector, tombstone, write_ts)
+			 VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?)
+			 ON CONFLICT(key) DO UPDATE SET
+			   value          = excluded.value,
+			   updated_at     = excluded.updated_at,
+			   updated_by     = excluded.updated_by,
+			   replica_id     = excluded.replica_id,
+			   version_vector = excluded.version_vector,
+			   tombstone      = excluded.tombstone,
+			   write_ts       = excluded.write_ts`,
+			merged.Key, merged.Value, merged.UpdatedBy, merged.ReplicaID, vecJSON, boolToInt(merged.Tombstone), merged.WriteTS,
+		); err != nil {
+			return fmt.Errorf("merge system_config %q: upsert: %w", merged.Key, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("merge system_config: commit: %w", err)
+	}
+	return nil
+}
+
+// scanSystemConfigRow reads one row from system_config into a
+// CRDTRecord. Used by GetSystemConfig and MergeSystemConfig;
+// the caller fills in rec.Key because the row scanner can't
+// know which key was queried (GetSystemConfig fills it after
+// the scan, MergeSystemConfig already has it).
+type scannableCRDT interface {
+	Scan(dest ...any) error
+}
+
+func scanSystemConfigRow(row scannableCRDT) (settings.CRDTRecord, error) {
+	var rec settings.CRDTRecord
+	var vecJSON string
+	var tombstone int
+	err := row.Scan(&rec.Value, &rec.UpdatedAt, &rec.UpdatedBy, &rec.ReplicaID, &vecJSON, &tombstone, &rec.WriteTS)
+	if errors.Is(err, sql.ErrNoRows) {
+		return settings.CRDTRecord{}, sql.ErrNoRows
+	}
+	if err != nil {
+		return settings.CRDTRecord{}, err
+	}
+	rec.Tombstone = tombstone != 0
+	vv, err := decodeVersionVector(vecJSON)
+	if err != nil {
+		return settings.CRDTRecord{}, err
+	}
+	rec.VersionVector = vv
+	return rec, nil
+}
+
+// encodeVersionVector marshals a vector map for SQLite. An
+// empty map is the JSON "{}" string so we never store NULL
+// (NULL would force the scanner to handle two distinct
+// representations).
+func encodeVersionVector(v map[string]uint64) (string, error) {
+	if v == nil {
+		return "{}", nil
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// decodeVersionVector unmarshals a vector from SQLite. An
+// empty-string column (legacy rows) becomes the empty map.
+func decodeVersionVector(s string) (map[string]uint64, error) {
+	if s == "" {
+		return map[string]uint64{}, nil
+	}
+	out := map[string]uint64{}
+	if err := json.Unmarshal([]byte(s), &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
