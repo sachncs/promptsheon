@@ -48,14 +48,24 @@ type HallucinationFunc func(executor.ExecutionRecord) bool
 // Aggregator rolls a window of ExecutionRecord values into
 // Observation values keyed by (capability_id, version_id, environment).
 //
-// Aggregator is safe for concurrent use; the same mutex guards every
-// operation. The producer goroutine should call Add once per
-// ExecutionRecord. The consumer goroutine should call Aggregate
-// once per window tick.
+// Aggregator is safe for concurrent use. PERF-4b: the global
+// mutex was replaced with per-key locks so Adds for different
+// (cap, version, env) tuples no longer serialise against each
+// other. The outer mutex only protects the map; each bucket has
+// its own sync.Mutex for the record slice.
 type Aggregator struct {
 	mu             sync.Mutex
-	records        map[windowKey][]executor.ExecutionRecord
+	records        map[windowKey]*obsBucket
 	hallucinationF HallucinationFunc
+}
+
+// obsBucket holds the per-window record list and its own mutex.
+// Two producers touching different (capability, version, env)
+// tuples run in parallel; the contention now is per-key, not
+// global.
+type obsBucket struct {
+	mu      sync.Mutex
+	records []executor.ExecutionRecord
 }
 
 // windowKey is the dimension over which observations are aggregated.
@@ -76,7 +86,7 @@ const maxRecordsPerWindow = 4096
 // field; pass nil to report a zero rate.
 func NewAggregator(hallucinationF HallucinationFunc) *Aggregator {
 	return &Aggregator{
-		records:        map[windowKey][]executor.ExecutionRecord{},
+		records:        map[windowKey]*obsBucket{},
 		hallucinationF: hallucinationF,
 	}
 }
@@ -90,8 +100,6 @@ func NewAggregator(hallucinationF HallucinationFunc) *Aggregator {
 // map with every invocation and never pruned, leaking memory
 // until the daemon was restarted.
 func (a *Aggregator) Add(r executor.ExecutionRecord) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
 	k := windowKey{CapabilityID: r.CapabilityID, VersionID: "", Environment: r.Environment}
 	if k.VersionID == "" {
 		// Until Version tracking lands on ExecutionRecord we
@@ -100,12 +108,21 @@ func (a *Aggregator) Add(r executor.ExecutionRecord) {
 		// available discriminator.
 		k.VersionID = r.ReleaseID
 	}
-	recs := append(a.records[k], r)
+	a.mu.Lock()
+	bucket, ok := a.records[k]
+	if !ok {
+		bucket = &obsBucket{}
+		a.records[k] = bucket
+	}
+	a.mu.Unlock()
+	bucket.mu.Lock()
+	recs := append(bucket.records, r)
 	if len(recs) > maxRecordsPerWindow {
 		// Drop oldest entries. O(N) copy; N is bounded.
 		recs = recs[len(recs)-maxRecordsPerWindow:]
 	}
-	a.records[k] = recs
+	bucket.records = recs
+	bucket.mu.Unlock()
 }
 
 // Aggregate returns one Observation per (capability, version, env)
@@ -118,13 +135,22 @@ func (a *Aggregator) Add(r executor.ExecutionRecord) {
 // HallucinationFunc supplied at construction.
 func (a *Aggregator) Aggregate(now time.Time) []rules.Observation {
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	out := make([]rules.Observation, 0, len(a.records))
-	for k, recs := range a.records {
+	keys := make([]windowKey, 0, len(a.records))
+	buckets := make([]*obsBucket, 0, len(a.records))
+	for k, b := range a.records {
+		keys = append(keys, k)
+		buckets = append(buckets, b)
+	}
+	a.mu.Unlock()
+	out := make([]rules.Observation, 0, len(buckets))
+	for i, b := range buckets {
+		b.mu.Lock()
+		recs := b.records
+		b.mu.Unlock()
 		if len(recs) == 0 {
 			continue
 		}
-		out = append(out, summarise(a.hallucinationF, k, recs))
+		out = append(out, summarise(a.hallucinationF, keys[i], recs))
 	}
 	return out
 }
