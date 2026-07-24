@@ -23,8 +23,11 @@ func TestAggregatorBoundedWindow(t *testing.T) {
 		})
 	}
 	a.mu.Lock()
-	n := len(a.records[windowKey{CapabilityID: "c1", VersionID: "r1", Environment: "prod"}])
+	bucket := a.records[windowKey{CapabilityID: "c1", VersionID: "r1", Environment: "prod"}]
 	a.mu.Unlock()
+	bucket.mu.Lock()
+	n := len(bucket.records)
+	bucket.mu.Unlock()
 	if n != maxRecordsPerWindow {
 		t.Fatalf("window size = %d want %d", n, maxRecordsPerWindow)
 	}
