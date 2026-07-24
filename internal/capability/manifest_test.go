@@ -38,11 +38,44 @@ func TestManifestValid(t *testing.T) {
 		Prompt:        ArtifactRef{Kind: ArtifactPrompt, Hash: goodHash()},
 		ModelPolicy:   ArtifactRef{Kind: ArtifactModelPolicy, Hash: goodHash()},
 		RuntimePolicy: ArtifactRef{Kind: ArtifactRuntimePolicy, Hash: goodHash()},
+	}
+	if err := m.Validate(); err != nil {
+		t.Fatalf("expected valid manifest, got %v", err)
+	}
+}
+
+// TestManifestMinimalThree pins MAN-1: a Manifest with only the
+// three required artifacts (Prompt, ModelPolicy, RuntimePolicy)
+// is valid. ContextContract and Memory are optional; the
+// Resolver does not load them in v0.2.0. The previous design
+// required all five, forcing every test fixture to fabricate
+// empty hashes for fields the system never used.
+func TestManifestMinimalThree(t *testing.T) {
+	t.Parallel()
+	m := Manifest{
+		Prompt:        ArtifactRef{Kind: ArtifactPrompt, Hash: goodHash()},
+		ModelPolicy:   ArtifactRef{Kind: ArtifactModelPolicy, Hash: goodHash()},
+		RuntimePolicy: ArtifactRef{Kind: ArtifactRuntimePolicy, Hash: goodHash()},
+	}
+	if err := m.Validate(); err != nil {
+		t.Fatalf("minimal 3-artifact manifest must validate, got %v", err)
+	}
+}
+
+// TestManifestWithOptionalsStillValid pins that adding
+// ContextContract or Memory to a Manifest does not break
+// validation; the optional fields remain valid ArtifactKinds.
+func TestManifestWithOptionalsStillValid(t *testing.T) {
+	t.Parallel()
+	m := Manifest{
+		Prompt:        ArtifactRef{Kind: ArtifactPrompt, Hash: goodHash()},
+		ModelPolicy:   ArtifactRef{Kind: ArtifactModelPolicy, Hash: goodHash()},
+		RuntimePolicy: ArtifactRef{Kind: ArtifactRuntimePolicy, Hash: goodHash()},
 		Context:       ArtifactRef{Kind: ArtifactContext, Hash: goodHash()},
 		Memory:        ArtifactRef{Kind: ArtifactMemory, Hash: goodHash()},
 	}
 	if err := m.Validate(); err != nil {
-		t.Fatalf("expected valid manifest, got %v", err)
+		t.Fatalf("manifest with optional context+memory must validate, got %v", err)
 	}
 }
 
