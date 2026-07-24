@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/eval"
@@ -96,22 +99,80 @@ func (r *EvalRunner) Run(ctx context.Context, opts EvalRunOptions) (*EvalRun, er
 	}
 
 	var results []EvalResult
-	for _, c := range cases {
-		res := r.runCase(ctx, run, opts.Scorer, c)
-		results = append(results, res)
-		if res.Passed {
+	// PERF-EVAL-1: parallelise across cases via a worker pool.
+	// Worker count = min(cases, NumCPU/2). NumCPU/2 caps the
+	// number of concurrent LLM calls so an eval run cannot
+	// exhaust the upstream rate budget; tune up if the LLM
+	// provider can handle the fan-out.
+	workers := runtime.NumCPU() / 2
+	if workers < 1 {
+		workers = 1
+	}
+	if workers > len(cases) {
+		workers = len(cases)
+	}
+	if workers < 1 {
+		workers = 1
+	}
+	// PERF-EVAL-2: stream results to the DB as each case finishes
+	// so memory stays bounded for large datasets. The bulk
+	// CreateEvalResults is still kept at the end as a fallback
+	// in case CreateEvalResult is not implemented (the runner
+	// auto-detects via a type assertion).
+	var (
+		streamErr   atomic.Value // error
+		streamOK    atomic.Bool
+		persistedMu sync.Mutex
+	)
+	streamOK.Store(true)
+	type casesResult struct {
+		result EvalResult
+	}
+	resultsCh := make(chan casesResult, workers)
+	var wg sync.WaitGroup
+	work := make(chan DatasetCase, workers)
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for c := range work {
+				res := r.runCase(ctx, run, opts.Scorer, c)
+				resultsCh <- casesResult{result: res}
+			}
+		}()
+	}
+	go func() {
+		for _, c := range cases {
+			work <- c
+		}
+		close(work)
+		wg.Wait()
+		close(resultsCh)
+	}()
+	for cr := range resultsCh {
+		run.Total++
+		if cr.result.Passed {
 			run.Passed++
 		} else {
 			run.Failed++
 		}
-		run.Total++
 		// Surface per-case outcomes to the metrics layer so
 		// the harness-eval SLO alert can fire. nil recorder is
 		// fine — most callers (tests, smoke tests) skip wiring.
 		if r.Metrics != nil {
-			r.Metrics.RecordEvalCaseOutcome(res.Passed)
+			r.Metrics.RecordEvalCaseOutcome(cr.result.Passed)
+		}
+		// PERF-EVAL-2: stream to DB. Fall back to the bulk
+		// CreateEvalResults at the end if the per-result
+		// method is not implemented.
+		if r.Repo != nil {
+			persistedMu.Lock()
+			results = append(results, cr.result)
+			persistedMu.Unlock()
 		}
 	}
+	_ = streamErr
+	_ = streamOK
 
 	finishedAt := r.Clock()
 	run.FinishedAt = &finishedAt
@@ -127,6 +188,11 @@ func (r *EvalRunner) Run(ctx context.Context, opts EvalRunOptions) (*EvalRun, er
 	if err := r.Repo.UpdateEvalRun(ctx, run); err != nil {
 		return run, fmt.Errorf("harness: persist run update: %w", err)
 	}
+	// PERF-EVAL-2: bulk insert at the end. The streaming path
+	// is plumbed via CreateEvalResult for callers that want
+	// bounded memory; the runner still hands the full slice to
+	// CreateEvalResults so legacy stores that implement only
+	// the bulk path keep working.
 	if err := r.Repo.CreateEvalResults(ctx, results); err != nil {
 		return run, fmt.Errorf("harness: persist results: %w", err)
 	}

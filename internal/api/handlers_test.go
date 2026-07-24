@@ -785,6 +785,14 @@ func (m *mockRepo) CreateEvalResults(_ context.Context, results []harness.EvalRe
 	return nil
 }
 
+func (m *mockRepo) CreateEvalResult(_ context.Context, r *harness.EvalResult) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := *r
+	m.evalResults = append(m.evalResults, cp)
+	return nil
+}
+
 // GetChannelsForAlertRule is a no-op on the api test mock: the
 // alert routing is exercised through the real alerting tests,
 // not through the api surface. Returning an empty slice keeps

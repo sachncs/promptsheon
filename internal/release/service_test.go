@@ -414,6 +414,9 @@ func (m *memStore) ListEvalRunsForRelease(ctx context.Context, releaseID string)
 func (m *memStore) CreateEvalResults(ctx context.Context, results []harness.EvalResult) error {
 	return m.harnessRepo.CreateEvalResults(ctx, results)
 }
+func (m *memStore) CreateEvalResult(ctx context.Context, r *harness.EvalResult) error {
+	return m.harnessRepo.CreateEvalResult(ctx, r)
+}
 func (m *memStore) ListEvalResultsForRun(ctx context.Context, runID string) ([]harness.EvalResult, error) {
 	return m.harnessRepo.ListEvalResultsForRun(ctx, runID)
 }

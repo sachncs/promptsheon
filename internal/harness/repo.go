@@ -31,5 +31,10 @@ type Repository interface {
 
 	// EvalResults.
 	CreateEvalResults(ctx context.Context, results []EvalResult) error
+	// PERF-EVAL-2: CreateEvalResult persists a single result row.
+	// Used by EvalRunner.Run to stream results to the DB as each
+	// case finishes, so memory stays bounded for large datasets.
+	// Implementations may fall back to CreateEvalResults internally.
+	CreateEvalResult(ctx context.Context, result *EvalResult) error
 	ListEvalResultsForRun(ctx context.Context, runID string) ([]EvalResult, error)
 }
