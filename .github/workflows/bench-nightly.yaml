@@ -59,6 +59,18 @@ jobs:
             make bench
           fi
 
+      - name: Regression gate
+        # PERF-BENCH-2: fail the job if any benchmark regresses
+        # > 20% against scripts/bench-baseline.txt. The first
+        # run with no baseline is a no-op so the file can be
+        # seeded by hand.
+        run: |
+          if [ -n "${{ github.event.inputs.benchtime }}" ]; then
+            scripts/check-bench-regression.sh "${{ github.event.inputs.benchtime }}"
+          else
+            scripts/check-bench-regression.sh
+          fi
+
       - name: Upload bench results
         if: always()
         uses: actions/upload-artifact@v7
@@ -66,6 +78,7 @@ jobs:
           name: go-bench-results
           path: |
             **/bench.txt
+            scripts/bench-current.txt
           if-no-files-found: warn
 
   k6-p99:
