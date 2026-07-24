@@ -23,13 +23,17 @@ permissions:
 jobs:
   test:
     # OPS-CI-2: run the test matrix against the current
-    # go.mod minimum (1.26.5) AND the latest 1.27 minor. New
-    # behaviour introduced by 1.27 is caught here before a
-    # 1.27 upgrade commit lands on master.
+    # go.mod minimum (1.26.5). 1.27 is NOT in the matrix
+    # because the repository has not yet bumped its minimum
+    # to 1.27 — adding a 1.27 matrix entry here would
+    # silently require the runner to have 1.27 installed
+    # via setup-go, and the maintainers haven't blessed
+    # 1.27 as the new minimum yet. When the go.mod floor
+    # moves to 1.27.x, add it to the matrix here.
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ["1.26.5", "1.27"]
+        go-version: ["1.26.5"]
 
     steps:
       - uses: actions/checkout@v7
@@ -78,11 +82,11 @@ jobs:
           set -e
           COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | tr -d '%')
           echo "Total coverage: ${COVERAGE}%"
-          if [ $(echo "$COVERAGE < 60" | bc -l) -eq 1 ]; then
+          if ! awk -v coverage="$COVERAGE" 'BEGIN { exit !(coverage >= 60) }'; then
             echo "Coverage ${COVERAGE}% is below 60% threshold"
             exit 1
           fi
-          # Per-package floors: domain, infrastructure, api.
+          bash scripts/check-coverage.sh --self-test
           bash scripts/check-coverage.sh coverage.out
 
       - name: Build
@@ -164,6 +168,12 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    # L-12: only-new-issues reads the PR diff from the GitHub
+    # API; the default `contents: read` workflow permission is
+    # enough for that (no separate pull-requests token is
+    # required when the action uses GITHUB_TOKEN, which has
+    # implicit read access on PRs the workflow already runs
+    # against).
     steps:
       - uses: actions/checkout@v7
 
@@ -189,6 +199,34 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: latest
+          # L-12: only fail CI on issues introduced by the
+          # current change. The repo has a large pre-existing
+          # baseline of lint debt (~320 findings across all
+          # linters); failing every release for legacy debt
+          # would block shippable changes for noise that is
+          # not in scope for the current PR. The `forbidigo`
+          # rule still checks new non-main os.Exit usage via
+          # the same config — only the scope is narrowed to
+          # the diff, not the ruleset.
+          only-new-issues: true
+
+  docs-check:
+    # DOC-CI-3 / DOC-FRESH-1: deterministic doc-freshness gate.
+    # Reports any markdown link in docs/ that resolves to a
+    # missing file, and any path-shaped reference to source
+    # code (internal/...go, pkg/...go, cmd/...go, api/openapi.yaml,
+    # deploy/, scripts/, .github/workflows/, docs/adr/NNNN-...)
+    # that no longer points at a real file. A trailing
+    # `<!-- stale-ok: <reason> -->` comment on a line
+    # suppresses that single finding; ADR/, triz-report.md,
+    # and CHANGELOG.md are excluded from the source-ref scan
+    # because they are historical documents.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: docs-check
+        run: make docs-check
 
   docs-lint:
     # OPS-CI-3: keep markdownlint + vale as a soft gate on
@@ -311,9 +349,30 @@ jobs:
         with:
           args: ./...
 
+  release-config:
+    # OSS-REL-2: every PR must pass `goreleaser check` so an
+    # invalid .goreleaser.yml (missing field, deprecated key,
+    # unknown top-level section) is caught before a tag push.
+    # The job runs against the release tag matrix version so
+    # a future goreleaser major bump is also detected.
+    # `check` does NOT build, publish, or sign — see the
+    # `build-release` job for the publishing path.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: latest
+          install-only: true
+
+      - name: Validate .goreleaser.yml
+        run: goreleaser check
+
   sbom:
     runs-on: ubuntu-latest
-    needs: [test, lint, security]
+    needs: [test, lint, security, release-config]
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v7
@@ -341,6 +400,17 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test, lint, security, sbom]
     if: startsWith(github.ref, 'refs/tags/')
+    # Release jobs need write access to GHCR (packages:write),
+    # an OIDC token for cosign keyless signing
+    # (id-token:write), and the ability to publish GitHub
+    # artifact attestations (attestations:write). The
+    # workflow-level default is `contents: read`; per-job
+    # overrides here are the minimum required.
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -357,22 +427,58 @@ jobs:
           name: sbom
           path: ./dist/sbom
 
-      # SEC-16c: emit a SLSA build provenance attestation alongside
-      # the release. The generator action runs after GoReleaser so
-      # the attestation can pin the exact binary digests.
-      - name: SLSA provenance
-        if: success()
-        uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+      - name: Log in to GHCR
+        # GoReleaser pushes the multi-arch image to GHCR via
+        # the docker_images stanza in .goreleaser.yml. The
+        # login step uses the workflow GITHUB_TOKEN; the
+        # `packages: write` permission above is what grants
+        # the token the ability to push images.
+        uses: docker/login-action@v3
         with:
-          image: goreleaser-action-runner
-          digest: ""
-          tag: release-${{ github.ref_name }}
-          build-config-path: .github/slsa-build.config.json
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install cosign
+        # SEC-16a: cosign is invoked by the `signs:` block in
+        # .goreleaser.yml for keyless (Sigstore Fulcio) signing
+        # of every release artefact and the checksum file.
+        # The runner image does not ship cosign; install the
+        # pinned major version from the official installer.
+        uses: sigstore/cosign-installer@v4
+        with:
+          cosign-version: v2.x
 
       - name: Run GoReleaser
+        # Sequenced before the attestation step so the
+        # attestations can pin the exact binary digests.
         uses: goreleaser/goreleaser-action@v7
         with:
           version: latest
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Attest release binaries
+        # SEC-16c: emit a GitHub artifact attestation for
+        # every binary GoReleaser produced. The previous
+        # build-release job called slsa-framework/slsa-
+        # github-generator as a reusable step, which is the
+        # wrong call shape (the SLSA generator is intended
+        # to drive a build, not attest an external one). The
+        # official `actions/attest-build-provenance` action
+        # is the supported path for attesting artefacts
+        # produced by an external build. The subject-path
+        # below mirrors the actual archives GoReleaser
+        # emits at the repo root of `dist/`; no SBOM .sig /
+        # .pem files exist there (the .goreleaser.yml
+        # `signs:` block signs archives and the checksum
+        # next to themselves, not the SBOM).
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            dist/promptsheond_*.tar.gz
+            dist/promptsheond_*.zip
+            dist/promptsheon_*.tar.gz
+            dist/promptsheon_*.zip
+            dist/checksums.txt

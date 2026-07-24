@@ -60,13 +60,24 @@ jobs:
           PROMPTSHEON_LOG_LEVEL=warn \
             ./promptsheond &
           echo $! > /tmp/daemon.pid
-          for i in {1..30}; do
+          # Strict readiness: fail the job if /health never
+          # returns 200 within 30 s. A silent break was the
+          # original bug — k6 then ran against a stalled
+          # daemon and every metric was a connection timeout.
+          ready=0
+          for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:8080/health > /dev/null; then
-              echo "Daemon is ready"
+              echo "Daemon is ready (after ${i}s)"
+              ready=1
               break
             fi
             sleep 1
           done
+          if [ "$ready" -ne 1 ]; then
+            echo "Daemon failed to become ready within 30s"
+            kill "$(cat /tmp/daemon.pid)" 2>/dev/null || true
+            exit 1
+          fi
 
       - name: Run load scenarios
         run: |
