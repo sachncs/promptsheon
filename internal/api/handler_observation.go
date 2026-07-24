@@ -21,10 +21,11 @@ import (
 // On larger deployments the rollups.Aggregator (background job)
 // replaces this with a single precomputed row.
 func (s *Server) handleGetWorkspaceObservation(w http.ResponseWriter, r *http.Request) error {
-	ws := r.PathValue("workspace_id")
-	if ws == "" {
-		return ErrBadRequest
-	}
+	// BUG-28: the route is registered as /workspaces/{id}/observation,
+	// so r.PathValue("id") is the only key that matches. The previous
+	// code read "workspace_id" and the `if ws == ""` defensive check
+	// triggered on every request — both bugs in one.
+	ws := r.PathValue("id")
 	now := time.Now().UTC()
 	if s.rollupAgg != nil {
 		// Production path: use the background-computed
