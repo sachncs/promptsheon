@@ -4,8 +4,8 @@ github.com/ClickHouse/clickhouse-go/v2 v2.47.0 h1:ZDAzrnKSOPTIsm4tdUNfrii2yc8dk4
 github.com/ClickHouse/clickhouse-go/v2 v2.47.0/go.mod h1:sPj7C7UYQ2MWHcfX+4eGN6nwnCqwUKfgO6PcwKpd6K8=
 github.com/andybalholm/brotli v1.2.1 h1:R+f5xP285VArJDRgowrfb9DqL18yVK0gKAW/F+eTWro=
 github.com/andybalholm/brotli v1.2.1/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
-github.com/anthropics/anthropic-sdk-go v1.58.0 h1:WbvzpIbFpd/eR6H4KK84j7VLuRJnIfKKyAptR1C49EI=
-github.com/anthropics/anthropic-sdk-go v1.58.0/go.mod h1:3EfIfmFqxH6rbiLcIP4tPFyXL/IHakx2wDG4OU+TIEI=
+github.com/anthropics/anthropic-sdk-go v1.59.0 h1:Idp7NBr9y1MZd6/zVHMZkdCVzqYxU3ujb2IKfxEpzZ0=
+github.com/anthropics/anthropic-sdk-go v1.59.0/go.mod h1:3EfIfmFqxH6rbiLcIP4tPFyXL/IHakx2wDG4OU+TIEI=
 github.com/aws/aws-sdk-go-v2 v1.42.1 h1:9eOTgu1z/dVtYpNZ3/8/XbbaX0x/BqE3HUzAzs6K0ek=
 github.com/aws/aws-sdk-go-v2 v1.42.1/go.mod h1:5pKeft2eJj+gElQ38Jqg4ibCqh+/AK33/0X3hip7IjM=
 github.com/aws/aws-sdk-go-v2/config v1.32.30 h1:XwsEzpTJfQYJbFicz/QMLwAZdyeNVVoOEkbF7R3gPJk=

@@ -20,7 +20,7 @@ github.com/ClickHouse/clickhouse-go/v2/resources
 github.com/andybalholm/brotli
 github.com/andybalholm/brotli/flate
 github.com/andybalholm/brotli/matchfinder
-# github.com/anthropics/anthropic-sdk-go v1.58.0
+# github.com/anthropics/anthropic-sdk-go v1.59.0
 ## explicit; go 1.24
 github.com/anthropics/anthropic-sdk-go
 github.com/anthropics/anthropic-sdk-go/config

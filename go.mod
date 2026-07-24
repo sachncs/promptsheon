@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.47.0
-	github.com/anthropics/anthropic-sdk-go v1.58.0
+	github.com/anthropics/anthropic-sdk-go v1.59.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.30
 	github.com/aws/aws-sdk-go-v2/service/kms v1.54.1
 	github.com/beorn7/perks v1.0.1
