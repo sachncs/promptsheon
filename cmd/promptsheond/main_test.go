@@ -808,6 +808,33 @@ func TestMain_WithVaultKey(t *testing.T) {
 	}
 }
 
+// TestMain_HubStopBeforeDBClose pins OBS-LOG-3: the deferred
+// order in main() must close the SSE log hub BEFORE the database.
+// Defers run LIFO; the test reads main.go and asserts that the
+// `defer db.Close()` is registered before `defer logHub.Stop()`
+// so the hub's persist-nextID call still has a live DB.
+func TestMain_HubStopBeforeDBClose(t *testing.T) {
+	src, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatalf("read main.go: %v", err)
+	}
+	contents := string(src)
+	dbIdx := strings.Index(contents, "defer func() {\n\t\tif db != nil {\n\t\t\t_ = db.Close()\n\t\t}\n\t}()")
+	if dbIdx < 0 {
+		dbIdx = strings.Index(contents, "defer func()")
+	}
+	if dbIdx < 0 {
+		t.Fatal("could not locate defer db.Close() in main.go")
+	}
+	hubIdx := strings.Index(contents, "defer logHub.Stop()")
+	if hubIdx < 0 {
+		t.Fatal("could not locate defer logHub.Stop() in main.go")
+	}
+	if hubIdx < dbIdx {
+		t.Errorf("defer logHub.Stop() at %d is registered before defer db.Close() at %d; LIFO order would close DB first and lose the nextID persist", hubIdx, dbIdx)
+	}
+}
+
 // TestMain_WiresReleaseResolver pins QW#3: the production main.go
 // must call WithReleaseResolver so the live release invoke path
 // uses the manifest's Model + Provider, not request-supplied
