@@ -123,13 +123,11 @@ type Selector struct {
 // The order is preserved so output of Select() is deterministic
 // given identical posteriors and RNG state.
 //
-// The previous implementation seeded the RNG from the wall clock
-// once at construction and never refreshed it, so two Select()
-// calls separated by less than a nanosecond would draw from the
-// same PRNG state and return the same arm. The new path seeds
-// once at construction (still deterministic) but uses a per-
-// Selector *rand.Rand the caller can override via NewSelectorWithRNG
-// for reproducible test runs.
+// The per-selector RNG is entropy-seeded once at construction;
+// Select() draws from this RNG under the selector mutex so
+// concurrent callers see distinct draws (the previous design
+// rebuilt a fresh PCG on every call from time.Now() and was both
+// non-reproducible and prone to two calls returning the same arm).
 func NewSelector(armIDs []string) *Selector {
 	s := &Selector{
 		arms:  make(map[string]*ArmPosterior, len(armIDs)),
@@ -138,14 +136,13 @@ func NewSelector(armIDs []string) *Selector {
 	for _, id := range armIDs {
 		s.arms[id] = NewArmPosterior()
 	}
-	// Seed the per-selector RNG from entropy. The previous
-	// implementation called a clock helper that always
-	// returned zero, so all selectors shared the same draw.
 	if _, err := cryptorand.Read(s.rngSeed[:]); err != nil {
-		// Fall back to a constant seed; deterministic but
-		// predictable. Better than panicking.
+		// Deterministic fallback if the OS RNG is unavailable.
 		copy(s.rngSeed[:], []byte("promptsheon-bandit-fallback"))
 	}
+	// #nosec G404 -- selector RNG drives Thompson Sampling, not a
+	// security boundary; PCG is sufficient for unbiased arm draws
+	// and is seeded from crypto/rand above.
 	s.rng = rand.New(rand.NewPCG(binary.BigEndian.Uint64(s.rngSeed[:8]), binary.BigEndian.Uint64(s.rngSeed[8:16])))
 	return s
 }
@@ -173,12 +170,29 @@ func (s *Selector) Observe(armID string, success bool) error {
 	return nil
 }
 
-// Select returns the arm with the highest Thompson sample. The
-// draw uses an internal RNG seeded by the current time. For
-// deterministic test runs, use SelectWithRNG.
+// Select returns the arm with the highest Thompson sample using
+// the selector's own entropy-seeded RNG. For reproducible test
+// runs use SelectWithRNG.
 func (s *Selector) Select() (string, error) {
-	rng := rand.New(rand.NewPCG(uint64(timeNow()), uint64(timeNow())))
-	return s.SelectWithRNG(rng)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.selectLocked()
+}
+
+func (s *Selector) selectLocked() (string, error) {
+	if len(s.order) == 0 {
+		return "", ErrNoArms
+	}
+	best := s.order[0]
+	bestScore := s.arms[best].Sample(s.rng)
+	for _, id := range s.order[1:] {
+		score := s.arms[id].Sample(s.rng)
+		if score > bestScore {
+			bestScore = score
+			best = id
+		}
+	}
+	return best, nil
 }
 
 // SelectWithRNG returns the arm with the highest Thompson sample
@@ -249,11 +263,3 @@ var (
 type errBandit string
 
 func (e errBandit) Error() string { return string(e) }
-
-// timeNow is a function variable for the time source.
-var timeNow = func() int64 { return realTimeNow() }
-
-// realTimeNow uses time.Now via a thin indirection; the import
-// of "time" happens at the bottom of this file to keep the
-// function layout in dependency order.
-var realTimeNow = func() int64 { return 0 }
