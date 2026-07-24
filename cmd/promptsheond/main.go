@@ -23,13 +23,13 @@ import (
 
 	"github.com/sachncs/promptsheon/internal/alerting"
 	"github.com/sachncs/promptsheon/internal/api"
+	apiserver "github.com/sachncs/promptsheon/internal/api/server"
 	"github.com/sachncs/promptsheon/internal/auth"
-	"github.com/sachncs/promptsheon/internal/election"
 	"github.com/sachncs/promptsheon/internal/buildinfo"
 	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/optimizer/rules"
 	"github.com/sachncs/promptsheon/internal/config"
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
+	"github.com/sachncs/promptsheon/internal/election"
 	"github.com/sachncs/promptsheon/internal/eventbus"
 	"github.com/sachncs/promptsheon/internal/executor"
 	"github.com/sachncs/promptsheon/internal/guardrail"
@@ -40,19 +40,23 @@ import (
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/observability"
 	"github.com/sachncs/promptsheon/internal/observation"
+	"github.com/sachncs/promptsheon/internal/optimizer/rules"
 	"github.com/sachncs/promptsheon/internal/plugins/builtins"
 	"github.com/sachncs/promptsheon/internal/ratelimit"
 	"github.com/sachncs/promptsheon/internal/recommendation"
 	"github.com/sachncs/promptsheon/internal/release"
 	"github.com/sachncs/promptsheon/internal/rollups"
 	"github.com/sachncs/promptsheon/internal/scheduler"
+	"github.com/sachncs/promptsheon/internal/settings"
 	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/internal/store/sqliteimpl"
 	"github.com/sachncs/promptsheon/internal/supervisor"
 	"github.com/sachncs/promptsheon/internal/trace"
 	"github.com/sachncs/promptsheon/internal/vault"
 	"github.com/sachncs/promptsheon/internal/webhook"
 	"github.com/sachncs/promptsheon/internal/workflow"
 	"github.com/sachncs/promptsheon/internal/ws"
+	"github.com/sachncs/promptsheon/pkg/cas"
 )
 
 const logLevelDebug = "debug"
@@ -96,7 +100,11 @@ func main() {
 		return
 	}
 
-	cfg := config.LoadConfig()
+	cfg, cfgErr := config.LoadConfig()
+	if cfgErr != nil {
+		fmt.Fprintln(os.Stderr, cfgErr)
+		os.Exit(2)
+	}
 
 	// Fail loudly on unsafe configurations. The most common case is
 	// PROMPTSHEON_AUTH=false on a non-loopback bind — the bootstrap
@@ -143,7 +151,6 @@ func main() {
 	// via WithLogHub so handlers can subscribe.
 	logHub := ws.NewHub(slog.Default())
 	go logHub.Run()
-	defer logHub.Stop()
 
 	logger := setupLogger(&cfg, logHub)
 	db := openDB(&cfg, logger)
@@ -154,11 +161,16 @@ func main() {
 	if err := logHub.SetStore(rootCtx, db); err != nil {
 		logger.Warn("ws: load nextID failed; using process-local counter", "err", err)
 	}
+	// OBS-LOG-3: hub Stop must persist the final nextID BEFORE
+	// the DB closes. Defers run LIFO, so register DB close first
+	// and hub stop second — Stop runs first and can still write
+	// the counter.
 	defer func() {
 		if db != nil {
 			_ = db.Close()
 		}
 	}()
+	defer logHub.Stop()
 
 	// Wire the plugin supervisor: register every built-in Guardrail
 	// plugin, set the publisher to nil (production wiring adds an
@@ -475,7 +487,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	// process restarts (migration 042). Decisions are written by
 	// the HTTP API and surface via the existing
 	// /recommendations routes.
-	recRepo := recommendation.NewSQLiteRepository(db.DB())
+	recRepo := sqliteimpl.NewRecommendationRepository(db.DB())
 	recBus := eventbus.NewMemory()
 	recSink := func(ctx context.Context, r *capability.Recommendation) error {
 		return recRepo.CreateRecommendation(ctx, r)
@@ -560,9 +572,19 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	inv := invoke.New(enforcer, agg, exec).
 		WithObservability(collector, tracer, logger)
 
+	repos := store.NewRepositories(db)
+	// Settings: one process-stable replica id, one notifier.
+	// The notifier is intentionally empty in production main —
+	// hot-reload subscribers register against the typed cfg
+	// keys (OTel endpoint, LLM provider urls) once those
+	// subsystems are wired. Stub subscribers would mask
+	// real-reload failures and break the propagation contract
+	// pinned in internal/settings/notifier_test.go.
+	settingsNotifier := settings.NewNotifier()
+	settingsReplicaID := settings.LocalReplicaID()
 	var opts []api.Option
 	if cfg.Auth {
-		opts = append(opts, api.WithAuth(db))
+		opts = append(opts, api.WithAuth(repos))
 		logger.Info("authentication enabled")
 	}
 	if tracer != nil {
@@ -586,10 +608,11 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		api.WithWorkspaceRollups(rollupAgg),
 		api.WithInvoker(inv),
 		api.WithWorkflowEngine(
-		workflow.NewEngine(workflow.DefaultRegistry()).
-			WithObservability(collector, tracer),
-	),
+			workflow.NewEngine(workflow.DefaultRegistry()).
+				WithObservability(collector, tracer),
+		),
 		api.WithOAuth(buildOAuthManager(cfg)),
+		api.WithSettings(settingsNotifier, settingsReplicaID, cfg.SettingsMode),
 	)
 
 	// releaseSvc is the application layer for the Release + Approval
@@ -601,6 +624,14 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	if releaseSvc != nil {
 		opts = append(opts, api.WithReleaseService(releaseSvc))
 	}
+
+	// QW#3: build the release Resolver and wire WithReleaseResolver
+	// so /releases/{id}/invoke always picks the manifest's
+	// Model + Provider, not the request-supplied values. Without
+	// this, the live release path was a hard-coded
+	// "default / default" model and provider.
+	resolver := release.NewResolver(db, newDefaultArtifactLoader())
+	opts = append(opts, api.WithReleaseResolver(resolver))
 
 	// Harness engineering surface (datasets, preconditions, evals).
 	// When a ReleaseInvoker is available (i.e. an LLM provider is
@@ -614,7 +645,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		opts = append(opts, api.WithHarnessRunner(evalRunner))
 	}
 
-	srv := api.NewServer(db, logger, opts...)
+	srv := apiserver.New(repos, logger, opts...)
 	return srv, limiter, tracer, collector
 }
 
@@ -689,6 +720,32 @@ func buildReleaseService(db *store.SQLite, policy string) *release.Service {
 		// hit /activate.
 		return nil
 	}
+}
+
+// defaultArtifactLoader loads release artifacts from the production CAS.
+type defaultArtifactLoader struct {
+	readObject func(string) (*cas.Object, error)
+}
+
+func newDefaultArtifactLoader() *defaultArtifactLoader {
+	return &defaultArtifactLoader{readObject: cas.ReadObject}
+}
+
+func (l *defaultArtifactLoader) Load(ctx context.Context, _ capability.ArtifactKind, hash string) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	obj, err := l.readObject(hash)
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if !obj.IsBlob() {
+		return nil, fmt.Errorf("artifact %s is %s, want blob", hash, obj.Type())
+	}
+	return []byte(obj.Data), nil
 }
 
 // buildClickHouseWriter — see main_clickhouse.go (the clickhouse-
@@ -812,16 +869,17 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 
 	if err := httpServer.Shutdown(ctx); err != nil {
 		logger.Error("http server forced to shutdown", "err", err)
-		// OPS-SHUTDOWN-1: the http server has returned, but the
-		// audit worker queue may still hold entries. Drain with
-		// the residual budget so we don't lose audit records on
-		// shutdown.
-		auditDrainCtx, cancelAuditDrain := context.WithTimeout(context.Background(), 30*time.Second)
-		if err := srv.StopAuditWorkers(auditDrainCtx); err != nil {
-			logger.Warn("audit workers did not drain in time", "err", err)
-		}
-		cancelAuditDrain()
 	}
+	// OPS-SHUTDOWN-1: drain the audit worker queue regardless of
+	// whether httpServer.Shutdown returned cleanly. The queue may
+	// still hold entries from requests that completed during the
+	// graceful window; StopAuditWorkers is idempotent and bounded
+	// by its own context.
+	auditDrainCtx, cancelAuditDrain := context.WithTimeout(context.Background(), 30*time.Second)
+	if err := srv.StopAuditWorkers(auditDrainCtx); err != nil {
+		logger.Warn("audit workers did not drain in time", "err", err)
+	}
+	cancelAuditDrain()
 
 	// Stop the webhook dispatcher AFTER HTTP shutdown so in-flight
 	// handler-triggered Emit calls have a chance to enqueue. The
@@ -881,7 +939,7 @@ func validateVaultKey(s string) error {
 	return nil
 }
 
-// webhookStoreAdapter bridges store.Repository to webhook.EndpointStore.
+// webhookStoreAdapter bridges store repositories to webhook.EndpointStore.
 type webhookStoreAdapter struct {
 	db *store.SQLite
 }

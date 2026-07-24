@@ -1,20 +1,20 @@
 // Command promptsheon-auditbackfill populates the
 // resource_kind and resource_id columns added to audit_entries
 // by migration 048a. The 048a migration added the columns with
-// DEFAULT ''; this command fills them from the existing
+// DEFAULT ”; this command fills them from the existing
 // `resource` column for historical rows so the structural
 // query path is useful against the full table, not just new
 // rows.
 //
 // Usage:
 //
-//	promptsheon-auditbackfill [--db PATH] [--batch-size N] [--dry-run] [--progress-every N]
+//		promptsheon-auditbackfill [--db PATH] [--batch-size N] [--dry-run] [--progress-every N]
 //
-//   --db PATH          SQLite database file (default:
-//                      $PROMPTSHEON_DB_PATH or "promptsheon.db")
-//   --batch-size N     rows per UPDATE batch (default 5000)
-//   --dry-run          show what would be updated, change nothing
-//   --progress-every N log progress every N batches (default 1)
+//	  --db PATH          SQLite database file (default:
+//	                     $PROMPTSHEON_DB_PATH or "promptsheon.db")
+//	  --batch-size N     rows per UPDATE batch (default 5000)
+//	  --dry-run          show what would be updated, change nothing
+//	  --progress-every N log progress every N batches (default 1)
 //
 // The command is safe to run while the daemon is online: it
 // takes a short transaction per batch and yields between
@@ -26,7 +26,7 @@
 // takes ~minutes to ~hours depending on disk. The progress
 // log is one line per batch. Cancel with SIGINT and restart
 // later — the script is idempotent because each UPDATE only
-// touches rows where resource_kind = '' (the 048a default).
+// touches rows where resource_kind = ” (the 048a default).
 package main
 
 import (

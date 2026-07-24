@@ -45,7 +45,7 @@ func seedAuditDB(t *testing.T) *sql.DB {
 		{"e3", "u1", "delete", "user:u2"},
 		{"e4", "u3", "noop", "no_colon_here"},
 		{"e5", "u1", "create", "workspace:xyz"},
-		{"e6", "u2", "delete", ""}, // empty resource → empty kind/id
+		{"e6", "u2", "delete", ""},           // empty resource → empty kind/id
 		{"e7", "u1", "update", "release:r1"}, // r1 will be re-backfilled
 	} {
 		if _, err := db.Exec(
