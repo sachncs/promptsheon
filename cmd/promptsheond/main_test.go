@@ -20,6 +20,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/store"
 	"github.com/sachncs/promptsheon/internal/webhook"
+	"github.com/sachncs/promptsheon/pkg/cas"
 )
 
 func init() {
@@ -27,6 +28,33 @@ func init() {
 	// fresh DB, including the destructive 025 cleanup migration.
 	// Production refuses by default; the test binary opts in.
 	os.Setenv(store.DestructiveMigrationEnv, "true")
+}
+
+func TestDefaultArtifactLoader(t *testing.T) {
+	loader := &defaultArtifactLoader{readObject: func(hash string) (*cas.Object, error) {
+		switch hash {
+		case "blob":
+			return cas.NewBlobObject(`{"provider":"local","model":"real"}`), nil
+		case "tree":
+			return cas.NewTreeObject([]cas.TreeEntry{{Name: "artifact", Type: cas.TypeBlob, Hash: "blob"}}), nil
+		default:
+			return nil, cas.ErrObjectNotFound
+		}
+	}}
+
+	got, err := loader.Load(t.Context(), "model_policy", "blob")
+	if err != nil || string(got) != `{"provider":"local","model":"real"}` {
+		t.Fatalf("Load blob: got=%q err=%v", got, err)
+	}
+	if _, err := loader.Load(t.Context(), "prompt", "tree"); err == nil {
+		t.Fatal("expected non-blob rejection")
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if _, err := loader.Load(ctx, "prompt", "blob"); err == nil {
+		t.Fatal("expected context cancellation")
+	}
 }
 
 // ---------------------------------------------------------------------------
