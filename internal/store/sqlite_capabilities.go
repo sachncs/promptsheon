@@ -3,12 +3,19 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/schedule"
 )
+
+// storeErrNotFound re-exports the package-level ErrNotFound so
+// repository implementations can return a typed sentinel
+// without a circular import on the callers' packages.
+var storeErrNotFound = ErrNotFound
 
 // ensure SQLite implements the consumer-defined capability.Repository
 // and schedule.Repository interfaces.
@@ -243,6 +250,151 @@ func (s *SQLite) DeleteCapability(ctx context.Context, id string) error {
 	return nil
 }
 
+// SetCapabilityContract upserts the contract attached to a
+// Capability. Pass nil to clear. Returns
+// capability.ErrCapabilityNotFound (re-exported via the
+// repository surface) when the capability id does not exist.
+func (s *SQLite) SetCapabilityContract(ctx context.Context, capabilityID string, c *capability.CapabilityContract) error {
+	if c == nil {
+		if _, err := s.db.ExecContext(ctx,
+			`DELETE FROM capability_contracts WHERE capability_id = ?`, capabilityID,
+		); err != nil {
+			return fmt.Errorf("clear contract: %w", err)
+		}
+		return nil
+	}
+	inSchema, _ := json.Marshal(c.InputSchema)
+	outSchema, _ := json.Marshal(c.OutputSchema)
+	auto := 0
+	if c.AutoPromotable {
+		auto = 1
+	}
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO capability_contracts
+		    (capability_id, blast_radius, success_rubric, auto_promotable,
+		     input_schema, output_schema, slo_max_p95_ms, slo_min_success,
+		     slo_max_hallu, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(capability_id) DO UPDATE SET
+		    blast_radius=excluded.blast_radius,
+		    success_rubric=excluded.success_rubric,
+		    auto_promotable=excluded.auto_promotable,
+		    input_schema=excluded.input_schema,
+		    output_schema=excluded.output_schema,
+		    slo_max_p95_ms=excluded.slo_max_p95_ms,
+		    slo_min_success=excluded.slo_min_success,
+		    slo_max_hallu=excluded.slo_max_hallu,
+		    updated_at=CURRENT_TIMESTAMP
+	`, capabilityID, string(c.BlastRadius), c.SuccessRubric, auto,
+		string(inSchema), string(outSchema),
+		c.SLOTarget.MaxP95LatencyMS, c.SLOTarget.MinSuccessRate,
+		c.SLOTarget.MaxHallucinationRate)
+	if err != nil {
+		return fmt.Errorf("upsert contract: %w", err)
+	}
+	return nil
+}
+
+// GetCapabilityContract returns the contract attached to a
+// Capability. Returns ErrNotFound when no contract is attached
+// or the capability id does not exist.
+func (s *SQLite) GetCapabilityContract(ctx context.Context, capabilityID string) (*capability.CapabilityContract, error) {
+	var (
+		blast, rubric, inJSON, outJSON string
+		auto                           int
+		maxP95                         int
+		minSuccess, maxHallu           float64
+	)
+	err := s.db.QueryRowContext(ctx, `
+		SELECT blast_radius, success_rubric, auto_promotable,
+		       input_schema, output_schema,
+		       slo_max_p95_ms, slo_min_success, slo_max_hallu
+		FROM capability_contracts WHERE capability_id = ?`, capabilityID,
+	).Scan(&blast, &rubric, &auto, &inJSON, &outJSON, &maxP95, &minSuccess, &maxHallu)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storeErrNotFound
+		}
+		return nil, fmt.Errorf("get contract: %w", err)
+	}
+	c := &capability.CapabilityContract{
+		BlastRadius:    capability.BlastRadius(blast),
+		SuccessRubric:  rubric,
+		AutoPromotable: auto == 1,
+		SLOTarget: capability.SLOTarget{
+			MaxP95LatencyMS:       maxP95,
+			MinSuccessRate:        minSuccess,
+			MaxHallucinationRate:  maxHallu,
+		},
+	}
+	if inJSON != "" && inJSON != "{}" {
+		_ = json.Unmarshal([]byte(inJSON), &c.InputSchema)
+	}
+	if outJSON != "" && outJSON != "{}" {
+		_ = json.Unmarshal([]byte(outJSON), &c.OutputSchema)
+	}
+	return c, nil
+}
+
+// GetCapabilityReputation derives a trust score for the
+// Capability from the executions and eval_results tables.
+// Returns a zero-valued Reputation when the Capability has no
+// history.
+func (s *SQLite) GetCapabilityReputation(ctx context.Context, capabilityID string) (capability.Reputation, error) {
+	r := capability.Reputation{CapabilityID: capabilityID}
+
+	var evalsTotal, evalsPassed int64
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(e.id), COALESCE(SUM(CASE WHEN e.status = 'passed' THEN 1 ELSE 0 END), 0)
+		FROM eval_results e
+		JOIN eval_runs r ON e.run_id = r.id
+		JOIN capability_versions v ON r.release_id IN (
+		    SELECT id FROM releases WHERE capability_id = ?
+		)
+		WHERE v.capability_id = ?
+	`, capabilityID, capabilityID).Scan(&evalsTotal, &evalsPassed)
+	if err == nil && evalsTotal > 0 {
+		r.EvalPassRate = float64(evalsPassed) / float64(evalsTotal)
+		r.SampleSize = evalsTotal
+	}
+
+	var execTotal, execOK int64
+	err = s.db.QueryRowContext(ctx, `
+		SELECT COUNT(id), COALESCE(SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END), 0)
+		FROM executions e
+		JOIN capability_versions v ON e.capability_version_id = v.id
+		WHERE v.capability_id = ?
+	`, capabilityID).Scan(&execTotal, &execOK)
+	if err == nil && execTotal > 0 {
+		r.SLOAdherenceRate = float64(execOK) / float64(execTotal)
+		r.SampleSize += execTotal
+	}
+
+	var decTotal, decAdopted int64
+	err = s.db.QueryRowContext(ctx, `
+		SELECT COUNT(DISTINCT recommendation_id), COALESCE(SUM(CASE WHEN outcome = 'adopted' THEN 1 ELSE 0 END), 0)
+		FROM decisions d
+		JOIN recommendations rec ON d.recommendation_id = rec.id
+		JOIN capability_versions v ON rec.capability_version_id = v.id
+		WHERE v.capability_id = ?
+	`, capabilityID).Scan(&decTotal, &decAdopted)
+	if err == nil && decTotal > 0 {
+		r.DecisionAdoptionRate = float64(decAdopted) / float64(decTotal)
+		r.SampleSize += decTotal
+	}
+
+	// Trust score is the product of the three rates, weighted
+	// by sample size. A Capability with zero history gets 0;
+	// the operator should interpret that as "unknown", not
+	// "untrusted".
+	if r.SampleSize == 0 {
+		r.TrustScore = 0
+	} else {
+		r.TrustScore = r.EvalPassRate * r.SLOAdherenceRate * r.DecisionAdoptionRate
+	}
+	return r, nil
+}
+
 func scanCapability(scanner interface {
 	Scan(dest ...any) error
 }) (*capability.Capability, error) {
@@ -328,6 +480,17 @@ func (s *SQLite) GetLatestVersion(ctx context.Context, capabilityID string) (*ca
 	row := s.db.QueryRowContext(ctx,
 		`SELECT id, capability_id, version, manifest, manifest_hash, created_at, created_by
 		 FROM capability_versions WHERE capability_id = ? ORDER BY version DESC LIMIT 1`, capabilityID,
+	)
+	return scanCapabilityVersion(row)
+}
+
+// GetVersionByNumber returns the Version whose integer
+// `version` column matches the supplied counter for the
+// Capability. Used by the diff endpoint.
+func (s *SQLite) GetVersionByNumber(ctx context.Context, capabilityID string, version int) (*capability.Version, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, capability_id, version, manifest, manifest_hash, created_at, created_by
+		 FROM capability_versions WHERE capability_id = ? AND version = ?`, capabilityID, version,
 	)
 	return scanCapabilityVersion(row)
 }

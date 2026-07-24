@@ -37,11 +37,25 @@ type Repository interface {
 	UpdateCapability(ctx context.Context, c *Capability) error
 	DeleteCapability(ctx context.Context, id string) error
 
+	// Capability contracts. A Capability may carry a typed
+	// CapabilityContract; the contract is the unit of
+	// governance. SetCapabilityContract is upsert; pass nil to
+	// clear. GetCapabilityContract returns errCapabilityNotFound
+	// when the capability has no contract.
+	SetCapabilityContract(ctx context.Context, capabilityID string, c *CapabilityContract) error
+	GetCapabilityContract(ctx context.Context, capabilityID string) (*CapabilityContract, error)
+
+	// Capability reputation. TrustScore is a derived value
+	// (eval_pass_rate * slo_adherence * decision_adoption_rate)
+	// computed from observations and decision history.
+	GetCapabilityReputation(ctx context.Context, capabilityID string) (Reputation, error)
+
 	// Capability Versions.
 	CreateVersion(ctx context.Context, v *Version) error
 	GetVersion(ctx context.Context, id string) (*Version, error)
 	ListVersions(ctx context.Context, capabilityID string) ([]*Version, error)
 	GetLatestVersion(ctx context.Context, capabilityID string) (*Version, error)
+	GetVersionByNumber(ctx context.Context, capabilityID string, version int) (*Version, error)
 
 	// Executions.
 	CreateExecution(ctx context.Context, e *Execution) error
@@ -54,4 +68,18 @@ type ExecutionFilter struct {
 	CapabilityVersionID string
 	Limit               int
 	Offset              int
+}
+
+// Reputation is the derived trust score for a Capability.
+// Computed from execution history, decision history, and SLO
+// adherence. Reputation is read-only; the inputs that drive
+// it are the audit chain, decisions table, and observations
+// table.
+type Reputation struct {
+	CapabilityID         string  `json:"capability_id"`
+	TrustScore           float64 `json:"trust_score"`
+	EvalPassRate         float64 `json:"eval_pass_rate"`
+	SLOAdherenceRate     float64 `json:"slo_adherence_rate"`
+	DecisionAdoptionRate float64 `json:"decision_adoption_rate"`
+	SampleSize           int64   `json:"sample_size"`
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/alerting"
 	"github.com/sachncs/promptsheon/internal/api/handlers"
 	"github.com/sachncs/promptsheon/internal/auth"
+	"github.com/sachncs/promptsheon/internal/capability"
 
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
 	"github.com/sachncs/promptsheon/internal/election"
@@ -42,6 +43,12 @@ type Func = handlers.Func
 type Server struct {
 	mux              *http.ServeMux
 	db               *store.Repositories
+	// capabilityRepo2 is the typed CapabilityRepository subset
+	// of the Repositories facade. The handler layer uses it
+	// for SetCapabilityContract / GetCapabilityContract /
+	// GetCapabilityReputation; the interface is owned by the
+	// capability package so domain purity holds.
+	capabilityRepo2  capability.Repository
 	logger           *slog.Logger
 	authn            *auth.Authenticator
 	requireAuth      bool
@@ -132,11 +139,12 @@ const auditQueueBackpressure = 200 * time.Millisecond
 // expose it through a fresh Option.
 func NewServer(db *store.Repositories, logger *slog.Logger, opts ...Option) *Server {
 	s := &Server{
-		mux:           http.NewServeMux(),
-		db:            db,
-		logger:        logger,
-		oauthStates:   newOAuthStateStore(),
-		searchManager: search.NewManager(),
+		mux:             http.NewServeMux(),
+		db:              db,
+		capabilityRepo2: db.CapabilityRepository,
+		logger:          logger,
+		oauthStates:     newOAuthStateStore(),
+		searchManager:   search.NewManager(),
 	}
 	// Make this server the active one for the package-level OAuth
 	// helpers (generateOAuthState, validateOAuthState, etc.). The

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -58,6 +59,7 @@ type mockRepo struct {
 	preconditions map[string]*harness.Precondition
 	evalRuns      map[string]*harness.EvalRun
 	evalResults   []harness.EvalResult
+	contracts     map[string]*capability.CapabilityContract
 	pingErr       error
 	closeErr      error
 }
@@ -99,6 +101,7 @@ func newMockRepo() *mockRepo {
 		approvals:     make(map[string]*approval.Approval),
 		datasets:      make(map[string]*harness.Dataset),
 		datasetCases:  make(map[string][]harness.DatasetCase),
+		contracts:     make(map[string]*capability.CapabilityContract),
 		preconditions: make(map[string]*harness.Precondition),
 		evalRuns:      make(map[string]*harness.EvalRun),
 	}
@@ -480,12 +483,39 @@ func (m *mockRepo) ListVersions(_ context.Context, capabilityID string) ([]*capa
 	defer m.mu.Unlock()
 	return m.versionsByCap[capabilityID], nil
 }
+func (m *mockRepo) GetVersionByNumber(_ context.Context, capabilityID string, version int) (*capability.Version, error) {
+	if v, ok := m.versions[fmt.Sprintf("%s_%d", capabilityID, version)]; ok {
+		return v, nil
+	}
+	return nil, store.ErrNotFound
+}
+
+func (m *mockRepo) SetCapabilityContract(_ context.Context, capabilityID string, c *capability.CapabilityContract) error {
+	if c == nil {
+		delete(m.contracts, capabilityID)
+		return nil
+	}
+	m.contracts[capabilityID] = c
+	return nil
+}
+
+func (m *mockRepo) GetCapabilityContract(_ context.Context, capabilityID string) (*capability.CapabilityContract, error) {
+	if c, ok := m.contracts[capabilityID]; ok {
+		return c, nil
+	}
+	return nil, store.ErrNotFound
+}
+
+func (m *mockRepo) GetCapabilityReputation(_ context.Context, capabilityID string) (capability.Reputation, error) {
+	return capability.Reputation{CapabilityID: capabilityID, TrustScore: 0.5, EvalPassRate: 0.5, SLOAdherenceRate: 0.5, DecisionAdoptionRate: 0.5, SampleSize: 1}, nil
+}
+
 func (m *mockRepo) GetLatestVersion(_ context.Context, capabilityID string) (*capability.Version, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	versions := m.versionsByCap[capabilityID]
 	if len(versions) == 0 {
-		return nil, sql.ErrNoRows
+		return nil, store.ErrNotFound
 	}
 	latest := versions[0]
 	for _, v := range versions[1:] {
@@ -495,6 +525,7 @@ func (m *mockRepo) GetLatestVersion(_ context.Context, capabilityID string) (*ca
 	}
 	return latest, nil
 }
+
 func (m *mockRepo) CreateExecution(_ context.Context, e *capability.Execution) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -3198,8 +3229,7 @@ func TestHandleGetLatestVersion(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateVersion(context.Background(), &capability.Version{ID: "v1", Version: 1, CapabilityID: "c1"})
 	_ = repo.CreateVersion(context.Background(), &capability.Version{ID: "v2", Version: 2, CapabilityID: "c1"})
-	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s := newTestServerWithRepo(t, repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/capabilities/c1/versions/latest", nil)
 	rr := httptest.NewRecorder()
