@@ -1,4 +1,4 @@
-.PHONY: all build build-server build-cli test lint lint-domain clean help
+.PHONY: all build build-server build-cli test test-verbose test-integration test-e2e load-test lint lint-domain lint-deps fmt vet deps clean coverage coverage-raw run cli openapi openapi-check update-deps security helm-docs docs-check bench docs-site help
 
 # Default target
 all: build
@@ -127,6 +127,40 @@ helm-docs:
 	@command -v helm-docs >/dev/null 2>&1 || { echo "helm-docs not installed (brew install helm-docs)"; exit 0; }
 	helm-docs --sort-values-order=file -t deploy/helm/promptsheon/README.md deploy/helm/promptsheon
 
+# DOC-CI-3 / DOC-FRESH-1: deterministic doc-freshness check.
+# Walks every markdown file under docs/ plus the root
+# README.md / CHANGELOG.md and reports:
+#   - any local markdown link that resolves to a missing file
+#     (HTTP(S), mailto, and pure-anchor links are skipped)
+#   - any path-shaped reference to source code
+#     (internal/...go, pkg/...go, cmd/...go, api/openapi.yaml,
+#     deploy/, scripts/, .github/workflows/, docs/adr/NNNN-...)
+#     that no longer points at a real file
+# Pure shell + awk; no new Go dependency. CI runs this on
+# every PR. Failing here means a documented reference is
+# stale or a local link is broken.
+docs-check:
+	bash scripts/docs-check.sh
+
+# PERF-BENCH-1: curated Go benchmark target. The list in
+# scripts/benchmarks.txt is the canonical eight trustworthy
+# benchmarks. `go test -bench` reports ns/op and B/op; the
+# p99 latency gate lives in the k6 scenarios, not here.
+# Override the per-benchmark time with BENCHTIME=100ms for
+# a fast smoke pass.
+bench:
+	@BENCHTIME="$(or $(BENCHTIME),1s)" bash scripts/run-benchmarks.sh
+
+# Build the mdBook site. The book lives in docs-site/ and reuses
+# docs/ as its source via the relative `src = "../docs"` in
+# docs-site/book.toml. The only mdBook-only file is
+# docs/SUMMARY.md; no markdown is duplicated. Requires mdbook
+# on PATH; if absent the target is a no-op (CI installs mdbook
+# via the docs-site.yaml workflow).
+docs-site:
+	@command -v mdbook >/dev/null 2>&1 || { echo "mdbook not installed (cargo install mdbook)"; exit 0; }
+	mdbook build docs-site
+
 # Show help
 help:
 	@echo "Promptsheon - Version Control for AI Intelligence"
@@ -155,6 +189,9 @@ help:
 	@echo "  openapi          Regenerate api/openapi.yaml from server routes"
 	@echo "  openapi-check    Fail if openapi.yaml is out of date"
 	@echo "  helm-docs        Regenerate deploy/helm/promptsheon/README.md from values.yaml"
+	@echo "  docs-check       Fail on broken local markdown links or stale source-path refs"
+	@echo "  bench            Run the curated 8 Go benchmarks (scripts/benchmarks.txt)"
+	@echo "  docs-site        Build the mdBook site (no-op if mdbook is missing)"
 	@echo "  update-deps      Update all dependencies"
 	@echo "  security         Check for security vulnerabilities"
 	@echo "  help             Show this help message"

@@ -1,87 +1,96 @@
 #!/usr/bin/env bash
-# TEST-COV-2: per-package coverage floors. Reads coverage.out
-# (the same file the global-coverage check uses) and enforces
-# three categories:
-#
-#   - domain packages (internal/<pkg>)     >= 50%
-#   - infrastructure (internal/api+store)    >= 40%
-#   - api handlers (internal/api handlers)    >= 60%
-#
-# The categories are a coarse-grained proxy for "high
-# blast-radius, must be tested". A package below its floor
-# is a regression worth investigating; the floor is low
-# enough that newly-added code is allowed a learning curve
-# before tripping the gate.
-#
-# Usage: bash scripts/check-coverage.sh coverage.out
-set -e
+set -euo pipefail
 
-COVERAGE_FILE="${1:-coverage.out}"
-if [[ ! -f "$COVERAGE_FILE" ]]; then
-  echo "check-coverage: $COVERAGE_FILE not found" >&2
-  exit 1
+check_profile() {
+  awk -v domain_packages="alerting approval audit auth budget capability eventbus executor experiment lineage observation optimizer policy quota recommendation release replay schedule" '
+    NR == 1 { next }
+    {
+      file = $1
+      sub(/:[0-9].*$/, "", file)
+      statements = $(NF-1)
+      covered = ($NF > 0 ? statements : 0)
+      package = ""
+      if (file ~ /\/internal\/api\//) package = "internal/api"
+      else if (file ~ /\/internal\/store\//) package = "internal/store"
+      else if (file ~ /\/internal\//) {
+        split(file, parts, "/internal/")
+        split(parts[2], name, "/")
+        package = name[1]
+      }
+      if (package == "internal/api" || package == "internal/store") {
+        total[package] += statements
+        hit[package] += covered
+      }
+      if (file ~ /\/internal\/api\/handlers_[^\/]*\.go$/) {
+        total["api handlers"] += statements
+        hit["api handlers"] += covered
+      }
+      if (package != "internal/api" && package != "internal/store" && package != "") {
+        wanted = " " package " "
+        if (index(" " domain_packages " ", wanted)) {
+          total[package] += statements
+          hit[package] += covered
+        }
+      }
+    }
+    END {
+      failed = 0
+      for (package in total) {
+        floor = (package == "api handlers" ? 60 : (package == "internal/api" || package == "internal/store" ? 40 : 50))
+        pct = 100 * hit[package] / total[package]
+        printf "%s: %.2f%% (%d/%d statements, floor %d%%)\n", (pct >= floor ? "OK" : "FAIL"), pct, hit[package], total[package], floor
+        if (pct < floor) failed = 1
+      }
+      for (i = 1; i <= 2; i++) {
+        package = (i == 1 ? "internal/api" : "internal/store")
+        if (total[package] == 0) {
+          printf "FAIL: %s has no statements\n", package > "/dev/stderr"
+          failed = 1
+        }
+      }
+      if (total["api handlers"] == 0) {
+        printf "FAIL: api handlers has no statements\n" > "/dev/stderr"
+        failed = 1
+      }
+      exit failed
+    }
+  ' "$1"
+}
+
+if [[ "${1:-}" == "--self-test" ]]; then
+  weak=$(mktemp)
+  pass=$(mktemp)
+  trap 'rm -f "$weak" "$pass"' EXIT
+  cat >"$weak" <<'EOF'
+mode: atomic
+github.com/sachncs/promptsheon/internal/release/release.go:1.1,2.1 5 1
+github.com/sachncs/promptsheon/internal/release/release.go:3.1,4.1 15 0
+github.com/sachncs/promptsheon/internal/optimizer/optimizer.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/internal/optimizer/optimizer.go:3.1,4.1 10 1
+github.com/sachncs/promptsheon/internal/api/server.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/internal/store/sqlite.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/internal/api/handlers_health.go:1.1,2.1 10 1
+EOF
+  if check_profile "$weak" >/dev/null 2>&1; then
+    printf 'coverage self-test failed: weak package was hidden\n' >&2
+    exit 1
+  fi
+  cat >"$pass" <<'EOF'
+mode: atomic
+github.com/sachncs/promptsheon/internal/release/release.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/internal/optimizer/optimizer.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/internal/api/server.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/internal/store/sqlite.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/internal/api/handlers_health.go:1.1,2.1 10 1
+EOF
+  check_profile "$pass" >/dev/null
+  printf 'ok: coverage profile parser self-test\n'
+  exit
 fi
 
-# Extract the per-package coverage from go tool cover -func
-# output. The lines look like:
-#   github.com/sachncs/promptsheon/internal/foo/bar.go:42: Bar 75.0%
-# We aggregate by package path and report the percentage of
-# statements covered.
-declare -A pkg_total
-declare -A pkg_covered
-while IFS=':' read -r file line func pct; do
-  # The pct field is "75.0%". Strip the % and convert to a
-  # percentage (we'll accumulate the values directly; the
-  # tool output is already a percentage per file, not per
-  # statement).
-  if [[ "$pct" =~ ([0-9.]+)% ]]; then
-    p=${BASH_REMATCH[1]}
-  else
-    continue
-  fi
-  # Extract the package path (everything before the first
-  # "/internal/" + suffix).
-  if [[ "$file" =~ github.com/sachncs/promptsheon/(.+)\.go$ ]]; then
-    pkg=${BASH_REMATCH[1]}
-  else
-    continue
-  fi
-  pkg_total[$pkg]=$((${pkg_total[$pkg]:-0} + 1))
-  pkg_covered[$pkg]=$(echo "${pkg_covered[$pkg]:-0} + $p" | bc -l)
-done < <(go tool cover -func="$COVERAGE_FILE" 2>/dev/null | grep -E '\.go:[0-9]+:' || true)
-
-# Compute per-package average.
-fail=0
-declare -a failed_pkgs
-for pkg in "${!pkg_total[@]}"; do
-  total=${pkg_total[$pkg]}
-  sum=${pkg_covered[$pkg]}
-  if [[ "$total" -eq 0 ]]; then continue; fi
-  avg=$(echo "scale=2; $sum / $total" | bc -l)
-  # Classify.
-  floor=0
-  case "$pkg" in
-    internal/api/handlers*) floor=60 ;;
-    internal/api/server*) floor=60 ;;
-    internal/api/pagination*|internal/api/validate*) floor=60 ;;
-    internal/store/*) floor=40 ;;
-    internal/api/*) floor=40 ;;
-    internal/*) floor=50 ;;
-  esac
-  if [[ "$floor" -gt 0 ]] && [ $(echo "$avg < $floor" | bc -l) -eq 1 ]; then
-    echo "FAIL: $pkg coverage $avg% < $floor% floor" >&2
-    failed_pkgs+=("$pkg: $avg% < $floor%")
-    fail=1
-  else
-    echo "OK:   $pkg $avg% (floor $floor%)"
-  fi
-done
-
-if [[ "$fail" -ne 0 ]]; then
-  echo "" >&2
-  echo "per-package coverage gate failed:" >&2
-  for line in "${failed_pkgs[@]}"; do
-    echo "  $line" >&2
-  done
+profile=${1:-coverage.out}
+if [[ ! -f "$profile" ]]; then
+  printf 'check-coverage: %s not found\n' "$profile" >&2
   exit 1
 fi
+check_profile "$profile"
