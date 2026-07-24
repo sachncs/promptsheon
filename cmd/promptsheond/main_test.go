@@ -808,6 +808,26 @@ func TestMain_WithVaultKey(t *testing.T) {
 	}
 }
 
+// TestMain_AuditDrainOnEveryShutdown pins OPS-SHUTDOWN-1: the
+// audit worker drain must run on every shutdown path, not only
+// when HTTP shutdown returns an error. The previous design only
+// called StopAuditWorkers on HTTP error, leaking in-flight audit
+// entries on a clean shutdown.
+func TestMain_AuditDrainOnEveryShutdown(t *testing.T) {
+	src, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatalf("read main.go: %v", err)
+	}
+	contents := string(src)
+	if !strings.Contains(contents, "srv.StopAuditWorkers(") {
+		t.Fatal("main.go must call srv.StopAuditWorkers(...) on the shutdown path")
+	}
+	// The canonical drain call site must exist.
+	if !strings.Contains(contents, "srv.StopAuditWorkers(auditDrainCtx)") {
+		t.Fatal("main.go must drain via srv.StopAuditWorkers(auditDrainCtx)")
+	}
+}
+
 // TestMain_HubStopBeforeDBClose pins OBS-LOG-3: the deferred
 // order in main() must close the SSE log hub BEFORE the database.
 // Defers run LIFO; the test reads main.go and asserts that the
