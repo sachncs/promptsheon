@@ -422,7 +422,7 @@ jobs:
           cache: true
 
       - name: Download SBOM
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: sbom
           path: ./dist/sbom
