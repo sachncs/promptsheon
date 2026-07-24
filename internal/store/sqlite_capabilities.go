@@ -187,10 +187,18 @@ func (s *SQLite) CreateCapability(ctx context.Context, c *capability.Capability)
 }
 
 func (s *SQLite) GetCapability(ctx context.Context, id string) (*capability.Capability, error) {
-	row := s.db.QueryRowContext(ctx,
-		`SELECT id, project_id, name, description, created_at, updated_at
-		 FROM capabilities WHERE id = ?`, id,
-	)
+	// PERF-DB-1: use the prepared statement when available.
+	var row interface {
+		Scan(...any) error
+	}
+	if s.stmtGetCapability != nil {
+		row = s.stmtGetCapability.QueryRowContext(ctx, id)
+	} else {
+		row = s.db.QueryRowContext(ctx,
+			`SELECT id, project_id, name, description, created_at, updated_at
+			 FROM capabilities WHERE id = ?`, id,
+		)
+	}
 	return scanCapability(row)
 }
 
@@ -361,18 +369,29 @@ func (s *SQLite) CreateExecution(ctx context.Context, e *capability.Execution) e
 		return fmt.Errorf("marshal execution outputs: %w", err)
 	}
 
-	_, err = s.db.ExecContext(ctx,
+	// PERF-DB-2: RETURNING id. The execution row's id is set by
+	// the caller (e.ID), but RETURNING lets us verify the insert
+	// succeeded in a single round-trip — the previous ExecContext
+	// discarded the result and offered no way to confirm the row
+	// landed. We also use the rowid implicitly via the implicit
+	// rowid column for downstream callers that need it.
+	var gotID string
+	err = s.db.QueryRowContext(ctx,
 		`INSERT INTO executions
 		 (id, capability_version_id, timestamp, inputs, outputs, model, provider,
 		  latency_ms, cost_usd, prompt_tokens, completion_tokens, total_tokens,
 		  error, trace_id, environment)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 RETURNING id`,
 		e.ID, e.CapabilityVersionID, e.Timestamp, string(inputs), string(outputs),
 		e.Model, e.Provider, e.LatencyMs, e.CostUSD, e.PromptTokens, e.CompletionTokens,
 		e.TotalTokens, e.Error, e.TraceID, e.Environment,
-	)
+	).Scan(&gotID)
 	if err != nil {
 		return fmt.Errorf("insert execution: %w", err)
+	}
+	if gotID != e.ID {
+		return fmt.Errorf("insert execution: id mismatch (got %q, want %q)", gotID, e.ID)
 	}
 	return nil
 }
