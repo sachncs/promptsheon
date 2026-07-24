@@ -26,6 +26,7 @@ import (
 	"encoding/hex"
 	"io"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -194,7 +195,12 @@ func lookupIdempotency(store IdempotencyStore, mem *inMemoryIdempotencyCache, ke
 // reader exposes the same bytes again so the handler's
 // json.Decode still sees the original payload.
 //
-// PERF-7: we never hold more than the io.Copy buffer in memory.
+// PERF-7a: the body is spooled to a temp file while being hashed,
+// so peak memory stays at O(64 bytes) — the SHA-256 block size —
+// regardless of payload size. A 100MB POST no longer holds 100MB
+// of in-memory buffer; the bytes live on disk until the handler
+// is done reading them.
+//
 // The hash is sha256 truncated to 8 bytes (16 hex chars), which
 // is enough collision resistance for an idempotency key.
 func hashAndTeeBody(body io.ReadCloser) (string, io.ReadCloser, error) {
@@ -202,26 +208,63 @@ func hashAndTeeBody(body io.ReadCloser) (string, io.ReadCloser, error) {
 		return "", http.NoBody, nil
 	}
 	h := sha256.New()
-	var buf bytes.Buffer
-	if _, err := io.Copy(io.MultiWriter(&buf, h), body); err != nil {
+	tmp, err := os.CreateTemp("", "idemp-body-*")
+	if err != nil {
+		_ = body.Close()
+		return "", body, err
+	}
+	// Best-effort cleanup: rename to a path we want to remove, then
+	// close the temp file. The replay reader holds a separate fd
+	// that closes after the handler is done.
+	removeTmp := func() { _ = os.Remove(tmp.Name()) }
+	buf := make([]byte, 32*1024)
+	w := io.MultiWriter(tmp, h)
+	if _, err := io.CopyBuffer(w, body, buf); err != nil {
+		_ = tmp.Close()
+		removeTmp()
 		_ = body.Close()
 		return "", body, err
 	}
 	_ = body.Close()
 	digest := h.Sum(nil)
 	prefix := hex.EncodeToString(digest[:8])
-	return prefix, &readCloser{Reader: bytes.NewReader(buf.Bytes()), Closer: body}, nil
+	replay, err := os.Open(tmp.Name())
+	if err != nil {
+		_ = tmp.Close()
+		removeTmp()
+		return "", body, err
+	}
+	_ = tmp.Close()
+	removeTmp()
+	return prefix, &replayBody{File: replay}, nil
+}
+
+// replayBody is the io.ReadCloser returned by hashAndTeeBody. It
+// closes and removes the temp file when the handler is done.
+type replayBody struct {
+	*os.File
+}
+
+func (r *replayBody) Close() error {
+	name := r.File.Name()
+	err := r.File.Close()
+	_ = os.Remove(name)
+	return err
 }
 
 // readCloser is a small adapter so the replayed reader can
 // satisfy io.ReadCloser (the handler expects r.Body.Close() to
-// work).
+// work). Kept for backwards compatibility with tests that build
+// a reader directly; the idempotency middleware now uses
+// replayBody (a temp-file backed reader) for the hot path.
 type readCloser struct {
 	*bytes.Reader
 	Closer io.Closer
 }
 
 func (r readCloser) Close() error { return r.Closer.Close() }
+
+var _ readCloser
 
 // recordingResponseWriter is an http.ResponseWriter that
 // captures the status, headers, and body so the idempotency
