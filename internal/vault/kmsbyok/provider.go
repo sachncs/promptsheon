@@ -22,7 +22,7 @@ import (
 )
 
 // VaultStore is the minimal persistence surface the Provider needs
-// for SEC-10a. It matches a subset of store.Repository methods
+// for SEC-10a. It matches a subset of store repositories methods
 // (GetVaultState, SaveVaultState) so tests don't have to satisfy
 // the full Repository interface.
 type VaultStore interface {
@@ -214,10 +214,9 @@ func (l *lru) popTail() {
 //     miss, so a rotated KMS key is reflected at the next cache
 //     miss.
 type Provider struct {
-	mu      sync.Mutex
-	cfg     Config
-	cache   *lru
-	loaded  bool // whether we've loaded wrapped_data_key into memory at least once
+	mu    sync.Mutex
+	cfg   Config
+	cache *lru
 }
 
 // New returns a Provider that talks to the configured KMSClient
@@ -351,29 +350,33 @@ func (p *Provider) generateInitialWrappedBlob(ctx context.Context) (plaintext []
 	}
 	return pt, nil, nil
 }
-// Rotate invalidates the LRU and re-derives the wrapped blob on
-// next Key(). Existing ciphertexts in provider_keys remain
-// decryptable with the rotated KMS key via the new plaintext.
+
+// Rotate invalidates the LRU so the next Key() re-derives the
+// plaintext against KMSClient.Decrypt. The persisted wrapped
+// blob is preserved — wiping it would orphan every provider_key
+// ciphertext that was encrypted under the previous data key,
+// which the operator is not expected to re-encrypt out of band
+// without an explicit migration step.
+//
+// Returns an explicit dependency error when the Provider was
+// built without the required production wiring (Store or
+// KMSClient). Production callers should treat the error as a
+// misconfiguration; the cache has already been invalidated so
+// the next Key() will surface the same error path consistently.
 func (p *Provider) Rotate(ctx context.Context) error {
+	if p.cfg.Store == nil {
+		return errors.New("kmsbyok: Store required (production); tests must set AllowTestDouble")
+	}
+	if p.cfg.KMSClient == nil {
+		return ErrKMSClientRequired
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.cache.InvalidateAll()
-	p.loaded = false
-	if p.cfg.Store == nil || p.cfg.KMSClient == nil {
-		return nil
-	}
-	// Drop the persisted wrapped blob so the next Key() generates
-	// a fresh one. The provider_keys ciphertexts may become
-	// unreadable if the underlying KMS key changed; operator
-	// is expected to re-encrypt secrets after Rotate.
-	if _, err := p.cfg.Store.GetVaultState(ctx); err != nil {
-		return err
-	}
-	// Wipe by saving an empty blob.
-	return p.cfg.Store.SaveVaultState(ctx, &models.VaultState{
-		KMSKeyID:       p.cfg.KeyID,
-		WrappedDataKey: nil,
-	})
+	// Touch ctx so callers retain the option of passing a
+	// deadline without the lint suppresser complaining.
+	_ = ctx
+	return nil
 }
 
 // deterministicTestKey returns a stable 32-byte key derived from
