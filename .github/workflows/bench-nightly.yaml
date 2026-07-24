@@ -1,0 +1,150 @@
+name: Bench nightly
+
+# PERF-BENCH-1: nightly run of the curated 8 Go benchmarks
+# (see scripts/benchmarks.txt), plus a k6 p99 latency gate
+# using the existing scenario
+# tests/load/scenarios/10-sustained-load.js. The p99 gate
+# is the k6 threshold `http_req_duration: ['p(95)<2000',
+# 'p(99)<3000']`, not a Go -bench flag — Go's testing.B has
+# no notion of p99 and we do not pretend otherwise.
+#
+# Schedule: 02:00 UTC every day. The workflow_dispatch
+# trigger lets operators launch an ad-hoc run from the
+# Actions tab; the benchtime input lets them shorten the
+# default 1s/benchmark to a faster smoke pass.
+#
+# The bench results are uploaded as a workflow artefact so
+# the maintainers can diff runs across nights.
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      benchtime:
+        description: "Override -benchtime (e.g. '100ms' for a smoke pass)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bench-nightly
+  cancel-in-progress: true
+
+jobs:
+  go-bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26.5"
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run curated benchmarks
+        # The optional benchtime input lets a manual run
+        # shorten each benchmark to a fast smoke pass. The
+        # default in the Makefile is -benchtime=1s.
+        run: |
+          if [ -n "${{ github.event.inputs.benchtime }}" ]; then
+            make bench BENCHTIME="${{ github.event.inputs.benchtime }}"
+          else
+            make bench
+          fi
+
+      - name: Upload bench results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: go-bench-results
+          path: |
+            **/bench.txt
+          if-no-files-found: warn
+
+  k6-p99:
+    # The p99 latency gate lives in the k6 scenario, not
+    # in Go benchmarks. This job boots the daemon, runs
+    # the existing sustained-load scenario, and lets the
+    # k6 threshold (http_req_duration: ['p(99)<3000']) act
+    # as the gate. The summary is also uploaded for
+    # post-hoc analysis.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      K6_BASE_URL: http://127.0.0.1:8080
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26.5"
+          cache: true
+
+      - name: Build daemon
+        run: go build -o promptsheond ./cmd/promptsheond
+
+      - name: Install k6
+        run: |
+          curl -fsSL https://github.com/grafana/k6/releases/download/v0.55.0/k6-v0.55.0-linux-amd64.tar.gz \
+            | tar -xz --strip-components=1 -C /usr/local/bin k6-v0.55.0-linux-amd64/k6
+          k6 version
+
+      - name: Start daemon
+        run: |
+          PROMPTSHEON_ADDR=127.0.0.1:8080 \
+          PROMPTSHEON_DB_PATH=/tmp/bench-nightly.db \
+          PROMPTSHEON_AUTH=false \
+          PROMPTSHEON_LOG_LEVEL=warn \
+            ./promptsheond &
+          echo $! > /tmp/daemon.pid
+          # Strict readiness: the loop MUST observe a 200 from
+          # /health within 30 s. The previous "for i in 1..30; do
+          # break; done" silently exited on the first failure
+          # and the k6 step then ran against a daemon that
+          # never came up — every p99 number was a network
+          # timeout, not a load measurement. The exit-on-
+          # timeout gate below turns a stalled boot into a
+          # failed job so the failure surfaces in the PR.
+          ready=0
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8080/health > /dev/null; then
+              echo "Daemon is ready (after ${i}s)"
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Daemon failed to become ready within 30s"
+            kill "$(cat /tmp/daemon.pid)" 2>/dev/null || true
+            exit 1
+          fi
+
+      - name: Run p99 latency gate
+        # The threshold is declared inside the scenario file;
+        # k6 exits non-zero when the threshold is breached,
+        # which fails the job. The scenario is a 100 s
+        # sustained-load run with p(99)<3000 ms.
+        run: |
+          mkdir -p /tmp/k6-results
+          k6 run tests/load/scenarios/10-sustained-load.js \
+            --out json=/tmp/k6-results/sustained-load.json \
+            --summary-trend-stats="avg,min,med,p(95),p(99),max"
+
+      - name: Upload k6 summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: k6-p99-results
+          path: /tmp/k6-results/
+
+      - name: Stop daemon
+        if: always()
+        run: kill $(cat /tmp/daemon.pid) 2>/dev/null || true
