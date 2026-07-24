@@ -227,6 +227,13 @@ func (r *MemRepo) CreateEvalResults(_ context.Context, results []harness.EvalRes
 	return nil
 }
 
+func (r *MemRepo) CreateEvalResult(_ context.Context, res *harness.EvalResult) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.EvalResults = append(r.EvalResults, *res)
+	return nil
+}
+
 func (r *MemRepo) ListEvalResultsForRun(_ context.Context, runID string) ([]harness.EvalResult, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

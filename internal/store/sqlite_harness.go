@@ -369,6 +369,24 @@ func (s *SQLite) CreateEvalResults(ctx context.Context, results []harness.EvalRe
 	return nil
 }
 
+// CreateEvalResult persists a single result row. PERF-EVAL-2:
+// the runner streams results as cases finish so memory stays
+// bounded for large datasets.
+func (s *SQLite) CreateEvalResult(ctx context.Context, r *harness.EvalResult) error {
+	passedInt := 0
+	if r.Passed {
+		passedInt = 1
+	}
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO eval_results (id, run_id, case_id, seq, passed, actual, error, latency_ms)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.RunID, r.CaseID, r.Seq, passedInt, string(r.Actual), r.Error, r.LatencyMs,
+	); err != nil {
+		return fmt.Errorf("insert eval result: %w", err)
+	}
+	return nil
+}
+
 func (s *SQLite) ListEvalResultsForRun(ctx context.Context, runID string) ([]harness.EvalResult, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, run_id, case_id, seq, passed, actual, error, latency_ms
