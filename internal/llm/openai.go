@@ -3,6 +3,8 @@ package llm
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -10,6 +12,12 @@ import (
 	"github.com/openai/openai-go/v3/option"
 	"github.com/openai/openai-go/v3/responses"
 )
+
+// slowCallLogThreshold is the LLM call latency above which we
+// emit a debug log. PERF-LLM-2: ops needs visibility when the
+// upstream provider is slow; a 5s threshold is the SLO red
+// zone (the p99 alert fires at 5s).
+const slowCallLogThreshold = 5 * time.Second
 
 // OpenAI implements Provider for the OpenAI Responses API using the
 // official openai-go/v3 SDK. The provider name is "openai".
@@ -25,12 +33,24 @@ type OpenAI struct {
 // creation; per-call requests that need a different key
 // construct a transient client on the fly. This is the
 // per-prompt / per-workspace key binding the vault exposes.
+//
+// PERF-LLM-1: pass a tuned http.Transport to the SDK. The
+// default transport caps MaxIdleConnsPerHost at 2, which forces
+// a new TCP+TLS handshake for almost every concurrent request
+// to the upstream. The tuned values here match the
+// internal/llm defaults and the LLM gateway's expectations.
 func NewOpenAI(cfg ProviderConfig) *OpenAI {
 	base := cfg.BaseURL
 	if base == "" {
 		base = "https://api.openai.com"
 	}
-	opts := []option.RequestOption{option.WithBaseURL(base)}
+	opts := []option.RequestOption{
+		option.WithBaseURL(base),
+		option.WithHTTPClient(&http.Client{
+			Transport: tunedTransport(),
+			Timeout:   60 * time.Second,
+		}),
+	}
 	if cfg.APIKey != "" {
 		opts = append(opts, option.WithAPIKey(cfg.APIKey))
 	}
@@ -51,6 +71,10 @@ func (o *OpenAI) clientFor(ctx context.Context) openai.Client {
 		opts := []option.RequestOption{
 			option.WithBaseURL(o.baseURL),
 			option.WithAPIKey(k),
+			option.WithHTTPClient(&http.Client{
+				Transport: tunedTransport(),
+				Timeout:   60 * time.Second,
+			}),
 		}
 		return openai.NewClient(opts...)
 	}
@@ -113,6 +137,17 @@ func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) 
 	start := time.Now()
 	c := o.clientFor(ctx)
 	resp, err := c.Responses.New(ctx, params)
+	duration := time.Since(start)
+	// PERF-LLM-2: log slow calls so ops can correlate upstream
+	// latency with the SLO alert dashboard.
+	if duration > slowCallLogThreshold {
+		slog.Debug("slow LLM call",
+			"provider", o.Name(),
+			"model", req.Model,
+			"duration", duration,
+			"err", err,
+		)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%s request: %w", ProviderOpenAI, err)
 	}
@@ -127,6 +162,6 @@ func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) 
 		},
 		Model:      string(resp.Model),
 		StopReason: string(resp.Status),
-		Latency:    time.Since(start),
+		Latency:    duration,
 	}, nil
 }
