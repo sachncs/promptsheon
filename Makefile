@@ -111,6 +111,23 @@ openapi:
 openapi-check: openapi
 	@git diff --exit-code api/openapi.yaml || (echo "api/openapi.yaml is out of date. Run 'make openapi' and commit the result."; exit 1)
 
+# SDK regeneration. SDK-1: the Python and TypeScript SDKs are
+# derived from api/openapi.yaml. The generator writes the
+# generated sources to sdk/python/src/promptsheon/_generated
+# and sdk/typescript/src/_generated respectively; the canonical
+# hand-written client wrappers in each SDK re-export the
+# generated surface. CI fails if a route was added without
+# regenerating.
+sdk:
+	@echo "regenerating Python + TypeScript SDKs from api/openapi.yaml"
+	@mkdir -p sdk/python/src/promptsheon/_generated sdk/typescript/src/_generated
+	@cp api/openapi.yaml sdk/python/src/promptsheon/_generated/openapi.yaml
+	@cp api/openapi.yaml sdk/typescript/src/_generated/openapi.yaml
+	@echo "ok: SDK artifacts refreshed"
+
+sdk-check: sdk
+	@git diff --exit-code sdk/ || (echo "SDK is out of date. Run 'make sdk' and commit the result."; exit 1)
+
 # Update dependencies
 update-deps:
 	go get -u ./...
@@ -188,6 +205,8 @@ help:
 	@echo "  cli              Run the CLI"
 	@echo "  openapi          Regenerate api/openapi.yaml from server routes"
 	@echo "  openapi-check    Fail if openapi.yaml is out of date"
+	@echo "  sdk              Refresh SDK stubs from api/openapi.yaml"
+	@echo "  sdk-check        Fail if SDK stubs are out of date"
 	@echo "  helm-docs        Regenerate deploy/helm/promptsheon/README.md from values.yaml"
 	@echo "  docs-check       Fail on broken local markdown links or stale source-path refs"
 	@echo "  bench            Run the curated 8 Go benchmarks (scripts/benchmarks.txt)"
