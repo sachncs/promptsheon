@@ -1,4 +1,4 @@
--- 014b: seed the otl.* defaults so the first-boot GET has rows.
+-- 015: seed the otl.* defaults so the first-boot GET has rows.
 --
 -- The settings layer's "get" path returns rows (or the hardcoded
 -- default if no row exists). On a fresh boot, before the operator

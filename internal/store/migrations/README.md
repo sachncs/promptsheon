@@ -1,7 +1,12 @@
 # Migrations
 
-The schema lives in 8 forward-only `.up.sql` files. There are no
-`.down.sql` files. The runner skips destructive migrations unless
+The schema lives in 8 forward-only `.up.sql` files at versions
+001..008, followed by individual `.up.sql` / `.down.sql` files at
+versions 009..017. Every version prefix is a strict, unique
+integer (no `014b`-style suffixes); the runner parses the leading
+integer and uses it as the `schema_migrations.version` primary
+key, so a suffixed name collides with the bare integer (014b ==
+14 == 014). The runner skips destructive migrations unless
 `PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true`.
 
 ## File layout
@@ -16,6 +21,15 @@ The schema lives in 8 forward-only `.up.sql` files. There are no
 | `006_security.up.sql` | Webhook secret ciphertext (no-op on fresh installs; declarative in 001) |
 | `007_views_and_triggers.up.sql` | Reserved for future views/triggers |
 | `008_destructive_cleanup.up.sql` | Drop pre-v0.1.0 legacy tables; gated by env var |
+| `009_vault_state.up.sql` / `.down.sql` | Singleton vault-state row (KMS rotation) |
+| `010_ws_state.up.sql` / `.down.sql` | WebSocket session state |
+| `011_audit_archive.up.sql` / `.down.sql` | `audit_archive` table + chain-state tail cache columns |
+| `012_enforcer_state.up.sql` / `.down.sql` | Policy enforcer per-key state |
+| `013_idempotency_cache.up.sql` / `.down.sql` | Idempotency-key dedupe cache |
+| `014_system_config.up.sql` / `.down.sql` | Operator-tunable key/value settings table |
+| `015_seed_settings.up.sql` / `.down.sql` | Seed `otl.*` / `llm.*` defaults |
+| `016_bandit_arm_counters.up.sql` / `.down.sql` | Per-(arm, replica) grow-only CRDT counters |
+| `017_system_config_crdt.up.sql` / `.down.sql` | LWW register metadata on `system_config` |
 
 The destructive gate regex is `^\d+_destructive`. Only files
 matching that anchored pattern are gated.
@@ -40,10 +54,13 @@ clean schema; otherwise they remain as dead tables.
 ## Adding a new migration
 
 After this consolidation, every new schema change adds a file
-beyond 008. Phase 2/3 changes will land at `009_*.up.sql`,
+beyond 008. Phase 2/3 changes land at `009_*.up.sql`,
 `010_*.up.sql`, and so on. The destructive gate stays anchored:
 a new file named `015_destructive_state_change.up.sql` is NOT
 gated; a file named `015_destructive_*.up.sql` IS gated.
+**Do not use suffix-style names like `014b_*.up.sql`** — the
+runner only parses the leading integer and would treat `014b`
+as `14`, colliding with the `014_` row.
 
 ## `migrateUpTo` targets
 
@@ -56,3 +73,7 @@ The `migrateUpTo(db, target)` helper accepts:
 - `6` — through `006_security.up.sql` (no-op on fresh installs)
 - `7` — through `007_views_and_triggers.up.sql` (no-op)
 - `8` — through `008_destructive_cleanup.up.sql` (gated)
+- `14` — through `014_system_config.up.sql`
+- `15` — through `015_seed_settings.up.sql`
+- `16` — through `016_bandit_arm_counters.up.sql`
+- `17` — through `017_system_config_crdt.up.sql`

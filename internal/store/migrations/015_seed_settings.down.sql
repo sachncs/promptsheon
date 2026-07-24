@@ -1,3 +1,3 @@
--- 014b: seed rows are idempotent; rolling back is a no-op.
+-- 015: seed rows are idempotent; rolling back is a no-op.
 -- (the rows are INSERT OR IGNORE; the down migration below is
 --   the inverse of 014_system_config.down.sql.)
