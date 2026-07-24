@@ -54,5 +54,6 @@ func newBenchServer(b *testing.B) *Server {
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError}))
 	providers := llm.NewRegistry()
 	providers.Configure("openai", llm.ProviderConfig{APIKey: "sk-test"})
-	return NewServer(newMockRepo(), logger, WithProviders(providers))
+	repo := newMockRepo()
+	return NewServer(newRepositories(repo), logger, WithProviders(providers))
 }

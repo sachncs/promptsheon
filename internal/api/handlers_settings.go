@@ -2,8 +2,8 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/auth"
@@ -31,32 +31,63 @@ func (s *Server) registerSettingsRoutes() {
 		s.wrapHandler(s.requirePerm(auth.PermSettingsWrite)(s.handleDeleteSetting)))
 }
 
-// handleListSettings returns every key. Secret-shaped values
-// are masked to "***" (see internal/settings/secret_keys.go).
+// settingsResolver is the per-Request view of the settings
+// layer. The Server owns the canonical *settings.Resolver;
+// handlers get a thin wrapper that knows the per-process
+// replica id and points at the right Store. Constructed
+// lazily so legacy tests that don't wire a settings layer
+// fall back to a no-op (handlers return 503).
+func (s *Server) settingsResolver() (*settings.Resolver, error) {
+	if s.settingsNotif == nil {
+		return nil, errors.New("settings: notifier not configured")
+	}
+	if s.settingsReplicaID == "" {
+		return nil, errors.New("settings: replica id not configured")
+	}
+	return settings.NewResolver(s.db, s.settingsNotif, nil, s.settingsReplicaID), nil
+}
+
+// handleListSettings returns every non-tombstoned key.
+// Secret-shaped values are masked to "***" (see
+// internal/settings/secret_keys.go).
 func (s *Server) handleListSettings(w http.ResponseWriter, r *http.Request) error {
-	rows, err := s.db.ListSystemConfig(r.Context())
+	res, err := s.settingsResolver()
+	if err != nil {
+		return err
+	}
+	rows, err := res.List(r.Context())
 	if err != nil {
 		return err
 	}
 	out := make([]map[string]any, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, settingsResponse(r.Key, r.Value, r.UpdatedBy, r.UpdatedAt))
+	for _, row := range rows {
+		out = append(out, settingsResponse(row.Key, row.Value, row.UpdatedBy, row.UpdatedAt))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": out})
 	return nil
 }
 
-// handleGetSetting returns one key (or 404).
+// handleGetSetting returns the effective value for one key (or 404).
+// Unlike list, which contains persisted live rows only, this endpoint applies
+// environment-over-database precedence. Tombstones remain distinguishable
+// from live empty values and are treated as missing.
 func (s *Server) handleGetSetting(w http.ResponseWriter, r *http.Request) error {
+	res, err := s.settingsResolver()
+	if err != nil {
+		return err
+	}
 	key := r.PathValue("key")
 	if key == "" {
 		return badRequest("key is required")
 	}
-	v, updatedAt, err := s.db.GetSystemConfig(r.Context(), key)
+	rec, found, err := res.Lookup(r.Context(), key)
 	if err != nil {
+		return err
+	}
+	if !found || rec.Tombstone {
 		return notFound("setting: " + key)
 	}
-	writeJSON(w, http.StatusOK, settingsResponse(key, v, "", updatedAt))
+	writeJSON(w, http.StatusOK, settingsResponse(key, rec.Value, rec.UpdatedBy, rec.UpdatedAt))
 	return nil
 }
 
@@ -65,11 +96,16 @@ func (s *Server) handleGetSetting(w http.ResponseWriter, r *http.Request) error 
 // at this layer — secrets go through the vault, not settings.
 //
 // The response is 200 only after the synchronous hot-reload
-// notifier (commit A3 + A4) has finished. The notifier is
-// currently empty; the PUT returns immediately.
+// notifier has finished. If any subscriber returns an error,
+// the handler propagates it as a 500 so the operator sees the
+// failed hot-reload.
 func (s *Server) handleSetSetting(w http.ResponseWriter, r *http.Request) error {
 	if s.settingsMode == "env-only" {
 		return forbidden("settings: PROMPTSHEON_SETTINGS_MODE=env-only; writes disabled")
+	}
+	res, err := s.settingsResolver()
+	if err != nil {
+		return err
 	}
 	key := r.PathValue("key")
 	if key == "" {
@@ -85,41 +121,42 @@ func (s *Server) handleSetSetting(w http.ResponseWriter, r *http.Request) error 
 		return badRequest("invalid json body")
 	}
 	updatedBy := settingsUpdatedBy(r)
-	if err := s.db.SetSystemConfig(r.Context(), key, req.Value, updatedBy); err != nil {
+	if err := res.Set(r.Context(), key, req.Value, updatedBy); err != nil {
 		return err
 	}
-	if s.settingsNotif != nil {
-		s.settingsNotif.Publish(key, req.Value)
-	}
 	s.audit(r.Context(), "create", "setting:"+key, map[string]any{
-		"key":  key,
-		"by":   updatedBy,
+		fieldAPIKey: key,
+		"by":        updatedBy,
 	})
 	writeJSON(w, http.StatusOK, settingsResponse(key, req.Value, updatedBy, timeNow()))
 	return nil
 }
 
-// handleDeleteSetting removes one key. 404 on miss.
+// handleDeleteSetting removes one key. 404 on miss. The
+// resolver writes a tombstone row (so a concurrent replica's
+// Set cannot resurrect the key); the GET surface treats the
+// tombstone as missing.
 func (s *Server) handleDeleteSetting(w http.ResponseWriter, r *http.Request) error {
 	if s.settingsMode == "env-only" {
 		return forbidden("settings: PROMPTSHEON_SETTINGS_MODE=env-only; writes disabled")
+	}
+	res, err := s.settingsResolver()
+	if err != nil {
+		return err
 	}
 	key := r.PathValue("key")
 	if key == "" {
 		return badRequest("key is required")
 	}
-	if err := s.db.DeleteSystemConfig(r.Context(), key); err != nil {
-		if strings.Contains(err.Error(), "sql: no rows") {
-			return notFound("setting: " + key)
-		}
+	// Resolver.Delete handles both "row missing" and "row
+	// present": a missing row still gets a tombstone so the
+	// eventual merge sees a coherent state.
+	if err := res.Delete(r.Context(), key); err != nil {
 		return err
 	}
-	if s.settingsNotif != nil {
-		s.settingsNotif.Publish(key, "")
-	}
 	s.audit(r.Context(), "delete", "setting:"+key, map[string]any{
-		"key": key,
-		"by": settingsUpdatedBy(r),
+		fieldAPIKey: key,
+		"by":        settingsUpdatedBy(r),
 	})
 	w.WriteHeader(http.StatusNoContent)
 	return nil
@@ -135,10 +172,10 @@ func settingsResponse(key, value, updatedBy string, updatedAt time.Time) map[str
 		display = "***"
 	}
 	return map[string]any{
-		"key":        key,
+		fieldAPIKey:        key,
 		fieldSettingsValue: display,
-		"updated_by": updatedBy,
-		"updated_at": updatedAt,
+		"updated_by":       updatedBy,
+		"updated_at":       updatedAt,
 	}
 }
 

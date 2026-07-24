@@ -2,7 +2,9 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -30,7 +32,7 @@ func seedReleaseFixture(repo *mockRepo) {
 
 func newReleaseTestServer(repo *mockRepo, svc *release.Service) *Server {
 	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
-	return NewServer(repo, logger, WithReleaseService(svc))
+	return NewServer(newRepositories(repo), logger, WithReleaseService(svc))
 }
 
 func decodeJSON(t *testing.T, r io.Reader, dst any) {
@@ -150,6 +152,46 @@ func TestReleaseActivateQuorumConflict(t *testing.T) {
 	srv.ServeHTTP(w, req)
 	if w.Code != http.StatusConflict {
 		t.Fatalf("activate without quorum: status=%d want 409, body=%s", w.Code, w.Body.String())
+	}
+}
+
+type failingArtifactLoader struct{}
+
+func (failingArtifactLoader) Load(context.Context, capability.ArtifactKind, string) ([]byte, error) {
+	return nil, errors.New("CAS unavailable")
+}
+
+func TestReleaseInvokeResolverErrorReturns502(t *testing.T) {
+	repo := newMockRepo()
+	seedReleaseFixture(repo)
+	svc := release.NewService(repo, repo, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	srv := newInvokeTestServerWithRepo(t, repo,
+		WithReleaseService(svc),
+		WithReleaseResolver(release.NewResolver(repo, failingArtifactLoader{})),
+	)
+
+	body, _ := json.Marshal(map[string]string{"environment": "prod"})
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/versions/v1/releases", bytes.NewReader(body))
+	req = req.WithContext(auth.WithUserContext(req.Context(), &auth.User{ID: "alice", Role: auth.RoleAdmin}))
+	srv.ServeHTTP(w, req)
+	var rel release.Release
+	decodeJSON(t, w.Body, &rel)
+
+	body, _ = json.Marshal(map[string]string{"decision": "approve"})
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/releases/"+rel.ID+"/votes", bytes.NewReader(body))
+	req = req.WithContext(auth.WithUserContext(req.Context(), &auth.User{ID: "bob", Role: auth.RoleAdmin}))
+	srv.ServeHTTP(w, req)
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/releases/"+rel.ID+"/activate", nil)
+	srv.ServeHTTP(w, req)
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/releases/"+rel.ID+"/invoke", bytes.NewReader([]byte(`{}`)))
+	srv.ServeHTTP(w, req)
+	if w.Code != http.StatusBadGateway || !bytes.Contains(w.Body.Bytes(), []byte("CAS unavailable")) {
+		t.Fatalf("invoke resolver failure: status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

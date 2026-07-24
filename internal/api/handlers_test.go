@@ -25,6 +25,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/ratelimit"
 	"github.com/sachncs/promptsheon/internal/release"
+	"github.com/sachncs/promptsheon/internal/settings"
 	"github.com/sachncs/promptsheon/internal/store"
 	"github.com/sachncs/promptsheon/internal/vault"
 	"github.com/sachncs/promptsheon/internal/webhook"
@@ -60,6 +61,26 @@ type mockRepo struct {
 	closeErr      error
 }
 
+func newRepositories(repo *mockRepo) *store.Repositories {
+	return &store.Repositories{
+		Users:                repo,
+		APIKeys:              repo,
+		Audit:                repo,
+		ProviderKeys:         repo,
+		Alerting:             repo,
+		Webhooks:             repo,
+		VaultState:           repo,
+		WSState:              repo,
+		EnforcerState:        repo,
+		Settings:             repo,
+		Lifecycle:            repo,
+		CapabilityRepository: repo,
+		ReleaseRepository:    repo,
+		ApprovalRepository:   repo,
+		HarnessRepository:    repo,
+	}
+}
+
 func newMockRepo() *mockRepo {
 	return &mockRepo{
 		users:         make(map[string]*models.User),
@@ -86,17 +107,17 @@ func (m *mockRepo) Close() error                 { return m.closeErr }
 func (m *mockRepo) Ping(_ context.Context) error { return m.pingErr }
 
 // Settings (operator-tunable runtime config, A1).
-func (m *mockRepo) GetSystemConfig(_ context.Context, key string) (string, time.Time, error) {
-	return "", time.Time{}, sql.ErrNoRows
+func (m *mockRepo) GetSystemConfig(_ context.Context, _ string) (settings.CRDTRecord, error) {
+	return settings.CRDTRecord{}, sql.ErrNoRows
 }
-func (m *mockRepo) SetSystemConfig(_ context.Context, _, _, _ string) error {
+func (m *mockRepo) SetSystemConfig(_ context.Context, _ settings.CRDTRecord) error {
 	return nil
 }
-func (m *mockRepo) DeleteSystemConfig(_ context.Context, _ string) error {
-	return sql.ErrNoRows
-}
-func (m *mockRepo) ListSystemConfig(_ context.Context) ([]models.SystemConfig, error) {
+func (m *mockRepo) ListSystemConfig(_ context.Context) ([]settings.CRDTRecord, error) {
 	return nil, nil
+}
+func (m *mockRepo) MergeSystemConfig(_ context.Context, _ string, _ []settings.CRDTRecord) error {
+	return nil
 }
 
 // Users
@@ -762,6 +783,7 @@ func (m *mockRepo) CreateEvalResults(_ context.Context, results []harness.EvalRe
 	}
 	return nil
 }
+
 // GetChannelsForAlertRule is a no-op on the api test mock: the
 // alert routing is exercised through the real alerting tests,
 // not through the api surface. Returning an empty slice keeps
@@ -828,22 +850,27 @@ func (m *mockRepo) ListEvalResultsForRun(_ context.Context, runID string) ([]har
 
 func newTestServer(t *testing.T, opts ...Option) *Server {
 	t.Helper()
+	return newTestServerWithRepo(t, newMockRepo(), opts...)
+}
+
+func newTestServerWithRepo(t *testing.T, repo *mockRepo, opts ...Option) *Server {
+	t.Helper()
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError}))
 	providers := llm.NewRegistry()
 	providers.Configure("openai", llm.ProviderConfig{APIKey: "sk-test"})
 	allOpts := make([]Option, 0, 2+len(opts))
 	allOpts = append(allOpts, WithProviders(providers))
 	allOpts = append(allOpts, opts...)
-	return NewServer(newMockRepo(), logger, allOpts...)
+	return NewServer(newRepositories(repo), logger, allOpts...)
 }
 
-func newAuthTestServer(t *testing.T, repo store.Repository, opts ...Option) *Server {
+func newAuthTestServer(t *testing.T, repo *mockRepo, opts ...Option) *Server {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError}))
 	allOpts := make([]Option, 0, 1+len(opts))
 	allOpts = append(allOpts, WithAuth(repo))
 	allOpts = append(allOpts, opts...)
-	return NewServer(repo, logger, allOpts...)
+	return NewServer(newRepositories(repo), logger, allOpts...)
 }
 
 func mustMarshal(t *testing.T, v any) []byte {
@@ -1318,7 +1345,7 @@ func TestHandleReady_DBPingFail(t *testing.T) {
 	repo := newMockRepo()
 	repo.pingErr = errors.New("db down")
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("GET", "/ready", nil)
 	rr := httptest.NewRecorder()
@@ -1485,7 +1512,7 @@ func TestHandleListAPIKeys_NoAuth(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateAPIKey(context.Background(), &models.APIKey{ID: "k1", UserID: "u1", Name: "key1", KeyHash: "h1", KeyPrefix: "ps_test1", Role: "reader"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/apikeys?user_id=u1", nil)
 	rr := httptest.NewRecorder()
@@ -1529,7 +1556,7 @@ func TestHandleRevokeAPIKey_NoAuth(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateAPIKey(context.Background(), &models.APIKey{ID: "k1", UserID: "u1", Name: "key1", KeyHash: "h1", KeyPrefix: "ps_test1", Role: "reader", Revoked: false})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/apikeys/k1", nil)
 	rr := httptest.NewRecorder()
@@ -1575,7 +1602,7 @@ func TestHandleRevokeAPIKey_AlreadyRevoked(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateAPIKey(context.Background(), &models.APIKey{ID: "k1", UserID: "u1", Name: "key1", KeyHash: "h1", KeyPrefix: "ps_test1", Role: "reader", Revoked: true})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/apikeys/k1", nil)
 	rr := httptest.NewRecorder()
@@ -1619,7 +1646,7 @@ func TestHandleBootstrap_InvalidJSON(t *testing.T) {
 func TestHandleBootstrap(t *testing.T) {
 	repo := newMockRepo()
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	body := mustMarshal(t, map[string]string{"email": "admin@local", "name": "Bootstrap Admin"})
 	req := httptest.NewRequest("POST", "/api/v1/setup", bytes.NewReader(body))
@@ -1642,7 +1669,7 @@ func TestHandleBootstrap_AlreadyUsers(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "u@t.com", Name: "U", Role: "admin"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	body := mustMarshal(t, map[string]string{"email": "admin@local"})
 	req := httptest.NewRequest("POST", "/api/v1/setup", bytes.NewReader(body))
@@ -1773,7 +1800,7 @@ func TestHandleListUsers(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "a@b.com", Name: "A", Role: "admin"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/users", nil)
 	rr := httptest.NewRecorder()
@@ -1836,7 +1863,7 @@ func TestHandleUpdateUser_RejectsInvalidRole(t *testing.T) {
 	s := newTestServer(t)
 	repo := newMockRepo()
 	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "u@t.com", Name: "U", Role: "reader"})
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	body := mustMarshal(t, map[string]string{"role": "superuser"})
 	req := httptest.NewRequest("PUT", "/api/v1/users/u1", bytes.NewReader(body))
@@ -1853,7 +1880,7 @@ func TestHandleGetUser(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "a@b.com", Name: "A", Role: "admin"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/users/u1", nil)
 	rr := httptest.NewRecorder()
@@ -1879,7 +1906,7 @@ func TestHandleUpdateUser(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "a@b.com", Name: "A", Role: "reader"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	body := mustMarshal(t, map[string]string{"name": "Updated Name", "email": "new@b.com", "role": "admin"})
 	req := httptest.NewRequest("PUT", "/api/v1/users/u1", bytes.NewReader(body))
@@ -1915,7 +1942,7 @@ func TestHandleDeleteUser(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "a@b.com", Name: "A", Role: "reader"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/users/u1", nil)
 	rr := httptest.NewRecorder()
@@ -2007,7 +2034,7 @@ func TestHandleExportAudit_WithFilters(t *testing.T) {
 		Details: nil, Timestamp: time.Now(),
 	})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/audit/export?user_id=u1&action=create&resource=test&since=2000-01-01T00:00:00Z&until=2100-01-01T00:00:00Z", nil)
 	rr := httptest.NewRecorder()
@@ -2052,7 +2079,7 @@ func TestHandleExportAudit_CSV(t *testing.T) {
 		Details: map[string]any{"key": "val"}, Timestamp: time.Now(),
 	})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/audit/export?format=csv", nil)
 	rr := httptest.NewRecorder()
@@ -2081,7 +2108,7 @@ func TestHandleExportAudit_CSVBadDetails(t *testing.T) {
 		Timestamp: time.Now(),
 	})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/audit/export?format=csv", nil)
 	rr := httptest.NewRecorder()
@@ -2310,12 +2337,9 @@ func TestHandleTestProvider_NotAvailable(t *testing.T) {
 // {c}/versions accepts an explicit Manifest in the request body and
 // rejects an invalid manifest with HTTP 400.
 func TestHandleCreateVersionWithManifest(t *testing.T) {
-	s := newTestServer(t)
-	srv, _ := s.db.(*mockRepo)
-	if srv == nil {
-		t.Fatalf("expected mock repo")
-	}
-	_ = srv.CreateCapability(context.Background(), &capability.Capability{ID: "c-manifest", Name: "manifest-test", ProjectID: "p1"})
+	repo := newMockRepo()
+	s := newTestServerWithRepo(t, repo)
+	_ = repo.CreateCapability(context.Background(), &capability.Capability{ID: "c-manifest", Name: "manifest-test", ProjectID: "p1"})
 	capID := "c-manifest"
 
 	good := capability.Manifest{
@@ -2413,7 +2437,7 @@ func TestHandleListVaultKeys(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.SaveProviderKey(context.Background(), &models.ProviderKey{ID: "pk1", ProviderName: "openai", KeyName: "default", EncryptedKey: "enc"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/vault/keys", nil)
 	rr := httptest.NewRecorder()
@@ -2428,7 +2452,7 @@ func TestHandleDeleteVaultKey(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.SaveProviderKey(context.Background(), &models.ProviderKey{ID: "pk1", ProviderName: "openai", KeyName: "default", EncryptedKey: "enc"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/vault/keys/pk1", nil)
 	rr := httptest.NewRecorder()
@@ -2866,7 +2890,7 @@ func TestHandleGetWorkspace(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateWorkspace(context.Background(), &capability.Workspace{ID: "w1", Name: "Test"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/workspaces/w1", nil)
 	rr := httptest.NewRecorder()
@@ -2892,7 +2916,7 @@ func TestHandleUpdateWorkspace(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateWorkspace(context.Background(), &capability.Workspace{ID: "w1", Name: "Old"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	body := mustMarshal(t, map[string]string{"name": "Updated"})
 	req := httptest.NewRequest("PUT", "/api/v1/workspaces/w1", bytes.NewReader(body))
@@ -2915,7 +2939,7 @@ func TestHandleDeleteWorkspace(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateWorkspace(context.Background(), &capability.Workspace{ID: "w1", Name: "Test"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/workspaces/w1", nil)
 	rr := httptest.NewRecorder()
@@ -2967,7 +2991,7 @@ func TestHandleGetProject(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateProject(context.Background(), &capability.Project{ID: "p1", Name: "Test", WorkspaceID: "w1"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/projects/p1", nil)
 	rr := httptest.NewRecorder()
@@ -2993,7 +3017,7 @@ func TestHandleUpdateProject(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateProject(context.Background(), &capability.Project{ID: "p1", Name: "Old", WorkspaceID: "w1"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	body := mustMarshal(t, map[string]string{"name": "Updated"})
 	req := httptest.NewRequest("PUT", "/api/v1/projects/p1", bytes.NewReader(body))
@@ -3010,7 +3034,7 @@ func TestHandleDeleteProject(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateProject(context.Background(), &capability.Project{ID: "p1", Name: "Test", WorkspaceID: "w1"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/projects/p1", nil)
 	rr := httptest.NewRecorder()
@@ -3061,7 +3085,7 @@ func TestHandleGetCapability(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateCapability(context.Background(), &capability.Capability{ID: "c1", Name: "Test", ProjectID: "p1"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/capabilities/c1", nil)
 	rr := httptest.NewRecorder()
@@ -3087,7 +3111,7 @@ func TestHandleUpdateCapability(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateCapability(context.Background(), &capability.Capability{ID: "c1", Name: "Old", ProjectID: "p1"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	body := mustMarshal(t, map[string]string{"name": "Updated", "description": "New desc"})
 	req := httptest.NewRequest("PUT", "/api/v1/capabilities/c1", bytes.NewReader(body))
@@ -3110,7 +3134,7 @@ func TestHandleDeleteCapability(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateCapability(context.Background(), &capability.Capability{ID: "c1", Name: "Test", ProjectID: "p1"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/capabilities/c1", nil)
 	rr := httptest.NewRecorder()
@@ -3162,7 +3186,7 @@ func TestHandleGetVersion(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateVersion(context.Background(), &capability.Version{ID: "v1", Version: 1, CapabilityID: "c1"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/versions/v1", nil)
 	rr := httptest.NewRecorder()
@@ -3178,7 +3202,7 @@ func TestHandleGetLatestVersion(t *testing.T) {
 	_ = repo.CreateVersion(context.Background(), &capability.Version{ID: "v1", Version: 1, CapabilityID: "c1"})
 	_ = repo.CreateVersion(context.Background(), &capability.Version{ID: "v2", Version: 2, CapabilityID: "c1"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/capabilities/c1/versions/latest", nil)
 	rr := httptest.NewRecorder()
@@ -3245,7 +3269,7 @@ func TestHandleGetExecution(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateExecution(context.Background(), &capability.Execution{ID: "e1", CapabilityVersionID: "v1"})
 	s := newTestServer(t)
-	s.db = repo
+	s.db = newRepositories(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/executions/e1", nil)
 	rr := httptest.NewRecorder()
@@ -3394,7 +3418,8 @@ func TestStartAuditWorkers_ZeroWorkers(t *testing.T) {
 }
 
 func TestAuditWorkerProcess(t *testing.T) {
-	s := newTestServer(t)
+	repo := newMockRepo()
+	s := newTestServerWithRepo(t, repo)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -3407,7 +3432,7 @@ func TestAuditWorkerProcess(t *testing.T) {
 	cancel()
 	_ = s.StopAuditWorkers(context.Background())
 
-	entries := s.db.(*mockRepo).auditEntries
+	entries := repo.auditEntries
 	var found bool
 	for _, e := range entries {
 		if e.ID == "test-audit" {
@@ -3472,6 +3497,19 @@ func TestAudit_WithUserInContext(t *testing.T) {
 		}
 	default:
 		t.Error("expected audit entry in queue")
+	}
+}
+
+func TestStopAuditWorkers_ConcurrentIdempotent(t *testing.T) {
+	s := newTestServer(t)
+	s.StartAuditWorkers(t.Context(), 2)
+	errs := make(chan error, 2)
+	go func() { errs <- s.StopAuditWorkers(t.Context()) }()
+	go func() { errs <- s.StopAuditWorkers(t.Context()) }()
+	for range 2 {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -3758,14 +3796,6 @@ func TestAuthAuditLogger_LogAuthFailure(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Span Helper Tests (dashboard.go)
 // ---------------------------------------------------------------------------
-
-
-
-
-
-
-
-
 
 // ---------------------------------------------------------------------------
 // WithRequest / httpRequestFromContext

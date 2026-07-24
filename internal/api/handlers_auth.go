@@ -17,13 +17,14 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/auth"
-	"github.com/sachncs/promptsheon/internal/store"
 	"github.com/sachncs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/internal/store"
 )
 
 const defaultAdminEmail = "admin@local"
 const oauthStateCookie = "oauth_state"
 const fieldAPIKey = "key"
+const fieldKeyPrefix = "key_prefix"
 
 // oauthStateStore holds in-flight OAuth state tokens. The previous
 // implementation used a package-level `var` shared across all Server
@@ -256,10 +257,10 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	s.audit(r.Context(), "apikey_create", "api_key:"+apiKey.ID, map[string]any{
-		"key_prefix":  apiKey.KeyPrefix,
-		"target_user": apiKey.UserID,
-		"role":        apiKey.Role,
-		"name":        apiKey.Name,
+		fieldKeyPrefix: apiKey.KeyPrefix,
+		"target_user":  apiKey.UserID,
+		fieldRole:      apiKey.Role,
+		auditKeyName:   apiKey.Name,
 	})
 
 	type response struct {
@@ -374,7 +375,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 	if s.logger != nil {
 		s.logger.Warn("bootstrap endpoint used; admin key minted",
 			"user_id", admin.ID,
-			"key_prefix", apiKey.KeyPrefix,
+			fieldKeyPrefix, apiKey.KeyPrefix,
 			"action", "rotate this key and enable PROMPTSHEON_AUTH=true before exposing the server")
 	}
 
@@ -463,8 +464,8 @@ func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	s.audit(r.Context(), "apikey_revoke", "api_key:"+id, map[string]any{
-		"key_prefix":  key.KeyPrefix,
-		"target_user": key.UserID,
+		fieldKeyPrefix: key.KeyPrefix,
+		"target_user":  key.UserID,
 	})
 
 	writeJSON(w, http.StatusOK, map[string]string{auditKeyStatus: "revoked"})
@@ -649,7 +650,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 	s.audit(r.Context(), "oauth_login", "user:"+existing.ID, map[string]any{
 		"provider":       providerName,
 		"email":          user.Email,
-		"key_prefix":     apiKeyModel.KeyPrefix,
+		fieldKeyPrefix:   apiKeyModel.KeyPrefix,
 		"auto_provision": autoProvisioned,
 	})
 
