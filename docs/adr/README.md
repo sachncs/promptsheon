@@ -20,9 +20,7 @@ ADRs are immutable. When a decision is superseded, the original ADR is updated w
 | [0010](0010-version-is-a-manifest-not-a-bundle.md) | Capability Version is a Manifest, not a Bundle | Accepted |
 | [0011](0011-release-and-approval-aggregates.md) | Release and Approval are separate aggregates | Accepted |
 | [0012](0012-providers-and-pricing-are-injected.md) | Providers and pricing are injected, never global | Accepted |
-| [0015](0015-postgres-backend-with-rls.md) | Postgres as a first-class backend with per-workspace RLS | Deprecated (Postgres removed in v0.1.0) |
 | [0016](0016-plugins-over-grpc.md) | Plugins over gRPC, loopback only | Accepted |
-| [0017](0017-approval-release-wiring.md) | Approval→Release wiring closes quorum-reality gap | Accepted |
 | [0018](0018-recommendation-loop-wired.md) | End-to-end Recommendation loop wired through Executor → Observation → Producer | Accepted |
 | [0019](0019-deferred-items.md) | Deferred architecture review items | Accepted |
 | [0020](0020-capability-slos.md) | Capability Service Level Objectives — Goal / Burn-rate / Repository contract | Accepted |
@@ -31,11 +29,6 @@ ADRs are immutable. When a decision is superseded, the original ADR is updated w
 | [0023](0023-forward-only-cleanup.md) | Forward-only cleanup of the legacy bundle model | Accepted |
 | [0024](0024-plugin-transport-uds.md) | Plugin transport — net/rpc over Unix-domain-socket for v0.1.x | Accepted |
 | [0025](0025-pluginproto.md) | Plugin gRPC over loopback UDS — wire contract | Accepted |
-| [0026](0026-https-only-webhooks.md) | Webhooks accept only HTTPS; per-endpoint allow_private removed | Accepted |
-| [0027](0027-webhook-secret-encryption.md) | Webhook HMAC secret encrypted at rest in the vault | Accepted |
-| [0028](0028-maker-checker-self-enforcing.md) | MakerCheckerPolicy self-enforces separation of duties | Accepted |
-| [0029](0029-otel-only-export.md) | HTTP spans export OTLP-only after the SQLite trace backend was removed | Accepted |
-| [0030](0030-leader-election-sqlite.md) | Multi-replica deployments elect a single writer via a SQLite advisory lock | Accepted |
 
 ## Status legend
 

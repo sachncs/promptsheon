@@ -1,7 +1,7 @@
 # Guardrails
 
 Guardrails are a `Provider` plugin that wraps a Capability's
-LLM call. Two Guardrails ship in v0.1.x as built-in
+LLM call. Two Guardrails ship in v0.2.0 as built-in
 plugins through the supervisor; production tenants can add
 custom Guardrails via the plugin manifest.
 
@@ -67,7 +67,7 @@ all (probably misconfigured).
   manifest; see [docs/development.md](development.md) for the
   plugin manifest format.
 
-The `promptsheon` v0.1.x does **not** expose a
+The `promptsheon` v0.2.0 does **not** expose a
 `/api/v1/guardrails/check` endpoint — Guardrail evaluation
 happens inline on the LLM call, not via a separate HTTP
 route. The metrics above are the only surface for Guardrail

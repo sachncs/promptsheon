@@ -1,6 +1,6 @@
 # LLM Providers
 
-Promptsheon ships with two LLM providers in v0.1.x:
+Promptsheon ships with two LLM providers in v0.2.0:
 **OpenAI** and **Anthropic**. Both implement the
 `internal/llm.Provider` interface and register a factory on
 the `llm.Registry` at boot.
@@ -100,7 +100,7 @@ invalidates the cached instance.
 `internal/llm/circuitbreaker.go` ships a circuit breaker
 that wraps any `Provider` with success/failure tracking and
 state transitions (`closed` / `open` / `half-open`). The
-daemon doesn't wire it into the default providers in v0.1.x
+daemon doesn't wire it into the default providers in v0.2.0
 because the OpenAI and Anthropic SDKs already retry on
 transient errors; production tenants who need their own
 policy wrap a `Provider` with `NewCircuitBreakerMiddleware` at

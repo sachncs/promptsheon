@@ -34,7 +34,7 @@ returns a clear error message naming the offending setting.
 | `PROMPTSHEON_ANTHROPIC_API_KEY` | (none) | Anthropic API key. |
 | `PROMPTSHEON_ANTHROPIC_BASE_URL` | (none) | Anthropic base URL override. |
 
-The daemon supports **OpenAI** and **Anthropic** in v0.1.x. Azure
+The daemon supports **OpenAI** and **Anthropic** in v0.2.0. Azure
 OpenAI, Ollama, and NVIDIA NIM were removed in v0.1.0. To add a
 new provider, register it on the LLM `Registry` in
 `cmd/promptsheond/main.go` and write the SDK adapter under
@@ -96,7 +96,8 @@ no longer read. Setting them is a no-op.
 - `PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE` — per-endpoint allowlist
   was removed (SEC-4). Webhooks only accept HTTPS to non-private IPs.
 - `PROMPTSHEON_AZURE_*`, `PROMPTSHEON_OLLAMA_*`, `PROMPTSHEON_NVIDIA_*`
-  — providers removed in v0.1.0.
+  — providers removed in v0.1.0 (the v0.2.0 release keeps them
+  out and ships only Anthropic + OpenAI).
 - `PROMPTSHEON_AUTH_TEST` — no consumer.
 - `PROMPTSHEON_METRICS_ADDR` — the metrics endpoint binds on
   the same address as the API; gate it via `PermAuditRead`.

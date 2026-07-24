@@ -1,0 +1,2493 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>api/openapi.yaml - Promptsheon</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="Version Control for AI Intelligence — promptsheon documentation.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../../api/openapi.html" class="active">api/openapi.yaml</a></li><li class="chapter-item expanded affix "><a href="../index.html">Introduction</a></li><li class="chapter-item expanded affix "><li class="part-title">User</li><li class="chapter-item expanded "><a href="../getting-started.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li class="chapter-item expanded "><a href="../configuration.html"><strong aria-hidden="true">2.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="../llm-providers.html"><strong aria-hidden="true">3.</strong> LLM Providers</a></li><li class="chapter-item expanded "><a href="../cli.html"><strong aria-hidden="true">4.</strong> CLI</a></li><li class="chapter-item expanded "><a href="../sdk.html"><strong aria-hidden="true">5.</strong> SDK</a></li><li class="chapter-item expanded "><a href="../api-reference.html"><strong aria-hidden="true">6.</strong> API Reference</a></li><li class="chapter-item expanded "><a href="../workflows.html"><strong aria-hidden="true">7.</strong> Workflows</a></li><li class="chapter-item expanded "><a href="../harness.html"><strong aria-hidden="true">8.</strong> Harness engineering</a></li><li class="chapter-item expanded "><a href="../eval.html"><strong aria-hidden="true">9.</strong> Evaluations</a></li><li class="chapter-item expanded "><a href="../guardrails.html"><strong aria-hidden="true">10.</strong> Guardrails</a></li><li class="chapter-item expanded "><a href="../faq.html"><strong aria-hidden="true">11.</strong> FAQ</a></li><li class="chapter-item expanded "><a href="../glossary.html"><strong aria-hidden="true">12.</strong> Glossary</a></li><li class="chapter-item expanded affix "><li class="part-title">Operator</li><li class="chapter-item expanded "><a href="../deployment.html"><strong aria-hidden="true">13.</strong> Deployment</a></li><li class="chapter-item expanded "><a href="../security.html"><strong aria-hidden="true">14.</strong> Security</a></li><li class="chapter-item expanded "><a href="../observability.html"><strong aria-hidden="true">15.</strong> Observability</a></li><li class="chapter-item expanded "><a href="../troubleshooting.html"><strong aria-hidden="true">16.</strong> Troubleshooting</a></li><li class="chapter-item expanded "><a href="../configuration.html"><strong aria-hidden="true">17.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="../release.html"><strong aria-hidden="true">18.</strong> Release notes</a></li><li class="chapter-item expanded "><a href="../upgrade.html"><strong aria-hidden="true">19.</strong> Upgrade guide</a></li><li class="chapter-item expanded "><a href="../operations.html"><strong aria-hidden="true">20.</strong> Operations</a></li><li class="chapter-item expanded "><a href="../slos.html"><strong aria-hidden="true">21.</strong> SLOs</a></li><li class="chapter-item expanded "><a href="../canary.html"><strong aria-hidden="true">22.</strong> Canary</a></li><li class="chapter-item expanded "><a href="../multi-region.html"><strong aria-hidden="true">23.</strong> Multi-region</a></li><li class="chapter-item expanded affix "><li class="part-title">Developer and contributor</li><li class="chapter-item expanded "><a href="../architecture.html"><strong aria-hidden="true">24.</strong> Architecture</a></li><li class="chapter-item expanded "><a href="../modules.html"><strong aria-hidden="true">25.</strong> Modules</a></li><li class="chapter-item expanded "><a href="../algorithms.html"><strong aria-hidden="true">26.</strong> Algorithms</a></li><li class="chapter-item expanded "><a href="../design-decisions.html"><strong aria-hidden="true">27.</strong> Design Decisions</a></li><li class="chapter-item expanded "><a href="../development.html"><strong aria-hidden="true">28.</strong> Development</a></li><li class="chapter-item expanded "><a href="../testing.html"><strong aria-hidden="true">29.</strong> Testing</a></li><li class="chapter-item expanded "><a href="../api-reference.html"><strong aria-hidden="true">30.</strong> OpenAPI Generator</a></li><li class="chapter-item expanded affix "><li class="part-title">Research</li><li class="chapter-item expanded "><a href="../research/crdt-idempotency-cache.html"><strong aria-hidden="true">31.</strong> CRDT idempotency cache</a></li><li class="chapter-item expanded "><a href="../research/replay-set-crdt.html"><strong aria-hidden="true">32.</strong> Replay-set CRDT</a></li><li class="chapter-item expanded "><a href="../research/thompson-sampling-bayesian.html"><strong aria-hidden="true">33.</strong> Thompson Sampling is already Bayesian</a></li><li class="chapter-item expanded "><a href="../research/tla-audit-chain.html"><strong aria-hidden="true">34.</strong> TLA+ audit chain spec</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Promptsheon</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/sachncs/promptsheon" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/sachncs/promptsheon/edit/master/../docs/../api/openapi.yaml" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <p>openapi: "3.0.3"
+info:
+title: Promptsheon API
+description: Version Control System for AI agent intelligence</p>
+<h1 id="version-020-is-the-production-surface-the-spec-is"><a class="header" href="#version-020-is-the-production-surface-the-spec-is">Version 0.2.0 is the production surface. The spec is</a></h1>
+<h1 id="auto-generated-by-scriptsgenopenapi-from-the-route"><a class="header" href="#auto-generated-by-scriptsgenopenapi-from-the-route">auto-generated by scripts/genopenapi from the route</a></h1>
+<h1 id="registrations-in-internalapiservergo-and-the-handler"><a class="header" href="#registrations-in-internalapiservergo-and-the-handler">registrations in internal/api/server.go and the handler</a></h1>
+<h1 id="bodies-in-internalapihandlers_go-re-run-the-generator"><a class="header" href="#bodies-in-internalapihandlers_go-re-run-the-generator">bodies in internal/api/handlers_*.go. Re-run the generator</a></h1>
+<h1 id="whenever-a-route-or-handler-changes"><a class="header" href="#whenever-a-route-or-handler-changes">whenever a route or handler changes.</a></h1>
+<p>version: "0.2.0"</p>
+<p>security:</p>
+<ul>
+<li>BearerAuth: []</li>
+</ul>
+<p>components:
+securitySchemes:
+BearerAuth:
+type: apiKey
+in: header
+name: Authorization
+description: "API key prefixed with ps_. Send as: Authorization: Bearer ps_..."</p>
+<p>schemas:
+Error:
+type: object
+properties:
+error:
+type: string</p>
+<p>paths:
+/api/v1/alerts/active:
+get:
+summary: "GET alerts/active"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/alerts/active/{id}/resolve:
+put:
+summary: "PUT alerts/active/{id}/resolve"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/alerts/notifications:
+post:
+summary: "POST alerts/notifications"
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+name:
+type: string
+channels:
+type: array
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/alerts/rules:
+get:
+summary: "GET alerts/rules"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+post:
+summary: "POST alerts/rules"
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+name:
+type: string
+severity:
+type: string
+threshold:
+type: number
+duration:
+type: number
+window:
+type: number
+config:
+type: object
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/alerts/rules/{id}:
+get:
+summary: "GET alerts/rules/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+put:
+summary: "PUT alerts/rules/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+name:
+type: string
+enabled:
+type: boolean
+severity:
+type: string
+threshold:
+type: number
+config:
+type: object
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+delete:
+summary: "DELETE alerts/rules/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/alerts/rules/{rule_id}/groups/{group_id}:
+post:
+summary: "handleLinkAlertRuleGroup wires an alert rule to a notification\ngroup."
+parameters:
+- name: rule_id
+in: path
+required: true
+schema:
+type: string
+- name: group_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+delete:
+summary: "handleUnlinkAlertRuleGroup removes the wire between an alert\nrule and a notification group."
+parameters:
+- name: rule_id
+in: path
+required: true
+schema:
+type: string
+- name: group_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/apikeys:
+get:
+summary: "GET apikeys"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+post:
+summary: "POST apikeys"
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/apikeys/{id}:
+delete:
+summary: "DELETE apikeys/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/audit:
+get:
+summary: "GET audit"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/audit/export:
+get:
+summary: "GET audit/export"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/audit/verify:
+get:
+summary: "GET audit/verify"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/auth/{provider}/callback:
+get:
+summary: "GET auth/{provider}/callback"
+parameters:
+- name: provider
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/auth/{provider}/login:
+get:
+summary: "GET auth/{provider}/login"
+parameters:
+- name: provider
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/capabilities/{capability_id}/datasets:
+get:
+summary: "GET capabilities/{capability_id}/datasets"
+parameters:
+- name: capability_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+post:
+summary: "POST capabilities/{capability_id}/datasets"
+parameters:
+- name: capability_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/capabilities/{capability_id}/preconditions:
+get:
+summary: "GET capabilities/{capability_id}/preconditions"
+parameters:
+- name: capability_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+post:
+summary: "POST capabilities/{capability_id}/preconditions"
+parameters:
+- name: capability_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/capabilities/{capability_id}/releases:
+get:
+summary: "GET capabilities/{capability_id}/releases"
+parameters:
+- name: capability_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/capabilities/{capability_id}/versions:
+get:
+summary: "GET capabilities/{capability_id}/versions"
+parameters:
+- name: capability_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+post:
+summary: "POST capabilities/{capability_id}/versions"
+parameters:
+- name: capability_id
+in: path
+required: true
+schema:
+type: string
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+version:
+type: number
+manifest:
+$ref: "#/components/schemas/capability.Manifest"
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/capabilities/{capability_id}/versions/latest:
+get:
+summary: "GET capabilities/{capability_id}/versions/latest"
+parameters:
+- name: capability_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/capabilities/{id}:
+get:
+summary: "GET capabilities/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+put:
+summary: "PUT capabilities/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+name:
+type: string
+owner:
+type: string
+tags:
+type: array
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+delete:
+summary: "DELETE capabilities/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/datasets/{id}:
+get:
+summary: "GET datasets/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+delete:
+summary: "DELETE datasets/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/datasets/{id}/cases:
+put:
+summary: "PUT datasets/{id}/cases"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/evals/{id}:
+get:
+summary: "GET evals/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/executions/{id}:
+get:
+summary: "GET executions/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/logs/stream:
+get:
+summary: "GET logs/stream"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/metrics:
+get:
+summary: "GET metrics"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/metrics/dashboard:
+get:
+summary: "GET metrics/dashboard"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/metrics/summary:
+get:
+summary: "GET metrics/summary"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/metrics/top-capabilities:
+get:
+summary: "GET metrics/top-capabilities"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/preconditions/{id}:
+put:
+summary: "handleUpdatePrecondition applies a partial mutation to an\nexisting precondition."
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+name:
+type: string
+command:
+type: string
+timeoutSec:
+type: number
+enabled:
+type: boolean
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+delete:
+summary: "DELETE preconditions/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/projects/{id}:
+get:
+summary: "GET projects/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+put:
+summary: "PUT projects/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+name:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+delete:
+summary: "DELETE projects/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/projects/{project_id}/capabilities:
+get:
+summary: "GET projects/{project_id}/capabilities"
+parameters:
+- name: project_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+post:
+summary: "POST projects/{project_id}/capabilities"
+parameters:
+- name: project_id
+in: path
+required: true
+schema:
+type: string
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+name:
+type: string
+owner:
+type: string
+tags:
+type: array
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/providers:
+get:
+summary: "GET providers"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/providers/{name}:
+get:
+summary: "GET providers/{name}"
+parameters:
+- name: name
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/providers/{name}/test:
+post:
+summary: "POST providers/{name}/test"
+parameters:
+- name: name
+in: path
+required: true
+schema:
+type: string
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+model:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/releases/{id}:
+get:
+summary: "GET releases/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/releases/{id}/activate:
+post:
+summary: "POST releases/{id}/activate"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/releases/{id}/approval:
+get:
+summary: "GET releases/{id}/approval"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/releases/{id}/invoke:
+post:
+summary: "POST releases/{id}/invoke"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/releases/{id}/rollback:
+post:
+summary: "POST releases/{id}/rollback"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/releases/{id}/votes:
+post:
+summary: "POST releases/{id}/votes"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/releases/{release_id}/evals:
+get:
+summary: "GET releases/{release_id}/evals"
+parameters:
+- name: release_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+post:
+summary: "POST releases/{release_id}/evals"
+parameters:
+- name: release_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/settings:
+get:
+summary: "handleListSettings returns every key."
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/settings/{key}:
+get:
+summary: "handleGetSetting returns one key (or 404)."
+parameters:
+- name: key
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+put:
+summary: "handleSetSetting upserts one key."
+parameters:
+- name: key
+in: path
+required: true
+schema:
+type: string
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+value:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+delete:
+summary: "handleDeleteSetting removes one key."
+parameters:
+- name: key
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/setup:
+post:
+summary: "handleBootstrap is the first-run endpoint that mints an admin\nuser and an admin API key when the deployment is brand-new and\nrunning with authentication disabled."
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+email:
+type: string
+name:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/users:
+get:
+summary: "GET users"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+post:
+summary: "POST users"
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+email:
+type: string
+name:
+type: string
+role:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/users/{id}:
+get:
+summary: "GET users/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+put:
+summary: "PUT users/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+email:
+type: string
+name:
+type: string
+role:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+delete:
+summary: "DELETE users/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/vault/keys:
+get:
+summary: "GET vault/keys"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+post:
+summary: "POST vault/keys"
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+providerName:
+type: string
+keyName:
+type: string
+plaintextKey:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/vault/keys/{id}:
+delete:
+summary: "DELETE vault/keys/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/version:
+get:
+summary: "handleVersion returns the structured build info."
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/versions/{id}:
+get:
+summary: "GET versions/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/versions/{version_id}/executions:
+get:
+summary: "GET versions/{version_id}/executions"
+parameters:
+- name: version_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+post:
+summary: "POST versions/{version_id}/executions"
+parameters:
+- name: version_id
+in: path
+required: true
+schema:
+type: string
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+inputs:
+type: object
+model:
+type: string
+provider:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/versions/{version_id}/releases:
+post:
+summary: "POST versions/{version_id}/releases"
+parameters:
+- name: version_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/webhooks:
+get:
+summary: "GET webhooks"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+post:
+summary: "POST webhooks"
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+uRL:
+type: string
+events:
+type: array
+secret:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/webhooks/{id}:
+delete:
+summary: "DELETE webhooks/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/workflows/run:
+post:
+summary: "handleRunWorkflow accepts a workflow Definition and runs it\nthrough the configured workflow.Engine."
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/workspaces:
+get:
+summary: "GET workspaces"
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+post:
+summary: "POST workspaces"
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+name:
+type: string
+organization:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/workspaces/{id}:
+get:
+summary: "GET workspaces/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+put:
+summary: "PUT workspaces/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+name:
+type: string
+organization:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+delete:
+summary: "DELETE workspaces/{id}"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/api/v1/workspaces/{id}/observation:
+get:
+summary: "GET workspaces/{id}/observation"
+parameters:
+- name: id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/api/v1/workspaces/{workspace_id}/projects:
+get:
+summary: "GET workspaces/{workspace_id}/projects"
+parameters:
+- name: workspace_id
+in: path
+required: true
+schema:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+post:
+summary: "POST workspaces/{workspace_id}/projects"
+parameters:
+- name: workspace_id
+in: path
+required: true
+schema:
+type: string
+requestBody:
+required: true
+content:
+application/json:
+schema:
+type: object
+name:
+type: string
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+"500":
+description: Internal server error
+/health:
+get:
+summary: "handleHealth is the liveness probe."
+security: []
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/livez:
+get:
+summary: "handleHealth is the liveness probe."
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/metrics:
+get:
+summary: "GET metrics"
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/ready:
+get:
+summary: "handleReady returns 200 only when every downstream the daemon\ndepends on for correct operation is reachable:\n\n  - The SQLite database responds to Ping (operator's data).\n  - The OTel tracer is reachable (the daemon otherwise can't\n    ship traces to the operator's collector; failures here\n    will not stall the request path but they do mean the\n    observability story is broken).\n  - The audit worker queue has room (degraded audit means\n    we may be losing entries; the queue depth is exposed\n    so K8s readiness can shed traffic before drops begin).\n\nA failed probe returns 503 with a body naming the failing\ncomponent so operators can triage from the kubelet log\nwithout digging through the daemon log."
+security: []
+responses:
+"200":
+description: OK
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found
+/readyz:
+get:
+summary: "handleReady returns 200 only when every downstream the daemon\ndepends on for correct operation is reachable:\n\n  - The SQLite database responds to Ping (operator's data).\n  - The OTel tracer is reachable (the daemon otherwise can't\n    ship traces to the operator's collector; failures here\n    will not stall the request path but they do mean the\n    observability story is broken).\n  - The audit worker queue has room (degraded audit means\n    we may be losing entries; the queue depth is exposed\n    so K8s readiness can shed traffic before drops begin).\n\nA failed probe returns 503 with a body naming the failing\ncomponent so operators can triage from the kubelet log\nwithout digging through the daemon log."
+responses:
+"200":
+description: OK
+content:
+application/json:
+schema:
+type: array
+items:
+$ref: "#/components/schemas/object"
+"400":
+description: Bad request
+content:
+application/json:
+schema:
+$ref: "#/components/schemas/Error"
+"401":
+description: Unauthorized
+"404":
+description: Not found</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+                            <a rel="next prefetch" href="../index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+                    <a rel="next prefetch" href="../index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

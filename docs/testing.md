@@ -13,8 +13,8 @@ jobs so the default PR path stays fast.
 | **Smoke** | Boots a real daemon, runs every `examples/bash/*.sh`, tears down. | `bash tests/smoke/run.sh` |
 | **Chaos** | SQLite file-delete mid-query doesn't panic. | `go test ./tests/chaos/...` |
 | **Load** | k6 scenarios in `tests/load/scenarios/*.js` (nightly). | `make load-test` |
-| **Property** | (future) `testing/quick` for the CAS layer. | non-goal for v0.1.x |
-| **Mutation** | (future) `go-mutesting` for domain packages. | non-goal for v0.1.x |
+| **Property** | `testing/quick` covers the LLM gateway (`internal/llm/property_test.go`) and the bandit selector (`internal/bandit/property_test.go`). CAS-layer properties are follow-on. | `go test ./internal/llm/... ./internal/bandit/...` |
+| **Mutation** | (future) `go-mutesting` for domain packages. | non-goal for v0.2.0 |
 
 ## Layer-to-CI-job mapping
 
@@ -27,7 +27,7 @@ jobs so the default PR path stays fast.
 | Vulnerability scan | `security` (govulncheck + gosec) | every PR + master |
 | SBOM | `sbom` (syft) | tags only |
 | Load | `nightly-load` (nightly schedule) | nightly |
-| Fuzz | (future) `nightly-fuzz` | non-goal for v0.1.x |
+| Fuzz | (future) `nightly-fuzz` | non-goal for v0.2.0 |
 
 ## Layout
 

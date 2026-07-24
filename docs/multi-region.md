@@ -1,6 +1,6 @@
 # Multi-region
 
-Promptsheon v0.1.x is **single-region by design**. The codebase
+Promptsheon v0.2.0 is **single-region by design**. The codebase
 intentionally does not support multi-region replication, and
 this page explains why and what the path forward looks like.
 
@@ -24,14 +24,14 @@ audit worker the bottleneck; the async variant makes
 The second problem is the **SQLite single-writer** model.
 SQLite serialises writes; multi-region requires either a
 shared disk (latency-bound) or a different store. We picked
-SQLite deliberately for v0.1.x because it removes an entire
+SQLite deliberately for v0.2.0 because it removes an entire
 class of operational complexity (no Postgres cluster to
 operate, no schema-drift, no DDL locks). Multi-region
 replication is the natural follow-on to "replace SQLite with
 Postgres", which itself is a follow-on to "decide whether the
 audit chain is per-region or global".
 
-## What multi-region WOULD look like (non-goal for v0.1.x)
+## What multi-region WOULD look like (non-goal for v0.2.0)
 
 A future multi-region design is sketched in
 `docs/adr/0019-deferred-items.md`. The shape:
@@ -54,7 +54,7 @@ A future multi-region design is sketched in
   `deploy/prometheus/promptsheon-alerts.yaml` are regional
   today; the multi-region variant uses Thanos Ruler.
 
-## What v0.1.x operators can do today
+## What v0.2.0 operators can do today
 
 A single-region deployment can be made highly available
 without multi-region replication:
@@ -75,8 +75,10 @@ replication", not "active-active multi-region writes".
 
 ## See also
 
-- [ADR-0015 (Deprecated)](adr/0015-postgres-backend-with-rls.md) —
-  the Postgres backend that would enable multi-region.
+- ADR-0015 (Postgres backend, Deprecated) — the Postgres
+  backend that would enable multi-region. The ADR file was
+  dropped when the v0.1.0 cleanup landed; the design rationale
+  is preserved in `CHANGELOG.md` under F-06.
 - [ADR-0019](adr/0019-deferred-items.md) — deferred items
   including the multi-region sketch.
 - [docs/operations.md](operations.md) — backup / restore.

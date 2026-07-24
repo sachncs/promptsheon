@@ -62,7 +62,7 @@ image, systemd units).
 
 ## What LLM providers are supported?
 
-**OpenAI** and **Anthropic** in v0.1.x. Azure OpenAI, Ollama,
+**OpenAI** and **Anthropic** in v0.2.0. Azure OpenAI, Ollama,
 and NVIDIA NIM were removed in v0.1.0. To add a new provider,
 implement the `llm.Provider` interface and register a factory
 on the `Registry` in `cmd/promptsheond/main.go`.
@@ -111,7 +111,7 @@ acquires a SQLite advisory lock so only the leader applies
 migrations and writes to the audit chain. Reads scale
 linearly. SQLite + WAL handles small to medium production
 loads; for high-throughput deployments, run a Postgres
-backend (a follow-on — v0.1.x is SQLite-only).
+backend (a follow-on — v0.2.0 is SQLite-only).
 
 ## How does pricing work?
 
@@ -146,7 +146,7 @@ retention contract.
 
 The `store.Repository` interface is the integration boundary.
 A Postgres implementation can be added without touching
-the domain packages. v0.1.x ships SQLite-only as a
+the domain packages. v0.2.0 ships SQLite-only as a
 deliberate simplification; the `pkg/store` Postgres driver
 lives at the same level as the `modernc.org/sqlite` driver
 today but isn't wired into the production wiring. See

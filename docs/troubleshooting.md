@@ -107,7 +107,8 @@ common case is resolved by step 1 or 2.
   busy timeout. The daemon currently hardcodes
   `?_pragma=busy_timeout(5000)` in `cmd/promptsheond/main.go`;
   for higher throughput run the daemon on a Postgres backend
-  instead (the SQLite-only constraint is v0.1.x).
+  instead (the SQLite-only constraint is v0.2.0; a Postgres
+  parity follows once the shared backend lands).
 - **Schema migration fails at boot** — the migration table
   records the highest applied version. If you jumped a
   version, run the missing migrations manually with
@@ -119,7 +120,7 @@ common case is resolved by step 1 or 2.
 ## LLM providers
 
 - **`unknown provider: <name>`** — the LLM `Registry` doesn't
-  have a factory for that name. v0.1.x ships with `openai` and
+  have a factory for that name. v0.2.0 ships with `openai` and
   `anthropic`; custom providers must be registered in
   `cmd/promptsheond/main.go` before the daemon boots.
 - **`provider <name> not configured`** — the provider's API

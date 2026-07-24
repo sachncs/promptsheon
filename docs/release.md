@@ -39,7 +39,7 @@ records the supersession. Operators can still `Get` and
 
 ## Approval policies
 
-Two policies ship in v0.1.x. Both are fail-closed: an
+Two policies ship in v0.2.0 (unchanged since v0.1.0). Both are fail-closed: an
 empty or invalid configuration returns an error from
 `Evaluate`, never silently approves.
 
@@ -166,3 +166,16 @@ promptsheon release rollback <id>     # active → rolled_back
   contract.
 - [docs/architecture.md](architecture.md) — the Release
   aggregate's role in the system.
+
+## v0.2.0 readiness tests
+
+The v0.2.0 readiness test suite is being implemented as the
+next milestone after this doc. Its expected scope is
+end-to-end coverage of the lifecycle above against the v0.2.0
+binary: real SQLite, real auth, the TLA+ spec invariants
+checked at the SQL boundary, and the k6 p99 gate
+(`p(99)<3000` on `tests/load/scenarios/10-sustained-load.js`).
+This is follow-on work — it is not bundled into the v0.2.0
+binary and is not covered by the v0.2.0 SLOs. Item #28 in
+the engineering closure list tracks the test suite; the
+in-binary v0.2.0 work (#1–#25) is complete.

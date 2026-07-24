@@ -71,7 +71,7 @@ The runner is fail-fast by default; `RunAll` runs every
 precondition regardless of outcome and aggregates the
 errors.
 
-Cases run serially in v0.1.x. Parallel execution ships in
+Cases run serially in v0.2.0. Parallel execution ships in
 a follow-on.
 
 ## Precondition execution
