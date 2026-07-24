@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -3709,8 +3710,34 @@ func TestUsageTracker_NewUsageTracker(t *testing.T) {
 	if ut == nil {
 		t.Fatal("expected non-nil tracker")
 	}
-	if ut.capabilityUsage == nil {
-		t.Error("expected initialized maps")
+	if ut.entries == nil {
+		t.Error("expected initialized map")
+	}
+	if ut.order == nil {
+		t.Error("expected initialized lru list")
+	}
+}
+
+func TestUsageTracker_LRUEvicts(t *testing.T) {
+	// PERF-5: oldest entry is evicted when the cap is hit.
+	// We can't easily test with the production cap (16384)
+	// here, so we directly exercise the list behaviour.
+	ut := NewUsageTracker()
+	for i := 0; i < maxUsageEntries; i++ {
+		ut.RecordCapabilityUsage(strconv.Itoa(i), "c", 0, 0)
+	}
+	if ut.order.Len() != maxUsageEntries {
+		t.Fatalf("expected full LRU, got %d", ut.order.Len())
+	}
+	ut.RecordCapabilityUsage("new", "new", 0, 0)
+	if ut.order.Len() != maxUsageEntries {
+		t.Fatalf("expected LRU cap, got %d", ut.order.Len())
+	}
+	if _, ok := ut.entries["0"]; ok {
+		t.Error("expected entry 0 to be evicted")
+	}
+	if _, ok := ut.entries["new"]; !ok {
+		t.Error("expected entry 'new' to be present")
 	}
 }
 
