@@ -58,10 +58,40 @@ referenced in the PR.
 ## Invariants checked
 
 - `TypeOK` — every state variable is well-typed.
-- `ConsistentTail` — `last_hash` always equals the hash of
-  the row at `last_row` (or the empty-chain sentinel when
+- `ConsistentTail` — `last_hash` always equals the hash of the
+  row at `last_row` (or the empty-chain sentinel when
   `last_row = 0`).
 - `ChainIsLinked` — `chain[i].prev = chain[i-1].hash` for
   every `i` in `[2..last_row]`.
 - `VerificationImpliesLinked` — if the reader reports `ok`,
   the chain is necessarily linked.
+
+## Release lifecycle spec
+
+`release_lifecycle.tla` models the Release state machine
+(`pending → approved → active → superseded | rolled_back`) the
+runtime Activate path in `internal/release/service.go`
+enforces. It pins:
+
+- `ActiveExclusive` — at most `MaxReleases` active Releases
+  per Environment.
+- `NoActiveToSupersede` — a superseded/rolled-back Release
+  must not appear in any active set.
+- `StatusConsistency` — `status = active` iff the Release is
+  in some Environment's active set.
+- `VoteImpliesPendingOrApproved` — a Release with recorded
+  Approve votes must be at least in pending state.
+- The Maker/Checker separation-of-duties rule (the
+  Release's creator cannot be the approver).
+
+`release_lifecycle.cfg` configures TLC with three Releases,
+two Environments, and `MaxReleases = 2`. Run:
+
+```bash
+tlc -config tla/release_lifecycle.cfg tla/release_lifecycle.tla
+```
+
+A Go-side regression test (`tla/release_lifecycle_test.go`)
+asserts the spec and config files exist with the required
+content so the file structure is preserved across edits.
+
