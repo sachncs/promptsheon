@@ -1,18 +1,19 @@
 // Package bandsession couples a bandit.Selector to a persistent
-// banditstore.Backend and exposes the load/select/observe/flush
+// banditstore.Store and exposes the load/select/observe/flush
 // lifecycle used by the production recommender.
 //
 // The Session is the production path for the bandit recommender:
 // load on init, select on demand, observe outcomes, flush on
-// demand.
-//
-// The Store backend may be either the InMemory backend (default;
-// tests; single-process installs) or the Postgres backend
-// (production).
+// demand. The Store backend may be either the InMemory backend
+// (default; tests; single-process installs) or the SQLite
+// backend (production) — the Session contract is identical
+// for both.
 package bandsession
 
 import (
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"math/rand/v2"
 	"sync"
@@ -21,6 +22,10 @@ import (
 	"github.com/sachncs/promptsheon/internal/bandit"
 	"github.com/sachncs/promptsheon/internal/banditstore"
 )
+
+type selectionObserver interface {
+	RecordBanditSelection(string)
+}
 
 // Session wraps a bandit.Selector and a banditstore.Store with the
 // lifecycle that production needs: load on init, observe on
@@ -33,6 +38,8 @@ type Session struct {
 	armIDs    []string
 	rngSeed   uint64
 	lastFlush time.Time
+	runID     string
+	observer  selectionObserver
 }
 
 // New constructs a Session around the given store. rngSeed is the
@@ -43,24 +50,47 @@ func New(store *banditstore.Store, rngSeed uint64) (*Session, error) {
 	if store == nil {
 		return nil, fmt.Errorf("banditsession: nil store")
 	}
+	var id [16]byte
+	if _, err := cryptorand.Read(id[:]); err != nil {
+		return nil, fmt.Errorf("banditsession: run id: %w", err)
+	}
 	return &Session{
 		store:   store,
 		rngSeed: rngSeed,
+		runID:   hex.EncodeToString(id[:]),
 	}, nil
 }
 
-// Load reads the persisted posteriors from the store and feeds
+// Load reads the persisted counters from the store and feeds
 // them into the Selector. Call this at boot, before any Select.
+// The store may be empty; cold-start arms are seeded with the
+// uniform Beta(1, 1) prior (alpha=1, beta=1).
 func (s *Session) Load(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if err := s.store.Load(ctx); err != nil {
+	state, err := s.store.Load(ctx)
+	if err != nil {
 		return fmt.Errorf("banditsession: load: %w", err)
 	}
-	armIDs := s.store.ArmIDs()
+	armIDs := make([]string, 0, len(state))
+	for id := range state {
+		armIDs = append(armIDs, id)
+	}
 	s.armIDs = armIDs
-	selector := s.buildSelector(armIDs)
-	s.selector = selector
+	s.selector = s.buildSelector(armIDs)
+	// Seed the Selector's posterior for every known arm from the
+	// merged store state. The store's Counter has the per-arm
+	// successes/failures; the Selector's posterior needs the
+	// derived (alpha=1+s, beta=1+f).
+	for id, c := range state {
+		post := bandit.NewArmPosteriorWithCounts(1+float64(c.Successes), 1+float64(c.Failures))
+		if err := s.selector.SetPosterior(id, *post); err != nil && err != bandit.ErrUnknownArm {
+			// armIDs list and Selector order must agree; if
+			// they don't the Selector's constructor didn't
+			// see this arm, which is a programmer error.
+			return fmt.Errorf("banditsession: seed posterior %q: %w", id, err)
+		}
+	}
 	s.loaded = true
 	s.lastFlush = time.Now().UTC()
 	return nil
@@ -68,23 +98,40 @@ func (s *Session) Load(ctx context.Context) error {
 
 // RegisterArms adds new arm IDs that did not exist in the store
 // at Load time. The new arms are seeded with the uniform prior.
-// Use this when the recommender is bringing up a new experiment
-// and the user-defined manifest is wider than the persisted set.
+// RegisterArms must NOT invent observations: the underlying
+// banditstore.Store.RegisterArms writes a (0, 0) Counter for
+// each arm, which translates to alpha=1, beta=1 once the
+// Selector is rebuilt.
 func (s *Session) RegisterArms(ctx context.Context, armIDs []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.loaded {
 		return fmt.Errorf("banditsession: must Load before RegisterArms")
 	}
-	s.store.ReconcileSeed(armIDs)
+	if err := s.store.RegisterArms(ctx, armIDs); err != nil {
+		return fmt.Errorf("banditsession: register: %w", err)
+	}
 	if err := s.store.Flush(ctx); err != nil {
 		return fmt.Errorf("banditsession: flush: %w", err)
 	}
 	s.lastFlush = time.Now().UTC()
 	// Reload the in-memory selector with the new arm list.
-	allIDs := s.store.ArmIDs()
+	state, err := s.store.Load(ctx)
+	if err != nil {
+		return fmt.Errorf("banditsession: reload: %w", err)
+	}
+	allIDs := make([]string, 0, len(state))
+	for id := range state {
+		allIDs = append(allIDs, id)
+	}
 	s.armIDs = allIDs
 	s.selector = s.buildSelector(allIDs)
+	for id, c := range state {
+		post := bandit.NewArmPosteriorWithCounts(1+float64(c.Successes), 1+float64(c.Failures))
+		if err := s.selector.SetPosterior(id, *post); err != nil && err != bandit.ErrUnknownArm {
+			return fmt.Errorf("banditsession: seed posterior %q: %w", id, err)
+		}
+	}
 	return nil
 }
 
@@ -101,30 +148,59 @@ func (s *Session) Select() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("banditsession: select: %w", err)
 	}
+	if s.observer != nil {
+		s.observer.RecordBanditSelection(s.runID)
+	}
 	return arm, nil
 }
 
+// RunID identifies this process-local selection session.
+func (s *Session) RunID() string { return s.runID }
+
+// SetSelectionObserver bridges selections to an observability collector.
+func (s *Session) SetSelectionObserver(observer selectionObserver) { s.observer = observer }
+
 // Observe records one outcome (success or failure) for the
-// given arm, persists the new posterior via the store, and
-// reflects it in the in-memory selector. Flushes the store at
-// the end of the call; a future commit may batch updates.
+// given arm. The order is: validate arm, persist to store,
+// then mutate selector. A failing backend must leave the
+// selector's posterior unchanged — the selector is the
+// in-memory cache and only advances once the backend has
+// accepted the write, so a transient failure does not poison
+// the next arm draw. The selector and the store stay
+// coherent because both grow monotonically on every Observe.
 func (s *Session) Observe(ctx context.Context, armID string, success bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.selector == nil {
 		return fmt.Errorf("banditsession: selector not loaded")
 	}
+	// Validate the arm against the registered set before any
+	// backend I/O. ErrUnknownArm is the canonical signal; the
+	// selector is the source of truth for which arms the
+	// session has accepted.
+	if _, ok := s.selector.Posterior(armID); !ok {
+		return fmt.Errorf("banditsession: selector observe: %w", bandit.ErrUnknownArm)
+	}
+	if err := s.store.Observe(ctx, armID, success); err != nil {
+		return fmt.Errorf("banditsession: store observe: %w", err)
+	}
+	if err := s.store.Flush(ctx); err != nil {
+		return fmt.Errorf("banditsession: flush: %w", err)
+	}
+	// Selector mutation only after the backend has accepted
+	// the write. A backend failure leaves the posterior
+	// untouched so the next Select() draws from the same
+	// state as before.
 	if err := s.selector.Observe(armID, success); err != nil {
-		return fmt.Errorf("banditsession: observe: %w", err)
+		return fmt.Errorf("banditsession: selector observe: %w", err)
 	}
-	if err := s.persistArm(ctx, armID); err != nil {
-		return fmt.Errorf("banditsession: persist: %w", err)
-	}
+	s.lastFlush = time.Now().UTC()
 	return nil
 }
 
-// Flush writes the in-memory posteriors to the store and records
-// the timestamp so callers can assert the persistence cadence.
+// Flush writes the in-memory store state to the backend. With
+// the SQLite backend this is the commit boundary; with the
+// InMemory backend it is a no-op.
 func (s *Session) Flush(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -159,10 +235,7 @@ func (s *Session) PosteriorMean(armID string) (float64, error) {
 
 // Close flushes the session and releases the store. Idempotent.
 func (s *Session) Close(ctx context.Context) error {
-	if err := s.Flush(ctx); err != nil {
-		return err
-	}
-	return nil
+	return s.Flush(ctx)
 }
 
 // LastFlush returns the timestamp of the most recent successful
@@ -174,7 +247,9 @@ func (s *Session) LastFlush() time.Time {
 }
 
 // buildSelector constructs a fresh Selector seeded by the
-// configured rngSeed and primed with the loaded posteriors.
+// configured rngSeed. The Selector's per-arm posteriors are
+// seeded by Load/RegisterArms after construction, so
+// buildSelector itself only wires the RNG and the arm order.
 func (s *Session) buildSelector(armIDs []string) *bandit.Selector {
 	var seed [32]byte
 	if s.rngSeed != 0 {
@@ -196,47 +271,5 @@ func (s *Session) buildSelector(armIDs []string) *bandit.Selector {
 		uint64(seed[0])<<56|uint64(seed[1])<<48|uint64(seed[2])<<40|uint64(seed[3])<<32|uint64(seed[4])<<24|uint64(seed[5])<<16|uint64(seed[6])<<8|uint64(seed[7]),
 		uint64(seed[8])<<56|uint64(seed[9])<<48|uint64(seed[10])<<40|uint64(seed[11])<<32|uint64(seed[12])<<24|uint64(seed[13])<<16|uint64(seed[14])<<8|uint64(seed[15]),
 	))
-	s2 := bandit.NewSelectorWithRNG(armIDs, rng)
-	for _, id := range armIDs {
-		if p, ok := s.store.Get(id); ok {
-			// Reconstruct the posterior with the exact (alpha,
-			// beta) counts the store persisted; subsequent
-			// Observe calls increment from there.
-			s2.SetPosterior(id, p)
-		}
-	}
-	return s2
-}
-
-// persistArm writes the given arm's current in-memory posterior
-// to the store. The store uses a wholesale-replace strategy; the
-// session keeps the rest of the map in memory.
-func (s *Session) persistArm(ctx context.Context, armID string) error {
-	// Rebuild the in-memory map so Flush writes the latest
-	// posteriors; the wholesale-replace strategy means the
-	// rebuilt map is what hits the backend.
-	all := s.storeArms()
-	_ = all // ponytail: rebuild is required so Flush writes fresh state; the map is consumed by Flush
-	if err := s.store.Flush(ctx); err != nil {
-		return err
-	}
-	s.lastFlush = time.Now().UTC()
-	return nil
-}
-
-// storeArms returns the current per-arm posterior from the
-// in-memory selector as a map of [armID]ArmPosterior. The exact
-// (alpha, beta) are read from the selector via its accessor.
-func (s *Session) storeArms() map[string]bandit.ArmPosterior {
-	out := make(map[string]bandit.ArmPosterior, len(s.armIDs))
-	for _, id := range s.armIDs {
-		if p, ok := s.selector.Posterior(id); ok {
-			out[id] = p
-		} else if cached, ok := s.store.Get(id); ok {
-			out[id] = cached
-		} else {
-			out[id] = *bandit.NewArmPosterior()
-		}
-	}
-	return out
+	return bandit.NewSelectorWithRNG(armIDs, rng)
 }
