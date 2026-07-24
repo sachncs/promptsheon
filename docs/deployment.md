@@ -63,7 +63,7 @@ healthcheck:
 ## Helm chart
 
 `deploy/helm/promptsheon/` ships a single-replica chart
-(SQLite is the v0.1.x constraint; a Postgres parity follows).
+(SQLite is the v0.2.0 constraint; a Postgres parity follows in v0.3.0+).
 The chart renders ConfigMap, Secret, Service, Deployment,
 Ingress, and ServiceMonitor.
 
@@ -156,7 +156,7 @@ prometheus reload
 
 ## Multi-replica
 
-v0.1.x is **single-replica** because of the SQLite constraint.
+v0.2.0 is **single-replica** because of the SQLite constraint.
 The leader-election work (ADR-0030) ships in v0.3.0; the
 SLO dashboard has a "stale chain verification" alert that
 catches multi-replica misconfigurations (the leader should

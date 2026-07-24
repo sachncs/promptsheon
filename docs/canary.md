@@ -60,7 +60,7 @@ elected.
 
 ## Feature flags
 
-In v0.1.x the only feature flag is `PROMPTSHEON_READ_ONLY`.
+In v0.2.0 the only feature flag is `PROMPTSHEON_READ_ONLY`.
 A future flag surface — `PROMPTSHEON_FEATURE_<name>` — is a
 follow-on. Today, operators who need to disable a specific
 route while upgrading (e.g. to avoid the rate limiter

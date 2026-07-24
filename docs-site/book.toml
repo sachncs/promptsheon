@@ -1,0 +1,40 @@
+# book.toml — mdBook site for the Promptsheon docs.
+#
+# The book REUSES docs/ as its source via the relative src below;
+# no markdown is duplicated. The only mdBook-managed file inside
+# docs/ is SUMMARY.md, which is a thin index over the existing
+# docs/*.md files. External DNS / custom domain is outside this
+# repository's authority; the Pages workflow deploys to the
+# default <owner>.github.io/<repo> path.
+
+[book]
+title = "Promptsheon"
+authors = ["Promptsheon Maintainers"]
+description = "Version Control for AI Intelligence — promptsheon documentation."
+language = "en"
+multilingual = false
+src = "../docs"
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/sachncs/promptsheon"
+edit-url-template = "https://github.com/sachncs/promptsheon/edit/master/{path}"
+site-url = "/promptsheon/"
+no-section-label = false
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.playground]
+editable = false
+copy-js = true
+copy-css = true
+
+[preprocessor.index]
+# markdown index pages; nothing additional needed.

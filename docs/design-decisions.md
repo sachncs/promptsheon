@@ -90,7 +90,7 @@ guide. The Prometheus alert definitions live in
 
 `MakerCheckerPolicy` (default) self-enforces separation of
 duties: the Release's creator cannot vote to approve their
-own release. [ADR 0028](adr/0028-maker-checker-self-enforcing.md)
+own release. [ADR 0011](adr/0011-release-and-approval-aggregates.md)
 is the design record. The alternative `MajorityPolicy` is a
 flat count-based threshold.
 

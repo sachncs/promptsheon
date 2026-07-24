@@ -201,3 +201,13 @@ key, body-hash)` receive the cached response with an
 `Idempotent-Replayed: true` header. Replicas share the cache
 via SQLite, so a retried POST on a different daemon still
 returns the original response.
+
+## Generator
+
+The OpenAPI spec at [`api/openapi.yaml`](../api/openapi.yaml)
+is auto-generated from the route registrations in
+`internal/api/server.go` and the handler signatures in
+`internal/api/handlers_*.go`. Run `go run ./scripts/genopenapi`
+(or `make openapi`) whenever a route or handler changes.
+`make openapi-check` (run in CI) fails the build if a developer
+added a route without regenerating the spec.

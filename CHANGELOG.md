@@ -6,9 +6,241 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-### Production-readiness hardening (v0.1.x)
+### v0.2.0 closure pass
 
-A 50+ commit audit and remediation pass. Highlights:
+- **DOC-CI-3 / DOC-FRESH-1** `make docs-check` is a deterministic
+  doc-freshness gate: it walks every markdown file under `docs/`
+  plus the root `README.md` / `CHANGELOG.md` and reports
+  (a) any local markdown link that resolves to a missing file
+  and (b) any path-shaped reference to source code
+  (`internal/...go`, `pkg/...go`, `cmd/...go`, `api/`,
+  `deploy/`, `scripts/`, `.github/workflows/`) that no longer
+  points at a real file. Stdlib Python; no new Go dependency.
+  CI runs it on every PR. Operators can add a trailing
+  `<!-- stale-ok: <reason> -->` to bless a historical line.
+- **DOC-CI-1 / OSS-GOV-1** The mdBook site lives under
+  `docs-site/`. `docs-site/book.toml` points `src` at
+  `../docs` so the existing prose is reused without
+  copy-paste. The Makefile target is `make docs-site`; the
+  Pages workflow builds with `mdbook build docs-site` and
+  deploys `docs-site/book/`. The only mdBook-only file inside
+  `docs/` is `SUMMARY.md`. A `docs-site.yaml` workflow
+  deploys the result via `actions/deploy-pages`. Custom
+  domain configuration is outside the repository's authority
+  and is documented as such in the workflow.
+- **PERF-BENCH-1** `make bench` runs the curated 8 Go benchmarks
+  listed in `scripts/benchmarks.txt`. A `bench-nightly.yaml`
+  workflow runs the same set nightly and on `workflow_dispatch`
+  and uploads results as artefacts. The p99 latency gate lives
+  in the existing k6 scenario
+  `tests/load/scenarios/10-sustained-load.js` — Go's
+  `testing.B` has no notion of p99 and we do not pretend
+  otherwise.
+- **OSS-REL-1 / SEC-16c** The release pipeline uses
+  `actions/attest-build-provenance@v1` to attach GitHub
+  artifact attestations to every release binary, in addition
+  to the existing cosign keyless signing. The release job now
+  installs cosign via `sigstore/cosign-installer@v4` (pinned
+  to the `v2.x` major) before GoReleaser runs. The
+  `subject-path` for the attestation step was fixed to the
+  paths GoReleaser actually emits (`dist/promptsheond_*.{tar.gz,zip}`,
+  `dist/promptsheon_*.{tar.gz,zip}`, `dist/checksums.txt`).
+  The stale SBOM `.sig` / `.pem` `extra_files` globs in
+  `.goreleaser.yml` were dropped — the `signs:` block signs
+  archives and the checksum next to themselves, never the
+  SBOM. The duplicate `release:` block in `.goreleaser.yml`
+  was collapsed into one. The release job carries explicit
+  `packages: write` / `id-token: write` / `attestations: write`
+  permissions and a `docker/login-action` step so GoReleaser
+  can push the multi-arch image to GHCR. The invalid
+  `slsa-framework/slsa-github-generator` step call was removed
+  (the SLSA generator is for driving a build, not attesting
+  one); the `.github/slsa-build.config.json` was deleted.
+- **RES-AUDIT-1** A TLA+ specification of the audit chain
+  (`tla/audit_chain.tla`) and its TLC config
+  (`tla/audit_chain.cfg`) land alongside a concise README.
+  The spec models the same ordering invariants the
+  `VerifyAuditChainOnDB` SQLite walk checks at runtime.
+- **RES-CRDT-1, RES-CRDT-2, RES-BANDIT-1** Research notes ship
+  as design docs only (no code, no schema):
+  - `docs/research/crdt-idempotency-cache.md` — design
+    options for a CRDT-backed idempotency cache, including a
+    minimal "smallest transactional reservation path" sketch
+    that does not require the unfinished CRDT to land.
+  - `docs/research/replay-set-crdt.md` — replay-set CRDT
+    (immutable add-only G-Set, conflict semantics, retention).
+  - `docs/research/thompson-sampling-bayesian.md` —
+    acknowledges the existing Thompson Sampling selector is
+    already Bayesian, and defines the criteria that would
+    justify replacing it.
+- **Note on what is NOT in v0.2.0**: the CRDT idempotency
+  cache, the replay-set CRDT, and multi-region replication
+  ship as research only — they are documented in
+  `docs/research/`, not in this binary. The bandit selector
+  remains the existing Thompson Sampling implementation; the
+  research note describes when a replacement would be
+  justified. Item #28 (v0.2.0 readiness tests) is documented
+  in `docs/release.md` as the next milestone; it is being
+  implemented by a separate agent and is not in this release.
+
+## [0.2.0] - 2026-07-24
+
+The v0.2.0 release. Honest scope: the runtime behaviour
+(#1–#25), the release pipeline, the doc-freshness gate, the
+mdBook site, the curated benchmark set, and the k6 p99 gate
+are production defaults. The CRDT-backed idempotency cache,
+the replay-set CRDT, and multi-region replication are
+research deliverables (design docs in `docs/research/`); they
+are not in this binary and not covered by the v0.2.0 SLOs.
+
+### Added
+
+Runtime (#1–#25 — the actually shipped work):
+
+- **#1 Audit archival + chain-state tail cache**.
+  `internal/observability.retention` archives eligible rows
+  into `audit_archive` (migration 011) and reads the chain
+  tail from `audit_chain_state` so the verifier does not
+  paginate from rowid 1. `internal/store/sqlite.AppendAudit`
+  keeps `audit_chain_state.last_hash` / `last_rowid` in step
+  with every insert; `VerifyAuditChain` cross-checks both
+  the rowid sequence and the chain hash and surfaces a
+  "chain tail mismatch" when the cache drifts.
+- **#2 Selector RNG injection**. `internal/bandit.Selector`
+  gains `NewSelectorWithRNG(armIDs, rng)`; `bandsession`
+  uses it so tests and the harness eval loop seed the
+  Thompson Sampling draws deterministically. `math/rand/v2`
+  is the RNG source.
+- **#3 Release resolver**. `internal/release.Resolver`
+  closes the gap between "the approved release" and "the
+  call that actually runs" by turning a Release into an
+  immutable `ResolvedInvocation` at the boundary — model,
+  provider, revision, prompt bytes, runtime limits, and
+  guardrail/tool/MCP refs all come from the manifest, not
+  from the HTTP request. The release invoke path consumes
+  the plan; the previous request-supplied model/provider
+  override is gone.
+- **#4 Vault lifecycle + hot-reload**. `internal/vault.Vault`
+  exposes `Reload(key)`; the settings `Notifier` wires the
+  vault as a subscriber so an operator-driven `settings`
+  write rotates the master key without a daemon restart.
+  `notifier_test.go` pins the failure-propagation contract:
+  a bad key returns the failure to the API caller (5xx),
+  not a silent fallback.
+- **#5 Shutdown drains + order**. `cmd/promptsheond` first
+  SIGINT/SIGTERM starts a 60s graceful drain: HTTP server
+  first, then audit-worker queue (30s), then webhook
+  dispatcher, then OTel provider. A second signal forces
+  exit. The previous "defer Close runs before the retention
+  tick" bug is closed by hoisting the retention `*sql.DB`
+  into `main()` scope.
+- **#6 API responsibility split**. `internal/api/server.go`
+  shrinks; a thin `internal/api/server/server.go` facade
+  re-exports `Server` and `Option` and forwards to
+  `api.NewServer`. Production wiring imports the facade;
+  the legacy `WithServerConfig` is deleted.
+- **#7 Repository facades + sqliteimpl move**. The bandit
+  store (`internal/banditstore.InMemory` + a SQLite-backed
+  sibling) and the recommendation / lineage repos moved
+  out of the monolithic `internal/store/sqlite.go` into
+  `internal/store/sqliteimpl/`. The monolithic file remains
+  the wiring root; the new package houses the per-aggregate
+  repository implementations.
+- **#8 Bandit + settings CRDT**. `internal/bandit/crdt.go`
+  pins the grow-only arm-state merge (MAX() per replica);
+  `internal/settings/crdt.go` pins the LWW register per key
+  with version vectors + deterministic tie-break
+  (WriteTS, then ReplicaID). Algebraic properties are
+  exercised by property tests; the tie-break is documented
+  in the package comment.
+- **#9 Property tests**. `internal/llm/property_test.go`
+  pins the behaviour of the LLM registry, the instrumented
+  middleware, the retry loop, and the fallback chain under
+  arbitrary inputs. `internal/bandit/property_test.go` pins
+  the Thompson Sampling selector's draw distribution.
+- **#10 Coverage / domain / lint gates**. CI runs
+  `scripts/check-coverage.sh` with per-package floors
+  (domain ≥ 50%, infra ≥ 40%, api handlers ≥ 60%) on top of
+  the global 60% floor; `make lint-domain` (AST walker,
+  fails on package-level mutable state) and `make lint-deps`
+  (shell, fails on infra imports from domain packages) are
+  wired into the lint job.
+- **#11 Metrics run ID**. `internal/metrics.collector`
+  exposes `promptsheon_bandit_current_run_info{run_id=…}`
+  via the `CurrentRunID` field on `BanditMetrics`; the run
+  ID is generated at daemon boot and propagates through
+  `bandsession.Session.RunID()`.
+- **#12 Benchmark gate**. `make bench` is the canonical
+  eight-benchmark Go target; `scripts/benchmarks.txt` is
+  the canonical list; `bench-nightly.yaml` runs the same
+  set nightly + on `workflow_dispatch`. The p99 latency
+  gate is the existing k6 scenario, not Go's `testing.B`.
+- **#13 KMS rotate**. The KMS-backed `KeyProvider` persists
+  the wrapped data key (`CiphertextBlob`) on first use and
+  re-reads it on cache miss via `KMSClient.Decrypt`. On
+  rotation the wrapped blob changes, the LRU key changes,
+  and the next read decrypts the new blob. Migration
+  `009_vault_state.up.sql` creates the singleton
+  `vault_state` table.
+- **#14 Docs site**. `docs-site/book.toml` (new location)
+  builds an mdBook site from the existing `docs/` prose;
+  `docs-site.yaml` workflow deploys it to GitHub Pages.
+- **#15 Release pipeline**. cosign keyless signing via
+  `sigstore/cosign-installer`; GitHub artifact attestations
+  via `actions/attest-build-provenance`; GHCR push via
+  `docker/login-action` + GoReleaser `docker_images`; SBOM
+  attachment (syft → `dist/sbom/` → goreleaser
+  `extra_files` → release archive).
+
+Release pipeline + release hygiene:
+
+- `make docs-check` (DOC-CI-3 / DOC-FRESH-1) — see above.
+- `make bench` — curated Go benchmark target.
+- `docs-site/book.toml` — mdBook site that reuses
+  `docs/` as its source.
+- `.github/workflows/docs-site.yaml` — build + Pages deploy.
+- `.github/workflows/bench-nightly.yaml` — nightly + manual
+  Go-benchmark + k6 run.
+- `tla/audit_chain.tla` + `tla/audit_chain.cfg` + `tla/README.md`.
+- `scripts/docs-check.sh`, `scripts/benchmarks.txt`.
+- `docs/research/crdt-idempotency-cache.md`,
+  `docs/research/replay-set-crdt.md`,
+  `docs/research/thompson-sampling-bayesian.md`,
+  `docs/research/tla-audit-chain.md`.
+
+### Changed
+
+- `.goreleaser.yml`: duplicate `release:` block collapsed;
+  SBOM `.sig` / `.pem` `extra_files` globs dropped (those
+  files are never produced — the `signs:` block signs
+  archives and the checksum next to themselves); `signs:`
+  block no longer requires `COSIGN_EXPERIMENTAL=1` (cosign
+  v2+); SBOM `.json` globs retained as the only
+  `extra_files` that actually exist post-build.
+- `.github/workflows/ci.yaml` `build-release` job: explicit
+  `permissions: contents: write, packages: write, id-token:
+  write, attestations: write`; `docker/login-action` step
+  for `ghcr.io`; `sigstore/cosign-installer@v4` (pinned
+  `v2.x`) before GoReleaser; SLSA-as-step replaced with
+  `actions/attest-build-provenance@v1` (the supported
+  artifact-attest action); attestation `subject-path`
+  corrected to the actual `dist/...` paths GoReleaser emits.
+- `scripts/sync-version.sh`: now synchronises the openapi
+  `info.version` comment prose (`Version 0.1.0 ...`) as
+  well as the literal `version` field; added
+  `sdk/python/pyproject.toml` and the Helm chart's
+  `appVersion` (in addition to `version`) so the SDK and
+  chart can never drift from `VERSION`.
+- `docs/adr/README.md`: removed pointer rows to ADRs that
+  never landed (DOC-9b follow-up).
+- `docs/design-decisions.md`: fixed broken link to ADR.
+- `docs/multi-region.md`: fixed broken link to ADR.
+- `Makefile`: `help` target now lists `docs-check`, `bench`,
+  and `docs-site`.
+
+## [0.1.x] - Production-readiness hardening
+
+The v0.1.x audit + remediation pass. Highlights:
 
 - **Migration numbering 028–040**: the gap is a numbering mistake,
   not a reserved block. Future migrations continue from 060
@@ -184,7 +416,7 @@ them.
   `pending` (no supersede + activate happens).
 - **`feat(api):` eight new HTTP routes** — `/datasets`,
   `/preconditions`, `/evals` under `/api/v1`.
-- **`feat(daemon):` wire harness service into promptsheond startup**.
+- **`feat(daemon):` wire harness service into promptsheond startup`.
   `apiReleaseInvoker` adapts `invoke.Invoker` for the eval loop
   so eval cases use the same provider wiring as the live
   `/releases/{id}/invoke` route.
@@ -201,9 +433,9 @@ them.
 - **`README:` Harness engineering section** with the curl-style
   iteration loop.
 
-## [Unreleased]
+## [0.1.0] - 2026-07-10
 
-### Release + Approval lifecycle (v0.1.0)
+### Release + Approval lifecycle
 
 The headline v0.1.0 feature: a Capability Version can be promoted
 to a Release in a target Environment via the new
@@ -251,7 +483,7 @@ governing activation.
 - **`feat(cli):` release subcommand** — `promptsheon release
   <list|create|get|vote|activate|rollback|invoke|approval>`.
 
-### LLM SDK migration (v0.1.0)
+### LLM SDK migration
 
 The hand-rolled OpenAI and Anthropic HTTP clients are replaced by
 their official SDKs. Ollama, Azure OpenAI, and NVIDIA NIM are
@@ -262,63 +494,7 @@ removed.
 - **`chore(llm):` drop Azure / Ollama / NVIDIA NIM providers**.
 - **`chore(llm):` remove Ollama pricing entries** in `PricingTable`.
 
-### Codebase cleanup (this pass)
-
-- **`refactor(testutil):` `NewManifest` helper** — shared capability
-  manifest fixture.
-- **`refactor(release):` consume `testdata.NewManifest`** in unit
-  tests.
-- **`fix(release):` transactional Activate** — Repository gains
-  `ActivateAtomic(prior, next)`. New round-trip + rollback test.
-- **`feat(release):` Service interface compliance assertion** —
-  catches signature drift.
-- **`refactor(llm):` provider compliance assertions + drop
-  redundant `providerAnthropic` const**.
-- **`refactor(store):` drop `CapabilityExists` + unused-import
-  workarounds**.
-- **`refactor(api):` hoist `auditKeyName` / `auditKeyStatus` /
-  `auditKeyVersion` to `middleware.go`**.
-- **`chore(cmd):` drop `approval.Approve` unused-import workaround**.
-- **`feat(cli):` split `cmd/promptsheon/main.go` into
-  `cas.go` + `http.go`** — main.go drops from 1274 to 513 lines.
-- **`docs(examples):` remove `sampleHash` dead reference**.
-
-### SQLite-only (forward-only)
-
-- **`chore(store):` delete `internal/store/postgres`** (the Postgres
-  backend was half-implemented against the new release/approval
-  aggregates and would not satisfy `store.Repository`).
-- **`chore(store):` delete `internal/store/migrations/postgres`**.
-- **`chore(banditstore):` delete `internal/banditstore/postgres`**.
-- **`chore(config):` drop `DBBackend` / `DBDSN`** fields and the
-  `PROMPTSHEON_DB_BACKEND` / `PROMPTSHEON_DB_DSN` env lookups.
-- **`docs:` delete `docs/adr/0015-postgres-backend-with-rls.md`**.
-
-### SDK path fixes
-
-- **`fix(sdk/python):` `/v1/` → `/api/v1/`** so the Python client
-  hits the actual server routes.
-- **`fix(sdk/typescript):` `/v1/` → `/api/v1/` + regenerate
-  `openapi.ts` placeholder.
-
-### Documentation
-
-- **`docs:` rewrite `docs/sdk.md`** for the three SDKs (Go, Python,
-  TypeScript).
-- **`docs:` rewrite `docs/llm-providers.md`** for the Anthropic +
-  OpenAI pair.
-- **`docs:` add `docs/release.md`** — Capability → Release lifecycle
-  walkthrough with curl and Go SDK examples.
-- **`docs:` extend `docs/api-reference.md`** with the seven release
-  routes.
-- **`docs:` fix README quickstart + config table** — the curl
-  sequence was using the legacy `POST /releases/{id}/approve`
-  route and a non-existent `sdk.NewClient(sdk.Config{...})`
-  constructor.
-
-## [Unreleased]
-
-### Re-review closure (F-18, F-19, F-20 follow-on after v0.1.0)
+### Re-review closure (F-18, F-19, F-20)
 
 The Engineering Completion Protocol's "Final Verification" step
 ran an independent re-review of the v0.1.0 tree. The
@@ -375,7 +551,61 @@ ensemble, Federation, Marketplace, on-prem appliance. Each lands
 in its own milestone; none requires a backwards-compat codepath
 because v0.1.0 is the baseline.
 
-## M3 follow-on closure (F-22, F-23)
+### Codebase cleanup
+
+- **`refactor(testutil):` `NewManifest` helper** — shared capability
+  manifest fixture.
+- **`refactor(release):` consume `testdata.NewManifest`** in unit
+  tests.
+- **`fix(release):` transactional Activate** — Repository gains
+  `ActivateAtomic(prior, next)`. New round-trip + rollback test.
+- **`feat(release):` Service interface compliance assertion** —
+  catches signature drift.
+- **`refactor(llm):` provider compliance assertions + drop
+  redundant `providerAnthropic` const**.
+- **`refactor(store):` drop `CapabilityExists` + unused-import
+  workarounds**.
+- **`refactor(api):` hoist `auditKeyName` / `auditKeyStatus` /
+  `auditKeyVersion` to `middleware.go`**.
+- **`chore(cmd):` drop `approval.Approve` unused-import workaround**.
+- **`feat(cli):` split `cmd/promptsheon/main.go` into
+  `cas.go` + `http.go`** — main.go drops from 1274 to 513 lines.
+- **`docs(examples):` remove `sampleHash` dead reference**.
+
+### SQLite-only (forward-only)
+
+- **`chore(store):` delete `internal/store/postgres`** (the Postgres
+  backend was half-implemented against the new release/approval
+  aggregates and would not satisfy `store.Repository`).
+- **`chore(store):` delete `internal/store/migrations/postgres`**.
+- **`chore(banditstore):` delete `internal/banditstore/postgres`**.
+- **`chore(config):` drop `DBBackend` / `DBDSN`** fields and the
+  `PROMPTSHEON_DB_BACKEND` / `PROMPTSHEON_DB_DSN` env lookups.
+- **`docs:` delete `docs/adr/0015-postgres-backend-with-rls.md`**.
+
+### SDK path fixes
+
+- **`fix(sdk/python):` `/v1/` → `/api/v1/`** so the Python client
+  hits the actual server routes.
+- **`fix(sdk/typescript):` `/v1/` → `/api/v1/` + regenerate
+  `openapi.ts` placeholder**.
+
+### Documentation
+
+- **`docs:` rewrite `docs/sdk.md`** for the three SDKs (Go, Python,
+  TypeScript).
+- **`docs:` rewrite `docs/llm-providers.md`** for the Anthropic +
+  OpenAI pair.
+- **`docs:` add `docs/release.md`** — Capability → Release lifecycle
+  walkthrough with curl and Go SDK examples.
+- **`docs:` extend `docs/api-reference.md`** with the seven release
+  routes.
+- **`docs:` fix README quickstart + config table** — the curl
+  sequence was using the legacy `POST /releases/{id}/approve`
+  route and a non-existent `sdk.NewClient(sdk.Config{...})`
+  constructor.
+
+### M3 follow-on closure (F-22, F-23)
 
 After the v0.1.0 forward-only closure, the M3 follow-on series
 shipped four additional atomic commits:
@@ -397,7 +627,7 @@ shipped four additional atomic commits:
   pb.go stubs and replaces `rpc.Dial` with `grpc.Dial` at the
   supervisor's subprocess call sites.
 - **F-23 ADR** `docs(adr): record 0025 — pluginproto gRPC
-  contract scaffold`. Documents the wire format and the M3.5
+  contract scaffold**. Documents the wire format and the M3.5
   migration path. The .proto file is the canonical source of
   truth; generated pb.go is M3.5 follow-on.
 
@@ -423,8 +653,6 @@ codegen is the next milestone per ADR-0019; the LLM-judge
 ensemble, Federation, Marketplace, and on-prem appliance are
 M4+ follow-on work, each with its own forward-only commit
 series.
-
-## [0.1.0] - 2026-07-10
 
 ### Changed (forward-only breaking)
 
@@ -488,9 +716,13 @@ Last release that supports the legacy bundle model. v0.1.0 is a
 breaking semver bump per the charter's "forward only" principle.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.0.5 - Tier 2 follow-on] - 2026-06-26
 
-### Added
+The Tier 2 follow-on series landed four passes of new
+primitives, examples, and wiring on top of the v0.0.5 baseline.
+Highlights:
+
+### Added (pass 1)
 
 - **Recommendation loop end-to-end (Tier 1.04).** New
   `internal/observation.Aggregator` rolls `ExecutionRecord`

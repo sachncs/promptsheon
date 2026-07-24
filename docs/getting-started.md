@@ -14,7 +14,7 @@ go build -o promptsheon  ./cmd/promptsheon
 go build -o promptsheon-healthcheck ./cmd/promptsheon-healthcheck
 ```
 
-Requirements: Go 1.26+ (see `go.mod`). v0.1.x is SQLite-only; no
+Requirements: Go 1.26+ (see `go.mod`). v0.2.0 is SQLite-only by design; no
 external database is required.
 
 ## 2. Configure environment
@@ -45,7 +45,7 @@ plugin-manifest status on boot. The first run creates
 
 ```bash
 curl http://localhost:8080/health
-# {"status":"healthy","version":"0.1.0","uptime":"..."}
+# {"status":"healthy","version":"0.2.0","uptime":"..."}
 
 curl http://localhost:8080/ready
 # {"status":"ready","go":"go1.26.x","database":"ok"}

@@ -79,7 +79,7 @@ The daemon emits `promptsheon_*` metrics under the
 | `promptsheon_audit_dropped_total` | counter | Entries dropped because the worker queue was full. |
 | `promptsheon_audit_queue_latency_seconds` | histogram | Time between `audit()` and DB write. |
 | `promptsheon_audit_chain_verifications_total` | counter | Increments on every `/audit/verify` call. |
-| `promptsheon_trace_dropped_total` | counter | Spans dropped (currently 0 in v0.1.x; reserved). |
+| `promptsheon_trace_dropped_total` | counter | Spans dropped (currently 0 in v0.2.0; reserved). |
 | `promptsheon_log_hub_drops_total` | counter | SSE log stream drops. |
 
 ### Workflow

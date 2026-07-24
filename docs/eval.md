@@ -53,7 +53,7 @@ the case's `EvalResult.Error` field and the case is marked
 
 ## Scorers
 
-v0.1.x ships four scorers. Each is registered in
+v0.2.0 ships four scorers. Each is registered in
 `internal/eval` and discoverable via `eval.ValidScorers`:
 
 | Scorer | Behaviour |
@@ -100,7 +100,7 @@ ignored.
 
 ## Serial execution
 
-v0.1.x runs cases serially. Each case invokes the Release
+v0.2.0 runs cases serially. Each case invokes the Release
 through the configured LLM provider; the next case doesn't
 start until the previous finishes. Parallel execution
 ships in a follow-on.

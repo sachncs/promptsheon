@@ -95,7 +95,7 @@ the migration timeline, and the integration boundaries.
 ## Migrations
 
 The store schema is versioned by `internal/store/migrations/*.up.sql`
-files. Migrations 001 through 013 ship in v0.1.x:
+files. Migrations 001 through 013 ship in v0.2.0:
 
 | # | Name | Purpose |
 |---|------|---------|
@@ -119,7 +119,7 @@ To add a new migration, drop a `014_your_migration.up.sql` (and a
 
 ## Storage backends
 
-v0.1.x is **SQLite-only**. The Postgres backend was removed in
+v0.2.0 is **SQLite-only**. The Postgres backend was removed in
 v0.1.0 — operators who need it can drop in a Postgres
 implementation by satisfying the `store.Repository` interface
 in `internal/store/repo.go`. The repository abstraction lives
@@ -130,7 +130,7 @@ domain packages.
 ## Provider registry
 
 `internal/llm/Registry` is the consumer-defined provider
-registry. v0.1.x ships with **OpenAI** and **Anthropic**. Azure
+registry. v0.2.0 ships with **OpenAI** and **Anthropic**. Azure
 OpenAI, Ollama, and NVIDIA NIM were removed in v0.1.0. To add
 a new provider, register a factory on the `Registry` at
 process startup:
@@ -151,7 +151,7 @@ implementing that interface is all that's required.
 `internal/pluginsup` ties the plugin manifest to the
 `internal/supervisor.Supervisor` lifecycle. A manifest entry
 with a `binary:` line produces a `subprocess.Binary` (the
-v0.1.x production transport: net/rpc over UDS); a manifest
+v0.2.0 production transport: net/rpc over UDS); a manifest
 entry without a binary line is a pure registration entry that
 fails closed (`Remote.Start/Health` return
 `errRemoteNotConfigured`) so operators see the gap in

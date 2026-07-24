@@ -95,7 +95,7 @@ aggregate.
 
 ## Scorer
 
-The scoring strategy. v0.1.x ships:
+The scoring strategy. v0.2.0 ships:
 - `exact_match`
 - `contains`
 - `regex`

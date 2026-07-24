@@ -30,7 +30,7 @@ on every authenticated endpoint. The OpenAPI spec lists the
 permission required for each route; the SDK and CLI pass
 those permissions through the key's role.
 
-Three roles ship in v0.1.x:
+Three roles ship in v0.2.0:
 
 | Role | Permissions |
 |------|-------------|
@@ -120,7 +120,7 @@ The validation runs at registration AND at delivery time.
 
 ## Guardrails
 
-Two built-in Guardrails ship in v0.1.x:
+Two built-in Guardrails ship in v0.2.0:
 
 - `internal/redactor` — strips PII patterns (emails, US SSNs,
   phone numbers, etc.) at the pre-LLM and post-LLM boundaries.

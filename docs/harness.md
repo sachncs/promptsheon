@@ -105,7 +105,7 @@ are persisted alongside the aggregate.
 
 ## Scorers
 
-v0.1.x ships four scorers:
+v0.2.0 ships four scorers:
 
 | Scorer | Behaviour |
 |--------|-----------|
