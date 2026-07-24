@@ -808,6 +808,26 @@ func TestMain_WithVaultKey(t *testing.T) {
 	}
 }
 
+// TestMain_WiresReleaseResolver pins QW#3: the production main.go
+// must call WithReleaseResolver so the live release invoke path
+// uses the manifest's Model + Provider, not request-supplied
+// defaults. The previous "default / default" bypass path was
+// shipped silently; this test fails if either the call site or
+// the option disappears.
+func TestMain_WiresReleaseResolver(t *testing.T) {
+	src, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatalf("read main.go: %v", err)
+	}
+	contents := string(src)
+	if !strings.Contains(contents, "WithReleaseResolver(resolver)") {
+		t.Error("main.go must call api.WithReleaseResolver(resolver) so live /releases/{id}/invoke uses the manifest plan")
+	}
+	if !strings.Contains(contents, "release.NewResolver(") {
+		t.Error("main.go must construct release.NewResolver(...) so the live path closes the gap between approved release and actual invocation")
+	}
+}
+
 func TestMain_WithCORSOrigins(t *testing.T) {
 	origArgs := os.Args
 	origCL := flag.CommandLine
