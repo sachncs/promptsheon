@@ -81,13 +81,13 @@ type Event struct {
 
 // Endpoint represents a configured webhook destination.
 type Endpoint struct {
-	ID              string      `json:"id"`
-	URL             string      `json:"url"`
-	Secret          string      `json:"-"` // in-memory only; ciphertext is in SecretCiphertext
-	SecretCiphertext []byte     `json:"-"`
-	Events          []EventType `json:"events"`
-	Active          bool        `json:"active"`
-	CreatedAt       time.Time   `json:"created_at"`
+	ID               string      `json:"id"`
+	URL              string      `json:"url"`
+	Secret           string      `json:"-"` // in-memory only; ciphertext is in SecretCiphertext
+	SecretCiphertext []byte      `json:"-"`
+	Events           []EventType `json:"events"`
+	Active           bool        `json:"active"`
+	CreatedAt        time.Time   `json:"created_at"`
 }
 
 // Delivery records the outcome of a webhook delivery attempt.

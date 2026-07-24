@@ -22,7 +22,7 @@ func makeTest(id string) *experiment.Test {
 }
 
 func TestCreateTest(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 
 	test := &experiment.Test{
 		ID:       "test1",
@@ -54,7 +54,7 @@ func TestCreateTest(t *testing.T) {
 }
 
 func TestCreateTestInvalidTraffic(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 
 	test := &experiment.Test{
 		ID:       "test1",
@@ -73,7 +73,7 @@ func TestCreateTestInvalidTraffic(t *testing.T) {
 }
 
 func TestSelectVariant(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 
 	test := &experiment.Test{
 		ID:       "test1",
@@ -104,7 +104,7 @@ func TestSelectVariant(t *testing.T) {
 }
 
 func TestRecordResult(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 
 	test := &experiment.Test{
 		ID:       "test1",
@@ -144,7 +144,7 @@ func TestRecordResult(t *testing.T) {
 }
 
 func TestStopTest(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 
 	test := &experiment.Test{
 		ID:       "test1",
@@ -165,7 +165,7 @@ func TestStopTest(t *testing.T) {
 }
 
 func TestListTests(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 
 	_ = engine.CreateTest(&experiment.Test{
 		ID:       "test1",
@@ -188,7 +188,7 @@ func TestListTests(t *testing.T) {
 }
 
 func TestCreateTestDuplicateID(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 	_ = engine.CreateTest(makeTest("dup"))
 	err := engine.CreateTest(makeTest("dup"))
 	if err == nil {
@@ -197,7 +197,7 @@ func TestCreateTestDuplicateID(t *testing.T) {
 }
 
 func TestGetTestNotFound(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 	_, err := engine.GetTest("nonexistent")
 	if err == nil {
 		t.Fatal("expected error for nonexistent test")
@@ -205,7 +205,7 @@ func TestGetTestNotFound(t *testing.T) {
 }
 
 func TestStopTestNotFound(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 	err := engine.StopTest("nonexistent")
 	if err == nil {
 		t.Fatal("expected error for nonexistent test")
@@ -213,7 +213,7 @@ func TestStopTestNotFound(t *testing.T) {
 }
 
 func TestSelectVariantNotFound(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 	_, err := engine.SelectVariant("nonexistent")
 	if err == nil {
 		t.Fatal("expected error for nonexistent test")
@@ -221,7 +221,7 @@ func TestSelectVariantNotFound(t *testing.T) {
 }
 
 func TestSelectVariantNotRunning(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 	_ = engine.CreateTest(makeTest("stopped"))
 	_ = engine.StopTest("stopped")
 	_, err := engine.SelectVariant("stopped")
@@ -231,7 +231,7 @@ func TestSelectVariantNotRunning(t *testing.T) {
 }
 
 func TestRecordResultMixedSuccessAndFailure(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 	test := &experiment.Test{
 		ID:       "mixed",
 		Name:     "Mixed",
@@ -271,14 +271,14 @@ func TestRecordResultMixedSuccessAndFailure(t *testing.T) {
 }
 
 func TestRecordResultNonexistentVariant(_ *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 	_ = engine.CreateTest(makeTest("rrtest"))
 	// Should not panic or error
 	engine.RecordResult("rrtest", "nonexistent", true, experiment.ResultMetrics{LatencyMs: 100, Tokens: 50, Cost: 0.001})
 }
 
 func TestGetResultsLatencyCriteria(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 
 	test := &experiment.Test{
 		ID:       "lat-test",
@@ -317,7 +317,7 @@ func TestGetResultsLatencyCriteria(t *testing.T) {
 }
 
 func TestGetResultsCostCriteria(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 
 	test := &experiment.Test{
 		ID:       "cost-test",
@@ -347,7 +347,7 @@ func TestGetResultsCostCriteria(t *testing.T) {
 }
 
 func TestGetResultsSuccessRateCriteria(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 
 	test := &experiment.Test{
 		ID:       "sr-test",
@@ -386,7 +386,7 @@ func TestGetResultsSuccessRateCriteria(t *testing.T) {
 }
 
 func TestGetResultsConfidenceClamped(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 
 	test := &experiment.Test{
 		ID:       "conf-test",
@@ -416,7 +416,7 @@ func TestGetResultsConfidenceClamped(t *testing.T) {
 }
 
 func TestSelectVariantFallback(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 
 	// Test with a single variant at 100% traffic to exercise the fallback path
 	test := &experiment.Test{
@@ -439,7 +439,7 @@ func TestSelectVariantFallback(t *testing.T) {
 }
 
 func TestCreateTestWeights(t *testing.T) {
-	engine := experiment.NewEngine(nil)
+	engine := experiment.NewEngine()
 
 	test := &experiment.Test{
 		ID:       "weight-test",

@@ -73,7 +73,7 @@ func (f LogFilter) matches(entry *LogEntry) bool {
 
 // HubStore is the persistence surface the Hub needs for
 // OBS-LOG-3 (nextID restart-resilience). It matches a subset of
-// store.Repository methods so tests don't have to satisfy the
+// store repositories methods so tests don't have to satisfy the
 // full Repository interface.
 type HubStore interface {
 	GetWSNextID(ctx context.Context) (int64, error)

@@ -18,10 +18,10 @@ import (
 	"log/slog"
 	"net"
 	"os"
-
-	"gopkg.in/yaml.v3"
 	"strconv"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Config holds all configuration for the server.
@@ -165,16 +165,11 @@ func DefaultConfig() Config {
 // any field the operator sets in the shell. The file format is
 // the same flat struct as Config — the YAML keys match the Go
 // field names exactly.
-func LoadConfig() Config {
+func LoadConfig() (Config, error) {
 	cfg := DefaultConfig()
 	if path := os.Getenv("PROMPTSHEON_CONFIG"); path != "" {
 		if err := loadYAMLFile(&cfg, path); err != nil {
-			// The file is required when PROMPTSHEON_CONFIG is set
-			// (the operator set it expecting a config); a missing
-			// or malformed file is a deployment error, not a
-			// soft fallback. Fail fast.
-			fmt.Fprintf(os.Stderr, "config: failed to load %q: %v\n", path, err)
-			os.Exit(1)
+			return Config{}, fmt.Errorf("config: failed to load %q: %w", path, err)
 		}
 	}
 
@@ -242,7 +237,7 @@ func LoadConfig() Config {
 	cfg.ReadOnly = getEnvBool("PROMPTSHEON_READ_ONLY", cfg.ReadOnly)
 
 	sanitizeConfig(&cfg)
-	return cfg
+	return cfg, nil
 }
 
 func getEnvString(key, defaultVal string) string {

@@ -15,12 +15,12 @@ func TestParseSampleRatio(t *testing.T) {
 		env  string
 		want float64
 	}{
-		{"", 1.0},          // unset → full sample
-		{"0.05", 0.05},     // standard 5%
-		{"0.5", 0.5},       // 50%
-		{"1.0", 1.0},       // explicit 100%
-		{"-0.1", 0.0},      // negative → clamp to 0
-		{"1.5", 1.0},       // >1 → clamp to 1
+		{"", 1.0},            // unset → full sample
+		{"0.05", 0.05},       // standard 5%
+		{"0.5", 0.5},         // 50%
+		{"1.0", 1.0},         // explicit 100%
+		{"-0.1", 0.0},        // negative → clamp to 0
+		{"1.5", 1.0},         // >1 → clamp to 1
 		{"not-a-float", 1.0}, // garbage → default
 	}
 	for _, c := range cases {

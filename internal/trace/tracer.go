@@ -209,7 +209,7 @@ func (noopTracer) StartChild(_ context.Context, parent *Span, operation string) 
 	}
 	return &Span{ID: "noop-child", TraceID: parent.TraceID, ParentID: parent.ID, StartedAt: time.Now()}
 }
-func (noopTracer) Finish(_ *Span) error { return nil }
+func (noopTracer) Finish(_ *Span) error          { return nil }
 func (noopTracer) Flush(_ context.Context) error { return nil }
 
 // Avoid unused-import lint when the package compiles without

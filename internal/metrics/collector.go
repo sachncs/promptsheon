@@ -177,11 +177,11 @@ type Collector struct {
 	// queries; the prior implementation created a single
 	// `promptsheon_eval_cases_total` counter with a `result`
 	// label that was never attached, so the alert never fired.
-	EvalRunsTotal      *Counter
-	EvalCasesTotal     *Counter
-	EvalCasesPassed    *Counter
-	EvalCasesFailed    *Counter
-	EvalDuration       *Histogram
+	EvalRunsTotal   *Counter
+	EvalCasesTotal  *Counter
+	EvalCasesPassed *Counter
+	EvalCasesFailed *Counter
+	EvalDuration    *Histogram
 
 	// Audit-chain verifications. Incremented on every
 	// VerifyAuditChain call from handlers_audit.go and the
@@ -236,6 +236,10 @@ type Collector struct {
 	// reads its current drop count on every scrape so the
 	// counter stays accurate without a sync loop.
 	hub HubDropper
+
+	banditSelections atomic.Int64
+	banditMu         sync.Mutex
+	banditRunID      string
 }
 
 // HubDropper is the subset of *ws.Hub the metrics collector
@@ -247,6 +251,14 @@ type HubDropper interface {
 // SetLogHub wires the live SSE hub into the collector so the
 // Prometheus scrape can read the cumulative drop count. OBS-LOG-2.
 func (c *Collector) SetLogHub(h HubDropper) { c.hub = h }
+
+// RecordBanditSelection records one selection and replaces the current run marker.
+func (c *Collector) RecordBanditSelection(runID string) {
+	c.banditSelections.Add(1)
+	c.banditMu.Lock()
+	c.banditRunID = runID
+	c.banditMu.Unlock()
+}
 
 // ObserveAuditQueue records a single audit-queue latency
 // observation in seconds. Called by the audit worker once the
@@ -320,37 +332,37 @@ func (g *Gauge) Value() float64 { g.mu.Lock(); defer g.mu.Unlock(); return g.val
 // NewCollector creates a new metrics collector.
 func NewCollector() *Collector {
 	return &Collector{
-		RequestsTotal:         newCounter(nil),
-		RequestDuration:       newHistogram(nil),
-		ErrorsTotal:           newCounter(nil),
-		LLMCallsTotal:         newCounter(nil),
-		LLMLatency:            newHistogram(nil),
-		LLMTokensTotal:        newCounter(nil),
-		LLMInputTokens:        newCounter(nil),
-		LLMOutputTokens:       newCounter(nil),
-		LLMCostUSD:            newCounter(nil),
-		LLMTTFT:               newHistogram(nil),
-		EvalRunsTotal:         newCounter(nil),
-		EvalCasesTotal:        newCounter(nil),
-		EvalCasesPassed:       newCounter(nil),
-		EvalCasesFailed:       newCounter(nil),
-		EvalDuration:          newHistogram(nil),
+		RequestsTotal:           newCounter(nil),
+		RequestDuration:         newHistogram(nil),
+		ErrorsTotal:             newCounter(nil),
+		LLMCallsTotal:           newCounter(nil),
+		LLMLatency:              newHistogram(nil),
+		LLMTokensTotal:          newCounter(nil),
+		LLMInputTokens:          newCounter(nil),
+		LLMOutputTokens:         newCounter(nil),
+		LLMCostUSD:              newCounter(nil),
+		LLMTTFT:                 newHistogram(nil),
+		EvalRunsTotal:           newCounter(nil),
+		EvalCasesTotal:          newCounter(nil),
+		EvalCasesPassed:         newCounter(nil),
+		EvalCasesFailed:         newCounter(nil),
+		EvalDuration:            newHistogram(nil),
 		AuditChainVerifications: newCounter(nil),
-		WorkflowRunsTotal:     newCounter(nil),
-		WorkflowDuration:      newHistogram(nil),
-		WorkflowActive:        &Gauge{},
-		ReviewPendingCount:    &Gauge{},
-		ReviewTotalCount:      newCounter(nil),
-		ReviewApprovedCount:   newCounter(nil),
-		ReviewRejectedCount:   newCounter(nil),
-		ReviewDuration:        newHistogram(nil),
-		GuardrailViolations:   newCounter(nil),
-		GuardrailBlocks:       newCounter(nil),
-		GuardrailPasses:       newCounter(nil),
-		AgentExecutionsTotal:  newCounter(nil),
-		AgentExecutionLatency: newHistogram(nil),
-		HallucinationScores:   newHistogram(nil),
-		AuditQueueLatency:     newHistogram(nil),
+		WorkflowRunsTotal:       newCounter(nil),
+		WorkflowDuration:        newHistogram(nil),
+		WorkflowActive:          &Gauge{},
+		ReviewPendingCount:      &Gauge{},
+		ReviewTotalCount:        newCounter(nil),
+		ReviewApprovedCount:     newCounter(nil),
+		ReviewRejectedCount:     newCounter(nil),
+		ReviewDuration:          newHistogram(nil),
+		GuardrailViolations:     newCounter(nil),
+		GuardrailBlocks:         newCounter(nil),
+		GuardrailPasses:         newCounter(nil),
+		AgentExecutionsTotal:    newCounter(nil),
+		AgentExecutionLatency:   newHistogram(nil),
+		HallucinationScores:     newHistogram(nil),
+		AuditQueueLatency:       newHistogram(nil),
 	}
 }
 
@@ -381,12 +393,12 @@ type Summary struct {
 	// receives them via SetAuditDropped / SetTraceDropped so the
 	// values surface in /metrics and /api/v1/metrics/summary.
 	PipelineMetrics struct {
-		AuditDropped        int64   `json:"audit_dropped"`
-		AuditQueueAvgSecs   float64 `json:"audit_queue_avg_secs"`
-		AuditQueueP95Secs   float64 `json:"audit_queue_p95_secs"`
-		AuditQueueP99Secs   float64 `json:"audit_queue_p99_secs"`
-		TraceDropped        int64   `json:"trace_dropped"`
-		LogHubDrops         int64   `json:"log_hub_drops"`
+		AuditDropped      int64   `json:"audit_dropped"`
+		AuditQueueAvgSecs float64 `json:"audit_queue_avg_secs"`
+		AuditQueueP95Secs float64 `json:"audit_queue_p95_secs"`
+		AuditQueueP99Secs float64 `json:"audit_queue_p99_secs"`
+		TraceDropped      int64   `json:"trace_dropped"`
+		LogHubDrops       int64   `json:"log_hub_drops"`
 	} `json:"pipeline_metrics"`
 	LLMMetrics struct {
 		TotalCalls   int64   `json:"total_calls"`
@@ -425,6 +437,10 @@ type Summary struct {
 		AvgScore float64 `json:"avg_score"`
 		P95Score float64 `json:"p95_score"`
 	} `json:"hallucination_metrics"`
+	BanditMetrics struct {
+		SelectionsTotal int64  `json:"selections_total"`
+		CurrentRunID    string `json:"current_run_id"`
+	} `json:"bandit_metrics"`
 }
 
 // GetSummary returns a snapshot of all metrics for the dashboard.
@@ -472,6 +488,10 @@ func (c *Collector) GetSummary() *Summary {
 
 	s.HallucinationMetrics.AvgScore = c.HallucinationScores.Avg()
 	s.HallucinationMetrics.P95Score = c.HallucinationScores.P95()
+	s.BanditMetrics.SelectionsTotal = c.banditSelections.Load()
+	c.banditMu.Lock()
+	s.BanditMetrics.CurrentRunID = c.banditRunID
+	c.banditMu.Unlock()
 
 	// OBS-7 / OBS-1b: surface the audit-pipeline drop and trace-pipeline
 	// drop counts as summary fields so /api/v1/metrics/summary can
@@ -520,6 +540,12 @@ func (c *Collector) prometheusFormat() string {
 	writeCounter("promptsheon_http_requests_total", "Total HTTP requests", c.RequestsTotal.Value())
 	writeHistogram("promptsheon_http_request_duration_seconds", "HTTP request duration", c.RequestDuration)
 	writeCounter("promptsheon_http_errors_total", "Total HTTP errors", c.ErrorsTotal.Value())
+	writeCounter("promptsheon_bandit_selections_total", "Total bandit arm selections", float64(c.banditSelections.Load()))
+	c.banditMu.Lock()
+	if c.banditRunID != "" {
+		fmt.Fprintf(&sb, "# HELP promptsheon_bandit_current_run_info Current bandit run\n# TYPE promptsheon_bandit_current_run_info gauge\npromptsheon_bandit_current_run_info{run_id=\"%s\"} 1\n", c.banditRunID)
+	}
+	c.banditMu.Unlock()
 
 	writeCounter("promptsheon_llm_calls_total", "Total LLM calls", c.LLMCallsTotal.Value())
 	writeHistogram("promptsheon_llm_latency_seconds", "LLM call latency", c.LLMLatency)

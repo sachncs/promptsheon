@@ -696,10 +696,10 @@ func TestHubBroadcastNonBlockingDrops(t *testing.T) {
 
 // fakeHubStore is the minimal HubStore stub for OBS-LOG-3 tests.
 type fakeHubStore struct {
-	mu       sync.Mutex
-	nextID   int64
-	failGet  bool
-	failSet  bool
+	mu      sync.Mutex
+	nextID  int64
+	failGet bool
+	failSet bool
 }
 
 func (f *fakeHubStore) GetWSNextID(_ context.Context) (int64, error) {
