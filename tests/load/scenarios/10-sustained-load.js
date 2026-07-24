@@ -36,15 +36,8 @@ export default function () {
   const operation = Math.random();
   let res;
   
-  if (operation < 0.6) {
-    res = http.get(`${BASE_URL}/api/v1/prompts`, { headers });
-  } else if (operation < 0.8) {
-    const payload = JSON.stringify({
-      name: `sustained-${__VU}-${__ITER}`,
-      content: 'Sustained load test prompt',
-      tags: ['sustained-test'],
-    });
-    res = http.post(`${BASE_URL}/api/v1/prompts`, payload, { headers });
+  if (operation < 0.8) {
+    res = http.get(`${BASE_URL}/api/v1/workspaces`, { headers });
   } else {
     res = http.get(`${BASE_URL}/health`, { headers });
   }

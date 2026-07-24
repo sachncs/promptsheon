@@ -83,11 +83,11 @@ func TestE2E_AuthenticatedLifecycle(t *testing.T) {
 		map[string]any{
 			"version": 1,
 			"manifest": map[string]any{
-				"prompt":          map[string]any{"kind": "prompt", "hash": "a" + strings.Repeat("0", 63)},
-				"model_policy":    map[string]any{"kind": "model_policy", "hash": "b" + strings.Repeat("0", 63)},
-				"runtime_policy":  map[string]any{"kind": "runtime_policy", "hash": "c" + strings.Repeat("0", 63)},
+				"prompt":           map[string]any{"kind": "prompt", "hash": "a" + strings.Repeat("0", 63)},
+				"model_policy":     map[string]any{"kind": "model_policy", "hash": "b" + strings.Repeat("0", 63)},
+				"runtime_policy":   map[string]any{"kind": "runtime_policy", "hash": "c" + strings.Repeat("0", 63)},
 				"context_contract": map[string]any{"kind": "context_contract", "hash": "d" + strings.Repeat("0", 63)},
-				"memory":          map[string]any{"kind": "memory", "hash": "e" + strings.Repeat("0", 63)},
+				"memory":           map[string]any{"kind": "memory", "hash": "e" + strings.Repeat("0", 63)},
 			},
 		}, daemonAPIKey)
 	if err != nil {
