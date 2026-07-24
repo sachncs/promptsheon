@@ -14,6 +14,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/release"
 	"github.com/sachncs/promptsheon/internal/schedule"
+	"github.com/sachncs/promptsheon/internal/settings"
 	"github.com/sachncs/promptsheon/internal/store"
 )
 
@@ -110,6 +111,44 @@ func TestNewSQLiteAndClose(t *testing.T) {
 	}
 	if err := s.Close(); err != nil {
 		t.Errorf("Close: %v", err)
+	}
+}
+
+// TestMergeSystemConfigPersistsWinner pins SETTINGS-CRDT-1: a
+// remote write with a strictly-dominant vector replaces the
+// local row. Without this, multi-replica deployments lose
+// updates from peers because the merge logic never persists
+// the winner.
+func TestMergeSystemConfigPersistsWinner(t *testing.T) {
+	t.Parallel()
+	s := newTestSQLite(t)
+	ctx := context.Background()
+	local := settings.CRDTRecord{
+		Key:           "otel_endpoint",
+		Value:         "http://local",
+		ReplicaID:     "local",
+		VersionVector: map[string]uint64{"local": 1},
+		WriteTS:       100,
+	}
+	if err := s.SetSystemConfig(ctx, local); err != nil {
+		t.Fatalf("set local: %v", err)
+	}
+	remote := settings.CRDTRecord{
+		Key:           "otel_endpoint",
+		Value:         "http://remote",
+		ReplicaID:     "remote",
+		VersionVector: map[string]uint64{"local": 1, "remote": 1},
+		WriteTS:       200,
+	}
+	if err := s.MergeSystemConfig(ctx, "remote", []settings.CRDTRecord{remote}); err != nil {
+		t.Fatalf("merge: %v", err)
+	}
+	got, err := s.GetSystemConfig(ctx, "otel_endpoint")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Value != "http://remote" {
+		t.Errorf("merge winner: got %q, want remote", got.Value)
 	}
 }
 

@@ -1575,6 +1575,11 @@ func (s *SQLite) ListSystemConfig(ctx context.Context) ([]settings.CRDTRecord, e
 	return out, rows.Err()
 }
 
+// TestMergeSystemConfigPersistsWinner (in store_test.go) pins
+// SETTINGS-CRDT-1: a remote write that dominates the local
+// vector must be persisted as the new winner. The merge must
+// not silently drop the remote's updates.
+
 // MergeSystemConfig folds a batch of remote records into the
 // local store. The per-key merge is the LWW semantics in
 // settings.Merge; the resulting record replaces the local row.
