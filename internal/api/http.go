@@ -123,11 +123,6 @@ func httpRequestFromContext(ctx context.Context) *http.Request {
 func ReadOnlyMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if os.Getenv("PROMPTSHEON_READ_ONLY") == "true" && r.Method != http.MethodGet && r.Method != http.MethodHead {
-			// Audit the read-only block: the operator should
-			// know when traffic is being shed.
-			if s, ok := r.Context().Value(httpRequestKey{}).(*http.Request); ok && s != nil {
-				_ = s // currently used only for context extraction
-			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_, _ = w.Write([]byte(`{"error":"daemon is in read-only mode","details":{"reason":"PROMPTSHEON_READ_ONLY=true"}}`))
