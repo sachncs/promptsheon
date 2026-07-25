@@ -25,27 +25,25 @@ their Go-side regression tests in place.
 
 ## v0.4.0
 
-Multi-region + canary + Postgres + CRDT cache.
+Multi-region + canary + gRPC + pgx.
 
 - **Multi-region replication.** Per-region audit chain +
   global Merkle-root checkpoint design. CRDT settings,
   bandit, replay, and idempotency caches already designed in
   `docs/research/`; this milestone lands the multi-region
   backend.
-- **Postgres backend with RLS.** The SQLite-only stance held
-  for v0.2.0; v0.4.0 adds Postgres with per-workspace row
-  level security. ADR-0015 documents the design.
+- **pgx backend.** v0.3.0 ships the schema, RLS policies, and
+  in-memory adapter under `internal/store/postgres/`. v0.4.0
+  replaces the in-memory adapter with a real pgx-backed
+  implementation and adds the `DatabaseURL` config knob.
 - **Canary Release primitive.** `docs/canary.md` already
   exists; v0.4.0 wires the runtime: N% traffic to a new
   Version, atomically superseded on promote.
 - **gRPC plugin transport.** The `.proto` file is committed;
   the runtime swap from net/rpc to gRPC is a v0.4.0 deliverable.
-- **Capability Inheritance.** Manifests compose other
-  Manifests; the unit of reuse is the Capability, not the
-  prompt.
-- **ContinuousEval at scale.** v0.2.0 shipped the harness
-  loop; v0.4.0 ships scheduled ContinuousEval that feeds
-  Observations without operator intervention.
+- **LLM-judge scorer at scale.** v0.3.0 ships the primitive;
+  v0.4.0 ships the production JudgeClient wiring through the
+  LLM gateway, with caching, batching, and SLO observability.
 
 ## v0.5.0
 
@@ -54,22 +52,23 @@ Capability marketplace + reputation as a market signal.
 - **Capability Marketplace.** Signed Manifest packages
   installable cross-Workspace. The signed package format
   mirrors Docker images: name + version + manifest hash +
-  signatures.
+  signatures. The Inheritance primitive (v0.3.0) is the
+  composition unit.
 - **Capability Reputation as a market signal.** Trust score
   ranks Capabilities in the marketplace; reputation is
   transportable across Workspaces (a high-reputation
   Capability from one Workspace is a credible install for
   another).
 - **Recommendation auto-promotion at scale.** v0.3.0 closes
-  the loop; v0.5.0 tunes it: per-Workspace policy tuning,
-  bandit sample-ratio configuration via settings, SLO-driven
-  thresholds.
+  the loop and adds the Reasoning Compiler; v0.5.0 tunes
+  per-Workspace policy, bandit sample-ratio configuration,
+  and SLO-driven thresholds.
 - **OpenTelemetry trace export.** v0.2.0 ships OTLP-only;
   v0.5.0 ships the Trace Visualizer.
 - **Decision audit replay.** Re-derive the system state from
-  the audit chain alone; the harness loop, the bandit, and
-  the recommendation producer are all re-derivable from
-  audit + observations + decisions.
+  the audit chain alone; the harness loop, the bandit, the
+  reasoning compiler, and the recommendation producer are
+  all re-derivable from audit + observations + decisions.
 
 ## v1.0.0
 
