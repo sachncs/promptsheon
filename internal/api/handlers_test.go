@@ -813,6 +813,13 @@ func (m *mockRepo) ListEvalRunsForRelease(_ context.Context, releaseID string) (
 	}
 	return out, nil
 }
+
+func (m *mockRepo) GetActiveReleaseID(_ context.Context, _ string) (string, error) {
+	// Mock returns empty string: no active release; the
+	// ContinuousEval loop is a no-op until production wiring
+	// populates this.
+	return "", nil
+}
 func (m *mockRepo) CreateEvalResults(_ context.Context, results []harness.EvalResult) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

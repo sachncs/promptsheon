@@ -21,8 +21,10 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/sachncs/promptsheon/internal/harness"
+	"github.com/sachncs/promptsheon/internal/release"
 )
 
 // ErrNotFound is returned for any lookup that misses. Tests
@@ -41,6 +43,7 @@ type MemRepo struct {
 	Preconds    map[string]*harness.Precondition
 	EvalRuns    map[string]*harness.EvalRun
 	EvalResults []harness.EvalResult
+	Releases    map[string]*release.Release
 }
 
 // New returns an empty MemRepo ready for use.
@@ -50,6 +53,7 @@ func New() *MemRepo {
 		Cases:    map[string][]harness.DatasetCase{},
 		Preconds: map[string]*harness.Precondition{},
 		EvalRuns: map[string]*harness.EvalRun{},
+		Releases: map[string]*release.Release{},
 	}
 }
 
@@ -216,6 +220,31 @@ func (r *MemRepo) ListEvalRunsForRelease(_ context.Context, releaseID string) ([
 		}
 	}
 	return out, nil
+}
+
+// GetActiveReleaseID returns the most recently activated
+// release id for the capability, or empty string if none.
+func (r *MemRepo) GetActiveReleaseID(_ context.Context, capabilityID string) (string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var latest string
+	var latestAt time.Time
+	for _, rel := range r.Releases {
+		if rel.CapabilityID != capabilityID {
+			continue
+		}
+		if rel.Status != release.StatusActive {
+			continue
+		}
+		if rel.ActivatedAt == nil {
+			continue
+		}
+		if rel.ActivatedAt.After(latestAt) {
+			latestAt = *rel.ActivatedAt
+			latest = rel.ID
+		}
+	}
+	return latest, nil
 }
 
 // ----- EvalResults -----

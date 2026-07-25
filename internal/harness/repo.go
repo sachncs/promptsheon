@@ -28,6 +28,10 @@ type Repository interface {
 	UpdateEvalRun(ctx context.Context, run *EvalRun) error
 	GetEvalRun(ctx context.Context, id string) (*EvalRun, error)
 	ListEvalRunsForRelease(ctx context.Context, releaseID string) ([]*EvalRun, error)
+	// GetActiveReleaseID returns the active Release id for
+	// the given Capability, or empty string if none is active.
+	// ContinuousEval uses this to drive its scheduled runs.
+	GetActiveReleaseID(ctx context.Context, capabilityID string) (string, error)
 
 	// EvalResults.
 	CreateEvalResults(ctx context.Context, results []EvalResult) error
