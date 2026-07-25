@@ -41,8 +41,8 @@ type Func = handlers.Func
 
 // Server holds dependencies and routes for the HTTP API.
 type Server struct {
-	mux              *http.ServeMux
-	db               *store.Repositories
+	mux *http.ServeMux
+	db  *store.Repositories
 	// capabilityRepo2 is the typed CapabilityRepository subset
 	// of the Repositories facade. The handler layer uses it
 	// for SetCapabilityContract / GetCapabilityContract /
