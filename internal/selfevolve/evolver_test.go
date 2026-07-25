@@ -37,7 +37,6 @@ type fakeRepo struct {
 	state          map[string]*store.SelfEvolveState // capabilityID+env → state
 }
 
-type stateBlob = store.SelfEvolveState // local alias for the test
 
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
@@ -254,12 +253,12 @@ func (r *fakeRepo) UpdateSelfEvolveConfig(ctx context.Context, id string, cfg ca
 	r.capabilities[id] = c
 	return nil
 }
-func (r *fakeRepo) LoadSelfEvolveState(ctx context.Context, capabilityID, targetEnv string) (*stateBlob, error) {
+func (r *fakeRepo) LoadSelfEvolveState(ctx context.Context, capabilityID, targetEnv string) (*store.SelfEvolveState, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.state[stateKey(capabilityID, targetEnv)], nil
 }
-func (r *fakeRepo) SaveSelfEvolveState(ctx context.Context, st *stateBlob) error {
+func (r *fakeRepo) SaveSelfEvolveState(ctx context.Context, st *store.SelfEvolveState) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.state[stateKey(st.CapabilityID, st.TargetEnv)] = st
@@ -457,7 +456,7 @@ func (r *fakeRepo) CreateRelease(ctx context.Context, rel ReleaseRecord) error {
 	}
 	return nil
 }
-func (r *fakeRepo) SelfEvolveStateGet(capID, env string) *stateBlob {
+func (r *fakeRepo) SelfEvolveStateGet(capID, env string) *store.SelfEvolveState {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.state[stateKey(capID, env)]
@@ -671,124 +670,12 @@ func (v *fakeValidator) Validate(ctx context.Context, capabilityID string, promp
 	}, nil
 }
 
-// compile-time guard: fakeRepo must satisfy the evolver's
-// Repository. We use an indirection via a small adapter that
-// translates the evolver's store-state types to the fake's
-// internal blob; see fakeStateAdapter.
-var _ Repository = (*fakeStateAdapter)(nil)
-
-// fakeStateAdapter wraps fakeRepo and satisfies the
-// evolver's Repository interface by translating state.
-type fakeStateAdapter struct{ inner *fakeRepo }
-
-func (a *fakeStateAdapter) GetCapability(ctx context.Context, id string) (*capability.Capability, error) {
-	return a.inner.GetCapability(ctx, id)
-}
-func (a *fakeStateAdapter) GetVersion(ctx context.Context, id string) (*capability.Version, error) {
-	return a.inner.GetVersion(ctx, id)
-}
-func (a *fakeStateAdapter) GetVersionByNumber(ctx context.Context, capabilityID string, version int) (*capability.Version, error) {
-	return a.inner.GetVersionByNumber(ctx, capabilityID, version)
-}
-func (a *fakeStateAdapter) CreateVersion(ctx context.Context, v *capability.Version) error {
-	return a.inner.CreateVersion(ctx, v)
-}
-func (a *fakeStateAdapter) UpdateSelfEvolveConfig(ctx context.Context, id string, cfg capability.SelfEvolveConfig) error {
-	return a.inner.UpdateSelfEvolveConfig(ctx, id, cfg)
-}
-func (a *fakeStateAdapter) LoadSelfEvolveState(ctx context.Context, capabilityID, targetEnv string) (*stateBlob, error) {
-	// The evolver's Repository interface uses store.SelfEvolveState
-	// for the return type, but the test fake stores an internal
-	// blob. We deliberately return the internal blob here —
-	// the adapter isn't meant to satisfy the evolver's
-	// Repository directly; tests construct Evolver / Promoter
-	// through helper constructors (see below) that wrap the
-	// adapter with the right type. Returning the internal
-	// blob keeps the adapter's signature independent of the
-	// store type.
-	return a.inner.SelfEvolveStateGet(capabilityID, targetEnv), nil
-}
-func (a *fakeStateAdapter) SaveSelfEvolveState(ctx context.Context, st *stateBlob) error {
-	return a.inner.SaveSelfEvolveState(ctx, st)
-}
-func (a *fakeStateAdapter) CreateDataset(ctx context.Context, d *harness.Dataset) error {
-	return a.inner.CreateDataset(ctx, d)
-}
-func (a *fakeStateAdapter) GetDataset(ctx context.Context, id string) (*harness.Dataset, error) {
-	return a.inner.GetDataset(ctx, id)
-}
-func (a *fakeStateAdapter) ListDatasetsForCapability(ctx context.Context, capabilityID string) ([]*harness.Dataset, error) {
-	return a.inner.ListDatasetsForCapability(ctx, capabilityID)
-}
-func (a *fakeStateAdapter) DeleteDataset(ctx context.Context, id string) error {
-	return a.inner.DeleteDataset(ctx, id)
-}
-func (a *fakeStateAdapter) UpsertDatasetCases(ctx context.Context, datasetID string, cases []harness.DatasetCase) error {
-	return a.inner.UpsertDatasetCases(ctx, datasetID, cases)
-}
-func (a *fakeStateAdapter) ListDatasetCases(ctx context.Context, datasetID string) ([]harness.DatasetCase, error) {
-	return a.inner.ListDatasetCases(ctx, datasetID)
-}
-func (a *fakeStateAdapter) CreatePrecondition(ctx context.Context, p *harness.Precondition) error {
-	return a.inner.CreatePrecondition(ctx, p)
-}
-func (a *fakeStateAdapter) GetPrecondition(ctx context.Context, id string) (*harness.Precondition, error) {
-	return a.inner.GetPrecondition(ctx, id)
-}
-func (a *fakeStateAdapter) ListPreconditionsForCapability(ctx context.Context, capabilityID string) ([]*harness.Precondition, error) {
-	return a.inner.ListPreconditionsForCapability(ctx, capabilityID)
-}
-func (a *fakeStateAdapter) UpdatePrecondition(ctx context.Context, p *harness.Precondition) error {
-	return a.inner.UpdatePrecondition(ctx, p)
-}
-func (a *fakeStateAdapter) DeletePrecondition(ctx context.Context, id string) error {
-	return a.inner.DeletePrecondition(ctx, id)
-}
-func (a *fakeStateAdapter) CreateEvalRun(ctx context.Context, run *harness.EvalRun) error {
-	return a.inner.CreateEvalRun(ctx, run)
-}
-func (a *fakeStateAdapter) UpdateEvalRun(ctx context.Context, run *harness.EvalRun) error {
-	return a.inner.UpdateEvalRun(ctx, run)
-}
-func (a *fakeStateAdapter) GetEvalRun(ctx context.Context, id string) (*harness.EvalRun, error) {
-	return a.inner.GetEvalRun(ctx, id)
-}
-func (a *fakeStateAdapter) ListEvalRunsForRelease(ctx context.Context, releaseID string) ([]*harness.EvalRun, error) {
-	return a.inner.ListEvalRunsForRelease(ctx, releaseID)
-}
-func (a *fakeStateAdapter) GetActiveReleaseID(ctx context.Context, capabilityID string) (string, error) {
-	return a.inner.GetActiveReleaseID(ctx, capabilityID)
-}
-func (a *fakeStateAdapter) CreateEvalResults(ctx context.Context, results []harness.EvalResult) error {
-	return a.inner.CreateEvalResults(ctx, results)
-}
-func (a *fakeStateAdapter) CreateEvalResult(ctx context.Context, result *harness.EvalResult) error {
-	return a.inner.CreateEvalResult(ctx, result)
-}
-func (a *fakeStateAdapter) ListEvalResultsForRun(ctx context.Context, runID string) ([]harness.EvalResult, error) {
-	return a.inner.ListEvalResultsForRun(ctx, runID)
-}
-func (a *fakeStateAdapter) ActiveReleaseID(ctx context.Context, capabilityID, env string) (string, error) {
-	return a.inner.ActiveReleaseID(ctx, capabilityID, env)
-}
-func (a *fakeStateAdapter) GetRelease(ctx context.Context, id string) (*ReleaseRecord, error) {
-	return a.inner.GetRelease(ctx, id)
-}
-func (a *fakeStateAdapter) LastEvalRun(ctx context.Context, releaseID string) (*harness.EvalRun, error) {
-	return a.inner.LastEvalRun(ctx, releaseID)
-}
-func (a *fakeStateAdapter) UpdateReleaseStatus(ctx context.Context, releaseID, status string) error {
-	return a.inner.UpdateReleaseStatus(ctx, releaseID, status)
-}
-func (a *fakeStateAdapter) CreateRelease(ctx context.Context, rel ReleaseRecord) error {
-	return a.inner.CreateRelease(ctx, rel)
-}
 
 // Tests below.
 func TestEvolver_RunOnce_DisabledSkips(t *testing.T) {
 	inner := newFakeRepo()
 	inner.seedCapability("c1", "ds1", "dev", "old prompt")
-	repo := &fakeStateAdapter{inner: inner}
+	repo := inner
 	inner.capabilities["c1"].SelfEvolve.Enabled = false
 	loader := newFakeLoader()
 	ev := NewEvolver(repo, loader, &fakeRevisionLLM{}, &fakeValidator{}, NewPromoter(repo, loader, &fakeActivator{repo: inner}, &fakeAuditor{}), &fakeAuditor{}, nil)
@@ -807,7 +694,7 @@ func TestEvolver_RunOnce_AboveThresholdSkips(t *testing.T) {
 	inner.seedDataset("ds1", []harness.DatasetCase{{ID: "c1", DatasetID: "ds1", Seq: 0, Inputs: json.RawMessage(`{}`), Expected: json.RawMessage(`"x"`)}})
 	rel := inner.activeReleaseID("c1", "dev")
 	inner.recordEvalRun(rel, 3, 0, false) // 3/3 = 1.0
-	repo := &fakeStateAdapter{inner: inner}
+	repo := inner
 	loader := newFakeLoader()
 	loader.seed(inner.versionsByCap["c1"][0].Manifest.Prompt.Hash, "old prompt")
 	ev := NewEvolver(repo, loader, &fakeRevisionLLM{}, &fakeValidator{score: 1.0}, NewPromoter(repo, loader, &fakeActivator{repo: inner}, &fakeAuditor{}), &fakeAuditor{}, nil)
@@ -835,7 +722,7 @@ func TestEvolver_RunOnce_BelowThresholdPromotes(t *testing.T) {
 	loader.seed(promptHash, "old prompt")
 	// Failed eval run: 0/3.
 	inner.recordEvalRun(rel, 0, 3, false)
-	repo := &fakeStateAdapter{inner: inner}
+	repo := inner
 	revision := &fakeRevisionLLM{newPrompt: "new better prompt"}
 	validator := &fakeValidator{score: 1.0} // validation passes
 	activator := &fakeActivator{repo: inner}
@@ -895,7 +782,7 @@ func TestEvolver_RunOnce_ValidateBelowThresholdRetries(t *testing.T) {
 	inner.recordEvalRun(rel, 0, 1, false)
 	// Set MaxRevisions to 3 so we don't hit the cap.
 	inner.capabilities["c1"].SelfEvolve.MaxRevisions = 3
-	repo := &fakeStateAdapter{inner: inner}
+	repo := inner
 	revision := &fakeRevisionLLM{newPrompt: "v2 prompt"}
 	validator := &fakeValidator{score: 0.5} // below threshold
 	activator := &fakeActivator{repo: inner}
@@ -930,7 +817,7 @@ func TestEvolver_RunOnce_RevisionLLMErrorContinues(t *testing.T) {
 	loader.seed(inner.versionsByCap["c1"][0].Manifest.Prompt.Hash, "old prompt")
 	inner.recordEvalRun(rel, 0, 1, false)
 	inner.capabilities["c1"].SelfEvolve.MaxRevisions = 3
-	repo := &fakeStateAdapter{inner: inner}
+	repo := inner
 	revision := &fakeRevisionLLM{err: fmt.Errorf("synthetic revise error")}
 	validator := &fakeValidator{score: 1.0}
 	activator := &fakeActivator{repo: inner}
@@ -960,9 +847,9 @@ func TestEvolver_RunOnce_CooldownSkips(t *testing.T) {
 	inner.recordEvalRun(rel, 0, 1, false)
 	// Set a recent LastPromoteAt to trip cooldown.
 	inner.capabilities["c1"].SelfEvolve.CooldownSec = 900
-	repo := &fakeStateAdapter{inner: inner}
+	repo := inner
 	now := time.Now().UTC()
-	inner.state[stateKey("c1", "dev")] = &stateBlob{
+	inner.state[stateKey("c1", "dev")] = &store.SelfEvolveState{
 		CapabilityID: "c1", TargetEnv: "dev",
 		LastPromoteAt: &now, LastStatus: "promoted",
 	}
@@ -1021,7 +908,7 @@ func TestEvolver_Promoter_Promote(t *testing.T) {
 	oldRelID := inner.activeReleaseID("c1", "dev")
 	loader := newFakeLoader()
 	loader.seed(inner.versionsByCap["c1"][0].Manifest.Prompt.Hash, "old prompt")
-	repo := &fakeStateAdapter{inner: inner}
+	repo := inner
 	activator := &fakeActivator{repo: inner}
 	auditor := &fakeAuditor{}
 	p := NewPromoter(repo, loader, activator, auditor)
