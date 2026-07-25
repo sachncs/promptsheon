@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/url"
 	"strings"
@@ -82,6 +81,3 @@ var (
 	errDSNNoHost = errors.New("clickhouse: DSN missing host")
 	errDSNNoDB   = errors.New("clickhouse: DSN missing database (and no fallback)")
 )
-
-// _ keeps the fmt import used (the codebase commonly errors-via-fmt).
-var _ = fmt.Sprintf
