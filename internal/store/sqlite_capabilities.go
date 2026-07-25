@@ -354,9 +354,9 @@ func (s *SQLite) GetCapabilityContract(ctx context.Context, capabilityID string)
 		SuccessRubric:  rubric,
 		AutoPromotable: auto == 1,
 		SLOTarget: capability.SLOTarget{
-			MaxP95LatencyMS:       maxP95,
-			MinSuccessRate:        minSuccess,
-			MaxHallucinationRate:  maxHallu,
+			MaxP95LatencyMS:      maxP95,
+			MinSuccessRate:       minSuccess,
+			MaxHallucinationRate: maxHallu,
 		},
 	}
 	if inJSON != "" && inJSON != "{}" {
