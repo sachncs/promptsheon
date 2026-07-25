@@ -868,6 +868,40 @@ func TestEvolver_RunOnce_CooldownSkips(t *testing.T) {
 	}
 }
 
+func TestEvolver_RunOnce_NoActiveRelease(t *testing.T) {
+	inner := newFakeRepo()
+	inner.seedCapability("c1", "ds1", "dev", "old prompt")
+	// Seed a release so the "no eval run yet" path doesn't
+	// fire first, then delete it so the active lookup
+	// returns empty.
+	rel := inner.activeReleaseID("c1", "dev")
+	inner.recordEvalRun(rel, 0, 1, false)
+	delete(inner.activeReleases, stateKey("c1", "dev"))
+	repo := inner
+	loader := newFakeLoader()
+	activator := &fakeActivator{repo: inner}
+	ev := NewEvolver(repo, loader, &fakeRevisionLLM{}, &fakeValidator{}, NewPromoter(repo, loader, activator, &fakeAuditor{}), &fakeAuditor{}, nil)
+	res, err := ev.RunOnce(context.Background(), "c1")
+	if err != nil {
+		t.Fatalf("RunOnce: %v", err)
+	}
+	if !res.Skipped || res.RejectReason != "no active release" {
+		t.Errorf("expected skipped/no active release, got %+v", res)
+	}
+}
+
+func TestEvolver_RunOnce_EmptyDatasetID(t *testing.T) {
+	inner := newFakeRepo()
+	inner.seedCapability("c1", "", "dev", "old prompt")
+	repo := inner
+	loader := newFakeLoader()
+	ev := NewEvolver(repo, loader, &fakeRevisionLLM{}, &fakeValidator{}, NewPromoter(repo, loader, &fakeActivator{repo: inner}, &fakeAuditor{}), &fakeAuditor{}, nil)
+	_, err := ev.RunOnce(context.Background(), "c1")
+	if err == nil {
+		t.Errorf("expected error for empty DatasetID")
+	}
+}
+
 func TestEvolver_LLMRevisionStrategy_RejectsEmpty(t *testing.T) {
 	called := 0
 	invoke := func(ctx context.Context, req LLMInvokeRequest) (string, error) {
