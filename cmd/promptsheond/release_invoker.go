@@ -55,7 +55,7 @@ func (r *apiReleaseInvoker) Invoke(ctx context.Context, releaseID string, inputs
 		Input:         input,
 		Provider:      plan.Provider,
 		Model:         plan.Model,
-		ModelRevision: modelRevision(plan.Model, plan.Provider),
+		ModelRevision: time.Now().UTC().Format("2006-01-02") + ":" + plan.Model + ":" + plan.Provider,
 		SystemPrompt:  plan.Prompt,
 	})
 	if err != nil {
@@ -70,13 +70,6 @@ func (r *apiReleaseInvoker) Invoke(ctx context.Context, releaseID string, inputs
 		return nil, nil
 	}
 	return rec.Output, nil
-}
-
-// modelRevision mirrors internal/api.handlers_capabilities.modelRevision
-// without dragging the api package into cmd/promptsheond. Format is
-// stable: YYYY-MM-DD:model:provider.
-func modelRevision(model, provider string) string {
-	return time.Now().UTC().Format("2006-01-02") + ":" + model + ":" + provider
 }
 
 func manifestHash(m interface{}) string {
