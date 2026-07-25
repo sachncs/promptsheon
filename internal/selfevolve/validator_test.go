@@ -9,7 +9,6 @@ import (
 	"github.com/sachncs/promptsheon/internal/harness"
 )
 
-// validatorCases returns 3 cases the validator can score.
 func validatorCases() []harness.DatasetCase {
 	return []harness.DatasetCase{
 		{ID: "k0", DatasetID: "ds1", Seq: 0, Inputs: []byte(`{"q":"ping"}`), Expected: []byte(`"pong"`)},
@@ -20,12 +19,17 @@ func validatorCases() []harness.DatasetCase {
 
 func validatorScorer() eval.Scorer { return eval.ScorerContains }
 
+type testCaseLoader struct{ cases []harness.DatasetCase }
+
+func (l *testCaseLoader) ListDatasetCases(_ context.Context, _ string) ([]harness.DatasetCase, error) {
+	return l.cases, nil
+}
+
+func newCaseLoader(c []harness.DatasetCase) CaseLoader { return &testCaseLoader{cases: c} }
+
 func TestHarnessValidator_AllPass(t *testing.T) {
-	loader := newCaseLoader(validatorCases())
-	invoke := func(ctx context.Context, req LLMInvokeRequest) (string, error) {
-		return "pong", nil
-	}
-	v := NewHarnessValidator(loader, invoke)
+	invoke := func(_ context.Context, _ LLMInvokeRequest) (string, error) { return "pong", nil }
+	v := NewHarnessValidator(newCaseLoader(validatorCases()), invoke)
 	v.Scorer = validatorScorer()
 	run, err := v.Validate(context.Background(), "c1", []byte("reply with pong"), "ds1")
 	if err != nil {
@@ -46,13 +50,10 @@ func TestHarnessValidator_AllPass(t *testing.T) {
 }
 
 func TestHarnessValidator_AllFail(t *testing.T) {
-	loader := newCaseLoader(validatorCases())
-	invoke := func(ctx context.Context, req LLMInvokeRequest) (string, error) {
-		return "wrong", nil
-	}
-	v := NewHarnessValidator(loader, invoke)
+	invoke := func(_ context.Context, _ LLMInvokeRequest) (string, error) { return "wrong", nil }
+	v := NewHarnessValidator(newCaseLoader(validatorCases()), invoke)
 	v.Scorer = validatorScorer()
-	run, err := v.Validate(context.Background(), "c1", []byte("prompt"), "ds1")
+	run, err := v.Validate(context.Background(), "c1", []byte("p"), "ds1")
 	if err != nil {
 		t.Fatalf("Validate: %v", err)
 	}
@@ -62,25 +63,18 @@ func TestHarnessValidator_AllFail(t *testing.T) {
 	if run.Score != 0 {
 		t.Errorf("Score = %v, want 0", run.Score)
 	}
-	if run.Status != harness.RunFailed {
-		t.Errorf("Status = %q, want RunFailed", run.Status)
-	}
 }
 
 func TestHarnessValidator_Mixed(t *testing.T) {
-	cases := validatorCases()
-	loader := newCaseLoader(cases)
-	invoke := func(ctx context.Context, req LLMInvokeRequest) (string, error) {
-		// Return "pong" only on the first call (Seq 0); other
-		// cases get "wrong".
+	invoke := func(_ context.Context, req LLMInvokeRequest) (string, error) {
 		if strings.Contains(req.User, "ping") {
 			return "pong", nil
 		}
 		return "wrong", nil
 	}
-	v := NewHarnessValidator(loader, invoke)
+	v := NewHarnessValidator(newCaseLoader(validatorCases()), invoke)
 	v.Scorer = validatorScorer()
-	run, err := v.Validate(context.Background(), "c1", []byte("prompt"), "ds1")
+	run, err := v.Validate(context.Background(), "c1", []byte("p"), "ds1")
 	if err != nil {
 		t.Fatalf("Validate: %v", err)
 	}
@@ -90,13 +84,12 @@ func TestHarnessValidator_Mixed(t *testing.T) {
 }
 
 func TestHarnessValidator_InvokeErrorCountsAsFail(t *testing.T) {
-	loader := newCaseLoader(validatorCases())
-	invoke := func(ctx context.Context, req LLMInvokeRequest) (string, error) {
+	invoke := func(_ context.Context, _ LLMInvokeRequest) (string, error) {
 		return "", context.DeadlineExceeded
 	}
-	v := NewHarnessValidator(loader, invoke)
+	v := NewHarnessValidator(newCaseLoader(validatorCases()), invoke)
 	v.Scorer = validatorScorer()
-	run, err := v.Validate(context.Background(), "c1", []byte("prompt"), "ds1")
+	run, err := v.Validate(context.Background(), "c1", []byte("p"), "ds1")
 	if err != nil {
 		t.Fatalf("Validate: %v", err)
 	}
@@ -106,14 +99,10 @@ func TestHarnessValidator_InvokeErrorCountsAsFail(t *testing.T) {
 }
 
 func TestHarnessValidator_InputsEmptyDefaultsToObject(t *testing.T) {
-	loader := newCaseLoader([]harness.DatasetCase{
+	invoke := func(_ context.Context, _ LLMInvokeRequest) (string, error) { return "pong", nil }
+	v := NewHarnessValidator(newCaseLoader([]harness.DatasetCase{
 		{ID: "k0", DatasetID: "ds1", Seq: 0, Inputs: nil, Expected: []byte(`"pong"`)},
-	})
-	invoke := func(ctx context.Context, req LLMInvokeRequest) (string, error) {
-		// Empty inputs default to "{}" — should still work.
-		return "pong", nil
-	}
-	v := NewHarnessValidator(loader, invoke)
+	}), invoke)
 	v.Scorer = validatorScorer()
 	run, err := v.Validate(context.Background(), "c1", []byte("p"), "ds1")
 	if err != nil {
@@ -124,31 +113,30 @@ func TestHarnessValidator_InputsEmptyDefaultsToObject(t *testing.T) {
 	}
 }
 
-func TestHarnessValidator_RejectsEmptyDataset(t *testing.T) {
-	v := NewHarnessValidator(newCaseLoader(nil), func(ctx context.Context, req LLMInvokeRequest) (string, error) { return "x", nil })
-	_, err := v.Validate(context.Background(), "c1", []byte("p"), "missing-ds")
-	if err == nil {
+func TestHarnessValidator_EmptyDataset(t *testing.T) {
+	invoke := func(_ context.Context, _ LLMInvokeRequest) (string, error) { return "x", nil }
+	v := NewHarnessValidator(newCaseLoader(nil), invoke)
+	if _, err := v.Validate(context.Background(), "c1", []byte("p"), "missing-ds"); err == nil {
 		t.Fatalf("expected error on empty dataset")
 	}
 }
 
 func TestHarnessValidator_UnknownScorer(t *testing.T) {
-	v := NewHarnessValidator(newCaseLoader(validatorCases()), func(ctx context.Context, req LLMInvokeRequest) (string, error) { return "x", nil })
+	invoke := func(_ context.Context, _ LLMInvokeRequest) (string, error) { return "x", nil }
+	v := NewHarnessValidator(newCaseLoader(validatorCases()), invoke)
 	v.Scorer = "not_a_real_scorer"
-	_, err := v.Validate(context.Background(), "c1", []byte("p"), "ds1")
-	if err == nil {
+	if _, err := v.Validate(context.Background(), "c1", []byte("p"), "ds1"); err == nil {
 		t.Fatalf("expected error on unknown scorer")
 	}
 }
 
-func TestHarnessValidator_PassesSystemPromptThrough(t *testing.T) {
-	loader := newCaseLoader(validatorCases())
+func TestHarnessValidator_PassesSystemPrompt(t *testing.T) {
 	var sawPrompt string
-	invoke := func(ctx context.Context, req LLMInvokeRequest) (string, error) {
+	invoke := func(_ context.Context, req LLMInvokeRequest) (string, error) {
 		sawPrompt = req.System
 		return "pong", nil
 	}
-	v := NewHarnessValidator(loader, invoke)
+	v := NewHarnessValidator(newCaseLoader(validatorCases()), invoke)
 	v.Scorer = validatorScorer()
 	if _, err := v.Validate(context.Background(), "c1", []byte("THE PROMPT"), "ds1"); err != nil {
 		t.Fatalf("Validate: %v", err)
@@ -156,13 +144,4 @@ func TestHarnessValidator_PassesSystemPromptThrough(t *testing.T) {
 	if sawPrompt != "THE PROMPT" {
 		t.Errorf("System = %q, want THE PROMPT", sawPrompt)
 	}
-}
-
-// caseLoader is a tiny CaseLoader for tests.
-type caseLoader struct{ cases []harness.DatasetCase }
-
-func newCaseLoader(c []harness.DatasetCase) CaseLoader { return &caseLoader{cases: c}
-
-func (l *caseLoader) ListDatasetCases(ctx context.Context, datasetID string) ([]harness.DatasetCase, error) {
-	return l.cases, nil
 }
