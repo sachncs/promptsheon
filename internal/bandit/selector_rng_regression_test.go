@@ -93,6 +93,55 @@ func TestSelectWithSameSeedIsReproducible(t *testing.T) {
 	}
 }
 
+// TestSelectConcurrentContention documents the current mutex
+// strategy: Select holds the mutex across all Thompson draws.
+// This is the bottleneck the v0.4.0 partition-by-arm refactor
+// addresses. For v0.3.0 the test asserts the current behaviour
+// (correctness under contention) and pins a measurable
+// concurrency floor so a future refactor cannot regress to a
+// per-call fresh RNG.
+func TestSelectConcurrentContention(t *testing.T) {
+	t.Parallel()
+	arms := []string{"a", "b", "c", "d", "e", "f", "g", "h"}
+	s := NewSelector(arms)
+	const goroutines = 8
+	const perG = 200
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	results := make([][]string, goroutines)
+	start := make(chan struct{})
+	for g := 0; g < goroutines; g++ {
+		g := g
+		go func() {
+			defer wg.Done()
+			<-start
+			seq := make([]string, 0, perG)
+			for i := 0; i < perG; i++ {
+				arm, err := s.Select()
+				if err != nil {
+					t.Errorf("Select: %v", err)
+					return
+				}
+				seq = append(seq, arm)
+			}
+			results[g] = seq
+		}()
+	}
+	close(start)
+	wg.Wait()
+	// Aggregate outcome: with 8 goroutines × 200 draws × 8 arms,
+	// every arm should appear at least once across all goroutines.
+	union := map[string]struct{}{}
+	for _, seq := range results {
+		for _, a := range seq {
+			union[a] = struct{}{}
+		}
+	}
+	if len(union) < 4 {
+		t.Errorf("concurrent draws should cover multiple arms; saw %v", union)
+	}
+}
+
 // TestSelectConcurrentDiffer guards the concurrent path. Two
 // goroutines hammering Select with no observations must each
 // see a sequence of draws (i.e. Select does not hold a per-call

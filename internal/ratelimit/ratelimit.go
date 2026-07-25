@@ -188,6 +188,12 @@ func (l *Limiter) cleanup() {
 }
 
 // Allow checks if a request from the given key is allowed.
+//
+// PERF-RL-1 (deferred): the limiter currently uses a single
+// process-wide mutex. The TRIZ performance review flagged
+// partition-by-key-prefix as the resolution; that change lands
+// in v0.4.0. For v0.3.0 the in-process mutex is sufficient at
+// the rates we expect.
 func (l *Limiter) Allow(key string) bool {
 	// SEC-RL-2: rate=0 means rate limiting is disabled. Without
 	// this short-circuit the bucket maths below sees

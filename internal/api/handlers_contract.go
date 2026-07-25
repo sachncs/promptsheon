@@ -79,11 +79,6 @@ func (s *Server) handleGetCapabilityContract(w http.ResponseWriter, r *http.Requ
 	return json.NewEncoder(w).Encode(c)
 }
 
-// errCapabilityNotFound is the typed sentinel returned by the
-// repository when a Capability id does not exist or has no
-// attached contract.
-var errCapabilityNotFound = errors.New("api: capability not found")
-
 // handleDiffVersions returns the structural diff between two
 // Versions of a Capability. The from / to query params name
 // integer Version counters; the response is a JSON object

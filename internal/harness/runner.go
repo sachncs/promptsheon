@@ -120,7 +120,6 @@ func (r *EvalRunner) Run(ctx context.Context, opts EvalRunOptions) (*EvalRun, er
 	// in case CreateEvalResult is not implemented (the runner
 	// auto-detects via a type assertion).
 	var (
-		streamErr   atomic.Value // error
 		streamOK    atomic.Bool
 		persistedMu sync.Mutex
 	)
@@ -171,8 +170,6 @@ func (r *EvalRunner) Run(ctx context.Context, opts EvalRunOptions) (*EvalRun, er
 			persistedMu.Unlock()
 		}
 	}
-	_ = streamErr
-	_ = streamOK
 
 	finishedAt := r.Clock()
 	run.FinishedAt = &finishedAt
