@@ -29,12 +29,25 @@ const (
 )
 
 // ValidScorers reports whether s is a recognised scorer name.
+// The llm_judge scorer is valid by name; whether it has a
+// configured JudgeClient is decided at Lookup time.
 func ValidScorers(s Scorer) bool {
 	switch s {
-	case ScorerExactMatch, ScorerContains, ScorerRegex, ScorerJSONSchema:
+	case ScorerExactMatch, ScorerContains, ScorerRegex, ScorerJSONSchema, ScorerLLMJudge:
 		return true
 	}
 	return false
+}
+
+// RegisterLLMJudge registers the LLMJudge scorer with the
+// supplied JudgeClient. The eval runner calls this at boot so
+// the scorer is ready before the first case runs.
+//
+// RegisterLLMJudge is idempotent: a re-registration replaces
+// the prior judge, which is what the hot-reload settings path
+// relies on.
+func RegisterLLMJudge(j JudgeClient) {
+	Register(LLMJudge{Judge: j})
 }
 
 // Strategy is the contract every scoring strategy satisfies.
@@ -364,4 +377,7 @@ func init() {
 	Register(Contains{})
 	Register(Regex{})
 	Register(JSONSchema{})
+	// LLMJudge is registered lazily: it requires a JudgeClient
+	// (the production LLM gateway wiring) which is constructed
+	// at boot, not at package-init time. See RegisterLLMJudge.
 }
