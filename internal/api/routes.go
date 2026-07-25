@@ -181,6 +181,7 @@ func (s *Server) registerCapabilityRoutes() {
 	s.mux.HandleFunc("PUT /api/v1/capabilities/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateCapability)))
 	s.mux.HandleFunc("DELETE /api/v1/capabilities/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptDelete)(s.handleDeleteCapability)))
 	s.mux.HandleFunc("PUT /api/v1/capabilities/{id}/contract", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateCapabilityContract)))
+	s.mux.HandleFunc("PUT /api/v1/capabilities/{id}/self-evolve", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleUpdateSelfEvolveConfig)))
 	s.mux.HandleFunc("GET /api/v1/capabilities/{id}/contract", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetCapabilityContract)))
 	s.mux.HandleFunc("GET /api/v1/capabilities/{id}/diff", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleDiffVersions)))
 	s.mux.HandleFunc("GET /api/v1/capabilities/{id}/reputation", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetCapabilityReputation)))
