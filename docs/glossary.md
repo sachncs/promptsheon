@@ -33,7 +33,7 @@ share the same underlying artifacts.
 ## Manifest
 
 The content-addressed composition that defines a Version.
-A Manifest references five required artifacts by `(kind, hash)`:
+A Manifest references three required artifacts by `(kind, hash)`:
 
 - `prompt` — the prompt text.
 - `model_policy` — provider + model + revision + defaults.
@@ -42,8 +42,10 @@ A Manifest references five required artifacts by `(kind, hash)`:
 - `memory` — the per-workspace Memory shape.
 
 Optional artifacts: `guardrails` (Guardrail references),
-`tools` (Tool references), `knowledge_sources` (knowledge
-graph), `mcp_servers` (MCP server allowlist).
+`tools` (Tool references), `mcp_servers` (MCP server allowlist).
+`context_contract` and `memory` remain valid artifact kinds
+but are not required by `Manifest.Validate` (the runtime
+Resolver does not load them in v0.2.0 / v0.3.0).
 
 ## Release
 
