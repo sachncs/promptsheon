@@ -52,7 +52,8 @@ func (s *Server) audit(ctx context.Context, action, resource string, details map
 	case s.auditQueue <- entry:
 		return
 	case <-timer.C:
-		// fall through to drop path
+		// Queue still full: drop the entry and increment
+		// the dropped counter below.
 	}
 	s.auditDropped.Add(1)
 	// OBS-7: surface the drop count to the metrics collector so
