@@ -420,3 +420,6 @@ func (m *memStore) CreateEvalResult(ctx context.Context, r *harness.EvalResult) 
 func (m *memStore) ListEvalResultsForRun(ctx context.Context, runID string) ([]harness.EvalResult, error) {
 	return m.harnessRepo.ListEvalResultsForRun(ctx, runID)
 }
+func (m *memStore) GetActiveReleaseID(ctx context.Context, capabilityID string) (string, error) {
+	return m.harnessRepo.GetActiveReleaseID(ctx, capabilityID)
+}

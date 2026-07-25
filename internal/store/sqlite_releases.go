@@ -144,6 +144,28 @@ func (s *SQLite) ListActiveReleasesForEnvironment(ctx context.Context, env relea
 	return out, rows.Err()
 }
 
+// GetActiveReleaseID returns the active release id for the
+// supplied Capability, or empty string if none is active.
+// "Active" means the most recent non-superseded release in
+// any environment; the per-environment invariant is enforced
+// elsewhere.
+func (s *SQLite) GetActiveReleaseID(ctx context.Context, capabilityID string) (string, error) {
+	var id string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id FROM releases
+		 WHERE capability_id = ? AND status = ?
+		 ORDER BY activated_at DESC LIMIT 1`,
+		capabilityID, string(release.StatusActive),
+	).Scan(&id)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("get active release: %w", err)
+	}
+	return id, nil
+}
+
 func (s *SQLite) UpdateRelease(ctx context.Context, r *release.Release) error {
 	manifestJSON, err := marshalOrErr(r.Manifest)
 	if err != nil {
