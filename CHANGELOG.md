@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Closed-loop self-evolution
+
+- **Evolv**er package: detect → revise → validate →
+  promote with cooldowns, max-revisions, and a
+  SelfApprovePolicy that bypasses maker-checker only
+  for the evolver's auto-promote.
+- **Wiring** via `PROMPTSHEON_SELF_EVOLVE=cap:ds:threshold:env:max_revs:cooldown_sec`
+  (env wins on boot; runtime toggle via the CLI below).
+- **CLI**: `promptsheon selfevolve {enable,disable,status}
+  <capability>`. `enable` accepts `--dataset`,
+  `--min-score`, `--max-revisions`, `--cooldown-sec`,
+  `--target-env`. Persisted via
+  `PUT /api/v1/capabilities/{id}/self-evolve`.
+- **Metrics**: `promptsheon_self_evolve_{runs,revisions,promoted}_total`
+  on the standard `/metrics` endpoint.
+- **Audit**: every cycle writes `self_evolve.{detect,revise,validate,promote,reject}`
+  to the tamper-evident audit chain; cooldown is persisted
+  in `self_evolve_state` and survives daemon restart.
+- **End-to-end smoke**: `scripts/selftest.sh` boots the
+  daemon with a deliberately-bad prompt, polls
+  `self_evolve_state` for terminal status, asserts the
+  audit chain has `self_evolve.*` rows, and asserts
+  `/metrics` exposes the new counters.
+- **Tests**: `internal/selfevolve` at 78.5% coverage
+  (validator, promoter, revision, loader, id all covered);
+  wiring parsed and CAS path tested at the daemon level.
+
+### Cleanups
+
+- Removed: `examples/`, `internal/pluginproto/proto/`,
+  `cmd/promptsheon-auditbackfill/`, the `fallbackTS`
+  and `timeNow` indirection in `internal/selfevolve/id.go`,
+  the `fakeStateAdapter` 100+ line wrapper in
+  `internal/selfevolve/evolver_test.go`, the dead
+  `var _ = s` in `internal/api/http.go`, the duplicated
+  `modelRevision` helper in
+  `cmd/promptsheond/release_invoker.go`, the dead
+  `v > 10000` version-probe cap and `cooldown < 0` guard.
+
 ## [0.3.0] - 2026-07-25
 
 The production release of v0.3.0. Six primitives originally
