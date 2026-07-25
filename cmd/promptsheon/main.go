@@ -102,6 +102,7 @@ var commandHandlers = map[string]func([]string) error{
 	"dataset":       cmdDataset,
 	"precondition":  cmdPrecondition,
 	"eval":          cmdEval,
+	"selfevolve":    cmdSelfEvolve,
 	"help":          func(_ []string) error { printUsage(); return nil },
 }
 
@@ -160,7 +161,8 @@ Usage:
   release <list|get|vote|activate|rollback|invoke|approval>  Manage releases via API
   dataset <list|create|get|put-cases|delete>        Manage eval datasets
   precondition <list|add|delete>                  Manage Activate preconditions
-  eval <list|run|get>                              Run and inspect eval runs`)
+  eval <list|run|get>                              Run and inspect eval runs
+  selfevolve <enable|disable|status> <capability>    Toggle closed-loop self-evolution on a capability`)
 }
 
 // ---------------------------------------------------------------------------
