@@ -31,4 +31,11 @@ type Version struct {
 	ManifestHash string    `json:"manifest_hash,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	CreatedBy    string    `json:"created_by"`
+
+	// Parents are the Capability IDs this Version inherits
+	// artifacts from. The Resolve call walks the parent
+	// chain and merges their Manifests; the merge is
+	// deterministic and the parent's artifacts are read-only
+	// from the child's perspective. INHERIT-1.
+	Parents []string `json:"parents,omitempty"`
 }
