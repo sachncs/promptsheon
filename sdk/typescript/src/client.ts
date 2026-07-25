@@ -93,6 +93,15 @@ export class PromptsheonAPIError extends Error {
 export class PromptsheonClient {
   constructor(private config: ClientConfig) {}
 
+  /**
+   * SDK-TS-1: returns the canonical URL prefix every method
+   * builds on. Useful in tests that want to assert the route
+   * shape without constructing the full request.
+   */
+  baseUrl(): string {
+    return this.config.baseUrl;
+  }
+
   private headers(json: boolean = false): Record<string, string> {
     const h: Record<string, string> = { Accept: "application/json" };
     if (this.config.apiKey) h.Authorization = `Bearer ${this.config.apiKey}`;
