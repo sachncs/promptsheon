@@ -189,8 +189,5 @@ func (p *Promoter) nextVersionNumber(ctx context.Context, capabilityID string) (
 			return v, nil
 		}
 		v++
-		if v > 10000 {
-			return 0, fmt.Errorf("version probe exceeded 10000 for capability %s", capabilityID)
-		}
 	}
 }
