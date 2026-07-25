@@ -3,17 +3,13 @@ package selfevolve
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 )
 
 // generateID returns a 16-char hex string with a prefix
-// (e.g. "v-0123abcd..."). The random bytes are sourced
-// from crypto/rand; on the rare read failure we fall
-// back to a timestamp so the evolver never panics.
+// (e.g. "v-0123abcd..."). crypto/rand doesn't fail on
+// Linux/macOS, so the call is not checked.
 func generateID(prefix string) string {
 	var b [8]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return fmt.Sprintf("%s-ts-%d", prefix, fallbackTS())
-	}
+	_, _ = rand.Read(b[:])
 	return prefix + "-" + hex.EncodeToString(b[:])
 }
