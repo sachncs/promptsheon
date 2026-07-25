@@ -106,9 +106,6 @@ func (e *Evolver) RunOnce(ctx context.Context, capabilityID string) (*Result, er
 	}
 
 	cooldown := time.Duration(cfg.CooldownSec) * time.Second
-	if cooldown < 0 {
-		cooldown = 0
-	}
 	if state.LastPromoteAt != nil && e.Now().Sub(*state.LastPromoteAt) < cooldown {
 		e.Logger.Debug("selfevolve: cooldown active", "capability_id", capabilityID, "remaining", cooldown-e.Now().Sub(*state.LastPromoteAt))
 		res.Skipped = true
