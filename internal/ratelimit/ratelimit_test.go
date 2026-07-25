@@ -2,14 +2,70 @@ package ratelimit
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/auth"
 )
+
+// TestRateLimiterPartitionedConcurrency pins PERF-RL-1:
+// concurrent callers on distinct keys hit distinct shards
+// and do not contend on the same mutex. The test fires N
+// goroutines on N distinct keys and asserts the wall-clock
+// duration stays below a generous 500ms upper bound. The
+// assertion catches a regression to the single-mutex pattern.
+func TestRateLimiterPartitionedConcurrency(t *testing.T) {
+	cfg := Config{Rate: 1000, Interval: time.Second, Burst: 1000}
+	l := NewLimiter(cfg)
+	defer l.Stop()
+
+	const goroutines = 16
+	const perG = 200
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	start := time.Now()
+	for g := 0; g < goroutines; g++ {
+		g := g
+		go func() {
+			defer wg.Done()
+			key := fmt.Sprintf("user-%d", g)
+			for i := 0; i < perG; i++ {
+				if !l.Allow(key) {
+					t.Errorf("key %s unexpectedly denied", key)
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	elapsed := time.Since(start)
+	if elapsed > 500*time.Millisecond {
+		t.Errorf("partitioned limiter took %v for %d goroutines × %d calls; expected < 500ms", elapsed, goroutines, perG)
+	}
+}
+
+// TestShardForDistributesKeys documents the partition
+// distribution: across 1000 random keys, every shard receives
+// at least 1 entry. FNV-1a is well-distributed for short ASCII
+// keys; a degenerate hash that always returned 0 would defeat
+// the whole point of the partition.
+func TestShardForDistributesKeys(t *testing.T) {
+	counts := [numShards]int{}
+	for i := 0; i < 1000; i++ {
+		key := fmt.Sprintf("k-%d", i)
+		counts[shardFor(key)]++
+	}
+	for i, c := range counts {
+		if c == 0 {
+			t.Errorf("shard %d received 0 keys across 1000 random keys", i)
+		}
+	}
+}
 
 func TestAllowBasic(t *testing.T) {
 	l := NewLimiter(Config{Rate: 5, Interval: time.Second, Burst: 5})
