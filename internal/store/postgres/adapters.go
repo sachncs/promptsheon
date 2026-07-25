@@ -168,6 +168,15 @@ func (a *capabilityAdapter) DeleteCapability(_ context.Context, id string) error
 	delete(a.p.capabilities, id)
 	return nil
 }
+func (a *capabilityAdapter) UpdateSelfEvolveConfig(_ context.Context, id string, cfg capability.SelfEvolveConfig) error {
+	c, ok := a.p.capabilities[id]
+	if !ok {
+		return errNotImplemented
+	}
+	c.SelfEvolve = cfg
+	a.p.capabilities[id] = c
+	return nil
+}
 func (a *capabilityAdapter) SetCapabilityContract(_ context.Context, _ string, _ *capability.CapabilityContract) error {
 	return errNotImplemented
 }

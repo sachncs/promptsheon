@@ -197,6 +197,50 @@ func (p MakerCheckerPolicy) Evaluate(votes []Vote) (State, bool, error) {
 	return StatePending, false, nil
 }
 
+// SelfApprovePolicy auto-approves a Release when the supplied
+// votes contain at least one Approve from the configured
+// SelfApprover identity. The policy intentionally bypasses the
+// maker-checker separation-of-duties check: the evolver is the
+// only caller and it has already validated the revision before
+// asking for activation. The self-approver identity is recorded
+// in the audit chain so operators can trace every auto-promote.
+//
+// RequiredApprovers defaults to 1. SelfApprover is the identity
+// the policy trusts; an empty SelfApprover makes the policy
+// always report pending, which is the safe default if the
+// evolver is misconfigured.
+type SelfApprovePolicy struct {
+	RequiredApprovers int
+	SelfApprover      string
+}
+
+// Evaluate implements Policy. Returns StateApproved once one or
+// more Approve votes from SelfApprover accumulate.
+func (p SelfApprovePolicy) Evaluate(votes []Vote) (State, bool, error) {
+	required := p.RequiredApprovers
+	if required <= 0 {
+		required = 1
+	}
+	if p.SelfApprover == "" {
+		return StatePending, false, errors.New("approval: SelfApprovePolicy.SelfApprover is required")
+	}
+	for _, v := range votes {
+		if v.Decision == Reject {
+			return StateRejected, false, nil
+		}
+	}
+	approves := 0
+	for _, v := range votes {
+		if v.Decision == Approve && v.Identity == p.SelfApprover {
+			approves++
+		}
+	}
+	if approves >= required {
+		return StateApproved, true, nil
+	}
+	return StatePending, false, nil
+}
+
 // VerifySeparationOfDuties was removed in SEC-1b. MakerCheckerPolicy
 // self-enforces against the Creator field at Evaluate time;
 // callers should populate Creator on the policy before passing

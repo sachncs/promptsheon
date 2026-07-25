@@ -106,6 +106,19 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 			content += text
 		}
 	}
+	// ponytail: MiniMax-M2.7's thinking mode is on by default and
+	// the SDK's `Block.Text` is empty for thinking blocks. If the
+	// model produced thinking without a text block, fall back to the
+	// thinking content so callers (harness, /releases/{id}/invoke)
+	// see something instead of an empty response.
+	if content == "" {
+		for _, block := range msg.Content {
+			if thinking := block.Thinking; thinking != "" {
+				content = thinking
+				break
+			}
+		}
+	}
 
 	inTok, outTok := int64(msg.Usage.InputTokens), int64(msg.Usage.OutputTokens)
 

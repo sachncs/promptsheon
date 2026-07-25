@@ -220,9 +220,18 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 	if err != nil {
 		return &HTTPError{Status: http.StatusBadGateway, Message: err.Error()}
 	}
+	// ponytail: previously the handler built
+	//   CapabilityVersionID: rel.CapabilityID + "@" + version
+	// which doesn't exist in the capability_versions table — the
+	// FK constraint to capability_versions(id) blew up. Look up
+	// the real version row by (capability_id, version number).
+	ver, err := s.db.GetVersionByNumber(r.Context(), rel.CapabilityID, rel.CapabilityVersion)
+	if err != nil {
+		return fmt.Errorf("lookup capability version: %w", err)
+	}
 	exec := &capability.Execution{
 		ID:                  generateID(),
-		CapabilityVersionID: rel.CapabilityID + "@" + fmt.Sprintf("%d", rel.CapabilityVersion),
+		CapabilityVersionID: ver.ID,
 		Timestamp:           time.Now(),
 		Inputs:              req.Inputs,
 		Environment:         string(rel.Environment),
@@ -267,6 +276,9 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 		"tokens_estimated": exec.TotalTokens > 0 || exec.CostUSD > 0,
 		valError:           exec.Error,
 	})
+	if invErr != nil {
+		return &HTTPError{Status: http.StatusBadGateway, Message: invErr.Error()}
+	}
 	writeJSON(w, http.StatusCreated, exec)
 	return nil
 }
@@ -319,6 +331,13 @@ func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, in
 		Model:         model,
 		ModelRevision: modelRevision(model, provider),
 		Provider:      provider,
+	}
+	// ponytail: same prompt-as-system fix as the harness path — the
+	// live /releases/{id}/invoke route also dropped the manifest
+	// prompt, so the model answered the user's raw input without
+	// the system instruction.
+	if plan != nil {
+		req.SystemPrompt = plan.Prompt
 	}
 	start := time.Now()
 	rec, err := s.invoker.Invoke(r.Context(), req)

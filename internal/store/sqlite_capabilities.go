@@ -202,7 +202,9 @@ func (s *SQLite) GetCapability(ctx context.Context, id string) (*capability.Capa
 		row = s.stmtGetCapability.QueryRowContext(ctx, id)
 	} else {
 		row = s.db.QueryRowContext(ctx,
-			`SELECT id, project_id, name, description, created_at, updated_at
+			`SELECT id, project_id, name, description, created_at, updated_at,
+			 self_evolve_enabled, self_evolve_min_score, self_evolve_max_revisions, self_evolve_cooldown_sec,
+			 self_evolve_target_env, self_evolve_dataset_id
 			 FROM capabilities WHERE id = ?`, id,
 		)
 	}
@@ -211,7 +213,9 @@ func (s *SQLite) GetCapability(ctx context.Context, id string) (*capability.Capa
 
 func (s *SQLite) ListCapabilities(ctx context.Context, projectID string) ([]*capability.Capability, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, project_id, name, description, created_at, updated_at
+		`SELECT id, project_id, name, description, created_at, updated_at,
+		 self_evolve_enabled, self_evolve_min_score, self_evolve_max_revisions, self_evolve_cooldown_sec,
+		 self_evolve_target_env, self_evolve_dataset_id
 		 FROM capabilities WHERE project_id = ? ORDER BY name`, projectID,
 	)
 	if err != nil {
@@ -239,7 +243,9 @@ func (s *SQLite) CatalogSearch(ctx context.Context, workspaceID, query string, l
 		limit = 1000
 	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT c.id, c.project_id, c.name, c.description, c.created_at, c.updated_at
+		SELECT c.id, c.project_id, c.name, c.description, c.created_at, c.updated_at,
+		 c.self_evolve_enabled, c.self_evolve_min_score, c.self_evolve_max_revisions, c.self_evolve_cooldown_sec,
+		 c.self_evolve_target_env, c.self_evolve_dataset_id
 		FROM capabilities c
 		JOIN projects p ON c.project_id = p.id
 		WHERE p.workspace_id = ?
@@ -280,6 +286,130 @@ func (s *SQLite) DeleteCapability(ctx context.Context, id string) error {
 		return fmt.Errorf("delete capability: %w", err)
 	}
 	return nil
+}
+
+// UpdateSelfEvolveConfig sets the closed-loop self-evolution
+// policy on a Capability. Idempotent: same value on repeat is a
+// no-op. Returns ErrNotFound if the capability does not exist.
+func (s *SQLite) UpdateSelfEvolveConfig(ctx context.Context, capabilityID string, cfg capability.SelfEvolveConfig) error {
+	dataset := cfg.DatasetID
+	if dataset == "" {
+		dataset = ""
+	}
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE capabilities
+		   SET self_evolve_enabled = ?,
+		       self_evolve_min_score = ?,
+		       self_evolve_max_revisions = ?,
+		       self_evolve_cooldown_sec = ?,
+		       self_evolve_target_env = ?,
+		       self_evolve_dataset_id = ?,
+		       updated_at = CURRENT_TIMESTAMP
+		 WHERE id = ?`,
+		boolToInt(cfg.Enabled), cfg.MinScore, cfg.MaxRevisions, cfg.CooldownSec,
+		cfg.TargetEnv, dataset, capabilityID,
+	)
+	if err != nil {
+		return fmt.Errorf("update self-evolve config: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// SelfEvolveState is the persisted cycle state for a
+// (capability, target_env) pair. Stored in the self_evolve_state
+// table. The evolver reads/writes one row per cycle to track
+// cooldown across daemon restarts.
+type SelfEvolveState struct {
+	CapabilityID      string
+	TargetEnv         string
+	LastAttemptAt     *time.Time
+	LastPromoteAt     *time.Time
+	LastScore         float64
+	LastRevisionIdx   int
+	CycleStartedAt    *time.Time
+	LastStatus        string
+	LastError         string
+	RevisionIndex     int
+}
+
+func (s *SQLite) LoadSelfEvolveState(ctx context.Context, capabilityID, targetEnv string) (*SelfEvolveState, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT capability_id, target_env, last_attempt_at, last_promote_at, last_score,
+		       last_revision_index, cycle_started_at, last_status, last_error
+		  FROM self_evolve_state
+		 WHERE capability_id = ? AND target_env = ?`, capabilityID, targetEnv)
+	var st SelfEvolveState
+	var lastAttempt, lastPromote, cycleStart sql.NullTime
+	if err := row.Scan(&st.CapabilityID, &st.TargetEnv, &lastAttempt, &lastPromote, &st.LastScore,
+		&st.LastRevisionIdx, &cycleStart, &st.LastStatus, &st.LastError); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("load self_evolve_state: %w", err)
+	}
+	if lastAttempt.Valid {
+		t := lastAttempt.Time
+		st.LastAttemptAt = &t
+	}
+	if lastPromote.Valid {
+		t := lastPromote.Time
+		st.LastPromoteAt = &t
+	}
+	if cycleStart.Valid {
+		t := cycleStart.Time
+		st.CycleStartedAt = &t
+	}
+	st.RevisionIndex = st.LastRevisionIdx
+	return &st, nil
+}
+
+// SaveSelfEvolveState upserts the cycle state row. The caller
+// passes a fully-populated state; the method stamps
+// last_attempt_at = now when it is nil.
+func (s *SQLite) SaveSelfEvolveState(ctx context.Context, st *SelfEvolveState) error {
+	if st == nil {
+		return fmt.Errorf("save self_evolve_state: nil state")
+	}
+	if st.LastAttemptAt == nil {
+		now := time.Now().UTC()
+		st.LastAttemptAt = &now
+	}
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO self_evolve_state
+		  (capability_id, target_env, last_attempt_at, last_promote_at, last_score,
+		   last_revision_index, cycle_started_at, last_status, last_error)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (capability_id, target_env) DO UPDATE SET
+		  last_attempt_at = excluded.last_attempt_at,
+		  last_promote_at = excluded.last_promote_at,
+		  last_score = excluded.last_score,
+		  last_revision_index = excluded.last_revision_index,
+		  cycle_started_at = excluded.cycle_started_at,
+		  last_status = excluded.last_status,
+		  last_error = excluded.last_error`,
+		st.CapabilityID, st.TargetEnv,
+		nullableTime(st.LastAttemptAt), nullableTime(st.LastPromoteAt),
+		st.LastScore, st.LastRevisionIdx, nullableTime(st.CycleStartedAt),
+		st.LastStatus, st.LastError,
+	)
+	if err != nil {
+		return fmt.Errorf("save self_evolve_state: %w", err)
+	}
+	return nil
+}
+
+func nullableTime(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return *t
 }
 
 // SetCapabilityContract upserts the contract attached to a
@@ -431,12 +561,29 @@ func scanCapability(scanner interface {
 	Scan(dest ...any) error
 }) (*capability.Capability, error) {
 	var c capability.Capability
-	err := scanner.Scan(&c.ID, &c.ProjectID, &c.Name, &c.Description, &c.CreatedAt, &c.UpdatedAt)
+	var seEnabled int
+	var seMinScore float64
+	var seMaxRevisions int
+	var seCooldownSec int
+	var seTargetEnv string
+	var seDatasetID sql.NullString
+	err := scanner.Scan(
+		&c.ID, &c.ProjectID, &c.Name, &c.Description, &c.CreatedAt, &c.UpdatedAt,
+		&seEnabled, &seMinScore, &seMaxRevisions, &seCooldownSec, &seTargetEnv, &seDatasetID,
+	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan capability: %w", err)
+	}
+	c.SelfEvolve = capability.SelfEvolveConfig{
+		Enabled:      seEnabled != 0,
+		MinScore:     seMinScore,
+		MaxRevisions: seMaxRevisions,
+		CooldownSec:  seCooldownSec,
+		TargetEnv:    seTargetEnv,
+		DatasetID:    seDatasetID.String,
 	}
 	// State and CurrentVersionID are derived from Release state
 	// (capability.DeriveState). Migration 044 dropped the

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/sachncs/promptsheon/internal/approval"
+	"github.com/sachncs/promptsheon/internal/harness"
 	"github.com/sachncs/promptsheon/internal/release"
 )
 
@@ -164,6 +165,54 @@ func (s *SQLite) GetActiveReleaseID(ctx context.Context, capabilityID string) (s
 		return "", fmt.Errorf("get active release: %w", err)
 	}
 	return id, nil
+}
+
+// GetActiveReleaseIDInEnv returns the active release id for
+// the supplied Capability in the given env, or empty string
+// if none. Used by the self-evolve orchestrator, which
+// per-target-env active release state.
+func (s *SQLite) GetActiveReleaseIDInEnv(ctx context.Context, capabilityID, env string) (string, error) {
+	var id string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id FROM releases
+		 WHERE capability_id = ? AND environment = ? AND status = ?
+		 ORDER BY activated_at DESC LIMIT 1`,
+		capabilityID, env, string(release.StatusActive),
+	).Scan(&id)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("get active release in env: %w", err)
+	}
+	return id, nil
+}
+
+// LastEvalRunForRelease returns the most recent EvalRun
+// record for the given release id, or (nil, nil) if none.
+// Self-evolve uses this to read the latest score and
+// per-case outcomes without scanning the whole table.
+func (s *SQLite) LastEvalRunForRelease(ctx context.Context, releaseID string) (*harness.EvalRun, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, release_id, dataset_id, scorer, score, passed, failed, total,
+		       status, started_at, finished_at
+		  FROM eval_runs
+		 WHERE release_id = ?
+		 ORDER BY started_at DESC LIMIT 1`, releaseID)
+	var run harness.EvalRun
+	var finishedAt sql.NullTime
+	if err := row.Scan(&run.ID, &run.ReleaseID, &run.DatasetID, &run.Scorer, &run.Score,
+		&run.Passed, &run.Failed, &run.Total, &run.Status, &run.StartedAt, &finishedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("last eval run: %w", err)
+	}
+	if finishedAt.Valid {
+		t := finishedAt.Time
+		run.FinishedAt = &t
+	}
+	return &run, nil
 }
 
 func (s *SQLite) UpdateRelease(ctx context.Context, r *release.Release) error {

@@ -33,6 +33,15 @@ type Service struct {
 	Policy    approval.Policy
 	Harness   *harness.PreconditionRunner
 	Clock     func() time.Time
+
+	// SelfApprove, when non-empty, enables the closed-loop
+	// self-evolution Activate path. Activate() and
+	// ActivateWithApprover() both honour the field; when empty
+	// the existing Policy governs. SelfApprove is a
+	// SelfApprovePolicy: the release's MakerCheckerPolicy is
+	// not used for self-evolved releases. The evolver is the
+	// only legitimate caller.
+	SelfApprove string
 }
 
 // NewService constructs a Service with the supplied policy. Callers
@@ -124,6 +133,26 @@ func (s *Service) Vote(ctx context.Context, releaseID string, vote approval.Vote
 // a concurrent Activate on the same capability+env returns
 // SQLITE_CONSTRAINT and the caller sees a 409.
 func (s *Service) Activate(ctx context.Context, releaseID string) (*Release, error) {
+	return s.activateWith(ctx, releaseID, s.Policy)
+}
+
+// SelfActivate runs the same Activate flow but with a
+// SelfApprovePolicy so the evolver can auto-promote a release
+// it has just validated. The policy still insists on a vote
+// from the configured self-approver identity; passing empty
+// SelfApprove to Service is a misconfiguration and returns an
+// error.
+func (s *Service) SelfActivate(ctx context.Context, releaseID string) (*Release, error) {
+	if s.SelfApprove == "" {
+		return nil, errors.New("release: self-activate called but Service.SelfApprove is empty")
+	}
+	return s.activateWith(ctx, releaseID, approval.SelfApprovePolicy{
+		RequiredApprovers: 1,
+		SelfApprover:      s.SelfApprove,
+	})
+}
+
+func (s *Service) activateWith(ctx context.Context, releaseID string, policy approval.Policy) (*Release, error) {
 	r, err := s.DB.GetRelease(ctx, releaseID)
 	if err != nil {
 		return nil, err
@@ -137,7 +166,7 @@ func (s *Service) Activate(ctx context.Context, releaseID string) (*Release, err
 		return nil, fmt.Errorf("approval: %w", err)
 	}
 
-	approved, err := r.ApproveWith(*a, s.Policy)
+	approved, err := r.ApproveWith(*a, policy)
 	if err != nil {
 		return nil, err
 	}
