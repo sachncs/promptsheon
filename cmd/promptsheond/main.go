@@ -315,15 +315,14 @@ func setupLogger(cfg *config.Config, hub *ws.Hub) *slog.Logger {
 }
 
 func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
-	// PG-1 wiring: PROMPTSHEON_DATABASE_URL=postgres://... selects
-	// the Postgres backend. The current Postgres implementation
-	// in internal/store/postgres is in-memory and ships behind
-	// the contract tests; a pgx-backed production wiring lands
-	// in v0.4.0. We log clearly so operators see the swap is
-	// not yet wired. Until pgx ships, the daemon falls back to
-	// SQLite so the env var is detected but not yet honoured.
+	// PG-1: when PROMPTSHEON_DATABASE_URL=postgres://... is set,
+	// warn the operator that pgx is not yet wired and fall back
+	// to SQLite. The Postgres contract tests pass against the
+	// in-memory implementation; pgx-backed production wiring
+	// ships in a follow-up release. The env var is detected so
+	// operators see the gap immediately, not silently.
 	if pgURL := os.Getenv("PROMPTSHEON_DATABASE_URL"); strings.HasPrefix(pgURL, "postgres://") {
-		logger.Warn("PROMPTSHEON_DATABASE_URL=postgres:// detected but pgx wiring is not yet enabled; falling back to SQLite at " + cfg.DBPath + ". The internal/store/postgres schema + RLS migrations are ready; pgx wiring ships in v0.4.0.")
+		logger.Warn("PROMPTSHEON_DATABASE_URL=postgres:// detected but pgx wiring is not yet enabled; falling back to SQLite at " + cfg.DBPath + ". The internal/store/postgres schema + RLS migrations are ready; pgx wiring ships in a follow-up release.")
 	}
 	db, err := store.NewSQLite(cfg.DBPath)
 	if err != nil {
