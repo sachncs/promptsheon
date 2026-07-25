@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0-rc.1] - 2026-07-25
+
+Tagged `v0.3.0-rc.1`. 31 atomic commits since `9832da2`
+(master before this pass); 46 atomic items across the Day 1/2/3
+punch list, every change verified by tests, atomic
+commits, and the CHANGELOG + ROADMAP + glossary updates.
+
 ### v0.3.0 — Day 1/2/3 closure pass
 
 The headline: Promptsheon closes the recommendation loop in
