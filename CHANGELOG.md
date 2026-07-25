@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### v0.3.0 — Deferred items landed
+
+Six items originally tagged v0.4.0+ landed in v0.3.0:
+
+- **LLM-JUDGE-1 / LLM-judge scorers** — `internal/eval/scorer_llm_judge.go`.
+  New `ScorerLLMJudge` registered via `RegisterLLMJudge(JudgeClient)`.
+  The judge emits `VERDICT: PASS|FAIL` plus `RATIONALE:`; the
+  scorer parses case-insensitive on whitespace and rejects
+  malformed responses as errors. Per-case judge timeout is
+  configurable on the scorer.
+- **REASON-COMP-1 / Reasoning compiler** —
+  `internal/reasoning/compiler.go`. `Compiler.Compile(ctx,
+  Intent)` returns a `Plan` (capability pick + budget) or
+  `ErrNoMatch` / `ErrConstraintViolation`. Goal-token match +
+  tag overlap + constraint filter + cost penalty on ties.
+- **PERF-RL-1 / Partitioned rate limiter** — `internal/ratelimit/`.
+  `Allow` is sharded by FNV-1a hash of the key into 16 mutexes
+  instead of one process-wide mutex. Tests pin concurrency
+  (`TestRateLimiterPartitionedConcurrency`) and uniform
+  distribution (`TestShardForDistributesKeys`).
+- **CONT-1 / ContinuousEval at scale** —
+  `internal/harness/continuous.go`. `ContinuousEval.Start`
+  schedules a ticker; each tick resolves the active release
+  via `Repository.GetActiveReleaseID` and runs `EvalRunner`
+  against the capability's dataset. Disabled when
+  `Interval == 0`.
+- **INHERIT-1 / Capability Inheritance** —
+  `internal/capability/inheritance.go`. `ResolveManifest`
+  walks the parent chain (max depth 8) and merges artifacts
+  with the rule "child overrides parent". Cycle detection
+  surfaces `*ErrInheritanceCycle` with the offending ids;
+  depth overflow returns `ErrInheritanceTooDeep`.
+- **PG-1 / Postgres backend with RLS** —
+  `internal/store/postgres/`. Schema mirror in
+  `migrations/000_init.up.sql`; per-Workspace row-level
+  security policies in `migrations/010_rls.up.sql`. The
+  `InMemoryPostgres` adapter satisfies every interface in
+  `store.Repositories` so a future pgx wiring is a drop-in
+  swap.
+
 ## [0.3.0-rc.1] - 2026-07-25
 
 Tagged `v0.3.0-rc.1`. 31 atomic commits since `9832da2`
