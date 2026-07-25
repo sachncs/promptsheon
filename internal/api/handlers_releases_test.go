@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -24,10 +25,15 @@ func seedReleaseFixture(repo *mockRepo) {
 	repo.workspaces["w1"] = &capability.Workspace{ID: "w1", Name: "test"}
 	repo.projects["p1"] = &capability.Project{ID: "p1", WorkspaceID: "w1", Name: "test"}
 	repo.capabilities["c1"] = &capability.Capability{ID: "c1", ProjectID: "p1", Name: "greeting"}
-	repo.versions["v1"] = &capability.Version{
+	v := &capability.Version{
 		ID: "v1", CapabilityID: "c1", Version: 1,
 		Manifest: releaseTestManifest(), ManifestHash: "h1",
 	}
+	repo.versions["v1"] = v
+	// ponytail: GetVersionByNumber looks up by capabilityID_version
+	// composite key (see handlers_test.go:486). Mirror the row so the
+	// invoke handler's lookup succeeds.
+	repo.versions[fmt.Sprintf("%s_%d", v.CapabilityID, v.Version)] = v
 }
 
 func newReleaseTestServer(repo *mockRepo, svc *release.Service) *Server {

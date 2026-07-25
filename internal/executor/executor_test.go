@@ -39,8 +39,10 @@ func TestRunCapturesCallerError(t *testing.T) {
 		return InvokeResult{}, errors.New("rate limited")
 	})
 	rec, err := e.Run(context.Background(), "ws", "rel-1", "prod", json.RawMessage(`{}`))
-	if err != nil {
-		t.Fatalf("Run should swallow caller errors, got %v", err)
+	// ponytail: BUG-19 used to swallow caller errors and return nil;
+	// the harness needed the error so RunRequest now returns it.
+	if err == nil {
+		t.Fatalf("Run should surface caller errors, got nil")
 	}
 	if rec.Status != "error" {
 		t.Fatalf("expected error status, got %s", rec.Status)

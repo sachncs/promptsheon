@@ -36,6 +36,11 @@ type Repository interface {
 	ListCapabilities(ctx context.Context, projectID string) ([]*Capability, error)
 	UpdateCapability(ctx context.Context, c *Capability) error
 	DeleteCapability(ctx context.Context, id string) error
+	// UpdateSelfEvolveConfig sets the per-Capability closed-loop
+	// self-evolution policy. The evolver reads the config on
+	// every cycle; operators update it via the API or via the
+	// PROMPTSHEON_SELF_EVOLVE env var at boot.
+	UpdateSelfEvolveConfig(ctx context.Context, capabilityID string, cfg SelfEvolveConfig) error
 
 	// Capability contracts. A Capability may carry a typed
 	// CapabilityContract; the contract is the unit of

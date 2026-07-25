@@ -453,6 +453,17 @@ func (m *mockRepo) UpdateCapability(_ context.Context, c *capability.Capability)
 	m.capabilities[c.ID] = c
 	return nil
 }
+func (m *mockRepo) UpdateSelfEvolveConfig(_ context.Context, id string, cfg capability.SelfEvolveConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c, ok := m.capabilities[id]
+	if !ok {
+		return store.ErrNotFound
+	}
+	c.SelfEvolve = cfg
+	m.capabilities[id] = c
+	return nil
+}
 func (m *mockRepo) DeleteCapability(_ context.Context, id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

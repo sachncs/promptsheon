@@ -555,6 +555,15 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 			Messages: []llm.Message{{Role: "user", Content: string(req.Input)}},
 			Model:    req.Model,
 		}
+		// ponytail: prepend the resolved manifest's prompt artifact as a
+		// system message so the model actually sees the instruction.
+		// Both the OpenAI and Anthropic providers extract role=system
+		// messages out of the slice and surface them via the SDK's
+		// system field (Anthropic) or the messages array (OpenAI).
+		if len(req.SystemPrompt) > 0 {
+			sys := llm.Message{Role: "system", Content: string(req.SystemPrompt)}
+			llmReq.Messages = append([]llm.Message{sys}, llmReq.Messages...)
+		}
 		resp, err := p.Complete(ctx, llmReq)
 		if err != nil {
 			return executor.InvokeResult{Status: "error", Error: err.Error()}, nil
@@ -638,6 +647,14 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	releaseSvc := buildReleaseService(db, cfg.ApprovalPolicy)
 	if releaseSvc != nil {
 		opts = append(opts, api.WithReleaseService(releaseSvc))
+		// Self-evolve needs a dedicated SelfApprove identity
+		// baked into the release service. We reuse the
+		// "self_evolve" identity as the auto-approver. The
+		// SelfApprove field is only consulted by
+		// Service.SelfActivate; regular Activate still
+		// runs the configured Policy (maker-checker or
+		// majority) untouched.
+		releaseSvc.SelfApprove = "self_evolve"
 	}
 
 	// QW#3: build the release Resolver and wire WithReleaseResolver
@@ -656,7 +673,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	if releaseSvc != nil {
 		precondRunner := harness.NewPreconditionRunner()
 		releaseSvc.WithHarness(precondRunner, db)
-		evalRunner = harness.NewEvalRunner(db, &apiReleaseInvoker{db: db, inv: inv, svc: releaseSvc})
+		evalRunner = harness.NewEvalRunner(db, &apiReleaseInvoker{db: db, inv: inv, svc: releaseSvc, resolver: resolver})
 		evalRunner.Metrics = collector
 		opts = append(opts, api.WithHarnessRunner(evalRunner))
 	}
@@ -699,6 +716,19 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 			}
 			logger.Info("continuous_eval: started", "capability_id", capID, "dataset_id", dsID, "interval_sec", intervalSec)
 		}
+	}
+
+	// SELF-1: closed-loop self-evolution. The
+	// PROMPTSHEON_SELF_EVOLVE env var lists
+	// (capability_id, dataset_id, threshold, target_env,
+	// max_revisions, cooldown_sec) tuples, one per line
+	// separated by ';'. Each entry opts a capability into
+	// the self-evolution loop: when its active release's
+	// EvalRun score falls below threshold, the evolver
+	// revises the prompt, validates the candidate, and
+	// promotes the validated version in target_env.
+	if selfEvolveCfg := os.Getenv("PROMPTSHEON_SELF_EVOLVE"); selfEvolveCfg != "" && evalRunner != nil {
+		wireSelfEvolve(rootCtx, db, releaseSvc, evalRunner, repos, logger, providers, selfEvolveCfg)
 	}
 
 	srv := apiserver.New(repos, logger, opts...)

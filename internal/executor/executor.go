@@ -50,6 +50,13 @@ type InvokeRequest struct {
 	Model         string
 	ModelRevision string
 	Provider      string
+	// SystemPrompt is the resolved manifest's prompt artifact bytes.
+	// The caller MUST prepend it as a system-role message before the
+	// user message; the harness/engine depend on the model seeing it.
+	// ponytail: previously dropped — the eval ran with no instruction
+	// and the model answered generically, so the scorer treated real
+	// answers as fails.
+	SystemPrompt json.RawMessage
 }
 
 // InvokeResult is the Caller's response.
@@ -178,15 +185,13 @@ func (e *Executor) RunRequest(ctx context.Context, req InvokeRequest, environmen
 	if err != nil {
 		rec.Status = "error"
 		rec.Error = err.Error()
-		// Propagate ErrProviderMissing so the HTTP layer can
-		// distinguish a missing provider from a provider that
-		// failed. Other errors are intentionally swallowed: the
-		// record carries them, the API returns 201 with the
-		// error in the body. BUG-19.
-		if errors.Is(err, ErrProviderMissing) {
-			return rec, err
-		}
-		return rec, nil
+		// ponytail: BUG-19 used to swallow non-ErrProviderMissing
+		// errors (return nil) so the API path could 201 with the
+		// error in the body. That hid provider-side errors from
+		// the eval harness, which only sees Go-errors. Now we
+		// surface every error; the API handler decides what status
+		// to return based on rec.Status and the error.
+		return rec, err
 	}
 	rec.Output = res.Output
 	rec.Status = res.Status

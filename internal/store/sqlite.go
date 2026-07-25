@@ -129,7 +129,9 @@ func NewSQLite(dbPath string) (*SQLite, error) {
 	 FROM releases WHERE id = ?`); err == nil {
 		s.stmtGetRelease = stmt
 	}
-	if stmt, err := db.Prepare(`SELECT id, project_id, name, description, created_at, updated_at
+	if stmt, err := db.Prepare(`SELECT id, project_id, name, description, created_at, updated_at,
+	 self_evolve_enabled, self_evolve_min_score, self_evolve_max_revisions, self_evolve_cooldown_sec,
+	 self_evolve_target_env, self_evolve_dataset_id
 	 FROM capabilities WHERE id = ?`); err == nil {
 		s.stmtGetCapability = stmt
 	}
