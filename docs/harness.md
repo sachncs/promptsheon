@@ -236,3 +236,57 @@ has elapsed, the evolver:
   the validated model can run a smaller downstream model.
 - Self-evolve is a background loop; it does not run on
   the eval path. The `ContinuousEval` is the trigger.
+
+### Quick start
+
+The fastest path to a working self-evolve loop:
+
+```bash
+# 1. Pick a capability and its eval dataset.
+CAP=...   # id
+DS=...    # dataset id
+
+# 2. Set PROMPTSHEON_SELF_EVOLVE in the daemon env.
+# Format: cap_id:dataset_id:threshold:target_env:max_revisions:cooldown_sec
+export PROMPTSHEON_SELF_EVOLVE="$CAP:$DS:0.9:dev:10:900"
+# Optional: override the model the revision LLM uses.
+export PROMPTSHEON_SELF_EVOLVE_MODEL="MiniMax-M2.7"
+
+# 3. Boot the daemon. The evolver loop starts automatically
+#    for any capability with the matching env entry.
+./promptsheond
+```
+
+The CLI also exposes the same surface for live toggling:
+
+```bash
+# Enable (idempotent; merges with existing config).
+./promptsheon selfevolve enable $CAP \
+  --dataset $DS \
+  --min-score 0.9 \
+  --max-revisions 10 \
+  --cooldown-sec 900 \
+  --target-env dev
+
+# Inspect persisted config.
+./promptsheon selfevolve status $CAP
+
+# Disable (other fields preserved).
+./promptsheon selfevolve disable $CAP
+```
+
+The daemon exposes self-evolve counters on the standard
+`/metrics` endpoint:
+
+```
+promptsheon_self_evolve_runs_total        # total RunOnce ticks
+promptsheon_self_evolve_revisions_total   # total revision attempts
+promptsheon_self_evolve_promoted_total    # total successful promotes
+```
+
+For an end-to-end smoke test (boot, seed, watch the
+cycle complete, assert audit + metrics):
+
+```bash
+./scripts/selftest.sh
+```
