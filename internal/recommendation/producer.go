@@ -36,9 +36,9 @@ import (
 // fetch the Aggregator.
 type SourceFunc func() []rules.Observation
 
-// SinkFunc persists or forwards Recommendations. production wiring
-// delivers to the SQLite / Postgres Repository; tests pass a
-// no-op closure.
+// SinkFunc persists or forwards Recommendations. Production
+// wiring delivers to the SQLite / Postgres Repository; tests
+// pass a closure that captures into a slice for assertions.
 type SinkFunc func(ctx context.Context, rec *capability.Recommendation) error
 
 // Producer runs on each scheduled tick. It aggregates Observations,
