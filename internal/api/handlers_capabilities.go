@@ -340,6 +340,33 @@ func (s *Server) handleDeleteCapability(w http.ResponseWriter, r *http.Request) 
 	return nil
 }
 
+// handleUpdateSelfEvolveConfig is the API backing the
+// `promptsheon selfevolve` CLI subcommand. The body is a
+// partial capability.SelfEvolveConfig; the daemon merges
+// over the persisted config and persists. Operators flip
+// the loop on/off here without restarting the daemon.
+func (s *Server) handleUpdateSelfEvolveConfig(w http.ResponseWriter, r *http.Request) error {
+	id := r.PathValue("id")
+	existing, err := s.db.GetCapability(r.Context(), id)
+	if err != nil {
+		return translateDBError(err, "capability")
+	}
+	var req capability.SelfEvolveConfig
+	if err := readJSON(r, &req); err != nil {
+		return ErrBadRequest
+	}
+	if err := s.db.UpdateSelfEvolveConfig(r.Context(), existing.ID, req); err != nil {
+		return err
+	}
+	s.audit(r.Context(), "update", "capability:"+existing.ID+":self_evolve", map[string]any{"enabled": req.Enabled, "min_score": req.MinScore, "max_revisions": req.MaxRevisions})
+	updated, err := s.db.GetCapability(r.Context(), id)
+	if err != nil {
+		return err
+	}
+	writeJSON(w, http.StatusOK, updated)
+	return nil
+}
+
 func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request) error {
 	limit, offset, err := parsePagination(r)
 	if err != nil {
