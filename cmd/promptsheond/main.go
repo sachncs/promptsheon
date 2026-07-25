@@ -727,7 +727,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	// revises the prompt, validates the candidate, and
 	// promotes the validated version in target_env.
 	if selfEvolveCfg := os.Getenv("PROMPTSHEON_SELF_EVOLVE"); selfEvolveCfg != "" && evalRunner != nil {
-		wireSelfEvolve(rootCtx, db, releaseSvc, evalRunner, repos, logger, providers, selfEvolveCfg)
+		wireSelfEvolve(rootCtx, db, releaseSvc, evalRunner, repos, logger, providers, collector, selfEvolveCfg)
 	}
 
 	srv := apiserver.New(repos, logger, opts...)

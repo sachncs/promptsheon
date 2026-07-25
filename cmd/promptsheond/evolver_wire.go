@@ -14,6 +14,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/harness"
 	"github.com/sachncs/promptsheon/internal/llm"
+	"github.com/sachncs/promptsheon/internal/metrics"
 	"github.com/sachncs/promptsheon/internal/models"
 	"github.com/sachncs/promptsheon/internal/release"
 	"github.com/sachncs/promptsheon/internal/selfevolve"
@@ -46,6 +47,7 @@ func wireSelfEvolve(
 	repos *store.Repositories,
 	logger *slog.Logger,
 	providers *llm.Registry,
+	metrics *metrics.Collector,
 	cfg string,
 ) {
 	for _, raw := range splitEntries(cfg, ';') {
@@ -65,7 +67,7 @@ func wireSelfEvolve(
 			logger.Warn("self_evolve: UpdateSelfEvolveConfig failed", "capability_id", entry.capID, "err", err)
 			continue
 		}
-		loop := buildEvolver(db, releaseSvc, repos, providers, logger, entry.capID)
+		loop := buildEvolver(db, releaseSvc, repos, providers, logger, metrics, entry.capID)
 		go loop.run(rootCtx)
 		logger.Info("self_evolve: started",
 			"capability_id", entry.capID, "dataset_id", entry.datasetID,
@@ -84,6 +86,7 @@ func buildEvolver(
 	repos *store.Repositories,
 	providers *llm.Registry,
 	logger *slog.Logger,
+	metrics *metrics.Collector,
 	capabilityID string,
 ) *selfEvolveLoop {
 	repo := newEvolverRepoAdapter(db)
@@ -103,6 +106,7 @@ func buildEvolver(
 		ev:       ev,
 		capID:    capabilityID,
 		logger:   logger,
+		metrics:  metrics,
 		interval: 60 * time.Second,
 	}
 }
@@ -149,6 +153,7 @@ type selfEvolveLoop struct {
 	ev       *selfevolve.Evolver
 	capID    string
 	logger   *slog.Logger
+	metrics  *metrics.Collector
 	interval time.Duration
 }
 
@@ -164,6 +169,13 @@ func (l *selfEvolveLoop) run(ctx context.Context) {
 			if err != nil {
 				l.logger.Warn("self_evolve: RunOnce error", "capability_id", l.capID, "err", err)
 				continue
+			}
+			if l.metrics != nil {
+				l.metrics.SelfEvolveRunsTotal.Inc()
+				l.metrics.SelfEvolveRevisionsTotal.Add(float64(res.Revisions))
+				if res.Promoted {
+					l.metrics.SelfEvolvePromotedTotal.Inc()
+				}
 			}
 			l.logger.Info("self_evolve: RunOnce result",
 				"capability_id", l.capID,

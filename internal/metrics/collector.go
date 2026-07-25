@@ -213,6 +213,12 @@ type Collector struct {
 	// Hallucination score histogram
 	HallucinationScores *Histogram
 
+	// Self-evolution metrics. The evolver emits one event per
+	// cycle tick. Result ∈ {promoted, rejected, skipped}.
+	SelfEvolveRunsTotal      *Counter
+	SelfEvolveRevisionsTotal *Counter
+	SelfEvolvePromotedTotal  *Counter
+
 	// Pipeline drop counters (OBS-7). These reflect the
 	// number of entries that the audit / trace pipeline
 	// rejected because its in-process queue was full. The
@@ -361,8 +367,11 @@ func NewCollector() *Collector {
 		GuardrailPasses:         newCounter(nil),
 		AgentExecutionsTotal:    newCounter(nil),
 		AgentExecutionLatency:   newHistogram(nil),
-		HallucinationScores:     newHistogram(nil),
-		AuditQueueLatency:       newHistogram(nil),
+		HallucinationScores:        newHistogram(nil),
+		AuditQueueLatency:          newHistogram(nil),
+		SelfEvolveRunsTotal:        newCounter(nil),
+		SelfEvolveRevisionsTotal:   newCounter(nil),
+		SelfEvolvePromotedTotal:    newCounter(nil),
 	}
 }
 
@@ -574,6 +583,9 @@ func (c *Collector) prometheusFormat() string {
 	writeCounter("promptsheon_guardrail_violations_total", "Guardrail violations", c.GuardrailViolations.Value())
 	writeCounter("promptsheon_guardrail_blocks_total", "Guardrail blocks", c.GuardrailBlocks.Value())
 	writeCounter("promptsheon_audit_dropped_total", "Audit entries dropped because the worker queue was full", float64(c.auditDropped.Load()))
+	writeCounter("promptsheon_self_evolve_runs_total", "Total self-evolve RunOnce ticks", c.SelfEvolveRunsTotal.Value())
+	writeCounter("promptsheon_self_evolve_revisions_total", "Total self-evolve revision attempts", c.SelfEvolveRevisionsTotal.Value())
+	writeCounter("promptsheon_self_evolve_promoted_total", "Total self-evolve successful promotes", c.SelfEvolvePromotedTotal.Value())
 	writeCounter("promptsheon_audit_chain_verifications_total", "Total audit-chain verifications (pass + tail-mismatch)", c.AuditChainVerifications.Value())
 	writeHistogram("promptsheon_audit_queue_latency_seconds", "Time between audit() being called and the entry being persisted by the worker", c.AuditQueueLatency)
 	writeCounter("promptsheon_trace_dropped_total", "Trace spans dropped because the worker queue was full", float64(c.traceDropped.Load()))
