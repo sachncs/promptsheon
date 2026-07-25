@@ -635,6 +635,9 @@ paths:
                   type: number
                 manifest:
                   $ref: "#/components/schemas/object"
+                parents:
+                  type: array
+                  items: {}
       responses:
         "200":
           description: OK
@@ -756,6 +759,117 @@ paths:
           description: Not found
         "500":
           description: Internal server error
+  /api/v1/capabilities/{id}/contract:
+    get:
+      summary: "handleGetCapabilityContract returns the contract attached to\na Capability."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+    put:
+      summary: "handleUpdateCapabilityContract attaches a contract to a\nCapability."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+  /api/v1/capabilities/{id}/diff:
+    get:
+      summary: "handleDiffVersions returns the structural diff between two\nVersions of a Capability."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+  /api/v1/capabilities/{id}/reputation:
+    get:
+      summary: "handleGetCapabilityReputation returns the derived trust\nscore for a Capability."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+  /api/v1/catalog/capabilities:
+    get:
+      summary: "handleCatalogSearch returns the Capabilities in the\nsupplied workspace whose name matches the query string.\nEmpty query returns every Capability in the workspace.\n\nGET /api/v1/catalog/capabilities?workspace_id=ws1&q=foo&limit=100"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/object"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
   /api/v1/datasets/{id}:
     get:
       summary: "GET datasets/{id}"
@@ -1258,6 +1372,24 @@ paths:
           description: Not found
         "500":
           description: Internal server error
+  /api/v1/reasoning/compile:
+    post:
+      summary: "handleReasoningCompile turns an Intent into a Plan.\n\nPOST /api/v1/reasoning/compile\nBody: reasoning.Intent JSON\n200 OK with reasoning.Plan\n404 Not Found: ErrNoMatch\n409 Conflict: ErrConstraintViolation"
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
   /api/v1/releases/{id}:
     get:
       summary: "GET releases/{id}"
@@ -1467,7 +1599,7 @@ paths:
           description: Not found
   /api/v1/settings/{key}:
     get:
-      summary: "handleGetSetting returns one key (or 404)."
+      summary: "handleGetSetting returns the effective value for one key (or 404).\nUnlike list, which contains persisted live rows only, this endpoint applies\nenvironment-over-database precedence."
       parameters:
         - name: key
           in: path
