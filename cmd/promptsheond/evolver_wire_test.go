@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/sachncs/promptsheon/internal/llm"
 	"github.com/sachncs/promptsheon/internal/selfevolve"
 )
 
@@ -83,7 +84,8 @@ func TestSplitEntries(t *testing.T) {
 func TestMakeEvolverLLMInvoke_NoProviders(t *testing.T) {
 	// Construct a registry with zero providers. The closure
 	// should return an error when called.
-	invoke := makeEvolverLLMInvoke(nil, nil)
+	r := llm.NewRegistry()
+	invoke := makeEvolverLLMInvoke(r, nil)
 	_, err := invoke(context.Background(), selfevolve.LLMInvokeRequest{System: "s", User: "u"})
 	if err == nil {
 		t.Errorf("expected error for no providers")
