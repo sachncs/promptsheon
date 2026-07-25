@@ -6,45 +6,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-### v0.3.0 — Deferred items landed
+## [0.3.0] - 2026-07-25
 
-Six items originally tagged v0.4.0+ landed in v0.3.0:
+The production release of v0.3.0. Six primitives originally
+tagged v0.4.0+ are now wired into the production daemon, not
+just exercised by tests. The OpenAPI spec regenerated; SDKs
+exposed new methods; the smoke test passes end-to-end.
+
+### Production wiring (WIRE-FINAL-1)
+
+- **LLM-judge scorer registered at boot.** `internal/llm/judge.go`
+  exposes `NewJudgeClient(registry)` which routes judge prompts
+  through the live LLM gateway. `cmd/promptsheond/main.go`
+  calls it after wiring the harness runner and registers
+  the scorer via `eval.RegisterLLMJudge`. Operators can opt
+  out with `PROMPTSHEON_LLM_JUDGE=off`.
+- **`POST /api/v1/reasoning/compile`** — new endpoint that
+  accepts an `Intent` and returns a `Plan`. Errors map to
+  `404 ErrNoMatch` and `409 ErrConstraintViolation`. The
+  catalog is built from the workspace's Capabilities filtered
+  by reputation; tests pass an explicit catalog.
+- **ContinuousEval loops.** Operators configure with
+  `PROMPTSHEON_CONTINUOUS_EVAL=cap-1:ds-1:60;cap-2:ds-2:300`.
+  Each entry starts a `ContinuousEval` goroutine that ticks
+  every N seconds and runs the active release against the
+  dataset. Tests cover disabled, no-active-release, and
+  end-to-end-passes paths.
+- **Inheritance wired into Version create.** `POST
+  /api/v1/capabilities/{id}/versions` accepts an optional
+  `parents: [version_id, ...]` field. The handler calls
+  `ResolveManifest` against the Repository; cycles and depth
+  overflow surface as `422 Unprocessable Entity`.
+- **`PROMPTSHEON_DATABASE_URL=postgres://...` detected.** The
+  daemon logs a clear warning that pgx wiring ships in v0.4.0
+  and falls back to SQLite. The schema + RLS migrations are
+  ready (`internal/store/postgres/migrations/`); the
+  in-memory adapter satisfies every interface in
+  `store.Repositories`.
+
+### Primitives landed (already shipped in v0.3.0-rc.1)
 
 - **LLM-JUDGE-1 / LLM-judge scorers** — `internal/eval/scorer_llm_judge.go`.
-  New `ScorerLLMJudge` registered via `RegisterLLMJudge(JudgeClient)`.
-  The judge emits `VERDICT: PASS|FAIL` plus `RATIONALE:`; the
-  scorer parses case-insensitive on whitespace and rejects
-  malformed responses as errors. Per-case judge timeout is
-  configurable on the scorer.
 - **REASON-COMP-1 / Reasoning compiler** —
-  `internal/reasoning/compiler.go`. `Compiler.Compile(ctx,
-  Intent)` returns a `Plan` (capability pick + budget) or
-  `ErrNoMatch` / `ErrConstraintViolation`. Goal-token match +
-  tag overlap + constraint filter + cost penalty on ties.
-- **PERF-RL-1 / Partitioned rate limiter** — `internal/ratelimit/`.
-  `Allow` is sharded by FNV-1a hash of the key into 16 mutexes
-  instead of one process-wide mutex. Tests pin concurrency
-  (`TestRateLimiterPartitionedConcurrency`) and uniform
-  distribution (`TestShardForDistributesKeys`).
+  `internal/reasoning/compiler.go`.
+- **PERF-RL-1 / Partitioned rate limiter** — 16-way FNV-1a sharded.
 - **CONT-1 / ContinuousEval at scale** —
-  `internal/harness/continuous.go`. `ContinuousEval.Start`
-  schedules a ticker; each tick resolves the active release
-  via `Repository.GetActiveReleaseID` and runs `EvalRunner`
-  against the capability's dataset. Disabled when
-  `Interval == 0`.
+  `internal/harness/continuous.go`.
 - **INHERIT-1 / Capability Inheritance** —
-  `internal/capability/inheritance.go`. `ResolveManifest`
-  walks the parent chain (max depth 8) and merges artifacts
-  with the rule "child overrides parent". Cycle detection
-  surfaces `*ErrInheritanceCycle` with the offending ids;
-  depth overflow returns `ErrInheritanceTooDeep`.
+  `internal/capability/inheritance.go`.
 - **PG-1 / Postgres backend with RLS** —
-  `internal/store/postgres/`. Schema mirror in
-  `migrations/000_init.up.sql`; per-Workspace row-level
-  security policies in `migrations/010_rls.up.sql`. The
-  `InMemoryPostgres` adapter satisfies every interface in
-  `store.Repositories` so a future pgx wiring is a drop-in
-  swap.
+  `internal/store/postgres/`.
 
 ## [0.3.0-rc.1] - 2026-07-25
 

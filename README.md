@@ -30,6 +30,26 @@ Beyond the deployment surface, Promptsheon ships:
 - **Capability Catalog** — search across Workspaces.
 - **Capability Reputation** — derived trust score from eval
   history, SLO adherence, and decision adoption.
+- **Capability Inheritance** — a Version can declare Parents
+  and inherit artifacts from another Version. Cycles and
+  depth overflow are detected at create time.
+- **Reasoning Compiler** — `POST /api/v1/reasoning/compile`
+  turns an Intent into a CapabilityPlan (a DAG of capability
+  invocations). Picks the best-fit capability against a
+  catalog filtered by reputation, cost, and latency
+  constraints.
+- **ContinuousEval** — scheduled eval loops that run the
+  active release against a dataset on a fixed cadence.
+  Configured via `PROMPTSHEON_CONTINUOUS_EVAL`.
+- **LLM-judge scorer** — `eval.RegisterLLMJudge(JudgeClient)`
+  registers an LLM-backed scorer; the production daemon
+  wires it to the live LLM gateway.
+- **Partitioned rate limiter** — 16-way FNV-1a sharded
+  Allow() — contention scales linearly with the shard count.
+- **Postgres backend with RLS** — schema mirror in
+  `internal/store/postgres/migrations/`; per-Workspace
+  row-level security policies. The pgx wiring ships in
+  v0.4.0; today the contract is exercised by tests.
 - **Recommendation Loop** — production telemetry → Observation
   → Rules/Bandit → Recommendation → Decision → next Version.
   The loop is closed end-to-end and persists across restarts.
