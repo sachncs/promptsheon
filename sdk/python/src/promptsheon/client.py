@@ -165,6 +165,10 @@ class Client(_BaseClient):
         url = f"/api/v1/releases/{release_id}/evals"
         return self._check(self._http.post(url, json={"dataset_id": dataset_id, "scorer": scorer}, headers=self._json_headers()), "POST", url)
 
+    def reasoning_compile(self, intent: dict) -> dict:
+        url = "/api/v1/reasoning/compile"
+        return self._check(self._http.post(url, json=intent, headers=self._json_headers()), "POST", url)
+
     def list_evals(self, release_id: str) -> list[dict]:
         url = f"/api/v1/releases/{release_id}/evals"
         return self._check(self._http.get(url, headers=self._headers()), "GET", url)
@@ -266,4 +270,9 @@ class AsyncClient(_BaseClient):
     async def run_eval(self, release_id: str, dataset_id: str, scorer: str = "exact_match") -> dict:
         url = f"/api/v1/releases/{release_id}/evals"
         r = await self._http.post(url, json={"dataset_id": dataset_id, "scorer": scorer}, headers=self._json_headers())
+        return await self._check(r, "POST", url)
+
+    async def reasoning_compile(self, intent: dict) -> dict:
+        url = "/api/v1/reasoning/compile"
+        r = await self._http.post(url, json=intent, headers=self._json_headers())
         return await self._check(r, "POST", url)
