@@ -213,6 +213,15 @@ export class PromptsheonClient {
     }), "POST", url);
   }
 
+  async reasoningCompile(intent: Record<string, unknown>): Promise<unknown> {
+    const url = `${this.config.baseUrl}/api/v1/reasoning/compile`;
+    return await this.check(await fetch(url, {
+      method: "POST",
+      headers: this.headers(true),
+      body: JSON.stringify(intent),
+    }), "POST", url);
+  }
+
   // --- Audit / Settings ------------------------------------------------
   async verifyAuditChain(): Promise<unknown> {
     const url = `${this.config.baseUrl}/api/v1/audit/verify`;

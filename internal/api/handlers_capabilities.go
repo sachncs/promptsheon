@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -363,6 +364,7 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 	var req struct {
 		Version  int                 `json:"version"`
 		Manifest capability.Manifest `json:"manifest"`
+		Parents  []string            `json:"parents,omitempty"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
@@ -379,6 +381,31 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 	if err := manifest.Validate(); err != nil {
 		return badRequest("manifest: " + err.Error())
 	}
+	// INHERIT-1 wiring: if the request declares Parents, the
+	// child's Manifest is overridden by the parent's artifacts
+	// for every Kind the parent supplies. Cycles and depth
+	// overflow are surfaced as 422 (Unprocessable Entity).
+	if len(req.Parents) > 0 {
+		resolver := &versionResolverAdapter{repo: s.db}
+		merged, err := capability.ResolveManifest(&capability.Version{
+			ID:           "",
+			CapabilityID: capabilityID,
+			Version:      req.Version,
+			Manifest:     manifest,
+			Parents:      req.Parents,
+		}, resolver)
+		if err != nil {
+			var cycle *capability.ErrInheritanceCycle
+			if errors.As(err, &cycle) {
+				return &HTTPError{Status: http.StatusUnprocessableEntity, Message: err.Error()}
+			}
+			if errors.Is(err, capability.ErrInheritanceTooDeep) {
+				return &HTTPError{Status: http.StatusUnprocessableEntity, Message: err.Error()}
+			}
+			return &HTTPError{Status: http.StatusBadRequest, Message: err.Error()}
+		}
+		manifest = merged
+	}
 	hash, err := computeManifestHash(manifest)
 	if err != nil {
 		return fmt.Errorf("compute manifest hash: %w", err)
@@ -390,15 +417,26 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 		Version:      req.Version,
 		Manifest:     manifest,
 		ManifestHash: hash,
+		Parents:      req.Parents,
 		CreatedAt:    now,
 		CreatedBy:    callerID(r),
 	}
 	if err := s.db.CreateVersion(r.Context(), v); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "version:"+v.ID, map[string]any{"capability_id": capabilityID, auditKeyVersion: v.Version, "manifest_hash": hash})
+	s.audit(r.Context(), "create", "version:"+v.ID, map[string]any{"capability_id": capabilityID, auditKeyVersion: v.Version, "manifest_hash": hash, "parents": req.Parents})
 	writeJSON(w, http.StatusCreated, v)
 	return nil
+}
+
+// versionResolverAdapter adapts the SQLite Repository surface
+// to the InheritanceResolver contract used by ResolveManifest.
+type versionResolverAdapter struct {
+	repo capability.Repository
+}
+
+func (a *versionResolverAdapter) GetVersion(id string) (*capability.Version, error) {
+	return a.repo.GetVersion(context.Background(), id)
 }
 
 // sha256Hex returns hex(sha256(b)).

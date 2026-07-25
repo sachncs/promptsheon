@@ -32,6 +32,7 @@ import (
 	"github.com/sachncs/promptsheon/internal/buildinfo"
 	"github.com/sachncs/promptsheon/internal/capability"
 	"github.com/sachncs/promptsheon/internal/config"
+	"github.com/sachncs/promptsheon/internal/eval"
 	contextpkg "github.com/sachncs/promptsheon/internal/context"
 	"github.com/sachncs/promptsheon/internal/election"
 	"github.com/sachncs/promptsheon/internal/eventbus"
@@ -314,6 +315,16 @@ func setupLogger(cfg *config.Config, hub *ws.Hub) *slog.Logger {
 }
 
 func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
+	// PG-1 wiring: PROMPTSHEON_DATABASE_URL=postgres://... selects
+	// the Postgres backend. The current Postgres implementation
+	// in internal/store/postgres is in-memory and ships behind
+	// the contract tests; a pgx-backed production wiring lands
+	// in v0.4.0. We log clearly so operators see the swap is
+	// not yet wired. Until pgx ships, the daemon falls back to
+	// SQLite so the env var is detected but not yet honoured.
+	if pgURL := os.Getenv("PROMPTSHEON_DATABASE_URL"); strings.HasPrefix(pgURL, "postgres://") {
+		logger.Warn("PROMPTSHEON_DATABASE_URL=postgres:// detected but pgx wiring is not yet enabled; falling back to SQLite at " + cfg.DBPath + ". The internal/store/postgres schema + RLS migrations are ready; pgx wiring ships in v0.4.0.")
+	}
 	db, err := store.NewSQLite(cfg.DBPath)
 	if err != nil {
 		logger.Error("failed to open database", "err", err)
@@ -641,16 +652,112 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	// When a ReleaseInvoker is available (i.e. an LLM provider is
 	// configured), we wire the EvalRunner into the daemon. The
 	// PreconditionRunner gates Activate; failures surface as 409.
+	var evalRunner *harness.EvalRunner
 	if releaseSvc != nil {
 		precondRunner := harness.NewPreconditionRunner()
 		releaseSvc.WithHarness(precondRunner, db)
-		evalRunner := harness.NewEvalRunner(db, &apiReleaseInvoker{db: db, inv: inv, svc: releaseSvc})
+		evalRunner = harness.NewEvalRunner(db, &apiReleaseInvoker{db: db, inv: inv, svc: releaseSvc})
 		evalRunner.Metrics = collector
 		opts = append(opts, api.WithHarnessRunner(evalRunner))
 	}
 
+	// LLM-JUDGE-1 wiring: register the LLM-judge scorer with a
+	// JudgeClient that wraps the live LLM gateway. Operators who
+	// don't want judge-based eval can set PROMPTSHEON_LLM_JUDGE=off
+	// to skip the registration. The judge is only useful when the
+	// LLM gateway is configured; if no providers are registered
+	// we skip silently.
+	if os.Getenv("PROMPTSHEON_LLM_JUDGE") != "off" && providers != nil {
+		if jc, ok := llm.NewJudgeClient(providers); ok {
+			eval.RegisterLLMJudge(jc)
+			logger.Info("llm_judge scorer registered")
+		}
+	}
+
+	// CONT-1 wiring: ContinuousEval loops for capabilities
+	// that opt-in via the PROMPTSHEON_CONTINUOUS_EVAL env var.
+	// Format: "capability_id:dataset_id:interval_seconds;..."
+	// An empty value (the default) means no continuous eval runs.
+	// Each loop is bound to the rootCtx so daemon shutdown
+	// cancels them.
+	if continuousCfg := os.Getenv("PROMPTSHEON_CONTINUOUS_EVAL"); continuousCfg != "" && evalRunner != nil {
+		for _, entry := range splitContinuousEntries(continuousCfg) {
+			capID, dsID, intervalSec := parseContinuousEntry(entry)
+			if capID == "" || dsID == "" || intervalSec <= 0 {
+				logger.Warn("continuous_eval: skipping malformed entry", "entry", entry)
+				continue
+			}
+			ce := harness.NewContinuousEval(harness.ContinuousEvalConfig{
+				CapabilityID: capID,
+				DatasetID:    dsID,
+				Interval:     time.Duration(intervalSec) * time.Second,
+				ScorerName:   "exact_match",
+			}, db, evalRunner, logger)
+			if err := ce.Start(rootCtx); err != nil {
+				logger.Warn("continuous_eval: start failed", "capability_id", capID, "err", err)
+				continue
+			}
+			logger.Info("continuous_eval: started", "capability_id", capID, "dataset_id", dsID, "interval_sec", intervalSec)
+		}
+	}
+
 	srv := apiserver.New(repos, logger, opts...)
 	return srv, limiter, tracer, collector, v
+}
+
+// splitContinuousEntries splits a PROMPTSHEON_CONTINUOUS_EVAL
+// value on the canonical separator. Whitespace is trimmed.
+func splitContinuousEntries(s string) []string {
+	out := []string{}
+	cur := ""
+	for _, r := range s {
+		if r == ';' {
+			if cur != "" {
+				out = append(out, cur)
+				cur = ""
+			}
+			continue
+		}
+		cur += string(r)
+	}
+	if cur != "" {
+		out = append(out, cur)
+	}
+	return out
+}
+
+// parseContinuousEntry parses "capability_id:dataset_id:interval_sec".
+// Returns ("", "", 0) on malformed input.
+func parseContinuousEntry(s string) (string, string, int) {
+	parts := splitByColon(s)
+	if len(parts) != 3 {
+		return "", "", 0
+	}
+	capID := parts[0]
+	dsID := parts[1]
+	intervalSec := 0
+	for _, r := range parts[2] {
+		if r < '0' || r > '9' {
+			return "", "", 0
+		}
+		intervalSec = intervalSec*10 + int(r-'0')
+	}
+	return capID, dsID, intervalSec
+}
+
+func splitByColon(s string) []string {
+	out := []string{}
+	cur := ""
+	for _, r := range s {
+		if r == ':' {
+			out = append(out, cur)
+			cur = ""
+			continue
+		}
+		cur += string(r)
+	}
+	out = append(out, cur)
+	return out
 }
 
 // buildOAuthManager constructs an *auth.OAuthManager from
