@@ -49,6 +49,9 @@ coverage.html
 sdk/typescript/node_modules/
 sdk/typescript/dist/
 sdk/typescript/*.tsbuildinfo
+web/node_modules/
+web/dist/
+web/screenshots/
 
 # Security files
 *.pem
