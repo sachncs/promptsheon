@@ -173,7 +173,6 @@ type McpListTools string                                     // Always "mcp_list
 type McpListToolsCompleted string                            // Always "mcp_list_tools.completed"
 type McpListToolsFailed string                               // Always "mcp_list_tools.failed"
 type McpListToolsInProgress string                           // Always "mcp_list_tools.in_progress"
-type Member string                                           // Always "member"
 type Message string                                          // Always "message"
 type MessageCreation string                                  // Always "message_creation"
 type Model string                                            // Always "model"
@@ -207,6 +206,8 @@ type OrganizationProjectUser string                          // Always "organiza
 type OrganizationProjectUserDeleted string                   // Always "organization.project.user.deleted"
 type OrganizationSpendAlert string                           // Always "organization.spend_alert"
 type OrganizationSpendAlertDeleted string                    // Always "organization.spend_alert.deleted"
+type OrganizationSpendLimit string                           // Always "organization.spend_limit"
+type OrganizationSpendLimitDeleted string                    // Always "organization.spend_limit.deleted"
 type OrganizationUsageAudioSpeechesResult string             // Always "organization.usage.audio_speeches.result"
 type OrganizationUsageAudioTranscriptionsResult string       // Always "organization.usage.audio_transcriptions.result"
 type OrganizationUsageCodeInterpreterSessionsResult string   // Always "organization.usage.code_interpreter_sessions.result"
@@ -238,6 +239,8 @@ type ProjectModelPermissionsDeleted string                   // Always "project.
 type ProjectRateLimit string                                 // Always "project.rate_limit"
 type ProjectSpendAlert string                                // Always "project.spend_alert"
 type ProjectSpendAlertDeleted string                         // Always "project.spend_alert.deleted"
+type ProjectSpendLimit string                                // Always "project.spend_limit"
+type ProjectSpendLimitDeleted string                         // Always "project.spend_limit.deleted"
 type ProtocolError string                                    // Always "protocol_error"
 type Python string                                           // Always "python"
 type QuotedText string                                       // Always "quoted_text"
@@ -609,7 +612,6 @@ func (c McpListTools) Default() McpListTools                     { return "mcp_l
 func (c McpListToolsCompleted) Default() McpListToolsCompleted   { return "mcp_list_tools.completed" }
 func (c McpListToolsFailed) Default() McpListToolsFailed         { return "mcp_list_tools.failed" }
 func (c McpListToolsInProgress) Default() McpListToolsInProgress { return "mcp_list_tools.in_progress" }
-func (c Member) Default() Member                                 { return "member" }
 func (c Message) Default() Message                               { return "message" }
 func (c MessageCreation) Default() MessageCreation               { return "message_creation" }
 func (c Model) Default() Model                                   { return "model" }
@@ -679,6 +681,10 @@ func (c OrganizationSpendAlert) Default() OrganizationSpendAlert { return "organ
 func (c OrganizationSpendAlertDeleted) Default() OrganizationSpendAlertDeleted {
 	return "organization.spend_alert.deleted"
 }
+func (c OrganizationSpendLimit) Default() OrganizationSpendLimit { return "organization.spend_limit" }
+func (c OrganizationSpendLimitDeleted) Default() OrganizationSpendLimitDeleted {
+	return "organization.spend_limit.deleted"
+}
 func (c OrganizationUsageAudioSpeechesResult) Default() OrganizationUsageAudioSpeechesResult {
 	return "organization.usage.audio_speeches.result"
 }
@@ -745,6 +751,10 @@ func (c ProjectRateLimit) Default() ProjectRateLimit   { return "project.rate_li
 func (c ProjectSpendAlert) Default() ProjectSpendAlert { return "project.spend_alert" }
 func (c ProjectSpendAlertDeleted) Default() ProjectSpendAlertDeleted {
 	return "project.spend_alert.deleted"
+}
+func (c ProjectSpendLimit) Default() ProjectSpendLimit { return "project.spend_limit" }
+func (c ProjectSpendLimitDeleted) Default() ProjectSpendLimitDeleted {
+	return "project.spend_limit.deleted"
 }
 func (c ProtocolError) Default() ProtocolError               { return "protocol_error" }
 func (c Python) Default() Python                             { return "python" }
@@ -1195,7 +1205,6 @@ func (c McpListTools) MarshalJSON() ([]byte, error)                        { ret
 func (c McpListToolsCompleted) MarshalJSON() ([]byte, error)               { return marshalString(c) }
 func (c McpListToolsFailed) MarshalJSON() ([]byte, error)                  { return marshalString(c) }
 func (c McpListToolsInProgress) MarshalJSON() ([]byte, error)              { return marshalString(c) }
-func (c Member) MarshalJSON() ([]byte, error)                              { return marshalString(c) }
 func (c Message) MarshalJSON() ([]byte, error)                             { return marshalString(c) }
 func (c MessageCreation) MarshalJSON() ([]byte, error)                     { return marshalString(c) }
 func (c Model) MarshalJSON() ([]byte, error)                               { return marshalString(c) }
@@ -1237,6 +1246,8 @@ func (c OrganizationProjectUser) MarshalJSON() ([]byte, error)              { re
 func (c OrganizationProjectUserDeleted) MarshalJSON() ([]byte, error)       { return marshalString(c) }
 func (c OrganizationSpendAlert) MarshalJSON() ([]byte, error)               { return marshalString(c) }
 func (c OrganizationSpendAlertDeleted) MarshalJSON() ([]byte, error)        { return marshalString(c) }
+func (c OrganizationSpendLimit) MarshalJSON() ([]byte, error)               { return marshalString(c) }
+func (c OrganizationSpendLimitDeleted) MarshalJSON() ([]byte, error)        { return marshalString(c) }
 func (c OrganizationUsageAudioSpeechesResult) MarshalJSON() ([]byte, error) { return marshalString(c) }
 func (c OrganizationUsageAudioTranscriptionsResult) MarshalJSON() ([]byte, error) {
 	return marshalString(c)
@@ -1272,6 +1283,8 @@ func (c ProjectModelPermissionsDeleted) MarshalJSON() ([]byte, error)        { r
 func (c ProjectRateLimit) MarshalJSON() ([]byte, error)                      { return marshalString(c) }
 func (c ProjectSpendAlert) MarshalJSON() ([]byte, error)                     { return marshalString(c) }
 func (c ProjectSpendAlertDeleted) MarshalJSON() ([]byte, error)              { return marshalString(c) }
+func (c ProjectSpendLimit) MarshalJSON() ([]byte, error)                     { return marshalString(c) }
+func (c ProjectSpendLimitDeleted) MarshalJSON() ([]byte, error)              { return marshalString(c) }
 func (c ProtocolError) MarshalJSON() ([]byte, error)                         { return marshalString(c) }
 func (c Python) MarshalJSON() ([]byte, error)                                { return marshalString(c) }
 func (c QuotedText) MarshalJSON() ([]byte, error)                            { return marshalString(c) }
