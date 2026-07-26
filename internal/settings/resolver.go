@@ -117,15 +117,6 @@ type Store interface {
 	MergeSystemConfig(ctx context.Context, replicaID string, records []CRDTRecord) error
 }
 
-// SystemConfigRow mirrors models.SystemConfig. Defined here so
-// this package doesn't import internal/models (which imports
-// the store package — circular).
-//
-// Deprecated alias for CRDTRecord. Kept so legacy call sites
-// that referred to SystemConfigRow do not break; new code
-// should use CRDTRecord.
-type SystemConfigRow = CRDTRecord
-
 // NewResolver wires the Resolver to its dependencies. env may
 // be nil; the Resolver falls back to OSEnvSource. replicaID is
 // the per-process CRDT id used to attribute local writes; an

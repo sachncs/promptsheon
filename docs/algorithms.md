@@ -32,8 +32,11 @@ The audit log is a hash chain, not an append-only list.
 Each row records:
 
 - `previous_hash` — the previous row's `entry_hash`.
-- `entry_hash` — `SHA-256(canonical_encode({id, user_id,
-  action, resource, details, timestamp, previous_hash}))`.
+- `entry_hash` — `SHA-256(id \x1f user_id \x1f action \x1f resource \x1f details_json \x1f timestamp \x1f previous_hash)`,
+  where `\x1f` (US, 0x1F) is the field separator. The fields are
+  written in order with no JSON wrapping; `details_json` is the
+  pre-serialised JSON blob, not a re-serialised map. See
+  `internal/store/sqlite.go::computeAuditHash`.
 
 `store.VerifyAuditChain` walks the chain from `rowid 1`
 forward and asserts the invariant. Any tampering — row
