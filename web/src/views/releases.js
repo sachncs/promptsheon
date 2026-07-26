@@ -50,14 +50,17 @@ export async function renderReleases(route) {
   for (const ws of workspaces.data || []) {
     const projects = await api.listProjects(ws.id);
     if (projects.ok) for (const p of projects.data || []) allProjects.push(p);
+    await new Promise((r) => setTimeout(r, 60));
   }
   for (const p of allProjects) {
     const caps = await api.listCapabilities(p.id);
     if (caps.ok) for (const c of caps.data || []) allCaps.push(c);
+    await new Promise((r) => setTimeout(r, 60));
   }
   for (const c of allCaps) {
     const rels = await api.listReleases(c.id);
     if (rels.ok) for (const r of rels.data || []) allRels.push(r);
+    await new Promise((r) => setTimeout(r, 60));
   }
   const capMap = new Map(allCaps.map((c) => [c.id, c]));
   const filtered = allRels.filter((r) =>

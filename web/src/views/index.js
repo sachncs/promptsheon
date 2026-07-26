@@ -20,8 +20,7 @@ const ROUTES = {
   "/guardrails": renderGuardrails,
   "/evaluations": renderEvaluations,
   "/logs": renderLogs,
-  "/operations": renderOperations,
-  "/operations/{tab}": renderOperations
+  "/operations": renderOperations
 };
 
 const PAGE_TITLES = {
@@ -34,14 +33,13 @@ const PAGE_TITLES = {
   "/guardrails": "Guardrails",
   "/evaluations": "Evaluations",
   "/logs": "Live logs",
-  "/operations": "Operations",
-  "/operations/{tab}": "Operations"
+  "/operations": "Operations"
 };
 
 function resolve(route) {
   if (ROUTES[route.path]) return ROUTES[route.path];
   if (route.path.startsWith("/capabilities/") && route.path !== "/capabilities") return renderCapabilityDetail;
-  if (route.path.startsWith("/operations/") && route.path !== "/operations") return renderOperationsPlaceholder;
+  if (route.path.startsWith("/operations/")) return renderOperations;
   return null;
 }
 
