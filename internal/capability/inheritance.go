@@ -130,16 +130,27 @@ func mergeManifests(base, overrides Manifest) Manifest {
 
 // mergeArtifactSlice returns the union of two slices. Hashes
 // in overrides win over the same hash in base.
+//
+// The output is deterministically ordered: base entries appear
+// first in base order, then override entries that introduced a
+// new hash appear in override order. Without this guarantee,
+// successive merges of the same inputs produced different hashes
+// and broke content identity for the resulting manifest.
 func mergeArtifactSlice(base, overrides []ArtifactRef) []ArtifactRef {
-	byHash := make(map[string]ArtifactRef, len(base)+len(overrides))
+	seen := make(map[string]struct{}, len(base)+len(overrides))
+	out := make([]ArtifactRef, 0, len(base)+len(overrides))
 	for _, r := range base {
-		byHash[r.Hash] = r
+		if _, ok := seen[r.Hash]; ok {
+			continue
+		}
+		seen[r.Hash] = struct{}{}
+		out = append(out, r)
 	}
 	for _, r := range overrides {
-		byHash[r.Hash] = r
-	}
-	out := make([]ArtifactRef, 0, len(byHash))
-	for _, r := range byHash {
+		if _, ok := seen[r.Hash]; ok {
+			continue
+		}
+		seen[r.Hash] = struct{}{}
 		out = append(out, r)
 	}
 	return out

@@ -83,12 +83,12 @@ type Capability struct {
 // the matching columns; JSON marshalling always emits the struct
 // (zero-value fields are explicit) so API consumers see the config.
 type SelfEvolveConfig struct {
-	Enabled       bool    `json:"enabled"`
-	MinScore      float64 `json:"min_score"`        // promote if validated score >= this
-	MaxRevisions  int     `json:"max_revisions"`   // hard cap per cycle
-	CooldownSec   int     `json:"cooldown_sec"`    // minimum gap between cycles
-	TargetEnv     string  `json:"target_env"`      // env to auto-promote in (typically dev)
-	DatasetID     string  `json:"dataset_id"`      // dataset the candidate version is validated against
+	Enabled      bool    `json:"enabled"`
+	MinScore     float64 `json:"min_score"`     // promote if validated score >= this
+	MaxRevisions int     `json:"max_revisions"` // hard cap per cycle
+	CooldownSec  int     `json:"cooldown_sec"`  // minimum gap between cycles
+	TargetEnv    string  `json:"target_env"`    // env to auto-promote in (typically dev)
+	DatasetID    string  `json:"dataset_id"`    // dataset the candidate version is validated against
 }
 
 // IsZero reports whether the config is the unset default. Callers
