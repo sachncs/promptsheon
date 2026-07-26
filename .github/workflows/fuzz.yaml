@@ -2,14 +2,17 @@ name: fuzz
 
 # CI-FUZZ-1: 1-minute fuzz per PR on the security-critical
 # paths. vault, redactor, and injection. Failures abort the
-# PR. Production: nightly fuzz runs for an hour via
-# workflow_dispatch.
+# PR. Production: nightly fuzz runs for 60s per harness via
+# schedule + workflow_dispatch.
 on:
   pull_request:
     paths:
       - 'internal/vault/**'
       - 'internal/redactor/**'
       - 'internal/injection/**'
+  schedule:
+    # Nightly at 03:00 UTC
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 permissions:
@@ -28,12 +31,12 @@ jobs:
 
       - name: Fuzz vault
         run: |
-          go test -run='^$' -fuzz='^Fuzz' -fuzztime=20s ./internal/vault/...
+          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./internal/vault/...
 
       - name: Fuzz redactor
         run: |
-          go test -run='^$' -fuzz='^Fuzz' -fuzztime=20s ./internal/redactor/...
+          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./internal/redactor/...
 
       - name: Fuzz injection
         run: |
-          go test -run='^$' -fuzz='^Fuzz' -fuzztime=20s ./internal/injection/...
+          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./internal/injection/...
