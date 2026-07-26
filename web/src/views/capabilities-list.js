@@ -62,16 +62,19 @@ export async function renderCapabilitiesList(route) {
     const projects = await api.listProjects(ws.id);
     if (!projects.ok) continue;
     for (const p of projects.data || []) allProjects.push(p);
+    await new Promise((r) => setTimeout(r, 60));
   }
   for (const p of allProjects) {
     const r = await api.listCapabilities(p.id);
     if (!r.ok) continue;
     for (const c of r.data || []) allCaps.push(c);
+    await new Promise((r) => setTimeout(r, 60));
   }
   for (const c of allCaps) {
     const r = await api.listReleases(c.id);
     if (!r.ok) continue;
     for (const rel of r.data || []) allRels.push(rel);
+    await new Promise((r) => setTimeout(r, 60));
   }
   const html = `
     <section class="flex flex-wrap items-center justify-between gap-3">
