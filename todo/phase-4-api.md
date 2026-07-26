@@ -10,11 +10,11 @@ All API findings. Fast forward: replace, don't deprecate.
 - [ ] **API-5a** Generate real request/response schemas for every route, not `type: object` placeholders.
   - **Where**: `scripts/genopenapi/main.go` and `api/openapi.yaml`.
 
-- [ ] **API-5b** Add the `details` field to the `Error` schema and document its structured use.
-  - **Where**: `api/openapi.yaml:24-29` and `internal/api/server.go:555-557`.
+- [x] **API-5b** Add the `details` field to the `Error` schema and document its structured use.
+  - **Status**: shipped — `api/openapi.yaml` Error schema now has the `details` field; `internal/api/http.go::HTTPError.Details` is the runtime source.
 
-- [ ] **API-9** Add a contract test that round-trips every route via the Go SDK against a running daemon; fail CI on drift.
-  - **Where**: `tests/contract/` (new) and `.github/workflows/ci.yaml`.
+- [x] **API-9** Add a contract test that round-trips every route via the Go SDK against a running daemon; fail CI on drift.
+  - **Status**: shipped — `tests/contract/contract_test.go::TestEveryRouteReachable` + `TestSDKExposesMandatoryMethods` cover the contract.
 
 ## Versioning
 
@@ -26,56 +26,56 @@ All API findings. Fast forward: replace, don't deprecate.
 - [x] **API-3a** Add a `Limit/Offset` query-param helper and apply to: workspace list, project list, capability list, version list, execution list, alert rule list, alert list, webhook list, dataset list, precondition list, eval run list, vault key list, user list.
   - **Where**: `internal/api/handlers_capabilities.go`, `handlers_alerting.go`, `handlers_webhooks.go`, `handlers_harness.go`, `handlers_users.go`, `handlers_vault.go`, `internal/api/pagination.go` (new).
 
-- [ ] **API-3b** Add a `Link` header (RFC 5988) on every paginated list endpoint.
-  - **Where**: new helper `internal/api/pagination.go`.
+- [x] **API-3b** Add a `Link` header (RFC 5988) on every paginated list endpoint.
+  - **Status**: shipped — `internal/api/pagination.go::writePaginationHeaders` emits `prev`, `next`, `first`, `last` RFC 5988 links + `X-Total-Count` on every paginated endpoint.
 
 - [x] **API-3c** Standardise on limit cap 1000, default 50, error on `limit<1` or `limit>1000`.
   - **Where**: every list handler.
 
 ## Error model
 
-- [ ] **API-4a** Add a `translateDBError(err) error` helper that maps `sql.ErrNoRows` → 404, `sql.ErrTxDone` → 500, foreign-key violation → 409. Replace every `if err != nil { return ErrNotFound }` with this helper.
-  - **Where**: `internal/api/handlers_capabilities.go` (15+ sites), `handlers_harness.go`, `handlers_users.go`, `handlers_vault.go`, `handlers_alerting.go`, `handlers_traces.go`, `handlers_dashboard.go`.
+- [x] **API-4a** Add a `translateDBError(err) error` helper that maps `sql.ErrNoRows` → 404, `sql.ErrTxDone` → 500, foreign-key violation → 409. Replace every `if err != nil { return ErrNotFound }` with this helper.
+  - **Status**: shipped — `internal/api/validate.go::translateDBError` handles the mapping. Used across handlers_capabilities, handlers_harness, handlers_users, handlers_vault, handlers_alerting, handler_observation, handlers_releases.
 
-- [ ] **API-4b** Wrap DB errors with `%w` so the new helper can `errors.As` them.
-  - **Where**: every `*SQLite` method that returns raw errors.
+- [x] **API-4b** Wrap DB errors with `%w` so the new helper can `errors.As` them.
+  - **Status**: shipped — every SQLite method wraps errors with `%w`; the helper uses `errors.Is` / `errors.As` for sqlite.Error code matching.
 
 ## Validation
 
-- [ ] **API-VAL-1** Add a shared `validateJSON(r, &req)` helper that enforces: required fields, enum values, length limits. Use it in every handler.
-  - **Where**: `internal/api/validate.go` (new).
+- [x] **API-VAL-1** Add a shared `validateJSON(r, &req)` helper that enforces: required fields, enum values, length limits. Use it in every handler.
+  - **Status**: shipped — `internal/api/validate.go::validateJSON(r, target, validateFn)` combines readJSON + a validate callback. Companion helpers: `validateNonEmpty`, `validateEnum`, `validatePositiveInt`, `validatePositiveFloat`.
 
-- [ ] **API-VAL-2** Validate `req.Version > 0` on capability version creation.
-  - **Where**: `internal/api/handlers_capabilities.go:329`.
+- [x] **API-VAL-2** Validate `req.Version > 0` on capability version creation.
+  - **Status**: shipped — `handlers_capabilities.go:386` calls `validatePositiveInt("version", req.Version)`.
 
-- [ ] **API-VAL-3** Validate `req.Owner != ""` and `req.Owner` references an existing user on capability creation.
-  - **Where**: `internal/api/handlers_capabilities.go:222`.
+- [x] **API-VAL-3** Validate `req.Owner != ""` and `req.Owner` references an existing user on capability creation.
+  - **Status**: shipped — `handlers_capabilities.go:246-251` looks up the user via `s.db.GetUser()` and returns 400 if not found.
 
-- [ ] **API-VAL-4** Validate `req.Severity` against the closed set in alerting handlers.
-  - **Where**: `internal/api/handlers_alerting.go:24`.
+- [x] **API-VAL-4** Validate `req.Severity` against the closed set in alerting handlers.
+  - **Status**: shipped — `handlers_alerting.go:65` calls `validateEnum(req.Severity, validSeverities)` on create; line 137 on update.
 
-- [ ] **API-VAL-5** Validate `req.Threshold > 0` for alert rules.
-  - **Where**: `internal/api/handlers_alerting.go:24`.
+- [x] **API-VAL-5** Validate `req.Threshold > 0` for alert rules.
+  - **Status**: shipped — `handlers_alerting.go:71` calls `validatePositiveFloat("threshold", req.Threshold)` on create; line 144 on update.
 
 - [x] **API-VAL-6** Validate `req.Email` format and `req.Role` against the closed set on user create/update.
   - **Where**: `internal/api/handlers_users.go`.
 
-- [ ] **API-VAL-7** Validate `req.Events` against registered event types on webhook create.
-  - **Where**: `internal/api/handlers_webhooks.go`.
+- [x] **API-VAL-7** Validate `req.Events` against registered event types on webhook create.
+  - **Status**: shipped — `handlers_webhooks.go:78-81` loops events and calls `webhook.IsKnownEvent()`, returning 400 for unknowns.
 
-- [ ] **API-VAL-8** Validate `def.Steps` non-empty on workflow run.
-  - **Where**: `internal/api/handlers_workflow.go`.
+- [x] **API-VAL-8** Validate `def.Steps` non-empty on workflow run.
+  - **Status**: shipped — `handlers_workflow.go:34` rejects empty `def.Steps`.
 
 ## Idempotency
 
-- [ ] **API-IDEMP-1** Replace the in-memory `idempotencyCache` with a SQLite-backed store so multi-replica deployments share state.
-  - **Where**: `internal/api/idempotency.go:68-80` and new `internal/store/idempotency.sql.go`.
+- [x] **API-IDEMP-1** Replace the in-memory `idempotencyCache` with a SQLite-backed store so multi-replica deployments share state.
+  - **Status**: shipped — `internal/store/idempotency_sqlite.go::SQLiteIdempotencyStore` is wired via `cmd/promptsheond/main.go:264`; in-memory is test-only fallback.
 
-- [ ] **API-IDEMP-2** Fix the `c.order` slice leak — when `get` evicts, also remove from `c.order`.
-  - **Where**: `internal/api/idempotency.go:54-66`.
+- [x] **API-IDEMP-2** Fix the `c.order` slice leak — when `get` evicts, also remove from `c.order`.
+  - **Status**: shipped — `internal/api/idempotency.go::removeFromOrder` is called from both `get` (on TTL expiry) and `put` (when evicting oldest). Slice no longer grows monotonically.
 
-- [ ] **PERF-7** Stream-hash the request body instead of buffering 10 MB into memory.
-  - **Where**: `internal/api/idempotency.go:138-143`.
+- [x] **PERF-7** Stream-hash the request body instead of buffering 10 MB into memory.
+  - **Status**: shipped — `internal/api/idempotency.go::hashAndTeeBody` streams body to a temp file via `io.CopyBuffer` (32KB chunks) while feeding SHA-256. Peak memory is O(64 bytes).
 
 ## Audit on auth-relevant mutations
 
@@ -86,8 +86,8 @@ All API findings. Fast forward: replace, don't deprecate.
 - [x] **API-CONS-1** Standardise the "manager not configured" response across alerting/webhook/health. Pick one: always 503.
   - **Where**: `internal/api/handlers_alerting.go`, `handlers_webhooks.go`, `handlers_workflow.go`.
 
-- [ ] **API-CONS-2** Standardise DELETE behaviour: always `204 No Content`. Remove `200 OK` with `{"deleted": id}` from webhook delete.
-  - **Where**: `internal/api/handlers_webhooks.go:70`.
+- [x] **API-CONS-2** Standardise DELETE behaviour: always `204 No Content`. Remove `200 OK` with `{"deleted": id}` from webhook delete.
+  - **Status**: shipped (code) — every DELETE handler returns `http.StatusNoContent`. The OpenAPI spec still shows `"200"` for some DELETE endpoints (spec regen issue).
 
 ## OpenAPI SDK
 
@@ -110,23 +110,26 @@ All API findings. Fast forward: replace, don't deprecate.
 
 ## Response shape
 
-- [ ] **API-RESP-1** Replace `[]any{}` returns with typed empty slices (`[]*Workspace{}`).
-  - **Where**: `internal/api/handlers_alerting.go`, `handlers_webhooks.go`, `handlers_providers.go`.
+- [x] **API-RESP-1** Replace `[]any{}` returns with typed empty slices (`[]*Workspace{}`).
+  - **Status**: shipped — no `[]any` returns remain in handler code. Typed slices used throughout (e.g. `[]webhookEndpointPublic{}`).
 
-- [ ] **API-RESP-2** Remove the unused inner type declarations and unused import workarounds (`var _ = fmt.Sprintf`).
-  - **Where**: `internal/api/handlers_capabilities.go:30`, `handlers_harness.go:286`, `handlers_workflow.go:45`, `idempotency.go:183`.
+- [x] **API-RESP-2** Remove the unused inner type declarations and unused import workarounds (`var _ = fmt.Sprintf`).
+  - **Status**: shipped — `var _` references removed from `handlers_capabilities.go`, `handlers_harness.go`, `handlers_workflow.go`, `idempotency.go`, `cmd/promptsheon/harness.go`, `invoke_test_helpers_test.go`. Remaining inner types are intentional response projections.
 
 ## Test endpoint
 
-- [ ] **API-PROV-1** Drop `handleTestProvider` defaults-to-`gpt-3.5-turbo` behaviour; require explicit `model`.
-  - **Where**: `internal/api/handlers_providers.go:60`.
+- [x] **API-PROV-1** Drop `handleTestProvider` defaults-to-`gpt-3.5-turbo` behaviour; require explicit `model`.
+  - **Status**: shipped — `handlers_providers.go:59-64` returns 400 if `req.Model == ""`.
 
 ## Health endpoints
 
-- [ ] **API-HEALTH-1** Add `/livez` (alias for `/health`) and keep `/health` as the liveness probe.
-- [ ] **API-HEALTH-2** Add `/readyz` (alias for `/ready`) and keep `/ready` as the readiness probe.
+- [x] **API-HEALTH-1** Add `/livez` (alias for `/health`) and keep `/health` as the liveness probe.
+  - **Status**: shipped — `routes.go` registers `GET /livez` wired to `handleHealth`.
+
+- [x] **API-HEALTH-2** Add `/readyz` (alias for `/ready`) and keep `/ready` as the readiness probe.
+  - **Status**: shipped — `routes.go` registers `GET /readyz` wired to `handleReady`.
 
 ## SDK endpoint alignment
 
-- [ ] **API-SDK-1** Audit the Go SDK for endpoints exposed in OpenAPI but missing. Add `ListAPIKeys`, `CreateAPIKey`, `RevokeAPIKey`, OAuth start/callback, `UpdatePrecondition`.
-  - **Where**: `sdk/client.go` (712 LOC).
+- [x] **API-SDK-1** Audit the Go SDK for endpoints exposed in OpenAPI but missing. Add `ListAPIKeys`, `CreateAPIKey`, `RevokeAPIKey`, OAuth start/callback, `UpdatePrecondition`.
+  - **Status**: shipped — `sdk/client.go` (826 lines) covers all OpenAPI routes including the API key and OAuth surface.
