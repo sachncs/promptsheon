@@ -7,7 +7,7 @@ import { renderObservability } from "./observability.js";
 import { renderGuardrails } from "./guardrails.js";
 import { renderEvaluations } from "./evaluations.js";
 import { renderOperations } from "./operations/index.js";
-import { renderLogsPlaceholder } from "./_placeholder.js";
+import { renderLogs } from "./logs.js";
 import { renderNotFound } from "./not-found.js";
 
 const ROUTES = {
@@ -19,7 +19,7 @@ const ROUTES = {
   "/observability": renderObservability,
   "/guardrails": renderGuardrails,
   "/evaluations": renderEvaluations,
-  "/logs": renderLogsPlaceholder,
+  "/logs": renderLogs,
   "/operations": renderOperations,
   "/operations/{tab}": renderOperations
 };
