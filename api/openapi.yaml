@@ -29,6 +29,9 @@ components:
       properties:
         error:
           type: string
+        details:
+          type: object
+          additionalProperties: true
 
 paths:
   /api/v1/alerts/active:
