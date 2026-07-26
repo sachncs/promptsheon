@@ -61,7 +61,8 @@ func TestOAuthManager_ExchangeCode(t *testing.T) {
 		TokenURL:     server.URL + "/token",
 	})
 
-	token, err := mgr.ExchangeCode(context.Background(), "test", "auth-code")
+	state, _ := mgr.GenerateOAuthState("test")
+	token, err := mgr.ExchangeCode(context.Background(), "test", "auth-code", state)
 	if err != nil {
 		t.Fatal(err)
 	}
