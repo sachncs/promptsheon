@@ -12,8 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/sachncs/promptsheon/internal/capability"
 )
 
 // Edge is one derivation: parent Version -> child Version, possibly
@@ -180,5 +178,3 @@ func (g Graph) Validate() error {
 	}
 	return nil
 }
-
-var _ = capability.ArtifactPrompt

@@ -30,11 +30,6 @@ import (
 	"os"
 )
 
-// hexDecode is a thin wrapper around hex.DecodeString so the
-// helper body is grouped with the rest of the file (rather than
-// scattered). It exists primarily for tests that want to stub it.
-func hexDecode(s string) ([]byte, error) { return hex.DecodeString(s) }
-
 // hexEncode is a thin wrapper around hex.EncodeToString for the
 // same reason as hexDecode.
 func hexEncode(b []byte) string { return hex.EncodeToString(b) }

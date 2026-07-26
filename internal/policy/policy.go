@@ -20,8 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/sachncs/promptsheon/internal/capability"
 )
 
 // Effect is what the runtime does in response to a Policy decision.
@@ -319,8 +317,3 @@ func (b Bundle) EvaluateExecution(in ExecutionPolicyInput) Decision {
 	}
 	return Allow("policy.Bundle", "")
 }
-
-// Compile-time check: capability.Manifest is the value the caller has
-// but Policy inputs are domain-shaped. This indirection prevents an
-// accidental coupling between Workspace Policy and Version aggregate.
-var _ = capability.ArtifactPrompt

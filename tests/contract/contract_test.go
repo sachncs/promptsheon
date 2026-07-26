@@ -24,7 +24,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -481,5 +480,3 @@ func repoRoot() (string, error) {
 	}
 	return "", fmt.Errorf("go.mod not found above %s", wd)
 }
-
-var _ = time.Second // keep the import; future tests may time-bound probes

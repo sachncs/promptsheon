@@ -750,7 +750,6 @@ func (s *SQLite) ListExecutions(ctx context.Context, filter capability.Execution
 		limit = 0
 	}
 	if filter.Offset > 0 && limit == 0 {
-		limit = -1
 		query += " LIMIT -1 OFFSET ?"
 		args = append(args, filter.Offset)
 	} else {

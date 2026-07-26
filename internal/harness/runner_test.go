@@ -9,7 +9,7 @@ import (
 
 	"github.com/sachncs/promptsheon/internal/eval"
 	"github.com/sachncs/promptsheon/internal/harness"
-	"github.com/sachncs/promptsheon/internal/testdata"
+	
 )
 
 // stubInvoker is a ReleaseInvoker that returns a canned output for
@@ -168,6 +168,3 @@ func mustCreateDataset(t *testing.T, repo harness.Repository, capabilityID, name
 	}
 	return d.ID
 }
-
-// silence unused import warning for testdata (some test helpers live in other files)
-var _ = testdata.NewManifest

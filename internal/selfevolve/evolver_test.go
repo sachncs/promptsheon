@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/eval"
 	"github.com/sachncs/promptsheon/internal/harness"
 	"github.com/sachncs/promptsheon/internal/store"
 )
@@ -976,7 +975,6 @@ func TestEvolver_Promoter_Promote(t *testing.T) {
 // silent unused-import guards for tools the linter sees as
 // referenced only by the test build; the imports stay live
 // for future tests.
-var _ = eval.ScorerContains
 
 // mustNewPromoter constructs a Promoter for tests and fails the
 // test fast if any required dependency is missing. The previous

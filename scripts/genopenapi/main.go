@@ -175,6 +175,10 @@ func fail(format string, args ...any) {
 	os.Exit(1)
 }
 
+// collectRoutes parses a single Go file and returns every
+// s.mux.HandleFunc call. It is kept as a public helper so the
+// per-file unit tests can exercise a single file at a time;
+// collectRoutesDir is the recursive walker the binary uses.
 func collectRoutes(path string) ([]route, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)

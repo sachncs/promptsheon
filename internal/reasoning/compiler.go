@@ -220,36 +220,6 @@ func (c *Compiler) applyConstraints(intent Intent, candidates []CapabilityDescri
 	return out
 }
 
-// filter applies the coarse-grained Intent-vs-Catalog filter.
-// Capabilities missing a required tag or with a TrustScore below
-// the floor are dropped before the scoring phase.
-func (c *Compiler) filter(intent Intent) []CapabilityDescriptor {
-	required := map[string]struct{}{}
-	for _, t := range intent.Constraints.RequiredTags {
-		required[t] = struct{}{}
-	}
-	var out []CapabilityDescriptor
-	for _, cap := range c.Catalog {
-		if intent.Constraints.MinTrustScore > 0 && cap.TrustScore < intent.Constraints.MinTrustScore {
-			continue
-		}
-		if intent.Constraints.MaxCostUSD > 0 && cap.CostUSD > intent.Constraints.MaxCostUSD {
-			continue
-		}
-		if intent.Constraints.MaxLatencyMS > 0 && cap.LatencyMS > intent.Constraints.MaxLatencyMS {
-			continue
-		}
-		if !hasAllTags(cap.Tags, required) {
-			continue
-		}
-		if !intentMatches(cap, intent) {
-			continue
-		}
-		out = append(out, cap)
-	}
-	return out
-}
-
 // score ranks candidates by fit. The score combines tag
 // overlap (high weight), goal-token overlap (medium), and a
 // small penalty for cost so an expensive candidate loses to a

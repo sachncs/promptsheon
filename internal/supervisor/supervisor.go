@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os/exec"
 	"sync"
 	"time"
 
@@ -300,6 +299,3 @@ func (s *Supervisor) publish(ev PluginEvent) {
 	}
 	s.publisher.Publish(ev)
 }
-
-// Compile-time guard.
-var _ = exec.Command // referenced for the gRPC follow-on that execs subprocesses

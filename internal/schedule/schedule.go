@@ -164,8 +164,7 @@ func nextCron(expr string, from time.Time) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, fmt.Errorf("hour: %w", err)
 	}
-	dom, err := parseField(parts[2], 1, 31)
-	if err != nil {
+	if _, err := parseField(parts[2], 1, 31); err != nil {
 		return time.Time{}, fmt.Errorf("dom: %w", err)
 	}
 	month, err := parseField(parts[3], 1, 12)
@@ -341,20 +340,6 @@ func splitWhitespace(s string) []string {
 	}
 	if start >= 0 {
 		out = append(out, s[start:])
-	}
-	return out
-}
-
-// splitCSVFields is retained for callers that want to enforce a
-// field count from a comma-separated expression.
-func splitCSVFields(s string, expected int) []string {
-	parts := splitCSV(s)
-	if len(parts) != expected {
-		return nil
-	}
-	out := make([]string, expected)
-	for i, p := range parts {
-		out[i] = p
 	}
 	return out
 }

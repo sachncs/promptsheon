@@ -120,30 +120,3 @@ func validateNonEmpty(name, s string) error {
 	}
 	return nil
 }
-
-// validateJSON decodes the request body into target and then calls
-// validate (if non-nil) to perform additional field-level checks.
-// This is the shared helper for API-VAL-1: handlers call it once
-// instead of manually chaining readJSON + individual validators.
-//
-// Usage:
-//
-//	var req CreateReleaseRequest
-//	if err := validateJSON(r, &req, func() error {
-//	    if err := validateNonEmpty("name", req.Name); err != nil { return err }
-//	    if !validateEnum(req.Env, validEnvs) { return badRequest("env must be dev|staging|prod") }
-//	    return nil
-//	}); err != nil {
-//	    return err
-//	}
-func validateJSON(r *http.Request, target any, validate func() error) error {
-	if err := readJSON(r, target); err != nil {
-		return badRequest("invalid JSON: " + err.Error())
-	}
-	if validate != nil {
-		if err := validate(); err != nil {
-			return err
-		}
-	}
-	return nil
-}

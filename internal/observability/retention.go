@@ -95,18 +95,14 @@ func (m *RetentionManager) Start(ctx context.Context) {
 	}()
 }
 
-// protectedAuditActions is retained as a documented invariant even
-// though audit retention is now a no-op: the set names every action
-// that the security review classified as "must never be lost". The
-// table is exported through this variable so future audit-archive
-// tooling can read it.
+// protectedAuditActions is the documented invariant that the
+// security review classified as "must never be lost". The table
+// is exported so test fixtures and audit-archive tooling can
+// read it.
 //
-// The previous implementation tried to honour this list by deleting
-// only non-protected actions, but deletion still broke the audit
-// chain (VerifyAuditChain walks the table from rowid 1 forward,
-// chaining by previous_hash). Removing rows from the middle of the
-// chain is unrecoverable. The current policy is therefore: never
-// delete audit rows. Operators archive externally.
+// Retention never deletes audit rows from audit_entries (the
+// chain walks rowid 1 forward by previous_hash). Removing rows
+// in the middle is unrecoverable. Operators archive externally.
 var protectedAuditActions = map[string]bool{
 	"auth_failure":     true,
 	"auto_approve":     true,
