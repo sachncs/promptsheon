@@ -12,11 +12,11 @@ import (
 // subcommands. The CLI writes to the daemon's API; the daemon's
 // store layer is the source of truth. Three subcommands:
 //
-//   selfevolve enable <capability>   --dataset <id> [--min-score N]
-//                                            [--max-revisions N] [--cooldown-sec N]
-//                                            [--target-env dev|staging|prod]
-//   selfevolve disable <capability>
-//   selfevolve status <capability>
+//	selfevolve enable <capability>   --dataset <id> [--min-score N]
+//	                                         [--max-revisions N] [--cooldown-sec N]
+//	                                         [--target-env dev|staging|prod]
+//	selfevolve disable <capability>
+//	selfevolve status <capability>
 //
 // `enable` enables closed-loop self-evolution on a capability by
 // PUTting the per-capability config. The daemon's evolver loop
@@ -122,7 +122,7 @@ func selfEvolveStatus(capID string) error {
 		return err
 	}
 	var cap struct {
-		ID        string  `json:"id"`
+		ID         string `json:"id"`
 		SelfEvolve struct {
 			Enabled      bool    `json:"enabled"`
 			MinScore     float64 `json:"min_score"`

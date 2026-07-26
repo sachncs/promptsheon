@@ -26,9 +26,9 @@ func TestParseSelfEvolveEntry_Valid(t *testing.T) {
 
 func TestParseSelfEvolveEntry_BadShape(t *testing.T) {
 	cases := []string{
-		"",                  // empty
-		"a:b:c:d:e",         // only 5 parts
-		"a:b:c:d:e:f:g",     // 7 parts
+		"",              // empty
+		"a:b:c:d:e",     // only 5 parts
+		"a:b:c:d:e:f:g", // 7 parts
 	}
 	for _, c := range cases {
 		if _, ok := parseSelfEvolveEntry(c); ok {
@@ -39,12 +39,12 @@ func TestParseSelfEvolveEntry_BadShape(t *testing.T) {
 
 func TestParseSelfEvolveEntry_BadFields(t *testing.T) {
 	cases := []string{
-		":ds:0.9:dev:10:900",     // empty cap id
-		"cap::0.9:dev:10:900",    // empty ds
+		":ds:0.9:dev:10:900",       // empty cap id
+		"cap::0.9:dev:10:900",      // empty ds
 		"cap:ds:notnum:dev:10:900", // bad threshold
-		"cap:ds:0.9::10:900",      // empty env
-		"cap:ds:0.9:dev:0:900",    // zero max
-		"cap:ds:0.9:dev:-1:900",   // negative max
+		"cap:ds:0.9::10:900",       // empty env
+		"cap:ds:0.9:dev:0:900",     // zero max
+		"cap:ds:0.9:dev:-1:900",    // negative max
 		"cap:ds:0.9:dev:10:-1",     // negative cooldown
 	}
 	for _, c := range cases {

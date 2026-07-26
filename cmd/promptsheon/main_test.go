@@ -273,7 +273,7 @@ func TestAssignGraphColumns(t *testing.T) {
 			{Hash: "b1", Parents: []string{"a1"}},
 			{Hash: "c1", Parents: []string{"b1"}, Branches: []string{"main"}, IsHEAD: true},
 		}
-		refs := []*promptsheoncas.RefDetail{
+		refs := []promptsheoncas.RefDetail{
 			{Name: "main", Hash: "c1"},
 		}
 		cols := assignGraphColumns(nodes, refs, "main")
@@ -289,7 +289,7 @@ func TestAssignGraphColumns(t *testing.T) {
 			{Hash: "c1", Parents: []string{"b1"}, Branches: []string{"main"}, IsHEAD: true},
 			{Hash: "d1", Parents: []string{"a1"}, Branches: []string{"feature"}},
 		}
-		refs := []*promptsheoncas.RefDetail{
+		refs := []promptsheoncas.RefDetail{
 			{Name: "main", Hash: "c1"},
 			{Name: "feature", Hash: "d1"},
 		}
@@ -307,7 +307,7 @@ func TestAssignGraphColumns(t *testing.T) {
 			{Hash: "a1", Parents: []string{}},
 			{Hash: "b1", Parents: []string{"a1"}, IsHEAD: true},
 		}
-		refs := []*promptsheoncas.RefDetail{}
+		refs := []promptsheoncas.RefDetail{}
 		cols := assignGraphColumns(nodes, refs, "")
 		if cols["a1"] != 0 || cols["b1"] != 0 {
 			t.Errorf("expected both in col 0, got %v", cols)
@@ -333,7 +333,7 @@ func TestAssignGraphColumns(t *testing.T) {
 			{Hash: "d1", Parents: []string{"a1"}, Branches: []string{"feature"}},
 			{Hash: "e1", Parents: []string{"a1"}, Branches: []string{"dev"}},
 		}
-		refs := []*promptsheoncas.RefDetail{
+		refs := []promptsheoncas.RefDetail{
 			{Name: "main", Hash: "c1"},
 			{Name: "feature", Hash: "d1"},
 			{Name: "dev", Hash: "e1"},
@@ -2193,7 +2193,7 @@ func TestAssignGraphColumnsNoMatchingRef(t *testing.T) {
 	nodes := []*promptsheoncas.GraphNode{
 		{Hash: "a1", Parents: []string{}, IsHEAD: true},
 	}
-	refs := []*promptsheoncas.RefDetail{
+	refs := []promptsheoncas.RefDetail{
 		{Name: "main", Hash: "b1"},
 	}
 	cols := assignGraphColumns(nodes, refs, "main")

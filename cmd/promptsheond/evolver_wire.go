@@ -67,7 +67,12 @@ func wireSelfEvolve(
 			logger.Warn("self_evolve: UpdateSelfEvolveConfig failed", "capability_id", entry.capID, "err", err)
 			continue
 		}
-		loop := buildEvolver(db, releaseSvc, repos, providers, logger, metrics, entry.capID)
+		loop, err := buildEvolver(db, releaseSvc, repos, providers, logger, metrics, entry.capID)
+		if err != nil {
+			logger.Error("self_evolve: build evolver failed",
+				"capability_id", entry.capID, "err", err)
+			continue
+		}
 		go loop.run(rootCtx)
 		logger.Info("self_evolve: started",
 			"capability_id", entry.capID, "dataset_id", entry.datasetID,
@@ -88,7 +93,7 @@ func buildEvolver(
 	logger *slog.Logger,
 	metrics *metrics.Collector,
 	capabilityID string,
-) *selfEvolveLoop {
+) (*selfEvolveLoop, error) {
 	repo := newEvolverRepoAdapter(db)
 	invoke := makeEvolverLLMInvoke(providers, logger)
 	loader := evolverLoaderAdapter{}
@@ -100,7 +105,10 @@ func buildEvolver(
 	auditor := &evolverAuditorAdapter{auditor: newEvolverAuditor(repos, logger)}
 	revision := selfevolve.NewLLMRevisionStrategy(invoke)
 	validator := selfevolve.NewHarnessValidator(repo, invoke)
-	promoter := selfevolve.NewPromoter(repo, loader, activator, auditor)
+	promoter, perr := selfevolve.NewPromoter(repo, loader, activator, auditor)
+	if perr != nil {
+		return nil, fmt.Errorf("build promoter: %w", perr)
+	}
 	ev := selfevolve.NewEvolver(repo, loader, revision, validator, promoter, auditor, logger)
 	return &selfEvolveLoop{
 		ev:       ev,
@@ -108,7 +116,7 @@ func buildEvolver(
 		logger:   logger,
 		metrics:  metrics,
 		interval: 60 * time.Second,
-	}
+	}, nil
 }
 
 // makeEvolverLLMInvoke returns the LLMInvokeFn the
