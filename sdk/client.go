@@ -582,7 +582,7 @@ func (c *Client) PutCases(ctx context.Context, id string, cases []DatasetCase) e
 
 // DeleteDataset removes a Dataset (cascades to cases).
 func (c *Client) DeleteDataset(ctx context.Context, id string) error {
-	return c.delete("/api/v1/datasets/" + id)
+	return c.delete(ctx, "/api/v1/datasets/"+id)
 }
 
 // CreatePreconditionRequest is the request body for adding a
@@ -647,7 +647,7 @@ func (c *Client) ListPreconditions(ctx context.Context, capabilityID string) ([]
 
 // DeletePrecondition removes a precondition.
 func (c *Client) DeletePrecondition(ctx context.Context, id string) error {
-	return c.delete("/api/v1/preconditions/" + id)
+	return c.delete(ctx, "/api/v1/preconditions/"+id)
 }
 
 // EvalRun mirrors harness.EvalRun.
@@ -731,9 +731,10 @@ func (c *Client) GetEval(ctx context.Context, id string) (*EvalRunWithResults, e
 }
 
 // delete is a small helper that swallows the body's []byte result
-// and returns just the error.
-func (c *Client) delete(path string) error {
-	_, err := c.do(context.Background(), "DELETE", path, nil)
+// and returns just the error. Callers must supply a context so
+// cancellation and tracing propagate end-to-end.
+func (c *Client) delete(ctx context.Context, path string) error {
+	_, err := c.do(ctx, "DELETE", path, nil)
 	return err
 }
 
@@ -801,7 +802,7 @@ func (c *Client) ListAPIKeys(ctx context.Context, userID string) ([]*APIKey, err
 // RevokeAPIKey removes a key by id. Idempotent on already-revoked
 // keys (the server returns 400; SDK callers can ignore that case).
 func (c *Client) RevokeAPIKey(ctx context.Context, id string) error {
-	return c.delete("/api/v1/apikeys/" + id)
+	return c.delete(ctx, "/api/v1/apikeys/"+id)
 }
 
 // --- OAuth (API-SDK-1) ---
