@@ -71,8 +71,8 @@ All testing findings. Fast forward: add, don't legacy.
 - [x] **TEST-NEW-8** Audit chain tail test: delete last 5 rows; verifier reports `TailMismatch`.
   - **Status**: `internal/store/store_test.go::TestAuditChainDetectsTailDeletion` covers the production contract (delete the last 5 rows, expect `TailMismatch: true`).
 
-- [ ] **TEST-NEW-9** Trace write test: 1000 concurrent requests don't block on trace SQLite.
-  - **Status**: deferred — the OTel SDK in `vendor/` doesn't include `tracetest`; building an in-memory trace recorder that exercises the concurrent path requires a follow-on that adds the test infra.
+- [x] **TEST-NEW-9** Trace write test: 1000 concurrent requests don't block on trace SQLite.
+  - **Status**: shipped — `internal/trace/otel_test.go::TestConcurrentTraceWrites` runs 1000 goroutines that create and end spans concurrently, verified with `-race`. Uses `internal/testutil/otel.go` in-memory collector.
 
 - [x] **TEST-NEW-10** Idempotency multi-replica test: two replicas share idempotency state via SQLite.
   - **Status**: implicit in the production wiring (the Idempotency-Key replay path uses `store.NewSQLiteIdempotencyStore` which reads from the shared DB; two daemons pointed at the same DB see the same replays). A direct test that spawns two daemons is heavy infra; the contract is verified at the `IdempotencyStore` unit-test level.
@@ -80,8 +80,8 @@ All testing findings. Fast forward: add, don't legacy.
 - [x] **TEST-NEW-11** SSE log stream test: `curl` against the endpoint receives log lines.
   - **Status**: `internal/ws/hub_test.go::TestHandleSSEWritesEventStreamHeaders` covers the contract (Content-Type: text/event-stream, write semantics).
 
-- [ ] **TEST-NEW-12** OTel span test: a request produces a span that lands in the OTLP test collector.
-  - **Status**: deferred — same OTel SDK constraint as TEST-NEW-9; an in-memory span recorder is a follow-on. The daemon's HTTPMiddleware wraps every request in a span via the global OTel provider; the test infra is the missing piece.
+- [x] **TEST-NEW-12** OTel span test: a request produces a span that lands in the OTLP test collector.
+  - **Status**: shipped — `internal/trace/otel_test.go::TestOTelSpanLandsInCollector` creates a span via the OTel SDK and asserts it lands in the in-memory collector. Additional tests cover attributes and parent-child relationships.
 
 ## Test infrastructure
 
@@ -96,8 +96,8 @@ All testing findings. Fast forward: add, don't legacy.
 - [x] **TEST-INFRA-3** Add `internal/testutil/clock.go` with a `ClockFunc` test seam used everywhere `time.Now` appears.
   - **Status**: `internal/testutil/testutil.go::ClockFunc` + `Now()` are the test seam. Production code uses `time.Now` directly; the seam only takes effect when a test substitutes the package-level var.
 
-- [ ] **TEST-INFRA-4** Add `internal/testutil/otel.go` with an in-memory OTLP collector.
-  - **Status**: deferred — the OTel SDK in `vendor/` doesn't include `tracetest`; adding the collector requires updating the vendor manifest. A follow-on adds the collector and wires `TEST-NEW-12` + `TEST-NEW-9`.
+- [x] **TEST-INFRA-4** Add `internal/testutil/otel.go` with an in-memory OTLP collector.
+  - **Status**: shipped — `internal/testutil/otel.go` provides `InMemoryCollector` wrapping `tracetest.InMemoryExporter`. Registers as global OTel TracerProvider. Includes `Spans()`, `Reset()`, `Shutdown()`, and `Exporter()` methods. Used by `TEST-NEW-9` and `TEST-NEW-12`.
 
 ## Race / chaos / property
 
@@ -108,8 +108,8 @@ All testing findings. Fast forward: add, don't legacy.
 - [x] **TEST-CHAOS-1** Add chaos tests: kill SQLite mid-request, kill plugin subprocess, drop webhook network. (Cross-ref Phase 6 OPS-DR-2.)
   - **Status**: `tests/chaos/sqlite_kill_test.go` ships `TestSQLiteSurvivesFileDelete` (file-unlink is safe with the held-fd driver) and `TestSQLitePanicOnHeldQueryAfterDelete` (no-panic property under unlink). Plugin subprocess + webhook network chaos are follow-ons; the production path runs through supervisor + dispatcher and a separate test would require a fault-injection harness.
 
-- [ ] **TEST-PROPERTY-1** Add property-based tests for the CAS layer (`pkg/cas/`) using `testing/quick` or `pgregory.net/rapid`.
-  - **Status**: deferred — `testing/quick` is in the standard library, but the CAS layer's invariants (content-addressing, deduplication, no collision) are best verified via a focused unit test rather than a property-based one. A follow-on adds a quick.Check for round-trip + dedup.
+- [x] **TEST-PROPERTY-1** Add property-based tests for the CAS layer (`pkg/cas/`) using `testing/quick` or `pgregory.net/rapid`.
+  - **Status**: shipped — `pkg/cas/property_test.go` has 8 property-based tests using `testing/quick` covering determinism, format invariants, no collisions, round-trips, idempotency, hash consistency, type preservation, and existence tracking.
 
 - [ ] **TEST-MUT-1** Add mutation testing with `go-mutesting` for the domain packages.
   - **Status**: deferred — mutation testing requires the `go-mutesting` binary, the AST-walker, and a per-package config. Heavy infra for a follow-on; the current coverage gate + per-package floors catch the same regressions in practice.
