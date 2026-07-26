@@ -155,9 +155,10 @@ func (e *Evolver) RunOnce(ctx context.Context, capabilityID string) (*Result, er
 	}
 
 	promoted, revisions := e.runRevisions(ctx, capabilityID, env, activeReleaseID, currentPrompt, modelPolicyHash, failing, state, cfg)
+	res.Revisions = revisions
 	if promoted {
 		res.Promoted = true
-		res.Revisions = revisions
+		res.Score = state.LastScore
 	} else {
 		res.RejectReason = state.LastError
 	}
