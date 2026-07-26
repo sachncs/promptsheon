@@ -1,7 +1,8 @@
 import { renderOverview } from "./overview.js";
 import { renderCapabilitiesList } from "./capabilities-list.js";
 import { renderCapabilityDetail } from "./capability-detail.js";
-import { renderReleasesPlaceholder, renderAuditPlaceholder, renderObservabilityPlaceholder, renderGuardrailsPlaceholder, renderEvaluationsPlaceholder, renderLogsPlaceholder, renderOperationsPlaceholder } from "./_placeholder.js";
+import { renderAudit } from "./audit.js";
+import { renderReleasesPlaceholder, renderObservabilityPlaceholder, renderGuardrailsPlaceholder, renderEvaluationsPlaceholder, renderLogsPlaceholder, renderOperationsPlaceholder } from "./_placeholder.js";
 import { renderNotFound } from "./not-found.js";
 
 const ROUTES = {
@@ -9,7 +10,7 @@ const ROUTES = {
   "/capabilities": renderCapabilitiesList,
   "/capabilities/{id}": renderCapabilityDetail,
   "/releases": renderReleasesPlaceholder,
-  "/audit": renderAuditPlaceholder,
+  "/audit": renderAudit,
   "/observability": renderObservabilityPlaceholder,
   "/guardrails": renderGuardrailsPlaceholder,
   "/evaluations": renderEvaluationsPlaceholder,
@@ -54,12 +55,20 @@ export async function renderView(route) {
   const title = window.document.getElementById("page-title");
   if (!view) return;
   const matched = resolve(route);
-  if (matched) {
-    const htmlOrPromise = matched(route);
-    const out = htmlOrPromise && typeof htmlOrPromise.then === "function" ? await htmlOrPromise : htmlOrPromise;
-    view.innerHTML = typeof out === "string" ? out : "";
-  } else {
+  if (!matched) {
     view.innerHTML = renderNotFound(route);
+    if (title) title.textContent = titleFromRoute(route) || "Promptsheon";
+    return;
+  }
+  const result = matched(route);
+  if (result && typeof result.then === "function") {
+    const html = await result;
+    // Renderers that mutate the DOM (e.g. overview) return "" to avoid clobbering bindings.
+    if (typeof html === "string" && html && view.innerHTML.trim() === "") {
+      view.innerHTML = html;
+    }
+  } else if (typeof result === "string" && result) {
+    view.innerHTML = result;
   }
   if (title) title.textContent = PAGE_TITLES[route.path] || titleFromRoute(route) || "Promptsheon";
 }
