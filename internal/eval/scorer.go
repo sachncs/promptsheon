@@ -328,14 +328,36 @@ func toFloat(v any) (float64, bool) {
 }
 
 // enumContains reports whether doc appears in enum. JSON equality is
-// implemented via reflect.DeepEqual.
+// implemented via a type switch over common JSON types (string, float64,
+// bool) with a reflect.DeepEqual fallback for complex values.
 func enumContains(doc any, enum []any) bool {
 	for _, e := range enum {
-		if reflect.DeepEqual(doc, e) {
+		if jsonEqual(doc, e) {
 			return true
 		}
 	}
 	return false
+}
+
+// jsonEqual compares two JSON-decoded values for equality.
+// Handles the common cases (string, float64, bool, nil) without
+// reflection; falls back to reflect.DeepEqual for arrays/objects.
+func jsonEqual(a, b any) bool {
+	switch av := a.(type) {
+	case string:
+		bv, ok := b.(string)
+		return ok && av == bv
+	case float64:
+		bv, ok := b.(float64)
+		return ok && av == bv
+	case bool:
+		bv, ok := b.(bool)
+		return ok && av == bv
+	case nil:
+		return b == nil
+	default:
+		return reflect.DeepEqual(a, b)
+	}
 }
 
 // canonicalise decodes v as JSON and re-encodes it compactly so
