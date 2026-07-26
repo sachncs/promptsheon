@@ -16,11 +16,14 @@ All documentation drift. Fast forward: rewrite, don't deprecate.
 
 ## Coverage and CI
 
-- [ ] **DOC-6** Update `docs/development.md:101` to say coverage gate is 60% (matches CI). Or raise CI to 70%.
-  - **Where**: `docs/development.md:101` and `.github/workflows/ci.yaml:62`.
+- [x] **DOC-6** Update `docs/development.md:101` to say coverage gate is 60% (matches CI). Or raise CI to 70%.
+  - **Status**: done — `docs/development.md:49` says "Coverage floor is 60%" which matches CI.
 
-- [ ] **DOC-7** Fix `docs/development.md:111` to say `./tests/...` (plural, matches Makefile).
-- [ ] **DOC-8** Update `docs/development.md:177` to remove "(Future) make security" — it's already wired.
+- [x] **DOC-7** Fix `docs/development.md:111` to say `./tests/...` (plural, matches Makefile).
+  - **Status**: done — `docs/development.md:42` uses `go test ./tests/contract/...`.
+
+- [x] **DOC-8** Update `docs/development.md:177` to remove "(Future) make security" — it's already wired.
+  - **Status**: done — no "(Future) make security" reference found in development.md.
 
 ## Getting started / API drift
 
@@ -40,7 +43,8 @@ All documentation drift. Fast forward: rewrite, don't deprecate.
 
 ## Code-doc contradictions
 
-- [ ] **DOC-1** Fix `internal/approval/approval.go:152-155` doc comment to match the actual fail-closed behaviour.
+- [x] **DOC-1** Fix `internal/approval/approval.go:152-155` doc comment to match the actual fail-closed behaviour.
+  - **Status**: done — doc comment at lines 156-166 describes all three fail-closed failure modes and references SEC-1 fix.
 
 ## Stale doc references
 
