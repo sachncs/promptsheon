@@ -293,32 +293,27 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 // deployment — operators must set PROMPTSHEON_AUTH=true before
 // exposing the port.
 func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
-	// BUG-27: dropped the manual r.Method != POST check. The
-	// route is registered as POST /api/v1/setup, so the mux
-	// already enforces the method and the guard was unreachable.
-	// Bootstrap is the documented "first caller wins" path. The
-	// standard configuration is PROMPTSHEON_AUTH=false so the
-	// first caller can mint an admin key without credentials. The
-	// e2e harness and a small number of human operators want the
-	// same first-call behaviour even with auth=true: the
-	// PROMPTSHEON_BOOTSTRAP_TOKEN env var gates the path. When
-	// the env var is set we honour the token; otherwise we
-	// require auth=false (the standard production path).
-	if s.requireAuth && os.Getenv("PROMPTSHEON_BOOTSTRAP_TOKEN") == "" {
-		return forbidden("bootstrap is disabled when authentication is enabled and no PROMPTSHEON_BOOTSTRAP_TOKEN is set")
+	// SEC-CRITICAL: bootstrap must NEVER be reachable without an
+	// explicit operator opt-in. When PROMPTSHEON_AUTH=false (the
+	// documented local-dev default) the route used to mint an admin
+	// key for any caller that reached the bind address. A deployment
+	// that flipped from local to "behind a reverse proxy" without
+	// rotating the env var would hand admin to whoever probed first.
+	//
+	// We now require PROMPTSHEON_BOOTSTRAP_TOKEN to be set regardless
+	// of auth mode; the caller must present it via X-Bootstrap-Token.
+	// Operators who genuinely want first-call-wins bootstrap set the
+	// token to a random value, hand it to the operator, and never
+	// expose the bind address without auth=true.
+	want := os.Getenv("PROMPTSHEON_BOOTSTRAP_TOKEN")
+	if want == "" {
+		return forbidden("bootstrap is disabled: set PROMPTSHEON_BOOTSTRAP_TOKEN to a random secret before calling POST /api/v1/setup")
 	}
-
-	// Bootstrap token: when PROMPTSHEON_BOOTSTRAP_TOKEN is set the
-	// caller must present it via X-Bootstrap-Token. Without this
-	// gate, a misconfigured deployment with auth=false would mint
-	// an admin key to the first network-adjacent caller. The token
-	// is a deliberate operational safety net, not a replacement
-	// for proper authentication.
-	if token, want := r.Header.Get("X-Bootstrap-Token"), os.Getenv("PROMPTSHEON_BOOTSTRAP_TOKEN"); want != "" {
-		if subtle.ConstantTimeCompare([]byte(token), []byte(want)) != 1 {
-			return forbidden("invalid or missing X-Bootstrap-Token")
-		}
+	got := r.Header.Get("X-Bootstrap-Token")
+	if subtle.ConstantTimeCompare([]byte(got), []byte(want)) != 1 {
+		return forbidden("invalid or missing X-Bootstrap-Token")
 	}
+	_ = s.requireAuth // retained for backwards-compatible Option wiring
 
 	var req struct {
 		Email string `json:"email"`
@@ -545,7 +540,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 		return badRequest("OAuth not configured")
 	}
 
-	token, err := s.oauth.ExchangeCode(r.Context(), providerName, code)
+	token, err := s.oauth.ExchangeCode(r.Context(), providerName, code, stateCookie.Value)
 	if err != nil {
 		// Do NOT echo err.Error() to the unauthenticated client. The
 		// underlying error already wraps the upstream provider's
@@ -578,6 +573,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 	}
 
 	existing, err := s.db.GetUserByEmail(r.Context(), user.Email)
+	autoProvisioned := false
 	if err == sql.ErrNoRows {
 		// OAuth auto-provision is gated behind an explicit env var
 		// (PROMPTSHEON_OAUTH_AUTO_PROVISION=true, default false). With
@@ -602,6 +598,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 			return e
 		}
 		existing = newUser
+		autoProvisioned = true
 	} else if err != nil {
 		return err
 	}
@@ -629,24 +626,6 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 	// logged auth failures but skipped successes; an audit log
 	// that records only failures is the worst kind — it confirms
 	// an attacker is on a successful path without recording it.
-	var newUser *models.User
-	if err == sql.ErrNoRows && os.Getenv("PROMPTSHEON_OAUTH_AUTO_PROVISION") == "true" {
-		newUser = &models.User{
-			ID:        generateID(),
-			Email:     user.Email,
-			Name:      user.Name,
-			Role:      string(auth.RoleReader),
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-		}
-		if e := s.db.CreateUser(r.Context(), newUser); e != nil {
-			return e
-		}
-		existing = newUser
-	} else if err != nil {
-		return err
-	}
-	autoProvisioned := existing == newUser
 	s.audit(r.Context(), "oauth_login", "user:"+existing.ID, map[string]any{
 		"provider":       providerName,
 		"email":          user.Email,

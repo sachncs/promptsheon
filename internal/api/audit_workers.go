@@ -153,22 +153,34 @@ func (s *Server) auditWorker(ctx context.Context) {
 			if !ok {
 				return
 			}
-			// Use a fresh background context for the DB write so a
-			// cancelled request does not abort the audit persistence.
-			writeStart := time.Now()
-			if err := s.db.AppendAudit(context.Background(), entry); err != nil {
-				if s.logger != nil {
-					s.logger.Error("failed to write audit entry",
-						"err", err, "entry_id", entry.ID, "action", entry.Action)
-				}
-			}
-			// OBS-AUDIT-2: surface the time between audit() being
-			// called and the DB write committing, so operators can
-			// detect worker backlog growth.
-			if s.collector != nil {
-				s.collector.ObserveAuditQueue(time.Since(entry.Timestamp).Seconds())
-			}
-			_ = writeStart
+			s.handleAuditEntry(entry)
 		}
+	}
+}
+
+// handleAuditEntry processes a single audit entry, with panic
+// recovery so a misbehaving AppendAudit implementation (e.g. a
+// type assertion in a future refactor) cannot permanently shrink
+// the audit worker pool. A recovered panic is logged and the
+// entry is dropped — durability of individual entries is best-
+// effort, but the worker keeps running.
+func (s *Server) handleAuditEntry(entry *models.AuditEntry) {
+	defer func() {
+		if r := recover(); r != nil {
+			if s.logger != nil {
+				s.logger.Error("audit worker panic recovered",
+					"err", r, "entry_id", entry.ID, "action", entry.Action)
+			}
+		}
+	}()
+	if err := s.db.AppendAudit(context.Background(), entry); err != nil {
+		if s.logger != nil {
+			s.logger.Error("failed to write audit entry",
+				"err", err, "entry_id", entry.ID, "action", entry.Action)
+		}
+		return
+	}
+	if s.collector != nil {
+		s.collector.ObserveAuditQueue(time.Since(entry.Timestamp).Seconds())
 	}
 }

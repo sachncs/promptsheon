@@ -1686,8 +1686,10 @@ func TestHandleRevokeAPIKey_AlreadyRevoked(t *testing.T) {
 
 func TestHandleBootstrap_InvalidJSON(t *testing.T) {
 	s := newTestServer(t)
+	t.Setenv("PROMPTSHEON_BOOTSTRAP_TOKEN", "test-bootstrap-secret")
 	req := httptest.NewRequest("POST", "/api/v1/setup", bytes.NewReader([]byte("not json")))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Bootstrap-Token", "test-bootstrap-secret")
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
 
@@ -1701,9 +1703,12 @@ func TestHandleBootstrap(t *testing.T) {
 	s := newTestServer(t)
 	s.db = newRepositories(repo)
 
+	t.Setenv("PROMPTSHEON_BOOTSTRAP_TOKEN", "test-bootstrap-secret")
+
 	body := mustMarshal(t, map[string]string{"email": "admin@local", "name": "Bootstrap Admin"})
 	req := httptest.NewRequest("POST", "/api/v1/setup", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Bootstrap-Token", "test-bootstrap-secret")
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
 
@@ -1718,15 +1723,54 @@ func TestHandleBootstrap(t *testing.T) {
 	}
 }
 
+func TestHandleBootstrap_NoToken(t *testing.T) {
+	repo := newMockRepo()
+	s := newTestServer(t)
+	s.db = newRepositories(repo)
+
+	// PROMPTSHEON_BOOTSTRAP_TOKEN is intentionally unset.
+	body := mustMarshal(t, map[string]string{"email": "admin@local"})
+	req := httptest.NewRequest("POST", "/api/v1/setup", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	s.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("expected 403 when bootstrap token is unset, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestHandleBootstrap_WrongToken(t *testing.T) {
+	repo := newMockRepo()
+	s := newTestServer(t)
+	s.db = newRepositories(repo)
+
+	t.Setenv("PROMPTSHEON_BOOTSTRAP_TOKEN", "test-bootstrap-secret")
+
+	body := mustMarshal(t, map[string]string{"email": "admin@local"})
+	req := httptest.NewRequest("POST", "/api/v1/setup", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Bootstrap-Token", "wrong-token")
+	rr := httptest.NewRecorder()
+	s.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("expected 403 on wrong bootstrap token, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestHandleBootstrap_AlreadyUsers(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "u@t.com", Name: "U", Role: "admin"})
 	s := newTestServer(t)
 	s.db = newRepositories(repo)
 
+	t.Setenv("PROMPTSHEON_BOOTSTRAP_TOKEN", "test-bootstrap-secret")
+
 	body := mustMarshal(t, map[string]string{"email": "admin@local"})
 	req := httptest.NewRequest("POST", "/api/v1/setup", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Bootstrap-Token", "test-bootstrap-secret")
 	rr := httptest.NewRecorder()
 	s.ServeHTTP(rr, req)
 
