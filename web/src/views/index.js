@@ -1,11 +1,13 @@
 import { renderOverview } from "./overview.js";
-import { renderCapabilitiesListPlaceholder, renderCapabilityDetailPlaceholder, renderReleasesPlaceholder, renderAuditPlaceholder, renderObservabilityPlaceholder, renderGuardrailsPlaceholder, renderEvaluationsPlaceholder, renderLogsPlaceholder, renderOperationsPlaceholder } from "./_placeholder.js";
+import { renderCapabilitiesList } from "./capabilities-list.js";
+import { renderCapabilityDetail } from "./capability-detail.js";
+import { renderReleasesPlaceholder, renderAuditPlaceholder, renderObservabilityPlaceholder, renderGuardrailsPlaceholder, renderEvaluationsPlaceholder, renderLogsPlaceholder, renderOperationsPlaceholder } from "./_placeholder.js";
 import { renderNotFound } from "./not-found.js";
 
 const ROUTES = {
   "/": renderOverview,
-  "/capabilities": renderCapabilitiesListPlaceholder,
-  "/capabilities/{id}": renderCapabilityDetailPlaceholder,
+  "/capabilities": renderCapabilitiesList,
+  "/capabilities/{id}": renderCapabilityDetail,
   "/releases": renderReleasesPlaceholder,
   "/audit": renderAuditPlaceholder,
   "/observability": renderObservabilityPlaceholder,
@@ -32,7 +34,7 @@ const PAGE_TITLES = {
 
 function resolve(route) {
   if (ROUTES[route.path]) return ROUTES[route.path];
-  if (route.path.startsWith("/capabilities/") && route.path !== "/capabilities") return renderCapabilityDetailPlaceholder;
+  if (route.path.startsWith("/capabilities/") && route.path !== "/capabilities") return renderCapabilityDetail;
   if (route.path.startsWith("/operations/") && route.path !== "/operations") return renderOperationsPlaceholder;
   return null;
 }

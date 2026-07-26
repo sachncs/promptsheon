@@ -1,0 +1,1 @@
+import { renderCapabilitiesList, renderCapabilityDetailPlaceholder } from "./_placeholder.js";

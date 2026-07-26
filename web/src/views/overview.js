@@ -268,6 +268,7 @@ function renderInitialSkeleton(filter) {
 export async function renderOverview(route) {
   const initialFilter = route?.query?.action || (window.localStorage.getItem("promptsheon.auditFilter") || "all");
   const html = renderInitialSkeleton(initialFilter);
+  window.document.getElementById("view").innerHTML = html;
   queueMicrotask(async () => {
     try {
       const data = await loadOverviewData(initialFilter);
@@ -278,7 +279,6 @@ export async function renderOverview(route) {
       console.error("Overview hydration failed:", error);
     }
   });
-  const activity = window.document.getElementById("view-activity-future");
   return html;
 }
 
