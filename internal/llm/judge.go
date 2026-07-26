@@ -59,9 +59,8 @@ type registryJudge struct {
 // cannot run away with budget.
 func (j *registryJudge) Complete(ctx context.Context, prompt string) (string, error) {
 	out, err := j.reg.Complete(ctx, &Request{
-		Messages:    []Message{{Role: "user", Content: prompt}},
-		MaxTokens:   256,
-		Temperature: 0.0,
+		Messages:  []Message{{Role: "user", Content: prompt}},
+		MaxTokens: 256,
 	})
 	if err != nil {
 		return "", fmt.Errorf("judge %s: %w", j.name, err)

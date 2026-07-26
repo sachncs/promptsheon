@@ -13,7 +13,8 @@ func BenchmarkCircuitBreakerAllow(b *testing.B) {
 	})
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		cb.Allow()
+		err := cb.Allow()
+		_ = err
 	}
 }
 

@@ -124,11 +124,11 @@ func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) 
 	if maxTokens > 0 {
 		params.MaxOutputTokens = openai.Int(maxTokens)
 	}
-	if req.Temperature > 0 {
-		params.Temperature = openai.Float(req.Temperature)
+	if req.Temperature != nil {
+		params.Temperature = openai.Float(*req.Temperature)
 	}
-	if req.TopP > 0 {
-		params.TopP = openai.Float(req.TopP)
+	if req.TopP != nil {
+		params.TopP = openai.Float(*req.TopP)
 	}
 	// req.Stop is not surfaced through the Responses API in v3; the
 	// parameter is silently dropped. Callers that need deterministic

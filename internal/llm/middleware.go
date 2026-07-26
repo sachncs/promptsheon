@@ -59,7 +59,9 @@ func (i *Instrumented) Complete(ctx context.Context, req *Request) (*Response, e
 	} else {
 		metrics.Usage = resp.Usage
 		if i.pricing != nil {
-			metrics.CostUSD = i.pricing.Calculate(req.Model, resp.Usage)
+			if cost, ok := i.pricing.Calculate(req.Model, resp.Usage); ok {
+				metrics.CostUSD = cost
+			}
 		}
 	}
 

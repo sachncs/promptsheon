@@ -24,9 +24,9 @@ func (f *fakeJudge) Complete(_ context.Context, prompt string) (string, error) {
 func TestParseJudgeResponse(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		in      string
-		want    judgeVerdict
-		ratLen  int
+		in     string
+		want   judgeVerdict
+		ratLen int
 	}{
 		{"VERDICT: PASS\nRATIONALE: looks good", verdictPass, 1},
 		{"VERDICT: FAIL\nRATIONALE: too short", verdictFail, 1},
@@ -62,10 +62,10 @@ func TestBuildJudgePromptShape(t *testing.T) {
 func TestLLMJudgeScoreCase(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name       string
-		verdict    string
-		wantPass   bool
-		wantErr    bool
+		name     string
+		verdict  string
+		wantPass bool
+		wantErr  bool
 	}{
 		{"pass", "VERDICT: PASS\nRATIONALE: ok", true, false},
 		{"fail", "VERDICT: FAIL\nRATIONALE: no", false, false},

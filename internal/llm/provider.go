@@ -38,8 +38,8 @@ type Request struct {
 	Model       string    `json:"model"`
 	Messages    []Message `json:"messages"`
 	MaxTokens   int       `json:"max_tokens,omitempty"`
-	Temperature float64   `json:"temperature,omitempty"`
-	TopP        float64   `json:"top_p,omitempty"`
+	Temperature *float64  `json:"temperature,omitempty"` // pointer so zero is expressible
+	TopP        *float64  `json:"top_p,omitempty"`       // pointer so zero is expressible
 	Stop        []string  `json:"stop,omitempty"`
 	Stream      bool      `json:"-"`
 }
@@ -50,8 +50,14 @@ type Message struct {
 	Content string `json:"content"`
 }
 
-// Response holds the output from an LLM call.
+// Response holds the output from an LLM call. Provider and
+// EffectiveModel are populated by the concrete providers so
+// downstream observability can attribute cost and metrics to the
+// actual backend that served the request, even when a fallback
+// chain routed through multiple providers.
 type Response struct {
+	Provider         string        `json:"provider,omitempty"`
+	EffectiveModel   string        `json:"effective_model,omitempty"`
 	Content          string        `json:"content"`
 	Usage            Usage         `json:"usage"`
 	Model            string        `json:"model"`
@@ -81,8 +87,15 @@ func PerCallKeyFromContext(ctx context.Context) string {
 }
 
 // ProviderConfig holds configuration for constructing a provider.
+//
+// APIKey is excluded from JSON marshalling. Configuration objects
+// are routinely logged, persisted, returned by APIs, or included
+// in diagnostics; serialising the bearer credential would leak
+// the key through any of those surfaces. Consumers that need to
+// persist the credential should keep it in a separate, access-
+// controlled secret store.
 type ProviderConfig struct {
-	APIKey  string            `json:"api_key"`
+	APIKey  string            `json:"-"`
 	BaseURL string            `json:"base_url,omitempty"`
 	Extra   map[string]string `json:"extra,omitempty"` // provider-specific config (e.g. deployment, api_version)
 }

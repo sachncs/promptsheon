@@ -36,6 +36,10 @@ func (s CircuitState) String() string {
 var (
 	// ErrCircuitOpen is returned when the circuit breaker is open.
 	ErrCircuitOpen = errors.New("circuit breaker is open")
+	// ErrCircuitHalfOpen is returned when the circuit breaker is
+	// half-open and a probe is already in flight. Callers should
+	// back off briefly and retry.
+	ErrCircuitHalfOpen = errors.New("circuit breaker is half-open with a probe in flight")
 )
 
 // CircuitBreakerConfig configures the circuit breaker behavior.
@@ -59,12 +63,13 @@ func DefaultCircuitBreakerConfig() CircuitBreakerConfig {
 
 // CircuitBreaker tracks failures and prevents calls when open.
 type CircuitBreaker struct {
-	config          CircuitBreakerConfig
-	state           CircuitState
-	failureCount    int
-	successCount    int
-	lastFailureTime time.Time
-	mu              sync.RWMutex
+	config           CircuitBreakerConfig
+	state            CircuitState
+	failureCount     int
+	successCount     int
+	lastFailureTime  time.Time
+	halfOpenInFlight bool
+	mu               sync.RWMutex
 }
 
 // NewCircuitBreaker creates a new circuit breaker with the given config.
@@ -83,25 +88,38 @@ func (cb *CircuitBreaker) State() CircuitState {
 }
 
 // Allow checks if a request should be allowed through the circuit breaker.
-func (cb *CircuitBreaker) Allow() bool {
+//
+// In the half-open state exactly one probe is permitted; subsequent
+// callers receive ErrCircuitHalfOpen until the probe completes and
+// transitions the breaker to closed (on success) or back to open
+// (on failure). The previous implementation permitted unlimited
+// concurrent probes, which let a recovering provider receive a burst
+// of requests — one of which could re-open the breaker and recreate
+// the original outage.
+func (cb *CircuitBreaker) Allow() error {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
 
 	switch cb.state {
 	case StateClosed:
-		return true
+		return nil
 	case StateOpen:
 		// Check if cooldown has elapsed
 		if time.Since(cb.lastFailureTime) >= cb.config.Cooldown {
 			cb.state = StateHalfOpen
 			cb.successCount = 0
-			return true
+			cb.halfOpenInFlight = true
+			return nil
 		}
-		return false
+		return ErrCircuitOpen
 	case StateHalfOpen:
-		return true
+		if cb.halfOpenInFlight {
+			return ErrCircuitHalfOpen
+		}
+		cb.halfOpenInFlight = true
+		return nil
 	default:
-		return false
+		return ErrCircuitOpen
 	}
 }
 
@@ -114,6 +132,7 @@ func (cb *CircuitBreaker) RecordSuccess() {
 	case StateClosed:
 		cb.failureCount = 0
 	case StateHalfOpen:
+		cb.halfOpenInFlight = false
 		cb.successCount++
 		if cb.successCount >= cb.config.SuccessThreshold {
 			cb.state = StateClosed
@@ -139,6 +158,7 @@ func (cb *CircuitBreaker) RecordFailure() {
 	case StateHalfOpen:
 		cb.state = StateOpen
 		cb.successCount = 0
+		cb.halfOpenInFlight = false
 	}
 }
 
@@ -168,8 +188,8 @@ func NewCircuitBreakerMiddleware(provider Provider, config CircuitBreakerConfig)
 
 // Complete implements Provider and wraps calls with circuit breaker logic.
 func (cbm *CircuitBreakerMiddleware) Complete(ctx context.Context, req *Request) (*Response, error) {
-	if !cbm.breaker.Allow() {
-		return nil, ErrCircuitOpen
+	if err := cbm.breaker.Allow(); err != nil {
+		return nil, err
 	}
 
 	resp, err := cbm.provider.Complete(ctx, req)
