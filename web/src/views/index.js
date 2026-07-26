@@ -2,18 +2,22 @@ import { renderOverview } from "./overview.js";
 import { renderCapabilitiesList } from "./capabilities-list.js";
 import { renderCapabilityDetail } from "./capability-detail.js";
 import { renderAudit } from "./audit.js";
-import { renderReleasesPlaceholder, renderObservabilityPlaceholder, renderGuardrailsPlaceholder, renderEvaluationsPlaceholder, renderLogsPlaceholder, renderOperationsPlaceholder } from "./_placeholder.js";
+import { renderReleases } from "./releases.js";
+import { renderObservability } from "./observability.js";
+import { renderGuardrails } from "./guardrails.js";
+import { renderEvaluations } from "./evaluations.js";
+import { renderLogsPlaceholder, renderOperationsPlaceholder } from "./_placeholder.js";
 import { renderNotFound } from "./not-found.js";
 
 const ROUTES = {
   "/": renderOverview,
   "/capabilities": renderCapabilitiesList,
   "/capabilities/{id}": renderCapabilityDetail,
-  "/releases": renderReleasesPlaceholder,
+  "/releases": renderReleases,
   "/audit": renderAudit,
-  "/observability": renderObservabilityPlaceholder,
-  "/guardrails": renderGuardrailsPlaceholder,
-  "/evaluations": renderEvaluationsPlaceholder,
+  "/observability": renderObservability,
+  "/guardrails": renderGuardrails,
+  "/evaluations": renderEvaluations,
   "/logs": renderLogsPlaceholder,
   "/operations": renderOperationsPlaceholder,
   "/operations/{tab}": renderOperationsPlaceholder
