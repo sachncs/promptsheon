@@ -86,7 +86,10 @@ func TestSelfEvolve_OrchestratorEndToEnd(t *testing.T) {
 	}
 	validator := selfevolve.NewHarnessValidator(fake, invoke)
 	sharedAuditor := &fakeAuditor{}
-	promoter, perr := selfevolve.NewPromoter(fake, loader, &fakeActivator{repo: fake}, sharedAuditor); if perr != nil { t.Fatalf("NewPromoter: %v", perr) }
+	promoter, perr := selfevolve.NewPromoter(fake, loader, &fakeActivator{repo: fake}, sharedAuditor)
+	if perr != nil {
+		t.Fatalf("NewPromoter: %v", perr)
+	}
 	ev := selfevolve.NewEvolver(fake, loader, revision, validator, promoter, sharedAuditor, nil)
 
 	// 7. Set the capability's self-evolve config.
@@ -195,7 +198,10 @@ func TestSelfEvolve_RejectsWhenLLMFails(t *testing.T) {
 	revision := selfevolve.NewLLMRevisionStrategy(invoke)
 	loader := selfevolve.NewCasPromptLoader()
 	validator := selfevolve.NewHarnessValidator(fake, invoke)
-	promoter, perr := selfevolve.NewPromoter(fake, loader, &fakeActivator{repo: fake}, &fakeAuditor{}); if perr != nil { t.Fatalf("NewPromoter: %v", perr) }
+	promoter, perr := selfevolve.NewPromoter(fake, loader, &fakeActivator{repo: fake}, &fakeAuditor{})
+	if perr != nil {
+		t.Fatalf("NewPromoter: %v", perr)
+	}
 	ev := selfevolve.NewEvolver(fake, loader, revision, validator, promoter, &fakeAuditor{}, nil)
 	if err := db.UpdateSelfEvolveConfig(ctx, capID, capability.SelfEvolveConfig{
 		Enabled: true, MinScore: 0.9, MaxRevisions: 3, CooldownSec: 0, TargetEnv: "dev", DatasetID: datasetID,
@@ -236,10 +242,10 @@ var selfEvolveAuditUser = &models.User{
 // for the prompt blobs. The only thing it fakes is the
 // LLM call (passed in via the validator + revision).
 type fakeEvolverRepo struct {
-	db         *store.SQLite
-	capID      string
-	datasetID  string
-	validator  selfevolve.LLMInvokeFn
+	db        *store.SQLite
+	capID     string
+	datasetID string
+	validator selfevolve.LLMInvokeFn
 }
 
 // All the methods below are passthroughs to db (or to the

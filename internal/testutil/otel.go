@@ -15,21 +15,21 @@ import (
 //
 // Usage:
 //
-//	collector := testutil.NewInMemoryCollector()
-//	defer collector.Shutdown(ctx)
+//		collector := testutil.NewInMemoryCollector()
+//		defer collector.Shutdown(ctx)
 //
-//	// Create a tracer that writes to the collector
-//	tracer := trace.NewTracerProvider(
-//	    trace.WithSyncer(collector.Exporter()),
-//    ).Tracer("test")
+//		// Create a tracer that writes to the collector
+//		tracer := trace.NewTracerProvider(
+//		    trace.WithSyncer(collector.Exporter()),
+//	   ).Tracer("test")
 //
-//	// ... do work that produces spans ...
+//		// ... do work that produces spans ...
 //
-//	// Assert on collected spans
-//	spans := collector.Spans()
-//	if len(spans) != 1 {
-//	    t.Fatalf("expected 1 span, got %d", len(spans))
-//	}
+//		// Assert on collected spans
+//		spans := collector.Spans()
+//		if len(spans) != 1 {
+//		    t.Fatalf("expected 1 span, got %d", len(spans))
+//		}
 type InMemoryCollector struct {
 	mu       sync.Mutex
 	exporter *tracetest.InMemoryExporter
