@@ -1,4 +1,4 @@
-.PHONY: all build build-server build-cli test test-verbose test-integration test-e2e load-test lint lint-domain lint-deps fmt vet deps clean coverage coverage-raw run cli openapi openapi-check update-deps security helm-docs docs-check bench docs-site help
+.PHONY: all build build-server build-cli test test-verbose test-integration test-e2e load-test lint lint-domain lint-deps fmt vet deps clean coverage coverage-raw run cli openapi openapi-check update-deps security helm-docs docs-check bench docs-site help web-install web-dev web-build web-smoke
 
 # Default target
 all: build
@@ -198,7 +198,7 @@ help:
 	@echo "  fmt              Format code with gofmt and goimports"
 	@echo "  vet              Run go vet"
 	@echo "  deps             Download and verify dependencies"
-	@echo "  clean            Remove build artifacts"
+	@echo "  clean            Clean build artifacts and database files"
 	@echo "  coverage         Generate HTML coverage report"
 	@echo "  coverage-raw     Show coverage in terminal"
 	@echo "  run              Run the server locally"
@@ -206,11 +206,32 @@ help:
 	@echo "  openapi          Regenerate api/openapi.yaml from server routes"
 	@echo "  openapi-check    Fail if openapi.yaml is out of date"
 	@echo "  sdk              Refresh SDK stubs from api/openapi.yaml"
-	@echo "  sdk-check        Fail if SDK stubs are out of date"
+	@echo "  sdk-check        Fail if SDK is out of date"
 	@echo "  helm-docs        Regenerate deploy/helm/promptsheon/README.md from values.yaml"
 	@echo "  docs-check       Fail on broken local markdown links or stale source-path refs"
 	@echo "  bench            Run the curated 8 Go benchmarks (scripts/benchmarks.txt)"
 	@echo "  docs-site        Build the mdBook site (no-op if mdbook is missing)"
-	@echo "  update-deps      Update all dependencies"
+	@echo "  update-deps      Update Go dependencies"
 	@echo "  security         Check for security vulnerabilities"
+	@echo "  web-install      Install dashboard dependencies (web/)"
+	@echo "  web-dev          Run dashboard dev server (web/)"
+	@echo "  web-build        Build dashboard static bundle (web/dist)"
+	@echo "  web-smoke        Run dashboard end-to-end smoke against a running daemon"
 	@echo "  help             Show this help message"
+
+# ----- Dashboard targets ----------------------------------------------------
+web-install:
+	@command -v node >/dev/null 2>&1 || { echo "node not found"; exit 1; }
+	cd web && npm install
+
+web-build:
+	cd web && npm run build
+
+web-dev:
+	cd web && npm run dev
+
+web-smoke:
+	@command -v node >/dev/null 2>&1 || { echo "node not found"; exit 1; }
+	cd web && [ -d node_modules ] || npm install
+	cd web && node scripts/smoke.mjs
+
