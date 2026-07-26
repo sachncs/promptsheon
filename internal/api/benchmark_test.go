@@ -61,7 +61,10 @@ func BenchmarkHashAndTeeBody(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		rc := struct{ io.Reader; io.Closer }{Reader: bytes.NewReader(body), Closer: closingNoop{}}
+		rc := struct {
+			io.Reader
+			io.Closer
+		}{Reader: bytes.NewReader(body), Closer: closingNoop{}}
 		hash, replay, err := hashAndTeeBody(rc)
 		if err != nil {
 			b.Fatal(err)
