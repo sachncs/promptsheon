@@ -35,10 +35,10 @@ type CaseLoader interface {
 // audit log entries are identifiable; the run is NOT
 // persisted to the eval_runs table.
 type HarnessValidator struct {
-	Cases   CaseLoader
-	Invoke  LLMInvokeFn
-	Scorer  eval.Scorer
-	Now     func() time.Time
+	Cases  CaseLoader
+	Invoke LLMInvokeFn
+	Scorer eval.Scorer
+	Now    func() time.Time
 }
 
 // NewHarnessValidator constructs a validator. Scorer
@@ -46,10 +46,10 @@ type HarnessValidator struct {
 // the model doesn't have to produce exact wording.
 func NewHarnessValidator(cases CaseLoader, invoke LLMInvokeFn) *HarnessValidator {
 	return &HarnessValidator{
-		Cases:   cases,
-		Invoke:  invoke,
-		Scorer:  eval.ScorerContains,
-		Now:     func() time.Time { return time.Now().UTC() },
+		Cases:  cases,
+		Invoke: invoke,
+		Scorer: eval.ScorerContains,
+		Now:    func() time.Time { return time.Now().UTC() },
 	}
 }
 

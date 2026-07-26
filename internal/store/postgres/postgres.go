@@ -14,6 +14,7 @@
 // Until pgx lands, the package exports:
 //   - NewInMemoryPostgresRepositories() *store.Repositories
 //   - LoadSQL() (initSQL, rlsSQL string)
+//
 // so callers can inspect the SQL and the in-memory mock.
 //
 // PG-2 (shipped): the RLS policies in migrations/010_rls.up.sql
@@ -92,18 +93,18 @@ func init() {
 // multi-tenant isolation must run the real Postgres backend
 // with the migrations applied.
 type InMemoryPostgres struct {
-	workspaces     map[string]capability.Workspace
-	projects       map[string]capability.Project
-	capabilities   map[string]capability.Capability
-	versions       map[string]capability.Version
-	releases       map[string]release.Release
-	approvals      map[string]approval.Approval
-	datasets       map[string]*harness.Dataset
-	cases          map[string][]harness.DatasetCase
-	preconditions  map[string]*harness.Precondition
-	evalRuns       map[string]*harness.EvalRun
-	evalResults    map[string][]harness.EvalResult
-	systemConfig   map[string]settings.CRDTRecord
+	workspaces    map[string]capability.Workspace
+	projects      map[string]capability.Project
+	capabilities  map[string]capability.Capability
+	versions      map[string]capability.Version
+	releases      map[string]release.Release
+	approvals     map[string]approval.Approval
+	datasets      map[string]*harness.Dataset
+	cases         map[string][]harness.DatasetCase
+	preconditions map[string]*harness.Precondition
+	evalRuns      map[string]*harness.EvalRun
+	evalResults   map[string][]harness.EvalResult
+	systemConfig  map[string]settings.CRDTRecord
 }
 
 // NewInMemoryPostgres constructs an empty in-memory Postgres

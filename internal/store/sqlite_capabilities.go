@@ -327,16 +327,16 @@ func (s *SQLite) UpdateSelfEvolveConfig(ctx context.Context, capabilityID string
 // table. The evolver reads/writes one row per cycle to track
 // cooldown across daemon restarts.
 type SelfEvolveState struct {
-	CapabilityID      string
-	TargetEnv         string
-	LastAttemptAt     *time.Time
-	LastPromoteAt     *time.Time
-	LastScore         float64
-	LastRevisionIdx   int
-	CycleStartedAt    *time.Time
-	LastStatus        string
-	LastError         string
-	RevisionIndex     int
+	CapabilityID    string
+	TargetEnv       string
+	LastAttemptAt   *time.Time
+	LastPromoteAt   *time.Time
+	LastScore       float64
+	LastRevisionIdx int
+	CycleStartedAt  *time.Time
+	LastStatus      string
+	LastError       string
+	RevisionIndex   int
 }
 
 func (s *SQLite) LoadSelfEvolveState(ctx context.Context, capabilityID, targetEnv string) (*SelfEvolveState, error) {
@@ -843,16 +843,21 @@ func (s *SQLite) CreateSchedule(ctx context.Context, sc *schedule.Schedule) erro
 }
 
 // ListDueSchedules returns schedules due to fire at-or-before now.
-// DEAD-Store-2 removed the unused Create/Get/List/Delete
-// variants; ListDueSchedules + UpdateSchedule is the only path
-// the scheduler needs.
+//
+// Webhook and manual schedules have no NextFireAt semantics —
+// they are driven by external events, not by the cron tick.
+// Returning them from the tick list would cause the scheduler to
+// fire them on every tick (NextFireAt defaults to the epoch and
+// never advances for non-cron kinds), creating runaway execution
+// traffic. We filter them out here; webhook fires go through the
+// dedicated HTTP handler and manual fires go through the CLI.
 func (s *SQLite) ListDueSchedules(ctx context.Context, now time.Time, limit int) ([]*schedule.Schedule, error) {
 	if limit <= 0 {
 		limit = 100
 	}
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, workspace_id, release_id, kind, cron, webhook_path, next_fire_at, last_fire_at, fired_count, enabled, created_at, created_by
-		 FROM schedules WHERE enabled = 1 AND next_fire_at <= ? ORDER BY next_fire_at ASC LIMIT ?`,
+		 FROM schedules WHERE enabled = 1 AND kind = 'cron' AND next_fire_at <= ? ORDER BY next_fire_at ASC LIMIT ?`,
 		now, limit,
 	)
 	if err != nil {
@@ -868,6 +873,32 @@ func (s *SQLite) ListDueSchedules(ctx context.Context, now time.Time, limit int)
 		out = append(out, sc)
 	}
 	return out, rows.Err()
+}
+
+// ClaimDueSchedule atomically transitions a schedule from
+// "due" to "in-flight" by advancing next_fire_at to the next
+// computed fire time and stamping last_fire_at. Returns false
+// (and nil error) when the row is no longer due — the caller
+// raced with another scheduler and should skip publication.
+//
+// The previous code path used ListDueSchedules followed by a
+// separate UpdateSchedule, allowing two schedulers to both
+// publish the same schedule event. ClaimDueSchedule makes the
+// read+write atomic.
+func (s *SQLite) ClaimDueSchedule(ctx context.Context, sc *schedule.Schedule, newNextFireAt time.Time) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE schedules SET next_fire_at = ?, last_fire_at = ?, fired_count = fired_count + 1, enabled = ?
+		 WHERE id = ? AND next_fire_at = ?`,
+		newNextFireAt, sc.LastFireAt, sc.Enabled, sc.ID, sc.NextFireAt,
+	)
+	if err != nil {
+		return false, fmt.Errorf("claim due schedule: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("claim due schedule rows: %w", err)
+	}
+	return n == 1, nil
 }
 
 func (s *SQLite) UpdateSchedule(ctx context.Context, sc *schedule.Schedule) error {

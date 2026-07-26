@@ -48,14 +48,17 @@ func newPromoterSetup(t *testing.T) (*fakePromoterRepo, *fakeLoader, *fakeActiva
 	loader.seed(inner.versionsByCap["c1"][0].Manifest.Prompt.Hash, "old prompt")
 	activator := &fakeActivator{repo: inner}
 	return &fakePromoterRepo{
-		fakeRepo:       inner,
+		fakeRepo:        inner,
 		releaseManifest: inner.versionsByCap["c1"][0].Manifest,
 	}, loader, activator
 }
 
 func TestPromoter_NextVersionNumber_FirstVersion(t *testing.T) {
 	repo, loader, activator := newPromoterSetup(t)
-	p := NewPromoter(repo, loader, activator, &fakeAuditor{})
+	p, perr := NewPromoter(repo, loader, activator, &fakeAuditor{})
+	if perr != nil {
+		t.Fatal(perr)
+	}
 	v, err := p.nextVersionNumber(context.Background(), "c1")
 	if err != nil {
 		t.Fatalf("nextVersionNumber: %v", err)
@@ -67,7 +70,10 @@ func TestPromoter_NextVersionNumber_FirstVersion(t *testing.T) {
 
 func TestPromoter_Promote_WritesCASAndCreatesRelease(t *testing.T) {
 	repo, loader, activator := newPromoterSetup(t)
-	p := NewPromoter(repo, loader, activator, &fakeAuditor{})
+	p, perr := NewPromoter(repo, loader, activator, &fakeAuditor{})
+	if perr != nil {
+		t.Fatal(perr)
+	}
 	oldRelID := repo.activeReleaseID("c1", "dev")
 	res, err := p.Promote(context.Background(), "c1", "dev", oldRelID, "new prompt text")
 	if err != nil {
@@ -99,7 +105,10 @@ func TestPromoter_Promote_WritesCASAndCreatesRelease(t *testing.T) {
 
 func TestPromoter_Promote_EmptyPrompt(t *testing.T) {
 	repo, loader, activator := newPromoterSetup(t)
-	p := NewPromoter(repo, loader, activator, &fakeAuditor{})
+	p, perr := NewPromoter(repo, loader, activator, &fakeAuditor{})
+	if perr != nil {
+		t.Fatal(perr)
+	}
 	_, err := p.Promote(context.Background(), "c1", "dev", "rel-old", "")
 	if err == nil {
 		t.Fatalf("expected error for empty prompt")
@@ -108,7 +117,10 @@ func TestPromoter_Promote_EmptyPrompt(t *testing.T) {
 
 func TestPromoter_Promote_NoOldReleaseID(t *testing.T) {
 	repo, loader, activator := newPromoterSetup(t)
-	p := NewPromoter(repo, loader, activator, &fakeAuditor{})
+	p, perr := NewPromoter(repo, loader, activator, &fakeAuditor{})
+	if perr != nil {
+		t.Fatal(perr)
+	}
 	// No old release id: the promoter probes versions.
 	res, err := p.Promote(context.Background(), "c1", "dev", "", "new prompt text")
 	if err != nil {
@@ -123,7 +135,10 @@ func TestPromoter_LoadActiveManifest_Fallback(t *testing.T) {
 	// seedCapability already created a release; loadActiveManifest
 	// should pick it up.
 	repo, loader, activator := newPromoterSetup(t)
-	p := NewPromoter(repo, loader, activator, &fakeAuditor{})
+	p, perr := NewPromoter(repo, loader, activator, &fakeAuditor{})
+	if perr != nil {
+		t.Fatal(perr)
+	}
 	manifest, err := p.loadActiveManifest(context.Background(), "c1", "rel-old")
 	if err != nil {
 		t.Fatalf("loadActiveManifest: %v", err)

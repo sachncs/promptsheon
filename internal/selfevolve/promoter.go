@@ -34,15 +34,26 @@ type Auditor interface {
 	Audit(ctx context.Context, action, target string, detail map[string]any)
 }
 
-// NewPromoter constructs a Promoter. Now defaults to UTC.
-func NewPromoter(repo Repository, loader PromptLoader, activator ReleaseActivator, auditor Auditor) *Promoter {
+// NewPromoter constructs a Promoter. Now defaults to UTC. Returns
+// an error when a required dependency is missing so callers fail
+// fast rather than discovering a nil dereference mid-cycle.
+func NewPromoter(repo Repository, loader PromptLoader, activator ReleaseActivator, auditor Auditor) (*Promoter, error) {
+	if repo == nil {
+		return nil, fmt.Errorf("selfevolve: promoter repo is required")
+	}
+	if loader == nil {
+		return nil, fmt.Errorf("selfevolve: promoter loader is required")
+	}
+	if activator == nil {
+		return nil, fmt.Errorf("selfevolve: promoter activator is required")
+	}
 	return &Promoter{
 		Repo:      repo,
 		Loader:    loader,
 		Activator: activator,
 		Auditor:   auditor,
 		Now:       func() time.Time { return time.Now().UTC() },
-	}
+	}, nil
 }
 
 // PromoteResult is the outcome of Promote.
@@ -123,12 +134,12 @@ func (p *Promoter) Promote(ctx context.Context, capabilityID, targetEnv string, 
 	}
 	if p.Auditor != nil {
 		p.Auditor.Audit(ctx, AuditPromote, "capability:"+capabilityID, map[string]any{
-			"new_version_id": versionID,
-			"new_release_id": releaseID,
-			"old_release_id": oldReleaseID,
+			"new_version_id":  versionID,
+			"new_release_id":  releaseID,
+			"old_release_id":  oldReleaseID,
 			"new_prompt_hash": newHash,
-			"target_env":     targetEnv,
-			"manifest_hash":  manifestHash,
+			"target_env":      targetEnv,
+			"manifest_hash":   manifestHash,
 		})
 	}
 	return &PromoteResult{

@@ -44,6 +44,7 @@ type Elector struct {
 	now       func() time.Time
 	isLeader  bool
 	lastRenew time.Time
+	term      int64
 	mu        sync.Mutex
 }
 
@@ -62,13 +63,17 @@ func New(db *sql.DB, identity string, ttl time.Duration) *Elector {
 }
 
 // EnsureTable creates the leader table on first call. Safe to
-// invoke repeatedly; the SQL is idempotent.
+// invoke repeatedly; the SQL is idempotent. The leader row also
+// carries a monotonic term counter; every successful Acquire
+// increments it so downstream writers can use the term as a
+// fencing token.
 func (e *Elector) EnsureTable(ctx context.Context) error {
 	_, err := e.db.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS leader (
 			name        TEXT PRIMARY KEY,
 			identity    TEXT NOT NULL,
-			expires_at  DATETIME NOT NULL
+			expires_at  DATETIME NOT NULL,
+			term        INTEGER NOT NULL DEFAULT 0
 		)`)
 	if err != nil {
 		return fmt.Errorf("election: create table: %w", err)
@@ -85,6 +90,12 @@ var ErrNotLeader = errors.New("election: not the leader")
 // replica becomes (or already was) the leader; ErrNotLeader
 // when another replica currently holds the lease.
 //
+// The transaction is upgraded to a SQLite BEGIN IMMEDIATE so the
+// read and the conditional write land atomically; otherwise the
+// default BEGIN DEFERRED would let the SELECT succeed without
+// holding the write lock and the subsequent INSERT/UPDATE could
+// fail with SQLITE_BUSY_SNAPSHOT under contention.
+//
 // A replica that already holds the lease and successfully
 // renews it returns nil again without going through the
 // SQL contention path.
@@ -92,55 +103,76 @@ func (e *Elector) Acquire(ctx context.Context) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	tx, err := e.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("election: begin: %w", err)
+	if _, err := e.db.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		return fmt.Errorf("election: begin immediate: %w", err)
 	}
-	defer func() { _ = tx.Rollback() }()
+	committed := false
+	defer func() {
+		if !committed {
+			_, _ = e.db.ExecContext(context.Background(), "ROLLBACK")
+		}
+	}()
 
 	var (
 		curIdentity string
 		expiresAt   time.Time
+		curTerm     int64
 	)
-	row := tx.QueryRowContext(ctx,
-		`SELECT identity, expires_at FROM leader WHERE name = 'promptsheon'`)
-	switch err := row.Scan(&curIdentity, &expiresAt); {
+	row := e.db.QueryRowContext(ctx,
+		`SELECT identity, expires_at, term FROM leader WHERE name = 'promptsheon'`)
+	switch err := row.Scan(&curIdentity, &expiresAt, &curTerm); {
 	case errors.Is(err, sql.ErrNoRows):
 		// No leader yet — try to insert.
 		expiresAt = e.now().Add(e.ttl)
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO leader (name, identity, expires_at) VALUES ('promptsheon', ?, ?)`,
+		if _, err := e.db.ExecContext(ctx,
+			`INSERT INTO leader (name, identity, expires_at, term) VALUES ('promptsheon', ?, ?, 1)`,
 			e.identity, expiresAt); err != nil {
 			return fmt.Errorf("election: insert: %w", err)
 		}
+		e.term = 1
 	case err != nil:
 		return fmt.Errorf("election: scan: %w", err)
 	default:
 		if curIdentity == e.identity {
 			// Renew.
 			expiresAt = e.now().Add(e.ttl)
-			if _, err := tx.ExecContext(ctx,
-				`UPDATE leader SET expires_at = ? WHERE name = 'promptsheon' AND identity = ?`,
-				expiresAt, e.identity); err != nil {
+			if _, err := e.db.ExecContext(ctx,
+				`UPDATE leader SET expires_at = ? WHERE name = 'promptsheon' AND identity = ? AND term = ?`,
+				expiresAt, e.identity, curTerm); err != nil {
 				return fmt.Errorf("election: renew: %w", err)
 			}
+			e.term = curTerm
 		} else if e.now().Before(expiresAt) {
 			// Held by someone else and the lease is still valid.
 			return ErrNotLeader
 		} else {
-			// Stale lease — steal it.
+			// Stale lease — steal it but only if the lease is
+			// actually expired. The expires_at <= now guard
+			// defeats the TOCTOU window where the previous leader
+			// renewed between our SELECT and our UPDATE.
 			expiresAt = e.now().Add(e.ttl)
-			if _, err := tx.ExecContext(ctx,
-				`UPDATE leader SET identity = ?, expires_at = ? WHERE name = 'promptsheon'`,
-				e.identity, expiresAt); err != nil {
+			res, err := e.db.ExecContext(ctx,
+				`UPDATE leader SET identity = ?, expires_at = ?, term = term + 1
+				 WHERE name = 'promptsheon' AND expires_at <= ?`,
+				e.identity, expiresAt, e.now())
+			if err != nil {
 				return fmt.Errorf("election: steal: %w", err)
 			}
+			n, _ := res.RowsAffected()
+			if n == 0 {
+				// Lost the race: the prior leader renewed
+				// between our SELECT and our UPDATE. Stay as
+				// follower.
+				return ErrNotLeader
+			}
+			e.term = curTerm + 1
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
+	if _, err := e.db.ExecContext(ctx, "COMMIT"); err != nil {
 		return fmt.Errorf("election: commit: %w", err)
 	}
+	committed = true
 	e.isLeader = true
 	e.lastRenew = e.now()
 	return nil
