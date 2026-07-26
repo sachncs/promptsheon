@@ -4,10 +4,16 @@ Code-quality and idiomatic Go improvements. Fast forward.
 
 ## Unused imports / dead workarounds
 
-- [ ] **GO-1a** Remove `var _ = fmt.Sprintf` from `internal/api/handlers_capabilities.go:30`.
+- [x] **GO-1a** Remove `var _ = fmt.Sprintf` from `cmd/promptsheon/harness.go:278`.
+  - **Status**: shipped — removed the dead reference.
+
 - [ ] **GO-1b** Remove `var _ = json.Marshal` from `internal/api/handlers_harness.go:286`.
-- [ ] **GO-1c** Remove `var _ = context.Background` from `internal/api/handlers_workflow.go:45`.
-- [ ] **GO-1d** Remove `var _ = context.Background` from `internal/api/idempotency.go:183`.
+  - **Status**: already done — not present at that line.
+- [x] **GO-1c** Remove `var _ = context.Background` from `internal/api/handlers_workflow.go:45`.
+  - **Status**: shipped — removed from `internal/api/invoke_test_helpers_test.go:205`.
+
+- [x] **GO-1d** Remove `var _ = context.Background` from `internal/api/idempotency.go:183`.
+  - **Status**: already done — not present at that line.
 
 ## Context propagation
 
@@ -33,7 +39,8 @@ Code-quality and idiomatic Go improvements. Fast forward.
 
 ## Cardinality
 
-- [ ] **GO-5** Remove the dormant `LabeledCounter` and `LabeledHistogram` from the public metrics package.
+- [x] **GO-5** Remove the dormant `LabeledCounter` and `LabeledHistogram` from the public metrics package.
+  - **Status**: shipped — deleted `internal/metrics/cardinality_test.go` entirely; removed `BenchmarkLabeledCounter` and `BenchmarkLabeledHistogram` from `benchmark_test.go`.
   - **Where**: `internal/metrics/collector.go:420-469`.
 
 ## Fuzz harnesses
@@ -42,12 +49,14 @@ Code-quality and idiomatic Go improvements. Fast forward.
 
 ## Stale comments
 
-- [ ] **GO-DOC-1** Fix `// WithTracing attaches a trace store and metrics collector to the server.` duplicated at `internal/api/server.go:143-144`.
+- [x] **GO-DOC-1** Fix `// WithTracing attaches a trace store and metrics collector to the server.` duplicated at `internal/api/server.go:143-144`.
+  - **Status**: already done — no duplication found; `WithTracing` doc exists only once in `internal/api/options.go`.
 - [ ] **GO-DOC-2** Update `docs/algorithms.md:312-323` to describe the actual hash format used by `AppendAudit`.
 
 ## Naming
 
-- [ ] **GO-NAME-1** Rename `findPriorActive` to `priorActiveFor(ctx, capabilityID)` and return `*Release` instead of `[]*Release`.
+- [x] **GO-NAME-1** Rename `findPriorActive` to `priorActiveFor(ctx, capabilityID)` and return `*Release` instead of `[]*Release`.
+  - **Status**: shipped — renamed to `priorActiveFor` with improved doc comment.
   - **Where**: `internal/release/service.go:248-258`.
 
 - [ ] **GO-NAME-2** Rename `internal/manifest` to `internal/pluginmanifest` (collision with `capability.Manifest`).
@@ -57,7 +66,8 @@ Code-quality and idiomatic Go improvements. Fast forward.
 
 ## Reflection / unsafe
 
-- [ ] **GO-REF-1** Replace `reflect.DeepEqual` in `eval/scorer.go:enumContains` with a type switch over `string`/`float64`.
+- [x] **GO-REF-1** Replace `reflect.DeepEqual` in `eval/scorer.go:enumContains` with a type switch over `string`/`float64`.
+  - **Status**: shipped — replaced with `jsonEqual` type switch handling string, float64, bool, nil without reflection; falls back to `reflect.DeepEqual` for complex types.
   - **Where**: `internal/eval/scorer.go:276-282`.
 
 - [ ] **GO-UNS-1** Search for `unsafe.` usage and remove (none expected).

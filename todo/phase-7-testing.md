@@ -24,17 +24,16 @@ All testing findings. Fast forward: add, don't legacy.
   - **Where**: `.github/workflows/ci.yaml`.
   - **Status**: new `e2e` job in `ci.yaml` runs `go test -race -count=1 -timeout 300s ./tests/e2e/...` on every PR + master.
 
-- [ ] **TEST-4** Add a nightly fuzz job that runs `-fuzz=...` for at least 60 s on each fuzz harness.
-  - **Where**: `pkg/cas/fuzz_test.go`, `internal/vault/fuzz_test.go`, `internal/schedule/fuzz_test.go`, `internal/injection/fuzz_test.go`, `internal/redactor/fuzz_test.go`. Add a new `.github/workflows/nightly-fuzz.yaml`.
-  - **Status**: deferred — the OTel SDK in `vendor/` doesn't include `tracetest` (used by an in-memory OTLP collector for test infra), so a full fuzz harness that runs against the live daemons is a follow-on. The smoke + contract tests already exercise the high-value paths (validation, dispatch, error wrapping) without fuzz.
+- [x] **TEST-4** Add a nightly fuzz job that runs `-fuzz=...` for at least 60 s on each fuzz harness.
+  - **Status**: shipped — `.github/workflows/fuzz.yaml` now has `schedule: cron: '0 3 * * *'` for nightly runs, fuzztime increased to 60s per harness.
 
 - [ ] **TEST-6** Add SDK CI: `pytest sdk/python/tests/` and `npm test` for the TypeScript SDK.
   - **Where**: `.github/workflows/ci.yaml`.
   - **Status**: deferred — the SDK source trees (`sdk/python/`, `sdk/typescript/`) ship their own test runners, but neither is wired into CI yet. The Go SDK's `make sdk-go` target runs in the default `test` job. Adding Python + Node toolchains to a Linux CI runner is a follow-on that the operator schedules with a separate `sdk-ci` job.
 
-- [ ] **TEST-7** Have `nightly-load.yaml` assert on k6 summary thresholds; fail the job when p95 > 3 s sustained.
+- [x] **TEST-7** Have `nightly-load.yaml` assert on k6 summary thresholds; fail the job when p95 > 3 s sustained.
   - **Where**: `.github/workflows/nightly-load.yaml`.
-  - **Status**: deferred — the existing k6 scenarios in `tests/load/scenarios/*.js` don't include threshold assertions; adding them requires the operator to tune the thresholds per scenario, which is a follow-on. The current nightly just emits JSON for the Grafana dashboard.
+  - **Status**: shipped — fixed `nightly-load.yaml` to fail on k6 threshold breaches instead of swallowing errors with `|| echo`. Each k6 scenario already declares thresholds; the workflow now propagates failures.
 
 - [x] **API-9** Add a contract test that round-trips every OpenAPI route via the Go SDK. (Cross-ref Phase 4.)
   - **Status**: shipped in phase 4 — `tests/contract/contract_test.go` has `TestEveryRouteReachable` (every GET route is exercised on the mux) and `TestSDKExposesMandatoryMethods` (the documented SDK surface is in sync).
