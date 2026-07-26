@@ -201,9 +201,6 @@ func newInvokeTestServerWithRepo(t *testing.T, repo *mockRepo, opts ...Option) *
 	return NewServer(newRepositories(repo), logger, allOpts...)
 }
 
-// silence the unused import linter when we trim imports later.
-var _ = context.Background
-
 // NewTestServer is the TEST-INFRA-2 canonical entry point for
 // tests that need an *api.Server. It pairs with internal/testutil
 // .NewTestDB: the helper here wraps the api.Server construction

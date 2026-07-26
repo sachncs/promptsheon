@@ -273,6 +273,3 @@ func loadCasesFile(path string) ([]map[string]any, error) {
 	}
 	return arr, nil
 }
-
-// keep fmt referenced even when timeout parsing is empty.
-var _ = fmt.Sprintf
