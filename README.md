@@ -73,11 +73,12 @@ pipeline (cosign keyless, GHCR, GitHub artifact attestations).
 The runtime work (audit archival, bandit/settings CRDT,
 release resolver, vault hot-reload, API server facade, the
 sqliteimpl repository move, property tests, coverage / domain
-/ lint gates, KMS rotate, LLM-judge scorer, native gRPC over
-UDS plugin transport) ships in the binary. Research notes
-for the unfinished CRDT idempotency cache, replay-set CRDT,
-and live pgx Postgres wiring ship as design docs only;
-multi-region replication is tracked as a follow-on.
+/ lint gates, KMS rotate, LLM-judge scorer, net/rpc over UDS
+plugin transport) ships in the binary. The native gRPC over
+UDS plugin transport, the live pgx Postgres wiring, the
+multi-region replication, and the CRDT idempotency / replay-set
+caches ship as design docs and follow-on milestones (see
+`ROADMAP.md` for the v0.4.0 / v0.5.0 schedule).
 
 ---
 
@@ -93,7 +94,7 @@ multi-region replication is tracked as a follow-on.
 - **Workflow DAG** — Topological execution with tool integration
 - **Observability** — OpenTelemetry tracing, Prometheus metrics, audit logging
 - **Built-in Guardrails** — PII redaction and prompt-injection detection ship as in-process plugins through the supervisor
-- **Plugin SDK** — gRPC-over-UDS transport for remote plugins (the supervisor keeps `internal/subprocess` net/rpc available as the fallback)
+- **Plugin SDK** — net/rpc over UDS subprocess transport (`internal/subprocess`, v0.1.x production transport per `ADR-0024`); the `.proto` definition for the future gRPC-over-UDS transport lives at `internal/pluginproto/` (`ADR-0025`) as a follow-on
 - **Webhooks** — Event-driven integrations with HMAC signing and SSRF protection
 - **Secrets Management** — Encrypted vault for API keys and sensitive configuration
 - **Rate Limiting** — Configurable per-client rate limiting with burst support
@@ -137,8 +138,8 @@ cd promptsheon
 go build -o promptsheond ./cmd/promptsheond
 go build -o promptsheon  ./cmd/promptsheon
 
-# Start the server
-./promptsheond
+# Start the server for this unauthenticated local walkthrough
+PROMPTSHEON_AUTH=false ./promptsheond
 ```
 
 ### REST API (curl)
@@ -167,10 +168,10 @@ curl -X POST http://localhost:8080/api/v1/capabilities/c1/versions \
 REL=$(curl -sS -X POST http://localhost:8080/api/v1/versions/v1/releases \
         -H 'Content-Type: application/json' \
         -d '{"environment":"prod"}' | jq -r .id)
-# 2. A non-creator identity casts an Approve vote.
+# 2. A distinct identity casts an Approve vote.
 curl -sS -X POST http://localhost:8080/api/v1/releases/$REL/votes \
      -H 'Content-Type: application/json' \
-     -d '{"identity":"alice","decision":"approve"}'
+     -d '{"identity":"bob","decision":"approve"}'
 # 3. Activate (consults MakerChecker policy; 409 if quorum not satisfied
 #    or if any precondition fails).
 curl -sS -X POST http://localhost:8080/api/v1/releases/$REL/activate
@@ -245,7 +246,7 @@ promptsheon dataset create c1 --name greeting --file cases.json
 promptsheon precondition add c1 --name go-test --cmd "go test ./..." --timeout 60
 
 # 2. Drive the iteration loop
-promptsheon release create <vid> '{"environment":"prod"}'
+promptsheon release create <vid> prod
 promptsheon release vote <rid> bob approve
 promptsheon release activate <rid>      # 409 if preconditions fail
 promptsheon eval run <rid> --dataset <dataset_id>
@@ -265,7 +266,7 @@ See [docs/eval.md](docs/eval.md) for the eval primitive, [docs/harness.md](docs/
 | `Manifest` | struct | Content-addressed composition of Prompt, ModelPolicy, RuntimePolicy, ContextContract, Memory, Guardrails, Tools, MCP, EvalSuite |
 | `CAS` | type | Content-addressable store (Merkle DAG), lives at `pkg/cas/` |
 | `Vault` | type | AES-256-GCM vault (or KMS-backed `KeyProvider`) |
-| `PluginSupervisor` | type | Supervisor for in-process and remote (gRPC-over-UDS) plugins |
+| `PluginSupervisor` | type | Supervisor for in-process plugins and remote (net/rpc over UDS) subprocess plugins |
 | `Dataset` | struct | Named collection of `(inputs, expected)` test cases. The ground truth for harness eval. |
 | `Precondition` | struct | Named command hook on a Capability; Activate runs every enabled precondition. |
 | `EvalRun` | struct | Recorded scoring of a Release against a Dataset using a chosen Scorer. |
@@ -288,7 +289,7 @@ See [docs/eval.md](docs/eval.md) for the eval primitive, [docs/harness.md](docs/
 │  Releases        │  Precond,  │  (rules +     │  │
 │  Approvals       │  Eval Runs │  bandit)      │  │
 ├──────────────────────────────────────────────────┤
-│  Content-Addressable Store  │  SQLite (only)    │
+│  Content-Addressable Store  │  SQLite runtime   │
 │  (Merkle DAG)               │                   │
 ├──────────────────────────────────────────────────┤
 │  LLM Providers  │  Observability  │  Webhooks     │
@@ -296,7 +297,7 @@ See [docs/eval.md](docs/eval.md) for the eval primitive, [docs/harness.md](docs/
 │  (official SDKs)│  Prometheus     │  HMAC-signed  │
 ├──────────────────────────────────────────────────┤
 │  Plugin Supervisor  │  Vault  │  KeyProvider     │
-│  (gRPC over UDS)   │  (KMS)  │  (BYOK)          │
+│  (net/rpc over UDS)│  (KMS)  │  (BYOK)          │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -311,7 +312,7 @@ The server is composed of layered modules:
 | **Providers** | Unified LLM provider abstraction layer (Anthropic + OpenAI) |
 | **Observability** | OpenTelemetry tracing, metrics collection, retention |
 | **Security** | AuthN/AuthZ, vault, guardrails, SSRF protection |
-| **Plugins** | gRPC over loopback (UDS); supervisor-managed lifecycle |
+| **Plugins** | net/rpc over loopback (UDS); supervisor-managed lifecycle |
 
 ---
 
@@ -327,26 +328,27 @@ promptsheon/
 ├── internal/           # Server-side implementation modules
 │   ├── capability/     # Workspace / Project / Capability / Version / Release / Approval types
 │   ├── harness/        # Dataset / Precondition / EvalRun types + runner
-│   ├── eval/           # Scorer registry (exact_match, contains, regex, json_schema)
+│   ├── eval/           # Scorer registry (exact_match, contains, regex, json_schema, llm_judge)
 │   ├── release/        # Release aggregate + application service
 │   ├── approval/       # MakerChecker + Majority policies
-│   ├── cas/ -> pkg/cas/ # Content-addressable store (Merkle DAG)
 │   ├── vault/          # AES-256-GCM + KMS KeyProvider
 │   ├── observability/  # OTel tracing and Prometheus metrics
 │   ├── llm/            # Anthropic + OpenAI provider implementations
-│   ├── pluginsup/      # Plugin supervisor + in-process Remote stub
-│   ├── subprocess/     # net/rpc-over-UDS subprocess plugin transport
-│   ├── pluginproto/    # gRPC over UDS plugin transport (proto + stubs)
+│   ├── pluginsup/      # Plugin supervisor (manifest → subprocess lifecycle)
+│   ├── subprocess/     # net/rpc-over-UDS subprocess plugin transport (v0.1.x production transport)
+│   ├── pluginproto/    # gRPC over UDS plugin contract (.proto + generated stubs; ADR-0025 follow-on)
 │   ├── guardrails/     # PII redaction, prompt-injection detection
+│   ├── store/          # SQLite + Postgres init/RLS bundles + sqliteimpl repository move
 │   └── ...
 ├── pkg/                # Stable public packages consumable by other Go projects
-│   └── cas/            # Content-addressable store
-├── sdk/                # Go SDK for embedding Promptsheon (also python/, typescript/)
-├── deploy/             # Helm chart, Grafana dashboard, Prometheus alerts, systemd units
+│   └── cas/            # Content-addressable store (Merkle DAG)
+├── sdk/                # Go SDK for embedding Promptsheon
+│   ├── python/         # Python client (codegen from api/openapi.yaml)
+│   └── typescript/     # TypeScript client (codegen from api/openapi.yaml)
+├── deploy/             # Helm chart, Grafana dashboard, Prometheus alerts
 ├── docs/               # Architecture, deployment, ADRs, troubleshooting, FAQ
-├── examples/           # End-to-end recipes
-├── tests/              # contract/ (OpenAPI↔SDK) + smoke/ (CLI scripts) + e2e/
-├── scripts/            # genopenapi, sync-version, etc.
+├── tests/              # contract/ + e2e/ + smoke/ + chaos/ + load/
+├── scripts/            # genopenapi/, sync-version.sh, docs-check.sh, etc.
 ├── go.mod
 ├── go.sum
 ├── Makefile
@@ -363,14 +365,14 @@ promptsheon/
 ## Development
 
 ```bash
-# Run all checks (format, vet, lint, test)
-make check
+# Format, vet, lint, and test
+make fmt
+make vet
+make lint
+make test
 
 # Build binaries
 make build
-
-# Run unit + integration tests
-make test
 
 # Regenerate the OpenAPI spec
 make openapi
@@ -378,10 +380,9 @@ make openapi
 # Run the server on the default addr (`:8080`)
 make run
 
-# Format, vet, lint individually
-gofmt -w .
-go vet ./...
-golangci-lint run
+# Run the lint-domain and lint-deps purity gates
+make lint-domain
+make lint-deps
 ```
 
 ---
@@ -397,8 +398,14 @@ go tool cover -html=coverage.out
 # Contract test (every OpenAPI route is reachable + SDK surface in sync)
 go test ./tests/contract/...
 
-# Smoke test (boots a real daemon, runs every examples/bash/*.sh)
+# End-to-end tests (in-process daemon, real HTTP)
+go test ./tests/e2e/...
+
+# Smoke test (boots a real daemon against an ephemeral DB)
 bash tests/smoke/run.sh
+
+# Chaos test (SQLite file-delete mid-query)
+go test ./tests/chaos/...
 ```
 
 ---
@@ -421,13 +428,20 @@ and a Docker image on tagged releases.
 
 ## Release
 
-Tagged `vX.Y.X` releases are produced by `.goreleaser.yml`. Each release:
+Tagged `vX.Y.Z` releases are produced by `.goreleaser.yml`. Each release:
 
-- Builds binaries for Linux, macOS, and Windows on amd64 and arm64.
-- Generates a Docker image published to the configured registry.
-- Produces a `promptsheon_${VERSION}_checksums.txt` SBOM and a `.deb`/`.rpm`
-  pair (when enabled).
-- Tags the Git repository.
+- Builds binaries for Linux, macOS, and Windows on amd64 and arm64
+  (`promptsheond` and `promptsheon`).
+- Generates a Docker image (`ghcr.io/sachncs/promptsheon/promptsheond`)
+  for `linux/amd64` and `linux/arm64`, tagged `v<version>` always
+  and `latest` only on stable releases.
+- Writes a single `checksums.txt` over every archive and signs it
+  with `cosign sign-blob` (keyless; the bundle ships next to the
+  checksum).
+- Bundles the CycloneDX and SPDX SBOMs (produced upstream by the
+  `sbom` CI job) as `extra_files` next to the archives.
+- Creates a GitHub Release at `v<version>` (prerelease flag is
+  inferred from the tag).
 
 See [docs/release.md](docs/release.md) for the full process.
 
@@ -442,9 +456,9 @@ See [docs/release.md](docs/release.md) for the full process.
 | CLI | Hand-rolled command dispatcher under `cmd/promptsheon/main.go` |
 | Storage | [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) (CGo-free SQLite). The Postgres backend ships init + RLS SQL and an in-memory fixture under `internal/store/postgres`; pgx wiring is a follow-on. |
 | LLM SDKs | [`anthropics/anthropic-sdk-go`](https://github.com/anthropics/anthropic-sdk-go), [`openai/openai-go/v3`](https://github.com/openai/openai-go) (Responses API) |
-| RPC | [google.golang.org/grpc](https://grpc.io/docs/languages/go/) (plugin transport via UDS; net/rpc-over-UDS is the fallback) |
-| Observability | [OpenTelemetry](https://opentelemetry.io/), Prometheus |
-| Auth | OIDC, static API keys |
+| RPC | `net/rpc` over UDS for plugin transport (`internal/subprocess`; `ADR-0024`); [google.golang.org/grpc](https://grpc.io/docs/languages/go/) for the future plugin transport (proto + stubs at `internal/pluginproto/`; `ADR-0025`, not yet wired) |
+| Observability | [OpenTelemetry](https://opentelemetry.io/) (OTLP gRPC), Prometheus |
+| Auth | OAuth 2.0 (`internal/auth/oauth.go`), static API keys (`internal/auth/auth.go`) |
 | Vault | AES-256-GCM via [crypto/aes](https://pkg.go.dev/crypto/aes); KMS via pluggable `KeyProvider` |
 | Lint/Format | [golangci-lint](https://golangci-lint.run/) (see `.golangci.yml`) |
 | Releases | [GoReleaser](https://goreleaser.com/) (`.goreleaser.yml`) |
@@ -485,13 +499,18 @@ Full documentation lives in **[docs/](docs/)**:
   gates, KMS key rotation, the mdBook site, curated Go
   benchmark set + k6 p99 gate, the cosign-keyless +
   GitHub-attestation release pipeline, LLM-judge scorer,
-  native gRPC over UDS plugin transport, configurable
-  retention, Prometheus exporter.
+  net/rpc over UDS plugin transport, configurable retention,
+  Prometheus exporter.
 - **v0.4.0** — Multi-region replication (the v0.3.0 release
   stays single-region by design; a shared backend lands
-  first), CRDT idempotency cache + replay-set CRDT (design
-  docs in `docs/research/`), webhook delivery retries +
-  dead-letter queue, additional KMS integrations.
+  first), live pgx Postgres wiring (v0.3.0 ships init +
+  RLS bundles + an in-memory adapter only), the gRPC over
+  UDS plugin transport swap-in (proto + stubs committed in
+  v0.3.0), CRDT idempotency cache + replay-set CRDT (design
+  docs in `docs/research/`), Canary Release primitive,
+  webhook delivery retries + dead-letter queue, LLM-judge
+  at scale (caching, batching, SLO observability), additional
+  KMS integrations.
 - **v1.0.0** — Stable API, gRPC streaming for real-time
   updates.
 
