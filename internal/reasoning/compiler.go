@@ -26,39 +26,39 @@ import (
 // an Intent into a CapabilityPlan. An Intent is the input to
 // the compiler; a CapabilityPlan is the output.
 type Intent struct {
-	ID            string            `json:"id"`
-	Goal          string            `json:"goal"`
-	Inputs        map[string]any    `json:"inputs"`
-	Constraints   Constraints       `json:"constraints"`
-	Tags          []string          `json:"tags,omitempty"`
-	WorkspaceID   string            `json:"workspace_id,omitempty"`
-	CorrelationID string            `json:"correlation_id,omitempty"`
+	ID            string         `json:"id"`
+	Goal          string         `json:"goal"`
+	Inputs        map[string]any `json:"inputs"`
+	Constraints   Constraints    `json:"constraints"`
+	Tags          []string       `json:"tags,omitempty"`
+	WorkspaceID   string         `json:"workspace_id,omitempty"`
+	CorrelationID string         `json:"correlation_id,omitempty"`
 }
 
 // Constraints are the cost / latency / quality bounds the
 // compiled plan must satisfy. The Compiler rejects capabilities
 // that violate any constraint; the engine rejects at runtime.
 type Constraints struct {
-	MaxCostUSD     float64       `json:"max_cost_usd,omitempty"`
-	MaxLatencyMS   int64         `json:"max_latency_ms,omitempty"`
-	MinTrustScore  float64       `json:"min_trust_score,omitempty"`
-	Deadline       time.Time     `json:"deadline,omitempty"`
-	BudgetTokenCap int           `json:"budget_token_cap,omitempty"`
-	RequiredTags   []string      `json:"required_tags,omitempty"`
+	MaxCostUSD     float64   `json:"max_cost_usd,omitempty"`
+	MaxLatencyMS   int64     `json:"max_latency_ms,omitempty"`
+	MinTrustScore  float64   `json:"min_trust_score,omitempty"`
+	Deadline       time.Time `json:"deadline,omitempty"`
+	BudgetTokenCap int       `json:"budget_token_cap,omitempty"`
+	RequiredTags   []string  `json:"required_tags,omitempty"`
 }
 
 // CapabilityDescriptor is the catalog's view of a Capability.
 // The Compiler consumes descriptors (not the live Capability
 // aggregate) so the catalog surface stays thin.
 type CapabilityDescriptor struct {
-	ID          string
-	Name        string
-	Tags        []string
-	TrustScore  float64
-	CostUSD     float64
-	LatencyMS   int64
-	Inputs      []string // required input names; satisfied by Intent.Inputs or prior step outputs.
-	Outputs     []string // names of values produced for downstream steps.
+	ID         string
+	Name       string
+	Tags       []string
+	TrustScore float64
+	CostUSD    float64
+	LatencyMS  int64
+	Inputs     []string // required input names; satisfied by Intent.Inputs or prior step outputs.
+	Outputs    []string // names of values produced for downstream steps.
 }
 
 // Plan is the compiled output: a DAG of capabilities with
@@ -66,21 +66,21 @@ type CapabilityDescriptor struct {
 // Steps execute in topological order; downstream steps
 // receive upstream outputs via the bind map.
 type Plan struct {
-	ID         string         `json:"id"`
-	IntentID   string         `json:"intent_id"`
-	Steps      []Step         `json:"steps"`
-	BudgetCost float64        `json:"budget_cost"`
-	BudgetETA  time.Duration  `json:"budget_eta_ms"`
-	CreatedAt  time.Time      `json:"created_at"`
+	ID         string        `json:"id"`
+	IntentID   string        `json:"intent_id"`
+	Steps      []Step        `json:"steps"`
+	BudgetCost float64       `json:"budget_cost"`
+	BudgetETA  time.Duration `json:"budget_eta_ms"`
+	CreatedAt  time.Time     `json:"created_at"`
 }
 
 // Step is one capability invocation in the plan. Order is
 // implicit in the parent's Steps slice (topological).
 type Step struct {
-	ID            string            `json:"id"`
-	CapabilityID  string            `json:"capability_id"`
-	Inputs        map[string]string `json:"inputs"` // input name -> prior step ID or "intent" sentinel.
-	DependsOn     []string          `json:"depends_on,omitempty"`
+	ID           string            `json:"id"`
+	CapabilityID string            `json:"capability_id"`
+	Inputs       map[string]string `json:"inputs"` // input name -> prior step ID or "intent" sentinel.
+	DependsOn    []string          `json:"depends_on,omitempty"`
 }
 
 // ErrNoMatch is returned by Compile when no CapabilityDescriptor
