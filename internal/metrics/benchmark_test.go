@@ -43,24 +43,6 @@ func BenchmarkHistogramPercentile(b *testing.B) {
 	}
 }
 
-func BenchmarkLabeledCounter(b *testing.B) {
-	lc := NewLabeledCounter()
-	labels := map[string]string{"method": "GET", "status": "200"}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		lc.With(labels).Inc()
-	}
-}
-
-func BenchmarkLabeledHistogram(b *testing.B) {
-	lh := NewLabeledHistogram()
-	labels := map[string]string{"method": "GET", "status": "200"}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		lh.With(labels).Observe(float64(i%100) / 100.0)
-	}
-}
-
 func BenchmarkSortLabels(b *testing.B) {
 	labels := map[string]string{
 		"method": "GET",
