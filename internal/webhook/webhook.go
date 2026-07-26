@@ -126,6 +126,11 @@ type Dispatcher struct {
 	maxDeliveries  int
 	wg             sync.WaitGroup
 	stop           chan struct{}
+	// allowInsecure, when true, permits delivery to loopback,
+	// private, and link-local addresses. It is set only by the
+	// WithAllowInsecure test option; production wiring must
+	// leave it false.
+	allowInsecure bool
 	// PERF-WH-1: pool of *bytes.Reader for the JSON body. The
 	// hot path constructs a new bytes.Reader on every delivery;
 	// the pool keeps one around per idle goroutine. Reset() is
@@ -133,8 +138,10 @@ type Dispatcher struct {
 	bodyPool sync.Pool
 }
 
-// NewDispatcher creates a webhook dispatcher.
-func NewDispatcher(logger *slog.Logger) *Dispatcher {
+// NewDispatcher creates a webhook dispatcher. Options apply
+// post-construction and are intended for tests; production
+// callers should use NewDispatcher with no arguments.
+func NewDispatcher(logger *slog.Logger, opts ...func(*Dispatcher)) *Dispatcher {
 	d := &Dispatcher{
 		endpoints:     make(map[string]*Endpoint),
 		client:        &http.Client{Timeout: 10 * time.Second},
@@ -145,6 +152,9 @@ func NewDispatcher(logger *slog.Logger) *Dispatcher {
 		bodyPool: sync.Pool{
 			New: func() any { return bytes.NewReader(nil) },
 		},
+	}
+	for _, opt := range opts {
+		opt(d)
 	}
 	return d
 }
@@ -312,14 +322,19 @@ func (d *Dispatcher) EmitContext(ctx context.Context, evt *Event) {
 //
 // handlers_webhooks.go runs the same check at registration time.
 // The dispatcher re-runs ValidateURL every delivery to defeat
-// DNS rebinding between registration and delivery.
-//
-// BypassSSRF is a process-wide escape hatch used by tests that
-// deliver to a loopback httptest server. Production wiring MUST
-// NOT set it; the dispatcher's default is to reject every
-// private, loopback, link-local, multicast, and unspecified
-// destination.
+// BypassSSRF is retained as a private package-level flag for
+// tests that deliver to a loopback httptest server. Production
+// wiring MUST NOT set it. The recommended escape hatch is to
+// build the Dispatcher with options that enable SSRF bypass for
+// the test's specific URL; see WithAllowInsecure for tests.
 var BypassSSRF = false
+
+// WithAllowInsecure returns a Dispatcher option that allows the
+// delivery loop to bypass the SSRF guard. It exists for tests;
+// production code MUST NOT pass this option.
+func WithAllowInsecure() func(*Dispatcher) {
+	return func(d *Dispatcher) { d.allowInsecure = true }
+}
 
 func ValidateURL(rawURL string) error {
 	u, err := url.Parse(rawURL)

@@ -80,10 +80,15 @@ type SLO struct {
 // Op, Target, Window, and a positive Breach.
 var (
 	ErrInvalidSignal = fmt.Errorf("slo: invalid signal")
+	ErrInvalidOp     = fmt.Errorf("slo: invalid op for signal")
 	ErrInvalidTarget = fmt.Errorf("slo: invalid target")
 )
 
 // Validate checks the SLO has the fields the evaluator needs.
+// In addition to the structural checks it cross-validates the
+// Op direction against the Signal — for example, an OpGT on a
+// latency signal would mean "higher latency is better", which is
+// the inverse of intent and must be rejected.
 func (s SLO) Validate() error {
 	switch s.Goal.Signal {
 	case SignalP95LatencyMS, SignalP99LatencyMS,
@@ -96,6 +101,25 @@ func (s SLO) Validate() error {
 	case OpLT, OpLTE, OpGT, OpGTE:
 	default:
 		return fmt.Errorf("slo: invalid op %q", s.Goal.Op)
+	}
+	// Op ↔ Signal cross-check. Latency and cost are "lower is
+	// better" signals; success rate, availability, and
+	// hallucination (inverted) are "higher is better". Mismatched
+	// configurations usually indicate a copy-paste typo and
+	// silently flipped verdicts.
+	switch s.Goal.Signal {
+	case SignalP95LatencyMS, SignalP99LatencyMS, SignalAvgCostMicroUSD:
+		if s.Goal.Op != OpLT && s.Goal.Op != OpLTE {
+			return fmt.Errorf("%w: latency/cost signals require OpLT or OpLTE, got %q", ErrInvalidOp, s.Goal.Op)
+		}
+	case SignalSuccessRate, SignalAvailability:
+		if s.Goal.Op != OpGT && s.Goal.Op != OpGTE {
+			return fmt.Errorf("%w: success/availability signals require OpGT or OpGTE, got %q", ErrInvalidOp, s.Goal.Op)
+		}
+	case SignalHallucinationRate:
+		if s.Goal.Op != OpLT && s.Goal.Op != OpLTE {
+			return fmt.Errorf("%w: hallucination signals require OpLT or OpLTE, got %q", ErrInvalidOp, s.Goal.Op)
+		}
 	}
 	switch s.Goal.Window {
 	case Window5Min, Window1Hour, Window1Day:

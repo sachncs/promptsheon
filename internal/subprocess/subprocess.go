@@ -122,6 +122,14 @@ func (b *Binary) Start(ctx context.Context) error {
 	b.lastStart = time.Now()
 	b.mu.Unlock()
 
+	// Always reap the child so cmd.ProcessState is populated and
+	// Reaped() can correctly report a cleanly-exited plugin.
+	// Without this the supervisor's health poll would mark a
+	// process that exited normally as "not reaped" forever.
+	go func() {
+		_ = cmd.Wait()
+	}()
+
 	// Wait for the UDS endpoint to come up. The plugin binary
 	// listens, the supervisor dials; net/rpc then connects.
 	deadline := time.Now().Add(5 * time.Second)
