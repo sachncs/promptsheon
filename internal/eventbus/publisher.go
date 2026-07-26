@@ -19,6 +19,7 @@ package eventbus
 
 import (
 	"errors"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -108,6 +109,7 @@ type Memory struct {
 	stop    chan struct{}
 	wg      sync.WaitGroup
 	dropped uint64
+	logger  *slog.Logger
 }
 
 // NewMemory constructs an empty synchronous Memory Publisher.
@@ -182,7 +184,15 @@ func (m *Memory) dispatch(event capability.Event) {
 			continue
 		}
 		func() {
-			defer func() { _ = recover() }()
+			defer func() {
+				if r := recover(); r != nil {
+					if m.logger != nil {
+						m.logger.Error("eventbus subscriber panic",
+							"event_type", event.Type,
+							"panic", r)
+					}
+				}
+			}()
 			s.handler(event)
 		}()
 	}

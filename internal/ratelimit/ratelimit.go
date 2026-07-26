@@ -316,7 +316,7 @@ func ExtractKey(r *http.Request) string {
 		return "user:" + u.ID
 	}
 	remote := realRemoteAddr(r)
-	if trustedProxies != nil && trustedProxies.Contains(net.ParseIP(remote)) {
+	if ip := net.ParseIP(remote); ip != nil && trustedProxies != nil && trustedProxies.Contains(ip) {
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 			if i := strings.IndexByte(xff, ','); i >= 0 {
 				return "ip:" + strings.TrimSpace(xff[:i])

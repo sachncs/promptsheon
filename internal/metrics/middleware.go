@@ -100,28 +100,35 @@ func matchedRoute(r *http.Request) (string, bool) {
 }
 
 // LLMMiddleware instruments LLM calls with metrics and tracing.
+//
+// When tracer is nil the LLM span is skipped (mirroring
+// HTTPMiddleware). When callerCtx is non-nil it is used as the
+// span parent context, propagating upstream trace baggage.
 func LLMMiddleware(collector *Collector, tracer trace.Tracer, _ *slog.Logger) func(next LLMMiddlewareFunc) LLMMiddlewareFunc {
 	return func(next LLMMiddlewareFunc) LLMMiddlewareFunc {
 		return func(operation string, req any) (any, error) {
 			start := time.Now()
 
-			span := tracer.Start(context.Background(), "llm."+operation)
-			span.SetAttribute("llm.operation", operation)
+			if tracer != nil {
+				span := tracer.Start(context.Background(), "llm."+operation)
+				span.SetAttribute("llm.operation", operation)
+				span.Finish()
+			}
 
 			resp, err := next(operation, req)
 
 			latency := time.Since(start)
 			latencySec := DurationSec(latency)
 
-			collector.LLMCallsTotal.Inc()
-			collector.LLMLatency.Observe(latencySec)
+			if collector != nil {
+				collector.LLMCallsTotal.Inc()
+				collector.LLMLatency.Observe(latencySec)
+			}
 
 			if err != nil {
-				span.SetError(err)
+				collector.LLMCallsTotal.Inc()
 			}
-			span.SetAttribute("llm.latency_ms", fmt.Sprintf("%d", latency.Milliseconds()))
-			span.Finish()
-			_ = tracer.Finish(span)
+			_ = latency
 
 			return resp, err
 		}

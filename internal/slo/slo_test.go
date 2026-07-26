@@ -11,7 +11,10 @@ func sampleSLO(op Op, target float64) SLO {
 		WorkspaceID:  "ws-1",
 		CapabilityID: "cap-1",
 		Goal: Goal{
-			Signal: SignalP95LatencyMS,
+			// Choose a signal that matches the requested Op
+			// direction so validation does not reject the SLO
+			// during the Evaluate test path.
+			Signal: signalForOp(op),
 			Op:     op,
 			Target: target,
 			Window: Window1Hour,
@@ -20,6 +23,15 @@ func sampleSLO(op Op, target float64) SLO {
 		Severity:  "ticket",
 		CreatedAt: time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
 		CreatedBy: "alice",
+	}
+}
+
+func signalForOp(op Op) Signal {
+	switch op {
+	case OpGT, OpGTE:
+		return SignalSuccessRate
+	default:
+		return SignalP95LatencyMS
 	}
 }
 

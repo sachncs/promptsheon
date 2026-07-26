@@ -150,7 +150,7 @@ func (v *Vault) Reload(hexKey string) error {
 
 // Encrypt encrypts plaintext using AES-256-GCM and returns a hex-encoded string.
 func (v *Vault) Encrypt(plaintext string) (string, error) {
-	ct, err := v.EncryptBytes([]byte(plaintext))
+	ct, err := v.EncryptBytes([]byte(plaintext), nil)
 	if err != nil {
 		return "", err
 	}
@@ -161,7 +161,14 @@ func (v *Vault) Encrypt(plaintext string) (string, error) {
 // the nonce-prefixed ciphertext as a byte slice. Useful for
 // callers that want to store the result in a BLOB column
 // rather than a TEXT column.
-func (v *Vault) EncryptBytes(plaintext []byte) ([]byte, error) {
+//
+// The supplied additionalData is bound to the ciphertext via
+// AES-GCM's associated data; a caller that decrypts the result
+// with a different associatedData will see an authentication
+// failure. This binds ciphertexts to their intended context
+// (secret ID, tenant, provider) so a swap of two ciphertexts
+// cannot produce a valid decryption.
+func (v *Vault) EncryptBytes(plaintext, additionalData []byte) ([]byte, error) {
 	block, err := v.cipher()
 	if err != nil {
 		return nil, err
@@ -177,39 +184,52 @@ func (v *Vault) EncryptBytes(plaintext []byte) ([]byte, error) {
 		return nil, fmt.Errorf("generate nonce: %w", err)
 	}
 
-	ciphertext := aesGCM.Seal(nonce, nonce, plaintext, nil)
+	ciphertext := aesGCM.Seal(nonce, nonce, plaintext, additionalData)
 	return ciphertext, nil
 }
 
 // Decrypt decrypts a hex-encoded AES-256-GCM ciphertext.
 func (v *Vault) Decrypt(hexCiphertext string) (string, error) {
+	plaintext, err := v.DecryptBytesString(hexCiphertext, nil)
+	return string(plaintext), err
+}
+
+// DecryptBytesString decrypts a hex-encoded ciphertext and
+// verifies the supplied additionalData matches the value that
+// was bound at encryption time.
+func (v *Vault) DecryptBytesString(hexCiphertext string, additionalData []byte) ([]byte, error) {
 	ciphertext, err := hex.DecodeString(hexCiphertext)
 	if err != nil {
-		return "", fmt.Errorf("decode ciphertext: %w", err)
+		return nil, fmt.Errorf("decode ciphertext: %w", err)
 	}
+	return v.DecryptBytes(ciphertext, additionalData)
+}
 
+// DecryptBytes decrypts a nonce-prefixed ciphertext and verifies
+// the supplied additionalData matches the bound context.
+func (v *Vault) DecryptBytes(ciphertext, additionalData []byte) ([]byte, error) {
 	block, err := v.cipher()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", fmt.Errorf("create GCM: %w", err)
+		return nil, fmt.Errorf("create GCM: %w", err)
 	}
 
 	nonceSize := aesGCM.NonceSize()
 	if len(ciphertext) < nonceSize {
-		return "", fmt.Errorf("ciphertext too short")
+		return nil, fmt.Errorf("ciphertext too short")
 	}
 
-	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
-	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
+	nonce, ct := ciphertext[:nonceSize], ciphertext[nonceSize:]
+	plaintext, err := aesGCM.Open(nil, nonce, ct, additionalData)
 	if err != nil {
-		return "", fmt.Errorf("decrypt: %w", err)
+		return nil, fmt.Errorf("decrypt: %w", err)
 	}
 
-	return string(plaintext), nil
+	return plaintext, nil
 }
 
 // cipher returns the AES cipher block for the current key, or
