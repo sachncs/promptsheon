@@ -47,8 +47,8 @@ func TestCompileMatchesByGoalToken(t *testing.T) {
 	t.Parallel()
 	c := NewCompiler(catalog())
 	p, err := c.Compile(context.Background(), Intent{
-		ID:   "i1",
-		Goal: "summarise this document",
+		ID:     "i1",
+		Goal:   "summarise this document",
 		Inputs: map[string]any{"text": "the quick brown fox"},
 	})
 	if err != nil {
