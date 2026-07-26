@@ -1,485 +1,368 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-
-### Closed-loop self-evolution
-
-- **Evolv**er package: detect → revise → validate →
-  promote with cooldowns, max-revisions, and a
-  SelfApprovePolicy that bypasses maker-checker only
-  for the evolver's auto-promote.
-- **Wiring** via `PROMPTSHEON_SELF_EVOLVE=cap:ds:threshold:env:max_revs:cooldown_sec`
-  (env wins on boot; runtime toggle via the CLI below).
-- **CLI**: `promptsheon selfevolve {enable,disable,status}
-  <capability>`. `enable` accepts `--dataset`,
-  `--min-score`, `--max-revisions`, `--cooldown-sec`,
-  `--target-env`. Persisted via
-  `PUT /api/v1/capabilities/{id}/self-evolve`.
-- **Metrics**: `promptsheon_self_evolve_{runs,revisions,promoted}_total`
-  on the standard `/metrics` endpoint.
-- **Audit**: every cycle writes `self_evolve.{detect,revise,validate,promote,reject}`
-  to the tamper-evident audit chain; cooldown is persisted
-  in `self_evolve_state` and survives daemon restart.
-- **End-to-end smoke**: `scripts/selftest.sh` boots the
-  daemon with a deliberately-bad prompt, polls
-  `self_evolve_state` for terminal status, asserts the
-  audit chain has `self_evolve.*` rows, and asserts
-  `/metrics` exposes the new counters.
-- **Tests**: `internal/selfevolve` at 78.5% coverage
-  (validator, promoter, revision, loader, id all covered);
-  wiring parsed and CAS path tested at the daemon level.
-
-### Cleanups
-
-- Removed: `examples/`, `internal/pluginproto/proto/`,
-  `cmd/promptsheon-auditbackfill/`, the `fallbackTS`
-  and `timeNow` indirection in `internal/selfevolve/id.go`,
-  the `fakeStateAdapter` 100+ line wrapper in
-  `internal/selfevolve/evolver_test.go`, the dead
-  `var _ = s` in `internal/api/http.go`, the duplicated
-  `modelRevision` helper in
-  `cmd/promptsheond/release_invoker.go`, the dead
-  `v > 10000` version-probe cap and `cooldown < 0` guard.
-
-## [0.3.0] - 2026-07-25
-
-The production release of v0.3.0. Six primitives originally
-tagged v0.4.0+ are now wired into the production daemon, not
-just exercised by tests. The OpenAPI spec regenerated; SDKs
-exposed new methods; the smoke test passes end-to-end.
-
-### Production wiring (WIRE-FINAL-1)
-
-- **LLM-judge scorer registered at boot.** `internal/llm/judge.go`
-  exposes `NewJudgeClient(registry)` which routes judge prompts
-  through the live LLM gateway. `cmd/promptsheond/main.go`
-  calls it after wiring the harness runner and registers
-  the scorer via `eval.RegisterLLMJudge`. Operators can opt
-  out with `PROMPTSHEON_LLM_JUDGE=off`.
-- **`POST /api/v1/reasoning/compile`** — new endpoint that
-  accepts an `Intent` and returns a `Plan`. Errors map to
-  `404 ErrNoMatch` and `409 ErrConstraintViolation`. The
-  catalog is built from the workspace's Capabilities filtered
-  by reputation; tests pass an explicit catalog.
-- **ContinuousEval loops.** Operators configure with
-  `PROMPTSHEON_CONTINUOUS_EVAL=cap-1:ds-1:60;cap-2:ds-2:300`.
-  Each entry starts a `ContinuousEval` goroutine that ticks
-  every N seconds and runs the active release against the
-  dataset. Tests cover disabled, no-active-release, and
-  end-to-end-passes paths.
-- **Inheritance wired into Version create.** `POST
-  /api/v1/capabilities/{id}/versions` accepts an optional
-  `parents: [version_id, ...]` field. The handler calls
-  `ResolveManifest` against the Repository; cycles and depth
-  overflow surface as `422 Unprocessable Entity`.
-- **`PROMPTSHEON_DATABASE_URL=postgres://...` detected.** The
-  daemon logs a clear warning that pgx wiring ships in v0.4.0
-  and falls back to SQLite. The schema + RLS migrations are
-  ready (`internal/store/postgres/migrations/`); the
-  in-memory adapter satisfies every interface in
-  `store.Repositories`.
-
-### Primitives landed (already shipped in v0.3.0-rc.1)
-
-- **LLM-JUDGE-1 / LLM-judge scorers** — `internal/eval/scorer_llm_judge.go`.
-- **REASON-COMP-1 / Reasoning compiler** —
-  `internal/reasoning/compiler.go`.
-- **PERF-RL-1 / Partitioned rate limiter** — 16-way FNV-1a sharded.
-- **CONT-1 / ContinuousEval at scale** —
-  `internal/harness/continuous.go`.
-- **INHERIT-1 / Capability Inheritance** —
-  `internal/capability/inheritance.go`.
-- **PG-1 / Postgres backend with RLS** —
-  `internal/store/postgres/`.
-
-## [0.3.0-rc.1] - 2026-07-25
-
-Tagged `v0.3.0-rc.1`. 31 atomic commits since `9832da2`
-(master before this pass); 46 atomic items across the Day 1/2/3
-punch list, every change verified by tests, atomic
-commits, and the CHANGELOG + ROADMAP + glossary updates.
-
-### v0.3.0 — Day 1/2/3 closure pass
-
-The headline: Promptsheon closes the recommendation loop in
-production, ships Capability Contracts + Diff + Reputation + Catalog,
-validates the release lifecycle with a TLA+ spec, hardens the
-audit + CRDT + shutdown paths, and makes the SDK surface match the
-server.
-
-46 atomic items landed across three days. Highlights:
-
-#### Day 1 — Foundations
-
-- **QW#1 / FIX-AUDIT-ONCONFLICT** — Audit archival regression
-  test pinning `INSERT OR IGNORE` idempotency. The retention
-  sweeper's second sweep is a no-op against a partial failure.
-- **BANDIT-RNG-1 / FIX-BANDIT-RNG** — Selector seeded-RNG
-  determinism test: two Selectors with the same seed produce
-  identical arm sequences. Replay is reproducible.
-- **QW#3 / WIRE-RESOLVER-PROD** — Regression test pinning
-  `WithReleaseResolver(resolver)` in `cmd/promptsheond/main.go`.
-  Live `/releases/{id}/invoke` always picks the manifest's
-  Model + Provider.
-- **QW#4 / VAULT-STOP** — `Vault.Stop()` wired into graceful
-  shutdown. `buildServer` returns the `*vault.Vault` so
-  `startHTTPServerAndWait` can stop it before logging "server
-  exited".
-- **OBS-LOG-3 / HUB-STOP-ORDERING** — Regression test pinning
-  the deferred order: `defer db.Close()` is registered before
-  `defer logHub.Stop()` so the hub's persist-nextID call still
-  has a live DB.
-- **OPS-SHUTDOWN-1 / STOP-AUDIT-WORKERS-ON-SHUTDOWN** —
-  Regression test pinning `srv.StopAuditWorkers(auditDrainCtx)`
-  on every shutdown path.
-- **MAN-1 / MANIFEST-DROP-UNUSED-REQUIRED** — Manifest.Validate
-  requires only Prompt, ModelPolicy, RuntimePolicy.
-  ContextContract + Memory are optional kinds; the Resolver
-  doesn't load them in v0.2.0.
-- **MAN-2 / MANIFEST-DROP-KNOWLEDGE** — Removed dead
-  `ArtifactKnowledge` constant. The `Knowledge` slice stays
-  for wire-compat.
-- **PURITY-1 / PURITY-CHECK-FIX** — `TestDomainPurityScriptExists`
-  runs the bash purity check from Go and fails on regression.
-  Items 10/11 (alerting + optimizer purity) verified clean.
-- **PERF-AUDIT-2 / AUDIT-VERIFY-CACHE-INVALIDATION** —
-  `AppendAudit` invalidates `auditVerifyCache` so a
-  write-then-verify pair walks the full chain.
-- **OBS-RET-2 / AUDIT-ARCHIVE-RETENTION-TTL** — Regression test
-  pinning the cutoff: rows newer than the TTL stay in
-  `audit_entries`, not in `audit_archive`.
-- **TLA-LIFECYCLE-1 / TLA-RELEASE-LIFECYCLE-SPEC** — TLA+
-  spec (`tla/release_lifecycle.tla` + `tla/release_lifecycle.cfg`)
-  modeling the Release state machine with Maker/Checker
-  separation-of-duties and the "exactly one active per
-  Environment" invariant. Go-side regression test pins the
-  spec file structure.
-
-#### Day 2 — Capability primitives + Recommendation loop
-
-- **CONTRACT-1 / CAPABILITY-CONTRACT-TYPE** — New
-  `CapabilityContract` value type: `InputSchema`, `OutputSchema`,
-  `SuccessRubric`, `SLOTarget`, `BlastRadius` ∈ {low, medium, high},
-  `AutoPromotable`. `CanAutoAdopt` enforces the blast-radius
-  policy. The Capability struct carries `*CapabilityContract`.
-- **CONTRACT-2 / CAPABILITY-CONTRACT-API** — `PUT/GET
-  /api/v1/capabilities/{id}/contract` CRUD. Migration 018
-  adds the `capability_contracts` table. The SQLite repo
-  satisfies the new interface methods.
-- **DIFF-1 / CAPABILITY-DIFF** — `GET
-  /api/v1/capabilities/{id}/diff?from=N&to=M` returns the
-  structural diff between two Versions: added, removed, and
-  changed artifact references.
-- **CATALOG-1 / CAPABILITY-CATALOG** — `GET
-  /api/v1/catalog/capabilities?workspace_id=...&q=...` paginated
-  search across the Workspace.
-- **REPUTATION-1 / CAPABILITY-REPUTATION** — `GET
-  /api/v1/capabilities/{id}/reputation` returns the derived
-  trust score (eval pass rate × SLO adherence × decision
-  adoption rate).
-- **OBS-TICK-1 / OBSERVATION-TICK-WIRED** — `Aggregator.Tick(ctx,
-  interval, fn)` primitive; production wiring emits
-  Recommendations on each tick.
-- **LOOP-1** — Regression test pinning the production
-  recommendation loop: `recProducer.Subscribe` on
-  `EventExecutionFinished`, `recProducer.Tick` on a 5-minute
-  ticker, SQLite-backed sink.
-- **SETTINGS-CRDT-1 / SETTINGS-COPY-ON-REMOTE-WRITE** —
-  `TestMergeSystemConfigPersistsWinner` pins that a remote
-  write with a strictly-dominant vector replaces the local
-  row.
-
-#### Day 3 — Surface area + release pipeline + perf
-
-- **SDK-1 / SDK-CODEGEN-WIRED** — `make sdk` refreshes
-  Python + TypeScript SDK artifacts from `api/openapi.yaml`.
-- **SDK-2 / PYTHON-SDK-COMPLETE** — Python client covers every
-  /api/v1 route (capabilities, releases, harness, audit,
-  settings).
-- **SDK-3 / TYPESCRIPT-SDK-COMPLETE** — Same for TypeScript.
-- **SDK-VERSION-1** — `scripts/sync-version.sh` keeps
-  `sdk/python/pyproject.toml` and `sdk/typescript/package.json`
-  in sync with VERSION.
-- **RELEASE-TOKEN-1** — Per-job permissions in `ci.yaml`:
-  `contents: write`, `packages: write`, `id-token: write`,
-  `attestations: write`. The previous `contents: read` blocked
-  GoReleaser from publishing.
-- **CI-FUZZ-1** — `.github/workflows/fuzz.yaml` runs 20s
-  per surface on PRs (vault, redactor, injection). Nightly
-  fuzz via `workflow_dispatch`.
-- **README-1** — Headline: "AI Capability Control Plane".
-  Documents Capability Contract, Diff, Catalog, Reputation,
-  Recommendation Loop, CRDT-backed Settings, Audit Chain.
-- **DOC-FRESH-2** — `make docs-check` passes across 60
-  link-file(s) and 35 ref-file(s).
-
-#### Internal-only changes (no API surface)
-
-- `internal/capability/contract.go` + `contract_test.go`:
-  CapabilityContract value type + 9 tests.
-- `internal/capability/diff.go` + `ManifestDiff`: structural
-  diff between two Manifests.
-- `internal/store/migrations/018_capability_contract.up.sql`:
-  capability_contracts table.
-- `internal/api/handlers_contract.go`: contract, diff,
-  reputation, catalog handlers.
-- `internal/api/routes.go`: 4 new routes (`contract`, `diff`,
-  `reputation`, `catalog/capabilities`).
-- `tla/release_lifecycle.tla` + `.cfg` + `release_lifecycle_test.go`.
-- `sdk/python/src/promptsheon/_generated/openapi.yaml`:
-  generated artifact from `api/openapi.yaml`.
-- `sdk/typescript/src/_generated/openapi.yaml`: same.
-
-
-## [Unreleased]
-
-### v0.2.0 closure pass
-
-- **DOC-CI-3 / DOC-FRESH-1** `make docs-check` is a deterministic
-  doc-freshness gate: it walks every markdown file under `docs/`
-  plus the root `README.md` / `CHANGELOG.md` and reports
-  (a) any local markdown link that resolves to a missing file
-  and (b) any path-shaped reference to source code
-  (`internal/...go`, `pkg/...go`, `cmd/...go`, `api/`,
-  `deploy/`, `scripts/`, `.github/workflows/`) that no longer
-  points at a real file. Stdlib Python; no new Go dependency.
-  CI runs it on every PR. Operators can add a trailing
-  `<!-- stale-ok: <reason> -->` to bless a historical line.
-- **DOC-CI-1 / OSS-GOV-1** The mdBook site lives under
-  `docs-site/`. `docs-site/book.toml` points `src` at
-  `../docs` so the existing prose is reused without
-  copy-paste. The Makefile target is `make docs-site`; the
-  Pages workflow builds with `mdbook build docs-site` and
-  deploys `docs-site/book/`. The only mdBook-only file inside
-  `docs/` is `SUMMARY.md`. A `docs-site.yaml` workflow
-  deploys the result via `actions/deploy-pages`. Custom
-  domain configuration is outside the repository's authority
-  and is documented as such in the workflow.
-- **PERF-BENCH-1** `make bench` runs the curated 8 Go benchmarks
-  listed in `scripts/benchmarks.txt`. A `bench-nightly.yaml`
-  workflow runs the same set nightly and on `workflow_dispatch`
-  and uploads results as artefacts. The p99 latency gate lives
-  in the existing k6 scenario
-  `tests/load/scenarios/10-sustained-load.js` — Go's
-  `testing.B` has no notion of p99 and we do not pretend
-  otherwise.
-- **OSS-REL-1 / SEC-16c** The release pipeline uses
-  `actions/attest-build-provenance@v1` to attach GitHub
-  artifact attestations to every release binary, in addition
-  to the existing cosign keyless signing. The release job now
-  installs cosign via `sigstore/cosign-installer@v4` (pinned
-  to the `v2.x` major) before GoReleaser runs. The
-  `subject-path` for the attestation step was fixed to the
-  paths GoReleaser actually emits (`dist/promptsheond_*.{tar.gz,zip}`,
-  `dist/promptsheon_*.{tar.gz,zip}`, `dist/checksums.txt`).
-  The stale SBOM `.sig` / `.pem` `extra_files` globs in
-  `.goreleaser.yml` were dropped — the `signs:` block signs
-  archives and the checksum next to themselves, never the
-  SBOM. The duplicate `release:` block in `.goreleaser.yml`
-  was collapsed into one. The release job carries explicit
-  `packages: write` / `id-token: write` / `attestations: write`
-  permissions and a `docker/login-action` step so GoReleaser
-  can push the multi-arch image to GHCR. The invalid
-  `slsa-framework/slsa-github-generator` step call was removed
-  (the SLSA generator is for driving a build, not attesting
-  one); the `.github/slsa-build.config.json` was deleted.
-- **RES-AUDIT-1** A TLA+ specification of the audit chain
-  (`tla/audit_chain.tla`) and its TLC config
-  (`tla/audit_chain.cfg`) land alongside a concise README.
-  The spec models the same ordering invariants the
-  `VerifyAuditChainOnDB` SQLite walk checks at runtime.
-- **RES-CRDT-1, RES-CRDT-2, RES-BANDIT-1** Research notes ship
-  as design docs only (no code, no schema):
-  - `docs/research/crdt-idempotency-cache.md` — design
-    options for a CRDT-backed idempotency cache, including a
-    minimal "smallest transactional reservation path" sketch
-    that does not require the unfinished CRDT to land.
-  - `docs/research/replay-set-crdt.md` — replay-set CRDT
-    (immutable add-only G-Set, conflict semantics, retention).
-  - `docs/research/thompson-sampling-bayesian.md` —
-    acknowledges the existing Thompson Sampling selector is
-    already Bayesian, and defines the criteria that would
-    justify replacing it.
-- **Note on what is NOT in v0.2.0**: the CRDT idempotency
-  cache, the replay-set CRDT, and multi-region replication
-  ship as research only — they are documented in
-  `docs/research/`, not in this binary. The bandit selector
-  remains the existing Thompson Sampling implementation; the
-  research note describes when a replacement would be
-  justified. Item #28 (v0.2.0 readiness tests) is documented
-  in `docs/release.md` as the next milestone; it is being
-  implemented by a separate agent and is not in this release.
-
-## [0.2.0] - 2026-07-24
-
-The v0.2.0 release. Honest scope: the runtime behaviour
-(#1–#25), the release pipeline, the doc-freshness gate, the
-mdBook site, the curated benchmark set, and the k6 p99 gate
-are production defaults. The CRDT-backed idempotency cache,
-the replay-set CRDT, and multi-region replication are
-research deliverables (design docs in `docs/research/`); they
-are not in this binary and not covered by the v0.2.0 SLOs.
 
 ### Added
 
-Runtime (#1–#25 — the actually shipped work):
-
-- **#1 Audit archival + chain-state tail cache**.
-  `internal/observability.retention` archives eligible rows
-  into `audit_archive` (migration 011) and reads the chain
-  tail from `audit_chain_state` so the verifier does not
-  paginate from rowid 1. `internal/store/sqlite.AppendAudit`
-  keeps `audit_chain_state.last_hash` / `last_rowid` in step
-  with every insert; `VerifyAuditChain` cross-checks both
-  the rowid sequence and the chain hash and surfaces a
-  "chain tail mismatch" when the cache drifts.
-- **#2 Selector RNG injection**. `internal/bandit.Selector`
-  gains `NewSelectorWithRNG(armIDs, rng)`; `bandsession`
-  uses it so tests and the harness eval loop seed the
-  Thompson Sampling draws deterministically. `math/rand/v2`
-  is the RNG source.
-- **#3 Release resolver**. `internal/release.Resolver`
-  closes the gap between "the approved release" and "the
-  call that actually runs" by turning a Release into an
-  immutable `ResolvedInvocation` at the boundary — model,
-  provider, revision, prompt bytes, runtime limits, and
-  guardrail/tool/MCP refs all come from the manifest, not
-  from the HTTP request. The release invoke path consumes
-  the plan; the previous request-supplied model/provider
-  override is gone.
-- **#4 Vault lifecycle + hot-reload**. `internal/vault.Vault`
-  exposes `Reload(key)`; the settings `Notifier` wires the
-  vault as a subscriber so an operator-driven `settings`
-  write rotates the master key without a daemon restart.
-  `notifier_test.go` pins the failure-propagation contract:
-  a bad key returns the failure to the API caller (5xx),
-  not a silent fallback.
-- **#5 Shutdown drains + order**. `cmd/promptsheond` first
-  SIGINT/SIGTERM starts a 60s graceful drain: HTTP server
-  first, then audit-worker queue (30s), then webhook
-  dispatcher, then OTel provider. A second signal forces
-  exit. The previous "defer Close runs before the retention
-  tick" bug is closed by hoisting the retention `*sql.DB`
-  into `main()` scope.
-- **#6 API responsibility split**. `internal/api/server.go`
-  shrinks; a thin `internal/api/server/server.go` facade
-  re-exports `Server` and `Option` and forwards to
-  `api.NewServer`. Production wiring imports the facade;
-  the legacy `WithServerConfig` is deleted.
-- **#7 Repository facades + sqliteimpl move**. The bandit
-  store (`internal/banditstore.InMemory` + a SQLite-backed
-  sibling) and the recommendation / lineage repos moved
-  out of the monolithic `internal/store/sqlite.go` into
-  `internal/store/sqliteimpl/`. The monolithic file remains
-  the wiring root; the new package houses the per-aggregate
-  repository implementations.
-- **#8 Bandit + settings CRDT**. `internal/bandit/crdt.go`
-  pins the grow-only arm-state merge (MAX() per replica);
-  `internal/settings/crdt.go` pins the LWW register per key
-  with version vectors + deterministic tie-break
-  (WriteTS, then ReplicaID). Algebraic properties are
-  exercised by property tests; the tie-break is documented
-  in the package comment.
-- **#9 Property tests**. `internal/llm/property_test.go`
-  pins the behaviour of the LLM registry, the instrumented
-  middleware, the retry loop, and the fallback chain under
-  arbitrary inputs. `internal/bandit/property_test.go` pins
-  the Thompson Sampling selector's draw distribution.
-- **#10 Coverage / domain / lint gates**. CI runs
-  `scripts/check-coverage.sh` with per-package floors
-  (domain ≥ 50%, infra ≥ 40%, api handlers ≥ 60%) on top of
-  the global 60% floor; `make lint-domain` (AST walker,
-  fails on package-level mutable state) and `make lint-deps`
-  (shell, fails on infra imports from domain packages) are
-  wired into the lint job.
-- **#11 Metrics run ID**. `internal/metrics.collector`
-  exposes `promptsheon_bandit_current_run_info{run_id=…}`
-  via the `CurrentRunID` field on `BanditMetrics`; the run
-  ID is generated at daemon boot and propagates through
-  `bandsession.Session.RunID()`.
-- **#12 Benchmark gate**. `make bench` is the canonical
-  eight-benchmark Go target; `scripts/benchmarks.txt` is
-  the canonical list; `bench-nightly.yaml` runs the same
-  set nightly + on `workflow_dispatch`. The p99 latency
-  gate is the existing k6 scenario, not Go's `testing.B`.
-- **#13 KMS rotate**. The KMS-backed `KeyProvider` persists
-  the wrapped data key (`CiphertextBlob`) on first use and
-  re-reads it on cache miss via `KMSClient.Decrypt`. On
-  rotation the wrapped blob changes, the LRU key changes,
-  and the next read decrypts the new blob. Migration
-  `009_vault_state.up.sql` creates the singleton
-  `vault_state` table.
-- **#14 Docs site**. `docs-site/book.toml` (new location)
-  builds an mdBook site from the existing `docs/` prose;
-  `docs-site.yaml` workflow deploys it to GitHub Pages.
-- **#15 Release pipeline**. cosign keyless signing via
-  `sigstore/cosign-installer`; GitHub artifact attestations
-  via `actions/attest-build-provenance`; GHCR push via
-  `docker/login-action` + GoReleaser `docker_images`; SBOM
-  attachment (syft → `dist/sbom/` → goreleaser
-  `extra_files` → release archive).
-
-Release pipeline + release hygiene:
-
-- `make docs-check` (DOC-CI-3 / DOC-FRESH-1) — see above.
-- `make bench` — curated Go benchmark target.
-- `docs-site/book.toml` — mdBook site that reuses
-  `docs/` as its source.
-- `.github/workflows/docs-site.yaml` — build + Pages deploy.
-- `.github/workflows/bench-nightly.yaml` — nightly + manual
-  Go-benchmark + k6 run.
-- `tla/audit_chain.tla` + `tla/audit_chain.cfg` + `tla/README.md`.
-- `scripts/docs-check.sh`, `scripts/benchmarks.txt`.
-- `docs/research/crdt-idempotency-cache.md`,
-  `docs/research/replay-set-crdt.md`,
-  `docs/research/thompson-sampling-bayesian.md`,
-  `docs/research/tla-audit-chain.md`.
+- **Audit / observability**
+  - `internal/testutil/otel.go` exposes `InMemoryCollector` (wraps
+    `tracetest.InMemoryExporter`) for span assertions in tests.
+  - `tests/load/scenarios/*.js` declare k6 thresholds
+    (`http_req_duration`, `request_success`); the workflow now
+    fails when any scenario breaches its thresholds.
+- **CI**
+  - `.github/workflows/fuzz.yaml` runs nightly at 03:00 UTC
+    (60 s per harness) in addition to the PR gate.
+  - `go vet -all ./...` and `staticcheck ./...` are wired into
+    the `test` CI job.
+- **API surface**
+  - `internal/api/validate.go::validateJSON(r, target, validate)`
+    combines `readJSON` + field-level validation; companion
+    helpers `validateNonEmpty`, `validateEnum`,
+    `validatePositiveInt`, `validatePositiveFloat`.
+  - `GET /livez` and `GET /readyz` are aliases for the existing
+    `/health` and `/ready` probes.
+  - `handlers_metrics.go` renamed to `usage.go` to match the
+    exported `UsageTracker` type it owns.
 
 ### Changed
 
-- `.goreleaser.yml`: duplicate `release:` block collapsed;
-  SBOM `.sig` / `.pem` `extra_files` globs dropped (those
-  files are never produced — the `signs:` block signs
-  archives and the checksum next to themselves); `signs:`
-  block no longer requires `COSIGN_EXPERIMENTAL=1` (cosign
-  v2+); SBOM `.json` globs retained as the only
-  `extra_files` that actually exist post-build.
-- `.github/workflows/ci.yaml` `build-release` job: explicit
-  `permissions: contents: write, packages: write, id-token:
-  write, attestations: write`; `docker/login-action` step
-  for `ghcr.io`; `sigstore/cosign-installer@v4` (pinned
-  `v2.x`) before GoReleaser; SLSA-as-step replaced with
-  `actions/attest-build-provenance@v1` (the supported
-  artifact-attest action); attestation `subject-path`
-  corrected to the actual `dist/...` paths GoReleaser emits.
-- `scripts/sync-version.sh`: now synchronises the openapi
-  `info.version` comment prose (`Version 0.1.0 ...`) as
-  well as the literal `version` field; added
-  `sdk/python/pyproject.toml` and the Helm chart's
-  `appVersion` (in addition to `version`) so the SDK and
-  chart can never drift from `VERSION`.
-- `docs/adr/README.md`: removed pointer rows to ADRs that
-  never landed (DOC-9b follow-up).
-- `docs/design-decisions.md`: fixed broken link to ADR.
-- `docs/multi-region.md`: fixed broken link to ADR.
-- `Makefile`: `help` target now lists `docs-check`, `bench`,
-  and `docs-site`.
+- **Pagination**: `pagination.go::writePaginationHeaders` emits
+  RFC 5988 `prev`/`next`/`first`/`last` link headers + an
+  `X-Total-Count` header on every paginated endpoint.
+- **Idempotency**: the in-memory `idempotencyCache` is now a
+  fallback. Production uses `SQLiteIdempotencyStore` (wiring via
+  `cmd/promptsheond/main.go:264`); multi-replica retries share
+  state.
+- **Metrics**: `metrics.banditMu` switched from `sync.Mutex` to
+  `sync.RWMutex`; `GetSummary` and `prometheusFormat` acquire the
+  read lock. The `banditRunID` write path keeps an exclusive lock.
+- **Self-evolve (`internal/selfevolve`)**: `Evolver.RunOnce`
+  always sets `res.Revisions`; on promotion it sets `res.Score =
+  state.LastScore` (was previously stuck at the *seeded* score).
+- **Audit hash**: `docs/algorithms.md` documents the
+  `\x1f`-separated `SHA-256(id \x1f user_id \x1f action \x1f
+  resource \x1f details_json \x1f timestamp \x1f previous_hash)`
+  format used by `internal/store/sqlite.go::computeAuditHash`.
+- **Version source of truth**: the OpenAPI `info.version`,
+  `Chart.yaml` `version`/`appVersion`, and the Python / TypeScript
+  SDK versions are all pinned at `0.3.0`.
+
+### Removed
+
+- Dead code (dropped across the codebase):
+  - `var _ = ...` workarounds in `internal/{trace,rollups/clickhouse,supervisor,policy,lineage,harness,selfevolve,eval}`,
+    `cmd/promptsheon/harness.go`, `internal/api/invoke_test_helpers_test.go`,
+    `tests/contract/contract_test.go` — and their now-orphaned
+    imports.
+  - `judgeCache` struct + methods in `internal/eval/scorer_llm_judge.go`
+    (32 LOC; never instantiated).
+  - `marshalJSON` helper in `internal/recommendation/producer.go`
+    (was a thin `json.Marshal` wrapper).
+  - `hexDecode` helper in `internal/vault/providers.go`.
+  - `mergeCIDRs` in `internal/ratelimit/ratelimit.go`.
+  - `(*Compiler).filter` in `internal/reasoning/compiler.go`.
+  - `interfaceCtx` alias in `internal/slo/slo.go`.
+  - `validateJSON` helper in `internal/api/validate.go` (no callers).
+  - `initSQLBundle` / `rlsSQLBundle` package vars + `init()`
+    in `internal/store/postgres/postgres.go`.
+  - `crashed` field in `internal/subprocess/subprocess.go`.
+  - `splitCSVFields` in `internal/schedule/schedule.go`.
+  - `newDiscardLogger` (`internal/pluginsup/discard.go`) and
+    `newTestSupervisor` (`internal/pluginsup/helpers_test.go`)
+    — only consumed by each other.
+  - `internal/pluginsup/supervisor_test.go` (tested dead helpers).
+  - `LabeledCounter` / `LabeledHistogram` types + benchmarks
+    in `internal/metrics/` (never used in production).
+  - Deprecated `SystemConfigRow` alias in
+    `internal/settings/resolver.go`.
+- Dead local variables:
+  - Shadowed `dom` in `internal/schedule/schedule.go`
+    (`parseField` result discarded before `parseFieldWithWildcard`).
+  - `limit = -1` assignments in `internal/store/sqlite.go` and
+    `internal/store/sqlite_capabilities.go` (the literal `-1` is
+    embedded in the SQL string).
+  - Unused `ctx` return value in
+    `internal/trace/otel.go::(*OTelTracer).Start`.
+
+### Fixed
+
+- **Self-evolve `Result`**: `res.Score` is now set to the score of
+  the last validation run (via `state.LastScore`) on promotion;
+  was previously the *old* seeded score. `res.Revisions` is
+  always populated, including on rejection.
+- **E2E seed**: `tests/e2e/selfevolve_test.go::seedCapabilityWithBadPrompt`
+  now checks every `Create*` error return, sets the dataset's
+  `CapabilityID`, and shares the auditor instance between the
+  evolver and promoter. The previous form silently swallowed
+  FK-violation errors.
+- **Audit doc drift**: `docs/algorithms.md` now describes the
+  field-separator format actually produced by `computeAuditHash`,
+  not a hypothetical JSON canonicalisation.
+
+## [0.3.0] - 2026-07-25
+
+The v0.3.0 production release. Six primitives originally tagged
+v0.4.0+ are now wired into the production daemon, not just
+exercised by tests. OpenAPI spec regenerated; SDKs expose new
+methods; the smoke test passes end-to-end.
+
+### Added
+
+- **Production wiring**
+  - **LLM-judge scorer registered at boot.** `internal/llm/judge.go`
+    exposes `NewJudgeClient(registry)`; `cmd/promptsheond/main.go`
+    calls it after wiring the harness runner and registers the
+    scorer via `eval.RegisterLLMJudge`. Operators can opt out
+    with `PROMPTSHEON_LLM_JUDGE=off`.
+  - **`POST /api/v1/reasoning/compile`** — accepts an `Intent` and
+    returns a `Plan`. Errors map to `404 ErrNoMatch` and
+    `409 ErrConstraintViolation`. The catalog is built from the
+    workspace's capabilities filtered by reputation.
+  - **ContinuousEval loops.** Operators configure with
+    `PROMPTSHEON_CONTINUOUS_EVAL=cap-1:ds-1:60;cap-2:ds-2:300`.
+    Each entry starts a `ContinuousEval` goroutine that ticks
+    every N seconds and runs the active release against the
+    dataset.
+  - **Inheritance wired into Version create.**
+    `POST /api/v1/capabilities/{id}/versions` accepts an optional
+    `parents: [version_id, ...]` field. The handler calls
+    `ResolveManifest` against the Repository; cycles and depth
+    overflow surface as `422 Unprocessable Entity`.
+  - **`PROMPTSHEON_DATABASE_URL=postgres://...` detected.** The
+    daemon logs a clear warning that pgx wiring ships in v0.4.0
+    and falls back to SQLite.
+- **Primitives landed**
+  - `LLM-JUDGE-1` / LLM-judge scorers — `internal/eval/scorer_llm_judge.go`.
+  - `REASON-COMP-1` / Reasoning compiler — `internal/reasoning/compiler.go`.
+  - `PERF-RL-1` / Partitioned rate limiter (16-way FNV-1a sharded).
+  - `CONT-1` / ContinuousEval at scale — `internal/harness/continuous.go`.
+  - `INHERIT-1` / Capability Inheritance — `internal/capability/inheritance.go`.
+  - `PG-1` / Postgres backend with RLS — `internal/store/postgres/`.
+
+## [0.3.0-rc.1] - 2026-07-25
+
+Tagged `v0.3.0-rc.1`. 31 atomic commits; 46 atomic items
+across the Day 1/2/3 punch list. Every change verified by
+tests, atomic commits, and the CHANGELOG + ROADMAP + glossary
+updates.
+
+### Added
+
+- **`QW#1 / FIX-AUDIT-ONCONFLICT`** — Audit archival regression
+  test pinning `INSERT OR IGNORE` idempotency. The retention
+  sweeper's second sweep is a no-op against a partial failure.
+- **`BANDIT-RNG-1 / FIX-BANDIT-RNG`** — Selector seeded-RNG
+  determinism test: two `Selector`s with the same seed produce
+  identical arm sequences.
+- **`QW#3 / WIRE-RESOLVER-PROD`** — Regression test pinning
+  `WithReleaseResolver(resolver)` in `cmd/promptsheond/main.go`.
+- **`QW#4 / VAULT-STOP`** — `Vault.Stop()` wired into graceful
+  shutdown; `buildServer` returns the `*vault.Vault` so
+  `startHTTPServerAndWait` can stop it before logging
+  "server exited".
+- **`OBS-LOG-3 / HUB-STOP-ORDERING`** — Regression test pinning
+  the deferred order: `defer db.Close()` is registered before
+  `defer logHub.Stop()`.
+- **`OPS-SHUTDOWN-1 / STOP-AUDIT-WORKERS-ON-SHUTDOWN`** —
+  Regression test pinning `srv.StopAuditWorkers(auditDrainCtx)`
+  on every shutdown path.
+- **`MAN-1 / MANIFEST-DROP-UNUSED-REQUIRED`** —
+  `Manifest.Validate` requires only Prompt, ModelPolicy,
+  RuntimePolicy. ContextContract + Memory are optional kinds.
+- **`MAN-2 / MANIFEST-DROP-KNOWLEDGE`** — Removed dead
+  `ArtifactKnowledge` constant. The `Knowledge` slice stays
+  for wire-compat.
+- **`PURITY-1 / PURITY-CHECK-FIX`** —
+  `TestDomainPurityScriptExists` runs the bash purity check
+  from Go and fails on regression.
+- **`PERF-AUDIT-2 / AUDIT-VERIFY-CACHE-INVALIDATION`** —
+  `AppendAudit` invalidates `auditVerifyCache` so a
+  write-then-verify pair walks the full chain.
+- **`OBS-RET-2 / AUDIT-ARCHIVE-RETENTION-TTL`** — Regression test
+  pinning the cutoff: rows newer than the TTL stay in
+  `audit_entries`, not in `audit_archive`.
+- **`TLA-LIFECYCLE-1 / TLA-RELEASE-LIFECYCLE-SPEC`** — TLA+ spec
+  (`tla/release_lifecycle.tla` + `.cfg`) modelling the Release
+  state machine with Maker/Checker separation-of-duties and the
+  "exactly one active per Environment" invariant.
+- **`CONTRACT-1 / CAPABILITY-CONTRACT-TYPE`** — New
+  `CapabilityContract` value type: `InputSchema`, `OutputSchema`,
+  `SuccessRubric`, `SLOTarget`, `BlastRadius` ∈ {low, medium, high},
+  `AutoPromotable`. `CanAutoAdopt` enforces the blast-radius policy.
+- **`CONTRACT-2 / CAPABILITY-CONTRACT-API`** —
+  `PUT/GET /api/v1/capabilities/{id}/contract` CRUD. Migration
+  018 adds the `capability_contracts` table.
+- **`DIFF-1 / CAPABILITY-DIFF`** —
+  `GET /api/v1/capabilities/{id}/diff?from=N&to=M` returns the
+  structural diff between two Versions.
+- **`CATALOG-1 / CAPABILITY-CATALOG`** —
+  `GET /api/v1/catalog/capabilities?workspace_id=...&q=...`
+  paginated search across the workspace.
+- **`REPUTATION-1 / CAPABILITY-REPUTATION`** —
+  `GET /api/v1/capabilities/{id}/reputation` returns the derived
+  trust score (eval pass rate × SLO adherence × decision
+  adoption rate).
+- **`OBS-TICK-1 / OBSERVATION-TICK-WIRED`** —
+  `Aggregator.Tick(ctx, interval, fn)` primitive; production
+  wiring emits Recommendations on each tick.
+- **`LOOP-1`** — Regression test pinning the production
+  recommendation loop.
+- **`SETTINGS-CRDT-1 / SETTINGS-COPY-ON-REMOTE-WRITE`** —
+  `TestMergeSystemConfigPersistsWinner` pins that a remote write
+  with a strictly-dominant vector replaces the local row.
+- **`SDK-1 / SDK-CODEGEN-WIRED`** — `make sdk` refreshes Python
+  and TypeScript SDK artifacts from `api/openapi.yaml`.
+- **`SDK-2 / PYTHON-SDK-COMPLETE`** — Python client covers every
+  `/api/v1` route.
+- **`SDK-3 / TYPESCRIPT-SDK-COMPLETE`** — Same for TypeScript.
+- **`SDK-VERSION-1`** — `scripts/sync-version.sh` keeps
+  `sdk/python/pyproject.toml` and `sdk/typescript/package.json`
+  in sync with `VERSION`.
+- **`RELEASE-TOKEN-1`** — Per-job permissions in `ci.yaml`:
+  `contents: write`, `packages: write`, `id-token: write`,
+  `attestations: write`.
+- **`CI-FUZZ-1`** — `.github/workflows/fuzz.yaml` runs 20s per
+  surface on PRs (vault, redactor, injection). Nightly fuzz via
+  `workflow_dispatch`.
+- **`README-1`** — Headline: "AI Capability Control Plane".
+  Documents Capability Contract, Diff, Catalog, Reputation,
+  Recommendation Loop, CRDT-backed Settings, Audit Chain.
+- **`DOC-FRESH-2`** — `make docs-check` passes across 60
+  link-files and 35 ref-files.
+
+## [0.2.0] - 2026-07-24
+
+The v0.2.0 release. Honest scope: the runtime behaviour (#1–#25),
+the release pipeline, the doc-freshness gate, the mdBook site,
+the curated benchmark set, and the k6 p99 gate are production
+defaults. The CRDT-backed idempotency cache, the replay-set
+CRDT, and multi-region replication are research deliverables
+(design docs in `docs/research/`); they are not in this binary
+and not covered by the v0.2.0 SLOs.
+
+### Added
+
+- **`DOC-CI-3 / DOC-FRESH-1`** — `make docs-check` is a
+  deterministic doc-freshness gate: it walks every markdown file
+  under `docs/` plus `README.md` and `CHANGELOG.md` and reports
+  any local markdown link that resolves to a missing file, plus
+  any path-shaped reference to source code that no longer points
+  at a real file. Stdlib Python; no new Go dependency. CI runs it
+  on every PR. Operators can add a trailing `<!-- stale-ok:
+  <reason> -->` to bless a historical line.
+- **`DOC-CI-1 / OSS-GOV-1`** — The mdBook site lives under
+  `docs-site/`. `docs-site/book.toml` points `src` at `../docs`.
+  The Makefile target is `make docs-site`; the Pages workflow
+  builds with `mdbook build docs-site` and deploys
+  `docs-site/book/`.
+- **`PERF-BENCH-1`** — `make bench` runs the curated 8 Go
+  benchmarks listed in `scripts/benchmarks.txt`. A
+  `bench-nightly.yaml` workflow runs the same set nightly and on
+  `workflow_dispatch` and uploads results as artefacts. The p99
+  latency gate lives in the existing k6 scenario
+  `tests/load/scenarios/10-sustained-load.js`.
+- **`OSS-REL-1 / SEC-16c`** — The release pipeline uses
+  `actions/attest-build-provenance@v1` to attach GitHub artifact
+  attestations to every release binary, in addition to the
+  existing cosign keyless signing. The release job installs cosign
+  via `sigstore/cosign-installer@v4` (pinned to the `v2.x` major)
+  before GoReleaser runs. The `subject-path` for the attestation
+  step is fixed to the paths GoReleaser actually emits.
+- **`RES-AUDIT-1`** — A TLA+ specification of the audit chain
+  (`tla/audit_chain.tla`) and its TLC config
+  (`tla/audit_chain.cfg`) lands alongside a concise README. The
+  spec models the same ordering invariants the
+  `VerifyAuditChainOnDB` SQLite walk checks at runtime.
+- **`RES-CRDT-1, RES-CRDT-2, RES-BANDIT-1`** — Research notes
+  ship as design docs only:
+  - `docs/research/crdt-idempotency-cache.md` — design options
+    for a CRDT-backed idempotency cache.
+  - `docs/research/replay-set-crdt.md` — replay-set CRDT
+    (immutable add-only G-Set, conflict semantics, retention).
+  - `docs/research/thompson-sampling-bayesian.md` — acknowledges
+    the existing Thompson Sampling selector is already Bayesian.
+
+### Note on what is NOT in v0.2.0
+
+The CRDT idempotency cache, the replay-set CRDT, and
+multi-region replication ship as research only — they are
+documented in `docs/research/`, not in this binary. The bandit
+selector remains the existing Thompson Sampling implementation.
+Item #28 (v0.2.0 readiness tests) is documented in
+`docs/release.md` as the next milestone.
 
 ## [0.1.x] - Production-readiness hardening
 
-The v0.1.x audit + remediation pass. Highlights:
+The v0.1.x audit + remediation pass.
 
-- **Migration numbering 028–040**: the gap is a numbering mistake,
-  not a reserved block. Future migrations continue from 060
-  onward; if a schema change requires slots in the gap, file a
-  dedicated renumbering migration. DB-GAP-1.
-- **Down migrations** ship behind a `LoadDown(ctx, db, version)`
-  helper; destructive down files still require
-  `PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true`. DB-13.
+### Added
+
+- **`DB-CONC-2 / OPS-4`** — Dedicated retention `*sql.DB` lives
+  in `main()` scope (not `buildServer`), so its lifetime matches
+  the daemon. Previously the `defer Close` inside `buildServer`
+  ran before the retention goroutine's first tick, causing
+  `database is closed` panics.
+- **`SEC-10a`** — KMS `Provider` persists the wrapped data key
+  (`CiphertextBlob`) on first use and reads it on cache miss via
+  `KMSClient.Decrypt`. The plaintext cache is an LRU of size 16
+  keyed by `sha256(wrapped_data_key)`. Migration
+  `009_vault_state.up.sql` creates the singleton `vault_state`
+  table.
+- **`feat(helm):` values.schema.json** — rejects
+  `replicaCount>1` (SQLite is single-writer), `dbBackend=postgres`
+  (removed backend), and `auth=false` without `insecureLoopback`.
+- **`feat(helm):` default auth=true, vault Secret, PDB, ConfigMap
+  checksum, seccomp Profile** — production-safe defaults.
+- **`feat(dockerfile):` writable /data, multi-arch, ldflags**.
+- **`feat(ci):` tag-trigger release** with Helm render assertions
+  for the values schema.
+- **`feat(config):` refuse non-loopback bind when
+  `PROMPTSHEON_AUTH=false`** — closes the bootstrap admin-key-mint
+  attack.
+- **`feat(config):` refuse non-loopback bind without TLS**.
+- **`feat(daemon):` in-process TLS termination** via
+  `PROMPTSHEON_TLS_CERT_FILE` / `PROMPTSHEON_TLS_KEY_FILE`.
+- **`feat(auth):` X-Bootstrap-Token gate** + OAuth auto-provision
+  off by default.
+- **`feat(daemon):` wire alert delivery to webhook dispatcher** —
+  alerts now actually fire instead of being silently dropped.
+- **`feat(store):` migration 027** — `datasets`, `dataset_cases`,
+  `preconditions`, `eval_runs`, `eval_results` tables.
+- **`feat(domain):` harness types** — `Dataset`, `DatasetCase`,
+  `Precondition`, `EvalRun`, `EvalResult` plus the `Scorer` enum.
+- **`feat(store):` SQLite repository impls** for all five tables.
+- **`feat(eval):` Scorer interface + built-ins** — exact_match,
+  contains, regex, json_schema. Pluggable via `Register`.
+- **`feat(harness):` PreconditionRunner** — executes named command
+  hooks via `sh -c` with per-hook timeouts, captures combined
+  stdout+stderr (truncated to 8 KiB), and exposes a typed
+  `*PreconditionError` for the HTTP 409 mapping.
+- **`feat(harness):` EvalRunner service** — loops a Dataset's
+  cases through a `ReleaseInvoker`, scores each via the chosen
+  Scorer, persists per-case results and the aggregate EvalRun.
+- **`feat(release):` Activate runs preconditions** —
+  `Service.WithHarness` attaches the runner + harness repo; a
+  failing hook returns `harness.ErrPreconditionFailed` and the
+  Release is left in `pending`.
+- **`feat(api):` eight new HTTP routes** — `/datasets`,
+  `/preconditions`, `/evals` under `/api/v1`.
+- **`feat(daemon):` wire harness service into promptsheond startup**.
+  `apiReleaseInvoker` adapts `invoke.Invoker` for the eval loop.
+- **`feat(cli):` `dataset`, `precondition`, `eval` subcommands**.
+- **`feat(sdk):` dataset / precondition / eval methods**.
+- **`docs:` `docs/eval.md`** — Dataset / Precondition / Eval
+  primitive, built-in scorers, iteration loop.
+- **`docs:` `docs/harness.md`** — why the harness exists.
+- **`README:` Harness engineering section** with the curl-style
+  iteration loop.
+
+### Changed
 
 - **Migration directory consolidated**: 51 .up.sql + 17 .down.sql
   files replaced with 8 .up.sql files (no .down.sql). Phase 1.x
@@ -488,304 +371,147 @@ The v0.1.x audit + remediation pass. Highlights:
   acknowledgement, ON DELETE SET NULL) are folded into
   `001_core_schema.up.sql`. The destructive gate is tightened
   from substring match to anchored regex `^\d+_destructive`.
-
-  Upgrade path for existing deployments: run the one-time shim
-  before starting the new daemon —
-  `INSERT OR IGNORE INTO schema_migrations (version) VALUES
-   (1),(2),(3),(4),(5),(6),(7),(8);` — which records the
-  consolidated versions as applied and lets the runner skip
-  the rebuild on next start.
-
-- **DB-CONC-2 / OPS-4**: dedicated retention `*sql.DB` lives in
-  `main()` scope (not `buildServer`), so its lifetime matches the
-  daemon. Previously the `defer Close` inside `buildServer` ran
-  before the retention goroutine's first tick, causing
-  `database is closed` panics. OPS-4 is now effectively shipped
-  in `15374e0`.
-
-- **SEC-10a**: KMS `Provider` persists the wrapped data key
-  (`CiphertextBlob`) on first use and reads it on cache miss
-  via `KMSClient.Decrypt`. The plaintext cache is an LRU of size
-  16 keyed by `sha256(wrapped_data_key)`. On rotation, the
-  wrapped blob changes, the LRU key changes, and the next read
-  Decrypts the new blob. Migration `009_vault_state.up.sql`
-  creates the singleton `vault_state` table.
-
-#### Deploy
-
-- **`fix(helm):` real probe + scrape paths** — `/health` and
-  `/ready` (not `/v1/healthz`); `/metrics` (not `/v1/metrics`).
-  The default install could not become healthy before this.
-- **`feat(helm):` values.schema.json** — rejects
-  `replicaCount>1` (SQLite is single-writer), `dbBackend=postgres`
-  (removed backend), and `auth=false` without `insecureLoopback`.
-- **`feat(helm):` default auth=true, vault Secret, PDB,
-  ConfigMap checksum, seccomp Profile** — production-safe defaults.
-- **`fix(dockerfile):` writable /data, multi-arch, ldflags**.
-- **`feat(ci):` tag-trigger release** with Helm render assertions
-  for the values schema.
-
-#### Trust boundaries
-
-- **`feat(config):` refuse non-loopback bind when `PROMPTSHEON_AUTH=false`** — closes the bootstrap admin-key-mint attack.
-- **`feat(config):` refuse non-loopback bind without TLS**.
-- **`feat(daemon):` in-process TLS termination** via
-  `PROMPTSHEON_TLS_CERT_FILE` / `PROMPTSHEON_TLS_KEY_FILE`.
-- **`feat(auth):` X-Bootstrap-Token gate** + OAuth auto-provision
-  off by default.
 - **`fix(config):` `CORSOrigins` is now `[]string`**; wildcard
   `*` rejected on non-loopback bind.
 - **`fix(ratelimit):` trust X-Forwarded-For only from
   `PROMPTSHEON_TRUSTED_PROXIES` CIDRs**.
 - **`fix(api):` require `PermAuditRead` on `/logs/stream` and
-  `/metrics`; rate-limit `/setup`, `/login`, `/callback`**.
-- **`fix(auth):` validate `ps_` prefix; never log raw key bytes**.
+  `/metrics`**; rate-limit `/setup`, `/login`, `/callback`.
+- **`fix(auth):` validate `ps_` prefix**; never log raw key bytes.
 - **`fix(api):` `*http.MaxBytesError` → 413 instead of 500**.
 - **`fix(api):` Idempotency-Key middleware** for POST handlers.
-- **`fix(webhooks):` per-endpoint `AllowPrivate`; remove global
-  `PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE` SSRF toggle**.
-- **`feat(daemon):` wire alert delivery to webhook dispatcher** —
-  alerts now actually fire instead of being silently dropped.
-
-#### Lifecycle
-
-- **`fix(audit):` dedicated worker context; drain barrier
-  before cancel** — never drop entries on SIGTERM.
-- **`fix(store):` drop `auditMu`; serialisable SQLite tx is the
-  ordering primitive**.
+- **`fix(webhooks):` per-endpoint `AllowPrivate`**; remove global
+  `PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE` SSRF toggle.
+- **`fix(audit):` dedicated worker context**; drain barrier before
+  cancel — never drop entries on SIGTERM.
+- **`fix(store):` drop `auditMu`**; serialisable SQLite tx is the
+  ordering primitive.
 - **`fix(observability):` never delete audit rows** — chain
   integrity. Trace-only retention.
 - **`fix(lifecycle):` `Stop()` for webhook dispatcher, ws Hub,
   authenticator** — no goroutine/FD leak on rolling restart.
 - **`fix(store):` enable SQLite `foreign_keys` on every
   connection**.
-
-#### Release runtime
-
-- **`feat(release):` canonical `Resolver`**; release invoke
-  ignores request model/provider.
-- **`feat(release):` atomic activation; partial unique index on
-  active releases**.
-- **`fix(release):` bind vote identity to authenticated
-  principal** — closes maker-checker one-person quorum.
+- **`feat(release):` canonical `Resolver`**; release invoke ignores
+  request model/provider.
+- **`feat(release):` atomic activation**; partial unique index on
+  active releases.
+- **`fix(release):` bind vote identity to authenticated principal**
+  — closes maker-checker one-person quorum.
 - **`feat(eval):` implement `json_schema` scorer**.
 - **`fix(harness):` precondition runner gated + env scrubbed +
   process-group kill**.
 - **`fix(llm):` preserve role + TopP in OpenAI `Complete`**.
+- **`.goreleaser.yml`**: duplicate `release:` block collapsed;
+  SBOM `.sig` / `.pem` `extra_files` globs dropped; `signs:`
+  block no longer requires `COSIGN_EXPERIMENTAL=1`.
+- **`.github/workflows/ci.yaml` `build-release` job**: explicit
+  `permissions: contents: write, packages: write, id-token: write,
+  attestations: write`; `docker/login-action` step for `ghcr.io`.
+- **`scripts/sync-version.sh`**: now synchronises the openapi
+  `info.version` comment prose as well as the literal `version`
+  field.
+- **`Makefile`**: `help` target now lists `docs-check`, `bench`,
+  and `docs-site`.
 
-#### Misc
+### Fixed
 
-- **`feat(store):` migration 048b (audit backfill tool)** —
-  the historical-row backfill for `resource_kind` /
-  `resource_id` added by 048a is now an operator command
-  (`cmd/promptsheon-auditbackfill`). Batched, idempotent,
-  signal-safe; the migration file itself is a no-op marker
-  documenting the operator workflow. See the 052 migration
-  header for the runbook.
-- **`feat(workflow):` `Engine.Run` with sequential steps and
-  cross-step data flow**; wired into `/api/v1/workflows/run`.
-- **`fix(redactor):` thread-safe `Enable`/`Disable`; Luhn
-  check in `Matches`**.
+- **`fix(helm):` real probe + scrape paths** — `/health` and
+  `/ready` (not `/v1/healthz`); `/metrics` (not `/v1/metrics`).
+- **`fix(redactor):` thread-safe `Enable`/`Disable`**; Luhn check
+  in `Matches`.
 - **`fix(injection):` snapshot-semantic `Enable` +
   `OverrideThreshold`**.
 - **`fix(guardrail):` credit-card regex now Luhn-verified**.
-- **`fix(schedule):` POSIX DOM/DOW semantics — wildcard means
-  'other field wins'**.
+- **`fix(schedule):` POSIX DOM/DOW semantics** — wildcard means
+  'other field wins'.
 - **`fix(observation):` bound window record list to 4096
   entries**.
-- **`fix(experiment):` validate variants; document Confidence =
-  sample ratio**.
-- **`fix(trace):` OTel provider lives for the daemon lifetime;
-  sample 5% by default**.
+- **`fix(experiment):` validate variants**; document Confidence =
+  sample ratio.
+- **`fix(trace):` OTel provider lives for the daemon lifetime**;
+  sample 5% by default.
 - **`fix(ratelimit):` exempt `/health`, `/ready`, `/metrics`**.
-- **`feat(recommendation):` SQLite-backed repository +
-  migration 042**.
-- **`feat(store):` migration 041** — partial unique index on
-  active releases.
-- **`feat(store):` migration 025 destructive gate** —
-  `PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true` required.
-- **`feat(e2e):` authenticated canonical lifecycle test** —
-  bootstrap-token path; audit chain verification.
-- **`refactor(api):` remove dead `ServerConfig` /
-  `WithServerConfig`**.
 - **`fix(models):` `json:"-"` on `EncryptedKey` and
   `WebhookEndpointRecord.Secret`**.
-- **`fix(daemon):` persist failed executions; surface provider
-  errors as 5xx**.
+- **`fix(daemon):` persist failed executions**; surface provider
+  errors as 5xx.
+
+### Removed
+
 - **`chore(store):` delete `internal/store/migrations/postgres/`**.
-- **`feat(eval):` bandit RNG from entropy; honour injected RNG**.
+- **`chore(cmd):` drop `approval.Approve` unused-import
+  workaround**.
+- **`refactor(api):` remove dead `ServerConfig` /
+  `WithServerConfig`**.
 
-### Harness engineering surface
+### Migration
 
-Inspired by the OpenAI [harness engineering](https://openai.com/index/harness-engineering/)
-article — evals are the new tests for LLM work, and the fast
-iteration loop is the lever. Adds three first-class primitives
-plus the application wiring that gates Release activation on
-them.
-
-- **`feat(store):` migration 027** — `datasets`, `dataset_cases`,
-  `preconditions`, `eval_runs`, `eval_results` tables. Postgres
-  parity included.
-- **`feat(domain):` harness types** — `Dataset`, `DatasetCase`,
-  `Precondition`, `EvalRun`, `EvalResult` plus the `Scorer` enum
-  (`exact_match`, `contains`, `regex`, `json_schema`).
-- **`feat(store):` SQLite repository impls** for all five tables.
-  `mockRepo` in handler tests grows the matching methods.
-- **`feat(eval):` Scorer interface + built-ins** — exact_match,
-  contains, regex, json_schema (placeholder). Pluggable via
-  `Register`.
-- **`feat(harness):` PreconditionRunner** — executes named
-  command hooks via `sh -c` with per-hook timeouts, captures
-  combined stdout+stderr (truncated to 8 KiB), and exposes a
-  typed `*PreconditionError` for the HTTP 409 mapping.
-- **`feat(harness):` EvalRunner service** — loops a Dataset's cases
-  through a `ReleaseInvoker`, scores each via the chosen Scorer,
-  persists per-case results and the aggregate EvalRun.
-- **`feat(release):` Activate runs preconditions** — `Service.WithHarness`
-  attaches the runner + harness repo; a failing hook returns
-  `harness.ErrPreconditionFailed` and the Release is left in
-  `pending` (no supersede + activate happens).
-- **`feat(api):` eight new HTTP routes** — `/datasets`,
-  `/preconditions`, `/evals` under `/api/v1`.
-- **`feat(daemon):` wire harness service into promptsheond startup`.
-  `apiReleaseInvoker` adapts `invoke.Invoker` for the eval loop
-  so eval cases use the same provider wiring as the live
-  `/releases/{id}/invoke` route.
-- **`feat(cli):` `dataset`, `precondition`, `eval` subcommands**.
-- **`feat(sdk):` `CreateDataset` / `ListDatasets` / `GetDataset` /
-  `PutCases` / `DeleteDataset` / `CreatePrecondition` /
-  `ListPreconditions` / `DeletePrecondition` / `RunEval` /
-  `ListEvals` / `GetEval`**.
-- **`docs:` `docs/eval.md`** — Dataset / Precondition / Eval
-  primitive, built-in scorers, iteration loop, programmatic
-  surface.
-- **`docs:` `docs/harness.md`** — why the harness exists; the four
-  surfaces; what the harness deliberately is not.
-- **`README:` Harness engineering section** with the curl-style
-  iteration loop.
+- **Migration 025 destructive gate** —
+  `PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true` required.
+- **Migration 042** — `recommendation` SQLite-backed repository.
+- **Migration 041** — partial unique index on active releases.
 
 ## [0.1.0] - 2026-07-10
 
-### Release + Approval lifecycle
+The v0.1.0 release is the architecture review board's "Forward
+only" baseline. Production tenants upgrading from v0.0.7 run
+migration 025 (destructive) before the v0.1.0 daemon starts.
+The Engineering Completion Protocol's "two consecutive
+independent reviews" requirement is met.
 
-The headline v0.1.0 feature: a Capability Version can be promoted
-to a Release in a target Environment via the new
-`/api/v1/releases/*` routes, with MakerChecker separation-of-duties
-governing activation.
+### Added
 
-- **`feat(store):` migration 024** — `releases` and `approvals`
-  tables. Schema for the Release aggregate (Pending → Approved →
-  Active → Superseded/RolledBack) and the per-Release vote trail.
+- **Release + Approval lifecycle (`feat(store):` migration 024)**.
+  `releases` and `approvals` tables. Schema for the Release
+  aggregate (Pending → Approved → Active → Superseded /
+  RolledBack) and the per-Release vote trail.
 - **`feat(store):` SQLite repository impls** — `CreateRelease` /
   `GetRelease` / `ListReleasesForCapability` /
   `ListActiveReleasesForEnvironment` / `UpdateRelease` /
   `DeleteRelease` plus the matching approval methods, plus the
   new `ActivateAtomic(prior, next)` that persists both writes
-  inside a single `*sql.Tx` so the "exactly one Active per
-  (Capability, Environment)" invariant holds even under partial
-  failure.
-- **`feat(release):` application service** — `release.Service` with
-  Create / Vote / Activate / Rollback / Get / List / Approval
-  methods; the Activate path is the single place that consults the
-  approval policy and supersedes the prior Active Release.
-- **`feat(api):` release + approval routes** —
-  `GET  /api/v1/capabilities/{capability_id}/releases`
-  `POST /api/v1/versions/{version_id}/releases`
-  `GET  /api/v1/releases/{id}`
-  `POST /api/v1/releases/{id}/votes`
-  `POST /api/v1/releases/{id}/activate`
-  `POST /api/v1/releases/{id}/rollback`
-  `POST /api/v1/releases/{id}/invoke`
-  `GET  /api/v1/releases/{id}/approval`
-- **`feat(api):` Execution fidelity** — both invoke paths
-  (`/versions/{id}/executions` and `/releases/{id}/invoke`) now
+  inside a single `*sql.Tx`.
+- **`feat(release):` application service** — `release.Service`
+  with Create / Vote / Activate / Rollback / Get / List /
+  Approval methods; the Activate path is the single place that
+  consults the approval policy and supersedes the prior Active
+  Release.
+- **`feat(api):` release + approval routes**.
+- **`feat(api):` Execution fidelity** — both invoke paths now
   populate the full Execution row: `outputs`, `latency_ms`,
-  `prompt_tokens`, `completion_tokens`, `total_tokens`, `cost_usd`,
-  `model`, `error`, `environment`. The Execution struct's
-  previously-empty fields are now populated.
-- **`feat(daemon):` release service wiring** — `cmd/promptsheond`
-  constructs the `release.Service` from
+  `prompt_tokens`, `completion_tokens`, `total_tokens`,
+  `cost_usd`, `model`, `error`, `environment`.
+- **`feat(daemon):` release service wiring** —
+  `cmd/promptsheond` constructs the `release.Service` from
   `PROMPTSHEON_APPROVAL_POLICY` (default `maker_checker`).
-- **`feat(sdk):` release + approval methods** — Go SDK exposes
-  `CreateRelease`, `GetRelease`, `ListReleases`, `Vote`,
-  `Activate`, `Rollback`, `Invoke`, `Approval`,
-  `ApproveAndInvoke`. Python and TypeScript SDKs updated to use
-  the correct `/api/v1/` URL prefix.
-- **`feat(cli):` release subcommand** — `promptsheon release
-  <list|create|get|vote|activate|rollback|invoke|approval>`.
+- **`feat(sdk):` release + approval methods**.
+- **`feat(cli):` release subcommand**.
+- **LLM SDK migration**: Anthropic on
+  `anthropics/anthropic-sdk-go`; OpenAI on `openai/openai-go/v3`
+  Responses API.
+- **`feat(store):` migration 048b (audit backfill tool)** — the
+  historical-row backfill for `resource_kind` / `resource_id`
+  added by 048a is now an operator command
+  (`cmd/promptsheon-auditbackfill`).
+- **`feat(workflow):` `Engine.Run` with sequential steps and
+  cross-step data flow**; wired into `/api/v1/workflows/run`.
+- **`feat(recommendation):` SQLite-backed repository +
+  migration 042**.
+- **`feat(e2e):` authenticated canonical lifecycle test** —
+  bootstrap-token path; audit chain verification.
 
-### LLM SDK migration
-
-The hand-rolled OpenAI and Anthropic HTTP clients are replaced by
-their official SDKs. Ollama, Azure OpenAI, and NVIDIA NIM are
-removed.
+### Changed
 
 - **`refactor(llm):` Anthropic on `anthropics/anthropic-sdk-go`**.
-- **`refactor(llm):` OpenAI on `openai/openai-go/v3` Responses API**.
-- **`chore(llm):` drop Azure / Ollama / NVIDIA NIM providers**.
-- **`chore(llm):` remove Ollama pricing entries** in `PricingTable`.
-
-### Re-review closure (F-18, F-19, F-20)
-
-The Engineering Completion Protocol's "Final Verification" step
-ran an independent re-review of the v0.1.0 tree. The
-re-review surfaced three additional forward-only cleanups, all
-landed as atomic commits:
-
-- **F-18** `refactor: drop dead SnapshotTTL retention sweep`.
-  The RetentionPolicy.SnapshotTTL field and the matching
-  "DELETE FROM output_snapshots" sweep in Enforce are gone; the
-  output_snapshots table is dropped in migration 025. The
-  retention test file is updated.
-- **F-19** `refactor: rename UsageTracker Prompts/Agents to
-  Capabilities`. The legacy "prompts" and "agents" terms in the
-  metrics surface are replaced with "capabilities". The route
-  /api/v1/metrics/top-prompts becomes
-  /api/v1/metrics/top-capabilities; the top-agents route is
-  removed.
-- **F-20** `docs: README reflects v0.1.0 Capability-centric
-  architecture`. The README is rewritten around the v0.1.0
-  Capability/Version/Release flow. Legacy prompts/agents
-  examples are replaced with the new flow; the configuration
-  table documents PROMPTSHEON_DB_BACKEND, PROMPTSHEON_DB_DSN,
-  PROMPTSHEON_PLUGINS_FILE, and PROMPTSHEON_VAULT_KEY.
-
-After this re-review closure, an audit confirms:
-- 0 references to legacy types (Prompt, ModelPolicy,
-  ContextContract, MemoryConfig, Guardrail, MCPServer,
-  RuntimePolicy, EvaluationSuite, KnowledgeSource) in any .go
-  file
-- 0 references to the internal/promptsheon CAS-shim package
-- 0 references to the legacy abtesting / playground / collab
-  packages
-- 0 references to migrations 024 or 026
-- 50/50 packages pass `go test -race -count=1 -timeout 180s ./...`
-- make lint-domain, make lint-deps, make openapi-check all clean
-- v0.1.0 is the version in pyproject.toml, package.json, and
-  Chart.yaml
-
-The v0.1.0 release is the architecture review board's "Forward
-only" baseline. Production tenants upgrading from v0.0.7 run
-migration 025 (destructive) before the v0.1.0 daemon starts.
-
-The Engineering Completion Protocol's
-"two consecutive independent reviews" requirement is met:
-- Round 1 (in plan mode) classified every §21 finding with one
-  disposition per item.
-- Round 2 (this independent re-review) confirmed the v0.1.0 tree
-  is forward-only and surfaced three additional cleanups that
-  were closed in the same session.
-
-Post-v0.1.0 follow-on work per ADR-0019: subprocess supervisor
-with gRPC over UDS, persistent bandit recommender store, LLM-judge
-ensemble, Federation, Marketplace, on-prem appliance. Each lands
-in its own milestone; none requires a backwards-compat codepath
-because v0.1.0 is the baseline.
-
-### Codebase cleanup
-
-- **`refactor(testutil):` `NewManifest` helper** — shared capability
-  manifest fixture.
+- **`refactor(llm):` OpenAI on `openai/openai-go/v3` Responses
+  API**.
+- **`fix(sdk/python):` `/v1/` → `/api/v1/`** so the Python client
+  hits the actual server routes.
+- **`fix(sdk/typescript):` `/v1/` → `/api/v1/` + regenerate
+  `openapi.ts` placeholder**.
+- **`refactor(testutil):` `NewManifest` helper** — shared
+  capability manifest fixture.
 - **`refactor(release):` consume `testdata.NewManifest`** in unit
   tests.
 - **`fix(release):` transactional Activate** — Repository gains
@@ -798,879 +524,145 @@ because v0.1.0 is the baseline.
   workarounds**.
 - **`refactor(api):` hoist `auditKeyName` / `auditKeyStatus` /
   `auditKeyVersion` to `middleware.go`**.
-- **`chore(cmd):` drop `approval.Approve` unused-import workaround**.
-- **`feat(cli):` split `cmd/promptsheon/main.go` into
-  `cas.go` + `http.go`** — main.go drops from 1274 to 513 lines.
-- **`docs(examples):` remove `sampleHash` dead reference**.
+- **`feat(cli):` split `cmd/promptsheon/main.go` into `cas.go` +
+  `http.go`** — main.go drops from 1274 to 513 lines.
 
-### SQLite-only (forward-only)
+### Removed
 
-- **`chore(store):` delete `internal/store/postgres`** (the Postgres
-  backend was half-implemented against the new release/approval
-  aggregates and would not satisfy `store.Repository`).
+- **`chore(llm):` drop Azure / Ollama / NVIDIA NIM providers**.
+- **`chore(llm):` remove Ollama pricing entries** in
+  `PricingTable`.
+- **`chore(store):` delete `internal/store/postgres`** (the
+  Postgres backend was half-implemented against the new release
+  / approval aggregates).
 - **`chore(store):` delete `internal/store/migrations/postgres`**.
 - **`chore(banditstore):` delete `internal/banditstore/postgres`**.
 - **`chore(config):` drop `DBBackend` / `DBDSN`** fields and the
   `PROMPTSHEON_DB_BACKEND` / `PROMPTSHEON_DB_DSN` env lookups.
 - **`docs:` delete `docs/adr/0015-postgres-backend-with-rls.md`**.
-
-### SDK path fixes
-
-- **`fix(sdk/python):` `/v1/` → `/api/v1/`** so the Python client
-  hits the actual server routes.
-- **`fix(sdk/typescript):` `/v1/` → `/api/v1/` + regenerate
-  `openapi.ts` placeholder**.
-
-### Documentation
-
-- **`docs:` rewrite `docs/sdk.md`** for the three SDKs (Go, Python,
-  TypeScript).
-- **`docs:` rewrite `docs/llm-providers.md`** for the Anthropic +
-  OpenAI pair.
-- **`docs:` add `docs/release.md`** — Capability → Release lifecycle
-  walkthrough with curl and Go SDK examples.
-- **`docs:` extend `docs/api-reference.md`** with the seven release
-  routes.
-- **`docs:` fix README quickstart + config table** — the curl
-  sequence was using the legacy `POST /releases/{id}/approve`
-  route and a non-existent `sdk.NewClient(sdk.Config{...})`
-  constructor.
-
-### M3 follow-on closure (F-22, F-23)
-
-After the v0.1.0 forward-only closure, the M3 follow-on series
-shipped four additional atomic commits:
-
-- **F-22** `feat(bandsession): integrate bandit.Selector with
-  banditstore.Store`. The Session is the production bridge
-  between the bandit algorithm and the persistent store. It
-  loads posteriors at boot, exposes Select/Observe/RegisterArms,
-  and Flushes the in-memory state back to the store on demand.
-  The bandit.Selector grew a `NewSelectorWithRNG` constructor
-  that M3.5 follow-on per ADR-0019 wires the custom-RNG path
-  through. The banditstore.InMemory backend grew a test-only
-  `Put` helper that bypasses the wholesale-replace SaveAll path.
-- **F-23** `feat(pluginproto): gRPC plugin transport .proto
-  scaffold`. The M3.5 gRPC follow-on per ADR-0019 commits the
-  .proto file under `internal/pluginproto/proto/`. Today's
-  net/rpc implementation in `internal/subprocess` remains the
-  production transport; the M3.5 commit imports the generated
-  pb.go stubs and replaces `rpc.Dial` with `grpc.Dial` at the
-  supervisor's subprocess call sites.
-- **F-23 ADR** `docs(adr): record 0025 — pluginproto gRPC
-  contract scaffold**. Documents the wire format and the M3.5
-  migration path. The .proto file is the canonical source of
-  truth; generated pb.go is M3.5 follow-on.
-
-All gates green after the M3 follow-on closure:
-- 54/54 packages pass go test -race -count=1 -timeout 180s ./...
-- make lint-domain clean (14 domain packages verified)
-- make lint-deps clean
-- gofmt clean
-- v0.1.0 is the version in pyproject.toml, package.json, and
-  Chart.yaml
-
-Total commits since v0.0.7 in this session: 33 atomic commits
-(v0.1.0 forward-only closure plus M3 follow-on). Each commit has
-strict verification at the time of commit and is forward-only:
-no deprecation paths, no backwards-compat codepaths.
-
-The Engineering Completion Protocol's
-"two consecutive independent reviews identify no remaining
-critical architectural, product, scalability, security,
-domain-model, maintainability, or production-readiness defects"
-requirement is met for v0.1.0 + M3 follow-on. The M3.5 gRPC
-codegen is the next milestone per ADR-0019; the LLM-judge
-ensemble, Federation, Marketplace, and on-prem appliance are
-M4+ follow-on work, each with its own forward-only commit
-series.
-
-### Changed (forward-only breaking)
-
-- **F-01**: Deleted `internal/promptsheon/alias.go` (the M0.7 CAS
-  re-export shim). Callers must import `pkg/cas` directly.
-- **F-04 + F-05**: Deleted the legacy bundle types
-  (`Prompt`, `ModelPolicy`, `ContextContract`, `Memory`,
-  `Guardrails`, `Tools`, `MCPServers`, `RuntimePolicy`,
-  `EvaluationSuite`) and the corresponding fields on
-  `capability.Version`. The Version struct is now
-  `{ID, CapabilityID, Manifest, ManifestHash, Version,
-  CreatedAt, CreatedBy}`. The legacy analyzers
-  (`internal/{context,guardrail,optimizer,workflow}/
-  *version*.go`) and `internal/eval/runner.go`'s
-  `RunVersion` / `buildVersionPrompt` are deleted.
-- **F-03**: Deleted `manifestFromLegacy` in
-  `handleCreateVersion`. The route accepts only
-  `{version, manifest}`; missing Manifest returns 400.
-- **F-06**: Migration 025 is destructive. Drops the legacy
-  `prompts`, `agents`, `prompt_versions`,
-  `agent_executions`, `test_datasets`, `eval_results`,
-  `eval_runs`, `reviews`, `output_snapshots`,
-  `workflows`, `workflow_steps` tables. Drops the
-  `capabilities.state`, `capabilities.current_version_id`,
-  and the per-artifact `capability_versions` columns.
-- **F-07**: Removed the defensive writes of
-  `state='draft' / current_version_id=''` from
-  `internal/store/sqlite_capabilities.go` and
-  `internal/store/postgres/postgres.go`.
-- **F-08**: Renamed `internal/abtesting` to
-  `internal/experiment` (board §22).
-- **F-09 + F-10**: Deleted `internal/playground` and
-  `internal/collab` (board §22).
-- **F-13**: OpenAPI spec regenerated. The Version resource
-  request body no longer exposes the legacy bundle fields; the
-  `prompt`, `modelPolicy`, `contextContract`, `knowledge`,
-  `memory`, `guardrails`, `tools`, `mCPServers`,
-  `runtimePolicy`, `evaluationSuite` fields are gone.
-- **F-14**: Version bump to v0.1.0 across
-  `sdk/python/pyproject.toml`,
-  `sdk/typescript/package.json`,
-  `deploy/helm/promptsheon/Chart.yaml`, and the
-  `internal/manifest/manifest_test.go` example.
-
-### Added
-
-- **F-15**: `docs/adr/0023` records the forward-only cleanup
-  decision: no deprecation period, no backwards-compat codepath;
-  the legacy tables and columns are gone in v0.1.0.
+- **F-18**: `refactor: drop dead SnapshotTTL retention sweep`.
+  The `RetentionPolicy.SnapshotTTL` field and the matching
+  "DELETE FROM output_snapshots" sweep in `Enforce` are gone.
+- **F-19**: `refactor: rename UsageTracker Prompts/Agents to
+  Capabilities`. The legacy "prompts" and "agents" terms are
+  replaced with "capabilities".
+- **F-20**: `docs: README reflects v0.1.0 Capability-centric
+  architecture**.
+- **Forward-only breaking cleanups**:
+  - **F-01**: Deleted `internal/promptsheon/alias.go` (the M0.7
+    CAS re-export shim).
+  - **F-04 + F-05**: Deleted the legacy bundle types (`Prompt`,
+    `ModelPolicy`, `ContextContract`, `Memory`, `Guardrails`,
+    `Tools`, `MCPServers`, `RuntimePolicy`, `EvaluationSuite`)
+    and the corresponding fields on `capability.Version`.
+  - **F-03**: Deleted `manifestFromLegacy` in
+    `handleCreateVersion`.
+  - **F-06**: Migration 025 is destructive. Drops the legacy
+    `prompts`, `agents`, `prompt_versions`,
+    `agent_executions`, `test_datasets`, `eval_results`,
+    `eval_runs`, `reviews`, `output_snapshots`,
+    `workflows`, `workflow_steps` tables.
+  - **F-08**: Renamed `internal/abtesting` to
+    `internal/experiment`.
+  - **F-09 + F-10**: Deleted `internal/playground` and
+    `internal/collab`.
+  - **F-13**: OpenAPI spec regenerated. The Version resource
+    request body no longer exposes the legacy bundle fields.
+  - **F-14**: Version bump to v0.1.0 across
+    `sdk/python/pyproject.toml`,
+    `sdk/typescript/package.json`,
+    `deploy/helm/promptsheon/Chart.yaml`.
 
 ### Migration
 
 Production tenants upgrading from v0.0.7 to v0.1.0 must run
 migration 025 (destructive) before starting the daemon. There
-is no automatic backwards-compat codepath. Operators that
-still need the legacy model must roll back to v0.0.7.
+is no automatic backwards-compat codepath. Operators that still
+need the legacy model must roll back to v0.0.7.
 
 ## [0.0.7] - 2026-06-26
 
 Last release that supports the legacy bundle model. v0.1.0 is a
 breaking semver bump per the charter's "forward only" principle.
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.0.5 - Tier 2 follow-on] - 2026-06-26
 
-The Tier 2 follow-on series landed four passes of new
-primitives, examples, and wiring on top of the v0.0.5 baseline.
-Highlights:
+The Tier 2 follow-on series landed four passes of new primitives,
+examples, and wiring on top of the v0.0.5 baseline.
 
-### Added (pass 1)
+### Added
 
 - **Recommendation loop end-to-end (Tier 1.04).** New
   `internal/observation.Aggregator` rolls `ExecutionRecord`
   values into `(capability, version, env)` windows; new
-  `internal/recommendation.Producer` is an EventBus subscriber
+  `internal/recommendation.Producer` is an `EventBus` subscriber
   that drives `rules.Engine`, persists via a supplied `SinkFunc`,
   and emits one `capability.EventRecommendationGenerated` per
-  emitted Recommendation. Wire into the daemon via
-  `producer.Subscribe(bus, capability.EventExecutionFinished)`.
+  emitted Recommendation.
 - **Canonical Invoke path with Budget + Quota enforcement
-  (Tier 1.33 / 1.34).** New `internal/invoke.Invoker` enforces Quota
-  before any LLM call (returns `ErrQuotaExceeded` → HTTP 429) and
-  enforces Budget against the Caller-reported cost (returns
-  `ErrBudgetExceeded` → HTTP 402). `DefaultEnforcer` is the
-  in-memory implementation; production wiring supplies a backend-
-  backed `Enforcer`.
+  (Tier 1.33 / 1.34).** New `internal/invoke.Invoker` enforces
+  Quota before any LLM call (returns `ErrQuotaExceeded` →
+  HTTP 429) and enforces Budget against the Caller-reported cost
+  (returns `ErrBudgetExceeded` → HTTP 402).
 - **Postgres backend with per-workspace RLS (Tier 1.10).**
   `internal/store/postgres` ships the consumer-defined
   `capability.Repository` interface implemented against
   `jackc/pgx/v5`. Migration `025_capabilities.sql` (Postgres)
-  mirrors the SQLite schema with TIMESTAMPTZ/JSONB; migration
-  `100_rls.sql` enables Row Level Security on every per-workspace
-  table with policies keyed to `SET LOCAL app.current_workspace`.
+  mirrors the SQLite schema with TIMESTAMPTZ / JSONB; migration
+  `100_rls.sql` enables Row Level Security on every
+  per-workspace table.
 - **Domain-purity CI gate (Tier 1.07).** New
   `scripts/check-domain-purity.sh` and `make lint-deps` step
   fail CI when any of 14 domain packages imports from
   `internal/llm`, `internal/api`, `internal/store/sqlite`, or
   `cmd/`. Companion to `make lint-domain` (no package-level
-  mutable state). Together they enforce Charter Principle 5 from
-  structural (AST-walked) and import-shape (grep-walked) angles.
-- **Observability Primitive — `WindowAggregator`.**
-  Subscription on `capability.EventRecommendationGenerated` is the
-  next observable to expose at a `/v1/metrics` endpoint.
+  mutable state).
+- **Observability Primitive — `WindowAggregator`**.
+- **Plugin supervisor with restart budget + health gate
+  (Tier 2.46).** New `internal/supervisor.Supervisor`
+  implements the in-process Plugin lifecycle.
+- **Built-in PII redactor Guardrail (Tier 2.47).** New
+  `internal/redactor.Redactor` implements the consumer-defined
+  Guardrail interface. Six builtin patterns: email, US SSN,
+  E.164 phone, Luhn-verified credit-card 13–19 digits, IPv4,
+  IBAN.
+- **Built-in prompt-injection heuristic Guardrail
+  (Tier 2.48).** New `internal/injection.Detector` scores user
+  inputs against 16 heuristics and returns Reject when the score
+  crosses the threshold.
+- **TypeScript SDK scaffold (Tier 2.41 part 1).**
 
-### Changed (Tier 1)
+### Changed
 
 - **Approval→Release wiring closes quorum-reality gap
   (Tier 1.27, the real bug).** `Release.ApproveWith(*Approval,
   Policy)` runs the supplied Policy against recorded votes,
   enforces separation of duties via `VerifySeparationOfDuties`,
-  and only advances Status from Pending to Approved on quorum. New
-  errors: `approval.ErrCreatorVoted`, `approval.ErrQuorumNotSatisfied`.
-  ADR-0017.
+  and only advances Status from Pending to Approved on quorum.
 - **Migrations: legacy `prompts` / `agents` /
   `prompt_versions` / `agent_executions` /
   `test_datasets` / `eval_results` / `eval_runs` /
   `reviews` / `output_snapshots` / `workflows` /
   `workflow_steps` tables dropped (Tier 1.26, migration 024).**
-  Audit confirmed zero code or test references to those tables;
-  the capability-centric architecture had already superseded them
-  at the code layer. The migration is mirrored under
-  `internal/store/migrations/postgres/` for the Postgres backend.
 - **`internal/snapshot` deleted (Tier 1.38).** Subsumed by
   `capability.Execution.Inputs` / `Outputs` (json.RawMessage)
-  plus the Replay buffer. `WithSnapshotStore` / `snapshot.NewStore`
-  gone from server and main.
+  plus the Replay buffer.
 - **`internal/capability/deployment` deleted (Tier 1.39).** The
-  Release lifecycle (`Pending → Approved → Active →
-  Superseded → RolledBack`) is the canonical deployment record.
-  Unused event constants `EventDeploymentStarted`,
-  `EventDeploymentSucceeded`, `EventDeploymentFailed` removed.
-  `EventDeploymentRolledBack` retained for backward compatibility.
+  Release lifecycle is the canonical deployment record.
 - **Import cycle fix**: `internal/optimizer/rules` no longer
   imports `internal/recommendation`; `CanAutoAdopt` moves into
-  the rules package as a plain function. Recommendation producers
-  import rules directly.
-- **Compilation**: pkg/plugin / pkg/cas / internal/eventbus /
-  internal/replay / internal/schedule / internal/scheduler /
-  internal/budget / internal/quota / internal/observation /
-  internal/executor / internal/invoke / internal/policy /
-  internal/lineage / internal/approval / internal/release all
-  green at strict verification: gofmt, go vet, `-race
-  -count=1 -timeout 180s ./...` 44/44 ok.
-
-### ADRs and architecture
-
-- **ADR-0015**: Postgres as a first-class backend with per-workspace
-  RLS.
-- **ADR-0016**: Plugins over gRPC, loopback only.
-- **ADR-0017**: Approval→Release wiring closes quorum-reality gap.
-- **ADR-0018**: End-to-end Recommendation loop wired through
-  Executor → Observation → Producer.
-- **ADR-0019**: Deferred architecture review items (plugin
-  supervisor, bandit, LLM-judge, Python/TS SDKs, Helm chart, etc).
-
-### Added (Tier 2 follow-on)
-
-- **Plugin supervisor with restart budget + health gate (Tier
-  2.46).** New `internal/supervisor.Supervisor` implements the
-  in-process Plugin lifecycle: `Register(name, plugin, policy)`
-  adds an item, `Run(ctx)` starts every plugin, polls `Health`
-  every 5s, applies exponential `Backoff` capped at `MaxBackoff`
-  on failures, and emits `PluginEvent` through the
-  consumer-defined `Publisher`. Wired into `cmd/promptsheond/main.go`
-  with both built-in Guardrail plugins attached via
-  `internal/plugins/builtins.Register`.
-- **Built-in PII redactor Guardrail (Tier 2.47).** New
-  `internal/redactor.Redactor` implements the consumer-defined
-  Guardrail interface. Six builtin patterns: email, US SSN,
-  E.164 phone, Luhn-verified credit-card 13–19 digits, IPv4, IBAN.
-  `Enable`/`Disable` for ops to extend. Luhn checksum exposed as
-  `LuhnValid` for tests.
-- **Built-in prompt-injection heuristic Guardrail (Tier 2.48).**
-  New `internal/injection.Detector` scores user inputs against
-  16 heuristics (ignore_previous, system_override, dan_mode,
-  jailbreak_mode, ignore_safety, …) and returns Reject when
-  the score crosses the threshold (default 0.6,
-  `OverrideThreshold` for ops). Note in code documents Go RE2
-  limitations on patterns mixing nested alternations with optional
-  quantifiers; the v1 set is written with one alternation or one
-  quantifier per group.
-- **TypeScript SDK scaffold (Tier 2.41 part 1).** New
-  `sdk/typescript/` package ships `PromptsheonClient`
-  (handwritten against `paths`-typed shapes for
-  `listCapabilities` / `invokeRelease`) plus
-  `scripts/codegen.sh` that runs `npx openapi-typescript` against
-  `api/openapi.yaml` and `tsc --noEmit`. The codegen pipeline is
-  wired; the production `src/openapi.ts` ships as a hand-written
-  placeholder so consumers can adopt the SDK today. The M3
-  follow-on commit regenerates against the production spec once
-  it covers every v1 resource.
-- **Helm chart (Tier 2.43).** New `deploy/helm/promptsheon/`
-  deploys a single-replica (configurable) `StatefulSet` with a
-  PVC-backed SQLite database by default; Postgres deploys set
-  `dbBackend=postgres` plus `dbDSN`. Probes wire to `/v1/healthz`
-  and `/v1/readyz`. `ServiceMonitor` ships gated on
-  `serviceMonitor.enabled=true`. Helm-template rendering verified
-  manually with `helm template release deploy/helm/promptsheon/`
-  under both sqlite (default) and postgres (--set
-  config.dbBackend=postgres ...) configs.
-- **Helm chart CI integration (Tier 2.42).** New `helm` job in
-  `.github/workflows/ci.yaml` installs Helm v3.16.2 and runs
-  `helm lint` plus two `helm template` renders (sqlite default
-  and Postgres with a representative DSN). Each render is
-  asserted to produce non-empty output. The chart cannot merge
-  with malformed templates — the gate is on every PR.
-- **Vault `KeyProvider` + `SecretBroker` abstractions (Tier 2.45).**
-  Two consumer-defined interfaces abstract the master-key source
-  and short-lived secret lookup, respectively, for BYOK and
-  managed-key service (AWS KMS, HashiCorp Vault) integrations.
-  Two built-in implementations ship today: `EnvKeyProvider`
-  reads `PROMPTSHEON_VAULT_KEY` (today's behavior), and
-  `StaticKeyProvider` carries a fixed key for air-gapped and
-  test deployments. `StaticSecretBroker` resolves pre-encrypted
-  secrets at startup. `BuildEnvVault()` preserves the legacy
-  path so existing deployments keep working unchanged.
-- **Python SDK scaffold (Tier 2.39).** New `sdk/python/` ships
-  `Client` (sync) + `AsyncClient` (async), `ClientConfig`,
-  `PromptsheonAPIError`, and a `py.typed` marker (PEP 561).
-  `scripts/codegen.sh` runs `openapi-python-client` against
-  `api/openapi.yaml` in M3 follow-on; today the implementation
-  is hand-written against the public resource list in §7.
-- **Capability SLO library (Tier 2.49).** New `internal/slo`
-  ships a closed-set Signal/Op/Window model with `SLO.Evaluate`
-  returning detailed breach errors and `Goal.BurnRate` returning
-  the ratio for the recommendation engine. ADR-0020 records
-  why the closed-set wins over open-ended PromQL or vendor-
-  specific models.
-
-### Added (Tier 2 follow-on, third pass)
-
-- **Bandit recommender foundation (Tier 2.35).** New
-  `internal/bandit` ships Thompson Sampling arm selection:
-  `ArmPosterior` is a Beta(alpha, beta) posterior over the
-  success rate; `Selector` runs concurrent-safe Thompson draws
-  and returns the highest-posterior arm. The M4 bandit
-  recommender that consumes this foundation ships in a
-  follow-on. ADR-0021 records the algorithmic choice.
-- **Per-Workspace MCP allowlist (Tier 2.49 follow-on).** New
-  `internal/mcplist` ships `List` and `Entry` value types plus
-  a closed-set Name validator (alnum, dash, dot, underscore;
-  1-64 characters). The empty list allows nothing — only
-  explicitly-listed servers may be called.
-- **Plugin manifest (PROMPTSHEON_PLUGINS_FILE, Tier 2.32).**
-  New `internal/manifest` parses a YAML manifest of plugin
-  descriptors: name, version, binary, args, env, services, uds,
-  min_core_version. The supervisor (M3 follow-on) reads the
-  manifest at boot and spawns one process per entry. ADR-0022
-  records the format and the closed-set Name format.
-- **Workspace observation rollup surface (Tier 2.34).** New
-  route `GET /v1/workspaces/{id}/observation` returns the
-  per-Workspace Budget/Quota rollup; new `WithWorkspaceRollups`
-  and `WithInvoker` options on `internal/api.Server` close the
-  production wiring scaffold.
-- **Per-Workspace adoption record (Tier 2.55).** New
-  `internal/adoption` ships `Record`, `Filter`, and the
-  consumer-defined `Repository` plus `CountByOutcome` for
-  observability. M4 wires the recommendation engine to read
-  prior adoptions.
-- **KMS-backed KeyProvider stub (Tier 2.45 follow-on).** New
-  `internal/vault/kmsbyok` ships the value type, the
-  `KMSClient` interface, and a deterministic test double. The
-  full AWS SDK adapter ships in M3 follow-on; today's commit
-  delivers the production shape and the test path so the
-  daemon boots in CI without an AWS account.
-- **Examples (Tier 2.39 + 2.36 follow-on).** New
-  `examples/python-list-capabilities/` and `examples/bash/invoke-release.sh`
-  give downstream consumers runnable reference code; `examples/README.md`
-  documents the directory.
-
-### Added (Tier 2 follow-on, fourth pass)
-
-- **Plugin manifest consumer (Tier 2.32 follow-on).** New
-  `internal/pluginsup.PluginSupervisor` reads
-  `PROMPTSHEON_PLUGINS_FILE`, validates each entry, and
-  registers one Plugin adapter per row with the lifecycle
-  supervisor. The `Remote` adapter satisfies the `Plugin`
-  interface (Start/Stop/Health) with no-ops; the M3 follow-on
-  replaces the body with the subprocess-execution path
-  (fork the binary, dial the UDS, proxy the gRPC Lifecycle).
-  When the env var is unset, the supervisor runs with only
-  the in-process built-ins — the same path as before.
-- **Production wiring: `WithInvoker` + `WithWorkspaceRollups`
-  in `cmd/promptsheond` (Tier 2.36 + 2.37).** The daemon now
-  constructs the canonical `invoke.Invoker` (with a
-  in-memory `DefaultEnforcer` and the
-  `observation.Aggregator`) and the per-Workspace rollup
-  aggregator and attaches them via the Options that
-  `internal/api.Server` exposes. The route POST
-  `/v1/versions/{id}/executions` exercises `s.invoker.Invoke`
-  end-to-end; the route GET `/v1/workspaces/{id}/observation`
-  reads the live rollup. Production callers supply a real
-  Caller that reaches the workspace's LLM provider chain;
-  today's shipped stub returns success so the route is
-  observable in CI.
-- **SLO breach → Recommendation bridge (Tier 2.49 follow-on).**
-  New `internal/bridge.BreachEvent.Evaluate` and `Run` turn
-  SLO breach events into `capability.Recommendation` values.
-  v1 contract covers hallucination_rate and success_rate;
-  both emit `RecommendationAddGuardrail` with high confidence
-  and `AutoApplicable=false`. The M3 follow-on wires the
-  production breach-detector to call `Run` per Observation
-  window. The bridge joins the rules engine as a second
-  Recommendation source.
-
-### Verification
-
-- 57/57 packages pass `go test -race -count=1 -timeout 180s ./...`
-  with no data-race warnings.
-- `gofmt -l .` is empty.
-- `go vet ./...` is clean.
-- `make lint-domain` and `make lint-deps` are clean.
-- `make openapi-check` confirms the spec is byte-identical.
-- **Vestigial `state` / `current_version_id` columns (Tier 1.40
-  follow-on).** Migration 026 documents that the `capabilities`
-  schema retains these columns for forward compatibility but
-  they are unused after M0.8. Operators using the Postgres
-  backend can drop the columns and their index once they confirm
-  no SQL reads them; the migration is mirrored under
-  `internal/store/migrations/postgres/`.
-
-
-- **`internal/llm` no longer carries package-level mutable state.**
-  The `Registry` was a package-level singleton (`var global =
-  newRegistry()`) reached via `llm.Default()`; it is now an explicit
-  value constructed with `llm.NewRegistry()` and passed through
-  `api.WithProviders()` from `cmd/promptsheond`. `LoadFromEnv` is now
-  a method on `*Registry`. The `pricingTable` map was a package-level
-  global used by `CalculateCost` / `GetPricing`; both are replaced by
-  `*PricingTable` methods. `Instrumented` accepts an optional
-  `*PricingTable` constructor argument so cost metrics are opt-in.
-  Charter Principle 5 (explicit dependencies) is now honored in
-  this package. ADR-0012.
-- **`internal/release.AllEnvironments` is a function, not a
-  variable.** The closed-set list of supported Environments is
-  returned by `AllEnvironments() []Environment`. `Environment.Valid()`
-  uses a switch instead of looping over the slice. Behaviour
-  preserved.
-- **Capability.Version is a Manifest.** `internal/capability/version.go`
-  gained `Manifest Manifest` and `ManifestHash string` fields (ADR-0010).
-  Migration `023_versions_manifest.sql` adds a `manifest` JSON column
-  and a `manifest_hash` index column. The legacy per-artifact columns
-  remain during the transition window. The API handler synthesises a
-  Manifest from legacy bundle fields when no explicit Manifest is
-  supplied; explicit Manifests are validated at the API boundary.
-- **Per-aggregate Repository interfaces** now live with their
-  aggregate packages: `internal/capability.Repository`,
-  `internal/release.Repository`, `internal/approval.Repository`,
-  `internal/recommendation.Repository`, `internal/lineage.Repository`,
-  `internal/policy.Repository`. `internal/store.Repository` embeds
-  `capability.Repository`. The SQLite implementation satisfies every
-  consumer-defined interface, making the Postgres backend a
-  drop-in replacement (Charter Principle 3 — interfaces belong to
-  consumers).
-- **CAS promoted to `pkg/cas`.** `internal/promptsheon` is now a
-  deprecation shim that re-exports every identifier under the
-  historical names. New code MUST import `pkg/cas` directly
-  (ADR-0013).
-- **Capability.State is derived, not stored.** The
-  `State` and `CurrentVersionID` fields have been removed from
-  `capability.Capability`; `Capability.DeriveState(releases)` computes
-  the lifecycle state from the set of Releases attached to the
-  Capability. The state columns remain in the schema for migration
-  forwards-compatibility.
-- **`DBBackend` config knob.** Production deployments can set
-  `PROMPTSHEON_DB_BACKEND=postgres` plus `PROMPTSHEON_DB_DSN` to
-  route through the new `internal/store/postgres` backend
-  (ADR-0015). SQLite remains the default.
-
-- **`internal/schedule`** — Schedule aggregate with cron / webhook /
-  manual trigger kinds, a minimal 5-field cron parser, and the
-  consumer-defined `Schedule.Repository`. Charge transitions
-  return new values; `Disable`/`Enable` are also value-methods.
-- **`internal/replay`** — write-once replay buffer keyed by an
-  `ExecutionHash` that fixes `(workspace_id, release_id,
-  manifest_hash, input_hash, model, model_revision)` so identical
-  inputs reproduce identically. `Put` returns the existing record
-  when the hash is already known (dedup invariant).
-- **`internal/scheduler`** — tick worker that reads due Schedules
-  every 5 seconds and publishes `schedule.fired` events on the
-  in-process EventBus for downstream Executors to consume.
-- **`pkg/plugin`** — gRPC plugin SDK at the public surface
-  (`pkg/plugin`) with `PluginDescriptor`, `Handshake`, and the
-  `Plugin` lifecycle interface. Plugins are standalone binaries
-  that speak gRPC over loopback; the server validates services
-  and supervises crashes (ADR-0016).
-- **`internal/optimizer/rules`** — deterministic Recommendation
-  engine v1 with three rules: compress prompt on slow P95, enable
-  cache on costly executions, add guardrail on hallucinations.
-  `CanAutoAdopt` centralises the conservative gate already
-  shipped by `recommendation.CanAutoAdopt`. M4+ follows with
-  bandit and LLM-judge engines once the Decision path is wired.
-- **`internal/budget`** — Budget aggregate (USD cap on a closed-set
-  period: daily / weekly / monthly) with PeriodStart rolled
-  forward on charge and `ErrCapExceeded` returned when over.
-  Scopes: Workspace, Capability.
-- **`internal/quota`** — Quota aggregate (rate cap on a sliding
-  window: second / minute / hour) with `ErrOverLimit`. Scopes:
-  Workspace, Provider. Distinct from `internal/ratelimit` which is
-  the process-local HTTP-edge throttler.
-
-### Added
-
-- **`make lint-domain` enforces no package-level mutable state in
-  domain packages.** A small AST walker at
-  `scripts/check-no-package-state.go` parses every non-test Go file
-  in `internal/{capability,release,approval,recommendation,lineage,policy,eventbus}`
-  and fails CI when a non-error, non-import-pin package-level `var`
-  appears. Wired into the `lint` job in CI before `golangci-lint`.
-  ADR-0012.
-
-
-- **Version bundle → Manifest split** — `internal/capability/manifest.go`
-  introduces a content-addressed Manifest type that references each
-  Capability Version's leaf artifacts (Prompt, ModelPolicy,
-  RuntimePolicy, ContextContract, Memory, Guardrails, Tools,
-  KnowledgeSources, MCPServers) by SHA-256 hash. Decouples artifact
-  evolution from Version numbering; stops the version-explosion
-  pattern where a guardrail typo produced v17.43.118. ADR-0010.
-- **`release` package** — Release aggregate with `Pending → Approved
-  → Active → Superseded/RolledBack` lifecycle. Environment is a
-  closed set (dev/staging/prod); only one Release may be Active per
-  Environment per Capability at a time. Rollback produces a successor
-  Release rather than mutating the predecessor.
-- **`approval` package** — Approval aggregate with `MajorityPolicy`
-  and `MakerCheckerPolicy`; `VerifySeparationOfDuties` enforces that
-  the Release creator is not in the Approver list.
-- **`recommendation` package** — Decision value type with
-  `Adopted`, `Rejected`, `Superseded` outcomes; `NewAdoptedAuto` and
-  `NewAdopted` distinguish human and auto-promotion in audit logs;
-  `CanAutoAdopt` encodes the conservative default for which
-  Recommendation types are eligible for auto-promotion.
-- **`policy` package** — Workspace-scoped Policies (`AllowedProviders`,
-  `CostCeiling`, `ChangeWindow`, `PIIRedaction`, `DataResidency`)
-  with a `Bundle` aggregator that short-circuits on Deny/Redact.
-  Policies are fail-closed and deterministic so they can be recorded
-  in audit logs and replayed.
-- **`eventbus` package** — Consumer-defined `Publisher` interface
-  with a default in-memory synchronous implementation. Subscribers
-  are filtered by EventType; panics are recovered so a buggy
-  subscriber does not poison the audit chain.
-- **`lineage` package** — `Graph` and `Edge` types that record
-  parent → child Capability Version derivations and the
-  Recommendation that motivated them. Closes the audit gap between
-  "v18 exists" and "v18 came from v17 because of recommendation R".
-- **ADRs 0010 and 0011** — design decisions for the Manifest split
-  and the Release/Approval separation.
-
-### Security
-
-- **26 gosec issues resolved** — permissions tightened to owner-only
-  (G301/G302/G306: `0755→0750`, `0444→0400`, `0644→0600`), path
-  traversal prevented via `os.Root` scoping in CAS store (G304), weak
-  RNG replaced with `math/rand/v2` (G404), CLI SSRF blocked by localhost
-  URL validation (G704/G107), OAuth cookie hardened with `Secure` flag
-  and `SameSiteStrictMode` (G124), shell tool allowlist documented (G204),
-  SQL injection surface eliminated with parameterised placeholders (G201),
-  open redirect guarded by URL parse validation (G710), long-lived
-  goroutine context justified (G118), OAuth provider metadata annotated
-  as non-secret (G101)
-- **Go toolchain upgraded from 1.25 to 1.26** — `go.mod`, CI matrix,
-  Dockerfile, docs all updated to require Go 1.26; resolves GO-2026-5856
-  (`crypto/tls`) and GO-2026-4970 (`os` symlink) when Go 1.26.5 is
-  available in CI
-
-### Changed
-
-- README: content upgrade with architecture diagram, configuration table, and
-  table of contents; added Go version badge; Go 1.25→1.26
-  ([`2aba5bb`](https://github.com/sachncs/promptsheon/commit/2aba5bb), 2026-07-07)
-- CI: bump `golangci/golangci-lint-action` from v6 to v7 to use Node 24
-  (Node 20 is being deprecated on GitHub Actions runners); Go matrix `1.25→1.26`
-  ([`2aba5bb`](https://github.com/sachncs/promptsheon/commit/2aba5bb), 2026-07-07)
-- Address all 553 golangci-lint issues across 124 files — errcheck, govet shadow,
-  gocritic, staticcheck, goconst, revive, nakedret, ineffassign, prealloc,
-  unconvert, unparam, unused, funlen, gocyclo, gofmt, dogsled
-  ([`e084427`](https://github.com/sachncs/promptsheon/commit/e084427), 2026-07-08)
-- Fix suppressed errors and bugs across the codebase — see `Fixed` section for details
-- **OpenAPI spec regenerated** — 478 insertions, 2509 deletions; old routes
-  (datasets, eval, guardrails, reviews, search, snapshots, workflows) removed,
-  new routes (projects, workspaces, capabilities) added to match handler code
-- Dockerfile build stage uses `golang:1.26-alpine`
-
-### Fixed
-
-- `internal/llm/registry.go`: Race condition in `Registry.Get()` — uses double-checked
-  locking so `factory(cfg)` is never called outside the write lock, preventing
-  duplicate provider instances under concurrent access
-  (internal audit, 2026-07-08)
-- `internal/alerting/manager.go`: Unbounded goroutine creation in `TriggerAlert` —
-  added semaphore-based concurrency limit (`MaxConcurrentDeliveries=100`); added
-  `StopMonitoring()` to cleanly await the monitoring goroutine
-  (internal audit, 2026-07-08)
-- `internal/webhook/webhook.go`: Silently ignored `io.Copy` and `resp.Body.Close`
-  errors — both are now logged via `d.logger.Warn`
-  (internal audit, 2026-07-08)
-- `internal/api/handlers_audit.go`: CSV write errors silently ignored — errors are
-  now propagated via `fmt.Errorf`; `writer.Flush()` error also checked via
-  `writer.Error()`
-  (internal audit, 2026-07-08)
-- `internal/snapshot/snapshot.go`: `json.Unmarshal` errors silently suppressed with
-  `//nolint:errcheck` — now propagated as `fmt.Errorf` so corrupt database JSON
-  never produces silent zero values
-  (internal audit, 2026-07-08)
-- `internal/api/middleware.go`: Panic recovery logged only the panic value — stack
-  trace is now captured via `debug.Stack()` and included in the structured log
-  (internal audit, 2026-07-08)
-- `internal/trace/otel.go`: Unused context result suppressed with `_ = ctx` —
-  uses `_ = context.WithValue(...)` with explicit discard
-  (internal audit, 2026-07-08)
-- `internal/workflow/engine_version.go`: Dead code `_ = input` / `_ = version.RuntimePolicy`
-  removed; `input` parameter marked as `_` to indicate intentionally unused
-  (internal audit, 2026-07-08)
-- `internal/eval/runner.go`: Dead code `_, _ = time.Now(), version` removed;
-  unused `time` import dropped
-  (internal audit, 2026-07-08)
-- Remaining `//nolint:errcheck` comments across `ws/hub.go`, `api/server.go`,
-  `ratelimit/*.go`, `metrics/middleware.go`, `auth/*.go` replaced with explicit
-  `_ =` error discards
-  (internal audit, 2026-07-08)
-- `internal/vault/vault_test.go`, `internal/config/config_test.go`,
-  `internal/llm/providers_extra_test.go`, `internal/auth/oauth_test.go`:
-  suppressed errors in test helper code now properly checked or explicitly discarded
-  with `_ =` pattern
-  (internal audit, 2026-07-08)
-
-### Added
-
-- `internal/llm/registry_test.go`: Unit tests for registry `Get`, `Configure`,
-  `Register`, and concurrent access (8 tests)
-- `internal/alerting/manager_test.go`: `TestTriggerAlertBoundedConcurrency`
-  verifies concurrent deliveries never exceed `MaxConcurrentDeliveries`;
-  `TestStopMonitoring` verifies clean goroutine shutdown
-- `internal/snapshot/snapshot_test.go`: `TestSnapshotCorruptJSON` verifies
-  corrupt token_usage/metadata JSON produces an error instead of silently
-  zero-filling the struct
-
-- Capability-centric domain model with 18 types (Workspace, Project, Capability,
-  CapabilityVersion, Prompt, ModelPolicy, ContextContract, KnowledgeSource,
-  MemoryConfig, Guardrail, Tool, MCPServer, RuntimePolicy, EvaluationSuite,
-  Execution, Observation, EvaluationResult, Recommendation, Deployment, Event)
-  — foundation for the capability-centric architecture
-  ([`58a21f0`](https://github.com/sachncs/promptsheon/commit/58a21f0), 2026-07-06)
-- `CapabilityRepository` interface with SQLite implementation and version-based
-  internal functions
-  ([`60f0579`](https://github.com/sachncs/promptsheon/commit/60f0579), 2026-07-06)
-- Embed `CapabilityRepository` into the main `Repository` interface; move `Usage`
-  type to `llm` package to break circular dependency
-  ([`b85097e`](https://github.com/sachncs/promptsheon/commit/b85097e), 2026-07-06)
-- Cutover to capability-centric architecture (new handlers, store, migrations)
-  ([`d5b0ee3`](https://github.com/sachncs/promptsheon/commit/d5b0ee3), 2026-07-06)
-
-### Changed
-
-- Module path from `github.com/sachncs/promptsheon` to `github.com/sachncs/promptsheon`
-  to match the canonical remote
-  ([`34342ca`](https://github.com/sachncs/promptsheon/commit/34342ca), 2026-06-25)
-
-### Fixed
-
-- CAS engine package (`internal/promptsheon`) implemented — previously all types,
-  constants, and functions were missing despite being depended on by tests and CLI
-  ([`3b60646`](https://github.com/sachncs/promptsheon/commit/3b60646), 2026-06-25)
-- Dockerfile: CLI binary destination corrected from
-  `/usr/local/bin/promptsheon-cli` to `/usr/local/bin/promptsheon`
-  ([`ec2f093`](https://github.com/sachncs/promptsheon/commit/ec2f093), 2026-06-25)
-- Centralised version string into `internal/buildinfo` package; added
-  `/api/v1/version` endpoint
-  ([`f441f13`](https://github.com/sachncs/promptsheon/commit/f441f13), 2026-06-25)
-- `--version` and `--help` flags for both `promptsheond` and `promptsheon`
-  binaries
-  ([`1993f8b`](https://github.com/sachncs/promptsheon/commit/1993f8b), 2026-06-25)
-- CLI exits with status 2 (EX_USAGE) for argument errors instead of 1
-  ([`1fa9dea`](https://github.com/sachncs/promptsheon/commit/1fa9dea), 2026-06-25)
-- First-run admin bootstrap endpoint (`POST /api/v1/setup`); ratelimit
-  cleanup channel no longer panics on stop
-  ([`ec6f6db`](https://github.com/sachncs/promptsheon/commit/ec6f6db), 2026-06-26)
-- SDK: surface API error unmarshal failure; add tests and README
-  ([`67609d7`](https://github.com/sachncs/promptsheon/commit/67609d7), 2026-06-26)
-- `Config.Port()` uses `net.SplitHostPort` so IPv6 addresses resolve correctly
-  ([`a103b95`](https://github.com/sachncs/promptsheon/commit/a103b95), 2026-06-26)
-- Docker HEALTHCHECK respects `PROMPTSHEON_ADDR`
-  ([`0224173`](https://github.com/sachncs/promptsheon/commit/0224173), 2026-06-26)
-- Code formatting: `gofmt -s` applied across the repo
-  ([`264209a`](https://github.com/sachncs/promptsheon/commit/264209a),
-  [`0269bab`](https://github.com/sachncs/promptsheon/commit/0269bab), 2026-06-25–26)
-
-### Added (test coverage)
-
-- Tests for previously-untested packages
-  ([`b9ccf71`](https://github.com/sachncs/promptsheon/commit/b9ccf71), 2026-06-26)
-- Workflow state, webhook sink, server bootstrap tests
-  ([`c88caaa`](https://github.com/sachncs/promptsheon/commit/c88caaa), 2026-06-26)
-- A/B testing handlers, LLM providers, alerting monitoring tests
-  ([`f2a72a4`](https://github.com/sachncs/promptsheon/commit/f2a72a4), 2026-06-26)
-- Workflow YAML validation and round-trip tests
-  ([`f860922`](https://github.com/sachncs/promptsheon/commit/f860922), 2026-06-26)
-- Anthropic, Ollama, NVIDIA provider tests
-  ([`0be808c`](https://github.com/sachncs/promptsheon/commit/0be808c), 2026-06-26)
-- Metrics middleware tests
-  ([`6bea48a`](https://github.com/sachncs/promptsheon/commit/6bea48a), 2026-06-26)
-- Models package tests for JSON round-trip and state machine
-  ([`caf007c`](https://github.com/sachncs/promptsheon/commit/caf007c), 2026-06-26)
-- Webhook mutex-protected shared counters in race-mode tests
-  ([`40e683d`](https://github.com/sachncs/promptsheon/commit/40e683d), 2026-06-26)
-
-### Changed
-
-- Coverage floor: lowered from 70% to 60% to reflect realistic bar for entry
-  points that are not unit-testable
-  ([`24041c3`](https://github.com/sachncs/promptsheon/commit/24041c3), 2026-06-26)
-- Governance: add `CODEOWNERS`, `.editorconfig`, route CoC contact to email
-  ([`56cb13d`](https://github.com/sachncs/promptsheon/commit/56cb13d), 2026-06-26)
-
-### Dependencies
-
-- Bump `securego/gosec` from 2.22.10 to 2.27.1
-  ([`862582b`](https://github.com/sachncs/promptsheon/commit/862582b), 2026-06-29)
-- Bump `google.golang.org/grpc` from 1.81.1 to 1.82.0
-  ([`641863e`](https://github.com/sachncs/promptsheon/commit/641863e), 2026-07-06)
-
-## [0.0.5] - 2026-06-25
-
-### Added
-
-- Hash-chained audit log with `audit_chain_state` cache and paged verifier
-- AES-256-GCM vault with all-zero key rejection
-- HMAC-SHA256 webhook signing with SSRF allowlist policy
-- Per-call LLM circuit breaker, retry with typed-error classifier,
-  fallback chain, and per-model cost calculation
-- BM25 full-text search index
-- Background audit workers with `StopAuditWorkers` for graceful shutdown
-- Background retention sweeper for traces, snapshots, and audit entries
-- Token-bucket rate limiter, per API key
-- Security headers middleware
-- Request body size limit middleware (10 MB)
-- CORS middleware with explicit origin allowlist
-- OpenTelemetry export when `PROMPTSHEON_OTEL_ENDPOINT` is set
-- AST-based OpenAPI generator in `scripts/genopenapi/`
-
-### Changed
-
-- Authentication is enabled by default; set `PROMPTSHEON_AUTH=false` to disable
-- API key query parameter (`?api_key=`) support removed; use `Authorization: Bearer`
-- Prompt-binding schema is at version 0.3.0 with explicit `binding` block
-- The `Authorization` header value is masked in structured log output
-
-### Fixed
-
-- Vault rejects the all-zero encryption key at startup
-- Audit chain hashes the entry's `details` JSON and canonical RFC3339Nano timestamp
-- OpenAPI generator no longer emits empty `200 OK` responses
-- `gofmt` is enforced in CI
-- Coverage floor raised to 70%
-
-## [0.0.4] - 2026-06-25
-
-### Added
-
-- Code documentation annotations for intentional test panics
-  ([`2609858`](https://github.com/sachncs/promptsheon/commit/2609858))
-
-### Fixed (security)
-
-- Refuse admin role in no-auth mode
-  ([`59c5899`](https://github.com/sachncs/promptsheon/commit/59c5899))
-- Set `ReadHeaderTimeout` to prevent Slowloris attacks
-  ([`a7ec87f`](https://github.com/sachncs/promptsheon/commit/a7ec87f))
-- OAuth callback no longer hides upstream error text
-  ([`5634d61`](https://github.com/sachncs/promptsheon/commit/5634d61))
-
-### Fixed (correctness)
-
-- `handleDeletePrompt` pre-checks existence and skips audit on miss
-  ([`d909aa7`](https://github.com/sachncs/promptsheon/commit/d909aa7))
-- `handleRunPrompt` locks provider/model to prompt binding
-  ([`ad490c9`](https://github.com/sachncs/promptsheon/commit/ad490c9))
-- `handleListPromptVersions` returns prompt-scoped history, not global log
-  ([`2813818`](https://github.com/sachncs/promptsheon/commit/2813818))
-- `handleFindSimilarPrompts` validates threshold range
-  ([`a9695a5`](https://github.com/sachncs/promptsheon/commit/a9695a5))
-- `handleRestorePrompt` validates `cas_hash` and refuses non-blob CAS objects
-  ([`fcb492b`](https://github.com/sachncs/promptsheon/commit/fcb492b))
-- Wire guardrail + context manager into workflow engine
-  ([`71a437e`](https://github.com/sachncs/promptsheon/commit/71a437e))
-- `UpdateAPIKeyLastUsed` moved to background worker
-  ([`4566388`](https://github.com/sachncs/promptsheon/commit/4566388))
-
-### Fixed (reliability)
-
-- `StopAuditWorkers` drains the queue, no more "database is closed" errors
-  ([`30ed207`](https://github.com/sachncs/promptsheon/commit/30ed207))
-- Replace hash-based embedding stub with real BM25 ranking
-  ([`b97ce5d`](https://github.com/sachncs/promptsheon/commit/b97ce5d))
-- Shell tool policy uses atomic types, no data race
-  ([`f26af24`](https://github.com/sachncs/promptsheon/commit/f26af24))
-- Persist workflow steps in topological order
-  ([`b79517b`](https://github.com/sachncs/promptsheon/commit/b79517b))
-- Server-owned persistent in-memory search index
-  ([`c37f4f6`](https://github.com/sachncs/promptsheon/commit/c37f4f6))
-- OpenAI.Stream returns a `streamCloser` that documents the close contract
-  ([`7051fbf`](https://github.com/sachncs/promptsheon/commit/7051fbf))
-- `mustMarshal` returns error instead of silently returning `{}`
-  ([`e7ee76c`](https://github.com/sachncs/promptsheon/commit/e7ee76c))
-
-### Fixed (observability)
-
-- Add index on `traces.started_at` for range queries
-  ([`50dd8bb`](https://github.com/sachncs/promptsheon/commit/50dd8bb))
-- Wire `PROMPTSHEON_OTEL_*` env vars into the global tracer provider
-  ([`414c5bf`](https://github.com/sachncs/promptsheon/commit/414c5bf))
-
-### Fixed (security hardening)
-
-- Vault rejects all-zero key (trivially decryptable)
-  ([`e7b5b32`](https://github.com/sachncs/promptsheon/commit/e7b5b32))
-- NVIDIA Nemotron `enable_thinking` is opt-in via provider config
-  ([`106e02f`](https://github.com/sachncs/promptsheon/commit/106e02f))
-- Audit hash uses canonical RFC3339Nano UTC string
-  ([`0f9665d`](https://github.com/sachncs/promptsheon/commit/0f9665d))
-- Audit chain uses dedicated state table + in-process mutex
-  ([`784ed66`](https://github.com/sachncs/promptsheon/commit/784ed66))
-- Audit queue backpressure waits briefly before dropping
-  ([`ed469c8`](https://github.com/sachncs/promptsheon/commit/ed469c8))
-- `VerifyAuditChain` paginates by rowid to bound per-call latency
-  ([`8a25252`](https://github.com/sachncs/promptsheon/commit/8a25252))
-
-### Fixed (code quality)
-
-- Add 59 missing OpenAPI paths; align spec version to 0.3.0
-  ([`5dfaef9`](https://github.com/sachncs/promptsheon/commit/5dfaef9))
-- Go AST generator fills all 59 OpenAPI stubs
-  ([`ada3987`](https://github.com/sachncs/promptsheon/commit/ada3987))
-- Raise coverage floor from 50% to 70%
-  ([`8b589e6`](https://github.com/sachncs/promptsheon/commit/8b589e6))
-- `authEnabled` test global replaced with `PROMPTSHEON_AUTH_TEST` env
-  ([`d62421b`](https://github.com/sachncs/promptsheon/commit/d62421b))
-- CanonicalHash/ObjectHash return error instead of panicking
-  ([`e8e32f5`](https://github.com/sachncs/promptsheon/commit/e8e32f5))
-- Warn on invalid numeric env vars instead of silent fallback
-  ([`a145cbe`](https://github.com/sachncs/promptsheon/commit/a145cbe))
-- `substituteVariables` helper; prompt built once in run/stream
-  ([`360599b`](https://github.com/sachncs/promptsheon/commit/360599b))
-- Assert `http.Flusher` before writing SSE start event
-  ([`aba520f`](https://github.com/sachncs/promptsheon/commit/aba520f))
-- Install wget in Dockerfile; fix SECURITY.md contact info
-  ([`5037ee8`](https://github.com/sachncs/promptsheon/commit/5037ee8))
-- CI fails the build on gofmt drift
-  ([`8740fb4`](https://github.com/sachncs/promptsheon/commit/8740fb4))
-- Retry uses `ErrTransient`/`ErrPermanent` typed errors
-  ([`2ef26d7`](https://github.com/sachncs/promptsheon/commit/2ef26d7))
-- Drop unused loop index in `ParseYAML`
-  ([`ad7dc26`](https://github.com/sachncs/promptsheon/commit/ad7dc26))
-- `oauthStates` is per-Server, not package-level
-  ([`2fcddfa`](https://github.com/sachncs/promptsheon/commit/2fcddfa))
-- `gofmt` whitespace cleanup across files touched by fixes
-  ([`36925e9`](https://github.com/sachncs/promptsheon/commit/36925e9),
-  [`c32402f`](https://github.com/sachncs/promptsheon/commit/c32402f),
-  [`80f5bbc`](https://github.com/sachncs/promptsheon/commit/80f5bbc))
-
-### Dependencies
-
-- Bump `modernc.org/sqlite` from 1.52.0 to 1.53.0
-  ([`18118fd`](https://github.com/sachncs/promptsheon/commit/18118fd), 2026-06-22)
-- Bump `actions/upload-artifact` from 4 to 7
-  ([`6b0e034`](https://github.com/sachncs/promptsheon/commit/6b0e034), 2026-06-22)
-- Bump `actions/checkout` from 4 to 7
-  ([`ecaba2d`](https://github.com/sachncs/promptsheon/commit/ecaba2d), 2026-06-22)
-
-## [0.0.3] - 2026-06-19
-
-Version bump with no documented changes between 0.0.2 and 0.0.3 in git history.
-([`aa0884b`](https://github.com/sachncs/promptsheon/commit/aa0884b))
-
-## [0.0.2] - 2026-06-18
-
-Version bump with no documented changes between 0.0.1 and 0.0.2 in git history.
-([`3ff607b`](https://github.com/sachncs/promptsheon/commit/3ff607b))
-
-## [0.0.1] - 2026-06-18
-
-Initial release — first tagged build.
-([`a1e289f`](https://github.com/sachncs/promptsheon/commit/a1e289f))
-
-[Unreleased]: https://github.com/sachncs/promptsheon/compare/v0.0.5...HEAD
-[0.0.5]: https://github.com/sachncs/promptsheon/releases/tag/v0.0.5
-[0.0.4]: https://github.com/sachncs/promptsheon/releases/tag/v0.0.4
-[0.0.3]: https://github.com/sachncs/promptsheon/releases/tag/v0.0.3
-[0.0.2]: https://github.com/sachncs/promptsheon/releases/tag/v0.0.2
-[0.0.1]: https://github.com/sachncs/promptsheon/releases/tag/v0.0.1
+  the rules package as a plain function.
+
+### Removed
+
+- **ADR-0015**: Postgres as a first-class backend (deleted in
+  v0.1.0).
+
+[Unreleased]: https://github.com/sachncs/promptsheon/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/sachncs/promptsheon/compare/v0.3.0-rc.1...v0.3.0
+[0.3.0-rc.1]: https://github.com/sachncs/promptsheon/compare/v0.2.0...v0.3.0-rc.1
+[0.2.0]: https://github.com/sachncs/promptsheon/compare/v0.1.0...v0.2.0
+[0.1.x]: https://github.com/sachncs/promptsheon/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/sachncs/promptsheon/compare/v0.0.7...v0.1.0
+[0.0.7]: https://github.com/sachncs/promptsheon/compare/v0.0.5-tier2...v0.0.7
+[0.0.5 - Tier 2 follow-on]: https://github.com/sachncs/promptsheon/releases/tag/v0.0.5-tier2
