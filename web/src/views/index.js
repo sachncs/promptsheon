@@ -6,7 +6,8 @@ import { renderReleases } from "./releases.js";
 import { renderObservability } from "./observability.js";
 import { renderGuardrails } from "./guardrails.js";
 import { renderEvaluations } from "./evaluations.js";
-import { renderLogsPlaceholder, renderOperationsPlaceholder } from "./_placeholder.js";
+import { renderOperations } from "./operations/index.js";
+import { renderLogsPlaceholder } from "./_placeholder.js";
 import { renderNotFound } from "./not-found.js";
 
 const ROUTES = {
@@ -19,8 +20,8 @@ const ROUTES = {
   "/guardrails": renderGuardrails,
   "/evaluations": renderEvaluations,
   "/logs": renderLogsPlaceholder,
-  "/operations": renderOperationsPlaceholder,
-  "/operations/{tab}": renderOperationsPlaceholder
+  "/operations": renderOperations,
+  "/operations/{tab}": renderOperations
 };
 
 const PAGE_TITLES = {
