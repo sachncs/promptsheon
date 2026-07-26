@@ -62,10 +62,9 @@ image, systemd units).
 
 ## What LLM providers are supported?
 
-**OpenAI** and **Anthropic** in v0.2.0. Azure OpenAI, Ollama,
-and NVIDIA NIM were removed in v0.1.0. To add a new provider,
-implement the `llm.Provider` interface and register a factory
-on the `Registry` in `cmd/promptsheond/main.go`.
+**OpenAI** and **Anthropic**. To add a new provider,
+implement the `llm.Provider` interface and register a
+factory on the `Registry` in `cmd/promptsheond/main.go`.
 
 ## How do I add a Capability?
 
@@ -110,8 +109,9 @@ Yes. Set `PROMPTSHEON_LEADER_ELECTION=true` and the daemon
 acquires a SQLite advisory lock so only the leader applies
 migrations and writes to the audit chain. Reads scale
 linearly. SQLite + WAL handles small to medium production
-loads; for high-throughput deployments, run a Postgres
-backend (a follow-on — v0.2.0 is SQLite-only).
+loads; a Postgres backend (init + RLS SQL +
+`InMemoryPostgres` fixture today; pgx wiring as a
+follow-on) is the path for high-throughput deployments.
 
 ## How does pricing work?
 
@@ -145,11 +145,12 @@ retention contract.
 ## Can I migrate to Postgres later?
 
 The `store.Repository` interface is the integration boundary.
-A Postgres implementation can be added without touching
-the domain packages. v0.2.0 ships SQLite-only as a
-deliberate simplification; the `pkg/store` Postgres driver
-lives at the same level as the `modernc.org/sqlite` driver
-today but isn't wired into the production wiring. See
+A Postgres implementation can be added without touching the
+domain packages. The daemon ships SQLite-only as a
+deliberate simplification; the Postgres backend at
+`internal/store/postgres/` exports the init + RLS SQL
+bundles (`LoadSQL()`) and an `InMemoryPostgres` fixture for
+contract tests, but the live pgx wiring is a follow-on. See
 [docs/architecture.md](architecture.md#storage-backends) for
 the storage layer.
 

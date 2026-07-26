@@ -49,23 +49,24 @@ docker run -d \
   ghcr.io/sachncs/promptsheon:latest
 ```
 
-The container healthcheck uses `promptsheon-healthcheck` to
-hit `/health`:
+The container's HEALTHCHECK is wired via the binary's env
+vars (`PROMPTSHEON_HEALTHCHECK_HOST` /
+`PROMPTSHEON_HEALTHCHECK_PORT`); see the Dockerfile for the
+exact form. The binary polls `GET /health` and exits 0 on
+200. A Kubernetes-style probe pointing at a different path
+can pass the path as the first positional argument, e.g.:
 
-```yaml
-healthcheck:
-  test: ["/usr/local/bin/promptsheon-healthcheck", "--addr=http://localhost:8080"]
-  interval: 30s
-  timeout: 5s
-  retries: 3
+```bash
+/usr/local/bin/promptsheon-healthcheck /livez
 ```
 
 ## Helm chart
 
 `deploy/helm/promptsheon/` ships a single-replica chart
-(SQLite is the v0.2.0 constraint; a Postgres parity follows in v0.3.0+).
-The chart renders ConfigMap, Secret, Service, Deployment,
-Ingress, and ServiceMonitor.
+(SQLite is the bundled store; a Postgres parity is tracked
+in [docs/multi-region.md](multi-region.md)). The chart
+renders ConfigMap, Secret, Service, Deployment, Ingress,
+and ServiceMonitor.
 
 Install:
 
@@ -116,8 +117,8 @@ behind a reverse proxy they're omitted.
 
 The reverse proxy must forward the client's source IP via
 `X-Forwarded-For`; the rate limiter and audit chain honour
-the header (set `RATELIMIT_TRUSTED_PROXIES` to the proxy's
-CIDR to prevent header-spoofing bypasses).
+the header (set `PROMPTSHEON_TRUSTED_PROXIES` to the
+proxy's CIDR list to prevent header-spoofing bypasses).
 
 ## Health probes
 
@@ -126,9 +127,12 @@ CIDR to prevent header-spoofing bypasses).
 | Liveness | `GET /health` (or `GET /livez`) | Restart the container if the daemon becomes unresponsive. |
 | Readiness | `GET /ready` (or `GET /readyz`) | Stop sending traffic until the daemon's DB is reachable. |
 
-`promptsheon-healthcheck <addr>` returns `0` for healthy and
-`1` for unhealthy, so it works as a direct
-`ExecStartCommand` argument.
+`promptsheon-healthcheck` honours `PROMPTSHEON_HEALTHCHECK_HOST`
+and `PROMPTSHEON_HEALTHCHECK_PORT`, returns `0` for healthy
+and non-zero for unhealthy, and accepts an optional path
+argument (default `/health`). It works as a direct
+`ExecStartCommand` argument or as the Docker HEALTHCHECK
+target.
 
 ## Observability integration
 
@@ -156,11 +160,12 @@ prometheus reload
 
 ## Multi-replica
 
-v0.2.0 is **single-replica** because of the SQLite constraint.
-The leader-election work (ADR-0030) ships in v0.3.0; the
-SLO dashboard has a "stale chain verification" alert that
-catches multi-replica misconfigurations (the leader should
-be running `/audit/verify` every minute).
+Multi-replica deployments are supported via
+`PROMPTSHEON_LEADER_ELECTION=true`; only the leader applies
+migrations and writes to the audit chain. Reads scale
+linearly across followers. SQLite + WAL handles small to
+medium production loads; a shared-backend follow-on is
+tracked in [docs/multi-region.md](multi-region.md).
 
 ## Upgrades
 

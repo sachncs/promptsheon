@@ -25,40 +25,44 @@ common case is resolved by step 1 or 2.
 ## Authentication issues
 
 - **`401 Unauthorized` on every call** — your `Authorization`
-  header is missing or the key was revoked. Run
-  `promptsheon audit list --action apikey_revoke` to see recent
-  revocations, and `promptsheon apikey create` to mint a new
-  one.
-- **`403 Forbidden` on a route I should have** — the key's role
-  doesn't have the required permission. Run
-  `promptsheon user get <user_id>` to see the role, or
-  `promptsheon user update <id> '{"role":"admin"}'` to elevate.
-- **`503 "setup is disabled when authentication is enabled and
-  no PROMPTSHEON_BOOTSTRAP_TOKEN is set"`** — set
-  `PROMPTSHEON_BOOTSTRAP_TOKEN` to enable the bootstrap
-  endpoint, or use the existing admin key from
-  `promptsheon apikey list --user-id <admin-id>`.
+  header is missing or the key was revoked. Mint a new key
+  via `POST /api/v1/apikeys` (admin permission required) and
+  pass it as `Authorization: Bearer ps_<key>`.
+- **`403 Forbidden` on a route I should have** — the key's
+  role doesn't have the required permission. Inspect the
+  key's role via `GET /api/v1/apikeys/{id}` or rotate to a
+  role that grants the permission.
+- **`403 "bootstrap is disabled: set PROMPTSHEON_BOOTSTRAP_TOKEN
+  before calling POST /api/v1/setup"`** — the bootstrap
+  endpoint requires `PROMPTSHEON_BOOTSTRAP_TOKEN` regardless
+  of auth mode. Set it (and present it as the
+  `X-Bootstrap-Token` header) to enable first-run admin
+  bootstrap, or use the existing admin key from
+  `GET /api/v1/apikeys?user_id=<admin-id>`.
 
 ## Invoke failures
 
 - **`502 "no LLM provider configured for this invocation"`** —
-  the Release's Manifest references a provider name that isn't
-  registered. `promptsheon provider list` to see registered
-  names; set the corresponding `PROMPTSHEON_<NAME>_API_KEY` env
-  var or use `WithProviders` on the server.
-- **`502 "no LLM provider configured for this invocation" (after
-  `provider test` succeeded)** — the Manifest's `model_policy`
-  artifact has a `provider` value the daemon doesn't recognise.
-  Inspect the Release with `promptsheon release get <id>` and
-  look at the resolved plan.
-- **`429 quota exceeded`** — the per-window quota is exhausted.
-  Wait for the window to roll, or raise the quota.
+  the Release's Manifest references a provider name that
+  isn't registered. `promptsheon provider list` to see
+  registered names; set the corresponding
+  `PROMPTSHEON_<NAME>_API_KEY` env var or wire a custom
+  provider in `cmd/promptsheond/main.go`.
+- **`502 "no LLM provider configured for this invocation"
+  (after `provider test` succeeded)** — the Manifest's
+  `model_policy` artifact has a `provider` value the daemon
+  doesn't recognise. Inspect the Release with
+  `promptsheon release get <id>` and look at the resolved
+  plan.
+- **`429 quota exceeded`** — the per-window quota is
+  exhausted. Wait for the window to roll, or raise the
+  quota.
 - **`402 budget exceeded`** — the per-period USD cap is
   exhausted. The Release stays in `pending` until the next
   period or an admin raises the cap.
 - **Invoke hangs and times out** — the upstream LLM provider
-  is unreachable. `promptsheon provider test <name> --model
-  <model>` to verify the connection; check your
+  is unreachable. `promptsheon provider test <name>` to
+  verify the connection; check your
   `PROMPTSHEON_<NAME>_API_KEY` and `*_BASE_URL` env vars.
 
 ## Activate failures
@@ -72,8 +76,8 @@ common case is resolved by step 1 or 2.
   Inspect the error message; the precondition's stdout/stderr
   is in the `details` payload.
 - **`409 with "release is not active"`** — the Release's
-  status is not `active`. Only Active Releases can be invoked.
-  Re-run Activate.
+  status is not `active`. Only Active Releases can be
+  invoked. Re-run Activate.
 
 ## Audit chain
 
@@ -106,9 +110,9 @@ common case is resolved by step 1 or 2.
 - **`database is locked` errors under load** — increase the
   busy timeout. The daemon currently hardcodes
   `?_pragma=busy_timeout(5000)` in `cmd/promptsheond/main.go`;
-  for higher throughput run the daemon on a Postgres backend
-  instead (the SQLite-only constraint is v0.2.0; a Postgres
-  parity follows once the shared backend lands).
+  for higher throughput run the daemon on the Postgres
+  backend instead (init + RLS SQL + `InMemoryPostgres`
+  fixture today; the pgx wiring is a follow-on).
 - **Schema migration fails at boot** — the migration table
   records the highest applied version. If you jumped a
   version, run the missing migrations manually with
@@ -120,9 +124,10 @@ common case is resolved by step 1 or 2.
 ## LLM providers
 
 - **`unknown provider: <name>`** — the LLM `Registry` doesn't
-  have a factory for that name. v0.2.0 ships with `openai` and
-  `anthropic`; custom providers must be registered in
-  `cmd/promptsheond/main.go` before the daemon boots.
+  have a factory for that name. The shipped providers are
+  `openai` and `anthropic`; custom providers must be
+  registered in `cmd/promptsheond/main.go` before the
+  daemon boots.
 - **`provider <name> not configured`** — the provider's API
   key env var is missing. The daemon logs a warning at boot
   for every missing key; check the startup log.
@@ -135,8 +140,10 @@ common case is resolved by step 1 or 2.
   `errRemoteNotConfigured`, and `/metrics` surfaces the gap.
   Add a `binary: /opt/foo` line and reload the manifest.
 - **Plugin binary restarts every minute** — check the
-  restart budget. The default `RestartPolicy` allows 5
-  restarts with 1s→30s exponential backoff.
+  restart budget. The built-in plugin `RestartPolicy`
+  allows 3 restarts with 1s→30s exponential backoff; the
+  supervisor's default allows 5. Operators can override
+  per-plugin in the manifest.
 
 ## More
 

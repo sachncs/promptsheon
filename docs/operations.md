@@ -94,5 +94,5 @@ migrations are forward-only).
 - [docs/upgrade.md](upgrade.md) — in-place upgrade + rollback.
 - [docs/slos.md](slos.md#rpo--rto) — the SLO targets.
 - [docs/multi-region.md](multi-region.md) — multi-region
-  replication story (and its non-goal status for v0.2.0; it
-  lands in v0.3.0 alongside a shared backend).
+  replication story (and its non-goal status today; a shared
+  backend is the prerequisite for multi-region).

@@ -91,8 +91,8 @@ is a rewrite for its own sake.
 
 ## 4. Status
 
-- **Shipped in v0.2.0**: this research note. No code.
-- **NOT shipped in v0.2.0**: any replacement selector.
+- **Current status**: this research note is design only. No
+  replacement selector is shipped in v0.3.0.
 - **Tracking**: the criteria above are the only accepted
   triggers for a replacement PR. A PR that wants to
   replace the selector without meeting one of the four

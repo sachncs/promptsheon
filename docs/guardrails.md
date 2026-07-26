@@ -1,9 +1,9 @@
 # Guardrails
 
 Guardrails are a `Provider` plugin that wraps a Capability's
-LLM call. Two Guardrails ship in v0.2.0 as built-in
-plugins through the supervisor; production tenants can add
-custom Guardrails via the plugin manifest.
+LLM call. Two Guardrails ship as built-in plugins through
+the supervisor; production tenants can add custom
+Guardrails via the plugin manifest.
 
 The two built-in Guardrails:
 
@@ -30,12 +30,15 @@ to the in-process handler.
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/v1/plugins` | List registered plugins. |
-| `POST` | `/api/v1/plugins` | Register a plugin (manifest entry). |
-| `GET`  | `/api/v1/plugins/{name}` | Get a registered plugin. |
-| `DELETE` | `/api/v1/plugins/{name}` | Remove a plugin. Returns 204. |
+The daemon does not expose an HTTP surface for plugin
+registration today; plugins are configured via
+`PROMPTSHEON_PLUGINS_FILE` (manifest path) and the daemon
+boots with the supervisor's in-process built-ins registered
+under their fixed names (`pii-redactor`, `prompt-injection`).
+The two metrics below are the only operator-visible surface
+for built-in Guardrail activity; the supervisor surfaces
+restart counts and health via the standard
+`/api/v1/metrics` Prometheus endpoint.
 
 ## Metrics
 
@@ -67,7 +70,7 @@ all (probably misconfigured).
   manifest; see [docs/development.md](development.md) for the
   plugin manifest format.
 
-The `promptsheon` v0.2.0 does **not** expose a
+The daemon does **not** expose a
 `/api/v1/guardrails/check` endpoint — Guardrail evaluation
 happens inline on the LLM call, not via a separate HTTP
 route. The metrics above are the only surface for Guardrail

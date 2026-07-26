@@ -8,18 +8,16 @@ approve, and roll back. The lifecycle is:
                     create
    (none) ───────────────────────▶ pending
                                        │
-                          vote (Approve)        │
-                                       ▼
-                                    pending  ──── rollback ──▶ rolled_back
-                                       │                            ▲
-                          vote (Reject)                              │
-                                       ▼                            │
-                                    rejected                        │
-                                                                        │
-                          activate  (MakerChecker quorum + preconditions)
-                                       │                            │
-                                       ▼                            │
-                                     active ────── rollback ────────┘
+                           vote (Approve or Reject)
+                                        │
+                                        ▼
+                                     pending
+                                        │
+                           activate (quorum + preconditions)
+                                        │
+                                        ▼
+                                      active
+
 ```
 
 The full state machine:
@@ -29,7 +27,7 @@ The full state machine:
 | (none) | `pending` | `Create` (POST `/api/v1/versions/{id}/releases`). |
 | `pending` | `pending` | `Vote` (POST `/api/v1/releases/{id}/votes`). Updates the approval trail. |
 | `pending` | `active` | `Activate` (POST `/api/v1/releases/{id}/activate`). MakerChecker quorum required. Preconditions run. |
-| `pending` | `rejected` | `Activate` with a `Reject` vote majority (MajorityPolicy). |
+| `pending` | `pending` | A `Vote` (Approve or Reject) updates the approval trail; a rejected vote does not create a `rejected` Release status. |
 | `active` | `rolled_back` | `Rollback` (POST `/api/v1/releases/{id}/rollback`). |
 | `active` | `superseded` | A new Release in the same Environment is Activated. |
 
@@ -39,9 +37,10 @@ records the supersession. Operators can still `Get` and
 
 ## Approval policies
 
-Two policies ship in v0.2.0 (unchanged since v0.1.0). Both are fail-closed: an
-empty or invalid configuration returns an error from
-`Evaluate`, never silently approves.
+Two policies ship (unchanged since the approval aggregate
+landed). Both are fail-closed: an empty or invalid
+configuration returns an error from `Evaluate`, never silently
+approves.
 
 ### `MakerCheckerPolicy` (default)
 
@@ -55,8 +54,8 @@ approval.MakerCheckerPolicy{
 - The creator's vote is rejected with `ErrCreatorVoted`.
 - At least `RequiredApprovers` non-creator identities must
   cast an `Approve` vote.
-- A `Reject` vote from any identity sends the state to
-  `rejected`.
+- A `Reject` vote is recorded in the approval trail and can
+  prevent activation; the Release remains `pending`.
 
 ### `MajorityPolicy`
 
@@ -68,8 +67,8 @@ approval.MajorityPolicy{
 
 - At least `Required` identities must cast an `Approve` vote
   (regardless of creator).
-- A `Reject` vote from any identity sends the state to
-  `rejected`.
+- A `Reject` vote is recorded in the approval trail and can
+  prevent activation; the Release remains `pending`.
 
 Configure via `PROMPTSHEON_APPROVAL_POLICY` and per-policy
 constructor options at `cmd/promptsheond/main.go`.
@@ -150,10 +149,10 @@ methods.
 ## CLI
 
 ```bash
-promptsheon release create v1 '{"environment":"prod"}'
+promptsheon release create v1 prod
 promptsheon release vote <id> bob approve
 promptsheon release activate <id>      # 409 if quorum / preconditions fail
-promptsheon release invoke <id> '{"q":"hello"}'
+promptsheon release invoke <id> --model claude-haiku-4-5
 promptsheon release approval <id>     # show the vote trail
 promptsheon release rollback <id>     # active → rolled_back
 ```
@@ -167,15 +166,13 @@ promptsheon release rollback <id>     # active → rolled_back
 - [docs/architecture.md](architecture.md) — the Release
   aggregate's role in the system.
 
-## v0.2.0 readiness tests
+## Readiness tests
 
-The v0.2.0 readiness test suite is being implemented as the
-next milestone after this doc. Its expected scope is
-end-to-end coverage of the lifecycle above against the v0.2.0
-binary: real SQLite, real auth, the TLA+ spec invariants
-checked at the SQL boundary, and the k6 p99 gate
-(`p(99)<3000` on `tests/load/scenarios/10-sustained-load.js`).
-This is follow-on work — it is not bundled into the v0.2.0
-binary and is not covered by the v0.2.0 SLOs. Item #28 in
-the engineering closure list tracks the test suite; the
-in-binary v0.2.0 work (#1–#25) is complete.
+End-to-end coverage of the lifecycle above runs against the
+real SQLite, real auth, the TLA+ spec invariants at the SQL
+boundary, and the k6 p99 gate (`p(99)<3000` on
+`tests/load/scenarios/10-sustained-load.js`). The contract
+test in `tests/contract/contract_test.go` and the smoke
+layer in `tests/smoke/run.sh` exercise the full lifecycle;
+the chaos layer exercises failure modes the smoke layer
+cannot simulate (e.g. SQLite file delete mid-query).

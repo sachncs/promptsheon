@@ -14,8 +14,8 @@ go build -o promptsheon  ./cmd/promptsheon
 go build -o promptsheon-healthcheck ./cmd/promptsheon-healthcheck
 ```
 
-Requirements: Go 1.26+ (see `go.mod`). v0.2.0 is SQLite-only by design; no
-external database is required.
+Requirements: Go 1.26+ (see `go.mod`). SQLite is bundled
+via `modernc.org/sqlite`; no external database is required.
 
 ## 2. Configure environment
 
@@ -45,7 +45,7 @@ plugin-manifest status on boot. The first run creates
 
 ```bash
 curl http://localhost:8080/health
-# {"status":"healthy","version":"0.2.0","uptime":"..."}
+# {"status":"healthy","version":"0.3.0","uptime":"..."}
 
 curl http://localhost:8080/ready
 # {"status":"ready","go":"go1.26.x","database":"ok"}
@@ -113,28 +113,30 @@ MakerChecker approval policy requires a non-creator identity
 to vote before Activate succeeds.
 
 ```bash
-# 1. Create a Pending Release (as "alice").
+# 1. Create a Pending Release. Auth is `Authorization: Bearer ps_<key>`.
 REL=$(curl -sS -X POST http://localhost:8080/api/v1/versions/v1/releases \
+        -H 'Authorization: Bearer ps_<admin-key>' \
         -H 'Content-Type: application/json' \
-        -H 'X-Promptsheon-User: alice' \
         -d '{"environment":"prod"}' | jq -r .id)
 
-# 2. A non-creator identity ("bob") casts an Approve vote.
+# 2. Cast an Approve vote. The API key's role determines who can
+#    vote; the MakerChecker policy rejects a vote from the same
+#    identity that created the Release.
 curl -sS -X POST http://localhost:8080/api/v1/releases/$REL/votes \
+     -H 'Authorization: Bearer ps_<key>' \
      -H 'Content-Type: application/json' \
-     -H 'X-Promptsheon-User: bob' \
      -d '{"identity":"bob","decision":"approve"}'
 
 # 3. Activate (consults MakerChecker; 409 if preconditions fail
 #    or quorum is not satisfied).
 curl -sS -X POST http://localhost:8080/api/v1/releases/$REL/activate \
-     -H 'X-Promptsheon-User: alice'
+     -H 'Authorization: Bearer ps_<admin-key>'
 
 # 4. Invoke through the configured LLM provider. The Release
 #    decides provider + model; the request carries only the inputs.
 curl -sS -X POST http://localhost:8080/api/v1/releases/$REL/invoke \
+     -H 'Authorization: Bearer ps_<key>' \
      -H 'Content-Type: application/json' \
-     -H 'X-Promptsheon-User: alice' \
      -d '{"inputs":{"q":"hello"}}'
 # {"id":"<exec-id>", "model":"claude-...", "prompt_tokens":1, "output_tokens":42, "cost_usd":0.0014, ...}
 ```
@@ -170,11 +172,11 @@ curl http://localhost:8080/metrics | grep promptsheon_
 
 # Audit chain (admin-only).
 curl 'http://localhost:8080/api/v1/audit?user_id=alice&limit=20' \
-  -H 'X-Promptsheon-User: admin'
+  -H 'Authorization: Bearer ps_<admin-key>'
 
 # Verify the chain (admin-only; returns LastRowID, LastHash, etc.).
 curl http://localhost:8080/api/v1/audit/verify \
-  -H 'X-Promptsheon-User: admin'
+  -H 'Authorization: Bearer ps_<admin-key>'
 ```
 
 See [docs/observability.md](observability.md) and

@@ -14,9 +14,9 @@ the Capability consumes.
 
 [ADR 0010](adr/0010-version-is-a-manifest-not-a-bundle.md) is
 the design record. The legacy "bundle" model (a Version
-carried inline JSON for every artifact) was removed in
-v0.1.0; today's Version is a Manifest of `(kind, hash)`
-references.
+carried inline JSON for every artifact) was removed in the
+forward-only v0.1.0 cleanup; today's Version is a Manifest
+of `(kind, hash)` references.
 
 [ADR 0023](adr/0023-forward-only-cleanup.md) is the migration
 record — what was removed, what replaced it, and the rationale
@@ -63,7 +63,7 @@ is the design record.
 
 `modernc.org/sqlite` is the SQLite driver — pure Go, no CGo.
 [ADR 0006](adr/0006-modernc-sqlite-no-cgo.md) is the
-rationale. v0.1.x is SQLite-only.
+rationale. The shipped configuration is SQLite-only.
 
 ## slog as observability foundation
 
@@ -97,9 +97,10 @@ flat count-based threshold.
 ## Recommendation engine
 
 A deterministic rules engine (`internal/optimizer/rules`)
-plus a Thompson Sampling bandit (`internal/bandit`). Two
-phases: v0.1.x ships the rules engine; the bandit selector
-is a follow-on. [ADR 0021](adr/0021-bandit-foundation.md) is
+plus a Thompson Sampling bandit (`internal/bandit`). Both
+ship today and close the loop: production telemetry →
+Observation → rules/bandit → Recommendation → Decision →
+next Version. [ADR 0021](adr/0021-bandit-foundation.md) is
 the bandit design record.
 
 ## Plugin supervisor
@@ -108,20 +109,21 @@ In-process plugins (PII redactor, prompt-injection detection)
 ship as built-ins; remote plugins are subprocess binaries that
 implement the gRPC-over-UDS `PluginServer` contract
 ([ADR 0025](adr/0025-pluginproto.md)) or the net/rpc-over-UDS
-fallback for v0.1.x
-([ADR 0024](adr/0024-plugin-transport-uds.md)).
+fallback ([ADR 0024](adr/0024-plugin-transport-uds.md)).
 [ADR 0022](adr/0022-plugin-manifest.md) is the manifest
 format.
 
 ## Deferred items
 
 The architecture review board's deferred work
-([ADR 0019](adr/0019-deferred-items.md)) includes the
-Postgres backend (removed in v0.1.0), the bandit
-recommender (v0.4), and the full DAG workflow runtime with
-parallel branches and `depends_on`. Items in this ADR are
-informational only — operators wanting them can track the
-GitHub issues.
+([ADR 0019](adr/0019-deferred-items.md)) includes the live
+pgx wiring for the Postgres backend, the multi-region
+replication story, the CRDT idempotency cache + replay-set
+CRDT, the full DAG workflow runtime with parallel branches
+and `depends_on`, and webhook delivery retries +
+dead-letter queue. Items in this ADR are informational
+only — operators wanting them can track the GitHub
+issues.
 
 ## See also
 

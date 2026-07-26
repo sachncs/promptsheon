@@ -34,8 +34,7 @@ returns a clear error message naming the offending setting.
 | `PROMPTSHEON_ANTHROPIC_API_KEY` | (none) | Anthropic API key. |
 | `PROMPTSHEON_ANTHROPIC_BASE_URL` | (none) | Anthropic base URL override. |
 
-The daemon supports **OpenAI** and **Anthropic** in v0.2.0. Azure
-OpenAI, Ollama, and NVIDIA NIM were removed in v0.1.0. To add a
+The daemon supports **OpenAI** and **Anthropic**. To add a
 new provider, register it on the LLM `Registry` in
 `cmd/promptsheond/main.go` and write the SDK adapter under
 `internal/llm/`.
@@ -82,22 +81,23 @@ new provider, register it on the LLM `Registry` in
 
 ## Removed env vars
 
-The following env vars were removed in recent versions and are
-no longer read. Setting them is a no-op.
+The following env vars are no longer read by the daemon.
+Setting them is a no-op.
 
 - `PROMPTSHEON_LOG_FORMAT` (json|text) — output is always JSON.
-- `PROMPTSHEON_AUTHOR`, `PROMPTSHEON_TELEMETRY` — CLI-only,
-  not read by the server.
 - `PROMPTSHEON_LLM_FALLBACK` — the per-call fallback chain
   lives on the LLM `Registry`; configure multiple providers
   per model instead.
 - `PROMPTSHEON_DB_BUSY_TIMEOUT`, `PROMPTSHEON_DB_CACHE_SIZE` —
-  hardcoded at `?_pragma=busy_timeout(5000)` in `cmd/promptsheond/main.go`.
+  hardcoded at `?_pragma=busy_timeout(5000)` in
+  `cmd/promptsheond/main.go`.
 - `PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE` — per-endpoint allowlist
   was removed (SEC-4). Webhooks only accept HTTPS to non-private IPs.
-- `PROMPTSHEON_AZURE_*`, `PROMPTSHEON_OLLAMA_*`, `PROMPTSHEON_NVIDIA_*`
-  — providers removed in v0.1.0 (the v0.2.0 release keeps them
-  out and ships only Anthropic + OpenAI).
 - `PROMPTSHEON_AUTH_TEST` — no consumer.
 - `PROMPTSHEON_METRICS_ADDR` — the metrics endpoint binds on
   the same address as the API; gate it via `PermAuditRead`.
+
+`PROMPTSHEON_AUTHOR` and `PROMPTSHEON_TELEMETRY` are still
+read by the `promptsheon` CLI's `commit` subcommand (commit
+author + commit telemetry blob); they are not server-side
+config and the daemon ignores them.

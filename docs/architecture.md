@@ -89,13 +89,13 @@ the migration timeline, and the integration boundaries.
 | `store` | `internal/store/` | The SQLite-backed `Repository` implementation + migrations. |
 | `cli` | `cmd/promptsheon/` | Hand-rolled CLI dispatcher. |
 | `daemon` | `cmd/promptsheond/` | The server binary entry point. |
-| `auditbackfill` | `cmd/promptsheon-auditbackfill/` | One-shot audit replay tool. |
 | `healthcheck` | `cmd/promptsheon-healthcheck/` | Container health probe binary. |
 
 ## Migrations
 
 The store schema is versioned by `internal/store/migrations/*.up.sql`
-files. Migrations 001 through 013 ship in v0.2.0:
+files. Migrations 001 through 019 ship today (19 numbered up.sql
+files plus their down counterparts where applicable):
 
 | # | Name | Purpose |
 |---|------|---------|
@@ -106,34 +106,42 @@ files. Migrations 001 through 013 ship in v0.2.0:
 | 005 | `seed` | Seed data for dev. |
 | 006 | `security` | API keys + audit_chain_state. |
 | 007 | `views_and_triggers` | View layer. |
-| 008 | `destructive_cleanup` | Drop v0.0.7 prompts/agents tables. |
+| 008 | `destructive_cleanup` | Drop v0.0.7 prompts/agents tables (gated by env var). |
 | 009 | `vault_state` | Vault state. |
 | 010 | `ws_state` | Workspace state. |
 | 011 | `audit_archive` | Audit archive (OBS-RET-1). |
 | 012 | `enforcer_state` | Persisted Budget/Quota enforcer state (OBS-13). |
 | 013 | `idempotency_cache` | Idempotency-Key replay cache (API-IDEMP-1). |
+| 014 | `system_config` | System config CRDT. |
+| 015 | `seed_settings` | Initial settings seed. |
+| 016 | `bandit_arm_counters` | Persistent bandit arm counters. |
+| 017 | `system_config_crdt` | Vector-aware merge for system_config. |
+| 018 | `capability_contract` | Capability contract schema. |
+| 019 | `self_evolve` | Closed-loop self-evolution state. |
 
-To add a new migration, drop a `014_your_migration.up.sql` (and a
+To add a new migration, drop a `020_your_migration.up.sql` (and a
 `.down.sql`) in `internal/store/migrations/`. The next
 `./promptsheond` boot applies it.
 
 ## Storage backends
 
-v0.2.0 is **SQLite-only**. The Postgres backend was removed in
-v0.1.0 — operators who need it can drop in a Postgres
-implementation by satisfying the `store.Repository` interface
-in `internal/store/repo.go`. The repository abstraction lives
-with the consumer-defined package pattern (ADR-0012), so a
-Postgres implementation can be added without touching the
-domain packages.
+The daemon ships with SQLite (`modernc.org/sqlite`, CGo-free)
+as the production store. The Postgres backend lives at
+`internal/store/postgres/` and ships the init + RLS SQL
+bundles via `LoadSQL()` plus an `InMemoryPostgres` fixture for
+contract tests; the live pgx wiring is a follow-on. Operators
+that need a live Postgres backend today can satisfy the
+`store.Repository` interface in `internal/store/repo.go` — the
+repository abstraction lives with the consumer-defined
+package pattern (ADR-0012), so a Postgres implementation can
+be added without touching the domain packages.
 
 ## Provider registry
 
 `internal/llm/Registry` is the consumer-defined provider
-registry. v0.2.0 ships with **OpenAI** and **Anthropic**. Azure
-OpenAI, Ollama, and NVIDIA NIM were removed in v0.1.0. To add
-a new provider, register a factory on the `Registry` at
-process startup:
+registry. The daemon ships with **OpenAI** and **Anthropic**.
+To add a new provider, register a factory on the `Registry`
+at process startup:
 
 ```go
 r := llm.NewRegistry()
@@ -150,19 +158,18 @@ implementing that interface is all that's required.
 
 `internal/pluginsup` ties the plugin manifest to the
 `internal/supervisor.Supervisor` lifecycle. A manifest entry
-with a `binary:` line produces a `subprocess.Binary` (the
-v0.2.0 production transport: net/rpc over UDS); a manifest
-entry without a binary line is a pure registration entry that
-fails closed (`Remote.Start/Health` return
+with a `binary:` line produces a `subprocess.Binary`; a
+manifest entry without a binary line is a pure registration
+entry that fails closed (`Remote.Start/Health` return
 `errRemoteNotConfigured`) so operators see the gap in
 `/metrics` rather than a silent healthy stub.
 
 The gRPC over UDS transport (`internal/pluginproto`) is wired
 through `pluginsup.GRPCPlugin`, which dials a plugin binary's
 gRPC server and exposes the standard `supervisor.Plugin`
-interface. Today's production path remains net/rpc; the gRPC
-adapter is the upgrade path for plugin binaries that want
-streaming or richer auth.
+interface. The net/rpc transport remains as a fallback; the
+gRPC adapter is the production path for plugin binaries that
+want streaming or richer auth.
 
 ## Audit chain
 

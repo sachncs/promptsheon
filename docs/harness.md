@@ -105,7 +105,10 @@ are persisted alongside the aggregate.
 
 ## Scorers
 
-v0.2.0 ships four scorers:
+Five scorers are registered in `internal/eval` and
+discoverable via `eval.ValidScorers`. Four are wired at
+`init()`; the fifth (`llm_judge`) is registered lazily by
+the daemon with the production `JudgeClient`.
 
 | Scorer | Behaviour |
 |--------|-----------|
@@ -113,6 +116,7 @@ v0.2.0 ships four scorers:
 | `contains` | The model's `output` contains the case's `expected` as a substring. |
 | `regex` | The model's `output` matches the case's `expected` regex. |
 | `json_schema` | The model's `output` is valid JSON that conforms to the case's `expected` JSON Schema document. |
+| `llm_judge` | LLM-as-judge; the daemon's eval runner calls the configured judge with the model output and the case's expected value. Registered via `eval.RegisterLLMJudge(JudgeClient)`. |
 
 The `json_schema` scorer uses an allow-list of JSON Schema
 keywords (SEC-3); unsupported keywords cause a

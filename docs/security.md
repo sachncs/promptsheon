@@ -16,7 +16,7 @@ events. The threat model is:
 |--------|------------|
 | **Credential theft** — an attacker with access to the daemon host reads `promptsheon.db` and harvests provider API keys. | AES-256-GCM vault (or KMS-backed `KeyProvider` for production). TLS on every non-loopback bind. |
 | **Tamper of audit chain** — an attacker modifies a past audit row to hide a malicious action. | Hash chain (each row records the previous row's `entry_hash`; tampering breaks the chain). `VerifyAuditChain` walks the chain on demand. |
-| **Privilege escalation** — a non-admin user creates an admin release or approves their own. | `MakerCheckerPolicy` self-enforces separation of duties (no vote from the creator, configurable RequiredApprovers). `mature_creator_can_vote` is closed-set. |
+| **Privilege escalation** — a non-admin user creates an admin release or approves their own. | `MakerCheckerPolicy` self-enforces separation of duties (no vote from the creator, configurable RequiredApprovers). |
 | **SSRF via webhook URL** — an attacker registers a webhook to `http://169.254.169.254/latest/meta-data/` and harvests IAM credentials. | Webhooks refuse non-HTTPS URLs to non-private / non-loopback / non-link-local / non-multicast / non-unspecified addresses. The `allow_private` per-endpoint flag was removed (SEC-4). |
 | **BOLA / IDOR** — a user accesses another Workspace's data. | The auth model is workspace-scoped; permission checks happen at every handler. Per-workspace budgets + quotas are the billing boundary. |
 | **Prompt injection** — a user message tricks the LLM into exfiltrating data. | Built-in `injection` Guardrail. Heuristics catch the obvious cases ("ignore all previous instructions", role-confusion attacks); production deployments layer an LLM-judge behind the same Guardrail interface. |
@@ -30,7 +30,7 @@ on every authenticated endpoint. The OpenAPI spec lists the
 permission required for each route; the SDK and CLI pass
 those permissions through the key's role.
 
-Three roles ship in v0.2.0:
+Three roles ship:
 
 | Role | Permissions |
 |------|-------------|
@@ -95,16 +95,21 @@ API keys for upstream LLM providers live in the vault
 (`internal/vault`). The default implementation is AES-256-GCM
 with a master key from `PROMPTSHEON_VAULT_KEY` (32-byte hex).
 Production deployments should use a `KeyProvider` backed by a
-managed-key service (AWS KMS, HashiCorp Vault, etc.) via the
-`PROMPTSHEON_VAULT_KEY_PROVIDER` interface.
+managed-key service (AWS KMS, HashiCorp Vault, etc.) — see
+`internal/vault/kmsbyok` for the interface and the bundled
+BYOK adapters.
 
 The vault never holds plaintext keys in the database; only
-ciphertext + the key version + the algorithm identifier.
+ciphertext + the key version + the algorithm identifier. The
+production master-key wiring is a pluggable `KeyProvider`
+implementation registered at boot (see
+`internal/vault/kmsbyok`); the static
+`PROMPTSHEON_VAULT_KEY` is the local-dev default.
 
 ## Webhooks
 
 Webhook secrets are encrypted at rest in the vault
-(ADR-0027). Each delivery is signed with
+(ADR-0005). Each delivery is signed with
 `X-Promptsheon-Signature: sha256=<hex>` and includes a
 timestamp; the daemon rejects signatures older than 5 minutes.
 
@@ -120,7 +125,7 @@ The validation runs at registration AND at delivery time.
 
 ## Guardrails
 
-Two built-in Guardrails ship in v0.2.0:
+Two built-in Guardrails ship:
 
 - `internal/redactor` — strips PII patterns (emails, US SSNs,
   phone numbers, etc.) at the pre-LLM and post-LLM boundaries.
@@ -135,7 +140,9 @@ removing their entries from `PROMPTSHEON_PLUGINS_FILE`.
 ## Rate limiting
 
 The `ratelimit` middleware enforces a per-client rate cap
-(per-User or per-IP, configurable via `RATELIMIT_TRUSTED_PROXIES`).
+(per-User or per-IP; the set of proxies trusted to set
+`X-Forwarded-For` is configured via
+`PROMPTSHEON_TRUSTED_PROXIES`, a comma-separated CIDR list).
 The default is 100 req / 60s with a burst of 50. Rate-exceeded
 responses include a `Retry-After: 60` header.
 

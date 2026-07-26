@@ -1,9 +1,9 @@
 # LLM Providers
 
-Promptsheon ships with two LLM providers in v0.2.0:
-**OpenAI** and **Anthropic**. Both implement the
-`internal/llm.Provider` interface and register a factory on
-the `llm.Registry` at boot.
+Promptsheon ships with two LLM providers: **OpenAI** and
+**Anthropic**. Both implement the `internal/llm.Provider`
+interface and register a factory on the `llm.Registry` at
+boot.
 
 ## Wiring a provider
 
@@ -63,15 +63,14 @@ Chat Completions API is not used.
 | Base URL override | `PROMPTSHEON_ANTHROPIC_BASE_URL` |
 | Smoke test | `promptsheon provider test anthropic --model claude-haiku-4-5` |
 
-## Removed providers
+## Adding a provider
 
-Azure OpenAI, Ollama, and NVIDIA NIM were removed in v0.1.0.
-To re-introduce any of them, implement the
-`internal/llm.Provider` interface (one method,
-`Complete(ctx, *Request) (*Response, error)`) and register a
-factory on the `Registry` in `cmd/promptsheond/main.go`. The
-registry is the integration boundary — no domain code needs
-to change.
+The shipped set is OpenAI + Anthropic. To add a new
+provider, implement the `internal/llm.Provider` interface
+(one method, `Complete(ctx, *Request) (*Response, error)`)
+and register a factory on the `Registry` in
+`cmd/promptsheond/main.go`. The registry is the integration
+boundary — no domain code needs to change.
 
 ```go
 r := llm.NewRegistry()
@@ -100,11 +99,11 @@ invalidates the cached instance.
 `internal/llm/circuitbreaker.go` ships a circuit breaker
 that wraps any `Provider` with success/failure tracking and
 state transitions (`closed` / `open` / `half-open`). The
-daemon doesn't wire it into the default providers in v0.2.0
-because the OpenAI and Anthropic SDKs already retry on
-transient errors; production tenants who need their own
-policy wrap a `Provider` with `NewCircuitBreakerMiddleware` at
-startup.
+daemon does not wire it into the default providers by
+default because the OpenAI and Anthropic SDKs already retry
+on transient errors; production tenants who need their own
+policy wrap a `Provider` with `NewCircuitBreakerMiddleware`
+at startup.
 
 ## Per-call API key override
 

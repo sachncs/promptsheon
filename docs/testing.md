@@ -1,20 +1,19 @@
 # Testing
 
-Promptsheon has nine test layers. The Makefile target `test`
-runs the first three; the rest are wired into CI as separate
+Promptsheon has eight test layers. The Makefile target `test`
+runs package tests; the rest are wired into CI as separate
 jobs so the default PR path stays fast.
 
 | Layer | What it covers | How to run |
 |-------|----------------|------------|
 | **Unit** | Every package's internal types and helpers. | `go test ./internal/...` |
-| **Integration** | A small set of cross-package tests in `tests/integration/` (the API + store round-trip). | `go test ./tests/integration/...` |
 | **Contract** | OpenAPI spec parses, every route is reachable on the mux, Go SDK surface is in sync. | `go test ./tests/contract/...` |
 | **End-to-end** | In-process daemon + real HTTP; auth + bootstrap paths. | `go test ./tests/e2e/...` |
-| **Smoke** | Boots a real daemon, runs every `examples/bash/*.sh`, tears down. | `bash tests/smoke/run.sh` |
+| **Smoke** | Boots a real daemon and runs the smoke harness. | `bash tests/smoke/run.sh` |
 | **Chaos** | SQLite file-delete mid-query doesn't panic. | `go test ./tests/chaos/...` |
 | **Load** | k6 scenarios in `tests/load/scenarios/*.js` (nightly). | `make load-test` |
 | **Property** | `testing/quick` covers the LLM gateway (`internal/llm/property_test.go`) and the bandit selector (`internal/bandit/property_test.go`). CAS-layer properties are follow-on. | `go test ./internal/llm/... ./internal/bandit/...` |
-| **Mutation** | (future) `go-mutesting` for domain packages. | non-goal for v0.2.0 |
+| **Mutation** | (future) `go-mutesting` for domain packages. | non-goal today |
 
 ## Layer-to-CI-job mapping
 
@@ -27,7 +26,7 @@ jobs so the default PR path stays fast.
 | Vulnerability scan | `security` (govulncheck + gosec) | every PR + master |
 | SBOM | `sbom` (syft) | tags only |
 | Load | `nightly-load` (nightly schedule) | nightly |
-| Fuzz | (future) `nightly-fuzz` | non-goal for v0.2.0 |
+| Fuzz | (future) `nightly-fuzz` | non-goal today |
 
 ## Layout
 
@@ -106,8 +105,7 @@ on the default `test` job.
 
 ## Smoke test
 
-The smoke test boots a fresh daemon, runs every
-`examples/bash/*.sh` against it, and tears down. It's
+The smoke test boots a fresh daemon and tears it down. It is
 intentionally not part of `make test` because it adds ~6s of
 wall-clock and depends on building `promptsheond`.
 
@@ -121,7 +119,7 @@ The script:
 2. Starts the daemon on `127.0.0.1:18080` with `PROMPTSHEON_AUTH=false`
    (so the smoke fixtures can call `/api/v1/setup`).
 3. Waits up to 6s for `/health` to return 200.
-4. Iterates `examples/bash/*.sh` with a fixture ID.
+4. Runs the configured smoke checks.
 5. Tears the daemon down on EXIT.
 
 ## End-to-end test
