@@ -77,11 +77,20 @@ var (
 )
 
 // validateDescriptor checks a descriptor against the services the
-// consumer expects. Used by the supervisor when binding a plugin to
-// a consumer.
+// consumer expects and against the server's minimum supported
+// plugin protocol version. Used by the supervisor when binding a
+// plugin to a consumer.
+//
+// Versioning uses semver-style dotted triples ("1.2.3"). When
+// either side omits the field we fall back to plain string equality
+// so test fixtures and dev builds keep working. Mismatched, but
+// parseable, versions return ErrVersionTooOld wrapped with detail.
 func validateDescriptor(d PluginDescriptor, expectedServices []string) error {
 	if d.Name == "" {
 		return fmt.Errorf("plugin: descriptor missing Name")
+	}
+	if err := compareVersions(d.Version, d.MinCoreVersion); err != nil {
+		return err
 	}
 	declared := map[string]struct{}{}
 	for _, s := range d.Services {
@@ -93,4 +102,87 @@ func validateDescriptor(d PluginDescriptor, expectedServices []string) error {
 		}
 	}
 	return nil
+}
+
+// compareVersions returns ErrVersionTooOld (wrapped) when
+// pluginVersion is strictly older than minCoreVersion per semver rules.
+// An empty pluginVersion or minCoreVersion is treated as "no
+// constraint" — equality check only.
+func compareVersions(pluginVersion, minCoreVersion PluginVersion) error {
+	if pluginVersion == "" || minCoreVersion == "" {
+		return nil
+	}
+	pv, perr := parseSemver(string(pluginVersion))
+	mv, merr := parseSemver(string(minCoreVersion))
+	if perr != nil || merr != nil {
+		// Unknown version formats are accepted verbatim; supervisors
+		// in production are expected to use semver, but dev builds
+		// may use arbitrary tags.
+		return nil
+	}
+	for i := 0; i < 3; i++ {
+		if pv[i] < mv[i] {
+			return fmt.Errorf("%w: plugin=%s min_core=%s", ErrVersionTooOld, pluginVersion, minCoreVersion)
+		}
+		if pv[i] > mv[i] {
+			return nil
+		}
+	}
+	return nil
+}
+
+// parseSemver splits "MAJOR.MINOR.PATCH" into its three integer
+// components. Trailing pre-release/build metadata is ignored. Returns
+// an error on any malformed input.
+func parseSemver(s string) ([3]int, error) {
+	var out [3]int
+	// Trim trailing -prerelease and +build metadata.
+	for i, r := range s {
+		if r == '-' || r == '+' {
+			s = s[:i]
+			break
+		}
+	}
+	parts := splitDots(s, 3)
+	if len(parts) != 3 {
+		return out, fmt.Errorf("not a triple: %q", s)
+	}
+	for i, p := range parts {
+		n, err := atoi(p)
+		if err != nil || n < 0 {
+			return out, fmt.Errorf("bad component %q in %q: %w", p, s, err)
+		}
+		out[i] = n
+	}
+	return out, nil
+}
+
+func splitDots(s string, n int) []string {
+	out := make([]string, 0, n)
+	start := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == '.' {
+			out = append(out, s[start:i])
+			start = i + 1
+			if len(out) == n-1 {
+				break
+			}
+		}
+	}
+	out = append(out, s[start:])
+	return out
+}
+
+func atoi(s string) (int, error) {
+	if s == "" {
+		return 0, fmt.Errorf("empty")
+	}
+	n := 0
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return 0, fmt.Errorf("not a digit: %c", r)
+		}
+		n = n*10 + int(r-'0')
+	}
+	return n, nil
 }

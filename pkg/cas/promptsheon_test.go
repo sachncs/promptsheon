@@ -106,7 +106,7 @@ func TestBlobRoundTrip(t *testing.T) {
 		t.Fatalf("data mismatch: expected %q, got %q", data, readObj.Data)
 	}
 
-	if !ObjectExists(hash) {
+	if ok, err := ObjectExists(hash); err != nil || !ok {
 		t.Fatal("ObjectExists() should be true for existing object")
 	}
 }
@@ -936,7 +936,7 @@ func TestConcurrentWrites(t *testing.T) {
 				t.Errorf("concurrent WriteObject(): %v", err)
 				return
 			}
-			if !ObjectExists(hash) {
+			if ok, err := ObjectExists(hash); err != nil || !ok {
 				t.Errorf("object should exist after write")
 			}
 		}(i)
@@ -1335,7 +1335,7 @@ func TestHEADRefName(t *testing.T) {
 		{"symbolic", "ref: refs/heads/main", "main"},
 		{"detached", "abc123", ""},
 		{"bare ref prefix", "ref: refs/heads/", ""},
-		{"malformed refs", "ref: refs/other/main", "refs/other/main"},
+		{"malformed refs", "ref: refs/other/main", ""},
 		{"empty", "", ""},
 	}
 	for _, tt := range tests {

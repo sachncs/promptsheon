@@ -2,6 +2,7 @@ package cas
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -114,7 +115,7 @@ func TestWalkReachableCommitChain(t *testing.T) {
 	c2, _ := Commit(th, []string{c1.Hash}, "a", "second", nil)
 
 	reachable := make(map[string]struct{})
-	walkReachable(c2.Hash, reachable)
+	walkReachable(c2.Hash, reachable, nil)
 
 	if _, ok := reachable[c2.Hash]; !ok {
 		t.Fatal("expected c2 to be reachable")
@@ -132,7 +133,7 @@ func TestWalkReachableBlob(t *testing.T) {
 	bh, _ := WriteObject(b)
 
 	reachable := make(map[string]struct{})
-	walkReachable(bh, reachable)
+	walkReachable(bh, reachable, nil)
 	if _, ok := reachable[bh]; !ok {
 		t.Fatal("expected blob hash to be reachable")
 	}
@@ -141,7 +142,7 @@ func TestWalkReachableBlob(t *testing.T) {
 func TestWalkReachableMissingObject(t *testing.T) {
 	reachable := make(map[string]struct{})
 	// A non-existent hash should be added to the set but not cause a panic.
-	walkReachable(strings.Repeat("a", 64), reachable)
+	walkReachable(strings.Repeat("a", 64), reachable, nil)
 	if _, ok := reachable[strings.Repeat("a", 64)]; !ok {
 		t.Fatal("expected missing hash to be added to reachable set")
 	}
@@ -158,14 +159,15 @@ func TestWalkReachableDedup(t *testing.T) {
 	c2, _ := Commit(th, []string{c1.Hash}, "a", "second", nil)
 
 	reachable := make(map[string]struct{})
-	walkReachable(c2.Hash, reachable)
-	if len(reachable) != 2 {
-		t.Fatalf("expected 2 reachable commits, got %d", len(reachable))
+	walkReachable(c2.Hash, reachable, nil)
+	// Expected reachable: c2, c1, the shared tree, the blob.
+	if len(reachable) != 4 {
+		t.Fatalf("expected 4 reachable objects (c2, c1, tree, blob), got %d", len(reachable))
 	}
 	// Second walk should be idempotent (no double-count).
-	walkReachable(c2.Hash, reachable)
-	if len(reachable) != 2 {
-		t.Fatalf("expected still 2 after duplicate walk, got %d", len(reachable))
+	walkReachable(c2.Hash, reachable, nil)
+	if len(reachable) != 4 {
+		t.Fatalf("expected still 4 after duplicate walk, got %d", len(reachable))
 	}
 }
 
@@ -222,29 +224,29 @@ func TestJSONNumberParseString(t *testing.T) {
 func TestErrIsWrapped(t *testing.T) {
 	base := fmt.Errorf("base error")
 	wrapped := fmt.Errorf("wrapped: %w", base)
-	if !errIs(wrapped, base) {
-		t.Fatal("expected errIs to find base in wrapped")
+	if !errors.Is(wrapped, base) {
+		t.Fatal("expected errors.Is to find base in wrapped")
 	}
 }
 
 func TestErrIsUnrelated(t *testing.T) {
 	base := fmt.Errorf("base error")
 	other := fmt.Errorf("other error")
-	if errIs(base, other) {
-		t.Fatal("expected errIs to return false for unrelated error")
+	if errors.Is(base, other) {
+		t.Fatal("expected errors.Is to return false for unrelated error")
 	}
 }
 
 func TestErrIsNil(t *testing.T) {
-	if errIs(nil, fmt.Errorf("err")) {
-		t.Fatal("expected errIs(nil, err) to return false")
+	if errors.Is(nil, fmt.Errorf("err")) {
+		t.Fatal("expected errors.Is(nil, err) to return false")
 	}
 }
 
 func TestErrIsExactMatch(t *testing.T) {
 	base := fmt.Errorf("base error")
-	if !errIs(base, base) {
-		t.Fatal("expected errIs to match identical error")
+	if !errors.Is(base, base) {
+		t.Fatal("expected errors.Is to match identical error")
 	}
 }
 
@@ -255,7 +257,7 @@ func (e *notWrapping) Error() string { return e.msg }
 func TestErrIsNoUnwrap(t *testing.T) {
 	base := fmt.Errorf("base error")
 	nw := &notWrapping{msg: "wrapping intentionally not implemented"}
-	if errIs(nw, base) {
+	if errors.Is(nw, base) {
 		t.Fatal("expected false when error does not implement Unwrap")
 	}
 }
@@ -265,23 +267,23 @@ func TestErrIsNoUnwrap(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSetLogger(t *testing.T) {
-	old := logger
-	defer func() { logger = old }()
+	old := loggerPtr.Load()
+	defer func() { SetLogger(old) }()
 
 	newLogger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	SetLogger(newLogger)
-	if logger != newLogger {
+	if got := loggerPtr.Load(); got != newLogger {
 		t.Fatal("SetLogger did not update the package logger")
 	}
 }
 
 func TestSetLoggerNil(t *testing.T) {
-	old := logger
-	defer func() { logger = old }()
+	old := loggerPtr.Load()
+	defer func() { SetLogger(old) }()
 
 	SetLogger(nil)
-	if logger != old {
-		t.Fatal("SetLogger(nil) should be a no-op")
+	if got := loggerPtr.Load(); got == old {
+		t.Fatal("SetLogger(nil) should restore the default logger")
 	}
 }
 
@@ -1109,13 +1111,24 @@ func TestVerifyWithHashMismatch(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestObjectExistsInvalidHash(t *testing.T) {
-	if ObjectExists("short") {
+	ok, err := ObjectExists("short")
+	if err == nil {
+		t.Fatal("expected error for invalid hash")
+	}
+	if ok {
 		t.Fatal("expected false for invalid hash")
 	}
 }
 
 func TestObjectExistsNonExistent(t *testing.T) {
-	if ObjectExists(strings.Repeat("c", 64)) {
+	setupTestRepo(t)
+	defer teardownTestRepo(t)
+
+	ok, err := ObjectExists(strings.Repeat("c", 64))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ok {
 		t.Fatal("expected false for non-existent object")
 	}
 }
@@ -1125,9 +1138,9 @@ func TestObjectExistsNonExistent(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestWriteObjectWithDebugLogger(t *testing.T) {
-	old := logger
-	defer func() { logger = old }()
-	logger = slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	old := loggerPtr.Load()
+	defer func() { SetLogger(old) }()
+	SetLogger(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
 	setupTestRepo(t)
 	defer teardownTestRepo(t)
@@ -1152,9 +1165,9 @@ func TestWriteObjectWithDebugLogger(t *testing.T) {
 }
 
 func TestReadObjectWithDebugLogger(t *testing.T) {
-	old := logger
-	defer func() { logger = old }()
-	logger = slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	old := loggerPtr.Load()
+	defer func() { SetLogger(old) }()
+	SetLogger(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
 	setupTestRepo(t)
 	defer teardownTestRepo(t)
@@ -1169,9 +1182,9 @@ func TestReadObjectWithDebugLogger(t *testing.T) {
 }
 
 func TestCommitWithDebugLogger(t *testing.T) {
-	old := logger
-	defer func() { logger = old }()
-	logger = slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	old := loggerPtr.Load()
+	defer func() { SetLogger(old) }()
+	SetLogger(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
 	setupTestRepo(t)
 	defer teardownTestRepo(t)
@@ -1186,9 +1199,9 @@ func TestCommitWithDebugLogger(t *testing.T) {
 }
 
 func TestDeleteBranchWithDebugLogger(t *testing.T) {
-	old := logger
-	defer func() { logger = old }()
-	logger = slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	old := loggerPtr.Load()
+	defer func() { SetLogger(old) }()
+	SetLogger(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
 	setupTestRepo(t)
 	defer teardownTestRepo(t)
@@ -1207,9 +1220,9 @@ func TestDeleteBranchWithDebugLogger(t *testing.T) {
 }
 
 func TestCheckoutWithDebugLogger(t *testing.T) {
-	old := logger
-	defer func() { logger = old }()
-	logger = slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	old := loggerPtr.Load()
+	defer func() { SetLogger(old) }()
+	SetLogger(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
 	setupTestRepo(t)
 	defer teardownTestRepo(t)
