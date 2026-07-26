@@ -47,13 +47,15 @@ function prettyTab(t) {
   return ({ alerts: "Alerts", webhooks: "Webhooks", vault: "Vault", providers: "Providers", users: "Users", reasoning: "Reasoning" })[t] || t;
 }
 
-export function renderView(route) {
+export async function renderView(route) {
   const view = window.document.getElementById("view");
   const title = window.document.getElementById("page-title");
   if (!view) return;
   const matched = resolve(route);
   if (matched) {
-    view.innerHTML = matched(route);
+    const htmlOrPromise = matched(route);
+    const out = htmlOrPromise && typeof htmlOrPromise.then === "function" ? await htmlOrPromise : htmlOrPromise;
+    view.innerHTML = typeof out === "string" ? out : "";
   } else {
     view.innerHTML = renderNotFound(route);
   }
