@@ -82,6 +82,7 @@ jobs:
       - name: Run load scenarios
         run: |
           mkdir -p /tmp/load-results
+          failed=0
           for scenario in tests/load/scenarios/*.js; do
             name=$(basename "$scenario" .js)
             echo "=== Running $name ==="
@@ -93,8 +94,12 @@ jobs:
             k6 run "$scenario" $duration_arg \
               --out json=/tmp/load-results/$name.json \
               --summary-trend-stats="avg,min,med,p(95),p(99),max" \
-              || echo "scenario $name failed; continuing so other scenarios run"
+            || { echo "SCENARIO FAILED: $name"; failed=1; }
           done
+          if [ "$failed" -ne 0 ]; then
+            echo "One or more scenarios failed (threshold breach or error)"
+            exit 1
+          fi
 
       - name: Summarise results
         # Print the summary lines from each scenario so the job
