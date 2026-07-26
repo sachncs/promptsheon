@@ -56,7 +56,7 @@ func NewOTelTracer(serviceName string) *OTelTracer {
 
 // Start creates a new root span using OpenTelemetry.
 func (t *OTelTracer) Start(ctx context.Context, operation string) *Span {
-	ctx, otelSpan := t.tracer.Start(ctx, operation,
+	_, otelSpan := t.tracer.Start(ctx, operation,
 		oteltrace.WithSpanKind(oteltrace.SpanKindInternal),
 	)
 

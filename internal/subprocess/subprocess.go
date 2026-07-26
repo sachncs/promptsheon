@@ -54,7 +54,6 @@ type Binary struct {
 
 	mu        sync.Mutex
 	lastStart time.Time
-	crashed   bool
 	stopped   bool
 }
 

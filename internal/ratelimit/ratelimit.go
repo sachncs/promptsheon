@@ -56,19 +56,6 @@ func init() {
 	ConfigureTrustedProxies(os.Getenv("PROMPTSHEON_TRUSTED_PROXIES"))
 }
 
-func mergeCIDRs(a, b *net.IPNet) *net.IPNet {
-	// Both a and b are valid CIDRs; produce a single IPNet that
-	// covers the union by widening to the smaller mask. The
-	// limiter only needs Contains() to work.
-	if mask, _ := a.Mask.Size(); mask > 0 {
-		bits, _ := b.Mask.Size()
-		if bits < mask {
-			return b
-		}
-	}
-	return a
-}
-
 func realRemoteAddr(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

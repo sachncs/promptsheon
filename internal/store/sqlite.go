@@ -582,7 +582,6 @@ func (s *SQLite) ListAudit(ctx context.Context, filter *models.AuditFilter) ([]*
 		limit = 0
 	}
 	if filter.Offset > 0 && limit == 0 {
-		limit = -1
 		query += " LIMIT -1 OFFSET ?"
 		args = append(args, filter.Offset)
 	} else {

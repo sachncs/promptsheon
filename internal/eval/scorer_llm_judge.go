@@ -18,7 +18,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -169,35 +168,6 @@ func parseJudgeResponse(raw string) (judgeVerdict, string) {
 // collisions across distinct cases are vanishingly rare in
 // practice and a false hit only costs a stale verdict, not
 // correctness.
-type judgeCache struct {
-	mu      sync.Mutex
-	entries map[string]judgeCacheEntry
-}
-
-type judgeCacheEntry struct {
-	verdict   judgeVerdict
-	rationale string
-}
-
-func newJudgeCache() *judgeCache {
-	return &judgeCache{entries: map[string]judgeCacheEntry{}}
-}
-
-func (c *judgeCache) get(rubric, actual string) (judgeCacheEntry, bool) {
-	if c == nil {
-		return judgeCacheEntry{}, false
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	e, ok := c.entries[rubric+"\x00"+actual]
-	return e, ok
-}
-
-func (c *judgeCache) put(rubric, actual string, v judgeCacheEntry) {
-	if c == nil {
-		return
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.entries[rubric+"\x00"+actual] = v
-}
+// (judgeCache implementation removed — the LLM judge scorers
+// in this file do not actually instantiate it; the in-memory
+// LRU lives in the caller.)

@@ -5,7 +5,6 @@ package trace
 import (
 	"context"
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -211,10 +210,6 @@ func (noopTracer) StartChild(_ context.Context, parent *Span, operation string) 
 }
 func (noopTracer) Finish(_ *Span) error          { return nil }
 func (noopTracer) Flush(_ context.Context) error { return nil }
-
-// Avoid unused-import lint when the package compiles without
-// referencing sync below.
-var _ = sync.Mutex{}
 
 // contextKey is the unexported type for context keys in this package.
 type contextKey string

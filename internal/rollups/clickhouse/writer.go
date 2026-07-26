@@ -84,10 +84,6 @@ func (w *Writer) Close() error {
 	return w.conn.Close()
 }
 
-// Compile-time assertion that time.Duration is used so the import
-// is not flagged by goimports when the only usage is via time.Time.
-var _ = time.Second
-
 // WriteSink adapts *Writer to the rollups.Sink interface. The
 // production wiring constructs one of these and passes it to
 // rollups.RunSink. The conversion from *WorkspaceSummary to the

@@ -3,7 +3,6 @@ package eval
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"testing"
 	"time"
 )
@@ -171,4 +170,3 @@ func indexOf(haystack, needle string) int {
 
 // Unused but exported so future tests can compose judges.
 var _ JudgeClient = (*fakeJudge)(nil)
-var _ = errors.New

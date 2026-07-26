@@ -68,18 +68,6 @@ func LoadSQLFiles() (initSQL, rlsSQL string) {
 	return string(initBytes), string(rlsBytes)
 }
 
-// initSQLBundle / rlsSQLBundle are populated at init time
-// from the embedded migration files. Tests assert these are
-// non-empty; production wiring uses LoadSQL().
-var (
-	initSQLBundle string
-	rlsSQLBundle  string
-)
-
-func init() {
-	initSQLBundle, rlsSQLBundle = LoadSQLFiles()
-}
-
 // InMemoryPostgres is an in-memory Repository implementation
 // that satisfies the same interfaces as the SQLite backend.
 // It is intended for:

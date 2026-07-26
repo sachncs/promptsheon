@@ -20,7 +20,6 @@ package recommendation
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"sync"
 	"time"
@@ -124,6 +123,3 @@ func generateID(prefix string) string {
 type noopWriter struct{}
 
 func (noopWriter) Write(b []byte) (int, error) { return len(b), nil }
-
-// JSON serialisation helper used by tests and external emitters.
-func marshalJSON(v any) ([]byte, error) { return json.Marshal(v) }

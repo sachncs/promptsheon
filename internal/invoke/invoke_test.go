@@ -7,22 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/approval"
 	"github.com/sachncs/promptsheon/internal/budget"
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/eventbus"
 	"github.com/sachncs/promptsheon/internal/executor"
 	"github.com/sachncs/promptsheon/internal/observation"
-	"github.com/sachncs/promptsheon/internal/optimizer/rules"
 	"github.com/sachncs/promptsheon/internal/quota"
 )
-
-type fakeBus struct{}
-
-func (fakeBus) Subscribe(_ eventbus.Handler, _ ...capability.EventType) (eventbus.Subscription, error) {
-	return nil, nil
-}
-func (fakeBus) Publish(_ capability.Event) error { return nil }
 
 func TestInvokeHappyPath(t *testing.T) {
 	t.Parallel()
@@ -115,10 +104,3 @@ var _ AggregatorConsumer = (*observation.Aggregator)(nil)
 // recommendations. We import it for completeness so a later
 // refactor that moves rules to internal/optimizer does not lose
 // the read-side dependency.
-var _ = rules.NewEngine
-
-// Sentinel: approval is wired up in production through the
-// release.ApproveWith path (commit 3a4d4d0). The Invoker does not
-// touch it today; the alias here documents the dependency so a
-// reviewer can follow the chain.
-var _ = approval.Approval{}

@@ -16,11 +16,6 @@ import (
 	"time"
 )
 
-// interfaceCtx aliases context.Context to avoid a file-scoped import
-// cycle when the Repository methods are reproduced below. It is
-// identical to context.Context.
-type interfaceCtx = context.Context
-
 // Signal enumerates the metrics the SLO can target.
 type Signal string
 
