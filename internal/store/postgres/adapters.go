@@ -13,7 +13,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"time"
 
@@ -617,7 +616,3 @@ func (a *harnessAdapter) CreateEvalResult(_ context.Context, r *harness.EvalResu
 func (a *harnessAdapter) ListEvalResultsForRun(_ context.Context, runID string) ([]harness.EvalResult, error) {
 	return a.p.evalResults[runID], nil
 }
-
-// Unused but exported so future tests can compose the
-// adapters.
-var _ = sql.ErrNoRows

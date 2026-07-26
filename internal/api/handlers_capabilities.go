@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,25 +14,11 @@ import (
 	"github.com/sachncs/promptsheon/internal/invoke"
 )
 
-// translateGetError is retained as a thin wrapper over the
-// shared translateDBError helper (API-4a) so existing call
-// sites in this file don't have to be renamed. New code should
-// call translateDBError directly.
-func translateGetError(err error, resource string) error {
-	return translateDBError(err, resource)
-}
-
 // computeManifestHash returns the canonical SHA-256 hex of a Manifest
-// in its JSON serialisation. It is used to set Version.ManifestHash,
-// which becomes the deduplication key on the CAS table that the
-// content-addressable store will be backed by in a later milestone.
+// in its JSON serialisation. It delegates to the domain-level
+// ComputeManifestHash so the hash algorithm stays in one place.
 func computeManifestHash(m capability.Manifest) (string, error) {
-	b, err := json.Marshal(m)
-	if err != nil {
-		return "", err
-	}
-	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:]), nil
+	return capability.ComputeManifestHash(m)
 }
 
 func (s *Server) handleListWorkspaces(w http.ResponseWriter, r *http.Request) error {
@@ -464,20 +449,6 @@ type versionResolverAdapter struct {
 
 func (a *versionResolverAdapter) GetVersion(id string) (*capability.Version, error) {
 	return a.repo.GetVersion(context.Background(), id)
-}
-
-// sha256Hex returns hex(sha256(b)).
-func sha256Hex(b []byte) string {
-	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:])
-}
-
-// legacyPlaceholderHash is used when marshalling fails. It is a
-// recognisable 64-hex string that flags the row as having arrived via
-// the migration rather than the canonical CAS path.
-func legacyPlaceholderHash(kind capability.ArtifactKind) string {
-	digest := sha256.Sum256([]byte("legacy:" + string(kind)))
-	return hex.EncodeToString(digest[:])
 }
 
 func (s *Server) handleGetVersion(w http.ResponseWriter, r *http.Request) error {

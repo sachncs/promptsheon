@@ -12,11 +12,6 @@ import (
 	"github.com/sachncs/promptsheon/internal/schedule"
 )
 
-// storeErrNotFound re-exports the package-level ErrNotFound so
-// repository implementations can return a typed sentinel
-// without a circular import on the callers' packages.
-var storeErrNotFound = ErrNotFound
-
 // ensure SQLite implements the consumer-defined capability.Repository
 // and schedule.Repository interfaces.
 var (
@@ -475,7 +470,7 @@ func (s *SQLite) GetCapabilityContract(ctx context.Context, capabilityID string)
 	).Scan(&blast, &rubric, &auto, &inJSON, &outJSON, &maxP95, &minSuccess, &maxHallu)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, storeErrNotFound
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("get contract: %w", err)
 	}
@@ -595,17 +590,6 @@ func scanCapability(scanner interface {
 // ---------------------------------------------------------------------------
 // Capability Versions
 // ---------------------------------------------------------------------------
-
-// marshalField is the single remaining helper from the legacy
-// versionJSONFields shape. F-05 forward-only: Version carries
-// only the Manifest; the per-artifact JSON columns are gone.
-func marshalField(v any) (string, error) {
-	b, err := marshalOrErr(v)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
-}
 
 func (s *SQLite) CreateVersion(ctx context.Context, v *capability.Version) error {
 	manifestJSON, err := marshalOrErr(v.Manifest)
