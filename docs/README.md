@@ -23,13 +23,13 @@ Welcome to the Promptsheon documentation. This is the master index. The full sou
 |---|---|
 | [Getting Started](getting-started.md) | First run, build, and basic usage. |
 | [Configuration](configuration.md) | Every environment variable and its default. |
-| [LLM Providers](llm-providers.md) | OpenAI, Anthropic, Azure OpenAI, Ollama, NVIDIA NIM. |
+| [LLM Providers](llm-providers.md) | OpenAI and Anthropic provider wiring; how to add a new one. |
 | [CLI](cli.md) | The `promptsheon` client binary. |
-| [SDK](sdk.md) | The Go client library. |
+| [SDK](sdk.md) | The Go, Python, and TypeScript client libraries. |
 | [API Reference](api-reference.md) | Human summary of the REST API. The [OpenAPI spec](../api/openapi.yaml) is the source of truth. |
 | [Workflows](workflows.md) | DAG-based multi-step agents. |
 | [Harness engineering](harness.md) | Why the harness surface exists; the Capability / Version / Release / Eval stack. |
-| [Evaluations (v0.1.0)](eval.md) | Datasets, preconditions, eval runs — the harness loop. |
+| [Evaluations](eval.md) | Datasets, preconditions, eval runs — the harness loop. |
 | [Guardrails](guardrails.md) | Content policy enforcement. |
 | [FAQ](faq.md) | Frequently asked questions. |
 | [Glossary](glossary.md) | Terminology reference. |
@@ -65,7 +65,7 @@ Welcome to the Promptsheon documentation. This is the master index. The full sou
 - **Prometheus metrics**: `GET /metrics`
 - **Audit chain verify**: `GET /api/v1/audit/verify`
 - **CLI help**: `./promptsheon help`
-- **Server help**: `./promptsheond` (the server has no `--help`; configuration is via env vars — see [Configuration](configuration.md))
+- **Server help**: `./promptsheond --help` (configuration is via env vars — see [Configuration](configuration.md))
 - **Makefile targets**: `make help`
 
 ## Authoring guide

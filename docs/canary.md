@@ -51,20 +51,21 @@ mechanisms work in blue-green mode:
 - Atomic cutover: flip the ingress to the new daemon, drain
   the old.
 
-The `PROMPTSHEON_LEADER_ELECTION=true` flag (ADR-0030) keeps
-the audit chain and migration application single-writer across
+The `PROMPTSHEON_LEADER_ELECTION=true` flag keeps the audit
+chain and migration application single-writer across
 replicas. Production tenants that need blue-green typically
-run the old + new as a single leader-eligible pair during the
-cutover, then drop the old replica after the new one is
-elected.
+run the old + new as a single leader-eligible pair during
+the cutover, then drop the old replica after the new one
+is elected.
 
 ## Feature flags
 
-In v0.2.0 the only feature flag is `PROMPTSHEON_READ_ONLY`.
-A future flag surface — `PROMPTSHEON_FEATURE_<name>` — is a
-follow-on. Today, operators who need to disable a specific
-route while upgrading (e.g. to avoid the rate limiter
-behaviour) configure the route via the existing Options in
+The only runtime feature flag today is
+`PROMPTSHEON_READ_ONLY`. A future flag surface —
+`PROMPTSHEON_FEATURE_<name>` — is a follow-on. Today,
+operators who need to disable a specific route while
+upgrading (e.g. to avoid the rate limiter behaviour)
+configure the route via the existing Options in
 `internal/api/server.go`.
 
 ## Database migration ordering
@@ -74,8 +75,7 @@ migration greater than the highest version in `migrations`
 table, in order. Two daemons racing on the same `promptsheon.db`
 will race on the migrations table; enable
 `PROMPTSHEON_LEADER_ELECTION=true` so only the leader applies
-migrations. The leader-election layer is documented in
-ADR-0030.
+migrations.
 
 Destructive migrations (filename `*_destructive_*.sql`) are
 gated on `PROMPTSHEON_ALLOW_DESTRUCTIVE_MIGRATIONS=true`. The

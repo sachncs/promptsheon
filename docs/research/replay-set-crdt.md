@@ -1,12 +1,12 @@
 # Replay-set CRDT — design
 
 Research note. The "replay" subsystem in `internal/replay/`
-replays capability executions for forensic analysis. The
-v0.2.0 release stops short of multi-region; the replay
-output is a single SQLite table per replica. The v0.3.0+
-multi-region work needs a CRDT for the replay set so that
-two replicas can independently record replays and converge
-to the same set.
+replays capability executions for forensic analysis. Promptsheon
+v0.3.0 remains single-region; the replay output is a single
+SQLite table per replica. The v0.4.0+ multi-region work needs a
+CRDT for the replay set so that two replicas can independently
+record replays and converge to the same set.
+
 
 This note describes the replay-set CRDT: an immutable
 add-only set, the conflict semantics, and the retention
@@ -97,13 +97,13 @@ merge does not have to honor.
 
 ## 5. Status
 
-- **Shipped in v0.2.0**: this design doc. No code.
-- **NOT shipped in v0.2.0**: the replay-set CRDT. The
-  v0.2.0 release uses a single SQLite table per replica
-  with no cross-replica merge.
-- **Tracking**: the v0.3.0 multi-region work packages
-  the G-Set implementation; the design above is the
-  contract the implementation must satisfy.
+- **Current status**: this design doc is research only. No code.
+- **Not shipped**: the replay-set CRDT. The v0.3.0 release
+  uses a single SQLite table per replica with no cross-replica
+  merge.
+- **Tracking**: future multi-region work packages the G-Set
+  implementation; the design above is the contract the
+  implementation must satisfy.
 - **Replacement criteria**: when the operator's DR
   strategy is "hot standby" and the standby needs to
   serve forensic queries, the CRDT is required. Until

@@ -1,6 +1,6 @@
 <p align="center">
   <h1 align="center">Promptsheon</h1>
-  <p align="center">The Control Plane for AI Capabilities — v0.2.0</p>
+  <p align="center">The Control Plane for AI Capabilities — v0.3.0</p>
   <p align="center">
     <a href="#installation"><img src="https://img.shields.io/badge/go-1.26-00ADD8?logo=go" alt="Go"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
@@ -48,8 +48,11 @@ Beyond the deployment surface, Promptsheon ships:
   Allow() — contention scales linearly with the shard count.
 - **Postgres backend with RLS** — schema mirror in
   `internal/store/postgres/migrations/`; per-Workspace
-  row-level security policies. The pgx wiring ships in
-  v0.4.0; today the contract is exercised by tests.
+  row-level security policies. Today the package ships
+  `LoadSQL()` for the init + RLS bundles and an
+  `InMemoryPostgres` fixture; the pgx wiring is a follow-on
+  (see [docs/multi-region.md](docs/multi-region.md) for the
+  rationale).
 - **Recommendation Loop** — production telemetry → Observation
   → Rules/Bandit → Recommendation → Decision → next Version.
   The loop is closed end-to-end and persists across restarts.
@@ -63,17 +66,18 @@ v0.1.0 is the forward-only baseline; the legacy bundle model
 and the v0.0.7 prompts/agents tables are gone (see
 [CHANGELOG.md](CHANGELOG.md) for the migration path).
 
-The v0.2.0 release adds the audit-chain TLA+ spec,
+The v0.3.0 release ships the audit-chain TLA+ spec,
 doc-freshness gating in CI, an mdBook documentation site, a
 curated benchmark set plus a k6 p99 gate, and a clean release
 pipeline (cosign keyless, GHCR, GitHub artifact attestations).
 The runtime work (audit archival, bandit/settings CRDT,
 release resolver, vault hot-reload, API server facade, the
 sqliteimpl repository move, property tests, coverage / domain
-/ lint gates, KMS rotate) ships in the binary. Research notes
-for the unfinished CRDT idempotency cache and replay-set CRDT
-ship as design docs only; multi-region replication remains
-v0.3.0 work.
+/ lint gates, KMS rotate, LLM-judge scorer, native gRPC over
+UDS plugin transport) ships in the binary. Research notes
+for the unfinished CRDT idempotency cache, replay-set CRDT,
+and live pgx Postgres wiring ship as design docs only;
+multi-region replication is tracked as a follow-on.
 
 ---
 
@@ -89,7 +93,7 @@ v0.3.0 work.
 - **Workflow DAG** — Topological execution with tool integration
 - **Observability** — OpenTelemetry tracing, Prometheus metrics, audit logging
 - **Built-in Guardrails** — PII redaction and prompt-injection detection ship as in-process plugins through the supervisor
-- **Plugin SDK** — gRPC-over-UDS transport for remote plugins (the supervisor keeps `internal/subprocess` net/rpc available as the v0.2.0 fallback)
+- **Plugin SDK** — gRPC-over-UDS transport for remote plugins (the supervisor keeps `internal/subprocess` net/rpc available as the fallback)
 - **Webhooks** — Event-driven integrations with HMAC signing and SSRF protection
 - **Secrets Management** — Encrypted vault for API keys and sensitive configuration
 - **Rate Limiting** — Configurable per-client rate limiting with burst support
@@ -211,7 +215,7 @@ Promptsheon is configured via environment variables. Key settings:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PROMPTSHEON_ADDR` | `:8080` | Listen address |
-| `PROMPTSHEON_DB_PATH` | `promptsheon.db` | SQLite database file. v0.2.0 is SQLite-only by design; the Postgres backend was removed in v0.1.0. A shared backend (the prerequisite for multi-region replication) lands first in a future release. |
+| `PROMPTSHEON_DB_PATH` | `promptsheon.db` | SQLite database file. The daemon ships with SQLite; the Postgres backend (init + RLS bundles, in-memory fixture) is wired through `internal/store/postgres` and awaits the pgx follow-on. A shared backend (the prerequisite for multi-region replication) is tracked in [docs/multi-region.md](docs/multi-region.md). |
 | `PROMPTSHEON_AUTH` | `true` | Enable authentication. Set `false` only for local dev (and never on a non-loopback bind — the daemon refuses to start). |
 | `PROMPTSHEON_LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
 | `PROMPTSHEON_APPROVAL_POLICY` | `maker_checker` | Approval policy: `maker_checker` (creator cannot approve their own release) or `majority`. See [docs/release.md](docs/release.md). |
@@ -237,14 +241,14 @@ Promptsheon's headline surface is the [harness engineering](docs/harness.md) loo
 
 ```bash
 # 1. Add a dataset + a precondition to your capability
-promptsheon dataset create c1 greeting cases.json
-promptsheon precondition add c1 go-test "go test ./..." 60
+promptsheon dataset create c1 --name greeting --file cases.json
+promptsheon precondition add c1 --name go-test --cmd "go test ./..." --timeout 60
 
 # 2. Drive the iteration loop
 promptsheon release create <vid> '{"environment":"prod"}'
 promptsheon release vote <rid> bob approve
 promptsheon release activate <rid>      # 409 if preconditions fail
-promptsheon eval run <rid> <dataset_id>
+promptsheon eval run <rid> --dataset <dataset_id>
 ```
 
 See [docs/eval.md](docs/eval.md) for the eval primitive, [docs/harness.md](docs/harness.md) for the surface rationale, and the [OpenAI article](https://openai.com/index/harness-engineering/) that inspired the design.
@@ -303,7 +307,7 @@ The server is composed of layered modules:
 | **API** | HTTP handlers, middleware (auth, rate-limit, audit, CORS) |
 | **Capabilities** | Manifests, Releases, Approvals, Datasets, Preconditions, Evals |
 | **Harness** | The harness-engineering loop: datasets, preconditions, eval runs. See [docs/harness.md](docs/harness.md). |
-| **Storage** | CAS (Merkle DAG, `pkg/cas/`) + SQLite (v0.2.0 is SQLite-only) |
+| **Storage** | CAS (Merkle DAG, `pkg/cas/`) + SQLite (Postgres init + RLS SQL ships in `internal/store/postgres`; pgx wiring is a follow-on) |
 | **Providers** | Unified LLM provider abstraction layer (Anthropic + OpenAI) |
 | **Observability** | OpenTelemetry tracing, metrics collection, retention |
 | **Security** | AuthN/AuthZ, vault, guardrails, SSRF protection |
@@ -318,8 +322,7 @@ promptsheon/
 ├── cmd/
 │   ├── promptsheond/   # Server binary
 │   ├── promptsheon/    # CLI binary
-│   ├── promptsheon-healthcheck/   # Container health probe
-│   └── promptsheon-auditbackfill/ # One-shot audit replay tool
+│   └── promptsheon-healthcheck/   # Container health probe
 ├── api/                # OpenAPI spec and codegen
 ├── internal/           # Server-side implementation modules
 │   ├── capability/     # Workspace / Project / Capability / Version / Release / Approval types
@@ -437,9 +440,9 @@ See [docs/release.md](docs/release.md) for the full process.
 | Language | Go 1.26 |
 | HTTP Routing | stdlib `net/http.ServeMux` (Go 1.22+ pattern matching) |
 | CLI | Hand-rolled command dispatcher under `cmd/promptsheon/main.go` |
-| Storage | [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) (CGo-free SQLite). v0.2.0 is SQLite-only by design; the Postgres backend was removed in v0.1.0. |
+| Storage | [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) (CGo-free SQLite). The Postgres backend ships init + RLS SQL and an in-memory fixture under `internal/store/postgres`; pgx wiring is a follow-on. |
 | LLM SDKs | [`anthropics/anthropic-sdk-go`](https://github.com/anthropics/anthropic-sdk-go), [`openai/openai-go/v3`](https://github.com/openai/openai-go) (Responses API) |
-| RPC | [google.golang.org/grpc](https://grpc.io/docs/languages/go/) (plugin transport via UDS; net/rpc-over-UDS is the v0.2.0 fallback) |
+| RPC | [google.golang.org/grpc](https://grpc.io/docs/languages/go/) (plugin transport via UDS; net/rpc-over-UDS is the fallback) |
 | Observability | [OpenTelemetry](https://opentelemetry.io/), Prometheus |
 | Auth | OIDC, static API keys |
 | Vault | AES-256-GCM via [crypto/aes](https://pkg.go.dev/crypto/aes); KMS via pluggable `KeyProvider` |
@@ -471,25 +474,26 @@ Full documentation lives in **[docs/](docs/)**:
 
 ## Roadmap
 
-- **v0.2.0** — Current: forward-only Capability / Version / Release
-  model, CAS + Merkle DAG (`pkg/cas/`), MakerChecker approval, harness
-  engineering (datasets / preconditions / evals), Anthropic + OpenAI
-  via official SDKs, REST API, OTLP-only tracing, SQLite. Adds:
-  audit archival + chain-state tail cache, bandit + settings CRDT
-  persistence, release resolver, vault hot-reload, API server
-  facade, sqliteimpl repository move, property tests, coverage /
-  domain / lint gates, KMS key rotation, the v0.2.0 mdBook site,
-  curated Go benchmark set + k6 p99 gate, the cosign-keyless +
-  GitHub-attestation release pipeline.
-- **v0.3.0** — Multi-region replication (the v0.2.0 release stays
-  single-region by design — the Postgres backend was removed in
-  v0.1.0; a shared backend lands first), CRDT idempotency cache
-  + replay-set CRDT (design docs in `docs/research/`),
-  configurable retention, Prometheus exporter.
-- **v0.4.0** — Webhook delivery retries + dead-letter queue,
-  LLM-judge scorer for evals, native gRPC over UDS plugin transport.
-- **v1.0.0** — Stable API, gRPC streaming for real-time updates,
-  additional KMS integrations.
+- **v0.3.0** — Current release: forward-only Capability / Version /
+  Release model, CAS + Merkle DAG (`pkg/cas/`), MakerChecker
+  approval, harness engineering (datasets / preconditions /
+  evals), Anthropic + OpenAI via official SDKs, REST API,
+  OTLP-only tracing, SQLite. Adds audit archival + chain-state
+  tail cache, bandit + settings CRDT persistence, release
+  resolver, vault hot-reload, API server facade, sqliteimpl
+  repository move, property tests, coverage / domain / lint
+  gates, KMS key rotation, the mdBook site, curated Go
+  benchmark set + k6 p99 gate, the cosign-keyless +
+  GitHub-attestation release pipeline, LLM-judge scorer,
+  native gRPC over UDS plugin transport, configurable
+  retention, Prometheus exporter.
+- **v0.4.0** — Multi-region replication (the v0.3.0 release
+  stays single-region by design; a shared backend lands
+  first), CRDT idempotency cache + replay-set CRDT (design
+  docs in `docs/research/`), webhook delivery retries +
+  dead-letter queue, additional KMS integrations.
+- **v1.0.0** — Stable API, gRPC streaming for real-time
+  updates.
 
 ---
 

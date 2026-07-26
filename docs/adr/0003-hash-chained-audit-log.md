@@ -15,7 +15,7 @@ Plain `INSERT` rows do not satisfy this. A row can be `UPDATE`d and the change w
 
 We extend the `audit_entries` table with two columns: `previous_hash` and `entry_hash`. For every new entry, we compute `entry_hash` as the SHA-256 of a canonical representation of the entry plus the `entry_hash` of the previous entry. The chain starts with an empty `previous_hash` (zero-length string).
 
-A separate `audit_chain_state` table (migration `021`) holds the latest `entry_hash` so the chain can be verified in O(n) without re-scanning the whole table. The verifier endpoint `GET /api/v1/audit/verify` re-walks the chain and reports the first mismatched row, if any.
+A separate `audit_chain_state` table, created by migration `001`, holds the latest `entry_hash` so the chain can be verified in O(n) without re-scanning the whole table. The verifier endpoint `GET /api/v1/audit/verify` re-walks the chain and reports the first mismatched row, if any.
 
 The chain is canonical. Every entry is serialised with stable JSON (no whitespace, struct fields in declaration order, sorted map keys) before hashing. The canonicalisation function is the only one that touches the chain, so we cannot accidentally hash a representation that differs from the on-disk row.
 
@@ -32,7 +32,7 @@ Positive:
 
 - `GET /api/v1/audit/verify` returns the integrity status of the entire log in one call.
 - The chain is verifiable by anyone with read access to the database. No server-side secret is required.
-- Migrations `006`, `020`, and `021` together implement the chain without breaking older databases (the columns default to empty, and the chain is rebuilt lazily).
+- Migrations `001` and `006` together implement the chain; the columns default to empty for older databases and the chain is rebuilt lazily.
 
 Negative:
 

@@ -7,7 +7,7 @@ runtime check is the production guarantee; the spec is
 the maintainer-facing proof that the contract has been
 thought through.
 
-## Why this lands in v0.2.0
+## Why this lands in v0.3.0
 
 The audit chain is the load-bearing invariant for
 forensic analysis ("did anyone tamper with this log?").

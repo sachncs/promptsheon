@@ -52,13 +52,10 @@ flagged.
 ## Lint
 
 ```bash
-# Format, vet, lint in one shot.
-make check
-
-# Or individually.
-gofmt -w .
-go vet ./...
-golangci-lint run
+# Format, vet, and lint individually.
+make fmt
+make vet
+make lint
 ```
 
 The project enforces a gofmt-clean tree (`gofmt -l .` must
@@ -116,8 +113,7 @@ promptsheon/
 ├── cmd/
 │   ├── promptsheond/   # Server binary
 │   ├── promptsheon/    # CLI binary
-│   ├── promptsheon-healthcheck/   # Container health probe
-│   └── promptsheon-auditbackfill/ # One-shot audit replay tool
+│   └── promptsheon-healthcheck/   # Container health probe
 ├── api/                # Generated OpenAPI spec
 ├── internal/           # Server-side implementation
 │   └── ...             # (see docs/architecture.md for the package table)
@@ -125,8 +121,7 @@ promptsheon/
 ├── sdk/                # Go SDK (plus python/, typescript/)
 ├── deploy/             # Helm chart, Grafana dashboard, Prometheus alerts
 ├── docs/               # Markdown documentation + ADRs
-├── examples/           # End-to-end recipes
-├── tests/              # contract/, e2e/, smoke/
+├── tests/              # contract/, e2e/, smoke/, chaos/, load/
 ├── scripts/            # genopenapi, sync-version, ...
 ├── Makefile
 └── go.mod / go.sum
@@ -170,11 +165,12 @@ promptsheon/
 
 ## Adding a new migration
 
-1. Drop a `014_your_migration.up.sql` (and a `.down.sql`) in
+1. Drop a `020_your_migration.up.sql` (and a `.down.sql`) in
    `internal/store/migrations/`.
 2. Update the migration count in
    `internal/store/store_test.go` (`TestNewSQLiteRunsAllMigrations`).
-3. Update the migration table in `docs/architecture.md`.
+3. Update the migration table in
+   `docs/architecture.md`.
 4. The next `./promptsheond` boot applies it.
 
 ## Troubleshooting

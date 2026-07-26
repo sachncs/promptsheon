@@ -8,102 +8,83 @@ first (`./promptsheond`), then run CLI commands.
 ## Invocation
 
 ```bash
-promptsheon [global flags] <command> [subcommand] [args]
+promptsheon <command> [subcommand] [args]
+promptsheon --version | --help
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--base-url` | `http://127.0.0.1:8080` | Daemon base URL. |
-| `--api-key` | (none) | API key for `Authorization: Bearer`. Falls back to `PROMPTSHEON_API_KEY`. |
-| `--json` | `false` | Emit machine-readable JSON instead of the default human output. |
-| `--help` | | Show per-command help. |
+The CLI talks to the daemon over loopback HTTP. The base URL
+comes from the `PROMPTSHEON_SERVER` environment variable
+(default `http://localhost:8080`). The CLI does **not** send
+an `Authorization` header today; for an authenticated daemon
+the CLI must be run against a loopback listener or wrapped by
+a tool that injects the API key. The CLI's HTTP helpers
+refuse to talk to non-loopback hosts (`validateLocalURL` in
+`cmd/promptsheon/http.go`).
+
+`--version` (also `-version`, `-V`) prints the build info.
+`--help` (also `-help`, `-h`) prints the usage block.
 
 ## Commands
 
+The actual handler surface is registered in
+`cmd/promptsheon/main.go`'s `commandHandlers` map. Top-level
+commands:
+
 | Command | Description |
 |---------|-------------|
-| `promptsheon workspace list` | List Workspaces. |
-| `promptsheon workspace get <id>` | Get one Workspace. |
-| `promptsheon workspace create <name>` | Create a Workspace. |
-| `promptsheon project list <workspace_id>` | List Projects under a Workspace. |
-| `promptsheon project create <workspace_id> <name>` | Create a Project. |
-| `promptsheon capability list <project_id>` | List Capabilities under a Project. |
-| `promptsheon capability get <id>` | Get one Capability. |
-| `promptsheon capability create <project_id> <name>` | Create a Capability. |
-| `promptsheon version list <capability_id>` | List Versions. |
-| `promptsheon version get <id>` | Get one Version. |
-| `promptsheon version add <capability_id> <manifest.json>` | Add a Version from a manifest JSON file. |
-| `promptsheon release create <version_id> '<json>'` | Create a Pending Release. JSON: `{"environment":"prod"}`. |
-| `promptsheon release vote <release_id> <identity> <decision>` | Cast a vote. `<decision>` is `approve` or `reject`. |
-| `promptsheon release activate <release_id>` | Transition Pending → Active. 409 if MakerChecker quorum not satisfied. |
-| `promptsheon release rollback <release_id>` | Transition Active → RolledBack. |
-| `promptsheon release approval <release_id>` | Show the vote trail. |
-| `promptsheon release invoke <release_id> '<inputs-json>'` | Invoke a Release. JSON: `{"inputs": {...}}`. |
-| `promptsheon dataset create <capability_id> <name> [cases.json]` | Create a Dataset. |
-| `promptsheon dataset list <capability_id>` | List Datasets. |
-| `promptsheon dataset get <id>` | Get one Dataset (with cases). |
-| `promptsheon dataset put-cases <dataset_id> [cases.json]` | Replace cases atomically. |
-| `promptsheon dataset delete <id>` | Delete a Dataset. |
-| `promptsheon precondition add <capability_id> <name> <command> [timeout_sec]` | Add a Precondition. |
-| `promptsheon precondition list <capability_id>` | List Preconditions. |
-| `promptsheon precondition update <id> '<json>'` | Update a Precondition (partial fields). |
-| `promptsheon precondition delete <id>` | Delete a Precondition. |
-| `promptsheon eval run <release_id> <dataset_id> [scorer]` | Run an Eval. `<scorer>` is `exact_match`, `contains`, `regex`, or `json_schema`. |
-| `promptsheon eval list <release_id>` | List EvalRuns for a Release. |
-| `promptsheon eval get <id>` | Get an EvalRun with per-case results. |
-| `promptsheon provider list` | List registered LLM provider names. |
-| `promptsheon provider test <name> --model <model>` | Smoke-test a provider. `--model` is required. |
-| `promptsheon webhook list` | List webhook endpoints. |
-| `promptsheon webhook add '<json>'` | Register a webhook. JSON: `{"url":"https://...","events":["eval.completed",...],"secret?":"..."}`. |
-| `promptsheon webhook delete <id>` | Remove a webhook. |
-| `promptsheon vault add '<json>'` | Save a provider key. JSON: `{"provider_name":"openai","key_name":"prod","key":"sk-..."}`. |
-| `promptsheon vault list` | List provider keys. |
-| `promptsheon vault delete <id>` | Delete a provider key. |
-| `promptsheon user list` | List users. |
-| `promptsheon user create '<json>'` | Create a user. |
-| `promptsheon user get <id>` | Get a user. |
-| `promptsheon user update <id> '<json>'` | Update a user. |
-| `promptsheon user delete <id>` | Delete a user. |
-| `promptsheon alert list-rules` | List alert rules. |
-| `promptsheon alert add-rule '<json>'` | Create an alert rule. |
-| `promptsheon alert list-active` | List active (firing) alerts. |
-| `promptsheon alert resolve <id>` | Resolve an active alert. |
-| `promptsheon audit list [filters]` | List audit entries. Filters: `--user-id`, `--resource`, `--action`, `--since`, `--until`, `--limit`. |
-| `promptsheon audit verify` | Verify the chain. |
-| `promptsheon health` | Daemon liveness. |
-| `promptsheon version` | Daemon build version. |
+| `init` | Initialize a local CAS repository (`.promptsheon/`). |
+| `hash-object <data>` | Compute SHA-256 of `<data>`. |
+| `write-object <data>` | Write a blob to the local CAS. |
+| `read-object <hash>` | Read + pretty-print a CAS object. |
+| `commit <tree> [msg]` | Create a commit on the current branch. Reads `PROMPTSHEON_AUTHOR` and `PROMPTSHEON_TELEMETRY`. |
+| `log [n]` | Show commit history (newest first). |
+| `checkout <ref\|hash>` | Switch to a branch or commit. |
+| `branch [name] [hash]` | Create or list branches. |
+| `delete-branch <name>` | Delete a branch. |
+| `diff <hashA> <hashB>` | Diff two states. |
+| `status` | Repository state summary. |
+| `show <hash>` | Object details (type-aware). |
+| `ls-tree <hash>` | List tree entries. |
+| `cat-file <hash>` | Output blob content to stdout. |
+| `graph` | Commit DAG visualization. |
+| `stats` | Repository statistics. |
+| `verify` | Check repository integrity. |
+| `run --provider <p> --model <m> --prompt <text>` | Run a single prompt through the LLM gateway. |
+| `provider list` | List registered LLM providers. |
+| `provider test <name>` | Smoke-test a provider. |
+| `workspace list\|create\|get\|delete` | Workspace CRUD against the API. |
+| `project list <ws_id>\|create <ws_id> <name>\|get <id>\|delete <id>` | Project CRUD. |
+| `capability list <proj_id>\|create <proj_id> <name>\|get <id>\|delete <id>` | Capability CRUD. |
+| `release list <cap_id>\|create <ver_id> <env>\|get <id>\|vote <id> <identity> <approve\|reject\|abstain>\|activate <id>\|rollback <id>\|invoke <id> --model <m>\|approval <id>` | Release lifecycle. |
+| `dataset list <cap_id>\|create <cap_id> --name <n> [--file cases.json]\|get <id>\|put-cases <id> <file>\|delete <id>` | Dataset CRUD. |
+| `precondition list <cap_id>\|add <cap_id> --name <n> --cmd <c> [--timeout N]\|delete <id>` | Precondition CRUD. |
+| `eval list <rel_id>\|run <rel_id> --dataset <id> [--scorer <name>]\|get <id>` | Eval runner. |
+| `selfevolve enable <cap_id> [--dataset <id>] [--min-score N] [--max-revisions N] [--cooldown-sec N] [--target-env env]\|disable <cap_id>\|status <cap_id>` | Toggle closed-loop self-evolution on a Capability. |
 
 ## Examples
 
 ```bash
-# 1. Health probe.
-promptsheon health
-# healthy
-
-# 2. Drive a full Release lifecycle.
-promptsheon workspace create acme
-promptsheon project create w1 summariser
-promptsheon capability create p1 summariser
-promptsheon version add c1 manifest.json
-REL=$(promptsheon release create v1 '{"environment":"prod"}' | jq -r .id)
+# Drive a Release lifecycle against a running daemon.
+REL=$(promptsheon release create v1 prod | jq -r .id)
 promptsheon release vote $REL bob approve
 promptsheon release activate $REL
-promptsheon release invoke $REL '{"q":"hello"}'
+promptsheon release invoke $REL --model claude-haiku-4-5
 
-# 3. Run an Eval.
-promptsheon dataset create c1 greeting cases.json
-promptsheon eval run $REL <dataset_id> exact_match
+# Wire the harness loop.
+promptsheon dataset create c1 --name greeting --file cases.json
+promptsheon precondition add c1 --name go-test --cmd "go test ./..." --timeout 60
+promptsheon eval run $REL --dataset <dataset_id> --scorer exact_match
 
-# 4. Audit chain.
-promptsheon audit verify
-# {"ok":true, "last_row_id":42, "last_hash":"..."}
+# Enable closed-loop self-evolve.
+promptsheon selfevolve enable c1 --dataset <ds_id> --min-score 0.9 \
+  --max-revisions 10 --cooldown-sec 900 --target-env dev
+promptsheon selfevolve status c1
 ```
 
-## Scripting
+## Local-only HTTP client
 
-Every command supports `--json` for machine-readable output.
-Combine with `jq` for ad-hoc filtering:
-
-```bash
-promptsheon --json capability list p1 | jq '.[] | {id, name}'
-```
+The CLI's `httpGet` / `httpPost` / `httpDelete` helpers in
+`cmd/promptsheon/http.go` refuse any non-loopback host. The
+CLI is a thin wrapper over the daemon's REST API; anything
+beyond this surface goes through the [Go](sdk.md) /
+[Python](sdk.md) / [TypeScript](sdk.md) SDKs instead.

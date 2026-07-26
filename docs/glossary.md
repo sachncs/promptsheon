@@ -44,8 +44,8 @@ A Manifest references three required artifacts by `(kind, hash)`:
 Optional artifacts: `guardrails` (Guardrail references),
 `tools` (Tool references), `mcp_servers` (MCP server allowlist).
 `context_contract` and `memory` remain valid artifact kinds
-but are not required by `Manifest.Validate` (the runtime
-Resolver does not load them in v0.2.0 / v0.3.0).
+but are not required by `Manifest.Validate`; the runtime
+Resolver does not load them today.
 
 ## Release
 
@@ -97,11 +97,14 @@ aggregate.
 
 ## Scorer
 
-The scoring strategy. v0.2.0 ships:
+The scoring strategy. Five are registered via
+`eval.ValidScorers`:
 - `exact_match`
 - `contains`
 - `regex`
 - `json_schema`
+- `llm_judge` (registered lazily via
+  `eval.RegisterLLMJudge(JudgeClient)`)
 
 ## Approval Policy
 

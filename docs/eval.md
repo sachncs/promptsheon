@@ -53,8 +53,10 @@ the case's `EvalResult.Error` field and the case is marked
 
 ## Scorers
 
-v0.2.0 ships four scorers. Each is registered in
-`internal/eval` and discoverable via `eval.ValidScorers`:
+Five scorers are registered in `internal/eval` and
+discoverable via `eval.ValidScorers`. Four are wired at
+`init()`; the fifth (`llm_judge`) is registered lazily by
+the daemon with the production `JudgeClient`.
 
 | Scorer | Behaviour |
 |--------|-----------|
@@ -62,6 +64,7 @@ v0.2.0 ships four scorers. Each is registered in
 | `contains` | `strings.Contains(actual, expected)`. |
 | `regex` | `regexp.MatchString(expected, actual)`. |
 | `json_schema` | `expected` is a JSON Schema document; `actual` must be a valid JSON value that conforms to the schema. |
+| `llm_judge` | An LLM-as-judge scorer. Registered via `eval.RegisterLLMJudge(JudgeClient)` at boot; the daemon wires the production LLM gateway so an eval run can score by LLM verdict. |
 
 The `json_schema` scorer is gated by an allow-list of
 JSON Schema keywords (SEC-3). Unsupported keywords cause
@@ -100,10 +103,10 @@ ignored.
 
 ## Serial execution
 
-v0.2.0 runs cases serially. Each case invokes the Release
-through the configured LLM provider; the next case doesn't
-start until the previous finishes. Parallel execution
-ships in a follow-on.
+Cases run serially. Each case invokes the Release through
+the configured LLM provider; the next case doesn't start
+until the previous finishes. Parallel execution ships in a
+follow-on.
 
 ## SLOs
 

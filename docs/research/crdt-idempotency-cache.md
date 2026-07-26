@@ -1,6 +1,6 @@
 # CRDT idempotency cache — design and the smallest transactional reservation path
 
-Research note. Tracks the v0.2.0 work package: the idempotency
+Research note. Tracks future multi-region work: the idempotency
 cache currently lives in `internal/api/idempotency.go` (a
 SQLite-backed cache) and a synchronous path inside the
 request handler. The cache is **not** a CRDT today; this
@@ -74,7 +74,7 @@ point if a future commit lands.
 ### Sketch
 
 ```sql
--- migration v0.2.0 (idempotency_reservation.up.sql)
+-- future migration (idempotency_reservation.up.sql)
 CREATE TABLE idempotency_reservation (
     scope_key    TEXT PRIMARY KEY,
     created_at   TEXT NOT NULL,
@@ -125,18 +125,15 @@ The CRDT work becomes priority when:
   "snapshot replicate" (the latter can stay SQLite + can
   tolerate per-replica semantics).
 
-The v0.2.0 release does not enable any of those. The
-smallest transactional reservation path above is the
-v0.2.0 deliverable. The CRDT lands in v0.3.0 alongside
-the multi-region work.
+The current v0.3.0 release does not enable any of those. The
+smallest transactional reservation path above is future work;
+the CRDT is tracked alongside multi-region work.
+
 
 ## 5. Status
 
-- **Shipped in v0.2.0**: this design doc. No code.
-- **NOT shipped in v0.2.0**: the SQLite reservation
-  table, the handler changes, the retention sweep. These
-  are v0.2.1 / v0.3.0 work, blocked on the design
-  review above.
-- **For a future PR**: the migration file, the
-  `Reservation` method on `IdempotencyStore`, the handler
-  integration, the test (`tests/idempotency_reservation`).
+- **Current status**: this design doc is research only. The
+  SQLite reservation table, handler changes, and retention
+  sweep are not shipped in v0.3.0.
+- **For a future PR**: the migration file, the `Reservation`
+  method on `IdempotencyStore`, handler integration, and tests.

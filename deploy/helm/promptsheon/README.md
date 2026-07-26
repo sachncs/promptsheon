@@ -8,8 +8,8 @@ Promptsheon is a single-binary HTTP daemon that versions, releases,
 and observes AI capabilities the way engineers manage code: with
 immutable Versions, content-addressed artifacts, an approval
 workflow (MakerChecker by default), a CAS (`pkg/cas/`), and an
-audit chain that detects tampering. v0.1.x is single-region and
-SQLite-backed by design.
+audit chain that detects tampering. The shipped configuration is
+single-region and SQLite-backed by design.
 
 ## Prerequisites
 
@@ -28,7 +28,7 @@ helm repo add promptsheon https://sachncs.github.io/promptsheon
 helm install promptsheon promptsheon/promptsheon \
   --set config.openaiApiKey="${OPENAI_API_KEY}" \
   --set config.anthropicApiKey="${ANTHROPIC_API_KEY}" \
-  --set image.tag=0.2.0
+  --set image.tag=0.3.0
 ```
 
 The chart defaults to a single-replica StatefulSet with a
@@ -90,10 +90,12 @@ starts at row 1.
 
 ## Multi-replica
 
-v0.1.x is single-replica by design. The leader-election layer
-(ADR-0030) is gated behind `config.leaderElection=true`; with
-it, only the leader applies migrations and writes to the audit
-chain. Reads scale linearly.
+Multi-replica deployments are supported via
+`config.leaderElection=true`; only the leader applies
+migrations and writes to the audit chain. Reads scale
+linearly. The default chart still ships a single-replica
+StatefulSet — set `replicaCount` higher and flip the flag
+to enable the leader/follower pair.
 
 ## See also
 
@@ -104,4 +106,4 @@ chain. Reads scale linearly.
 - [docs/canary.md](../../docs/canary.md) — canary / blue-green
   with `PROMPTSHEON_READ_ONLY`.
 - [docs/multi-region.md](../../docs/multi-region.md) — the
-  multi-region story (and its non-goal status for v0.1.x).
+  multi-region story (and its non-goal status today).

@@ -74,8 +74,8 @@ The runner is fail-fast by default; `RunAll` runs every
 precondition regardless of outcome and aggregates the
 errors.
 
-Cases run serially in v0.2.0. Parallel execution ships in
-a follow-on.
+Cases run serially today. Parallel execution ships in a
+follow-on.
 
 ## Precondition execution
 
@@ -150,6 +150,6 @@ metric surfaces the running total per daemon.
 - `internal/optimizer/rules/rules.go` (rule engine).
 - `internal/invoke/invoke.go` (Budget / Quota / LLM call).
 - `internal/harness/precondition.go` (Precondition execution).
-- `internal/cas/` (`pkg/cas/`, content-addressed store).
+- `pkg/cas/` (content-addressed store).
 - [ADR 0003](adr/0003-hash-chained-audit-log.md) — audit chain
   design.

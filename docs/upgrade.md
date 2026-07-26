@@ -18,8 +18,8 @@ applied version in the daemon's `migrations` table.
 promptsheond backup /var/backups/promptsheon/pre-upgrade.db
 
 # 2. Pull the new binary.
-docker pull ghcr.io/sachncs/promptsheon:v0.2.0
-# (or `go install github.com/sachncs/promptsheon/cmd/promptsheond@v0.2.0`)
+docker pull ghcr.io/sachncs/promptsheon:v0.3.0
+# (or `go install github.com/sachncs/promptsheon/cmd/promptsheond@v0.3.0`)
 
 # 3. Restart the daemon. The new binary applies pending
 #    migrations on boot, then serves traffic.

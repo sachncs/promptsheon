@@ -338,7 +338,8 @@ Long-Term Vision (6-12 months):
 - **Day 9-12**: `ROADMAP.md`, `CONTRIBUTING.md` rewrite, `PULL_REQUEST_TEMPLATE.md`, `ISSUE_TEMPLATE/` expansion.
 - **Day 13-18**: CI fix (release job token, SLSA step), doc-freshness gate, benchmark suite (8 benchmarks).
 - **Day 19-25**: Audit archival SLA (run every 5 min), per-component coverage floors, bandit sample ratio configurable via settings.
-- **Day 26-30**: Release v0.2.0 with the above. Tag the v0.2.0 commit. Update README, CHANGELOG, ROADMAP.
+- **Day 26-30**: Prepare the next release with the above. Update
+  README, CHANGELOG, and ROADMAP.
 
 ## 16. 90-Day Roadmap
 

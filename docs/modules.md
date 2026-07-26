@@ -59,7 +59,6 @@ or `cmd/`.
 | `redactor` | `internal/redactor/` | Domain | PII redaction default Guardrail. |
 | `cli` | `cmd/promptsheon/` | CLI | Hand-rolled command dispatcher. |
 | `daemon` | `cmd/promptsheond/` | HTTP | Server binary. |
-| `auditbackfill` | `cmd/promptsheon-auditbackfill/` | Tool | One-shot audit replay. |
 | `healthcheck` | `cmd/promptsheon-healthcheck/` | Tool | Container health probe. |
 | `cas` (public) | `pkg/cas/` | Public | Content-addressable store. Stable public API. |
 | `plugin` (public) | `pkg/plugin/` | Public | Stable plugin SDK. |
