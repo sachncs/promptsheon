@@ -84,18 +84,19 @@ func (s *Server) handleCreateWebhook(w http.ResponseWriter, r *http.Request) err
 		return &HTTPError{Status: http.StatusBadRequest, Message: fmt.Sprintf("invalid url: %v", err)}
 	}
 	var secretCiphertext []byte
+	endpointID := generateID()
 	if req.Secret != "" {
 		if s.vault == nil {
 			return &HTTPError{Status: http.StatusServiceUnavailable, Message: "vault not configured; cannot store webhook secret"}
 		}
-		ct, err := s.vault.EncryptBytes([]byte(req.Secret))
+		ct, err := s.vault.EncryptBytes([]byte(req.Secret), []byte("webhook:"+endpointID))
 		if err != nil {
 			return fmt.Errorf("encrypt webhook secret: %w", err)
 		}
 		secretCiphertext = ct
 	}
 	ep := &webhook.Endpoint{
-		ID:               generateID(),
+		ID:               endpointID,
 		URL:              req.URL,
 		Secret:           req.Secret,
 		SecretCiphertext: secretCiphertext,
