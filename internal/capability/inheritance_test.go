@@ -45,7 +45,7 @@ func TestResolveManifestInheritsParentsArtifacts(t *testing.T) {
 	childModel := ArtifactRef{Kind: ArtifactModelPolicy, Hash: goodHash()}
 	child := &Version{
 		ID: "child-v1", CapabilityID: "child",
-		Parents: []string{"parent-v1"},
+		Parents:  []string{"parent-v1"},
 		Manifest: Manifest{Prompt: childPrompt, ModelPolicy: childModel},
 	}
 	resolver := &fakeResolver{versions: map[string]*Version{
@@ -71,7 +71,7 @@ func TestResolveManifestFallsBackToParent(t *testing.T) {
 	parent := &Version{
 		ID: "parent-v1", CapabilityID: "parent",
 		Manifest: Manifest{
-			Prompt:     ArtifactRef{Kind: ArtifactPrompt, Hash: goodHash()},
+			Prompt:      ArtifactRef{Kind: ArtifactPrompt, Hash: goodHash()},
 			ModelPolicy: ArtifactRef{Kind: ArtifactModelPolicy, Hash: goodHash()},
 			Tools:       []ArtifactRef{parentTool},
 			Guardrails:  []ArtifactRef{parentGuard},
@@ -81,7 +81,7 @@ func TestResolveManifestFallsBackToParent(t *testing.T) {
 	// and guardrails should be inherited from the parent.
 	child := &Version{
 		ID: "child-v1", CapabilityID: "child",
-		Parents: []string{"parent-v1"},
+		Parents:  []string{"parent-v1"},
 		Manifest: minimalManifest(),
 	}
 	resolver := &fakeResolver{versions: map[string]*Version{
@@ -145,7 +145,7 @@ func TestResolveManifestParentMissing(t *testing.T) {
 	t.Parallel()
 	child := &Version{
 		ID: "child-v1", CapabilityID: "child",
-		Parents: []string{"nonexistent"},
+		Parents:  []string{"nonexistent"},
 		Manifest: minimalManifest(),
 	}
 	resolver := &fakeResolver{versions: map[string]*Version{}}
@@ -158,15 +158,15 @@ func TestResolveManifestParentMissing(t *testing.T) {
 func TestMergeManifestsOverrideWins(t *testing.T) {
 	t.Parallel()
 	base := Manifest{
-		Prompt:        ArtifactRef{Kind: ArtifactPrompt, Hash: "aaaa"},
-		ModelPolicy:   ArtifactRef{Kind: ArtifactModelPolicy, Hash: "bbbb"},
-		Tools:         []ArtifactRef{{Kind: ArtifactTool, Hash: "t1"}},
-		Guardrails:    []ArtifactRef{{Kind: ArtifactGuardrail, Hash: "g1"}},
+		Prompt:      ArtifactRef{Kind: ArtifactPrompt, Hash: "aaaa"},
+		ModelPolicy: ArtifactRef{Kind: ArtifactModelPolicy, Hash: "bbbb"},
+		Tools:       []ArtifactRef{{Kind: ArtifactTool, Hash: "t1"}},
+		Guardrails:  []ArtifactRef{{Kind: ArtifactGuardrail, Hash: "g1"}},
 	}
 	override := Manifest{
-		Prompt:        ArtifactRef{Kind: ArtifactPrompt, Hash: "cccc"},
-		Tools:         []ArtifactRef{{Kind: ArtifactTool, Hash: "t2"}},
-		Guardrails:    []ArtifactRef{{Kind: ArtifactGuardrail, Hash: "g1"}},
+		Prompt:     ArtifactRef{Kind: ArtifactPrompt, Hash: "cccc"},
+		Tools:      []ArtifactRef{{Kind: ArtifactTool, Hash: "t2"}},
+		Guardrails: []ArtifactRef{{Kind: ArtifactGuardrail, Hash: "g1"}},
 	}
 	got := mergeManifests(base, override)
 	if got.Prompt.Hash != "cccc" {
@@ -187,7 +187,7 @@ func itoa(i int) string {
 	if i < 10 {
 		return string(rune('0' + i))
 	}
-	return string(rune('0' + i/10)) + string(rune('0'+i%10))
+	return string(rune('0'+i/10)) + string(rune('0'+i%10))
 }
 
 func minimalManifest() Manifest {
@@ -197,5 +197,3 @@ func minimalManifest() Manifest {
 		RuntimePolicy: ArtifactRef{Kind: ArtifactRuntimePolicy, Hash: goodHash()},
 	}
 }
-
-

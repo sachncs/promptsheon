@@ -53,39 +53,57 @@ func TestContractHallucinationRateRange(t *testing.T) {
 
 func TestContractCanAutoAdoptLow(t *testing.T) {
 	t.Parallel()
-	c := CapabilityContract{BlastRadius: BlastLow}
+	c := CapabilityContract{
+		BlastRadius: BlastLow,
+		SLOTarget:   SLOTarget{MaxP95LatencyMS: 1000},
+	}
 	if !c.CanAutoAdopt() {
-		t.Error("low blast radius must always be auto-adoptable")
+		t.Error("low blast radius with a valid SLO must be auto-adoptable")
+	}
+	cNoSLO := CapabilityContract{BlastRadius: BlastLow}
+	if cNoSLO.CanAutoAdopt() {
+		t.Error("low blast radius without an SLO must NOT auto-adopt")
 	}
 }
 
 func TestContractCanAutoAdoptMediumRequiresOpt(t *testing.T) {
 	t.Parallel()
-	cOff := CapabilityContract{BlastRadius: BlastMedium}
+	cOff := CapabilityContract{BlastRadius: BlastMedium, SLOTarget: SLOTarget{MaxP95LatencyMS: 1000}}
 	if cOff.CanAutoAdopt() {
 		t.Error("medium blast radius without AutoPromotable must not auto-adopt")
 	}
-	cOn := CapabilityContract{BlastRadius: BlastMedium, AutoPromotable: true}
+	cOn := CapabilityContract{
+		BlastRadius:    BlastMedium,
+		AutoPromotable: true,
+		SLOTarget:      SLOTarget{MaxP95LatencyMS: 1000},
+	}
 	if !cOn.CanAutoAdopt() {
-		t.Error("medium blast radius with AutoPromotable must auto-adopt")
+		t.Error("medium blast radius with AutoPromotable and an SLO must auto-adopt")
 	}
 }
 
 func TestContractCanAutoAdoptHighRequiresOpt(t *testing.T) {
 	t.Parallel()
-	cOff := CapabilityContract{BlastRadius: BlastHigh}
+	cOff := CapabilityContract{BlastRadius: BlastHigh, SLOTarget: SLOTarget{MaxP95LatencyMS: 1000}}
 	if cOff.CanAutoAdopt() {
 		t.Error("high blast radius without AutoPromotable must not auto-adopt")
 	}
-	cOn := CapabilityContract{BlastRadius: BlastHigh, AutoPromotable: true}
+	cOn := CapabilityContract{
+		BlastRadius:    BlastHigh,
+		AutoPromotable: true,
+		SLOTarget:      SLOTarget{MaxP95LatencyMS: 1000},
+	}
 	if !cOn.CanAutoAdopt() {
-		t.Error("high blast radius with AutoPromotable must auto-adopt")
+		t.Error("high blast radius with AutoPromotable and an SLO must auto-adopt")
 	}
 }
 
 func TestContractCanAutoAdoptInvalidIsFalse(t *testing.T) {
 	t.Parallel()
-	c := CapabilityContract{BlastRadius: "wat"}
+	c := CapabilityContract{
+		BlastRadius: "wat",
+		SLOTarget:   SLOTarget{MaxP95LatencyMS: 1000},
+	}
 	if c.CanAutoAdopt() {
 		t.Error("invalid contract must never auto-adopt")
 	}

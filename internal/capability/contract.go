@@ -106,10 +106,19 @@ func (c CapabilityContract) IsZero() bool {
 
 // CanAutoAdopt reports whether the contract permits the
 // Recommendation engine to auto-promote. Low blast radius is
-// always auto-promotable; medium and high require the operator
-// to opt in via AutoPromotable.
+// auto-promotable only when the contract declares an SLO; medium
+// and high require both an SLO and the operator's AutoPromotable
+// opt-in.
+//
+// An empty SLO produces no auto-promotion signal: a capability
+// without a quality or latency target cannot tell whether its
+// output is getting better or worse, so blindly auto-promoting
+// it would silently regress production.
 func (c CapabilityContract) CanAutoAdopt() bool {
 	if err := c.Validate(); err != nil {
+		return false
+	}
+	if c.SLOTarget == (SLOTarget{}) {
 		return false
 	}
 	switch c.BlastRadius {
