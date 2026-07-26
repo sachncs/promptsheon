@@ -252,20 +252,6 @@ func (r *replayBody) Close() error {
 	return err
 }
 
-// readCloser is a small adapter so the replayed reader can
-// satisfy io.ReadCloser (the handler expects r.Body.Close() to
-// work). Kept for backwards compatibility with tests that build
-// a reader directly; the idempotency middleware now uses
-// replayBody (a temp-file backed reader) for the hot path.
-type readCloser struct {
-	*bytes.Reader
-	Closer io.Closer
-}
-
-func (r readCloser) Close() error { return r.Closer.Close() }
-
-var _ readCloser
-
 // recordingResponseWriter is an http.ResponseWriter that
 // captures the status, headers, and body so the idempotency
 // cache can replay them verbatim. Header setters are recorded
