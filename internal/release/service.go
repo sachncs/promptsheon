@@ -198,7 +198,7 @@ func (s *Service) activateWith(ctx context.Context, releaseID string, policy app
 	}
 
 	// Supersede any prior Active Release in the same environment.
-	prior, err := s.findPriorActive(ctx, r.CapabilityID, r.Environment)
+	prior, err := s.priorActiveFor(ctx, r.CapabilityID, r.Environment)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +261,9 @@ func (s *Service) Approval(ctx context.Context, releaseID string) (*approval.App
 	return s.App.GetApproval(ctx, releaseID)
 }
 
-func (s *Service) findPriorActive(ctx context.Context, capabilityID string, env Environment) (*Release, error) {
+// priorActiveFor returns the currently active release for the given
+// capability and environment, or nil if none exists.
+func (s *Service) priorActiveFor(ctx context.Context, capabilityID string, env Environment) (*Release, error) {
 	releases, err := s.DB.ListReleasesForCapability(ctx, capabilityID)
 	if err != nil {
 		return nil, err
