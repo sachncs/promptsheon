@@ -168,19 +168,19 @@ func TestAggregateMetrics(t *testing.T) {
 func TestCostCalculation(t *testing.T) {
 	pt := NewPricingTable()
 	usage := Usage{PromptTokens: 1000, CompletionTokens: 500}
-	cost := pt.Calculate("gpt-4o", usage)
+	cost, _ := pt.Calculate("gpt-4o", usage)
 	if cost <= 0 {
 		t.Fatalf("expected positive cost, got %f", cost)
 	}
 
 	// Unknown model returns 0
-	cost = pt.Calculate("unknown-model", usage)
+	cost, _ = pt.Calculate("unknown-model", usage)
 	if cost != 0 {
 		t.Fatalf("expected 0 cost for unknown model, got %f", cost)
 	}
 
 	// Ollama is free
-	cost = pt.Calculate("llama3", usage)
+	cost, _ = pt.Calculate("llama3", usage)
 	if cost != 0 {
 		t.Fatalf("expected 0 cost for llama3, got %f", cost)
 	}
@@ -495,17 +495,17 @@ func TestCircuitBreakerAllowEdgeCases(t *testing.T) {
 	if cb.State() != StateOpen {
 		t.Fatal("expected open state")
 	}
-	if cb.Allow() {
-		t.Error("expected Allow to return false when open and cooldown not elapsed")
+	if err := cb.Allow(); err == nil {
+		t.Error("expected Allow to return an error when open and cooldown not elapsed")
 	}
 
 	cb.state = StateHalfOpen
-	if !cb.Allow() {
-		t.Error("expected Allow to return true in half-open state")
+	if err := cb.Allow(); err != nil {
+		t.Errorf("expected Allow to succeed in half-open state, got %v", err)
 	}
 
 	cb.state = CircuitState(99)
-	if cb.Allow() {
-		t.Error("expected Allow to return false for invalid state")
+	if err := cb.Allow(); err == nil {
+		t.Error("expected Allow to return an error for invalid state")
 	}
 }

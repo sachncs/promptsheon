@@ -51,5 +51,6 @@ func EstimateCost(inputTokens, outputTokens int, model string) float64 {
 		CompletionTokens: outputTokens,
 		TotalTokens:      inputTokens + outputTokens,
 	}
-	return NewPricingTable().Calculate(model, usage)
+	cost, _ := NewPricingTable().Calculate(model, usage)
+	return cost
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	anthropic "github.com/anthropics/anthropic-sdk-go"
@@ -77,8 +78,8 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 	if len(systemBlocks) > 0 {
 		params.System = systemBlocks
 	}
-	if req.Temperature > 0 {
-		params.Temperature = anthropic.Float(req.Temperature)
+	if req.Temperature != nil {
+		params.Temperature = anthropic.Float(*req.Temperature)
 	}
 	if len(req.Stop) > 0 {
 		params.StopSequences = req.Stop
@@ -100,30 +101,29 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 		return nil, fmt.Errorf("%s request: %w", ProviderAnthropic, err)
 	}
 
-	var content string
+	var content strings.Builder
 	for _, block := range msg.Content {
 		if text := block.Text; text != "" {
-			content += text
+			content.WriteString(text)
 		}
 	}
-	// ponytail: MiniMax-M2.7's thinking mode is on by default and
-	// the SDK's `Block.Text` is empty for thinking blocks. If the
-	// model produced thinking without a text block, fall back to the
-	// thinking content so callers (harness, /releases/{id}/invoke)
-	// see something instead of an empty response.
-	if content == "" {
-		for _, block := range msg.Content {
-			if thinking := block.Thinking; thinking != "" {
-				content = thinking
-				break
-			}
-		}
-	}
+	// Thinking blocks contain private chain-of-thought or internal
+	// reasoning. They are NEVER promoted into the visible response
+	// content — callers and downstream endpoints must not see
+	// reasoning unless they explicitly opt in via a dedicated
+	// response field, and even then the field should be authorisation
+	// gated. The previous behaviour exposed Thinking as Content when
+	// the model produced no visible text, leaking reasoning into
+	// audit and replay records.
+	text := content.String()
+	_ = text // visible text assembled below; reasoning deliberately dropped
 
 	inTok, outTok := int64(msg.Usage.InputTokens), int64(msg.Usage.OutputTokens)
 
 	return &Response{
-		Content: content,
+		Provider:       string(ProviderAnthropic),
+		EffectiveModel: string(msg.Model),
+		Content:        text,
 		Usage: Usage{
 			PromptTokens:     int(inTok),
 			CompletionTokens: int(outTok),

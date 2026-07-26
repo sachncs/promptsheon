@@ -1,6 +1,17 @@
 package llm
 
+import (
+	"math"
+	"sync"
+)
+
 // ModelPricing defines per-token costs for a model.
+//
+// Per-token rates are stored as float64 dollars for display
+// convenience; callers that accumulate monetary amounts across
+// many invocations should convert to integer nanos or use a
+// decimal type to avoid the rounding drift inherent in float
+// arithmetic.
 type ModelPricing struct {
 	Name               string
 	PromptPerToken     float64 // cost per prompt token in dollars
@@ -22,7 +33,12 @@ const (
 // it to whichever components need cost computation (e.g. an
 // Instrumented provider wrapper, a metrics aggregator, a CLI driver).
 // See ADR-0012 for the rationale.
+//
+// All exported methods are safe for concurrent use. Register uses a
+// write lock; Lookup and Calculate take a read lock so heavy read
+// paths (cost attribution in the request hot loop) do not serialise.
 type PricingTable struct {
+	mu      sync.RWMutex
 	pricing map[string]ModelPricing
 }
 
@@ -60,32 +76,64 @@ const (
 	claude3Opus    = "claude-3-opus-20240229"
 )
 
-// Register adds or overrides a pricing entry.
+// Register adds or overrides a pricing entry. Pricing values must
+// be finite and non-negative; invalid values are rejected so a
+// misconfigured plugin cannot poison the cost attribution table.
 func (p *PricingTable) Register(pricing ModelPricing) {
 	if pricing.Name == "" {
 		return
+	}
+	if !isFiniteNonNegative(pricing.PromptPerToken) || !isFiniteNonNegative(pricing.CompletionPerToken) {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.pricing == nil {
+		p.pricing = make(map[string]ModelPricing)
 	}
 	p.pricing[pricing.Name] = pricing
 }
 
 // Calculate returns the cost in USD for the given token usage on the
-// named model. When the model is unknown, Calculate returns 0; callers
-// may distinguish "free model" from "unknown" by Lookup.
-func (p *PricingTable) Calculate(model string, usage Usage) float64 {
+// named model. The second return value is true when the model is
+// known; callers should treat a (0, false) result as "unknown model
+// — please register" rather than "free".
+func (p *PricingTable) Calculate(model string, usage Usage) (float64, bool) {
+	p.mu.RLock()
 	pricing, ok := p.pricing[model]
+	p.mu.RUnlock()
 	if !ok {
-		return 0
+		return 0, false
 	}
-	return float64(usage.PromptTokens)*pricing.PromptPerToken +
+	cost := float64(usage.PromptTokens)*pricing.PromptPerToken +
 		float64(usage.CompletionTokens)*pricing.CompletionPerToken
+	return cost, true
 }
 
 // Lookup returns a copy of the pricing for the model, or nil when the
 // model is unknown.
 func (p *PricingTable) Lookup(model string) *ModelPricing {
+	p.mu.RLock()
 	v, ok := p.pricing[model]
+	p.mu.RUnlock()
 	if !ok {
 		return nil
 	}
 	return &v
+}
+
+// Snapshot returns a copy of every pricing entry, in unspecified
+// order. Useful for diagnostics and admin views.
+func (p *PricingTable) Snapshot() []ModelPricing {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	out := make([]ModelPricing, 0, len(p.pricing))
+	for _, v := range p.pricing {
+		out = append(out, v)
+	}
+	return out
+}
+
+func isFiniteNonNegative(v float64) bool {
+	return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0
 }

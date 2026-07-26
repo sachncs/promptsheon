@@ -91,8 +91,8 @@ func TestCircuitBreakerStateMachine(t *testing.T) {
 				case "wait":
 					time.Sleep(tt.config.Cooldown + 50*time.Millisecond)
 				case "allow":
-					allowed := cb.Allow()
-					if tt.expectedError != nil && allowed {
+					allowErr := cb.Allow()
+					if tt.expectedError != nil && allowErr == nil {
 						t.Error("expected request to be rejected")
 					}
 				}
