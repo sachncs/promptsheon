@@ -177,13 +177,17 @@ func (d *DefaultEnforcer) SetQuota(q quota.Quota) {
 	d.quotas[q.TargetID] = &q
 }
 
-// EnforceBudget implements Enforcer. Read-mostly path; takes the
-// read lock for the lookup and upgrades to the write lock only
-// when a budget is configured and being charged.
+// EnforceBudget implements Enforcer. The read→Charge→write
+// window is held under the write lock for the entire operation so
+// concurrent callers cannot both observe the same snapshot,
+// charge against it, and overwrite each other's increment. The
+// previous read-then-upgrade pattern allowed two callers to
+// charge twice against a budget that should have rejected one
+// of them.
 func (d *DefaultEnforcer) EnforceBudget(_ context.Context, workspaceID string, costUSD float64) error {
-	d.mu.RLock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	b, ok := d.budgets[workspaceID]
-	d.mu.RUnlock()
 	if !ok {
 		return nil // no policy -> allow
 	}
@@ -191,19 +195,18 @@ func (d *DefaultEnforcer) EnforceBudget(_ context.Context, workspaceID string, c
 	if err != nil {
 		return err
 	}
-	d.mu.Lock()
 	d.budgets[workspaceID] = &updated
-	d.mu.Unlock()
 	return nil
 }
 
-// EnforceQuota implements Enforcer. Read-mostly path; takes the
-// read lock for the lookup and upgrades to the write lock only
-// when a quota is configured and being charged.
+// EnforceQuota implements Enforcer. Same locking discipline as
+// EnforceBudget — the Charge must run while holding the write
+// lock so concurrent callers serialise on the same per-workspace
+// quota.
 func (d *DefaultEnforcer) EnforceQuota(_ context.Context, workspaceID string) error {
-	d.mu.RLock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	q, ok := d.quotas[workspaceID]
-	d.mu.RUnlock()
 	if !ok {
 		return nil // no policy -> allow
 	}
@@ -211,9 +214,7 @@ func (d *DefaultEnforcer) EnforceQuota(_ context.Context, workspaceID string) er
 	if err != nil {
 		return err
 	}
-	d.mu.Lock()
 	d.quotas[workspaceID] = &updated
-	d.mu.Unlock()
 	return nil
 }
 

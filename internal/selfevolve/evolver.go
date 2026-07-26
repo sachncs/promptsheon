@@ -257,9 +257,9 @@ func (e *Evolver) runRevisions(ctx context.Context, capabilityID, env, activeRel
 		}
 		if e.Auditor != nil {
 			e.Auditor.Audit(ctx, AuditRevise, "capability:"+capabilityID, map[string]any{
-				"iteration":       i + 1,
+				"iteration":        i + 1,
 				"new_prompt_chars": len(reviseResp.NewPrompt),
-				"rationale":       reviseResp.Rationale,
+				"rationale":        reviseResp.Rationale,
 			})
 		}
 
@@ -274,11 +274,11 @@ func (e *Evolver) runRevisions(ctx context.Context, capabilityID, env, activeRel
 		}
 		if e.Auditor != nil {
 			e.Auditor.Audit(ctx, AuditValidate, "capability:"+capabilityID, map[string]any{
-				"iteration":  i + 1,
-				"score":      run.Score,
-				"passed":     run.Passed,
-				"failed":     run.Failed,
-				"total":      run.Total,
+				"iteration":   i + 1,
+				"score":       run.Score,
+				"passed":      run.Passed,
+				"failed":      run.Failed,
+				"total":       run.Total,
 				"eval_run_id": run.ID,
 			})
 		}

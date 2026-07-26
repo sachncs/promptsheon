@@ -237,7 +237,9 @@ func (a *capabilityAdapter) GetVersionByNumber(_ context.Context, capabilityID s
 	return nil, store.ErrNotFound
 }
 
-func (a *capabilityAdapter) CreateExecution(_ context.Context, e *capability.Execution) error { return errNotImplemented }
+func (a *capabilityAdapter) CreateExecution(_ context.Context, e *capability.Execution) error {
+	return errNotImplemented
+}
 func (a *capabilityAdapter) GetExecution(_ context.Context, _ string) (*capability.Execution, error) {
 	return nil, errNotImplemented
 }
@@ -257,9 +259,11 @@ func (a *usersAdapter) GetUser(_ context.Context, _ string) (*models.User, error
 func (a *usersAdapter) GetUserByEmail(_ context.Context, _ string) (*models.User, error) {
 	return nil, errNotImplemented
 }
-func (a *usersAdapter) ListUsers(_ context.Context) ([]*models.User, error)   { return nil, errNotImplemented }
-func (a *usersAdapter) UpdateUser(_ context.Context, _ *models.User) error    { return errNotImplemented }
-func (a *usersAdapter) DeleteUser(_ context.Context, _ string) error         { return errNotImplemented }
+func (a *usersAdapter) ListUsers(_ context.Context) ([]*models.User, error) {
+	return nil, errNotImplemented
+}
+func (a *usersAdapter) UpdateUser(_ context.Context, _ *models.User) error { return errNotImplemented }
+func (a *usersAdapter) DeleteUser(_ context.Context, _ string) error       { return errNotImplemented }
 func (a *usersAdapter) BootstrapAdmin(_ context.Context, _ *models.User, _ *models.APIKey) error {
 	return errNotImplemented
 }
@@ -267,23 +271,29 @@ func (a *usersAdapter) BootstrapAdmin(_ context.Context, _ *models.User, _ *mode
 // apiKeysAdapter implements store.APIKeys. Stub.
 type apiKeysAdapter struct{ p *InMemoryPostgres }
 
-func (a *apiKeysAdapter) CreateAPIKey(_ context.Context, _ *models.APIKey) error { return errNotImplemented }
+func (a *apiKeysAdapter) CreateAPIKey(_ context.Context, _ *models.APIKey) error {
+	return errNotImplemented
+}
 func (a *apiKeysAdapter) GetAPIKeyByHash(_ context.Context, _ string) (*models.APIKey, error) {
 	return nil, errNotImplemented
 }
 func (a *apiKeysAdapter) GetAPIKeyByID(_ context.Context, _ string) (*models.APIKey, error) {
 	return nil, errNotImplemented
 }
-func (a *apiKeysAdapter) DeleteAPIKey(_ context.Context, _ string) error        { return errNotImplemented }
+func (a *apiKeysAdapter) DeleteAPIKey(_ context.Context, _ string) error { return errNotImplemented }
 func (a *apiKeysAdapter) ListAPIKeysByUser(_ context.Context, _ string) ([]*models.APIKey, error) {
 	return nil, errNotImplemented
 }
-func (a *apiKeysAdapter) UpdateAPIKeyLastUsed(_ context.Context, _ string) error { return errNotImplemented }
+func (a *apiKeysAdapter) UpdateAPIKeyLastUsed(_ context.Context, _ string) error {
+	return errNotImplemented
+}
 
 // auditAdapter implements store.Audit. Stub.
 type auditAdapter struct{ p *InMemoryPostgres }
 
-func (a *auditAdapter) AppendAudit(_ context.Context, _ *models.AuditEntry) error { return errNotImplemented }
+func (a *auditAdapter) AppendAudit(_ context.Context, _ *models.AuditEntry) error {
+	return errNotImplemented
+}
 func (a *auditAdapter) ListAudit(_ context.Context, _ *models.AuditFilter) ([]*models.AuditEntry, error) {
 	return nil, errNotImplemented
 }
@@ -297,14 +307,18 @@ func (a *auditAdapter) VerifyAuditChain(_ context.Context) (*store.AuditVerifyRe
 // providerKeysAdapter implements store.ProviderKeys. Stub.
 type providerKeysAdapter struct{ p *InMemoryPostgres }
 
-func (a *providerKeysAdapter) SaveProviderKey(_ context.Context, _ *models.ProviderKey) error { return errNotImplemented }
+func (a *providerKeysAdapter) SaveProviderKey(_ context.Context, _ *models.ProviderKey) error {
+	return errNotImplemented
+}
 func (a *providerKeysAdapter) GetProviderKey(_ context.Context, _ string) (*models.ProviderKey, error) {
 	return nil, errNotImplemented
 }
 func (a *providerKeysAdapter) GetProviderKeyByName(_ context.Context, _ string, _ string) (*models.ProviderKey, error) {
 	return nil, errNotImplemented
 }
-func (a *providerKeysAdapter) DeleteProviderKey(_ context.Context, _ string) error { return errNotImplemented }
+func (a *providerKeysAdapter) DeleteProviderKey(_ context.Context, _ string) error {
+	return errNotImplemented
+}
 func (a *providerKeysAdapter) ListProviderKeys(_ context.Context) ([]*models.ProviderKey, error) {
 	return nil, errNotImplemented
 }
@@ -312,19 +326,27 @@ func (a *providerKeysAdapter) ListProviderKeys(_ context.Context) ([]*models.Pro
 // alertingAdapter implements store.Alerting. Stub.
 type alertingAdapter struct{ p *InMemoryPostgres }
 
-func (a *alertingAdapter) SaveAlertRule(_ context.Context, _ *models.AlertRuleRecord) error { return errNotImplemented }
+func (a *alertingAdapter) SaveAlertRule(_ context.Context, _ *models.AlertRuleRecord) error {
+	return errNotImplemented
+}
 func (a *alertingAdapter) GetAlertRule(_ context.Context, _ string) (*models.AlertRuleRecord, error) {
 	return nil, errNotImplemented
 }
-func (a *alertingAdapter) DeleteAlertRule(_ context.Context, _ string) error { return errNotImplemented }
+func (a *alertingAdapter) DeleteAlertRule(_ context.Context, _ string) error {
+	return errNotImplemented
+}
 func (a *alertingAdapter) ListAlertRules(_ context.Context) ([]*models.AlertRuleRecord, error) {
 	return nil, errNotImplemented
 }
-func (a *alertingAdapter) SaveAlert(_ context.Context, _ *models.AlertRecord) error { return errNotImplemented }
+func (a *alertingAdapter) SaveAlert(_ context.Context, _ *models.AlertRecord) error {
+	return errNotImplemented
+}
 func (a *alertingAdapter) GetAlert(_ context.Context, _ string) (*models.AlertRecord, error) {
 	return nil, errNotImplemented
 }
-func (a *alertingAdapter) UpdateAlert(_ context.Context, _ *models.AlertRecord) error { return errNotImplemented }
+func (a *alertingAdapter) UpdateAlert(_ context.Context, _ *models.AlertRecord) error {
+	return errNotImplemented
+}
 func (a *alertingAdapter) ListAlerts(_ context.Context, _ string) ([]*models.AlertRecord, error) {
 	return nil, errNotImplemented
 }
@@ -334,14 +356,18 @@ func (a *alertingAdapter) SaveNotificationGroup(_ context.Context, _ *models.Not
 func (a *alertingAdapter) GetNotificationGroup(_ context.Context, _ string) (*models.NotificationGroupRecord, error) {
 	return nil, errNotImplemented
 }
-func (a *alertingAdapter) DeleteNotificationGroup(_ context.Context, _ string) error { return errNotImplemented }
+func (a *alertingAdapter) DeleteNotificationGroup(_ context.Context, _ string) error {
+	return errNotImplemented
+}
 func (a *alertingAdapter) ListNotificationGroups(_ context.Context) ([]*models.NotificationGroupRecord, error) {
 	return nil, errNotImplemented
 }
 func (a *alertingAdapter) GetChannelsForAlertRule(_ context.Context, _ string) ([]string, error) {
 	return nil, errNotImplemented
 }
-func (a *alertingAdapter) LinkRuleToGroup(_ context.Context, _ string, _ string) error { return errNotImplemented }
+func (a *alertingAdapter) LinkRuleToGroup(_ context.Context, _ string, _ string) error {
+	return errNotImplemented
+}
 func (a *alertingAdapter) UnlinkRuleFromGroup(_ context.Context, _ string, _ string) error {
 	return errNotImplemented
 }
@@ -355,7 +381,9 @@ func (a *webhooksAdapter) SaveWebhookEndpoint(_ context.Context, _ *models.Webho
 func (a *webhooksAdapter) GetWebhookEndpoint(_ context.Context, _ string) (*models.WebhookEndpointRecord, error) {
 	return nil, errNotImplemented
 }
-func (a *webhooksAdapter) DeleteWebhookEndpoint(_ context.Context, _ string) error { return errNotImplemented }
+func (a *webhooksAdapter) DeleteWebhookEndpoint(_ context.Context, _ string) error {
+	return errNotImplemented
+}
 func (a *webhooksAdapter) ListWebhookEndpoints(_ context.Context) ([]*models.WebhookEndpointRecord, error) {
 	return nil, errNotImplemented
 }

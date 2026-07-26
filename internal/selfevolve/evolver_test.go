@@ -33,10 +33,9 @@ type fakeRepo struct {
 	datasets       map[string]*harness.Dataset
 	cases          map[string][]harness.DatasetCase // datasetID → cases
 	evalRuns       map[string]*harness.EvalRun
-	evalResults    map[string][]harness.EvalResult // runID → results
+	evalResults    map[string][]harness.EvalResult   // runID → results
 	state          map[string]*store.SelfEvolveState // capabilityID+env → state
 }
-
 
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
@@ -517,7 +516,9 @@ type fakeLoader struct {
 	writeCh chan string
 }
 
-func newFakeLoader() *fakeLoader { return &fakeLoader{blobs: map[string]string{}, writeCh: make(chan string, 8)} }
+func newFakeLoader() *fakeLoader {
+	return &fakeLoader{blobs: map[string]string{}, writeCh: make(chan string, 8)}
+}
 
 func (l *fakeLoader) seed(hash, text string) {
 	l.mu.Lock()
@@ -627,8 +628,8 @@ func splitStateKey(k string) (capID, env, rest string) {
 
 // fakeAuditor captures audit rows.
 type fakeAuditor struct {
-	mu    sync.Mutex
-	rows  []auditRow
+	mu   sync.Mutex
+	rows []auditRow
 }
 type auditRow struct {
 	Action string
@@ -670,7 +671,6 @@ func (v *fakeValidator) Validate(ctx context.Context, capabilityID string, promp
 	}, nil
 }
 
-
 // Tests below.
 func TestEvolver_RunOnce_DisabledSkips(t *testing.T) {
 	inner := newFakeRepo()
@@ -678,7 +678,7 @@ func TestEvolver_RunOnce_DisabledSkips(t *testing.T) {
 	repo := inner
 	inner.capabilities["c1"].SelfEvolve.Enabled = false
 	loader := newFakeLoader()
-	ev := NewEvolver(repo, loader, &fakeRevisionLLM{}, &fakeValidator{}, NewPromoter(repo, loader, &fakeActivator{repo: inner}, &fakeAuditor{}), &fakeAuditor{}, nil)
+	ev := NewEvolver(repo, loader, &fakeRevisionLLM{}, &fakeValidator{}, mustNewPromoter(t, repo, loader, &fakeActivator{repo: inner}, &fakeAuditor{}), &fakeAuditor{}, nil)
 	res, err := ev.RunOnce(context.Background(), "c1")
 	if err != nil {
 		t.Fatalf("RunOnce: %v", err)
@@ -697,7 +697,7 @@ func TestEvolver_RunOnce_AboveThresholdSkips(t *testing.T) {
 	repo := inner
 	loader := newFakeLoader()
 	loader.seed(inner.versionsByCap["c1"][0].Manifest.Prompt.Hash, "old prompt")
-	ev := NewEvolver(repo, loader, &fakeRevisionLLM{}, &fakeValidator{score: 1.0}, NewPromoter(repo, loader, &fakeActivator{repo: inner}, &fakeAuditor{}), &fakeAuditor{}, nil)
+	ev := NewEvolver(repo, loader, &fakeRevisionLLM{}, &fakeValidator{score: 1.0}, mustNewPromoter(t, repo, loader, &fakeActivator{repo: inner}, &fakeAuditor{}), &fakeAuditor{}, nil)
 	res, err := ev.RunOnce(context.Background(), "c1")
 	if err != nil {
 		t.Fatalf("RunOnce: %v", err)
@@ -727,7 +727,7 @@ func TestEvolver_RunOnce_BelowThresholdPromotes(t *testing.T) {
 	validator := &fakeValidator{score: 1.0} // validation passes
 	activator := &fakeActivator{repo: inner}
 	auditor := &fakeAuditor{}
-	ev := NewEvolver(repo, loader, revision, validator, NewPromoter(repo, loader, activator, auditor), auditor, nil)
+	ev := NewEvolver(repo, loader, revision, validator, mustNewPromoter(t, repo, loader, activator, auditor), auditor, nil)
 	res, err := ev.RunOnce(context.Background(), "c1")
 	if err != nil {
 		t.Fatalf("RunOnce: %v", err)
@@ -787,7 +787,7 @@ func TestEvolver_RunOnce_ValidateBelowThresholdRetries(t *testing.T) {
 	validator := &fakeValidator{score: 0.5} // below threshold
 	activator := &fakeActivator{repo: inner}
 	auditor := &fakeAuditor{}
-	ev := NewEvolver(repo, loader, revision, validator, NewPromoter(repo, loader, activator, auditor), auditor, nil)
+	ev := NewEvolver(repo, loader, revision, validator, mustNewPromoter(t, repo, loader, activator, auditor), auditor, nil)
 	res, err := ev.RunOnce(context.Background(), "c1")
 	if err != nil {
 		t.Fatalf("RunOnce: %v", err)
@@ -822,7 +822,7 @@ func TestEvolver_RunOnce_RevisionLLMErrorContinues(t *testing.T) {
 	validator := &fakeValidator{score: 1.0}
 	activator := &fakeActivator{repo: inner}
 	auditor := &fakeAuditor{}
-	ev := NewEvolver(repo, loader, revision, validator, NewPromoter(repo, loader, activator, auditor), auditor, nil)
+	ev := NewEvolver(repo, loader, revision, validator, mustNewPromoter(t, repo, loader, activator, auditor), auditor, nil)
 	res, err := ev.RunOnce(context.Background(), "c1")
 	if err != nil {
 		t.Fatalf("RunOnce: %v", err)
@@ -855,7 +855,7 @@ func TestEvolver_RunOnce_CooldownSkips(t *testing.T) {
 	}
 	revision := &fakeRevisionLLM{newPrompt: "x"}
 	validator := &fakeValidator{score: 1.0}
-	ev := NewEvolver(repo, loader, revision, validator, NewPromoter(repo, loader, &fakeActivator{repo: inner}, &fakeAuditor{}), &fakeAuditor{}, nil)
+	ev := NewEvolver(repo, loader, revision, validator, mustNewPromoter(t, repo, loader, &fakeActivator{repo: inner}, &fakeAuditor{}), &fakeAuditor{}, nil)
 	res, err := ev.RunOnce(context.Background(), "c1")
 	if err != nil {
 		t.Fatalf("RunOnce: %v", err)
@@ -880,7 +880,7 @@ func TestEvolver_RunOnce_NoActiveRelease(t *testing.T) {
 	repo := inner
 	loader := newFakeLoader()
 	activator := &fakeActivator{repo: inner}
-	ev := NewEvolver(repo, loader, &fakeRevisionLLM{}, &fakeValidator{}, NewPromoter(repo, loader, activator, &fakeAuditor{}), &fakeAuditor{}, nil)
+	ev := NewEvolver(repo, loader, &fakeRevisionLLM{}, &fakeValidator{}, mustNewPromoter(t, repo, loader, activator, &fakeAuditor{}), &fakeAuditor{}, nil)
 	res, err := ev.RunOnce(context.Background(), "c1")
 	if err != nil {
 		t.Fatalf("RunOnce: %v", err)
@@ -895,7 +895,7 @@ func TestEvolver_RunOnce_EmptyDatasetID(t *testing.T) {
 	inner.seedCapability("c1", "", "dev", "old prompt")
 	repo := inner
 	loader := newFakeLoader()
-	ev := NewEvolver(repo, loader, &fakeRevisionLLM{}, &fakeValidator{}, NewPromoter(repo, loader, &fakeActivator{repo: inner}, &fakeAuditor{}), &fakeAuditor{}, nil)
+	ev := NewEvolver(repo, loader, &fakeRevisionLLM{}, &fakeValidator{}, mustNewPromoter(t, repo, loader, &fakeActivator{repo: inner}, &fakeAuditor{}), &fakeAuditor{}, nil)
 	_, err := ev.RunOnce(context.Background(), "c1")
 	if err == nil {
 		t.Errorf("expected error for empty DatasetID")
@@ -945,7 +945,7 @@ func TestEvolver_Promoter_Promote(t *testing.T) {
 	repo := inner
 	activator := &fakeActivator{repo: inner}
 	auditor := &fakeAuditor{}
-	p := NewPromoter(repo, loader, activator, auditor)
+	p := mustNewPromoter(t, repo, loader, activator, auditor)
 	res, err := p.Promote(context.Background(), "c1", "dev", oldRelID, "new prompt text")
 	if err != nil {
 		t.Fatalf("Promote: %v", err)
@@ -977,3 +977,17 @@ func TestEvolver_Promoter_Promote(t *testing.T) {
 // referenced only by the test build; the imports stay live
 // for future tests.
 var _ = eval.ScorerContains
+
+// mustNewPromoter constructs a Promoter for tests and fails the
+// test fast if any required dependency is missing. The previous
+// single-return NewPromoter silently dropped nil-dependency
+// errors; the constructor now returns (*Promoter, error) and
+// tests use this helper to keep call sites compact.
+func mustNewPromoter(t *testing.T, repo Repository, loader PromptLoader, activator ReleaseActivator, auditor Auditor) *Promoter {
+	t.Helper()
+	p, err := NewPromoter(repo, loader, activator, auditor)
+	if err != nil {
+		t.Fatalf("NewPromoter: %v", err)
+	}
+	return p
+}
