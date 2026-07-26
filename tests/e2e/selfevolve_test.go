@@ -85,16 +85,11 @@ func TestSelfEvolve_OrchestratorEndToEnd(t *testing.T) {
 		t.Fatalf("seed failed eval: %v", err)
 	}
 	validator := selfevolve.NewHarnessValidator(fake, invoke)
-	promoter, perr := selfevolve.NewPromoter(fake, loader, &fakeActivator{repo: fake}, &fakeAuditor{}); if perr != nil { t.Fatalf("NewPromoter: %v", perr) }
-	ev := selfevolve.NewEvolver(fake, loader, revision, validator, promoter, &fakeAuditor{}, nil)
+	sharedAuditor := &fakeAuditor{}
+	promoter, perr := selfevolve.NewPromoter(fake, loader, &fakeActivator{repo: fake}, sharedAuditor); if perr != nil { t.Fatalf("NewPromoter: %v", perr) }
+	ev := selfevolve.NewEvolver(fake, loader, revision, validator, promoter, sharedAuditor, nil)
 
 	// 7. Set the capability's self-evolve config.
-	auditor := &fakeAuditor{}
-	fake.auditor = auditor
-	_ = auditor
-	// (the Evolver stores its own auditor; the test reads
-	// from fake.auditor to assert the audit chain recorded
-	// every transition.)
 	if err := db.UpdateSelfEvolveConfig(ctx, capID, capability.SelfEvolveConfig{
 		Enabled:      true,
 		MinScore:     0.9,
@@ -129,7 +124,7 @@ func TestSelfEvolve_OrchestratorEndToEnd(t *testing.T) {
 		"self_evolve.validate": false,
 		"self_evolve.promote":  false,
 	}
-	for _, a := range fakeAuditor.rows {
+	for _, a := range sharedAuditor.rows {
 		if _, ok := want[a.Action]; ok {
 			want[a.Action] = true
 		}
@@ -184,7 +179,7 @@ func TestSelfEvolve_RejectsWhenLLMFails(t *testing.T) {
 	defer db.Close()
 
 	ctx := context.Background()
-	if _, err := db.CreateUser(ctx, selfEvolveAuditUser); err != nil {
+	if err := db.CreateUser(ctx, selfEvolveAuditUser); err != nil {
 		t.Fatalf("user: %v", err)
 	}
 	capID, datasetID := "cap-r", "ds-r"
@@ -406,10 +401,16 @@ func (a *fakeAuditor) Audit(_ context.Context, action, target string, _ map[stri
 // env=dev, and a 3-case dataset that expects "pong".
 func seedCapabilityWithBadPrompt(ctx context.Context, db *store.SQLite, capID, datasetID string) (string, error) {
 	ws := "ws-" + capID
-	db.CreateWorkspace(ctx, &capability.Workspace{ID: ws, Name: "e2e-ws"})
+	if err := db.CreateWorkspace(ctx, &capability.Workspace{ID: ws, Name: "e2e-ws"}); err != nil {
+		return "", fmt.Errorf("create workspace: %w", err)
+	}
 	proj := "p-" + capID
-	db.CreateProject(ctx, &capability.Project{ID: proj, WorkspaceID: ws, Name: "e2e-p"})
-	db.CreateCapability(ctx, &capability.Capability{ID: capID, ProjectID: proj, Name: "e2e-cap"})
+	if err := db.CreateProject(ctx, &capability.Project{ID: proj, WorkspaceID: ws, Name: "e2e-p"}); err != nil {
+		return "", fmt.Errorf("create project: %w", err)
+	}
+	if err := db.CreateCapability(ctx, &capability.Capability{ID: capID, ProjectID: proj, Name: "e2e-cap"}); err != nil {
+		return "", fmt.Errorf("create capability: %w", err)
+	}
 	// Bad prompt blob.
 	badText := "audit code"
 	badHash, _ := casWritePrompt(badText, "")
@@ -424,33 +425,43 @@ func seedCapabilityWithBadPrompt(ctx context.Context, db *store.SQLite, capID, d
 	}
 	mh, _ := capability.ComputeManifestHash(manifest)
 	vid := "v-1-" + capID
-	db.CreateVersion(ctx, &capability.Version{
+	if err := db.CreateVersion(ctx, &capability.Version{
 		ID: vid, CapabilityID: capID, Version: 1, Manifest: manifest, ManifestHash: mh,
 		CreatedAt: time.Now().UTC(), CreatedBy: "seed",
-	})
+	}); err != nil {
+		return "", fmt.Errorf("create version: %w", err)
+	}
 	// CAS write the bad prompt.
 	if err := writeCASPrompt(badText, badHash); err != nil {
 		return "", err
 	}
 	// Active release in dev.
 	relID := "rel-old"
-	db.CreateRelease(ctx, &release.Release{
+	if err := db.CreateRelease(ctx, &release.Release{
 		ID: relID, CapabilityID: capID, CapabilityVersion: 1, Manifest: manifest,
 		Environment: release.Environment("dev"), Status: release.StatusActive,
 		CreatedBy: "seed", CreatedAt: time.Now().UTC(),
-	})
+	}); err != nil {
+		return "", fmt.Errorf("create release: %w", err)
+	}
 	// Dataset with 3 cases expecting "pong".
-	ds := &harness.Dataset{ID: datasetID, Name: datasetID}
-	db.CreateDataset(ctx, ds)
-	db.UpsertDatasetCases(ctx, datasetID, []harness.DatasetCase{
+	ds := &harness.Dataset{ID: datasetID, CapabilityID: capID, Name: datasetID}
+	if err := db.CreateDataset(ctx, ds); err != nil {
+		return "", fmt.Errorf("create dataset: %w", err)
+	}
+	if err := db.UpsertDatasetCases(ctx, datasetID, []harness.DatasetCase{
 		{ID: "k0", DatasetID: datasetID, Seq: 0, Inputs: []byte(`{"q":"ping"}`), Expected: []byte(`"pong"`)},
 		{ID: "k1", DatasetID: datasetID, Seq: 1, Inputs: []byte(`{"q":"hi"}`), Expected: []byte(`"pong"`)},
 		{ID: "k2", DatasetID: datasetID, Seq: 2, Inputs: []byte(`{"q":"yo"}`), Expected: []byte(`"pong"`)},
-	})
+	}); err != nil {
+		return "", fmt.Errorf("upsert dataset cases: %w", err)
+	}
 	// Approval so SelfActivate doesn't fail.
-	db.CreateApproval(ctx, &approval.Approval{
+	if err := db.CreateApproval(ctx, &approval.Approval{
 		ReleaseID: relID, UpdatedAt: time.Now().UTC(),
-	})
+	}); err != nil {
+		return "", fmt.Errorf("create approval: %w", err)
+	}
 	return capID, nil
 }
 
@@ -501,5 +512,6 @@ func seedFailedEval(ctx context.Context, f *fakeEvolverRepo, passed, failed int)
 // .promptsheon/objects/. Tests must chdir to a temp dir
 // before calling this.
 func writeCASPrompt(text, hash string) error {
-	return casWritePrompt(text, hash)
+	_, err := casWritePrompt(text, hash)
+	return err
 }
