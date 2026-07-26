@@ -1,5 +1,5 @@
 import * as api from "../api.js";
-import { escape, formatCompact, formatInteger, formatMoney, formatPercent, formatRelative } from "../utils.js";
+import { escape, formatCompact, formatInteger, formatMoney, formatRelative } from "../utils.js";
 import { ownerName } from "../state/owners.js";
 
 const skeleton = (label, lines = 3) => `
@@ -15,14 +15,12 @@ const card = (eyebrow, icon, value, sub, tone = "neutral") => `
     <div class="mt-6 flex items-end justify-between gap-3"><span class="metric-value">${escape(value)}</span><span class="status-pill ${tone}"><span class="status-dot"></span>${escape(sub)}</span></div>
   </article>`;
 
-const TONES = { active: "good", approved: "good", pending: "warn", superseded: "neutral", rolled_back: "danger" };
-
 function pill(text, tone = "neutral") {
   return `<span class="status-pill ${tone}"><span class="status-dot"></span>${escape(text)}</span>`;
 }
 
 function sectionOpen(title, anchor) {
-  return `<section class="panel p-5 sm:p-6"><div class="flex items-start justify-between"><div><div class="eyebrow">${escape(anchor)}</div><h2 class="mt-2 text-[1.05rem] font-bold tracking-[-.035em]">${escape(title)}</h2></div></div>`;
+  return `<div class="flex items-start justify-between"><div><div class="eyebrow">${escape(anchor)}</div><h2 class="mt-2 text-[1.05rem] font-bold tracking-[-.035em]">${escape(title)}</h2></div></div>`;
 }
 
 function errorPanel(message) {
@@ -33,34 +31,50 @@ function emptyPanel(text) {
   return `<div class="rounded-xl border border-dashed border-line bg-paper p-4 text-center text-[.7rem] text-muted">${escape(text)}</div>`;
 }
 
-async function loadOverviewData() {
+async function loadOverviewData(initialAuditFilter) {
   const out = {
     health: null, ready: null, metrics: null, providers: null,
-    alerts: null, audit: null, workspaces: null,
-    projects: [], capabilities: [], releases: [], capabilityMap: new Map()
+    alerts: null, audit: null, auditFilter: initialAuditFilter || "all",
+    workspaces: null, projects: [], capabilities: [], releases: [], capabilityMap: new Map()
   };
   out.health = await api.getHealth();
   out.ready = await api.getReady();
   if (!out.health.ok && !out.ready.ok) return out;
-  const [metrics, providers, alerts, audit, workspaces] = await Promise.all([
-    api.getMetricsSummary(), api.listProviders(), api.listAlerts(),
-    api.listAudit(12), api.listWorkspaces()
-  ]);
-  out.metrics = metrics; out.providers = providers; out.alerts = alerts;
-  out.audit = audit; out.workspaces = workspaces;
-  if (workspaces.ok && workspaces.data?.length) {
-    const w = workspaces.data[0];
+  const auditOpts = { limit: 12 };
+  if (initialAuditFilter && initialAuditFilter !== "all") auditOpts.action = initialAuditFilter;
+  // Sequential fetch with small jitter to stay under the daemon's per-second rate cap.
+  out.metrics = await api.getMetricsSummary();
+  await delay(40);
+  out.providers = await api.listProviders();
+  await delay(40);
+  out.alerts = await api.listAlerts();
+  await delay(40);
+  out.audit = await api.listAudit(auditOpts);
+  await delay(40);
+  out.workspaces = await api.listWorkspaces();
+  if (out.workspaces.ok && out.workspaces.data?.length) {
+    const w = out.workspaces.data[0];
     const projects = await api.listProjects(w.id);
     if (projects.ok) {
       out.projects = projects.data || [];
-      const capLists = await Promise.all(out.projects.map((p) => api.listCapabilities(p.id)));
+      const capLists = await api.sequential(
+        out.projects.map((p) => () => api.listCapabilities(p.id)),
+        { delayMs: 30, maxParallel: 1 }
+      );
       out.capabilities = capLists.filter((r) => r.ok).flatMap((r) => r.data || []);
-      const relLists = await Promise.all(out.capabilities.map((c) => api.listReleases(c.id)));
+      const relLists = await api.sequential(
+        out.capabilities.map((c) => () => api.listReleases(c.id)),
+        { delayMs: 30, maxParallel: 1 }
+      );
       out.releases = relLists.filter((r) => r.ok).flatMap((r) => r.data || []);
       out.capabilityMap = new Map(out.capabilities.map((c) => [c.id, c]));
     }
   }
   return out;
+}
+
+function delay(ms) {
+  return new Promise((r) => setTimeout(r, ms + Math.random() * 30));
 }
 
 function renderMetrics(metrics) {
@@ -124,15 +138,20 @@ function renderPending(releases, capabilitiesById) {
   }).join("")}</div>`;
 }
 
-function renderAudit(audit) {
+function renderAudit(audit, filter) {
   if (!audit || !audit.ok || !audit.data) {
     if (audit?.status === 429) return errorPanel("Audit log rate-limited. Retrying automatically.");
     return errorPanel("Live activity unavailable" + (audit?.error ? ` (${escape(audit.error)})` : "") + ".");
   }
-  const rows = (audit.data || []).slice(0, 8);
+  const all = audit.data || [];
+  const rows = all.slice(0, 12);
   if (!rows.length) return emptyPanel("No activity yet. Create a capability or release to populate the audit trail.");
   const tone = (action) => ({ delete: "danger", update: "warn", create: "good", activate: "good", rollback: "danger" }[action]) || "neutral";
-  return `<div class="mt-5 space-y-3">${rows.map((entry) => {
+  const chips = ["all", "create", "update", "delete", "activate", "rollback"].map((action) => {
+    const active = (filter || "all") === action;
+    return `<button type="button" data-audit-filter="${escape(action)}" class="rounded-md ${active ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"} px-2.5 py-1.5 text-[.66rem] font-${active ? "bold" : "semibold"}">${escape(action)}</button>`;
+  }).join("");
+  const list = rows.map((entry) => {
     const details = entry.details || {};
     const target = (entry.resource || "").split(":").pop();
     const label = details.name || target || entry.resource;
@@ -142,7 +161,10 @@ function renderAudit(audit) {
       <div class="min-w-0 flex-1"><p class="text-[.74rem] leading-5"><span class="font-bold">${escape(subject)}</span> · <span class="font-semibold">${escape(entry.action)}</span> · <span class="font-bold">${escape(label)}</span></p><p class="mt-0.5 text-[.63rem] text-muted">${escape(formatRelative(entry.timestamp))} <span class="mx-1 text-[#c1c2bd]">·</span> <span class="mono">${escape(entry.resource)}</span></p></div>
       ${pill(entry.action, tone(entry.action))}
     </div>`;
-  }).join("")}</div>`;
+  }).join("");
+  return `<div class="mt-5 space-y-3">${list}</div>
+  <div class="mt-4 flex items-center gap-1 rounded-lg bg-paper p-1" data-audit-chips>${chips}</div>
+  <p class="mt-2 text-[.62rem] text-muted">Showing ${rows.length} of ${all.length} entries. Open <a class="font-bold text-ink hover:text-accent" href="#/audit${filter && filter !== "all" ? `?action=${encodeURIComponent(filter)}` : ""}">Audit trail →</a> for full history with filters.</p>`;
 }
 
 function renderCapabilities(capabilities, releases) {
@@ -196,20 +218,15 @@ function renderStrips(providers, alerts) {
   return `${providerPanel}${alertPanel}`;
 }
 
-export async function renderOverview(route) {
-  const body = window.document.getElementById("view-body");
-  if (!body) return "";
-  body.innerHTML = `
+function shell(topActions, clock) {
+  return `
     <section class="flex flex-col justify-between gap-5 md:flex-row md:items-end">
       <div>
-        <div class="eyebrow flex items-center gap-2">Command center <span class="h-1 w-1 rounded-full bg-accent"></span> <span id="overview-clock">—</span></div>
+        <div class="eyebrow flex items-center gap-2">Command center <span class="h-1 w-1 rounded-full bg-accent"></span> <span id="overview-clock">${escape(clock)}</span></div>
         <h1 class="mt-3 max-w-2xl text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[.98] tracking-[-.075em]">Make every capability<br class="hidden sm:block" /> production-ready.</h1>
         <p class="mt-4 max-w-xl text-[.86rem] leading-6 text-muted">One clear view of your intelligence stack. Review what changed, promote what works, and keep every decision traceable.</p>
       </div>
-      <div class="flex shrink-0 items-center gap-2">
-        <button id="action-refresh" class="quiet-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-[1.8]"><use href="#icon-refresh"/></svg><span>Refresh</span></button>
-        <button id="action-new-capability" class="primary-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-[2]"><use href="#icon-plus"/></svg> New capability</button>
-      </div>
+      ${topActions}
     </section>
     <section id="overview-metrics" class="mt-8">${skeleton("metrics", 4)}</section>
     <section class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(330px,.85fr)]">
@@ -234,11 +251,35 @@ export async function renderOverview(route) {
     <section class="mt-5 grid gap-5 md:grid-cols-2"><div id="overview-strip-1">${skeleton("providers", 1)}</div><div id="overview-strip-2">${skeleton("alerts", 1)}</div></section>
     <footer class="flex flex-col justify-between gap-2 py-8 text-[.64rem] text-muted sm:flex-row sm:items-center"><span>Promptsheon control plane <span class="mx-1 text-[#b7b8b3]">·</span> <span id="runtime-status-footer">Loading</span></span><span class="mono">build <span id="runtime-version-footer">v0.3.0</span></span></footer>
   `;
+}
 
-  const data = await loadOverviewData();
-  applyRuntimePill(data.health, data.ready);
-  applyOverviewData(data);
-  return "";
+function topActions() {
+  return `<div class="flex shrink-0 items-center gap-2">
+    <button id="action-refresh" class="quiet-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-[1.8]"><use href="#icon-refresh"/></svg><span>Refresh</span></button>
+    <button id="action-new-capability" class="primary-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-[2]"><use href="#icon-plus"/></svg> New capability</button>
+  </div>`;
+}
+
+function renderInitialSkeleton(filter) {
+  const clock = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric" }).format(new Date());
+  return shell(topActions(), clock);
+}
+
+export async function renderOverview(route) {
+  const initialFilter = route?.query?.action || (window.localStorage.getItem("promptsheon.auditFilter") || "all");
+  const html = renderInitialSkeleton(initialFilter);
+  queueMicrotask(async () => {
+    try {
+      const data = await loadOverviewData(initialFilter);
+      applyRuntimePill(data.health, data.ready);
+      applyOverviewData(data);
+      attachOverviewActions(data);
+    } catch (error) {
+      console.error("Overview hydration failed:", error);
+    }
+  });
+  const activity = window.document.getElementById("view-activity-future");
+  return html;
 }
 
 function applyRuntimePill(health, ready) {
@@ -263,7 +304,19 @@ function applyOverviewData(data) {
   const pending = window.document.getElementById("overview-pending");
   if (pending) pending.innerHTML = renderPending(data.releases, data.capabilityMap);
   const activity = window.document.getElementById("overview-activity");
-  if (activity) activity.innerHTML = renderAudit(data.audit);
+  if (activity) {
+    activity.innerHTML = renderAudit(data.audit, data.auditFilter);
+    activity.addEventListener("click", (event) => {
+      const chip = event.target.closest("[data-audit-filter]");
+      if (!chip) return;
+      const next = chip.dataset.auditFilter;
+      if (next === data.auditFilter) return;
+      window.localStorage.setItem("promptsheon.auditFilter", next);
+      const action = next === "all" ? "" : `?action=${encodeURIComponent(next)}`;
+      window.location.hash = `#/${action}`;
+      window.location.reload();
+    });
+  }
   const env = window.document.getElementById("overview-environment");
   if (env) env.innerHTML = renderEnvironments(data.releases, data.capabilityMap);
   const caps = window.document.getElementById("overview-capabilities");
@@ -305,6 +358,16 @@ function applyOverviewData(data) {
       footer.textContent = "Live";
     }
   }
+  const pendingSection = window.document.getElementById("overview-pending");
+  if (pendingSection) {
+    pendingSection.addEventListener("click", async (event) => {
+      const row = event.target.closest("[data-open-release]");
+      if (!row) return;
+      const { openReleaseModal } = await import("./release-modal.js");
+      const root = window.document.getElementById("modal-root");
+      await openReleaseModal(root, row.dataset.openRelease);
+    });
+  }
   attachOverviewActions(data);
 }
 
@@ -312,7 +375,11 @@ function attachOverviewActions(data) {
   const refresh = window.document.getElementById("action-refresh");
   refresh?.addEventListener("click", () => window.location.reload());
   const newCap = window.document.getElementById("action-new-capability");
-  newCap?.addEventListener("click", () => {
-    window.dispatchEvent(new CustomEvent("promptsheon:new-capability", { detail: { projects: data.projects } }));
+  newCap?.addEventListener("click", async () => {
+    const root = window.document.getElementById("modal-root");
+    if (root) {
+      const { openNewCapabilityModal } = await import("./new-capability-modal.js");
+      await openNewCapabilityModal(root, data.projects);
+    }
   });
 }

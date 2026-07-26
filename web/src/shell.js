@@ -5,6 +5,7 @@ import { renderModalRoot } from "./components/modal-root.js";
 import { currentRoute } from "./router.js";
 
 export function renderAppShell() {
+  attachModalHandlers();
   return `
     <div id="sidebar-shade" class="sidebar-shade fixed inset-0 z-30 bg-ink/40 lg:hidden"></div>
     ${renderNav()}
@@ -45,4 +46,31 @@ export function renderAppShell() {
 
 export function renderInitialState() {
   renderView(currentRoute());
+}
+
+let modalHandlersAttached = false;
+function attachModalHandlers() {
+  if (modalHandlersAttached) return;
+  modalHandlersAttached = true;
+  document.addEventListener("click", (event) => {
+    const closer = event.target.closest("[data-close-modal]");
+    if (!closer) return;
+    const root = document.getElementById("modal-root");
+    if (root) root.replaceChildren();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      const root = document.getElementById("modal-root");
+      if (root) root.replaceChildren();
+    }
+  });
+  document.addEventListener("click", async (event) => {
+    const openSettings = event.target.closest("[data-open-settings]");
+    if (openSettings) {
+      event.preventDefault();
+      const { openSettings } = await import("./components/settings-button.js");
+      const root = document.getElementById("modal-root");
+      if (root) await openSettings(root);
+    }
+  });
 }

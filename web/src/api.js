@@ -12,6 +12,33 @@ function buildUrl(path) {
   return path;
 }
 
+function buildQuery(params) {
+  if (!params) return "";
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    qs.set(key, String(value));
+  }
+  const out = qs.toString();
+  return out ? `?${out}` : "";
+}
+
+export async function sequential(thunks, { delayMs = 25, maxParallel = 2 } = {}) {
+  const results = new Array(thunks.length);
+  let cursor = 0;
+  async function worker() {
+    while (cursor < thunks.length) {
+      const i = cursor++;
+      try { results[i] = await thunks[i](); }
+      catch (e) { results[i] = { ok: false, status: 0, error: String(e?.message || e) }; }
+      if (cursor < thunks.length) await new Promise((r) => setTimeout(r, delayMs + Math.random() * 20));
+    }
+  }
+  const workers = Array.from({ length: Math.min(maxParallel, thunks.length) }, worker);
+  await Promise.all(workers);
+  return results;
+}
+
 function buildHeaders(extra, hasBody, explicitKey) {
   const settings = loadSettings();
   const headers = { Accept: "application/json", ...(extra || {}) };
@@ -160,8 +187,179 @@ export async function getRelease(id) {
   return apiFetch(`/api/v1/releases/${encodeURIComponent(id)}`);
 }
 
-export async function listAudit(limit = 12) {
-  return apiFetch(`/api/v1/audit?limit=${limit}`);
+export async function getReleaseApproval(id) {
+  return apiFetch(`/api/v1/releases/${encodeURIComponent(id)}/approval`);
+}
+
+export async function rollbackRelease(id) {
+  return apiFetch(`/api/v1/releases/${encodeURIComponent(id)}/rollback`, { method: "POST" });
+}
+
+export async function invokeRelease(id, inputs) {
+  return apiFetch(`/api/v1/releases/${encodeURIComponent(id)}/invoke`, { method: "POST", body: { inputs } });
+}
+
+export async function getCapabilityContract(id) {
+  return apiFetch(`/api/v1/capabilities/${encodeURIComponent(id)}/contract`);
+}
+
+export async function updateCapabilityContract(id, payload) {
+  return apiPut(`/api/v1/capabilities/${encodeURIComponent(id)}/contract`, payload);
+}
+
+export async function getCapabilityReputation(id) {
+  return apiFetch(`/api/v1/capabilities/${encodeURIComponent(id)}/reputation`);
+}
+
+export async function updateCapability(id, payload) {
+  return apiPut(`/api/v1/capabilities/${encodeURIComponent(id)}`, payload);
+}
+
+export async function deleteCapability(id) {
+  return apiDelete(`/api/v1/capabilities/${encodeURIComponent(id)}`);
+}
+
+export async function getCapabilityDiff(id, fromVersion, toVersion) {
+  return apiFetch(`/api/v1/capabilities/${encodeURIComponent(id)}/diff?from=${fromVersion}&to=${toVersion}`);
+}
+
+export async function listVersions(capabilityId) {
+  return apiFetch(`/api/v1/capabilities/${encodeURIComponent(capabilityId)}/versions`);
+}
+
+export async function getLatestVersion(capabilityId) {
+  return apiFetch(`/api/v1/capabilities/${encodeURIComponent(capabilityId)}/versions/latest`);
+}
+
+export async function createVersion(capabilityId, payload) {
+  return apiPost(`/api/v1/capabilities/${encodeURIComponent(capabilityId)}/versions`, payload);
+}
+
+export async function updateSelfEvolveConfig(id, payload) {
+  return apiPut(`/api/v1/capabilities/${encodeURIComponent(id)}/self-evolve`, payload);
+}
+
+export async function listExecutions(versionId) {
+  return apiFetch(`/api/v1/versions/${encodeURIComponent(versionId)}/executions`);
+}
+
+export async function createExecution(versionId, body) {
+  return apiPost(`/api/v1/versions/${encodeURIComponent(versionId)}/executions`, body);
+}
+
+export async function getReleaseCreation(versionId, environment) {
+  return apiPost(`/api/v1/versions/${encodeURIComponent(versionId)}/releases`, { environment });
+}
+
+export async function getWorkspaceObservation(id) {
+  return apiFetch(`/api/v1/workspaces/${encodeURIComponent(id)}/observation`);
+}
+
+export async function listAlertRules() {
+  return apiFetch("/api/v1/alerts/rules");
+}
+
+export async function createAlertRule(payload) {
+  return apiPost("/api/v1/alerts/rules", payload);
+}
+
+export async function updateAlertRule(id, payload) {
+  return apiPut(`/api/v1/alerts/rules/${encodeURIComponent(id)}`, payload);
+}
+
+export async function deleteAlertRule(id) {
+  return apiDelete(`/api/v1/alerts/rules/${encodeURIComponent(id)}`);
+}
+
+export async function listNotificationGroups() {
+  return apiFetch("/api/v1/alerts/notifications");
+}
+
+export async function createNotificationGroup(payload) {
+  return apiPost("/api/v1/alerts/notifications", payload);
+}
+
+export async function resolveAlert(id) {
+  return apiPut(`/api/v1/alerts/active/${encodeURIComponent(id)}/resolve`);
+}
+
+export async function listWebhooks() {
+  return apiFetch("/api/v1/webhooks");
+}
+
+export async function createWebhook(payload) {
+  return apiPost("/api/v1/webhooks", payload);
+}
+
+export async function deleteWebhook(id) {
+  return apiDelete(`/api/v1/webhooks/${encodeURIComponent(id)}`);
+}
+
+export async function listVaultKeys() {
+  return apiFetch("/api/v1/vault/keys");
+}
+
+export async function saveVaultKey(payload) {
+  return apiPost("/api/v1/vault/keys", payload);
+}
+
+export async function deleteVaultKey(id) {
+  return apiDelete(`/api/v1/vault/keys/${encodeURIComponent(id)}`);
+}
+
+export async function getProvider(name) {
+  return apiFetch(`/api/v1/providers/${encodeURIComponent(name)}`);
+}
+
+export async function testProvider(name, model) {
+  return apiPost(`/api/v1/providers/${encodeURIComponent(name)}/test`, { model });
+}
+
+export async function listUsers(limit = 200) {
+  return apiFetch(`/api/v1/users?limit=${limit}`);
+}
+
+export async function createUser(payload) {
+  return apiPost("/api/v1/users", payload);
+}
+
+export async function updateUser(id, payload) {
+  return apiPut(`/api/v1/users/${encodeURIComponent(id)}`, payload);
+}
+
+export async function deleteUser(id) {
+  return apiDelete(`/api/v1/users/${encodeURIComponent(id)}`);
+}
+
+export async function compileReasoning(intent, workspaceId) {
+  return apiPost("/api/v1/reasoning/compile", { intent, workspace_id: workspaceId || undefined });
+}
+
+export async function getTopCapabilities() {
+  return apiFetch("/api/v1/metrics/top-capabilities");
+}
+
+export async function listAudit(options = {}) {
+  const params = { limit: options.limit || 24 };
+  if (options.action) params.action = options.action;
+  if (options.resource) params.resource = options.resource;
+  if (options.user_id) params.user_id = options.user_id;
+  if (options.since) params.since = options.since;
+  if (options.until) params.until = options.until;
+  if (options.offset != null) params.offset = options.offset;
+  return apiFetch(`/api/v1/audit${buildQuery(params)}`);
+}
+
+export async function verifyAuditChain() {
+  return apiGet("/api/v1/audit/verify");
+}
+
+export async function exportAudit(format = "csv") {
+  const headers = { Accept: "text/csv" };
+  if (loadSettings().apiKey) headers.Authorization = "Bearer " + loadSettings().apiKey;
+  const url = buildUrl(`/api/v1/audit/export?format=${encodeURIComponent(format)}`);
+  const response = await fetch(url, { headers, credentials: "omit" });
+  return { ok: response.ok, status: response.status, blob: response.ok ? await response.blob() : null, error: response.ok ? null : `HTTP ${response.status}` };
 }
 
 export async function listAlerts() {
