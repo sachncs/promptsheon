@@ -2,7 +2,6 @@ package cas
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -37,52 +36,19 @@ const (
 	maxBranchLength = 255
 )
 
-// logger is the package-wide structured logger. It is initialised
-// at package load time via the package-level defaultLogger() call
-// (no init() — Google Go style guide §1.7.4 discourages init()
-// for package-level state because it cannot be overridden before
-// first use). The PROMPTSHEON_LOG_LEVEL environment variable is
-// consulted exactly once, at process start. Library consumers can
-// override via SetLogger at any time.
-var logger = defaultLogger()
-
-// defaultLogger returns a JSON slog handler writing to stderr at
-// the level requested by the PROMPTSHEON_LOG_LEVEL environment
-// variable. The function is called once during package load.
-func defaultLogger() *slog.Logger {
-	level := slog.LevelInfo
-	switch os.Getenv("PROMPTSHEON_LOG_LEVEL") {
-	case "debug":
-		level = slog.LevelDebug
-	case "warn":
-		level = slog.LevelWarn
-	case "error":
-		level = slog.LevelError
-	}
-	return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
-}
-
-// SetLogger replaces the package logger. Useful for tests and for
-// host applications that want to route promptsheon's structured
-// logs through their own logger.
-func SetLogger(l *slog.Logger) {
-	if l == nil {
-		return
-	}
-	logger = l
-}
-
 // nowUnixNano returns the current wall-clock time in nanoseconds
 // since the Unix epoch. Extracted into a helper so tests can
-// override the clock via a package-private variable in the future.
+// override the clock via a package-private variable.
 func nowUnixNano() int64 {
 	return time.Now().UnixNano()
 }
 
 // Init creates a fresh .promptsheon directory in the current
 // working directory. It is idempotent: directories that already
-// exist are left in place, and HEAD is rewritten to point at the
-// default branch.
+// exist are left in place, and HEAD/refs are only (re)written when
+// the repository has just been created. Re-running Init against
+// an existing repo with a HEAD pointing at a non-default branch
+// will NOT clobber the user's branch.
 //
 // Returns an error if .promptsheon already contains content but
 // does not look like a repository, or if any of the directory
@@ -93,34 +59,34 @@ func Init() error {
 		if !IsInitialized() {
 			return fmt.Errorf("%s exists but is not a promptsheon repository", PromptsheonDir)
 		}
-	} else if !os.IsNotExist(err) {
+		// Already initialised: leave HEAD and refs alone.
+		logger().Debug("repository already initialised", "dir", PromptsheonDir)
+		return nil
+	} else if !isNotExist(err) {
 		return fmt.Errorf("stat %s: %w", PromptsheonDir, err)
-	} else {
-		// Create the layout.
-		dirs := []string{
-			filepath.Join(PromptsheonDir, objectsDir),
-			filepath.Join(PromptsheonDir, headsDir),
-		}
-		for _, d := range dirs {
-			if err := os.MkdirAll(d, 0o750); err != nil {
-				return fmt.Errorf("mkdir %s: %w", d, err)
-			}
+	}
+
+	// Create the layout.
+	dirs := []string{
+		filepath.Join(PromptsheonDir, objectsDir),
+		filepath.Join(PromptsheonDir, headsDir),
+	}
+	for _, d := range dirs {
+		if err := os.MkdirAll(d, 0o750); err != nil {
+			return fmt.Errorf("mkdir %s: %w", d, err)
 		}
 	}
 
-	// Always rewrite HEAD so a half-initialized directory can be
-	// rescued by re-running init. We also create an empty "main"
-	// ref file so ListRefs and the CLI both report a branch even
-	// before the first commit; the empty hash signals "no commits
-	// yet" without breaking the invariant that HEAD always points
-	// at an existing ref.
+	// First-time init: write HEAD pointing at the default branch and
+	// create an empty "main" ref file so ListRefs and the CLI both
+	// report a branch even before the first commit.
 	if err := WriteHEAD("ref: refs/heads/main"); err != nil {
 		return err
 	}
 	if err := WriteRef("main", ""); err != nil {
 		return err
 	}
-	logger.Debug("repository initialised", "dir", PromptsheonDir)
+	logger().Debug("repository initialised", "dir", PromptsheonDir)
 	return nil
 }
 

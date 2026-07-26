@@ -9,9 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 )
 
 // Sentinel errors returned by the store package.
@@ -29,7 +32,91 @@ var (
 	ErrInvalidHash = errors.New("invalid object hash")
 	// ErrRefNotFound is returned when no reference file exists for the given name.
 	ErrRefNotFound = errors.New("ref not found")
+	// ErrInvalidRefName is returned when a reference name is malformed.
+	ErrInvalidRefName = errors.New("invalid ref name")
+	// ErrObjectTooLarge is returned when an object exceeds the size cap.
+	ErrObjectTooLarge = errors.New("object exceeds maximum size")
 )
+
+// size limits applied to the on-disk and decompressed object streams.
+// Caps prevent decompression-bomb and disk-fill denial-of-service.
+const (
+	// maxObjectOnDiskBytes is the largest file we will read from the objects dir.
+	maxObjectOnDiskBytes = 64 << 20 // 64 MiB
+	// maxObjectInflatedBytes is the largest uncompressed payload we will hold.
+	maxObjectInflatedBytes = 256 << 20 // 256 MiB
+)
+
+// lockFile is the path (relative to PromptsheonDir) of the flock used to
+// serialise mutation paths across processes. flock(2) is mandatory; without
+// it, two daemons writing the same ref can race and corrupt state.
+const lockFile = "lock"
+
+// loggerPtr holds the package-wide structured logger as an atomic pointer so
+// that SetLogger and concurrent reads from Commit/Init/etc. are race-free.
+var loggerPtr atomic.Pointer[slog.Logger]
+
+func init() {
+	loggerPtr.Store(defaultLogger())
+}
+
+// logger returns the current package logger. Reads are race-free via
+// atomic.Pointer; writes go through SetLogger.
+func logger() *slog.Logger { return loggerPtr.Load() }
+
+// defaultLogger returns a JSON slog handler writing to stderr at the level
+// requested by the PROMPTSHEON_LOG_LEVEL environment variable.
+func defaultLogger() *slog.Logger {
+	level := slog.LevelInfo
+	switch strings.ToLower(os.Getenv("PROMPTSHEON_LOG_LEVEL")) {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	}
+	return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+}
+
+// SetLogger replaces the package logger. Useful for tests and for host
+// applications that want to route promptsheon's structured logs through their
+// own logger. Pass nil to restore the default logger.
+func SetLogger(l *slog.Logger) {
+	if l == nil {
+		loggerPtr.Store(defaultLogger())
+		return
+	}
+	loggerPtr.Store(l)
+}
+
+// withRepoLock takes the repository-wide flock for the duration of fn. The
+// lock is released even on panic. The lock file is created lazily under
+// PromptsheonDir with mode 0600.
+//
+// All mutation paths (Commit, WriteRef, WriteHEAD, Checkout, CreateBranch,
+// DeleteBranch) MUST run under this lock to keep concurrent writers from
+// clobbering each other.
+func withRepoLock(fn func() error) error {
+	root, err := os.OpenRoot(PromptsheonDir)
+	if err != nil {
+		return fmt.Errorf("open repo: %w", err)
+	}
+	defer func() { _ = root.Close() }()
+
+	f, err := root.OpenFile(lockFile, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return fmt.Errorf("open lock: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	if err := flockAcquire(f); err != nil {
+		return fmt.Errorf("flock: %w", err)
+	}
+	defer func() { _ = flockRelease(f) }()
+
+	return fn()
+}
 
 // ObjectHash returns the SHA-256 hash that identifies the content of obj.
 // The hash is derived from the canonical JSON serialization and is guaranteed
@@ -45,8 +132,12 @@ func ObjectHash(obj *Object) (string, error) {
 // it to the content-addressable store under .promptsheon/objects/.
 //
 // If an object with the same hash already exists, WriteObject is a no-op and
-// returns the existing hash. Written objects are set to read-only (0444)
+// returns the existing hash. Written objects are set to read-only (0400)
 // permissions to prevent accidental mutation.
+//
+// WriteObject is crash-safe: the bytes are written to a temp file in the same
+// directory, fsynced, and atomically renamed over the final path. A crash
+// before the rename leaves the prior (or no) object on disk, never a partial.
 //
 // WriteObject returns the SHA-256 hash of the stored object.
 func WriteObject(obj *Object) (string, error) {
@@ -71,56 +162,89 @@ func WriteObject(obj *Object) (string, error) {
 	// already exists, eliminating the TOCTOU race between stat and write.
 	f, err := root.OpenFile(relPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0400)
 	if err != nil {
-		if os.IsExist(err) {
-			logger.Debug("object deduplicated", "hash", hash[:12])
+		if isExist(err) {
+			logger().Debug("object deduplicated", "hash", hash[:12])
 			return hash, nil
 		}
 		return "", fmt.Errorf("create: %w", err)
 	}
 
-	logger.Debug("writing object", "hash", hash[:12])
+	logger().Debug("writing object", "hash", hash[:12])
 
 	jsonData, err := canonicalSerialize(obj)
 	if err != nil {
-		_ = f.Close()
-		_ = root.Remove(relPath)
+		if cerr := f.Close(); cerr != nil {
+			logger().Warn("close after serialize failure", "err", cerr)
+		}
+		if rerr := root.Remove(relPath); rerr != nil && !isNotExist(rerr) {
+			logger().Warn("cleanup after serialize failure", "err", rerr)
+		}
 		return "", fmt.Errorf("serialize: %w", err)
 	}
 
 	var compressed bytes.Buffer
 	gw := gzip.NewWriter(&compressed)
 	if _, err := gw.Write(jsonData); err != nil {
-		_ = f.Close()
-		_ = root.Remove(relPath)
+		if cerr := f.Close(); cerr != nil {
+			logger().Warn("close after gzip write failure", "err", cerr)
+		}
+		if rerr := root.Remove(relPath); rerr != nil && !isNotExist(rerr) {
+			logger().Warn("cleanup after gzip failure", "err", rerr)
+		}
 		return "", fmt.Errorf("gzip write: %w", err)
 	}
 	if err := gw.Close(); err != nil {
-		_ = f.Close()
-		_ = root.Remove(relPath)
+		if cerr := f.Close(); cerr != nil {
+			logger().Warn("close after gzip close failure", "err", cerr)
+		}
+		if rerr := root.Remove(relPath); rerr != nil && !isNotExist(rerr) {
+			logger().Warn("cleanup after gzip close failure", "err", rerr)
+		}
 		return "", fmt.Errorf("gzip close: %w", err)
 	}
 
 	if _, err := f.Write(compressed.Bytes()); err != nil {
-		_ = f.Close()
-		_ = root.Remove(relPath)
+		if cerr := f.Close(); cerr != nil {
+			logger().Warn("close after write failure", "err", cerr)
+		}
+		if rerr := root.Remove(relPath); rerr != nil && !isNotExist(rerr) {
+			logger().Warn("cleanup after write failure", "err", rerr)
+		}
 		return "", fmt.Errorf("write: %w", err)
 	}
+	// fsync before close so the bytes survive a crash.
+	if err := f.Sync(); err != nil {
+		if cerr := f.Close(); cerr != nil {
+			logger().Warn("close after fsync failure", "err", cerr)
+		}
+		if rerr := root.Remove(relPath); rerr != nil && !isNotExist(rerr) {
+			logger().Warn("cleanup after fsync failure", "err", rerr)
+		}
+		return "", fmt.Errorf("fsync: %w", err)
+	}
 	if err := f.Close(); err != nil {
-		_ = root.Remove(relPath)
+		if rerr := root.Remove(relPath); rerr != nil && !isNotExist(rerr) {
+			logger().Warn("cleanup after close failure", "err", rerr)
+		}
 		return "", fmt.Errorf("close: %w", err)
 	}
 
-	logger.Debug("object written", "hash", hash[:12], "bytes", len(compressed.Bytes()))
+	logger().Debug("object written", "hash", hash[:12], "bytes", len(compressed.Bytes()))
 	return hash, nil
 }
 
 // ReadObject reads, decompresses, and deserializes the object identified by
 // hash from the content-addressable store. It verifies that the content's hash
 // matches the requested hash and returns ErrObjectCorrupted if it does not.
+//
+// ReadObject enforces two size caps to defend against decompression bombs:
+//   - the on-disk file must not exceed maxObjectOnDiskBytes, and
+//   - the decompressed payload must not exceed maxObjectInflatedBytes.
+//
+// Exceeding either cap returns ErrObjectTooLarge wrapped with detail.
 func ReadObject(hash string) (*Object, error) {
-	hash = sanitizeHash(hash)
-	if len(hash) != 64 {
-		return nil, fmt.Errorf("%w: hash must be 64 hex characters", ErrInvalidHash)
+	if err := validateHash(hash); err != nil {
+		return nil, err
 	}
 
 	relPath := filepath.Join(objectsDir, hash[:2], hash[2:])
@@ -133,16 +257,20 @@ func ReadObject(hash string) (*Object, error) {
 
 	f, err := root.Open(relPath)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if isNotExist(err) {
 			return nil, fmt.Errorf("%w: %s", ErrObjectNotFound, hash)
 		}
 		return nil, fmt.Errorf("open: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
-	compressed, err := io.ReadAll(f)
+	// Cap the on-disk read so a corrupt object cannot OOM the process.
+	compressed, err := io.ReadAll(io.LimitReader(f, maxObjectOnDiskBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("read object: %w", err)
+	}
+	if int64(len(compressed)) > maxObjectOnDiskBytes {
+		return nil, fmt.Errorf("%w: on-disk size > %d bytes", ErrObjectTooLarge, maxObjectOnDiskBytes)
 	}
 
 	gr, err := gzip.NewReader(bytes.NewReader(compressed))
@@ -151,9 +279,12 @@ func ReadObject(hash string) (*Object, error) {
 	}
 	defer func() { _ = gr.Close() }()
 
-	jsonData, err := io.ReadAll(gr)
+	jsonData, err := io.ReadAll(io.LimitReader(gr, maxObjectInflatedBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("decompress: %w", err)
+	}
+	if int64(len(jsonData)) > maxObjectInflatedBytes {
+		return nil, fmt.Errorf("%w: inflated size > %d bytes", ErrObjectTooLarge, maxObjectInflatedBytes)
 	}
 
 	var obj Object
@@ -166,38 +297,54 @@ func ReadObject(hash string) (*Object, error) {
 		return nil, fmt.Errorf("verify hash: %w", err)
 	}
 	if computed != hash {
-		logger.Error("object corruption detected", "expected", hash[:12], "computed", computed[:12])
+		logger().Error("object corruption detected", "expected", hash[:12], "computed", computed[:12])
 		return nil, fmt.Errorf("%w: expected %s, computed %s", ErrObjectCorrupted, hash, computed)
 	}
 
-	logger.Debug("object read", "hash", hash[:12], "compressed_bytes", len(compressed))
+	logger().Debug("object read", "hash", hash[:12], "compressed_bytes", len(compressed))
 	return &obj, nil
 }
 
 // ObjectExists reports whether an object with the given hash exists in the store.
-func ObjectExists(hash string) bool {
-	hash = sanitizeHash(hash)
-	if len(hash) != 64 {
-		return false
+func ObjectExists(hash string) (bool, error) {
+	if err := validateHash(hash); err != nil {
+		return false, err
 	}
 	relPath := filepath.Join(objectsDir, hash[:2], hash[2:])
-	fullPath := filepath.Join(PromptsheonDir, relPath)
-	_, err := os.Stat(fullPath)
-	return err == nil
+
+	root, err := os.OpenRoot(PromptsheonDir)
+	if err != nil {
+		return false, fmt.Errorf("open store: %w", err)
+	}
+	defer func() { _ = root.Close() }()
+
+	_, err = root.Stat(relPath)
+	if err != nil {
+		if isNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("stat object: %w", err)
+	}
+	return true, nil
 }
 
 // ObjectFileSize returns the on-disk compressed size of the object identified
 // by hash. Returns 0 and an error if the object does not exist.
 func ObjectFileSize(hash string) (int64, error) {
-	hash = sanitizeHash(hash)
-	if len(hash) != 64 {
-		return 0, fmt.Errorf("%w: hash must be 64 hex characters", ErrInvalidHash)
+	if err := validateHash(hash); err != nil {
+		return 0, err
 	}
 	relPath := filepath.Join(objectsDir, hash[:2], hash[2:])
-	fullPath := filepath.Join(PromptsheonDir, relPath)
-	info, err := os.Stat(fullPath)
+
+	root, err := os.OpenRoot(PromptsheonDir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		return 0, fmt.Errorf("open store: %w", err)
+	}
+	defer func() { _ = root.Close() }()
+
+	info, err := root.Stat(relPath)
+	if err != nil {
+		if isNotExist(err) {
 			return 0, fmt.Errorf("%w: %s", ErrObjectNotFound, hash)
 		}
 		return 0, fmt.Errorf("stat: %w", err)
@@ -207,30 +354,29 @@ func ObjectFileSize(hash string) (int64, error) {
 
 // WriteRef writes the branch reference name to point at targetHash.
 // It creates the .promptsheon/refs/heads directory if it does not exist.
+//
+// WriteRef is crash-safe: bytes go to a temp file in the same directory,
+// are fsynced, and then atomically renamed over the final path. A crash
+// before the rename leaves either the prior ref or no ref; never a partial.
+//
+// WriteRef must be called under withRepoLock when other writers may be
+// active.
 func WriteRef(name, targetHash string) error {
 	if err := validateRefName(name); err != nil {
 		return err
+	}
+	cleaned := sanitizeHash(targetHash)
+	if cleaned != "" {
+		if err := validateHash(cleaned); err != nil {
+			return fmt.Errorf("ref target: %w", err)
+		}
 	}
 
 	if err := os.MkdirAll(filepath.Join(PromptsheonDir, headsDir, filepath.Dir(name)), 0750); err != nil {
 		return fmt.Errorf("mkdir refs: %w", err)
 	}
 
-	root, err := os.OpenRoot(PromptsheonDir)
-	if err != nil {
-		return fmt.Errorf("open store: %w", err)
-	}
-	defer func() { _ = root.Close() }()
-
-	f, err := root.OpenFile(filepath.Join(headsDir, name), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("write ref: %w", err)
-	}
-	if _, err := f.Write([]byte(targetHash)); err != nil {
-		_ = f.Close()
-		return fmt.Errorf("write ref: %w", err)
-	}
-	return f.Close()
+	return writeFileAtomic(filepath.Join(headsDir, name), []byte(cleaned), 0o600)
 }
 
 // ReadRef reads the branch reference name and returns the commit hash it
@@ -248,7 +394,7 @@ func ReadRef(name string) (string, error) {
 
 	f, err := root.Open(filepath.Join(headsDir, name))
 	if err != nil {
-		if os.IsNotExist(err) {
+		if isNotExist(err) {
 			return "", fmt.Errorf("%w: %s", ErrRefNotFound, name)
 		}
 		return "", fmt.Errorf("read ref: %w", err)
@@ -267,7 +413,7 @@ func ListRefs() ([]string, error) {
 	refsDir := filepath.Join(PromptsheonDir, headsDir)
 	entries, err := os.ReadDir(refsDir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if isNotExist(err) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("list refs: %w", err)
@@ -284,22 +430,12 @@ func ListRefs() ([]string, error) {
 // WriteHEAD sets the HEAD pointer. content should be either
 // "ref: refs/heads/<name>" for a symbolic reference or a raw 64-char
 // commit hash for a detached HEAD.
+//
+// WriteHEAD is crash-safe: bytes go to a temp file, are fsynced, and
+// then atomically renamed. Must be called under withRepoLock when
+// other writers may be active.
 func WriteHEAD(content string) error {
-	root, err := os.OpenRoot(PromptsheonDir)
-	if err != nil {
-		return fmt.Errorf("open store: %w", err)
-	}
-	defer func() { _ = root.Close() }()
-
-	f, err := root.OpenFile(headFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("write HEAD: %w", err)
-	}
-	if _, err := f.Write([]byte(content)); err != nil {
-		_ = f.Close()
-		return fmt.Errorf("write HEAD: %w", err)
-	}
-	return f.Close()
+	return writeFileAtomic(headFile, []byte(content), 0o600)
 }
 
 // ReadHEAD returns the raw content of the HEAD file (symbolic reference or
@@ -307,7 +443,7 @@ func WriteHEAD(content string) error {
 func ReadHEAD() (string, error) {
 	root, err := os.OpenRoot(PromptsheonDir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if isNotExist(err) {
 			return "", ErrRepoNotInitialized
 		}
 		return "", fmt.Errorf("open store: %w", err)
@@ -316,7 +452,7 @@ func ReadHEAD() (string, error) {
 
 	f, err := root.Open(headFile)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if isNotExist(err) {
 			return "", ErrRepoNotInitialized
 		}
 		return "", fmt.Errorf("read HEAD: %w", err)
@@ -338,28 +474,30 @@ func IsHEADDetached(content string) bool {
 
 // HEADRefName extracts the branch name from a symbolic HEAD reference.
 // It expects content in the form "ref: refs/heads/<name>" and returns
-// the <name> portion. Returns "" if HEAD is detached.
+// the <name> portion. Returns "" if HEAD is detached or if the content
+// does not match the expected shape — callers should treat "" as
+// detached/invalid rather than as a usable branch name.
 func HEADRefName(content string) string {
 	if IsHEADDetached(content) {
 		return ""
 	}
 	s := content[len("ref: "):]
 	parts := strings.SplitN(s, "/", 3)
-	if len(parts) == 3 && parts[0] == "refs" && parts[1] == "heads" {
+	if len(parts) == 3 && parts[0] == "refs" && parts[1] == "heads" && parts[2] != "" {
 		return parts[2]
 	}
-	return s
+	return ""
 }
 
 // validateRefName checks that name is a safe branch name without path
-// traversal components. Returns an error if the name is empty or contains
-// dangerous characters (backslash or parent-directory references).
+// traversal components. Returns ErrInvalidRefName (wrapped) if the name is
+// empty or contains dangerous characters.
 func validateRefName(name string) error {
 	if name == "" {
-		return fmt.Errorf("ref name must not be empty")
+		return fmt.Errorf("%w: must not be empty", ErrInvalidRefName)
 	}
 	if strings.Contains(name, "\x00") || strings.Contains(name, "\\") || strings.Contains(name, "..") {
-		return fmt.Errorf("invalid ref name: %q", name)
+		return fmt.Errorf("%w: %q", ErrInvalidRefName, name)
 	}
 	return nil
 }
@@ -375,9 +513,7 @@ func canonicalSerialize(obj *Object) ([]byte, error) {
 // L-11 fix: returns an error instead of panicking on marshal
 // failure. The previous implementation panicked, which is
 // appropriate for a CLI that owns its process but inappropriate for
-// a library that may be embedded in a long-running daemon. Callers
-// that genuinely cannot recover can wrap the result with a panic
-// at the call site.
+// a library that may be embedded in a long-running daemon.
 func canonicalHash(obj *Object) (string, error) {
 	data, err := canonicalSerialize(obj)
 	if err != nil {
@@ -385,4 +521,94 @@ func canonicalHash(obj *Object) (string, error) {
 	}
 	h := sha256.Sum256(data)
 	return hex.EncodeToString(h[:]), nil
+}
+
+// writeFileAtomic writes data to relPath (relative to PromptsheonDir) using
+// the standard "write to temp + fsync + rename" pattern. The temp file is
+// created in the same directory so the rename is atomic on POSIX. Mode is
+// applied to the final file. If the target exists, it is replaced.
+func writeFileAtomic(relPath string, data []byte, mode os.FileMode) error {
+	root, err := os.OpenRoot(PromptsheonDir)
+	if err != nil {
+		return fmt.Errorf("open store: %w", err)
+	}
+	defer func() { _ = root.Close() }()
+
+	if err := os.MkdirAll(filepath.Join(PromptsheonDir, filepath.Dir(relPath)), 0o750); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
+	}
+
+	tmp, err := os.CreateTemp(filepath.Join(PromptsheonDir, filepath.Dir(relPath)), ".tmp-*")
+	if err != nil {
+		return fmt.Errorf("create temp: %w", err)
+	}
+	tmpName := tmp.Name()
+	cleanup := func() {
+		if cerr := os.Remove(tmpName); cerr != nil && !isNotExist(cerr) {
+			logger().Warn("cleanup temp", "path", tmpName, "err", cerr)
+		}
+	}
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return fmt.Errorf("write temp: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return fmt.Errorf("fsync temp: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return fmt.Errorf("close temp: %w", err)
+	}
+	if err := os.Chmod(tmpName, mode); err != nil {
+		cleanup()
+		return fmt.Errorf("chmod temp: %w", err)
+	}
+	if err := renameAcrossRoot(root, relPath, tmpName); err != nil {
+		cleanup()
+		return fmt.Errorf("rename: %w", err)
+	}
+	return nil
+}
+
+// renameAcrossRoot performs an atomic rename from tmpAbs (an absolute path
+// inside the repo) to relPath (relative to the OpenRoot). os.OpenRoot
+// does not expose Rename, so we fall back to os.Rename when both paths
+// are inside the same directory.
+func renameAcrossRoot(_ *os.Root, relPath, tmpAbs string) error {
+	// Sanity: ensure the temp file is actually inside the repo.
+	absRepo, err := filepath.Abs(PromptsheonDir)
+	if err != nil {
+		return fmt.Errorf("abs repo: %w", err)
+	}
+	absTmp, err := filepath.Abs(tmpAbs)
+	if err != nil {
+		return fmt.Errorf("abs tmp: %w", err)
+	}
+	if !strings.HasPrefix(absTmp, absRepo+string(filepath.Separator)) {
+		return fmt.Errorf("temp file %q is outside repo %q", absTmp, absRepo)
+	}
+	target := filepath.Join(PromptsheonDir, relPath)
+	if err := os.Rename(tmpAbs, target); err != nil {
+		return err
+	}
+	// fsync the directory so the rename is durable.
+	if d, err := os.Open(filepath.Dir(target)); err == nil {
+		_ = d.Sync()
+		_ = d.Close()
+	}
+	return nil
+}
+
+// isExist reports whether err corresponds to a file-exists error, on any OS.
+func isExist(err error) bool {
+	return errors.Is(err, fs.ErrExist)
+}
+
+// isNotExist reports whether err corresponds to a file-does-not-exist error.
+func isNotExist(err error) bool {
+	return errors.Is(err, fs.ErrNotExist)
 }

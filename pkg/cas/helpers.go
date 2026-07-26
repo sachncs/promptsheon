@@ -13,20 +13,11 @@ var hashPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // sanitizeHash normalises a user-supplied hash. It lowercases the
 // input, strips any surrounding whitespace, and returns the
-// sentinel ErrInvalidHash wrapped with detail if the result is not
-// a valid 64-character lowercase hex string.
-//
-// The function never silently accepts bad input: callers can use
-// errors.Is to detect the failure mode and the CLI can surface a
-// helpful diagnostic.
+// cleaned string. Validation (and the wrapped ErrInvalidHash) is
+// performed by validateHash — callers that want to surface a
+// helpful diagnostic should call validateHash after sanitizing.
 func sanitizeHash(raw string) string {
 	cleaned := strings.ToLower(strings.TrimSpace(raw))
-	if !hashPattern.MatchString(cleaned) {
-		// We return the cleaned-but-invalid form so the caller can
-		// show it back in an error message; the wrapping of
-		// ErrInvalidHash is done by the caller when it matters.
-		return cleaned
-	}
 	return cleaned
 }
 
@@ -51,12 +42,20 @@ var branchNamePattern = regexp.MustCompile(`^[!-~]+$`)
 //
 //   - empty names
 //   - names longer than maxBranchLength characters
-//   - names with whitespace, control characters, slashes, or
+//   - names containing whitespace, control characters, slashes, or
 //     backslashes
+//   - names containing ".." anywhere (path-traversal defence)
+//   - names equal to the reserved HEAD sentinel
 //   - names starting with a dot (Git reserves those)
 func validateBranchName(name string) error {
 	if name == "" {
 		return fmt.Errorf("branch name is empty")
+	}
+	if name == headFile {
+		return fmt.Errorf("branch name %q is reserved", name)
+	}
+	if strings.Contains(name, "..") {
+		return fmt.Errorf("branch name %q contains '..'", name)
 	}
 	if len(name) > maxBranchLength {
 		return fmt.Errorf("branch name is %d characters, max is %d", len(name), maxBranchLength)

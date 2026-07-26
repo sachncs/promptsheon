@@ -338,7 +338,7 @@ func TestProperty_ObjectExistsTracksWrite(t *testing.T) {
 			t.Logf("WriteObject: %v", err)
 			return false
 		}
-		if !ObjectExists(hash) {
+		if ok, err := ObjectExists(hash); err != nil || !ok {
 			t.Logf("ObjectExists(%s) = false after write", hash)
 			return false
 		}
@@ -351,7 +351,7 @@ func TestProperty_ObjectExistsTracksWrite(t *testing.T) {
 		if otherHash == hash {
 			return true
 		}
-		if ObjectExists(otherHash) {
+		if ok, err := ObjectExists(otherHash); err == nil && ok {
 			t.Logf("ObjectExists(%s) = true before write", otherHash)
 			return false
 		}

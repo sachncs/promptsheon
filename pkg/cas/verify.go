@@ -16,6 +16,7 @@ type VerifyResult struct {
 	CorruptedObjects int
 	BrokenRefs       int
 	OrphanedObjects  int
+	ReadErrors       int
 	Errors           []string
 }
 
@@ -77,7 +78,7 @@ func collectAllObjects(result *VerifyResult) (map[string]string, error) {
 }
 
 func verifyObjects(result *VerifyResult, allObjects map[string]string) {
-	for hash, path := range allObjects {
+	for hash := range allObjects {
 		obj, e := ReadObject(hash)
 		if e != nil {
 			result.CorruptedObjects++
@@ -96,7 +97,6 @@ func verifyObjects(result *VerifyResult, allObjects map[string]string) {
 			continue
 		}
 		result.VerifiedObjects++
-		_ = path
 	}
 }
 
@@ -133,7 +133,7 @@ func findOrphans(result *VerifyResult, allObjects map[string]string, refs []stri
 		if err != nil || hash == "" {
 			continue
 		}
-		walkReachable(hash, reachable)
+		walkReachable(hash, reachable, result)
 	}
 	for h := range allObjects {
 		if _, ok := reachable[h]; !ok {
@@ -142,11 +142,15 @@ func findOrphans(result *VerifyResult, allObjects map[string]string, refs []stri
 	}
 }
 
-// walkReachable performs a BFS from hash following the Parents
-// links on commit objects. Non-commit objects are added but not
-// recursed into. Cycles are tolerated because we track visited
-// hashes.
-func walkReachable(hash string, out map[string]struct{}) {
+// walkReachable performs a BFS from hash following commit→tree→entries and
+// commit→parents links. Trees are followed recursively through their entries;
+// nested trees and the blobs they reference are marked reachable. Cycles are
+// tolerated because we track visited hashes.
+//
+// Read failures are recorded in result.ReadErrors and result.Errors but do not
+// abort the walk — a single corrupt object should not prevent the rest of the
+// repository from being verified.
+func walkReachable(hash string, out map[string]struct{}, result *VerifyResult) {
 	queue := []string{hash}
 	for len(queue) > 0 {
 		h := queue[0]
@@ -157,10 +161,24 @@ func walkReachable(hash string, out map[string]struct{}) {
 		out[h] = struct{}{}
 		obj, err := ReadObject(h)
 		if err != nil {
+			if result != nil {
+				result.ReadErrors++
+				result.Errors = append(result.Errors, fmt.Sprintf("reachable walk read %s: %v", shortHash(h), err))
+			}
 			continue
 		}
-		if obj.IsCommit() {
+		switch obj.Type() {
+		case TypeCommit:
 			queue = append(queue, obj.Parents...)
+			if obj.TreeHash != "" {
+				queue = append(queue, obj.TreeHash)
+			}
+		case TypeTree:
+			for _, entry := range obj.Entries {
+				if entry.Hash != "" {
+					queue = append(queue, entry.Hash)
+				}
+			}
 		}
 	}
 }

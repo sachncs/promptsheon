@@ -8,6 +8,10 @@ import (
 // LogEntry is one row in the output of Log. The Timestamp is in
 // nanoseconds since the Unix epoch so the CLI can format it
 // however it likes.
+//
+// Telemetry is a deep copy of the commit's telemetry slice so
+// callers may mutate LogEntry.Telemetry[i].Value without
+// affecting the underlying object store.
 type LogEntry struct {
 	Hash      string
 	Author    string
@@ -19,15 +23,16 @@ type LogEntry struct {
 
 // Log returns up to n commits, newest first, reachable from the
 // current HEAD. The traversal follows the first parent of each
-// commit (the linear history) and visits merge commits only when
-// they appear on that path. A repository with no commits returns
-// (nil, nil) so callers can render the "no commits" UI without a
-// separate "is empty" check.
+// commit (the linear history). Merge commits are visited only
+// when they appear on the primary path; their other parents are
+// not followed. A repository with no commits returns (nil, nil)
+// so callers can render the "no commits" UI without a separate
+// "is empty" check.
 func Log(n int) ([]*LogEntry, error) {
 	if !IsInitialized() {
 		return nil, ErrRepoNotInitialized
 	}
-	head, err := GetCurrentCommitHash()
+	head, err := CurrentCommitHash()
 	if err != nil {
 		return nil, err
 	}
@@ -36,40 +41,54 @@ func Log(n int) ([]*LogEntry, error) {
 	}
 
 	visited := make(map[string]struct{})
-	queue := []string{head}
 	out := make([]*LogEntry, 0, n)
 
-	for len(queue) > 0 && len(out) < n {
-		hash := queue[0]
-		queue = queue[1:]
-		if _, seen := visited[hash]; seen {
-			continue
+	current := head
+	for len(out) < n {
+		if _, seen := visited[current]; seen {
+			break
 		}
-		visited[hash] = struct{}{}
+		visited[current] = struct{}{}
 
-		obj, err := ReadObject(hash)
+		obj, err := ReadObject(current)
 		if err != nil {
-			return nil, fmt.Errorf("log: read %s: %w", shortHash(hash), err)
+			return nil, fmt.Errorf("log: read %s: %w", shortHash(current), err)
 		}
 		if !obj.IsCommit() {
-			return nil, fmt.Errorf("log: %s is not a commit object", shortHash(hash))
+			return nil, fmt.Errorf("log: %s is not a commit object", shortHash(current))
 		}
 
 		parents := append([]string(nil), obj.Parents...)
 		entry := &LogEntry{
-			Hash:      hash,
+			Hash:      current,
 			Author:    obj.Author,
 			Message:   obj.Message,
 			Timestamp: obj.Timestamp,
 			Parents:   parents,
-			Telemetry: append([]TelemetryKV(nil), obj.Telemetry...),
+			Telemetry: deepCopyTelemetry(obj.Telemetry),
 		}
 		out = append(out, entry)
-		// Follow only the first parent for the linear log; the
-		// merge commit is still recorded as we visit it.
-		queue = append(queue, parents...)
+
+		// Follow only the first parent for the linear log; the merge
+		// commit is still recorded as we visit it.
+		if len(parents) == 0 {
+			break
+		}
+		current = parents[0]
 	}
 	return out, nil
+}
+
+// deepCopyTelemetry returns a fresh slice containing a deep copy of each
+// TelemetryKV. The Value field is shallow-copied (any) — callers that store
+// mutable values (maps, slices) must clone them themselves if needed.
+func deepCopyTelemetry(in []TelemetryKV) []TelemetryKV {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]TelemetryKV, len(in))
+	copy(out, in)
+	return out
 }
 
 // GraphNode is one commit in the visualisation produced by
@@ -102,7 +121,7 @@ func BuildGraph() ([]*GraphNode, error) {
 	if err != nil {
 		return nil, err
 	}
-	headHash, err := GetCurrentCommitHash()
+	headHash, err := CurrentCommitHash()
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +138,7 @@ func BuildGraph() ([]*GraphNode, error) {
 	return buildGraphNodes(order, commits, branchOf, headHash), nil
 }
 
-func collectCommits(refs []*RefDetail) (map[string]*Object, map[string][]string, error) {
+func collectCommits(refs []RefDetail) (map[string]*Object, map[string][]string, error) {
 	commits := make(map[string]*Object)
 	branchOf := make(map[string][]string)
 	for _, r := range refs {
