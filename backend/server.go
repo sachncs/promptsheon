@@ -32,7 +32,6 @@ import (
 	"github.com/sachncs/promptsheon/backend/vault"
 	"github.com/sachncs/promptsheon/backend/webhook"
 	"github.com/sachncs/promptsheon/backend/workflow"
-	"github.com/sachncs/promptsheon/backend/ws"
 )
 
 // Func is the handler signature that returns errors for centralized handling.
@@ -56,7 +55,7 @@ type Server struct {
 	webhooks         *webhook.Dispatcher
 	vault            *vault.Vault
 	oauth            *auth.OAuthManager
-	logHub           *ws.Hub
+	logHub           *Hub
 	elector          *election.Elector
 	usageTracker     *UsageTracker
 	guardrailManager *guardrail.Manager

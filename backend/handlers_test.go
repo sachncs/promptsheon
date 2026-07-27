@@ -32,7 +32,6 @@ import (
 	"github.com/sachncs/promptsheon/backend/store"
 	"github.com/sachncs/promptsheon/backend/vault"
 	"github.com/sachncs/promptsheon/backend/webhook"
-	"github.com/sachncs/promptsheon/backend/ws"
 )
 
 // ---------------------------------------------------------------------------
@@ -2354,7 +2353,7 @@ func TestHandleMetricsPrometheus_NotConfigured(t *testing.T) {
 }
 
 func TestHandleLogsStream_WithHub(t *testing.T) {
-	hub := ws.NewHub(slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError})))
+	hub := NewHub(slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError})))
 	go hub.Run()
 
 	s := newTestServer(t)

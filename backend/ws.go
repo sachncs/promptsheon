@@ -1,5 +1,5 @@
 // Package ws provides real-time log streaming via Server-Sent Events (SSE).
-package ws
+package backend
 
 import (
 	"context"
