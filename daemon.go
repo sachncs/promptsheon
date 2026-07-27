@@ -27,7 +27,6 @@ import (
 
 	"github.com/sachncs/promptsheon/backend/alerting"
 	"github.com/sachncs/promptsheon/backend/api"
-	apiserver "github.com/sachncs/promptsheon/backend/api/server"
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/buildinfo"
 	"github.com/sachncs/promptsheon/backend/capability"
@@ -730,7 +729,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		wireSelfEvolve(rootCtx, db, releaseSvc, evalRunner, repos, logger, providers, collector, selfEvolveCfg)
 	}
 
-	srv := apiserver.New(repos, logger, opts...)
+	srv := api.NewServer(repos, logger, opts...)
 	return srv, limiter, tracer, collector, v
 }
 
