@@ -24,7 +24,7 @@
 // Pure merge helpers and algebraic properties live in
 // internal/bandit/crdt.go and crdt_test.go; this file only
 // adds the persistence contract.
-package banditstore
+package backend
 
 import (
 	"context"

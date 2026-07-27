@@ -1,7 +1,7 @@
 package banditstore_test
 
 import (
-	. "github.com/sachncs/promptsheon/backend/banditstore"
+	. "github.com/sachncs/promptsheon/backend"
 	"context"
 	"testing"
 

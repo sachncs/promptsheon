@@ -1,5 +1,5 @@
 // Package bandsession couples a bandit.Selector to a persistent
-// banditstore.Store and exposes the load/select/observe/flush
+// backend.Store and exposes the load/select/observe/flush
 // lifecycle used by the production recommender.
 //
 // The Session is the production path for the bandit recommender:
@@ -20,18 +20,18 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/bandit"
-	"github.com/sachncs/promptsheon/backend/banditstore"
+	"github.com/sachncs/promptsheon/backend"
 )
 
 type selectionObserver interface {
 	RecordBanditSelection(string)
 }
 
-// Session wraps a bandit.Selector and a banditstore.Store with the
+// Session wraps a bandit.Selector and a backend.Store with the
 // lifecycle that production needs: load on init, observe on
 // outcome, persist on Flush.
 type Session struct {
-	store     *banditstore.Store
+	store     *backend.Store
 	selector  *bandit.Selector
 	mu        sync.Mutex
 	loaded    bool
@@ -46,7 +46,7 @@ type Session struct {
 // seed for the underlying Selector's RNG; zero means "seed by
 // wall-clock nanos". For tests, set rngSeed to a known value
 // (e.g. 42) for deterministic arm selection.
-func New(store *banditstore.Store, rngSeed uint64) (*Session, error) {
+func New(store *backend.Store, rngSeed uint64) (*Session, error) {
 	if store == nil {
 		return nil, fmt.Errorf("banditsession: nil store")
 	}
@@ -99,7 +99,7 @@ func (s *Session) Load(ctx context.Context) error {
 // RegisterArms adds new arm IDs that did not exist in the store
 // at Load time. The new arms are seeded with the uniform prior.
 // RegisterArms must NOT invent observations: the underlying
-// banditstore.Store.RegisterArms writes a (0, 0) Counter for
+// backend.Store.RegisterArms writes a (0, 0) Counter for
 // each arm, which translates to alpha=1, beta=1 once the
 // Selector is rebuilt.
 func (s *Session) RegisterArms(ctx context.Context, armIDs []string) error {
