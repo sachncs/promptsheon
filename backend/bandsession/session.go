@@ -11,6 +11,7 @@
 package bandsession
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	cryptorand "crypto/rand"
 	"encoding/hex"
@@ -20,7 +21,6 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/bandit"
-	"github.com/sachncs/promptsheon/backend"
 )
 
 type selectionObserver interface {
@@ -31,7 +31,7 @@ type selectionObserver interface {
 // lifecycle that production needs: load on init, observe on
 // outcome, persist on Flush.
 type Session struct {
-	store     *Store
+	store     *backend.Store
 	selector  *bandit.Selector
 	mu        sync.Mutex
 	loaded    bool
