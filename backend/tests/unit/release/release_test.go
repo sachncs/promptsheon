@@ -1,6 +1,7 @@
-package release
+package release_test
 
 import (
+	. "github.com/sachncs/promptsheon/backend/release"
 	"errors"
 	"testing"
 	"time"
