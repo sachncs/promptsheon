@@ -1,0 +1,26 @@
+import{m as e,n as t,r as n,w as r}from"./index-BWv0qt4w.js";async function i(t,r){if(!t)return;let i=await e(r.id),s=i.ok&&i.data||{slo_target:{},blast_radius:`low`,auto_promotable:!1},c=s.slo_target||{},l=({error:e=null,saved:t=null}={})=>`<div class="modal-backdrop" role="presentation">
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-contract-title">
+      <div class="flex items-start justify-between border-b border-line/70 px-5 py-5 sm:px-6">
+        <div><div class="eyebrow">Contract / Edit</div><h2 id="edit-contract-title" class="mt-2 text-[1.1rem] font-bold tracking-[-.04em]">${n(r.name)} contract</h2><p class="mt-1 text-[.7rem] text-muted">Defines the SLO, blast radius, and schema required to auto-promote releases.</p></div>
+        <button class="icon-button !h-8 !w-8 !bg-paper" data-close-modal aria-label="Close dialog"><svg class="h-4 w-4 fill-none stroke-current stroke-2"><use href="#icon-close"/></svg></button>
+      </div>
+      <form id="edit-contract-form" class="space-y-4 px-5 py-5 sm:px-6">
+        <div><label class="eyebrow mb-2 block" for="ec-rubric">Success rubric</label><textarea id="ec-rubric" name="success_rubric" class="field min-h-20 resize-y" data-autofocus>${n(s.success_rubric||``)}</textarea></div>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div><label class="eyebrow mb-2 block" for="ec-blast">Blast radius</label><select id="ec-blast" name="blast_radius" class="field"><option value="low" ${s.blast_radius===`low`?`selected`:``}>low</option><option value="medium" ${s.blast_radius===`medium`?`selected`:``}>medium</option><option value="high" ${s.blast_radius===`high`?`selected`:``}>high</option></select></div>
+          <div><label class="eyebrow mb-2 block" for="ec-auto">Auto-promotable</label><select id="ec-auto" name="auto_promotable" class="field"><option value="false" ${s.auto_promotable?``:`selected`}>false</option><option value="true" ${s.auto_promotable?`selected`:``}>true</option></select></div>
+          <div><label class="eyebrow mb-2 block" for="ec-p95">Max p95 latency (ms)</label><input id="ec-p95" name="max_p95_latency_ms" class="field mono" type="number" min="0" value="${n(c.max_p95_latency_ms??``)}" /></div>
+          <div><label class="eyebrow mb-2 block" for="ec-success">Min success rate (0-1)</label><input id="ec-success" name="min_success_rate" class="field mono" type="number" step="0.01" min="0" max="1" value="${n(c.min_success_rate??``)}" /></div>
+          <div><label class="eyebrow mb-2 block" for="ec-hallu">Max hallucination rate (0-1)</label><input id="ec-hallu" name="max_hallucination_rate" class="field mono" type="number" step="0.01" min="0" max="1" value="${n(c.max_hallucination_rate??``)}" /></div>
+        </div>
+        <details class="rounded-lg border border-line p-3"><summary class="cursor-pointer text-[.66rem] font-bold">Input schema (JSON)</summary><textarea id="ec-input" name="input_schema" class="field mono mt-2 min-h-24 resize-y" placeholder='{"type":"object"}'>${n(a(s.input_schema))}</textarea></details>
+        <details class="rounded-lg border border-line p-3"><summary class="cursor-pointer text-[.66rem] font-bold">Output schema (JSON)</summary><textarea id="ec-output" name="output_schema" class="field mono mt-2 min-h-24 resize-y" placeholder='{"type":"object"}'>${n(a(s.output_schema))}</textarea></details>
+        ${e?`<p class="rounded-lg bg-rose-50 px-3 py-2 text-[.68rem] text-rose-800">${n(e)}</p>`:``}
+        ${t?`<p class="rounded-lg bg-lime/15 px-3 py-2 text-[.68rem] text-[#52632d]">Contract saved.</p>`:``}
+        <div class="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+          <button type="button" class="quiet-button" data-close-modal>Cancel</button>
+          <button type="submit" class="primary-button">Save contract</button>
+        </div>
+      </form>
+    </section>
+  </div>`;t.innerHTML=l(),o(t,l,r)}function a(e){if(!e)return``;try{return JSON.stringify(e,null,2)}catch{return``}}function o(e,n,i){e.querySelector(`[data-close-modal]`)?.addEventListener(`click`,()=>e.replaceChildren()),e.querySelector(`#edit-contract-form`)?.addEventListener(`submit`,async a=>{a.preventDefault();let c=new FormData(a.target),l={success_rubric:(c.get(`success_rubric`)||``).toString().trim()||void 0,blast_radius:(c.get(`blast_radius`)||`low`).toString(),auto_promotable:c.get(`auto_promotable`)===`true`,slo_target:{max_p95_latency_ms:c.get(`max_p95_latency_ms`)?Number(c.get(`max_p95_latency_ms`)):void 0,min_success_rate:c.get(`min_success_rate`)?Number(c.get(`min_success_rate`)):void 0,max_hallucination_rate:c.get(`max_hallucination_rate`)?Number(c.get(`max_hallucination_rate`)):void 0}},u=s(c.get(`input_schema`)),d=s(c.get(`output_schema`));u&&(l.input_schema=u),d&&(l.output_schema=d);let f=await r(i.id,l);if(!f.ok){e.innerHTML=n({error:t(f)}),o(e,n,i);return}window.location.reload()})}function s(e){if(!e)return null;try{return JSON.parse(e)}catch{return null}}export{i as openEditContractModal};
