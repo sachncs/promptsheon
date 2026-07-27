@@ -314,20 +314,20 @@ func TestProperty_OrderIsPreservedAfterObservations(t *testing.T) {
 		}
 		sel := NewSelector(s.IDs)
 		want := append([]string(nil), s.IDs...)
-		got := append([]string(nil), sel.order...)
+		got := append([]string(nil), sel.Order...)
 		if !sliceEqualUnordered(want, got) {
 			return false
 		}
 		// Drive a few observations so the field is dirty.
 		rng := randv2.New(randv2.NewPCG(seed, seed))
 		for i := 0; i < 16; i++ {
-			id := sel.order[rng.IntN(len(sel.order))]
+			id := sel.Order[rng.IntN(len(sel.Order))]
 			ok := rng.IntN(2) == 0
 			if err := sel.Observe(id, ok); err != nil {
 				return false
 			}
 		}
-		got2 := append([]string(nil), sel.order...)
+		got2 := append([]string(nil), sel.Order...)
 		return sliceEqualUnordered(want, got2)
 	}
 	if err := quick.Check(f, &quick.Config{MaxCount: 50}); err != nil {

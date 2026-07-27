@@ -139,7 +139,7 @@ func (a *Authenticator) Stop() {
 // Authenticate extracts and validates the API key from the request.
 // It returns an error if the key is missing, invalid, or expired.
 func (a *Authenticator) Authenticate(r *http.Request) (*User, error) {
-	key := extractAPIKey(r)
+	key := ExtractAPIKey(r)
 	if key == "" {
 		a.authLogger.LogAuthFailure(r.Context(), "", "missing or malformed api key", r.RemoteAddr)
 		return nil, fmt.Errorf("missing api key")
@@ -193,7 +193,7 @@ func (a *Authenticator) AuthenticateMiddleware(next http.Handler) http.Handler {
 
 // extractAPIKey gets the API key from the Authorization header.
 // Query parameter support is deprecated for security reasons (key appears in logs/referer).
-func extractAPIKey(r *http.Request) string {
+func ExtractAPIKey(r *http.Request) string {
 	// Check Authorization header: "Bearer ps_..."
 	if auth := r.Header.Get("Authorization"); auth != "" {
 		if strings.HasPrefix(auth, "Bearer ") {

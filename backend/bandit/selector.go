@@ -114,7 +114,7 @@ func gammaSample(rng *rand.Rand, shape float64) float64 {
 type Selector struct {
 	mu      sync.Mutex
 	arms    map[string]*ArmPosterior
-	order   []string
+	Order   []string
 	rng     *rand.Rand
 	rngSeed [32]byte
 }
@@ -131,7 +131,7 @@ type Selector struct {
 func NewSelector(armIDs []string) *Selector {
 	s := &Selector{
 		arms:  make(map[string]*ArmPosterior, len(armIDs)),
-		order: append([]string(nil), armIDs...),
+		Order: append([]string(nil), armIDs...),
 	}
 	for _, id := range armIDs {
 		s.arms[id] = NewArmPosterior()
@@ -180,12 +180,12 @@ func (s *Selector) Select() (string, error) {
 }
 
 func (s *Selector) selectLocked() (string, error) {
-	if len(s.order) == 0 {
+	if len(s.Order) == 0 {
 		return "", ErrNoArms
 	}
-	best := s.order[0]
+	best := s.Order[0]
 	bestScore := s.arms[best].Sample(s.rng)
-	for _, id := range s.order[1:] {
+	for _, id := range s.Order[1:] {
 		score := s.arms[id].Sample(s.rng)
 		if score > bestScore {
 			bestScore = score
@@ -201,12 +201,12 @@ func (s *Selector) selectLocked() (string, error) {
 func (s *Selector) SelectWithRNG(rng *rand.Rand) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.order) == 0 {
+	if len(s.Order) == 0 {
 		return "", ErrNoArms
 	}
-	best := s.order[0]
+	best := s.Order[0]
 	bestScore := s.arms[best].Sample(rng)
-	for _, id := range s.order[1:] {
+	for _, id := range s.Order[1:] {
 		score := s.arms[id].Sample(rng)
 		if score > bestScore {
 			bestScore = score

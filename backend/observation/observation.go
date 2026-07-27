@@ -56,7 +56,7 @@ type HallucinationFunc func(executor.ExecutionRecord) bool
 // its own sync.Mutex for the record slice.
 type Aggregator struct {
 	mu             sync.Mutex
-	records        map[windowKey]*obsBucket
+	records        map[WindowKey]*obsBucket
 	hallucinationF HallucinationFunc
 }
 
@@ -69,8 +69,8 @@ type obsBucket struct {
 	records []executor.ExecutionRecord
 }
 
-// windowKey is the dimension over which observations are aggregated.
-type windowKey struct {
+// WindowKey is the dimension over which observations are aggregated.
+type WindowKey struct {
 	CapabilityID string
 	VersionID    string
 	Environment  string
@@ -78,11 +78,11 @@ type windowKey struct {
 
 // NewAggregator constructs an empty Aggregator. The supplied
 // HallucinationFunc classifies records for the hallucination-rate
-// maxRecordsPerWindow caps the per-window record list so a busy
+// MaxRecordsPerWindow caps the per-window record list so a busy
 // deployment cannot OOM the daemon. 4096 is roughly an hour at
 // 1 invocation/second per window; the recompute is O(N) so this
 // is the ceiling above which Aggregate becomes expensive.
-const maxRecordsPerWindow = 4096
+const MaxRecordsPerWindow = 4096
 
 // PERF-5b: per-tenant memory ceiling. Caps the total number of
 // buckets (keyed by cap/version/env) the aggregator will keep in
@@ -96,7 +96,7 @@ const maxBuckets = 4096
 // field; pass nil to report a zero rate.
 func NewAggregator(hallucinationF HallucinationFunc) *Aggregator {
 	return &Aggregator{
-		records:        map[windowKey]*obsBucket{},
+		records:        map[WindowKey]*obsBucket{},
 		hallucinationF: hallucinationF,
 	}
 }
@@ -104,13 +104,13 @@ func NewAggregator(hallucinationF HallucinationFunc) *Aggregator {
 // Add records one execution. The caller may continue to mutate
 // the record after this call; Aggregator copies the fields it needs.
 //
-// The window's record list is bounded to maxRecordsPerWindow;
+// The window's record list is bounded to MaxRecordsPerWindow;
 // once the cap is hit the oldest record is dropped on every
 // insert. The previous implementation append-unbounded grew the
 // map with every invocation and never pruned, leaking memory
 // until the daemon was restarted.
 func (a *Aggregator) Add(r executor.ExecutionRecord) {
-	k := windowKey{CapabilityID: r.CapabilityID, VersionID: "", Environment: r.Environment}
+	k := WindowKey{CapabilityID: r.CapabilityID, VersionID: "", Environment: r.Environment}
 	if k.VersionID == "" {
 		// Until Version tracking lands on ExecutionRecord we
 		// use the Release ID as the version key, falling back to
@@ -131,7 +131,7 @@ func (a *Aggregator) Add(r executor.ExecutionRecord) {
 	// records slice is shortest, i.e. the one least recently
 	// active).
 	if len(a.records) > maxBuckets {
-		var evictKey windowKey
+		var evictKey WindowKey
 		evictBucket, evictSet := bucket, false
 		for k2, b2 := range a.records {
 			if k2 == k {
@@ -151,9 +151,9 @@ func (a *Aggregator) Add(r executor.ExecutionRecord) {
 	a.mu.Unlock()
 	bucket.mu.Lock()
 	recs := append(bucket.records, r)
-	if len(recs) > maxRecordsPerWindow {
+	if len(recs) > MaxRecordsPerWindow {
 		// Drop oldest entries. O(N) copy; N is bounded.
-		recs = recs[len(recs)-maxRecordsPerWindow:]
+		recs = recs[len(recs)-MaxRecordsPerWindow:]
 	}
 	bucket.records = recs
 	bucket.mu.Unlock()
@@ -200,7 +200,7 @@ func (a *Aggregator) Tick(ctx context.Context, interval time.Duration, fn TickFu
 // HallucinationFunc supplied at construction.
 func (a *Aggregator) Aggregate(now time.Time) []rules.Observation {
 	a.mu.Lock()
-	keys := make([]windowKey, 0, len(a.records))
+	keys := make([]WindowKey, 0, len(a.records))
 	buckets := make([]*obsBucket, 0, len(a.records))
 	for k, b := range a.records {
 		keys = append(keys, k)
@@ -224,7 +224,7 @@ func (a *Aggregator) Aggregate(now time.Time) []rules.Observation {
 // rules engine reads. P95 is computed via the streaming quantile
 // sketch, not the maximum, so a single outlier no longer
 // dominates the trigger.
-func summarise(halluF HallucinationFunc, k windowKey, recs []executor.ExecutionRecord) rules.Observation {
+func summarise(halluF HallucinationFunc, k WindowKey, recs []executor.ExecutionRecord) rules.Observation {
 	q := quantile.NewTargeted(map[float64]float64{0.95: 0.001}) // p95 with 0.1% error
 	var (
 		totalCostMicro int64
