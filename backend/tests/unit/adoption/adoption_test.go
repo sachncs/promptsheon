@@ -1,7 +1,7 @@
 package adoption_test
 
 import (
-	. "github.com/sachncs/promptsheon/backend/adoption"
+	. "github.com/sachncs/promptsheon/backend"
 	"context"
 	"errors"
 	"testing"

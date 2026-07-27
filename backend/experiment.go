@@ -1,7 +1,9 @@
+package backend
+
+// Flattened from backend/
+
 // Package experiment provides in-memory weighted A/B testing
 // with per-variant metric aggregation.
-package experiment
-
 import (
 	"fmt"
 	"math/rand/v2"
@@ -374,3 +376,4 @@ func sortVariantsByScore(variants []*VariantResult, criteria WinCriterion) {
 		}
 	}
 }
+
