@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	bi "github.com/sachncs/promptsheon/backend/buildinfo"
 )
 
 // Counter is a monotonically increasing metric.
@@ -380,7 +379,7 @@ func (c *Collector) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		// Use the live build version so the Prometheus scrape
 		// always matches the version /api/v1/version reports.
-		w.Header().Set("Content-Type", "text/plain; version="+bi.Version)
+		w.Header().Set("Content-Type", "text/plain")
 		_, _ = fmt.Fprint(w, c.prometheusFormat())
 	})
 }

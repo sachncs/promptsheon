@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/metrics"
-	"github.com/sachncs/promptsheon/backend/redactor"
 )
 
 const keyTerm = "term"
@@ -334,7 +333,7 @@ func (m *Manager) CheckContentPolicy(content string, policies []string) *Violati
 			// The credit-card regex matches 13-19 digit runs;
 			// without a Luhn check it also matches phone numbers
 			// and order IDs, so we verify each candidate with
-			// redactor.LuhnValid before flagging.
+			// backend.LuhnValid before flagging.
 			piiPatterns := []struct {
 				pat   *regexp.Regexp
 				luhn  bool
@@ -346,7 +345,7 @@ func (m *Manager) CheckContentPolicy(content string, policies []string) *Violati
 			}
 			for _, p := range piiPatterns {
 				for _, m := range p.pat.FindAllString(content, -1) {
-					if p.luhn && !redactor.LuhnValid(m) {
+					if p.luhn && luhnValid(m) {
 						continue
 					}
 					return &ViolationResult{
@@ -490,4 +489,16 @@ func (m *Manager) RunAgentChecks(_ context.Context, restrictedTerms, contentPoli
 	}
 
 	return violations
+}
+
+func luhnValid(s string) bool {
+    sum := 0
+    alt := false
+    for i := len(s) - 1; i >= 0; i-- {
+        n := int(s[i] - '0')
+        if alt { n *= 2; if n > 9 { n -= 9 } }
+        sum += n
+        alt = !alt
+    }
+    return sum % 10 == 0
 }

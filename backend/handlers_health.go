@@ -6,7 +6,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend/buildinfo"
 )
 
 const dbStatusOK = "ok"
@@ -18,7 +17,7 @@ var startTime = time.Now()
 // liveness/readiness contract, liveness is "is the process
 // alive" not "is it healthy". Deeper checks live in /ready.
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
-	info := buildinfo.Get()
+	info := Get()
 	body := map[string]any{
 		auditKeyStatus:  "healthy",
 		auditKeyVersion: info.Version,
@@ -131,6 +130,6 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 // is intentionally unauthenticated so external uptime probes and
 // load balancers can read the running version without an API key.
 func (s *Server) handleVersion(w http.ResponseWriter, _ *http.Request) error {
-	writeJSON(w, http.StatusOK, buildinfo.Get())
+	writeJSON(w, http.StatusOK, Get())
 	return nil
 }

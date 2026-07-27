@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/sachncs/promptsheon/backend/mcplist"
-	"github.com/sachncs/promptsheon/backend/mcpsdk"
+	"github.com/sachncs/promptsheon/backend"
 )
 
 func TestDialRejectsBadEntry(t *testing.T) {
 	t.Parallel()
-	if _, err := mcpsdk.Dial(context.Background(), mcplist.Entry{Name: "bad name"}); err == nil {
+	if _, err := backend.Dial(context.Background(), mcplist.Entry{Name: "bad name"}); err == nil {
 		t.Error("expected error for invalid entry")
 	}
 }
@@ -18,7 +18,7 @@ func TestDialRejectsBadEntry(t *testing.T) {
 func TestDialRejectsUnsupportedHTTPScheme(t *testing.T) {
 	t.Parallel()
 	e := mcplist.Entry{Name: "remote", URL: "https://example.com/mcp"}
-	if _, err := mcpsdk.Dial(context.Background(), e); err == nil {
+	if _, err := backend.Dial(context.Background(), e); err == nil {
 		t.Error("expected error for http(s) URL until upstream streamable client ships")
 	}
 }
@@ -26,7 +26,7 @@ func TestDialRejectsUnsupportedHTTPScheme(t *testing.T) {
 func TestDialRejectsUnsupportedUnixScheme(t *testing.T) {
 	t.Parallel()
 	e := mcplist.Entry{Name: "local", URL: "unix:///var/run/mcp.sock"}
-	if _, err := mcpsdk.Dial(context.Background(), e); err == nil {
+	if _, err := backend.Dial(context.Background(), e); err == nil {
 		t.Error("expected error for unix:// URL (future UDS support)")
 	}
 }
@@ -34,7 +34,7 @@ func TestDialRejectsUnsupportedUnixScheme(t *testing.T) {
 func TestDialRejectsCommandMissingPath(t *testing.T) {
 	t.Parallel()
 	e := mcplist.Entry{Name: "cmd", URL: "command:"}
-	if _, err := mcpsdk.Dial(context.Background(), e); err == nil {
+	if _, err := backend.Dial(context.Background(), e); err == nil {
 		t.Error("expected error for command: without path")
 	}
 }
@@ -42,7 +42,7 @@ func TestDialRejectsCommandMissingPath(t *testing.T) {
 func TestDialRejectsMissingBinary(t *testing.T) {
 	t.Parallel()
 	e := mcplist.Entry{Name: "cmd", URL: "command:/nonexistent/binary/path"}
-	_, err := mcpsdk.Dial(context.Background(), e)
+	_, err := backend.Dial(context.Background(), e)
 	if err == nil {
 		t.Fatal("expected dial failure for nonexistent binary")
 	}
@@ -50,7 +50,7 @@ func TestDialRejectsMissingBinary(t *testing.T) {
 
 func TestHTTPHealthCheckRejectsNonHTTP(t *testing.T) {
 	t.Parallel()
-	if _, err := mcpsdk.HTTPHealthCheck(context.Background(), "command:/foo"); err == nil {
+	if _, err := backend.HTTPHealthCheck(context.Background(), "command:/foo"); err == nil {
 		t.Error("expected error for non-http URL")
 	}
 }

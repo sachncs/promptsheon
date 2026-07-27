@@ -1,7 +1,7 @@
 package redactor_test
 
 import (
-	. "github.com/sachncs/promptsheon/backend/redactor"
+	. "github.com/sachncs/promptsheon/backend"
 	"testing"
 )
 

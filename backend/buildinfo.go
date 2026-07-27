@@ -10,7 +10,7 @@
 // the variables fall back to "dev" / "unknown" / "unknown". This
 // lets `go test ./...` and local development work without
 // setting any flags.
-package buildinfo
+package backend
 
 import "runtime"
 

@@ -18,7 +18,7 @@
 // Workspace operators register or remove redaction targets via the
 // internal/policy.Bundle. The Redactor.Read() method is the
 // canonical parser path; tests use it directly.
-package redactor
+package backend
 
 import (
 	"context"
@@ -35,7 +35,7 @@ import (
 // Redactor rather than mutating the receiver. Concurrent Redact
 // and Matches calls from different goroutines are allowed.
 type Redactor struct {
-	rules []rule
+	rules []redactRule
 }
 
 // NewRedactor constructs a Redactor with the built-in pattern set.
@@ -44,7 +44,7 @@ func NewRedactor() *Redactor {
 }
 
 // Rule is a single redaction pattern plus its mask template.
-type rule struct {
+type redactRule struct {
 	name string
 	pat  *regexp.Regexp
 	mask string // replacement literal, e.g. "[REDACTED:EMAIL]"
@@ -56,7 +56,7 @@ func (r *Redactor) Enable(name, pattern, mask string) error {
 	if err != nil {
 		return err
 	}
-	r.rules = append(r.rules, rule{name: name, pat: re, mask: mask})
+	r.rules = append(r.rules, redactRule{name: name, pat: re, mask: mask})
 	return nil
 }
 
@@ -122,8 +122,8 @@ func (r *Redactor) CheckGuardrail(_ context.Context, kind, text string) (recomme
 }
 
 // builtinRules returns the seven default redaction patterns.
-func builtinRules() []rule {
-	return []rule{
+func builtinRules() []redactRule {
+	return []redactRule{
 		{name: "email", pat: regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`), mask: "[REDACTED:EMAIL]"},
 		{name: "ssn_us", pat: regexp.MustCompile(`\b\d{3}-\d{2}-\d{4}\b`), mask: "[REDACTED:SSN]"},
 		{name: "phone_us_e164", pat: regexp.MustCompile(`\+1\s?\d{10}\b`), mask: "[REDACTED:PHONE]"},
