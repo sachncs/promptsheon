@@ -53,6 +53,11 @@ export async function openNotificationsModal(root) {
   root.innerHTML = shell;
   root.querySelector("[data-close-modal]")?.addEventListener("click", () => root.replaceChildren());
 
+  const { loadSettings } = await import("../settings.js");
+  if (!loadSettings().apiKey) {
+    return;
+  }
+
   const [alertsRes, auditRes] = await Promise.all([
     api.listAlerts().catch((e) => ({ ok: false, error: String(e?.message || e) })),
     api.listAudit({ limit: 8 }).catch((e) => ({ ok: false, error: String(e?.message || e) }))

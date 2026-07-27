@@ -1,5 +1,6 @@
 import * as api from "../api.js";
 import { escape, formatRelative, apiStatusLabel } from "../utils.js";
+import { renderConnectPrompt } from "./index.js";
 
 const ACTIONS = ["all", "create", "update", "delete", "activate", "rollback", "vote", "invoke"];
 const ACTION_LABEL = { create: "create", update: "update", delete: "delete", activate: "activate", rollback: "rollback", vote: "vote", invoke: "invoke", resolve: "resolve", approve: "approve", reject: "reject" };
@@ -63,6 +64,12 @@ function renderVerifyResult(result) {
 export async function renderAudit(route) {
   const root = window.document.getElementById("view");
   if (!root) return "";
+  const { loadSettings } = await import("../settings.js");
+  if (!loadSettings().apiKey) {
+    const html = renderConnectPrompt("The audit log requires an API key. Open Connection to paste one.");
+    root.innerHTML = html;
+    return html;
+  }
   const action = route?.query?.action || "all";
   const resource = route?.query?.resource || "";
   root.innerHTML = `<section class="panel p-6"><div class="skeleton h-3 w-32"></div><div class="skeleton mt-4 h-12 w-full"></div><div class="skeleton mt-4 h-12 w-full"></div></section>`;

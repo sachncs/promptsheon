@@ -39,6 +39,13 @@ function row(alert) {
 export async function renderGuardrails(route) {
   const root = window.document.getElementById("view");
   if (!root) return "";
+  const { loadSettings } = await import("../settings.js");
+  if (!loadSettings().apiKey) {
+    const { renderConnectPrompt } = await import("./index.js");
+    const html = renderConnectPrompt("Guardrails data requires an API key. Open Connection to paste one.");
+    root.innerHTML = html;
+    return html;
+  }
   root.innerHTML = `<section class="panel p-6"><div class="skeleton h-3 w-32"></div><div class="skeleton mt-4 h-12 w-full"></div></section>`;
   const alertsRes = await api.listAlerts();
   if (!alertsRes.ok) {
