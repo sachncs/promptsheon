@@ -1,0 +1,22 @@
+# Route group: workflows
+paths:
+  /api/v1/workflows/run:
+    post:
+      summary: 'handleRunWorkflow accepts a workflow Definition and runs it
+
+        through the configured workflow.Engine.'
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+        '500':
+          description: Internal server error
