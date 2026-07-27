@@ -32,8 +32,13 @@ function bootstrap() {
     }
   });
   renderInitialState();
-  ensureOwnerIndex();
-  watchSettings(() => { renderView(currentRoute()); });
+  // Owners depend on the API key; if no key is set yet, skip the fetch
+  // and let watchSettings retry once the user pastes a key.
+  if (loadSettings().apiKey) ensureOwnerIndex();
+  watchSettings(() => {
+    renderView(currentRoute());
+    if (loadSettings().apiKey) ensureOwnerIndex();
+  });
 }
 
 if (document.readyState === "loading") {

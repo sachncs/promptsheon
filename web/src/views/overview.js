@@ -266,6 +266,10 @@ function renderInitialSkeleton(filter) {
 }
 
 export async function renderOverview(route) {
+  const { loadSettings } = await import("../settings.js");
+  if (!loadSettings().apiKey) {
+    return renderConnectPrompt();
+  }
   const initialFilter = route?.query?.action || (window.localStorage.getItem("promptsheon.auditFilter") || "all");
   const html = renderInitialSkeleton(initialFilter);
   window.document.getElementById("view").innerHTML = html;
@@ -279,6 +283,20 @@ export async function renderOverview(route) {
       console.error("Overview hydration failed:", error);
     }
   });
+  return html;
+}
+
+function renderConnectPrompt() {
+  const html = `<section class="panel p-8 text-center">
+    <div class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-paper text-muted"><svg class="h-6 w-6 fill-none stroke-current stroke-2"><use href="#icon-key"/></svg></div>
+    <h1 class="mt-5 text-[1.4rem] font-bold tracking-[-.04em]">Connect the Promptsheon API</h1>
+    <p class="mt-2 text-[.78rem] text-muted">Open <span class="font-bold text-ink">Connection</span> in the sidebar to paste an API key or set a custom base URL.</p>
+    <div class="mt-5 flex justify-center gap-2">
+      <button data-open-settings class="primary-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-settings"/></svg>Open Connection</button>
+    </div>
+  </section>`;
+  const view = window.document.getElementById("view");
+  if (view) view.innerHTML = html;
   return html;
 }
 

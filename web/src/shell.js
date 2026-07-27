@@ -26,7 +26,7 @@ export function renderAppShell() {
               <input id="capability-search" class="field !h-9 !rounded-lg !border-transparent !bg-white/65 !py-1.5 !pl-9 !pr-12 !text-[.72rem]" placeholder="Search capabilities" />
               <kbd class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-line bg-paper px-1.5 py-0.5 font-mono text-[.58rem] text-muted">⌘ K</kbd>
             </label>
-            <button class="icon-button relative" aria-label="Notifications"><svg class="h-4 w-4 fill-none stroke-current stroke-[1.7]"><use href="#icon-bell"/></svg><span class="absolute right-[5px] top-[5px] h-1.5 w-1.5 rounded-full bg-accent ring-2 ring-paper"></span></button>
+            <button class="icon-button relative" aria-label="Notifications" data-open-notifications><svg class="h-4 w-4 fill-none stroke-current stroke-[1.7]"><use href="#icon-bell"/></svg><span class="absolute right-[5px] top-[5px] h-1.5 w-1.5 rounded-full bg-accent ring-2 ring-paper"></span></button>
             <div class="ml-1 hidden h-7 w-px bg-line sm:block"></div>
             <button data-open-settings class="flex items-center gap-2 rounded-lg p-1 transition hover:bg-white/80" aria-label="Open connection settings">
               <span class="grid h-8 w-8 place-items-center rounded-lg bg-[#dce7bd] text-[.68rem] font-bold text-[#52632d]">AL</span>
@@ -71,6 +71,13 @@ function attachModalHandlers() {
       const { openSettings } = await import("./components/settings-button.js");
       const root = document.getElementById("modal-root");
       if (root) await openSettings(root);
+      return;
+    }
+    const bell = event.target.closest("[data-open-notifications]");
+    if (bell) {
+      const { openNotificationsModal } = await import("./views/notifications-modal.js");
+      const root = document.getElementById("modal-root");
+      if (root) await openNotificationsModal(root);
     }
   });
 }
