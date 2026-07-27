@@ -42,7 +42,7 @@ import (
 	"github.com/sachncs/promptsheon/backend/metrics"
 	"github.com/sachncs/promptsheon/backend/models"
 	"github.com/sachncs/promptsheon/backend/observation"
-	"github.com/sachncs/promptsheon/backend/optimizer/rules"
+	"github.com/sachncs/promptsheon/backend/rules"
 	"github.com/sachncs/promptsheon/backend/plugins/builtins"
 	"github.com/sachncs/promptsheon/backend/ratelimit"
 	"github.com/sachncs/promptsheon/backend/recommendation"
