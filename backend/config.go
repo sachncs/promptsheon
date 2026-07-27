@@ -9,7 +9,7 @@
 // This means a deployment can ship a `promptsheon.yaml` with
 // sensible defaults and let env vars override the per-instance
 // values (db path, tls cert, etc.) without editing the file.
-package config
+package backend
 
 import (
 	"bytes"

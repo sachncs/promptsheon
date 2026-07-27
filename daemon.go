@@ -2,6 +2,7 @@
 package main
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"database/sql"
@@ -26,11 +27,9 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
-	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/alerting"
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/capability"
-	"github.com/sachncs/promptsheon/backend/config"
 	contextpkg "github.com/sachncs/promptsheon/backend/context"
 	"github.com/sachncs/promptsheon/backend/election"
 	"github.com/sachncs/promptsheon/backend/eval"
@@ -104,7 +103,7 @@ func runDaemon() {
 		return
 	}
 
-	cfg, cfgErr := config.LoadConfig()
+	cfg, cfgErr := backend.LoadConfig()
 	if cfgErr != nil {
 		fmt.Fprintln(os.Stderr, cfgErr)
 		os.Exit(2)
@@ -267,7 +266,7 @@ func runDaemon() {
 // configureShellTool loads the shell tool policy from environment. The
 // tool is disabled unless BOTH PROMPTSHEON_SHELL_ENABLED=true and
 // PROMPTSHEON_SHELL_ALLOWLIST contains at least one command.
-func configureShellTool(_ *config.Config) {
+func configureShellTool(_ *backend.Config) {
 	enabled := os.Getenv("PROMPTSHEON_SHELL_ENABLED") == "true"
 	raw := os.Getenv("PROMPTSHEON_SHELL_ALLOWLIST")
 	var allow []string
@@ -288,7 +287,7 @@ func configureShellTool(_ *config.Config) {
 	workflow.SetShellToolPolicy(enabled, allow)
 }
 
-func setupLogger(cfg *config.Config, hub *ws.Hub) *slog.Logger {
+func setupLogger(cfg *backend.Config, hub *ws.Hub) *slog.Logger {
 	var logLevel slog.Level
 	switch cfg.LogLevel {
 	case logLevelDebug:
@@ -313,7 +312,7 @@ func setupLogger(cfg *config.Config, hub *ws.Hub) *slog.Logger {
 	return slog.New(base)
 }
 
-func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
+func openDB(cfg *backend.Config, logger *slog.Logger) *store.SQLite {
 	// PG-1: when PROMPTSHEON_DATABASE_URL=postgres://... is set,
 	// warn the operator that pgx is not yet wired and fall back
 	// to SQLite. The Postgres contract tests pass against the
@@ -334,7 +333,7 @@ func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
 	return db
 }
 
-func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub, elector *election.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*backend.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector, *vault.Vault) {
+func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub, elector *election.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*backend.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector, *vault.Vault) {
 	// OBS-TR-1: no SQLite tracer; OTel-only export.
 	collector := metrics.NewCollector()
 	// OBS-LOG-2: wire the SSE hub's drop counter into the
@@ -452,7 +451,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	// SEC-LLM-1: refuse to start when an LLM base URL is http://
 	// but the daemon binds a non-loopback address. Production
 	// deployments must talk to LLM providers over TLS.
-	if err := providers.ValidateBaseURLs(cfg.Addr, config.IsLoopbackAddr); err != nil {
+	if err := providers.ValidateBaseURLs(cfg.Addr, backend.IsLoopbackAddr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
@@ -794,7 +793,7 @@ func splitByColon(s string) []string {
 // CLIENT_SECRET, REDIRECT_URL) are present; otherwise they are
 // silently skipped. The login/callback routes work for any
 // provider that is registered.
-func buildOAuthManager(cfg *config.Config) *auth.OAuthManager {
+func buildOAuthManager(cfg *backend.Config) *auth.OAuthManager {
 	mgr := auth.NewOAuthManager()
 	if google := buildGoogleOAuth(cfg); google != nil {
 		mgr.RegisterProvider("google", google)
@@ -805,7 +804,7 @@ func buildOAuthManager(cfg *config.Config) *auth.OAuthManager {
 	return mgr
 }
 
-func buildGoogleOAuth(cfg *config.Config) *auth.OAuthProvider {
+func buildGoogleOAuth(cfg *backend.Config) *auth.OAuthProvider {
 	clientID := os.Getenv("PROMPTSHEON_OAUTH_GOOGLE_CLIENT_ID")
 	clientSecret := os.Getenv("PROMPTSHEON_OAUTH_GOOGLE_CLIENT_SECRET")
 	redirectURL := os.Getenv("PROMPTSHEON_OAUTH_GOOGLE_REDIRECT_URL")
@@ -824,7 +823,7 @@ func buildGoogleOAuth(cfg *config.Config) *auth.OAuthProvider {
 	}
 }
 
-func buildGitHubOAuth(cfg *config.Config) *auth.OAuthProvider {
+func buildGitHubOAuth(cfg *backend.Config) *auth.OAuthProvider {
 	clientID := os.Getenv("PROMPTSHEON_OAUTH_GITHUB_CLIENT_ID")
 	clientSecret := os.Getenv("PROMPTSHEON_OAUTH_GITHUB_CLIENT_SECRET")
 	redirectURL := os.Getenv("PROMPTSHEON_OAUTH_GITHUB_REDIRECT_URL")
@@ -892,7 +891,7 @@ func (l *defaultArtifactLoader) Load(ctx context.Context, _ capability.ArtifactK
 // The tag-split lives in two separate files so the placeholder
 // doesn't ship with the production binary.
 
-func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *config.Config, srv *backend.Server, logger *slog.Logger, limiter *ratelimit.Limiter, tracer trace.Tracer, collector *metrics.Collector, idempStore store.IdempotencyStore, v *vault.Vault) {
+func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *backend.Config, srv *backend.Server, logger *slog.Logger, limiter *ratelimit.Limiter, tracer trace.Tracer, collector *metrics.Collector, idempStore store.IdempotencyStore, v *vault.Vault) {
 	handler := backend.ChainHTTP(srv,
 		backend.Recovery(logger),
 		backend.MaxBytesReader(10<<20),

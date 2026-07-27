@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/sachncs/promptsheon/backend/bandit"
-	"github.com/sachncs/promptsheon/backend/banditstore"
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/store"
 )
 
@@ -37,11 +37,11 @@ func TestBanditStoreSQLite_MergeConverges(t *testing.T) {
 	// expected SUM aggregate after they exchange per-replica
 	// snapshots. The per-replica Merge is still component-wise
 	// max so duplicates from a single replica are no-ops.
-	storeA, err := banditstore.NewStoreWithReplica(NewBanditStore(db.DB()), "rep-a")
+	storeA, err := backend.NewStoreWithReplica(NewBanditStore(db.DB()), "rep-a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	storeB, err := banditstore.NewStoreWithReplica(NewBanditStore(db.DB()), "rep-b")
+	storeB, err := backend.NewStoreWithReplica(NewBanditStore(db.DB()), "rep-b")
 	if err != nil {
 		t.Fatal(err)
 	}
