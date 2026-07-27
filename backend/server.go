@@ -13,7 +13,6 @@ import (
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/capability"
 
-	contextpkg "github.com/sachncs/promptsheon/backend/context"
 	"github.com/sachncs/promptsheon/backend/election"
 	_ "github.com/sachncs/promptsheon/backend/eval" // Scorer registry (no Server dep yet)
 	"github.com/sachncs/promptsheon/backend/guardrail"
@@ -61,7 +60,7 @@ type Server struct {
 	guardrailManager *guardrail.Manager
 	alertingManager  *alerting.Manager
 	rateLimiter      *ratelimit.Limiter
-	contextManager   *contextpkg.Manager
+	contextManager   *Manager
 	providers        *llm.Registry
 	rollupAgg        *rollups.Aggregator
 	invoker          *invoke.Invoker
