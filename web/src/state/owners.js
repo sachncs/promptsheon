@@ -1,21 +1,26 @@
-const owners = new Map();
+import * as api from "../api.js";
 
-async function fetchJSON(path, opts) {
-  const r = await fetch(path, opts);
-  return r.ok ? r.json() : null;
-}
+const owners = new Map();
 
 export async function ensureOwnerIndex() {
   if (owners.size) return owners;
-  const data = await fetchJSON("/api/v1/users?limit=200");
-  if (!Array.isArray(data)) return owners;
-  for (const user of data) owners.set(user.id, user.name || user.email || user.id);
+  // /api/v1/users requires the UserManage permission (admin only). A reader
+  // or writer key gets 403 here. In that case we fall back to the empty
+  // index and the dashboard renders user ids in place of display names.
+  const result = await api.listUsers(200);
+  if (!result || !result.ok || !Array.isArray(result.data)) return owners;
+  for (const user of result.data) owners.set(user.id, user.name || user.email || user.id);
   return owners;
 }
 
 export function ownerName(id) {
   if (!id) return "—";
-  return owners.get(id) || id;
+  const cached = owners.get(id);
+  if (cached) return cached;
+  // Owner id we haven't loaded yet (admin only). Show a short
+  // readable form rather than the full opaque id.
+  if (typeof id === "string" && id.length > 12) return `…${id.slice(-8)}`;
+  return id || "—";
 }
 
 export function setOwners(list) {

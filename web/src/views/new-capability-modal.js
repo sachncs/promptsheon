@@ -9,7 +9,8 @@ function optional(label, value) {
 export async function openNewCapabilityModal(root, projects) {
   if (!root) return;
   const render = (opts) => {
-    const options = (opts.projects || []).map((p) => `<option value="${escape(p.id)}">${escape(p.name)}</option>`).join("");
+    const noProjects = !opts.projects || opts.projects.length === 0;
+    const options = (opts.projects || []).map((p) => `<option value="${escape(p.id)}"${p.selected ? " selected" : ""}>${escape(p.name)}</option>`).join("");
     return `<div class="modal-backdrop" role="presentation">
       <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="new-capability-title">
         <div class="flex items-start justify-between border-b border-line/70 px-5 py-5 sm:px-6">
@@ -20,7 +21,12 @@ export async function openNewCapabilityModal(root, projects) {
           <div><label class="eyebrow mb-2 block" for="nc-name">Capability name</label><input id="nc-name" name="name" class="field" required ${opts.autofocus ? "data-autofocus" : ""} placeholder="e.g. Summarize customer feedback" /></div>
           <div><label class="eyebrow mb-2 block" for="nc-description">Business outcome</label><textarea id="nc-description" name="description" class="field min-h-24 resize-y" placeholder="What should this capability reliably help your team accomplish?"></textarea></div>
           <div class="grid gap-4 sm:grid-cols-2">
-            <div><label class="eyebrow mb-2 block" for="nc-project">Project</label><select id="nc-project" name="project_id" class="field" required>${options || `<option value="" disabled selected>No projects yet</option>`}</select></div>
+            <div>
+              <label class="eyebrow mb-2 block" for="nc-project">Project</label>
+              <select id="nc-project" name="project_id" class="field" required>
+                ${options || (noProjects ? `<option value="" disabled selected>No projects yet — create one first</option>` : `<option value="" disabled selected>Select a project</option>`)}
+              </select>
+            </div>
             <div><label class="eyebrow mb-2 block" for="nc-owner">Owner</label><select id="nc-owner" name="owner" class="field"><option value="">— unassigned —</option>${(opts.users || []).map((u) => `<option value="${escape(u.id)}">${escape(u.name || u.email || u.id)}</option>`).join("")}</select></div>
           </div>
           <div><label class="eyebrow mb-2 block" for="nc-tags">Tags (comma separated)</label><input id="nc-tags" name="tags" class="field" placeholder="research, finance" /></div>
@@ -47,10 +53,16 @@ export async function openNewCapabilityModal(root, projects) {
 
   const users = (await api.listUsers(50)).data || [];
   if (!projects?.length) {
-    root.innerHTML = render({ projects, users, autofocus: true, error: "No projects in this workspace yet. Create one with `POST /api/v1/workspaces/{id}/projects` first, then reload." });
+    root.innerHTML = render({
+      projects,
+      users,
+      autofocus: true,
+      error: "No projects in this workspace yet. Create one with `POST /api/v1/workspaces/{id}/projects` first, then reload."
+    });
     attach(root, render, { projects, users });
     return;
   }
+  // Highlight the preselect in the error if nothing matches
   root.innerHTML = render({ projects, users, autofocus: true });
   attach(root, render, { projects, users });
 }

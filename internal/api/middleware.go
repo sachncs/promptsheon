@@ -321,3 +321,13 @@ func (w *statusWriter) WriteHeader(code int) {
 	w.status = code
 	w.ResponseWriter.WriteHeader(code)
 }
+
+// Flush forwards to the underlying ResponseWriter so SSE handlers
+// (which type-assert http.Flusher on the response writer) work
+// correctly through the middleware chain. Without this, the assertion
+// fails and /api/v1/logs/stream returns 500.
+func (w *statusWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
