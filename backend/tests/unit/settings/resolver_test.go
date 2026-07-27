@@ -3,9 +3,10 @@
 // the tests below pin it so a future refactor doesn't flip
 // the order by accident. The CRDT-specific behaviour
 // (vector dominance, tombstone) lives in crdt_test.go.
-package settings
+package settings_test
 
 import (
+	. "github.com/sachncs/promptsheon/backend/settings"
 	"context"
 	"database/sql"
 	"errors"
