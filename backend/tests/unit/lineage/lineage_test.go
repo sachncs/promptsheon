@@ -1,6 +1,7 @@
 package lineage_test
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	. "github.com/sachncs/promptsheon/backend/lineage"
 	"errors"
 	"testing"
@@ -37,8 +38,8 @@ func TestAppendRecommendationRequiresID(t *testing.T) {
 func TestRejectsSelfReference(t *testing.T) {
 	t.Parallel()
 	var g Graph
-	if _, err := g.AppendRecommendation(ref("cap", 1), ref("cap", 1), SourceManual, "", "alice", "", time.Now()); !errors.Is(err, ErrSelfReference) {
-		t.Fatalf("expected ErrSelfReference, got %v", err)
+	if _, err := g.AppendRecommendation(ref("cap", 1), ref("cap", 1), SourceManual, "", "alice", "", time.Now()); !errors.Is(err, backend.ErrorLineageSelfReference) {
+		t.Fatalf("expected backend.ErrorLineageSelfReference, got %v", err)
 	}
 }
 
@@ -46,16 +47,16 @@ func TestRejectsDuplicateEdge(t *testing.T) {
 	t.Parallel()
 	var g Graph
 	g, _ = g.AppendRecommendation(ref("cap", 1), ref("cap", 2), SourceManual, "", "alice", "", time.Now())
-	if _, err := g.AppendRecommendation(ref("cap", 1), ref("cap", 2), SourceManual, "", "alice", "", time.Now()); !errors.Is(err, ErrDuplicateEdge) {
-		t.Fatalf("expected ErrDuplicateEdge, got %v", err)
+	if _, err := g.AppendRecommendation(ref("cap", 1), ref("cap", 2), SourceManual, "", "alice", "", time.Now()); !errors.Is(err, backend.ErrorLineageDuplicateEdge) {
+		t.Fatalf("expected backend.ErrorLineageDuplicateEdge, got %v", err)
 	}
 }
 
 func TestRejectsInconsistentCapability(t *testing.T) {
 	t.Parallel()
 	g := Graph{CapabilityID: "cap-a"}
-	if _, err := g.AppendRecommendation(ref("cap-b", 1), ref("cap-a", 2), SourceManual, "", "alice", "", time.Now()); !errors.Is(err, ErrInconsistentCapability) {
-		t.Fatalf("expected ErrInconsistentCapability, got %v", err)
+	if _, err := g.AppendRecommendation(ref("cap-b", 1), ref("cap-a", 2), SourceManual, "", "alice", "", time.Now()); !errors.Is(err, backend.ErrorLineageInconsistentCapability) {
+		t.Fatalf("expected backend.ErrorLineageInconsistentCapability, got %v", err)
 	}
 }
 

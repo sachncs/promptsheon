@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"database/sql"
 	"errors"
@@ -69,7 +70,7 @@ func scanDataset(scan interface {
 	var d harness.Dataset
 	err := scan.Scan(&d.ID, &d.CapabilityID, &d.Name, &d.Description, &d.CreatedAt, &d.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, backend.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan dataset: %w", err)
@@ -157,7 +158,7 @@ func (s *SQLite) CreatePrecondition(ctx context.Context, p *harness.Precondition
 }
 
 // GetPrecondition fetches a single precondition by id. Returns
-// ErrNotFound when the row does not exist so the API handler can
+// backend.ErrorStoreNotFound when the row does not exist so the API handler can
 // translate it into a 404 via translateDBError.
 func (s *SQLite) GetPrecondition(ctx context.Context, id string) (*harness.Precondition, error) {
 	row := s.db.QueryRowContext(ctx,
@@ -170,7 +171,7 @@ func (s *SQLite) GetPrecondition(ctx context.Context, id string) (*harness.Preco
 // UpdatePrecondition replaces the mutable fields of an existing
 // precondition. The (id, capability_id, created_at) tuple is
 // immutable: callers cannot move a precondition to a different
-// capability or rewrite its creation time. Returns ErrNotFound
+// capability or rewrite its creation time. Returns backend.ErrorStoreNotFound
 // when no row matched the id so the API can return 404.
 func (s *SQLite) UpdatePrecondition(ctx context.Context, p *harness.Precondition) error {
 	enabledInt := 0
@@ -191,7 +192,7 @@ func (s *SQLite) UpdatePrecondition(ctx context.Context, p *harness.Precondition
 		return fmt.Errorf("update precondition rows affected: %w", err)
 	}
 	if n == 0 {
-		return ErrNotFound
+		return backend.ErrorStoreNotFound
 	}
 	return nil
 }
@@ -231,7 +232,7 @@ func scanPrecondition(scan interface {
 	var enabled int
 	err := scan.Scan(&p.ID, &p.CapabilityID, &p.Name, &p.Command, &p.TimeoutSec, &enabled, &p.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, backend.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan precondition: %w", err)
@@ -282,7 +283,7 @@ func (s *SQLite) UpdateEvalRun(ctx context.Context, r *harness.EvalRun) error {
 		return fmt.Errorf("rows affected: %w", err)
 	}
 	if n == 0 {
-		return ErrNotFound
+		return backend.ErrorStoreNotFound
 	}
 	return nil
 }
@@ -327,7 +328,7 @@ func scanEvalRun(scan interface {
 		&r.StartedAt, &finished,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, backend.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan eval run: %w", err)

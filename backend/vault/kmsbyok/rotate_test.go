@@ -5,6 +5,7 @@
 package kmsbyok
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"errors"
 	"testing"
@@ -93,7 +94,7 @@ func TestRotateMissingStoreReturnsDependencyError(t *testing.T) {
 }
 
 // TestRotateMissingKMSClientReturnsDependencyError mirrors the
-// Store test for KMSClient: Rotate must surface ErrKMSClientRequired
+// Store test for KMSClient: Rotate must surface backend.ErrorVaultKMSClientRequired
 // when no KMSClient is wired.
 func TestRotateMissingKMSClientReturnsDependencyError(t *testing.T) {
 	t.Parallel()
@@ -108,8 +109,8 @@ func TestRotateMissingKMSClientReturnsDependencyError(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	err = p.Rotate(context.Background())
-	if !errors.Is(err, ErrKMSClientRequired) {
-		t.Fatalf("Rotate: want ErrKMSClientRequired, got %v", err)
+	if !errors.Is(err, backend.ErrorVaultKMSClientRequired) {
+		t.Fatalf("Rotate: want backend.ErrorVaultKMSClientRequired, got %v", err)
 	}
 }
 

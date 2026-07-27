@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -87,7 +88,7 @@ func scanWorkspace(scanner interface {
 	var w capability.Workspace
 	err := scanner.Scan(&w.ID, &w.Name, &w.Organization, &w.CreatedAt, &w.UpdatedAt)
 	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
+		return nil, backend.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan workspace: %w", err)
@@ -164,7 +165,7 @@ func scanProject(scanner interface {
 	var p capability.Project
 	err := scanner.Scan(&p.ID, &p.WorkspaceID, &p.Name, &p.Description, &p.CreatedAt, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
+		return nil, backend.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan project: %w", err)
@@ -285,7 +286,7 @@ func (s *SQLite) DeleteCapability(ctx context.Context, id string) error {
 
 // UpdateSelfEvolveConfig sets the closed-loop self-evolution
 // policy on a Capability. Idempotent: same value on repeat is a
-// no-op. Returns ErrNotFound if the capability does not exist.
+// no-op. Returns backend.ErrorStoreNotFound if the capability does not exist.
 func (s *SQLite) UpdateSelfEvolveConfig(ctx context.Context, capabilityID string, cfg capability.SelfEvolveConfig) error {
 	dataset := cfg.DatasetID
 	if dataset == "" {
@@ -312,7 +313,7 @@ func (s *SQLite) UpdateSelfEvolveConfig(ctx context.Context, capabilityID string
 		return fmt.Errorf("rows affected: %w", err)
 	}
 	if n == 0 {
-		return ErrNotFound
+		return backend.ErrorStoreNotFound
 	}
 	return nil
 }
@@ -453,7 +454,7 @@ func (s *SQLite) SetCapabilityContract(ctx context.Context, capabilityID string,
 }
 
 // GetCapabilityContract returns the contract attached to a
-// Capability. Returns ErrNotFound when no contract is attached
+// Capability. Returns backend.ErrorStoreNotFound when no contract is attached
 // or the capability id does not exist.
 func (s *SQLite) GetCapabilityContract(ctx context.Context, capabilityID string) (*capability.CapabilityContract, error) {
 	var (
@@ -470,7 +471,7 @@ func (s *SQLite) GetCapabilityContract(ctx context.Context, capabilityID string)
 	).Scan(&blast, &rubric, &auto, &inJSON, &outJSON, &maxP95, &minSuccess, &maxHallu)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
+			return nil, backend.ErrorStoreNotFound
 		}
 		return nil, fmt.Errorf("get contract: %w", err)
 	}
@@ -567,7 +568,7 @@ func scanCapability(scanner interface {
 		&seEnabled, &seMinScore, &seMaxRevisions, &seCooldownSec, &seTargetEnv, &seDatasetID,
 	)
 	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
+		return nil, backend.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan capability: %w", err)
@@ -668,7 +669,7 @@ func scanCapabilityVersion(scanner interface {
 		&manifestJSON, &v.ManifestHash, &v.CreatedAt, &v.CreatedBy,
 	)
 	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
+		return nil, backend.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan version: %w", err)
@@ -792,7 +793,7 @@ func scanExecution(scanner interface {
 		&e.TotalTokens, &e.Error, &e.TraceID, &e.Environment,
 	)
 	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
+		return nil, backend.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan execution: %w", err)
@@ -940,7 +941,7 @@ func scanSchedule(scanner interface {
 		&sc.CreatedAt, &sc.CreatedBy,
 	)
 	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
+		return nil, backend.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan schedule: %w", err)

@@ -24,12 +24,12 @@
 package vault
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"encoding/hex"
 	"errors"
 	"os"
 
-	"github.com/sachncs/promptsheon/backend"
 )
 
 // hexEncode is a thin wrapper around hex.EncodeToString for the
@@ -61,14 +61,12 @@ type SecretBroker interface {
 	Resolve(ctx context.Context, secretID string) ([]byte, error)
 }
 
-// ErrUnknownSecret is returned by SecretBroker implementations
+// backend.ErrorVaultUnknownSecret is returned by SecretBroker implementations
 // when the requested secret identifier is not present in the
 // underlying store.
-var ErrUnknownSecret = backend.ErrorVaultUnknownSecret
 
-// ErrKeyUnavailable is returned by KeyProvider implementations
+// backend.ErrorVaultKeyUnavailable is returned by KeyProvider implementations
 // when no master key is currently available.
-var ErrKeyUnavailable = backend.ErrorVaultKeyUnavailable
 
 // EnvKeyProvider sources the master key from an environment
 // variable. It is the production-default today; KMSKeyProvider
@@ -89,7 +87,7 @@ func NewEnvKeyProvider() *EnvKeyProvider {
 func LoadFromEnv(varName string) ([]byte, error) {
 	v := os.Getenv(varName)
 	if v == "" {
-		return nil, ErrKeyUnavailable
+		return nil, backend.ErrorVaultKeyUnavailable
 	}
 	b, err := hex.DecodeString(v)
 	if err != nil {
@@ -153,7 +151,7 @@ func NewStaticSecretBroker(v *Vault, secrets map[string][]byte) *StaticSecretBro
 func (b *StaticSecretBroker) Resolve(_ context.Context, secretID string) ([]byte, error) {
 	ct, ok := b.Secrets[secretID]
 	if !ok {
-		return nil, ErrUnknownSecret
+		return nil, backend.ErrorVaultUnknownSecret
 	}
 	pt, err := b.Vault.Decrypt(string(ct))
 	if err != nil {

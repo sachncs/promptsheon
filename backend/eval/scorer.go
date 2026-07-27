@@ -7,6 +7,7 @@
 package eval
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -16,7 +17,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/sachncs/promptsheon/backend"
 )
 
 // Scorer is the registered name of a built-in or user-supplied
@@ -148,7 +148,7 @@ func (Regex) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 //   - enum (array of allowed values)
 //
 // Anything outside this supported subset is rejected with
-// ErrUnsupportedSchema (SEC-3): a schema that uses only unsupported
+// backend.ErrorEvalUnsupportedSchema (SEC-3): a schema that uses only unsupported
 // keywords (e.g. allOf without any of the above) used to be
 // silently accepted. The new behaviour surfaces the unsupported
 // keyword in the error so users know to add type/required/
@@ -170,7 +170,7 @@ func (JSONSchema) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 		return false, fmt.Errorf("json_schema: schema is not an object: %w", err)
 	}
 	if u := unsupportedSchemaKeywords(schema); u != "" {
-		return false, fmt.Errorf("%w: %s", ErrUnsupportedSchema, u)
+		return false, fmt.Errorf("%w: %s", backend.ErrorEvalUnsupportedSchema, u)
 	}
 	var doc any
 	if err := json.Unmarshal(actual, &doc); err != nil {
@@ -179,11 +179,10 @@ func (JSONSchema) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 	return validateSchema(doc, schema, "")
 }
 
-// ErrUnsupportedSchema is returned by JSONSchema.ScoreCase when
+// backend.ErrorEvalUnsupportedSchema is returned by JSONSchema.ScoreCase when
 // the supplied schema uses only keywords outside the supported
 // subset. Callers should switch to a different scorer or add
 // one of the supported keywords to their schema.
-var ErrUnsupportedSchema = backend.ErrorEvalUnsupportedSchema
 
 // supportedSchemaKeywords is the closed set of JSON Schema keys
 // this scorer honours. Anything outside the set is rejected.

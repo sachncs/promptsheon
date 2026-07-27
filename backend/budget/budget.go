@@ -17,12 +17,12 @@
 package budget
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend"
 )
 
 // Period is the closed set of budget periods.
@@ -55,15 +55,14 @@ type Budget struct {
 	CreatedBy   string    `json:"created_by"`
 }
 
-// ErrCapNotPositive is returned when constructing a Budget with a
+// backend.ErrorBudgetCapNotPositive is returned when constructing a Budget with a
 // non-positive cap.
-var ErrCapNotPositive = backend.ErrorBudgetCapNotPositive
 
 // New constructs a Budget with the period_start set to the
 // canonical start of the current period.
 func New(scope Scope, targetID string, period Period, capUSD float64, now time.Time, createdBy string) (Budget, error) {
 	if capUSD <= 0 {
-		return Budget{}, ErrCapNotPositive
+		return Budget{}, backend.ErrorBudgetCapNotPositive
 	}
 	switch scope {
 	case ScopeWorkspace, ScopeCapability:
@@ -94,7 +93,7 @@ func New(scope Scope, targetID string, period Period, capUSD float64, now time.T
 }
 
 // Charge records spend against the budget. If the new spend would
-// exceed the cap the charge is rejected and ErrCapExceeded is
+// exceed the cap the charge is rejected and backend.ErrorBudgetCapExceeded is
 // returned; otherwise the budget is advanced and the new total
 // is included in the returned Budget.
 func (b Budget) Charge(amount float64, now time.Time) (Budget, error) {
@@ -108,15 +107,14 @@ func (b Budget) Charge(amount float64, now time.Time) (Budget, error) {
 		b.SpentUSD = 0
 	}
 	if b.SpentUSD+amount > b.CapUSD {
-		return b, ErrCapExceeded
+		return b, backend.ErrorBudgetCapExceeded
 	}
 	b.SpentUSD += amount
 	return b, nil
 }
 
-// ErrCapExceeded is returned when a Charge would push spent over
+// backend.ErrorBudgetCapExceeded is returned when a Charge would push spent over
 // the cap.
-var ErrCapExceeded = backend.ErrorBudgetCapExceeded
 
 // Remaining returns the headroom left for the period.
 func (b Budget) Remaining() float64 {

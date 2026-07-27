@@ -9,12 +9,12 @@
 package release
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/capability"
 )
 
@@ -67,11 +67,10 @@ type ResolvedInvocation struct {
 	ResolvedAt time.Time
 }
 
-// ErrReleaseNotActive is returned by Resolver.Resolve when the
+// backend.ErrorReleaseNotActive is returned by Resolver.Resolve when the
 // release is not in the Active state. The only way to invoke a
 // release is via the active, approved, currently-serving
 // (release_id, environment) pair.
-var ErrReleaseNotActive = backend.ErrorReleaseNotActive
 
 // ArtifactLoader fetches artifact bytes by content hash. The
 // Resolver does not own the storage; the caller passes a Loader
@@ -136,7 +135,7 @@ func (r *Resolver) Resolve(ctx context.Context, releaseID string) (*ResolvedInvo
 		return nil, err
 	}
 	if rel.Status != StatusActive {
-		return nil, fmt.Errorf("%w: got status %q", ErrReleaseNotActive, rel.Status)
+		return nil, fmt.Errorf("%w: got status %q", backend.ErrorReleaseNotActive, rel.Status)
 	}
 	if err := rel.Manifest.Validate(); err != nil {
 		return nil, fmt.Errorf("resolver: manifest: %w", err)

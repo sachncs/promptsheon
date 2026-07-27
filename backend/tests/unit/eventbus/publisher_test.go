@@ -1,6 +1,7 @@
 package eventbus_test
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	. "github.com/sachncs/promptsheon/backend/eventbus"
 	"errors"
 	"sync"
@@ -103,8 +104,8 @@ func TestCancelStopsDelivery(t *testing.T) {
 
 func TestSubscribeRejectsDuplicateSubscription(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(ErrAlreadyCanceled, ErrAlreadyCanceled) {
-		t.Fatalf("ErrAlreadyCanceled should be a sentinel")
+	if !errors.Is(backend.ErrorEventBusAlreadyCanceled, backend.ErrorEventBusAlreadyCanceled) {
+		t.Fatalf("backend.ErrorEventBusAlreadyCanceled should be a sentinel")
 	}
 }
 

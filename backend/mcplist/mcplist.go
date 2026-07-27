@@ -11,6 +11,7 @@
 package mcplist
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"errors"
 	"fmt"
@@ -19,7 +20,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sachncs/promptsheon/backend"
 )
 
 // Entry is one allowlisted MCP server.
@@ -38,28 +38,25 @@ type Entry struct {
 	CreatedBy   string `json:"created_by"`
 }
 
-// ErrEmptyName is returned by Validate when the Name is empty.
-var ErrEmptyName = backend.ErrorMCPEmptyName
+// backend.ErrorMCPEmptyName is returned by Validate when the Name is empty.
 
-// ErrBadName is returned when the Name contains characters
+// backend.ErrorMCPBadName is returned when the Name contains characters
 // outside the allowed set (alnum, dash, dot, underscore).
-var ErrBadName = backend.ErrorMCPBadName
 
-// ErrBadURL is returned when the URL cannot be parsed as an
+// backend.ErrorMCPBadURL is returned when the URL cannot be parsed as an
 // absolute http(s) URL or unix UDS path.
-var ErrBadURL = backend.ErrorMCPBadURL
 
 // Validate enforces the closed-set Name format and a syntactically
 // valid URL (http(s)://host[:port][/path] or unix:///abs/path).
 func (e Entry) Validate() error {
 	if strings.TrimSpace(e.Name) == "" {
-		return ErrEmptyName
+		return backend.ErrorMCPEmptyName
 	}
 	if !namePattern.MatchString(e.Name) {
-		return fmt.Errorf("%w: %q", ErrBadName, e.Name)
+		return fmt.Errorf("%w: %q", backend.ErrorMCPBadName, e.Name)
 	}
 	if err := validateURL(e.URL); err != nil {
-		return fmt.Errorf("%w: %q: %w", ErrBadURL, e.URL, err)
+		return fmt.Errorf("%w: %q: %w", backend.ErrorMCPBadURL, e.URL, err)
 	}
 	return nil
 }
@@ -126,7 +123,7 @@ func (l *List) Add(e Entry) error {
 }
 
 // Remove deletes the entry with the supplied Name. Returns
-// ErrUnknownName if no entry matches.
+// backend.ErrorMCPUnknownName if no entry matches.
 func (l *List) Remove(name string) error {
 	for i, e := range l.Entries {
 		if e.Name == name {
@@ -134,7 +131,7 @@ func (l *List) Remove(name string) error {
 			return nil
 		}
 	}
-	return ErrUnknownName
+	return backend.ErrorMCPUnknownName
 }
 
 // Allows reports whether the supplied name is on the list. The
@@ -165,9 +162,8 @@ func (l *List) sort() {
 	})
 }
 
-// ErrUnknownName is returned by Remove when the supplied Name
+// backend.ErrorMCPUnknownName is returned by Remove when the supplied Name
 // is not on the list.
-var ErrUnknownName = backend.ErrorMCPUnknownName
 
 // Repository is the consumer-defined persistence interface.
 // Production wiring supplies a backend-backed implementation;

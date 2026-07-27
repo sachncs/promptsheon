@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"errors"
 	"testing"
@@ -9,8 +10,8 @@ import (
 func TestEnvKeyProviderMissing(t *testing.T) {
 	t.Parallel()
 	got, err := LoadFromEnv("PROMPTSHEON_VAULT_KEY_NOT_SET_XYZ")
-	if !errors.Is(err, ErrKeyUnavailable) {
-		t.Fatalf("expected ErrKeyUnavailable, got %v", err)
+	if !errors.Is(err, backend.ErrorVaultKeyUnavailable) {
+		t.Fatalf("expected backend.ErrorVaultKeyUnavailable, got %v", err)
 	}
 	if got != nil {
 		t.Fatalf("expected nil key, got %v", got)
@@ -71,7 +72,7 @@ func TestStaticSecretBrokerUnknownSecret(t *testing.T) {
 		v = &Vault{}
 	}
 	b := NewStaticSecretBroker(v, map[string][]byte{})
-	if _, err := b.Resolve(context.Background(), "missing"); !errors.Is(err, ErrUnknownSecret) {
-		t.Fatalf("expected ErrUnknownSecret, got %v", err)
+	if _, err := b.Resolve(context.Background(), "missing"); !errors.Is(err, backend.ErrorVaultUnknownSecret) {
+		t.Fatalf("expected backend.ErrorVaultUnknownSecret, got %v", err)
 	}
 }

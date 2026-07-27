@@ -1,6 +1,7 @@
 package harness_test
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"errors"
 	"testing"
@@ -37,8 +38,8 @@ func TestPreconditionRunnerFails(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error from failing precondition")
 	}
-	if !errors.Is(err, harness.ErrPreconditionFailed) {
-		t.Fatalf("expected harness.ErrPreconditionFailed, got %v", err)
+	if !errors.Is(err, backend.ErrorHarnessPreconditionFailed) {
+		t.Fatalf("expected backend.ErrorHarnessPreconditionFailed, got %v", err)
 	}
 	if len(results) != 1 || results[0].Passed {
 		t.Fatalf("expected one failing result, got %+v", results)

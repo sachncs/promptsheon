@@ -1,6 +1,7 @@
 package reasoning_test
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	. "github.com/sachncs/promptsheon/backend/reasoning"
 	"context"
 	"errors"
@@ -73,8 +74,8 @@ func TestCompileNoMatch(t *testing.T) {
 		ID:   "i1",
 		Goal: "play chess",
 	})
-	if !errors.Is(err, ErrNoMatch) {
-		t.Errorf("expected ErrNoMatch, got %v", err)
+	if !errors.Is(err, backend.ErrorReasoningNoMatch) {
+		t.Errorf("expected backend.ErrorReasoningNoMatch, got %v", err)
 	}
 }
 
@@ -97,8 +98,8 @@ func TestCompileRespectsMinTrustScore(t *testing.T) {
 			MinTrustScore: 0.99,
 		},
 	})
-	if !errors.Is(err, ErrConstraintViolation) {
-		t.Errorf("expected ErrConstraintViolation, got %v", err)
+	if !errors.Is(err, backend.ErrorReasoningConstraintViolation) {
+		t.Errorf("expected backend.ErrorReasoningConstraintViolation, got %v", err)
 	}
 }
 
@@ -112,8 +113,8 @@ func TestCompileRespectsMaxCost(t *testing.T) {
 			MaxCostUSD: 0.0001,
 		},
 	})
-	if !errors.Is(err, ErrConstraintViolation) {
-		t.Errorf("expected ErrConstraintViolation, got %v", err)
+	if !errors.Is(err, backend.ErrorReasoningConstraintViolation) {
+		t.Errorf("expected backend.ErrorReasoningConstraintViolation, got %v", err)
 	}
 }
 
@@ -129,10 +130,10 @@ func TestCompileRespectsRequiredTags(t *testing.T) {
 	})
 	// RequiredTags is a hard constraint; when no candidate
 	// satisfies it, the compiler reports
-	// ErrConstraintViolation (a constraint rejected every
+	// backend.ErrorReasoningConstraintViolation (a constraint rejected every
 	// match).
-	if !errors.Is(err, ErrConstraintViolation) {
-		t.Errorf("expected ErrConstraintViolation, got %v", err)
+	if !errors.Is(err, backend.ErrorReasoningConstraintViolation) {
+		t.Errorf("expected backend.ErrorReasoningConstraintViolation, got %v", err)
 	}
 }
 

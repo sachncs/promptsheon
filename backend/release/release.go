@@ -14,11 +14,11 @@
 package release
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/approval"
 	"github.com/sachncs/promptsheon/backend/capability"
 )
@@ -67,13 +67,11 @@ func (e Environment) Valid() bool {
 	}
 }
 
-// ErrNotPending is returned when a transition is attempted on a
+// backend.ErrorReleaseNotPending is returned when a transition is attempted on a
 // Release that is not in the Pending state.
-var ErrNotPending = backend.ErrorReleaseNotPending
 
-// ErrUnknownEnvironment is returned when an Environment fails the
+// backend.ErrorReleaseUnknownEnvironment is returned when an Environment fails the
 // closed-set check.
-var ErrUnknownEnvironment = backend.ErrorReleaseUnknownEnvironment
 
 // Release is the approved pointer from a Version to an Environment.
 //
@@ -115,7 +113,7 @@ func New(capabilityID string, capabilityVersion int, manifest capability.Manifes
 		return Release{}, errors.New("release: created_by is required")
 	}
 	if !environment.Valid() {
-		return Release{}, fmt.Errorf("%w: %q", ErrUnknownEnvironment, environment)
+		return Release{}, fmt.Errorf("%w: %q", backend.ErrorReleaseUnknownEnvironment, environment)
 	}
 	if err := manifest.Validate(); err != nil {
 		return Release{}, fmt.Errorf("release: manifest: %w", err)
@@ -142,7 +140,7 @@ func New(capabilityID string, capabilityVersion int, manifest capability.Manifes
 // as a separate step (SEC-1): the policy is self-checking.
 func (r Release) ApproveWith(a approval.Approval, pol approval.Policy) (Release, error) {
 	if r.Status != StatusPending {
-		return r, ErrNotPending
+		return r, backend.ErrorReleaseNotPending
 	}
 	if r.CreatedBy == "" {
 		return r, errors.New("release: cannot approve; created_by is empty (cannot run separation-of-duties check)")
@@ -162,7 +160,7 @@ func (r Release) ApproveWith(a approval.Approval, pol approval.Policy) (Release,
 		return r, fmt.Errorf("release: policy: %w", err)
 	}
 	if !satisfied {
-		return r, fmt.Errorf("%w: state=%s, votes=%d", approval.ErrQuorumNotSatisfied, state, len(a.Votes))
+		return r, fmt.Errorf("%w: state=%s, votes=%d", backend.ErrorApprovalQuorumNotMet, state, len(a.Votes))
 	}
 	for _, v := range a.Votes {
 		if v.Decision == approval.Approve {

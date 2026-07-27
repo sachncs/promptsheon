@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"errors"
 	"net/http"
 	"time"
@@ -8,7 +9,6 @@ import (
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/eval"
 	"github.com/sachncs/promptsheon/backend/harness"
-	"github.com/sachncs/promptsheon/backend/store"
 )
 
 // ---------------------------------------------------------------------------
@@ -336,12 +336,12 @@ func (s *Server) handleGetEval(w http.ResponseWriter, r *http.Request) error {
 	// BUG-26: distinguish 404 from 500 on DB failure. The
 	// previous form returned ErrNotFound for any error,
 	// masking DB outages as "run not found". The repo
-	// translates sql.ErrNoRows into store.ErrNotFound, so
+	// translates sql.ErrNoRows into backend.ErrorStoreNotFound, so
 	// match that sentinel here; anything else is a real
 	// failure and gets a 500.
 	run, err := s.db.GetEvalRun(r.Context(), r.PathValue("id"))
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, backend.ErrorStoreNotFound) {
 			return ErrNotFound
 		}
 		return &HTTPError{Status: http.StatusInternalServerError, Message: "eval run lookup failed"}

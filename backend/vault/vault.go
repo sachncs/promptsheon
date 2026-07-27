@@ -3,6 +3,7 @@
 package vault
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -12,18 +13,16 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/sachncs/promptsheon/backend"
 )
 
-// ErrStopped is returned by Encrypt/Decrypt after Stop has been
+// backend.ErrorVaultStopped is returned by Encrypt/Decrypt after Stop has been
 // called. The Vault retains no plaintext after Stop, so any
 // further use is fail-closed.
-var ErrStopped = backend.ErrorVaultStopped
 
 // Vault encrypts and decrypts data using AES-256-GCM.
 //
 // After Stop is called, the in-memory key is zeroized and every
-// subsequent Encrypt/Decrypt returns ErrStopped. Stop is
+// subsequent Encrypt/Decrypt returns backend.ErrorVaultStopped. Stop is
 // idempotent and concurrency-safe: parallel callers either see a
 // live vault or a stopped vault, never a half-swapped state.
 //
@@ -78,7 +77,7 @@ func parseVaultKey(hexKey string) ([]byte, error) {
 
 // Stop zeroizes the in-memory key and marks the Vault stopped.
 // Safe to call from any goroutine and any number of times;
-// subsequent Encrypt/Decrypt calls return ErrStopped.
+// subsequent Encrypt/Decrypt calls return backend.ErrorVaultStopped.
 //
 // The motivation: a process holding the master key in memory is
 // a long-lived secret. After Stop returns, the bytes backing the
@@ -117,7 +116,7 @@ func (v *Vault) Stopped() bool {
 // must plan to re-encrypt stored secrets.
 func (v *Vault) Reload(hexKey string) error {
 	if v.stopped.Load() {
-		return ErrStopped
+		return backend.ErrorVaultStopped
 	}
 	key, err := parseVaultKey(hexKey)
 	if err != nil {
@@ -139,7 +138,7 @@ func (v *Vault) Reload(hexKey string) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if v.stopped.Load() {
-		return ErrStopped
+		return backend.ErrorVaultStopped
 	}
 	// Zeroize the old key before installing the new one.
 	for i := range v.key {
@@ -234,17 +233,17 @@ func (v *Vault) DecryptBytes(ciphertext, additionalData []byte) ([]byte, error) 
 }
 
 // cipher returns the AES cipher block for the current key, or
-// ErrStopped if the Vault has been Stopped. The key slice is
+// backend.ErrorVaultStopped if the Vault has been Stopped. The key slice is
 // returned under a read lock so a concurrent Reload cannot
 // swap the slice mid-call.
 func (v *Vault) cipher() (cipher.Block, error) {
 	if v.stopped.Load() {
-		return nil, ErrStopped
+		return nil, backend.ErrorVaultStopped
 	}
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	if v.stopped.Load() || v.key == nil {
-		return nil, ErrStopped
+		return nil, backend.ErrorVaultStopped
 	}
 	return aes.NewCipher(v.key)
 }

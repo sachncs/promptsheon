@@ -22,7 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/capability"
 	"github.com/sachncs/promptsheon/backend/eventbus"
 	"github.com/sachncs/promptsheon/backend/replay"
@@ -33,13 +32,12 @@ import (
 // implementation that talks to the right plugin / built-in.
 type Caller func(ctx context.Context, req InvokeRequest) (InvokeResult, error)
 
-// ErrProviderMissing is returned by a Caller when the request names
+// backend.ErrorExecutorProviderMissing is returned by a Caller when the request names
 // a model whose provider is not registered, or names no provider at
 // all. The handler maps this to a 502 Bad Gateway so operators can
 // distinguish "no provider configured" from "provider failed"
 // without reading the daemon log. RunRequest propagates it as a Go
 // error so the handler's errors.Is check fires (BUG-19).
-var ErrProviderMissing = backend.ErrorExecutorProviderMissing
 
 // InvokeRequest is the payload passed to Caller.
 type InvokeRequest struct {
@@ -186,7 +184,7 @@ func (e *Executor) RunRequest(ctx context.Context, req InvokeRequest, environmen
 	if err != nil {
 		rec.Status = "error"
 		rec.Error = err.Error()
-		// ponytail: BUG-19 used to swallow non-ErrProviderMissing
+		// ponytail: BUG-19 used to swallow non-backend.ErrorExecutorProviderMissing
 		// errors (return nil) so the API path could 201 with the
 		// error in the body. That hid provider-side errors from
 		// the eval harness, which only sees Go-errors. Now we

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"database/sql"
 	"errors"
@@ -250,7 +251,7 @@ func (s *SQLite) UpdateRelease(ctx context.Context, r *release.Release) error {
 		return fmt.Errorf("rows affected: %w", err)
 	}
 	if n == 0 {
-		return release.ErrNotFound
+		return backend.ErrorReleaseNotFound
 	}
 	return nil
 }
@@ -298,7 +299,7 @@ func (s *SQLite) ActivateAtomic(ctx context.Context, prior, next *release.Releas
 		if n, err := res.RowsAffected(); err != nil {
 			return fmt.Errorf("rows affected: %w", err)
 		} else if n == 0 {
-			return release.ErrNotFound
+			return backend.ErrorReleaseNotFound
 		}
 	}
 
@@ -333,7 +334,7 @@ func (s *SQLite) ActivateAtomic(ctx context.Context, prior, next *release.Releas
 	if n, err := res.RowsAffected(); err != nil {
 		return fmt.Errorf("rows affected: %w", err)
 	} else if n == 0 {
-		return release.ErrNotFound
+		return backend.ErrorReleaseNotFound
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -358,7 +359,7 @@ func scanRelease(scanner interface {
 		&r.CreatedAt, &createdBy, &activatedAt, &supersededAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, release.ErrNotFound
+		return nil, backend.ErrorReleaseNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan release: %w", err)
@@ -435,7 +436,7 @@ func (s *SQLite) UpdateApproval(ctx context.Context, a *approval.Approval) error
 		return fmt.Errorf("rows affected: %w", err)
 	}
 	if n == 0 {
-		return approval.ErrNotFound
+		return backend.ErrorApprovalNotFound
 	}
 	return nil
 }
@@ -447,7 +448,7 @@ func scanApproval(scanner interface {
 	var votesJSON string
 	err := scanner.Scan(&a.ReleaseID, &votesJSON, &a.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, approval.ErrNotFound
+		return nil, backend.ErrorApprovalNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan approval: %w", err)

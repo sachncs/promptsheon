@@ -2,10 +2,10 @@
 package context
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"errors"
 	"strings"
 
-	"github.com/sachncs/promptsheon/backend"
 )
 
 // TokenEstimateFunc estimates the token count for a given text.
@@ -48,10 +48,9 @@ const (
 	StrategyNone Strategy = "none"
 )
 
-// ErrBudgetExhausted is returned when the strategy cannot trim the
+// backend.ErrorContextBudgetExhausted is returned when the strategy cannot trim the
 // context below the budget without losing the system message. The
 // caller should fall back to a smaller model or split the call.
-var ErrBudgetExhausted = backend.ErrorContextBudgetExhausted
 
 // Inputs is the input shape to Assemble. SystemMessage is pinned at
 // the top of every assembled context; Messages are the user /
@@ -92,7 +91,7 @@ func (m *Manager) EstimateTokens(text string) int {
 // ordered by the Strategy ("tail" keeps the most recent,
 // "head" keeps the oldest). Truncation stops once the running
 // total fits in Budget; if the SystemMessage itself exceeds
-// Budget, ErrBudgetExhausted is returned.
+// Budget, backend.ErrorContextBudgetExhausted is returned.
 func (m *Manager) Assemble(in Inputs) (AssembledContext, error) {
 	if in.Strategy == "" {
 		in.Strategy = StrategyTail
@@ -102,7 +101,7 @@ func (m *Manager) Assemble(in Inputs) (AssembledContext, error) {
 	}
 	sysTokens := m.estimateTokens(in.SystemMessage)
 	if sysTokens > in.Budget {
-		return AssembledContext{}, ErrBudgetExhausted
+		return AssembledContext{}, backend.ErrorContextBudgetExhausted
 	}
 	remaining := in.Budget - sysTokens
 

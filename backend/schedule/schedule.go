@@ -22,13 +22,13 @@
 package schedule
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend"
 )
 
 // Kind is how a Schedule decides when to fire.
@@ -58,7 +58,7 @@ type Schedule struct {
 	CreatedBy   string     `json:"created_by"`
 }
 
-// New constructs a Schedule. Returns ErrInvalidCron when the kind
+// New constructs a Schedule. Returns backend.ErrorScheduleInvalidCron when the kind
 // is cron and the expression is not a valid 5-field cron expression.
 func New(workspaceID, releaseID string, kind Kind, cronExpr, webhookPath string) (Schedule, error) {
 	if workspaceID == "" || releaseID == "" {
@@ -89,16 +89,15 @@ func New(workspaceID, releaseID string, kind Kind, cronExpr, webhookPath string)
 	}, nil
 }
 
-// ErrInvalidCron signals an unparseable cron expression.
-var ErrInvalidCron = backend.ErrorScheduleInvalidCron
+// backend.ErrorScheduleInvalidCron signals an unparseable cron expression.
 
-// Validate returns ErrInvalidCron if cron is empty or unparseable.
+// Validate returns backend.ErrorScheduleInvalidCron if cron is empty or unparseable.
 func (s Schedule) Validate() error {
 	if s.Kind != KindCron {
 		return nil
 	}
 	if _, err := nextCron(s.Cron, time.Now().UTC()); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidCron, err)
+		return fmt.Errorf("%w: %w", backend.ErrorScheduleInvalidCron, err)
 	}
 	return nil
 }
@@ -143,15 +142,15 @@ func (s Schedule) Enable() Schedule {
 //
 // Each field may be `*`, a single integer, or a comma list. Range
 // lists (a-b) and step expressions (a-b/n) are NOT supported in M2
-// and produce ErrInvalidCron. The parsing is deliberate: full cron
+// and produce backend.ErrorScheduleInvalidCron. The parsing is deliberate: full cron
 // parsers ship in M2 follow-on if real operators ask for them.
 func nextCron(expr string, from time.Time) (time.Time, error) {
 	if expr == "" {
-		return time.Time{}, ErrInvalidCron
+		return time.Time{}, backend.ErrorScheduleInvalidCron
 	}
 	parts := splitWhitespace(expr)
 	if len(parts) != 5 {
-		return time.Time{}, ErrInvalidCron
+		return time.Time{}, backend.ErrorScheduleInvalidCron
 	}
 	parts2 := make([]string, 5)
 	for i, p := range parts {
@@ -212,13 +211,13 @@ func nextCron(expr string, from time.Time) (time.Time, error) {
 		}
 		t = t.Add(time.Minute)
 	}
-	return time.Time{}, ErrInvalidCron
+	return time.Time{}, backend.ErrorScheduleInvalidCron
 }
 
 // parseField accepts "*", "n", "n,m,...", "a-b", and "*/n" step
 // expressions. Returns a slice indexed by the field's natural
 // integer range for fast membership tests. All errors wrap
-// ErrInvalidCron so callers can errors.Is against the sentinel.
+// backend.ErrorScheduleInvalidCron so callers can errors.Is against the sentinel.
 func parseField(s string, lo, hi int) ([]bool, error) {
 	out, _, err := parseFieldWithWildcard(s, lo, hi)
 	return out, err
@@ -241,23 +240,23 @@ func parseFieldWithWildcard(s string, lo, hi int) ([]bool, bool, error) {
 	}
 	for _, raw := range splitCSV(s) {
 		if raw == "" {
-			return nil, false, fmt.Errorf("%w: empty token", ErrInvalidCron)
+			return nil, false, fmt.Errorf("%w: empty token", backend.ErrorScheduleInvalidCron)
 		}
 		if strings.Contains(raw, "/") {
 			if err := applyStep(out, raw, lo, hi); err != nil {
-				return nil, false, fmt.Errorf("%w: %w", ErrInvalidCron, err)
+				return nil, false, fmt.Errorf("%w: %w", backend.ErrorScheduleInvalidCron, err)
 			}
 			continue
 		}
 		if strings.Contains(raw, "-") {
 			if err := applyRange(out, raw, lo, hi); err != nil {
-				return nil, false, fmt.Errorf("%w: %w", ErrInvalidCron, err)
+				return nil, false, fmt.Errorf("%w: %w", backend.ErrorScheduleInvalidCron, err)
 			}
 			continue
 		}
 		v, err := atoiStrict(raw, lo, hi)
 		if err != nil {
-			return nil, false, fmt.Errorf("%w: %w", ErrInvalidCron, err)
+			return nil, false, fmt.Errorf("%w: %w", backend.ErrorScheduleInvalidCron, err)
 		}
 		out[v] = true
 	}
