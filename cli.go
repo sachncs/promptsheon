@@ -2,11 +2,11 @@
 //
 // The CLI is structured as follows:
 //
-//	main.go      - entry point, dispatcher, common flags, LLM commands,
+//	cli.go      - entry point, dispatcher, common flags, LLM commands,
 //	              and the workspace/project/capability/release CRUD commands.
-//	cas.go       - the git-style content-addressable storage commands
+//	cli_cas.go  - the git-style content-addressable storage commands
 //	              (init, hash-object, commit, log, branch, graph, ...).
-//	http.go      - tiny localhost-only HTTP helpers used by the CRUD
+//	cli_http.go - tiny localhost-only HTTP helpers used by the CRUD
 //	              subcommands to talk to a running promptsheond.
 //
 // Splitting per-command keeps individual files small and reviewable.
@@ -34,7 +34,7 @@ const (
 	cmdTest  = "test"
 )
 
-func main() {
+func runCLI() {
 	if handleEarlyExit() {
 		return
 	}
@@ -66,7 +66,7 @@ func handleEarlyExit() bool {
 }
 
 func dispatchCommand(cmd string, args []string) error {
-	h, ok := commandHandlers[cmd]
+	h, ok := cliCommandHandlers[cmd]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "error: unknown command: %s\n", cmd)
 		printUsage()
@@ -75,7 +75,7 @@ func dispatchCommand(cmd string, args []string) error {
 	return h(args)
 }
 
-var commandHandlers = map[string]func([]string) error{
+var cliCommandHandlers = map[string]func([]string) error{
 	"init":          func(_ []string) error { return cmdInit() },
 	"hash-object":   cmdHashObject,
 	"write-object":  cmdWriteObject,

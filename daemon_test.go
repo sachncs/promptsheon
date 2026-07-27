@@ -58,11 +58,11 @@ func TestDefaultArtifactLoader(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// serverHelpText
+// daemonHelpText
 // ---------------------------------------------------------------------------
 
-func TestServerHelpText(t *testing.T) {
-	text := serverHelpText()
+func TestDaemonHelpText(t *testing.T) {
+	text := daemonHelpText()
 	if text == "" {
 		t.Fatal("expected non-empty help text")
 	}
@@ -309,7 +309,7 @@ func TestBuildServer_WithVault(t *testing.T) {
 
 // TestValidateVaultKey exercises the OPS-CFG-3 startup check
 // directly (no os.Exit, no subprocess). The function is the
-// unit that main() calls before constructing the vault; a
+// unit that runDaemon() calls before constructing the vault; a
 // separate test verifies the daemon binary exits on failure
 // via the end-to-end harness in tests/smoke.
 func TestValidateVaultKey(t *testing.T) {
@@ -593,7 +593,7 @@ func TestStartHTTPServerAndWait_WithCORS(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// main() via flag manipulation
+// runDaemon() via flag manipulation
 // ---------------------------------------------------------------------------
 
 func TestMain_VersionFlag(t *testing.T) {
@@ -611,7 +611,7 @@ func TestMain_VersionFlag(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	main()
+	runDaemon()
 
 	_ = w.Close()
 	os.Stdout = old
@@ -642,7 +642,7 @@ func TestMain_HelpFlag(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	main()
+	runDaemon()
 
 	_ = w.Close()
 	os.Stdout = old
@@ -681,7 +681,7 @@ func TestMain_FullServer(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		main()
+		runDaemon()
 	}()
 
 	time.Sleep(3 * time.Second)
@@ -717,7 +717,7 @@ func TestMain_FullServerWithAuth(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		main()
+		runDaemon()
 	}()
 
 	time.Sleep(3 * time.Second)
@@ -755,7 +755,7 @@ func TestMain_WithShellToolEnabled(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		main()
+		runDaemon()
 	}()
 
 	time.Sleep(3 * time.Second)
@@ -792,7 +792,7 @@ func TestMain_WithVaultKey(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		main()
+		runDaemon()
 	}()
 
 	time.Sleep(3 * time.Second)
@@ -854,7 +854,7 @@ func TestMain_RecommendationLoopWired(t *testing.T) {
 }
 
 // TestMain_HubStopBeforeDBClose pins OBS-LOG-3: the deferred
-// order in main() must close the SSE log hub BEFORE the database.
+// order in runDaemon() must close the SSE log hub BEFORE the database.
 // Defers run LIFO; the test reads main.go and asserts that the
 // `defer db.Close()` is registered before `defer logHub.Stop()`
 // so the hub's persist-nextID call still has a live DB.
@@ -921,7 +921,7 @@ func TestMain_WithCORSOrigins(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		main()
+		runDaemon()
 	}()
 
 	time.Sleep(3 * time.Second)

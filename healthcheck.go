@@ -1,8 +1,6 @@
-// Command promptsheon-healthcheck polls the daemon's /health
-// endpoint and exits 0 on 200, non-zero otherwise. Used as the
-// Docker HEALTHCHECK alternative to wget (SEC-CONTAINER-2).
-//
-//	go build -o promptsheon-healthcheck ./cmd/promptsheon-healthcheck
+// healthcheck.go polls the daemon's /health endpoint and exits 0 on 200,
+// non-zero otherwise. Used as the Docker HEALTHCHECK alternative to wget
+// (SEC-CONTAINER-2).
 //
 // The binary honours two env vars:
 //
@@ -22,7 +20,7 @@ import (
 	"time"
 )
 
-func main() {
+func runHealthcheck() {
 	host := getenv("PROMPTSHEON_HEALTHCHECK_HOST", "localhost")
 	portStr := getenv("PROMPTSHEON_HEALTHCHECK_PORT", "8080")
 	port, err := strconv.Atoi(portStr)

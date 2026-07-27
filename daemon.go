@@ -1,4 +1,4 @@
-// promptsheond is the Promptsheon API server daemon.
+// daemon.go is the Promptsheon API server daemon entry point.
 package main
 
 import (
@@ -69,7 +69,7 @@ const logLevelInfo = "info"
 const logLevelWarn = "warn"
 const logLevelError = "error"
 
-func main() {
+func runDaemon() {
 	// Handle --version and --help before loading the rest of the
 	// config. Operators commonly run 'promptsheond --version' to
 	// confirm a deployment, and we don't want a missing or invalid
@@ -93,7 +93,7 @@ func main() {
 		return
 	}
 	if *showHelp {
-		fmt.Print(serverHelpText())
+		fmt.Print(daemonHelpText())
 		return
 	}
 	if *backupPath != "" {
@@ -1187,7 +1187,7 @@ func (a *webhookStoreAdapter) ListWebhookEndpoints(ctx context.Context) ([]*webh
 // by --help. We keep the text in a function so it can be
 // exercised by a test (e.g. a future doc-snippet test) without
 // having to actually exec the binary.
-func serverHelpText() string {
+func daemonHelpText() string {
 	return `promptsheond — Promptsheon API server
 
 Usage:
