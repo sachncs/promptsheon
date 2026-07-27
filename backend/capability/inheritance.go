@@ -3,6 +3,8 @@ package capability
 import (
 	"errors"
 	"fmt"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // MaxInheritanceDepth bounds the inheritance chain length.
@@ -24,7 +26,7 @@ func (e *ErrInheritanceCycle) Error() string {
 
 // ErrInheritanceTooDeep is returned when the parent chain
 // exceeds MaxInheritanceDepth.
-var ErrInheritanceTooDeep = errors.New("capability: inheritance chain too deep")
+var ErrInheritanceTooDeep = backend.ErrorCapabilityInheritanceTooDeep
 
 // InheritanceResolver resolves a Version's parent chain into
 // the effective Manifest. The resolver is a thin abstraction

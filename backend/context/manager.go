@@ -4,6 +4,8 @@ package context
 import (
 	"errors"
 	"strings"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // TokenEstimateFunc estimates the token count for a given text.
@@ -49,7 +51,7 @@ const (
 // ErrBudgetExhausted is returned when the strategy cannot trim the
 // context below the budget without losing the system message. The
 // caller should fall back to a smaller model or split the call.
-var ErrBudgetExhausted = errors.New("context: token budget exhausted after truncation")
+var ErrBudgetExhausted = backend.ErrorContextBudgetExhausted
 
 // Inputs is the input shape to Assemble. SystemMessage is pinned at
 // the top of every assembled context; Messages are the user /

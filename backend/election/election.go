@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // Leader carries the identity of the current leader plus the
@@ -84,7 +86,7 @@ func (e *Elector) EnsureTable(ctx context.Context) error {
 // ErrNotLeader is returned by TryAcquire when this replica did
 // not win the election. Callers should treat the local
 // replica as a read-only follower until Acquire succeeds.
-var ErrNotLeader = errors.New("election: not the leader")
+var ErrNotLeader = backend.ErrorElectionNotLeader
 
 // Acquire tries to claim the leader row. Returns nil when this
 // replica becomes (or already was) the leader; ErrNotLeader

@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // Period is the closed set of budget periods.
@@ -55,7 +57,7 @@ type Budget struct {
 
 // ErrCapNotPositive is returned when constructing a Budget with a
 // non-positive cap.
-var ErrCapNotPositive = errors.New("budget: cap must be > 0")
+var ErrCapNotPositive = backend.ErrorBudgetCapNotPositive
 
 // New constructs a Budget with the period_start set to the
 // canonical start of the current period.
@@ -114,7 +116,7 @@ func (b Budget) Charge(amount float64, now time.Time) (Budget, error) {
 
 // ErrCapExceeded is returned when a Charge would push spent over
 // the cap.
-var ErrCapExceeded = errors.New("budget: cap exceeded")
+var ErrCapExceeded = backend.ErrorBudgetCapExceeded
 
 // Remaining returns the headroom left for the period.
 func (b Budget) Remaining() float64 {

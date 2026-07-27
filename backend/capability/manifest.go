@@ -1,8 +1,9 @@
 package capability
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // ArtifactKind classifies a content-addressed reference inside a Manifest.
@@ -88,7 +89,7 @@ type Manifest struct {
 
 // ErrEmptyManifest indicates a Manifest that has not been populated.
 // An empty Manifest must never be deployed, approved, or evaluated.
-var ErrEmptyManifest = errors.New("manifest is empty")
+var ErrEmptyManifest = backend.ErrorCapabilityEmptyManifest
 
 // Validate checks structural correctness of the Manifest.
 //

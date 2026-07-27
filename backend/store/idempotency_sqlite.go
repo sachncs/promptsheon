@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // IdempotencyStore persists idempotency cache entries so multi-
@@ -32,7 +34,7 @@ type IdempotencyEntry struct {
 }
 
 // ErrIdempotencyMiss signals a cache miss to the middleware.
-var ErrIdempotencyMiss = errors.New("idempotency: miss")
+var ErrIdempotencyMiss = backend.ErrorStoreIdempotencyMiss
 
 // SQLiteIdempotencyStore is the default implementation, backed
 // by the `idempotency_cache` table created in migration 013.

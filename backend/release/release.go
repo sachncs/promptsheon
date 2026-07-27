@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/approval"
 	"github.com/sachncs/promptsheon/backend/capability"
 )
@@ -68,11 +69,11 @@ func (e Environment) Valid() bool {
 
 // ErrNotPending is returned when a transition is attempted on a
 // Release that is not in the Pending state.
-var ErrNotPending = errors.New("release: transition requires Pending status")
+var ErrNotPending = backend.ErrorReleaseNotPending
 
 // ErrUnknownEnvironment is returned when an Environment fails the
 // closed-set check.
-var ErrUnknownEnvironment = errors.New("release: unknown environment")
+var ErrUnknownEnvironment = backend.ErrorReleaseUnknownEnvironment
 
 // Release is the approved pointer from a Version to an Environment.
 //

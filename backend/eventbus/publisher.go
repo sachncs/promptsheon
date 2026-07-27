@@ -24,6 +24,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/capability"
 )
 
@@ -55,7 +56,7 @@ type Subscription interface {
 
 // ErrAlreadyCanceled is returned by a Handler whose Subscription has
 // been Canceled; consumers should treat it as "stop processing".
-var ErrAlreadyCanceled = errors.New("eventbus: subscription canceled")
+var ErrAlreadyCanceled = backend.ErrorEventBusAlreadyCanceled
 
 // subscription is the internal handle.
 //

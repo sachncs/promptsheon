@@ -11,11 +11,11 @@
 package manifest
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"regexp"
 
+	"github.com/sachncs/promptsheon/backend"
 	"gopkg.in/yaml.v3"
 )
 
@@ -37,11 +37,11 @@ type Entry struct {
 }
 
 // ErrEmpty is returned when a manifest is empty.
-var ErrEmpty = errors.New("manifest: no plugins")
+var ErrEmpty = backend.ErrorManifestEmpty
 
 // ErrBadName is returned when a plugin Name is empty or fails
 // the same closed-set as the MCP allowlist.
-var ErrBadName = errors.New("manifest: bad plugin name")
+var ErrBadName = backend.ErrorManifestBadName
 
 // Load reads the manifest from path and validates each entry.
 func Load(path string) (*File, error) {
@@ -68,7 +68,7 @@ func Load(path string) (*File, error) {
 // not live under /tmp/promptsheon/. The path namespace avoids
 // collisions with system sockets and keeps plugin lifecycles
 // scoped to a single tenant.
-var ErrBadUDS = errors.New("manifest: UDS path must be under /tmp/promptsheon/")
+var ErrBadUDS = backend.ErrorManifestBadUDS
 
 // Validate enforces the closed-set Name, a non-empty Binary, and
 // (if set) a UDS path that points under /tmp/promptsheon/.

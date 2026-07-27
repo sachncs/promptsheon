@@ -18,6 +18,7 @@ import (
 
 	_ "modernc.org/sqlite" // sqlite driver
 
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/models"
 	"github.com/sachncs/promptsheon/backend/settings"
 )
@@ -26,8 +27,8 @@ import (
 var migrationsFS embed.FS
 
 // ErrNotFound is returned when a requested resource is not found.
-var ErrNotFound = errors.New("not found")
-var ErrConflict = errors.New("conflict")
+var ErrNotFound = backend.ErrorStoreNotFound
+var ErrConflict = backend.ErrorStoreConflict
 
 func marshalOrErr(v any) ([]byte, error) {
 	b, err := json.Marshal(v)

@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/capability"
 	"github.com/sachncs/promptsheon/backend/eventbus"
 	"github.com/sachncs/promptsheon/backend/replay"
@@ -38,7 +39,7 @@ type Caller func(ctx context.Context, req InvokeRequest) (InvokeResult, error)
 // distinguish "no provider configured" from "provider failed"
 // without reading the daemon log. RunRequest propagates it as a Go
 // error so the handler's errors.Is check fires (BUG-19).
-var ErrProviderMissing = errors.New("executor: provider missing")
+var ErrProviderMissing = backend.ErrorExecutorProviderMissing
 
 // InvokeRequest is the payload passed to Caller.
 type InvokeRequest struct {

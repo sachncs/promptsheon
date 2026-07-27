@@ -8,13 +8,14 @@ package release
 
 import (
 	"context"
-	"errors"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // ErrNotFound is returned by Repository implementations when a row is
 // missing. It is package-local so callers do not need to import a
 // storage-specific sentinel.
-var ErrNotFound = errors.New("release: not found")
+var ErrNotFound = backend.ErrorReleaseNotFound
 
 // Repository persists Release rows.
 type Repository interface {

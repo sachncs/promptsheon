@@ -9,8 +9,8 @@ package recommendation
 
 import (
 	"context"
-	"errors"
 
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/capability"
 )
 
@@ -26,4 +26,4 @@ type Repository interface {
 	ListDecisions(ctx context.Context) ([]*Decision, error)
 }
 
-var ErrNotFound = errors.New("recommendation: not found")
+var ErrNotFound = backend.ErrorRecommendationNotFound

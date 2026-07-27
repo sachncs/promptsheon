@@ -7,17 +7,18 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // ErrStopped is returned by Encrypt/Decrypt after Stop has been
 // called. The Vault retains no plaintext after Stop, so any
 // further use is fail-closed.
-var ErrStopped = errors.New("vault: stopped")
+var ErrStopped = backend.ErrorVaultStopped
 
 // Vault encrypts and decrypts data using AES-256-GCM.
 //

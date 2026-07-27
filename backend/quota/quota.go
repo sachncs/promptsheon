@@ -17,6 +17,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // Scope identifies what a Quota applies to.
@@ -51,11 +53,11 @@ type Quota struct {
 
 // ErrLimitNotPositive is returned when constructing a Quota with
 // a non-positive limit.
-var ErrLimitNotPositive = errors.New("quota: limit must be > 0")
+var ErrLimitNotPositive = backend.ErrorQuotaLimitNotPositive
 
 // ErrOverLimit is returned by Charge when the window's used
 // counter would exceed the limit.
-var ErrOverLimit = errors.New("quota: over limit")
+var ErrOverLimit = backend.ErrorQuotaOverLimit
 
 // New constructs a Quota at the start of the supplied window.
 func New(scope Scope, targetID string, window Window, limit int64, now time.Time, createdBy string) (Quota, error) {

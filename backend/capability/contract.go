@@ -1,8 +1,9 @@
 package capability
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // BlastRadius is the impact classification of a Capability.
@@ -31,13 +32,13 @@ func (b BlastRadius) Valid() bool {
 
 // ErrInvalidBlastRadius is returned by Contract.Validate when
 // the supplied BlastRadius is not in the closed set.
-var ErrInvalidBlastRadius = errors.New("capability: invalid blast radius")
+var ErrInvalidBlastRadius = backend.ErrorCapabilityInvalidBlastRadius
 
 // ErrEmptyContract is returned when a Capability has no
 // Contract. The contract-less state is preserved for back-
 // compat with v0.2.0 Capabilities that predate the Contract
 // primitive; new Capabilities SHOULD attach a Contract.
-var ErrEmptyContract = errors.New("capability: empty contract")
+var ErrEmptyContract = backend.ErrorCapabilityEmptyContract
 
 // CapabilityContract is the typed contract attached to a
 // Capability. A Capability with a contract declares what it

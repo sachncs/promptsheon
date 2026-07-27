@@ -15,6 +15,8 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // Scorer is the registered name of a built-in or user-supplied
@@ -181,7 +183,7 @@ func (JSONSchema) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 // the supplied schema uses only keywords outside the supported
 // subset. Callers should switch to a different scorer or add
 // one of the supported keywords to their schema.
-var ErrUnsupportedSchema = errors.New("json_schema: schema uses unsupported keywords")
+var ErrUnsupportedSchema = backend.ErrorEvalUnsupportedSchema
 
 // supportedSchemaKeywords is the closed set of JSON Schema keys
 // this scorer honours. Anything outside the set is rejected.

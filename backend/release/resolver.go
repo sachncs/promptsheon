@@ -11,10 +11,10 @@ package release
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/capability"
 )
 
@@ -71,7 +71,7 @@ type ResolvedInvocation struct {
 // release is not in the Active state. The only way to invoke a
 // release is via the active, approved, currently-serving
 // (release_id, environment) pair.
-var ErrReleaseNotActive = errors.New("release: not active")
+var ErrReleaseNotActive = backend.ErrorReleaseNotActive
 
 // ArtifactLoader fetches artifact bytes by content hash. The
 // Resolver does not own the storage; the caller passes a Loader

@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/models"
 )
 
@@ -35,7 +36,7 @@ type VaultStore interface {
 // real AWS KMS client; the only consumers allowed to use the
 // nil-client path are tests that explicitly inject a test double
 // via Config.AllowTestDouble.
-var ErrKMSClientRequired = errors.New("kmsbyok: KMSClient required (production); tests must set AllowTestDouble")
+var ErrKMSClientRequired = backend.ErrorVaultKMSClientRequired
 
 // Config is the per-deployment configuration. KeyID is the KMS
 // key ARN; Region is the AWS region for the SDK config; KMSClient

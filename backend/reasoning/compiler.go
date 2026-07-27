@@ -15,11 +15,12 @@ package reasoning
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // Intent is the user's high-level goal. The Compiler translates
@@ -85,11 +86,11 @@ type Step struct {
 
 // ErrNoMatch is returned by Compile when no CapabilityDescriptor
 // satisfies the Intent. Callers should map this to a 422.
-var ErrNoMatch = errors.New("reasoning: no capability matches intent")
+var ErrNoMatch = backend.ErrorReasoningNoMatch
 
 // ErrConstraintViolation is returned by Compile when the only
 // candidates exceed one of the Intent's Constraints.
-var ErrConstraintViolation = errors.New("reasoning: candidates violate constraints")
+var ErrConstraintViolation = backend.ErrorReasoningConstraintViolation
 
 // Compiler turns an Intent into a Plan. The Compiler is a
 // pure function: same input, same output, no side effects.
