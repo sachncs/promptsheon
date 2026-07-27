@@ -132,8 +132,8 @@ func TestExtractAPIKey(t *testing.T) {
 			case "malformed bearer header":
 				tt.req.Header.Set("Authorization", "Bearer ps_abc123")
 			}
-			if got := extractAPIKey(tt.req); got != tt.want {
-				t.Errorf("extractAPIKey() = %q, want %q", got, tt.want)
+			if got := ExtractAPIKey(tt.req); got != tt.want {
+				t.Errorf("ExtractAPIKey() = %q, want %q", got, tt.want)
 			}
 		})
 	}

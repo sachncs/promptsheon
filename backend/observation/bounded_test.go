@@ -8,13 +8,13 @@ import (
 )
 
 // TestAggregatorBoundedWindow verifies that adding more than
-// maxRecordsPerWindow records does not grow the in-memory
+// MaxRecordsPerWindow records does not grow the in-memory
 // window. The previous implementation appended unbounded and
 // leaked memory.
 func TestAggregatorBoundedWindow(t *testing.T) {
 	a := NewAggregator(nil)
 	now := time.Now()
-	for i := 0; i < maxRecordsPerWindow+1000; i++ {
+	for i := 0; i < MaxRecordsPerWindow+1000; i++ {
 		a.Add(executor.ExecutionRecord{
 			CapabilityID: "c1",
 			ReleaseID:    "r1",
@@ -23,12 +23,12 @@ func TestAggregatorBoundedWindow(t *testing.T) {
 		})
 	}
 	a.mu.Lock()
-	bucket := a.records[windowKey{CapabilityID: "c1", VersionID: "r1", Environment: "prod"}]
+	bucket := a.records[WindowKey{CapabilityID: "c1", VersionID: "r1", Environment: "prod"}]
 	a.mu.Unlock()
 	bucket.mu.Lock()
 	n := len(bucket.records)
 	bucket.mu.Unlock()
-	if n != maxRecordsPerWindow {
-		t.Fatalf("window size = %d want %d", n, maxRecordsPerWindow)
+	if n != MaxRecordsPerWindow {
+		t.Fatalf("window size = %d want %d", n, MaxRecordsPerWindow)
 	}
 }

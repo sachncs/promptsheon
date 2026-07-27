@@ -31,7 +31,7 @@ type selectionObserver interface {
 // lifecycle that production needs: load on init, observe on
 // outcome, persist on Flush.
 type Session struct {
-	store     *backend.Store
+	store     *Store
 	selector  *bandit.Selector
 	mu        sync.Mutex
 	loaded    bool
