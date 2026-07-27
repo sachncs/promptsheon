@@ -8,12 +8,12 @@
 package backend
 
 import (
-	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 
+	"github.com/sachncs/promptsheon/backend/errs"
 	"github.com/sachncs/promptsheon/backend/reasoning"
 )
 

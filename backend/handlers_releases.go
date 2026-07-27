@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/sachncs/promptsheon/backend/errs"
 	"github.com/sachncs/promptsheon/backend/approval"
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/capability"
