@@ -25,7 +25,7 @@ trap 'rm -f "$LOG" "$DB" "$DB-shm" "$DB-wal"; kill $DAEMON_PID 2>/dev/null || tr
 # Build the daemon if missing.
 if [[ ! -x ./promptsheond ]]; then
   echo "smoke: building promptsheond..."
-  go build -o ./promptsheond ./cmd/promptsheond
+  go build -o ./promptsheond .
 fi
 
 # Boot in the background. The daemon's config.Validate() refuses

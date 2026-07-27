@@ -19,7 +19,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Extract every (method, path) pair registered in server.go.
-grep -oE '"[A-Z]+ /[^"]+"' internal/api/server.go | tr -d '"' | sort -u > /tmp/_openapi_routes.txt
+grep -oE '"[A-Z]+ /[^"]+"' backend/api/server.go | tr -d '"' | sort -u > /tmp/_openapi_routes.txt
 
 # Extract every path already in the spec.
 grep -E "^  /" api/openapi.yaml | tr -d ' ' | tr -d ':' | sort -u > /tmp/_openapi_existing.txt

@@ -101,7 +101,7 @@ jobs:
           cache: true
 
       - name: Build daemon
-        run: go build -o promptsheond ./cmd/promptsheond
+        run: go build -o promptsheond .
 
       - name: Install k6
         run: |

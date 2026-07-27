@@ -10,22 +10,22 @@ check_profile() {
       statements = $(NF-1)
       covered = ($NF > 0 ? statements : 0)
       package = ""
-      if (file ~ /\/internal\/api\//) package = "internal/api"
-      else if (file ~ /\/internal\/store\//) package = "internal/store"
-      else if (file ~ /\/internal\//) {
-        split(file, parts, "/internal/")
+      if (file ~ /\/backend\/api\//) package = "backend/api"
+      else if (file ~ /\/backend\/store\//) package = "backend/store"
+      else if (file ~ /\/backend\//) {
+        split(file, parts, "/backend/")
         split(parts[2], name, "/")
         package = name[1]
       }
-      if (package == "internal/api" || package == "internal/store") {
+      if (package == "backend/api" || package == "backend/store") {
         total[package] += statements
         hit[package] += covered
       }
-      if (file ~ /\/internal\/api\/handlers_[^\/]*\.go$/) {
+      if (file ~ /\/backend\/api\/handlers_[^\/]*\.go$/) {
         total["api handlers"] += statements
         hit["api handlers"] += covered
       }
-      if (package != "internal/api" && package != "internal/store" && package != "") {
+      if (package != "backend/api" && package != "backend/store" && package != "") {
         wanted = " " package " "
         if (index(" " domain_packages " ", wanted)) {
           total[package] += statements
@@ -36,13 +36,13 @@ check_profile() {
     END {
       failed = 0
       for (package in total) {
-        floor = (package == "api handlers" ? 60 : (package == "internal/api" || package == "internal/store" ? 40 : 50))
+        floor = (package == "api handlers" ? 60 : (package == "backend/api" || package == "backend/store" ? 40 : 50))
         pct = 100 * hit[package] / total[package]
         printf "%s: %.2f%% (%d/%d statements, floor %d%%)\n", (pct >= floor ? "OK" : "FAIL"), pct, hit[package], total[package], floor
         if (pct < floor) failed = 1
       }
       for (i = 1; i <= 2; i++) {
-        package = (i == 1 ? "internal/api" : "internal/store")
+        package = (i == 1 ? "backend/api" : "backend/store")
         if (total[package] == 0) {
           printf "FAIL: %s has no statements\n", package > "/dev/stderr"
           failed = 1
@@ -63,13 +63,13 @@ if [[ "${1:-}" == "--self-test" ]]; then
   trap 'rm -f "$weak" "$pass"' EXIT
   cat >"$weak" <<'EOF'
 mode: atomic
-github.com/sachncs/promptsheon/internal/release/release.go:1.1,2.1 5 1
-github.com/sachncs/promptsheon/internal/release/release.go:3.1,4.1 15 0
-github.com/sachncs/promptsheon/internal/optimizer/optimizer.go:1.1,2.1 10 1
-github.com/sachncs/promptsheon/internal/optimizer/optimizer.go:3.1,4.1 10 1
-github.com/sachncs/promptsheon/internal/api/server.go:1.1,2.1 10 1
-github.com/sachncs/promptsheon/internal/store/sqlite.go:1.1,2.1 10 1
-github.com/sachncs/promptsheon/internal/api/handlers_health.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/backend/release/release.go:1.1,2.1 5 1
+github.com/sachncs/promptsheon/backend/release/release.go:3.1,4.1 15 0
+github.com/sachncs/promptsheon/backend/optimizer/optimizer.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/backend/optimizer/optimizer.go:3.1,4.1 10 1
+github.com/sachncs/promptsheon/backend/api/server.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/backend/store/sqlite.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/backend/api/handlers_health.go:1.1,2.1 10 1
 EOF
   if check_profile "$weak" >/dev/null 2>&1; then
     printf 'coverage self-test failed: weak package was hidden\n' >&2
@@ -77,11 +77,11 @@ EOF
   fi
   cat >"$pass" <<'EOF'
 mode: atomic
-github.com/sachncs/promptsheon/internal/release/release.go:1.1,2.1 10 1
-github.com/sachncs/promptsheon/internal/optimizer/optimizer.go:1.1,2.1 10 1
-github.com/sachncs/promptsheon/internal/api/server.go:1.1,2.1 10 1
-github.com/sachncs/promptsheon/internal/store/sqlite.go:1.1,2.1 10 1
-github.com/sachncs/promptsheon/internal/api/handlers_health.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/backend/release/release.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/backend/optimizer/optimizer.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/backend/api/server.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/backend/store/sqlite.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/backend/api/handlers_health.go:1.1,2.1 10 1
 EOF
   check_profile "$pass" >/dev/null
   printf 'ok: coverage profile parser self-test\n'
