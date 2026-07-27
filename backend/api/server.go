@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/alerting"
-	"github.com/sachncs/promptsheon/backend/api/handlers"
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/capability"
 
@@ -37,7 +36,7 @@ import (
 )
 
 // Func is the handler signature that returns errors for centralized handling.
-type Func = handlers.Func
+type Func func(http.ResponseWriter, *http.Request) error
 
 // Server holds dependencies and routes for the HTTP API.
 type Server struct {

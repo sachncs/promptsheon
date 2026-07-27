@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/sachncs/promptsheon/backend/api/handlers"
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/ratelimit"
 	"github.com/sachncs/promptsheon/backend/store"
@@ -51,9 +50,16 @@ func (s *Server) wrapHandler(fn Func) http.HandlerFunc {
 	}
 }
 
+// JSON writes a JSON response with the given status code.
+func JSON(w http.ResponseWriter, status int, value any) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	return json.NewEncoder(w).Encode(value)
+}
+
 // writeJSON writes a JSON response with the given status code.
 func writeJSON(w http.ResponseWriter, status int, data any) {
-	if err := handlers.JSON(w, status, data); err != nil {
+	if err := JSON(w, status, data); err != nil {
 		slog.Error("failed to encode json response", "err", err)
 	}
 }
