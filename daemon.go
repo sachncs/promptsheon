@@ -30,7 +30,6 @@ import (
 	"github.com/sachncs/promptsheon/backend/alerting"
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/capability"
-	contextpkg "github.com/sachncs/promptsheon/backend/context"
 	"github.com/sachncs/promptsheon/backend/election"
 	"github.com/sachncs/promptsheon/backend/eval"
 	"github.com/sachncs/promptsheon/backend/eventbus"
@@ -395,7 +394,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 
 	_ = logHub
 
-	contextMgr := contextpkg.NewManager()
+	contextMgr := backend.NewManager()
 	usageTracker := backend.NewUsageTracker()
 	guardrailManager := guardrail.NewManager(logger, collector)
 	alertingManager := alerting.NewManagerWithDB(logger, collector, db)

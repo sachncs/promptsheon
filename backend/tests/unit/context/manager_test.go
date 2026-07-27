@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	px "github.com/sachncs/promptsheon/backend/context"
+	px "github.com/sachncs/promptsheon/backend"
 )
 
 func TestDefaultTokenEstimate(t *testing.T) {

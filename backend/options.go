@@ -3,7 +3,6 @@ package backend
 import (
 	"github.com/sachncs/promptsheon/backend/alerting"
 	"github.com/sachncs/promptsheon/backend/auth"
-	contextpkg "github.com/sachncs/promptsheon/backend/context"
 	"github.com/sachncs/promptsheon/backend/election"
 	"github.com/sachncs/promptsheon/backend/guardrail"
 	"github.com/sachncs/promptsheon/backend/harness"
@@ -137,7 +136,7 @@ func WithAlertingManager(m *alerting.Manager) Option {
 }
 
 // WithContextManager sets the context manager for context assembly.
-func WithContextManager(m *contextpkg.Manager) Option {
+func WithContextManager(m *Manager) Option {
 	return func(s *Server) {
 		s.contextManager = m
 	}

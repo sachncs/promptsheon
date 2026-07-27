@@ -1,6 +1,8 @@
-// Package context provides context management for LLM prompts.
-package context
+package backend
 
+// Flattened from backend/context/manager.go (renamed to avoid stdlib collision).
+
+// Package context provides context management for LLM prompts.
 import (
 	"github.com/sachncs/promptsheon/backend/errs"
 	"errors"
