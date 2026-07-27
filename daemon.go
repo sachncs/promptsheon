@@ -321,7 +321,7 @@ func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
 	// ships in a follow-up release. The env var is detected so
 	// operators see the gap immediately, not silently.
 	if pgURL := os.Getenv("PROMPTSHEON_DATABASE_URL"); strings.HasPrefix(pgURL, "postgres://") {
-		logger.Warn("PROMPTSHEON_DATABASE_URL=postgres:// detected but pgx wiring is not yet enabled; falling back to SQLite at " + cfg.DBPath + ". The internal/store/postgres schema + RLS migrations are ready; pgx wiring ships in a follow-up release.")
+		logger.Warn("PROMPTSHEON_DATABASE_URL=postgres:// detected but pgx wiring is not yet enabled; falling back to SQLite at " + cfg.DBPath + ".")
 	}
 	db, err := store.NewSQLite(cfg.DBPath)
 	if err != nil {
