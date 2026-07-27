@@ -134,7 +134,7 @@ async function smoke(key) {
 
   await pageAssert(page, "Promptsheon", "Overview");
   await go(page, "/capabilities");
-  await pageAssert(page, "Workspace catalog", "Capabilities nav");
+  await pageAssert(page, "Catalog", "Capabilities nav");
   await pageAssert(page, "Smoke cap", "Capabilities seed");
 
   await go(page, "/releases");
