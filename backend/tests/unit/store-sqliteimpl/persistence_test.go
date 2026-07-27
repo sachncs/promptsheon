@@ -1,6 +1,7 @@
-package sqliteimpl
+package sqliteimpl_test
 
 import (
+	. "github.com/sachncs/promptsheon/backend/store/sqliteimpl"
 	"context"
 	"testing"
 	"time"

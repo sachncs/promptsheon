@@ -1,6 +1,7 @@
-package eval
+package eval_test
 
 import (
+	. "github.com/sachncs/promptsheon/backend/eval"
 	"encoding/json"
 	"errors"
 	"strings"
