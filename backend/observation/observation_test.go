@@ -4,11 +4,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sachncs/promptsheon/backend/executor"
 )
 
-func mk(cap, version, env string, status string, latencyMS int64, costUSD float64) backend.ExecutionRecord {
+func mk(cap, version, env string, status string, latencyMS int64, costUSD float64) executor.ExecutionRecord {
 	now := time.Now().UTC()
-	return backend.ExecutionRecord{
+	return executor.ExecutionRecord{
 		ID:           "exec-" + cap + "-" + version + "-" + env,
 		CapabilityID: cap,
 		ReleaseID:    version,
@@ -89,7 +90,7 @@ func TestAggregatorP95IsRealQuantile(t *testing.T) {
 
 func TestAggregatorHallucinationRate(t *testing.T) {
 	t.Parallel()
-	halluF := func(r backend.ExecutionRecord) bool {
+	halluF := func(r executor.ExecutionRecord) bool {
 		return r.Status == "hallucination"
 	}
 	a := NewAggregator(halluF)

@@ -8,7 +8,10 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/eventbus"
+	"github.com/sachncs/promptsheon/backend/executor"
 	"github.com/sachncs/promptsheon/backend/observation"
+	"github.com/sachncs/promptsheon/backend/rules"
 )
 
 func TestProducerEmitsOnQuietObservation(t *testing.T) {
@@ -106,7 +109,7 @@ type fakeBus struct {
 	events []capability.Event
 }
 
-func (f *fakeBus) Subscribe(_ backend.Handler, _ ...capability.EventType) (backend.Subscription, error) {
+func (f *fakeBus) Subscribe(_ eventbus.Handler, _ ...capability.EventType) (eventbus.Subscription, error) {
 	return nil, nil
 }
 
@@ -122,8 +125,8 @@ func (f *fakeBus) count() int {
 	return len(f.events)
 }
 
-func recWithCost(avgMicroUSD int64) (r backend.ExecutionRecord) {
-	return backend.ExecutionRecord{
+func recWithCost(avgMicroUSD int64) (r executor.ExecutionRecord) {
+	return executor.ExecutionRecord{
 		ID:           "exec-1",
 		CapabilityID: "cap-1",
 		ReleaseID:    "rel-1",

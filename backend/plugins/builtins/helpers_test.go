@@ -4,10 +4,11 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/sachncs/promptsheon/backend/supervisor"
 )
 
 // supervisorForTest returns a Supervisor wired to a no-op logger.
 // Tests in this package use it as a constructor.
-func supervisorForTest() *backend.Supervisor {
-	return backend.New(nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+func supervisorForTest() *supervisor.Supervisor {
+	return supervisor.New(nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
