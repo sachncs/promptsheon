@@ -17,6 +17,7 @@
 package policy
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -316,4 +317,10 @@ func (b Bundle) EvaluateExecution(in ExecutionPolicyInput) Decision {
 		}
 	}
 	return Allow("policy.Bundle", "")
+}
+// Repository persists Policy bundles per Workspace.
+type Repository interface {
+	GetBundle(ctx context.Context, workspaceID string) (*Bundle, error)
+	PutBundle(ctx context.Context, workspaceID string, b *Bundle) error
+	DeleteBundle(ctx context.Context, workspaceID string) error
 }

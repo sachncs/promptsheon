@@ -9,6 +9,7 @@
 package lineage
 
 import (
+	"context"
 	"github.com/sachncs/promptsheon/backend/errs"
 	"errors"
 	"fmt"
@@ -175,4 +176,10 @@ func (g Graph) Validate() error {
 		seen[key] = struct{}{}
 	}
 	return nil
+}
+
+// Repository persists a Lineage Graph for each Capability.
+type Repository interface {
+	GetGraph(ctx context.Context, capabilityID string) (*Graph, error)
+	PutGraph(ctx context.Context, g *Graph) error
 }
