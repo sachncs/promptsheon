@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/approval"
-	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/backend/approval"
+	"github.com/sachncs/promptsheon/backend/capability"
 )
 
 // Status is the lifecycle state of a Release.

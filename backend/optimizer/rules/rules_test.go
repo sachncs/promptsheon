@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/backend/capability"
 )
 
 func baseObs() Observation {

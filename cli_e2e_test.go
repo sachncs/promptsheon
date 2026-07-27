@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	promptsheoncas "github.com/sachncs/promptsheon/pkg/cas"
+	promptsheoncas "github.com/sachncs/promptsheon/backend/cas"
 )
 
 var cliBinary string
@@ -100,7 +100,7 @@ func setupE2ERepo(t *testing.T) string {
 	return dir
 }
 
-func runCLI(t *testing.T, dir string, args ...string) string {
+func execCLI(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command(cliBinary, args...)
 	cmd.Dir = dir
@@ -113,7 +113,7 @@ func runCLI(t *testing.T, dir string, args ...string) string {
 
 func TestE2EStatus(t *testing.T) {
 	dir := setupE2ERepo(t)
-	out := runCLI(t, dir, "status")
+	out := execCLI(t, dir, "status")
 	if !strings.Contains(out, "on branch main") {
 		t.Fatalf("expected 'on branch main', got:\n%s", out)
 	}
@@ -124,7 +124,7 @@ func TestE2EStatus(t *testing.T) {
 
 func TestE2EStats(t *testing.T) {
 	dir := setupE2ERepo(t)
-	out := runCLI(t, dir, "stats")
+	out := execCLI(t, dir, "stats")
 	if !strings.Contains(out, "blobs:") {
 		t.Fatalf("expected stats output, got:\n%s", out)
 	}
@@ -135,7 +135,7 @@ func TestE2EStats(t *testing.T) {
 
 func TestE2EVerify(t *testing.T) {
 	dir := setupE2ERepo(t)
-	out := runCLI(t, dir, "verify")
+	out := execCLI(t, dir, "verify")
 	if !strings.Contains(out, "repository is healthy") {
 		t.Fatalf("expected healthy repo, got:\n%s", out)
 	}
@@ -143,7 +143,7 @@ func TestE2EVerify(t *testing.T) {
 
 func TestE2EGraph(t *testing.T) {
 	dir := setupE2ERepo(t)
-	out := runCLI(t, dir, "graph")
+	out := execCLI(t, dir, "graph")
 	if !strings.Contains(out, "Initial agent") {
 		t.Fatalf("expected commits in graph output, got:\n%s", out)
 	}
@@ -161,7 +161,7 @@ func TestE2EShowBlob(t *testing.T) {
 		t.Fatalf("ObjectHash: %v", err)
 	}
 
-	out := runCLI(t, dir, "show", hash)
+	out := execCLI(t, dir, "show", hash)
 	if !strings.Contains(out, "blob") {
 		t.Fatalf("expected 'blob' in show output, got:\n%s", out)
 	}
@@ -179,7 +179,7 @@ func TestE2ECatFile(t *testing.T) {
 		t.Fatalf("WriteObject(): %v", err)
 	}
 
-	out := runCLI(t, dir, "cat-file", hash)
+	out := execCLI(t, dir, "cat-file", hash)
 	if !strings.Contains(out, "test content for cat-file") {
 		t.Fatalf("expected content output, got:\n%s", out)
 	}
@@ -197,7 +197,7 @@ func TestE2ELsTree(t *testing.T) {
 		t.Fatalf("ReadObject(): %v", err)
 	}
 
-	out := runCLI(t, dir, "ls-tree", commitObj.TreeHash)
+	out := execCLI(t, dir, "ls-tree", commitObj.TreeHash)
 	if !strings.Contains(out, "system-prompt") {
 		t.Fatalf("expected tree entries, got:\n%s", out)
 	}
@@ -214,7 +214,7 @@ func TestE2EShowCommit(t *testing.T) {
 		t.Fatalf("GetCurrentCommitHash(): %v", err)
 	}
 
-	out := runCLI(t, dir, "show", hash)
+	out := execCLI(t, dir, "show", hash)
 	if !strings.Contains(out, "commit") {
 		t.Fatalf("expected 'commit' in output, got:\n%s", out)
 	}
@@ -231,7 +231,7 @@ func TestE2EShowCommit(t *testing.T) {
 
 func TestE2EBranchList(t *testing.T) {
 	dir := setupE2ERepo(t)
-	out := runCLI(t, dir, "branch")
+	out := execCLI(t, dir, "branch")
 	if !strings.Contains(out, "main") {
 		t.Fatalf("expected main branch, got:\n%s", out)
 	}
@@ -242,7 +242,7 @@ func TestE2EBranchList(t *testing.T) {
 
 func TestE2ELog(t *testing.T) {
 	dir := setupE2ERepo(t)
-	out := runCLI(t, dir, "log", "5")
+	out := execCLI(t, dir, "log", "5")
 	if !strings.Contains(out, "Initial agent") {
 		t.Fatalf("expected commit in log, got:\n%s", out)
 	}
@@ -256,7 +256,7 @@ func TestE2EDiff(t *testing.T) {
 	hash2, _ := promptsheoncas.GetCurrentCommitHash()
 	_ = promptsheoncas.Checkout("main")
 
-	out := runCLI(t, dir, "diff", hash1, hash2)
+	out := execCLI(t, dir, "diff", hash1, hash2)
 	if !strings.Contains(out, "Diff") {
 		t.Fatalf("expected diff output, got:\n%s", out)
 	}
@@ -264,7 +264,7 @@ func TestE2EDiff(t *testing.T) {
 
 func TestE2EHashObject(t *testing.T) {
 	dir := setupE2ERepo(t)
-	out := runCLI(t, dir, "hash-object", "test data")
+	out := execCLI(t, dir, "hash-object", "test data")
 	out = strings.TrimSpace(out)
 	if len(out) != 64 {
 		t.Fatalf("expected 64-char hash, got %q (len=%d)", out, len(out))
@@ -273,13 +273,13 @@ func TestE2EHashObject(t *testing.T) {
 
 func TestE2EWriteReadObject(t *testing.T) {
 	dir := setupE2ERepo(t)
-	hashOut := runCLI(t, dir, "write-object", "round trip test")
+	hashOut := execCLI(t, dir, "write-object", "round trip test")
 	hash := strings.TrimSpace(hashOut)
 	if len(hash) != 64 {
 		t.Fatalf("expected 64-char hash, got %q", hash)
 	}
 
-	readOut := runCLI(t, dir, "read-object", hash)
+	readOut := execCLI(t, dir, "read-object", hash)
 	if !strings.Contains(readOut, "round trip test") {
 		t.Fatalf("expected content in read output, got:\n%s", readOut)
 	}
@@ -287,7 +287,7 @@ func TestE2EWriteReadObject(t *testing.T) {
 
 func TestE2EHelp(t *testing.T) {
 	dir := setupE2ERepo(t)
-	out := runCLI(t, dir, "help")
+	out := execCLI(t, dir, "help")
 	if !strings.Contains(out, "status") {
 		t.Fatalf("expected status in help, got:\n%s", out)
 	}
@@ -326,7 +326,7 @@ func TestE2EInitError(t *testing.T) {
 
 func TestE2EGraphOutputFormat(t *testing.T) {
 	dir := setupE2ERepo(t)
-	out := runCLI(t, dir, "graph")
+	out := execCLI(t, dir, "graph")
 
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	if len(lines) == 0 {
@@ -376,7 +376,7 @@ func TestE2EUninitializedCommand(t *testing.T) {
 
 func TestE2EHelpNoDemo(t *testing.T) {
 	dir := setupE2ERepo(t)
-	out := runCLI(t, dir, "help")
+	out := execCLI(t, dir, "help")
 	if strings.Contains(out, "demo") {
 		t.Fatal("demo command should not appear in help")
 	}

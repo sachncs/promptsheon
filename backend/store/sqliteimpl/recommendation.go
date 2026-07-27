@@ -7,8 +7,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/recommendation"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/recommendation"
 )
 
 type RecommendationRepository struct{ db *sql.DB }

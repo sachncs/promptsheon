@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/sachncs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/backend/models"
 )
 
 // VaultStore is the minimal persistence surface the Provider needs

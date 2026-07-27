@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/api/handlers"
+	"github.com/sachncs/promptsheon/backend/api/handlers"
 )
 
 func TestJSON_SetsContentType(t *testing.T) {

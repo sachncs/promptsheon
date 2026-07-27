@@ -24,8 +24,8 @@ import (
 
 	_ "modernc.org/sqlite" // sqlite driver
 
-	"github.com/sachncs/promptsheon/internal/eventbus"
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/eventbus"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 // DiscardLogger returns a *slog.Logger that writes to io.Discard.

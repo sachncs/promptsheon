@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/executor"
+	"github.com/sachncs/promptsheon/backend/executor"
 )
 
 func mk(cap, version, env string, status string, latencyMS int64, costUSD float64) executor.ExecutionRecord {

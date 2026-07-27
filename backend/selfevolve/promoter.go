@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/backend/capability"
 )
 
 // Promoter turns a validated candidate prompt into an

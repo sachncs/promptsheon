@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/harness"
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/harness"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 // fakeRepo is an in-memory implementation of the evolver's

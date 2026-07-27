@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	promptsheoncas "github.com/sachncs/promptsheon/pkg/cas"
+	promptsheoncas "github.com/sachncs/promptsheon/backend/cas"
 )
 
 func cmdInit() error {

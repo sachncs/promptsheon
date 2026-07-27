@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/llm"
+	"github.com/sachncs/promptsheon/backend/llm"
 )
 
 const keyProvider = "provider"

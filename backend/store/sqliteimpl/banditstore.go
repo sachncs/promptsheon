@@ -12,7 +12,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sachncs/promptsheon/internal/bandit"
+	"github.com/sachncs/promptsheon/backend/bandit"
 )
 
 // BanditStore implements banditstore.Backend against SQLite.

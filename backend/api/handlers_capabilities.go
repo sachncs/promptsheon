@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/executor"
-	"github.com/sachncs/promptsheon/internal/invoke"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/executor"
+	"github.com/sachncs/promptsheon/backend/invoke"
 )
 
 // computeManifestHash returns the canonical SHA-256 hex of a Manifest

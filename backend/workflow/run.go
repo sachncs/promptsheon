@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/metrics"
+	"github.com/sachncs/promptsheon/backend/metrics"
 )
 
 // Step is one node in a workflow DAG. The Engine runs steps in

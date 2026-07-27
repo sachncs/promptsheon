@@ -19,8 +19,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/buildinfo"
-	"github.com/sachncs/promptsheon/internal/llm"
+	"github.com/sachncs/promptsheon/backend/buildinfo"
+	"github.com/sachncs/promptsheon/backend/llm"
 )
 
 // Shared subcommand names. The CAS file and the API CRUD files each

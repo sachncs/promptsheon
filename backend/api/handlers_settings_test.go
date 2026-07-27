@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/settings"
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/settings"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 // settingsTestServer builds a Server backed by a real

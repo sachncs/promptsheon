@@ -18,8 +18,8 @@ import (
 
 	_ "modernc.org/sqlite" // sqlite driver
 
-	"github.com/sachncs/promptsheon/internal/models"
-	"github.com/sachncs/promptsheon/internal/settings"
+	"github.com/sachncs/promptsheon/backend/models"
+	"github.com/sachncs/promptsheon/backend/settings"
 )
 
 //go:embed migrations/*.sql

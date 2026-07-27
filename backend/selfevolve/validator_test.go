@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/eval"
-	"github.com/sachncs/promptsheon/internal/harness"
+	"github.com/sachncs/promptsheon/backend/eval"
+	"github.com/sachncs/promptsheon/backend/harness"
 )
 
 func validatorCases() []harness.DatasetCase {

@@ -36,7 +36,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/supervisor"
+	"github.com/sachncs/promptsheon/backend/supervisor"
 )
 
 // Binary is the per-entry runtime state. The supervisor owns one

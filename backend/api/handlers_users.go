@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/auth"
-	"github.com/sachncs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/backend/auth"
+	"github.com/sachncs/promptsheon/backend/models"
 )
 
 const roleReader = "reader"

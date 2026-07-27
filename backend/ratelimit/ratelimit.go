@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/auth"
+	"github.com/sachncs/promptsheon/backend/auth"
 )
 
 // trustedProxies is the set of CIDRs that may set X-Forwarded-For

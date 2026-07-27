@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/api/server"
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/api/server"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 func TestMain(m *testing.M) {

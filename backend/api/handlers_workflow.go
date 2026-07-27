@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/sachncs/promptsheon/internal/workflow"
+	"github.com/sachncs/promptsheon/backend/workflow"
 )
 
 // handleRunWorkflow accepts a workflow Definition and runs it

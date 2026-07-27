@@ -26,7 +26,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sachncs/promptsheon/internal/recommendation"
+	"github.com/sachncs/promptsheon/backend/recommendation"
 )
 
 // Redactor is the pre/post PII Guardrail. It is concurrency-safe:

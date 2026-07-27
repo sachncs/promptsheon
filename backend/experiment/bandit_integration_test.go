@@ -3,7 +3,7 @@ package experiment
 import (
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/bandit"
+	"github.com/sachncs/promptsheon/backend/bandit"
 )
 
 // TestEngineSelectsWithBandit exercises the bandit selector

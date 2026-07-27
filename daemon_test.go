@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/config"
-	"github.com/sachncs/promptsheon/internal/models"
-	"github.com/sachncs/promptsheon/internal/store"
-	"github.com/sachncs/promptsheon/internal/webhook"
-	"github.com/sachncs/promptsheon/pkg/cas"
+	"github.com/sachncs/promptsheon/backend/config"
+	"github.com/sachncs/promptsheon/backend/models"
+	"github.com/sachncs/promptsheon/backend/store"
+	"github.com/sachncs/promptsheon/backend/webhook"
+	"github.com/sachncs/promptsheon/backend/cas"
 )
 
 func init() {
@@ -814,29 +814,29 @@ func TestMain_WithVaultKey(t *testing.T) {
 // called StopAuditWorkers on HTTP error, leaking in-flight audit
 // entries on a clean shutdown.
 func TestMain_AuditDrainOnEveryShutdown(t *testing.T) {
-	src, err := os.ReadFile("main.go")
+	src, err := os.ReadFile("daemon.go")
 	if err != nil {
-		t.Fatalf("read main.go: %v", err)
+		t.Fatalf("read daemon.go: %v", err)
 	}
 	contents := string(src)
 	if !strings.Contains(contents, "srv.StopAuditWorkers(") {
-		t.Fatal("main.go must call srv.StopAuditWorkers(...) on the shutdown path")
+		t.Fatal("daemon.go must call srv.StopAuditWorkers(...) on the shutdown path")
 	}
 	// The canonical drain call site must exist.
 	if !strings.Contains(contents, "srv.StopAuditWorkers(auditDrainCtx)") {
-		t.Fatal("main.go must drain via srv.StopAuditWorkers(auditDrainCtx)")
+		t.Fatal("daemon.go must drain via srv.StopAuditWorkers(auditDrainCtx)")
 	}
 }
 
 // TestMain_RecommendationLoopWired pins LOOP-1: the production
-// main.go must wire the recommendation loop end-to-end:
+// daemon.go must wire the recommendation loop end-to-end:
 // (a) the producer subscribes to EventExecutionFinished,
 // (b) a periodic tick calls producer.Tick, and
 // (c) recommendations are persisted via a SQLite-backed sink.
 func TestMain_RecommendationLoopWired(t *testing.T) {
-	src, err := os.ReadFile("main.go")
+	src, err := os.ReadFile("daemon.go")
 	if err != nil {
-		t.Fatalf("read main.go: %v", err)
+		t.Fatalf("read daemon.go: %v", err)
 	}
 	contents := string(src)
 	required := []string{
@@ -848,20 +848,20 @@ func TestMain_RecommendationLoopWired(t *testing.T) {
 	}
 	for _, fragment := range required {
 		if !strings.Contains(contents, fragment) {
-			t.Errorf("main.go must contain %q for the recommendation loop to be live", fragment)
+			t.Errorf("daemon.go must contain %q for the recommendation loop to be live", fragment)
 		}
 	}
 }
 
 // TestMain_HubStopBeforeDBClose pins OBS-LOG-3: the deferred
 // order in runDaemon() must close the SSE log hub BEFORE the database.
-// Defers run LIFO; the test reads main.go and asserts that the
+// Defers run LIFO; the test reads daemon.go and asserts that the
 // `defer db.Close()` is registered before `defer logHub.Stop()`
 // so the hub's persist-nextID call still has a live DB.
 func TestMain_HubStopBeforeDBClose(t *testing.T) {
-	src, err := os.ReadFile("main.go")
+	src, err := os.ReadFile("daemon.go")
 	if err != nil {
-		t.Fatalf("read main.go: %v", err)
+		t.Fatalf("read daemon.go: %v", err)
 	}
 	contents := string(src)
 	dbIdx := strings.Index(contents, "defer func() {\n\t\tif db != nil {\n\t\t\t_ = db.Close()\n\t\t}\n\t}()")
@@ -869,34 +869,34 @@ func TestMain_HubStopBeforeDBClose(t *testing.T) {
 		dbIdx = strings.Index(contents, "defer func()")
 	}
 	if dbIdx < 0 {
-		t.Fatal("could not locate defer db.Close() in main.go")
+		t.Fatal("could not locate defer db.Close() in daemon.go")
 	}
 	hubIdx := strings.Index(contents, "defer logHub.Stop()")
 	if hubIdx < 0 {
-		t.Fatal("could not locate defer logHub.Stop() in main.go")
+		t.Fatal("could not locate defer logHub.Stop() in daemon.go")
 	}
 	if hubIdx < dbIdx {
 		t.Errorf("defer logHub.Stop() at %d is registered before defer db.Close() at %d; LIFO order would close DB first and lose the nextID persist", hubIdx, dbIdx)
 	}
 }
 
-// TestMain_WiresReleaseResolver pins QW#3: the production main.go
+// TestMain_WiresReleaseResolver pins QW#3: the production daemon.go
 // must call WithReleaseResolver so the live release invoke path
 // uses the manifest's Model + Provider, not request-supplied
 // defaults. The previous "default / default" bypass path was
 // shipped silently; this test fails if either the call site or
 // the option disappears.
 func TestMain_WiresReleaseResolver(t *testing.T) {
-	src, err := os.ReadFile("main.go")
+	src, err := os.ReadFile("daemon.go")
 	if err != nil {
-		t.Fatalf("read main.go: %v", err)
+		t.Fatalf("read daemon.go: %v", err)
 	}
 	contents := string(src)
 	if !strings.Contains(contents, "WithReleaseResolver(resolver)") {
-		t.Error("main.go must call api.WithReleaseResolver(resolver) so live /releases/{id}/invoke uses the manifest plan")
+		t.Error("daemon.go must call api.WithReleaseResolver(resolver) so live /releases/{id}/invoke uses the manifest plan")
 	}
 	if !strings.Contains(contents, "release.NewResolver(") {
-		t.Error("main.go must construct release.NewResolver(...) so the live path closes the gap between approved release and actual invocation")
+		t.Error("daemon.go must construct release.NewResolver(...) so the live path closes the gap between approved release and actual invocation")
 	}
 }
 

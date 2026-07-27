@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/budget"
-	"github.com/sachncs/promptsheon/internal/executor"
-	"github.com/sachncs/promptsheon/internal/observation"
-	"github.com/sachncs/promptsheon/internal/quota"
+	"github.com/sachncs/promptsheon/backend/budget"
+	"github.com/sachncs/promptsheon/backend/executor"
+	"github.com/sachncs/promptsheon/backend/observation"
+	"github.com/sachncs/promptsheon/backend/quota"
 )
 
 func TestInvokeHappyPath(t *testing.T) {

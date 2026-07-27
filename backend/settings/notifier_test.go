@@ -11,7 +11,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/vault"
+	"github.com/sachncs/promptsheon/backend/vault"
 )
 
 func TestNotifier_PublishReturnsSubscriberError(t *testing.T) {

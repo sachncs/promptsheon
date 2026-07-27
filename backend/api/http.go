@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/sachncs/promptsheon/internal/api/handlers"
-	"github.com/sachncs/promptsheon/internal/auth"
-	"github.com/sachncs/promptsheon/internal/ratelimit"
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/api/handlers"
+	"github.com/sachncs/promptsheon/backend/auth"
+	"github.com/sachncs/promptsheon/backend/ratelimit"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 // requirePerm returns middleware that requires a specific permission.

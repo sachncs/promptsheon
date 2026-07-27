@@ -10,7 +10,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"github.com/sachncs/promptsheon/internal/rollups"
+	"github.com/sachncs/promptsheon/backend/rollups"
 )
 
 // clickhouseDSN returns the integration DSN or skips the test.

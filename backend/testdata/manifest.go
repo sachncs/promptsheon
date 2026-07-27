@@ -4,7 +4,7 @@
 // it without dragging in the storage layer or other dependencies.
 package testdata
 
-import "github.com/sachncs/promptsheon/internal/capability"
+import "github.com/sachncs/promptsheon/backend/capability"
 
 // SampleManifestHash is a 32-byte (64 hex) SHA-256 placeholder used
 // by test fixtures. Callers should use NewManifest to build a manifest

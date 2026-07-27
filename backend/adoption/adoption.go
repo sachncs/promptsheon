@@ -13,7 +13,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/backend/capability"
 )
 
 // Record is one adoption event: a Recommendation that was

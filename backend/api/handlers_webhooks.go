@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/webhook"
+	"github.com/sachncs/promptsheon/backend/webhook"
 )
 
 func (s *Server) handleListWebhooks(w http.ResponseWriter, _ *http.Request) error {

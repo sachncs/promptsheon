@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 // RetentionPolicy defines TTL for different log types.

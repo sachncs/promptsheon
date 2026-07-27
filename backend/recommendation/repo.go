@@ -11,7 +11,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/backend/capability"
 )
 
 // Repository persists Recommendations and their Decisions.

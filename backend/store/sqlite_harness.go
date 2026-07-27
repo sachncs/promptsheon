@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/harness"
+	"github.com/sachncs/promptsheon/backend/harness"
 )
 
 // ---------------------------------------------------------------------------

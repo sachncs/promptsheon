@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/mcplist"
-	"github.com/sachncs/promptsheon/internal/mcpsdk"
+	"github.com/sachncs/promptsheon/backend/mcplist"
+	"github.com/sachncs/promptsheon/backend/mcpsdk"
 )
 
 func TestDialRejectsBadEntry(t *testing.T) {

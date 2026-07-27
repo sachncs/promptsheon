@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/guardrail"
-	"github.com/sachncs/promptsheon/internal/metrics"
+	"github.com/sachncs/promptsheon/backend/guardrail"
+	"github.com/sachncs/promptsheon/backend/metrics"
 )
 
 func discardLogger() *slog.Logger {

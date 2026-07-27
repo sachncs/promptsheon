@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sachncs/promptsheon/pkg/cas"
+	"github.com/sachncs/promptsheon/backend/cas"
 )
 
 // CasPromptLoader reads and writes prompt blobs in the local

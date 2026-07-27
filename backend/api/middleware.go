@@ -11,8 +11,8 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/auth"
-	"github.com/sachncs/promptsheon/internal/trace"
+	"github.com/sachncs/promptsheon/backend/auth"
+	"github.com/sachncs/promptsheon/backend/trace"
 )
 
 // Shared audit-detail keys. Handler packages reference these

@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/schedule"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/schedule"
 )
 
 // ensure SQLite implements the consumer-defined capability.Repository

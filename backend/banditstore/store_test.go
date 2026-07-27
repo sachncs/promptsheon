@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/bandit"
+	"github.com/sachncs/promptsheon/backend/bandit"
 )
 
 func TestNewStoreRejectsNil(t *testing.T) {

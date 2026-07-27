@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/harness"
+	"github.com/sachncs/promptsheon/backend/harness"
 )
 
 func TestValidScorers(t *testing.T) {

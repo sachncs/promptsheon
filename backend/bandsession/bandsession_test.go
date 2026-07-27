@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/bandit"
-	"github.com/sachncs/promptsheon/internal/banditstore"
-	"github.com/sachncs/promptsheon/internal/metrics"
+	"github.com/sachncs/promptsheon/backend/bandit"
+	"github.com/sachncs/promptsheon/backend/banditstore"
+	"github.com/sachncs/promptsheon/backend/metrics"
 )
 
 func newTestSession(t *testing.T) (*Session, *banditstore.Store, *banditstore.InMemory) {

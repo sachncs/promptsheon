@@ -24,10 +24,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/eventbus"
-	"github.com/sachncs/promptsheon/internal/observation"
-	"github.com/sachncs/promptsheon/internal/optimizer/rules"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/eventbus"
+	"github.com/sachncs/promptsheon/backend/observation"
+	"github.com/sachncs/promptsheon/backend/optimizer/rules"
 )
 
 // SourceFunc is the in-process bridge from Aggregator to Producer.

@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	bi "github.com/sachncs/promptsheon/internal/buildinfo"
+	bi "github.com/sachncs/promptsheon/backend/buildinfo"
 )
 
 // Counter is a monotonically increasing metric.

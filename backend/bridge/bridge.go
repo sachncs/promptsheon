@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/backend/capability"
 )
 
 // BreachEvent is the input to the bridge. Construct it from

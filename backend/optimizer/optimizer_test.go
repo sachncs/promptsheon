@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/optimizer"
-	"github.com/sachncs/promptsheon/internal/optimizer/rules"
+	"github.com/sachncs/promptsheon/backend/optimizer"
+	"github.com/sachncs/promptsheon/backend/optimizer/rules"
 )
 
 func TestGetOptimizationTipsHasContent(t *testing.T) {

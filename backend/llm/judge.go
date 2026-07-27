@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sachncs/promptsheon/internal/eval"
+	"github.com/sachncs/promptsheon/backend/eval"
 )
 
 // JudgeClient is an alias for eval.JudgeClient so callers

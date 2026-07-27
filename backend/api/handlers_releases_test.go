@@ -12,11 +12,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/approval"
-	"github.com/sachncs/promptsheon/internal/auth"
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/release"
-	"github.com/sachncs/promptsheon/internal/testdata"
+	"github.com/sachncs/promptsheon/backend/approval"
+	"github.com/sachncs/promptsheon/backend/auth"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/release"
+	"github.com/sachncs/promptsheon/backend/testdata"
 )
 
 func releaseTestManifest() capability.Manifest { return testdata.NewManifest() }

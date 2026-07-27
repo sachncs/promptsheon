@@ -18,7 +18,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sachncs/promptsheon/internal/recommendation"
+	"github.com/sachncs/promptsheon/backend/recommendation"
 )
 
 // Detector is the Guardrail. It is concurrency-safe: the

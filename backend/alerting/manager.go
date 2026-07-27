@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/metrics"
-	"github.com/sachncs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/backend/metrics"
+	"github.com/sachncs/promptsheon/backend/models"
 )
 
 // Severity levels for alerts.

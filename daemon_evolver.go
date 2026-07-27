@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/harness"
-	"github.com/sachncs/promptsheon/internal/llm"
-	"github.com/sachncs/promptsheon/internal/metrics"
-	"github.com/sachncs/promptsheon/internal/models"
-	"github.com/sachncs/promptsheon/internal/release"
-	"github.com/sachncs/promptsheon/internal/selfevolve"
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/harness"
+	"github.com/sachncs/promptsheon/backend/llm"
+	"github.com/sachncs/promptsheon/backend/metrics"
+	"github.com/sachncs/promptsheon/backend/models"
+	"github.com/sachncs/promptsheon/backend/release"
+	"github.com/sachncs/promptsheon/backend/selfevolve"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 // selfEvolveConfig is one parsed entry from the

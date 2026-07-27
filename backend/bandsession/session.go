@@ -19,8 +19,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/bandit"
-	"github.com/sachncs/promptsheon/internal/banditstore"
+	"github.com/sachncs/promptsheon/backend/bandit"
+	"github.com/sachncs/promptsheon/backend/banditstore"
 )
 
 type selectionObserver interface {

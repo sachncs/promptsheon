@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/backend/models"
 )
 
 const fieldKeyName = "key_name"
