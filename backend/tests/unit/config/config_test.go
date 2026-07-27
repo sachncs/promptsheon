@@ -1,7 +1,7 @@
 package config_test
 
 import (
-	. "github.com/sachncs/promptsheon/backend/config"
+	. "github.com/sachncs/promptsheon/backend"
 	"bytes"
 	"log/slog"
 	"os"
