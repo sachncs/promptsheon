@@ -1,6 +1,9 @@
-package capability
+package capability_test
 
-import "testing"
+import (
+	. "github.com/sachncs/promptsheon/backend/capability"
+	"testing"
+)
 
 func TestArtifactRefValid(t *testing.T) {
 	t.Parallel()

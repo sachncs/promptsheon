@@ -1,6 +1,7 @@
-package capability
+package capability_test
 
 import (
+	. "github.com/sachncs/promptsheon/backend/capability"
 	"errors"
 	"testing"
 )

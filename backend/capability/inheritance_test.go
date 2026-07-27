@@ -197,3 +197,7 @@ func minimalManifest() Manifest {
 		RuntimePolicy: ArtifactRef{Kind: ArtifactRuntimePolicy, Hash: goodHash()},
 	}
 }
+
+func goodHash() string {
+	return "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+}
