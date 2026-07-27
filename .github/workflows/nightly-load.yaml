@@ -38,10 +38,10 @@ jobs:
         run: go mod download
 
       - name: Build daemon
-        run: go build -o promptsheond ./cmd/promptsheond
+        run: go build -o promptsheond .
 
       - name: Build CLI
-        run: go build -o promptsheon ./cmd/promptsheon
+        run: go build -o promptsheon .
 
       - name: Install k6
         run: |

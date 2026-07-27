@@ -8,11 +8,11 @@ build: build-server build-cli
 
 # Build the server daemon
 build-server:
-	go build -o promptsheond ./cmd/promptsheond
+	go build -o promptsheond .
 
 # Build the CLI client
 build-cli:
-	go build -o promptsheon ./cmd/promptsheon
+	go build -o promptsheon .
 
 # Run all tests
 test:
@@ -53,8 +53,8 @@ lint:
 lint-domain:
 	go run ./scripts/check-no-package-state.go
 
-# Lint domain-purity: fail if any domain package imports internal/llm,
-# internal/api, internal/store, or cmd. Domain packages depend only
+# Lint domain-purity: fail if any domain package imports backend/llm,
+# backend/api, backend/store, or cmd. Domain packages depend only
 # on each other and the standard library (Charter Principle 5).
 lint-deps:
 	scripts/check-domain-purity.sh
@@ -91,15 +91,15 @@ coverage-raw:
 
 # Run the server locally
 run:
-	go run ./cmd/promptsheond
+	go run .
 
 # Run the CLI
 cli:
-	go run ./cmd/promptsheon
+	go run .
 
 # Regenerate api/openapi.yaml from the server's route
-# registrations. The generator parses internal/api/server.go
-# for routes and internal/api/handlers_*.go for request
+# registrations. The generator parses backend/api/server.go
+# for routes and backend/api/handlers_*.go for request
 # schemas, then emits a real OpenAPI 3.0 spec. Re-run this
 # target whenever a route or handler changes.
 openapi:
@@ -150,7 +150,7 @@ helm-docs:
 #   - any local markdown link that resolves to a missing file
 #     (HTTP(S), mailto, and pure-anchor links are skipped)
 #   - any path-shaped reference to source code
-#     (internal/...go, pkg/...go, cmd/...go, api/openapi.yaml,
+#     (backend/...go, pkg/...go, api/openapi.yaml,
 #     deploy/, scripts/, .github/workflows/, docs/adr/NNNN-...)
 #     that no longer points at a real file
 # Pure shell + awk; no new Go dependency. CI runs this on
@@ -213,25 +213,25 @@ help:
 	@echo "  docs-site        Build the mdBook site (no-op if mdbook is missing)"
 	@echo "  update-deps      Update Go dependencies"
 	@echo "  security         Check for security vulnerabilities"
-	@echo "  web-install      Install dashboard dependencies (web/)"
-	@echo "  web-dev          Run dashboard dev server (web/)"
-	@echo "  web-build        Build dashboard static bundle (web/dist)"
+	@echo "  web-install      Install dashboard dependencies (frontend/)"
+	@echo "  web-dev          Run dashboard dev server (frontend/)"
+	@echo "  web-build        Build dashboard static bundle (frontend/dist)"
 	@echo "  web-smoke        Run dashboard end-to-end smoke against a running daemon"
 	@echo "  help             Show this help message"
 
 # ----- Dashboard targets ----------------------------------------------------
 web-install:
 	@command -v node >/dev/null 2>&1 || { echo "node not found"; exit 1; }
-	cd web && npm install
+	cd frontend && npm install
 
 web-build:
-	cd web && npm run build
+	cd frontend && npm run build
 
 web-dev:
-	cd web && npm run dev
+	cd frontend && npm run dev
 
 web-smoke:
 	@command -v node >/dev/null 2>&1 || { echo "node not found"; exit 1; }
-	cd web && [ -d node_modules ] || npm install
-	cd web && node scripts/smoke.mjs
+	cd frontend && [ -d node_modules ] || npm install
+	cd frontend && node scripts/smoke.mjs
 

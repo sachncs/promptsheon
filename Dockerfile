@@ -16,15 +16,15 @@ ARG TARGETOS
 ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -trimpath \
-      -ldflags="-s -w -X github.com/sachncs/promptsheon/internal/buildinfo.Version=${VERSION} -X github.com/sachncs/promptsheon/internal/buildinfo.Commit=${COMMIT} -X github.com/sachncs/promptsheon/internal/buildinfo.BuildTime=${BUILD_TIME}" \
-      -o /out/promptsheond ./cmd/promptsheond && \
+      -ldflags="-s -w -X github.com/sachncs/promptsheon/backend/buildinfo.Version=${VERSION} -X github.com/sachncs/promptsheon/backend/buildinfo.Commit=${COMMIT} -X github.com/sachncs/promptsheon/backend/buildinfo.BuildTime=${BUILD_TIME}" \
+      -o /out/promptsheond . && \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -trimpath \
-      -ldflags="-s -w -X github.com/sachncs/promptsheon/internal/buildinfo.Version=${VERSION} -X github.com/sachncs/promptsheon/internal/buildinfo.Commit=${COMMIT} -X github.com/sachncs/promptsheon/internal/buildinfo.BuildTime=${BUILD_TIME}" \
-      -o /out/promptsheon ./cmd/promptsheon && \
+      -ldflags="-s -w -X github.com/sachncs/promptsheon/backend/buildinfo.Version=${VERSION} -X github.com/sachncs/promptsheon/backend/buildinfo.Commit=${COMMIT} -X github.com/sachncs/promptsheon/backend/buildinfo.BuildTime=${BUILD_TIME}" \
+      -o /out/promptsheon . && \
     CGO_ENABLED=0 go build -trimpath \
       -ldflags="-s -w" \
-      -o /out/promptsheon-healthcheck ./cmd/promptsheon-healthcheck
+      -o /out/promptsheon-healthcheck .
 
 # --- Runtime stage ---------------------------------------------------------
 FROM alpine:${ALPINE_VERSION}

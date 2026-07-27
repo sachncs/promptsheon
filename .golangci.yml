@@ -72,7 +72,7 @@ linters:
         - name: redefines-builtin-id
   exclusions:
     rules:
-      - path: (^|/)(cmd|scripts)/|_test\.go$
+      - path: (^|/)scripts/|_test\.go$
         linters:
           - forbidigo
       - path: _test\.go
@@ -81,9 +81,6 @@ linters:
           - goconst
           - gocritic
           - unparam
-      - path: internal/promptsheon/
-        linters:
-          - gocritic
       - linters:
           - revive
         text: "exported.*should have comment or be unexported"

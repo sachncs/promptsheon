@@ -81,10 +81,10 @@ jobs:
         # the cmd entry points, examples/, and the OpenAPI
         # generator aren't unit-testable in the conventional
         # sense). We also enforce per-package floors for the
-        # testable layers: domain packages (internal/...,
-        # excluding cmd/api/store) >= 50%, infrastructure
-        # (internal/api + internal/store) >= 40%, api handlers
-        # (internal/api) >= 60%. The per-package floors catch
+        # testable layers: domain packages (backend/...,
+        # excluding api/store) >= 50%, infrastructure
+        # (backend/api + backend/store) >= 40%, api handlers
+        # (backend/api) >= 60%. The per-package floors catch
         # silent regressions in the testable surface; the global
         # floor catches regressions in the testable aggregate.
         run: |
@@ -151,7 +151,7 @@ jobs:
         run: go mod download
 
       - name: Build promptsheond
-        run: go build -o ./promptsheond ./cmd/promptsheond
+        run: go build -o ./promptsheond .
 
       - name: Run smoke tests
         run: bash tests/smoke/run.sh
@@ -200,7 +200,7 @@ jobs:
       - name: Lint domain-purity (no infra imports from domain packages)
         # CI gate: domain packages depend only on other domain
         # packages and the standard library. They MUST NOT import
-        # internal/llm, internal/api, internal/store, or cmd. See
+        # backend/llm, backend/api, backend/store, or cmd. See
         # ADR-0012.
         run: make lint-deps
 
@@ -223,7 +223,7 @@ jobs:
     # DOC-CI-3 / DOC-FRESH-1: deterministic doc-freshness gate.
     # Reports any markdown link in docs/ that resolves to a
     # missing file, and any path-shaped reference to source
-    # code (internal/...go, pkg/...go, cmd/...go, api/openapi.yaml,
+    # code (backend/...go, api/openapi.yaml,
     # deploy/, scripts/, .github/workflows/, docs/adr/NNNN-...)
     # that no longer points at a real file. A trailing
     # `<!-- stale-ok: <reason> -->` comment on a line

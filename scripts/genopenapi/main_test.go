@@ -21,7 +21,7 @@ func TestGenerator_NoStubsInOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Run the generator from the repo root so it finds
-	// internal/api/server.go.
+	// backend/api/server.go.
 	if e := os.Chdir(repoRoot(t)); e != nil {
 		t.Fatal(e)
 	}
@@ -113,7 +113,7 @@ func TestGenerator_AllServerRoutesCovered(t *testing.T) {
 
 	run(t, "-out", outPath)
 
-	routes, err := collectRoutes(filepath.Join(repoRoot(t), "internal/api/server.go"))
+	routes, err := collectRoutes(filepath.Join(repoRoot(t), "backend/api/server.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestGenerator_RequestBodyOnWrites(t *testing.T) {
 
 	run(t, "-out", outPath)
 
-	handlers, err := collectHandlers(filepath.Join(repoRoot(t), "internal/api"))
+	handlers, err := collectHandlers(filepath.Join(repoRoot(t), "backend/api"))
 	if err != nil {
 		t.Fatal(err)
 	}

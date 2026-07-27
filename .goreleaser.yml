@@ -25,7 +25,7 @@ release:
 
 builds:
   - id: promptsheond
-    main: ./cmd/promptsheond
+    main: .
     binary: promptsheond
     env:
       - CGO_ENABLED=0
@@ -38,12 +38,12 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/sachncs/promptsheon/internal/buildinfo.Version={{.Version}}
-      - -X github.com/sachncs/promptsheon/internal/buildinfo.Commit={{.Commit}}
-      - -X github.com/sachncs/promptsheon/internal/buildinfo.BuildTime={{.CommitDate}}
+      - -X github.com/sachncs/promptsheon/backend/buildinfo.Version={{.Version}}
+      - -X github.com/sachncs/promptsheon/backend/buildinfo.Commit={{.Commit}}
+      - -X github.com/sachncs/promptsheon/backend/buildinfo.BuildTime={{.CommitDate}}
 
   - id: promptsheon-cli
-    main: ./cmd/promptsheon
+    main: .
     binary: promptsheon
     env:
       - CGO_ENABLED=0
@@ -56,9 +56,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/sachncs/promptsheon/internal/buildinfo.Version={{.Version}}
-      - -X github.com/sachncs/promptsheon/internal/buildinfo.Commit={{.Commit}}
-      - -X github.com/sachncs/promptsheon/internal/buildinfo.BuildTime={{.CommitDate}}
+      - -X github.com/sachncs/promptsheon/backend/buildinfo.Version={{.Version}}
+      - -X github.com/sachncs/promptsheon/backend/buildinfo.Commit={{.Commit}}
+      - -X github.com/sachncs/promptsheon/backend/buildinfo.BuildTime={{.CommitDate}}
 
 archives:
   - id: promptsheond
