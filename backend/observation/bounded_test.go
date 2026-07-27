@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend/executor"
 )
 
 // TestAggregatorBoundedWindow verifies that adding more than
@@ -15,7 +14,7 @@ func TestAggregatorBoundedWindow(t *testing.T) {
 	a := NewAggregator(nil)
 	now := time.Now()
 	for i := 0; i < MaxRecordsPerWindow+1000; i++ {
-		a.Add(executor.ExecutionRecord{
+		a.Add(backend.ExecutionRecord{
 			CapabilityID: "c1",
 			ReleaseID:    "r1",
 			Environment:  "prod",
