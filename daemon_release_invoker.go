@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/executor"
-	"github.com/sachncs/promptsheon/internal/invoke"
-	"github.com/sachncs/promptsheon/internal/release"
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/executor"
+	"github.com/sachncs/promptsheon/backend/invoke"
+	"github.com/sachncs/promptsheon/backend/release"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 // apiReleaseInvoker adapts the daemon's invoke.Invoker into the

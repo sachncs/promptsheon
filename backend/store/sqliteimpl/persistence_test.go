@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/lineage"
-	"github.com/sachncs/promptsheon/internal/recommendation"
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/lineage"
+	"github.com/sachncs/promptsheon/backend/recommendation"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 func openTestDB(t *testing.T) *store.SQLite {

@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/models"
-	"github.com/sachncs/promptsheon/internal/release"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/models"
+	"github.com/sachncs/promptsheon/backend/release"
 )
 
 // migrateOnce opens a fresh DB and runs the full migration set.

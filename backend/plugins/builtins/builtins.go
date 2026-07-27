@@ -12,9 +12,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/injection"
-	"github.com/sachncs/promptsheon/internal/redactor"
-	"github.com/sachncs/promptsheon/internal/supervisor"
+	"github.com/sachncs/promptsheon/backend/injection"
+	"github.com/sachncs/promptsheon/backend/redactor"
+	"github.com/sachncs/promptsheon/backend/supervisor"
 )
 
 // PIIDetector adapts redactor.Redactor to the supervisor.Plugin

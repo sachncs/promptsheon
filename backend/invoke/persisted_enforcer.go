@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/budget"
-	"github.com/sachncs/promptsheon/internal/quota"
+	"github.com/sachncs/promptsheon/backend/budget"
+	"github.com/sachncs/promptsheon/backend/quota"
 )
 
 // EnforcerStore is the persistence surface the persisted enforcer

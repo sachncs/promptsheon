@@ -6,8 +6,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/eventbus"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/eventbus"
 )
 
 func TestRunHappyPath(t *testing.T) {

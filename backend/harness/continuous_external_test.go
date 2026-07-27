@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/harness"
-	"github.com/sachncs/promptsheon/internal/release"
-	"github.com/sachncs/promptsheon/internal/testutil/harnessrepo"
+	"github.com/sachncs/promptsheon/backend/harness"
+	"github.com/sachncs/promptsheon/backend/release"
+	"github.com/sachncs/promptsheon/backend/testutil/harnessrepo"
 )
 
 // fakeInvoker returns a fixed output for every Invoke call.

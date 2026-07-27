@@ -18,12 +18,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/budget"
-	"github.com/sachncs/promptsheon/internal/executor"
-	"github.com/sachncs/promptsheon/internal/metrics"
-	"github.com/sachncs/promptsheon/internal/observation"
-	"github.com/sachncs/promptsheon/internal/quota"
-	"github.com/sachncs/promptsheon/internal/trace"
+	"github.com/sachncs/promptsheon/backend/budget"
+	"github.com/sachncs/promptsheon/backend/executor"
+	"github.com/sachncs/promptsheon/backend/metrics"
+	"github.com/sachncs/promptsheon/backend/observation"
+	"github.com/sachncs/promptsheon/backend/quota"
+	"github.com/sachncs/promptsheon/backend/trace"
 )
 
 // Caller is the actual LLM provider invocation. It is the same

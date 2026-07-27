@@ -18,7 +18,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
-	"github.com/sachncs/promptsheon/internal/rollups"
+	"github.com/sachncs/promptsheon/backend/rollups"
 )
 
 // Writer is a thin ClickHouse writer for WorkspaceSummary rows.

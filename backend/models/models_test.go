@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/backend/models"
 )
 
 func TestUserJSONRoundTrip(t *testing.T) {

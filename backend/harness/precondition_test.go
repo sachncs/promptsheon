@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/harness"
+	"github.com/sachncs/promptsheon/backend/harness"
 )
 
 func TestPreconditionRunnerPasses(t *testing.T) {

@@ -1,7 +1,7 @@
 package harness_test
 
 import (
-	"github.com/sachncs/promptsheon/internal/testutil/harnessrepo"
+	"github.com/sachncs/promptsheon/backend/testutil/harnessrepo"
 )
 
 // newRepo returns a fresh in-memory harness.Repository for

@@ -17,8 +17,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/budget"
-	"github.com/sachncs/promptsheon/internal/quota"
+	"github.com/sachncs/promptsheon/backend/budget"
+	"github.com/sachncs/promptsheon/backend/quota"
 )
 
 // WorkspaceSummary is one Workspace's rollup at a moment in time.

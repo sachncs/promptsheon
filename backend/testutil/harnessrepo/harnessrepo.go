@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/harness"
-	"github.com/sachncs/promptsheon/internal/release"
+	"github.com/sachncs/promptsheon/backend/harness"
+	"github.com/sachncs/promptsheon/backend/release"
 )
 
 // ErrNotFound is returned for any lookup that misses. Tests

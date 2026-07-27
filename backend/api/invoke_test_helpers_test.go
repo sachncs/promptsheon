@@ -23,16 +23,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/eventbus"
-	"github.com/sachncs/promptsheon/internal/executor"
-	"github.com/sachncs/promptsheon/internal/invoke"
-	"github.com/sachncs/promptsheon/internal/llm"
-	"github.com/sachncs/promptsheon/internal/metrics"
-	"github.com/sachncs/promptsheon/internal/observation"
-	"github.com/sachncs/promptsheon/internal/release"
-	"github.com/sachncs/promptsheon/internal/store"
-	"github.com/sachncs/promptsheon/internal/testutil"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/eventbus"
+	"github.com/sachncs/promptsheon/backend/executor"
+	"github.com/sachncs/promptsheon/backend/invoke"
+	"github.com/sachncs/promptsheon/backend/llm"
+	"github.com/sachncs/promptsheon/backend/metrics"
+	"github.com/sachncs/promptsheon/backend/observation"
+	"github.com/sachncs/promptsheon/backend/release"
+	"github.com/sachncs/promptsheon/backend/store"
+	"github.com/sachncs/promptsheon/backend/testutil"
 )
 
 // inMemoryProvider is a deterministic llm.Provider used by the

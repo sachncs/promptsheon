@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/models"
-	"github.com/sachncs/promptsheon/internal/release"
-	"github.com/sachncs/promptsheon/internal/schedule"
-	"github.com/sachncs/promptsheon/internal/settings"
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/models"
+	"github.com/sachncs/promptsheon/backend/release"
+	"github.com/sachncs/promptsheon/backend/schedule"
+	"github.com/sachncs/promptsheon/backend/settings"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 func init() {

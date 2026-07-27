@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/eval"
+	"github.com/sachncs/promptsheon/backend/eval"
 )
 
 // ReleaseInvoker produces the LLM-side output for a single eval

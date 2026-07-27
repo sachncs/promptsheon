@@ -6,8 +6,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/rollups"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/rollups"
 )
 
 // handleGetWorkspaceObservation returns the per-Workspace rollup:

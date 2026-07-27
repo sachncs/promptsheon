@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/executor"
+	"github.com/sachncs/promptsheon/backend/executor"
 )
 
 // TestAggregatorBoundedWindow verifies that adding more than

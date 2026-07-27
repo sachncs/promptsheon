@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/settings"
-	"github.com/sachncs/promptsheon/internal/store"
-	"github.com/sachncs/promptsheon/internal/store/postgres"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/settings"
+	"github.com/sachncs/promptsheon/backend/store"
+	"github.com/sachncs/promptsheon/backend/store/postgres"
 )
 
 // TestPostgresContractSatisfied is the headline PG-1

@@ -28,10 +28,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
-	"github.com/sachncs/promptsheon/internal/pluginmanifest"
-	pluginv1 "github.com/sachncs/promptsheon/internal/pluginproto/pluginv1"
-	"github.com/sachncs/promptsheon/internal/subprocess"
-	"github.com/sachncs/promptsheon/internal/supervisor"
+	"github.com/sachncs/promptsheon/backend/pluginmanifest"
+	pluginv1 "github.com/sachncs/promptsheon/backend/pluginproto/pluginv1"
+	"github.com/sachncs/promptsheon/backend/subprocess"
+	"github.com/sachncs/promptsheon/backend/supervisor"
 )
 
 // EnvKey is the environment variable that holds the manifest path.

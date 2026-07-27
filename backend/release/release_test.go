@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/approval"
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/testdata"
+	"github.com/sachncs/promptsheon/backend/approval"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/testdata"
 )
 
 func goodManifest() capability.Manifest { return testdata.NewManifest() }

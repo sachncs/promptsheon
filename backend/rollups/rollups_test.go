@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/budget"
-	"github.com/sachncs/promptsheon/internal/quota"
+	"github.com/sachncs/promptsheon/backend/budget"
+	"github.com/sachncs/promptsheon/backend/quota"
 )
 
 type fakeBudgetRepo struct {

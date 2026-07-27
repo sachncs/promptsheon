@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sachncs/promptsheon/pkg/cas"
+	"github.com/sachncs/promptsheon/backend/cas"
 )
 
 // loadCASPrompt reads a prompt blob by content hash from

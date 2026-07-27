@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/auth"
-	"github.com/sachncs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/backend/auth"
+	"github.com/sachncs/promptsheon/backend/models"
 )
 
 // audit writes an audit entry for a mutation. The user ID is taken

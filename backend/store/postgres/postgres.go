@@ -27,12 +27,12 @@ package postgres
 
 import (
 	"embed"
-	"github.com/sachncs/promptsheon/internal/approval"
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/harness"
-	"github.com/sachncs/promptsheon/internal/release"
-	"github.com/sachncs/promptsheon/internal/settings"
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/approval"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/harness"
+	"github.com/sachncs/promptsheon/backend/release"
+	"github.com/sachncs/promptsheon/backend/settings"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 //go:embed migrations/*.sql

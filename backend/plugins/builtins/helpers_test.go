@@ -4,7 +4,7 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/sachncs/promptsheon/internal/supervisor"
+	"github.com/sachncs/promptsheon/backend/supervisor"
 )
 
 // supervisorForTest returns a Supervisor wired to a no-op logger.

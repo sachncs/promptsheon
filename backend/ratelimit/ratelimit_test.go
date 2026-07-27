@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/auth"
+	"github.com/sachncs/promptsheon/backend/auth"
 )
 
 // TestRateLimiterPartitionedConcurrency pins PERF-RL-1:

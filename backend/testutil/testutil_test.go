@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/testutil"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/testutil"
 )
 
 func TestDiscardLoggerReturnsLogger(t *testing.T) {

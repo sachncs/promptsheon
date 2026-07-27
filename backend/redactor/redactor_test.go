@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/recommendation"
+	"github.com/sachncs/promptsheon/backend/recommendation"
 )
 
 func TestRedactEmail(t *testing.T) {

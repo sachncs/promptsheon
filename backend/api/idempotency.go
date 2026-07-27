@@ -30,7 +30,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 const (

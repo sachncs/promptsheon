@@ -3,7 +3,7 @@ package experiment_test
 import (
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/experiment"
+	"github.com/sachncs/promptsheon/backend/experiment"
 )
 
 // makeTest is a helper to create a test with two variants.

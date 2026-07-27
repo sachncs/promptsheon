@@ -19,7 +19,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/eval"
+	"github.com/sachncs/promptsheon/backend/eval"
 )
 
 // Scorer is an alias for eval.Scorer so callers that already import

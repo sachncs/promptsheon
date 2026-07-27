@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/auth"
-	"github.com/sachncs/promptsheon/internal/settings"
+	"github.com/sachncs/promptsheon/backend/auth"
+	"github.com/sachncs/promptsheon/backend/settings"
 )
 
 const fieldSettingsValue = "value"

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sachncs/promptsheon/internal/lineage"
+	"github.com/sachncs/promptsheon/backend/lineage"
 )
 
 type LineageRepository struct{ db *sql.DB }

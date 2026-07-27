@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/approval"
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/harness"
-	"github.com/sachncs/promptsheon/internal/release"
-	"github.com/sachncs/promptsheon/internal/testdata"
-	"github.com/sachncs/promptsheon/internal/testutil/harnessrepo"
+	"github.com/sachncs/promptsheon/backend/approval"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/harness"
+	"github.com/sachncs/promptsheon/backend/release"
+	"github.com/sachncs/promptsheon/backend/testdata"
+	"github.com/sachncs/promptsheon/backend/testutil/harnessrepo"
 )
 
 // errMemStoreNotFound stands in for store.ErrNotFound in this

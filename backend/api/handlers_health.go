@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/buildinfo"
+	"github.com/sachncs/promptsheon/backend/buildinfo"
 )
 
 const dbStatusOK = "ok"

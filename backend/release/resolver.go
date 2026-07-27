@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/backend/capability"
 )
 
 // ResolvedInvocation is the immutable plan for a single invoke. It

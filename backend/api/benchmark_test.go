@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/llm"
+	"github.com/sachncs/promptsheon/backend/llm"
 )
 
 // BenchmarkHandleHealth exercises the smallest possible handler

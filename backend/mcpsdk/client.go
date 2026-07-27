@@ -26,7 +26,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sachncs/promptsheon/internal/mcplist"
+	"github.com/sachncs/promptsheon/backend/mcplist"
 )
 
 // Dial connects to a single MCP server entry and returns a

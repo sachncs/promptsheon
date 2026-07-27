@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/models"
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/models"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 // TestAppendAuditConcurrentChainPreserved hammers AppendAudit

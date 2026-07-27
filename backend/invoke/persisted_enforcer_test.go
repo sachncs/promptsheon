@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/budget"
+	"github.com/sachncs/promptsheon/backend/budget"
 )
 
 // fakeEnforcerStore is a minimal in-memory EnforcerStore for tests.

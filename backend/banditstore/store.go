@@ -34,7 +34,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/sachncs/promptsheon/internal/bandit"
+	"github.com/sachncs/promptsheon/backend/bandit"
 )
 
 // Backend is the per-replica persistence contract. A backend

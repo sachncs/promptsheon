@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/eventbus"
-	"github.com/sachncs/promptsheon/internal/schedule"
-	"github.com/sachncs/promptsheon/internal/scheduler"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/eventbus"
+	"github.com/sachncs/promptsheon/backend/schedule"
+	"github.com/sachncs/promptsheon/backend/scheduler"
 )
 
 // fakeScheduleRepo is a hand-rolled in-memory implementation of

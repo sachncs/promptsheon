@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/alerting"
+	"github.com/sachncs/promptsheon/backend/alerting"
 )
 
 // validSeverities is the closed set for AlertRule.Severity.

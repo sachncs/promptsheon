@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/approval"
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/release"
-	"github.com/sachncs/promptsheon/internal/store"
-	"github.com/sachncs/promptsheon/internal/testdata"
+	"github.com/sachncs/promptsheon/backend/approval"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/release"
+	"github.com/sachncs/promptsheon/backend/store"
+	"github.com/sachncs/promptsheon/backend/testdata"
 )
 
 // fixture provides a populated workspace/project/capability/version so

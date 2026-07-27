@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	chgo "github.com/ClickHouse/clickhouse-go/v2"
-	"github.com/sachncs/promptsheon/internal/rollups/clickhouse"
+	"github.com/sachncs/promptsheon/backend/rollups/clickhouse"
 )
 
 // buildClickHouseWriter is the clickhouse-tagged replacement for

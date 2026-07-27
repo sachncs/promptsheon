@@ -14,9 +14,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
-	"github.com/sachncs/promptsheon/internal/eventbus"
-	"github.com/sachncs/promptsheon/internal/schedule"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/eventbus"
+	"github.com/sachncs/promptsheon/backend/schedule"
 )
 
 // Scheduler holds the tick loop.

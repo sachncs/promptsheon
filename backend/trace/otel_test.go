@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/testutil"
+	"github.com/sachncs/promptsheon/backend/testutil"
 )
 
 // TestOTelSpanLandsInCollector verifies TEST-NEW-12: a request

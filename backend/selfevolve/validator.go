@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/eval"
-	"github.com/sachncs/promptsheon/internal/harness"
+	"github.com/sachncs/promptsheon/backend/eval"
+	"github.com/sachncs/promptsheon/backend/harness"
 )
 
 // Validator scores a candidate prompt against the

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/eval"
-	"github.com/sachncs/promptsheon/internal/harness"
+	"github.com/sachncs/promptsheon/backend/eval"
+	"github.com/sachncs/promptsheon/backend/harness"
 )
 
 // BenchmarkEvalRun1000Cases pins PERF-DB-3: a 1000-case eval run

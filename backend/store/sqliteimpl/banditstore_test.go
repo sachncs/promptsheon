@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/bandit"
-	"github.com/sachncs/promptsheon/internal/banditstore"
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/bandit"
+	"github.com/sachncs/promptsheon/backend/banditstore"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 func TestBanditStoreSQLite_ObservePersists(t *testing.T) {

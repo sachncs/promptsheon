@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/eval"
+	"github.com/sachncs/promptsheon/backend/eval"
 )
 
 func raw(s string) json.RawMessage { return json.RawMessage(s) }

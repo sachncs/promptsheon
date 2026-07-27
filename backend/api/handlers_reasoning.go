@@ -13,7 +13,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/sachncs/promptsheon/internal/reasoning"
+	"github.com/sachncs/promptsheon/backend/reasoning"
 )
 
 // handleReasoningCompile turns an Intent into a Plan.

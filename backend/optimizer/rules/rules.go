@@ -15,7 +15,7 @@ package rules
 import (
 	"context"
 
-	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/backend/capability"
 )
 
 // Observation is the minimal signal a rule consumes. The full

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/backend/capability"
 )
 
 func TestNewAdoptedRequiresVersion(t *testing.T) {

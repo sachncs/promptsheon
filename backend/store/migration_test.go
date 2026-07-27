@@ -3,7 +3,7 @@ package store_test
 import (
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 func TestReleasesMigration024(t *testing.T) {

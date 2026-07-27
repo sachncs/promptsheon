@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/sachncs/promptsheon/internal/models"
+	"github.com/sachncs/promptsheon/backend/models"
 )
 
 // fakeKMS satisfies KMSClient (including Decrypt) and the optional

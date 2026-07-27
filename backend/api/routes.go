@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/sachncs/promptsheon/internal/auth"
+	"github.com/sachncs/promptsheon/backend/auth"
 )
 
 func (s *Server) routes() {

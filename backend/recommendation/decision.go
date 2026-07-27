@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/internal/capability"
+	"github.com/sachncs/promptsheon/backend/capability"
 )
 
 // Outcome is the disposition of a Recommendation.

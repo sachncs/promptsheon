@@ -3,8 +3,8 @@ package server
 import (
 	"log/slog"
 
-	"github.com/sachncs/promptsheon/internal/api"
-	"github.com/sachncs/promptsheon/internal/store"
+	"github.com/sachncs/promptsheon/backend/api"
+	"github.com/sachncs/promptsheon/backend/store"
 )
 
 type Server = api.Server
