@@ -58,7 +58,6 @@ import (
 	"github.com/sachncs/promptsheon/backend/vault"
 	"github.com/sachncs/promptsheon/backend/webhook"
 	"github.com/sachncs/promptsheon/backend/workflow"
-	"github.com/sachncs/promptsheon/backend/ws"
 	"github.com/sachncs/promptsheon/backend/cas"
 )
 
@@ -152,7 +151,7 @@ func runDaemon() {
 	// every daemon log line over the SSE /api/v1/logs/stream
 	// endpoint (OBS-4). The hub is also passed to backend.NewServer
 	// via WithLogHub so handlers can subscribe.
-	logHub := ws.NewHub(slog.Default())
+	logHub := backend.NewHub(slog.Default())
 	go logHub.Run()
 
 	logger := setupLogger(&cfg, logHub)
@@ -287,7 +286,7 @@ func configureShellTool(_ *backend.Config) {
 	workflow.SetShellToolPolicy(enabled, allow)
 }
 
-func setupLogger(cfg *backend.Config, hub *ws.Hub) *slog.Logger {
+func setupLogger(cfg *backend.Config, hub *backend.Hub) *slog.Logger {
 	var logLevel slog.Level
 	switch cfg.LogLevel {
 	case logLevelDebug:
@@ -306,7 +305,7 @@ func setupLogger(cfg *backend.Config, hub *ws.Hub) *slog.Logger {
 	// its own broadcast loop and is concurrency-safe.
 	var base slog.Handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
 	if hub != nil {
-		streamer := &ws.LogStreamer{Hub: hub}
+		streamer := &backend.LogStreamer{Hub: hub}
 		base = streamer.StreamHandler(base)
 	}
 	return slog.New(base)
@@ -333,7 +332,7 @@ func openDB(cfg *backend.Config, logger *slog.Logger) *store.SQLite {
 	return db
 }
 
-func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub, elector *election.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*backend.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector, *vault.Vault) {
+func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *backend.Hub, elector *election.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*backend.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector, *vault.Vault) {
 	// OBS-TR-1: no SQLite tracer; OTel-only export.
 	collector := metrics.NewCollector()
 	// OBS-LOG-2: wire the SSE hub's drop counter into the

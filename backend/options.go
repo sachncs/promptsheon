@@ -19,7 +19,6 @@ import (
 	"github.com/sachncs/promptsheon/backend/vault"
 	"github.com/sachncs/promptsheon/backend/webhook"
 	"github.com/sachncs/promptsheon/backend/workflow"
-	"github.com/sachncs/promptsheon/backend/ws"
 )
 
 // Option configures the Server.
@@ -101,7 +100,7 @@ func WithOAuth(o *auth.OAuthManager) Option {
 }
 
 // WithLogHub attaches a WebSocket hub for real-time log streaming.
-func WithLogHub(h *ws.Hub) Option {
+func WithLogHub(h *Hub) Option {
 	return func(s *Server) {
 		s.logHub = h
 	}
