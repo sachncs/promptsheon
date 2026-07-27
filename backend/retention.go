@@ -1,6 +1,8 @@
-// Package observability provides log retention and cleanup policies.
-package observability
+package backend
 
+// Flattened from backend/
+
+// Package observability provides log retention and cleanup policies.
 import (
 	"context"
 	"database/sql"
@@ -215,3 +217,4 @@ func (m *RetentionManager) verifyChainForRetention(ctx context.Context) (string,
 func (m *RetentionManager) GetPolicy() RetentionPolicy {
 	return m.policy
 }
+

@@ -41,7 +41,6 @@ import (
 	"github.com/sachncs/promptsheon/backend/llm"
 	"github.com/sachncs/promptsheon/backend/metrics"
 	"github.com/sachncs/promptsheon/backend/models"
-	"github.com/sachncs/promptsheon/backend/observability"
 	"github.com/sachncs/promptsheon/backend/observation"
 	"github.com/sachncs/promptsheon/backend/optimizer/rules"
 	"github.com/sachncs/promptsheon/backend/plugins/builtins"
@@ -350,12 +349,12 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 		logger.Info("OTel tracer initialised", "endpoint", cfg.OTelEndpoint, "insecure", cfg.OTelInsecure)
 	}
 
-	retentionPolicy := observability.LoadRetentionPolicyFromEnv()
+	retentionPolicy := backend.LoadRetentionPolicyFromEnv()
 	// DB-CONC-2: retentionDB is passed in from main() so its
 	// lifetime matches the daemon lifetime, not buildServer's.
 	// Closing it inside buildServer would tear down the DB
 	// before the retention goroutine ever runs a tick.
-	retention := observability.NewRetentionManager(retentionDB, retentionPolicy, logger)
+	retention := backend.NewRetentionManager(retentionDB, retentionPolicy, logger)
 	retention.Start(rootCtx)
 
 	webhookDispatcher := webhook.NewDispatcher(logger).

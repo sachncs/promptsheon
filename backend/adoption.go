@@ -1,3 +1,7 @@
+package backend
+
+// Flattened from backend/
+
 // Package adoption captures the per-Workspace Recommendation adoption
 // record. When a Recommendation is auto-applied (via recommendation.
 // CanAutoAdopt) the adoption record is appended to the Workspace's
@@ -7,8 +11,6 @@
 // Production wiring supplies a backend-backed Repository; the
 // Recommendation engine reads the prior adoption record and avoids
 // re-recommending a Decision the Workspace already rejected.
-package adoption
-
 import (
 	"context"
 	"time"
@@ -47,3 +49,4 @@ type Repository interface {
 	List(ctx context.Context, f Filter) ([]*Record, error)
 	CountByOutcome(ctx context.Context, workspaceID string) (map[string]int64, error)
 }
+
