@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
@@ -17,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sachncs/promptsheon/backend/errs"
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/models"
 )
