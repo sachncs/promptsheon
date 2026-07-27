@@ -1,7 +1,7 @@
 package capability
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"fmt"
 
 )
@@ -87,7 +87,7 @@ type Manifest struct {
 	MCPServers    []ArtifactRef `json:"mcp_servers,omitempty"`
 }
 
-// backend.ErrorCapabilityEmptyManifest indicates a Manifest that has not been populated.
+// errs.ErrorCapabilityEmptyManifest indicates a Manifest that has not been populated.
 // An empty Manifest must never be deployed, approved, or evaluated.
 
 // Validate checks structural correctness of the Manifest.
@@ -130,7 +130,7 @@ func (m Manifest) Validate() error {
 	if m.Prompt.Hash == "" &&
 		m.ModelPolicy.Hash == "" &&
 		m.RuntimePolicy.Hash == "" {
-		return backend.ErrorCapabilityEmptyManifest
+		return errs.ErrorCapabilityEmptyManifest
 	}
 	return nil
 }

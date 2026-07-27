@@ -10,7 +10,7 @@ import (
 
 )
 
-// backend.ErrorApprovalNotFound is returned by Repository implementations when a row is
+// errs.ErrorApprovalNotFound is returned by Repository implementations when a row is
 // missing. It is package-local so callers do not need to import a
 // storage-specific sentinel.
 

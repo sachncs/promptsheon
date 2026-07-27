@@ -1,0 +1,369 @@
+package backend
+
+import (
+	"github.com/sachncs/promptsheon/backend/errs"
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/sachncs/promptsheon/backend/approval"
+	"github.com/sachncs/promptsheon/backend/auth"
+	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/executor"
+	"github.com/sachncs/promptsheon/backend/harness"
+	"github.com/sachncs/promptsheon/backend/release"
+)
+
+// ---------------------------------------------------------------------------
+// Release + Approval routes
+// ---------------------------------------------------------------------------
+
+func (s *Server) registerReleaseRoutes() {
+	if s.releaseSvc == nil {
+		return
+	}
+	s.mux.HandleFunc("GET /api/v1/capabilities/{capability_id}/releases", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleListReleases)))
+	s.mux.HandleFunc("POST /api/v1/versions/{version_id}/releases", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleCreateRelease)))
+	s.mux.HandleFunc("GET /api/v1/releases/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptRead)(s.handleGetRelease)))
+	s.mux.HandleFunc("POST /api/v1/releases/{id}/votes", s.wrapHandler(s.requirePerm(auth.PermReviewApprove)(s.handleVoteOnRelease)))
+	s.mux.HandleFunc("POST /api/v1/releases/{id}/activate", s.wrapHandler(s.requirePerm(auth.PermReviewApprove)(s.handleActivateRelease)))
+	s.mux.HandleFunc("POST /api/v1/releases/{id}/rollback", s.wrapHandler(s.requirePerm(auth.PermReviewApprove)(s.handleRollbackRelease)))
+	s.mux.HandleFunc("POST /api/v1/releases/{id}/invoke", s.wrapHandler(s.requirePerm(auth.PermPromptCreate)(s.handleInvokeRelease)))
+	s.mux.HandleFunc("GET /api/v1/releases/{id}/approval", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleGetReleaseApproval)))
+}
+
+type createReleaseRequest struct {
+	Environment string `json:"environment"`
+}
+
+func (s *Server) handleCreateRelease(w http.ResponseWriter, r *http.Request) error {
+	versionID := r.PathValue("version_id")
+	v, err := s.db.GetVersion(r.Context(), versionID)
+	if err != nil {
+		return ErrNotFound
+	}
+	var req createReleaseRequest
+	if err := readJSON(r, &req); err != nil {
+		return ErrBadRequest
+	}
+	env := release.Environment(req.Environment)
+	if !env.Valid() {
+		return badRequest("environment: must be dev|staging|prod")
+	}
+
+	// Look up the parent Capability to compute capabilityVersion if not set.
+	cap, err := s.db.GetCapability(r.Context(), v.CapabilityID)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	rel, err := s.releaseSvc.Create(r.Context(), cap.ID, v.Version, v.Manifest, env, callerID(r))
+	if err != nil {
+		return badRequest(err.Error())
+	}
+	s.audit(r.Context(), "create", "release:"+rel.ID, map[string]any{
+		"capability_id": cap.ID, "version_id": versionID, "environment": string(env),
+	})
+	writeJSON(w, http.StatusCreated, rel)
+	return nil
+}
+
+func (s *Server) handleGetRelease(w http.ResponseWriter, r *http.Request) error {
+	rel, err := s.releaseSvc.Get(r.Context(), r.PathValue("id"))
+	if err != nil {
+		return ErrNotFound
+	}
+	writeJSON(w, http.StatusOK, rel)
+	return nil
+}
+
+func (s *Server) handleListReleases(w http.ResponseWriter, r *http.Request) error {
+	rels, err := s.releaseSvc.ListForCapability(r.Context(), r.PathValue("capability_id"))
+	if err != nil {
+		return err
+	}
+	if rels == nil {
+		rels = []*release.Release{}
+	}
+	writeJSON(w, http.StatusOK, rels)
+	return nil
+}
+
+type voteRequest struct {
+	Identity string `json:"identity"`
+	Decision string `json:"decision"`
+	Reason   string `json:"reason,omitempty"`
+}
+
+func (s *Server) handleVoteOnRelease(w http.ResponseWriter, r *http.Request) error {
+	releaseID := r.PathValue("id")
+	var req voteRequest
+	if err := readJSON(r, &req); err != nil {
+		return ErrBadRequest
+	}
+	// SECURITY: vote identity is bound to the authenticated
+	// principal. The previous implementation accepted an
+	// arbitrary `identity` from the request body and defaulted to
+	// the caller only when blank — which let the release creator
+	// vote under another name to satisfy maker-checker quorum.
+	// The authenticated principal is now the only allowed source.
+	//
+	// If delegated voting is ever required, expose it as a
+	// separate admin-only operation that records both the
+	// delegator and the represented identity in the audit log.
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok || user == nil || user.ID == "" {
+		return &HTTPError{Status: http.StatusUnauthorized, Message: "no authenticated user in context"}
+	}
+	if req.Identity != "" && req.Identity != user.ID {
+		return &HTTPError{Status: http.StatusForbidden, Message: "vote identity must match the authenticated principal"}
+	}
+	req.Identity = user.ID
+	decision := approval.Decision(req.Decision)
+	switch decision {
+	case approval.Approve, approval.Reject, approval.Abstain:
+	default:
+		return badRequest("decision: must be approve|reject|abstain")
+	}
+	vote := approval.Vote{
+		Identity: req.Identity,
+		Decision: decision,
+		Reason:   req.Reason,
+	}
+	a, err := s.releaseSvc.Vote(r.Context(), releaseID, vote)
+	if err != nil {
+		return badRequest(err.Error())
+	}
+	s.audit(r.Context(), "vote", "release:"+releaseID, map[string]any{
+		"identity": req.Identity, "decision": string(decision),
+	})
+	writeJSON(w, http.StatusOK, a)
+	return nil
+}
+
+func (s *Server) handleActivateRelease(w http.ResponseWriter, r *http.Request) error {
+	releaseID := r.PathValue("id")
+	activated, err := s.releaseSvc.Activate(r.Context(), releaseID)
+	if err != nil {
+		if errors.Is(err, errs.ErrorReleaseNotPending) {
+			return &HTTPError{Status: http.StatusConflict, Message: err.Error()}
+		}
+		if errors.Is(err, errs.ErrorApprovalCreatorVoted) || errors.Is(err, errs.ErrorApprovalQuorumNotMet) {
+			return &HTTPError{Status: http.StatusConflict, Message: err.Error()}
+		}
+		if errors.Is(err, errs.ErrorApprovalNotFound) {
+			return &HTTPError{Status: http.StatusConflict, Message: "no votes recorded; quorum not satisfied"}
+		}
+		if errors.Is(err, errs.ErrorReleaseNotFound) {
+			return ErrNotFound
+		}
+		if errors.Is(err, errs.ErrorHarnessPreconditionFailed) {
+			var pe *harness.PreconditionError
+			if errors.As(err, &pe) {
+				return &HTTPError{
+					Status:  http.StatusConflict,
+					Message: pe.Error(),
+					Details: map[string]any{"failures": pe.Failures},
+				}
+			}
+			return &HTTPError{Status: http.StatusConflict, Message: err.Error()}
+		}
+		return badRequest(err.Error())
+	}
+	s.audit(r.Context(), "activate", "release:"+releaseID, nil)
+	writeJSON(w, http.StatusOK, activated)
+	return nil
+}
+
+func (s *Server) handleRollbackRelease(w http.ResponseWriter, r *http.Request) error {
+	rolled, err := s.releaseSvc.Rollback(r.Context(), r.PathValue("id"))
+	if err != nil {
+		if errors.Is(err, errs.ErrorReleaseNotFound) {
+			return ErrNotFound
+		}
+		return badRequest(err.Error())
+	}
+	s.audit(r.Context(), "rollback", "release:"+rolled.ID, nil)
+	writeJSON(w, http.StatusOK, rolled)
+	return nil
+}
+
+type invokeReleaseRequest struct {
+	Inputs map[string]any `json:"inputs,omitempty"`
+	// Model and Provider are intentionally NOT exposed on the
+	// invoke-release request. The release runtime is the
+	// authoritative source for both (via the Manifest's
+	// ModelPolicy artifact). The previous design let the
+	// caller pick either, which made the approval a fiction.
+}
+
+func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) error {
+	releaseID := r.PathValue("id")
+	rel, err := s.releaseSvc.Get(r.Context(), releaseID)
+	if err != nil {
+		return ErrNotFound
+	}
+	if rel.Status != release.StatusActive {
+		return &HTTPError{Status: http.StatusConflict, Message: "release is not active"}
+	}
+	var req invokeReleaseRequest
+	if err := readJSON(r, &req); err != nil {
+		return ErrBadRequest
+	}
+	manifestHash, err := manifestHashForRelease(rel)
+	if err != nil {
+		return fmt.Errorf("manifest hash: %w", err)
+	}
+	plan, err := s.resolveRelease(r.Context(), rel)
+	if err != nil {
+		return &HTTPError{Status: http.StatusBadGateway, Message: err.Error()}
+	}
+	// ponytail: previously the handler built
+	//   CapabilityVersionID: rel.CapabilityID + "@" + version
+	// which doesn't exist in the capability_versions table — the
+	// FK constraint to capability_versions(id) blew up. Look up
+	// the real version row by (capability_id, version number).
+	ver, err := s.db.GetVersionByNumber(r.Context(), rel.CapabilityID, rel.CapabilityVersion)
+	if err != nil {
+		return fmt.Errorf("lookup capability version: %w", err)
+	}
+	exec := &capability.Execution{
+		ID:                  generateID(),
+		CapabilityVersionID: ver.ID,
+		Timestamp:           time.Now(),
+		Inputs:              req.Inputs,
+		Environment:         string(rel.Environment),
+	}
+	if plan != nil {
+		exec.Model = plan.Model
+		exec.Provider = plan.Provider
+	}
+	// Model and provider are now derived from the release, not
+	// from the request. If the release has a Resolver wired, we
+	// use the Resolver's plan; otherwise we use the placeholder
+	// derived from the manifest hash, which surfaces as a 502
+	// at the provider call site.
+	rec, invErr, latency := s.invokeOneWithManifest(r, rel, req.Inputs, plan)
+	exec.LatencyMs = latency.Milliseconds()
+	// BUG-21/30: even on a failed invoke, when the executor
+	// returns a partial record (a record that has a token
+	// count or a cost line before erroring), surface those
+	// values on the execution and in the audit map. The
+	// tokens_estimated flag tells audit consumers that the
+	// numbers are real even if the call did not complete.
+	if rec != nil {
+		exec.PromptTokens = rec.PromptTokens
+		exec.CompletionTokens = rec.OutputTokens
+		exec.TotalTokens = rec.PromptTokens + rec.OutputTokens
+		exec.Model = rec.Model
+		exec.CostUSD = rec.CostUSD
+		if len(rec.Output) > 0 {
+			exec.Outputs = map[string]any{"content": string(rec.Output)}
+		}
+	}
+	if invErr != nil {
+		exec.Error = invErr.Error()
+	}
+	if err := s.db.CreateExecution(r.Context(), exec); err != nil {
+		return err
+	}
+	s.audit(r.Context(), "invoke", "release:"+releaseID, map[string]any{
+		"manifest_hash":    manifestHash,
+		"tokens":           exec.TotalTokens,
+		"cost_usd":         exec.CostUSD,
+		"tokens_estimated": exec.TotalTokens > 0 || exec.CostUSD > 0,
+		valError:           exec.Error,
+	})
+	if invErr != nil {
+		return &HTTPError{Status: http.StatusBadGateway, Message: invErr.Error()}
+	}
+	writeJSON(w, http.StatusCreated, exec)
+	return nil
+}
+
+// resolveRelease builds a ResolvedInvocation for a release. It is
+// a no-op (returns nil plan) when no Resolver is configured; the
+// invoke path then falls back to the placeholder model name.
+func (s *Server) resolveRelease(ctx context.Context, rel *release.Release) (*release.ResolvedInvocation, error) {
+	if s.releaseResolver == nil {
+		return nil, nil
+	}
+	return s.releaseResolver.Resolve(ctx, rel.ID)
+}
+
+// invokeOneWithManifest is the release-side equivalent of invokeOne;
+// it uses the Release's loaded Manifest to derive a stable manifest
+// hash rather than the placeholder hash used by the existing
+// /versions/{id}/executions route. Returns the ExecutionRecord (or nil
+// when the invoker has nothing to record), the invocation error (or
+// nil on success), and the wall-clock latency so the handler can
+// populate the Execution row.
+//
+// Model and provider are taken from plan (the ResolvedInvocation),
+// not from the HTTP request, so the request cannot override the
+// approved release's runtime.
+//
+// Like invokeOne, requires s.invoker to be wired. A missing invoker
+// returns an error rather than a silent no-op.
+func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, inputs map[string]any, plan *release.ResolvedInvocation) (*executor.ExecutionRecord, error, time.Duration) {
+	if s.invoker == nil {
+		return nil, errors.New("api: invoke.Invoker not wired on this server"), 0
+	}
+	input, err := marshalNoArgs(inputs)
+	if err != nil {
+		return nil, err, 0
+	}
+	manifestHash, _ := computeManifestHash(rel.Manifest)
+	model := ""
+	provider := ""
+	if plan != nil {
+		model = plan.Model
+		provider = plan.Provider
+	}
+	req := executor.InvokeRequest{
+		WorkspaceID:   r.PathValue("workspace_id"),
+		ReleaseID:     rel.ID,
+		ManifestHash:  manifestHash,
+		InputHash:     inputHash(input),
+		Input:         input,
+		Model:         model,
+		ModelRevision: modelRevision(model, provider),
+		Provider:      provider,
+	}
+	// ponytail: same prompt-as-system fix as the harness path — the
+	// live /releases/{id}/invoke route also dropped the manifest
+	// prompt, so the model answered the user's raw input without
+	// the system instruction.
+	if plan != nil {
+		req.SystemPrompt = plan.Prompt
+	}
+	start := time.Now()
+	rec, err := s.invoker.Invoke(r.Context(), req)
+	return &rec, err, time.Since(start)
+}
+
+func (s *Server) handleGetReleaseApproval(w http.ResponseWriter, r *http.Request) error {
+	a, err := s.releaseSvc.Approval(r.Context(), r.PathValue("id"))
+	if err != nil {
+		return ErrNotFound
+	}
+	writeJSON(w, http.StatusOK, a)
+	return nil
+}
+
+func manifestHashForRelease(rel *release.Release) (string, error) {
+	h, err := computeManifestHash(rel.Manifest)
+	if err != nil {
+		// BUG-20: previously this returned "" and the caller
+		// stored the empty hash in the audit row, silently
+		// dropping tamper-evidence. Surface the error so the
+		// handler returns 500 and the operator can see what
+		// happened.
+		slog.Error("manifest hash failed", "release_id", rel.ID, "err", err)
+		return "", err
+	}
+	return h, nil
+}

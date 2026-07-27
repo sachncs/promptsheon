@@ -1,7 +1,7 @@
 package election_test
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	. "github.com/sachncs/promptsheon/backend/election"
 	"context"
 	"database/sql"
@@ -47,8 +47,8 @@ func TestAcquireFirstCallerWins(t *testing.T) {
 	if !a.IsLeader() {
 		t.Fatal("pod-a should be leader")
 	}
-	if err := b.Acquire(context.Background()); err != backend.ErrorElectionNotLeader {
-		t.Fatalf("pod-b acquire: want backend.ErrorElectionNotLeader, got %v", err)
+	if err := b.Acquire(context.Background()); err != errs.ErrorElectionNotLeader {
+		t.Fatalf("pod-b acquire: want errs.ErrorElectionNotLeader, got %v", err)
 	}
 	if b.IsLeader() {
 		t.Fatal("pod-b should not be leader")

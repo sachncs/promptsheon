@@ -4,7 +4,7 @@
 package main
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"fmt"
 	"time"
@@ -71,7 +71,7 @@ func (a *evolverRepoAdapter) UpdateReleaseStatus(ctx context.Context, releaseID,
 		return err
 	}
 	if rel == nil {
-		return backend.ErrorStoreNotFound
+		return errs.ErrorStoreNotFound
 	}
 	rel.Status = release.Status(status)
 	return a.SQLite.UpdateRelease(ctx, rel)

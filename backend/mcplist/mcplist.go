@@ -11,7 +11,7 @@
 package mcplist
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -38,25 +38,25 @@ type Entry struct {
 	CreatedBy   string `json:"created_by"`
 }
 
-// backend.ErrorMCPEmptyName is returned by Validate when the Name is empty.
+// errs.ErrorMCPEmptyName is returned by Validate when the Name is empty.
 
-// backend.ErrorMCPBadName is returned when the Name contains characters
+// errs.ErrorMCPBadName is returned when the Name contains characters
 // outside the allowed set (alnum, dash, dot, underscore).
 
-// backend.ErrorMCPBadURL is returned when the URL cannot be parsed as an
+// errs.ErrorMCPBadURL is returned when the URL cannot be parsed as an
 // absolute http(s) URL or unix UDS path.
 
 // Validate enforces the closed-set Name format and a syntactically
 // valid URL (http(s)://host[:port][/path] or unix:///abs/path).
 func (e Entry) Validate() error {
 	if strings.TrimSpace(e.Name) == "" {
-		return backend.ErrorMCPEmptyName
+		return errs.ErrorMCPEmptyName
 	}
 	if !namePattern.MatchString(e.Name) {
-		return fmt.Errorf("%w: %q", backend.ErrorMCPBadName, e.Name)
+		return fmt.Errorf("%w: %q", errs.ErrorMCPBadName, e.Name)
 	}
 	if err := validateURL(e.URL); err != nil {
-		return fmt.Errorf("%w: %q: %w", backend.ErrorMCPBadURL, e.URL, err)
+		return fmt.Errorf("%w: %q: %w", errs.ErrorMCPBadURL, e.URL, err)
 	}
 	return nil
 }
@@ -123,7 +123,7 @@ func (l *List) Add(e Entry) error {
 }
 
 // Remove deletes the entry with the supplied Name. Returns
-// backend.ErrorMCPUnknownName if no entry matches.
+// errs.ErrorMCPUnknownName if no entry matches.
 func (l *List) Remove(name string) error {
 	for i, e := range l.Entries {
 		if e.Name == name {
@@ -131,7 +131,7 @@ func (l *List) Remove(name string) error {
 			return nil
 		}
 	}
-	return backend.ErrorMCPUnknownName
+	return errs.ErrorMCPUnknownName
 }
 
 // Allows reports whether the supplied name is on the list. The
@@ -162,7 +162,7 @@ func (l *List) sort() {
 	})
 }
 
-// backend.ErrorMCPUnknownName is returned by Remove when the supplied Name
+// errs.ErrorMCPUnknownName is returned by Remove when the supplied Name
 // is not on the list.
 
 // Repository is the consumer-defined persistence interface.

@@ -14,7 +14,7 @@
 package reasoning
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"fmt"
 	"sort"
@@ -84,10 +84,10 @@ type Step struct {
 	DependsOn    []string          `json:"depends_on,omitempty"`
 }
 
-// backend.ErrorReasoningNoMatch is returned by Compile when no CapabilityDescriptor
+// errs.ErrorReasoningNoMatch is returned by Compile when no CapabilityDescriptor
 // satisfies the Intent. Callers should map this to a 422.
 
-// backend.ErrorReasoningConstraintViolation is returned by Compile when the only
+// errs.ErrorReasoningConstraintViolation is returned by Compile when the only
 // candidates exceed one of the Intent's Constraints.
 
 // Compiler turns an Intent into a Plan. The Compiler is a
@@ -100,7 +100,7 @@ type Compiler struct {
 }
 
 // NewCompiler constructs a Compiler with the supplied catalog.
-// A nil catalog is permitted; Compile returns backend.ErrorReasoningNoMatch for
+// A nil catalog is permitted; Compile returns errs.ErrorReasoningNoMatch for
 // every intent.
 func NewCompiler(catalog []CapabilityDescriptor) *Compiler {
 	return &Compiler{Catalog: catalog}
@@ -109,10 +109,10 @@ func NewCompiler(catalog []CapabilityDescriptor) *Compiler {
 // Compile turns an Intent into a Plan. The algorithm is:
 //
 //  1. Match the catalog by Intent.Goal + Intent.Tags (semantic
-//     intent match). If nothing matches, return backend.ErrorReasoningNoMatch.
+//     intent match). If nothing matches, return errs.ErrorReasoningNoMatch.
 //  2. Filter surviving candidates by Constraints (cost,
 //     latency, trust, tags). If everything is filtered out by
-//     constraints, return backend.ErrorReasoningConstraintViolation.
+//     constraints, return errs.ErrorReasoningConstraintViolation.
 //  3. Pick the highest-scoring candidate. Bind inputs.
 //  4. The plan has one step for now; the multi-step DAG is a
 //     v0.4.0 follow-on.
@@ -128,15 +128,15 @@ func (c *Compiler) Compile(ctx context.Context, intent Intent) (*Plan, error) {
 	}
 	matched := c.matchIntent(intent)
 	if len(matched) == 0 {
-		return nil, backend.ErrorReasoningNoMatch
+		return nil, errs.ErrorReasoningNoMatch
 	}
 	filtered := c.applyConstraints(intent, matched)
 	if len(filtered) == 0 {
-		return nil, backend.ErrorReasoningConstraintViolation
+		return nil, errs.ErrorReasoningConstraintViolation
 	}
 	scored := c.score(intent, filtered)
 	if len(scored) == 0 {
-		return nil, backend.ErrorReasoningConstraintViolation
+		return nil, errs.ErrorReasoningConstraintViolation
 	}
 	// Pick the highest-scoring candidate.
 	best := scored[0]
@@ -165,7 +165,7 @@ func (c *Compiler) Compile(ctx context.Context, intent Intent) (*Plan, error) {
 // survives if EITHER its name shares a token with the goal OR
 // its tag set intersects (non-empty) with the intent's Tags.
 // Empty intent.Tags + empty goal matches nothing; that
-// returns backend.ErrorReasoningNoMatch, which is the desired behaviour for a
+// returns errs.ErrorReasoningNoMatch, which is the desired behaviour for a
 // missing or vague Intent.
 func (c *Compiler) matchIntent(intent Intent) []CapabilityDescriptor {
 	intentTags := make(map[string]struct{}, len(intent.Tags))

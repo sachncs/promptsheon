@@ -1,7 +1,7 @@
 package store_test
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -253,7 +253,7 @@ func TestUserRoundTrip(t *testing.T) {
 		t.Fatalf("DeleteUser: %v", err)
 	}
 	_, err = s.GetUser(ctx, "alice")
-	if !errors.Is(err, backend.ErrorStoreNotFound) {
+	if !errors.Is(err, errs.ErrorStoreNotFound) {
 		t.Errorf("GetUser after delete: err = %v, want ErrNotFound", err)
 	}
 }
@@ -599,7 +599,7 @@ func TestProviderKeyRoundTrip(t *testing.T) {
 	if err := s.DeleteProviderKey(ctx, "pk1"); err != nil {
 		t.Fatalf("DeleteProviderKey: %v", err)
 	}
-	if _, err := s.GetProviderKey(ctx, "pk1"); !errors.Is(err, backend.ErrorStoreNotFound) {
+	if _, err := s.GetProviderKey(ctx, "pk1"); !errors.Is(err, errs.ErrorStoreNotFound) {
 		t.Errorf("GetProviderKey after delete: %v, want ErrNotFound", err)
 	}
 }
@@ -895,7 +895,7 @@ func TestBootstrapAdminConcurrent(t *testing.T) {
 		switch {
 		case err == nil:
 			wins++
-		case errors.Is(err, backend.ErrorStoreConflict):
+		case errors.Is(err, errs.ErrorStoreConflict):
 			conflicts++
 		default:
 			other++

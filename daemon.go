@@ -2,7 +2,7 @@
 package main
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"database/sql"
 	"encoding/hex"
@@ -26,8 +26,8 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/alerting"
-	"github.com/sachncs/promptsheon/backend/api"
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/buildinfo"
 	"github.com/sachncs/promptsheon/backend/capability"
@@ -152,7 +152,7 @@ func runDaemon() {
 
 	// Log hub is created early so the slog chain can broadcast
 	// every daemon log line over the SSE /api/v1/logs/stream
-	// endpoint (OBS-4). The hub is also passed to api.NewServer
+	// endpoint (OBS-4). The hub is also passed to backend.NewServer
 	// via WithLogHub so handlers can subscribe.
 	logHub := ws.NewHub(slog.Default())
 	go logHub.Run()
@@ -231,7 +231,7 @@ func runDaemon() {
 				logger.Warn("leader-election error", "err", e)
 			}
 		}()
-		if err := elector.Acquire(rootCtx); err != nil && !errors.Is(err, backend.ErrorElectionNotLeader) {
+		if err := elector.Acquire(rootCtx); err != nil && !errors.Is(err, errs.ErrorElectionNotLeader) {
 			logger.Warn("initial leader acquire failed", "err", err)
 		}
 		logger.Info("leader-election active", "pod", podName)
@@ -335,7 +335,7 @@ func openDB(cfg *config.Config, logger *slog.Logger) *store.SQLite {
 	return db
 }
 
-func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub, elector *election.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*api.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector, *vault.Vault) {
+func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *ws.Hub, elector *election.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*backend.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector, *vault.Vault) {
 	// OBS-TR-1: no SQLite tracer; OTel-only export.
 	collector := metrics.NewCollector()
 	// OBS-LOG-2: wire the SSE hub's drop counter into the
@@ -400,7 +400,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	_ = logHub
 
 	contextMgr := contextpkg.NewManager()
-	usageTracker := api.NewUsageTracker()
+	usageTracker := backend.NewUsageTracker()
 	guardrailManager := guardrail.NewManager(logger, collector)
 	alertingManager := alerting.NewManagerWithDB(logger, collector, db)
 	alertingManager.StartMonitoring(rootCtx, collector, 1*time.Minute)
@@ -541,14 +541,14 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		// on a random provider, then be recorded as a successful
 		// "stub execution" because the Caller swallowed the error.
 		if req.Provider == "" {
-			return executor.InvokeResult{Status: "error", Error: "no provider specified in invocation"}, backend.ErrorExecutorProviderMissing
+			return executor.InvokeResult{Status: "error", Error: "no provider specified in invocation"}, errs.ErrorExecutorProviderMissing
 		}
 		p, err := providers.Get(req.Provider)
 		if err != nil {
-			return executor.InvokeResult{Status: "error", Error: "provider not registered: " + req.Provider}, backend.ErrorExecutorProviderMissing
+			return executor.InvokeResult{Status: "error", Error: "provider not registered: " + req.Provider}, errs.ErrorExecutorProviderMissing
 		}
 		if req.Model == "" || req.Model == "<unspecified>" {
-			return executor.InvokeResult{Status: "error", Error: "no model configured"}, backend.ErrorExecutorProviderMissing
+			return executor.InvokeResult{Status: "error", Error: "no model configured"}, errs.ErrorExecutorProviderMissing
 		}
 		llmReq := &llm.Request{
 			Messages: []llm.Message{{Role: "user", Content: string(req.Input)}},
@@ -605,37 +605,37 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	// pinned in internal/settings/notifier_test.go.
 	settingsNotifier := settings.NewNotifier()
 	settingsReplicaID := settings.LocalReplicaID()
-	var opts []api.Option
+	var opts []backend.Option
 	if cfg.Auth {
-		opts = append(opts, api.WithAuth(repos))
+		opts = append(opts, backend.WithAuth(repos))
 		logger.Info("authentication enabled")
 	}
 	if tracer != nil {
-		opts = append(opts, api.WithTracing(tracer, collector))
+		opts = append(opts, backend.WithTracing(tracer, collector))
 	}
 	if elector != nil {
-		opts = append(opts, api.WithElector(elector))
+		opts = append(opts, backend.WithElector(elector))
 	}
-	opts = append(opts, api.WithWebhooks(webhookDispatcher))
+	opts = append(opts, backend.WithWebhooks(webhookDispatcher))
 	if v != nil {
-		opts = append(opts, api.WithVault(v))
+		opts = append(opts, backend.WithVault(v))
 	}
 	opts = append(opts,
-		api.WithLogHub(logHub),
-		api.WithUsageTracker(usageTracker),
-		api.WithGuardrailManager(guardrailManager),
-		api.WithAlertingManager(alertingManager),
-		api.WithContextManager(contextMgr),
-		api.WithRateLimiter(limiter),
-		api.WithProviders(providers),
-		api.WithWorkspaceRollups(rollupAgg),
-		api.WithInvoker(inv),
-		api.WithWorkflowEngine(
+		backend.WithLogHub(logHub),
+		backend.WithUsageTracker(usageTracker),
+		backend.WithGuardrailManager(guardrailManager),
+		backend.WithAlertingManager(alertingManager),
+		backend.WithContextManager(contextMgr),
+		backend.WithRateLimiter(limiter),
+		backend.WithProviders(providers),
+		backend.WithWorkspaceRollups(rollupAgg),
+		backend.WithInvoker(inv),
+		backend.WithWorkflowEngine(
 			workflow.NewEngine(workflow.DefaultRegistry()).
 				WithObservability(collector, tracer),
 		),
-		api.WithOAuth(buildOAuthManager(cfg)),
-		api.WithSettings(settingsNotifier, settingsReplicaID, cfg.SettingsMode),
+		backend.WithOAuth(buildOAuthManager(cfg)),
+		backend.WithSettings(settingsNotifier, settingsReplicaID, cfg.SettingsMode),
 	)
 
 	// releaseSvc is the application layer for the Release + Approval
@@ -645,7 +645,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	// PROMPTSHEON_APPROVAL_POLICY=majority for a flat majority count.
 	releaseSvc := buildReleaseService(db, cfg.ApprovalPolicy)
 	if releaseSvc != nil {
-		opts = append(opts, api.WithReleaseService(releaseSvc))
+		opts = append(opts, backend.WithReleaseService(releaseSvc))
 		// Self-evolve needs a dedicated SelfApprove identity
 		// baked into the release service. We reuse the
 		// "self_evolve" identity as the auto-approver. The
@@ -662,7 +662,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 	// this, the live release path was a hard-coded
 	// "default / default" model and provider.
 	resolver := release.NewResolver(db, newDefaultArtifactLoader())
-	opts = append(opts, api.WithReleaseResolver(resolver))
+	opts = append(opts, backend.WithReleaseResolver(resolver))
 
 	// Harness engineering surface (datasets, preconditions, evals).
 	// When a ReleaseInvoker is available (i.e. an LLM provider is
@@ -674,7 +674,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		releaseSvc.WithHarness(precondRunner, db)
 		evalRunner = harness.NewEvalRunner(db, &apiReleaseInvoker{db: db, inv: inv, svc: releaseSvc, resolver: resolver})
 		evalRunner.Metrics = collector
-		opts = append(opts, api.WithHarnessRunner(evalRunner))
+		opts = append(opts, backend.WithHarnessRunner(evalRunner))
 	}
 
 	// LLM-JUDGE-1 wiring: register the LLM-judge scorer with a
@@ -730,7 +730,7 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		wireSelfEvolve(rootCtx, db, releaseSvc, evalRunner, repos, logger, providers, collector, selfEvolveCfg)
 	}
 
-	srv := api.NewServer(repos, logger, opts...)
+	srv := backend.NewServer(repos, logger, opts...)
 	return srv, limiter, tracer, collector, v
 }
 
@@ -839,7 +839,7 @@ func buildGitHubOAuth(cfg *config.Config) *auth.OAuthProvider {
 		RedirectURL:  redirectURL,
 		AuthURL:      "https://github.com/login/oauth/authorize",
 		TokenURL:     "https://github.com/login/oauth/access_token",
-		UserInfoURL:  "https://api.github.com/user",
+		UserInfoURL:  "https://backend.github.com/user",
 		Scopes:       []string{"read:user", "user:email"},
 	}
 }
@@ -893,21 +893,21 @@ func (l *defaultArtifactLoader) Load(ctx context.Context, _ capability.ArtifactK
 // The tag-split lives in two separate files so the placeholder
 // doesn't ship with the production binary.
 
-func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *config.Config, srv *api.Server, logger *slog.Logger, limiter *ratelimit.Limiter, tracer trace.Tracer, collector *metrics.Collector, idempStore store.IdempotencyStore, v *vault.Vault) {
-	handler := api.ChainHTTP(srv,
-		api.Recovery(logger),
-		api.MaxBytesReader(10<<20),
+func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *config.Config, srv *backend.Server, logger *slog.Logger, limiter *ratelimit.Limiter, tracer trace.Tracer, collector *metrics.Collector, idempStore store.IdempotencyStore, v *vault.Vault) {
+	handler := backend.ChainHTTP(srv,
+		backend.Recovery(logger),
+		backend.MaxBytesReader(10<<20),
 		// OPS-ROLLOUT-2: PROMPTSHEON_READ_ONLY=true blocks every
 		// non-GET request with 503. Used during canary /
 		// blue-green rollouts so the new code can run against
 		// live traffic with writes off.
-		api.ReadOnlyMiddleware,
-		api.SecurityHeaders,
-		api.IdempotencyMiddleware(idempStore),
+		backend.ReadOnlyMiddleware,
+		backend.SecurityHeaders,
+		backend.IdempotencyMiddleware(idempStore),
 		limiter.Middleware,
 		metrics.HTTPMiddleware(collector, tracer, logger),
-		api.Logging(logger),
-		api.CORS(cfg.CORSOrigins...),
+		backend.Logging(logger),
+		backend.CORS(cfg.CORSOrigins...),
 	)
 
 	writeTimeout := time.Duration(cfg.WriteTimeout) * time.Second
@@ -1001,7 +1001,7 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 		}
 	}()
 
-	api.StartOAuthStateJanitor(rootCtx)
+	backend.StartOAuthStateJanitor(rootCtx)
 
 	// OBS-1b (deferred): with OBS-TR-1 there is no SQLite writer to
 	// expose a drop count from. The metric wiring stays so a
@@ -1078,7 +1078,7 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 	srv.StopDependents()
 
 	limiter.Stop()
-	api.StopOAuthStateJanitor()
+	backend.StopOAuthStateJanitor()
 	if srv.Authenticator() != nil {
 		srv.Authenticator().Stop()
 	}
@@ -1219,7 +1219,7 @@ Once running, the server exposes:
   POST /api/v1/setup       first-run admin bootstrap; only active
                            when PROMPTSHEON_AUTH=false and the
                            user table is empty
-  /api/v1/...              REST API (see api/openapi.yaml)
+  /api/v1/...              REST API (see api/openbackend.yaml)
 
 SECURITY: setting PROMPTSHEON_AUTH=false disables all
 authentication. The first caller of /api/v1/setup receives an

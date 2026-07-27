@@ -9,7 +9,7 @@
 package lineage
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"errors"
 	"fmt"
 	"time"
@@ -65,15 +65,15 @@ type Graph struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-// backend.ErrorLineageUnknownSource is returned when a Source is not in the closed set.
+// errs.ErrorLineageUnknownSource is returned when a Source is not in the closed set.
 
-// backend.ErrorLineageSelfReference is returned when an Edge would have a Version as
+// errs.ErrorLineageSelfReference is returned when an Edge would have a Version as
 // its own parent.
 
-// backend.ErrorLineageDuplicateEdge is returned when an Edge with the same parent and
+// errs.ErrorLineageDuplicateEdge is returned when an Edge with the same parent and
 // child already exists in the Graph.
 
-// backend.ErrorLineageInconsistentCapability is returned when an Edge references a
+// errs.ErrorLineageInconsistentCapability is returned when an Edge references a
 // Capability different from the Graph's Capability.
 
 // AppendRecommendation records that the child Version was derived
@@ -87,26 +87,26 @@ func (g Graph) AppendRecommendation(parent, child VersionRef, source Source, rec
 	switch source {
 	case SourceRecommendation, SourceManual, SourceMigration:
 	default:
-		return g, fmt.Errorf("%w: %q", backend.ErrorLineageUnknownSource, source)
+		return g, fmt.Errorf("%w: %q", errs.ErrorLineageUnknownSource, source)
 	}
 	if g.CapabilityID != "" && parent.CapabilityID != g.CapabilityID {
-		return g, fmt.Errorf("%w: parent %s vs graph %s", backend.ErrorLineageInconsistentCapability, parent.CapabilityID, g.CapabilityID)
+		return g, fmt.Errorf("%w: parent %s vs graph %s", errs.ErrorLineageInconsistentCapability, parent.CapabilityID, g.CapabilityID)
 	}
 	if g.CapabilityID != "" && child.CapabilityID != g.CapabilityID {
-		return g, fmt.Errorf("%w: child %s vs graph %s", backend.ErrorLineageInconsistentCapability, child.CapabilityID, g.CapabilityID)
+		return g, fmt.Errorf("%w: child %s vs graph %s", errs.ErrorLineageInconsistentCapability, child.CapabilityID, g.CapabilityID)
 	}
 	if source == SourceRecommendation && recommendationID == "" {
 		return g, errors.New("lineage: recommendation source requires recommendation_id")
 	}
 	if parent == child {
-		return g, backend.ErrorLineageSelfReference
+		return g, errs.ErrorLineageSelfReference
 	}
 	if at.IsZero() {
 		at = time.Now().UTC()
 	}
 	for _, e := range g.Edges {
 		if e.Parent == parent && e.Child == child {
-			return g, backend.ErrorLineageDuplicateEdge
+			return g, errs.ErrorLineageDuplicateEdge
 		}
 	}
 	edge := Edge{

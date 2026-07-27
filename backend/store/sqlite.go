@@ -2,7 +2,7 @@
 package store
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -26,7 +26,7 @@ import (
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
-// backend.ErrorStoreNotFound is returned when a requested resource is not found.
+// errs.ErrorStoreNotFound is returned when a requested resource is not found.
 
 func marshalOrErr(v any) ([]byte, error) {
 	b, err := json.Marshal(v)
@@ -650,19 +650,19 @@ func (s *SQLite) CreateUser(ctx context.Context, u *models.User) error {
 }
 
 // BootstrapAdmin atomically inserts the first admin user and
-// returns backend.ErrorStoreConflict if any non-system user row already
+// returns errs.ErrorStoreConflict if any non-system user row already
 // exists. The system user 'api' (seeded by migration 057) is
 // ignored so the bootstrap endpoint stays available even when
 // the audit FK has been satisfied.
 //
 // BootstrapAdmin is the single-caller bootstrap. SEC-5a: 100
 // concurrent POST /api/v1/setup calls must produce exactly one
-// admin key, with the rest seeing backend.ErrorStoreConflict. The race-free
+// admin key, with the rest seeing errs.ErrorStoreConflict. The race-free
 // path is INSERT ... ON CONFLICT (email) DO NOTHING: SQLite
 // resolves the conflict at write time, so even under a
 // DEFERRED transaction the second writer's INSERT silently
 // drops and RowsAffected returns 0. We then check the rows-
-// affected count and return backend.ErrorStoreConflict for the loser.
+// affected count and return errs.ErrorStoreConflict for the loser.
 //
 // The previous implementation used a SELECT COUNT(*) then a
 // plain INSERT; under DEFERRED locking both writers could read
@@ -691,7 +691,7 @@ func (s *SQLite) BootstrapAdmin(ctx context.Context, u *models.User, key *models
 	if n == 0 {
 		// Another caller won the race. Roll back the key insert
 		// (we never get there) and surface a typed conflict.
-		return backend.ErrorStoreConflict
+		return errs.ErrorStoreConflict
 	}
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO api_keys (id, user_id, name, key_hash, key_prefix, role, created_at)
@@ -822,7 +822,7 @@ func scanUser(row scannable) (*models.User, error) {
 	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.Role, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, backend.ErrorStoreNotFound
+			return nil, errs.ErrorStoreNotFound
 		}
 		return nil, fmt.Errorf("scan user: %w", err)
 	}
@@ -883,7 +883,7 @@ func (s *SQLite) GetAPIKeyByID(ctx context.Context, id string) (*models.APIKey, 
 		&k.Role, &k.ExpiresAt, &k.LastUsed, &k.CreatedAt, &k.Revoked,
 	)
 	if err == sql.ErrNoRows {
-		return nil, backend.ErrorStoreNotFound
+		return nil, errs.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get api key by id: %w", err)
@@ -1003,7 +1003,7 @@ func scanProviderKey(row scannable) (*models.ProviderKey, error) {
 	err := row.Scan(&pk.ID, &pk.ProviderName, &pk.KeyName, &pk.EncryptedKey, &pk.CreatedAt, &pk.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, backend.ErrorStoreNotFound
+			return nil, errs.ErrorStoreNotFound
 		}
 		return nil, fmt.Errorf("scan provider key: %w", err)
 	}
@@ -1086,7 +1086,7 @@ func scanAlertRule(row scannable) (*models.AlertRuleRecord, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, backend.ErrorStoreNotFound
+			return nil, errs.ErrorStoreNotFound
 		}
 		return nil, fmt.Errorf("scan alert rule: %w", err)
 	}
@@ -1174,7 +1174,7 @@ func scanAlert(row scannable) (*models.AlertRecord, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, backend.ErrorStoreNotFound
+			return nil, errs.ErrorStoreNotFound
 		}
 		return nil, fmt.Errorf("scan alert: %w", err)
 	}
@@ -1286,7 +1286,7 @@ func scanNotificationGroup(row scannable) (*models.NotificationGroupRecord, erro
 	err := row.Scan(&g.ID, &g.Name, &channelsJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, backend.ErrorStoreNotFound
+			return nil, errs.ErrorStoreNotFound
 		}
 		return nil, fmt.Errorf("scan notification group: %w", err)
 	}
@@ -1325,7 +1325,7 @@ func (s *SQLite) GetWebhookEndpoint(ctx context.Context, id string) (*models.Web
 		`SELECT id, url, secret_ciphertext, events, active, created_at FROM webhook_endpoints WHERE id = ?`, id)
 	ep, err := scanWebhookEndpoint(row)
 	if err == sql.ErrNoRows {
-		return nil, backend.ErrorStoreNotFound
+		return nil, errs.ErrorStoreNotFound
 	}
 	return ep, err
 }
