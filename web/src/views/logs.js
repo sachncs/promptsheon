@@ -32,6 +32,13 @@ const MAX_BUFFER = 500;
 export async function renderLogs(route) {
   const root = window.document.getElementById("view");
   if (!root) return "";
+  const { loadSettings } = await import("../settings.js");
+  if (!loadSettings().apiKey) {
+    const { renderConnectPrompt } = await import("./index.js");
+    const html = renderConnectPrompt("The live log stream requires an API key. Open Connection to paste one.");
+    root.innerHTML = html;
+    return html;
+  }
   const levelFilter = route?.query?.level || "all";
 
   root.innerHTML = `<section class="panel p-6"><div class="skeleton h-3 w-32"></div><div class="skeleton mt-4 h-12 w-full"></div></section>`;

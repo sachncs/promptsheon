@@ -128,7 +128,11 @@ async function smoke(key) {
   page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(`console: ${m.text()}`); });
 
   await page.goto(FRONTEND, { waitUntil: "networkidle0", timeout: 30000 });
-  await page.evaluate((k) => localStorage.setItem("promptsheon.settings.v1", JSON.stringify({ apiBase: "", apiKey: k })), key);
+  // The dashboard bails to a Connect prompt when no apiKey is set,
+  // even if the daemon runs auth-off. Always set a placeholder so the
+  // smoke exercises the data-loading path.
+  const keyToSet = key || "ps_smoke_no_auth_required";
+  await page.evaluate((k) => localStorage.setItem("promptsheon.settings.v1", JSON.stringify({ apiBase: "", apiKey: k })), keyToSet);
   await page.reload({ waitUntil: "networkidle0" });
   await wait(5000);
 

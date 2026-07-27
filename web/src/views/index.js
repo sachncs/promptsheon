@@ -9,6 +9,7 @@ import { renderEvaluations } from "./evaluations.js";
 import { renderOperations } from "./operations/index.js";
 import { renderLogs } from "./logs.js";
 import { renderNotFound } from "./not-found.js";
+import { loadSettings } from "../settings.js";
 
 const ROUTES = {
   "/": renderOverview,
@@ -74,4 +75,19 @@ export async function renderView(route) {
     view.innerHTML = result;
   }
   if (title) title.textContent = PAGE_TITLES[route.path] || titleFromRoute(route) || "Promptsheon";
+}
+
+export function requiresKey() {
+  return Boolean(loadSettings().apiKey);
+}
+
+export function renderConnectPrompt(message) {
+  return `<section class="panel p-8 text-center">
+    <div class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-paper text-muted"><svg class="h-6 w-6 fill-none stroke-current stroke-2"><use href="#icon-key"/></svg></div>
+    <h1 class="mt-5 text-[1.4rem] font-bold tracking-[-.04em]">Connect the Promptsheon API</h1>
+    <p class="mt-2 text-[.78rem] text-muted">${message || 'Open <span class="font-bold text-ink">Connection</span> in the sidebar to paste an API key.'}</p>
+    <div class="mt-5 flex justify-center gap-2">
+      <button data-open-settings class="primary-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-settings"/></svg>Open Connection</button>
+    </div>
+  </section>`;
 }
