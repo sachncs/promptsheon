@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/capability"
 )
 
@@ -58,7 +59,7 @@ type Decision struct {
 
 // ErrUnknownOutcome is returned when an outcome value is not in the
 // closed set.
-var ErrUnknownOutcome = errors.New("decision: unknown outcome")
+var ErrUnknownOutcome = backend.ErrorRecommendationUnknownOutcome
 
 // NewAdopted constructs an Adopted Decision for an adopter that is
 // not the auto-promotion path. Use NewAdoptedAuto for the

@@ -13,6 +13,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // Decision is the per-identity vote on a Release.
@@ -70,21 +72,21 @@ type Approval struct {
 
 // ErrDuplicateIdentity is returned when the same identity tries to
 // vote twice on the same Release.
-var ErrDuplicateIdentity = errors.New("approval: duplicate voter")
+var ErrDuplicateIdentity = backend.ErrorApprovalDuplicateIdentity
 
 // ErrCreatorVoted is returned by MakerCheckerPolicy.Evaluate when
 // the Release creator is found in the votes list. The policy
 // owns the separation-of-duties check; no separate helper is
 // required.
-var ErrCreatorVoted = errors.New("approval: creator voted on own release (separation of duties)")
+var ErrCreatorVoted = backend.ErrorApprovalCreatorVoted
 
 // ErrQuorumNotSatisfied is returned when the Policy reports the
 // supplied votes do not yet constitute an Approved state.
-var ErrQuorumNotSatisfied = errors.New("approval: quorum not yet satisfied")
+var ErrQuorumNotSatisfied = backend.ErrorApprovalQuorumNotMet
 
 // ErrUnknownDecision is returned when a decision value is not one of
 // the supported closed-set values.
-var ErrUnknownDecision = errors.New("approval: unknown decision")
+var ErrUnknownDecision = backend.ErrorApprovalUnknownDecision
 
 // Record adds a vote to the Approval and returns a new value. The
 // caller is expected to re-evaluate the Policy after each Record.

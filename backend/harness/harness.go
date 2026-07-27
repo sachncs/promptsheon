@@ -19,6 +19,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/eval"
 )
 
@@ -50,7 +51,7 @@ const (
 // ErrPreconditionFailed is returned by Activate when one or more
 // preconditions for the Release's Capability failed. Failures
 // carries the per-hook name + output for the handler to surface.
-var ErrPreconditionFailed = errors.New("harness: precondition failed")
+var ErrPreconditionFailed = backend.ErrorHarnessPreconditionFailed
 
 // Failure describes one failing precondition.
 type Failure struct {

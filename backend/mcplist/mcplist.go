@@ -18,6 +18,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // Entry is one allowlisted MCP server.
@@ -37,15 +39,15 @@ type Entry struct {
 }
 
 // ErrEmptyName is returned by Validate when the Name is empty.
-var ErrEmptyName = errors.New("mcplist: empty name")
+var ErrEmptyName = backend.ErrorMCPEmptyName
 
 // ErrBadName is returned when the Name contains characters
 // outside the allowed set (alnum, dash, dot, underscore).
-var ErrBadName = errors.New("mcplist: bad name")
+var ErrBadName = backend.ErrorMCPBadName
 
 // ErrBadURL is returned when the URL cannot be parsed as an
 // absolute http(s) URL or unix UDS path.
-var ErrBadURL = errors.New("mcplist: bad url")
+var ErrBadURL = backend.ErrorMCPBadURL
 
 // Validate enforces the closed-set Name format and a syntactically
 // valid URL (http(s)://host[:port][/path] or unix:///abs/path).
@@ -165,7 +167,7 @@ func (l *List) sort() {
 
 // ErrUnknownName is returned by Remove when the supplied Name
 // is not on the list.
-var ErrUnknownName = errors.New("mcplist: unknown name")
+var ErrUnknownName = backend.ErrorMCPUnknownName
 
 // Repository is the consumer-defined persistence interface.
 // Production wiring supplies a backend-backed implementation;

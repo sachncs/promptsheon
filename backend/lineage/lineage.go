@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // Edge is one derivation: parent Version -> child Version, possibly
@@ -64,19 +66,19 @@ type Graph struct {
 }
 
 // ErrUnknownSource is returned when a Source is not in the closed set.
-var ErrUnknownSource = errors.New("lineage: unknown source")
+var ErrUnknownSource = backend.ErrorLineageUnknownSource
 
 // ErrSelfReference is returned when an Edge would have a Version as
 // its own parent.
-var ErrSelfReference = errors.New("lineage: child cannot be its own parent")
+var ErrSelfReference = backend.ErrorLineageSelfReference
 
 // ErrDuplicateEdge is returned when an Edge with the same parent and
 // child already exists in the Graph.
-var ErrDuplicateEdge = errors.New("lineage: edge already exists")
+var ErrDuplicateEdge = backend.ErrorLineageDuplicateEdge
 
 // ErrInconsistentCapability is returned when an Edge references a
 // Capability different from the Graph's Capability.
-var ErrInconsistentCapability = errors.New("lineage: edge references a different capability")
+var ErrInconsistentCapability = backend.ErrorLineageInconsistentCapability
 
 // AppendRecommendation records that the child Version was derived
 // from the parent as a result of the named Recommendation. If

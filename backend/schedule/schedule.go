@@ -27,6 +27,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // Kind is how a Schedule decides when to fire.
@@ -88,7 +90,7 @@ func New(workspaceID, releaseID string, kind Kind, cronExpr, webhookPath string)
 }
 
 // ErrInvalidCron signals an unparseable cron expression.
-var ErrInvalidCron = errors.New("schedule: invalid cron expression")
+var ErrInvalidCron = backend.ErrorScheduleInvalidCron
 
 // Validate returns ErrInvalidCron if cron is empty or unparseable.
 func (s Schedule) Validate() error {

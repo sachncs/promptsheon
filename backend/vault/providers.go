@@ -28,6 +28,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
+
+	"github.com/sachncs/promptsheon/backend"
 )
 
 // hexEncode is a thin wrapper around hex.EncodeToString for the
@@ -62,11 +64,11 @@ type SecretBroker interface {
 // ErrUnknownSecret is returned by SecretBroker implementations
 // when the requested secret identifier is not present in the
 // underlying store.
-var ErrUnknownSecret = errors.New("vault: unknown secret")
+var ErrUnknownSecret = backend.ErrorVaultUnknownSecret
 
 // ErrKeyUnavailable is returned by KeyProvider implementations
 // when no master key is currently available.
-var ErrKeyUnavailable = errors.New("vault: master key unavailable")
+var ErrKeyUnavailable = backend.ErrorVaultKeyUnavailable
 
 // EnvKeyProvider sources the master key from an environment
 // variable. It is the production-default today; KMSKeyProvider
