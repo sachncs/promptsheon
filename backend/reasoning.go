@@ -1,3 +1,7 @@
+package backend
+
+// Flattened from backend/reasoning/compiler.go.
+
 // Package reasoning implements the Reasoning Compiler — the
 // primitive that turns an Intent (a goal + constraints) into an
 // executable CapabilityPlan (a DAG of Capability invocations).
@@ -11,8 +15,6 @@
 // (intent, catalog, registry) tuple. Non-determinism lives in
 // the workflow Engine (LLM calls have variance) and in the
 // bandit (which arm to pick); the compiler itself is pure.
-package reasoning
-
 import (
 	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
