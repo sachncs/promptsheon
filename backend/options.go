@@ -3,7 +3,6 @@ package backend
 import (
 	"github.com/sachncs/promptsheon/backend/alerting"
 	"github.com/sachncs/promptsheon/backend/auth"
-	"github.com/sachncs/promptsheon/backend/election"
 	"github.com/sachncs/promptsheon/backend/guardrail"
 	"github.com/sachncs/promptsheon/backend/harness"
 	"github.com/sachncs/promptsheon/backend/invoke"
@@ -108,7 +107,7 @@ func WithLogHub(h *Hub) Option {
 // WithElector attaches a leader-election Elector. When set, the
 // readiness handler reports the current leader and the role of
 // this replica.
-func WithElector(e *election.Elector) Option {
+func WithElector(e *Elector) Option {
 	return func(s *Server) {
 		s.elector = e
 	}

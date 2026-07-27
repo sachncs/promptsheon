@@ -1,3 +1,7 @@
+package backend
+
+// Flattened from backend/election/election.go.
+
 // Package election provides a SQLite-backed leader election
 // primitive. It lets a multi-replica StatefulSet run several
 // Promptsheon daemons against a single database file while
@@ -15,8 +19,6 @@
 // replica that holds the row but stops renewing will be
 // detected within TTL. The election is NOT a quorum protocol;
 // it is a single-master advisory lock suitable for SQLite.
-package election
-
 import (
 	"github.com/sachncs/promptsheon/backend/errs"
 	"context"

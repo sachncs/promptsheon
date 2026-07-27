@@ -30,7 +30,6 @@ import (
 	"github.com/sachncs/promptsheon/backend/alerting"
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/capability"
-	"github.com/sachncs/promptsheon/backend/election"
 	"github.com/sachncs/promptsheon/backend/eval"
 	"github.com/sachncs/promptsheon/backend/eventbus"
 	"github.com/sachncs/promptsheon/backend/executor"
@@ -209,13 +208,13 @@ func runDaemon() {
 	// when PROMPTSHEON_LEADER_ELECTION=true; the default is
 	// single-replica, where the daemon holds the lock itself
 	// the moment it starts.
-	var elector *election.Elector
+	var elector *backend.Elector
 	if os.Getenv("PROMPTSHEON_LEADER_ELECTION") == "true" {
 		podName := os.Getenv("POD_NAME")
 		if podName == "" {
 			podName, _ = os.Hostname()
 		}
-		elector = election.New(db.DB(), podName, 30*time.Second)
+		elector = backend.New(db.DB(), podName, 30*time.Second)
 		if err := elector.EnsureTable(rootCtx); err != nil {
 			logger.Warn("leader-election table init failed", "err", err)
 		}
@@ -330,7 +329,7 @@ func openDB(cfg *backend.Config, logger *slog.Logger) *store.SQLite {
 	return db
 }
 
-func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *backend.Hub, elector *election.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*backend.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector, *vault.Vault) {
+func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *backend.Hub, elector *backend.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*backend.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector, *vault.Vault) {
 	// OBS-TR-1: no SQLite tracer; OTel-only export.
 	collector := metrics.NewCollector()
 	// OBS-LOG-2: wire the SSE hub's drop counter into the
