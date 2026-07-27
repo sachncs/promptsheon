@@ -2,9 +2,10 @@
 // Every test below runs without I/O so the storage backend
 // can be swapped (in-memory, SQLite) without re-asserting
 // convergence.
-package settings
+package settings_test
 
 import (
+	. "github.com/sachncs/promptsheon/backend/settings"
 	"fmt"
 	"math/rand/v2"
 	"testing"

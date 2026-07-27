@@ -1,6 +1,7 @@
-package trace
+package trace_test
 
 import (
+	. "github.com/sachncs/promptsheon/backend/trace"
 	"context"
 	"testing"
 )

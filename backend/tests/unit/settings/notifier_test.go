@@ -5,9 +5,10 @@
 // propagation contract without storing vault master keys in
 // settings — the test wires the vault directly into the
 // notifier, bypassing the settings layer's storage path.
-package settings
+package settings_test
 
 import (
+	. "github.com/sachncs/promptsheon/backend/settings"
 	"errors"
 	"testing"
 

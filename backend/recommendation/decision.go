@@ -66,29 +66,29 @@ var ErrUnknownOutcome = backend.ErrorRecommendationUnknownOutcome
 // auto-promotion case so that auto vs human adoption is captured
 // explicitly in the audit log.
 func NewAdopted(recommendationID, decidedBy, reason string, resultingVersion int) (Decision, error) {
-	return newDecision(recommendationID, OutcomeAdopted, decidedBy, reason, resultingVersion, false)
+	return NewDecision(recommendationID, OutcomeAdopted, decidedBy, reason, resultingVersion, false)
 }
 
 // NewRejected constructs a Rejected Decision.
 func NewRejected(recommendationID, decidedBy, reason string) (Decision, error) {
-	return newDecision(recommendationID, OutcomeRejected, decidedBy, reason, 0, false)
+	return NewDecision(recommendationID, OutcomeRejected, decidedBy, reason, 0, false)
 }
 
 // NewAdoptedAuto constructs an Adopted Decision for the
 // auto-promotion path. The Auto flag distinguishes this from human
 // adoption in audit reports.
 func NewAdoptedAuto(recommendationID string, resultingVersion int) (Decision, error) {
-	return newDecision(recommendationID, OutcomeAdopted, "system:auto-optimizer", "auto-promotion", resultingVersion, true)
+	return NewDecision(recommendationID, OutcomeAdopted, "system:auto-optimizer", "auto-promotion", resultingVersion, true)
 }
 
 // NewSuperseded marks the Recommendation as moot. It is recorded
 // without an adopter identity because the reason for supersession is
 // an internal event.
 func NewSuperseded(recommendationID string) (Decision, error) {
-	return newDecision(recommendationID, OutcomeSuperseded, "system:scheduler", "", 0, true)
+	return NewDecision(recommendationID, OutcomeSuperseded, "system:scheduler", "", 0, true)
 }
 
-func newDecision(recommendationID string, outcome Outcome, decidedBy, reason string, resultingVersion int, auto bool) (Decision, error) {
+func NewDecision(recommendationID string, outcome Outcome, decidedBy, reason string, resultingVersion int, auto bool) (Decision, error) {
 	if recommendationID == "" {
 		return Decision{}, errors.New("decision: recommendation_id is required")
 	}
