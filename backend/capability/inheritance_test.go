@@ -1,6 +1,7 @@
 package capability
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"errors"
 	"testing"
 )
@@ -136,8 +137,8 @@ func TestResolveManifestDepthLimit(t *testing.T) {
 		resolver.versions[v.ID] = v
 	}
 	_, err := ResolveManifest(chain[len(chain)-1], resolver)
-	if !errors.Is(err, ErrInheritanceTooDeep) {
-		t.Errorf("expected ErrInheritanceTooDeep, got %v", err)
+	if !errors.Is(err, backend.ErrorCapabilityInheritanceTooDeep) {
+		t.Errorf("expected backend.ErrorCapabilityInheritanceTooDeep, got %v", err)
 	}
 }
 

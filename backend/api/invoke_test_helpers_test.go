@@ -16,6 +16,7 @@ package api
 // surfaces those in the audit chain and the Execution record.
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"bytes"
 	"context"
 	"fmt"
@@ -145,11 +146,11 @@ func newInvokeTestServerWithRepo(t *testing.T, repo *mockRepo, opts ...Option) *
 	bus := eventbus.NewMemory()
 	caller := executor.Caller(func(ctx context.Context, req executor.InvokeRequest) (executor.InvokeResult, error) {
 		if req.Provider == "" {
-			return executor.InvokeResult{Status: "error", Error: "no provider specified"}, executor.ErrProviderMissing
+			return executor.InvokeResult{Status: "error", Error: "no provider specified"}, backend.ErrorExecutorProviderMissing
 		}
 		p, err := providers.Get(req.Provider)
 		if err != nil {
-			return executor.InvokeResult{Status: "error", Error: "provider not registered: " + req.Provider}, executor.ErrProviderMissing
+			return executor.InvokeResult{Status: "error", Error: "provider not registered: " + req.Provider}, backend.ErrorExecutorProviderMissing
 		}
 		llmReq := &llm.Request{
 			Model: req.Model,

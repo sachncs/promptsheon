@@ -1,6 +1,7 @@
 package recommendation_test
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"errors"
 	. "github.com/sachncs/promptsheon/backend/recommendation"
 	"testing"
@@ -66,8 +67,8 @@ func TestNewSuperseded(t *testing.T) {
 
 func TestNewRejectsUnknownOutcome(t *testing.T) {
 	t.Parallel()
-	if _, err := NewDecision("rec-1", Outcome("maybe"), "alice", "", 0, false); !errors.Is(err, ErrUnknownOutcome) {
-		t.Fatalf("expected ErrUnknownOutcome, got %v", err)
+	if _, err := NewDecision("rec-1", Outcome("maybe"), "alice", "", 0, false); !errors.Is(err, backend.ErrorRecommendationUnknownOutcome) {
+		t.Fatalf("expected backend.ErrorRecommendationUnknownOutcome, got %v", err)
 	}
 }
 

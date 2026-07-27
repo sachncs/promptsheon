@@ -18,6 +18,7 @@
 package election
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"database/sql"
 	"errors"
@@ -25,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend"
 )
 
 // Leader carries the identity of the current leader plus the
@@ -83,13 +83,12 @@ func (e *Elector) EnsureTable(ctx context.Context) error {
 	return nil
 }
 
-// ErrNotLeader is returned by TryAcquire when this replica did
+// backend.ErrorElectionNotLeader is returned by TryAcquire when this replica did
 // not win the election. Callers should treat the local
 // replica as a read-only follower until Acquire succeeds.
-var ErrNotLeader = backend.ErrorElectionNotLeader
 
 // Acquire tries to claim the leader row. Returns nil when this
-// replica becomes (or already was) the leader; ErrNotLeader
+// replica becomes (or already was) the leader; backend.ErrorElectionNotLeader
 // when another replica currently holds the lease.
 //
 // The transaction is upgraded to a SQLite BEGIN IMMEDIATE so the
@@ -146,7 +145,7 @@ func (e *Elector) Acquire(ctx context.Context) error {
 			e.term = curTerm
 		} else if e.now().Before(expiresAt) {
 			// Held by someone else and the lease is still valid.
-			return ErrNotLeader
+			return backend.ErrorElectionNotLeader
 		} else {
 			// Stale lease — steal it but only if the lease is
 			// actually expired. The expires_at <= now guard
@@ -165,7 +164,7 @@ func (e *Elector) Acquire(ctx context.Context) error {
 				// Lost the race: the prior leader renewed
 				// between our SELECT and our UPDATE. Stay as
 				// follower.
-				return ErrNotLeader
+				return backend.ErrorElectionNotLeader
 			}
 			e.term = curTerm + 1
 		}
@@ -239,7 +238,7 @@ func (e *Elector) Run(ctx context.Context, errs chan<- error) {
 			return
 		case <-ticker.C:
 			if err := e.Acquire(ctx); err != nil {
-				if !errors.Is(err, ErrNotLeader) {
+				if !errors.Is(err, backend.ErrorElectionNotLeader) {
 					select {
 					case errs <- err:
 					default:

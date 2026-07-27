@@ -13,12 +13,12 @@
 package quota
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend"
 )
 
 // Scope identifies what a Quota applies to.
@@ -51,18 +51,16 @@ type Quota struct {
 	CreatedBy string    `json:"created_by"`
 }
 
-// ErrLimitNotPositive is returned when constructing a Quota with
+// backend.ErrorQuotaLimitNotPositive is returned when constructing a Quota with
 // a non-positive limit.
-var ErrLimitNotPositive = backend.ErrorQuotaLimitNotPositive
 
-// ErrOverLimit is returned by Charge when the window's used
+// backend.ErrorQuotaOverLimit is returned by Charge when the window's used
 // counter would exceed the limit.
-var ErrOverLimit = backend.ErrorQuotaOverLimit
 
 // New constructs a Quota at the start of the supplied window.
 func New(scope Scope, targetID string, window Window, limit int64, now time.Time, createdBy string) (Quota, error) {
 	if limit <= 0 {
-		return Quota{}, ErrLimitNotPositive
+		return Quota{}, backend.ErrorQuotaLimitNotPositive
 	}
 	switch scope {
 	case ScopeWorkspace, ScopeProvider:
@@ -91,7 +89,7 @@ func New(scope Scope, targetID string, window Window, limit int64, now time.Time
 	}, nil
 }
 
-// Charge increments the window counter; returns ErrOverLimit when
+// Charge increments the window counter; returns backend.ErrorQuotaOverLimit when
 // the limit is reached.
 func (q Quota) Charge(now time.Time) (Quota, error) {
 	if now.UTC().After(q.WindowEnd) || now.UTC().Equal(q.WindowEnd) {
@@ -99,7 +97,7 @@ func (q Quota) Charge(now time.Time) (Quota, error) {
 		q.Used = 0
 	}
 	if q.Used >= q.Limit {
-		return q, ErrOverLimit
+		return q, backend.ErrorQuotaOverLimit
 	}
 	q.Used++
 	return q, nil

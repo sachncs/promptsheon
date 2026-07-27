@@ -1,6 +1,7 @@
 package eval_test
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	. "github.com/sachncs/promptsheon/backend/eval"
 	"encoding/json"
 	"errors"
@@ -155,7 +156,7 @@ func TestJSONSchema_EmptySchema(t *testing.T) {
 
 // TestJSONSchema_RejectsUnsupportedKeywords locks in the SEC-3a
 // acceptance: a schema that uses only unsupported keywords
-// (allOf, $ref, oneOf) returns ErrUnsupportedSchema from
+// (allOf, $ref, oneOf) returns backend.ErrorEvalUnsupportedSchema from
 // ScoreCase.
 func TestJSONSchema_RejectsUnsupportedKeywords(t *testing.T) {
 	cases := []struct {
@@ -169,8 +170,8 @@ func TestJSONSchema_RejectsUnsupportedKeywords(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			_, err := (JSONSchema{}).ScoreCase(json.RawMessage(`"x"`), json.RawMessage(c.schema))
-			if !errors.Is(err, ErrUnsupportedSchema) {
-				t.Errorf("expected ErrUnsupportedSchema, got %v", err)
+			if !errors.Is(err, backend.ErrorEvalUnsupportedSchema) {
+				t.Errorf("expected backend.ErrorEvalUnsupportedSchema, got %v", err)
 			}
 		})
 	}

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/models"
-	"github.com/sachncs/promptsheon/backend/store"
 )
 
 const defaultAdminEmail = "admin@local"
@@ -358,7 +358,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 	// the writes, so two concurrent callers cannot both win:
 	// the second one sees ErrConflict and returns 409.
 	if err := s.db.BootstrapAdmin(r.Context(), admin, apiKey); err != nil {
-		if errors.Is(err, store.ErrConflict) {
+		if errors.Is(err, backend.ErrorStoreConflict) {
 			return &HTTPError{Status: http.StatusConflict, Message: "bootstrap is no longer available; the server already has users"}
 		}
 		return fmt.Errorf("bootstrap: %w", err)

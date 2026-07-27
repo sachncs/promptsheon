@@ -1,9 +1,9 @@
 package capability
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"fmt"
 
-	"github.com/sachncs/promptsheon/backend"
 )
 
 // ArtifactKind classifies a content-addressed reference inside a Manifest.
@@ -87,9 +87,8 @@ type Manifest struct {
 	MCPServers    []ArtifactRef `json:"mcp_servers,omitempty"`
 }
 
-// ErrEmptyManifest indicates a Manifest that has not been populated.
+// backend.ErrorCapabilityEmptyManifest indicates a Manifest that has not been populated.
 // An empty Manifest must never be deployed, approved, or evaluated.
-var ErrEmptyManifest = backend.ErrorCapabilityEmptyManifest
 
 // Validate checks structural correctness of the Manifest.
 //
@@ -131,7 +130,7 @@ func (m Manifest) Validate() error {
 	if m.Prompt.Hash == "" &&
 		m.ModelPolicy.Hash == "" &&
 		m.RuntimePolicy.Hash == "" {
-		return ErrEmptyManifest
+		return backend.ErrorCapabilityEmptyManifest
 	}
 	return nil
 }

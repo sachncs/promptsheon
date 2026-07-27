@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"fmt"
 	"os"
@@ -136,7 +137,7 @@ func NewPreconditionRunner() *PreconditionRunner {
 
 // Run executes every precondition in preconditions. It returns the
 // per-hook results plus a non-nil error if any precondition failed;
-// the error wraps ErrPreconditionFailed and carries a Failure list
+// the error wraps backend.ErrorHarnessPreconditionFailed and carries a Failure list
 // describing each failure.
 //
 // Run is fail-fast: it stops at the first failing precondition and
@@ -271,7 +272,7 @@ func TruncateOutput(s string, max int) string {
 
 // PreconditionError is the typed error returned by Run when one or
 // more preconditions fail. The HTTP layer matches errors.Is(err,
-// ErrPreconditionFailed) and converts to 409 with the Failure list.
+// backend.ErrorHarnessPreconditionFailed) and converts to 409 with the Failure list.
 type PreconditionError struct {
 	Failures []Failure
 }
@@ -287,4 +288,4 @@ func (e *PreconditionError) Error() string {
 	return fmt.Sprintf("precondition failed: %s", strings.Join(names, ", "))
 }
 
-func (e *PreconditionError) Unwrap() error { return ErrPreconditionFailed }
+func (e *PreconditionError) Unwrap() error { return backend.ErrorHarnessPreconditionFailed }

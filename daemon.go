@@ -2,6 +2,7 @@
 package main
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"database/sql"
 	"encoding/hex"
@@ -230,7 +231,7 @@ func runDaemon() {
 				logger.Warn("leader-election error", "err", e)
 			}
 		}()
-		if err := elector.Acquire(rootCtx); err != nil && !errors.Is(err, election.ErrNotLeader) {
+		if err := elector.Acquire(rootCtx); err != nil && !errors.Is(err, backend.ErrorElectionNotLeader) {
 			logger.Warn("initial leader acquire failed", "err", err)
 		}
 		logger.Info("leader-election active", "pod", podName)
@@ -540,14 +541,14 @@ func buildServer(rootCtx context.Context, cfg *config.Config, db *store.SQLite, 
 		// on a random provider, then be recorded as a successful
 		// "stub execution" because the Caller swallowed the error.
 		if req.Provider == "" {
-			return executor.InvokeResult{Status: "error", Error: "no provider specified in invocation"}, executor.ErrProviderMissing
+			return executor.InvokeResult{Status: "error", Error: "no provider specified in invocation"}, backend.ErrorExecutorProviderMissing
 		}
 		p, err := providers.Get(req.Provider)
 		if err != nil {
-			return executor.InvokeResult{Status: "error", Error: "provider not registered: " + req.Provider}, executor.ErrProviderMissing
+			return executor.InvokeResult{Status: "error", Error: "provider not registered: " + req.Provider}, backend.ErrorExecutorProviderMissing
 		}
 		if req.Model == "" || req.Model == "<unspecified>" {
-			return executor.InvokeResult{Status: "error", Error: "no model configured"}, executor.ErrProviderMissing
+			return executor.InvokeResult{Status: "error", Error: "no model configured"}, backend.ErrorExecutorProviderMissing
 		}
 		llmReq := &llm.Request{
 			Messages: []llm.Message{{Role: "user", Content: string(req.Input)}},

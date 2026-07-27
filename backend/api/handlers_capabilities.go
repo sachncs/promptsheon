@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -411,7 +412,7 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 			if errors.As(err, &cycle) {
 				return &HTTPError{Status: http.StatusUnprocessableEntity, Message: err.Error()}
 			}
-			if errors.Is(err, capability.ErrInheritanceTooDeep) {
+			if errors.Is(err, backend.ErrorCapabilityInheritanceTooDeep) {
 				return &HTTPError{Status: http.StatusUnprocessableEntity, Message: err.Error()}
 			}
 			return &HTTPError{Status: http.StatusBadRequest, Message: err.Error()}
@@ -499,7 +500,7 @@ func (s *Server) handleListExecutions(w http.ResponseWriter, r *http.Request) er
 // requested model) to 502 Bad Gateway with a provider_missing
 // detail so operators can distinguish "no provider" from
 // "provider failed" without reading the daemon log. BUG-19.
-var errProviderMissing = executor.ErrProviderMissing
+var errProviderMissing = backend.ErrorExecutorProviderMissing
 
 func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) error {
 	capabilityVersionID := r.PathValue("version_id")

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"errors"
 	"fmt"
@@ -147,19 +148,19 @@ func (s *Server) handleActivateRelease(w http.ResponseWriter, r *http.Request) e
 	releaseID := r.PathValue("id")
 	activated, err := s.releaseSvc.Activate(r.Context(), releaseID)
 	if err != nil {
-		if errors.Is(err, release.ErrNotPending) {
+		if errors.Is(err, backend.ErrorReleaseNotPending) {
 			return &HTTPError{Status: http.StatusConflict, Message: err.Error()}
 		}
-		if errors.Is(err, approval.ErrCreatorVoted) || errors.Is(err, approval.ErrQuorumNotSatisfied) {
+		if errors.Is(err, backend.ErrorApprovalCreatorVoted) || errors.Is(err, backend.ErrorApprovalQuorumNotMet) {
 			return &HTTPError{Status: http.StatusConflict, Message: err.Error()}
 		}
-		if errors.Is(err, approval.ErrNotFound) {
+		if errors.Is(err, backend.ErrorApprovalNotFound) {
 			return &HTTPError{Status: http.StatusConflict, Message: "no votes recorded; quorum not satisfied"}
 		}
-		if errors.Is(err, release.ErrNotFound) {
+		if errors.Is(err, backend.ErrorReleaseNotFound) {
 			return ErrNotFound
 		}
-		if errors.Is(err, harness.ErrPreconditionFailed) {
+		if errors.Is(err, backend.ErrorHarnessPreconditionFailed) {
 			var pe *harness.PreconditionError
 			if errors.As(err, &pe) {
 				return &HTTPError{
@@ -180,7 +181,7 @@ func (s *Server) handleActivateRelease(w http.ResponseWriter, r *http.Request) e
 func (s *Server) handleRollbackRelease(w http.ResponseWriter, r *http.Request) error {
 	rolled, err := s.releaseSvc.Rollback(r.Context(), r.PathValue("id"))
 	if err != nil {
-		if errors.Is(err, release.ErrNotFound) {
+		if errors.Is(err, backend.ErrorReleaseNotFound) {
 			return ErrNotFound
 		}
 		return badRequest(err.Error())

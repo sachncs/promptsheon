@@ -11,11 +11,11 @@
 package manifest
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"fmt"
 	"os"
 	"regexp"
 
-	"github.com/sachncs/promptsheon/backend"
 	"gopkg.in/yaml.v3"
 )
 
@@ -36,12 +36,10 @@ type Entry struct {
 	MinCoreVersion string   `yaml:"min_core_version"`
 }
 
-// ErrEmpty is returned when a manifest is empty.
-var ErrEmpty = backend.ErrorManifestEmpty
+// backend.ErrorManifestEmpty is returned when a manifest is empty.
 
-// ErrBadName is returned when a plugin Name is empty or fails
+// backend.ErrorManifestBadName is returned when a plugin Name is empty or fails
 // the same closed-set as the MCP allowlist.
-var ErrBadName = backend.ErrorManifestBadName
 
 // Load reads the manifest from path and validates each entry.
 func Load(path string) (*File, error) {
@@ -54,7 +52,7 @@ func Load(path string) (*File, error) {
 		return nil, fmt.Errorf("manifest: parse: %w", err)
 	}
 	if len(f.Plugins) == 0 {
-		return nil, ErrEmpty
+		return nil, backend.ErrorManifestEmpty
 	}
 	for i := range f.Plugins {
 		if err := f.Plugins[i].Validate(); err != nil {
@@ -64,23 +62,22 @@ func Load(path string) (*File, error) {
 	return &f, nil
 }
 
-// ErrBadUDS is returned when a manifest entry's UDS path does
+// backend.ErrorManifestBadUDS is returned when a manifest entry's UDS path does
 // not live under /tmp/promptsheon/. The path namespace avoids
 // collisions with system sockets and keeps plugin lifecycles
 // scoped to a single tenant.
-var ErrBadUDS = backend.ErrorManifestBadUDS
 
 // Validate enforces the closed-set Name, a non-empty Binary, and
 // (if set) a UDS path that points under /tmp/promptsheon/.
 func (e Entry) Validate() error {
 	if !namePattern.MatchString(e.Name) {
-		return fmt.Errorf("%w: %q", ErrBadName, e.Name)
+		return fmt.Errorf("%w: %q", backend.ErrorManifestBadName, e.Name)
 	}
 	if e.Binary == "" {
 		return fmt.Errorf("manifest: empty binary path for %q", e.Name)
 	}
 	if e.UDS != "" && !udsPattern.MatchString(e.UDS) {
-		return fmt.Errorf("%w: got %q", ErrBadUDS, e.UDS)
+		return fmt.Errorf("%w: got %q", backend.ErrorManifestBadUDS, e.UDS)
 	}
 	return nil
 }

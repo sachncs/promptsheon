@@ -24,7 +24,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/capability"
 )
 
@@ -54,9 +53,8 @@ type Subscription interface {
 	Cancel()
 }
 
-// ErrAlreadyCanceled is returned by a Handler whose Subscription has
+// backend.ErrorEventBusAlreadyCanceled is returned by a Handler whose Subscription has
 // been Canceled; consumers should treat it as "stop processing".
-var ErrAlreadyCanceled = backend.ErrorEventBusAlreadyCanceled
 
 // subscription is the internal handle.
 //
@@ -204,7 +202,7 @@ func (m *Memory) IsAsync() bool { return m.queue != nil }
 
 // Subscribe registers Handler for the supplied event types.
 //
-// Subscribe returns ErrAlreadyCanceled only if the Memory has been
+// Subscribe returns backend.ErrorEventBusAlreadyCanceled only if the Memory has been
 // Closed; under normal operation it returns nil error.
 func (m *Memory) Subscribe(handler Handler, eventTypes ...capability.EventType) (Subscription, error) {
 	if handler == nil {

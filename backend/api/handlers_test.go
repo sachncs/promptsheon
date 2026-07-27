@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -135,7 +136,7 @@ func (m *mockRepo) BootstrapAdmin(_ context.Context, u *models.User, key *models
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if len(m.users) > 0 {
-		return store.ErrConflict
+		return backend.ErrorStoreConflict
 	}
 	m.users[u.ID] = u
 	m.apiKeys[key.ID] = key
@@ -458,7 +459,7 @@ func (m *mockRepo) UpdateSelfEvolveConfig(_ context.Context, id string, cfg capa
 	defer m.mu.Unlock()
 	c, ok := m.capabilities[id]
 	if !ok {
-		return store.ErrNotFound
+		return backend.ErrorStoreNotFound
 	}
 	c.SelfEvolve = cfg
 	m.capabilities[id] = c
@@ -498,7 +499,7 @@ func (m *mockRepo) GetVersionByNumber(_ context.Context, capabilityID string, ve
 	if v, ok := m.versions[fmt.Sprintf("%s_%d", capabilityID, version)]; ok {
 		return v, nil
 	}
-	return nil, store.ErrNotFound
+	return nil, backend.ErrorStoreNotFound
 }
 
 func (m *mockRepo) SetCapabilityContract(_ context.Context, capabilityID string, c *capability.CapabilityContract) error {
@@ -514,7 +515,7 @@ func (m *mockRepo) GetCapabilityContract(_ context.Context, capabilityID string)
 	if c, ok := m.contracts[capabilityID]; ok {
 		return c, nil
 	}
-	return nil, store.ErrNotFound
+	return nil, backend.ErrorStoreNotFound
 }
 
 func (m *mockRepo) GetCapabilityReputation(_ context.Context, capabilityID string) (capability.Reputation, error) {
@@ -533,7 +534,7 @@ func (m *mockRepo) GetLatestVersion(_ context.Context, capabilityID string) (*ca
 	defer m.mu.Unlock()
 	versions := m.versionsByCap[capabilityID]
 	if len(versions) == 0 {
-		return nil, store.ErrNotFound
+		return nil, backend.ErrorStoreNotFound
 	}
 	latest := versions[0]
 	for _, v := range versions[1:] {
@@ -585,7 +586,7 @@ func (m *mockRepo) GetRelease(_ context.Context, id string) (*release.Release, e
 	defer m.mu.Unlock()
 	r, ok := m.releases[id]
 	if !ok {
-		return nil, release.ErrNotFound
+		return nil, backend.ErrorReleaseNotFound
 	}
 	cp := *r
 	return &cp, nil
@@ -616,7 +617,7 @@ func (m *mockRepo) UpdateRelease(_ context.Context, r *release.Release) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.releases[r.ID]; !ok {
-		return release.ErrNotFound
+		return backend.ErrorReleaseNotFound
 	}
 	cp := *r
 	m.releases[r.ID] = &cp
@@ -639,13 +640,13 @@ func (m *mockRepo) ActivateAtomic(_ context.Context, prior, next *release.Releas
 	defer m.mu.Unlock()
 	if prior != nil {
 		if _, ok := m.releases[prior.ID]; !ok {
-			return release.ErrNotFound
+			return backend.ErrorReleaseNotFound
 		}
 		cp := *prior
 		m.releases[prior.ID] = &cp
 	}
 	if _, ok := m.releases[next.ID]; !ok {
-		return release.ErrNotFound
+		return backend.ErrorReleaseNotFound
 	}
 	cp := *next
 	m.releases[next.ID] = &cp
@@ -665,7 +666,7 @@ func (m *mockRepo) GetApproval(_ context.Context, releaseID string) (*approval.A
 	defer m.mu.Unlock()
 	a, ok := m.approvals[releaseID]
 	if !ok {
-		return nil, approval.ErrNotFound
+		return nil, backend.ErrorApprovalNotFound
 	}
 	cp := *a
 	return &cp, nil
@@ -674,7 +675,7 @@ func (m *mockRepo) UpdateApproval(_ context.Context, a *approval.Approval) error
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.approvals[a.ReleaseID]; !ok {
-		return approval.ErrNotFound
+		return backend.ErrorApprovalNotFound
 	}
 	cp := *a
 	m.approvals[a.ReleaseID] = &cp
@@ -700,7 +701,7 @@ func (m *mockRepo) GetDataset(_ context.Context, id string) (*harness.Dataset, e
 	defer m.mu.Unlock()
 	d, ok := m.datasets[id]
 	if !ok {
-		return nil, store.ErrNotFound
+		return nil, backend.ErrorStoreNotFound
 	}
 	cp := *d
 	return &cp, nil
@@ -765,7 +766,7 @@ func (m *mockRepo) GetPrecondition(_ context.Context, id string) (*harness.Preco
 	defer m.mu.Unlock()
 	p, ok := m.preconditions[id]
 	if !ok {
-		return nil, store.ErrNotFound
+		return nil, backend.ErrorStoreNotFound
 	}
 	cp := *p
 	return &cp, nil
@@ -774,7 +775,7 @@ func (m *mockRepo) UpdatePrecondition(_ context.Context, p *harness.Precondition
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.preconditions[p.ID]; !ok {
-		return store.ErrNotFound
+		return backend.ErrorStoreNotFound
 	}
 	cp := *p
 	m.preconditions[p.ID] = &cp
@@ -807,7 +808,7 @@ func (m *mockRepo) GetEvalRun(_ context.Context, id string) (*harness.EvalRun, e
 	defer m.mu.Unlock()
 	r, ok := m.evalRuns[id]
 	if !ok {
-		return nil, store.ErrNotFound
+		return nil, backend.ErrorStoreNotFound
 	}
 	cp := *r
 	return &cp, nil

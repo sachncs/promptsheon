@@ -1,6 +1,7 @@
 package approval_test
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	. "github.com/sachncs/promptsheon/backend/approval"
 	"errors"
 	"testing"
@@ -31,8 +32,8 @@ func TestRecordRejectsEmptyIdentity(t *testing.T) {
 func TestRecordRejectsUnknownDecision(t *testing.T) {
 	t.Parallel()
 	a := Approval{}
-	if _, err := a.Record(vote("alice", Decision("maybe"), "")); !errors.Is(err, ErrUnknownDecision) {
-		t.Fatalf("expected ErrUnknownDecision, got %v", err)
+	if _, err := a.Record(vote("alice", Decision("maybe"), "")); !errors.Is(err, backend.ErrorApprovalUnknownDecision) {
+		t.Fatalf("expected backend.ErrorApprovalUnknownDecision, got %v", err)
 	}
 }
 
@@ -40,8 +41,8 @@ func TestRecordRejectsDuplicateIdentity(t *testing.T) {
 	t.Parallel()
 	a := Approval{}
 	a, _ = a.Record(vote("alice", Approve, ""))
-	if _, err := a.Record(vote("alice", Approve, "oops")); !errors.Is(err, ErrDuplicateIdentity) {
-		t.Fatalf("expected ErrDuplicateIdentity, got %v", err)
+	if _, err := a.Record(vote("alice", Approve, "oops")); !errors.Is(err, backend.ErrorApprovalDuplicateIdentity) {
+		t.Fatalf("expected backend.ErrorApprovalDuplicateIdentity, got %v", err)
 	}
 }
 

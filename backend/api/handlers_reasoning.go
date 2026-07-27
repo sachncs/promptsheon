@@ -8,6 +8,7 @@
 package api
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"context"
 	"encoding/json"
 	"errors"
@@ -35,9 +36,9 @@ func (s *Server) handleReasoningCompile(w http.ResponseWriter, r *http.Request) 
 	plan, err := reasoning.NewCompiler(catalog).Compile(r.Context(), intent)
 	if err != nil {
 		switch {
-		case errors.Is(err, reasoning.ErrNoMatch):
+		case errors.Is(err, backend.ErrorReasoningNoMatch):
 			return &HTTPError{Status: http.StatusNotFound, Message: err.Error()}
-		case errors.Is(err, reasoning.ErrConstraintViolation):
+		case errors.Is(err, backend.ErrorReasoningConstraintViolation):
 			return &HTTPError{Status: http.StatusConflict, Message: err.Error()}
 		default:
 			return &HTTPError{Status: http.StatusBadRequest, Message: err.Error()}

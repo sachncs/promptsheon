@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -114,7 +115,7 @@ func TestHarnessPreconditionBlocksActivate(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected activate to fail when precondition fails")
 	}
-	if !errors.Is(err, harness.ErrPreconditionFailed) {
+	if !errors.Is(err, backend.ErrorHarnessPreconditionFailed) {
 		t.Fatalf("expected ErrPreconditionFailed, got %v", err)
 	}
 }

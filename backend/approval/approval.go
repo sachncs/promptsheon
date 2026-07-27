@@ -10,11 +10,11 @@
 package approval
 
 import (
+	"github.com/sachncs/promptsheon/backend"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend"
 )
 
 // Decision is the per-identity vote on a Release.
@@ -70,23 +70,19 @@ type Approval struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// ErrDuplicateIdentity is returned when the same identity tries to
+// backend.ErrorApprovalDuplicateIdentity is returned when the same identity tries to
 // vote twice on the same Release.
-var ErrDuplicateIdentity = backend.ErrorApprovalDuplicateIdentity
 
-// ErrCreatorVoted is returned by MakerCheckerPolicy.Evaluate when
+// backend.ErrorApprovalCreatorVoted is returned by MakerCheckerPolicy.Evaluate when
 // the Release creator is found in the votes list. The policy
 // owns the separation-of-duties check; no separate helper is
 // required.
-var ErrCreatorVoted = backend.ErrorApprovalCreatorVoted
 
-// ErrQuorumNotSatisfied is returned when the Policy reports the
+// backend.ErrorApprovalQuorumNotMet is returned when the Policy reports the
 // supplied votes do not yet constitute an Approved state.
-var ErrQuorumNotSatisfied = backend.ErrorApprovalQuorumNotMet
 
-// ErrUnknownDecision is returned when a decision value is not one of
+// backend.ErrorApprovalUnknownDecision is returned when a decision value is not one of
 // the supported closed-set values.
-var ErrUnknownDecision = backend.ErrorApprovalUnknownDecision
 
 // Record adds a vote to the Approval and returns a new value. The
 // caller is expected to re-evaluate the Policy after each Record.
@@ -101,11 +97,11 @@ func (a Approval) Record(v Vote) (Approval, error) {
 	switch v.Decision {
 	case Approve, Reject, Abstain:
 	default:
-		return a, fmt.Errorf("%w: %q", ErrUnknownDecision, v.Decision)
+		return a, fmt.Errorf("%w: %q", backend.ErrorApprovalUnknownDecision, v.Decision)
 	}
 	for _, existing := range a.Votes {
 		if existing.Identity == v.Identity {
-			return a, ErrDuplicateIdentity
+			return a, backend.ErrorApprovalDuplicateIdentity
 		}
 	}
 	if v.Timestamp.IsZero() {
@@ -151,7 +147,7 @@ func (p MajorityPolicy) Evaluate(votes []Vote) (State, bool, error) {
 // MakerCheckerPolicy requires the creator to abstain and at least one
 // other identity to Approve. The separation-of-duties rule is
 // enforced inside Evaluate: any vote whose Identity matches Creator
-// fails the entire evaluation with ErrCreatorVoted (the rejected
+// fails the entire evaluation with backend.ErrorApprovalCreatorVoted (the rejected
 // state is not advanced). Callers no longer need to invoke a
 // side-check helper.
 //
@@ -160,7 +156,7 @@ func (p MajorityPolicy) Evaluate(votes []Vote) (State, bool, error) {
 //
 //   - RequiredApprovers <= 0  →  error "RequiredApprovers must be positive"
 //   - Creator == ""           →  error "Creator is required for maker-checker enforcement"
-//   - any vote by Creator     →  error ErrCreatorVoted
+//   - any vote by Creator     →  error backend.ErrorApprovalCreatorVoted
 //
 // The policy will NEVER report StateApproved without a
 // non-creator Approve vote. The previous version silently
@@ -181,7 +177,7 @@ func (p MakerCheckerPolicy) Evaluate(votes []Vote) (State, bool, error) {
 	}
 	for _, v := range votes {
 		if v.Identity == p.Creator {
-			return "", false, ErrCreatorVoted
+			return "", false, backend.ErrorApprovalCreatorVoted
 		}
 		if v.Decision == Reject {
 			return StateRejected, false, nil
