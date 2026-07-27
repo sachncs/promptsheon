@@ -11,7 +11,7 @@
 package invoke
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -111,7 +111,7 @@ var (
 // them.
 func (i *Invoker) Invoke(ctx context.Context, req executor.InvokeRequest) (executor.ExecutionRecord, error) {
 	if err := i.enforcer.EnforceQuota(ctx, req.WorkspaceID); err != nil {
-		if errors.Is(err, backend.ErrorQuotaOverLimit) {
+		if errors.Is(err, errs.ErrorQuotaOverLimit) {
 			return executor.ExecutionRecord{}, ErrQuotaExceeded
 		}
 		return executor.ExecutionRecord{}, fmt.Errorf("%w: %w", ErrQuotaEnforcer, err)
@@ -121,7 +121,7 @@ func (i *Invoker) Invoke(ctx context.Context, req executor.InvokeRequest) (execu
 		return rec, err
 	}
 	if err := i.enforcer.EnforceBudget(ctx, req.WorkspaceID, rec.CostUSD); err != nil {
-		if errors.Is(err, backend.ErrorBudgetCapExceeded) {
+		if errors.Is(err, errs.ErrorBudgetCapExceeded) {
 			rec.Status = "budget_exceeded"
 			i.agg.Add(rec)
 			return rec, ErrBudgetExceeded

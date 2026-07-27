@@ -1,7 +1,7 @@
 package sqliteimpl
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -42,7 +42,7 @@ func (r *RecommendationRepository) GetRecommendation(ctx context.Context, id str
 	var payload string
 	err := r.db.QueryRowContext(ctx, `SELECT payload FROM recommendations WHERE id = ?`, id).Scan(&payload)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, backend.ErrorRecommendationNotFound
+		return nil, errs.ErrorRecommendationNotFound
 	}
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (r *RecommendationRepository) UpdateRecommendation(ctx context.Context, rec
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return backend.ErrorRecommendationNotFound
+		return errs.ErrorRecommendationNotFound
 	}
 	return nil
 }
@@ -115,7 +115,7 @@ func (r *RecommendationRepository) GetDecision(ctx context.Context, recommendati
 	var payload string
 	err := r.db.QueryRowContext(ctx, `SELECT payload FROM decisions WHERE recommendation_id = ? ORDER BY created_at DESC LIMIT 1`, recommendationID).Scan(&payload)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, backend.ErrorRecommendationNotFound
+		return nil, errs.ErrorRecommendationNotFound
 	}
 	if err != nil {
 		return nil, err

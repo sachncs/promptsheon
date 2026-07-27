@@ -5,7 +5,7 @@
 package release
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -92,7 +92,7 @@ func (s *Service) Create(ctx context.Context, capabilityID string, capabilityVer
 // and returns the updated Approval.
 func (s *Service) Vote(ctx context.Context, releaseID string, vote approval.Vote) (*approval.Approval, error) {
 	a, err := s.App.GetApproval(ctx, releaseID)
-	if errors.Is(err, backend.ErrorApprovalNotFound) {
+	if errors.Is(err, errs.ErrorApprovalNotFound) {
 		// First vote on this release.
 		a = &approval.Approval{ReleaseID: releaseID, UpdatedAt: s.Clock()}
 	} else if err != nil {
@@ -159,7 +159,7 @@ func (s *Service) activateWith(ctx context.Context, releaseID string, policy app
 		return nil, err
 	}
 	if r.Status != StatusPending {
-		return nil, backend.ErrorReleaseNotPending
+		return nil, errs.ErrorReleaseNotPending
 	}
 
 	a, err := s.App.GetApproval(ctx, releaseID)

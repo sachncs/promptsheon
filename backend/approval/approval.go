@@ -10,7 +10,7 @@
 package approval
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"errors"
 	"fmt"
 	"time"
@@ -70,18 +70,18 @@ type Approval struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// backend.ErrorApprovalDuplicateIdentity is returned when the same identity tries to
+// errs.ErrorApprovalDuplicateIdentity is returned when the same identity tries to
 // vote twice on the same Release.
 
-// backend.ErrorApprovalCreatorVoted is returned by MakerCheckerPolicy.Evaluate when
+// errs.ErrorApprovalCreatorVoted is returned by MakerCheckerPolicy.Evaluate when
 // the Release creator is found in the votes list. The policy
 // owns the separation-of-duties check; no separate helper is
 // required.
 
-// backend.ErrorApprovalQuorumNotMet is returned when the Policy reports the
+// errs.ErrorApprovalQuorumNotMet is returned when the Policy reports the
 // supplied votes do not yet constitute an Approved state.
 
-// backend.ErrorApprovalUnknownDecision is returned when a decision value is not one of
+// errs.ErrorApprovalUnknownDecision is returned when a decision value is not one of
 // the supported closed-set values.
 
 // Record adds a vote to the Approval and returns a new value. The
@@ -97,11 +97,11 @@ func (a Approval) Record(v Vote) (Approval, error) {
 	switch v.Decision {
 	case Approve, Reject, Abstain:
 	default:
-		return a, fmt.Errorf("%w: %q", backend.ErrorApprovalUnknownDecision, v.Decision)
+		return a, fmt.Errorf("%w: %q", errs.ErrorApprovalUnknownDecision, v.Decision)
 	}
 	for _, existing := range a.Votes {
 		if existing.Identity == v.Identity {
-			return a, backend.ErrorApprovalDuplicateIdentity
+			return a, errs.ErrorApprovalDuplicateIdentity
 		}
 	}
 	if v.Timestamp.IsZero() {
@@ -147,7 +147,7 @@ func (p MajorityPolicy) Evaluate(votes []Vote) (State, bool, error) {
 // MakerCheckerPolicy requires the creator to abstain and at least one
 // other identity to Approve. The separation-of-duties rule is
 // enforced inside Evaluate: any vote whose Identity matches Creator
-// fails the entire evaluation with backend.ErrorApprovalCreatorVoted (the rejected
+// fails the entire evaluation with errs.ErrorApprovalCreatorVoted (the rejected
 // state is not advanced). Callers no longer need to invoke a
 // side-check helper.
 //
@@ -156,7 +156,7 @@ func (p MajorityPolicy) Evaluate(votes []Vote) (State, bool, error) {
 //
 //   - RequiredApprovers <= 0  →  error "RequiredApprovers must be positive"
 //   - Creator == ""           →  error "Creator is required for maker-checker enforcement"
-//   - any vote by Creator     →  error backend.ErrorApprovalCreatorVoted
+//   - any vote by Creator     →  error errs.ErrorApprovalCreatorVoted
 //
 // The policy will NEVER report StateApproved without a
 // non-creator Approve vote. The previous version silently
@@ -177,7 +177,7 @@ func (p MakerCheckerPolicy) Evaluate(votes []Vote) (State, bool, error) {
 	}
 	for _, v := range votes {
 		if v.Identity == p.Creator {
-			return "", false, backend.ErrorApprovalCreatorVoted
+			return "", false, errs.ErrorApprovalCreatorVoted
 		}
 		if v.Decision == Reject {
 			return StateRejected, false, nil

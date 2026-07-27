@@ -85,7 +85,7 @@ func TestManifestWithOptionalsStillValid(t *testing.T) {
 func TestManifestEmpty(t *testing.T) {
 	t.Parallel()
 	if err := (Manifest{}).Validate(); err == nil {
-		t.Fatalf("expected backend.ErrorCapabilityEmptyManifest")
+		t.Fatalf("expected errs.ErrorCapabilityEmptyManifest")
 	}
 }
 

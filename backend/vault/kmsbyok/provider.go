@@ -13,7 +13,7 @@
 package kmsbyok
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -31,7 +31,7 @@ type VaultStore interface {
 	SaveVaultState(ctx context.Context, vs *models.VaultState) error
 }
 
-// backend.ErrorVaultKMSClientRequired is returned when the Provider is
+// errs.ErrorVaultKMSClientRequired is returned when the Provider is
 // constructed without a KMSClient. Production tenants MUST wire a
 // real AWS KMS client; the only consumers allowed to use the
 // nil-client path are tests that explicitly inject a test double
@@ -230,7 +230,7 @@ func New(cfg Config) (*Provider, error) {
 	}
 	if !cfg.AllowTestDouble {
 		if cfg.KMSClient == nil {
-			return nil, backend.ErrorVaultKMSClientRequired
+			return nil, errs.ErrorVaultKMSClientRequired
 		}
 		if cfg.Store == nil {
 			return nil, errors.New("kmsbyok: Store required (production); tests must set AllowTestDouble")
@@ -368,7 +368,7 @@ func (p *Provider) Rotate(ctx context.Context) error {
 		return errors.New("kmsbyok: Store required (production); tests must set AllowTestDouble")
 	}
 	if p.cfg.KMSClient == nil {
-		return backend.ErrorVaultKMSClientRequired
+		return errs.ErrorVaultKMSClientRequired
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()

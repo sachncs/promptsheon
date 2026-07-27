@@ -2,7 +2,7 @@
 package context
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"errors"
 	"strings"
 
@@ -48,7 +48,7 @@ const (
 	StrategyNone Strategy = "none"
 )
 
-// backend.ErrorContextBudgetExhausted is returned when the strategy cannot trim the
+// errs.ErrorContextBudgetExhausted is returned when the strategy cannot trim the
 // context below the budget without losing the system message. The
 // caller should fall back to a smaller model or split the call.
 
@@ -91,7 +91,7 @@ func (m *Manager) EstimateTokens(text string) int {
 // ordered by the Strategy ("tail" keeps the most recent,
 // "head" keeps the oldest). Truncation stops once the running
 // total fits in Budget; if the SystemMessage itself exceeds
-// Budget, backend.ErrorContextBudgetExhausted is returned.
+// Budget, errs.ErrorContextBudgetExhausted is returned.
 func (m *Manager) Assemble(in Inputs) (AssembledContext, error) {
 	if in.Strategy == "" {
 		in.Strategy = StrategyTail
@@ -101,7 +101,7 @@ func (m *Manager) Assemble(in Inputs) (AssembledContext, error) {
 	}
 	sysTokens := m.estimateTokens(in.SystemMessage)
 	if sysTokens > in.Budget {
-		return AssembledContext{}, backend.ErrorContextBudgetExhausted
+		return AssembledContext{}, errs.ErrorContextBudgetExhausted
 	}
 	remaining := in.Budget - sysTokens
 

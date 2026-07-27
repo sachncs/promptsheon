@@ -18,7 +18,7 @@
 package election
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"database/sql"
 	"errors"
@@ -83,12 +83,12 @@ func (e *Elector) EnsureTable(ctx context.Context) error {
 	return nil
 }
 
-// backend.ErrorElectionNotLeader is returned by TryAcquire when this replica did
+// errs.ErrorElectionNotLeader is returned by TryAcquire when this replica did
 // not win the election. Callers should treat the local
 // replica as a read-only follower until Acquire succeeds.
 
 // Acquire tries to claim the leader row. Returns nil when this
-// replica becomes (or already was) the leader; backend.ErrorElectionNotLeader
+// replica becomes (or already was) the leader; errs.ErrorElectionNotLeader
 // when another replica currently holds the lease.
 //
 // The transaction is upgraded to a SQLite BEGIN IMMEDIATE so the
@@ -145,7 +145,7 @@ func (e *Elector) Acquire(ctx context.Context) error {
 			e.term = curTerm
 		} else if e.now().Before(expiresAt) {
 			// Held by someone else and the lease is still valid.
-			return backend.ErrorElectionNotLeader
+			return errs.ErrorElectionNotLeader
 		} else {
 			// Stale lease — steal it but only if the lease is
 			// actually expired. The expires_at <= now guard
@@ -164,7 +164,7 @@ func (e *Elector) Acquire(ctx context.Context) error {
 				// Lost the race: the prior leader renewed
 				// between our SELECT and our UPDATE. Stay as
 				// follower.
-				return backend.ErrorElectionNotLeader
+				return errs.ErrorElectionNotLeader
 			}
 			e.term = curTerm + 1
 		}
@@ -228,7 +228,7 @@ func (e *Elector) Current(ctx context.Context) (Leader, error) {
 // TTL/2 and stepping down on cancel. Errors are logged via the
 // returned channel and do not stop the loop; a renewal failure
 // causes the replica to lose leadership after TTL expires.
-func (e *Elector) Run(ctx context.Context, errs chan<- error) {
+func (e *Elector) Run(ctx context.Context, errCh chan<- error) {
 	ticker := time.NewTicker(e.ttl / 2)
 	defer ticker.Stop()
 	for {
@@ -238,9 +238,9 @@ func (e *Elector) Run(ctx context.Context, errs chan<- error) {
 			return
 		case <-ticker.C:
 			if err := e.Acquire(ctx); err != nil {
-				if !errors.Is(err, backend.ErrorElectionNotLeader) {
+				if !errors.Is(err, errs.ErrorElectionNotLeader) {
 					select {
-					case errs <- err:
+					case errCh <- err:
 					default:
 					}
 				}

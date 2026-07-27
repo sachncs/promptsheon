@@ -47,7 +47,7 @@ const (
 	RunError   RunStatus = "error"
 )
 
-// backend.ErrorHarnessPreconditionFailed is returned by Activate when one or more
+// errs.ErrorHarnessPreconditionFailed is returned by Activate when one or more
 // preconditions for the Release's Capability failed. Failures
 // carries the per-hook name + output for the handler to surface.
 

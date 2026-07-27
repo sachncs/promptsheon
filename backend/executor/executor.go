@@ -32,7 +32,7 @@ import (
 // implementation that talks to the right plugin / built-in.
 type Caller func(ctx context.Context, req InvokeRequest) (InvokeResult, error)
 
-// backend.ErrorExecutorProviderMissing is returned by a Caller when the request names
+// errs.ErrorExecutorProviderMissing is returned by a Caller when the request names
 // a model whose provider is not registered, or names no provider at
 // all. The handler maps this to a 502 Bad Gateway so operators can
 // distinguish "no provider configured" from "provider failed"
@@ -184,7 +184,7 @@ func (e *Executor) RunRequest(ctx context.Context, req InvokeRequest, environmen
 	if err != nil {
 		rec.Status = "error"
 		rec.Error = err.Error()
-		// ponytail: BUG-19 used to swallow non-backend.ErrorExecutorProviderMissing
+		// ponytail: BUG-19 used to swallow non-errs.ErrorExecutorProviderMissing
 		// errors (return nil) so the API path could 201 with the
 		// error in the body. That hid provider-side errors from
 		// the eval harness, which only sees Go-errors. Now we

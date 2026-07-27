@@ -1,7 +1,7 @@
 package release_test
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	. "github.com/sachncs/promptsheon/backend/release"
 	"errors"
 	"testing"
@@ -79,8 +79,8 @@ func TestApproveRejectsWrongState(t *testing.T) {
 		approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
 	)
 	r, _ = r.ApproveWith(a, approval.MajorityPolicy{Required: 1})
-	if _, err := r.ApproveWith(a, approval.MajorityPolicy{Required: 1}); !errors.Is(err, backend.ErrorReleaseNotPending) {
-		t.Fatalf("expected backend.ErrorReleaseNotPending, got %v", err)
+	if _, err := r.ApproveWith(a, approval.MajorityPolicy{Required: 1}); !errors.Is(err, errs.ErrorReleaseNotPending) {
+		t.Fatalf("expected errs.ErrorReleaseNotPending, got %v", err)
 	}
 }
 
@@ -217,7 +217,7 @@ func TestMakerCheckerPolicySelfEnforcesCreator(t *testing.T) {
 		approval.Vote{Identity: "alice", Decision: approval.Approve, Timestamp: time.Now()},
 	)
 	_, err := r.ApproveWith(a, approval.MakerCheckerPolicy{RequiredApprovers: 1, Creator: "alice"})
-	if !errors.Is(err, backend.ErrorApprovalCreatorVoted) {
+	if !errors.Is(err, errs.ErrorApprovalCreatorVoted) {
 		t.Fatalf("expected ErrCreatorVoted, got %v", err)
 	}
 }

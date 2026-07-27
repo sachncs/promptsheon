@@ -1,7 +1,7 @@
 package budget_test
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	. "github.com/sachncs/promptsheon/backend/budget"
 	"errors"
 	"testing"
@@ -10,8 +10,8 @@ import (
 
 func TestNewRejectsNonPositiveCap(t *testing.T) {
 	t.Parallel()
-	if _, err := New(ScopeWorkspace, "ws", PeriodDaily, 0, time.Now(), "alice"); !errors.Is(err, backend.ErrorBudgetCapNotPositive) {
-		t.Fatalf("expected backend.ErrorBudgetCapNotPositive, got %v", err)
+	if _, err := New(ScopeWorkspace, "ws", PeriodDaily, 0, time.Now(), "alice"); !errors.Is(err, errs.ErrorBudgetCapNotPositive) {
+		t.Fatalf("expected errs.ErrorBudgetCapNotPositive, got %v", err)
 	}
 }
 
@@ -48,8 +48,8 @@ func TestChargeExceedingCapRejected(t *testing.T) {
 	t.Parallel()
 	b, _ := New(ScopeWorkspace, "ws", PeriodDaily, 100, time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC), "alice")
 	_, err := b.Charge(200, time.Now())
-	if !errors.Is(err, backend.ErrorBudgetCapExceeded) {
-		t.Fatalf("expected backend.ErrorBudgetCapExceeded, got %v", err)
+	if !errors.Is(err, errs.ErrorBudgetCapExceeded) {
+		t.Fatalf("expected errs.ErrorBudgetCapExceeded, got %v", err)
 	}
 }
 

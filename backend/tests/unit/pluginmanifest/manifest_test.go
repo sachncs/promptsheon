@@ -1,7 +1,7 @@
 package manifest_test
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	. "github.com/sachncs/promptsheon/backend/pluginmanifest"
 	"os"
 	"path/filepath"
@@ -59,8 +59,8 @@ func TestLoadEmptyManifest(t *testing.T) {
 	if err := os.WriteFile(path, []byte("plugins: []\n"), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	if _, err := Load(path); err != backend.ErrorManifestEmpty {
-		t.Fatalf("expected backend.ErrorManifestEmpty, got %v", err)
+	if _, err := Load(path); err != errs.ErrorManifestEmpty {
+		t.Fatalf("expected errs.ErrorManifestEmpty, got %v", err)
 	}
 }
 

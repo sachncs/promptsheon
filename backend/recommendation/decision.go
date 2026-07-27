@@ -14,7 +14,7 @@
 package recommendation
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"errors"
 	"fmt"
 	"time"
@@ -57,7 +57,7 @@ type Decision struct {
 	Auto             bool      `json:"auto"`
 }
 
-// backend.ErrorRecommendationUnknownOutcome is returned when an outcome value is not in the
+// errs.ErrorRecommendationUnknownOutcome is returned when an outcome value is not in the
 // closed set.
 
 // NewAdopted constructs an Adopted Decision for an adopter that is
@@ -97,7 +97,7 @@ func NewDecision(recommendationID string, outcome Outcome, decidedBy, reason str
 	switch outcome {
 	case OutcomeAdopted, OutcomeRejected, OutcomeSuperseded:
 	default:
-		return Decision{}, fmt.Errorf("%w: %q", backend.ErrorRecommendationUnknownOutcome, outcome)
+		return Decision{}, fmt.Errorf("%w: %q", errs.ErrorRecommendationUnknownOutcome, outcome)
 	}
 	if outcome == OutcomeAdopted && resultingVersion <= 0 {
 		return Decision{}, errors.New("decision: adopted requires positive resulting_version")

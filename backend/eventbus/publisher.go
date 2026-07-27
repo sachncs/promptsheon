@@ -53,7 +53,7 @@ type Subscription interface {
 	Cancel()
 }
 
-// backend.ErrorEventBusAlreadyCanceled is returned by a Handler whose Subscription has
+// errs.ErrorEventBusAlreadyCanceled is returned by a Handler whose Subscription has
 // been Canceled; consumers should treat it as "stop processing".
 
 // subscription is the internal handle.
@@ -202,7 +202,7 @@ func (m *Memory) IsAsync() bool { return m.queue != nil }
 
 // Subscribe registers Handler for the supplied event types.
 //
-// Subscribe returns backend.ErrorEventBusAlreadyCanceled only if the Memory has been
+// Subscribe returns errs.ErrorEventBusAlreadyCanceled only if the Memory has been
 // Closed; under normal operation it returns nil error.
 func (m *Memory) Subscribe(handler Handler, eventTypes ...capability.EventType) (Subscription, error) {
 	if handler == nil {

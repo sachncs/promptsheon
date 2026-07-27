@@ -1,7 +1,7 @@
 package mcplist_test
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	. "github.com/sachncs/promptsheon/backend/mcplist"
 	"errors"
 	"testing"
@@ -9,8 +9,8 @@ import (
 
 func TestEntryValidateEmpty(t *testing.T) {
 	t.Parallel()
-	if err := (Entry{}).Validate(); !errors.Is(err, backend.ErrorMCPEmptyName) {
-		t.Fatalf("expected backend.ErrorMCPEmptyName, got %v", err)
+	if err := (Entry{}).Validate(); !errors.Is(err, errs.ErrorMCPEmptyName) {
+		t.Fatalf("expected errs.ErrorMCPEmptyName, got %v", err)
 	}
 }
 
@@ -66,7 +66,7 @@ func TestEntryValidateRejectsBadURL(t *testing.T) {
 			t.Parallel()
 			e := Entry{Name: "good", URL: tc.url}
 			if err := e.Validate(); err == nil {
-				t.Errorf("expected backend.ErrorMCPBadURL for %q", tc.url)
+				t.Errorf("expected errs.ErrorMCPBadURL for %q", tc.url)
 			}
 		})
 	}
@@ -104,8 +104,8 @@ func TestListAddRemoveAllows(t *testing.T) {
 	if l.Allows("server-a") {
 		t.Fatalf("expected Allows(server-a) false after remove")
 	}
-	if err := l.Remove("server-a"); !errors.Is(err, backend.ErrorMCPUnknownName) {
-		t.Fatalf("expected backend.ErrorMCPUnknownName, got %v", err)
+	if err := l.Remove("server-a"); !errors.Is(err, errs.ErrorMCPUnknownName) {
+		t.Fatalf("expected errs.ErrorMCPUnknownName, got %v", err)
 	}
 }
 

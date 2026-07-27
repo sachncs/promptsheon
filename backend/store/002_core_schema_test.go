@@ -1,7 +1,7 @@
 package store
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"database/sql"
 	"errors"
@@ -365,14 +365,14 @@ func TestLineageEdgesForeignKeyConstraint(t *testing.T) {
 
 // TestStoreNotFoundTranslation pins the typed error path for the
 // consolidated FK rebuilds. GetEvalRun on a missing row should
-// return backend.ErrorStoreNotFound, not sql.ErrNoRows.
+// return errs.ErrorStoreNotFound, not sql.ErrNoRows.
 func TestStoreNotFoundTranslation(t *testing.T) {
 	s := migrateOnce(t)
 	_, err := s.GetEvalRun(context.Background(), "no-such")
 	if err == nil {
-		t.Fatal("expected backend.ErrorStoreNotFound")
+		t.Fatal("expected errs.ErrorStoreNotFound")
 	}
-	if !errors.Is(err, backend.ErrorStoreNotFound) {
-		t.Errorf("expected backend.ErrorStoreNotFound, got %v", err)
+	if !errors.Is(err, errs.ErrorStoreNotFound) {
+		t.Errorf("expected errs.ErrorStoreNotFound, got %v", err)
 	}
 }

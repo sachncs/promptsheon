@@ -11,7 +11,7 @@
 package manifest
 
 import (
-	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"fmt"
 	"os"
 	"regexp"
@@ -36,9 +36,9 @@ type Entry struct {
 	MinCoreVersion string   `yaml:"min_core_version"`
 }
 
-// backend.ErrorManifestEmpty is returned when a manifest is empty.
+// errs.ErrorManifestEmpty is returned when a manifest is empty.
 
-// backend.ErrorManifestBadName is returned when a plugin Name is empty or fails
+// errs.ErrorManifestBadName is returned when a plugin Name is empty or fails
 // the same closed-set as the MCP allowlist.
 
 // Load reads the manifest from path and validates each entry.
@@ -52,7 +52,7 @@ func Load(path string) (*File, error) {
 		return nil, fmt.Errorf("manifest: parse: %w", err)
 	}
 	if len(f.Plugins) == 0 {
-		return nil, backend.ErrorManifestEmpty
+		return nil, errs.ErrorManifestEmpty
 	}
 	for i := range f.Plugins {
 		if err := f.Plugins[i].Validate(); err != nil {
@@ -62,7 +62,7 @@ func Load(path string) (*File, error) {
 	return &f, nil
 }
 
-// backend.ErrorManifestBadUDS is returned when a manifest entry's UDS path does
+// errs.ErrorManifestBadUDS is returned when a manifest entry's UDS path does
 // not live under /tmp/promptsheon/. The path namespace avoids
 // collisions with system sockets and keeps plugin lifecycles
 // scoped to a single tenant.
@@ -71,13 +71,13 @@ func Load(path string) (*File, error) {
 // (if set) a UDS path that points under /tmp/promptsheon/.
 func (e Entry) Validate() error {
 	if !namePattern.MatchString(e.Name) {
-		return fmt.Errorf("%w: %q", backend.ErrorManifestBadName, e.Name)
+		return fmt.Errorf("%w: %q", errs.ErrorManifestBadName, e.Name)
 	}
 	if e.Binary == "" {
 		return fmt.Errorf("manifest: empty binary path for %q", e.Name)
 	}
 	if e.UDS != "" && !udsPattern.MatchString(e.UDS) {
-		return fmt.Errorf("%w: got %q", backend.ErrorManifestBadUDS, e.UDS)
+		return fmt.Errorf("%w: got %q", errs.ErrorManifestBadUDS, e.UDS)
 	}
 	return nil
 }
