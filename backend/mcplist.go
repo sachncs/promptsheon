@@ -1,3 +1,7 @@
+package backend
+
+// Flattened from backend/mcplist/mcplist.go.
+
 // Package mcplist is the per-Workspace MCP (Model Context Protocol)
 // allowlist. Each Workspace declares the set of trusted MCP servers
 // its Releases may call; Releases whose Manifest references an
@@ -8,8 +12,6 @@
 // Repository interface. Runtime enforcement is in the invoke path;
 // the MCP server SDK (gRPC over UDS plus the server manifest) ships in a
 // follow-on.
-package mcplist
-
 import (
 	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
@@ -168,7 +170,7 @@ func (l *List) sort() {
 // Repository is the consumer-defined persistence interface.
 // Production wiring supplies a backend-backed implementation;
 // tests use an in-memory map.
-type Repository interface {
+type MCPRepository interface {
 	Load(ctx context.Context, workspaceID string) (*List, error)
 	Save(ctx context.Context, l *List) error
 }

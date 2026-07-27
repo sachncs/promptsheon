@@ -2,7 +2,7 @@ package mcplist_test
 
 import (
 	"github.com/sachncs/promptsheon/backend/errs"
-	. "github.com/sachncs/promptsheon/backend/mcplist"
+	. "github.com/sachncs/promptsheon/backend"
 	"errors"
 	"testing"
 )
