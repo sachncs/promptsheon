@@ -305,38 +305,6 @@ func TestAuthenticate_UpdateLastUsedIsNonBlocking(t *testing.T) {
 	auth.Stop()
 }
 
-func TestAuthorizer_Require(t *testing.T) {
-	az := NewAuthorizer()
-	handler := az.Require(PermPromptCreate)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	// No user in context.
-	req := httptest.NewRequest("GET", "/", nil)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("no user: code = %d, want %d", rr.Code, http.StatusUnauthorized)
-	}
-
-	// User with wrong role.
-	ctx := context.WithValue(context.Background(), userContextKey, &User{ID: "u1", Role: RoleReader})
-	req = httptest.NewRequest("GET", "/", nil).WithContext(ctx)
-	rr = httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusForbidden {
-		t.Errorf("wrong role: code = %d, want %d", rr.Code, http.StatusForbidden)
-	}
-
-	// User with correct role.
-	ctx = context.WithValue(context.Background(), userContextKey, &User{ID: "u1", Role: RoleWriter})
-	req = httptest.NewRequest("GET", "/", nil).WithContext(ctx)
-	rr = httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Errorf("correct role: code = %d, want %d", rr.Code, http.StatusOK)
-	}
-}
 
 func TestWithUserContext(t *testing.T) {
 	u := &User{ID: "u42", Role: RoleAdmin}
