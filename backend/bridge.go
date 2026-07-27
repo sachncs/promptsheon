@@ -16,7 +16,7 @@
 // breach recommend". Production wiring runs Run() on the
 // observation tick; the resulting recommendations feed the same
 // Producer pipeline as the rule-engine output.
-package bridge
+package backend
 
 import (
 	"context"

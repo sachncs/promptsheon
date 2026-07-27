@@ -6,14 +6,14 @@ import (
 	"testing"
 
 	"github.com/sachncs/promptsheon/backend/bandit"
-	"github.com/sachncs/promptsheon/backend/banditstore"
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/metrics"
 )
 
-func newTestSession(t *testing.T) (*Session, *banditstore.Store, *banditstore.InMemory) {
+func newTestSession(t *testing.T) (*Session, *backend.Store, *backend.InMemory) {
 	t.Helper()
-	im := banditstore.NewInMemory()
-	store, err := banditstore.NewStoreWithReplica(im, "rep-test")
+	im := backend.NewInMemory()
+	store, err := backend.NewStoreWithReplica(im, "rep-test")
 	if err != nil {
 		t.Fatalf("NewStoreWithReplica: %v", err)
 	}
@@ -299,9 +299,9 @@ func (failingBackend) Merge(context.Context, string, bandit.State) error {
 // replica-id setter exists but the backend is immutable), so
 // we construct a fresh Store, copy the replica id, and
 // replace s.store in place. The selector wiring is unchanged.
-func replaceStoreBackend(s *Session, b banditstore.Backend) error {
+func replaceStoreBackend(s *Session, b backend.Backend) error {
 	replicaID := s.store.ReplicaID()
-	newStore, err := banditstore.NewStoreWithReplica(b, replicaID)
+	newStore, err := backend.NewStoreWithReplica(b, replicaID)
 	if err != nil {
 		return err
 	}
