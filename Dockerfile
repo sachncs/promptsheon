@@ -16,11 +16,11 @@ ARG TARGETOS
 ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -trimpath \
-      -ldflags="-s -w -X github.com/sachncs/promptsheon/backend/buildinfo.Version=${VERSION} -X github.com/sachncs/promptsheon/backend/buildinfo.Commit=${COMMIT} -X github.com/sachncs/promptsheon/backend/buildinfo.BuildTime=${BUILD_TIME}" \
+      -ldflags="-s -w -X github.com/sachncs/promptsheon/backend.Version=${VERSION} -X github.com/sachncs/promptsheon/backend.Commit=${COMMIT} -X github.com/sachncs/promptsheon/backend.BuildTime=${BUILD_TIME}" \
       -o /out/promptsheond . && \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -trimpath \
-      -ldflags="-s -w -X github.com/sachncs/promptsheon/backend/buildinfo.Version=${VERSION} -X github.com/sachncs/promptsheon/backend/buildinfo.Commit=${COMMIT} -X github.com/sachncs/promptsheon/backend/buildinfo.BuildTime=${BUILD_TIME}" \
+      -ldflags="-s -w -X github.com/sachncs/promptsheon/backend.Version=${VERSION} -X github.com/sachncs/promptsheon/backend.Commit=${COMMIT} -X github.com/sachncs/promptsheon/backend.BuildTime=${BUILD_TIME}" \
       -o /out/promptsheon . && \
     CGO_ENABLED=0 go build -trimpath \
       -ldflags="-s -w" \

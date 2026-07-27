@@ -98,8 +98,8 @@ cli:
 	go run .
 
 # Regenerate api/openapi.yaml from the server's route
-# registrations. The generator parses backend/api/server.go
-# for routes and backend/api/handlers_*.go for request
+# registrations. The generator parses backend/server.go
+# for routes and backend/handlers_*.go for request
 # schemas, then emits a real OpenAPI 3.0 spec. Re-run this
 # target whenever a route or handler changes.
 openapi:

@@ -38,9 +38,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/sachncs/promptsheon/backend/buildinfo.Version={{.Version}}
-      - -X github.com/sachncs/promptsheon/backend/buildinfo.Commit={{.Commit}}
-      - -X github.com/sachncs/promptsheon/backend/buildinfo.BuildTime={{.CommitDate}}
+      - -X github.com/sachncs/promptsheon/backend.Version={{.Version}}
+      - -X github.com/sachncs/promptsheon/backend.Commit={{.Commit}}
+      - -X github.com/sachncs/promptsheon/backend.BuildTime={{.CommitDate}}
 
   - id: promptsheon-cli
     main: .
@@ -56,9 +56,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/sachncs/promptsheon/backend/buildinfo.Version={{.Version}}
-      - -X github.com/sachncs/promptsheon/backend/buildinfo.Commit={{.Commit}}
-      - -X github.com/sachncs/promptsheon/backend/buildinfo.BuildTime={{.CommitDate}}
+      - -X github.com/sachncs/promptsheon/backend.Version={{.Version}}
+      - -X github.com/sachncs/promptsheon/backend.Commit={{.Commit}}
+      - -X github.com/sachncs/promptsheon/backend.BuildTime={{.CommitDate}}
 
 archives:
   - id: promptsheond
