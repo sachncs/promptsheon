@@ -12,27 +12,26 @@ import (
 	"context"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend/injection"
-	"github.com/sachncs/promptsheon/backend/redactor"
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/supervisor"
 )
 
-// PIIDetector adapts redactor.Redactor to the supervisor.Plugin
+// PIIDetector adapts backend.Redactor to the supervisor.Plugin
 // interface. The redactor's real work happens at the request path
 // via Redactor.CheckGuardrail.
-type PIIDetector struct{ R *redactor.Redactor }
+type PIIDetector struct{ R *backend.Redactor }
 
-func NewPIIDetector() *PIIDetector { return &PIIDetector{R: redactor.NewRedactor()} }
+func NewPIIDetector() *PIIDetector { return &PIIDetector{R: backend.NewRedactor()} }
 
 func (p *PIIDetector) Start(context.Context) error  { return nil }
 func (p *PIIDetector) Stop(context.Context) error   { return nil }
 func (p *PIIDetector) Health(context.Context) error { return nil }
 
-// InjectionDetector adapts injection.Detector.
-type InjectionDetector struct{ D *injection.Detector }
+// InjectionDetector adapts backend.Detector.
+type InjectionDetector struct{ D *backend.Detector }
 
 func NewInjectionDetector() *InjectionDetector {
-	return &InjectionDetector{D: injection.NewDetector()}
+	return &InjectionDetector{D: backend.NewDetector()}
 }
 
 func (p *InjectionDetector) Start(context.Context) error  { return nil }

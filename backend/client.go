@@ -13,7 +13,7 @@
 // launched and JSON-RPC over stdio is used. Production tenants
 // running pure HTTP MCP servers should pin to a future go-sdk
 // release with streamable HTTP client support.
-package mcpsdk
+package backend
 
 import (
 	"context"

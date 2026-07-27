@@ -19,7 +19,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend/buildinfo"
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/llm"
 )
 
@@ -53,7 +53,7 @@ func handleEarlyExit() bool {
 	if len(os.Args) >= 2 {
 		switch os.Args[1] {
 		case "--version", "-version", "-V":
-			info := buildinfo.Get()
+			info := backend.Get()
 			fmt.Printf("promptsheon %s (commit %s, built %s, %s/%s)\n",
 				info.Version, info.Commit, info.BuildTime, info.OS, info.Arch)
 			return true

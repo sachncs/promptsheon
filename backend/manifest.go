@@ -8,7 +8,7 @@
 // The subprocess-execution path (gRPC over UDS, health gate,
 // restart budget) is the follow-on; this package ships the manifest
 // parser and the Manifest / Entry value types.
-package manifest
+package backend
 
 import (
 	"github.com/sachncs/promptsheon/backend/errs"

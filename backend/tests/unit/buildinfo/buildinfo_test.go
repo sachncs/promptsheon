@@ -1,7 +1,7 @@
 package buildinfo_test
 
 import (
-	. "github.com/sachncs/promptsheon/backend/buildinfo"
+	. "github.com/sachncs/promptsheon/backend"
 	"os/exec"
 	"runtime"
 	"strings"

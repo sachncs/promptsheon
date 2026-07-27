@@ -1,7 +1,7 @@
 package injection_test
 
 import (
-	. "github.com/sachncs/promptsheon/backend/injection"
+	. "github.com/sachncs/promptsheon/backend"
 	"context"
 	"strings"
 	"testing"

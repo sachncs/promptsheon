@@ -28,7 +28,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
-	"github.com/sachncs/promptsheon/backend/pluginmanifest"
+	"github.com/sachncs/promptsheon/backend"
 	pluginv1 "github.com/sachncs/promptsheon/backend/pluginproto/pluginv1"
 	"github.com/sachncs/promptsheon/backend/subprocess"
 	"github.com/sachncs/promptsheon/backend/supervisor"
@@ -70,7 +70,7 @@ func (p *PluginSupervisor) LoadFromEnv(ctx context.Context) error {
 		p.log.Info("manifest: env var not set, supervisor runs in-process built-ins only")
 		return nil
 	}
-	f, err := manifest.Load(path)
+	f, err := backend.Load(path)
 	if err != nil {
 		return fmt.Errorf("pluginsup: %w", err)
 	}
@@ -117,7 +117,7 @@ func (p *PluginSupervisor) LoadFromEnv(ctx context.Context) error {
 // registered so the operator sees the failure in
 // /metrics, not in silent absence.
 type Remote struct {
-	Entry  manifest.Entry
+	Entry  backend.Entry
 	Logger *slog.Logger
 }
 

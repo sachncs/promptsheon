@@ -2,7 +2,7 @@ package manifest_test
 
 import (
 	"github.com/sachncs/promptsheon/backend/errs"
-	. "github.com/sachncs/promptsheon/backend/pluginmanifest"
+	. "github.com/sachncs/promptsheon/backend"
 	"os"
 	"path/filepath"
 	"testing"

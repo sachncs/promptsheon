@@ -29,7 +29,6 @@ import (
 	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/alerting"
 	"github.com/sachncs/promptsheon/backend/auth"
-	"github.com/sachncs/promptsheon/backend/buildinfo"
 	"github.com/sachncs/promptsheon/backend/capability"
 	"github.com/sachncs/promptsheon/backend/config"
 	contextpkg "github.com/sachncs/promptsheon/backend/context"
@@ -87,7 +86,7 @@ func runDaemon() {
 	flag.Parse()
 
 	if *showVersion {
-		info := buildinfo.Get()
+		info := backend.Get()
 		fmt.Printf("promptsheond %s (commit %s, built %s, %s/%s)\n",
 			info.Version, info.Commit, info.BuildTime, info.OS, info.Arch)
 		return
@@ -975,7 +974,7 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *con
 	}
 
 	go func() {
-		info := buildinfo.Get()
+		info := backend.Get()
 		logger.Info("starting server",
 			"version", info.Version,
 			"commit", info.Commit,

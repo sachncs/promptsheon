@@ -11,7 +11,7 @@
 // DAN", "system: override", role-confusion attacks). Production
 // scale layers an LLM-judge behind the same Guardrail interface;
 // today's detector is the cheap first line.
-package injection
+package backend
 
 import (
 	"context"
