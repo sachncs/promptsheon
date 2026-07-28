@@ -224,12 +224,12 @@ jobs:
     # Reports any markdown link in docs/ that resolves to a
     # missing file, and any path-shaped reference to source
     # code (backend/...go, api/openapi.yaml,
-    # deploy/, scripts/, .github/workflows/, docs/adr/NNNN-...)
-    # that no longer points at a real file. A trailing
+    # deploy/, scripts/, .github/workflows/) that no longer
+    # points at a real file. A trailing
     # `<!-- stale-ok: <reason> -->` comment on a line
-    # suppresses that single finding; ADR/, triz-report.md,
-    # and CHANGELOG.md are excluded from the source-ref scan
-    # because they are historical documents.
+    # suppresses that single finding; CHANGELOG.md is excluded
+    # from the source-ref scan because it is a historical
+    # document.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

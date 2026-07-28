@@ -4,7 +4,7 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = re.compile(r"(?:internal|pkg|cmd)/[A-Za-z0-9_./-]+\.go(?::[0-9]+(?:-[0-9]+)?)?|api/openapi\.yaml|deploy/[A-Za-z0-9_./-]+\.(?:yaml|yml|tpl|json|md|sh)|scripts/[A-Za-z0-9_./-]+\.(?:sh|go|py)|\.github/workflows/[A-Za-z0-9_./-]+\.(?:yml|yaml)|docs/adr/[0-9]+-[A-Za-z0-9_.-]+\.md")
+SRC = re.compile(r"(?:internal|pkg|cmd)/[A-Za-z0-9_./-]+\.go(?::[0-9]+(?:-[0-9]+)?)?|api/openapi\.yaml|deploy/[A-Za-z0-9_./-]+\.(?:yaml|yml|tpl|json|md|sh)|scripts/[A-Za-z0-9_./-]+\.(?:sh|go|py)|\.github/workflows/[A-Za-z0-9_./-]+\.(?:yml|yaml)")
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 SPAN = re.compile(r"`[^`]*`")
 
@@ -13,7 +13,7 @@ def files(exclude_refs=False):
     result = sorted(ROOT.joinpath("docs").rglob("*.md"))
     result += [p for p in (ROOT / "README.md", ROOT / "CHANGELOG.md") if p.is_file()]
     if exclude_refs:
-        result = [p for p in result if p.name != "CHANGELOG.md" and "docs/adr" not in p.relative_to(ROOT).as_posix() and p.name != "triz-report.md"]
+        result = [p for p in result if p.name != "CHANGELOG.md"]
     return result
 
 

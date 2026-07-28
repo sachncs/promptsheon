@@ -34,8 +34,7 @@ chain is per-region or global".
 
 ## What multi-region WOULD look like (non-goal today)
 
-A future multi-region design is sketched in
-`docs/adr/0019-deferred-items.md`. The shape:
+A future multi-region design would look like:
 
 - **Audit chain**: per-region chains, with a global
   Merkle-root checkpoint every N rows. `VerifyAuditChain`
@@ -76,8 +75,6 @@ replication", not "active-active multi-region writes".
 
 ## See also
 
-- [ADR-0019](adr/0019-deferred-items.md) — deferred items
-  including the multi-region sketch.
 - [docs/operations.md](operations.md) — backup / restore.
 - [docs/upgrade.md](upgrade.md) — in-place upgrade +
   restore from snapshot.

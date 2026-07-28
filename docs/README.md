@@ -15,7 +15,7 @@ Welcome to the Promptsheon documentation. This is the master index. The full sou
 | User who wants to use the CLI | [CLI](cli.md) |
 | Developer integrating with the API | [API Reference](api-reference.md) and the [SDK](sdk.md) |
 | Contributor | [Development](development.md) and [Testing](testing.md) |
-| Reviewer / compliance | [Security](security.md) and the [ADRs](adr/README.md) |
+| Reviewer / compliance | [Security](security.md) |
 
 ## User
 
@@ -51,8 +51,7 @@ Welcome to the Promptsheon documentation. This is the master index. The full sou
 | [Architecture](architecture.md) | System diagram, package layout, request lifecycle. |
 | [Modules](modules.md) | One-line purpose for every Go package. |
 | [Algorithms](algorithms.md) | BM25, retry, circuit breaker, fallback, cost, vault, audit chain, HMAC, workflow DAG execution, retention. |
-| [Design Decisions](design-decisions.md) | The summary index into the ADRs. |
-| [ADRs](adr/README.md) | Architecture Decision Records. |
+| [Design Decisions](design-decisions.md) | The architectural rationale behind key choices. |
 | [Development](development.md) | Setup, layout, Make targets, OpenAPI generator, migrations. |
 | [Testing](testing.md) | Test layers, helpers, race detection, coverage. |
 | [API Reference — Generator](api-reference.md#generator) | How `api/openapi.yaml` is produced. |
