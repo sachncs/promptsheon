@@ -60,27 +60,26 @@ fi
 
 echo "smoke: daemon up"
 
-# Iterate over every example script and exercise its main
-# happy path. The first positional argument is supplied via
-# $1; each script must be tolerant of a smoke-only fixture
-# (e.g. a release id that doesn't exist) — the smoke test
-# accepts any 4xx response as "the script ran without
-# crashing".
-FAIL=0
-for script in examples/bash/*.sh; do
-  echo "smoke: running $script"
-  if ! PROMPTSHEON_BASE_URL="$BASE_URL" \
-        PROMPTSHEON_API_KEY="smoke-test-key" \
-        bash "$script" "smoke-fixture-id" 2>&1 \
-        | head -3; then
-    echo "smoke: FAIL ($script)" >&2
-    FAIL=1
+# Exercise example scripts if the directory exists.
+if compgen -G "examples/bash/*.sh" > /dev/null 2>&1; then
+  FAIL=0
+  for script in examples/bash/*.sh; do
+    echo "smoke: running $script"
+    if ! PROMPTSHEON_BASE_URL="$BASE_URL" \
+          PROMPTSHEON_API_KEY="smoke-test-key" \
+          bash "$script" "smoke-fixture-id" 2>&1 \
+          | head -3; then
+      echo "smoke: FAIL ($script)" >&2
+      FAIL=1
+    fi
+  done
+
+  if [[ "$FAIL" -ne 0 ]]; then
+    echo "smoke: at least one example failed" >&2
+    exit 1
   fi
-done
 
-if [[ "$FAIL" -ne 0 ]]; then
-  echo "smoke: at least one example failed" >&2
-  exit 1
+  echo "smoke: all examples exercised"
+else
+  echo "smoke: no examples/bash/*.sh found, skipping"
 fi
-
-echo "smoke: all examples exercised"

@@ -21,15 +21,7 @@ updates:
       - "dependencies"
       - "ops"
 
-  - package-ecosystem: "gomod"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    commit-message:
-      prefix: "go"
-    labels:
-      - "dependencies"
-      - "go"
+  # gomod handled by Renovate (better batching + auto-merge)
 
   - package-ecosystem: "docker"
     directory: "/"

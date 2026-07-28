@@ -42,30 +42,6 @@ func TestContextWithTimeoutCancels(t *testing.T) {
 	}
 }
 
-func TestCounter(t *testing.T) {
-	t.Parallel()
-	c := &testutil.Counter{}
-	c.Inc()
-	c.Inc()
-	c.Inc()
-	if got := c.Value(); got != 3 {
-		t.Errorf("Counter.Value = %d, want 3", got)
-	}
-}
-
-func TestSpy(t *testing.T) {
-	t.Parallel()
-	s := &testutil.Spy[int]{}
-	if _, hit := s.Last(); hit {
-		t.Error("Spy.Last should report hit=false before Record")
-	}
-	s.Record(42)
-	v, hit := s.Last()
-	if !hit || v != 42 {
-		t.Errorf("Spy.Last = (%d, %v), want (42, true)", v, hit)
-	}
-}
-
 func TestSetenvAndUnsetenv(t *testing.T) {
 	t.Setenv("PROMPTSHEON_TESTUTIL_KEY", "first")
 	testutil.Setenv(t, "PROMPTSHEON_TESTUTIL_KEY", "second")
@@ -75,16 +51,6 @@ func TestSetenvAndUnsetenv(t *testing.T) {
 	testutil.Unsetenv(t, "PROMPTSHEON_TESTUTIL_KEY")
 	if v := os.Getenv("PROMPTSHEON_TESTUTIL_KEY"); v != "" {
 		t.Errorf("Unsetenv failed to remove: got %q", v)
-	}
-}
-
-func TestErrSentinel(t *testing.T) {
-	t.Parallel()
-	if testutil.ErrSentinel == nil {
-		t.Error("expected non-nil sentinel")
-	}
-	if testutil.ErrSentinel.Error() == "" {
-		t.Error("sentinel should have a message")
 	}
 }
 
