@@ -1,3 +1,7 @@
+package backend
+
+// Flattened from backend/policy/policy.go.
+
 // Package policy defines Workspace-level Policies that constrain
 // Capability Versions, Releases, and Executions.
 //
@@ -14,8 +18,6 @@
 // Policies are evaluated against the inputs that the runtime cares
 // about (an Execution request, a Release, a Manifest). They return
 // an Effect that the runtime then honors.
-package policy
-
 import (
 	"context"
 	"errors"
@@ -319,7 +321,7 @@ func (b Bundle) EvaluateExecution(in ExecutionPolicyInput) Decision {
 	return Allow("policy.Bundle", "")
 }
 // Repository persists Policy bundles per Workspace.
-type Repository interface {
+type PolicyRepository interface {
 	GetBundle(ctx context.Context, workspaceID string) (*Bundle, error)
 	PutBundle(ctx context.Context, workspaceID string, b *Bundle) error
 	DeleteBundle(ctx context.Context, workspaceID string) error
