@@ -26,13 +26,12 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sachncs/promptsheon/backend/mcplist"
 )
 
 // Dial connects to a single MCP server entry and returns a
 // ClientSession ready for tool calls. The session is owned by the
 // caller; Close it when done.
-func Dial(ctx context.Context, entry mcplist.Entry) (*mcp.ClientSession, error) {
+func Dial(ctx context.Context, entry Entry) (*mcp.ClientSession, error) {
 	if err := entry.Validate(); err != nil {
 		return nil, fmt.Errorf("mcpsdk: %w", err)
 	}
@@ -60,7 +59,7 @@ func Dial(ctx context.Context, entry mcplist.Entry) (*mcp.ClientSession, error) 
 // entry's URL. http(s):// is rejected today because the upstream
 // SDK only ships server-side streamable HTTP; unix:// and
 // command: forms are supported.
-func buildTransport(entry mcplist.Entry) (mcp.Transport, error) {
+func buildTransport(entry Entry) (mcp.Transport, error) {
 	switch {
 	case strings.HasPrefix(entry.URL, "http://"), strings.HasPrefix(entry.URL, "https://"):
 		return nil, errors.New("mcpsdk: streamable http client transport not yet shipped by upstream go-sdk; pin to command: or unix: URLs")
@@ -84,7 +83,7 @@ func buildTransport(entry mcplist.Entry) (mcp.Transport, error) {
 // ListTools dials the entry, returns the advertised tool list,
 // and closes the session. Convenience wrapper for capability
 // discovery.
-func ListTools(ctx context.Context, entry mcplist.Entry) (*mcp.ListToolsResult, error) {
+func ListTools(ctx context.Context, entry Entry) (*mcp.ListToolsResult, error) {
 	session, err := Dial(ctx, entry)
 	if err != nil {
 		return nil, err

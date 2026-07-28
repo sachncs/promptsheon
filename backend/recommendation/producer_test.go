@@ -11,7 +11,7 @@ import (
 	"github.com/sachncs/promptsheon/backend/eventbus"
 	"github.com/sachncs/promptsheon/backend/executor"
 	"github.com/sachncs/promptsheon/backend/observation"
-	"github.com/sachncs/promptsheon/backend/optimizer/rules"
+	"github.com/sachncs/promptsheon/backend/rules"
 )
 
 func TestProducerEmitsOnQuietObservation(t *testing.T) {

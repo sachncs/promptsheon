@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"github.com/sachncs/promptsheon/backend/errs"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -17,6 +16,7 @@ import (
 	"github.com/sachncs/promptsheon/backend/harness"
 	"github.com/sachncs/promptsheon/backend/release"
 	"github.com/sachncs/promptsheon/backend/testdata"
+	"github.com/sachncs/promptsheon/backend/errs"
 )
 
 func harnessRunnerWithStub(t *testing.T, repo *mockRepo) *harness.EvalRunner {

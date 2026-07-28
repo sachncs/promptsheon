@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend/config"
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/models"
 	"github.com/sachncs/promptsheon/backend/store"
 	"github.com/sachncs/promptsheon/backend/webhook"
@@ -91,37 +91,37 @@ func TestDaemonHelpText(t *testing.T) {
 func TestConfigureShellToolEmptyAllowlistDisables(t *testing.T) {
 	t.Setenv("PROMPTSHEON_SHELL_ENABLED", "true")
 	t.Setenv("PROMPTSHEON_SHELL_ALLOWLIST", "")
-	configureShellTool(&config.Config{})
+	configureShellTool(&backend.Config{})
 }
 
 func TestConfigureShellToolWithAllowlist(t *testing.T) {
 	t.Setenv("PROMPTSHEON_SHELL_ENABLED", "true")
 	t.Setenv("PROMPTSHEON_SHELL_ALLOWLIST", "ls, cat, head")
-	configureShellTool(&config.Config{})
+	configureShellTool(&backend.Config{})
 }
 
 func TestConfigureShellToolDisabledByDefault(t *testing.T) {
 	t.Setenv("PROMPTSHEON_SHELL_ENABLED", "")
 	t.Setenv("PROMPTSHEON_SHELL_ALLOWLIST", "")
-	configureShellTool(&config.Config{})
+	configureShellTool(&backend.Config{})
 }
 
 func TestConfigureShellToolEnabledWithValidAllowlist(t *testing.T) {
 	t.Setenv("PROMPTSHEON_SHELL_ENABLED", "true")
 	t.Setenv("PROMPTSHEON_SHELL_ALLOWLIST", "ls,cat")
-	configureShellTool(&config.Config{})
+	configureShellTool(&backend.Config{})
 }
 
 func TestConfigureShellToolOnlySpaces(t *testing.T) {
 	t.Setenv("PROMPTSHEON_SHELL_ENABLED", "true")
 	t.Setenv("PROMPTSHEON_SHELL_ALLOWLIST", "  ,  ,  ")
-	configureShellTool(&config.Config{})
+	configureShellTool(&backend.Config{})
 }
 
 func TestConfigureShellToolNotEnabled(t *testing.T) {
 	t.Setenv("PROMPTSHEON_SHELL_ENABLED", "false")
 	t.Setenv("PROMPTSHEON_SHELL_ALLOWLIST", "ls,cat")
-	configureShellTool(&config.Config{})
+	configureShellTool(&backend.Config{})
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ func TestSetupLogger(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &config.Config{LogLevel: tt.level}
+			cfg := &backend.Config{LogLevel: tt.level}
 			logger := setupLogger(cfg, nil)
 			if logger == nil {
 				t.Fatal("expected non-nil logger")
@@ -157,7 +157,7 @@ func TestSetupLogger(t *testing.T) {
 
 func TestOpenDB(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "promptsheon_test.db")
-	cfg := &config.Config{DBPath: dbPath}
+	cfg := &backend.Config{DBPath: dbPath}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	db := openDB(cfg, logger)
 	if db == nil {
@@ -174,7 +174,7 @@ func TestOpenDB(t *testing.T) {
 }
 
 func TestOpenDB_InMemory(t *testing.T) {
-	cfg := &config.Config{DBPath: ":memory:"}
+	cfg := &backend.Config{DBPath: ":memory:"}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	db := openDB(cfg, logger)
 	if db == nil {
@@ -212,7 +212,7 @@ func TestOpenDB_InvalidPath(t *testing.T) {
 func TestBuildServer_Minimal(t *testing.T) {
 	db := setupTestDB(t)
 
-	cfg := config.DefaultConfig()
+	cfg := backend.DefaultConfig()
 	cfg.LogLevel = "warn"
 	cfg.Auth = false
 	cfg.OTelEndpoint = ""
@@ -247,7 +247,7 @@ func TestBuildServer_Minimal(t *testing.T) {
 func TestBuildServer_WithAuth(t *testing.T) {
 	db := setupTestDB(t)
 
-	cfg := config.DefaultConfig()
+	cfg := backend.DefaultConfig()
 	cfg.LogLevel = "warn"
 	cfg.Auth = true
 
@@ -283,7 +283,7 @@ func TestBuildServer_WithVault(t *testing.T) {
 
 	t.Setenv("PROMPTSHEON_VAULT_KEY", "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")
 
-	cfg := config.DefaultConfig()
+	cfg := backend.DefaultConfig()
 	cfg.LogLevel = "warn"
 	cfg.Auth = false
 
@@ -348,7 +348,7 @@ func TestBuildServer_WithInvalidVaultKey(t *testing.T) {
 
 	t.Setenv("PROMPTSHEON_VAULT_KEY", "not-a-valid-hex-key")
 
-	cfg := config.DefaultConfig()
+	cfg := backend.DefaultConfig()
 	cfg.LogLevel = "warn"
 	cfg.Auth = false
 
@@ -387,7 +387,7 @@ func TestBuildServer_WithWebhookEndpointsInDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := backend.DefaultConfig()
 	cfg.LogLevel = "warn"
 	cfg.Auth = false
 	cfg.OTelEndpoint = ""
@@ -415,7 +415,7 @@ func TestBuildServer_WithWebhookEndpointsInDB(t *testing.T) {
 func TestBuildServer_WithOTelEndpoint(t *testing.T) {
 	db := setupTestDB(t)
 
-	cfg := config.DefaultConfig()
+	cfg := backend.DefaultConfig()
 	cfg.LogLevel = "warn"
 	cfg.Auth = false
 	cfg.OTelEndpoint = "localhost:19999"
@@ -453,7 +453,7 @@ func TestBuildServer_ClosedDB(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg := config.DefaultConfig()
+	cfg := backend.DefaultConfig()
 	cfg.LogLevel = "warn"
 	cfg.Auth = false
 
@@ -522,7 +522,7 @@ func TestStartHTTPServerAndWait_Subprocess(t *testing.T) {
 func TestStartHTTPServerAndWait_InProcess(t *testing.T) {
 	db := setupTestDB(t)
 
-	cfg := config.DefaultConfig()
+	cfg := backend.DefaultConfig()
 	cfg.Addr = ":0"
 	cfg.LogLevel = "warn"
 	cfg.Auth = false
@@ -560,7 +560,7 @@ func TestStartHTTPServerAndWait_InProcess(t *testing.T) {
 func TestStartHTTPServerAndWait_WithCORS(t *testing.T) {
 	db := setupTestDB(t)
 
-	cfg := config.DefaultConfig()
+	cfg := backend.DefaultConfig()
 	cfg.Addr = ":0"
 	cfg.LogLevel = "warn"
 	cfg.Auth = false
@@ -1181,7 +1181,7 @@ func runServerSubprocess() {
 	_ = db.Close()
 	defer func() { _ = os.Remove(dbPath) }()
 
-	cfg := config.DefaultConfig()
+	cfg := backend.DefaultConfig()
 	cfg.DBPath = dbPath
 	cfg.LogLevel = "warn"
 	cfg.Auth = false
@@ -1200,7 +1200,7 @@ func runServerSubprocess() {
 }
 
 func runOpenDBSubprocess() {
-	cfg := &config.Config{DBPath: "/nonexistent_dir_xyzzy/promptsheon.db"}
+	cfg := &backend.Config{DBPath: "/nonexistent_dir_xyzzy/promptsheon.db"}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	openDB(cfg, logger)
 }

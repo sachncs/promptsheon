@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/sachncs/promptsheon/backend/optimizer"
-	"github.com/sachncs/promptsheon/backend/optimizer/rules"
+	"github.com/sachncs/promptsheon/backend/rules"
 )
 
 func TestGetOptimizationTipsHasContent(t *testing.T) {

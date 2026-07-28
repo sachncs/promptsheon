@@ -30,8 +30,6 @@ import (
 	"github.com/sachncs/promptsheon/backend/alerting"
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/capability"
-	contextpkg "github.com/sachncs/promptsheon/backend/context"
-	"github.com/sachncs/promptsheon/backend/election"
 	"github.com/sachncs/promptsheon/backend/eval"
 	"github.com/sachncs/promptsheon/backend/eventbus"
 	"github.com/sachncs/promptsheon/backend/executor"
@@ -41,9 +39,8 @@ import (
 	"github.com/sachncs/promptsheon/backend/llm"
 	"github.com/sachncs/promptsheon/backend/metrics"
 	"github.com/sachncs/promptsheon/backend/models"
-	"github.com/sachncs/promptsheon/backend/observability"
 	"github.com/sachncs/promptsheon/backend/observation"
-	"github.com/sachncs/promptsheon/backend/optimizer/rules"
+	"github.com/sachncs/promptsheon/backend/rules"
 	"github.com/sachncs/promptsheon/backend/plugins/builtins"
 	"github.com/sachncs/promptsheon/backend/ratelimit"
 	"github.com/sachncs/promptsheon/backend/recommendation"
@@ -211,13 +208,13 @@ func runDaemon() {
 	// when PROMPTSHEON_LEADER_ELECTION=true; the default is
 	// single-replica, where the daemon holds the lock itself
 	// the moment it starts.
-	var elector *election.Elector
+	var elector *backend.Elector
 	if os.Getenv("PROMPTSHEON_LEADER_ELECTION") == "true" {
 		podName := os.Getenv("POD_NAME")
 		if podName == "" {
 			podName, _ = os.Hostname()
 		}
-		elector = election.New(db.DB(), podName, 30*time.Second)
+		elector = backend.New(db.DB(), podName, 30*time.Second)
 		if err := elector.EnsureTable(rootCtx); err != nil {
 			logger.Warn("leader-election table init failed", "err", err)
 		}
@@ -332,7 +329,7 @@ func openDB(cfg *backend.Config, logger *slog.Logger) *store.SQLite {
 	return db
 }
 
-func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *backend.Hub, elector *election.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*backend.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector, *vault.Vault) {
+func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *backend.Hub, elector *backend.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*backend.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector, *vault.Vault) {
 	// OBS-TR-1: no SQLite tracer; OTel-only export.
 	collector := metrics.NewCollector()
 	// OBS-LOG-2: wire the SSE hub's drop counter into the
@@ -350,12 +347,12 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 		logger.Info("OTel tracer initialised", "endpoint", cfg.OTelEndpoint, "insecure", cfg.OTelInsecure)
 	}
 
-	retentionPolicy := observability.LoadRetentionPolicyFromEnv()
+	retentionPolicy := backend.LoadRetentionPolicyFromEnv()
 	// DB-CONC-2: retentionDB is passed in from main() so its
 	// lifetime matches the daemon lifetime, not buildServer's.
 	// Closing it inside buildServer would tear down the DB
 	// before the retention goroutine ever runs a tick.
-	retention := observability.NewRetentionManager(retentionDB, retentionPolicy, logger)
+	retention := backend.NewRetentionManager(retentionDB, retentionPolicy, logger)
 	retention.Start(rootCtx)
 
 	webhookDispatcher := webhook.NewDispatcher(logger).
@@ -396,7 +393,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 
 	_ = logHub
 
-	contextMgr := contextpkg.NewManager()
+	contextMgr := backend.NewManager()
 	usageTracker := backend.NewUsageTracker()
 	guardrailManager := guardrail.NewManager(logger, collector)
 	alertingManager := alerting.NewManagerWithDB(logger, collector, db)

@@ -2,7 +2,7 @@ package reasoning_test
 
 import (
 	"github.com/sachncs/promptsheon/backend/errs"
-	. "github.com/sachncs/promptsheon/backend/reasoning"
+	. "github.com/sachncs/promptsheon/backend"
 	"context"
 	"errors"
 	"strings"

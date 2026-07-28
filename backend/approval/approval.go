@@ -10,6 +10,7 @@
 package approval
 
 import (
+	"context"
 	"github.com/sachncs/promptsheon/backend/errs"
 	"errors"
 	"fmt"
@@ -243,3 +244,8 @@ func (p SelfApprovePolicy) Evaluate(votes []Vote) (State, bool, error) {
 // self-enforces against the Creator field at Evaluate time;
 // callers should populate Creator on the policy before passing
 // it to Evaluate.
+type Repository interface {
+	CreateApproval(ctx context.Context, a *Approval) error
+	GetApproval(ctx context.Context, releaseID string) (*Approval, error)
+	UpdateApproval(ctx context.Context, a *Approval) error
+}
