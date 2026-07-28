@@ -725,6 +725,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 	}
 
 	srv := backend.NewServer(repos, logger, opts...)
+	srv.HandleFrontend(frontendDist)
 	return srv, limiter, tracer, collector, v
 }
 
