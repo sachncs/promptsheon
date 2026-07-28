@@ -74,8 +74,6 @@ genopenapi
 .Trashes
 ehthumbs.db
 
-# mdBook build output (lives under docs-site/book/, not repo root)
-/docs-site/book/
 .promptsheon/
 
 # Dependencies

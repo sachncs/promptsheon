@@ -1,4 +1,4 @@
-.PHONY: all build build-server build-cli test test-verbose test-integration test-e2e load-test lint lint-domain lint-deps fmt vet deps clean coverage coverage-raw run cli openapi openapi-check update-deps security helm-docs docs-check bench docs-site help web-install web-dev web-build web-smoke
+.PHONY: all build build-server build-cli test test-verbose test-integration test-e2e load-test lint lint-domain lint-deps fmt vet deps clean coverage coverage-raw run cli openapi openapi-check update-deps security helm-docs docs-check bench help web-install web-dev web-build web-smoke
 
 # Default target
 all: build
@@ -151,7 +151,7 @@ helm-docs:
 #     (HTTP(S), mailto, and pure-anchor links are skipped)
 #   - any path-shaped reference to source code
 #     (backend/...go, pkg/...go, api/openapi.yaml,
-#     deploy/, scripts/, .github/workflows/, docs/adr/NNNN-...)
+#     deploy/, scripts/, .github/workflows/)
 #     that no longer points at a real file
 # Pure shell + awk; no new Go dependency. CI runs this on
 # every PR. Failing here means a documented reference is
@@ -167,16 +167,6 @@ docs-check:
 # a fast smoke pass.
 bench:
 	@BENCHTIME="$(or $(BENCHTIME),1s)" bash scripts/run-benchmarks.sh
-
-# Build the mdBook site. The book lives in docs-site/ and reuses
-# docs/ as its source via the relative `src = "../docs"` in
-# docs-site/book.toml. The only mdBook-only file is
-# docs/SUMMARY.md; no markdown is duplicated. Requires mdbook
-# on PATH; if absent the target is a no-op (CI installs mdbook
-# via the docs-site.yaml workflow).
-docs-site:
-	@command -v mdbook >/dev/null 2>&1 || { echo "mdbook not installed (cargo install mdbook)"; exit 0; }
-	mdbook build docs-site
 
 # Show help
 help:
@@ -210,7 +200,6 @@ help:
 	@echo "  helm-docs        Regenerate deploy/helm/promptsheon/README.md from values.yaml"
 	@echo "  docs-check       Fail on broken local markdown links or stale source-path refs"
 	@echo "  bench            Run the curated 8 Go benchmarks (scripts/benchmarks.txt)"
-	@echo "  docs-site        Build the mdBook site (no-op if mdbook is missing)"
 	@echo "  update-deps      Update Go dependencies"
 	@echo "  security         Check for security vulnerabilities"
 	@echo "  web-install      Install dashboard dependencies (frontend/)"

@@ -151,5 +151,5 @@ metric surfaces the running total per daemon.
 - `internal/invoke/invoke.go` (Budget / Quota / LLM call).
 - `internal/harness/precondition.go` (Precondition execution).
 - `pkg/cas/` (content-addressed store).
-- [ADR 0003](adr/0003-hash-chained-audit-log.md) — audit chain
+- [Design Decisions](design-decisions.md#hash-chained-audit-log) — audit chain
   design.

@@ -480,7 +480,7 @@ Full documentation lives in **[docs/](docs/)**:
 - [SDKs](docs/sdk.md) — Go / Python / TypeScript clients
 - [LLM providers](docs/llm-providers.md) — Anthropic + OpenAI
 - [SLOs](docs/slos.md) — three first-class SLOs with Prometheus alerts in `deploy/prometheus/`
-- [Design Decisions](docs/design-decisions.md) and [ADRs](docs/adr/)
+- [Design Decisions](docs/design-decisions.md)
 - [Security](docs/security.md)
 - [Troubleshooting](docs/troubleshooting.md) — [FAQ](docs/faq.md)
 
