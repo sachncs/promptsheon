@@ -447,7 +447,7 @@ jobs:
         # login step uses the workflow GITHUB_TOKEN; the
         # `packages: write` permission above is what grants
         # the token the ability to push images.
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
