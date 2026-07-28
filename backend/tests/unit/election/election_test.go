@@ -2,7 +2,7 @@ package election_test
 
 import (
 	"github.com/sachncs/promptsheon/backend/errs"
-	. "github.com/sachncs/promptsheon/backend/election"
+	. "github.com/sachncs/promptsheon/backend"
 	"context"
 	"database/sql"
 	"path/filepath"

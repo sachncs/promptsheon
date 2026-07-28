@@ -4,13 +4,10 @@ package auth
 import (
 	"context"
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -277,67 +274,6 @@ func (m *OAuthManager) GetUserInfo(ctx context.Context, providerName string, tok
 	return &user, nil
 }
 
-// ValidateOAuthProvider performs SSRF-style validation on every URL
-// the provider declares. The check rejects loopback, link-local,
-// private, and metadata IP ranges, requires HTTPS, and verifies the
-// host is not empty. Returns nil for a clean configuration.
-func ValidateOAuthProvider(p *OAuthProvider) error {
-	if p == nil {
-		return errors.New("nil provider")
-	}
-	if p.Name == "" {
-		return errors.New("provider name is empty")
-	}
-	for _, u := range []struct {
-		field string
-		url   string
-	}{
-		{"AuthURL", p.AuthURL},
-		{"TokenURL", p.TokenURL},
-		{"UserInfoURL", p.UserInfoURL},
-		{"RedirectURL", p.RedirectURL},
-	} {
-		if err := validateOAuthURL(u.field, u.url); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func validateOAuthURL(field, raw string) error {
-	if raw == "" {
-		return fmt.Errorf("%s is empty", field)
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
-		return fmt.Errorf("%s parse: %w", field, err)
-	}
-	if u.Scheme != "https" && u.Scheme != "http" {
-		return fmt.Errorf("%s scheme %q not allowed", field, u.Scheme)
-	}
-	host := u.Hostname()
-	if host == "" {
-		return fmt.Errorf("%s host is empty", field)
-	}
-	// Resolve host and reject loopback/private/link-local/metadata ranges.
-	ips, err := net.LookupIP(host)
-	if err != nil {
-		// Allow unresolved hosts in tests/dev: deeper SSRF defence
-		// happens at dial time. Operators can disable DNS resolution
-		// checks via direct configuration.
-		return nil
-	}
-	for _, ip := range ips {
-		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
-			ip.IsPrivate() || ip.IsMulticast() || ip.IsUnspecified() {
-			return fmt.Errorf("%s host %s resolves to disallowed address %s", field, host, ip)
-		}
-		if ip.Equal(net.ParseIP("169.254.169.254")) {
-			return fmt.Errorf("%s host %s resolves to cloud metadata address", field, host)
-		}
-	}
-	return nil
-}
 
 // DefaultGoogleProvider returns default Google OAuth configuration.
 // #nosec G101 -- provider names and endpoint URLs are metadata, not credentials.
@@ -370,9 +306,6 @@ func DefaultGitHubProvider(clientID, clientSecret, redirectURL string) *OAuthPro
 	}
 }
 
-// CompareStates performs a constant-time comparison of two state
-// strings. Exported so callers that maintain their own state cache
-// can use the same primitive.
-func CompareStates(a, b string) bool {
-	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
-}
+// ponytail: CompareStates was a constant-time state comparator
+// intended for callers maintaining their own state cache. The Manager's
+// ValidateState does the same comparison inline; no production caller.

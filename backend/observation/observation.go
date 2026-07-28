@@ -23,7 +23,7 @@ import (
 	"github.com/beorn7/perks/quantile"
 
 	"github.com/sachncs/promptsheon/backend/executor"
-	"github.com/sachncs/promptsheon/backend/optimizer/rules"
+	"github.com/sachncs/promptsheon/backend/rules"
 )
 
 // Source is anything that produces ExecutionRecord values; the

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/capability"
-	"github.com/sachncs/promptsheon/backend/optimizer/rules"
+	"github.com/sachncs/promptsheon/backend/rules"
 )
 
 // OptimizationSuggestion represents a single prompt optimization suggestion.

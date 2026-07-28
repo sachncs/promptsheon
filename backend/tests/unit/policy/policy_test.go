@@ -1,7 +1,7 @@
 package policy_test
 
 import (
-	. "github.com/sachncs/promptsheon/backend/policy"
+	. "github.com/sachncs/promptsheon/backend"
 	"testing"
 	"time"
 )

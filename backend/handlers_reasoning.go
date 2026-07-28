@@ -8,24 +8,23 @@
 package backend
 
 import (
-	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 
-	"github.com/sachncs/promptsheon/backend/reasoning"
+	"github.com/sachncs/promptsheon/backend/errs"
 )
 
 // handleReasoningCompile turns an Intent into a Plan.
 //
 // POST /api/v1/reasoning/compile
-// Body: reasoning.Intent JSON
-// 200 OK with reasoning.Plan
+// Body: Intent JSON
+// 200 OK with Plan
 // 404 Not Found: ErrNoMatch
 // 409 Conflict: ErrConstraintViolation
 func (s *Server) handleReasoningCompile(w http.ResponseWriter, r *http.Request) error {
-	var intent reasoning.Intent
+	var intent Intent
 	if err := json.NewDecoder(r.Body).Decode(&intent); err != nil {
 		return &HTTPError{Status: http.StatusBadRequest, Message: "invalid intent: " + err.Error()}
 	}
@@ -33,7 +32,7 @@ func (s *Server) handleReasoningCompile(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		return &HTTPError{Status: http.StatusInternalServerError, Message: "catalog: " + err.Error()}
 	}
-	plan, err := reasoning.NewCompiler(catalog).Compile(r.Context(), intent)
+	plan, err := NewCompiler(catalog).Compile(r.Context(), intent)
 	if err != nil {
 		switch {
 		case errors.Is(err, errs.ErrorReasoningNoMatch):
@@ -53,15 +52,15 @@ func (s *Server) handleReasoningCompile(w http.ResponseWriter, r *http.Request) 
 // Capabilities (with reputation as the TrustScore); the
 // default returns an empty catalog so the daemon boots even
 // without capabilities.
-func (s *Server) reasoningCatalog(ctx context.Context) ([]reasoning.CapabilityDescriptor, error) {
+func (s *Server) reasoningCatalog(ctx context.Context) ([]CapabilityDescriptor, error) {
 	caps, err := s.capabilityRepo().ListCapabilities(ctx, "")
 	if err != nil || len(caps) == 0 {
 		return nil, err
 	}
-	out := make([]reasoning.CapabilityDescriptor, 0, len(caps))
+	out := make([]CapabilityDescriptor, 0, len(caps))
 	for _, c := range caps {
 		rep, _ := s.capabilityRepo().GetCapabilityReputation(ctx, c.ID)
-		out = append(out, reasoning.CapabilityDescriptor{
+		out = append(out, CapabilityDescriptor{
 			ID:         c.ID,
 			Name:       c.Name,
 			Tags:       c.Tags,
