@@ -13,12 +13,10 @@ package testutil
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
@@ -124,66 +122,3 @@ func NewTestDB(t *testing.T) *store.SQLite {
 	t.Helper()
 	return TempSQLite(t)
 }
-
-// ClockFunc is the TEST-INFRA-3 test seam: tests that need a
-// deterministic time use the supplied func instead of time.Now().
-// Production code uses time.Now directly; the seam only takes
-// effect when a test substitutes the package-level var.
-var ClockFunc = time.Now
-
-// Now is a drop-in replacement for time.Now that honours the
-// ClockFunc test seam. Tests that need deterministic time set
-// ClockFunc; production code calls Now() through this seam so
-// the substitution is transparent.
-func Now() time.Time {
-	return ClockFunc()
-}
-
-// Counter is a concurrency-safe int counter useful for verifying
-// "callback fired N times" assertions.
-type Counter struct {
-	mu sync.Mutex
-	n  int
-}
-
-// Inc increments the counter by 1.
-func (c *Counter) Inc() {
-	c.mu.Lock()
-	c.n++
-	c.mu.Unlock()
-}
-
-// Value returns the current count.
-func (c *Counter) Value() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.n
-}
-
-// Spy captures the most recent value passed to Record. Use to
-// assert on the last argument a callback received.
-type Spy[T any] struct {
-	mu  sync.Mutex
-	val T
-	hit bool
-}
-
-// Record stashes the supplied value as the most-recent.
-func (s *Spy[T]) Record(v T) {
-	s.mu.Lock()
-	s.val = v
-	s.hit = true
-	s.mu.Unlock()
-}
-
-// Last returns the most-recently recorded value and whether
-// anything was ever recorded.
-func (s *Spy[T]) Last() (T, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.val, s.hit
-}
-
-// ErrSentinel is a stub error useful for tests that need a
-// distinguishable error but want to avoid leaking stdlib sentinels.
-var ErrSentinel = errors.New("testutil: sentinel")
