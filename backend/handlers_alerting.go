@@ -204,6 +204,18 @@ func (s *Server) handleResolveAlert(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
+func (s *Server) handleListNotificationGroups(w http.ResponseWriter, r *http.Request) error {
+	if s.alertingManager == nil {
+		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
+	}
+	groups, err := s.db.ListNotificationGroups(r.Context())
+	if err != nil {
+		return fmt.Errorf("list notification groups: %w", err)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"groups": groups})
+	return nil
+}
+
 func (s *Server) handleAddNotificationGroup(w http.ResponseWriter, r *http.Request) error {
 	if s.alertingManager == nil {
 		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}

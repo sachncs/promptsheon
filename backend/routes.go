@@ -12,7 +12,6 @@ func (s *Server) routes() {
 	s.registerSettingsRoutes()
 	s.registerAuthRoutes()
 	s.registerAuditRoutes()
-	s.registerTracingRoutes()
 	s.registerMetricsRoutes()
 	s.registerProviderRoutes()
 	s.registerVaultRoutes()
@@ -98,13 +97,6 @@ func (s *Server) registerAuditRoutes() {
 	s.mux.HandleFunc("GET /api/v1/logs/stream", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleLogsStream)))
 }
 
-func (s *Server) registerTracingRoutes() {
-	// The SQLite tracer was removed; /api/v1/traces routes are
-	// gone and traces now flow through OTel export. The register
-	// function remains so future OTel-based query paths can be
-	// wired here.
-}
-
 func (s *Server) registerMetricsRoutes() {
 	s.mux.HandleFunc("GET /api/v1/metrics/summary", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsSummary)))
 	s.mux.HandleFunc("GET /api/v1/metrics/top-capabilities", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleTopCapabilities)))
@@ -134,6 +126,7 @@ func (s *Server) registerAlertRoutes() {
 	s.mux.HandleFunc("DELETE /api/v1/alerts/rules/{id}", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleDeleteAlertRule)))
 	s.mux.HandleFunc("POST /api/v1/alerts/notifications", s.wrapHandler(s.requirePerm(auth.PermPromptUpdate)(s.handleAddNotificationGroup)))
 	s.mux.HandleFunc("GET /api/v1/alerts/active", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListAlerts)))
+	s.mux.HandleFunc("GET /api/v1/alerts/notifications", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleListNotificationGroups)))
 	s.mux.HandleFunc("PUT /api/v1/alerts/active/{id}/resolve", s.wrapHandler(s.requirePerm(auth.PermReviewApprove)(s.handleResolveAlert)))
 	// DB-11b: HTTP surface for alert M2M link/unlink. Operators
 	// can now wire a notification group to a rule via the API

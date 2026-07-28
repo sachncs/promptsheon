@@ -50,7 +50,6 @@ sdk/typescript/node_modules/
 sdk/typescript/dist/
 sdk/typescript/*.tsbuildinfo
 frontend/node_modules/
-frontend/dist/
 frontend/screenshots/
 
 # Security files

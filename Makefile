@@ -6,8 +6,8 @@ all: build
 # Build all binaries
 build: build-server build-cli
 
-# Build the server daemon
-build-server:
+# Build the server daemon (embeds frontend/dist/)
+build-server: web-build
 	go build -o promptsheond .
 
 # Build the CLI client
