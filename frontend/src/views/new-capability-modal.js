@@ -1,6 +1,5 @@
 import * as api from "../api.js";
 import { escape, apiStatusLabel } from "../utils.js";
-import { ownerName } from "../state/owners.js";
 
 function optional(label, value) {
   return `<div class="rounded-lg bg-paper p-3"><span class="eyebrow">${escape(label)}</span><span class="mono mt-2 block text-[.78rem] font-bold">${escape(value)}</span></div>`;

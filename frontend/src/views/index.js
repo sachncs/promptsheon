@@ -77,9 +77,9 @@ export async function renderView(route) {
   if (title) title.textContent = PAGE_TITLES[route.path] || titleFromRoute(route) || "Promptsheon";
 }
 
-export function requiresKey() {
-  return Boolean(loadSettings().apiKey);
-}
+// requiresKey was a shared check used by an earlier router hook;
+// the connect-prompt logic inlines its own loadSettings().apiKey
+// test today. Reintroduce when the hook comes back.
 
 export function renderConnectPrompt(message) {
   return `<section class="panel p-8 text-center">

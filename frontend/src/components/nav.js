@@ -1,5 +1,3 @@
-import { escape } from "../utils.js";
-
 export function renderNav() {
   return `
     <aside id="sidebar" class="sidebar fixed inset-y-0 left-0 z-40 flex w-[248px] flex-col overflow-y-auto bg-ink px-4 py-5 text-white lg:translate-x-0">
@@ -57,6 +55,7 @@ export function renderNav() {
   `;
 }
 
-export function renderConnectionBar() {
-  return `<div id="connect-banner"></div>`;
-}
+// renderConnectionBar was a stub that returned an empty
+// connect-banner placeholder; shell.js hardcodes the banner
+// directly. Reintroduce if a future test needs to mount the
+// banner in isolation.

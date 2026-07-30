@@ -23,11 +23,7 @@ export function ownerName(id) {
   return id || "—";
 }
 
-export function setOwners(list) {
-  owners.clear();
-  for (const user of list || []) owners.set(user.id, user.name || user.email || user.id);
-}
-
-export function getOwners() {
-  return owners;
-}
+// setOwners / getOwners were a manual override hook used by an
+// earlier admin-only path; the /api/v1/users call in
+// ensureOwnerIndex is the only producer now. Reintroduce them
+// when a non-default seed (e.g. an SSO fixture) lands.

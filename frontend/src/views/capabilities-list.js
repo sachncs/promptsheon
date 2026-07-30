@@ -1,5 +1,5 @@
 import * as api from "../api.js";
-import { escape, formatRelative } from "../utils.js";
+import { escape } from "../utils.js";
 import { ownerName } from "../state/owners.js";
 
 const STATUS_TONES = { active: "good", approved: "good", pending: "warn", superseded: "neutral", rolled_back: "danger" };

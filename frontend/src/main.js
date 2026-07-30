@@ -1,13 +1,11 @@
-import htmx from "htmx.org";
 import "./styles.css";
 import * as api from "./api.js";
-import { loadSettings, saveSettings, clearSettings, watchSettings } from "./settings.js";
+import { loadSettings, watchSettings } from "./settings.js";
 import { initRouter, go, currentRoute } from "./router.js";
 import { renderAppShell, renderInitialState } from "./shell.js";
 import { renderView } from "./views/index.js";
 import { ensureOwnerIndex } from "./state/owners.js";
 
-window.htmx = htmx;
 window.promptsheon = { api, go };
 
 const qs = (selector, scope = document) => scope.querySelector(selector);

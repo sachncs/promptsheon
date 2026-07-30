@@ -1,5 +1,5 @@
 import * as api from "../api.js";
-import { escape, formatCompact, formatInteger, formatMoney, formatPercent, formatRelative, apiStatusLabel } from "../utils.js";
+import { escape, formatCompact, formatInteger, formatMoney, formatRelative, apiStatusLabel } from "../utils.js";
 
 function pill(text, tone = "neutral") {
   return `<span class="status-pill ${tone} !px-2 !py-1"><span class="status-dot"></span>${escape(text)}</span>`;

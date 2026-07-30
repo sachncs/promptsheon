@@ -1,4 +1,3 @@
-import { escape } from "./utils.js";
 import { renderNav } from "./components/nav.js";
 import { renderView } from "./views/index.js";
 import { renderModalRoot } from "./components/modal-root.js";

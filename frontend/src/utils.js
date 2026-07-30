@@ -40,20 +40,6 @@ export const formatRelative = (iso) => {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
 };
 
-export const initials = (name) => {
-  if (!name) return "—";
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || "")
-    .join("") || name.slice(0, 2).toUpperCase();
-};
-
-export const statusPill = (label, tone = "neutral") => `<span class="status-pill ${tone}"><span class="status-dot"></span>${escape(label)}</span>`;
-
-export const STATUS_TONES = { active: "good", approved: "good", pending: "warn", superseded: "neutral", rolled_back: "danger", draft: "neutral", open: "warn", closed: "good", failed: "danger" };
-
 export function apiStatusLabel(result) {
   if (!result) return "Offline";
   if (result.ok) return "OK";

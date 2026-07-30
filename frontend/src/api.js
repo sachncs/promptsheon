@@ -1,4 +1,4 @@
-import { loadSettings, saveSettings, clearSettings } from "./settings.js";
+import { loadSettings } from "./settings.js";
 
 const DEFAULT_TIMEOUT_MS = 8000;
 const RETRYABLE_STATUSES = new Set([0, 408, 425, 429, 500, 502, 503, 504]);
@@ -139,10 +139,6 @@ export async function getReady() {
   return apiFetch("/ready", { retry: false });
 }
 
-export async function getVersion() {
-  return apiFetch("/api/v1/version", { retry: false });
-}
-
 export async function getMetricsSummary() {
   return apiFetch("/api/v1/metrics/summary");
 }
@@ -151,9 +147,9 @@ export async function listWorkspaces() {
   return apiFetch("/api/v1/workspaces");
 }
 
-export async function createWorkspace(name, organization) {
-  return apiPost("/api/v1/workspaces", { name, organization: organization || undefined });
-}
+// createWorkspace was an admin bootstrap helper; the dashboard
+// does not create workspaces. Reintroduce when the admin
+// workspace-creation flow lands.
 
 export async function listProjects(workspaceId) {
   return apiFetch(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/projects`);
@@ -167,9 +163,9 @@ export async function listCapabilities(projectId) {
   return apiFetch(`/api/v1/projects/${encodeURIComponent(projectId)}/capabilities`);
 }
 
-export async function listAllCapabilities() {
-  return apiFetch(`/api/v1/catalog/capabilities`);
-}
+// listAllCapabilities was the catalog search preview endpoint;
+// the dashboard lists capabilities per-project today, not
+// cross-project. Reintroduce when the catalog tab ships.
 
 export async function createCapability(projectId, payload) {
   return apiPost(`/api/v1/projects/${encodeURIComponent(projectId)}/capabilities`, payload);
@@ -195,9 +191,10 @@ export async function rollbackRelease(id) {
   return apiFetch(`/api/v1/releases/${encodeURIComponent(id)}/rollback`, { method: "POST" });
 }
 
-export async function invokeRelease(id, inputs) {
-  return apiFetch(`/api/v1/releases/${encodeURIComponent(id)}/invoke`, { method: "POST", body: { inputs } });
-}
+// invokeRelease was the eval-loop shortcut; the harness runner
+// drives invocations server-side today and the dashboard
+// triggers evals via runEval, not direct invoke. Reintroduce
+// when an admin "try it" button lands.
 
 export async function getCapabilityContract(id) {
   return apiFetch(`/api/v1/capabilities/${encodeURIComponent(id)}/contract`);
@@ -227,9 +224,10 @@ export async function listVersions(capabilityId) {
   return apiFetch(`/api/v1/capabilities/${encodeURIComponent(capabilityId)}/versions`);
 }
 
-export async function getLatestVersion(capabilityId) {
-  return apiFetch(`/api/v1/capabilities/${encodeURIComponent(capabilityId)}/versions/latest`);
-}
+// getLatestVersion was a quick "show me the latest" shortcut;
+// the capability-detail view fetches the full version list
+// and picks the latest from it. Reintroduce only if a route
+// starts depending on the single-version endpoint.
 
 export async function createVersion(capabilityId, payload) {
   return apiPost(`/api/v1/capabilities/${encodeURIComponent(capabilityId)}/versions`, payload);
@@ -251,9 +249,10 @@ export async function getReleaseCreation(versionId, environment) {
   return apiPost(`/api/v1/versions/${encodeURIComponent(versionId)}/releases`, { environment });
 }
 
-export async function getWorkspaceObservation(id) {
-  return apiFetch(`/api/v1/workspaces/${encodeURIComponent(id)}/observation`);
-}
+// getWorkspaceObservation was the per-workspace rollup
+// dashboard endpoint; the rollup pipeline was unwired (see
+// CHANGELOG [Unreleased]), so this would 200 with an empty
+// summary forever. Reintroduce when the rollup job ships.
 
 export async function listAlertRules() {
   return apiFetch("/api/v1/alerts/rules");
@@ -263,9 +262,9 @@ export async function createAlertRule(payload) {
   return apiPost("/api/v1/alerts/rules", payload);
 }
 
-export async function updateAlertRule(id, payload) {
-  return apiPut(`/api/v1/alerts/rules/${encodeURIComponent(id)}`, payload);
-}
+// updateAlertRule was the edit-existing-alert path; the
+// dashboard today only creates + deletes alerts. Reintroduce
+// when the alerts page grows an edit form.
 
 export async function deleteAlertRule(id) {
   return apiDelete(`/api/v1/alerts/rules/${encodeURIComponent(id)}`);
@@ -307,9 +306,9 @@ export async function deleteVaultKey(id) {
   return apiDelete(`/api/v1/vault/keys/${encodeURIComponent(id)}`);
 }
 
-export async function getProvider(name) {
-  return apiFetch(`/api/v1/providers/${encodeURIComponent(name)}`);
-}
+// getProvider was the per-provider detail endpoint; the
+// dashboard today only renders the providers list. Reintroduce
+// when a provider-detail page ships.
 
 export async function testProvider(name, model) {
   return apiPost(`/api/v1/providers/${encodeURIComponent(name)}/test`, { model });
@@ -323,9 +322,9 @@ export async function createUser(payload) {
   return apiPost("/api/v1/users", payload);
 }
 
-export async function updateUser(id, payload) {
-  return apiPut(`/api/v1/users/${encodeURIComponent(id)}`, payload);
-}
+// updateUser was the user-edit path; the admin users page
+// today only lists + creates + deletes users. Reintroduce
+// when the user-edit form lands.
 
 export async function deleteUser(id) {
   return apiDelete(`/api/v1/users/${encodeURIComponent(id)}`);

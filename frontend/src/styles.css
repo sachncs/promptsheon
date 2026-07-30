@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@source "../public";
 
 @theme {
   --color-ink: #151619;
@@ -253,43 +252,13 @@
     background: currentColor;
   }
 
-  .status-dot.live {
-    box-shadow: 0 0 0 4px rgba(201, 243, 106, .12);
-    color: #84b737;
-  }
-
-  .status-dot.warning {
-    color: #d8992d;
-  }
-
-  .status-dot.error {
-    color: #e35b42;
-  }
-
-  .chart-grid {
-    background-image: linear-gradient(to bottom, rgba(21, 22, 25, .065) 1px, transparent 1px);
-    background-size: 100% 25%;
-  }
-
-  .data-row {
+.data-row {
     border-top: 1px solid #eeeee9;
     transition: background 160ms ease;
   }
 
   .data-row:hover {
     background: rgba(245, 245, 241, .75);
-  }
-
-  .sparkline {
-    fill: none;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 2.4;
-  }
-
-  .dot-grid {
-    background-image: radial-gradient(rgba(21, 22, 25, .12) 1px, transparent 1px);
-    background-size: 14px 14px;
   }
 
   .soft-divider {
@@ -339,40 +308,11 @@
     animation: float-in 240ms cubic-bezier(.2,.8,.2,1) both;
   }
 
-  .toast {
-    position: fixed;
-    right: 1rem;
-    bottom: 1rem;
-    z-index: 70;
-    max-width: min(24rem, calc(100vw - 2rem));
-    border: 1px solid rgba(255, 255, 255, .16);
-    border-radius: .9rem;
-    background: #1b1c20;
-    padding: .8rem 1rem;
-    color: #fff;
-    box-shadow: 0 15px 40px rgba(21, 22, 25, .24);
-    font-size: .78rem;
-    animation: float-in 240ms cubic-bezier(.2,.8,.2,1) both;
-  }
-
   .skeleton {
     border-radius: .45rem;
     background: linear-gradient(90deg, #ecece7 25%, #f7f7f4 50%, #ecece7 75%);
     background-size: 200% 100%;
     animation: skeleton 1.4s ease-in-out infinite;
-  }
-
-  .htmx-request .htmx-indicator,
-  .htmx-request.htmx-indicator {
-    display: inline-flex;
-  }
-
-  .htmx-indicator {
-    display: none;
-  }
-
-  .htmx-request {
-    cursor: progress;
   }
 
   @keyframes skeleton {
