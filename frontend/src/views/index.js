@@ -13,6 +13,8 @@ import { renderWorkspaceDetail } from "./workspace-detail.js";
 import { renderProjectDetail } from "./project-detail.js";
 import { renderVersionDetail } from "./version-detail.js";
 import { renderExecutionDetail } from "./execution-detail.js";
+import { renderProviderDetail } from "./provider-detail.js";
+import { renderEvalDetail } from "./eval-detail.js";
 import { loadSettings } from "../settings.js";
 
 const ROUTES = {
@@ -49,6 +51,8 @@ function resolve(route) {
   if (route.path.startsWith("/projects/") && route.path !== "/projects") return renderProjectDetail;
   if (route.path.startsWith("/versions/") && route.path !== "/versions") return renderVersionDetail;
   if (route.path.startsWith("/executions/") && route.path !== "/executions") return renderExecutionDetail;
+  if (route.path.startsWith("/providers/") && route.path !== "/providers") return renderProviderDetail;
+  if (route.path.startsWith("/evals/") && route.path !== "/evals") return renderEvalDetail;
   return null;
 }
 

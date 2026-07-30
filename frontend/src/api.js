@@ -222,6 +222,62 @@ export async function invokeRelease(id, inputs) {
   return apiFetch(`/api/v1/releases/${encodeURIComponent(id)}/invoke`, { method: "POST", body: { inputs } });
 }
 
+// Datasets: /api/v1/capabilities/{id}/datasets and
+// /api/v1/datasets/{id}[/cases]. The cases endpoint is a
+// bulk-write (PUT) that replaces the case list.
+export async function listDatasets(capabilityId) {
+  return apiFetch(`/api/v1/capabilities/${encodeURIComponent(capabilityId)}/datasets`);
+}
+
+export async function createDataset(capabilityId, payload) {
+  return apiPost(`/api/v1/capabilities/${encodeURIComponent(capabilityId)}/datasets`, payload);
+}
+
+export async function getDataset(id) {
+  return apiFetch(`/api/v1/datasets/${encodeURIComponent(id)}`);
+}
+
+export async function deleteDataset(id) {
+  return apiDelete(`/api/v1/datasets/${encodeURIComponent(id)}`);
+}
+
+export async function putDatasetCases(id, cases) {
+  return apiPut(`/api/v1/datasets/${encodeURIComponent(id)}/cases`, { cases });
+}
+
+// Preconditions: /api/v1/capabilities/{id}/preconditions and
+// /api/v1/preconditions/{id}. PUT updates; DELETE removes.
+export async function listPreconditions(capabilityId) {
+  return apiFetch(`/api/v1/capabilities/${encodeURIComponent(capabilityId)}/preconditions`);
+}
+
+export async function createPrecondition(capabilityId, payload) {
+  return apiPost(`/api/v1/capabilities/${encodeURIComponent(capabilityId)}/preconditions`, payload);
+}
+
+export async function updatePrecondition(id, payload) {
+  return apiPut(`/api/v1/preconditions/${encodeURIComponent(id)}`, payload);
+}
+
+export async function deletePrecondition(id) {
+  return apiDelete(`/api/v1/preconditions/${encodeURIComponent(id)}`);
+}
+
+// Eval runs: POST /api/v1/releases/{id}/evals triggers; the
+// list endpoint returns recent runs for a release. The
+// single-eval detail endpoint surfaces inputs/outputs/scores.
+export async function runEval(releaseId, payload) {
+  return apiPost(`/api/v1/releases/${encodeURIComponent(releaseId)}/evals`, payload || {});
+}
+
+export async function listEvals(releaseId) {
+  return apiFetch(`/api/v1/releases/${encodeURIComponent(releaseId)}/evals`);
+}
+
+export async function getEval(id) {
+  return apiFetch(`/api/v1/evals/${encodeURIComponent(id)}`);
+}
+
 // listSettings / getSetting / setSetting / deleteSetting
 // surface the four /api/v1/settings routes. The list endpoint
 // returns the per-key mask; a value of "***" means the key is
@@ -327,9 +383,11 @@ export async function createAlertRule(payload) {
   return apiPost("/api/v1/alerts/rules", payload);
 }
 
-// updateAlertRule was the edit-existing-alert path; the
-// dashboard today only creates + deletes alerts. Reintroduce
-// when the alerts page grows an edit form.
+// updateAlertRule backs the alert-rule-edit modal opened
+// from the operations → alerts tab.
+export async function updateAlertRule(id, payload) {
+  return apiPut(`/api/v1/alerts/rules/${encodeURIComponent(id)}`, payload);
+}
 
 export async function deleteAlertRule(id) {
   return apiDelete(`/api/v1/alerts/rules/${encodeURIComponent(id)}`);
@@ -413,9 +471,11 @@ export async function deleteVaultKey(id) {
   return apiDelete(`/api/v1/vault/keys/${encodeURIComponent(id)}`);
 }
 
-// getProvider was the per-provider detail endpoint; the
-// dashboard today only renders the providers list. Reintroduce
-// when a provider-detail page ships.
+// getProvider is exposed by the provider-detail page. The
+// list + test endpoints below back the providers tab.
+export async function getProvider(name) {
+  return apiFetch(`/api/v1/providers/${encodeURIComponent(name)}`);
+}
 
 export async function testProvider(name, model) {
   return apiPost(`/api/v1/providers/${encodeURIComponent(name)}/test`, { model });
@@ -429,9 +489,11 @@ export async function createUser(payload) {
   return apiPost("/api/v1/users", payload);
 }
 
-// updateUser was the user-edit path; the admin users page
-// today only lists + creates + deletes users. Reintroduce
-// when the user-edit form lands.
+// updateUser backs the user-edit modal opened from the
+// operations → users tab.
+export async function updateUser(id, payload) {
+  return apiPut(`/api/v1/users/${encodeURIComponent(id)}`, payload);
+}
 
 export async function deleteUser(id) {
   return apiDelete(`/api/v1/users/${encodeURIComponent(id)}`);

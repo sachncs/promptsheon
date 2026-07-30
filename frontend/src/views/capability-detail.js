@@ -107,6 +107,41 @@ function versionsCard(versions) {
   </div>`;
 }
 
+function datasetsCard(datasets) {
+  const rows = (datasets || []).map((d) => `<li class="flex items-center justify-between border-t border-line/60 px-5 py-3" data-dataset-id="${escape(d.id)}">
+    <div>
+      <p class="text-[.78rem] font-bold">${escape(d.name || "—")}</p>
+      <p class="text-[.62rem] text-muted mono">${escape(d.id)}</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button data-dataset-cases="${escape(d.id)}" class="quiet-button !text-[.62rem]">Cases</button>
+      <button data-dataset-delete="${escape(d.id)}" data-dataset-name="${escape(d.name || d.id)}" class="rounded-md bg-rose-50 px-2 py-1 text-[.62rem] font-bold text-rose-700 hover:bg-rose-100">Delete</button>
+    </div>
+  </li>`).join("");
+  return `<div class="panel p-5 sm:p-6">
+    <div class="flex items-center justify-between"><div class="eyebrow">Datasets</div><button data-action="new-dataset" class="quiet-button !text-[.66rem]"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-plus"/></svg>New dataset</button></div>
+    ${datasets?.length ? `<ul class="mt-3 -mx-5">${rows}</ul>` : `<p class="mt-3 text-[.68rem] text-muted">No datasets yet. Create one to start running eval cases.</p>`}
+  </div>`;
+}
+
+function preconditionsCard(preconditions) {
+  const rows = (preconditions || []).map((p) => `<li class="flex items-center justify-between border-t border-line/60 px-5 py-3" data-precondition-id="${escape(p.id)}">
+    <div>
+      <p class="text-[.78rem] font-bold">${escape(p.name || "—")}</p>
+      <p class="text-[.66rem] text-muted">${escape(p.command || "")}</p>
+      <p class="text-[.62rem] text-muted mono">${escape(p.id)}</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button data-precondition-edit="${escape(p.id)}" class="quiet-button !text-[.62rem]">Edit</button>
+      <button data-precondition-delete="${escape(p.id)}" data-precondition-name="${escape(p.name || p.id)}" class="rounded-md bg-rose-50 px-2 py-1 text-[.62rem] font-bold text-rose-700 hover:bg-rose-100">Delete</button>
+    </div>
+  </li>`).join("");
+  return `<div class="panel p-5 sm:p-6">
+    <div class="flex items-center justify-between"><div class="eyebrow">Preconditions</div><button data-action="new-precondition" class="quiet-button !text-[.66rem]"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-plus"/></svg>New precondition</button></div>
+    ${preconditions?.length ? `<ul class="mt-3 -mx-5">${rows}</ul>` : `<p class="mt-3 text-[.68rem] text-muted">No preconditions yet. Add command hooks that must pass before a release can activate.</p>`}
+  </div>`;
+}
+
 function contractCard(contract) {
   return `<div class="panel p-5 sm:p-6">
     <div class="flex items-center justify-between"><div class="eyebrow">Capability contract</div><button data-action="edit-contract" class="quiet-button !text-[.66rem]"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-edit"/></svg>Edit</button></div>
@@ -163,11 +198,13 @@ export async function renderCapabilityDetail(route) {
   }
   root.innerHTML = renderSkeleton();
 
-  const [capRes, contractRes, reputationRes, versionsRes] = await Promise.all([
+  const [capRes, contractRes, reputationRes, versionsRes, datasetsRes, preconditionsRes] = await Promise.all([
     api.getCapability(id),
     api.getCapabilityContract(id),
     api.getCapabilityReputation(id),
-    api.listVersions(id).catch((e) => ({ ok: false, error: String(e?.message || e) }))
+    api.listVersions(id).catch((e) => ({ ok: false, error: String(e?.message || e) })),
+    api.listDatasets(id).catch((e) => ({ ok: false, error: String(e?.message || e) })),
+    api.listPreconditions(id).catch((e) => ({ ok: false, error: String(e?.message || e) }))
   ]);
   if (!capRes.ok) {
     const fallback = `<p class="panel p-6 text-center text-[.78rem]">${escape(apiStatusLabel(capRes))}</p>`;
@@ -178,18 +215,20 @@ export async function renderCapabilityDetail(route) {
   const contract = contractRes.ok ? contractRes.data : null;
   const reputation = reputationRes.ok ? reputationRes.data : null;
   const versions = versionsRes.ok ? versionsRes.data || [] : [];
+  const datasets = datasetsRes.ok ? datasetsRes.data || [] : [];
+  const preconditions = preconditionsRes.ok ? preconditionsRes.data || [] : [];
 
   const html = `
     <section class="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,.85fr)]">
-      <div class="space-y-5">${header(capability)}${versionsCard(versions)}${contractCard(contract)}<div id="diff-slot"></div></div>
+      <div class="space-y-5">${header(capability)}${versionsCard(versions)}${datasetsCard(datasets)}${preconditionsCard(preconditions)}${contractCard(contract)}<div id="diff-slot"></div></div>
       <div class="space-y-5">${reputationCard(reputation)}${selfEvolveCard(capability.self_evolve)}</div>
     </section>`;
   root.innerHTML = html;
-  attach(id, capability, versions);
+  attach(id, capability, versions, datasets, preconditions);
   return html;
 }
 
-function attach(id, capability, versions) {
+function attach(id, capability, versions, datasets, preconditions) {
   const root = window.document.getElementById("view");
   const newVersionBtn = root.querySelector("[data-action=new-version]");
   newVersionBtn?.addEventListener("click", async () => {
@@ -236,4 +275,53 @@ function attach(id, capability, versions) {
       event.stopImmediatePropagation();
     });
   });
+
+  // Datasets
+  root.querySelector("[data-action=new-dataset]")?.addEventListener("click", () => openDatasetCreateModal(capability));
+  root.querySelectorAll("[data-dataset-delete]").forEach((b) => b.addEventListener("click", async () => {
+    const id = b.dataset.datasetDelete;
+    const name = b.dataset.datasetName || id;
+    if (!window.confirm(`Delete dataset "${name}"?`)) return;
+    const result = await api.deleteDataset(id);
+    if (!result.ok) { window.alert(`Delete failed: ${apiStatusLabel(result)}`); return; }
+    window.location.reload();
+  }));
+  root.querySelectorAll("[data-dataset-cases]").forEach((b) => b.addEventListener("click", () => openDatasetCasesModal(b.dataset.datasetCases)));
+
+  // Preconditions
+  root.querySelector("[data-action=new-precondition]")?.addEventListener("click", () => openPreconditionCreateModal(capability));
+  root.querySelectorAll("[data-precondition-edit]").forEach((b) => b.addEventListener("click", () => openPreconditionEditModal(b.dataset.preconditionEdit, preconditions)));
+  root.querySelectorAll("[data-precondition-delete]").forEach((b) => b.addEventListener("click", async () => {
+    const id = b.dataset.preconditionDelete;
+    const name = b.dataset.preconditionName || id;
+    if (!window.confirm(`Delete precondition "${name}"?`)) return;
+    const result = await api.deletePrecondition(id);
+    if (!result.ok) { window.alert(`Delete failed: ${apiStatusLabel(result)}`); return; }
+    window.location.reload();
+  }));
+}
+
+// Dataset create modal
+async function openDatasetCreateModal(capability) {
+  const { openDatasetCreateModal: open } = await import("./harness-modals.js");
+  await open(window.document.getElementById("modal-root"), capability);
+}
+
+// Precondition create modal
+async function openPreconditionCreateModal(capability) {
+  const { openPreconditionCreateModal: open } = await import("./harness-modals.js");
+  await open(window.document.getElementById("modal-root"), capability);
+}
+
+// Precondition edit modal
+async function openPreconditionEditModal(id, preconditions) {
+  const target = preconditions.find((p) => p.id === id) || null;
+  const { openPreconditionEditModal: open } = await import("./harness-modals.js");
+  await open(window.document.getElementById("modal-root"), id, target);
+}
+
+// Dataset cases (bulk-write JSON) modal
+async function openDatasetCasesModal(id) {
+  const { openDatasetCasesModal: open } = await import("./harness-modals.js");
+  await open(window.document.getElementById("modal-root"), id);
 }

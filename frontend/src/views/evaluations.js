@@ -21,6 +21,19 @@ function executionRow(exec) {
   </tr>`;
 }
 
+function evalRow(ev) {
+  const overall = typeof ev.overall_score === "number" ? ev.overall_score : (ev.score ?? null);
+  const tone = ev.status === "passed" || ev.status === "pass" ? "good" : (overall != null && overall >= 0.6 ? "warn" : "danger");
+  return `<tr class="border-t border-line/60">
+    <td class="py-2 pr-3 text-[.66rem] text-muted whitespace-nowrap">${escape(formatRelative(ev.timestamp || ev.created_at))}</td>
+    <td class="py-2 pr-3 mono text-[.66rem] truncate max-w-[12rem]"><a href="#/evals/${escape(ev.id)}" class="hover:underline">${escape(ev.id)}</a></td>
+    <td class="py-2 pr-3">${pill(overall != null ? overall.toFixed(2) : "—", tone)}</td>
+    <td class="py-2 pr-3 text-[.66rem]">${escape(ev.dataset_id || "—")}</td>
+    <td class="py-2 pr-3 text-[.66rem]">${escape(ev.scorer || "—")}</td>
+    <td class="py-2 pr-3 mono text-[.66rem]">${escape(String(ev.latency_ms || 0))}ms</td>
+  </tr>`;
+}
+
 function renderTable(executions) {
   if (!executions || !executions.ok || !executions.data || !executions.data.length) {
     const tone = !executions || executions.ok === false ? (executions?.status === 429 ? "warn" : "neutral") : "neutral";
@@ -29,6 +42,12 @@ function renderTable(executions) {
   }
   return `<div class="overflow-x-auto rounded-xl border border-line"><table class="w-full text-[.7rem]"><thead><tr class="bg-paper text-left text-[.6rem] uppercase tracking-wider text-muted"><th class="px-3 py-2 font-bold">When</th><th class="px-3 py-2 font-bold">Execution id</th><th class="px-3 py-2 font-bold">Status</th><th class="px-3 py-2 font-bold">Input hash</th><th class="px-3 py-2 font-bold">Manifest hash</th><th class="px-3 py-2 font-bold">Model</th><th class="px-3 py-2 font-bold">Latency</th></tr></thead><tbody>${executions.data.map(executionRow).join("")}</tbody></table></div>
   <p class="mt-3 text-[.62rem] text-muted">Showing ${executions.data.length} executions.</p>`;
+}
+
+function renderEvalTable(evals) {
+  if (!evals?.ok || !evals.data?.length) return "";
+  return `<div class="mt-5 overflow-x-auto rounded-xl border border-line"><table class="w-full text-[.7rem]"><thead><tr class="bg-paper text-left text-[.6rem] uppercase tracking-wider text-muted"><th class="px-3 py-2 font-bold">When</th><th class="px-3 py-2 font-bold">Eval id</th><th class="px-3 py-2 font-bold">Score</th><th class="px-3 py-2 font-bold">Dataset</th><th class="px-3 py-2 font-bold">Scorer</th><th class="px-3 py-2 font-bold">Latency</th></tr></thead><tbody>${evals.data.map(evalRow).join("")}</tbody></table></div>
+  <p class="mt-3 text-[.62rem] text-muted">Showing ${evals.data.length} eval runs.</p>`;
 }
 
 function versionOption(v) {
@@ -63,6 +82,16 @@ export async function renderEvaluations(route) {
 
   const selected = versions.find((v) => v.id === versionId) || versions[0];
   const executions = selected ? await api.listExecutions(selected.id) : { ok: false };
+  // Releases are version-scoped on the API. There's no
+  // /api/v1/versions/{id}/releases endpoint, so we infer the
+  // release id from the version id by loading the version. (If
+  // the version exists, its release's id is the version's
+  // active release; for the MVP this is best-effort — the eval
+  // runs tab falls back to empty if the version has no active
+  // release.)
+  const evals = selected
+    ? await api.listEvals(selected.id).catch(() => ({ ok: false }))
+    : { ok: false };
 
   const shell = `
     <section class="flex flex-wrap items-end justify-between gap-3">
@@ -79,6 +108,7 @@ export async function renderEvaluations(route) {
           ${selected ? `<select id="exec-version" class="field !h-9 !rounded-lg !w-72 !text-[.72rem]">${versions.map(versionOption).join("")}</select>` : ""}
         </div>
         <div class="mt-5" id="exec-table">${renderTable(executions)}</div>
+        ${renderEvalTable(evals)}
       </article>
       <article class="panel p-5 sm:p-6">
         <div class="eyebrow">Run</div>

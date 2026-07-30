@@ -49,7 +49,10 @@ async function alertsTab() {
         <td class="py-2 mono">${escape(rule.threshold ?? "—")}</td>
         <td class="py-2 mono">${escape((rule.duration_minutes ?? rule.duration) ?? "—")}m</td>
         <td class="py-2 mono">${escape((rule.window_minutes ?? rule.window) ?? "—")}m</td>
-        <td class="py-2 text-right"><button data-rule-delete="${escape(rule.id)}" class="rounded-md bg-rose-50 px-2 py-1 text-[.62rem] font-bold text-rose-700 hover:bg-rose-100">Delete</button></td>
+        <td class="py-2 text-right">
+          <button data-rule-edit='${JSON.stringify({ id: rule.id, name: rule.name, type: rule.type, severity: rule.severity, threshold: rule.threshold, duration_minutes: rule.duration_minutes ?? rule.duration, window_minutes: rule.window_minutes ?? rule.window })}' class="quiet-button !text-[.62rem]">Edit</button>
+          <button data-rule-delete="${escape(rule.id)}" class="rounded-md bg-rose-50 px-2 py-1 text-[.62rem] font-bold text-rose-700 hover:bg-rose-100">Delete</button>
+        </td>
       </tr>`).join("")}</tbody></table>` : `<p class="mt-3 text-[.7rem] text-muted">No alert rules. Create one to start receiving signals.</p>`}
     </article>
     <article class="panel p-5 sm:p-6">
@@ -101,7 +104,7 @@ async function providersTab() {
   return `<section class="mt-5">
     <article class="panel p-5 sm:p-6">
       <div class="eyebrow">Registered providers</div>
-      <div class="mt-3 space-y-2">${list.map((p) => `<div class="flex items-center justify-between rounded-xl bg-paper p-3"><span class="text-[.78rem] font-bold">${escape(p)}</span><button data-provider-test="${escape(p)}" class="quiet-button !text-[.66rem]"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-play"/></svg>Test connection</button></div>`).join("")}</div>
+      <div class="mt-3 space-y-2">${list.map((p) => `<div class="flex items-center justify-between rounded-xl bg-paper p-3"><span><a href="#/providers/${escape(p)}" class="text-[.78rem] font-bold hover:underline">${escape(p)}</a></span><button data-provider-test="${escape(p)}" class="quiet-button !text-[.66rem]"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-play"/></svg>Test connection</button></div>`).join("")}</div>
       <p id="provider-test-result" class="mt-3 text-[.68rem] text-muted">Click a provider to run a connectivity smoke test.</p>
     </article>
   </section>`;
@@ -121,7 +124,10 @@ async function usersTab() {
         <td class="py-2"><span class="font-bold">${escape(u.name || u.id)}</span><span class="block text-[.62rem] text-muted mono">${escape(u.id)}</span></td>
         <td class="py-2 mono text-[.66rem]">${escape(u.email || "—")}</td>
         <td class="py-2"><span class="status-pill ${u.role === "admin" ? "good" : u.role === "writer" ? "warn" : "neutral"} !px-2 !py-1">${escape(u.role || "—")}</span></td>
-        <td class="py-2 text-right"><button data-user-delete="${escape(u.id)}" class="rounded-md bg-rose-50 px-2 py-1 text-[.62rem] font-bold text-rose-700 hover:bg-rose-100">Delete</button></td>
+        <td class="py-2 text-right">
+          <button data-user-edit='${JSON.stringify(u)}' class="quiet-button !text-[.62rem]">Edit</button>
+          <button data-user-delete="${escape(u.id)}" class="rounded-md bg-rose-50 px-2 py-1 text-[.62rem] font-bold text-rose-700 hover:bg-rose-100">Delete</button>
+        </td>
       </tr>`).join("")}</tbody></table>` : `<p class="mt-3 text-[.7rem] text-muted">No users.</p>`}
     </article>
   </section>`;
@@ -264,6 +270,16 @@ function attach(tab, root) {
       }
       window.location.reload();
     }));
+    root.querySelectorAll("[data-rule-edit]").forEach((b) =>
+      b.addEventListener("click", async () => {
+        const raw = b.getAttribute("data-rule-edit");
+        if (!raw) return;
+        let rule;
+        try { rule = JSON.parse(raw); } catch { return; }
+        const { openAlertRuleEditModal } = await import("../alert-rule-edit-modal.js");
+        await openAlertRuleEditModal(document.getElementById("modal-root"), rule);
+      })
+    );
     root.querySelector("#group-new")?.addEventListener("click", async () => {
       const { openNewGroupModal } = await import("./modals.js");
       await openNewGroupModal(root, () => window.location.reload());
@@ -384,6 +400,16 @@ function attach(tab, root) {
       if (!result.ok) { window.alert(apiStatusLabel(result)); return; }
       window.location.reload();
     }));
+    root.querySelectorAll("[data-user-edit]").forEach((b) =>
+      b.addEventListener("click", async () => {
+        const raw = b.getAttribute("data-user-edit");
+        if (!raw) return;
+        let user;
+        try { user = JSON.parse(raw); } catch { return; }
+        const { openUserEditModal } = await import("../user-edit-modal.js");
+        await openUserEditModal(document.getElementById("modal-root"), user);
+      })
+    );
   } else if (tab === "reasoning") {
     root.querySelector("#reasoning-form")?.addEventListener("submit", async (event) => {
       event.preventDefault();
