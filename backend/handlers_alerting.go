@@ -19,6 +19,7 @@ var validSeverities = []string{
 	string(alerting.SeverityCritical),
 }
 
+// ListAlertRules lists the alertRules.
 func (s *Server) handleListAlertRules(w http.ResponseWriter, r *http.Request) error {
 	if s.alertingManager == nil {
 		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
@@ -37,6 +38,7 @@ func (s *Server) handleListAlertRules(w http.ResponseWriter, r *http.Request) er
 	return nil
 }
 
+// CreateAlertRule creates the alertRule.
 func (s *Server) handleCreateAlertRule(w http.ResponseWriter, r *http.Request) error {
 	if s.alertingManager == nil {
 		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
@@ -93,6 +95,7 @@ func (s *Server) handleCreateAlertRule(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
+// GetAlertRule returns the alertRule.
 func (s *Server) handleGetAlertRule(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if s.alertingManager == nil {
@@ -106,6 +109,7 @@ func (s *Server) handleGetAlertRule(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
+// UpdateAlertRule updates the alertRule.
 func (s *Server) handleUpdateAlertRule(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if s.alertingManager == nil {
@@ -157,6 +161,7 @@ func (s *Server) handleUpdateAlertRule(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
+// DeleteAlertRule deletes the alertRule.
 func (s *Server) handleDeleteAlertRule(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if s.alertingManager == nil {
@@ -174,6 +179,7 @@ func (s *Server) handleDeleteAlertRule(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
+// ListAlerts lists the alerts.
 func (s *Server) handleListAlerts(w http.ResponseWriter, r *http.Request) error {
 	if s.alertingManager == nil {
 		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
@@ -192,6 +198,7 @@ func (s *Server) handleListAlerts(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
+// ResolveAlert resolves the alert.
 func (s *Server) handleResolveAlert(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if s.alertingManager == nil {
@@ -204,6 +211,7 @@ func (s *Server) handleResolveAlert(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
+// ListNotificationGroups lists the notificationGroups.
 func (s *Server) handleListNotificationGroups(w http.ResponseWriter, r *http.Request) error {
 	if s.alertingManager == nil {
 		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}
@@ -216,6 +224,7 @@ func (s *Server) handleListNotificationGroups(w http.ResponseWriter, r *http.Req
 	return nil
 }
 
+// AddNotificationGroup adds the notificationGroup.
 func (s *Server) handleAddNotificationGroup(w http.ResponseWriter, r *http.Request) error {
 	if s.alertingManager == nil {
 		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "alerting manager not configured"}

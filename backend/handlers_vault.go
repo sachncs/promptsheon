@@ -10,6 +10,7 @@ import (
 const fieldKeyName = "key_name"
 const fieldProviderName = "provider_name"
 
+// SaveVaultKey saves the vaultKey.
 func (s *Server) handleSaveVaultKey(w http.ResponseWriter, r *http.Request) error {
 	if s.vault == nil {
 		return badRequest("vault not configured")
@@ -57,6 +58,7 @@ func (s *Server) handleSaveVaultKey(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
+// ListVaultKeys lists the vaultKeys.
 func (s *Server) handleListVaultKeys(w http.ResponseWriter, r *http.Request) error {
 	keys, err := s.db.ListProviderKeys(r.Context())
 	if err != nil {
@@ -88,6 +90,7 @@ func (s *Server) handleListVaultKeys(w http.ResponseWriter, r *http.Request) err
 	return nil
 }
 
+// DeleteVaultKey deletes the vaultKey.
 func (s *Server) handleDeleteVaultKey(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if err := s.db.DeleteProviderKey(r.Context(), id); err != nil {

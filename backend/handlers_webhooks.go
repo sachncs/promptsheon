@@ -12,6 +12,7 @@ import (
 	"github.com/sachncs/promptsheon/backend/webhook"
 )
 
+// ListWebhooks lists the webhooks.
 func (s *Server) handleListWebhooks(w http.ResponseWriter, _ *http.Request) error {
 	if s.webhooks == nil {
 		// API-RESP-1: return a typed empty slice (the inner
@@ -52,6 +53,7 @@ type webhookEndpointPublic struct {
 	SecretSet bool                `json:"secret_set"`
 }
 
+// CreateWebhook creates the webhook.
 func (s *Server) handleCreateWebhook(w http.ResponseWriter, r *http.Request) error {
 	if s.webhooks == nil {
 		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "webhook dispatcher not configured"}
@@ -119,6 +121,7 @@ func (s *Server) handleCreateWebhook(w http.ResponseWriter, r *http.Request) err
 	return nil
 }
 
+// DeleteWebhook deletes the webhook.
 func (s *Server) handleDeleteWebhook(w http.ResponseWriter, r *http.Request) error {
 	if s.webhooks == nil {
 		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "webhook dispatcher not configured"}

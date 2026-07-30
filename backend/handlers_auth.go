@@ -147,6 +147,7 @@ func (s *Server) authenticateRequest(r *http.Request) (*http.Request, *auth.User
 	return r.WithContext(auth.WithUserContext(r.Context(), user)), user, nil
 }
 
+// CreateAPIKey creates the aPIKey.
 func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) error {
 	// Authenticate explicitly because the apikeys route is not wrapped
 	// with requirePerm (the create-key route is the bootstrap path for
@@ -389,6 +390,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+// ListAPIKeys lists the aPIKeys.
 func (s *Server) handleListAPIKeys(w http.ResponseWriter, r *http.Request) error {
 	newCtx, _, err := s.authenticateRequest(r)
 	if err != nil {
@@ -420,6 +422,7 @@ func (s *Server) handleListAPIKeys(w http.ResponseWriter, r *http.Request) error
 	return nil
 }
 
+// RevokeAPIKey handles the request.
 func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) error {
 	newCtx, _, err := s.authenticateRequest(r)
 	if err != nil {
@@ -510,6 +513,7 @@ func (s *Server) handleOAuthLogin(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
+// OAuthCallback handles the request.
 func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) error {
 	providerName := r.PathValue("provider")
 	if providerName == "" {

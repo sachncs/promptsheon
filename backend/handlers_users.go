@@ -27,6 +27,7 @@ func validRole(r string) bool {
 	return ok
 }
 
+// ListUsers lists the users.
 func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) error {
 	users, err := s.db.ListUsers(r.Context())
 	if err != nil {
@@ -39,6 +40,7 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+// CreateUser creates the user.
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) error {
 	var req struct {
 		Email string `json:"email"`
@@ -86,6 +88,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
+// GetUser returns the user.
 func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	u, err := s.db.GetUser(r.Context(), id)
@@ -96,6 +99,7 @@ func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+// UpdateUser updates the user.
 func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	existing, err := s.db.GetUser(r.Context(), id)
@@ -140,6 +144,7 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
+// DeleteUser deletes the user.
 func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if err := s.db.DeleteUser(r.Context(), id); err != nil {

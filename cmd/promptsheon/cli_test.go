@@ -1287,7 +1287,7 @@ func TestCmdDeleteBranchWithRepo(t *testing.T) {
 func TestCmdDiffWithRepo(t *testing.T) {
 	_ = withTempRepo(t)
 
-	hash1, _ := promptsheoncas.GetCurrentCommitHash()
+	hash1, _ := promptsheoncas.CurrentCommitHash()
 	_ = promptsheoncas.CreateBranch("other", "")
 	_ = promptsheoncas.Checkout("other")
 
@@ -1298,7 +1298,7 @@ func TestCmdDiffWithRepo(t *testing.T) {
 	})
 	th, _ := promptsheoncas.WriteObject(tree)
 	_, _ = promptsheoncas.Commit(th, nil, "engineer", "other commit", nil)
-	hash2, _ := promptsheoncas.GetCurrentCommitHash()
+	hash2, _ := promptsheoncas.CurrentCommitHash()
 
 	_ = promptsheoncas.Checkout("main")
 
@@ -1355,7 +1355,7 @@ func TestCmdShowBlob(t *testing.T) {
 func TestCmdShowCommit(t *testing.T) {
 	_ = withTempRepo(t)
 
-	hash, _ := promptsheoncas.GetCurrentCommitHash()
+	hash, _ := promptsheoncas.CurrentCommitHash()
 
 	out := captureStdout(t, func() {
 		err := dispatchCommand("show", []string{hash})
@@ -1383,7 +1383,7 @@ func TestCmdShowCommit(t *testing.T) {
 func TestCmdLsTree(t *testing.T) {
 	_ = withTempRepo(t)
 
-	hash, _ := promptsheoncas.GetCurrentCommitHash()
+	hash, _ := promptsheoncas.CurrentCommitHash()
 	commitObj, _ := promptsheoncas.ReadObject(hash)
 
 	out := captureStdout(t, func() {
@@ -1879,7 +1879,7 @@ func TestDrawMergeForkLinesSkipWhenNoColumnsBelowNoParentCols(t *testing.T) {
 func TestCmdShowTree(t *testing.T) {
 	_ = withTempRepo(t)
 
-	hash, _ := promptsheoncas.GetCurrentCommitHash()
+	hash, _ := promptsheoncas.CurrentCommitHash()
 	commitObj, _ := promptsheoncas.ReadObject(hash)
 	treeHash := commitObj.TreeHash
 
@@ -1935,7 +1935,7 @@ func TestCmdLsTreeNotATree(t *testing.T) {
 func TestCmdCatFileNotABlob(t *testing.T) {
 	_ = withTempRepo(t)
 
-	hash, _ := promptsheoncas.GetCurrentCommitHash()
+	hash, _ := promptsheoncas.CurrentCommitHash()
 
 	err := dispatchCommand("cat-file", []string{hash})
 	if err == nil {
@@ -2075,7 +2075,7 @@ func TestCmdLogWithCount(t *testing.T) {
 func TestCmdCheckoutDetached(t *testing.T) {
 	dir := withTempRepo(t)
 
-	hash, _ := promptsheoncas.GetCurrentCommitHash()
+	hash, _ := promptsheoncas.CurrentCommitHash()
 
 	_ = promptsheoncas.CreateBranch("other", "")
 	_ = promptsheoncas.Checkout("other")
@@ -2103,7 +2103,7 @@ func TestCmdCheckoutDetached(t *testing.T) {
 func TestCmdBranchCreateWithHash(t *testing.T) {
 	_ = withTempRepo(t)
 
-	hash, _ := promptsheoncas.GetCurrentCommitHash()
+	hash, _ := promptsheoncas.CurrentCommitHash()
 
 	out := captureStdout(t, func() {
 		err := dispatchCommand("branch", []string{"newbranch", hash})

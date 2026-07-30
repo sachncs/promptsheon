@@ -28,6 +28,7 @@ func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
+// CreateProject creates the project.
 func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) error {
 	workspaceID := r.PathValue("workspace_id")
 	var req struct {
@@ -57,6 +58,7 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) err
 	return nil
 }
 
+// GetProject returns the project.
 func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	proj, err := s.db.GetProject(r.Context(), id)
@@ -67,6 +69,7 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
+// UpdateProject updates the project.
 func (s *Server) handleUpdateProject(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	existing, err := s.db.GetProject(r.Context(), id)
@@ -95,6 +98,7 @@ func (s *Server) handleUpdateProject(w http.ResponseWriter, r *http.Request) err
 	return nil
 }
 
+// DeleteProject deletes the project.
 func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if err := s.db.DeleteProject(r.Context(), id); err != nil {

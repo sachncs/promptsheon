@@ -46,6 +46,7 @@ type createDatasetRequest struct {
 	Cases       []harness.DatasetCase `json:"cases,omitempty"`
 }
 
+// CreateDataset creates the dataset.
 func (s *Server) handleCreateDataset(w http.ResponseWriter, r *http.Request) error {
 	capabilityID := r.PathValue("capability_id")
 	var req createDatasetRequest
@@ -86,6 +87,7 @@ func (s *Server) handleCreateDataset(w http.ResponseWriter, r *http.Request) err
 	return nil
 }
 
+// ListDatasets lists the datasets.
 func (s *Server) handleListDatasets(w http.ResponseWriter, r *http.Request) error {
 	ds, err := s.db.ListDatasetsForCapability(r.Context(), r.PathValue("capability_id"))
 	if err != nil {
@@ -98,6 +100,7 @@ func (s *Server) handleListDatasets(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
+// GetDataset returns the dataset.
 func (s *Server) handleGetDataset(w http.ResponseWriter, r *http.Request) error {
 	d, err := s.db.GetDataset(r.Context(), r.PathValue("id"))
 	if err != nil {
@@ -116,6 +119,7 @@ type putCasesRequest struct {
 	Cases []harness.DatasetCase `json:"cases"`
 }
 
+// PutDatasetCases handles the request.
 func (s *Server) handlePutDatasetCases(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	var req putCasesRequest
@@ -142,6 +146,7 @@ func (s *Server) handlePutDatasetCases(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
+// DeleteDataset deletes the dataset.
 func (s *Server) handleDeleteDataset(w http.ResponseWriter, r *http.Request) error {
 	if err := s.db.DeleteDataset(r.Context(), r.PathValue("id")); err != nil {
 		return err
@@ -161,6 +166,7 @@ type createPreconditionRequest struct {
 	Enabled    *bool  `json:"enabled,omitempty"`
 }
 
+// CreatePrecondition creates the precondition.
 func (s *Server) handleCreatePrecondition(w http.ResponseWriter, r *http.Request) error {
 	capabilityID := r.PathValue("capability_id")
 	var req createPreconditionRequest
@@ -195,6 +201,7 @@ func (s *Server) handleCreatePrecondition(w http.ResponseWriter, r *http.Request
 	return nil
 }
 
+// ListPreconditions lists the preconditions.
 func (s *Server) handleListPreconditions(w http.ResponseWriter, r *http.Request) error {
 	ps, err := s.db.ListPreconditionsForCapability(r.Context(), r.PathValue("capability_id"))
 	if err != nil {
@@ -207,6 +214,7 @@ func (s *Server) handleListPreconditions(w http.ResponseWriter, r *http.Request)
 	return nil
 }
 
+// DeletePrecondition deletes the precondition.
 func (s *Server) handleDeletePrecondition(w http.ResponseWriter, r *http.Request) error {
 	if err := s.db.DeletePrecondition(r.Context(), r.PathValue("id")); err != nil {
 		return err
@@ -280,6 +288,7 @@ type runEvalRequest struct {
 	Scorer    string `json:"scorer"`
 }
 
+// RunEval runs the eval.
 func (s *Server) handleRunEval(w http.ResponseWriter, r *http.Request) error {
 	releaseID := r.PathValue("release_id")
 	var req runEvalRequest
@@ -319,6 +328,7 @@ func (s *Server) handleRunEval(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+// ListEvals lists the evals.
 func (s *Server) handleListEvals(w http.ResponseWriter, r *http.Request) error {
 	releaseID := r.PathValue("release_id")
 	rs, err := s.db.ListEvalRunsForRelease(r.Context(), releaseID)
@@ -332,6 +342,7 @@ func (s *Server) handleListEvals(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+// GetEval returns the eval.
 func (s *Server) handleGetEval(w http.ResponseWriter, r *http.Request) error {
 	// BUG-26: distinguish 404 from 500 on DB failure. The
 	// previous form returned ErrNotFound for any error,

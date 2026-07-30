@@ -13,6 +13,7 @@ import (
 
 const fieldUserID = "user_id"
 
+// ListAudit lists the audit.
 func (s *Server) handleListAudit(w http.ResponseWriter, r *http.Request) error {
 	filter := models.AuditFilter{
 		UserID:   r.URL.Query().Get("user_id"),
@@ -68,6 +69,7 @@ func (s *Server) handleListAudit(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+// ExportAudit exports the audit.
 func (s *Server) handleExportAudit(w http.ResponseWriter, r *http.Request) error {
 	filter := models.AuditFilter{
 		UserID:   r.URL.Query().Get("user_id"),
@@ -141,6 +143,7 @@ func (s *Server) writeAuditCSV(w http.ResponseWriter, entries []*models.AuditEnt
 	return writer.Error()
 }
 
+// VerifyAuditChain verifies the auditChain.
 func (s *Server) handleVerifyAuditChain(w http.ResponseWriter, r *http.Request) error {
 	res, err := s.db.VerifyAuditChain(r.Context())
 	if err != nil {
