@@ -53,6 +53,11 @@ frontend/node_modules/
 frontend/screenshots/
 frontend/dist/
 
+# cmd/promptsheond embeds the dashboard via //go:embed frontend/dist.
+# The Makefile copies frontend/dist into cmd/promptsheond/frontend/dist
+# at build time so the embed pattern stays inside the package.
+cmd/promptsheond/frontend/
+
 # Secret material — never commit
 *.pem
 *.key

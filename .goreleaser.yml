@@ -25,7 +25,7 @@ release:
 
 builds:
   - id: promptsheond
-    main: .
+    main: ./cmd/promptsheond
     binary: promptsheond
     env:
       - CGO_ENABLED=0
@@ -43,7 +43,7 @@ builds:
       - -X github.com/sachncs/promptsheon/backend.BuildTime={{.CommitDate}}
 
   - id: promptsheon-cli
-    main: .
+    main: ./cmd/promptsheon
     binary: promptsheon
     env:
       - CGO_ENABLED=0
@@ -61,7 +61,7 @@ builds:
       - -X github.com/sachncs/promptsheon/backend.BuildTime={{.CommitDate}}
 
   - id: promptsheon-healthcheck
-    main: .
+    main: ./cmd/promptsheon-healthcheck
     binary: promptsheon-healthcheck
     env:
       - CGO_ENABLED=0

@@ -20,8 +20,21 @@ def files(exclude_refs=False):
 def relative_path(file, target):
     if target.startswith("/"):
         return Path(target)
-    candidate = file.parent / target
-    return candidate if candidate.exists() else ROOT / target
+    # Try relative to the file's directory; resolve() normalises
+    # any ../ segments so cross-directory references resolve
+    # correctly even after docs/ was reorganised into topic
+    # subdirectories.
+    try:
+        candidate = (file.parent / target).resolve()
+        if candidate.exists():
+            return candidate
+    except (OSError, ValueError):
+        pass
+    # Fall back to repo-root-relative.
+    try:
+        return (ROOT / target).resolve()
+    except (OSError, ValueError):
+        return Path(target)
 
 
 def clean_target(target):

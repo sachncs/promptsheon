@@ -138,10 +138,10 @@ func startDaemon(dir string) (string, func()) {
 
 func buildDaemon(dir string) string {
 	bin := filepath.Join(dir, "promptsheond")
-	// Build from the module root so . resolves
-	// regardless of the working directory the test was started
-	// from.
-	cmd := exec.Command("go", "build", "-o", bin, ".")
+	// Build from the module root so ./cmd/promptsheond
+	// resolves regardless of the working directory the test
+	// was started from.
+	cmd := exec.Command("go", "build", "-o", bin, "./cmd/promptsheond")
 	cmd.Dir = moduleRoot()
 	out, err := cmd.CombinedOutput()
 	if err != nil {

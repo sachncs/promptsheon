@@ -36,7 +36,7 @@ Multi-region + canary + gRPC + pgx.
   in-memory adapter under `backend/store/postgres/`. v0.4.0
   replaces the in-memory adapter with a real pgx-backed
   implementation and adds the `DatabaseURL` config knob.
-- **Canary Release primitive.** `docs/canary.md` already
+- **Canary Release primitive.** `docs/reference/canary.md` already
   exists; v0.4.0 wires the runtime: N% traffic to a new
   Version, atomically superseded on promote.
 - **gRPC plugin transport.** The `.proto` file is committed;

@@ -14,19 +14,24 @@ build: build-server build-cli build-healthcheck
 # Build the server daemon (embeds frontend/dist/). web-build is
 # commented out by default because vite isn't installed in CI;
 # run `make web-build` first when iterating on the dashboard.
+# The dashboard assets are copied into cmd/promptsheond/frontend/
+# so the //go:embed directive (which forbids '..' patterns) can
+# find them inside the cmd package.
 build-server:
-	@mkdir -p $(BIN)
-	go build -o $(BIN)/promptsheond .
+	@mkdir -p $(BIN) cmd/promptsheond/frontend/dist
+	@rm -rf cmd/promptsheond/frontend/dist/*
+	@if [ -d frontend/dist ]; then cp -r frontend/dist/. cmd/promptsheond/frontend/dist/; fi
+	go build -o $(BIN)/promptsheond ./cmd/promptsheond
 
 # Build the CLI client
 build-cli:
 	@mkdir -p $(BIN)
-	go build -o $(BIN)/promptsheon .
+	go build -o $(BIN)/promptsheon ./cmd/promptsheon
 
 # Build the healthcheck probe
 build-healthcheck:
 	@mkdir -p $(BIN)
-	go build -o $(BIN)/promptsheon-healthcheck .
+	go build -o $(BIN)/promptsheon-healthcheck ./cmd/promptsheon-healthcheck
 
 # Run all tests
 test:

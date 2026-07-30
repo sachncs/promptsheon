@@ -46,13 +46,13 @@ Beyond the deployment surface, Promptsheon ships:
   wires it to the live LLM gateway.
 - **Partitioned rate limiter** — 16-way FNV-1a sharded
   Allow() — contention scales linearly with the shard count.
-- **Postgres backend with RLS** — schema mirror in
-  `backend/store/postgres/migrations/`; per-Workspace
-  row-level security policies. Today the package ships
-  `LoadSQL()` for the init + RLS bundles and an
-  `InMemoryPostgres` fixture; the pgx wiring is a follow-on
-  (see [docs/multi-region.md](docs/multi-region.md) for the
-  rationale).
+- **Postgres backend with RLS** — planned, not implemented
+  in this build. The Postgres backend was removed during the
+  layout migration; only SQLite ships today. A future pgx
+  adapter will satisfy the `store.Repository` interface at
+  `backend/store/repo.go` without touching domain packages
+  (see [docs/operations/multi-region.md](docs/operations/multi-region.md)
+  for the rationale).
 - **Recommendation Loop** — production telemetry → Observation
   → Rules/Bandit → Recommendation → Decision → next Version.
   The loop is closed end-to-end and persists across restarts.
@@ -89,12 +89,12 @@ caches ship as design docs and follow-on milestones (see
 - **Manifest** — Content-addressed composition of Prompt, Model Policy, Runtime Policy, Context Contract, Memory, Guardrails, Tools, MCP servers, and Evaluation Suite
 - **Recommendation Engine** — The deterministic rules engine plus the bandit Thompson Sampling selector close the loop
 - **Approval Workflow** — `MajorityPolicy` and `MakerCheckerPolicy` with fail-closed separation of duties
-- **Harness Engineering** — Preconditions gate Activate; eval runs score a Release against a Dataset. The fast iteration loop the OpenAI [harness engineering article](docs/harness.md) prescribes.
+- **Harness Engineering** — Preconditions gate Activate; eval runs score a Release against a Dataset. The fast iteration loop the OpenAI [harness engineering article](docs/reference/harness.md) prescribes.
 - **LLM Provider Abstraction** — Unified interface for Anthropic and OpenAI via the official SDKs (`anthropics/anthropic-sdk-go`, `openai/openai-go/v3` Responses API)
 - **Workflow DAG** — Topological execution with tool integration
 - **Observability** — OpenTelemetry tracing, Prometheus metrics, audit logging
 - **Built-in Guardrails** — PII redaction and prompt-injection detection ship as in-process plugins through the supervisor
-- **Plugin SDK** — net/rpc over UDS subprocess transport (`backend/subprocess`, v0.1.x production transport per `ADR-0024`); the `.proto` definition for the future gRPC-over-UDS transport lives at `backend/pluginproto/` (`ADR-0025`) as a follow-on
+- **Plugin SDK** — net/rpc over UDS subprocess transport (in-process supervisor at `backend/plugins/` + `backend/supervisor/`; v0.1.x production transport per `ADR-0024`); a future gRPC-over-UDS transport is on the roadmap (`ADR-0025`, not yet wired)
 - **Webhooks** — Event-driven integrations with HMAC signing and SSRF protection
 - **Secrets Management** — Encrypted vault for API keys and sensitive configuration
 - **Rate Limiting** — Configurable per-client rate limiting with burst support
@@ -214,10 +214,10 @@ Promptsheon is configured via environment variables. Key settings:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PROMPTSHEON_ADDR` | `:8080` | Listen address |
-| `PROMPTSHEON_DB_PATH` | `promptsheon.db` | SQLite database file. The daemon ships with SQLite; the Postgres backend (init + RLS bundles, in-memory fixture) is wired through `backend/store/postgres` and awaits the pgx follow-on. A shared backend (the prerequisite for multi-region replication) is tracked in [docs/multi-region.md](docs/multi-region.md). |
+| `PROMPTSHEON_DB_PATH` | `promptsheon.db` | SQLite database file. The daemon ships with SQLite; the Postgres backend (init + RLS bundles, in-memory fixture) is wired through `backend/store/postgres` and awaits the pgx follow-on. A shared backend (the prerequisite for multi-region replication) is tracked in [docs/multi-region.md](docs/operations/multi-region.md). |
 | `PROMPTSHEON_AUTH` | `true` | Enable authentication. Set `false` only for local dev (and never on a non-loopback bind — the daemon refuses to start). |
 | `PROMPTSHEON_LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
-| `PROMPTSHEON_APPROVAL_POLICY` | `maker_checker` | Approval policy: `maker_checker` (creator cannot approve their own release) or `majority`. See [docs/release.md](docs/release.md). |
+| `PROMPTSHEON_APPROVAL_POLICY` | `maker_checker` | Approval policy: `maker_checker` (creator cannot approve their own release) or `majority`. See [docs/release.md](docs/reference/release.md). |
 | `PROMPTSHEON_OPENAI_API_KEY` | (none) | OpenAI API key. Required to invoke OpenAI-backed Releases. |
 | `PROMPTSHEON_OPENAI_BASE_URL` | (none) | OpenAI base URL override (for proxies). Defaults to `https://api.openai.com`. |
 | `PROMPTSHEON_ANTHROPIC_API_KEY` | (none) | Anthropic API key. Required to invoke Anthropic-backed Releases. |
@@ -230,13 +230,13 @@ Promptsheon is configured via environment variables. Key settings:
 | `PROMPTSHEON_OTEL_SAMPLE_RATIO` | `1.0` | OTel trace sampling ratio (0.0–1.0). |
 | `PROMPTSHEON_OTEL_ENDPOINT` | (none) | OTLP gRPC endpoint for trace export. |
 
-See [docs/configuration.md](docs/configuration.md) for the full reference.
+See [docs/configuration.md](docs/operations/configuration.md) for the full reference.
 
 ---
 
 ## Harness engineering
 
-Promptsheon's headline surface is the [harness engineering](docs/harness.md) loop: Datasets (ground-truth `{inputs, expected}` pairs), Preconditions (named command hooks), and Evals (recorded scoring runs of a Release against a Dataset). Activate runs the Capability's preconditions; a failing hook returns 409 and leaves the Release in `pending`. Eval runs return 200 (passed) or 422 (failed) with per-case outcomes persisted.
+Promptsheon's headline surface is the [harness engineering](docs/reference/harness.md) loop: Datasets (ground-truth `{inputs, expected}` pairs), Preconditions (named command hooks), and Evals (recorded scoring runs of a Release against a Dataset). Activate runs the Capability's preconditions; a failing hook returns 409 and leaves the Release in `pending`. Eval runs return 200 (passed) or 422 (failed) with per-case outcomes persisted.
 
 ```bash
 # 1. Add a dataset + a precondition to your capability
@@ -250,7 +250,7 @@ promptsheon release activate <rid>      # 409 if preconditions fail
 promptsheon eval run <rid> --dataset <dataset_id>
 ```
 
-See [docs/eval.md](docs/eval.md) for the eval primitive, [docs/harness.md](docs/harness.md) for the surface rationale, and the [OpenAI article](https://openai.com/index/harness-engineering/) that inspired the design.
+See [docs/eval.md](docs/reference/eval.md) for the eval primitive, [docs/harness.md](docs/reference/harness.md) for the surface rationale, and the [OpenAI article](https://openai.com/index/harness-engineering/) that inspired the design.
 
 ---
 
@@ -305,8 +305,8 @@ The server is composed of layered modules:
 |-------|-------------|
 | **API** | HTTP handlers, middleware (auth, rate-limit, audit, CORS) |
 | **Capabilities** | Manifests, Releases, Approvals, Datasets, Preconditions, Evals |
-| **Harness** | The harness-engineering loop: datasets, preconditions, eval runs. See [docs/harness.md](docs/harness.md). |
-| **Storage** | CAS (Merkle DAG, `backend/cas/`) + SQLite (Postgres init + RLS SQL ships in `backend/store/postgres`; pgx wiring is a follow-on) |
+| **Harness** | The harness-engineering loop: datasets, preconditions, eval runs. See [docs/harness.md](docs/reference/harness.md). |
+| **Storage** | CAS (Merkle DAG, `backend/cas/`) + SQLite. The Postgres backend is not implemented in this build. |
 | **Providers** | Unified LLM provider abstraction layer (Anthropic + OpenAI) |
 | **Observability** | OpenTelemetry tracing, metrics collection, retention |
 | **Security** | AuthN/AuthZ, vault, guardrails, SSRF protection |
@@ -318,7 +318,10 @@ The server is composed of layered modules:
 
 ```
 promptsheon/
-├── main.go, *.go            # Single Go package; bin name picks mode (daemon|cli|healthcheck)
+├── cmd/                     # One package main per binary
+│   ├── promptsheond/        # Server daemon (daemon.go + adapters + embed + tests)
+│   ├── promptsheon/         # CLI (cli.go + cli_cas + cli_harness + cli_http + cli_selfevolve)
+│   └── promptsheon-healthcheck/  # Container probe (healthcheck.go)
 ├── backend/                 # Server-side implementation (all sub-packages live here)
 │   ├── capability/          # Workspace / Project / Capability / Version / Release / Approval types
 │   ├── harness/             # Dataset / Precondition / EvalRun types + runner
@@ -340,14 +343,19 @@ promptsheon/
 │   └── typescript/          # TypeScript client (codegen from backend/spec/spec.yaml)
 ├── deploy/                  # Helm chart, Grafana dashboard, Prometheus alerts
 ├── docs/                    # Architecture, deployment, ADRs, troubleshooting, FAQ
+│   ├── architecture/        # architecture.md, modules.md, design-decisions.md, glossary.md, algorithms.md, README.md (index)
+│   ├── operations/          # deployment, configuration, operations, troubleshooting, upgrade, observability, slos, multi-region
+│   ├── development/         # development, cli, testing, getting-started, faq
+│   ├── reference/           # api-reference, sdk, harness, eval, llm-providers, guardrails, release, canary, workflows
+│   └── security/            # security.md, audit-2026-07-26.md (frozen snapshot)
 ├── tests/                   # contract/ + e2e/ + smoke/ + chaos/ + load/
-├── scripts/            # genopenapi/, sync-version.sh, docs-check.sh, etc.
+├── scripts/                 # genopenapi/, sync-version.sh, docs-check.sh, etc.
 ├── go.mod
 ├── go.sum
 ├── Makefile
 ├── Dockerfile.goreleaser
-├── .github/workflows/  # CI (ci.yaml), release pipeline
-├── LICENSE             # Apache 2.0
+├── .github/workflows/       # CI (ci.yaml), release pipeline
+├── LICENSE                  # Apache 2.0
 ├── CONTRIBUTING.md
 ├── CODE_OF_CONDUCT.md
 └── SECURITY.md
@@ -433,7 +441,7 @@ Tagged `vX.Y.Z` releases are produced by `.goreleaser.yml`. Each release:
 - Creates a GitHub Release at `v<version>` (prerelease flag is
   inferred from the tag).
 
-See [docs/release.md](docs/release.md) for the full process.
+See [docs/release.md](docs/reference/release.md) for the full process.
 
 ---
 
@@ -443,10 +451,10 @@ See [docs/release.md](docs/release.md) for the full process.
 |----------|------------|
 | Language | Go 1.26 |
 | HTTP Routing | stdlib `net/http.ServeMux` (Go 1.22+ pattern matching) |
-| CLI | Hand-rolled command dispatcher under `bin/promptsheonmain.go` |
-| Storage | [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) (CGo-free SQLite). The Postgres backend ships init + RLS SQL and an in-memory fixture under `backend/store/postgres`; pgx wiring is a follow-on. |
+| CLI | Hand-rolled command dispatcher under `cmd/promptsheon/` |
+| Storage | [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) (CGo-free SQLite). The Postgres backend is not implemented in this build. |
 | LLM SDKs | [`anthropics/anthropic-sdk-go`](https://github.com/anthropics/anthropic-sdk-go), [`openai/openai-go/v3`](https://github.com/openai/openai-go) (Responses API) |
-| RPC | `net/rpc` over UDS for plugin transport (`backend/subprocess`; `ADR-0024`); [google.golang.org/grpc](https://grpc.io/docs/languages/go/) for the future plugin transport (proto + stubs at `backend/pluginproto/`; `ADR-0025`, not yet wired) |
+| RPC | `net/rpc` over UDS for plugin transport (`backend/plugins/` + `backend/supervisor/`; `ADR-0024`); a future gRPC-over-UDS transport is on the roadmap (`ADR-0025`, not yet wired) |
 | Observability | [OpenTelemetry](https://opentelemetry.io/) (OTLP gRPC), Prometheus |
 | Auth | OAuth 2.0 (`backend/auth/oauth.go`), static API keys (`backend/auth/auth.go`) |
 | Vault | AES-256-GCM via [crypto/aes](https://pkg.go.dev/crypto/aes); KMS via pluggable `KeyProvider` |
@@ -460,19 +468,19 @@ See [docs/release.md](docs/release.md) for the full process.
 
 Full documentation lives in **[docs/](docs/)**:
 
-- [Getting Started](docs/getting-started.md)
-- [Configuration](docs/configuration.md)
-- [API Reference](docs/api-reference.md) — [OpenAPI spec](backend/spec/spec.yaml)
-- [Architecture](docs/architecture.md) — [Modules](docs/modules.md)
-- [Harness engineering](docs/harness.md) — why the eval/precondition/dataset surface exists
-- [Eval primitive](docs/eval.md) — datasets, preconditions, eval runs in detail
-- [Release lifecycle](docs/release.md) — Capability → Release with MakerChecker approval
-- [SDKs](docs/sdk.md) — Go / Python / TypeScript clients
-- [LLM providers](docs/llm-providers.md) — Anthropic + OpenAI
-- [SLOs](docs/slos.md) — three first-class SLOs with Prometheus alerts in `deploy/prometheus/`
-- [Design Decisions](docs/design-decisions.md)
-- [Security](docs/security.md)
-- [Troubleshooting](docs/troubleshooting.md) — [FAQ](docs/faq.md)
+- [Getting Started](docs/development/getting-started.md)
+- [Configuration](docs/operations/configuration.md)
+- [API Reference](docs/reference/api-reference.md) — [OpenAPI spec](backend/spec/spec.yaml)
+- [Architecture](docs/architecture/architecture.md) — [Modules](docs/architecture/modules.md)
+- [Harness engineering](docs/reference/harness.md) — why the eval/precondition/dataset surface exists
+- [Eval primitive](docs/reference/eval.md) — datasets, preconditions, eval runs in detail
+- [Release lifecycle](docs/reference/release.md) — Capability → Release with MakerChecker approval
+- [SDKs](docs/reference/sdk.md) — Go / Python / TypeScript clients
+- [LLM providers](docs/reference/llm-providers.md) — Anthropic + OpenAI
+- [SLOs](docs/operations/slos.md) — three first-class SLOs with Prometheus alerts in `deploy/prometheus/`
+- [Design Decisions](docs/architecture/design-decisions.md)
+- [Security](docs/security/security.md)
+- [Troubleshooting](docs/operations/troubleshooting.md) — [FAQ](docs/development/faq.md)
 
 ---
 
@@ -508,7 +516,7 @@ Full documentation lives in **[docs/](docs/)**:
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/development.md](docs/development.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/development.md](docs/development/development.md).
 
 ## Security
 
