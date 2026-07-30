@@ -1,5 +1,6 @@
 import * as api from "../api.js";
 import { escape, apiStatusLabel } from "../utils.js";
+import { openProjectCreateModal } from "./project-create-modal.js";
 
 function optional(label, value) {
   return `<div class="rounded-lg bg-paper p-3"><span class="eyebrow">${escape(label)}</span><span class="mono mt-2 block text-[.78rem] font-bold">${escape(value)}</span></div>`;
@@ -51,13 +52,30 @@ export async function openNewCapabilityModal(root, projects) {
   };
 
   const users = (await api.listUsers(50)).data || [];
+  const workspaces = (await api.listWorkspaces()).data || [];
   if (!projects?.length) {
     root.innerHTML = render({
       projects,
       users,
       autofocus: true,
-      error: "No projects in this workspace yet. Create one with `POST /api/v1/workspaces/{id}/projects` first, then reload."
+      error: workspaces.length === 0
+        ? "No workspaces exist yet."
+        : "No projects in this workspace yet."
     });
+    // Surface a one-click project-creation affordance alongside
+    // the error so the operator does not have to leave the
+    // dashboard. Both `workspaces` and `projects` may be empty
+    // on a fresh install; the project modal handles either.
+    if (workspaces.length > 0) {
+      const createBtn = document.createElement("button");
+      createBtn.type = "button";
+      createBtn.className = "quiet-button mt-3";
+      createBtn.textContent = "Create project";
+      createBtn.addEventListener("click", () => {
+        openProjectCreateModal(root, { workspaces, onCreated: () => window.location.reload() });
+      });
+      root.querySelector("form")?.appendChild(createBtn);
+    }
     attach(root, render, { projects, users });
     return;
   }

@@ -1,6 +1,8 @@
 import * as api from "../api.js";
 import { escape } from "../utils.js";
 import { ownerName } from "../state/owners.js";
+import { openWorkspaceCreateModal } from "./workspace-create-modal.js";
+import { openProjectCreateModal } from "./project-create-modal.js";
 
 const STATUS_TONES = { active: "good", approved: "good", pending: "warn", superseded: "neutral", rolled_back: "danger" };
 const ENV_TONES = { prod: "good", staging: "warn", dev: "neutral" };
@@ -73,9 +75,9 @@ export async function renderCapabilitiesList(route) {
   `;
   root.innerHTML = shell;
 
-  const projectsRes = await api.listWorkspaces().then(async (ws) => {
-    if (!ws.ok) return ws;
-    const workspaces = ws.data || [];
+  const workspacesRes = await api.listWorkspaces();
+  const workspaces = workspacesRes.ok ? (workspacesRes.data || []) : [];
+  const projectsRes = await (async () => {
     const allProjects = [];
     for (const w of workspaces) {
       const p = await api.listProjects(w.id);
@@ -83,7 +85,7 @@ export async function renderCapabilitiesList(route) {
       await new Promise((r) => setTimeout(r, 40));
     }
     return { ok: true, data: allProjects };
-  });
+  })();
   const list = root.querySelector("#cap-list");
   if (!projectsRes.ok) {
     list.innerHTML = `<p class="panel p-5 text-center text-[.78rem] text-muted">${escape(projectsRes.error || "Failed to load catalog.")}</p>`;
@@ -91,9 +93,34 @@ export async function renderCapabilitiesList(route) {
   }
   const projects = projectsRes.data || [];
   if (projects.length === 0) {
-    list.innerHTML = `<div class="rounded-xl border border-dashed border-line bg-paper p-8 text-center"><p class="text-[.78rem] font-bold">No projects yet</p><p class="mt-1 text-[.66rem] text-muted">Create a project in your workspace to host capabilities.</p></div>`;
+    if (workspaces.length === 0) {
+      list.innerHTML = `<div class="rounded-xl border border-dashed border-line bg-paper p-8 text-center">
+        <p class="text-[.78rem] font-bold">No workspaces yet</p>
+        <p class="mt-1 text-[.66rem] text-muted">Workspaces hold projects, which hold capabilities.</p>
+        <button data-new-workspace class="primary-button mt-4"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-plus"/></svg> Create workspace</button>
+      </div>`;
+      list.querySelector("[data-new-workspace]")?.addEventListener("click", () => {
+        const modalRoot = document.getElementById("modal-root") || root;
+        openWorkspaceCreateModal(modalRoot, { onCreated: () => render(route) });
+      });
+    } else {
+      list.innerHTML = `<div class="rounded-xl border border-dashed border-line bg-paper p-8 text-center">
+        <p class="text-[.78rem] font-bold">No projects yet</p>
+        <p class="mt-1 text-[.66rem] text-muted">Pick a workspace and create your first project.</p>
+        <button data-new-project class="primary-button mt-4"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-plus"/></svg> Create project</button>
+      </div>`;
+      list.querySelector("[data-new-project]")?.addEventListener("click", () => {
+        const modalRoot = document.getElementById("modal-root") || root;
+        openProjectCreateModal(modalRoot, {
+          workspaces,
+          onCreated: () => render(route)
+        });
+      });
+    }
     root.querySelector("[data-new-capability]")?.addEventListener("click", () => {
-      window.alert("Create a project first via the API: POST /api/v1/workspaces/{id}/projects");
+      const modalRoot = document.getElementById("modal-root") || root;
+      if (workspaces.length === 0) openWorkspaceCreateModal(modalRoot, { onCreated: () => render(route) });
+      else openProjectCreateModal(modalRoot, { workspaces, onCreated: () => render(route) });
     });
     return shell;
   }

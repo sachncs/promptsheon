@@ -45,6 +45,17 @@ export function renderAppShell() {
 
 export function renderInitialState() {
   renderView(currentRoute());
+  // First-run bootstrap: when the dashboard has no API key,
+  // surface the setup modal so a fresh install can mint its
+  // initial admin key via the UI instead of curl. The modal
+  // handles its own X-Bootstrap-Token header.
+  import("./views/first-run-setup.js").then(({ shouldOfferFirstRun, openFirstRunSetupModal }) => {
+    if (!shouldOfferFirstRun()) return;
+    const root = document.getElementById("modal-root");
+    if (root && root.childElementCount === 0) {
+      openFirstRunSetupModal(root, { onReady: () => window.location.reload() });
+    }
+  });
 }
 
 let modalHandlersAttached = false;

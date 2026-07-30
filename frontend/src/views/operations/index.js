@@ -10,6 +10,7 @@ const TABS = [
   { key: "webhooks", label: "Webhooks", href: "#/operations/webhooks" },
   { key: "vault", label: "Vault", href: "#/operations/vault" },
   { key: "providers", label: "Providers", href: "#/operations/providers" },
+  { key: "apikeys", label: "API keys", href: "#/operations/apikeys" },
   { key: "users", label: "Users", href: "#/operations/users" },
   { key: "reasoning", label: "Reasoning", href: "#/operations/reasoning" }
 ];
@@ -125,21 +126,100 @@ async function usersTab() {
 }
 
 async function reasoningTab() {
+  // The reasoning compiler is a thin wrapper over the
+  // catalog: if the workspace has zero capabilities, every
+  // compile attempt 404s with ErrNoMatch. Surface that
+  // up-front rather than after the operator has typed an
+  // intent.
+  const wsRes = await api.listWorkspaces();
+  const workspaces = wsRes.ok ? (wsRes.data || []) : [];
+  let hasCapabilities = false;
+  if (workspaces.length > 0) {
+    const projRes = await api.listProjects(workspaces[0].id);
+    if (projRes.ok && projRes.data?.length) {
+      const capRes = await api.listCapabilities(projRes.data[0].id);
+      hasCapabilities = Boolean(capRes.ok && capRes.data?.length);
+    }
+  }
+  const empty = workspaces.length === 0
+    ? `<p class="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-[.68rem] text-amber-800">No workspaces yet — the compiler needs at least one capability to route against. Create a workspace, project, and capability first.</p>`
+    : !hasCapabilities
+    ? `<p class="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-[.68rem] text-amber-800">Workspace has no capabilities yet — create one in <a href="#/capabilities" class="font-bold underline">Capabilities</a> before running the compiler.</p>`
+    : "";
   return `<section class="mt-5">
     <article class="panel p-5 sm:p-6">
       <div class="eyebrow">Reasoning compiler</div>
       <p class="mt-1 text-[.7rem] text-muted">Paste an intent; the compiler returns the CapabilityPlan it would execute. Use to validate routing against the live catalog.</p>
+      ${empty}
       <form id="reasoning-form" class="mt-4 space-y-3">
         <div><label class="eyebrow mb-2 block" for="rz-intent">Intent</label><textarea id="rz-intent" class="field min-h-28 resize-y" required data-autofocus placeholder="e.g. Summarize today's GitHub issues for the dashboard project and email the digest to the on-call."></textarea></div>
         <div><label class="eyebrow mb-2 block" for="rz-ws">Workspace (optional)</label><input id="rz-ws" class="field mono" placeholder="workspace id (optional)" /></div>
         <p id="rz-error" class="hidden rounded-lg bg-rose-50 px-3 py-2 text-[.68rem] text-rose-800"></p>
         <div class="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
-          <button type="submit" class="primary-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-spark"/></svg>Compile</button>
+          <button type="submit" class="primary-button" ${hasCapabilities ? "" : "disabled"}><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-spark"/></svg>Compile</button>
         </div>
       </form>
       <div id="rz-result" class="mt-5"></div>
     </article>
   </section>`;
+}
+
+async function apikeysTab() {
+  const res = await api.listAPIKeys("");
+  if (!res.ok) {
+    return errorPanel(`API keys unavailable${res.error ? ` (${escape(res.error)})` : ""}.`);
+  }
+  const keys = res.data || [];
+  return `<section class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,.85fr)]">
+    <article class="panel p-5 sm:p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="eyebrow">API keys</div>
+          <h2 class="mt-1 text-[1rem] font-bold">${keys.length} active</h2>
+        </div>
+        <button id="apikey-new" class="primary-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-plus"/></svg> New key</button>
+      </div>
+      <form id="apikey-form" class="hidden mt-4 space-y-3 rounded-xl bg-paper p-4">
+        <p class="text-[.66rem] text-muted">New keys are shown once and never again. Copy the value into your secret store before closing this dialog.</p>
+        <div class="grid gap-3 sm:grid-cols-[1fr_180px]">
+          <div><label class="eyebrow mb-2 block" for="apikey-name">Name</label><input id="apikey-name" name="name" class="field" required placeholder="e.g. ci-deploy" /></div>
+          <div><label class="eyebrow mb-2 block" for="apikey-role">Role</label>
+            <select id="apikey-role" name="role" class="field" required>
+              <option value="">Pick…</option>
+              <option value="admin">admin</option>
+              <option value="writer">writer</option>
+              <option value="reader">reader</option>
+            </select>
+          </div>
+        </div>
+        <p id="apikey-error" class="hidden rounded-lg bg-rose-50 px-3 py-2 text-[.68rem] text-rose-800"></p>
+        <div class="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+          <button type="button" class="quiet-button" data-collapse-apikey-form>Cancel</button>
+          <button type="submit" class="primary-button">Create key</button>
+        </div>
+      </form>
+      <div id="apikey-created" class="hidden mt-3"></div>
+      <div id="apikey-list" class="mt-4">${renderKeyListInner(keys)}</div>
+    </article>
+  </section>`;
+}
+
+function renderKeyList(slot, keys) {
+  slot.innerHTML = renderKeyListInner(keys);
+}
+
+function renderKeyListInner(keys) {
+  if (!keys.length) {
+    return `<p class="mt-3 text-[.7rem] text-muted">No API keys yet. Create one above.</p>`;
+  }
+  return `<table class="mt-2 w-full text-[.7rem]"><thead><tr class="text-left text-[.6rem] uppercase tracking-wider text-muted"><th class="py-1 font-bold">Name</th><th class="py-1 font-bold">Role</th><th class="py-1 font-bold">Prefix</th><th class="py-1 font-bold">Created</th><th class="py-1 font-bold">Last used</th><th class="py-1 font-bold text-right"></th></tr></thead><tbody>${keys.map((k) => `<tr class="border-t border-line/60">
+    <td class="py-2"><span class="font-bold">${escape(k.name || "—")}</span><span class="block text-[.62rem] text-muted mono">${escape(k.id || "")}</span></td>
+    <td class="py-2">${pill(k.role || "—", ({ admin: "danger", writer: "warn", reader: "neutral" })[k.role] || "neutral")}</td>
+    <td class="py-2 mono text-[.66rem]">${escape(k.prefix || k.key_prefix || "—")}</td>
+    <td class="py-2 mono">${escape(formatRelative(k.created_at))}</td>
+    <td class="py-2 mono">${k.last_used_at ? escape(formatRelative(k.last_used_at)) : "—"}</td>
+    <td class="py-2 text-right"><button data-apikey-revoke="${escape(k.id)}" data-apikey-name="${escape(k.name || k.id)}" class="rounded-md bg-rose-50 px-2 py-1 text-[.62rem] font-bold text-rose-700 hover:bg-rose-100">Revoke</button></td>
+  </tr>`).join("")}</tbody></table>`;
 }
 
 export async function renderOperations(route) {
@@ -149,7 +229,7 @@ export async function renderOperations(route) {
 
   root.innerHTML = `<section class="panel p-6"><div class="skeleton h-3 w-32"></div><div class="skeleton mt-4 h-12 w-full"></div></section>`;
 
-  const renderers = { alerts: alertsTab, webhooks: webhooksTab, vault: vaultTab, providers: providersTab, users: usersTab, reasoning: reasoningTab };
+  const renderers = { alerts: alertsTab, webhooks: webhooksTab, vault: vaultTab, providers: providersTab, apikeys: apikeysTab, users: usersTab, reasoning: reasoningTab };
   const renderer = renderers[tab] || alertsTab;
   const body = await renderer();
 
@@ -223,6 +303,74 @@ function attach(tab, root) {
       const content = result.data?.content ? ` — "${result.data.content.replace(/[\\n\\r]/g, " ").slice(0, 80)}…"` : "";
       slot.textContent = `${name}: ${result.data?.status || "ok"} (${result.data?.latency_ms || 0}ms)${content}`;
     }));
+  } else if (tab === "apikeys") {
+    root.querySelector("#apikey-new")?.addEventListener("click", () => {
+      const form = root.querySelector("#apikey-form");
+      form?.classList.toggle("hidden");
+      const firstInput = form?.querySelector("input,select");
+      if (firstInput) firstInput.focus();
+    });
+    root.querySelector("[data-collapse-apikey-form]")?.addEventListener("click", () => {
+      const form = root.querySelector("#apikey-form");
+      form?.classList.add("hidden");
+      const created = root.querySelector("#apikey-created");
+      created?.classList.add("hidden");
+      const error = root.querySelector("#apikey-error");
+      error?.classList.add("hidden");
+    });
+    root.querySelector("#apikey-form")?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const errorSlot = root.querySelector("#apikey-error");
+      const createdSlot = root.querySelector("#apikey-created");
+      errorSlot.classList.add("hidden");
+      createdSlot.classList.add("hidden");
+      const data = new FormData(event.target);
+      const name = String(data.get("name") || "").trim();
+      const role = String(data.get("role") || "");
+      if (!name || !role) {
+        errorSlot.textContent = "Name and role are required.";
+        errorSlot.classList.remove("hidden");
+        return;
+      }
+      const result = await api.createAPIKey({ name, role });
+      if (!result.ok) {
+        errorSlot.textContent = `Could not create key: ${apiStatusLabel(result)}`;
+        errorSlot.classList.remove("hidden");
+        return;
+      }
+      // The plaintext key is returned exactly once. Surface it
+      // prominently so the operator copies it before reload.
+      createdSlot.innerHTML = `<div class="rounded-xl border border-line bg-amber-50 p-4">
+        <p class="text-[.74rem] font-bold">Save this key — it will not be shown again.</p>
+        <pre class="mt-2 overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-white p-3 text-[.66rem] mono">${escape(result.data?.key || "(empty)")}</pre>
+      </div>`;
+      createdSlot.classList.remove("hidden");
+      event.target.reset();
+      // Re-fetch the list without re-rendering the whole shell so
+      // the operator can still see the just-shown key.
+      const list = root.querySelector("#apikey-list");
+      const refreshed = await api.listAPIKeys("");
+      if (refreshed.ok) {
+        const keys = refreshed.data || [];
+        renderKeyList(list, keys);
+      }
+    });
+    root.querySelectorAll("[data-apikey-revoke]").forEach((b) =>
+      b.addEventListener("click", async () => {
+        const id = b.dataset.apikeyRevoke;
+        const name = b.dataset.apikeyName || id;
+        if (!window.confirm(`Revoke API key "${name}"? This cannot be undone.`)) return;
+        const result = await api.revokeAPIKey(id);
+        if (!result.ok) {
+          window.alert(`Could not revoke: ${apiStatusLabel(result)}`);
+          return;
+        }
+        // Reload the list inline.
+        const list = root.querySelector("#apikey-list");
+        const refreshed = await api.listAPIKeys("");
+        if (refreshed.ok) renderKeyList(list, refreshed.data || []);
+      })
+    );
   } else if (tab === "users") {
     root.querySelector("#user-new")?.addEventListener("click", async () => {
       const { openNewUserModal } = await import("./modals.js");

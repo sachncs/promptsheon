@@ -123,9 +123,8 @@ function statusPillHtml(label, tone) {
 
 async function open(root, releaseId) {
   root.innerHTML = modalSkeleton(releaseId);
-  const [release, capability, approval] = await Promise.all([
+  const [release, approval] = await Promise.all([
     api.getRelease(releaseId),
-    api.getCapability(/* placeholder */ null).catch(() => null),
     api.getReleaseApproval(releaseId)
   ]);
   const releaseData = release.ok ? release.data : null;

@@ -64,7 +64,7 @@ export async function apiFetch(path, options = {}) {
     try {
       const response = await fetch(url, {
         method: options.method || "GET",
-        headers: buildHeaders(options.headers, options.body !== undefined, explicitKey),
+        headers: buildHeaders({ ...(options.extraHeaders || {}), ...(options.headers || {}) }, options.body !== undefined, explicitKey),
         body: options.body !== undefined ? (typeof options.body === "string" ? options.body : JSON.stringify(options.body)) : undefined,
         signal: controller.signal,
         credentials: "omit"
@@ -302,6 +302,48 @@ export async function saveVaultKey(payload) {
   return apiPost("/api/v1/vault/keys", payload);
 }
 
+// createWorkspace is exposed by the workspace-create modal.
+// Only POSTs; the dashboard does not currently update or delete
+// workspaces.
+export async function createWorkspace(name, organization) {
+  return apiPost("/api/v1/workspaces", { name, organization: organization || undefined });
+}
+
+// createAPIKey + listAPIKeys + revokeAPIKey surface the
+// /api/v1/apikeys endpoints to the operations dashboard.
+// The plaintext key is returned exactly once (on create);
+// the list endpoint returns metadata (prefix, name, role,
+// timestamps) but never the raw key bytes.
+export async function createAPIKey(payload) {
+  return apiPost("/api/v1/apikeys", payload);
+}
+
+export async function listAPIKeys(userId) {
+  const qs = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
+  return apiFetch(`/api/v1/apikeys${qs}`);
+}
+
+export async function revokeAPIKey(id) {
+  return apiDelete(`/api/v1/apikeys/${encodeURIComponent(id)}`);
+}
+
+// setupBootstrap performs the first-run admin key mint via
+// POST /api/v1/setup. The daemon must be started with
+// PROMPTSHEON_BOOTSTRAP_TOKEN; the dashboard asks the operator
+// to paste the token at the same time as the email + name.
+// On success the plaintext admin key is returned and the
+// dashboard stores it in localStorage like any other key.
+export async function setupBootstrap({ email, name, bootstrapToken }) {
+  const headers = { "Content-Type": "application/json" };
+  if (bootstrapToken) headers["X-Bootstrap-Token"] = bootstrapToken;
+  return apiFetch("/api/v1/setup", {
+    method: "POST",
+    body: { email, name },
+    retry: false,
+    extraHeaders: headers,
+  });
+}
+
 export async function deleteVaultKey(id) {
   return apiDelete(`/api/v1/vault/keys/${encodeURIComponent(id)}`);
 }
@@ -367,10 +409,6 @@ export async function listAlerts() {
 
 export async function listProviders() {
   return apiFetch("/api/v1/providers");
-}
-
-export async function setupBootstrap() {
-  return apiPost("/api/v1/setup", {});
 }
 
 export async function voteRelease(releaseId, decision, reason) {
