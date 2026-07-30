@@ -1,5 +1,6 @@
 import * as api from "../../api.js";
 import { escape, formatRelative, apiStatusLabel } from "../../utils.js";
+import { renderSettingsTab as settingsTab } from "../settings-view.js";
 
 function pill(text, tone = "neutral") {
   return `<span class="status-pill ${tone} !px-2 !py-1"><span class="status-dot"></span>${escape(text)}</span>`;
@@ -12,6 +13,7 @@ const TABS = [
   { key: "providers", label: "Providers", href: "#/operations/providers" },
   { key: "apikeys", label: "API keys", href: "#/operations/apikeys" },
   { key: "users", label: "Users", href: "#/operations/users" },
+  { key: "settings", label: "Settings", href: "#/operations/settings" },
   { key: "reasoning", label: "Reasoning", href: "#/operations/reasoning" }
 ];
 
@@ -229,7 +231,7 @@ export async function renderOperations(route) {
 
   root.innerHTML = `<section class="panel p-6"><div class="skeleton h-3 w-32"></div><div class="skeleton mt-4 h-12 w-full"></div></section>`;
 
-  const renderers = { alerts: alertsTab, webhooks: webhooksTab, vault: vaultTab, providers: providersTab, apikeys: apikeysTab, users: usersTab, reasoning: reasoningTab };
+  const renderers = { alerts: alertsTab, webhooks: webhooksTab, vault: vaultTab, providers: providersTab, apikeys: apikeysTab, users: usersTab, settings: settingsTab, reasoning: reasoningTab };
   const renderer = renderers[tab] || alertsTab;
   const body = await renderer();
 

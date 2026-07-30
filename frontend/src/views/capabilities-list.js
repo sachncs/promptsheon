@@ -43,10 +43,17 @@ function projectSection(project, capabilities, releasesByCap) {
     const version = releases.reduce((m, r) => Math.max(m, r.capability_version || 0), 0) || 1;
     return rowContent(cap, release, version);
   }).join("");
+  const wsLink = project.workspace_id
+    ? `<a href="#/workspaces/${escape(project.workspace_id)}" class="hover:underline">${escape(project.workspaceName || "workspace")}</a>`
+    : (project.workspaceName || "");
   return `<section class="panel overflow-hidden">
     <header class="flex items-center justify-between border-b border-line/70 bg-paper/60 px-5 py-3">
       <div>
-        <h3 class="text-[.84rem] font-bold">${escape(project.name)}</h3>
+        <h3 class="text-[.84rem] font-bold">
+          <a href="#/workspaces/${escape(project.workspace_id || "")}" class="hover:underline">${escape(project.workspaceName || "workspace")}</a>
+          <span class="text-[#b2b3af]">/</span>
+          <a href="#/projects/${escape(project.id)}" class="hover:underline">${escape(project.name)}</a>
+        </h3>
         <span class="mt-0.5 block text-[.62rem] text-muted">${escape(project.id.slice(-8))} · ${capabilities.length} capabilit${capabilities.length === 1 ? "y" : "ies"}</span>
       </div>
       <button data-new-capability-for-project="${escape(project.id)}" class="quiet-button !h-8 !text-[.66rem]"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-plus"/></svg>Add capability</button>

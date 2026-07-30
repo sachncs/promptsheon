@@ -12,6 +12,8 @@ import (
 	sqlitelib "modernc.org/sqlite/lib"
 
 	"modernc.org/sqlite"
+
+	"github.com/sachncs/promptsheon/backend/errs"
 )
 
 // translateDBError is the central error->HTTP mapping for
@@ -32,7 +34,7 @@ func translateDBError(err error, resource string) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, errs.ErrorStoreNotFound) {
 		return ErrNotFound
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {

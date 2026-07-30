@@ -15,6 +15,9 @@ function parseHash() {
     params.id = segments[1];
     params.kind = segments[2] || "";
   }
+  if (pathname.startsWith("/workspaces/")) params.id = segments[1];
+  if (pathname.startsWith("/projects/")) params.id = segments[1];
+  if (pathname.startsWith("/executions/")) params.id = segments[1];
   const qs = Object.fromEntries(new URLSearchParams(query));
   return { path: pathname, segments, params, query: qs };
 }

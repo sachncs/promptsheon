@@ -9,6 +9,10 @@ import { renderEvaluations } from "./evaluations.js";
 import { renderOperations } from "./operations/index.js";
 import { renderLogs } from "./logs.js";
 import { renderNotFound } from "./not-found.js";
+import { renderWorkspaceDetail } from "./workspace-detail.js";
+import { renderProjectDetail } from "./project-detail.js";
+import { renderVersionDetail } from "./version-detail.js";
+import { renderExecutionDetail } from "./execution-detail.js";
 import { loadSettings } from "../settings.js";
 
 const ROUTES = {
@@ -41,12 +45,20 @@ function resolve(route) {
   if (ROUTES[route.path]) return ROUTES[route.path];
   if (route.path.startsWith("/capabilities/") && route.path !== "/capabilities") return renderCapabilityDetail;
   if (route.path.startsWith("/operations/")) return renderOperations;
+  if (route.path.startsWith("/workspaces/") && route.path !== "/workspaces") return renderWorkspaceDetail;
+  if (route.path.startsWith("/projects/") && route.path !== "/projects") return renderProjectDetail;
+  if (route.path.startsWith("/versions/") && route.path !== "/versions") return renderVersionDetail;
+  if (route.path.startsWith("/executions/") && route.path !== "/executions") return renderExecutionDetail;
   return null;
 }
 
 function titleFromRoute(route) {
   if (route.path === "/capabilities/{id}") return route.params.id ? `Capability ${route.params.id.slice(-8)}` : "Capability";
   if (route.path === "/operations/{tab}") return route.params.tab ? `Operations · ${prettyTab(route.params.tab)}` : "Operations";
+  if (route.path === "/workspaces/{id}") return route.params.id ? `Workspace ${route.params.id.slice(-8)}` : "Workspace";
+  if (route.path === "/projects/{id}") return route.params.id ? `Project ${route.params.id.slice(-8)}` : "Project";
+  if (route.path === "/versions/{id}") return route.params.id ? `Version v${route.params.id.slice(-8)}` : "Version";
+  if (route.path === "/executions/{id}") return route.params.id ? `Execution ${route.params.id.slice(-8)}` : "Execution";
   return null;
 }
 

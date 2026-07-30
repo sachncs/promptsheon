@@ -37,7 +37,7 @@ function renderVersionsTable(versions, currentId, capabilityId) {
   if (!versions?.length) return `<p class="mt-3 text-[.68rem] text-muted">No versions yet. Create the first version to enable releases.</p>`;
   return `<div class="mt-3 overflow-x-auto"><table class="w-full text-[.7rem]"><thead><tr class="text-left text-[.62rem] uppercase tracking-wider text-muted"><th class="py-1.5 font-bold">Version</th><th class="py-1.5 font-bold">Manifest hash</th><th class="py-1.5 font-bold">Created</th><th class="py-1.5 font-bold">By</th><th class="py-1.5 font-bold text-right"></th></tr></thead><tbody>${versions.slice(0, 30).map((v) => `
     <tr class="border-t border-line/60">
-      <td class="py-2 mono font-bold">v${escape(v.version)}</td>
+      <td class="py-2 mono font-bold"><a href="#/versions/${escape(v.id)}" class="hover:underline">v${escape(v.version)}</a></td>
       <td class="py-2 mono truncate max-w-[12rem]">${escape((v.manifest_hash || "").slice(0, 12))}…</td>
       <td class="py-2 text-muted">${escape(formatRelative(v.created_at))}</td>
       <td class="py-2 text-muted">${escape(v.created_by || "—")}</td>

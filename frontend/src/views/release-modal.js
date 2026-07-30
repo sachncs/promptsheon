@@ -43,6 +43,7 @@ function releaseModalHtml(release, capability, approval) {
   const tone = ({ active: "good", approved: "good", pending: "warn", superseded: "neutral", rolled_back: "danger" })[r.status] || "neutral";
   const canVote = r.status === "pending";
   const canRollback = r.status === "active" || r.status === "superseded";
+  const canInvoke = r.status === "active";
   return `<div class="modal-backdrop" role="presentation">
     <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="release-title">
       <div class="flex items-start justify-between border-b border-line/70 px-5 py-5 sm:px-6">
@@ -76,8 +77,10 @@ function releaseModalHtml(release, capability, approval) {
           <label class="eyebrow block" for="vote-note">Decision note</label>
           <textarea id="vote-note" class="field min-h-20 resize-y" placeholder="Add context for the audit trail"></textarea>
           <p id="vote-error" class="hidden rounded-lg bg-rose-50 px-3 py-2 text-[.68rem] text-rose-800"></p>
+          <div id="invoke-result" class="hidden"></div>
           <div class="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
             ${canRollback ? `<button type="button" id="vote-rollback" data-rollback class="quiet-button">Rollback</button>` : ""}
+            ${canInvoke ? `<button type="button" data-invoke class="quiet-button">Try it</button>` : ""}
             <button type="button" class="quiet-button" data-close-modal>Close</button>
             ${canVote ? `
               <button type="submit" name="decision" value="reject" class="quiet-button">Reject</button>
@@ -180,6 +183,39 @@ function attach(root, release) {
       return;
     }
     closeAndReload(form, root);
+  });
+
+  // Live invoke: send a sample call through the executor. The
+  // response body or 502 is surfaced inline. The form is reused
+  // as the input area; the note textarea becomes the input JSON.
+  const invoke = root.querySelector("[data-invoke]");
+  invoke?.addEventListener("click", async () => {
+    const error = root.querySelector("#vote-error");
+    const note = root.querySelector("#vote-note");
+    const result = root.querySelector("#invoke-result");
+    if (error) { error.classList.add("hidden"); error.textContent = ""; }
+    if (result) { result.classList.add("hidden"); result.innerHTML = ""; }
+    invoke.disabled = true;
+    const inputs = (() => {
+      const raw = (note?.value || "").trim();
+      if (!raw) return {};
+      try { return JSON.parse(raw); } catch { return { _raw: raw }; }
+    })();
+    const response = await api.invokeRelease(release.id, inputs);
+    invoke.disabled = false;
+    if (!response.ok) {
+      if (error) {
+        error.textContent = `Invoke failed: ${apiStatusLabel(response)}`;
+        error.classList.remove("hidden");
+      }
+      return;
+    }
+    if (result) {
+      const data = response.data || {};
+      const output = typeof data.output === "string" ? data.output : JSON.stringify(data, null, 2);
+      result.innerHTML = `<div class="rounded-xl bg-paper p-3"><div class="eyebrow">Invoke response</div><pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all text-[.66rem] mono">${escape(output)}</pre></div>`;
+      result.classList.remove("hidden");
+    }
   });
 
   const close = root.querySelector("[data-close-modal]");

@@ -147,12 +147,35 @@ export async function listWorkspaces() {
   return apiFetch("/api/v1/workspaces");
 }
 
-// createWorkspace was an admin bootstrap helper; the dashboard
-// does not create workspaces. Reintroduce when the admin
-// workspace-creation flow lands.
+// createWorkspace is exposed by the workspace-create modal.
+// getWorkspace / updateWorkspace / deleteWorkspace back the
+// workspace-detail page.
+export async function getWorkspace(id) {
+  return apiFetch(`/api/v1/workspaces/${encodeURIComponent(id)}`);
+}
+
+export async function updateWorkspace(id, payload) {
+  return apiPut(`/api/v1/workspaces/${encodeURIComponent(id)}`, payload);
+}
+
+export async function deleteWorkspace(id) {
+  return apiDelete(`/api/v1/workspaces/${encodeURIComponent(id)}`);
+}
 
 export async function listProjects(workspaceId) {
   return apiFetch(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/projects`);
+}
+
+export async function getProject(id) {
+  return apiFetch(`/api/v1/projects/${encodeURIComponent(id)}`);
+}
+
+export async function updateProject(id, payload) {
+  return apiPut(`/api/v1/projects/${encodeURIComponent(id)}`, payload);
+}
+
+export async function deleteProject(id) {
+  return apiDelete(`/api/v1/projects/${encodeURIComponent(id)}`);
 }
 
 export async function createProject(workspaceId, name, description) {
@@ -191,10 +214,52 @@ export async function rollbackRelease(id) {
   return apiFetch(`/api/v1/releases/${encodeURIComponent(id)}/rollback`, { method: "POST" });
 }
 
-// invokeRelease was the eval-loop shortcut; the harness runner
-// drives invocations server-side today and the dashboard
-// triggers evals via runEval, not direct invoke. Reintroduce
-// when an admin "try it" button lands.
+// invokeRelease is exposed by the release-modal "Try it" button.
+// Sends a runtime invocation through the executor. Without a
+// live LLM provider configured the daemon responds 502; the
+// modal surfaces that error inline.
+export async function invokeRelease(id, inputs) {
+  return apiFetch(`/api/v1/releases/${encodeURIComponent(id)}/invoke`, { method: "POST", body: { inputs } });
+}
+
+// listSettings / getSetting / setSetting / deleteSetting
+// surface the four /api/v1/settings routes. The list endpoint
+// returns the per-key mask; a value of "***" means the key is
+// secret-shaped (see backend/handlers_settings.go::secret_keys).
+export async function listSettings() {
+  return apiFetch("/api/v1/settings");
+}
+
+export async function getSetting(key) {
+  return apiFetch(`/api/v1/settings/${encodeURIComponent(key)}`);
+}
+
+export async function setSetting(key, value) {
+  return apiPut(`/api/v1/settings/${encodeURIComponent(key)}`, { value });
+}
+
+export async function deleteSetting(key) {
+  return apiDelete(`/api/v1/settings/${encodeURIComponent(key)}`);
+}
+
+// getVersion + getExecution surface the single-resource
+// detail endpoints used by the version-detail and
+// execution-detail pages.
+export async function getVersion(id) {
+  return apiFetch(`/api/v1/versions/${encodeURIComponent(id)}`);
+}
+
+export async function getExecution(id) {
+  return apiFetch(`/api/v1/executions/${encodeURIComponent(id)}`);
+}
+
+// getWorkspaceObservation is exposed by the rollup page
+// (workspace-detail). The rollup pipeline is unwired so the
+// response is always an empty summary; the page still surfaces
+// it as a placeholder.
+export async function getWorkspaceObservation(id) {
+  return apiFetch(`/api/v1/workspaces/${encodeURIComponent(id)}/observation`);
+}
 
 export async function getCapabilityContract(id) {
   return apiFetch(`/api/v1/capabilities/${encodeURIComponent(id)}/contract`);
@@ -302,9 +367,9 @@ export async function saveVaultKey(payload) {
   return apiPost("/api/v1/vault/keys", payload);
 }
 
-// createWorkspace is exposed by the workspace-create modal.
-// Only POSTs; the dashboard does not currently update or delete
-// workspaces.
+// createWorkspace is exposed by the workspace-create modal
+// (creation only). Update + delete live on the workspace-detail
+// page.
 export async function createWorkspace(name, organization) {
   return apiPost("/api/v1/workspaces", { name, organization: organization || undefined });
 }
