@@ -178,10 +178,3 @@ func BuildVault(p KeyProvider) (*Vault, error) {
 	}
 	return v, nil
 }
-
-// BuildEnvVault is the backwards-compat constructor: it reads the
-// env var, validates the key, and returns a Vault. New code should
-// use BuildVault with an explicit KeyProvider.
-func BuildEnvVault() (*Vault, error) {
-	return BuildVault(NewEnvKeyProvider())
-}

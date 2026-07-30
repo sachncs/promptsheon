@@ -131,11 +131,6 @@ func CurrentCommitHash() (string, error) {
 	return hash, nil
 }
 
-// GetCurrentCommitHash is a deprecated alias for CurrentCommitHash. New
-// callers should use CurrentCommitHash; this wrapper remains so existing
-// consumers keep compiling during the migration window.
-func GetCurrentCommitHash() (string, error) { return CurrentCommitHash() }
-
 // readHEADRef resolves HEAD to a (ref, head) pair. ref is the branch name HEAD
 // points at, or the empty string for a detached HEAD. head is the raw HEAD
 // file content (a ref: line or a raw hash). Both are useful for error

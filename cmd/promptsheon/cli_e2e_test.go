@@ -209,9 +209,9 @@ func TestE2ECatFile(t *testing.T) {
 func TestE2ELsTree(t *testing.T) {
 	dir := setupE2ERepo(t)
 
-	hash, err := promptsheoncas.GetCurrentCommitHash()
+	hash, err := promptsheoncas.CurrentCommitHash()
 	if err != nil {
-		t.Fatalf("GetCurrentCommitHash(): %v", err)
+		t.Fatalf("CurrentCommitHash(): %v", err)
 	}
 	commitObj, err := promptsheoncas.ReadObject(hash)
 	if err != nil {
@@ -230,9 +230,9 @@ func TestE2ELsTree(t *testing.T) {
 func TestE2EShowCommit(t *testing.T) {
 	dir := setupE2ERepo(t)
 
-	hash, err := promptsheoncas.GetCurrentCommitHash()
+	hash, err := promptsheoncas.CurrentCommitHash()
 	if err != nil {
-		t.Fatalf("GetCurrentCommitHash(): %v", err)
+		t.Fatalf("CurrentCommitHash(): %v", err)
 	}
 
 	out := execCLI(t, dir, "show", hash)
@@ -272,9 +272,9 @@ func TestE2ELog(t *testing.T) {
 func TestE2EDiff(t *testing.T) {
 	dir := setupE2ERepo(t)
 
-	hash1, _ := promptsheoncas.GetCurrentCommitHash()
+	hash1, _ := promptsheoncas.CurrentCommitHash()
 	_ = promptsheoncas.Checkout("experimental")
-	hash2, _ := promptsheoncas.GetCurrentCommitHash()
+	hash2, _ := promptsheoncas.CurrentCommitHash()
 	_ = promptsheoncas.Checkout("main")
 
 	out := execCLI(t, dir, "diff", hash1, hash2)
@@ -412,7 +412,7 @@ func TestE2EBadTelemetryWarns(t *testing.T) {
 		{Name: "file", Type: promptsheoncas.TypeBlob, Hash: bh},
 	}))
 
-	hash, _ := promptsheoncas.GetCurrentCommitHash()
+	hash, _ := promptsheoncas.CurrentCommitHash()
 	_ = promptsheoncas.WriteRef("main", hash)
 
 	cmd := exec.Command(cliBinary, "commit", th, "telemetry test commit")

@@ -464,9 +464,9 @@ func TestBranchAndCheckout(t *testing.T) {
 		t.Fatalf("Checkout('feature') error: %v", err)
 	}
 
-	ref, err := GetCurrentRef()
+	ref, err := CurrentRef()
 	if err != nil {
-		t.Fatalf("GetCurrentRef() error: %v", err)
+		t.Fatalf("CurrentRef() error: %v", err)
 	}
 	if ref != "feature" {
 		t.Fatalf("expected 'feature', got %q", ref)
@@ -577,9 +577,9 @@ func TestDetachedHEAD(t *testing.T) {
 		t.Fatal("expected detached HEAD state")
 	}
 
-	ref, err := GetCurrentRef()
+	ref, err := CurrentRef()
 	if err != nil {
-		t.Fatalf("GetCurrentRef() error: %v", err)
+		t.Fatalf("CurrentRef() error: %v", err)
 	}
 	if ref != "" {
 		t.Fatalf("expected empty ref for detached HEAD, got %q", ref)
@@ -604,9 +604,9 @@ func TestDetachedHeadCommit(t *testing.T) {
 		t.Fatalf("expected empty ref for detached HEAD commit, got %q", c2.Ref)
 	}
 
-	rootHash, err := GetCurrentCommitHash()
+	rootHash, err := CurrentCommitHash()
 	if err != nil {
-		t.Fatalf("GetCurrentCommitHash(): %v", err)
+		t.Fatalf("CurrentCommitHash(): %v", err)
 	}
 	if rootHash != c2.Hash {
 		t.Fatalf("expected %s, got %s", c2.Hash, rootHash)
@@ -626,9 +626,9 @@ func TestReAttachHEAD(t *testing.T) {
 		t.Fatalf("CreateBranch() from detached HEAD: %v", err)
 	}
 
-	ref, err := GetCurrentRef()
+	ref, err := CurrentRef()
 	if err != nil {
-		t.Fatalf("GetCurrentRef(): %v", err)
+		t.Fatalf("CurrentRef(): %v", err)
 	}
 	if ref != "" {
 		t.Fatalf("expected detached HEAD still, got %q", ref)
@@ -637,7 +637,7 @@ func TestReAttachHEAD(t *testing.T) {
 	if err := Checkout("from-detached"); err != nil {
 		t.Fatalf("Checkout('from-detached'): %v", err)
 	}
-	ref, _ = GetCurrentRef()
+	ref, _ = CurrentRef()
 	if ref != "from-detached" {
 		t.Fatalf("expected 'from-detached', got %q", ref)
 	}

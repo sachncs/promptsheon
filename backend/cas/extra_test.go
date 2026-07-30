@@ -647,9 +647,9 @@ func TestGetCurrentCommitHashDetached(t *testing.T) {
 	c, _ := Commit(th, nil, "a", "msg", nil)
 	_ = Checkout(c.Hash)
 
-	hash, err := GetCurrentCommitHash()
+	hash, err := CurrentCommitHash()
 	if err != nil {
-		t.Fatalf("GetCurrentCommitHash(): %v", err)
+		t.Fatalf("CurrentCommitHash(): %v", err)
 	}
 	if hash != c.Hash {
 		t.Fatalf("expected %s, got %s", c.Hash, hash)

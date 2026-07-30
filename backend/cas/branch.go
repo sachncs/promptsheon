@@ -180,11 +180,6 @@ func CurrentRef() (string, error) {
 	return ref, err
 }
 
-// GetCurrentRef is a deprecated alias for CurrentRef. New callers should use
-// CurrentRef; this wrapper remains for compatibility during the rename
-// window.
-func GetCurrentRef() (string, error) { return CurrentRef() }
-
 // RefDetail is one entry returned by ListRefDetails. The Hash is
 // the commit the ref currently points at, or the empty string if
 // the ref has no commit yet.

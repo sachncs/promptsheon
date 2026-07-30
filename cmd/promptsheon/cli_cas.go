@@ -89,7 +89,7 @@ func cmdCommit(args []string) error {
 	}
 
 	var parentHashes []string
-	currentHash, err := promptsheoncas.GetCurrentCommitHash()
+	currentHash, err := promptsheoncas.CurrentCommitHash()
 	if err == nil && currentHash != "" {
 		parentHashes = []string{currentHash}
 	}
@@ -141,7 +141,7 @@ func cmdLog(args []string) error {
 		return nil
 	}
 
-	ref, _ := promptsheoncas.GetCurrentRef()
+	ref, _ := promptsheoncas.CurrentRef()
 
 	for i, e := range entries {
 		refMarker := ""
@@ -193,7 +193,7 @@ func cmdBranch(args []string) error {
 			return err
 		}
 		sort.Strings(refs)
-		currentRef, _ := promptsheoncas.GetCurrentRef()
+		currentRef, _ := promptsheoncas.CurrentRef()
 		for _, r := range refs {
 			hash, _ := promptsheoncas.ReadRef(r)
 			prefix := "  "
@@ -250,11 +250,11 @@ func cmdStatus() error {
 		return fmt.Errorf("not a promptsheon repository")
 	}
 
-	ref, err := promptsheoncas.GetCurrentRef()
+	ref, err := promptsheoncas.CurrentRef()
 	if err != nil {
 		return fmt.Errorf("read ref: %w", err)
 	}
-	headHash, err := promptsheoncas.GetCurrentCommitHash()
+	headHash, err := promptsheoncas.CurrentCommitHash()
 	if err != nil {
 		return fmt.Errorf("read HEAD: %w", err)
 	}
@@ -443,7 +443,7 @@ func cmdGraph() error {
 	}
 
 	refs, _ := promptsheoncas.ListRefDetails()
-	headRef, _ := promptsheoncas.GetCurrentRef()
+	headRef, _ := promptsheoncas.CurrentRef()
 
 	columns := assignGraphColumns(nodes, refs, headRef)
 	maxCol := 0

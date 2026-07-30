@@ -66,7 +66,7 @@ func TestStaticKeyProviderRotateIsNoop(t *testing.T) {
 
 func TestStaticSecretBrokerUnknownSecret(t *testing.T) {
 	t.Parallel()
-	v, err := BuildEnvVault()
+	v, err := BuildVault(NewEnvKeyProvider())
 	if err == nil {
 		// Skip if env not set; the no-env case is exercised above.
 		v = &Vault{}
