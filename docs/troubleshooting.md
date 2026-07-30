@@ -47,7 +47,7 @@ common case is resolved by step 1 or 2.
   isn't registered. `promptsheon provider list` to see
   registered names; set the corresponding
   `PROMPTSHEON_<NAME>_API_KEY` env var or wire a custom
-  provider in `cmd/promptsheond/main.go`.
+  provider in `daemon.go`.
 - **`502 "no LLM provider configured for this invocation"
   (after `provider test` succeeded)** — the Manifest's
   `model_policy` artifact has a `provider` value the daemon
@@ -109,14 +109,14 @@ common case is resolved by step 1 or 2.
 
 - **`database is locked` errors under load** — increase the
   busy timeout. The daemon currently hardcodes
-  `?_pragma=busy_timeout(5000)` in `cmd/promptsheond/main.go`;
+  `?_pragma=busy_timeout(5000)` in `daemon.go`;
   for higher throughput run the daemon on the Postgres
   backend instead (init + RLS SQL + `InMemoryPostgres`
   fixture today; the pgx wiring is a follow-on).
 - **Schema migration fails at boot** — the migration table
   records the highest applied version. If you jumped a
   version, run the missing migrations manually with
-  `sqlite3 promptsheon.db < internal/store/migrations/0NN_*.up.sql`.
+  `sqlite3 promptsheon.db < backend/store/migrations/0NN_*.up.sql`.
   If two replicas race on the same `promptsheon.db`, enable
   `PROMPTSHEON_LEADER_ELECTION=true` so only the leader
   applies migrations.
@@ -126,7 +126,7 @@ common case is resolved by step 1 or 2.
 - **`unknown provider: <name>`** — the LLM `Registry` doesn't
   have a factory for that name. The shipped providers are
   `openai` and `anthropic`; custom providers must be
-  registered in `cmd/promptsheond/main.go` before the
+  registered in `daemon.go` before the
   daemon boots.
 - **`provider <name> not configured`** — the provider's API
   key env var is missing. The daemon logs a warning at boot

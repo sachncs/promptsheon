@@ -57,7 +57,7 @@ stderr and `/api/v1/logs/stream`.
 
 Workflows are sequences of `Step`s executed in declaration
 order. Each step is `{ID, Tool, Input, Output?}`; the
-Workflow runtime is in `internal/workflow`.
+Workflow runtime is in `backend/workflow`.
 
 ## Capability Service Level Objectives
 
@@ -75,8 +75,8 @@ count-based threshold.
 
 ## Recommendation engine
 
-A deterministic rules engine (`internal/optimizer/rules`)
-plus a Thompson Sampling bandit (`internal/bandit`). Both
+A deterministic rules engine (`backend/optimizer`)
+plus a Thompson Sampling bandit (`backend/bandit`). Both
 ship today and close the loop: production telemetry →
 Observation → rules/bandit → Recommendation → Decision →
 next Version.

@@ -40,7 +40,7 @@ verbose output during development.
 ## Metrics
 
 The daemon emits `promptsheon_*` metrics under the
-`internal/metrics` package. The full inventory:
+`backend/metrics` package. The full inventory:
 
 ### API
 

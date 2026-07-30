@@ -61,9 +61,9 @@ func TestGenerator_NoStubsInOutput(t *testing.T) {
 
 // TestGenerator_Idempotent pins the second Item 1 requirement:
 // running the generator twice produces the same output. The
-// canonical way to keep api/openapi.yaml in sync with the code
-// is to re-run the generator; idempotence is what makes that
-// safe to do on every PR.
+// canonical way to keep backend/spec/spec.yaml in sync with the
+// code is to re-run the generator; idempotence is what makes
+// that safe to do on every PR.
 func TestGenerator_Idempotent(t *testing.T) {
 	tmp := t.TempDir()
 	outA := filepath.Join(tmp, "a.yaml")
@@ -113,7 +113,7 @@ func TestGenerator_AllServerRoutesCovered(t *testing.T) {
 
 	run(t, "-out", outPath)
 
-	routes, err := collectRoutes(filepath.Join(repoRoot(t), "backend/api/server.go"))
+	routes, err := collectRoutes(filepath.Join(repoRoot(t), "backend/routes.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestGenerator_RequestBodyOnWrites(t *testing.T) {
 
 	run(t, "-out", outPath)
 
-	handlers, err := collectHandlers(filepath.Join(repoRoot(t), "backend/api"))
+	handlers, err := collectHandlers(filepath.Join(repoRoot(t), "backend"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -36,15 +36,15 @@ returns a clear error message naming the offending setting.
 
 The daemon supports **OpenAI** and **Anthropic**. To add a
 new provider, register it on the LLM `Registry` in
-`cmd/promptsheond/main.go` and write the SDK adapter under
-`internal/llm/`.
+`daemon.go` and write the SDK adapter under
+`backend/llm/`.
 
 ## Vault
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PROMPTSHEON_VAULT_KEY` | (none) | 32-byte hex master key for the AES-256-GCM vault. Override with a KMS-backed `KeyProvider` for production. |
-| `PROMPTSHEON_CLICKHOUSE_DSN` | (none) | ClickHouse DSN (used only when the binary is built with `-tags clickhouse`). |
+| `PROMPTSHEON_CLICKHOUSE_DSN` | (none) | Reserved. No-op in this build; ClickHouse persistence is not wired in. |
 
 ## OAuth
 
@@ -90,7 +90,7 @@ Setting them is a no-op.
   per model instead.
 - `PROMPTSHEON_DB_BUSY_TIMEOUT`, `PROMPTSHEON_DB_CACHE_SIZE` —
   hardcoded at `?_pragma=busy_timeout(5000)` in
-  `cmd/promptsheond/main.go`.
+  `daemon.go`.
 - `PROMPTSHEON_WEBHOOK_ALLOW_PRIVATE` — per-endpoint allowlist
   was removed (SEC-4). Webhooks only accept HTTPS to non-private IPs.
 - `PROMPTSHEON_AUTH_TEST` — no consumer.

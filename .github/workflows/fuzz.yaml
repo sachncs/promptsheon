@@ -1,15 +1,18 @@
 name: fuzz
 
 # CI-FUZZ-1: 1-minute fuzz per PR on the security-critical
-# paths. vault, redactor, and injection. Failures abort the
-# PR. Production: nightly fuzz runs for 60s per harness via
-# schedule + workflow_dispatch.
+# paths. vault, redactor, injection, CAS verification, and
+# schedule next-fire. Failures abort the PR. Production:
+# nightly fuzz runs for 60s per harness via schedule +
+# workflow_dispatch.
 on:
   pull_request:
     paths:
-      - 'internal/vault/**'
-      - 'internal/redactor/**'
-      - 'internal/injection/**'
+      - 'backend/vault/**'
+      - 'backend/tests/unit/redactor/**'
+      - 'backend/tests/unit/injection/**'
+      - 'backend/cas/**'
+      - 'backend/schedule/**'
   schedule:
     # Nightly at 03:00 UTC
     - cron: '0 3 * * *'
@@ -31,12 +34,20 @@ jobs:
 
       - name: Fuzz vault
         run: |
-          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./internal/vault/...
+          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./backend/vault/...
 
       - name: Fuzz redactor
         run: |
-          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./internal/redactor/...
+          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./backend/tests/unit/redactor/...
 
-      - name: Fuzz injection
+      - name: Fuzz injection detector
         run: |
-          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./internal/injection/...
+          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./backend/tests/unit/injection/...
+
+      - name: Fuzz CAS verification
+        run: |
+          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./backend/cas/...
+
+      - name: Fuzz schedule next-fire
+        run: |
+          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./backend/schedule/...

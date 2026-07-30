@@ -1,7 +1,7 @@
 // Command check-no-package-state reports package-level mutable state in
 // domain packages. It is a structural static analysis pass:
 //
-//   - For each named package under internal/<name>/ it parses every
+//   - For each named package under backend/<name>/ it parses every
 //     non-test Go file.
 //
 //   - At the file scope it inspects every GenDecl of token.VAR.
@@ -35,22 +35,21 @@ import (
 // domainPackages is the list of packages the check enforces on by
 // default. Tests and infrastructure packages are out of scope.
 var domainPackages = []string{
-	"capability",
-	"release",
-	"approval",
-	"recommendation",
-	"lineage",
-	"policy",
-	"eventbus",
+	"backend/capability",
+	"backend/release",
+	"backend/approval",
+	"backend/recommendation",
+	"backend/lineage",
+	"backend/eventbus",
 }
 
 func main() {
-	target := flag.String("pkg", "", "restrict the check to a single package (without the internal/ prefix)")
+	target := flag.String("pkg", "", "restrict the check to a single package (without the backend/ prefix)")
 	flag.Parse()
 
 	pkgs := domainPackages
 	if *target != "" {
-		pkgs = []string{*target}
+		pkgs = []string{"backend/" + *target}
 	}
 
 	wd, err := os.Getwd()
@@ -61,9 +60,9 @@ func main() {
 
 	failures := 0
 	for _, pkg := range pkgs {
-		dir := filepath.Join(wd, "internal", pkg)
+		dir := filepath.Join(wd, pkg)
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "internal/%s: directory not found, skipping\n", pkg)
+			fmt.Fprintf(os.Stderr, "%s: directory not found, skipping\n", pkg)
 			continue
 		}
 		if !scanPackage(dir, pkg) {
@@ -83,7 +82,7 @@ func scanPackage(dir, name string) bool {
 	ok := true
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "internal/%s: read dir: %v\n", name, err)
+		fmt.Fprintf(os.Stderr, "%s: read dir: %v\n", name, err)
 		return false
 	}
 	for _, e := range entries {
@@ -178,7 +177,7 @@ func checkVarSpec(vs *ast.ValueSpec, path string, fset *token.FileSet) bool {
 func relPath(path string) string {
 	dir := filepath.Base(filepath.Dir(path))
 	base := filepath.Base(path)
-	return filepath.Join("internal", dir, base)
+	return filepath.Join("backend", dir, base)
 }
 
 func firstLine(vs *ast.ValueSpec) string {

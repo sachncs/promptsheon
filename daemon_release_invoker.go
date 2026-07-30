@@ -2,16 +2,13 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"time"
 
+	"github.com/sachncs/promptsheon/backend"
 	"github.com/sachncs/promptsheon/backend/executor"
 	"github.com/sachncs/promptsheon/backend/invoke"
 	"github.com/sachncs/promptsheon/backend/release"
-	"github.com/sachncs/promptsheon/backend/store"
 )
 
 // apiReleaseInvoker adapts the daemon's invoke.Invoker into the
@@ -22,7 +19,6 @@ import (
 // cases route through the same provider wiring as the live
 // /releases/{id}/invoke route.
 type apiReleaseInvoker struct {
-	db       *store.SQLite
 	inv      *invoke.Invoker
 	svc      *release.Service
 	resolver *release.Resolver
@@ -48,20 +44,24 @@ func (r *apiReleaseInvoker) Invoke(ctx context.Context, releaseID string, inputs
 	if err != nil {
 		return nil, err
 	}
+	manifestHash, err := backend.ComputeManifestHash(rel.Manifest)
+	if err != nil {
+		return nil, fmt.Errorf("release %s: manifest hash: %w", releaseID, err)
+	}
 	rec, err := r.inv.Invoke(ctx, executor.InvokeRequest{
 		ReleaseID:     rel.ID,
-		ManifestHash:  manifestHash(rel.Manifest),
-		InputHash:     inputHash(input),
+		ManifestHash:  manifestHash,
+		InputHash:     backend.InputHash(input),
 		Input:         input,
 		Provider:      plan.Provider,
 		Model:         plan.Model,
-		ModelRevision: time.Now().UTC().Format("2006-01-02") + ":" + plan.Model + ":" + plan.Provider,
+		ModelRevision: backend.ModelRevision(plan.Model, plan.Provider),
 		SystemPrompt:  plan.Prompt,
 	})
 	if err != nil {
 		return nil, err
 	}
-	// ponytail: previously coerced empty output to `json.RawMessage(""")`
+	// ponytail: previously coerced empty output to `json.RawMessage("")`
 	// (an empty JSON string), which is lossy: the eval scorer would
 	// see a present-but-empty string instead of absent output. Return
 	// the zero value so downstream consumers (DB, scorer) can tell
@@ -70,21 +70,4 @@ func (r *apiReleaseInvoker) Invoke(ctx context.Context, releaseID string, inputs
 		return nil, nil
 	}
 	return rec.Output, nil
-}
-
-func manifestHash(m interface{}) string {
-	b, err := json.Marshal(m)
-	if err != nil {
-		return ""
-	}
-	sum := sha256.Sum256(b)
-	return "sha256:" + hex.EncodeToString(sum[:])
-}
-
-func inputHash(b []byte) string {
-	if len(b) == 0 {
-		return ""
-	}
-	sum := sha256.Sum256(b)
-	return "sha256:" + hex.EncodeToString(sum[:])
 }

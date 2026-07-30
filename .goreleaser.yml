@@ -60,6 +60,24 @@ builds:
       - -X github.com/sachncs/promptsheon/backend.Commit={{.Commit}}
       - -X github.com/sachncs/promptsheon/backend.BuildTime={{.CommitDate}}
 
+  - id: promptsheon-healthcheck
+    main: .
+    binary: promptsheon-healthcheck
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/sachncs/promptsheon/backend.Version={{.Version}}
+      - -X github.com/sachncs/promptsheon/backend.Commit={{.Commit}}
+      - -X github.com/sachncs/promptsheon/backend.BuildTime={{.CommitDate}}
+
 archives:
   - id: promptsheond
     ids:
@@ -76,6 +94,17 @@ archives:
     ids:
       - promptsheon-cli
     name_template: "promptsheon_{{.Version}}_{{.Os}}_{{.Arch}}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+  - id: promptsheon-healthcheck
+    ids:
+      - promptsheon-healthcheck
+    name_template: "promptsheon-healthcheck_{{.Version}}_{{.Os}}_{{.Arch}}"
     formats:
       - tar.gz
     format_overrides:

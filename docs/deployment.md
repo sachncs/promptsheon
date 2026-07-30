@@ -11,19 +11,19 @@ Three binaries ship from this repo:
 
 | Binary | Path | Purpose |
 |--------|------|---------|
-| `promptsheond` | `cmd/promptsheond/` | Long-running server. |
-| `promptsheon` | `cmd/promptsheon/` | CLI dispatcher. |
-| `promptsheon-healthcheck` | `cmd/promptsheon-healthcheck/` | Container health probe. |
+| `promptsheond` | `bin/promptsheond` | Long-running server. |
+| `promptsheon` | `bin/promptsheon` | CLI dispatcher. |
+| `promptsheon-healthcheck` | `bin/promptsheon-healthcheck` | Container health probe. |
 
 Build:
 
 ```bash
-go build -o promptsheond ./cmd/promptsheond
-go build -o promptsheon  ./cmd/promptsheon
-go build -o promptsheon-healthcheck ./cmd/promptsheon-healthcheck
+go build -o bin/promptsheond .
+go build -o bin/promptsheon .
+go build -o bin/promptsheon-healthcheck .
 
 # ClickHouse rollup writer (optional build tag).
-go build -tags clickhouse -o promptsheond ./cmd/promptsheond
+go build -o bin/promptsheond .
 ```
 
 ## Container

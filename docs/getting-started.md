@@ -9,9 +9,9 @@ Dataset. Time budget: ~10 minutes.
 ```bash
 git clone https://github.com/sachncs/promptsheon.git
 cd promptsheon
-go build -o promptsheond ./cmd/promptsheond
-go build -o promptsheon  ./cmd/promptsheon
-go build -o promptsheon-healthcheck ./cmd/promptsheon-healthcheck
+go build -o bin/promptsheond .
+go build -o bin/promptsheon .
+go build -o bin/promptsheon-healthcheck .
 ```
 
 Requirements: Go 1.26+ (see `go.mod`). SQLite is bundled

@@ -1,7 +1,7 @@
 # SDKs
 
 Three SDKs ship with Promptsheon: **Go**, **Python**, and
-**TypeScript**. Each is generated from `api/openapi.yaml` via
+**TypeScript**. Each is generated from `backend/spec/spec.yaml` via
 the `sdk/{lang}/scripts/codegen.sh` helper, so the surface
 stays in lockstep with the daemon.
 
@@ -73,7 +73,7 @@ client = Client(base_url="http://localhost:8080", api_key="ps_...")
 
 Same method surface as the Go SDK. Generated via
 [`openapi-python-client`](https://github.com/openapi-generators/openapi-python-client)
-from `api/openapi.yaml`. Regenerate via:
+from `backend/spec/spec.yaml`. Regenerate via:
 
 ```bash
 bash sdk/python/scripts/codegen.sh
@@ -92,7 +92,7 @@ const client = new PromptsheonClient({
 
 Generated via
 [`openapi-typescript`](https://openapi-ts.dev) from
-`api/openapi.yaml`. Regenerate via:
+`backend/spec/spec.yaml`. Regenerate via:
 
 ```bash
 bash sdk/typescript/scripts/codegen.sh
@@ -114,7 +114,7 @@ bash sdk/typescript/scripts/codegen.sh
 ## Contract test
 
 `tests/contract/contract_test.go` is the gate that catches
-drift between `api/openapi.yaml` and the Go SDK. The test
+drift between `backend/spec/spec.yaml` and the Go SDK. The test
 parses the spec, walks every registered route, and asserts
 the documented SDK surface. It's wired into CI as a step
 on the default `test` job.

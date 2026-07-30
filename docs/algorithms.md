@@ -22,8 +22,8 @@ differ. The CAS deduplication is a hash table: the Manifest
 references the same hash twice and the second reference is
 free.
 
-The `pkg/cas` package is the production implementation. It
-lives at `pkg/cas/` so other Go projects can import it
+The `backend/cas` package is the production implementation. It
+lives at `backend/cas/` so other Go projects can import it
 without dragging in the rest of Promptsheon.
 
 ## Hash-chained audit log
@@ -36,7 +36,7 @@ Each row records:
   where `\x1f` (US, 0x1F) is the field separator. The fields are
   written in order with no JSON wrapping; `details_json` is the
   pre-serialised JSON blob, not a re-serialised map. See
-  `internal/store/sqlite.go::computeAuditHash`.
+  `backend/store/sqlite.go::computeAuditHash`.
 
 `store.VerifyAuditChain` walks the chain from `rowid 1`
 forward and asserts the invariant. Any tampering — row
@@ -102,7 +102,7 @@ unconfigured deployments don't accidentally execute hooks.
 
 ## LLM call flow
 
-The Invoke path (`internal/invoke.Invoker`):
+The Invoke path (`backend/invoke.Invoker`):
 
 1. Enforce Quota (atomic counter, in-memory; backed by
    ClickHouse in production scale).
@@ -144,12 +144,12 @@ metric surfaces the running total per daemon.
 
 ## Source
 
-- `internal/store/sqlite.go` (`AppendAudit`, `computeAuditHash`,
+- `backend/store/sqlite.go` (`AppendAudit`, `computeAuditHash`,
   `VerifyAuditChain`).
-- `internal/observation/observation.go` (windowed aggregator).
-- `internal/optimizer/rules/rules.go` (rule engine).
-- `internal/invoke/invoke.go` (Budget / Quota / LLM call).
-- `internal/harness/precondition.go` (Precondition execution).
-- `pkg/cas/` (content-addressed store).
+- `backend/observation/observation.go` (windowed aggregator).
+- `backend/optimizer/optimizer.go` (rule engine).
+- `backend/invoke/invoke.go` (Budget / Quota / LLM call).
+- `backend/harness/precondition.go` (Precondition execution).
+- `backend/cas/` (content-addressed store).
 - [Design Decisions](design-decisions.md#hash-chained-audit-log) — audit chain
   design.

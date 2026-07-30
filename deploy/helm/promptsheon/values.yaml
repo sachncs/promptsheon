@@ -19,7 +19,7 @@ resources:
   memoryLimit: 1Gi
 
 # config knobs land in a ConfigMap and are read by the daemon at
-# boot. See internal/config/config.go for every supported env var.
+# boot. See backend/config/config.go for every supported env var.
 config:
   dbBackend: sqlite
   dbPath: /var/lib/promptsheon/promptsheon.db

@@ -3,7 +3,7 @@
 `github.com/sachncs/promptsheon/sdk` is the official Go client
 for the Promptsheon REST API. It targets the `0.x` line of the
 server and is regenerated on every release to match the OpenAPI
-spec at `api/openapi.yaml`.
+spec at `backend/spec/spec.yaml`.
 
 > **Forward-only.** v0.0.7 Prompt and Agent SDK methods are gone
 > in v0.1.0. Use the Capability/Version/Release flow below.
@@ -131,7 +131,7 @@ The SDK exposes the high-traffic capability/release surface:
 | Health | `Health` |
 | Providers | `ListProviders` |
 
-The full HTTP surface is documented in `api/openapi.yaml`; if
+The full HTTP surface is documented in `backend/spec/spec.yaml`; if
 you need a method the SDK doesn't expose yet, file an issue or
 use `http.Post` against the documented endpoint while a typed
 wrapper is being added.

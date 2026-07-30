@@ -94,19 +94,6 @@ func (a *evolverRepoAdapter) CreateRelease(ctx context.Context, rec selfevolve.R
 	return a.SQLite.CreateRelease(ctx, r)
 }
 
-// evolverLoaderAdapter exposes the local CAS as a
-// selfevolve.PromptLoader. The CAS is process-global
-// (the daemon's CWD has the .promptsheon directory).
-type evolverLoaderAdapter struct{}
-
-func (evolverLoaderAdapter) LoadPrompt(ctx context.Context, hash string) ([]byte, error) {
-	return loadCASPrompt(ctx, hash)
-}
-
-func (evolverLoaderAdapter) WritePrompt(ctx context.Context, text string) (string, error) {
-	return writeCASPrompt(ctx, text)
-}
-
 // evolverActivatorAdapter exposes release.Service.SelfActivate
 // as a selfevolve.ReleaseActivator. It also writes the
 // synthetic Approve vote so the SelfApprovePolicy has

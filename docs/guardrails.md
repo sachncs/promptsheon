@@ -7,10 +7,10 @@ Guardrails via the plugin manifest.
 
 The two built-in Guardrails:
 
-- **`redactor`** (`internal/redactor`) — strips PII patterns
+- **`redactor`** (`backend/redactor`) — strips PII patterns
   (emails, US SSNs, phone numbers, etc.) at the pre-LLM and
   post-LLM boundaries.
-- **`injection`** (`internal/injection`) — flags
+- **`injection`** (`backend/injection`) — flags
   role-confusion attacks and common prompt-injection patterns.
   Heuristic today; production deployments layer an LLM-judge
   behind the same Guardrail interface.
@@ -64,7 +64,7 @@ all (probably misconfigured).
   same interface for sensitive use cases.
 - The `injection` Guardrail runs every user message through a
   small set of canonical patterns. To add a new pattern,
-  edit `internal/injection/detector.go` and add the regex
+  edit `backend/detector.go` and add the regex
   plus a test.
 - Custom Guardrails register a `Provider` factory on the
   manifest; see [docs/development.md](development.md) for the

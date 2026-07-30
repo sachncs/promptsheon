@@ -7,103 +7,169 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- **Audit / observability**
-  - `internal/testutil/otel.go` exposes `InMemoryCollector` (wraps
-    `tracetest.InMemoryExporter`) for span assertions in tests.
-  - `tests/load/scenarios/*.js` declare k6 thresholds
-    (`http_req_duration`, `request_success`); the workflow now
-    fails when any scenario breaches its thresholds.
-- **CI**
-  - `.github/workflows/fuzz.yaml` runs nightly at 03:00 UTC
-    (60 s per harness) in addition to the PR gate.
-  - `go vet -all ./...` and `staticcheck ./...` are wired into
-    the `test` CI job.
-- **API surface**
-  - `internal/api/validate.go::validateJSON(r, target, validate)`
-    combines `readJSON` + field-level validation; companion
-    helpers `validateNonEmpty`, `validateEnum`,
-    `validatePositiveInt`, `validatePositiveFloat`.
-  - `GET /livez` and `GET /readyz` are aliases for the existing
-    `/health` and `/ready` probes.
-  - `handlers_metrics.go` renamed to `usage.go` to match the
-    exported `UsageTracker` type it owns.
-
 ### Changed
 
-- **Pagination**: `pagination.go::writePaginationHeaders` emits
-  RFC 5988 `prev`/`next`/`first`/`last` link headers + an
-  `X-Total-Count` header on every paginated endpoint.
-- **Idempotency**: the in-memory `idempotencyCache` is now a
-  fallback. Production uses `SQLiteIdempotencyStore` (wiring via
-  `cmd/promptsheond/main.go:264`); multi-replica retries share
-  state.
-- **Metrics**: `metrics.banditMu` switched from `sync.Mutex` to
-  `sync.RWMutex`; `GetSummary` and `prometheusFormat` acquire the
-  read lock. The `banditRunID` write path keeps an exclusive lock.
-- **Self-evolve (`internal/selfevolve`)**: `Evolver.RunOnce`
-  always sets `res.Revisions`; on promotion it sets `res.Score =
-  state.LastScore` (was previously stuck at the *seeded* score).
-- **Audit hash**: `docs/algorithms.md` documents the
-  `\x1f`-separated `SHA-256(id \x1f user_id \x1f action \x1f
-  resource \x1f details_json \x1f timestamp \x1f previous_hash)`
-  format used by `internal/store/sqlite.go::computeAuditHash`.
-- **Version source of truth**: the OpenAPI `info.version`,
-  `Chart.yaml` `version`/`appVersion`, and the Python / TypeScript
-  SDK versions are all pinned at `0.3.0`.
+- **Source layout**: the project is now root + `backend/`. All
+  production code lives either at the repo root (`main.go`,
+  `daemon.go`, `cli.go`, `cli_*.go`, `daemon_evolver.go`,
+  `daemon_release_invoker.go`, `embed_frontend.go`, `healthcheck.go`,
+  `*_test.go`) or under `backend/<pkg>/`. There is no `cmd/`,
+  `internal/`, or `pkg/` directory. `main.go` dispatches by
+  `os.Args[0]` (`promptsheond` → daemon, `promptsheon` → CLI,
+  `promptsheon-healthcheck` → probe) so the three binaries
+  build from the same source via `make build`.
+- **OpenAPI source of truth**: the spec lives at
+  `backend/spec/spec.yaml`. `api/openapi.yaml` and the 24
+  per-resource splits under `backend/spec/` are deleted.
+  `scripts/genopenapi` parses `backend/routes.go` for routes
+  and `backend/handlers_*.go` for request schemas. The contract
+  test, the Python SDK codegen, and the TypeScript SDK codegen
+  all read from `backend/spec/spec.yaml`.
+- **Build + release**: `Makefile` builds all three binaries
+  into `./bin/`; `bin/promptsheond`, `bin/promptsheon`, and
+  `bin/promptsheon-healthcheck` are produced by three
+  `go build -o bin/<name> .` invocations. `.goreleaser.yml`
+  publishes all three on tagged releases. A multi-stage
+  `Dockerfile` is added for `docker build` / `docker compose`.
+- **`embed_frontend.go`**: `frontendDist` is wrapped in
+  `fs.Sub(frontendDist, "frontend/dist")` before being handed
+  to `HandleFrontend`, so the dashboard's index.html and assets
+  are reachable. The previous form passed the embed root and
+  the mux could not find `index.html`.
+- **Self-evolve disable**: `PUT
+  /api/v1/capabilities/{id}/self-evolve` now merges the request
+  into the persisted config instead of zeroing every column.
+  The previous form decoded the request body into a
+  zero-valued `SelfEvolveConfig` and overwrote `dataset_id`,
+  `min_score`, `max_revisions`, `cooldown_sec`, and
+  `target_env` whenever the client sent `{"enabled": false}`.
+  Regression test: `handlers_capabilities_merge_test.go`.
+- **Release invoke hashes**: `daemon_release_invoker.go` now
+  uses `backend.{ComputeManifestHash,InputHash,ModelRevision}`
+  (bare hex, no `sha256:` prefix) instead of local copies that
+  produced hashes incompatible with `handlers_releases.go`.
+  Eval cases and live `/releases/{id}/invoke` invocations now
+  record the same `manifest_hash` and `input_hash`.
+- **CAS loader dedup**: `daemon_evolver_cas.go` is deleted.
+  `selfevolve.NewCasPromptLoader` (`backend/selfevolve/loader.go`)
+  is used directly. The `evolverLoaderAdapter` type is removed.
+- **ClickHouse**: `daemon_clickhouse.go`,
+  `daemon_noclickhouse.go`, and `backend/rollups/clickhouse/`
+  are deleted. The build tag `-tags clickhouse` is no longer
+  wired; `PROMPTSHEON_CLICKHOUSE_DSN` is a no-op reserved env
+  var. Rollups are kept in-memory only.
+- **Coverage gate**: `scripts/check-coverage.sh` profiles
+  `backend/` (was reading nonexistent `backend/api/`). Floors:
+  60% for `api handlers`, 50% for domain packages, 40% for
+  `backend` root and `backend/store`.
+- **Domain-purity gate**: `scripts/check-no-package-state.go`
+  scans `backend/<pkg>` (was scanning nonexistent `internal/`).
+  `scripts/docs-check.py` recognises `backend/...go` and
+  `backend/spec/...yaml` refs (was matching the old
+  `internal/`/`pkg/`/`cmd/` layout).
+- **Bench regression gate**: `scripts/bench-baseline.txt` is
+  committed with the 8 curated benchmarks at
+  `BENCHTIME=1s`. `scripts/check-bench-regression.sh` now
+  enforces a 20% delta against the baseline instead of
+  silently passing.
+- **`make check`** — new umbrella gate: `fmt + vet + lint + test
+  + openapi-check + docs-check`. **`make purity`** — new
+  domain-purity gate: `lint-domain + lint-deps`. Both are the
+  hooks the ROADMAP referenced; the targets now exist.
+- **Contract test**: `newTestServer` boots the real daemon via
+  subprocess instead of a fake mux that returned structured
+  JSON 404s (which made the wiring check useless). The test
+  is skipped when `bin/promptsheond` is absent (so
+  contributors running only `go test ./...` are not blocked).
+  `TestEveryRouteReachable` now probes every documented
+  `(method, path)` pair, not a uniform GET — so a missing PUT
+  registration trips the test. `TestSDKExposesMandatoryMethods`
+  uses reflection over `*sdk.Client`'s method set instead of a
+  hardcoded list.
+- **E2E lifecycle**: `tests/e2e/daemon_e2e_test.go::TestCapabilityLifecycle`
+  walks the full workspace → project → capability → version →
+  release → vote (via a second-principal reviewer) → activate →
+  invoke flow. The previous form stopped at `Health +
+  ListProviders`.
+- **SDK test wiring**: `.github/workflows/ci.yaml` now runs
+  `pytest sdk/python/tests` and `npm --prefix sdk/typescript
+  test` (Jest) on every PR. `sdk/typescript/package.json` has
+  Jest wired and `tsconfig.json` includes `tests/`; the
+  `sdk/typescript/scripts/codegen.sh` previously did
+  `tsc --noEmit` only.
+- **Fuzz paths**: `.github/workflows/fuzz.yaml` watches
+  `backend/{vault,tests/unit/redactor,tests/unit/injection,cas,schedule}/**`
+  (was watching nonexistent `internal/vault`,
+  `internal/redactor`, `internal/injection`).
+- **TLC gate**: a soft-gate CI job runs `tlc` if installed;
+  the existing Go test that asserts the spec's presence and
+  required invariants remains the always-on check.
+- **Coverage / openapi-check / docs-check**: each is now wired
+  into its own CI job or step and fails the build on drift.
 
 ### Removed
 
-- Dead code (dropped across the codebase):
-  - `var _ = ...` workarounds in `internal/{trace,rollups/clickhouse,supervisor,policy,lineage,harness,selfevolve,eval}`,
-    `cmd/promptsheon/harness.go`, `internal/api/invoke_test_helpers_test.go`,
-    `tests/contract/contract_test.go` — and their now-orphaned
-    imports.
-  - `judgeCache` struct + methods in `internal/eval/scorer_llm_judge.go`
-    (32 LOC; never instantiated).
-  - `marshalJSON` helper in `internal/recommendation/producer.go`
-    (was a thin `json.Marshal` wrapper).
-  - `hexDecode` helper in `internal/vault/providers.go`.
-  - `mergeCIDRs` in `internal/ratelimit/ratelimit.go`.
-  - `(*Compiler).filter` in `internal/reasoning/compiler.go`.
-  - `interfaceCtx` alias in `internal/slo/slo.go`.
-  - `validateJSON` helper in `internal/api/validate.go` (no callers).
-  - `initSQLBundle` / `rlsSQLBundle` package vars + `init()`
-    in `internal/store/postgres/postgres.go`.
-  - `crashed` field in `internal/subprocess/subprocess.go`.
-  - `splitCSVFields` in `internal/schedule/schedule.go`.
-  - `newDiscardLogger` (`internal/pluginsup/discard.go`) and
-    `newTestSupervisor` (`internal/pluginsup/helpers_test.go`)
-    — only consumed by each other.
-  - `internal/pluginsup/supervisor_test.go` (tested dead helpers).
-  - `LabeledCounter` / `LabeledHistogram` types + benchmarks
-    in `internal/metrics/` (never used in production).
-  - Deprecated `SystemConfigRow` alias in
-    `internal/settings/resolver.go`.
-- Dead local variables:
-  - Shadowed `dom` in `internal/schedule/schedule.go`
-    (`parseField` result discarded before `parseFieldWithWildcard`).
-  - `limit = -1` assignments in `internal/store/sqlite.go` and
-    `internal/store/sqlite_capabilities.go` (the literal `-1` is
-    embedded in the SQL string).
-  - Unused `ctx` return value in
-    `internal/trace/otel.go::(*OTelTracer).Start`.
+- **Layout cruft**:
+  - `api/openapi.yaml` and the entire `api/` directory.
+  - 24 unread per-resource OpenAPI splits under
+    `backend/spec/` (`alerts.yaml`, `apikeys.yaml`, ...);
+    `backend/spec/spec.yaml` is the single remaining file.
+  - `scripts/generate-openapi-paths.sh` (no caller, referenced
+    nonexistent paths).
+  - `scripts/genproto.sh` (no caller, no `.proto` files exist).
+- **Duplicate code**:
+  - `daemon_evolver_cas.go` — replaced by
+    `backend/selfevolve/loader.go`.
+  - `evolverLoaderAdapter` type in `daemon_evolver_adapter.go`.
+  - Dead `db *store.SQLite` field on `apiReleaseInvoker` in
+    `daemon_release_invoker.go`.
+  - Local `inputHash`, `manifestHash`, `modelRevision`
+    helpers in `daemon_release_invoker.go` (replaced by
+    `backend.{InputHash,ComputeManifestHash,ModelRevision}`).
+- **Unwired build tags / dead sinks**:
+  - `daemon_clickhouse.go`, `daemon_noclickhouse.go`,
+    `backend/rollups/clickhouse/`.
+  - The discarded-writer block in `daemon.go` that initialised
+    a ClickHouse sink and never persisted anywhere.
 
 ### Fixed
 
-- **Self-evolve `Result`**: `res.Score` is now set to the score of
-  the last validation run (via `state.LastScore`) on promotion;
-  was previously the *old* seeded score. `res.Revisions` is
-  always populated, including on rejection.
-- **E2E seed**: `tests/e2e/selfevolve_test.go::seedCapabilityWithBadPrompt`
-  now checks every `Create*` error return, sets the dataset's
-  `CapabilityID`, and shares the auditor instance between the
-  evolver and promoter. The previous form silently swallowed
-  FK-violation errors.
-- **Audit doc drift**: `docs/algorithms.md` now describes the
-  field-separator format actually produced by `computeAuditHash`,
-  not a hypothetical JSON canonicalisation.
+- **Dashboard unreachable**: `fs.Sub` is applied to the
+  embedded `frontend/dist` so the SPA's `index.html` resolves
+  through `HandleFrontend`. The previous wiring passed the
+  embed root and `/` returned the mux's text 404. Test:
+  `embed_frontend_test.go`.
+- **Self-evolve `disable` clobbered config**: see the Changed
+  note above. Regression test:
+  `handlers_capabilities_merge_test.go`.
+- **Eval vs live invocation hash mismatch**: see the Changed
+  note. The eval harness now records the same manifest and
+  input hashes as the live `/releases/{id}/invoke` route.
+- **Docs-check false negatives**: `isMuxFallback` previously
+  matched every 404 from the fake contract-test mux, so the
+  route-wiring check passed even when a route was missing.
+  With the new real-daemon test server, missing routes fail
+  the test.
+- **Bench regression gate disabled**: was silently passing
+  because `scripts/bench-baseline.txt` was absent. Baseline
+  is committed; gate now catches > 20% regressions.
+- **Many stale doc references**: `docs/architecture.md`,
+  `docs/modules.md`, `docs/development.md`, `docs/cli.md`,
+  `docs/guardrails.md`, `docs/security.md`, `docs/harness.md`,
+  `docs/configuration.md`, `docs/release.md`,
+  `docs/algorithms.md`, `docs/troubleshooting.md`,
+  `docs/deployment.md`, `docs/getting-started.md`,
+  `docs/faq.md`, `docs/llm-providers.md`, `docs/testing.md`,
+  `docs/design-decisions.md`, `docs/operations.md`,
+  `docs/glossary.md`, `docs/multi-region.md`,
+  `docs/upgrade.md` were rewritten to match the root +
+  `backend/` layout. `docs/audit.md` is renamed to
+  `docs/audit-2026-07-26.md` and banner-tagged as a frozen
+  historical snapshot.
+- **`.gitignore` cruft**: removed `arc-agi/`, `environment_files/`,
+  duplicated `*.test` and `.DS_Store` entries, the dead
+  `/promptsheond` and `/promptsheon` root entries (binaries
+  now live in `bin/`), and the `genopenapi` root entry.
 
 ## [0.3.0] - 2026-07-25
 

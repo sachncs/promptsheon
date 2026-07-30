@@ -47,7 +47,7 @@ Beyond the deployment surface, Promptsheon ships:
 - **Partitioned rate limiter** — 16-way FNV-1a sharded
   Allow() — contention scales linearly with the shard count.
 - **Postgres backend with RLS** — schema mirror in
-  `internal/store/postgres/migrations/`; per-Workspace
+  `backend/store/postgres/migrations/`; per-Workspace
   row-level security policies. Today the package ships
   `LoadSQL()` for the init + RLS bundles and an
   `InMemoryPostgres` fixture; the pgx wiring is a follow-on
@@ -94,12 +94,12 @@ caches ship as design docs and follow-on milestones (see
 - **Workflow DAG** — Topological execution with tool integration
 - **Observability** — OpenTelemetry tracing, Prometheus metrics, audit logging
 - **Built-in Guardrails** — PII redaction and prompt-injection detection ship as in-process plugins through the supervisor
-- **Plugin SDK** — net/rpc over UDS subprocess transport (`internal/subprocess`, v0.1.x production transport per `ADR-0024`); the `.proto` definition for the future gRPC-over-UDS transport lives at `internal/pluginproto/` (`ADR-0025`) as a follow-on
+- **Plugin SDK** — net/rpc over UDS subprocess transport (`backend/subprocess`, v0.1.x production transport per `ADR-0024`); the `.proto` definition for the future gRPC-over-UDS transport lives at `backend/pluginproto/` (`ADR-0025`) as a follow-on
 - **Webhooks** — Event-driven integrations with HMAC signing and SSRF protection
 - **Secrets Management** — Encrypted vault for API keys and sensitive configuration
 - **Rate Limiting** — Configurable per-client rate limiting with burst support
 - **Per-Workspace Budgets and Quotas** — USD-cap and rate-cap enforcement via the `invoke` package
-- **REST API** — Full-featured HTTP API with auto-generated OpenAPI specification (`api/openapi.yaml`)
+- **REST API** — Full-featured HTTP API with auto-generated OpenAPI specification (`backend/spec/spec.yaml`)
 
 ---
 
@@ -110,9 +110,7 @@ caches ship as design docs and follow-on milestones (see
 ```bash
 git clone https://github.com/sachncs/promptsheon.git
 cd promptsheon
-go build -o promptsheond ./cmd/promptsheond
-go build -o promptsheon  ./cmd/promptsheon
-go build -o promptsheon-healthcheck ./cmd/promptsheon-healthcheck
+make build                    # produces bin/promptsheond, bin/promptsheon, bin/promptsheon-healthcheck
 ```
 
 ### Run from a release binary
@@ -135,8 +133,8 @@ go build -o promptsheon-healthcheck ./cmd/promptsheon-healthcheck
 # Clone and build
 git clone https://github.com/sachncs/promptsheon.git
 cd promptsheon
-go build -o promptsheond ./cmd/promptsheond
-go build -o promptsheon  ./cmd/promptsheon
+go build -o promptsheond ./bin/promptsheond
+go build -o promptsheon  ./bin/promptsheon
 
 # Start the server for this unauthenticated local walkthrough
 PROMPTSHEON_AUTH=false ./promptsheond
@@ -216,7 +214,7 @@ Promptsheon is configured via environment variables. Key settings:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PROMPTSHEON_ADDR` | `:8080` | Listen address |
-| `PROMPTSHEON_DB_PATH` | `promptsheon.db` | SQLite database file. The daemon ships with SQLite; the Postgres backend (init + RLS bundles, in-memory fixture) is wired through `internal/store/postgres` and awaits the pgx follow-on. A shared backend (the prerequisite for multi-region replication) is tracked in [docs/multi-region.md](docs/multi-region.md). |
+| `PROMPTSHEON_DB_PATH` | `promptsheon.db` | SQLite database file. The daemon ships with SQLite; the Postgres backend (init + RLS bundles, in-memory fixture) is wired through `backend/store/postgres` and awaits the pgx follow-on. A shared backend (the prerequisite for multi-region replication) is tracked in [docs/multi-region.md](docs/multi-region.md). |
 | `PROMPTSHEON_AUTH` | `true` | Enable authentication. Set `false` only for local dev (and never on a non-loopback bind — the daemon refuses to start). |
 | `PROMPTSHEON_LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
 | `PROMPTSHEON_APPROVAL_POLICY` | `maker_checker` | Approval policy: `maker_checker` (creator cannot approve their own release) or `majority`. See [docs/release.md](docs/release.md). |
@@ -264,13 +262,13 @@ See [docs/eval.md](docs/eval.md) for the eval primitive, [docs/harness.md](docs/
 | `Version` | struct | A specific immutable build of a Capability Manifest |
 | `Release` | struct | A pointer to a Version inside a tenant Environment |
 | `Manifest` | struct | Content-addressed composition of Prompt, ModelPolicy, RuntimePolicy, ContextContract, Memory, Guardrails, Tools, MCP, EvalSuite |
-| `CAS` | type | Content-addressable store (Merkle DAG), lives at `pkg/cas/` |
+| `CAS` | type | Content-addressable store (Merkle DAG), lives at `backend/cas/` |
 | `Vault` | type | AES-256-GCM vault (or KMS-backed `KeyProvider`) |
 | `PluginSupervisor` | type | Supervisor for in-process plugins and remote (net/rpc over UDS) subprocess plugins |
 | `Dataset` | struct | Named collection of `(inputs, expected)` test cases. The ground truth for harness eval. |
 | `Precondition` | struct | Named command hook on a Capability; Activate runs every enabled precondition. |
 | `EvalRun` | struct | Recorded scoring of a Release against a Dataset using a chosen Scorer. |
-| `OpenAPI` | resource | Auto-generated OpenAPI spec at `api/openapi.yaml` |
+| `OpenAPI` | resource | Auto-generated OpenAPI spec at `backend/spec/spec.yaml` |
 
 ---
 
@@ -308,7 +306,7 @@ The server is composed of layered modules:
 | **API** | HTTP handlers, middleware (auth, rate-limit, audit, CORS) |
 | **Capabilities** | Manifests, Releases, Approvals, Datasets, Preconditions, Evals |
 | **Harness** | The harness-engineering loop: datasets, preconditions, eval runs. See [docs/harness.md](docs/harness.md). |
-| **Storage** | CAS (Merkle DAG, `pkg/cas/`) + SQLite (Postgres init + RLS SQL ships in `internal/store/postgres`; pgx wiring is a follow-on) |
+| **Storage** | CAS (Merkle DAG, `backend/cas/`) + SQLite (Postgres init + RLS SQL ships in `backend/store/postgres`; pgx wiring is a follow-on) |
 | **Providers** | Unified LLM provider abstraction layer (Anthropic + OpenAI) |
 | **Observability** | OpenTelemetry tracing, metrics collection, retention |
 | **Security** | AuthN/AuthZ, vault, guardrails, SSRF protection |
@@ -320,39 +318,34 @@ The server is composed of layered modules:
 
 ```
 promptsheon/
-├── cmd/
-│   ├── promptsheond/   # Server binary
-│   ├── promptsheon/    # CLI binary
-│   └── promptsheon-healthcheck/   # Container health probe
-├── api/                # OpenAPI spec and codegen
-├── internal/           # Server-side implementation modules
-│   ├── capability/     # Workspace / Project / Capability / Version / Release / Approval types
-│   ├── harness/        # Dataset / Precondition / EvalRun types + runner
-│   ├── eval/           # Scorer registry (exact_match, contains, regex, json_schema, llm_judge)
-│   ├── release/        # Release aggregate + application service
-│   ├── approval/       # MakerChecker + Majority policies
-│   ├── vault/          # AES-256-GCM + KMS KeyProvider
-│   ├── observability/  # OTel tracing and Prometheus metrics
-│   ├── llm/            # Anthropic + OpenAI provider implementations
-│   ├── pluginsup/      # Plugin supervisor (manifest → subprocess lifecycle)
-│   ├── subprocess/     # net/rpc-over-UDS subprocess plugin transport (v0.1.x production transport)
-│   ├── pluginproto/    # gRPC over UDS plugin contract (.proto + generated stubs; ADR-0025 follow-on)
-│   ├── guardrails/     # PII redaction, prompt-injection detection
-│   ├── store/          # SQLite + Postgres init/RLS bundles + sqliteimpl repository move
-│   └── ...
-├── pkg/                # Stable public packages consumable by other Go projects
-│   └── cas/            # Content-addressable store (Merkle DAG)
-├── sdk/                # Go SDK for embedding Promptsheon
-│   ├── python/         # Python client (codegen from api/openapi.yaml)
-│   └── typescript/     # TypeScript client (codegen from api/openapi.yaml)
-├── deploy/             # Helm chart, Grafana dashboard, Prometheus alerts
-├── docs/               # Architecture, deployment, ADRs, troubleshooting, FAQ
-├── tests/              # contract/ + e2e/ + smoke/ + chaos/ + load/
+├── main.go, *.go            # Single Go package; bin name picks mode (daemon|cli|healthcheck)
+├── backend/                 # Server-side implementation (all sub-packages live here)
+│   ├── capability/          # Workspace / Project / Capability / Version / Release / Approval types
+│   ├── harness/             # Dataset / Precondition / EvalRun types + runner
+│   ├── eval/                # Scorer registry (exact_match, contains, regex, json_schema, llm_judge)
+│   ├── release/             # Release aggregate + application service
+│   ├── approval/            # MakerChecker + Majority policies
+│   ├── vault/               # AES-256-GCM + KMS KeyProvider
+│   ├── observability/       # OTel tracing and Prometheus metrics
+│   ├── llm/                 # Anthropic + OpenAI provider implementations
+│   ├── plugins/             # Plugin supervisor + transport
+│   ├── guardrail/           # PII redaction, prompt-injection detection
+│   ├── store/               # SQLite init + sqliteimpl repository layer
+│   ├── cas/                 # Content-addressable store (Merkle DAG)
+│   ├── handlers_*.go        # HTTP handlers (auth, capability, releases, harness, ...)
+│   └── routes.go            # Mux registration; main entry point for the route table
+├── backend/spec/spec.yaml   # OpenAPI 3.0 spec (source of truth; regenerated by `make openapi`)
+├── sdk/                     # Go SDK for embedding Promptsheon
+│   ├── python/              # Python client (codegen from backend/spec/spec.yaml)
+│   └── typescript/          # TypeScript client (codegen from backend/spec/spec.yaml)
+├── deploy/                  # Helm chart, Grafana dashboard, Prometheus alerts
+├── docs/                    # Architecture, deployment, ADRs, troubleshooting, FAQ
+├── tests/                   # contract/ + e2e/ + smoke/ + chaos/ + load/
 ├── scripts/            # genopenapi/, sync-version.sh, docs-check.sh, etc.
 ├── go.mod
 ├── go.sum
 ├── Makefile
-├── Dockerfile
+├── Dockerfile.goreleaser
 ├── .github/workflows/  # CI (ci.yaml), release pipeline
 ├── LICENSE             # Apache 2.0
 ├── CONTRIBUTING.md
@@ -413,13 +406,10 @@ go test ./tests/chaos/...
 ## Build
 
 ```bash
-go build -o promptsheond ./cmd/promptsheond
-go build -o promptsheon  ./cmd/promptsheon
-go build -o promptsheon-healthcheck ./cmd/promptsheon-healthcheck
-
-# ClickHouse rollup writer (optional build tag)
-go build -tags clickhouse -o promptsheond ./cmd/promptsheond
+make build                   # builds all three binaries into ./bin/
 ```
+
+A GoReleaser pipeline (`.goreleaser.yml`) publishes multi-platform binaries
 
 A GoReleaser pipeline (`.goreleaser.yml`) publishes multi-platform binaries
 and a Docker image on tagged releases.
@@ -453,12 +443,12 @@ See [docs/release.md](docs/release.md) for the full process.
 |----------|------------|
 | Language | Go 1.26 |
 | HTTP Routing | stdlib `net/http.ServeMux` (Go 1.22+ pattern matching) |
-| CLI | Hand-rolled command dispatcher under `cmd/promptsheon/main.go` |
-| Storage | [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) (CGo-free SQLite). The Postgres backend ships init + RLS SQL and an in-memory fixture under `internal/store/postgres`; pgx wiring is a follow-on. |
+| CLI | Hand-rolled command dispatcher under `bin/promptsheonmain.go` |
+| Storage | [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) (CGo-free SQLite). The Postgres backend ships init + RLS SQL and an in-memory fixture under `backend/store/postgres`; pgx wiring is a follow-on. |
 | LLM SDKs | [`anthropics/anthropic-sdk-go`](https://github.com/anthropics/anthropic-sdk-go), [`openai/openai-go/v3`](https://github.com/openai/openai-go) (Responses API) |
-| RPC | `net/rpc` over UDS for plugin transport (`internal/subprocess`; `ADR-0024`); [google.golang.org/grpc](https://grpc.io/docs/languages/go/) for the future plugin transport (proto + stubs at `internal/pluginproto/`; `ADR-0025`, not yet wired) |
+| RPC | `net/rpc` over UDS for plugin transport (`backend/subprocess`; `ADR-0024`); [google.golang.org/grpc](https://grpc.io/docs/languages/go/) for the future plugin transport (proto + stubs at `backend/pluginproto/`; `ADR-0025`, not yet wired) |
 | Observability | [OpenTelemetry](https://opentelemetry.io/) (OTLP gRPC), Prometheus |
-| Auth | OAuth 2.0 (`internal/auth/oauth.go`), static API keys (`internal/auth/auth.go`) |
+| Auth | OAuth 2.0 (`backend/auth/oauth.go`), static API keys (`backend/auth/auth.go`) |
 | Vault | AES-256-GCM via [crypto/aes](https://pkg.go.dev/crypto/aes); KMS via pluggable `KeyProvider` |
 | Lint/Format | [golangci-lint](https://golangci-lint.run/) (see `.golangci.yml`) |
 | Releases | [GoReleaser](https://goreleaser.com/) (`.goreleaser.yml`) |
@@ -472,7 +462,7 @@ Full documentation lives in **[docs/](docs/)**:
 
 - [Getting Started](docs/getting-started.md)
 - [Configuration](docs/configuration.md)
-- [API Reference](docs/api-reference.md) — [OpenAPI spec](api/openapi.yaml)
+- [API Reference](docs/api-reference.md) — [OpenAPI spec](backend/spec/spec.yaml)
 - [Architecture](docs/architecture.md) — [Modules](docs/modules.md)
 - [Harness engineering](docs/harness.md) — why the eval/precondition/dataset surface exists
 - [Eval primitive](docs/eval.md) — datasets, preconditions, eval runs in detail
@@ -489,7 +479,7 @@ Full documentation lives in **[docs/](docs/)**:
 ## Roadmap
 
 - **v0.3.0** — Current release: forward-only Capability / Version /
-  Release model, CAS + Merkle DAG (`pkg/cas/`), MakerChecker
+  Release model, CAS + Merkle DAG (`backend/cas/`), MakerChecker
   approval, harness engineering (datasets / preconditions /
   evals), Anthropic + OpenAI via official SDKs, REST API,
   OTLP-only tracing, SQLite. Adds audit archival + chain-state

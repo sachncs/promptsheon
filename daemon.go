@@ -10,6 +10,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	_ "net/http/pprof"
@@ -454,28 +455,10 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 
 	// Per-Workspace rollup aggregator (Tier 2.37). The production
 	// wiring supplies a backend-backed Budget/Quota repository.
-	// When PROMPTSHEON_CLICKHOUSE_DSN is set and the binary is
-	// built with the `clickhouse` tag, the rollup job persists
-	// summaries to ClickHouse via internal/rollups/clickhouse.
-	// When the binary is built without the tag, buildClickHouseWriter
-	// returns a clear diagnostic so the operator knows to rebuild.
+	// ClickHouse persistence is no longer wired in this binary;
+	// rollups are kept in process memory only. Re-add a ClickHouse
+	// sink when there is a real consumer for the rollup stream.
 	rollupAgg := rollups.New(nil, nil)
-	if dsn := os.Getenv("PROMPTSHEON_CLICKHOUSE_DSN"); dsn != "" {
-		if writer, werr := buildClickHouseWriter(rootCtx, dsn, "promptsheon", logger); werr != nil {
-			logger.Warn("clickhouse writer disabled", "err", werr)
-		} else if writer != nil {
-			logger.Info("clickhouse writer initialised")
-			// Start a 30-second flusher that drains the
-			// workspace rollup queue into ClickHouse. The
-			// default interval matches Prometheus's typical
-			// scrape cadence so dashboards see fresh data.
-			// The buildClickHouseWriter placeholder returns
-			// (nil, error). The real writer under -tags
-			// clickhouse will set up a Sink that writes the
-			// periodic WorkspaceSummary rollups.
-			_ = writer
-		}
-	}
 
 	// Canonical invoke.Invoker (Tier 2.36). The Caller resolves
 	// the model + provider from the request, then routes through
@@ -666,7 +649,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 	if releaseSvc != nil {
 		precondRunner := harness.NewPreconditionRunner()
 		releaseSvc.WithHarness(precondRunner, db)
-		evalRunner = harness.NewEvalRunner(db, &apiReleaseInvoker{db: db, inv: inv, svc: releaseSvc, resolver: resolver})
+		evalRunner = harness.NewEvalRunner(db, &apiReleaseInvoker{inv: inv, svc: releaseSvc, resolver: resolver})
 		evalRunner.Metrics = collector
 		opts = append(opts, backend.WithHarnessRunner(evalRunner))
 	}
@@ -725,7 +708,11 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 	}
 
 	srv := backend.NewServer(repos, logger, opts...)
-	srv.HandleFrontend(frontendDist)
+	frontendFS, ferr := fs.Sub(frontendDist, "frontend/dist")
+	if ferr != nil {
+		return nil, nil, nil, nil, v
+	}
+	srv.HandleFrontend(frontendFS)
 	return srv, limiter, tracer, collector, v
 }
 
@@ -882,11 +869,6 @@ func (l *defaultArtifactLoader) Load(ctx context.Context, _ capability.ArtifactK
 	}
 	return []byte(obj.Data), nil
 }
-
-// buildClickHouseWriter — see main_clickhouse.go (the clickhouse-
-// tagged build) and main_noclickhouse.go (the default build).
-// The tag-split lives in two separate files so the placeholder
-// doesn't ship with the production binary.
 
 func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *backend.Config, srv *backend.Server, logger *slog.Logger, limiter *ratelimit.Limiter, tracer trace.Tracer, collector *metrics.Collector, idempStore store.IdempotencyStore, v *vault.Vault) {
 	handler := backend.ChainHTTP(srv,

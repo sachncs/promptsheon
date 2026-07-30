@@ -77,7 +77,7 @@ source row is preserved so the chain survives.
 
 ### Retention
 
-The retention manager (`internal/observability`) runs on a
+The retention manager (`backend/retention.go`) runs on a
 configurable interval (default 60 minutes). It enforces
 `PROMPTSHEON_TRACE_TTL_DAYS` (min 30) and
 `PROMPTSHEON_AUDIT_TTL_DAYS` (default 90). On a chain mismatch
@@ -92,18 +92,18 @@ pool's health. Drops are a 5xx-class event; the
 ## Vault
 
 API keys for upstream LLM providers live in the vault
-(`internal/vault`). The default implementation is AES-256-GCM
+(`backend/vault`). The default implementation is AES-256-GCM
 with a master key from `PROMPTSHEON_VAULT_KEY` (32-byte hex).
 Production deployments should use a `KeyProvider` backed by a
 managed-key service (AWS KMS, HashiCorp Vault, etc.) — see
-`internal/vault/kmsbyok` for the interface and the bundled
+`backend/vault/kmsbyok` for the interface and the bundled
 BYOK adapters.
 
 The vault never holds plaintext keys in the database; only
 ciphertext + the key version + the algorithm identifier. The
 production master-key wiring is a pluggable `KeyProvider`
 implementation registered at boot (see
-`internal/vault/kmsbyok`); the static
+`backend/vault/kmsbyok`); the static
 `PROMPTSHEON_VAULT_KEY` is the local-dev default.
 
 ## Webhooks
@@ -127,9 +127,9 @@ The validation runs at registration AND at delivery time.
 
 Two built-in Guardrails ship:
 
-- `internal/redactor` — strips PII patterns (emails, US SSNs,
+- `backend/redactor` — strips PII patterns (emails, US SSNs,
   phone numbers, etc.) at the pre-LLM and post-LLM boundaries.
-- `internal/injection` — flags role-confusion attacks and
+- `backend/injection` — flags role-confusion attacks and
   common injection patterns. Heuristic today; production
   deployments layer an LLM-judge behind the same Guardrail
   interface.

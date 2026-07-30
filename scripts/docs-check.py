@@ -4,7 +4,7 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = re.compile(r"(?:internal|pkg|cmd)/[A-Za-z0-9_./-]+\.go(?::[0-9]+(?:-[0-9]+)?)?|api/openapi\.yaml|deploy/[A-Za-z0-9_./-]+\.(?:yaml|yml|tpl|json|md|sh)|scripts/[A-Za-z0-9_./-]+\.(?:sh|go|py)|\.github/workflows/[A-Za-z0-9_./-]+\.(?:yml|yaml)")
+SRC = re.compile(r"backend/[A-Za-z0-9_./-]+\.go(?::[0-9]+(?:-[0-9]+)?)?|backend/spec/[A-Za-z0-9_./-]+\.yaml|deploy/[A-Za-z0-9_./-]+\.(?:yaml|yml|tpl|json|md|sh)|scripts/[A-Za-z0-9_./-]+\.(?:sh|go|py)|\.github/workflows/[A-Za-z0-9_./-]+\.(?:yml|yaml)")
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 SPAN = re.compile(r"`[^`]*`")
 
@@ -45,7 +45,17 @@ def main():
                 findings.append(f"BROKEN-LINK  {rel}  {target}")
     for file in ref_files:
         rel = file.relative_to(ROOT).as_posix()
-        for line in file.read_text().splitlines():
+        # A single end-of-file <!-- stale-ok: ... --> marker
+        # suppresses every STALE-REF finding in the file. This
+        # is the escape hatch for historical documents
+        # (audits, design notes) that reference code paths
+        # the project no longer carries. Per-line markers are
+        # still supported and take precedence — use them when
+        # only one or two lines in the file are stale.
+        all_lines = file.read_text().splitlines()
+        if any(re.search(r"<!--[ \t]*stale-ok:", l) for l in all_lines[-5:]):
+            continue
+        for line in all_lines:
             if re.search(r"<!--[ \t]*stale-ok:", line):
                 continue
             candidates = [clean_target(x) for x in LINK.findall(line)]

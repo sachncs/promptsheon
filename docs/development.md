@@ -20,12 +20,12 @@ locally. The contribution policy is in
 make build
 
 # Or build individually.
-go build -o promptsheond     ./cmd/promptsheond
-go build -o promptsheon      ./cmd/promptsheon
-go build -o promptsheon-healthcheck ./cmd/promptsheon-healthcheck
+go build -o promptsheond     ./bin/promptsheond
+go build -o promptsheon      ./bin/promptsheon
+go build -o bin/promptsheon-healthcheck .
 
 # Build with the optional ClickHouse rollup writer.
-go build -tags clickhouse -o promptsheond ./cmd/promptsheond
+go build -o bin/promptsheond .
 ```
 
 ## Test
@@ -60,9 +60,9 @@ make lint
 
 The project enforces a gofmt-clean tree (`gofmt -l .` must
 return no files) and a `go vet` pass on every commit. Domain
-packages are kept infra-free (no imports from `internal/api`,
-`internal/store`, or `cmd/`); `make lint-domain` and
-`make lint-deps` enforce that.
+packages are kept infra-free (no imports from `backend/store`
+or anything that pulls in `package main` at the repo root);
+`make lint-domain` and `make lint-deps` enforce that.
 
 ## Run the daemon locally
 
@@ -92,7 +92,7 @@ The generator walks every `register*Routes()` method on
 `api.Server` and emits a per-route entry with the request
 struct fields (when extractable from the AST). The output is
 deterministic; running it twice produces byte-identical
-output. CI fails if the committed `api/openapi.yaml` is
+output. CI fails if the committed `backend/spec/spec.yaml` is
 stale.
 
 When you add a new handler:
@@ -100,7 +100,7 @@ When you add a new handler:
 1. Implement the handler.
 2. Register it in the appropriate `register*Routes()`.
 3. Run `make openapi`.
-4. Commit the regenerated `api/openapi.yaml` alongside the
+4. Commit the regenerated `backend/spec/spec.yaml` alongside the
    handler.
 
 The contract test (`tests/contract/contract_test.go`) catches
@@ -110,32 +110,32 @@ the case where the spec is out of date.
 
 ```
 promptsheon/
-├── cmd/
-│   ├── promptsheond/   # Server binary
-│   ├── promptsheon/    # CLI binary
-│   └── promptsheon-healthcheck/   # Container health probe
-├── api/                # Generated OpenAPI spec
-├── internal/           # Server-side implementation
-│   └── ...             # (see docs/architecture.md for the package table)
-├── pkg/cas/            # Stable public CAS package
-├── sdk/                # Go SDK (plus python/, typescript/)
-├── deploy/             # Helm chart, Grafana dashboard, Prometheus alerts
-├── docs/               # Markdown documentation + ADRs
-├── tests/              # contract/, e2e/, smoke/, chaos/, load/
-├── scripts/            # genopenapi, sync-version, ...
+├── main.go, daemon.go, cli.go, ...   # Single Go package; bin name picks mode
+├── backend/                          # Server-side implementation
+│   ├── capability/, release/, harness/, eval/, vault/, llm/, ...
+│   ├── handlers_*.go                 # HTTP handlers (one domain per file)
+│   ├── routes.go                     # Mux registration (single entry point)
+│   ├── cas/                          # Content-addressable store
+│   ├── store/                        # SQLite init + sqliteimpl repositories
+│   └── spec/spec.yaml                # Generated OpenAPI 3.0 spec
+├── sdk/                              # Go SDK (plus python/, typescript/)
+├── deploy/                           # Helm chart, Grafana dashboard, Prometheus alerts
+├── docs/                             # Markdown documentation + ADRs
+├── tests/                            # contract/, e2e/, smoke/, chaos/, load/
+├── scripts/                          # genopenapi, check-coverage, check-domain-purity, ...
 ├── Makefile
 └── go.mod / go.sum
 ```
 
 ## Adding a new handler
 
-1. Add the handler function in `internal/api/handlers_*.go`
+1. Add the handler function in `backend/handlers_*.go`
    (match the existing file's domain — capability, release,
    harness, webhooks, etc.).
 2. Register the route in the corresponding `register*Routes()`
-   method on `internal/api/server.go`.
+   method on `backend/server.go`.
 3. Add validation rules if the body has required fields
-   (see `internal/api/validate.go`).
+   (see `backend/validate.go`).
 4. Wire error responses to `HTTPError` so the daemon's
    consistent shape (`{error, details?}`) is preserved.
 5. Run `make openapi` to regenerate the spec.
@@ -153,7 +153,7 @@ promptsheon/
 
 ## Adding a new metric
 
-1. Add the field to `internal/metrics/collector.go` (counter,
+1. Add the field to `backend/metrics/collector.go` (counter,
    histogram, or gauge).
 2. Initialise it in `NewCollector()`.
 3. Emit it in `prometheusFormat()`.
@@ -166,9 +166,9 @@ promptsheon/
 ## Adding a new migration
 
 1. Drop a `020_your_migration.up.sql` (and a `.down.sql`) in
-   `internal/store/migrations/`.
+   `backend/store/migrations/`.
 2. Update the migration count in
-   `internal/store/store_test.go` (`TestNewSQLiteRunsAllMigrations`).
+   `backend/store/migrate_test.go` (`TestNewSQLiteRunsAllMigrations`).
 3. Update the migration table in
    `docs/architecture.md`.
 4. The next `./promptsheond` boot applies it.

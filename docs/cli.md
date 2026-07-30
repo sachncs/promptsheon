@@ -1,7 +1,7 @@
 # CLI Reference
 
 The `promptsheon` CLI is a hand-rolled command dispatcher under
-`cmd/promptsheon/main.go`. It talks to a running daemon over
+`cli.go`. It talks to a running daemon over
 HTTP — it is **not** a standalone binary. Start the daemon
 first (`./promptsheond`), then run CLI commands.
 
@@ -19,7 +19,7 @@ an `Authorization` header today; for an authenticated daemon
 the CLI must be run against a loopback listener or wrapped by
 a tool that injects the API key. The CLI's HTTP helpers
 refuse to talk to non-loopback hosts (`validateLocalURL` in
-`cmd/promptsheon/http.go`).
+`cli_http.go`).
 
 `--version` (also `-version`, `-V`) prints the build info.
 `--help` (also `-help`, `-h`) prints the usage block.
@@ -27,7 +27,7 @@ refuse to talk to non-loopback hosts (`validateLocalURL` in
 ## Commands
 
 The actual handler surface is registered in
-`cmd/promptsheon/main.go`'s `commandHandlers` map. Top-level
+`cli.go`'s `commandHandlers` map. Top-level
 commands:
 
 | Command | Description |
@@ -84,7 +84,7 @@ promptsheon selfevolve status c1
 ## Local-only HTTP client
 
 The CLI's `httpGet` / `httpPost` / `httpDelete` helpers in
-`cmd/promptsheon/http.go` refuse any non-loopback host. The
+`cli_http.go` refuse any non-loopback host. The
 CLI is a thin wrapper over the daemon's REST API; anything
 beyond this surface goes through the [Go](sdk.md) /
 [Python](sdk.md) / [TypeScript](sdk.md) SDKs instead.

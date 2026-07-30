@@ -71,7 +71,7 @@ approval.MajorityPolicy{
   prevent activation; the Release remains `pending`.
 
 Configure via `PROMPTSHEON_APPROVAL_POLICY` and per-policy
-constructor options at `cmd/promptsheond/main.go`.
+constructor options at `daemon.go`.
 
 ## Activate path
 

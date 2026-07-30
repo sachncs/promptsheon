@@ -22,7 +22,7 @@ Regenerate from the production OpenAPI spec:
 cd sdk/python
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e '.[codegen]'
-bash scripts/codegen.sh   # regenerates src/promptsheon from ../../api/openapi.yaml
+bash scripts/codegen.sh   # regenerates src/promptsheon from ../../backend/spec/spec.yaml
 python3 -m compileall src/promptsheon tests
 ```
 

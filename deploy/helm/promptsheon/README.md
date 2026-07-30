@@ -7,7 +7,7 @@ The Control Plane for AI Capabilities.
 Promptsheon is a single-binary HTTP daemon that versions, releases,
 and observes AI capabilities the way engineers manage code: with
 immutable Versions, content-addressed artifacts, an approval
-workflow (MakerChecker by default), a CAS (`pkg/cas/`), and an
+workflow (MakerChecker by default), a CAS (`backend/cas/`), and an
 audit chain that detects tampering. The shipped configuration is
 single-region and SQLite-backed by design.
 

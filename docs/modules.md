@@ -1,88 +1,84 @@
 # Modules
 
-The internal package tree maps to the layered architecture.
+The `backend/` package tree maps to the layered architecture.
 Domain packages declare consumer-defined interfaces; storage
 and HTTP packages implement them. The split is enforced by
 the `lint-domain` and `lint-deps` Makefile targets — domain
-packages must not import from `internal/api`, `internal/store`,
-or `cmd/`.
+packages must not import from `backend/store` (or anything
+that pulls in `package main` at the repo root).
 
-| Package | Path | Layer | Purpose |
-|---------|------|-------|---------|
-| `api` | `internal/api/` | HTTP | Handlers, middleware, server wiring, request/response shapes. |
-| `auth` | `internal/auth/` | Security | API key authentication + permission model. |
-| `observation` | `internal/observation/` | Domain | Execution-windowed aggregator. |
-| `optimization` (rules + bandit) | `internal/optimizer/`, `internal/bandit/` | Domain | Recommendation engine (deterministic rules + Thompson Sampling). |
-| `recommendation` | `internal/recommendation/` | Domain | Producer that consumes Observations and emits Recommendations. |
-| `banditstore` | `internal/banditstore/` | Domain | Persistent arm-posterior store. |
-| `abtesting` | `internal/experiment/` | Domain | A/B test scaffolding around `bandit`. |
-| `invocation` | `internal/invoke/` | Domain | Canonical entry point for one invocation; Budget + Quota enforcement. |
-| `execution` | `internal/executor/` | Domain | Schedule + webhook → Execution record. |
-| `release` | `internal/release/` | Domain | Release aggregate + application service. |
-| `approval` | `internal/approval/` | Domain | MakerChecker + Majority policies. |
-| `capability` | `internal/capability/` | Domain | Workspace, Project, Capability, Version, Manifest value types. |
-| `harness` | `internal/harness/` | Domain | Dataset, Precondition, EvalRun types + runner. |
-| `eval` | `internal/eval/` | Domain | Scorer registry. |
-| `lineage` | `internal/lineage/` | Domain | Decision + lineage persistence. |
-| `adoption` | `internal/adoption/` | Domain | Per-Workspace Recommendation adoption history. |
-| `vault` | `internal/vault/` | Domain | AES-256-GCM + KMS-backed KeyProvider. |
-| `llm` | `internal/llm/` | Domain | Anthropic + OpenAI provider implementations. |
-| `webhook` | `internal/webhook/` | Domain | Event delivery with HMAC signing + SSRF protection. |
-| `rollups` | `internal/rollups/` | Domain | Per-Workspace Budget/Quota rollup aggregator. |
-| `rollups/clickhouse` | `internal/rollups/clickhouse/` | Storage | ClickHouse writer (build tag `clickhouse`). |
-| `budget` | `internal/budget/` | Domain | USD-cap enforcement. |
-| `quota` | `internal/quota/` | Domain | Rate-cap enforcement. |
-| `mcplist` | `internal/mcplist/` | Domain | Per-Workspace MCP allowlist. |
-| `slo` | `internal/slo/` | Domain | Capability-level SLOs + Repository contract. |
-| `slo/evaluator` | `internal/slo/evaluator.go` | Domain | SLO burn-rate evaluator. |
-| `redactor` | `internal/redactor/` | Plugin | PII redaction default Guardrail. |
-| `injection` | `internal/injection/` | Plugin | Prompt-injection detection default Guardrail. |
-| `pluginsup` | `internal/pluginsup/` | Plugin | Plugin supervisor (in-process + subprocess). |
-| `subprocess` | `internal/subprocess/` | Plugin | net/rpc-over-UDS subprocess plugin transport. |
-| `pluginproto` | `internal/pluginproto/` | Plugin | gRPC over UDS plugin transport (proto + stubs). |
-| `pluginmanifest` | `internal/pluginmanifest/` | Plugin | Plugin manifest parser. |
-| `plugins/builtins` | `internal/plugins/builtins/` | Plugin | Default in-process plugins. |
-| `replay` | `internal/replay/` | Domain | Replay buffer for hash-stable round-trip reproducibility. |
-| `schedule` | `internal/schedule/` | Domain | Schedule aggregate. |
-| `scheduler` | `internal/scheduler/` | Domain | The tick loop. |
-| `config` | `internal/config/` | Config | Env-var loader + Validate. |
-| `metrics` | `internal/metrics/` | Observability | Prometheus collector + HTTP middlewares. |
-| `trace` | `internal/trace/` | Observability | OTLP-only trace export. |
-| `observability` | `internal/observability/` | Observability | OTel tracing, Prometheus metrics, retention sweep. |
-| `ws` | `internal/ws/` | HTTP | SSE log stream hub. |
-| `ratelimit` | `internal/ratelimit/` | HTTP | Per-client rate limiting. |
-| `bridge` | `internal/bridge/` | Adapter | Cross-package adapters. |
-| `context` | `internal/context/` | Domain | Context assembly manager. |
-| `eventbus` | `internal/eventbus/` | Domain | In-process pub/sub. |
-| `policy` | `internal/policy/` | Domain | Policy decision framework. |
-| `alerting` | `internal/alerting/` | Domain | Alert rule + notification groups. |
-| `redactor` | `internal/redactor/` | Domain | PII redaction default Guardrail. |
-| `cli` | `cmd/promptsheon/` | CLI | Hand-rolled command dispatcher. |
-| `daemon` | `cmd/promptsheond/` | HTTP | Server binary. |
-| `healthcheck` | `cmd/promptsheon-healthcheck/` | Tool | Container health probe. |
-| `cas` (public) | `pkg/cas/` | Public | Content-addressable store. Stable public API. |
-| `plugin` (public) | `pkg/plugin/` | Public | Stable plugin SDK. |
+| Package / File | Path | Layer | Purpose |
+|---|---|---|---|
+| `server` | `backend/server.go` | HTTP | Server composition, options, mux setup. |
+| `routes` | `backend/routes.go` | HTTP | Single `RegisterRoutes` entry point. |
+| `handlers_*` | `backend/handlers_*.go` | HTTP | One HTTP handler file per domain. |
+| `helpers` | `backend/handlers_helpers.go` | HTTP | `validateNonEmpty`, `parsePagination`, `writeJSON`, `HTTPError`. |
+| `auth` | `backend/auth/` | Security | API key authentication + permission model. |
+| `observation` | `backend/observation/` | Domain | Windowed `ExecutionRecord` aggregator. |
+| `optimizer` | `backend/optimizer/` | Domain | Optimizer rules + `CanAutoAdopt`. |
+| `rules` | `backend/rules/` | Domain | Recommendation rule primitives. |
+| `recommendation` | `backend/recommendation/` | Domain | Producer that consumes Observations and emits Recommendations. |
+| `bandit` | `backend/bandit/` | Domain | Thompson Sampling arm selector. |
+| `banditstore` | `backend/banditstore.go` | Domain | Persistent arm-posterior store. |
+| `experiment` | `backend/experiment.go` | Domain | A/B test scaffolding around `bandit`. |
+| `invoke` | `backend/invoke/` | Domain | Canonical entry point for one invocation; Budget + Quota enforcement. |
+| `executor` | `backend/executor/` | Domain | Schedule + webhook → Execution record. |
+| `release` | `backend/release/` | Domain | Release aggregate + application service. |
+| `approval` | `backend/approval/` | Domain | MakerChecker + Majority policies. |
+| `capability` | `backend/capability/` | Domain | Workspace, Project, Capability, Version, Manifest value types. |
+| `harness` | `backend/harness/` | Domain | Dataset, Precondition, EvalRun types + runner. |
+| `eval` | `backend/eval/` | Domain | Scorer registry. |
+| `lineage` | `backend/lineage/` | Domain | Decision + lineage persistence. |
+| `adoption` | `backend/adoption.go` | Domain | Per-Workspace Recommendation adoption history. |
+| `vault` | `backend/vault/` | Domain | AES-256-GCM + KMS-backed KeyProvider. |
+| `llm` | `backend/llm/` | Domain | Anthropic + OpenAI provider implementations + `Registry`. |
+| `webhook` | `backend/webhook/` | Domain | Event delivery with HMAC signing + SSRF protection. |
+| `budget` | `backend/budget/` | Domain | USD-cap enforcement. |
+| `quota` | `backend/quota/` | Domain | Rate-cap enforcement. |
+| `mcplist` | `backend/mcplist.go` | Domain | Per-Workspace MCP allowlist. |
+| `redactor` | `backend/redactor.go` | Plugin | PII redaction default Guardrail. |
+| `detector` | `backend/detector.go` | Plugin | Prompt-injection heuristic Guardrail. |
+| `guardrail` | `backend/guardrail/` | Plugin | Guardrail interface + runner. |
+| `plugins` | `backend/plugins/` | Plugin | In-process + subprocess plugin transport. |
+| `supervisor` | `backend/supervisor/` | Plugin | Plugin lifecycle (restart budget, health gate). |
+| `replay` | `backend/replay/` | Domain | Replay buffer for hash-stable round-trip reproducibility. |
+| `schedule` | `backend/schedule/` | Domain | Schedule aggregate. |
+| `scheduler` | `backend/scheduler/` | Domain | The tick loop. |
+| `config` | `backend/config.go` | Config | Env-var loader + `Validate`. |
+| `metrics` | `backend/metrics/` | Observability | Prometheus collector + HTTP middlewares. |
+| `trace` | `backend/trace/` | Observability | OTLP-only trace export. |
+| `retention` | `backend/retention.go` | Observability | Audit archive retention sweep. |
+| `ratelimit` | `backend/ratelimit/` | HTTP | Per-client partitioned rate limiter. |
+| `eventbus` | `backend/eventbus/` | Domain | In-process pub/sub. |
+| `policy` | `backend/policy.go` | Domain | Policy decision framework. |
+| `alerting` | `backend/alerting/` | Domain | Alert rule + notification groups. |
+| `rollups` | `backend/rollups/` | Domain | Per-Workspace Budget/Quota rollup aggregator (in-memory). |
+| `settings` | `backend/settings/` | Domain | System config CRDT + resolver. |
+| `selfevolve` | `backend/selfevolve/` | Domain | Closed-loop self-evolution orchestrator. |
+| `search` | `backend/search/` | Domain | Catalog search. |
+| `election` | `backend/election.go` | Domain | Leader election for HA. |
+| `reasoning` | `backend/reasoning.go` | Domain | Reasoning compiler primitives. |
+| `llmcontext` | `backend/llmcontext.go` | Domain | LLM context assembly. |
+| `usage` | `backend/usage.go` | Observability | `UsageTracker` + Prometheus exposition. |
+| `models` | `backend/models/` | Domain | Shared wire types (User, APIKey, ProviderKey, ...). |
+| `errs` | `backend/errs/` | Domain | Sentinel errors. |
+| `store` | `backend/store/` | Infrastructure | SQLite-backed `Repository` implementation + migrations. |
+| `testutil` | `backend/testutil/` | Test | Shared test helpers (logger, sqlite, harness fixture). |
+| `testutil/harnessrepo` | `backend/testutil/harnessrepo/` | Test | Shared in-memory `harness.Repository` fixture. |
+| `cas` | `backend/cas/` | Domain | Content-addressable store (Merkle DAG). |
+| `cli` | root `cli.go`, `cli_cas.go`, `cli_harness.go`, `cli_http.go`, `cli_selfevolve.go` | CLI | Command dispatcher + handlers (in `package main`). |
+| `daemon` | root `daemon.go`, `daemon_evolver.go`, `daemon_release_invoker.go`, `embed_frontend.go`, `healthcheck.go` | HTTP | Server entry point + dispatch (in `package main`). |
 | `client` (Go SDK) | `sdk/` | SDK | Go SDK; see [docs/sdk.md](sdk.md). |
-| `client` (Py SDK) | `sdk/python/src/promptsheon/` | SDK | Python SDK; generated. |
-| `client` (TS SDK) | `sdk/typescript/src/` | SDK | TypeScript SDK; generated. |
-
-## Stable public packages
-
-The `pkg/` directory hosts packages with stable APIs intended
-to be importable by external Go projects:
-
-- `pkg/cas/` — content-addressable storage.
-- `pkg/plugin/` — plugin SDK.
-
-The `sdk/` directory hosts the language SDKs.
+| `client` (Py SDK) | `sdk/python/src/promptsheon/` | SDK | Python SDK; generated from `backend/spec/spec.yaml`. |
+| `client` (TS SDK) | `sdk/typescript/src/` | SDK | TypeScript SDK; generated from `backend/spec/spec.yaml`. |
 
 ## Domain-package purity
 
 `make lint-domain` enforces that every domain package
-(declared via the `domain:` Makefile target) does not import
-from `internal/api`, `internal/store`, or `cmd/`. This is the
-core architectural rule: domain logic does not know about
-HTTP, storage, or wiring.
+(declared in `scripts/check-no-package-state.go`'s
+`domainPackages` list) does not declare package-level
+mutable state. Sentinel errors (`Err…`) and import-pin
+discards (`var _ = ...`) are explicitly allowed.
 
 `make lint-deps` enforces the broader rule that domain
 packages may only depend on other domain packages, the

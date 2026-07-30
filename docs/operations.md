@@ -23,7 +23,7 @@ from the upstream provider when the operator re-issues them.
 
 ## Backup strategy
 
-The `promptsheond backup <path>` subcommand writes a consistent
+The `promptsheond --backup= <path>` subcommand writes a consistent
 SQLite snapshot to the supplied path while the daemon is live.
 It uses SQLite's online backup API (`.backup` / `VACUUM INTO`)
 so a running daemon's writes don't split the snapshot.
@@ -36,7 +36,7 @@ Recommended schedule:
 
 ```bash
 # Hourly cron: keep the last 24 snapshots, prune the rest.
-0 * * * * /usr/local/bin/promptsheond backup /var/backups/promptsheon/hourly.db && \
+0 * * * * /usr/local/bin/promptsheond --backup= /var/backups/promptsheon/hourly.db && \
   find /var/backups/promptsheon/hourly.db.* -mmin +1440 -delete
 
 # Daily offsite: S3 with object-lock for compliance.

@@ -12,7 +12,7 @@ jobs so the default PR path stays fast.
 | **Smoke** | Boots a real daemon and runs the smoke harness. | `bash tests/smoke/run.sh` |
 | **Chaos** | SQLite file-delete mid-query doesn't panic. | `go test ./tests/chaos/...` |
 | **Load** | k6 scenarios in `tests/load/scenarios/*.js` (nightly). | `make load-test` |
-| **Property** | `testing/quick` covers the LLM gateway (`internal/llm/property_test.go`) and the bandit selector (`internal/bandit/property_test.go`). CAS-layer properties are follow-on. | `go test ./internal/llm/... ./internal/bandit/...` |
+| **Property** | `testing/quick` covers the LLM gateway (`backend/llm/property_test.go`) and the bandit selector (`backend/bandit/property_test.go`). CAS-layer properties are follow-on. | `go test ./backend/llm/... ./backend/bandit/...` |
 | **Mutation** | (future) `go-mutesting` for domain packages. | non-goal today |
 
 ## Layer-to-CI-job mapping
@@ -32,8 +32,8 @@ jobs so the default PR path stays fast.
 
 ```
 internal/<pkg>/*_test.go            # Unit tests for each package.
-internal/testutil/                 # Shared test helpers (logger, sqlite, env, harness repo).
-internal/testutil/harnessrepo/     # Shared in-memory harness.Repository fixture.
+backend/testutil/                 # Shared test helpers (logger, sqlite, env, harness repo).
+backend/testutil/harnessrepo/     # Shared in-memory harness.Repository fixture.
 tests/contract/contract_test.go   # OpenAPI ↔ SDK contract.
 tests/e2e/                         # In-process daemon, real HTTP.
 tests/smoke/run.sh                 # Bash smoke against a fresh daemon.
@@ -49,10 +49,10 @@ tests/load/scenarios/*.js          # k6 load scenarios (nightly).
 - Cleanup is registered with `t.Cleanup`, not `defer`, so
   the test ends in a known state even on panic.
 - Concurrency: shared fixtures use `sync.Mutex` (e.g.
-  `internal/testutil/harnessrepo.MemRepo`) so tests can run
+  `backend/testutil/harnessrepo.MemRepo`) so tests can run
   in parallel.
 - Fakes (in-memory providers, repositories) live under
-  `internal/testutil/` so cross-package tests can link them
+  `backend/testutil/` so cross-package tests can link them
   without dragging in the storage layer.
 - Use `testutil.NewTestDB(t)` for every test that needs the
   store layer. No test creates its own `*sql.DB` directly.
@@ -64,14 +64,14 @@ tests/load/scenarios/*.js          # k6 load scenarios (nightly).
 
 | Helper | Where | Purpose |
 |--------|-------|---------|
-| `testutil.DiscardLogger` | `internal/testutil/testutil.go` | Logger that writes to `io.Discard`. |
+| `testutil.DiscardLogger` | `backend/testutil/testutil.go` | Logger that writes to `io.Discard`. |
 | `testutil.TempSQLite` / `testutil.NewTestDB` | same | On-disk SQLite in `t.TempDir()` with migrations applied. |
 | `testutil.MemoryBus` | same | In-memory `eventbus.Memory` with cleanup. |
 | `testutil.ContextWithTimeout` | same | Context cancelled at `d` + auto-cleanup. |
 | `testutil.Setenv` / `Unsetenv` | same | Env-var mutation scoped to a single test. |
 | `testutil.ClockFunc` / `testutil.Now` | same | Test seam: substitute a deterministic time source. |
-| `testutil.harnessrepo.New` | `internal/testutil/harnessrepo/` | `harness.Repository` fixture (datasets, preconditions, eval runs). |
-| `api.NewTestServer` | `internal/api/invoke_test_helpers_test.go` | Canonical entry point for an `*api.Server` with an in-memory store. |
+| `testutil.harnessrepo.New` | `backend/testutil/harnessrepo/` | `harness.Repository` fixture (datasets, preconditions, eval runs). |
+| `api.NewTestServer` | `backend/invoke_test_helpers_test.go` | Canonical entry point for an `*api.Server` with an in-memory store. |
 
 ## Coverage
 
@@ -79,8 +79,8 @@ The CI gate enforces **60% total coverage** plus per-package
 floors:
 
 - Domain packages (most of `internal/<pkg>/`): >= 50%
-- Infrastructure (`internal/api/`, `internal/store/`): >= 40%
-- API handlers (`internal/api/handlers*`): >= 60%
+- Infrastructure (`backend/`, `backend/store/`): >= 40%
+- API handlers (`backend/handlers*`): >= 60%
 
 The script `scripts/check-coverage.sh` reads the same
 `coverage.out` produced by `go test -coverprofile` and
@@ -98,7 +98,7 @@ for local debugging.
 ## Contract test
 
 `tests/contract/contract_test.go` is the gate that catches
-drift between `api/openapi.yaml` and the Go SDK. The test
+drift between `backend/spec/spec.yaml` and the Go SDK. The test
 parses the spec, walks every registered route, and asserts
 the documented SDK surface. It's wired into CI as a step
 on the default `test` job.
@@ -160,20 +160,20 @@ and TypeScript) where their toolchains are available.
   `testing` package.
 - For cross-package coverage (a real daemon + real HTTP),
   drop a `*_test.go` in `tests/e2e/` and use the helpers in
-  `internal/testutil` + `internal/api`.
+  `backend/testutil` + `backend`.
 - For OpenAPI / SDK drift detection, extend
   `tests/contract/contract_test.go`.
 
 If your test needs a fixture that doesn't exist, add it to
-`internal/testutil/`. The harness fixture in
-`internal/testutil/harnessrepo/` is the canonical pattern:
+`backend/testutil/`. The harness fixture in
+`backend/testutil/harnessrepo/` is the canonical pattern:
 implements the consumer-defined interface, safe for
 concurrent use, exported (so cross-package tests can link
 it).
 
 ## Migration tests
 
-`internal/store/002_core_schema_test.go` covers the schema
+`backend/store/002_core_schema_test.go` covers the schema
 migrations applied at boot (tables, indexes, foreign keys,
 unique constraints). Each migration is applied to a fresh
 in-memory DB by `TestNewSQLiteRunsAllMigrations`; the

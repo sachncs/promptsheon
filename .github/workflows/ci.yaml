@@ -83,8 +83,8 @@ jobs:
         # sense). We also enforce per-package floors for the
         # testable layers: domain packages (backend/...,
         # excluding api/store) >= 50%, infrastructure
-        # (backend/api + backend/store) >= 40%, api handlers
-        # (backend/api) >= 60%. The per-package floors catch
+        # (backend + backend/store) >= 40%, api handlers
+        # (backend) >= 60%. The per-package floors catch
         # silent regressions in the testable surface; the global
         # floor catches regressions in the testable aggregate.
         run: |
@@ -104,13 +104,13 @@ jobs:
       - name: OpenAPI spec is in sync
         # Item 1 (openapi): CI fails the build if a developer
         # added a route or changed a handler without
-        # regenerating api/openapi.yaml. The generator is
-        # invoked once on a clean tree and the output is
+        # regenerating backend/spec/spec.yaml. The generator
+        # is invoked once on a clean tree and the output is
         # compared to the committed file via git diff.
         run: |
           go run ./scripts/genopenapi
-          git diff --exit-code api/openapi.yaml || \
-            (echo "api/openapi.yaml is out of date. Run 'make openapi' and commit the result."; exit 1)
+          git diff --exit-code backend/spec/spec.yaml || \
+            (echo "backend/spec/spec.yaml is out of date. Run 'make openapi' and commit the result."; exit 1)
 
       - name: Contract test
         # API-9: the contract test walks every registered
@@ -120,14 +120,14 @@ jobs:
 
       - name: SDK Python codegen + compile
         # API-7a: openapi-python-client regenerates the Python
-        # SDK from api/openapi.yaml. compileall catches
+        # SDK from backend/spec/spec.yaml. compileall catches
         # syntax errors that codegen might emit.
         run: bash sdk/python/scripts/codegen.sh
 
       - name: SDK TypeScript codegen + typecheck
         # API-7b: openapi-typescript regenerates the TS SDK
-        # from api/openapi.yaml. tsc --noEmit catches type
-        # errors that codegen might emit.
+        # from backend/spec/spec.yaml. tsc --noEmit catches
+        # type errors that codegen might emit.
         run: bash sdk/typescript/scripts/codegen.sh
 
   smoke:
@@ -200,7 +200,7 @@ jobs:
       - name: Lint domain-purity (no infra imports from domain packages)
         # CI gate: domain packages depend only on other domain
         # packages and the standard library. They MUST NOT import
-        # backend/llm, backend/api, backend/store, or cmd. See
+        # backend/llm, backend, backend/store, or cmd. See
         # ADR-0012.
         run: make lint-deps
 
@@ -223,7 +223,7 @@ jobs:
     # DOC-CI-3 / DOC-FRESH-1: deterministic doc-freshness gate.
     # Reports any markdown link in docs/ that resolves to a
     # missing file, and any path-shaped reference to source
-    # code (backend/...go, api/openapi.yaml,
+    # code (backend/...go, backend/spec/*.yaml,
     # deploy/, scripts/, .github/workflows/) that no longer
     # points at a real file. A trailing
     # `<!-- stale-ok: <reason> -->` comment on a line
@@ -236,6 +236,81 @@ jobs:
 
       - name: docs-check
         run: make docs-check
+
+  sdk-python:
+    # SDK-2: run the real pytest suite (not just compileall)
+    # for sdk/python. compileall catches syntax errors in
+    # generated code; pytest covers the hand-written client
+    # wrappers in sdk/python/tests/. The job runs the
+    # codegen first so the test sees the freshly-generated
+    # client surface, not a stale copy.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26.5"
+          cache: true
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install SDK + test deps
+        run: |
+          python3 -m pip install --quiet -e ./sdk/python
+          python3 -m pip install --quiet pytest
+
+      - name: Regenerate SDK from spec
+        run: bash sdk/python/scripts/codegen.sh
+
+      - name: Run pytest
+        run: python3 -m pytest sdk/python/tests
+
+  sdk-typescript:
+    # SDK-3: run the real jest suite for sdk/typescript.
+    # The job regenerates the SDK first so jest exercises
+    # the freshly-generated types, not a stale copy.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26.5"
+          cache: true
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Regenerate SDK from spec
+        run: bash sdk/typescript/scripts/codegen.sh
+
+      - name: Install jest
+        run: npm --prefix sdk/typescript install --no-audit --no-fund
+
+      - name: Run jest
+        run: npm --prefix sdk/typescript test
+
+  tla:
+    # TLA-LIFECYCLE-2: model-check the release lifecycle spec
+    # with TLC. The job is a soft gate: if tlc is installed
+    # it runs the model checker; if not, the job warns and
+    # passes (the tla/ Go test in tests/ still asserts the
+    # spec is present and contains the right invariants).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run TLC if available
+        run: |
+          if command -v tlc >/dev/null 2>&1; then
+            tlc -deadlock -config tla/release_lifecycle.cfg tla/release_lifecycle.tla
+          else
+            echo "tlc not installed; the Go test in tla/ pins the spec presence"
+          fi
 
   docs-lint:
     # OPS-CI-3: keep markdownlint + vale as a soft gate on

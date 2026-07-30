@@ -23,7 +23,7 @@ Regenerate the types from the production OpenAPI spec, then build:
 ```sh
 cd sdk/typescript
 npm install
-npm run codegen   # regenerates src/openapi.ts from ../../api/openapi.yaml
+npm run codegen   # regenerates src/openapi.ts from ../../backend/spec/spec.yaml
 npm test          # tsc --noEmit; verifies the package compiles
 npm run build     # emit dist/
 ```

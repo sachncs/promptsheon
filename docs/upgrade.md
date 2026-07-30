@@ -8,14 +8,14 @@ upgrade". This page walks through both paths.
 ## In-place upgrade
 
 Promptsheon ships schema migrations as
-`internal/store/migrations/NNN_*.up.sql`. The next boot applies
+`backend/store/migrations/NNN_*.up.sql`. The next boot applies
 every migration whose version is greater than the highest
 applied version in the daemon's `migrations` table.
 
 ```bash
 # 1. Snapshot the live DB. Even on a single-replica SQLite
 #    deployment, an `sqlite3 .backup` is cheap insurance.
-promptsheond backup /var/backups/promptsheon/pre-upgrade.db
+promptsheond --backup= /var/backups/promptsheon/pre-upgrade.db
 
 # 2. Pull the new binary.
 docker pull ghcr.io/sachncs/promptsheon:v0.3.0

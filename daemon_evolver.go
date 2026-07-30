@@ -96,7 +96,7 @@ func buildEvolver(
 ) (*selfEvolveLoop, error) {
 	repo := newEvolverRepoAdapter(db)
 	invoke := makeEvolverLLMInvoke(providers, logger)
-	loader := evolverLoaderAdapter{}
+	loader := selfevolve.NewCasPromptLoader()
 	activator := &evolverActivatorAdapter{
 		svc:          releaseSvc,
 		selfApprover: releaseSvc.SelfApprove,

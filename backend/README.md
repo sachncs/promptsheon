@@ -80,7 +80,7 @@ which would create import cycles with several handlers and subsystem packages.
 
 A handful of single-file packages (`approval`, `budget`, `context` only had
 `Manager`, `quota`, `eventbus`, `executor`, `guardrail`, `invoke`, `metrics`,
-`optimizer`, `replay`, `rollups/clickhouse`, `schedule`, `scheduler`, `supervisor`)
+`optimizer`, `replay`, `schedule`, `scheduler`, `supervisor`)
 could not be flattened without introducing import cycles:
 
 - `metrics` is depended on by 10 backend subdirs; flattening creates cycles.

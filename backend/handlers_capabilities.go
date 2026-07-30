@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -135,14 +136,51 @@ func (s *Server) handleUpdateSelfEvolveConfig(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		return translateDBError(err, "capability")
 	}
-	var req capability.SelfEvolveConfig
-	if err := readJSON(r, &req); err != nil {
+	// ponytail: read into a map so we can tell "field present
+	// with zero value" from "field omitted". A plain struct
+	// decode makes both indistinguishable, which clobbered
+	// every persisted threshold when the CLI sent
+	// {"enabled": false}. The merged result preserves the
+	// existing values for fields the client did not send.
+	var raw map[string]json.RawMessage
+	if err := readJSON(r, &raw); err != nil {
 		return ErrBadRequest
 	}
-	if err := s.db.UpdateSelfEvolveConfig(r.Context(), existing.ID, req); err != nil {
+	merged := existing.SelfEvolve
+	if v, ok := raw["enabled"]; ok {
+		if err := json.Unmarshal(v, &merged.Enabled); err != nil {
+			return ErrBadRequest
+		}
+	}
+	if v, ok := raw["min_score"]; ok {
+		if err := json.Unmarshal(v, &merged.MinScore); err != nil {
+			return ErrBadRequest
+		}
+	}
+	if v, ok := raw["max_revisions"]; ok {
+		if err := json.Unmarshal(v, &merged.MaxRevisions); err != nil {
+			return ErrBadRequest
+		}
+	}
+	if v, ok := raw["cooldown_sec"]; ok {
+		if err := json.Unmarshal(v, &merged.CooldownSec); err != nil {
+			return ErrBadRequest
+		}
+	}
+	if v, ok := raw["target_env"]; ok {
+		if err := json.Unmarshal(v, &merged.TargetEnv); err != nil {
+			return ErrBadRequest
+		}
+	}
+	if v, ok := raw["dataset_id"]; ok {
+		if err := json.Unmarshal(v, &merged.DatasetID); err != nil {
+			return ErrBadRequest
+		}
+	}
+	if err := s.db.UpdateSelfEvolveConfig(r.Context(), existing.ID, merged); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "update", "capability:"+existing.ID+":self_evolve", map[string]any{"enabled": req.Enabled, "min_score": req.MinScore, "max_revisions": req.MaxRevisions})
+	s.audit(r.Context(), "update", "capability:"+existing.ID+":self_evolve", map[string]any{"enabled": merged.Enabled, "min_score": merged.MinScore, "max_revisions": merged.MaxRevisions})
 	updated, err := s.db.GetCapability(r.Context(), id)
 	if err != nil {
 		return err
