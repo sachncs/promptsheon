@@ -39,7 +39,6 @@ var domainPackages = []string{
 	"backend/release",
 	"backend/approval",
 	"backend/recommendation",
-	"backend/lineage",
 	"backend/eventbus",
 }
 

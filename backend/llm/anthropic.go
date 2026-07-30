@@ -45,7 +45,7 @@ func NewAnthropic(cfg ProviderConfig) *Anthropic {
 }
 
 // Name returns the provider name.
-func (a *Anthropic) Name() string { return string(ProviderAnthropic) }
+func (a *Anthropic) Name() string { return "anthropic" }
 
 // Anthropic satisfies the Provider interface.
 var _ Provider = (*Anthropic)(nil)
@@ -98,7 +98,7 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 		)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%s request: %w", ProviderAnthropic, err)
+		return nil, fmt.Errorf("anthropic request: %w", err)
 	}
 
 	var content strings.Builder
@@ -121,7 +121,7 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 	inTok, outTok := int64(msg.Usage.InputTokens), int64(msg.Usage.OutputTokens)
 
 	return &Response{
-		Provider:       string(ProviderAnthropic),
+		Provider:       "anthropic",
 		EffectiveModel: string(msg.Model),
 		Content:        text,
 		Usage: Usage{

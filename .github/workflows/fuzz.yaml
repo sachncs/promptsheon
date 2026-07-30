@@ -9,8 +9,6 @@ on:
   pull_request:
     paths:
       - 'backend/vault/**'
-      - 'backend/tests/unit/redactor/**'
-      - 'backend/tests/unit/injection/**'
       - 'backend/cas/**'
       - 'backend/schedule/**'
   schedule:
@@ -35,14 +33,6 @@ jobs:
       - name: Fuzz vault
         run: |
           go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./backend/vault/...
-
-      - name: Fuzz redactor
-        run: |
-          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./backend/tests/unit/redactor/...
-
-      - name: Fuzz injection detector
-        run: |
-          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./backend/tests/unit/injection/...
 
       - name: Fuzz CAS verification
         run: |

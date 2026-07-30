@@ -221,9 +221,10 @@ type Collector struct {
 	// Pipeline drop counters (OBS-7). These reflect the
 	// number of entries that the audit / trace pipeline
 	// rejected because its in-process queue was full. The
-	// values are written from outside via SetAuditDropped
-	// and SetTraceDropped; the collector reads them on every
-	// scrape.
+	// audit counter is written from outside via SetAuditDropped;
+	// the trace counter is always zero (no setter; the SQLite
+	// tracer that owned it was removed). The collector reads
+	// them on every scrape.
 	auditDropped atomic.Int64
 	traceDropped atomic.Int64
 
@@ -306,14 +307,13 @@ func (c *Collector) RecordAuditChainVerification() {
 // dashboard can alert on sustained drops.
 func (c *Collector) SetAuditDropped(n int64) { c.auditDropped.Store(n) }
 
-// SetTraceDropped updates the cumulative trace-pipeline drop
-// count.
-func (c *Collector) SetTraceDropped(n int64) { c.traceDropped.Store(n) }
-
 // AuditDropped returns the latest audit drop count.
 func (c *Collector) AuditDropped() int64 { return c.auditDropped.Load() }
 
-// TraceDropped returns the latest trace drop count.
+// TraceDropped returns the latest trace drop count. The
+// pipeline-side setter was removed when the SQLite-backed
+// tracer was deleted; the JSON field is kept so the Prometheus
+// exposition shape doesn't change.
 func (c *Collector) TraceDropped() int64 { return c.traceDropped.Load() }
 
 // Gauge is a metric that can go up and down.

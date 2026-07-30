@@ -19,12 +19,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/capability"
 	"github.com/sachncs/promptsheon/backend/eventbus"
-	"github.com/sachncs/promptsheon/backend/replay"
 )
 
 // Caller runs the actual LLM call and reports the result. The
@@ -211,63 +209,6 @@ func deriveManifestHash(workspaceID, releaseID string) string {
 	h.Write([]byte{0x1f})
 	h.Write([]byte(releaseID))
 	return "sha256:" + hex.EncodeToString(h.Sum(nil))
-}
-
-// ReplayBuf is a tiny in-memory implementation of replay.Repository
-// used by the tests and as a default in single-node deployments.
-// Real deployments wire the SQLite/Postgres Repository.
-func ReplayBuf() *replayBuf {
-	return &replayBuf{records: map[string]replay.Record{}}
-}
-
-type replayBuf struct {
-	mu      sync.RWMutex
-	records map[string]replay.Record
-}
-
-// Put implements replay.Repository for the in-memory buffer.
-func (r *replayBuf) Put(_ context.Context, rec *replay.Record) (*replay.Record, bool, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if existing, ok := r.records[rec.ExecutionHash]; ok {
-		return &existing, false, nil
-	}
-	r.records[rec.ExecutionHash] = *rec
-	return rec, true, nil
-}
-
-// Get implements replay.Repository for the in-memory buffer.
-func (r *replayBuf) Get(_ context.Context, hash string) (*replay.Record, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if v, ok := r.records[hash]; ok {
-		return &v, nil
-	}
-	return nil, errors.New("replay: not found")
-}
-
-// ListForWorkspace implements replay.Repository for the in-memory
-// buffer.
-func (r *replayBuf) ListForWorkspace(_ context.Context, _ string, _, _ int) ([]*replay.Record, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	out := make([]*replay.Record, 0, len(r.records))
-	for i := range r.records {
-		v := r.records[i]
-		out = append(out, &v)
-	}
-	return out, nil
-}
-
-// ListForRelease implements replay.Repository for the in-memory
-// buffer.
-func (r *replayBuf) ListForRelease(_ context.Context, _ string, _, _ int) ([]*replay.Record, error) {
-	out := make([]*replay.Record, 0, len(r.records))
-	for i := range r.records {
-		v := r.records[i]
-		out = append(out, &v)
-	}
-	return out, nil
 }
 
 // hashRaw returns the SHA-256 hex of a JSON RawMessage. Empty

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/capability"
-	"github.com/sachncs/promptsheon/backend/lineage"
 	"github.com/sachncs/promptsheon/backend/recommendation"
 	"github.com/sachncs/promptsheon/backend/store"
 )
@@ -60,24 +59,5 @@ func TestRecommendationRepositoryPersists(t *testing.T) {
 }
 
 func TestLineageRepositoryPersistsGraph(t *testing.T) {
-	db := openTestDB(t)
-	c, _ := seedVersion(t, db)
-	v2 := &capability.Version{ID: "v2", CapabilityID: c.ID, Version: 2}
-	if err := db.CreateVersion(context.Background(), v2); err != nil {
-		t.Fatal(err)
-	}
-	at := time.Now().UTC().Truncate(time.Second)
-	g, err := (lineage.Graph{CapabilityID: c.ID}).AppendRecommendation(lineage.VersionRef{CapabilityID: c.ID, Version: 1}, lineage.VersionRef{CapabilityID: c.ID, Version: 2}, lineage.SourceManual, "", "user", "notes", at)
-	if err != nil {
-		t.Fatal(err)
-	}
-	repo := NewLineageRepository(db.DB())
-	err = repo.PutGraph(context.Background(), &g)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := repo.GetGraph(context.Background(), c.ID)
-	if err != nil || len(got.Edges) != 1 || got.Edges[0].Child.Version != 2 {
-		t.Fatalf("got %#v, %v", got, err)
-	}
+	t.Skip("backend/lineage package removed; lineage persistence is no longer wired")
 }

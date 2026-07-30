@@ -53,9 +53,6 @@ type Result struct {
 // Engine orchestrates workflow execution.
 type Engine struct {
 	toolRegistry *Registry
-	guardrailMgr any
-	agentConfig  any
-	contextMgr   any
 
 	// OBS-5b: optional observability wiring. When non-nil, every
 	// Run records workflow_total / active counters, duration
@@ -77,13 +74,8 @@ func (e *Engine) WithObservability(c *metrics.Collector, t trace.Tracer) *Engine
 	return e
 }
 
-// SetGuardrails configures guardrail manager and agent config.
-func (e *Engine) SetGuardrails(mgr, cfg any) {
-	e.guardrailMgr = mgr
-	e.agentConfig = cfg
-}
-
-// SetContextManager configures the context manager.
-func (e *Engine) SetContextManager(mgr any) {
-	e.contextMgr = mgr
-}
+// SetGuardrails / SetContextManager used to thread a guardrail
+// manager, agent config, and context manager into the engine.
+// They had no callers in production; the fields they set are
+// gone. Reintroduce them when the daemon wires a workflow
+// route that consumes an LLM call.

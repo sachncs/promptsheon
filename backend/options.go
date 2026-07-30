@@ -3,7 +3,6 @@ package backend
 import (
 	"github.com/sachncs/promptsheon/backend/alerting"
 	"github.com/sachncs/promptsheon/backend/auth"
-	"github.com/sachncs/promptsheon/backend/guardrail"
 	"github.com/sachncs/promptsheon/backend/harness"
 	"github.com/sachncs/promptsheon/backend/invoke"
 	"github.com/sachncs/promptsheon/backend/llm"
@@ -66,16 +65,6 @@ func WithTracing(spans trace.Tracer, collector *metrics.Collector) Option {
 	}
 }
 
-// WithCollector attaches only the metrics collector. Tests use
-// this when they want to assert on counter increments without
-// pulling in a Tracer. Production callers should prefer
-// WithTracing so OTel spans also flow.
-func WithCollector(c *metrics.Collector) Option {
-	return func(s *Server) {
-		s.collector = c
-	}
-}
-
 // WithWebhooks attaches a webhook dispatcher.
 func WithWebhooks(d *webhook.Dispatcher) Option {
 	return func(s *Server) {
@@ -120,24 +109,10 @@ func WithUsageTracker(t *UsageTracker) Option {
 	}
 }
 
-// WithGuardrailManager attaches a guardrail manager for policy enforcement.
-func WithGuardrailManager(m *guardrail.Manager) Option {
-	return func(s *Server) {
-		s.guardrailManager = m
-	}
-}
-
 // WithAlertingManager attaches an alerting manager for threshold monitoring.
 func WithAlertingManager(m *alerting.Manager) Option {
 	return func(s *Server) {
 		s.alertingManager = m
-	}
-}
-
-// WithContextManager sets the context manager for context assembly.
-func WithContextManager(m *Manager) Option {
-	return func(s *Server) {
-		s.contextManager = m
 	}
 }
 

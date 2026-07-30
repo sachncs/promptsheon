@@ -57,14 +57,6 @@ func TestRegistry_Tools(t *testing.T) {
 	}
 }
 
-// --- Engine tests ---
-
-func TestSetContextManager(_ *testing.T) {
-	e := NewEngine(NewRegistry())
-	e.SetContextManager("some-manager")
-	// no panic = pass
-}
-
 // --- HTTPTool tests ---
 
 func TestHTTPTool_Name(t *testing.T) {

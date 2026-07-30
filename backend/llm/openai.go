@@ -82,7 +82,7 @@ func (o *OpenAI) clientFor(ctx context.Context) openai.Client {
 }
 
 // Name returns the provider name.
-func (o *OpenAI) Name() string { return ProviderOpenAI.String() }
+func (o *OpenAI) Name() string { return "openai" }
 
 // OpenAI satisfies the Provider interface.
 var _ Provider = (*OpenAI)(nil)
@@ -149,7 +149,7 @@ func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) 
 		)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%s request: %w", ProviderOpenAI, err)
+		return nil, fmt.Errorf("openai request: %w", err)
 	}
 
 	inTok, outTok := int64(resp.Usage.InputTokens), int64(resp.Usage.OutputTokens)

@@ -193,7 +193,6 @@ func newInvokeTestServerWithRepo(t *testing.T, repo *mockRepo, opts ...Option) *
 	defaults := []Option{
 		WithProviders(providers),
 		WithInvoker(inv),
-		WithCollector(collector),
 		WithReleaseResolver(resolver),
 	}
 	allOpts := append(defaults, opts...)

@@ -16,7 +16,6 @@
 package observation
 
 import (
-	"context"
 	"sync"
 	"time"
 
@@ -157,37 +156,6 @@ func (a *Aggregator) Add(r executor.ExecutionRecord) {
 	}
 	bucket.records = recs
 	bucket.mu.Unlock()
-}
-
-// TickFunc is the callback the observation tick loop invokes
-// on every aggregation cycle. Production wiring passes a
-// function that hands each Observation to the rules engine and
-// then to the recommendation Producer. Tests can use it to
-// inspect the aggregated state.
-type TickFunc func(observations []rules.Observation)
-
-// Tick runs the aggregator on a fixed interval and invokes the
-// supplied TickFunc with each Aggregate's output. Returns when
-// ctx is cancelled. The loop is bounded by the Aggregate call's
-// own O(buckets * records) cost; the cadence should be tuned
-// to the deployment's observation volume.
-func (a *Aggregator) Tick(ctx context.Context, interval time.Duration, fn TickFunc) {
-	if interval <= 0 {
-		interval = time.Minute
-	}
-	if fn == nil {
-		fn = func(_ []rules.Observation) {}
-	}
-	t := time.NewTicker(interval)
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-			fn(a.Aggregate(time.Now().UTC()))
-		}
-	}
 }
 
 // Aggregate returns one Observation per (capability, version, env)

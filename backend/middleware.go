@@ -24,9 +24,6 @@ const (
 	auditKeyVersion = "version"
 )
 
-// Middleware is a function that wraps a Func with additional behavior.
-type Middleware func(Func) Func
-
 // ChainHTTP applies http.Handler middlewares in order.
 func ChainHTTP(h http.Handler, mws ...func(http.Handler) http.Handler) http.Handler {
 	for i := len(mws) - 1; i >= 0; i-- {

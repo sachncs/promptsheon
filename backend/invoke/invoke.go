@@ -12,7 +12,7 @@ package invoke
 
 import (
 	"github.com/sachncs/promptsheon/backend/errs"
-	"context"
+"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -133,16 +133,11 @@ func (i *Invoker) Invoke(ctx context.Context, req executor.InvokeRequest) (execu
 	return rec, nil
 }
 
-// -- Default Enforcer --
 // DefaultEnforcer is the in-process, in-memory Budget + Quota
-// enforcer. Production wiring supplies a Backend-backed one.
-//
-// PERF-4 follow-up: the enforcer used to hold one sync.Mutex
-// across every read and write. Reads (EnforceBudget, EnforceQuota
-// for an unknown workspace) were the vast majority; contention
-// would have scaled linearly with concurrent invocations. Use
-// sync.RWMutex so reads run in parallel and only the
-// rare workspace-known write path takes the write lock.
+// enforcer used by tests. Production wiring supplies the
+// PersistedEnforcer (below); the default implementation is kept
+// because it's how the unit suite wires deterministic per-test
+// budgets and quotas without touching SQLite.
 type DefaultEnforcer struct {
 	mu      sync.RWMutex
 	budgets map[string]*budget.Budget
@@ -150,9 +145,8 @@ type DefaultEnforcer struct {
 	now     func() time.Time
 }
 
-// NewDefaultEnforcer constructs a DefaultEnforcer used by tests and
-// single-process installs. now is the clock; the default is
-// time.Now.UTC.
+// NewDefaultEnforcer constructs a DefaultEnforcer for tests.
+// now is the clock; the default is time.Now.UTC.
 func NewDefaultEnforcer(now func() time.Time) *DefaultEnforcer {
 	if now == nil {
 		now = func() time.Time { return time.Now().UTC() }
@@ -178,13 +172,9 @@ func (d *DefaultEnforcer) SetQuota(q quota.Quota) {
 	d.quotas[q.TargetID] = &q
 }
 
-// EnforceBudget implements Enforcer. The read→Charge→write
-// window is held under the write lock for the entire operation so
-// concurrent callers cannot both observe the same snapshot,
-// charge against it, and overwrite each other's increment. The
-// previous read-then-upgrade pattern allowed two callers to
-// charge twice against a budget that should have rejected one
-// of them.
+// EnforceBudget implements Enforcer. Read→Charge→write is held
+// under the write lock so concurrent callers serialise on the
+// same per-workspace budget.
 func (d *DefaultEnforcer) EnforceBudget(_ context.Context, workspaceID string, costUSD float64) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -200,10 +190,7 @@ func (d *DefaultEnforcer) EnforceBudget(_ context.Context, workspaceID string, c
 	return nil
 }
 
-// EnforceQuota implements Enforcer. Same locking discipline as
-// EnforceBudget — the Charge must run while holding the write
-// lock so concurrent callers serialise on the same per-workspace
-// quota.
+// EnforceQuota implements Enforcer. Same locking discipline.
 func (d *DefaultEnforcer) EnforceQuota(_ context.Context, workspaceID string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()

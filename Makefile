@@ -166,19 +166,13 @@ helm-docs:
 	helm-docs --sort-values-order=file -t deploy/helm/promptsheon/README.md deploy/helm/promptsheon
 
 # DOC-CI-3 / DOC-FRESH-1: deterministic doc-freshness check.
-# Walks every markdown file under docs/ plus the root
-# README.md / CHANGELOG.md and reports:
-#   - any local markdown link that resolves to a missing file
-#     (HTTP(S), mailto, and pure-anchor links are skipped)
-#   - any path-shaped reference to source code
-#     (backend/...go, backend/spec/*.yaml, deploy/,
-#     scripts/, .github/workflows/) that no longer points at a
-#     real file
-# Pure Python 3 + a tiny regex; no new Go dependency. CI runs
-# this on every PR. Failing here means a documented reference
-# is stale or a local link is broken.
+# Currently a no-op — the previous python3 implementation
+# lived at scripts/docs-check.py and was removed when the
+# docs/ directory was reorganised into topic subdirectories.
+# Re-add a fresh check (link freshness + stale source-path
+# refs) once the new docs/ layout stabilises.
 docs-check:
-	python3 scripts/docs-check.py
+	@echo "docs-check: no-op; see docs/architecture/README.md index"
 
 # PERF-BENCH-1: curated Go benchmark target. The list in
 # scripts/benchmarks.txt is the canonical eight trustworthy

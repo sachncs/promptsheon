@@ -34,7 +34,6 @@ import (
 	"github.com/sachncs/promptsheon/backend/eval"
 	"github.com/sachncs/promptsheon/backend/eventbus"
 	"github.com/sachncs/promptsheon/backend/executor"
-	"github.com/sachncs/promptsheon/backend/guardrail"
 	"github.com/sachncs/promptsheon/backend/harness"
 	"github.com/sachncs/promptsheon/backend/invoke"
 	"github.com/sachncs/promptsheon/backend/llm"
@@ -42,7 +41,6 @@ import (
 	"github.com/sachncs/promptsheon/backend/models"
 	"github.com/sachncs/promptsheon/backend/observation"
 	"github.com/sachncs/promptsheon/backend/rules"
-	"github.com/sachncs/promptsheon/backend/plugins/builtins"
 	"github.com/sachncs/promptsheon/backend/ratelimit"
 	"github.com/sachncs/promptsheon/backend/recommendation"
 	"github.com/sachncs/promptsheon/backend/release"
@@ -172,21 +170,16 @@ func runDaemon() {
 	}()
 	defer logHub.Stop()
 
-	// Wire the plugin supervisor: register every built-in Guardrail
-	// plugin, set the publisher to nil (production wiring adds an
-	// EventBus adapter in a follow-on), and start the supervisor in
-	// a goroutine that observes rootCtx for shutdown. The supervisor
-	// owns plugin lifecycle; the daemon owns the supervisor.
-	// DEAD-Plg-2: wire the supervisor lifecycle events through
-	// OBS-5a: share one eventbus.Memory between the supervisor,
-	// scheduler, and executor. The supervisor's plugin-lifecycle
-	// events, scheduler's schedule.fired events, and the
-	// executor's HandleScheduleEvent subscriber all see the same
-	// shared bus, so a scheduler tick reaches the executor without
-	// a separate bridge.
+	// Wire the plugin supervisor. The supervisor owns plugin
+	// lifecycle; the daemon owns the supervisor. The previous
+	// built-in guardrail plugins (pii-redactor,
+// prompt-injection) were no-ops whose CheckGuardrail methods
+	// were never called from a request path; the bodies and
+	// their fuzz/unit tests are removed. Reintroduce them when a
+	// handler route wires Redactor.CheckGuardrail or
+	// Detector.CheckGuardrail into the request lifecycle.
 	sharedBus := eventbus.NewMemory()
 	sup := supervisor.New(supervisor.NewAdapter(sharedBus), logger)
-	builtins.Register(sup)
 	go func() {
 		if err := sup.Run(rootCtx); err != nil && !errors.Is(err, context.Canceled) {
 			logger.Warn("plugin supervisor exited with error", "err", err)
@@ -394,9 +387,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 
 	_ = logHub
 
-	contextMgr := backend.NewManager()
 	usageTracker := backend.NewUsageTracker()
-	guardrailManager := guardrail.NewManager(logger, collector)
 	alertingManager := alerting.NewManagerWithDB(logger, collector, db)
 	alertingManager.StartMonitoring(rootCtx, collector, 1*time.Minute)
 
@@ -600,9 +591,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 	opts = append(opts,
 		backend.WithLogHub(logHub),
 		backend.WithUsageTracker(usageTracker),
-		backend.WithGuardrailManager(guardrailManager),
 		backend.WithAlertingManager(alertingManager),
-		backend.WithContextManager(contextMgr),
 		backend.WithRateLimiter(limiter),
 		backend.WithProviders(providers),
 		backend.WithWorkspaceRollups(rollupAgg),
@@ -984,8 +973,7 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *bac
 	// expose a drop count from. The metric wiring stays so a
 	// future OTel-aware drop counter can drop in without API
 	// changes. For now, promptsheon_trace_dropped_total stays at
-	// zero and the loop is omitted.
-	_ = collector // collector.SetTraceDropped exists; see metrics.Collector.
+	// zero and the loop is omitted. See metrics.Collector.TraceDropped.
 
 	// OPS-6 / OPS-SHUTDOWN-2 graceful shutdown:
 	//   - First SIGINT/SIGTERM: 60s drain, audit worker drain,
@@ -1216,12 +1204,10 @@ a non-empty PROMPTSHEON_CORS_ORIGINS allowlist.
 // overwrite. Operators should append a timestamp suffix to
 // the path so successive runs don't clobber each other.
 func runBackup(dst string) error {
-	if v := os.Getenv("PROMPTSHEON_DB_PATH"); v == "" {
-		return fmt.Errorf("backup: PROMPTSHEON_DB_PATH is not set")
-	} else {
-		_ = v
-	}
 	src := os.Getenv("PROMPTSHEON_DB_PATH")
+	if src == "" {
+		return fmt.Errorf("backup: PROMPTSHEON_DB_PATH is not set")
+	}
 	return runBackupVACUUMINTO(src, dst)
 }
 

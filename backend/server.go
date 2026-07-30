@@ -14,7 +14,6 @@ import (
 	"github.com/sachncs/promptsheon/backend/capability"
 
 	_ "github.com/sachncs/promptsheon/backend/eval" // Scorer registry (no Server dep yet)
-	"github.com/sachncs/promptsheon/backend/guardrail"
 	"github.com/sachncs/promptsheon/backend/harness"
 	"github.com/sachncs/promptsheon/backend/invoke"
 	"github.com/sachncs/promptsheon/backend/llm"
@@ -23,7 +22,6 @@ import (
 	"github.com/sachncs/promptsheon/backend/ratelimit"
 	"github.com/sachncs/promptsheon/backend/release"
 	"github.com/sachncs/promptsheon/backend/rollups"
-	"github.com/sachncs/promptsheon/backend/search"
 	"github.com/sachncs/promptsheon/backend/settings"
 	"github.com/sachncs/promptsheon/backend/store"
 	"github.com/sachncs/promptsheon/backend/trace"
@@ -56,10 +54,8 @@ type Server struct {
 	logHub           *Hub
 	elector          *Elector
 	usageTracker     *UsageTracker
-	guardrailManager *guardrail.Manager
 	alertingManager  *alerting.Manager
 	rateLimiter      *ratelimit.Limiter
-	contextManager   *Manager
 	providers        *llm.Registry
 	rollupAgg        *rollups.Aggregator
 	invoker          *invoke.Invoker
@@ -102,10 +98,6 @@ type Server struct {
 	// set to the most recently constructed server.
 	oauthStates *oauthStateStore
 
-	// searchManager owns the in-memory semantic search index.
-	// M-1: built once on Server construction, refreshed on
-	// prompt create/update/delete via RefreshSearchIndex.
-	searchManager  *search.Manager
 	workflowEngine *workflow.Engine
 }
 
@@ -140,7 +132,6 @@ func NewServer(db *store.Repositories, logger *slog.Logger, opts ...Option) *Ser
 		capabilityRepo2: db.CapabilityRepository,
 		logger:          logger,
 		oauthStates:     newOAuthStateStore(),
-		searchManager:   search.NewManager(),
 	}
 	// Make this server the active one for the package-level OAuth
 	// helpers (generateOAuthState, validateOAuthState, etc.). The
