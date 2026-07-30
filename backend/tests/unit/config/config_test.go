@@ -56,15 +56,6 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.RateLimitBurst != 50 {
 		t.Errorf("RateLimitBurst = %d, want 50", cfg.RateLimitBurst)
 	}
-	if cfg.CircuitBreakerFailureThreshold != 5 {
-		t.Errorf("CircuitBreakerFailureThreshold = %d, want 5", cfg.CircuitBreakerFailureThreshold)
-	}
-	if cfg.CircuitBreakerSuccessThreshold != 3 {
-		t.Errorf("CircuitBreakerSuccessThreshold = %d, want 3", cfg.CircuitBreakerSuccessThreshold)
-	}
-	if cfg.CircuitBreakerCooldown != 30 {
-		t.Errorf("CircuitBreakerCooldown = %d, want 30", cfg.CircuitBreakerCooldown)
-	}
 	if len(cfg.CORSOrigins) != 0 {
 		t.Errorf("CORSOrigins = %v, want empty", cfg.CORSOrigins)
 	}
@@ -224,12 +215,6 @@ func TestLoadConfig_AdditionalEnvs(t *testing.T) {
 	}
 	if cfg.RateLimitBurst != 100 {
 		t.Errorf("RateLimitBurst = %d, want 100", cfg.RateLimitBurst)
-	}
-	if cfg.CircuitBreakerSuccessThreshold != 5 {
-		t.Errorf("CircuitBreakerSuccessThreshold = %d, want 5", cfg.CircuitBreakerSuccessThreshold)
-	}
-	if cfg.CircuitBreakerCooldown != 60 {
-		t.Errorf("CircuitBreakerCooldown = %d, want 60", cfg.CircuitBreakerCooldown)
 	}
 	if !cfg.OTelInsecure {
 		t.Error("OTelInsecure should be true")

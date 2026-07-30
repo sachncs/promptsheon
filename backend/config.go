@@ -68,9 +68,6 @@ type Config struct {
 	RateLimitBurst    int // Burst capacity (default: 50)
 
 	// Circuit breaker
-	CircuitBreakerFailureThreshold int // Failures before opening the circuit (default: 5)
-	CircuitBreakerSuccessThreshold int // Successes to close the circuit (default: 3)
-	CircuitBreakerCooldown         int // Cooldown in seconds (default: 30)
 
 	// LLM fallback chain. Retained as a struct field for
 	// backwards compatibility; the LLM registry does not
@@ -141,9 +138,6 @@ func DefaultConfig() Config {
 		RateLimitInterval: 60,
 		RateLimitBurst:    50,
 
-		CircuitBreakerFailureThreshold: 5,
-		CircuitBreakerSuccessThreshold: 3,
-		CircuitBreakerCooldown:         30,
 
 		// Default CORS policy: deny all cross-origin requests. Operators
 		// must explicitly set PROMPTSHEON_CORS_ORIGINS to a list of
@@ -193,9 +187,6 @@ func LoadConfig() (Config, error) {
 	cfg.RateLimitInterval = getEnvInt("PROMPTSHEON_RATE_LIMIT_INTERVAL", cfg.RateLimitInterval)
 	cfg.RateLimitBurst = getEnvInt("PROMPTSHEON_RATE_LIMIT_BURST", cfg.RateLimitBurst)
 
-	cfg.CircuitBreakerFailureThreshold = getEnvInt("PROMPTSHEON_CIRCUIT_BREAKER_FAILURE_THRESHOLD", cfg.CircuitBreakerFailureThreshold)
-	cfg.CircuitBreakerSuccessThreshold = getEnvInt("PROMPTSHEON_CIRCUIT_BREAKER_SUCCESS_THRESHOLD", cfg.CircuitBreakerSuccessThreshold)
-	cfg.CircuitBreakerCooldown = getEnvInt("PROMPTSHEON_CIRCUIT_BREAKER_COOLDOWN", cfg.CircuitBreakerCooldown)
 
 	// FC-3: LLMFallback removed. The env var is no longer read;
 	// callers wanting a fallback chain configure the LLM registry.
