@@ -1,6 +1,7 @@
 import * as api from "../../api.js";
 import { escape, formatRelative, apiStatusLabel } from "../../utils.js";
 import { renderSettingsTab as settingsTab } from "../settings-view.js";
+import { renderCatalogTab as catalogTab } from "../catalog-view.js";
 
 function pill(text, tone = "neutral") {
   return `<span class="status-pill ${tone} !px-2 !py-1"><span class="status-dot"></span>${escape(text)}</span>`;
@@ -14,6 +15,7 @@ const TABS = [
   { key: "apikeys", label: "API keys", href: "#/operations/apikeys" },
   { key: "users", label: "Users", href: "#/operations/users" },
   { key: "settings", label: "Settings", href: "#/operations/settings" },
+  { key: "catalog", label: "Catalog", href: "#/operations/catalog" },
   { key: "reasoning", label: "Reasoning", href: "#/operations/reasoning" }
 ];
 
@@ -37,7 +39,10 @@ async function alertsTab() {
   if (!rulesRes.ok) return errorPanel(`Alert rules unavailable${rulesRes.error ? ` (${escape(rulesRes.error)})` : ""}.`);
   if (!groupsRes.ok) return errorPanel(`Notification groups unavailable${groupsRes.error ? ` (${escape(groupsRes.error)})` : ""}.`);
   const rules = rulesRes.data || [];
-  const groups = groupsRes.data || [];
+  // Backend wraps the groups list in {groups: [...]}. Tolerate
+  // a bare array too.
+  const groupsRaw = groupsRes.data;
+  const groups = Array.isArray(groupsRaw) ? groupsRaw : (groupsRaw?.groups || []);
   const active = (activeRes.data || []).filter((a) => a.status === "active" || a.status === "pending");
   return `<section class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,.85fr)]">
     <article class="panel p-5 sm:p-6">
@@ -53,7 +58,17 @@ async function alertsTab() {
           <button data-rule-edit='${JSON.stringify({ id: rule.id, name: rule.name, type: rule.type, severity: rule.severity, threshold: rule.threshold, duration_minutes: rule.duration_minutes ?? rule.duration, window_minutes: rule.window_minutes ?? rule.window })}' class="quiet-button !text-[.62rem]">Edit</button>
           <button data-rule-delete="${escape(rule.id)}" class="rounded-md bg-rose-50 px-2 py-1 text-[.62rem] font-bold text-rose-700 hover:bg-rose-100">Delete</button>
         </td>
-      </tr>`).join("")}</tbody></table>` : `<p class="mt-3 text-[.7rem] text-muted">No alert rules. Create one to start receiving signals.</p>`}
+      </tr>
+      <tr class="border-t border-line/60 bg-paper/40"><td colspan="7" class="py-2 px-3 text-[.62rem]">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="eyebrow mr-1">Notify:</span>
+          ${groups.length === 0
+            ? `<span class="text-muted">No notification groups — create one in the right column to wire rules.</span>`
+            : groups.map((g) => `<button data-rule-link='${JSON.stringify({ rule_id: rule.id, group_id: g.id, name: g.name })}' class="quiet-button !text-[.6rem] !px-2 !py-1"><svg class="h-3 w-3 fill-none stroke-current stroke-2"><use href="#icon-bell"/></svg>${escape(g.name)}</button>`).join("")
+          }
+        </div>
+      </td></tr>
+      `).join("")}</tbody></table>` : `<p class="mt-3 text-[.7rem] text-muted">No alert rules. Create one to start receiving signals.</p>`}
     </article>
     <article class="panel p-5 sm:p-6">
       <div class="flex items-center justify-between"><div><div class="eyebrow">Notification groups</div><h2 class="mt-1 text-[1rem] font-bold">${groups.length} configured</h2></div><button id="group-new" class="quiet-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-plus"/></svg>New group</button></div>
@@ -121,7 +136,7 @@ async function usersTab() {
     <article class="panel p-5 sm:p-6">
       <div class="flex items-center justify-between"><div><div class="eyebrow">Users</div><h2 class="mt-1 text-[1rem] font-bold">${list.length} total</h2></div><button id="user-new" class="quiet-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-plus"/></svg>Create user</button></div>
       ${list.length ? `<table class="mt-4 w-full text-[.7rem]"><thead><tr class="text-left text-[.6rem] uppercase tracking-wider text-muted"><th class="py-1 font-bold">Name</th><th class="py-1 font-bold">Email</th><th class="py-1 font-bold">Role</th><th class="py-1 font-bold text-right"></th></tr></thead><tbody>${list.map((u) => `<tr class="border-t border-line/60" data-user-id="${escape(u.id)}">
-        <td class="py-2"><span class="font-bold">${escape(u.name || u.id)}</span><span class="block text-[.62rem] text-muted mono">${escape(u.id)}</span></td>
+        <td class="py-2"><a href="#/users/${escape(u.id)}" class="font-bold hover:underline">${escape(u.name || u.id)}</a><span class="block text-[.62rem] text-muted mono">${escape(u.id)}</span></td>
         <td class="py-2 mono text-[.66rem]">${escape(u.email || "—")}</td>
         <td class="py-2"><span class="status-pill ${u.role === "admin" ? "good" : u.role === "writer" ? "warn" : "neutral"} !px-2 !py-1">${escape(u.role || "—")}</span></td>
         <td class="py-2 text-right">
@@ -237,7 +252,7 @@ export async function renderOperations(route) {
 
   root.innerHTML = `<section class="panel p-6"><div class="skeleton h-3 w-32"></div><div class="skeleton mt-4 h-12 w-full"></div></section>`;
 
-  const renderers = { alerts: alertsTab, webhooks: webhooksTab, vault: vaultTab, providers: providersTab, apikeys: apikeysTab, users: usersTab, settings: settingsTab, reasoning: reasoningTab };
+  const renderers = { alerts: alertsTab, webhooks: webhooksTab, vault: vaultTab, providers: providersTab, apikeys: apikeysTab, users: usersTab, settings: settingsTab, catalog: catalogTab, reasoning: reasoningTab };
   const renderer = renderers[tab] || alertsTab;
   const body = await renderer();
 
@@ -249,7 +264,13 @@ export async function renderOperations(route) {
     </section>
     ${body}
   `;
-  root.innerHTML = shell;
+  // Settings and catalog render directly into the view (they
+  // own their own skeleton + fetch). For those, the renderer
+  // returns undefined and the view already has the right HTML;
+  // for the others, body is a string we render into the shell.
+  if (body !== undefined) {
+    root.innerHTML = shell;
+  }
   attach(tab, root);
   return shell;
 }
@@ -278,6 +299,21 @@ function attach(tab, root) {
         try { rule = JSON.parse(raw); } catch { return; }
         const { openAlertRuleEditModal } = await import("../alert-rule-edit-modal.js");
         await openAlertRuleEditModal(document.getElementById("modal-root"), rule);
+      })
+    );
+    root.querySelectorAll("[data-rule-link]").forEach((b) =>
+      b.addEventListener("click", async () => {
+        const raw = b.getAttribute("data-rule-link");
+        if (!raw) return;
+        let link;
+        try { link = JSON.parse(raw); } catch { return; }
+        if (!window.confirm(`Wire alert rule to notification group "${link.name}"?`)) return;
+        const result = await api.linkRuleToGroup(link.rule_id, link.group_id);
+        if (!result.ok) {
+          window.alert(`Link failed: ${apiStatusLabel(result)}`);
+          return;
+        }
+        window.location.reload();
       })
     );
     root.querySelector("#group-new")?.addEventListener("click", async () => {
@@ -428,5 +464,17 @@ function attach(tab, root) {
       }
       slot.innerHTML = `<div class="rounded-xl bg-paper p-4"><div class="eyebrow">Plan</div><pre class="mt-2 overflow-x-auto text-[.66rem] mono">${escape(JSON.stringify(result.data, null, 2))}</pre></div>`;
     });
+  } else if (tab === "settings") {
+    // Settings has its own module that fills the inner body
+    // (it does its own skeleton + fetch). Call it on attach.
+    import("../settings-view.js").then(({ renderSettingsTab }) =>
+      renderSettingsTab(root).catch((e) => console.error("settings tab:", e))
+    );
+  } else if (tab === "catalog") {
+    // Catalog search fills the inner body. Same delegation as
+    // settings: the view owns its own skeleton + fetch.
+    import("../catalog-view.js").then(({ renderCatalogTab }) =>
+      renderCatalogTab(root).catch((e) => console.error("catalog tab:", e))
+    );
   }
 }

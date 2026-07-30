@@ -100,9 +100,12 @@ function header(c) {
   </div>`;
 }
 
-function versionsCard(versions) {
+function versionsCard(versions, latestVersion) {
+  const latestPill = latestVersion != null
+    ? `<span class="status-pill good !px-2 !py-1">Latest v${escape(String(latestVersion))}</span>`
+    : "";
   return `<div class="panel p-5 sm:p-6">
-    <div class="flex items-center justify-between"><div class="eyebrow">Versions</div><button data-action="new-version" class="quiet-button !text-[.66rem]"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-plus"/></svg>New version</button></div>
+    <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="eyebrow">Versions</div>${latestPill}</div><button data-action="new-version" class="quiet-button !text-[.66rem]"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-plus"/></svg>New version</button></div>
     ${renderVersionsTable(versions)}
   </div>`;
 }
@@ -198,13 +201,14 @@ export async function renderCapabilityDetail(route) {
   }
   root.innerHTML = renderSkeleton();
 
-  const [capRes, contractRes, reputationRes, versionsRes, datasetsRes, preconditionsRes] = await Promise.all([
+  const [capRes, contractRes, reputationRes, versionsRes, datasetsRes, preconditionsRes, latestRes] = await Promise.all([
     api.getCapability(id),
     api.getCapabilityContract(id),
     api.getCapabilityReputation(id),
     api.listVersions(id).catch((e) => ({ ok: false, error: String(e?.message || e) })),
     api.listDatasets(id).catch((e) => ({ ok: false, error: String(e?.message || e) })),
-    api.listPreconditions(id).catch((e) => ({ ok: false, error: String(e?.message || e) }))
+    api.listPreconditions(id).catch((e) => ({ ok: false, error: String(e?.message || e) })),
+    api.getLatestVersion(id).catch(() => ({ ok: false }))
   ]);
   if (!capRes.ok) {
     const fallback = `<p class="panel p-6 text-center text-[.78rem]">${escape(apiStatusLabel(capRes))}</p>`;
@@ -217,10 +221,13 @@ export async function renderCapabilityDetail(route) {
   const versions = versionsRes.ok ? versionsRes.data || [] : [];
   const datasets = datasetsRes.ok ? datasetsRes.data || [] : [];
   const preconditions = preconditionsRes.ok ? preconditionsRes.data || [] : [];
+  // Backend's latest-version endpoint returns {version, ...}; the
+  // badge surfaces it alongside the full versions list.
+  const latestVersion = latestRes.ok ? latestRes.data?.version : null;
 
   const html = `
     <section class="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,.85fr)]">
-      <div class="space-y-5">${header(capability)}${versionsCard(versions)}${datasetsCard(datasets)}${preconditionsCard(preconditions)}${contractCard(contract)}<div id="diff-slot"></div></div>
+      <div class="space-y-5">${header(capability)}${versionsCard(versions, latestVersion)}${datasetsCard(datasets)}${preconditionsCard(preconditions)}${contractCard(contract)}<div id="diff-slot"></div></div>
       <div class="space-y-5">${reputationCard(reputation)}${selfEvolveCard(capability.self_evolve)}</div>
     </section>`;
   root.innerHTML = html;

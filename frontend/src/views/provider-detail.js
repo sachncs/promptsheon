@@ -21,10 +21,12 @@ export async function renderProviderDetail(route) {
     return;
   }
   const p = pRes.data || {};
-  const all = listRes.ok ? (listRes.data || []) : [];
-  const meta = all.find((q) => q.name === name) || {};
-  const config = p.config || meta.config || {};
-  const supported = Array.isArray(meta.supported_models) ? meta.supported_models : (Array.isArray(p.supported_models) ? p.supported_models : []);
+  // Backend wraps the providers list in { providers: [...] } so
+  // the dashboard has room to add metadata fields later.
+  const providerNames = listRes.ok ? (listRes.data?.providers || []) : [];
+  const meta = { name };
+  const config = p.config || {};
+  const supported = Array.isArray(p.supported_models) ? p.supported_models : [];
   root.innerHTML = render(name, p, meta, config, supported);
   attach(name, p);
 }

@@ -263,6 +263,32 @@ export async function deletePrecondition(id) {
   return apiDelete(`/api/v1/preconditions/${encodeURIComponent(id)}`);
 }
 
+// Catalog search: GET /api/v1/catalog/capabilities
+// cross-workspace. Pass workspace_id (required) and an optional
+// q query string. Empty q returns every capability in the
+// workspace.
+export async function searchCatalog(workspaceId, query) {
+  const qs = new URLSearchParams();
+  if (workspaceId) qs.set("workspace_id", workspaceId);
+  if (query) qs.set("q", query);
+  const tail = qs.toString();
+  return apiFetch(`/api/v1/catalog/capabilities${tail ? "?" + tail : ""}`);
+}
+
+// getLatestVersion fetches the version the backend considers
+// the capability's current head (largest version number). The
+// capability-detail page uses it to surface a "Latest" badge
+// alongside the version picker.
+export async function getLatestVersion(capabilityId) {
+  return apiFetch(`/api/v1/capabilities/${encodeURIComponent(capabilityId)}/versions/latest`);
+}
+
+// getUser fetches a single user. Used by the user-detail page
+// opened from the operations → users tab.
+export async function getUser(id) {
+  return apiFetch(`/api/v1/users/${encodeURIComponent(id)}`);
+}
+
 // Eval runs: POST /api/v1/releases/{id}/evals triggers; the
 // list endpoint returns recent runs for a release. The
 // single-eval detail endpoint surfaces inputs/outputs/scores.
@@ -399,6 +425,28 @@ export async function listNotificationGroups() {
 
 export async function createNotificationGroup(payload) {
   return apiPost("/api/v1/alerts/notifications", payload);
+}
+
+// M2M link / unlink between an alert rule and a notification
+// group. The backend wraps LinkRuleToGroup + UnlinkRuleFromGroup;
+// the response is 204 No Content on success.
+export async function linkRuleToGroup(ruleId, groupId) {
+  return apiPost(`/api/v1/alerts/rules/${encodeURIComponent(ruleId)}/groups/${encodeURIComponent(groupId)}`, {});
+}
+
+export async function unlinkRuleFromGroup(ruleId, groupId) {
+  return apiDelete(`/api/v1/alerts/rules/${encodeURIComponent(ruleId)}/groups/${encodeURIComponent(groupId)}`);
+}
+
+// listGroupsForRule fetches the notification groups wired to a
+// single rule. The backend exposes this via the groups endpoint
+// (POST/DELETE for M2M); a dedicated GET per-rule would need a
+// backend handler. For now we filter the global group list
+// against the rule's id list at render time.
+export async function listGroupsForRule(ruleId) {
+  const all = await api.listNotificationGroups();
+  if (!all.ok) return { ok: false, error: all.error };
+  return { ok: true, data: (all.data?.groups || all.data || []).filter((g) => (g.rule_ids || []).includes(ruleId)) };
 }
 
 export async function resolveAlert(id) {
