@@ -20,9 +20,6 @@ import (
 // on the wider Repositories facade; they only see the surface
 // the capability package owns.
 func (s *Server) capabilityRepo() capability.Repository {
-	if s.capabilityRepo2 != nil {
-		return s.capabilityRepo2
-	}
 	return s.db.CapabilityRepository
 }
 

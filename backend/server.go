@@ -11,7 +11,6 @@ import (
 
 	"github.com/sachncs/promptsheon/backend/alerting"
 	"github.com/sachncs/promptsheon/backend/auth"
-	"github.com/sachncs/promptsheon/backend/capability"
 
 	_ "github.com/sachncs/promptsheon/backend/eval" // Scorer registry (no Server dep yet)
 	"github.com/sachncs/promptsheon/backend/harness"
@@ -35,15 +34,9 @@ type Func func(http.ResponseWriter, *http.Request) error
 
 // Server holds dependencies and routes for the HTTP API.
 type Server struct {
-	mux *http.ServeMux
-	db  *store.Repositories
-	// capabilityRepo2 is the typed CapabilityRepository subset
-	// of the Repositories facade. The handler layer uses it
-	// for SetCapabilityContract / GetCapabilityContract /
-	// GetCapabilityReputation; the interface is owned by the
-	// capability package so domain purity holds.
-	capabilityRepo2  capability.Repository
-	logger           *slog.Logger
+	mux    *http.ServeMux
+	db     *store.Repositories
+	logger *slog.Logger
 	authn            *auth.Authenticator
 	requireAuth      bool
 	spans            trace.Tracer
@@ -127,11 +120,10 @@ const auditQueueBackpressure = 200 * time.Millisecond
 // expose it through a fresh Option.
 func NewServer(db *store.Repositories, logger *slog.Logger, opts ...Option) *Server {
 	s := &Server{
-		mux:             http.NewServeMux(),
-		db:              db,
-		capabilityRepo2: db.CapabilityRepository,
-		logger:          logger,
-		oauthStates:     newOAuthStateStore(),
+		mux:         http.NewServeMux(),
+		db:          db,
+		logger:      logger,
+		oauthStates: newOAuthStateStore(),
 	}
 	// Make this server the active one for the package-level OAuth
 	// helpers (generateOAuthState, validateOAuthState, etc.). The
