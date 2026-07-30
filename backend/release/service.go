@@ -16,11 +16,8 @@ import (
 	"github.com/sachncs/promptsheon/backend/harness"
 )
 
-// PolicyKind is removed (DEAD-Rel-3). Callers now construct a
-// concrete approval.Policy and pass it directly to NewService.
-// The two previous kinds are preserved as helper functions
-// (NewServiceMakerChecker, NewServiceMajority) for callers that
-// still want the old convenience without an extra type.
+// PolicyKind is removed (DEAD-Rel-3). Callers construct a concrete
+// approval.Policy and pass it directly to NewService.
 
 // Service is the application layer for Release + Approval.
 //
@@ -49,18 +46,6 @@ type Service struct {
 // that want a clock seam should set Service.Clock after construction.
 func NewService(db Repository, app approval.Repository, policy approval.Policy) *Service {
 	return &Service{DB: db, App: app, Policy: policy, Clock: func() time.Time { return time.Now().UTC() }}
-}
-
-// NewServiceMakerChecker is a convenience for callers that want
-// the Maker-Checker policy without spelling out the struct literal.
-func NewServiceMakerChecker(db Repository, app approval.Repository, requiredApprovers int) *Service {
-	return NewService(db, app, approval.MakerCheckerPolicy{RequiredApprovers: requiredApprovers})
-}
-
-// NewServiceMajority is a convenience for callers that want the
-// Majority policy without spelling out the struct literal.
-func NewServiceMajority(db Repository, app approval.Repository, requiredVotes int) *Service {
-	return NewService(db, app, approval.MajorityPolicy{Required: requiredVotes})
 }
 
 // WithHarness attaches a PreconditionRunner + the harness

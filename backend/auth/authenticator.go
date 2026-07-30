@@ -75,30 +75,32 @@ func WithUserContext(ctx context.Context, u *User) context.Context {
 	return context.WithValue(ctx, userContextKey, u)
 }
 
-// NewAuthenticator creates a new Authenticator.
-func NewAuthenticator(store APIKeyStore) *Authenticator {
+// NewAuthenticator creates a new Authenticator. The optional logger
+// receives every authentication failure for audit. Passing nil
+// installs a no-op logger.
+func NewAuthenticator(store APIKeyStore, logger ...logger) *Authenticator {
 	a := &Authenticator{
 		store:      store,
-		authLogger: &noopLogger{},
 		lastUsedCh: make(chan string, 1024),
 		stopCh:     make(chan struct{}),
+	}
+	if len(logger) > 0 && logger[0] != nil {
+		a.authLogger = logger[0]
+	} else {
+		a.authLogger = &noopLogger{}
 	}
 	a.wg.Add(1)
 	go a.lastUsedWorker()
 	return a
 }
 
-// NewAuthenticatorWithLogger creates a new Authenticator with an audit logger.
+// NewAuthenticatorWithLogger is a thin wrapper kept for source
+// compatibility — callers that already pass an explicit logger
+// keep working. New callers should use NewAuthenticator(store, logger).
+//
+// Deprecated: use NewAuthenticator(store, logger) instead.
 func NewAuthenticatorWithLogger(store APIKeyStore, logger logger) *Authenticator {
-	a := &Authenticator{
-		store:      store,
-		authLogger: logger,
-		lastUsedCh: make(chan string, 1024),
-		stopCh:     make(chan struct{}),
-	}
-	a.wg.Add(1)
-	go a.lastUsedWorker()
-	return a
+	return NewAuthenticator(store, logger)
 }
 
 // lastUsedWorker drains the lastUsedCh channel and applies updates on

@@ -43,6 +43,7 @@ import (
 	"github.com/sachncs/promptsheon/backend/rules"
 	"github.com/sachncs/promptsheon/backend/ratelimit"
 	"github.com/sachncs/promptsheon/backend/recommendation"
+	"github.com/sachncs/promptsheon/backend/approval"
 	"github.com/sachncs/promptsheon/backend/release"
 	"github.com/sachncs/promptsheon/backend/rollups"
 	"github.com/sachncs/promptsheon/backend/scheduler"
@@ -822,9 +823,9 @@ func buildGitHubOAuth(cfg *backend.Config) *auth.OAuthProvider {
 func buildReleaseService(db *store.SQLite, policy string) *release.Service {
 	switch policy {
 	case "majority":
-		return release.NewServiceMajority(db, db, 1)
+		return release.NewService(db, db, approval.MajorityPolicy{Required: 1})
 	case "", "maker_checker":
-		return release.NewServiceMakerChecker(db, db, 1)
+		return release.NewService(db, db, approval.MakerCheckerPolicy{RequiredApprovers: 1})
 	default:
 		// unknown policy: log nothing here; the daemon's job is to
 		// keep running. Operators see the misconfiguration when they
