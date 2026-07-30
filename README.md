@@ -133,8 +133,8 @@ make build                    # produces bin/promptsheond, bin/promptsheon, bin/
 # Clone and build
 git clone https://github.com/sachncs/promptsheon.git
 cd promptsheon
-go build -o promptsheond ./bin/promptsheond
-go build -o promptsheon  ./bin/promptsheon
+go build -o bin/promptsheond ./cmd/promptsheond
+go build -o bin/promptsheon  ./cmd/promptsheon
 
 # Start the server for this unauthenticated local walkthrough
 PROMPTSHEON_AUTH=false ./promptsheond
