@@ -811,7 +811,7 @@ func buildGitHubOAuth(cfg *backend.Config) *auth.OAuthProvider {
 		RedirectURL:  redirectURL,
 		AuthURL:      "https://github.com/login/oauth/authorize",
 		TokenURL:     "https://github.com/login/oauth/access_token",
-		UserInfoURL:  "https://backend.github.com/user",
+		UserInfoURL:  "https://api.github.com/user",
 		Scopes:       []string{"read:user", "user:email"},
 	}
 }
