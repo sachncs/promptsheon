@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -90,11 +91,25 @@ func NewOAuthManager() *OAuthManager {
 
 // RegisterProvider registers an OAuth provider. The provider
 // configuration is deep-copied so subsequent caller-side mutation
-// cannot affect the registered copy. SSRF validation is applied to
-// every URL the provider declares.
-func (m *OAuthManager) RegisterProvider(name string, provider *OAuthProvider) {
+// cannot affect the registered copy.
+//
+// 1.4 / CRIT-3: every URL the provider declares (AuthURL, TokenURL,
+// UserInfoURL, RedirectURL) is now SSRF-validated at registration
+// time. The previous comment claimed this was done; the code did
+// not. With auto-provisioning on, a misconfigured operator could
+// route OAuth code exchange + access tokens to an internal
+// endpoint and exfiltrate IAM credentials.
+//
+// Returns an error if any URL fails validation; the provider is
+// not registered.
+func (m *OAuthManager) RegisterProvider(name string, provider *OAuthProvider) error {
 	if provider == nil {
-		return
+		return nil
+	}
+	for _, raw := range []string{provider.AuthURL, provider.TokenURL, provider.UserInfoURL, provider.RedirectURL} {
+		if err := validateOAuthURL(raw); err != nil {
+			return fmt.Errorf("oauth provider %q: %w", name, err)
+		}
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -102,6 +117,38 @@ func (m *OAuthManager) RegisterProvider(name string, provider *OAuthProvider) {
 	clone := *provider
 	clone.Scopes = append([]string(nil), provider.Scopes...)
 	m.providers[name] = &clone
+	return nil
+}
+
+// validateOAuthURL rejects URLs that don't pass the SSRF guard:
+// must parse, must be https or http (loopback allowed for tests),
+// host must resolve to a non-loopback, non-private, non-link-local,
+// non-metadata IP. Empty URL is permitted (the field is optional).
+func validateOAuthURL(rawURL string) error {
+	if rawURL == "" {
+		return nil
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL %q: %w", rawURL, err)
+	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return fmt.Errorf("URL %q has unsupported scheme %q (https required)", rawURL, u.Scheme)
+	}
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("URL %q missing host", rawURL)
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return fmt.Errorf("URL %q: cannot resolve host %q: %w", rawURL, host, err)
+	}
+	for _, ip := range ips {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+			return fmt.Errorf("URL %q resolves to disallowed address %s", rawURL, ip)
+		}
+	}
+	return nil
 }
 
 // generateOAuthState returns a cryptographically random 32-byte
