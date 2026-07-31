@@ -36,6 +36,19 @@ builds:
     goarch:
       - amd64
       - arm64
+    hooks:
+      pre:
+        - cmd: sh
+          args:
+            - -c
+            - |
+              command -v node >/dev/null 2>&1 || { echo "node missing"; exit 1; }
+              cd frontend
+              [ -d node_modules ] || npm ci --no-audit --no-fund
+              npm run build
+              rm -rf ../cmd/promptsheond/frontend/dist
+              mkdir -p ../cmd/promptsheond/frontend/dist
+              cp -r dist/. ../cmd/promptsheond/frontend/dist/
     ldflags:
       - -s -w
       - -X github.com/sachncs/promptsheon/backend.Version={{.Version}}
