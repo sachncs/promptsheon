@@ -38,7 +38,7 @@ func seedReleaseFixture(repo *mockRepo) {
 
 func newReleaseTestServer(repo *mockRepo, svc *release.Service) *Server {
 	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
-	return NewServer(newRepositories(repo), logger, WithReleaseService(svc))
+	return NewServer(newDB(repo), logger, WithReleaseService(svc))
 }
 
 func decodeJSON(t *testing.T, r io.Reader, dst any) {

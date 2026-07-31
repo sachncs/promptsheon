@@ -90,5 +90,5 @@ func newBenchServer(b *testing.B) *Server {
 	providers := llm.NewRegistry()
 	providers.Configure("openai", llm.ProviderConfig{APIKey: "sk-test"})
 	repo := newMockRepo()
-	return NewServer(newRepositories(repo), logger, WithProviders(providers))
+	return NewServer(newDB(repo), logger, WithProviders(providers))
 }

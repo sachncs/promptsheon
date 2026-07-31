@@ -567,7 +567,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 	inv := invoke.New(enforcer, agg, exec).
 		WithObservability(collector, tracer, logger)
 
-	repos := store.NewRepositories(db)
+	repos := store.NewDB(db)
 	// Settings: one process-stable replica id, one notifier.
 	// The notifier is intentionally empty in production main —
 	// hot-reload subscribers register against the typed cfg

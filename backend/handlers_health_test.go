@@ -59,7 +59,7 @@ func TestHandleReady_DBPingFail(t *testing.T) {
 	repo := newMockRepo()
 	repo.pingErr = errors.New("db down")
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("GET", "/ready", nil)
 	rr := httptest.NewRecorder()

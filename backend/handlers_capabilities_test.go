@@ -52,7 +52,7 @@ func TestHandleGetCapability(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateCapability(context.Background(), &capability.Capability{ID: "c1", Name: "Test", ProjectID: "p1"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/capabilities/c1", nil)
 	rr := httptest.NewRecorder()
@@ -80,7 +80,7 @@ func TestHandleUpdateCapability(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateCapability(context.Background(), &capability.Capability{ID: "c1", Name: "Old", ProjectID: "p1"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	body := mustMarshal(t, map[string]string{"name": "Updated", "description": "New desc"})
 	req := httptest.NewRequest("PUT", "/api/v1/capabilities/c1", bytes.NewReader(body))
@@ -104,7 +104,7 @@ func TestHandleDeleteCapability(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateCapability(context.Background(), &capability.Capability{ID: "c1", Name: "Test", ProjectID: "p1"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/capabilities/c1", nil)
 	rr := httptest.NewRecorder()

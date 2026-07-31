@@ -83,7 +83,7 @@ func TestHandleExportAudit_WithFilters(t *testing.T) {
 		Details: nil, Timestamp: time.Now(),
 	})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/audit/export?user_id=u1&action=create&resource=test&since=2000-01-01T00:00:00Z&until=2100-01-01T00:00:00Z", nil)
 	rr := httptest.NewRecorder()
@@ -131,7 +131,7 @@ func TestHandleExportAudit_CSV(t *testing.T) {
 		Details: map[string]any{"key": "val"}, Timestamp: time.Now(),
 	})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/audit/export?format=csv", nil)
 	rr := httptest.NewRecorder()
@@ -161,7 +161,7 @@ func TestHandleExportAudit_CSVBadDetails(t *testing.T) {
 		Timestamp: time.Now(),
 	})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/audit/export?format=csv", nil)
 	rr := httptest.NewRecorder()

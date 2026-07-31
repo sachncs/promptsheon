@@ -101,7 +101,7 @@ type ReleaseRepository = release.Repository
 type ApprovalRepository = approval.Repository
 type HarnessRepository = harness.Repository
 
-type Repositories struct {
+type DB struct {
 	Users
 	APIKeys
 	Audit
@@ -119,22 +119,22 @@ type Repositories struct {
 	HarnessRepository
 }
 
-func NewRepositories(db *SQLite) *Repositories {
-	return &Repositories{
-		Users:                db,
-		APIKeys:              db,
-		Audit:                db,
-		ProviderKeys:         db,
-		Alerting:             db,
-		Webhooks:             db,
-		VaultState:           db,
-		WSState:              db,
-		EnforcerState:        db,
-		Settings:             db,
-		Lifecycle:            db,
-		CapabilityRepository: db,
-		ReleaseRepository:    db,
-		ApprovalRepository:   db,
-		HarnessRepository:    db,
+func NewDB(sqlite *SQLite) *DB {
+	return &DB{
+		Users:                sqlite,
+		APIKeys:              sqlite,
+		Audit:                sqlite,
+		ProviderKeys:         sqlite,
+		Alerting:             sqlite,
+		Webhooks:             sqlite,
+		VaultState:           sqlite,
+		WSState:              sqlite,
+		EnforcerState:        sqlite,
+		Settings:             sqlite,
+		Lifecycle:            sqlite,
+		CapabilityRepository: sqlite,
+		ReleaseRepository:    sqlite,
+		ApprovalRepository:   sqlite,
+		HarnessRepository:    sqlite,
 	}
 }

@@ -154,7 +154,7 @@ func TestHandleListAPIKeys_NoAuth(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateAPIKey(context.Background(), &models.APIKey{ID: "k1", UserID: "u1", Name: "key1", KeyHash: "h1", KeyPrefix: "ps_test1", Role: "reader"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/apikeys?user_id=u1", nil)
 	rr := httptest.NewRecorder()
@@ -201,7 +201,7 @@ func TestHandleRevokeAPIKey_NoAuth(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateAPIKey(context.Background(), &models.APIKey{ID: "k1", UserID: "u1", Name: "key1", KeyHash: "h1", KeyPrefix: "ps_test1", Role: "reader", Revoked: false})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/apikeys/k1", nil)
 	rr := httptest.NewRecorder()
@@ -250,7 +250,7 @@ func TestHandleRevokeAPIKey_AlreadyRevoked(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateAPIKey(context.Background(), &models.APIKey{ID: "k1", UserID: "u1", Name: "key1", KeyHash: "h1", KeyPrefix: "ps_test1", Role: "reader", Revoked: true})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/apikeys/k1", nil)
 	rr := httptest.NewRecorder()
@@ -286,7 +286,7 @@ func TestHandleBootstrap_InvalidJSON(t *testing.T) {
 func TestHandleBootstrap(t *testing.T) {
 	repo := newMockRepo()
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	t.Setenv("PROMPTSHEON_BOOTSTRAP_TOKEN", "test-bootstrap-secret")
 
@@ -312,7 +312,7 @@ func TestHandleBootstrap(t *testing.T) {
 func TestHandleBootstrap_NoToken(t *testing.T) {
 	repo := newMockRepo()
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	// PROMPTSHEON_BOOTSTRAP_TOKEN is intentionally unset.
 	body := mustMarshal(t, map[string]string{"email": "admin@local"})
@@ -330,7 +330,7 @@ func TestHandleBootstrap_NoToken(t *testing.T) {
 func TestHandleBootstrap_WrongToken(t *testing.T) {
 	repo := newMockRepo()
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	t.Setenv("PROMPTSHEON_BOOTSTRAP_TOKEN", "test-bootstrap-secret")
 
@@ -351,7 +351,7 @@ func TestHandleBootstrap_AlreadyUsers(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "u@t.com", Name: "U", Role: "admin"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	t.Setenv("PROMPTSHEON_BOOTSTRAP_TOKEN", "test-bootstrap-secret")
 

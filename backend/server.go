@@ -35,7 +35,7 @@ type Func func(http.ResponseWriter, *http.Request) error
 // Server holds dependencies and routes for the HTTP API.
 type Server struct {
 	mux    *http.ServeMux
-	db     *store.Repositories
+	db     *store.DB
 	logger *slog.Logger
 	authn            *auth.Authenticator
 	requireAuth      bool
@@ -116,7 +116,7 @@ const auditQueueBackpressure = 200 * time.Millisecond
 // configured per-provider via internal/llm.WithCircuitBreaker
 // instead; if the production wiring wants a server-wide override,
 // expose it through a fresh Option.
-func NewServer(db *store.Repositories, logger *slog.Logger, opts ...Option) *Server {
+func NewServer(db *store.DB, logger *slog.Logger, opts ...Option) *Server {
 	s := &Server{
 		mux:         http.NewServeMux(),
 		db:          db,

@@ -44,7 +44,7 @@ func wireSelfEvolve(
 	db *store.SQLite,
 	releaseSvc *release.Service,
 	evalRunner *harness.EvalRunner,
-	repos *store.Repositories,
+	repos *store.DB,
 	logger *slog.Logger,
 	providers *llm.Registry,
 	metrics *metrics.Collector,
@@ -88,7 +88,7 @@ func wireSelfEvolve(
 func buildEvolver(
 	db *store.SQLite,
 	releaseSvc *release.Service,
-	repos *store.Repositories,
+	repos *store.DB,
 	providers *llm.Registry,
 	logger *slog.Logger,
 	metrics *metrics.Collector,
@@ -261,11 +261,11 @@ func parseSelfEvolveEntry(s string) (selfEvolveConfig, bool) {
 // user_id is the self_evolve admin (created on first
 // use); this is stable across restarts.
 type daemonEvolverAuditor struct {
-	repos  *store.Repositories
+	repos  *store.DB
 	logger *slog.Logger
 }
 
-func newEvolverAuditor(repos *store.Repositories, logger *slog.Logger) *daemonEvolverAuditor {
+func newEvolverAuditor(repos *store.DB, logger *slog.Logger) *daemonEvolverAuditor {
 	return &daemonEvolverAuditor{repos: repos, logger: logger}
 }
 

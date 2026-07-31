@@ -14,7 +14,7 @@ func TestHandleListUsers(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "a@b.com", Name: "A", Role: "admin"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/users", nil)
 	rr := httptest.NewRecorder()
@@ -81,7 +81,7 @@ func TestHandleUpdateUser_RejectsInvalidRole(t *testing.T) {
 	s := newTestServer(t)
 	repo := newMockRepo()
 	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "u@t.com", Name: "U", Role: "reader"})
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	body := mustMarshal(t, map[string]string{"role": "superuser"})
 	req := httptest.NewRequest("PUT", "/api/v1/users/u1", bytes.NewReader(body))
@@ -99,7 +99,7 @@ func TestHandleGetUser(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "a@b.com", Name: "A", Role: "admin"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/users/u1", nil)
 	rr := httptest.NewRecorder()
@@ -127,7 +127,7 @@ func TestHandleUpdateUser(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "a@b.com", Name: "A", Role: "reader"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	body := mustMarshal(t, map[string]string{"name": "Updated Name", "email": "new@b.com", "role": "admin"})
 	req := httptest.NewRequest("PUT", "/api/v1/users/u1", bytes.NewReader(body))
@@ -165,7 +165,7 @@ func TestHandleDeleteUser(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateUser(context.Background(), &models.User{ID: "u1", Email: "a@b.com", Name: "A", Role: "reader"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/users/u1", nil)
 	rr := httptest.NewRecorder()

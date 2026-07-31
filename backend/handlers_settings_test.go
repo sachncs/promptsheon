@@ -26,7 +26,7 @@ func settingsTestServer(t *testing.T) *Server {
 		t.Fatalf("NewSQLite: %v", err)
 	}
 	s := newTestServer(t)
-	s.db = store.NewRepositories(db)
+	s.db = store.NewDB(db)
 	s.settingsReplicaID = "test-replica"
 	s.settingsNotif = settings.NewNotifier()
 	t.Cleanup(func() { _ = db.Close() })

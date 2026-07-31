@@ -15,9 +15,9 @@ import (
 	"github.com/sachncs/promptsheon/backend/store"
 )
 
-// mockStore implements store.Repositories for testing.
+// mockStore implements store.DB for testing.
 type mockStore struct {
-	store.Repositories
+	store.DB
 	alertRules               []*models.AlertRuleRecord
 	alerts                   []*models.AlertRecord
 	notificationGroups       []*models.NotificationGroupRecord

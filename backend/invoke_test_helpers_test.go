@@ -198,7 +198,7 @@ func newInvokeTestServerWithRepo(t *testing.T, repo *mockRepo, opts ...Option) *
 	allOpts := append(defaults, opts...)
 
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError}))
-	return NewServer(newRepositories(repo), logger, allOpts...)
+	return NewServer(newDB(repo), logger, allOpts...)
 }
 
 // NewTestServer is the TEST-INFRA-2 canonical entry point for
@@ -217,7 +217,7 @@ func NewTestServer(t *testing.T, opts ...Option) *Server {
 	logger := testutil.DiscardLogger()
 	defaults := []Option{WithProviders(llm.NewRegistry())}
 	allOpts := append(defaults, opts...)
-	s := NewServer(store.NewRepositories(db), logger, allOpts...)
+	s := NewServer(store.NewDB(db), logger, allOpts...)
 	t.Cleanup(func() { _ = db.Close() })
 	return s
 }

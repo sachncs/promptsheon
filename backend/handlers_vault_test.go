@@ -66,7 +66,7 @@ func TestHandleListVaultKeys(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.SaveProviderKey(context.Background(), &models.ProviderKey{ID: "pk1", ProviderName: "openai", KeyName: "default", EncryptedKey: "enc"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/vault/keys", nil)
 	rr := httptest.NewRecorder()
@@ -82,7 +82,7 @@ func TestHandleDeleteVaultKey(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.SaveProviderKey(context.Background(), &models.ProviderKey{ID: "pk1", ProviderName: "openai", KeyName: "default", EncryptedKey: "enc"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/vault/keys/pk1", nil)
 	rr := httptest.NewRecorder()

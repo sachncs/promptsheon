@@ -103,7 +103,7 @@ func TestHandleGetVersion(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateVersion(context.Background(), &capability.Version{ID: "v1", Version: 1, CapabilityID: "c1"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/versions/v1", nil)
 	rr := httptest.NewRecorder()

@@ -18,7 +18,7 @@ import (
 
 // capabilityRepo returns the typed CapabilityRepository the
 // server holds. The accessor exists so handlers don't depend
-// on the wider Repositories facade; they only see the surface
+// on the wider DB facade; they only see the surface
 // the capability package owns.
 func (s *Server) capabilityRepo() capability.Repository {
 	return s.db.CapabilityRepository

@@ -54,7 +54,7 @@ func TestHandleGetProject(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateProject(context.Background(), &capability.Project{ID: "p1", Name: "Test", WorkspaceID: "w1"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/projects/p1", nil)
 	rr := httptest.NewRecorder()
@@ -82,7 +82,7 @@ func TestHandleUpdateProject(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateProject(context.Background(), &capability.Project{ID: "p1", Name: "Old", WorkspaceID: "w1"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	body := mustMarshal(t, map[string]string{"name": "Updated"})
 	req := httptest.NewRequest("PUT", "/api/v1/projects/p1", bytes.NewReader(body))
@@ -100,7 +100,7 @@ func TestHandleDeleteProject(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateProject(context.Background(), &capability.Project{ID: "p1", Name: "Test", WorkspaceID: "w1"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/projects/p1", nil)
 	rr := httptest.NewRecorder()

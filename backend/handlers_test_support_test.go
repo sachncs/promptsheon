@@ -52,8 +52,8 @@ type mockRepo struct {
 	closeErr      error
 }
 
-func newRepositories(repo *mockRepo) *store.Repositories {
-	return &store.Repositories{
+func newDB(repo *mockRepo) *store.DB {
+	return &store.DB{
 		Users:                repo,
 		APIKeys:              repo,
 		Audit:                repo,
@@ -914,7 +914,7 @@ func newTestServerWithRepo(t *testing.T, repo *mockRepo, opts ...Option) *Server
 	allOpts := make([]Option, 0, 2+len(opts))
 	allOpts = append(allOpts, WithProviders(providers))
 	allOpts = append(allOpts, opts...)
-	return NewServer(newRepositories(repo), logger, allOpts...)
+	return NewServer(newDB(repo), logger, allOpts...)
 }
 
 func newAuthTestServer(t *testing.T, repo *mockRepo, opts ...Option) *Server {
@@ -923,7 +923,7 @@ func newAuthTestServer(t *testing.T, repo *mockRepo, opts ...Option) *Server {
 	allOpts := make([]Option, 0, 1+len(opts))
 	allOpts = append(allOpts, WithAuth(repo))
 	allOpts = append(allOpts, opts...)
-	return NewServer(newRepositories(repo), logger, allOpts...)
+	return NewServer(newDB(repo), logger, allOpts...)
 }
 
 func mustMarshal(t *testing.T, v any) []byte {

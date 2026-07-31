@@ -62,7 +62,7 @@ func TestHandleGetExecution(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateExecution(context.Background(), &capability.Execution{ID: "e1", CapabilityVersionID: "v1"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/executions/e1", nil)
 	rr := httptest.NewRecorder()

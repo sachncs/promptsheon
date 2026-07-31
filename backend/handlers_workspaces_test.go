@@ -60,7 +60,7 @@ func TestHandleGetWorkspace(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateWorkspace(context.Background(), &capability.Workspace{ID: "w1", Name: "Test"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("GET", "/api/v1/workspaces/w1", nil)
 	rr := httptest.NewRecorder()
@@ -88,7 +88,7 @@ func TestHandleUpdateWorkspace(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateWorkspace(context.Background(), &capability.Workspace{ID: "w1", Name: "Old"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	body := mustMarshal(t, map[string]string{"name": "Updated"})
 	req := httptest.NewRequest("PUT", "/api/v1/workspaces/w1", bytes.NewReader(body))
@@ -112,7 +112,7 @@ func TestHandleDeleteWorkspace(t *testing.T) {
 	repo := newMockRepo()
 	_ = repo.CreateWorkspace(context.Background(), &capability.Workspace{ID: "w1", Name: "Test"})
 	s := newTestServer(t)
-	s.db = newRepositories(repo)
+	s.db = newDB(repo)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/workspaces/w1", nil)
 	rr := httptest.NewRecorder()
