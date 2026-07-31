@@ -11,17 +11,27 @@ BIN := bin
 # Build all binaries
 build: build-server build-cli build-healthcheck
 
-# Build the server daemon (embeds frontend/dist/). web-build is
-# commented out by default because vite isn't installed in CI;
-# run `make web-build` first when iterating on the dashboard.
-# The dashboard assets are copied into cmd/promptsheond/frontend/
-# so the //go:embed directive (which forbids '..' patterns) can
-# find them inside the cmd package.
-build-server:
-	@mkdir -p $(BIN) cmd/promptsheond/frontend/dist
-	@rm -rf cmd/promptsheond/frontend/dist/*
-	@if [ -d frontend/dist ]; then cp -r frontend/dist/. cmd/promptsheond/frontend/dist/; fi
+# Build the server daemon. The daemon embeds frontend/dist/ via
+# cmd/promptsheond/embed_frontend.go; that directory MUST exist
+# at compile time (//go:embed forbids '..' patterns). build-server
+# depends on web-build so a clean checkout always produces a
+# working embed. If node is missing, web-build exits with a clear
+# error instead of failing later in go build with a cryptic
+# "pattern frontend/dist: no matching files found" message.
+build-server: web-build
+	@mkdir -p $(BIN)
 	go build -o $(BIN)/promptsheond ./cmd/promptsheond
+
+# Build the frontend dashboard. Self-installs node_modules on
+# first run so a fresh checkout of frontend/src/ is sufficient.
+web-build:
+	@command -v node >/dev/null 2>&1 || { echo "node not installed; install Node 20+ from https://nodejs.org"; exit 1; }
+	@mkdir -p frontend/node_modules
+	@test -d frontend/node_modules/vite || (cd frontend && npm install --no-audit --no-fund)
+	cd frontend && npm run build
+	@mkdir -p cmd/promptsheond/frontend/dist
+	@rm -rf cmd/promptsheond/frontend/dist
+	cp -r frontend/dist cmd/promptsheond/frontend/dist
 
 # Build the CLI client
 build-cli:
@@ -244,11 +254,18 @@ help:
 	@echo "  help               Show this help message"
 
 # ----- Dashboard targets ----------------------------------------------------
+# These targets are kept for explicit invocation (e.g. iterating
+# on the dashboard without rebuilding the daemon). The canonical
+# dashboard build path is the build-server target above, which
+# invokes web-build as a dependency.
 web-install:
 	@command -v node >/dev/null 2>&1 || { echo "node not found"; exit 1; }
 	cd frontend && npm install
 
 web-build:
+	@command -v node >/dev/null 2>&1 || { echo "node not installed; install Node 20+ from https://nodejs.org"; exit 1; }
+	@mkdir -p frontend/node_modules
+	@test -d frontend/node_modules/vite || (cd frontend && npm install --no-audit --no-fund)
 	cd frontend && npm run build
 
 web-dev:
