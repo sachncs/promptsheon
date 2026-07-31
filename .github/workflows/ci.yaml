@@ -332,21 +332,21 @@ jobs:
 
   tla:
     # TLA-LIFECYCLE-2: model-check the release lifecycle spec
-    # with TLC. The job is a soft gate: if tlc is installed
-    # it runs the model checker; if not, the job warns and
-    # passes (the tla/ Go test in tests/ still asserts the
-    # spec is present and contains the right invariants).
+    # with TLC. PLAN-49 c3.14: install tlc via the official
+    # tlaplus/tlaplus-action (a thin wrapper around the
+    # tlatools/tlaplus Docker image) and run it as a hard gate.
+    # The previous 'soft gate' was documentation, not enforcement.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - name: Run TLC if available
-        run: |
-          if command -v tlc >/dev/null 2>&1; then
-            tlc -deadlock -config tla/release_lifecycle.cfg tla/release_lifecycle.tla
-          else
-            echo "tlc not installed; the Go test in tla/ pins the spec presence"
-          fi
+      - name: Run TLC on the release lifecycle spec
+        uses: tlaplus/tlaplus-action@v1
+        with:
+          tlc-version: '1.8.0'
+          mode: check
+          files: |
+            tla/release_lifecycle.tla
 
   docs-lint:
     # OPS-CI-3: keep markdownlint + vale as a soft gate on
