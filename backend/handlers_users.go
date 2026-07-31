@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -140,9 +141,39 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) error 
 	}
 	existing.UpdatedAt = time.Now()
 
+	// HIGH-9: if the role changes, snapshot the active keys
+	// before UpdateUser so the handler can emit one audit row
+	// per revoked key. The bulk revoke inside UpdateUser
+	// happens in the same transaction; reading the keys
+	// beforehand is consistent because SQLite serialises the
+	// reads and the UPDATE.
+	var keysBefore []*models.APIKey
+	if req.Role != nil && existing.Role != *req.Role {
+		var lerr error
+		keysBefore, lerr = s.db.ListAPIKeysByUser(r.Context(), existing.ID)
+		if lerr != nil {
+			return fmt.Errorf("list keys for revocation audit: %w", lerr)
+		}
+	}
+
 	if err := s.db.UpdateUser(r.Context(), existing); err != nil {
 		return err
 	}
+
+	if req.Role != nil && existing.Role != *req.Role {
+		for _, k := range keysBefore {
+			if k.Revoked {
+				continue
+			}
+			s.audit(r.Context(), "apikey_revoke", "api_key:"+k.ID, map[string]any{
+				fieldKeyPrefix: k.KeyPrefix,
+				"target_user":  k.UserID,
+				"reason":       "role_change",
+				auditKeyName:   k.Name,
+			})
+		}
+	}
+
 	s.audit(r.Context(), "update", "user:"+existing.ID, map[string]any{fieldEmail: existing.Email, fieldRole: existing.Role})
 	writeJSON(w, http.StatusOK, existing)
 	return nil
