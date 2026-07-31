@@ -25,27 +25,27 @@ func init() {
 	os.Setenv(store.DestructiveMigrationEnv, "true")
 }
 
-func newTestSQLite(t *testing.T) *store.SQLite {
-	t.Helper()
-	s, err := store.NewSQLite(filepath.Join(t.TempDir(), "test.db"))
+func newTestSQLite(tb testing.TB) *store.SQLite {
+	tb.Helper()
+	s, err := store.NewSQLite(filepath.Join(tb.TempDir(), "test.db"))
 	if err != nil {
-		t.Fatalf("NewSQLite: %v", err)
+		tb.Fatalf("NewSQLite: %v", err)
 	}
-	t.Cleanup(func() { _ = s.Close() })
+	tb.Cleanup(func() { _ = s.Close() })
 	// Seed the three default users ("u1", "u2", "u3") that the
 	// legacy test fixtures expect. The post-043 FK on
 	// audit_entries.user_id and guardrail_violations.user_id
 	// rejects writes for unknown users. The seed is idempotent:
 	// it leaves a user row alone if the test created it first.
-	seedDefaultUsers(t, s)
+	seedDefaultUsers(tb, s)
 	return s
 }
 
 // seedDefaultUsers creates "u1", "u2", "u3" if they don't already
 // exist. Tests that supply their own "u1" record (with a specific
 // email or role) are not stomped: the seed is a no-op for that id.
-func seedDefaultUsers(t *testing.T, s *store.SQLite) {
-	t.Helper()
+func seedDefaultUsers(tb testing.TB, s *store.SQLite) {
+	tb.Helper()
 	ctx := context.Background()
 	now := time.Now().UTC()
 	for _, id := range []string{"u1", "u2", "u3"} {
@@ -60,7 +60,7 @@ func seedDefaultUsers(t *testing.T, s *store.SQLite) {
 			CreatedAt: now,
 			UpdatedAt: now,
 		}); err != nil {
-			t.Fatalf("seed user %s: %v", id, err)
+			tb.Fatalf("seed user %s: %v", id, err)
 		}
 	}
 }
