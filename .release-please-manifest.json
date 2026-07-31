@@ -1,0 +1,7 @@
+{
+  "packages": {
+    ".": {"component": "daemon"},
+    "sdk/python": {"component": "python-sdk"},
+    "sdk/typescript": {"component": "typescript-sdk"}
+  }
+}
