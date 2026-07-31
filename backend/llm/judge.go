@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/sachncs/promptsheon/backend/eval"
 )
@@ -32,9 +33,9 @@ func NewJudgeClient(reg *Registry) (JudgeClient, bool) {
 		return nil, false
 	}
 	// Pick the first provider; production wiring can override
-	// via PROMPTSHEON_LLM_JUDGE_PROVIDER.
+	// via PROMPTSHEON_LLM_JUDGE_PROVIDER (env var).
 	name := names[0]
-	if v := envJudgeProvider(); v != "" {
+	if v := os.Getenv("PROMPTSHEON_LLM_JUDGE_PROVIDER"); v != "" {
 		name = v
 	}
 	prov, err := reg.Get(name)

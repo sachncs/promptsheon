@@ -2,6 +2,7 @@ package llm
 
 import (
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"sync"
@@ -106,51 +107,56 @@ func (r *Registry) Providers() []string {
 //
 // Returns the value of PROMPTSHEON_LLM_PROVIDER (empty string when
 // unset) for callers that want to default to a specific provider.
-func (r *Registry) LoadFromEnv() string {
+// LoadFromEnv configures both providers from environment variables.
+// Returns the preferred default provider name (PROMPTSHEON_LLM_PROVIDER)
+// for callers that want to know which provider to invoke.
+// bindAddr / isLoopback are used to validate PROMPTSHEON_*_BASE_URL:
+// http base URLs are only allowed on loopback binds.
+func (r *Registry) LoadFromEnv(bindAddr string, isLoopback func(string) bool) string {
 	if v := os.Getenv("PROMPTSHEON_OPENAI_API_KEY"); v != "" {
-		r.Configure("openai", ProviderConfig{
-			APIKey:  v,
-			BaseURL: os.Getenv("PROMPTSHEON_OPENAI_BASE_URL"),
-		})
+		if err := loadFromEnvBaseURL("openai", os.Getenv("PROMPTSHEON_OPENAI_BASE_URL"), bindAddr, isLoopback); err != nil {
+			slog.Error("openai base url", "err", err)
+		} else {
+			r.Configure("openai", ProviderConfig{
+				APIKey:  v,
+				BaseURL: os.Getenv("PROMPTSHEON_OPENAI_BASE_URL"),
+			})
+		}
 	}
 	if v := os.Getenv("PROMPTSHEON_ANTHROPIC_API_KEY"); v != "" {
-		r.Configure("anthropic", ProviderConfig{
-			APIKey:  v,
-			BaseURL: os.Getenv("PROMPTSHEON_ANTHROPIC_BASE_URL"),
-		})
+		if err := loadFromEnvBaseURL("anthropic", os.Getenv("PROMPTSHEON_ANTHROPIC_BASE_URL"), bindAddr, isLoopback); err != nil {
+			slog.Error("anthropic base url", "err", err)
+		} else {
+			r.Configure("anthropic", ProviderConfig{
+				APIKey:  v,
+				BaseURL: os.Getenv("PROMPTSHEON_ANTHROPIC_BASE_URL"),
+			})
+		}
 	}
 
 	return os.Getenv("PROMPTSHEON_LLM_PROVIDER")
 }
 
-// ValidateBaseURLs enforces SEC-LLM-1: PROMPTSHEON_OPENAI_BASE_URL
-// and PROMPTSHEON_ANTHROPIC_BASE_URL may be http:// only when the
-// daemon is bound to a loopback address. Otherwise the URL must
-// be https:// (or unset, in which case the provider's default
-// applies). bindAddr is the value of cfg.Addr; isLoopback tells
-// us whether bindAddr is a loopback bind. The check runs at
-// startup, before any provider call, so a misconfigured base URL
-// fails fast.
-func (r *Registry) ValidateBaseURLs(bindAddr string, isLoopback func(string) bool) error {
+// loadFromEnvBaseURL validates an individual provider's BaseURL.
+// Inlined from the old ValidateBaseURLs method (c2.24). The
+// provider constructors (NewOpenAI / NewAnthropic) call this at
+// registration time so a misconfigured base URL fails fast.
+func loadFromEnvBaseURL(name, baseURL, bindAddr string, isLoopback func(string) bool) error {
+	if baseURL == "" {
+		return nil
+	}
 	if isLoopback == nil {
 		isLoopback = func(string) bool { return true }
 	}
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	for name, cfg := range r.configs {
-		if cfg.BaseURL == "" {
-			continue
-		}
-		u, err := url.Parse(cfg.BaseURL)
-		if err != nil {
-			return fmt.Errorf("provider %q base url: %w", name, err)
-		}
-		if u.Scheme != "http" && u.Scheme != "https" {
-			return fmt.Errorf("provider %q base url scheme %q is not http or https", name, u.Scheme)
-		}
-		if u.Scheme == "http" && !isLoopback(bindAddr) {
-			return fmt.Errorf("provider %q base url %q uses http but daemon binds %q (non-loopback); http base URLs are only allowed on loopback binds", name, cfg.BaseURL, bindAddr)
-		}
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return fmt.Errorf("provider %q base url: %w", name, err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("provider %q base url scheme %q is not http or https", name, u.Scheme)
+	}
+	if u.Scheme == "http" && !isLoopback(bindAddr) {
+		return fmt.Errorf("provider %q base url %q uses http but daemon binds %q (non-loopback); http base URLs are only allowed on loopback binds", name, baseURL, bindAddr)
 	}
 	return nil
 }

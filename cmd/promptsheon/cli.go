@@ -203,7 +203,7 @@ func cmdRun(args []string) error {
 	}
 
 	providers := llm.NewRegistry()
-	providers.LoadFromEnv()
+	providers.LoadFromEnv("", nil)
 	p, err := providers.Get(provider)
 	if err != nil {
 		return fmt.Errorf("provider not available: %w", err)
@@ -237,7 +237,7 @@ func cmdProvider(args []string) error {
 	switch args[0] {
 	case opList:
 		providers := llm.NewRegistry()
-		providers.LoadFromEnv()
+		providers.LoadFromEnv("", nil)
 		names := providers.Providers()
 		fmt.Println("Registered providers:")
 		for _, name := range names {
@@ -248,7 +248,7 @@ func cmdProvider(args []string) error {
 			return usageErrorf("promptsheon provider test <name>")
 		}
 		providers := llm.NewRegistry()
-		providers.LoadFromEnv()
+		providers.LoadFromEnv("", nil)
 		name := args[1]
 		p, err := providers.Get(name)
 		if err != nil {

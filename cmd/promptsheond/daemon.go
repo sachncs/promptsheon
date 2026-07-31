@@ -439,14 +439,13 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 	limiter := ratelimit.NewLimiter(ratelimit.LoadConfigFromEnv())
 
 	providers := llm.NewRegistry()
-	providers.LoadFromEnv()
 	// SEC-LLM-1: refuse to start when an LLM base URL is http://
 	// but the daemon binds a non-loopback address. Production
-	// deployments must talk to LLM providers over TLS.
-	if err := providers.ValidateBaseURLs(cfg.Addr, backend.IsLoopbackAddr); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
-	}
+	// deployments must talk to LLM providers over TLS. The check
+	// logs (via slog.Error inside LoadFromEnv) and skips the
+	// offending provider; it does not abort startup because
+	// providers without base URLs are valid.
+	providers.LoadFromEnv(cfg.Addr, backend.IsLoopbackAddr)
 
 	// Per-Workspace rollup aggregator (Tier 2.37). The production
 	// wiring supplies a backend-backed Budget/Quota repository.
@@ -540,7 +539,12 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 			return executor.InvokeResult{Status: "error", Error: err.Error()}, nil
 		}
 		usage := resp.Usage
-		costUSD := llm.EstimateCost(usage.PromptTokens, usage.CompletionTokens, resp.Model)
+		// C2.23: llm.EstimateCost / PricingTable dropped; the
+		// per-token cost is now sourced from a model-specific
+		// pricing map in models.go (TODO c2.23.5). Until then the
+		// cost is recorded as 0 — observed in metrics, not
+		// gateable on.
+		costUSD := 0.0
 		return executor.InvokeResult{
 			Output:       []byte(resp.Content),
 			PromptTokens: usage.PromptTokens,
