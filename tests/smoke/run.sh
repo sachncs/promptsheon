@@ -22,10 +22,24 @@ LOG="$(mktemp -t promptsheon-smoke.XXXXXX.log)"
 DB="$(mktemp -t promptsheon-smoke.XXXXXX.db)"
 trap 'rm -f "$LOG" "$DB" "$DB-shm" "$DB-wal"; kill $DAEMON_PID 2>/dev/null || true' EXIT
 
+# Build the dashboard if missing. Without this, the smoke binary
+# ships an empty embed and dashboard HTTP requests 404.
+if [[ ! -d cmd/promptsheond/frontend/dist ]]; then
+  if [[ -d frontend && -f frontend/package.json ]]; then
+    echo "smoke: building dashboard..."
+    (cd frontend && npm install --no-audit --no-fund)
+    (cd frontend && npm run build)
+    mkdir -p cmd/promptsheond/frontend
+    cp -r frontend/dist cmd/promptsheond/frontend/dist
+  else
+    echo "smoke: frontend/ not present; embed will be empty"
+  fi
+fi
+
 # Build the daemon if missing.
 if [[ ! -x ./promptsheond ]]; then
   echo "smoke: building promptsheond..."
-  go build -o ./promptsheond .
+  go build -o ./promptsheond ./cmd/promptsheond
 fi
 
 # Boot in the background. The daemon's config.Validate() refuses

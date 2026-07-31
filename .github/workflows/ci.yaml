@@ -38,10 +38,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v7
+- uses: actions/setup-go@v7
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version-file: go.mod
           cache: true
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Download dependencies
         run: go mod download
@@ -147,11 +153,26 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
       - name: Download dependencies
         run: go mod download
 
+      - name: Build dashboard
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          mkdir -p ../cmd/promptsheond/frontend/dist
+          rm -rf ../cmd/promptsheond/frontend/dist
+          cp -r dist ../cmd/promptsheond/frontend/dist
+
       - name: Build promptsheond
-        run: go build -o ./promptsheond .
+        run: go build -o ./promptsheond ./cmd/promptsheond
 
       - name: Run smoke tests
         run: bash tests/smoke/run.sh
@@ -169,8 +190,23 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
       - name: Download dependencies
         run: go mod download
+
+      - name: Build dashboard
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          mkdir -p ../cmd/promptsheond/frontend/dist
+          rm -rf ../cmd/promptsheond/frontend/dist
+          cp -r dist ../cmd/promptsheond/frontend/dist
 
       - name: Run e2e suite
         run: go test -race -count=1 -timeout 300s ./tests/e2e/...
