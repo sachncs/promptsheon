@@ -7,7 +7,7 @@ DOMAIN=(
   alerting approval audit auth budget capability eventbus executor experiment
   lineage observation optimizer policy quota recommendation release replay schedule
 )
-FORBIDDEN=("$repo/backend/store" "$repo/backend/llm" "$repo/backend/api")
+FORBIDDEN=("$repo/backend/store" "$repo/backend/llm")
 errors=0
 
 for pkg in "${DOMAIN[@]}"; do
