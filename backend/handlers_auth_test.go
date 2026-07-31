@@ -3,6 +3,7 @@ package backend
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -417,6 +418,64 @@ func TestHandleOAuthLogin(t *testing.T) {
 	location := rr.Header().Get("Location")
 	if !strings.Contains(location, "accounts.google.com") {
 		t.Errorf("expected Google auth URL, got %s", location)
+	}
+}
+
+// TestHandleOAuthLogin_CookieSecureConditional locks in DEF-10 fix (c0.6).
+// The OAuth state cookie must be Secure when the request is over TLS
+// (r.TLS != nil OR X-Forwarded-Proto=https) and NOT Secure otherwise,
+// otherwise local-dev OAuth over plain HTTP is broken.
+func TestHandleOAuthLogin_CookieSecureConditional(t *testing.T) {
+	oauthMgr := auth.NewOAuthManager()
+	oauthMgr.RegisterProvider("google", &auth.OAuthProvider{
+		Name:     "google",
+		AuthURL:  "https://accounts.google.com/o/oauth2/auth",
+		ClientID: "test-client-id",
+		Scopes:   []string{"email"},
+	})
+	s := newTestServer(t)
+	s.oauth = oauthMgr
+
+	cases := []struct {
+		name           string
+		setTLS         bool
+		forwardedProto string
+		wantSecure     bool
+	}{
+		{"plain HTTP", false, "", false},
+		{"plain HTTP behind proxy that forgot the header", false, "", false},
+		{"TLS direct", true, "", true},
+		{"TLS via forwarded proto (proxy)", false, "https", true},
+		{"plain HTTP behind proxy with http header", false, "http", false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/api/v1/auth/google/login", nil)
+			if c.setTLS {
+				req.TLS = &tls.ConnectionState{}
+			}
+			if c.forwardedProto != "" {
+				req.Header.Set("X-Forwarded-Proto", c.forwardedProto)
+			}
+			rr := httptest.NewRecorder()
+			s.ServeHTTP(rr, req)
+
+			cookies := rr.Result().Cookies()
+			var oauthCookie *http.Cookie
+			for _, ck := range cookies {
+				if ck.Name == "oauth_state" {
+					oauthCookie = ck
+					break
+				}
+			}
+			if oauthCookie == nil {
+				t.Fatalf("oauth_state cookie not set (got %d cookies)", len(cookies))
+			}
+			if oauthCookie.Secure != c.wantSecure {
+				t.Errorf("Secure=%v, want %v", oauthCookie.Secure, c.wantSecure)
+			}
+		})
 	}
 }
 
