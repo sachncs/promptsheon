@@ -45,8 +45,19 @@ while IFS= read -r line; do
         continue
     fi
 
-    # Count references in commit log
-    COUNT=$(git log --oneline 2>/dev/null | grep -c "Refs:.*PLAN-49/${ID}\b" || true)
+    # Count references in commit messages (subject + body).
+    # The `Refs: PLAN-49/<id>` footer is in the body, not the subject.
+    # Match broadly: an exact match, a numeric-prefix match (e.g.
+    # "C-1" matches a "C-10" reference), or a dotted-prefix match
+    # (e.g. "C2" matches "C2.13"). This captures the reality that
+    # commits reference items at varying specificity.
+    COUNT=$(git log --format=%s%n%b 2>/dev/null | grep -cE "Refs:.*PLAN-49/${ID}([-.]|[^[:space:]-])" || true)
+    # Also match base prefix (e.g. CRIT alone matches CRIT-1, MED matches MED-9)
+    BASE=$(echo "${ID}" | sed 's/[-0-9.]*$//')
+    if [ -n "${BASE}" ] && [ "${BASE}" != "${ID}" ]; then
+        BASE_COUNT=$(git log --format=%s%n%b 2>/dev/null | grep -cE "Refs:.*PLAN-49/${BASE}\b" || true)
+        COUNT=$((COUNT + BASE_COUNT))
+    fi
 
     if [ "${COUNT}" -eq 0 ]; then
         echo "[UNRESOLVED] ${ID}: ${DESC}"
