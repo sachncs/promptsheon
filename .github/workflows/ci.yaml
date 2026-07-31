@@ -144,7 +144,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.5"
+          go-version-file: go.mod
           cache: true
 
       - name: Download dependencies
@@ -166,7 +166,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.5"
+          go-version-file: go.mod
           cache: true
 
       - name: Download dependencies
@@ -188,7 +188,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.5"
+          go-version-file: go.mod
           cache: true
 
       - name: Lint domain packages (no package-level mutable state)
@@ -250,7 +250,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.5"
+          go-version-file: go.mod
           cache: true
 
       - uses: actions/setup-python@v6
@@ -278,7 +278,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.5"
+          go-version-file: go.mod
           cache: true
 
       - uses: actions/setup-node@v6
@@ -422,7 +422,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.5"
+          go-version-file: go.mod
           cache: true
 
       - name: Run govulncheck
@@ -507,7 +507,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.5"
+          go-version-file: go.mod
           cache: true
 
       - name: Download SBOM
