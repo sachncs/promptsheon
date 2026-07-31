@@ -87,7 +87,7 @@ type Manifest struct {
 	MCPServers    []ArtifactRef `json:"mcp_servers,omitempty"`
 }
 
-// errs.ErrorCapabilityEmptyManifest indicates a Manifest that has not been populated.
+// errs.ErrEmptyManifest indicates a Manifest that has not been populated.
 // An empty Manifest must never be deployed, approved, or evaluated.
 
 // Validate checks structural correctness of the Manifest.
@@ -130,7 +130,7 @@ func (m Manifest) Validate() error {
 	if m.Prompt.Hash == "" &&
 		m.ModelPolicy.Hash == "" &&
 		m.RuntimePolicy.Hash == "" {
-		return errs.ErrorCapabilityEmptyManifest
+		return errs.ErrEmptyManifest
 	}
 	return nil
 }

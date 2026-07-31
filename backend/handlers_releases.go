@@ -160,19 +160,19 @@ func (s *Server) handleActivateRelease(w http.ResponseWriter, r *http.Request) e
 	releaseID := r.PathValue("id")
 	activated, err := s.releaseSvc.Activate(r.Context(), releaseID)
 	if err != nil {
-		if errors.Is(err, errs.ErrorReleaseNotPending) {
+		if errors.Is(err, errs.ErrReleaseNotPending) {
 			return &HTTPError{Status: http.StatusConflict, Message: err.Error()}
 		}
-		if errors.Is(err, errs.ErrorApprovalCreatorVoted) || errors.Is(err, errs.ErrorApprovalQuorumNotMet) {
+		if errors.Is(err, errs.ErrSelfVote) || errors.Is(err, errs.ErrQuorum) {
 			return &HTTPError{Status: http.StatusConflict, Message: err.Error()}
 		}
-		if errors.Is(err, errs.ErrorApprovalNotFound) {
+		if errors.Is(err, errs.ErrApprovalNotFound) {
 			return &HTTPError{Status: http.StatusConflict, Message: "no votes recorded; quorum not satisfied"}
 		}
-		if errors.Is(err, errs.ErrorReleaseNotFound) {
+		if errors.Is(err, errs.ErrReleaseNotFound) {
 			return ErrNotFound
 		}
-		if errors.Is(err, errs.ErrorHarnessPreconditionFailed) {
+		if errors.Is(err, errs.ErrPrecondition) {
 			var pe *harness.PreconditionError
 			if errors.As(err, &pe) {
 				return &HTTPError{
@@ -195,7 +195,7 @@ func (s *Server) handleActivateRelease(w http.ResponseWriter, r *http.Request) e
 func (s *Server) handleRollbackRelease(w http.ResponseWriter, r *http.Request) error {
 	rolled, err := s.releaseSvc.Rollback(r.Context(), r.PathValue("id"))
 	if err != nil {
-		if errors.Is(err, errs.ErrorReleaseNotFound) {
+		if errors.Is(err, errs.ErrReleaseNotFound) {
 			return ErrNotFound
 		}
 		return badRequest(err.Error())

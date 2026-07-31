@@ -71,7 +71,7 @@ func (a *evolverRepoAdapter) UpdateReleaseStatus(ctx context.Context, releaseID,
 		return err
 	}
 	if rel == nil {
-		return errs.ErrorStoreNotFound
+		return errs.ErrStoreNotFound
 	}
 	rel.Status = release.Status(status)
 	return a.SQLite.UpdateRelease(ctx, rel)

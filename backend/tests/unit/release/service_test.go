@@ -15,7 +15,7 @@ import (
 	"github.com/sachncs/promptsheon/backend/testutil/harnessrepo"
 )
 
-// errMemStoreNotFound stands in for errs.ErrorStoreNotFound in this
+// errMemStoreNotFound stands in for errs.ErrStoreNotFound in this
 // test fixture. The release_test package cannot import
 // internal/store (store imports harness via its Repository
 // surface, and harness is reachable from release via its
@@ -60,7 +60,7 @@ func (m *memStore) CreateRelease(_ context.Context, r *release.Release) error {
 func (m *memStore) GetRelease(_ context.Context, id string) (*release.Release, error) {
 	r, ok := m.releases[id]
 	if !ok {
-		return nil, errs.ErrorReleaseNotFound
+		return nil, errs.ErrReleaseNotFound
 	}
 	cp := *r
 	return &cp, nil
@@ -87,7 +87,7 @@ func (m *memStore) ListActiveReleasesForEnvironment(_ context.Context, env relea
 }
 func (m *memStore) UpdateRelease(_ context.Context, r *release.Release) error {
 	if _, ok := m.releases[r.ID]; !ok {
-		return errs.ErrorReleaseNotFound
+		return errs.ErrReleaseNotFound
 	}
 	cp := *r
 	m.releases[r.ID] = &cp
@@ -100,13 +100,13 @@ func (m *memStore) DeleteRelease(_ context.Context, id string) error {
 func (m *memStore) ActivateAtomic(_ context.Context, prior, next *release.Release) error {
 	if prior != nil {
 		if _, ok := m.releases[prior.ID]; !ok {
-			return errs.ErrorReleaseNotFound
+			return errs.ErrReleaseNotFound
 		}
 		cp := *prior
 		m.releases[prior.ID] = &cp
 	}
 	if _, ok := m.releases[next.ID]; !ok {
-		return errs.ErrorReleaseNotFound
+		return errs.ErrReleaseNotFound
 	}
 	cp := *next
 	m.releases[next.ID] = &cp
@@ -120,14 +120,14 @@ func (m *memStore) CreateApproval(_ context.Context, a *approval.Approval) error
 func (m *memStore) GetApproval(_ context.Context, releaseID string) (*approval.Approval, error) {
 	a, ok := m.approvals[releaseID]
 	if !ok {
-		return nil, errs.ErrorApprovalNotFound
+		return nil, errs.ErrApprovalNotFound
 	}
 	cp := *a
 	return &cp, nil
 }
 func (m *memStore) UpdateApproval(_ context.Context, a *approval.Approval) error {
 	if _, ok := m.approvals[a.ReleaseID]; !ok {
-		return errs.ErrorApprovalNotFound
+		return errs.ErrApprovalNotFound
 	}
 	cp := *a
 	m.approvals[a.ReleaseID] = &cp
@@ -293,7 +293,7 @@ func TestServiceActivateRunsPreconditions(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected Activate to fail when a precondition fails")
 	}
-	if !errors.Is(err, errs.ErrorHarnessPreconditionFailed) {
+	if !errors.Is(err, errs.ErrPrecondition) {
 		t.Fatalf("expected ErrPreconditionFailed, got %v", err)
 	}
 	var perr *harness.PreconditionError

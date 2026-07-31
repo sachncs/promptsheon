@@ -365,14 +365,14 @@ func TestLineageEdgesForeignKeyConstraint(t *testing.T) {
 
 // TestStoreNotFoundTranslation pins the typed error path for the
 // consolidated FK rebuilds. GetEvalRun on a missing row should
-// return errs.ErrorStoreNotFound, not sql.ErrNoRows.
+// return errs.ErrStoreNotFound, not sql.ErrNoRows.
 func TestStoreNotFoundTranslation(t *testing.T) {
 	s := migrateOnce(t)
 	_, err := s.GetEvalRun(context.Background(), "no-such")
 	if err == nil {
-		t.Fatal("expected errs.ErrorStoreNotFound")
+		t.Fatal("expected errs.ErrStoreNotFound")
 	}
-	if !errors.Is(err, errs.ErrorStoreNotFound) {
-		t.Errorf("expected errs.ErrorStoreNotFound, got %v", err)
+	if !errors.Is(err, errs.ErrStoreNotFound) {
+		t.Errorf("expected errs.ErrStoreNotFound, got %v", err)
 	}
 }

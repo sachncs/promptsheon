@@ -55,14 +55,14 @@ type Budget struct {
 	CreatedBy   string    `json:"created_by"`
 }
 
-// errs.ErrorBudgetCapNotPositive is returned when constructing a Budget with a
+// errs.ErrBudgetInvalid is returned when constructing a Budget with a
 // non-positive cap.
 
 // New constructs a Budget with the period_start set to the
 // canonical start of the current period.
 func New(scope Scope, targetID string, period Period, capUSD float64, now time.Time, createdBy string) (Budget, error) {
 	if capUSD <= 0 {
-		return Budget{}, errs.ErrorBudgetCapNotPositive
+		return Budget{}, errs.ErrBudgetInvalid
 	}
 	switch scope {
 	case ScopeWorkspace, ScopeCapability:
@@ -93,7 +93,7 @@ func New(scope Scope, targetID string, period Period, capUSD float64, now time.T
 }
 
 // Charge records spend against the budget. If the new spend would
-// exceed the cap the charge is rejected and errs.ErrorBudgetCapExceeded is
+// exceed the cap the charge is rejected and errs.ErrBudget is
 // returned; otherwise the budget is advanced and the new total
 // is included in the returned Budget.
 func (b Budget) Charge(amount float64, now time.Time) (Budget, error) {
@@ -107,13 +107,13 @@ func (b Budget) Charge(amount float64, now time.Time) (Budget, error) {
 		b.SpentUSD = 0
 	}
 	if b.SpentUSD+amount > b.CapUSD {
-		return b, errs.ErrorBudgetCapExceeded
+		return b, errs.ErrBudget
 	}
 	b.SpentUSD += amount
 	return b, nil
 }
 
-// errs.ErrorBudgetCapExceeded is returned when a Charge would push spent over
+// errs.ErrBudget is returned when a Charge would push spent over
 // the cap.
 
 // Remaining returns the headroom left for the period.

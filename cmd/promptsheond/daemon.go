@@ -220,7 +220,7 @@ func runDaemon() {
 				logger.Warn("leader-election error", "err", e)
 			}
 		}()
-		if err := elector.Acquire(rootCtx); err != nil && !errors.Is(err, errs.ErrorElectionNotLeader) {
+		if err := elector.Acquire(rootCtx); err != nil && !errors.Is(err, errs.ErrNotLeader) {
 			logger.Warn("initial leader acquire failed", "err", err)
 		}
 		logger.Info("leader-election active", "pod", podName)

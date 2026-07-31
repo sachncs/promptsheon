@@ -144,7 +144,7 @@ func scanSchedule(scanner interface {
 		&sc.CreatedAt, &sc.CreatedBy,
 	)
 	if err == sql.ErrNoRows {
-		return nil, errs.ErrorStoreNotFound
+		return nil, errs.ErrStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan schedule: %w", err)

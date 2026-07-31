@@ -78,7 +78,7 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 			if errors.As(err, &cycle) {
 				return &HTTPError{Status: http.StatusUnprocessableEntity, Message: err.Error()}
 			}
-			if errors.Is(err, errs.ErrorCapabilityInheritanceTooDeep) {
+			if errors.Is(err, errs.ErrInheritanceTooDeep) {
 				return &HTTPError{Status: http.StatusUnprocessableEntity, Message: err.Error()}
 			}
 			return &HTTPError{Status: http.StatusBadRequest, Message: err.Error()}

@@ -51,16 +51,16 @@ type Quota struct {
 	CreatedBy string    `json:"created_by"`
 }
 
-// errs.ErrorQuotaLimitNotPositive is returned when constructing a Quota with
+// errs.ErrQuotaInvalid is returned when constructing a Quota with
 // a non-positive limit.
 
-// errs.ErrorQuotaOverLimit is returned by Charge when the window's used
+// errs.ErrQuota is returned by Charge when the window's used
 // counter would exceed the limit.
 
 // New constructs a Quota at the start of the supplied window.
 func New(scope Scope, targetID string, window Window, limit int64, now time.Time, createdBy string) (Quota, error) {
 	if limit <= 0 {
-		return Quota{}, errs.ErrorQuotaLimitNotPositive
+		return Quota{}, errs.ErrQuotaInvalid
 	}
 	switch scope {
 	case ScopeWorkspace, ScopeProvider:
@@ -89,7 +89,7 @@ func New(scope Scope, targetID string, window Window, limit int64, now time.Time
 	}, nil
 }
 
-// Charge increments the window counter; returns errs.ErrorQuotaOverLimit when
+// Charge increments the window counter; returns errs.ErrQuota when
 // the limit is reached.
 func (q Quota) Charge(now time.Time) (Quota, error) {
 	if now.UTC().After(q.WindowEnd) || now.UTC().Equal(q.WindowEnd) {
@@ -97,7 +97,7 @@ func (q Quota) Charge(now time.Time) (Quota, error) {
 		q.Used = 0
 	}
 	if q.Used >= q.Limit {
-		return q, errs.ErrorQuotaOverLimit
+		return q, errs.ErrQuota
 	}
 	q.Used++
 	return q, nil

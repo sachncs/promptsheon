@@ -30,10 +30,10 @@ func (b BlastRadius) Valid() bool {
 	}
 }
 
-// errs.ErrorCapabilityInvalidBlastRadius is returned by Contract.Validate when
+// errs.ErrInvalidBlastRadius is returned by Contract.Validate when
 // the supplied BlastRadius is not in the closed set.
 
-// errs.ErrorCapabilityEmptyContract is returned when a Capability has no
+// errs.ErrEmptyContract is returned when a Capability has no
 // Contract. The contract-less state is preserved for back-
 // compat with v0.2.0 Capabilities that predate the Contract
 // primitive; new Capabilities SHOULD attach a Contract.
@@ -78,10 +78,10 @@ type SLOTarget struct {
 // blast radius.
 func (c CapabilityContract) Validate() error {
 	if c.IsZero() {
-		return errs.ErrorCapabilityEmptyContract
+		return errs.ErrEmptyContract
 	}
 	if !c.BlastRadius.Valid() {
-		return fmt.Errorf("%w: %q", errs.ErrorCapabilityInvalidBlastRadius, c.BlastRadius)
+		return fmt.Errorf("%w: %q", errs.ErrInvalidBlastRadius, c.BlastRadius)
 	}
 	if c.SLOTarget.MinSuccessRate < 0 || c.SLOTarget.MinSuccessRate > 1 {
 		return fmt.Errorf("capability: success rate out of range: %f", c.SLOTarget.MinSuccessRate)

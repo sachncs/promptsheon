@@ -42,7 +42,7 @@ func (r *RecommendationRepository) GetRecommendation(ctx context.Context, id str
 	var payload string
 	err := r.db.QueryRowContext(ctx, `SELECT payload FROM recommendations WHERE id = ?`, id).Scan(&payload)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, errs.ErrorRecommendationNotFound
+		return nil, errs.ErrRecommendationNotFound
 	}
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (r *RecommendationRepository) UpdateRecommendation(ctx context.Context, rec
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return errs.ErrorRecommendationNotFound
+		return errs.ErrRecommendationNotFound
 	}
 	return nil
 }
@@ -115,7 +115,7 @@ func (r *RecommendationRepository) GetDecision(ctx context.Context, recommendati
 	var payload string
 	err := r.db.QueryRowContext(ctx, `SELECT payload FROM decisions WHERE recommendation_id = ? ORDER BY created_at DESC LIMIT 1`, recommendationID).Scan(&payload)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, errs.ErrorRecommendationNotFound
+		return nil, errs.ErrRecommendationNotFound
 	}
 	if err != nil {
 		return nil, err

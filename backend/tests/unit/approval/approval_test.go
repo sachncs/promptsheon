@@ -32,8 +32,8 @@ func TestRecordRejectsEmptyIdentity(t *testing.T) {
 func TestRecordRejectsUnknownDecision(t *testing.T) {
 	t.Parallel()
 	a := Approval{}
-	if _, err := a.Record(vote("alice", Decision("maybe"), "")); !errors.Is(err, errs.ErrorApprovalUnknownDecision) {
-		t.Fatalf("expected errs.ErrorApprovalUnknownDecision, got %v", err)
+	if _, err := a.Record(vote("alice", Decision("maybe"), "")); !errors.Is(err, errs.ErrApprovalUnknown) {
+		t.Fatalf("expected errs.ErrApprovalUnknown, got %v", err)
 	}
 }
 
@@ -41,8 +41,8 @@ func TestRecordRejectsDuplicateIdentity(t *testing.T) {
 	t.Parallel()
 	a := Approval{}
 	a, _ = a.Record(vote("alice", Approve, ""))
-	if _, err := a.Record(vote("alice", Approve, "oops")); !errors.Is(err, errs.ErrorApprovalDuplicateIdentity) {
-		t.Fatalf("expected errs.ErrorApprovalDuplicateIdentity, got %v", err)
+	if _, err := a.Record(vote("alice", Approve, "oops")); !errors.Is(err, errs.ErrApprovalDuplicate) {
+		t.Fatalf("expected errs.ErrApprovalDuplicate, got %v", err)
 	}
 }
 
