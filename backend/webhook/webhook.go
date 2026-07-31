@@ -314,21 +314,20 @@ func (d *Dispatcher) EmitContext(ctx context.Context, evt *Event) {
 	}
 }
 
-// ValidateURL is the dispatcher-side SSRF check. Only https
+// validateURL is the dispatcher-side SSRF check. Only https
 // is accepted and the host must resolve to a non-private,
 // non-loopback address. The previous per-endpoint allow_private
 // and allow_insecure flags were removed (SEC-4, SEC-11); no
 // caller can dial a private address through this surface.
 //
 // handlers_webhooks.go runs the same check at registration time.
-// The dispatcher re-runs ValidateURL every delivery to defeat
-// BypassSSRF is retained as a private package-level flag for
-// tests that deliver to a loopback httptest server. Production
-// wiring MUST NOT set it. The recommended escape hatch is to
-// build the Dispatcher with options that enable SSRF bypass for
-// the test's specific URL; see WithAllowInsecure for tests.
-var BypassSSRF = false
-
+// The dispatcher re-runs validateURL every delivery to defeat
+// DNS rebinding between registration and dispatch.
+// DEF-3 / 1.3: validateURL is now a method on *Dispatcher so the
+// SSRF bypass flag is per-instance. The previous package-level
+// BypassSSRF var was a process-wide mutable that any test (or
+// any future importer) could flip without coordination.
+//
 // WithAllowInsecure returns a Dispatcher option that allows the
 // delivery loop to bypass the SSRF guard. It exists for tests;
 // production code MUST NOT pass this option.
@@ -336,19 +335,19 @@ func WithAllowInsecure() func(*Dispatcher) {
 	return func(d *Dispatcher) { d.allowInsecure = true }
 }
 
-func ValidateURL(rawURL string) error {
+func (d *Dispatcher) validateURL(rawURL string) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return err
 	}
-	if u.Scheme != "https" && !(BypassSSRF && (u.Scheme == "http" || u.Scheme == "https")) {
+	if u.Scheme != "https" && !(d.allowInsecure && (u.Scheme == "http" || u.Scheme == "https")) {
 		return fmt.Errorf("unsupported scheme %q (only https is accepted)", u.Scheme)
 	}
 	host := u.Hostname()
 	if host == "" {
 		return fmt.Errorf("missing host")
 	}
-	if BypassSSRF {
+	if d.allowInsecure {
 		return nil
 	}
 	ips, err := net.LookupIP(host)
@@ -365,7 +364,7 @@ func ValidateURL(rawURL string) error {
 
 func (d *Dispatcher) deliver(ctx context.Context, ep *Endpoint, evt *Event) {
 	// Re-validate the URL at delivery time to defeat DNS rebinding.
-	if err := ValidateURL(ep.URL); err != nil {
+	if err := d.validateURL(ep.URL); err != nil {
 		d.recordDelivery(&Delivery{
 			ID:         generateID(),
 			EndpointID: ep.ID,

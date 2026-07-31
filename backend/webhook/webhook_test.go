@@ -13,18 +13,15 @@ import (
 	"time"
 )
 
-// enableTestBypassSSRF flips the process-wide BypassSSRF flag so
-// dispatch tests can deliver to httptest loopback servers. The
-// flag is reset between tests.
-func enableTestBypassSSRF(t *testing.T) {
-	t.Helper()
-	prev := BypassSSRF
-	BypassSSRF = true
-	t.Cleanup(func() { BypassSSRF = prev })
+// bypassDispatcher constructs a *Dispatcher with SSRF bypass
+// enabled so dispatch tests can deliver to httptest loopback
+// servers. Replaces the old enableTestBypassSSRF helper that
+// flipped a process-wide var.
+func bypassDispatcher() *Dispatcher {
+	return NewDispatcher(slog.Default(), WithAllowInsecure())
 }
 
 func TestDispatcherEmit(t *testing.T) {
-	enableTestBypassSSRF(t)
 	d := NewDispatcher(slog.Default()).WithMaxRetries(0)
 
 	ep := &Endpoint{
@@ -140,7 +137,6 @@ func TestDispatcherConcurrentEmit(t *testing.T) {
 }
 
 func TestDispatcherSuccessfulDelivery(t *testing.T) {
-	enableTestBypassSSRF(t)
 	// Note: the ring-buffer indexing in ListDeliveries has
 	// a pre-existing off-by-one that the existing tests
 	// work around. We exercise the success path by
@@ -157,7 +153,7 @@ func TestDispatcherSuccessfulDelivery(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d := NewDispatcher(slog.Default()).WithMaxRetries(0)
+	d := NewDispatcher(slog.Default(), WithAllowInsecure()).WithMaxRetries(0)
 	d.Register(&Endpoint{
 		ID:     "ep-ok",
 		URL:    srv.URL,
@@ -174,7 +170,6 @@ func TestDispatcherSuccessfulDelivery(t *testing.T) {
 }
 
 func TestDispatcherServerErrorTriggersRetry(t *testing.T) {
-	enableTestBypassSSRF(t)
 
 	var calls int
 	var mu sync.Mutex
@@ -186,7 +181,7 @@ func TestDispatcherServerErrorTriggersRetry(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d := NewDispatcher(slog.Default()).WithMaxRetries(2)
+	d := NewDispatcher(slog.Default(), WithAllowInsecure()).WithMaxRetries(2)
 	d.Register(&Endpoint{
 		ID:     "ep-500",
 		URL:    srv.URL,
@@ -205,39 +200,40 @@ func TestDispatcherServerErrorTriggersRetry(t *testing.T) {
 }
 
 func TestValidateURLRejectsBadSchemes(t *testing.T) {
+	d := bypassDispatcher()
 	for _, raw := range []string{
 		"javascript:alert(1)",
 		"file:///etc/passwd",
 		"gopher://example.com",
 		"",
 	} {
-		if err := ValidateURL(raw); err == nil {
+		if err := d.validateURL(raw); err == nil {
 			t.Errorf("expected error for %q, got nil", raw)
 		}
 	}
 }
 
 func TestValidateURLAllowsHTTPAndHTTPS(t *testing.T) {
-	t.Setenv("PROMPTSHEON_TEST_BYPASS_SSRF", "true")
-	BypassSSRF = true
-	t.Cleanup(func() { BypassSSRF = false })
+	d := bypassDispatcher()
 	for _, raw := range []string{
 		"http://example.com",
 		"https://example.com",
 	} {
-		if err := ValidateURL(raw); err != nil {
+		if err := d.validateURL(raw); err != nil {
 			t.Errorf("expected no error for %q, got %v", raw, err)
 		}
 	}
 }
 
 func TestValidateURLRejectsHTTP(t *testing.T) {
-	// Production wiring: BypassSSRF is false. http:// is rejected.
+	// Production wiring: bypassDispatcher doesn't apply (default
+	// dispatcher with allowInsecure=false). http:// is rejected.
+	d := NewDispatcher(slog.Default())
 	for _, raw := range []string{
 		"http://example.com",
 		"ftp://example.com",
 	} {
-		if err := ValidateURL(raw); err == nil {
+		if err := d.validateURL(raw); err == nil {
 			t.Errorf("expected error for %q", raw)
 		}
 	}
@@ -263,7 +259,6 @@ func TestWithEndpointStoreAndLoad(t *testing.T) {
 }
 
 func TestWithHTTPClientReplacesDefault(t *testing.T) {
-	enableTestBypassSSRF(t)
 	// A custom http.Client round-trip is observable by
 	// pointing the dispatcher at a server and verifying
 	// the call lands.
@@ -278,7 +273,7 @@ func TestWithHTTPClientReplacesDefault(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d := NewDispatcher(slog.Default()).WithMaxRetries(0).WithHTTPClient(http.DefaultClient)
+	d := NewDispatcher(slog.Default(), WithAllowInsecure()).WithMaxRetries(0).WithHTTPClient(http.DefaultClient)
 	d.Register(&Endpoint{
 		ID:     "ep-custom",
 		URL:    srv.URL,
@@ -350,14 +345,14 @@ func TestLoadFromStoreNoStore(t *testing.T) {
 }
 
 func TestValidateURLMissingHost(t *testing.T) {
-	err := ValidateURL("https://")
+	d := bypassDispatcher()
+	err := d.validateURL("https://")
 	if err == nil {
 		t.Error("expected error for missing host")
 	}
 }
 
 func TestDeliverHMACSigning(t *testing.T) {
-	enableTestBypassSSRF(t)
 
 	var mu sync.Mutex
 	var gotSignature string
@@ -369,7 +364,7 @@ func TestDeliverHMACSigning(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d := NewDispatcher(slog.Default()).WithMaxRetries(0)
+	d := NewDispatcher(slog.Default(), WithAllowInsecure()).WithMaxRetries(0)
 	d.Register(&Endpoint{
 		ID: "ep-hmac", URL: srv.URL, Secret: "my-secret",
 
@@ -420,15 +415,15 @@ func TestSleepBackoffContextCancel(t *testing.T) {
 }
 
 func TestValidateURLRejectsPrivateIP(t *testing.T) {
-	BypassSSRF = false
-	err := ValidateURL("https://localhost")
+	// Production wiring (default dispatcher, no bypass).
+	d := NewDispatcher(slog.Default())
+	err := d.validateURL("https://localhost")
 	if err == nil {
 		t.Error("expected error for private IP without ALLOW_PRIVATE")
 	}
 }
 
 func TestDeliverWithSecretAnd500(t *testing.T) {
-	enableTestBypassSSRF(t)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
