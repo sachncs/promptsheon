@@ -143,6 +143,21 @@ openapi:
 openapi-check: openapi
 	@git diff --exit-code backend/spec/spec.yaml || (echo "backend/spec/spec.yaml is out of date. Run 'make openapi' and commit the result."; exit 1)
 
+# dist-check catches frontend/src drift: if any frontend/src/*
+# file is newer than cmd/promptsheond/frontend/dist/, the embed
+# is stale and the build is invalid. Used in CI to gate PRs that
+# touch frontend/src without rebuilding.
+dist-check:
+	@if [ -d cmd/promptsheond/frontend/dist ]; then \
+		if find frontend/src -newer cmd/promptsheond/frontend/dist/index.html -type f 2>/dev/null | grep -q .; then \
+			echo "FAIL: frontend/src is newer than embed; run make web-build"; exit 1; \
+		else \
+			echo "OK: embed is current"; \
+		fi; \
+	else \
+		echo "FAIL: cmd/promptsheond/frontend/dist does not exist; run make web-build"; exit 1; \
+	fi
+
 # SDK regeneration. SDK-1: the Python and TypeScript SDKs are
 # derived from backend/spec/spec.yaml. The generator writes the
 # generated sources to sdk/python/src/promptsheon/_generated
