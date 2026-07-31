@@ -102,12 +102,6 @@ func WithElector(e *Elector) Option {
 	}
 }
 
-// WithUsageTracker attaches a usage tracker for top-used resources.
-func WithUsageTracker(t *UsageTracker) Option {
-	return func(s *Server) {
-		s.usageTracker = t
-	}
-}
 
 // WithAlertingManager attaches an alerting manager for threshold monitoring.
 func WithAlertingManager(m *alerting.Manager) Option {

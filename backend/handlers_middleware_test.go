@@ -35,8 +35,7 @@ func TestNewServerOptions(t *testing.T) {
 		WithVault(nil),
 		WithOAuth(nil),
 		WithLogHub(nil),
-		WithUsageTracker(nil),
-		WithAlertingManager(nil),
+				WithAlertingManager(nil),
 		WithRateLimiter(nil),
 	)
 }

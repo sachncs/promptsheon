@@ -99,7 +99,6 @@ func (s *Server) registerAuditRoutes() {
 
 func (s *Server) registerMetricsRoutes() {
 	s.mux.HandleFunc("GET /api/v1/metrics/summary", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsSummary)))
-	s.mux.HandleFunc("GET /api/v1/metrics/top-capabilities", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleTopCapabilities)))
 	// /api/v1/metrics/dashboard dropped the TraceStats block since
 	// there is no SQLite-backed trace read store.
 	s.mux.HandleFunc("GET /api/v1/metrics/dashboard", s.wrapHandler(s.requirePerm(auth.PermAuditRead)(s.handleMetricsSummary)))

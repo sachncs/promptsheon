@@ -46,7 +46,6 @@ type Server struct {
 	oauth            *auth.OAuthManager
 	logHub           *Hub
 	elector          *Elector
-	usageTracker     *UsageTracker
 	alertingManager  *alerting.Manager
 	rateLimiter      *ratelimit.Limiter
 	providers        *llm.Registry
@@ -137,4 +136,13 @@ func NewServer(db *store.DB, logger *slog.Logger, opts ...Option) *Server {
 // ServeHTTP makes Server implement http.Handler.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
+}
+
+// handleMetricsSummary returns the in-memory metrics summary
+// (counters, histograms) for the operator dashboard.
+// /metrics/dashboard is an alias for the same payload.
+func (s *Server) handleMetricsSummary(w http.ResponseWriter, _ *http.Request) error {
+	summary := s.collector.GetSummary()
+	writeJSON(w, http.StatusOK, summary)
+	return nil
 }

@@ -391,8 +391,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 
 	_ = logHub
 
-	usageTracker := backend.NewUsageTracker()
-	alertingManager := alerting.NewManagerWithDB(logger, collector, db)
+		alertingManager := alerting.NewManagerWithDB(logger, collector, db)
 	alertingManager.StartMonitoring(rootCtx, collector, 1*time.Minute)
 
 	// Wire alert delivery. The delivery function emits
@@ -598,7 +597,6 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 	}
 	opts = append(opts,
 		backend.WithLogHub(logHub),
-		backend.WithUsageTracker(usageTracker),
 		backend.WithAlertingManager(alertingManager),
 		backend.WithRateLimiter(limiter),
 		backend.WithProviders(providers),
