@@ -82,7 +82,7 @@ func scanProviderKey(row scannable) (*models.ProviderKey, error) {
 	err := row.Scan(&pk.ID, &pk.ProviderName, &pk.KeyName, &pk.EncryptedKey, &pk.CreatedAt, &pk.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, errs.ErrorStoreNotFound
+			return nil, errs.ErrStoreNotFound
 		}
 		return nil, fmt.Errorf("scan provider key: %w", err)
 	}

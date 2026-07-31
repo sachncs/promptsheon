@@ -34,7 +34,7 @@ func translateDBError(err error, resource string) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, errs.ErrorStoreNotFound) {
+	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, errs.ErrStoreNotFound) {
 		return ErrNotFound
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {

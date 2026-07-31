@@ -115,7 +115,7 @@ func TestHarnessPreconditionBlocksActivate(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected activate to fail when precondition fails")
 	}
-	if !errors.Is(err, errs.ErrorHarnessPreconditionFailed) {
+	if !errors.Is(err, errs.ErrPrecondition) {
 		t.Fatalf("expected ErrPreconditionFailed, got %v", err)
 	}
 }

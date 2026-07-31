@@ -251,7 +251,7 @@ func scanAlertRule(row scannable) (*models.AlertRuleRecord, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, errs.ErrorStoreNotFound
+			return nil, errs.ErrStoreNotFound
 		}
 		return nil, fmt.Errorf("scan alert rule: %w", err)
 	}
@@ -276,7 +276,7 @@ func scanAlert(row scannable) (*models.AlertRecord, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, errs.ErrorStoreNotFound
+			return nil, errs.ErrStoreNotFound
 		}
 		return nil, fmt.Errorf("scan alert: %w", err)
 	}
@@ -298,7 +298,7 @@ func scanNotificationGroup(row scannable) (*models.NotificationGroupRecord, erro
 	err := row.Scan(&g.ID, &g.Name, &channelsJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, errs.ErrorStoreNotFound
+			return nil, errs.ErrStoreNotFound
 		}
 		return nil, fmt.Errorf("scan notification group: %w", err)
 	}

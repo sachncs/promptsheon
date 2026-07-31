@@ -251,7 +251,7 @@ func (s *SQLite) UpdateRelease(ctx context.Context, r *release.Release) error {
 		return fmt.Errorf("rows affected: %w", err)
 	}
 	if n == 0 {
-		return errs.ErrorReleaseNotFound
+		return errs.ErrReleaseNotFound
 	}
 	return nil
 }
@@ -299,7 +299,7 @@ func (s *SQLite) ActivateAtomic(ctx context.Context, prior, next *release.Releas
 		if n, err := res.RowsAffected(); err != nil {
 			return fmt.Errorf("rows affected: %w", err)
 		} else if n == 0 {
-			return errs.ErrorReleaseNotFound
+			return errs.ErrReleaseNotFound
 		}
 	}
 
@@ -334,7 +334,7 @@ func (s *SQLite) ActivateAtomic(ctx context.Context, prior, next *release.Releas
 	if n, err := res.RowsAffected(); err != nil {
 		return fmt.Errorf("rows affected: %w", err)
 	} else if n == 0 {
-		return errs.ErrorReleaseNotFound
+		return errs.ErrReleaseNotFound
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -359,7 +359,7 @@ func scanRelease(scanner interface {
 		&r.CreatedAt, &createdBy, &activatedAt, &supersededAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, errs.ErrorReleaseNotFound
+		return nil, errs.ErrReleaseNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan release: %w", err)
@@ -440,7 +440,7 @@ func (s *SQLite) UpdateApproval(ctx context.Context, a *approval.Approval) error
 		return fmt.Errorf("rows affected: %w", err)
 	}
 	if n == 0 {
-		return errs.ErrorApprovalNotFound
+		return errs.ErrApprovalNotFound
 	}
 	return nil
 }
@@ -452,7 +452,7 @@ func scanApproval(scanner interface {
 	var votesJSON string
 	err := scanner.Scan(&a.ReleaseID, &votesJSON, &a.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, errs.ErrorApprovalNotFound
+		return nil, errs.ErrApprovalNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan approval: %w", err)

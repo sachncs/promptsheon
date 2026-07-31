@@ -359,12 +359,12 @@ func (s *Server) handleGetEval(w http.ResponseWriter, r *http.Request) error {
 	// BUG-26: distinguish 404 from 500 on DB failure. The
 	// previous form returned ErrNotFound for any error,
 	// masking DB outages as "run not found". The repo
-	// translates sql.ErrNoRows into errs.ErrorStoreNotFound, so
+	// translates sql.ErrNoRows into errs.ErrStoreNotFound, so
 	// match that sentinel here; anything else is a real
 	// failure and gets a 500.
 	run, err := s.db.GetEvalRun(r.Context(), r.PathValue("id"))
 	if err != nil {
-		if errors.Is(err, errs.ErrorStoreNotFound) {
+		if errors.Is(err, errs.ErrStoreNotFound) {
 			return ErrNotFound
 		}
 		return &HTTPError{Status: http.StatusInternalServerError, Message: "eval run lookup failed"}

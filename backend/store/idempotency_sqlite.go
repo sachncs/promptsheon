@@ -33,7 +33,7 @@ type IdempotencyEntry struct {
 	Body       []byte
 }
 
-// errs.ErrorStoreIdempotencyMiss signals a cache miss to the middleware.
+// errs.ErrStoreIdempotencyMiss signals a cache miss to the middleware.
 
 // SQLiteIdempotencyStore is the default implementation, backed
 // by the `idempotency_cache` table created in migration 013.
@@ -46,7 +46,7 @@ func NewSQLiteIdempotencyStore(db *sql.DB) *SQLiteIdempotencyStore {
 }
 
 // GetIdempotency returns the cached response for key, or
-// errs.ErrorStoreIdempotencyMiss if the key is unknown or expired. A
+// errs.ErrStoreIdempotencyMiss if the key is unknown or expired. A
 // background DELETE on expiry keeps the table small; the
 // current Get path also lazy-deletes expired rows so the
 // replay window is correct even before the janitor runs.
@@ -62,14 +62,14 @@ func (s *SQLiteIdempotencyStore) GetIdempotency(ctx context.Context, key string)
 		FROM idempotency_cache
 		WHERE key = ?`, key).Scan(&expires, &statusCode, &headerJSON, &body)
 	if errors.Is(err, sql.ErrNoRows) {
-		return IdempotencyEntry{}, errs.ErrorStoreIdempotencyMiss
+		return IdempotencyEntry{}, errs.ErrStoreIdempotencyMiss
 	}
 	if err != nil {
 		return IdempotencyEntry{}, fmt.Errorf("idempotency get: %w", err)
 	}
 	if time.Now().After(expires) {
 		_, _ = s.db.ExecContext(ctx, `DELETE FROM idempotency_cache WHERE key = ?`, key)
-		return IdempotencyEntry{}, errs.ErrorStoreIdempotencyMiss
+		return IdempotencyEntry{}, errs.ErrStoreIdempotencyMiss
 	}
 	var headers http.Header
 	if err := json.Unmarshal([]byte(headerJSON), &headers); err != nil {

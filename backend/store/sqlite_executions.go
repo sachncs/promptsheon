@@ -121,7 +121,7 @@ func scanExecution(scanner interface {
 		&e.TotalTokens, &e.Error, &e.TraceID, &e.Environment,
 	)
 	if err == sql.ErrNoRows {
-		return nil, errs.ErrorStoreNotFound
+		return nil, errs.ErrStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan execution: %w", err)

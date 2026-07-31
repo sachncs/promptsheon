@@ -51,12 +51,12 @@ func TestStopZeroizesKeyAndIsIdempotent(t *testing.T) {
 		t.Fatalf("expected key slice to be nil after Stop, got len=%d", keyLen)
 	}
 
-	// Any use-after-stop must return errs.ErrorVaultStopped.
-	if _, err := v.Encrypt("anything"); !errors.Is(err, errs.ErrorVaultStopped) {
-		t.Fatalf("Encrypt after Stop: want errs.ErrorVaultStopped, got %v", err)
+	// Any use-after-stop must return errs.ErrVaultStopped.
+	if _, err := v.Encrypt("anything"); !errors.Is(err, errs.ErrVaultStopped) {
+		t.Fatalf("Encrypt after Stop: want errs.ErrVaultStopped, got %v", err)
 	}
-	if _, err := v.Decrypt(ct); !errors.Is(err, errs.ErrorVaultStopped) {
-		t.Fatalf("Decrypt after Stop: want errs.ErrorVaultStopped, got %v", err)
+	if _, err := v.Decrypt(ct); !errors.Is(err, errs.ErrVaultStopped) {
+		t.Fatalf("Decrypt after Stop: want errs.ErrVaultStopped, got %v", err)
 	}
 }
 
@@ -79,8 +79,8 @@ func TestStopConcurrent(t *testing.T) {
 	if !v.Stopped() {
 		t.Fatal("vault should be Stopped after concurrent Stop calls")
 	}
-	if _, err := v.Encrypt("x"); !errors.Is(err, errs.ErrorVaultStopped) {
-		t.Fatalf("Encrypt after concurrent Stop: want errs.ErrorVaultStopped, got %v", err)
+	if _, err := v.Encrypt("x"); !errors.Is(err, errs.ErrVaultStopped) {
+		t.Fatalf("Encrypt after concurrent Stop: want errs.ErrVaultStopped, got %v", err)
 	}
 }
 
@@ -161,8 +161,8 @@ func TestReloadAfterStopReturnsVaultStopped(t *testing.T) {
 	t.Parallel()
 	v := mustNew(t, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 	v.Stop()
-	if err := v.Reload("fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"); !errors.Is(err, errs.ErrorVaultStopped) {
-		t.Fatalf("Reload after Stop: want errs.ErrorVaultStopped, got %v", err)
+	if err := v.Reload("fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"); !errors.Is(err, errs.ErrVaultStopped) {
+		t.Fatalf("Reload after Stop: want errs.ErrVaultStopped, got %v", err)
 	}
 }
 
@@ -178,8 +178,8 @@ func TestStopAfterReloadStopsReloadedVault(t *testing.T) {
 	if !v.Stopped() {
 		t.Fatal("Stopped should be true after Reload+Stop")
 	}
-	if _, err := v.Encrypt("x"); !errors.Is(err, errs.ErrorVaultStopped) {
-		t.Fatalf("Encrypt: want errs.ErrorVaultStopped, got %v", err)
+	if _, err := v.Encrypt("x"); !errors.Is(err, errs.ErrVaultStopped) {
+		t.Fatalf("Encrypt: want errs.ErrVaultStopped, got %v", err)
 	}
 }
 
@@ -216,10 +216,10 @@ func TestReloadConcurrentWithEncryptDoesNotPanic(t *testing.T) {
 			default:
 			}
 			// Either Encrypt succeeds (pre/post Reload) or it
-			// returns errs.ErrorVaultStopped (if Stop runs concurrently,
+			// returns errs.ErrVaultStopped (if Stop runs concurrently,
 			// which we don't trigger here) — any other error is
 			// a real bug.
-			if _, err := v.Encrypt("x"); err != nil && !errors.Is(err, errs.ErrorVaultStopped) {
+			if _, err := v.Encrypt("x"); err != nil && !errors.Is(err, errs.ErrVaultStopped) {
 				t.Errorf("Encrypt during Reload: %v", err)
 				return
 			}

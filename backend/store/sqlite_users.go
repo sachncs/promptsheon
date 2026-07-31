@@ -24,19 +24,19 @@ func (s *SQLite) CreateUser(ctx context.Context, u *models.User) error {
 }
 
 // BootstrapAdmin atomically inserts the first admin user and
-// returns errs.ErrorStoreConflict if any non-system user row already
+// returns errs.ErrStoreConflict if any non-system user row already
 // exists. The system user 'api' (seeded by migration 057) is
 // ignored so the bootstrap endpoint stays available even when
 // the audit FK has been satisfied.
 //
 // BootstrapAdmin is the single-caller bootstrap. SEC-5a: 100
 // concurrent POST /api/v1/setup calls must produce exactly one
-// admin key, with the rest seeing errs.ErrorStoreConflict. The race-free
+// admin key, with the rest seeing errs.ErrStoreConflict. The race-free
 // path is INSERT ... ON CONFLICT (email) DO NOTHING: SQLite
 // resolves the conflict at write time, so even under a
 // DEFERRED transaction the second writer's INSERT silently
 // drops and RowsAffected returns 0. We then check the rows-
-// affected count and return errs.ErrorStoreConflict for the loser.
+// affected count and return errs.ErrStoreConflict for the loser.
 //
 // The previous implementation used a SELECT COUNT(*) then a
 // plain INSERT; under DEFERRED locking both writers could read
@@ -66,7 +66,7 @@ func (s *SQLite) BootstrapAdmin(ctx context.Context, u *models.User, key *models
 	if n == 0 {
 		// Another caller won the race. Roll back the key insert
 		// (we never get there) and surface a typed conflict.
-		return errs.ErrorStoreConflict
+		return errs.ErrStoreConflict
 	}
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO api_keys (id, user_id, name, key_hash, key_prefix, role, created_at)
@@ -199,7 +199,7 @@ func scanUser(row scannable) (*models.User, error) {
 	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.Role, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, errs.ErrorStoreNotFound
+			return nil, errs.ErrStoreNotFound
 		}
 		return nil, fmt.Errorf("scan user: %w", err)
 	}

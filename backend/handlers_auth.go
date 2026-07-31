@@ -360,7 +360,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 	// the writes, so two concurrent callers cannot both win:
 	// the second one sees ErrConflict and returns 409.
 	if err := s.db.BootstrapAdmin(r.Context(), admin, apiKey); err != nil {
-		if errors.Is(err, errs.ErrorStoreConflict) {
+		if errors.Is(err, errs.ErrStoreConflict) {
 			return &HTTPError{Status: http.StatusConflict, Message: "bootstrap is no longer available; the server already has users"}
 		}
 		return fmt.Errorf("bootstrap: %w", err)

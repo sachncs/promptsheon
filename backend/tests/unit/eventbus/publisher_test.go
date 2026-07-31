@@ -104,8 +104,8 @@ func TestCancelStopsDelivery(t *testing.T) {
 
 func TestSubscribeRejectsDuplicateSubscription(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(errs.ErrorEventBusAlreadyCanceled, errs.ErrorEventBusAlreadyCanceled) {
-		t.Fatalf("errs.ErrorEventBusAlreadyCanceled should be a sentinel")
+	if !errors.Is(errs.ErrEventBusCanceled, errs.ErrEventBusCanceled) {
+		t.Fatalf("errs.ErrEventBusCanceled should be a sentinel")
 	}
 }
 

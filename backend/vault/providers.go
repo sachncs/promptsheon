@@ -61,11 +61,11 @@ type SecretBroker interface {
 	Resolve(ctx context.Context, secretID string) ([]byte, error)
 }
 
-// errs.ErrorVaultUnknownSecret is returned by SecretBroker implementations
+// errs.ErrVaultUnknown is returned by SecretBroker implementations
 // when the requested secret identifier is not present in the
 // underlying store.
 
-// errs.ErrorVaultKeyUnavailable is returned by KeyProvider implementations
+// errs.ErrVaultKeyUnavail is returned by KeyProvider implementations
 // when no master key is currently available.
 
 // EnvKeyProvider sources the master key from an environment
@@ -87,7 +87,7 @@ func NewEnvKeyProvider() *EnvKeyProvider {
 func LoadFromEnv(varName string) ([]byte, error) {
 	v := os.Getenv(varName)
 	if v == "" {
-		return nil, errs.ErrorVaultKeyUnavailable
+		return nil, errs.ErrVaultKeyUnavail
 	}
 	b, err := hex.DecodeString(v)
 	if err != nil {
@@ -151,7 +151,7 @@ func NewStaticSecretBroker(v *Vault, secrets map[string][]byte) *StaticSecretBro
 func (b *StaticSecretBroker) Resolve(_ context.Context, secretID string) ([]byte, error) {
 	ct, ok := b.Secrets[secretID]
 	if !ok {
-		return nil, errs.ErrorVaultUnknownSecret
+		return nil, errs.ErrVaultUnknown
 	}
 	pt, err := b.Vault.Decrypt(string(ct))
 	if err != nil {

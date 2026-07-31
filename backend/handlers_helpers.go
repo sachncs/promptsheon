@@ -59,4 +59,4 @@ func ModelRevision(model, provider string) string {
 func modelRevision(model, provider string) string {
 	return ModelRevision(model, provider)
 }
-var errProviderMissing = errs.ErrorExecutorProviderMissing
+var errProviderMissing = errs.ErrProviderMissing

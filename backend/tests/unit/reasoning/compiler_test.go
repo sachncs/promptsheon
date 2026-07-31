@@ -74,8 +74,8 @@ func TestCompileNoMatch(t *testing.T) {
 		ID:   "i1",
 		Goal: "play chess",
 	})
-	if !errors.Is(err, errs.ErrorReasoningNoMatch) {
-		t.Errorf("expected errs.ErrorReasoningNoMatch, got %v", err)
+	if !errors.Is(err, errs.ErrReasoningNoMatch) {
+		t.Errorf("expected errs.ErrReasoningNoMatch, got %v", err)
 	}
 }
 
@@ -98,8 +98,8 @@ func TestCompileRespectsMinTrustScore(t *testing.T) {
 			MinTrustScore: 0.99,
 		},
 	})
-	if !errors.Is(err, errs.ErrorReasoningConstraintViolation) {
-		t.Errorf("expected errs.ErrorReasoningConstraintViolation, got %v", err)
+	if !errors.Is(err, errs.ErrReasoningConstraintViolation) {
+		t.Errorf("expected errs.ErrReasoningConstraintViolation, got %v", err)
 	}
 }
 
@@ -113,8 +113,8 @@ func TestCompileRespectsMaxCost(t *testing.T) {
 			MaxCostUSD: 0.0001,
 		},
 	})
-	if !errors.Is(err, errs.ErrorReasoningConstraintViolation) {
-		t.Errorf("expected errs.ErrorReasoningConstraintViolation, got %v", err)
+	if !errors.Is(err, errs.ErrReasoningConstraintViolation) {
+		t.Errorf("expected errs.ErrReasoningConstraintViolation, got %v", err)
 	}
 }
 
@@ -130,10 +130,10 @@ func TestCompileRespectsRequiredTags(t *testing.T) {
 	})
 	// RequiredTags is a hard constraint; when no candidate
 	// satisfies it, the compiler reports
-	// errs.ErrorReasoningConstraintViolation (a constraint rejected every
+	// errs.ErrReasoningConstraintViolation (a constraint rejected every
 	// match).
-	if !errors.Is(err, errs.ErrorReasoningConstraintViolation) {
-		t.Errorf("expected errs.ErrorReasoningConstraintViolation, got %v", err)
+	if !errors.Is(err, errs.ErrReasoningConstraintViolation) {
+		t.Errorf("expected errs.ErrReasoningConstraintViolation, got %v", err)
 	}
 }
 

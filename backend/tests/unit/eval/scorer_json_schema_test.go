@@ -156,7 +156,7 @@ func TestJSONSchema_EmptySchema(t *testing.T) {
 
 // TestJSONSchema_RejectsUnsupportedKeywords locks in the SEC-3a
 // acceptance: a schema that uses only unsupported keywords
-// (allOf, $ref, oneOf) returns errs.ErrorEvalUnsupportedSchema from
+// (allOf, $ref, oneOf) returns errs.ErrEvalUnsupportedSchema from
 // ScoreCase.
 func TestJSONSchema_RejectsUnsupportedKeywords(t *testing.T) {
 	cases := []struct {
@@ -170,8 +170,8 @@ func TestJSONSchema_RejectsUnsupportedKeywords(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			_, err := (JSONSchema{}).ScoreCase(json.RawMessage(`"x"`), json.RawMessage(c.schema))
-			if !errors.Is(err, errs.ErrorEvalUnsupportedSchema) {
-				t.Errorf("expected errs.ErrorEvalUnsupportedSchema, got %v", err)
+			if !errors.Is(err, errs.ErrEvalUnsupportedSchema) {
+				t.Errorf("expected errs.ErrEvalUnsupportedSchema, got %v", err)
 			}
 		})
 	}

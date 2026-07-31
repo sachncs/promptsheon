@@ -67,10 +67,10 @@ func (e Environment) Valid() bool {
 	}
 }
 
-// errs.ErrorReleaseNotPending is returned when a transition is attempted on a
+// errs.ErrReleaseNotPending is returned when a transition is attempted on a
 // Release that is not in the Pending state.
 
-// errs.ErrorReleaseUnknownEnvironment is returned when an Environment fails the
+// errs.ErrReleaseUnknownEnvironment is returned when an Environment fails the
 // closed-set check.
 
 // Release is the approved pointer from a Version to an Environment.
@@ -113,7 +113,7 @@ func New(capabilityID string, capabilityVersion int, manifest capability.Manifes
 		return Release{}, errors.New("release: created_by is required")
 	}
 	if !environment.Valid() {
-		return Release{}, fmt.Errorf("%w: %q", errs.ErrorReleaseUnknownEnvironment, environment)
+		return Release{}, fmt.Errorf("%w: %q", errs.ErrReleaseUnknownEnvironment, environment)
 	}
 	if err := manifest.Validate(); err != nil {
 		return Release{}, fmt.Errorf("release: manifest: %w", err)
@@ -140,7 +140,7 @@ func New(capabilityID string, capabilityVersion int, manifest capability.Manifes
 // as a separate step (SEC-1): the policy is self-checking.
 func (r Release) ApproveWith(a approval.Approval, pol approval.Policy) (Release, error) {
 	if r.Status != StatusPending {
-		return r, errs.ErrorReleaseNotPending
+		return r, errs.ErrReleaseNotPending
 	}
 	if r.CreatedBy == "" {
 		return r, errors.New("release: cannot approve; created_by is empty (cannot run separation-of-duties check)")
@@ -160,7 +160,7 @@ func (r Release) ApproveWith(a approval.Approval, pol approval.Policy) (Release,
 		return r, fmt.Errorf("release: policy: %w", err)
 	}
 	if !satisfied {
-		return r, fmt.Errorf("%w: state=%s, votes=%d", errs.ErrorApprovalQuorumNotMet, state, len(a.Votes))
+		return r, fmt.Errorf("%w: state=%s, votes=%d", errs.ErrQuorum, state, len(a.Votes))
 	}
 	for _, v := range a.Votes {
 		if v.Decision == approval.Approve {
