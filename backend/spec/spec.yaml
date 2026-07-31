@@ -33,7 +33,7 @@ components:
 paths:
   /api/v1/alerts/active:
     get:
-      summary: "GET alerts/active"
+      summary: "ListAlerts lists the alerts. ListAlerts lists the alerts."
       responses:
         "200":
           description: OK
@@ -55,7 +55,7 @@ paths:
           description: Not found
   /api/v1/alerts/active/{id}/resolve:
     put:
-      summary: "PUT alerts/active/{id}/resolve"
+      summary: "ResolveAlert resolves the alert. ResolveAlert resolves the alert."
       parameters:
         - name: id
           in: path
@@ -79,7 +79,7 @@ paths:
           description: Internal server error
   /api/v1/alerts/notifications:
     get:
-      summary: "GET alerts/notifications"
+      summary: "ListNotificationGroups lists the notificationGroups. ListNotificationGroups lists the notificationGroups."
       responses:
         "200":
           description: OK
@@ -100,7 +100,7 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "POST alerts/notifications"
+      summary: "AddNotificationGroup adds the notificationGroup. AddNotificationGroup adds the notificationGroup."
       requestBody:
         required: true
         content:
@@ -130,7 +130,7 @@ paths:
           description: Internal server error
   /api/v1/alerts/rules:
     get:
-      summary: "GET alerts/rules"
+      summary: "ListAlertRules lists the alertRules. ListAlertRules lists the alertRules."
       responses:
         "200":
           description: OK
@@ -151,7 +151,7 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "POST alerts/rules"
+      summary: "CreateAlertRule creates the alertRule. CreateAlertRule creates the alertRule."
       requestBody:
         required: true
         content:
@@ -190,7 +190,7 @@ paths:
           description: Internal server error
   /api/v1/alerts/rules/{id}:
     get:
-      summary: "GET alerts/rules/{id}"
+      summary: "GetAlertRule returns the alertRule. GetAlertRule returns the alertRule."
       parameters:
         - name: id
           in: path
@@ -211,7 +211,7 @@ paths:
         "404":
           description: Not found
     put:
-      summary: "PUT alerts/rules/{id}"
+      summary: "UpdateAlertRule updates the alertRule. UpdateAlertRule updates the alertRule."
       parameters:
         - name: id
           in: path
@@ -251,7 +251,7 @@ paths:
         "500":
           description: Internal server error
     delete:
-      summary: "DELETE alerts/rules/{id}"
+      summary: "DeleteAlertRule deletes the alertRule. DeleteAlertRule deletes the alertRule."
       parameters:
         - name: id
           in: path
@@ -275,7 +275,7 @@ paths:
           description: Internal server error
   /api/v1/alerts/rules/{rule_id}/groups/{group_id}:
     post:
-      summary: "handleLinkAlertRuleGroup wires an alert rule to a notification\ngroup."
+      summary: "handleLinkAlertRuleGroup wires an alert rule to a notification group."
       parameters:
         - name: rule_id
           in: path
@@ -303,7 +303,7 @@ paths:
         "500":
           description: Internal server error
     delete:
-      summary: "handleUnlinkAlertRuleGroup removes the wire between an alert\nrule and a notification group."
+      summary: "handleUnlinkAlertRuleGroup removes the wire between an alert rule and a notification group."
       parameters:
         - name: rule_id
           in: path
@@ -332,7 +332,7 @@ paths:
           description: Internal server error
   /api/v1/apikeys:
     get:
-      summary: "GET apikeys"
+      summary: "ListAPIKeys lists the aPIKeys. ListAPIKeys lists the aPIKeys."
       responses:
         "200":
           description: OK
@@ -353,7 +353,22 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "POST apikeys"
+      summary: "CreateAPIKey creates the aPIKey. CreateAPIKey creates the aPIKey."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                userID:
+                  type: string
+                role:
+                  type: string
+                expiresAt:
+                  $ref: "#/components/schemas/object"
       responses:
         "200":
           description: OK
@@ -371,7 +386,7 @@ paths:
           description: Internal server error
   /api/v1/apikeys/{id}:
     delete:
-      summary: "DELETE apikeys/{id}"
+      summary: "RevokeAPIKey handles the request. RevokeAPIKey handles the request."
       parameters:
         - name: id
           in: path
@@ -395,7 +410,7 @@ paths:
           description: Internal server error
   /api/v1/audit:
     get:
-      summary: "GET audit"
+      summary: "ListAudit lists the audit. ListAudit lists the audit."
       responses:
         "200":
           description: OK
@@ -417,7 +432,7 @@ paths:
           description: Not found
   /api/v1/audit/export:
     get:
-      summary: "GET audit/export"
+      summary: "ExportAudit exports the audit. ExportAudit exports the audit."
       responses:
         "200":
           description: OK
@@ -439,7 +454,7 @@ paths:
           description: Not found
   /api/v1/audit/verify:
     get:
-      summary: "GET audit/verify"
+      summary: "VerifyAuditChain verifies the auditChain. VerifyAuditChain verifies the auditChain."
       responses:
         "200":
           description: OK
@@ -461,7 +476,7 @@ paths:
           description: Not found
   /api/v1/auth/{provider}/callback:
     get:
-      summary: "GET auth/{provider}/callback"
+      summary: "OAuthCallback handles the request. OAuthCallback handles the request."
       parameters:
         - name: provider
           in: path
@@ -483,7 +498,7 @@ paths:
           description: Not found
   /api/v1/auth/{provider}/login:
     get:
-      summary: "GET auth/{provider}/login"
+      summary: "handleOAuthLogin is the OAuth login start endpoint; it redirects the caller to the provider\\'s authorization URL. OAuthLogin handles the request."
       parameters:
         - name: provider
           in: path
@@ -505,7 +520,7 @@ paths:
           description: Not found
   /api/v1/capabilities/{capability_id}/datasets:
     get:
-      summary: "GET capabilities/{capability_id}/datasets"
+      summary: "ListDatasets lists the datasets. ListDatasets lists the datasets."
       parameters:
         - name: capability_id
           in: path
@@ -526,7 +541,7 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "POST capabilities/{capability_id}/datasets"
+      summary: "CreateDataset creates the dataset. CreateDataset creates the dataset."
       parameters:
         - name: capability_id
           in: path
@@ -550,7 +565,7 @@ paths:
           description: Internal server error
   /api/v1/capabilities/{capability_id}/preconditions:
     get:
-      summary: "GET capabilities/{capability_id}/preconditions"
+      summary: "ListPreconditions lists the preconditions. ListPreconditions lists the preconditions."
       parameters:
         - name: capability_id
           in: path
@@ -571,7 +586,7 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "POST capabilities/{capability_id}/preconditions"
+      summary: "CreatePrecondition creates the precondition. CreatePrecondition creates the precondition."
       parameters:
         - name: capability_id
           in: path
@@ -595,7 +610,7 @@ paths:
           description: Internal server error
   /api/v1/capabilities/{capability_id}/releases:
     get:
-      summary: "GET capabilities/{capability_id}/releases"
+      summary: "ListReleases lists the releases. ListReleases lists the releases."
       parameters:
         - name: capability_id
           in: path
@@ -617,7 +632,7 @@ paths:
           description: Not found
   /api/v1/capabilities/{capability_id}/versions:
     get:
-      summary: "GET capabilities/{capability_id}/versions"
+      summary: "handleListVersions returns every immutable Version for the given Capability, ordered by version number (newest first). ListVersions lists the versions."
       parameters:
         - name: capability_id
           in: path
@@ -638,7 +653,7 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "POST capabilities/{capability_id}/versions"
+      summary: "CreateVersion creates the version. CreateVersion creates the version."
       parameters:
         - name: capability_id
           in: path
@@ -676,7 +691,7 @@ paths:
           description: Internal server error
   /api/v1/capabilities/{capability_id}/versions/latest:
     get:
-      summary: "GET capabilities/{capability_id}/versions/latest"
+      summary: "GetLatestVersion returns the latestVersion. GetLatestVersion returns the latestVersion."
       parameters:
         - name: capability_id
           in: path
@@ -698,7 +713,7 @@ paths:
           description: Not found
   /api/v1/capabilities/{id}:
     get:
-      summary: "GET capabilities/{id}"
+      summary: "GetCapability returns the capability. GetCapability returns the capability."
       parameters:
         - name: id
           in: path
@@ -719,7 +734,7 @@ paths:
         "404":
           description: Not found
     put:
-      summary: "PUT capabilities/{id}"
+      summary: "UpdateCapability updates the capability. UpdateCapability updates the capability."
       parameters:
         - name: id
           in: path
@@ -758,7 +773,7 @@ paths:
         "500":
           description: Internal server error
     delete:
-      summary: "DELETE capabilities/{id}"
+      summary: "DeleteCapability deletes the capability. DeleteCapability deletes the capability."
       parameters:
         - name: id
           in: path
@@ -782,7 +797,7 @@ paths:
           description: Internal server error
   /api/v1/capabilities/{id}/contract:
     get:
-      summary: "handleGetCapabilityContract returns the contract attached to\na Capability."
+      summary: "handleGetCapabilityContract returns the contract attached to a Capability."
       parameters:
         - name: id
           in: path
@@ -803,7 +818,7 @@ paths:
         "404":
           description: Not found
     put:
-      summary: "handleUpdateCapabilityContract attaches a contract to a\nCapability."
+      summary: "handleUpdateCapabilityContract attaches a contract to a Capability."
       parameters:
         - name: id
           in: path
@@ -827,7 +842,7 @@ paths:
           description: Internal server error
   /api/v1/capabilities/{id}/diff:
     get:
-      summary: "handleDiffVersions returns the structural diff between two\nVersions of a Capability."
+      summary: "handleDiffVersions returns the structural diff between two Versions of a Capability."
       parameters:
         - name: id
           in: path
@@ -849,7 +864,7 @@ paths:
           description: Not found
   /api/v1/capabilities/{id}/reputation:
     get:
-      summary: "handleGetCapabilityReputation returns the derived trust\nscore for a Capability."
+      summary: "handleGetCapabilityReputation returns the derived trust score for a Capability."
       parameters:
         - name: id
           in: path
@@ -871,7 +886,7 @@ paths:
           description: Not found
   /api/v1/capabilities/{id}/self-evolve:
     put:
-      summary: "handleUpdateSelfEvolveConfig is the API backing the\n`promptsheon selfevolve` CLI subcommand."
+      summary: "handleUpdateSelfEvolveConfig is the API backing the `promptsheon selfevolve` CLI subcommand."
       parameters:
         - name: id
           in: path
@@ -895,7 +910,7 @@ paths:
           description: Internal server error
   /api/v1/catalog/capabilities:
     get:
-      summary: "handleCatalogSearch returns the Capabilities in the\nsupplied workspace whose name matches the query string.\nEmpty query returns every Capability in the workspace.\n\nGET /api/v1/catalog/capabilities?workspace_id=ws1&q=foo&limit=100"
+      summary: "handleCatalogSearch returns the Capabilities in the supplied workspace whose name matches the query string. Empty query returns every Capability in the workspace.  GET /api/v1/catalog/capabilities?workspace_id=ws1&q=foo&limit=100 CatalogSearch handles the request."
       responses:
         "200":
           description: OK
@@ -917,7 +932,7 @@ paths:
           description: Not found
   /api/v1/datasets/{id}:
     get:
-      summary: "GET datasets/{id}"
+      summary: "GetDataset returns the dataset. GetDataset returns the dataset."
       parameters:
         - name: id
           in: path
@@ -938,7 +953,7 @@ paths:
         "404":
           description: Not found
     delete:
-      summary: "DELETE datasets/{id}"
+      summary: "DeleteDataset deletes the dataset. DeleteDataset deletes the dataset."
       parameters:
         - name: id
           in: path
@@ -962,7 +977,7 @@ paths:
           description: Internal server error
   /api/v1/datasets/{id}/cases:
     put:
-      summary: "PUT datasets/{id}/cases"
+      summary: "PutDatasetCases handles the request. PutDatasetCases handles the request."
       parameters:
         - name: id
           in: path
@@ -986,7 +1001,7 @@ paths:
           description: Internal server error
   /api/v1/evals/{id}:
     get:
-      summary: "GET evals/{id}"
+      summary: "GetEval returns the eval. GetEval returns the eval."
       parameters:
         - name: id
           in: path
@@ -1008,7 +1023,7 @@ paths:
           description: Not found
   /api/v1/executions/{id}:
     get:
-      summary: "GET executions/{id}"
+      summary: "GetExecution returns the execution. GetExecution returns the execution."
       parameters:
         - name: id
           in: path
@@ -1030,7 +1045,7 @@ paths:
           description: Not found
   /api/v1/logs/stream:
     get:
-      summary: "GET logs/stream"
+      summary: "handleLogsStream streams backend log entries over Server-Sent Events."
       responses:
         "200":
           description: OK
@@ -1052,7 +1067,7 @@ paths:
           description: Not found
   /api/v1/metrics:
     get:
-      summary: "GET metrics"
+      summary: "handleMetricsPrometheus returns the metrics collector in the Prometheus text exposition format. MetricsPrometheus handles the request."
       responses:
         "200":
           description: OK
@@ -1074,7 +1089,7 @@ paths:
           description: Not found
   /api/v1/metrics/dashboard:
     get:
-      summary: "GET metrics/dashboard"
+      summary: "handleMetricsSummary returns the in-memory metrics summary (counters, histograms, per-capability usage) for the operator dashboard."
       responses:
         "200":
           description: OK
@@ -1096,7 +1111,7 @@ paths:
           description: Not found
   /api/v1/metrics/summary:
     get:
-      summary: "GET metrics/summary"
+      summary: "handleMetricsSummary returns the in-memory metrics summary (counters, histograms, per-capability usage) for the operator dashboard."
       responses:
         "200":
           description: OK
@@ -1118,7 +1133,7 @@ paths:
           description: Not found
   /api/v1/metrics/top-capabilities:
     get:
-      summary: "GET metrics/top-capabilities"
+      summary: "handleTopCapabilities returns the top N most-used capabilities for the metrics dashboard. TopCapabilities handles the request."
       responses:
         "200":
           description: OK
@@ -1140,7 +1155,7 @@ paths:
           description: Not found
   /api/v1/preconditions/{id}:
     put:
-      summary: "handleUpdatePrecondition applies a partial mutation to an\nexisting precondition."
+      summary: "handleUpdatePrecondition applies a partial mutation to an existing precondition."
       parameters:
         - name: id
           in: path
@@ -1178,7 +1193,7 @@ paths:
         "500":
           description: Internal server error
     delete:
-      summary: "DELETE preconditions/{id}"
+      summary: "DeletePrecondition deletes the precondition. DeletePrecondition deletes the precondition."
       parameters:
         - name: id
           in: path
@@ -1202,7 +1217,7 @@ paths:
           description: Internal server error
   /api/v1/projects/{id}:
     get:
-      summary: "GET projects/{id}"
+      summary: "GetProject returns the project. GetProject returns the project."
       parameters:
         - name: id
           in: path
@@ -1223,7 +1238,7 @@ paths:
         "404":
           description: Not found
     put:
-      summary: "PUT projects/{id}"
+      summary: "UpdateProject updates the project. UpdateProject updates the project."
       parameters:
         - name: id
           in: path
@@ -1257,7 +1272,7 @@ paths:
         "500":
           description: Internal server error
     delete:
-      summary: "DELETE projects/{id}"
+      summary: "DeleteProject deletes the project. DeleteProject deletes the project."
       parameters:
         - name: id
           in: path
@@ -1281,7 +1296,7 @@ paths:
           description: Internal server error
   /api/v1/projects/{project_id}/capabilities:
     get:
-      summary: "GET projects/{project_id}/capabilities"
+      summary: "Capability HTTP handlers (CRUD + self-evolve config). ListCapabilities lists the capabilities."
       parameters:
         - name: project_id
           in: path
@@ -1302,7 +1317,7 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "POST projects/{project_id}/capabilities"
+      summary: "CreateCapability creates the capability. CreateCapability creates the capability."
       parameters:
         - name: project_id
           in: path
@@ -1342,7 +1357,7 @@ paths:
           description: Internal server error
   /api/v1/providers:
     get:
-      summary: "GET providers"
+      summary: "ListProviders lists the providers. ListProviders lists the providers."
       responses:
         "200":
           description: OK
@@ -1364,7 +1379,7 @@ paths:
           description: Not found
   /api/v1/providers/{name}:
     get:
-      summary: "GET providers/{name}"
+      summary: "GetProvider returns the provider. GetProvider returns the provider."
       parameters:
         - name: name
           in: path
@@ -1386,7 +1401,7 @@ paths:
           description: Not found
   /api/v1/providers/{name}/test:
     post:
-      summary: "POST providers/{name}/test"
+      summary: "TestProvider handles the request. TestProvider handles the request."
       parameters:
         - name: name
           in: path
@@ -1419,7 +1434,7 @@ paths:
           description: Internal server error
   /api/v1/reasoning/compile:
     post:
-      summary: "handleReasoningCompile turns an Intent into a Plan.\n\nPOST /api/v1/reasoning/compile\nBody: Intent JSON\n200 OK with Plan\n404 Not Found: ErrNoMatch\n409 Conflict: ErrConstraintViolation"
+      summary: "handleReasoningCompile turns an Intent into a Plan.  POST /api/v1/reasoning/compile Body: Intent JSON 200 OK with Plan 404 Not Found: ErrNoMatch 409 Conflict: ErrConstraintViolation ReasoningCompile handles the request."
       responses:
         "200":
           description: OK
@@ -1437,7 +1452,7 @@ paths:
           description: Internal server error
   /api/v1/releases/{id}:
     get:
-      summary: "GET releases/{id}"
+      summary: "GetRelease returns the release. GetRelease returns the release."
       parameters:
         - name: id
           in: path
@@ -1459,7 +1474,7 @@ paths:
           description: Not found
   /api/v1/releases/{id}/activate:
     post:
-      summary: "POST releases/{id}/activate"
+      summary: "ActivateRelease activates the release. ActivateRelease activates the release."
       parameters:
         - name: id
           in: path
@@ -1483,7 +1498,7 @@ paths:
           description: Internal server error
   /api/v1/releases/{id}/approval:
     get:
-      summary: "GET releases/{id}/approval"
+      summary: "GetReleaseApproval returns the releaseApproval. GetReleaseApproval returns the releaseApproval."
       parameters:
         - name: id
           in: path
@@ -1505,7 +1520,7 @@ paths:
           description: Not found
   /api/v1/releases/{id}/invoke:
     post:
-      summary: "POST releases/{id}/invoke"
+      summary: "InvokeRelease invokes the release. InvokeRelease invokes the release."
       parameters:
         - name: id
           in: path
@@ -1529,7 +1544,7 @@ paths:
           description: Internal server error
   /api/v1/releases/{id}/rollback:
     post:
-      summary: "POST releases/{id}/rollback"
+      summary: "RollbackRelease rolls back the release. RollbackRelease rolls back the release."
       parameters:
         - name: id
           in: path
@@ -1553,7 +1568,7 @@ paths:
           description: Internal server error
   /api/v1/releases/{id}/votes:
     post:
-      summary: "POST releases/{id}/votes"
+      summary: "VoteOnRelease records a vote on the release. VoteOnRelease records a vote on the release."
       parameters:
         - name: id
           in: path
@@ -1577,7 +1592,7 @@ paths:
           description: Internal server error
   /api/v1/releases/{release_id}/evals:
     get:
-      summary: "GET releases/{release_id}/evals"
+      summary: "ListEvals lists the evals. ListEvals lists the evals."
       parameters:
         - name: release_id
           in: path
@@ -1598,7 +1613,7 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "POST releases/{release_id}/evals"
+      summary: "RunEval runs the eval. RunEval runs the eval."
       parameters:
         - name: release_id
           in: path
@@ -1622,7 +1637,7 @@ paths:
           description: Internal server error
   /api/v1/settings:
     get:
-      summary: "handleListSettings returns every non-tombstoned key.\nSecret-shaped values are masked to \"***\" (see\ninternal/settings/secret_keys.go)."
+      summary: "handleListSettings returns every non-tombstoned key. Secret-shaped values are masked to \"***\" (see internal/settings/secret_keys.go). ListSettings lists the settings."
       responses:
         "200":
           description: OK
@@ -1644,7 +1659,7 @@ paths:
           description: Not found
   /api/v1/settings/{key}:
     get:
-      summary: "handleGetSetting returns the effective value for one key (or 404).\nUnlike list, which contains persisted live rows only, this endpoint applies\nenvironment-over-database precedence."
+      summary: "handleGetSetting returns the effective value for one key (or 404). Unlike list, which contains persisted live rows only, this endpoint applies environment-over-database precedence."
       parameters:
         - name: key
           in: path
@@ -1721,7 +1736,7 @@ paths:
           description: Internal server error
   /api/v1/setup:
     post:
-      summary: "handleBootstrap is the first-run endpoint that mints an admin\nuser and an admin API key when the deployment is brand-new and\nrunning with authentication disabled."
+      summary: "handleBootstrap is the first-run endpoint that mints an admin user and an admin API key when the deployment is brand-new and running with authentication disabled."
       requestBody:
         required: true
         content:
@@ -1750,7 +1765,7 @@ paths:
           description: Internal server error
   /api/v1/users:
     get:
-      summary: "GET users"
+      summary: "ListUsers lists the users. ListUsers lists the users."
       responses:
         "200":
           description: OK
@@ -1771,7 +1786,7 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "POST users"
+      summary: "CreateUser creates the user. CreateUser creates the user."
       requestBody:
         required: true
         content:
@@ -1802,7 +1817,7 @@ paths:
           description: Internal server error
   /api/v1/users/{id}:
     get:
-      summary: "GET users/{id}"
+      summary: "GetUser returns the user. GetUser returns the user."
       parameters:
         - name: id
           in: path
@@ -1823,7 +1838,7 @@ paths:
         "404":
           description: Not found
     put:
-      summary: "PUT users/{id}"
+      summary: "UpdateUser updates the user. UpdateUser updates the user."
       parameters:
         - name: id
           in: path
@@ -1859,7 +1874,7 @@ paths:
         "500":
           description: Internal server error
     delete:
-      summary: "DELETE users/{id}"
+      summary: "DeleteUser deletes the user. DeleteUser deletes the user."
       parameters:
         - name: id
           in: path
@@ -1883,7 +1898,7 @@ paths:
           description: Internal server error
   /api/v1/vault/keys:
     get:
-      summary: "GET vault/keys"
+      summary: "ListVaultKeys lists the vaultKeys. ListVaultKeys lists the vaultKeys."
       responses:
         "200":
           description: OK
@@ -1904,7 +1919,7 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "POST vault/keys"
+      summary: "SaveVaultKey saves the vaultKey. SaveVaultKey saves the vaultKey."
       requestBody:
         required: true
         content:
@@ -1935,7 +1950,7 @@ paths:
           description: Internal server error
   /api/v1/vault/keys/{id}:
     delete:
-      summary: "DELETE vault/keys/{id}"
+      summary: "DeleteVaultKey deletes the vaultKey. DeleteVaultKey deletes the vaultKey."
       parameters:
         - name: id
           in: path
@@ -1981,7 +1996,7 @@ paths:
           description: Not found
   /api/v1/versions/{id}:
     get:
-      summary: "GET versions/{id}"
+      summary: "GetVersion returns the version. GetVersion returns the version."
       parameters:
         - name: id
           in: path
@@ -2003,7 +2018,7 @@ paths:
           description: Not found
   /api/v1/versions/{version_id}/executions:
     get:
-      summary: "GET versions/{version_id}/executions"
+      summary: "Auto-split from handlers_capabilities.go ListExecutions lists the executions."
       parameters:
         - name: version_id
           in: path
@@ -2024,7 +2039,7 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "errProviderMissing is an alias for the executor's typed\nsentinel."
+      summary: "errProviderMissing is an alias for the executor's typed sentinel."
       parameters:
         - name: version_id
           in: path
@@ -2061,7 +2076,7 @@ paths:
           description: Internal server error
   /api/v1/versions/{version_id}/releases:
     post:
-      summary: "POST versions/{version_id}/releases"
+      summary: "CreateRelease creates the release. CreateRelease creates the release."
       parameters:
         - name: version_id
           in: path
@@ -2085,7 +2100,7 @@ paths:
           description: Internal server error
   /api/v1/webhooks:
     get:
-      summary: "GET webhooks"
+      summary: "ListWebhooks lists the webhooks. ListWebhooks lists the webhooks."
       responses:
         "200":
           description: OK
@@ -2106,7 +2121,7 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "POST webhooks"
+      summary: "CreateWebhook creates the webhook. CreateWebhook creates the webhook."
       requestBody:
         required: true
         content:
@@ -2138,7 +2153,7 @@ paths:
           description: Internal server error
   /api/v1/webhooks/{id}:
     delete:
-      summary: "DELETE webhooks/{id}"
+      summary: "DeleteWebhook deletes the webhook. DeleteWebhook deletes the webhook."
       parameters:
         - name: id
           in: path
@@ -2162,7 +2177,7 @@ paths:
           description: Internal server error
   /api/v1/workflows/run:
     post:
-      summary: "handleRunWorkflow accepts a workflow Definition and runs it\nthrough the configured workflow.Engine."
+      summary: "handleRunWorkflow accepts a workflow Definition and runs it through the configured workflow.Engine."
       responses:
         "200":
           description: OK
@@ -2180,7 +2195,7 @@ paths:
           description: Internal server error
   /api/v1/workspaces:
     get:
-      summary: "GET workspaces"
+      summary: "Auto-split from handlers_capabilities.go ListWorkspaces lists the workspaces."
       responses:
         "200":
           description: OK
@@ -2201,7 +2216,7 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "POST workspaces"
+      summary: "CreateWorkspace creates the workspace. CreateWorkspace creates the workspace."
       requestBody:
         required: true
         content:
@@ -2230,7 +2245,7 @@ paths:
           description: Internal server error
   /api/v1/workspaces/{id}:
     get:
-      summary: "GET workspaces/{id}"
+      summary: "GetWorkspace returns the workspace. GetWorkspace returns the workspace."
       parameters:
         - name: id
           in: path
@@ -2251,7 +2266,7 @@ paths:
         "404":
           description: Not found
     put:
-      summary: "PUT workspaces/{id}"
+      summary: "UpdateWorkspace updates the workspace. UpdateWorkspace updates the workspace."
       parameters:
         - name: id
           in: path
@@ -2285,7 +2300,7 @@ paths:
         "500":
           description: Internal server error
     delete:
-      summary: "DELETE workspaces/{id}"
+      summary: "DeleteWorkspace deletes the workspace. DeleteWorkspace deletes the workspace."
       parameters:
         - name: id
           in: path
@@ -2309,7 +2324,7 @@ paths:
           description: Internal server error
   /api/v1/workspaces/{id}/observation:
     get:
-      summary: "GET workspaces/{id}/observation"
+      summary: "handleGetWorkspaceObservation returns the per-Workspace rollup: invocation counts, token totals, error rate, and the most recent execution timestamp."
       parameters:
         - name: id
           in: path
@@ -2331,7 +2346,7 @@ paths:
           description: Not found
   /api/v1/workspaces/{workspace_id}/projects:
     get:
-      summary: "GET workspaces/{workspace_id}/projects"
+      summary: "Auto-split from handlers_capabilities.go ListProjects lists the projects."
       parameters:
         - name: workspace_id
           in: path
@@ -2352,7 +2367,7 @@ paths:
         "404":
           description: Not found
     post:
-      summary: "POST workspaces/{workspace_id}/projects"
+      summary: "CreateProject creates the project. CreateProject creates the project."
       parameters:
         - name: workspace_id
           in: path
@@ -2442,7 +2457,7 @@ paths:
           description: Not found
   /ready:
     get:
-      summary: "handleReady returns 200 only when every downstream the daemon\ndepends on for correct operation is reachable:\n\n  - The SQLite database responds to Ping (operator's data).\n  - The OTel tracer is reachable (the daemon otherwise can't\n    ship traces to the operator's collector; failures here\n    will not stall the request path but they do mean the\n    observability story is broken).\n  - The audit worker queue has room (degraded audit means\n    we may be losing entries; the queue depth is exposed\n    so K8s readiness can shed traffic before drops begin).\n\nA failed probe returns 503 with a body naming the failing\ncomponent so operators can triage from the kubelet log\nwithout digging through the daemon log."
+      summary: "handleReady returns 200 only when every downstream the daemon depends on for correct operation is reachable:    - The SQLite database responds to Ping (operator's data).   - The OTel tracer is reachable (the daemon otherwise can't     ship traces to the operator's collector; failures here     will not stall the request path but they do mean the     observability story is broken).   - The audit worker queue has room (degraded audit means     we may be losing entries; the queue depth is exposed     so K8s readiness can shed traffic before drops begin).  A failed probe returns 503 with a body naming the failing component so operators can triage from the kubelet log without digging through the daemon log. Ready handles the request."
       security: []
       responses:
         "200":
@@ -2459,7 +2474,7 @@ paths:
           description: Not found
   /readyz:
     get:
-      summary: "handleReady returns 200 only when every downstream the daemon\ndepends on for correct operation is reachable:\n\n  - The SQLite database responds to Ping (operator's data).\n  - The OTel tracer is reachable (the daemon otherwise can't\n    ship traces to the operator's collector; failures here\n    will not stall the request path but they do mean the\n    observability story is broken).\n  - The audit worker queue has room (degraded audit means\n    we may be losing entries; the queue depth is exposed\n    so K8s readiness can shed traffic before drops begin).\n\nA failed probe returns 503 with a body naming the failing\ncomponent so operators can triage from the kubelet log\nwithout digging through the daemon log."
+      summary: "handleReady returns 200 only when every downstream the daemon depends on for correct operation is reachable:    - The SQLite database responds to Ping (operator's data).   - The OTel tracer is reachable (the daemon otherwise can't     ship traces to the operator's collector; failures here     will not stall the request path but they do mean the     observability story is broken).   - The audit worker queue has room (degraded audit means     we may be losing entries; the queue depth is exposed     so K8s readiness can shed traffic before drops begin).  A failed probe returns 503 with a body naming the failing component so operators can triage from the kubelet log without digging through the daemon log. Ready handles the request."
       responses:
         "200":
           description: OK

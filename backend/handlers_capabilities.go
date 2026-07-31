@@ -9,7 +9,7 @@ import (
 )
 
 // Capability HTTP handlers (CRUD + self-evolve config).
-
+// ListCapabilities lists the capabilities.
 func (s *Server) handleListCapabilities(w http.ResponseWriter, r *http.Request) error {
 	limit, offset, err := parsePagination(r)
 	if err != nil {
@@ -29,6 +29,7 @@ func (s *Server) handleListCapabilities(w http.ResponseWriter, r *http.Request) 
 	return nil
 }
 
+// CreateCapability creates the capability.
 // CreateCapability creates the capability.
 func (s *Server) handleCreateCapability(w http.ResponseWriter, r *http.Request) error {
 	projectID := r.PathValue("project_id")
@@ -71,6 +72,7 @@ func (s *Server) handleCreateCapability(w http.ResponseWriter, r *http.Request) 
 }
 
 // GetCapability returns the capability.
+// GetCapability returns the capability.
 func (s *Server) handleGetCapability(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	c, err := s.db.GetCapability(r.Context(), id)
@@ -81,6 +83,7 @@ func (s *Server) handleGetCapability(w http.ResponseWriter, r *http.Request) err
 	return nil
 }
 
+// UpdateCapability updates the capability.
 // UpdateCapability updates the capability.
 func (s *Server) handleUpdateCapability(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
@@ -119,6 +122,7 @@ func (s *Server) handleUpdateCapability(w http.ResponseWriter, r *http.Request) 
 }
 
 // DeleteCapability deletes the capability.
+// DeleteCapability deletes the capability.
 func (s *Server) handleDeleteCapability(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if err := s.db.DeleteCapability(r.Context(), id); err != nil {
@@ -134,6 +138,7 @@ func (s *Server) handleDeleteCapability(w http.ResponseWriter, r *http.Request) 
 // partial capability.SelfEvolveConfig; the daemon merges
 // over the persisted config and persists. Operators flip
 // the loop on/off here without restarting the daemon.
+// UpdateSelfEvolveConfig updates the selfEvolveConfig.
 func (s *Server) handleUpdateSelfEvolveConfig(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	existing, err := s.db.GetCapability(r.Context(), id)

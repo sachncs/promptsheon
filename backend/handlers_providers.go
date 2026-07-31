@@ -12,6 +12,7 @@ const valError = "error"
 const fieldModel = "model"
 
 // ListProviders lists the providers.
+// ListProviders lists the providers.
 func (s *Server) handleListProviders(w http.ResponseWriter, _ *http.Request) error {
 	if s.providers == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"providers": []string{}})
@@ -22,6 +23,7 @@ func (s *Server) handleListProviders(w http.ResponseWriter, _ *http.Request) err
 	return nil
 }
 
+// GetProvider returns the provider.
 // GetProvider returns the provider.
 func (s *Server) handleGetProvider(w http.ResponseWriter, r *http.Request) error {
 	if s.providers == nil {
@@ -46,6 +48,7 @@ func (s *Server) handleGetProvider(w http.ResponseWriter, r *http.Request) error
 	return nil
 }
 
+// TestProvider handles the request.
 // TestProvider handles the request.
 func (s *Server) handleTestProvider(w http.ResponseWriter, r *http.Request) error {
 	if s.providers == nil {

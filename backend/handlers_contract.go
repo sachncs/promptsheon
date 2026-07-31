@@ -33,6 +33,7 @@ func (s *Server) capabilityRepo() capability.Repository {
 // 200 OK with the persisted contract.
 // 400 Bad Request: contract.Validate failed.
 // 404 Not Found: capability id does not exist.
+// UpdateCapabilityContract updates the capabilityContract.
 func (s *Server) handleUpdateCapabilityContract(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if id == "" {
@@ -59,6 +60,7 @@ func (s *Server) handleUpdateCapabilityContract(w http.ResponseWriter, r *http.R
 // handleGetCapabilityContract returns the contract attached to
 // a Capability. 404 if the Capability has no contract or does
 // not exist.
+// GetCapabilityContract returns the capabilityContract.
 func (s *Server) handleGetCapabilityContract(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if id == "" {
@@ -83,6 +85,7 @@ func (s *Server) handleGetCapabilityContract(w http.ResponseWriter, r *http.Requ
 // two.
 //
 // GET /api/v1/capabilities/{id}/diff?from=1&to=2
+// DiffVersions handles the request.
 func (s *Server) handleDiffVersions(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if id == "" {
@@ -118,6 +121,7 @@ func (s *Server) handleDiffVersions(w http.ResponseWriter, r *http.Request) erro
 // execution history, decision history, and SLO adherence.
 //
 // GET /api/v1/capabilities/{id}/reputation
+// GetCapabilityReputation returns the capabilityReputation.
 func (s *Server) handleGetCapabilityReputation(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if id == "" {
@@ -164,6 +168,7 @@ func parseVersionDiffArgs(r *http.Request) (int, int, error) {
 // Empty query returns every Capability in the workspace.
 //
 // GET /api/v1/catalog/capabilities?workspace_id=ws1&q=foo&limit=100
+// CatalogSearch handles the request.
 func (s *Server) handleCatalogSearch(w http.ResponseWriter, r *http.Request) error {
 	ws := r.URL.Query().Get("workspace_id")
 	if ws == "" {

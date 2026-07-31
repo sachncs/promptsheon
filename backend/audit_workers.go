@@ -164,6 +164,7 @@ func (s *Server) auditWorker(ctx context.Context) {
 // the audit worker pool. A recovered panic is logged and the
 // entry is dropped — durability of individual entries is best-
 // effort, but the worker keeps running.
+// AuditEntry handles the request.
 func (s *Server) handleAuditEntry(entry *models.AuditEntry) {
 	defer func() {
 		if r := recover(); r != nil {

@@ -111,12 +111,20 @@ func (t *UsageTracker) GetTopCapabilities(limit int) []*UsageCount {
 	return usages
 }
 
+// handleMetricsSummary returns the in-memory metrics summary
+// (counters, histograms, per-capability usage) for the operator
+// dashboard. The /metrics/dashboard alias returns the same
+// payload as a convenience for /api/v1/metrics/dashboard.
+// MetricsSummary handles the request.
 func (s *Server) handleMetricsSummary(w http.ResponseWriter, _ *http.Request) error {
 	summary := s.collector.GetSummary()
 	writeJSON(w, http.StatusOK, summary)
 	return nil
 }
 
+// handleTopCapabilities returns the top N most-used capabilities
+// for the metrics dashboard.
+// TopCapabilities handles the request.
 func (s *Server) handleTopCapabilities(w http.ResponseWriter, _ *http.Request) error {
 	if s.usageTracker == nil {
 		writeJSON(w, http.StatusOK, []*UsageCount{})

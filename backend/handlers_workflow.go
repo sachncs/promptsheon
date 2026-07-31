@@ -16,6 +16,7 @@ import (
 // audit-chain wrapping is provided by audit() so a workflow
 // run is recorded as a single "workflow.run" event with the
 // workflow id.
+// RunWorkflow runs the workflow.
 func (s *Server) handleRunWorkflow(w http.ResponseWriter, r *http.Request) error {
 	if s.workflowEngine == nil {
 		return &HTTPError{Status: http.StatusServiceUnavailable, Message: "workflow engine not configured"}

@@ -50,6 +50,7 @@ func (s *Server) settingsResolver() (*settings.Resolver, error) {
 // handleListSettings returns every non-tombstoned key.
 // Secret-shaped values are masked to "***" (see
 // internal/settings/secret_keys.go).
+// ListSettings lists the settings.
 func (s *Server) handleListSettings(w http.ResponseWriter, r *http.Request) error {
 	res, err := s.settingsResolver()
 	if err != nil {
@@ -71,6 +72,7 @@ func (s *Server) handleListSettings(w http.ResponseWriter, r *http.Request) erro
 // Unlike list, which contains persisted live rows only, this endpoint applies
 // environment-over-database precedence. Tombstones remain distinguishable
 // from live empty values and are treated as missing.
+// GetSetting returns the setting.
 func (s *Server) handleGetSetting(w http.ResponseWriter, r *http.Request) error {
 	res, err := s.settingsResolver()
 	if err != nil {
@@ -99,6 +101,7 @@ func (s *Server) handleGetSetting(w http.ResponseWriter, r *http.Request) error 
 // notifier has finished. If any subscriber returns an error,
 // the handler propagates it as a 500 so the operator sees the
 // failed hot-reload.
+// SetSetting handles the request.
 func (s *Server) handleSetSetting(w http.ResponseWriter, r *http.Request) error {
 	if s.settingsMode == "env-only" {
 		return forbidden("settings: PROMPTSHEON_SETTINGS_MODE=env-only; writes disabled")
@@ -136,6 +139,7 @@ func (s *Server) handleSetSetting(w http.ResponseWriter, r *http.Request) error 
 // resolver writes a tombstone row (so a concurrent replica's
 // Set cannot resurrect the key); the GET surface treats the
 // tombstone as missing.
+// DeleteSetting deletes the setting.
 func (s *Server) handleDeleteSetting(w http.ResponseWriter, r *http.Request) error {
 	if s.settingsMode == "env-only" {
 		return forbidden("settings: PROMPTSHEON_SETTINGS_MODE=env-only; writes disabled")

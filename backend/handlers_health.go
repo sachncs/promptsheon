@@ -15,6 +15,7 @@ var startTime = time.Now()
 // the HTTP server is processing requests; per the K8s
 // liveness/readiness contract, liveness is "is the process
 // alive" not "is it healthy". Deeper checks live in /ready.
+// Health handles the request.
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
 	info := Get()
 	body := map[string]any{
@@ -65,6 +66,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
 // A failed probe returns 503 with a body naming the failing
 // component so operators can triage from the kubelet log
 // without digging through the daemon log.
+// Ready handles the request.
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 	ready := map[string]any{
 		auditKeyStatus: "ready",
@@ -128,6 +130,7 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 // handleVersion returns the structured build info. The endpoint
 // is intentionally unauthenticated so external uptime probes and
 // load balancers can read the running version without an API key.
+// Version handles the request.
 func (s *Server) handleVersion(w http.ResponseWriter, _ *http.Request) error {
 	writeJSON(w, http.StatusOK, Get())
 	return nil

@@ -8,7 +8,7 @@ import (
 )
 
 // Auto-split from handlers_capabilities.go
-
+// ListWorkspaces lists the workspaces.
 func (s *Server) handleListWorkspaces(w http.ResponseWriter, r *http.Request) error {
 	limit, offset, err := parsePagination(r)
 	if err != nil {
@@ -27,6 +27,7 @@ func (s *Server) handleListWorkspaces(w http.ResponseWriter, r *http.Request) er
 	return nil
 }
 
+// CreateWorkspace creates the workspace.
 // CreateWorkspace creates the workspace.
 func (s *Server) handleCreateWorkspace(w http.ResponseWriter, r *http.Request) error {
 	var req struct {
@@ -56,6 +57,7 @@ func (s *Server) handleCreateWorkspace(w http.ResponseWriter, r *http.Request) e
 }
 
 // GetWorkspace returns the workspace.
+// GetWorkspace returns the workspace.
 func (s *Server) handleGetWorkspace(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	wksp, err := s.db.GetWorkspace(r.Context(), id)
@@ -66,6 +68,7 @@ func (s *Server) handleGetWorkspace(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
+// UpdateWorkspace updates the workspace.
 // UpdateWorkspace updates the workspace.
 func (s *Server) handleUpdateWorkspace(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
@@ -95,6 +98,7 @@ func (s *Server) handleUpdateWorkspace(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
+// DeleteWorkspace deletes the workspace.
 // DeleteWorkspace deletes the workspace.
 func (s *Server) handleDeleteWorkspace(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")

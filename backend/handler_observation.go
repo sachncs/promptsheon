@@ -20,6 +20,7 @@ import (
 // for a workspace with N capabilities this is O(N) queries.
 // On larger deployments the rollups.Aggregator (background job)
 // replaces this with a single precomputed row.
+// GetWorkspaceObservation returns the workspaceObservation.
 func (s *Server) handleGetWorkspaceObservation(w http.ResponseWriter, r *http.Request) error {
 	// BUG-28: the route is registered as /workspaces/{id}/observation,
 	// so r.PathValue("id") is the only key that matches. The previous

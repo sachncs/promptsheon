@@ -11,7 +11,7 @@ import (
 )
 
 // Auto-split from handlers_capabilities.go
-
+// ListExecutions lists the executions.
 func (s *Server) handleListExecutions(w http.ResponseWriter, r *http.Request) error {
 	limit, offset, err := parsePagination(r)
 	if err != nil {
@@ -40,6 +40,7 @@ func (s *Server) handleListExecutions(w http.ResponseWriter, r *http.Request) er
 // requested model) to 502 Bad Gateway with a provider_missing
 // detail so operators can distinguish "no provider" from
 // "provider failed" without reading the daemon log. BUG-19.
+// CreateExecution creates the execution.
 func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) error {
 	capabilityVersionID := r.PathValue("version_id")
 	var req struct {
@@ -186,6 +187,7 @@ func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]
 	return &rec, err, time.Since(start)
 }
 
+// GetExecution returns the execution.
 // GetExecution returns the execution.
 func (s *Server) handleGetExecution(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")

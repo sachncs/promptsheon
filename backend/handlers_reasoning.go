@@ -23,6 +23,7 @@ import (
 // 200 OK with Plan
 // 404 Not Found: ErrNoMatch
 // 409 Conflict: ErrConstraintViolation
+// ReasoningCompile handles the request.
 func (s *Server) handleReasoningCompile(w http.ResponseWriter, r *http.Request) error {
 	var intent Intent
 	if err := json.NewDecoder(r.Body).Decode(&intent); err != nil {

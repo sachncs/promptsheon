@@ -40,6 +40,7 @@ type createReleaseRequest struct {
 }
 
 // CreateRelease creates the release.
+// CreateRelease creates the release.
 func (s *Server) handleCreateRelease(w http.ResponseWriter, r *http.Request) error {
 	versionID := r.PathValue("version_id")
 	v, err := s.db.GetVersion(r.Context(), versionID)
@@ -73,6 +74,7 @@ func (s *Server) handleCreateRelease(w http.ResponseWriter, r *http.Request) err
 }
 
 // GetRelease returns the release.
+// GetRelease returns the release.
 func (s *Server) handleGetRelease(w http.ResponseWriter, r *http.Request) error {
 	rel, err := s.releaseSvc.Get(r.Context(), r.PathValue("id"))
 	if err != nil {
@@ -82,6 +84,7 @@ func (s *Server) handleGetRelease(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
+// ListReleases lists the releases.
 // ListReleases lists the releases.
 func (s *Server) handleListReleases(w http.ResponseWriter, r *http.Request) error {
 	rels, err := s.releaseSvc.ListForCapability(r.Context(), r.PathValue("capability_id"))
@@ -101,6 +104,7 @@ type voteRequest struct {
 	Reason   string `json:"reason,omitempty"`
 }
 
+// VoteOnRelease records a vote on the release.
 // VoteOnRelease records a vote on the release.
 func (s *Server) handleVoteOnRelease(w http.ResponseWriter, r *http.Request) error {
 	releaseID := r.PathValue("id")
@@ -149,6 +153,7 @@ func (s *Server) handleVoteOnRelease(w http.ResponseWriter, r *http.Request) err
 }
 
 // ActivateRelease activates the release.
+// ActivateRelease activates the release.
 func (s *Server) handleActivateRelease(w http.ResponseWriter, r *http.Request) error {
 	releaseID := r.PathValue("id")
 	activated, err := s.releaseSvc.Activate(r.Context(), releaseID)
@@ -184,6 +189,7 @@ func (s *Server) handleActivateRelease(w http.ResponseWriter, r *http.Request) e
 }
 
 // RollbackRelease rolls back the release.
+// RollbackRelease rolls back the release.
 func (s *Server) handleRollbackRelease(w http.ResponseWriter, r *http.Request) error {
 	rolled, err := s.releaseSvc.Rollback(r.Context(), r.PathValue("id"))
 	if err != nil {
@@ -206,6 +212,7 @@ type invokeReleaseRequest struct {
 	// caller pick either, which made the approval a fiction.
 }
 
+// InvokeRelease invokes the release.
 // InvokeRelease invokes the release.
 func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) error {
 	releaseID := r.PathValue("id")
@@ -352,6 +359,7 @@ func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, in
 	return &rec, err, time.Since(start)
 }
 
+// GetReleaseApproval returns the releaseApproval.
 // GetReleaseApproval returns the releaseApproval.
 func (s *Server) handleGetReleaseApproval(w http.ResponseWriter, r *http.Request) error {
 	a, err := s.releaseSvc.Approval(r.Context(), r.PathValue("id"))

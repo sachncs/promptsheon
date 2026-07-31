@@ -285,22 +285,57 @@ func extractHandlerName(expr ast.Expr) string {
 	return ""
 }
 
+// unwrapHandlerExpr recurses through wrapping call expressions
+// to extract the underlying handler identifier. For both
+// `s.wrapHandler(s.handleX)` (Fun=SelectorExpr) and the
+// curried `s.requirePerm(auth.X)(s.handleX)` (Fun=CallExpr),
+// the handler is in Args[0] — recurse into it. The deepest
+// SelectorExpr has the actual identifier at `.X`.
+// unwrapHandlerExpr returns either a real *ast.Ident or a
+// synthetic Ident constructed from a SelectorExpr's .Sel.Name.
+// The latter is what we need for forms like `s.handleX` and the
+// curried `s.requirePerm(auth.X)(s.handleX)` where the receiver
+// `s` is just a routing indirection.
+func unwrapHandlerExpr(expr ast.Expr) (*ast.Ident, bool) {
+	switch e := expr.(type) {
+	case *ast.Ident:
+		return e, true
+	case *ast.CallExpr:
+		if len(e.Args) > 0 {
+			return unwrapHandlerExpr(e.Args[0])
+		}
+	case *ast.SelectorExpr:
+		// Synthesize an Ident carrying the function name. The
+		// downstream code mutates .Name to install the
+		// resolved handler name.
+		return &ast.Ident{Name: e.Sel.Name}, true
+	}
+	return nil, false
+}
+
 // resolveAlias looks up the value of a variable alias in the
-// server.go routes() function. For example:
+// routes() function of routes.go. For example:
 //
 //	createKey := s.handleCreateAPIKey
 //
-// is resolved to "handleCreateAPIKey".
+// is resolved to "handleCreateAPIKey". The previous
+// implementation mutated the AST in place and asked the caller
+// to re-extract, but the caller's loop never re-ran extract —
+// the resolved name was silently dropped and every handler
+// using an alias lost its OpenAPI summary. The version below
+// returns the resolved name explicitly and unwraps wrapping
+// call expressions like s.wrapHandler(listKeys).
 func resolveAlias(path string, r route) (string, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 	if err != nil {
 		return "", err
 	}
-	// Find the s.mux.HandleFunc call. Look at the statement
-	// that contains it. The previous statement should be the
-	// assignment of the alias.
+	var resolved string
 	ast.Inspect(file, func(n ast.Node) bool {
+		if resolved != "" {
+			return false
+		}
 		call, ok := n.(*ast.CallExpr)
 		if !ok {
 			return true
@@ -320,22 +355,14 @@ func resolveAlias(path string, r route) (string, error) {
 		if !strings.HasPrefix(mp, r.Method+" ") || strings.SplitN(mp, " ", 2)[1] != r.Path {
 			return true
 		}
-		// We have the matching HandleFunc. The alias is
-		// whatever the previous statement assigned. We can
-		// walk up the block, but a simpler approach: search
-		// the entire file for an assignment of the form
-		//
-		//   <alias> := <expr>
-		//
-		// where <alias> appears as the second arg of THIS
-		// HandleFunc call. We do that by comparing the
-		// syntactic text of call.Args[1] to the LHS of
-		// every AssignStmt in the file.
-		ident, ok := call.Args[1].(*ast.Ident)
+		ident, ok := unwrapHandlerExpr(call.Args[1])
 		if !ok {
 			return true
 		}
 		ast.Inspect(file, func(m ast.Node) bool {
+			if resolved != "" {
+				return false
+			}
 			as, ok := m.(*ast.AssignStmt)
 			if !ok || as.Tok != token.DEFINE || len(as.Lhs) != 1 || len(as.Rhs) != 1 {
 				return true
@@ -346,17 +373,14 @@ func resolveAlias(path string, r route) (string, error) {
 			}
 			if lhs.Name == ident.Name {
 				if sel, ok := as.Rhs[0].(*ast.SelectorExpr); ok {
-					ident.Name = sel.Sel.Name
+					resolved = sel.Sel.Name
 				}
 			}
 			return true
 		})
-		// We mutated ident.Name in place; the caller will
-		// re-extract.
-		_ = ident
 		return false
 	})
-	return r.handlerName, nil
+	return resolved, nil
 }
 
 // handlerInfo is the extracted description of a handler. We
@@ -366,6 +390,11 @@ func resolveAlias(path string, r route) (string, error) {
 type handlerInfo struct {
 	Name    string
 	Summary string
+	// SkipSummary, when true, suppresses the "no godoc" failure
+	// in writeMethod. Handlers marked with // genopenapi: skip-summary
+	// in their doc block set this. Use sparingly — every skipped
+	// handler is one fewer useful description in the generated SDK.
+	SkipSummary bool
 	// requestType is the Go type name of the request struct
 	// (e.g. "struct {...}"). The generator treats it as
 	// anonymous and walks its fields directly rather than
@@ -387,9 +416,12 @@ type requestField struct {
 }
 
 // collectHandlers reads every Go file in the given directory and
-// extracts handler function metadata.
+// extracts handler function metadata. The historical glob
+// matched handlers_*.go only, but a handful of handlers live
+// in backend/http.go (system probes, the metrics endpoint)
+// and the strict-summary mode needs to see their godoc too.
 func collectHandlers(dir string) (map[string]*handlerInfo, error) {
-	matches, err := filepath.Glob(filepath.Join(dir, "handlers_*.go"))
+	matches, err := filepath.Glob(filepath.Join(dir, "*.go"))
 	if err != nil {
 		return nil, err
 	}
@@ -410,6 +442,7 @@ func collectHandlers(dir string) (map[string]*handlerInfo, error) {
 			}
 			info := &handlerInfo{Name: fn.Name.Name}
 			info.Summary = extractDocSummary(fn.Doc)
+			info.SkipSummary = extractSkipSummary(fn.Doc)
 			info.requestType = extractRequestStruct(fn)
 			out[fn.Name.Name] = info
 		}
@@ -427,17 +460,36 @@ func extractDocSummary(doc *ast.CommentGroup) string {
 	// Strip leading // and any leading package/function
 	// heading.
 	full = strings.TrimSpace(full)
-	if i := strings.IndexAny(full, "\n."); i > 0 {
-		// Prefer the first sentence (terminated by '.')
-		// over the first line, since the line might be a
-		// sub-heading like "Foo does X.".
-		end := strings.Index(full, ". ")
-		if end == -1 {
-			return full
+		if i := strings.IndexAny(full, "\n."); i > 0 {
+			// Prefer the first sentence (terminated by '.')
+			// over the first line, since the line might be a
+			// sub-heading like "Foo does X.". Strip embedded
+			// newlines so the YAML stays single-line.
+			end := strings.Index(full, ". ")
+			if end == -1 {
+				return strings.ReplaceAll(full, "\n", " ")
+			}
+			return strings.ReplaceAll(full[:end+1], "\n", " ")
 		}
-		return full[:end+1]
+		return strings.ReplaceAll(full, "\n", " ")
 	}
-	return full
+
+// extractSkipSummary reads an explicit
+// `// genopenapi: skip-summary` marker from a handler's doc
+// block. Handlers carrying the marker are exempt from the
+// godoc-required failure in writeMethod. Use sparingly — the
+// generated SDK descriptions stay useful only while most
+// handlers have real summaries.
+func extractSkipSummary(doc *ast.CommentGroup) bool {
+	if doc == nil || doc.List == nil {
+		return false
+	}
+	for _, c := range doc.List {
+		if strings.Contains(c.Text, "genopenapi: skip-summary") {
+			return true
+		}
+	}
+	return false
 }
 
 // extractRequestStruct walks a function body looking for the
@@ -752,11 +804,35 @@ func writeMethod(buf *bytes.Buffer, method string, h *handlerInfo, path string, 
 	buf.WriteString(strings.ToLower(method))
 	buf.WriteString(":\n")
 
+	// System probe endpoints (health/readiness/version) are
+	// intentionally undocumented; emit a stable placeholder so
+	// the OpenAPI stays machine-readable without inventing a
+	// doc-string every handler would have to repeat.
+	// systemProbe lists the URLs that don't need a real handler
+	// name (they're typically served by inline funcs or by
+	// packages without godoc, like /metrics which is wired by
+	// an inline func in routes.go). The handler emits a stable
+	// placeholder summary so the SDKs have something to render.
+	systemProbe := path == pathHealth || path == pathReady || path == "/api/v1/version" || path == "/metrics" || path == "/readyz" || path == "/livez" || path == "/ready"
 	summary := ""
 	if h != nil && h.Summary != "" {
 		summary = h.Summary
-	} else {
+	} else if systemProbe {
 		summary = fmt.Sprintf("%s %s", method, cleanPath(path))
+	} else {
+		// Handlers outside the system-probe set must carry a
+		// doc comment or an explicit // genopenapi: skip-summary
+		// marker. Without one, the SDK consumers get a useless
+		// "GET /path" summary that no real client can act on.
+		skip := h != nil && h.SkipSummary
+		if !skip {
+			hint := ""
+			if h != nil {
+				hint = " (handler=" + h.Name + ")"
+			}
+			fmt.Fprintf(os.Stderr, "genopenapi: %s %s has no godoc summary%s; add a doc comment or // genopenapi: skip-summary\n", method, path, hint)
+			os.Exit(2)
+		}
 	}
 	fmt.Fprintf(buf, "      summary: %q\n", summary)
 

@@ -138,6 +138,9 @@ func ReadOnlyMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// handleLogsStream streams backend log entries over Server-Sent
+// Events. The stream is open-ended until the caller disconnects.
+// LogsStream handles the request.
 func (s *Server) handleLogsStream(w http.ResponseWriter, r *http.Request) error {
 	if s.logHub == nil {
 		return badRequest("log streaming not configured")
@@ -146,6 +149,9 @@ func (s *Server) handleLogsStream(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
+// handleMetricsPrometheus returns the metrics collector in the
+// Prometheus text exposition format.
+// MetricsPrometheus handles the request.
 func (s *Server) handleMetricsPrometheus(w http.ResponseWriter, r *http.Request) error {
 	if s.collector == nil {
 		return badRequest("metrics not configured")

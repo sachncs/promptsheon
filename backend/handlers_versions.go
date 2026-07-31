@@ -13,6 +13,9 @@ import (
 
 // Auto-split from handlers_capabilities.go
 
+// handleListVersions returns every immutable Version for the
+// given Capability, ordered by version number (newest first).
+// ListVersions lists the versions.
 func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request) error {
 	limit, offset, err := parsePagination(r)
 	if err != nil {
@@ -32,6 +35,7 @@ func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
+// CreateVersion creates the version.
 // CreateVersion creates the version.
 func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) error {
 	capabilityID := r.PathValue("capability_id")
@@ -114,6 +118,7 @@ func (a *versionResolverAdapter) GetVersion(id string) (*capability.Version, err
 }
 
 // GetVersion returns the version.
+// GetVersion returns the version.
 func (s *Server) handleGetVersion(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	v, err := s.db.GetVersion(r.Context(), id)
@@ -124,6 +129,7 @@ func (s *Server) handleGetVersion(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
+// GetLatestVersion returns the latestVersion.
 // GetLatestVersion returns the latestVersion.
 func (s *Server) handleGetLatestVersion(w http.ResponseWriter, r *http.Request) error {
 	capabilityID := r.PathValue("capability_id")
