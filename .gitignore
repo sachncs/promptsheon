@@ -76,4 +76,4 @@ scripts/bench-current.txt
 # Local promptsheon state directory
 .promptsheon/
 
-# vendor/ is committed for reproducible CI builds; not ignored.
+# vendor/ is committed for reproducible CI builds; not ignored.sdk/typescript/node_modules/

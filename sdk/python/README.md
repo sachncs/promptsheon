@@ -2,16 +2,19 @@
 
 Auto-generated Python client for the [Promptsheon](https://github.com/sachncs/promptsheon) v1 API.
 
+The `src/promptsheon/` package is regenerated from
+`backend/spec/spec.yaml` by `openapi-python-client`. The
+generated API exposes a `Client` and an `AuthenticatedClient`
+for every route in the spec — see the per-route modules under
+`promptsheon.api.default.*` for the full surface.
+
 ## Usage
 
 ```python
-from promptsheon import Client, ClientConfig
+from promptsheon import Client
 
-with Client(ClientConfig(
-    base_url="https://api.promptsheon.example.com",
-    api_key="<your API key>",
-)) as client:
-    capabilities = client.list_capabilities("project-1")
+with Client(base_url="https://api.promptsheon.example.com", token="<your API key>") as client:
+    workspaces = client.api.list_workspaces()
 ```
 
 ## Development
@@ -23,11 +26,10 @@ cd sdk/python
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e '.[codegen]'
 bash scripts/codegen.sh   # regenerates src/promptsheon from ../../backend/spec/spec.yaml
-python3 -m compileall src/promptsheon tests
+python3 -m compileall -q src/promptsheon
+python3 -m compileall -q tests
+python3 -m pytest tests    # smoke test the package imports
 ```
 
-Today `src/promptsheon/client.py` is a hand-written scaffold
-covering the public-resource list in the architecture review
-(§7: listCapabilities, invokeRelease). The M3 follow-on commit
-regenerates against the production spec once it covers every v1
-resource.
+If `bash scripts/codegen.sh` produces a diff the SDK is out of
+sync with the daemon's OpenAPI spec. CI fails the build.

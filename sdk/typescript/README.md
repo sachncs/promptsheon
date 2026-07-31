@@ -3,17 +3,18 @@
 Auto-generated TypeScript client for the [Promptsheon](https://github.com/sachncs/promptsheon)
 v1 API.
 
+The `src/openapi.ts` file is regenerated from
+`backend/spec/spec.yaml` by `openapi-typescript`. The output is
+types-only: a `paths` map keyed by route, with request/response
+schemas per method. Consumers instantiate the generated HTTP
+client of their choice (fetch, axios, …) and wrap those types.
+
 ## Usage
 
 ```ts
-import { PromptsheonClient } from "@promptsheon/typescript";
+import type { paths } from "@promptsheon/typescript";
 
-const client = new PromptsheonClient({
-  baseUrl: "https://api.promptsheon.example.com",
-  apiKey: process.env.PROMPTSHEON_API_KEY,
-});
-
-const capabilities = await client.listCapabilities("project-1");
+type ListWorkspaces = paths["/api/v1/workspaces"]["get"]["responses"]["200"]["content"]["application/json"];
 ```
 
 ## Development
@@ -29,6 +30,5 @@ npm run build     # emit dist/
 ```
 
 The codegen script uses `openapi-typescript` and requires Node.js
->= 18. Today `src/openapi.ts` is a placeholder hand-written against
-the public resource list in the architecture review; the M3
-follow-on commit wires the codegen pipeline.
+>= 18. If `npm run codegen` produces a diff the SDK types are
+out of sync with the daemon's OpenAPI spec. CI fails the build.

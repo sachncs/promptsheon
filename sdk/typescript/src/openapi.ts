@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET alerts/active */
+        /** ListAlerts lists the alerts. ListAlerts lists the alerts. */
         get: {
             parameters: {
                 query?: never;
@@ -71,7 +71,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** PUT alerts/active/{id}/resolve */
+        /** ResolveAlert resolves the alert. ResolveAlert resolves the alert. */
         put: {
             parameters: {
                 query?: never;
@@ -136,9 +136,52 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** ListNotificationGroups lists the notificationGroups. ListNotificationGroups lists the notificationGroups. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["object"][];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         put?: never;
-        /** POST alerts/notifications */
+        /** AddNotificationGroup adds the notificationGroup. AddNotificationGroup adds the notificationGroup. */
         post: {
             parameters: {
                 query?: never;
@@ -207,7 +250,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET alerts/rules */
+        /** ListAlertRules lists the alertRules. ListAlertRules lists the alertRules. */
         get: {
             parameters: {
                 query?: never;
@@ -252,7 +295,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** POST alerts/rules */
+        /** CreateAlertRule creates the alertRule. CreateAlertRule creates the alertRule. */
         post: {
             parameters: {
                 query?: never;
@@ -326,7 +369,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET alerts/rules/{id} */
+        /** GetAlertRule returns the alertRule. GetAlertRule returns the alertRule. */
         get: {
             parameters: {
                 query?: never;
@@ -370,7 +413,7 @@ export interface paths {
                 };
             };
         };
-        /** PUT alerts/rules/{id} */
+        /** UpdateAlertRule updates the alertRule. UpdateAlertRule updates the alertRule. */
         put: {
             parameters: {
                 query?: never;
@@ -432,7 +475,7 @@ export interface paths {
             };
         };
         post?: never;
-        /** DELETE alerts/rules/{id} */
+        /** DeleteAlertRule deletes the alertRule. DeleteAlertRule deletes the alertRule. */
         delete: {
             parameters: {
                 query?: never;
@@ -497,10 +540,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * handleLinkAlertRuleGroup wires an alert rule to a notification
-         *     group.
-         */
+        /** handleLinkAlertRuleGroup wires an alert rule to a notification group. */
         post: {
             parameters: {
                 query?: never;
@@ -552,10 +592,7 @@ export interface paths {
                 };
             };
         };
-        /**
-         * handleUnlinkAlertRuleGroup removes the wire between an alert
-         *     rule and a notification group.
-         */
+        /** handleUnlinkAlertRuleGroup removes the wire between an alert rule and a notification group. */
         delete: {
             parameters: {
                 query?: never;
@@ -619,7 +656,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET apikeys */
+        /** ListAPIKeys lists the aPIKeys. ListAPIKeys lists the aPIKeys. */
         get: {
             parameters: {
                 query?: never;
@@ -664,7 +701,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** POST apikeys */
+        /** CreateAPIKey creates the aPIKey. CreateAPIKey creates the aPIKey. */
         post: {
             parameters: {
                 query?: never;
@@ -672,7 +709,16 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        userID?: string;
+                        role?: string;
+                        expiresAt?: components["schemas"]["object"];
+                    };
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -729,7 +775,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** DELETE apikeys/{id} */
+        /** RevokeAPIKey handles the request. RevokeAPIKey handles the request. */
         delete: {
             parameters: {
                 query?: never;
@@ -792,7 +838,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET audit */
+        /** ListAudit lists the audit. ListAudit lists the audit. */
         get: {
             parameters: {
                 query?: never;
@@ -851,7 +897,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET audit/export */
+        /** ExportAudit exports the audit. ExportAudit exports the audit. */
         get: {
             parameters: {
                 query?: never;
@@ -910,7 +956,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET audit/verify */
+        /** VerifyAuditChain verifies the auditChain. VerifyAuditChain verifies the auditChain. */
         get: {
             parameters: {
                 query?: never;
@@ -969,7 +1015,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET auth/{provider}/callback */
+        /** OAuthCallback handles the request. OAuthCallback handles the request. */
         get: {
             parameters: {
                 query?: never;
@@ -1028,7 +1074,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET auth/{provider}/login */
+        /** handleOAuthLogin is the OAuth login start endpoint; it redirects the caller to the provider\'s authorization URL. OAuthLogin handles the request. */
         get: {
             parameters: {
                 query?: never;
@@ -1087,7 +1133,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET capabilities/{capability_id}/datasets */
+        /** ListDatasets lists the datasets. ListDatasets lists the datasets. */
         get: {
             parameters: {
                 query?: never;
@@ -1132,7 +1178,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** POST capabilities/{capability_id}/datasets */
+        /** CreateDataset creates the dataset. CreateDataset creates the dataset. */
         post: {
             parameters: {
                 query?: never;
@@ -1196,7 +1242,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET capabilities/{capability_id}/preconditions */
+        /** ListPreconditions lists the preconditions. ListPreconditions lists the preconditions. */
         get: {
             parameters: {
                 query?: never;
@@ -1241,7 +1287,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** POST capabilities/{capability_id}/preconditions */
+        /** CreatePrecondition creates the precondition. CreatePrecondition creates the precondition. */
         post: {
             parameters: {
                 query?: never;
@@ -1305,7 +1351,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET capabilities/{capability_id}/releases */
+        /** ListReleases lists the releases. ListReleases lists the releases. */
         get: {
             parameters: {
                 query?: never;
@@ -1364,7 +1410,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET capabilities/{capability_id}/versions */
+        /** handleListVersions returns every immutable Version for the given Capability, ordered by version number (newest first). ListVersions lists the versions. */
         get: {
             parameters: {
                 query?: never;
@@ -1409,7 +1455,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** POST capabilities/{capability_id}/versions */
+        /** CreateVersion creates the version. CreateVersion creates the version. */
         post: {
             parameters: {
                 query?: never;
@@ -1424,6 +1470,7 @@ export interface paths {
                     "application/json": {
                         version?: number;
                         manifest?: components["schemas"]["object"];
+                        parents?: unknown[];
                     };
                 };
             };
@@ -1480,7 +1527,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET capabilities/{capability_id}/versions/latest */
+        /** GetLatestVersion returns the latestVersion. GetLatestVersion returns the latestVersion. */
         get: {
             parameters: {
                 query?: never;
@@ -1539,7 +1586,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET capabilities/{id} */
+        /** GetCapability returns the capability. GetCapability returns the capability. */
         get: {
             parameters: {
                 query?: never;
@@ -1583,7 +1630,7 @@ export interface paths {
                 };
             };
         };
-        /** PUT capabilities/{id} */
+        /** UpdateCapability updates the capability. UpdateCapability updates the capability. */
         put: {
             parameters: {
                 query?: never;
@@ -1644,7 +1691,7 @@ export interface paths {
             };
         };
         post?: never;
-        /** DELETE capabilities/{id} */
+        /** DeleteCapability deletes the capability. DeleteCapability deletes the capability. */
         delete: {
             parameters: {
                 query?: never;
@@ -1700,14 +1747,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/datasets/{id}": {
+    "/api/v1/capabilities/{id}/contract": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** GET datasets/{id} */
+        /** handleGetCapabilityContract returns the contract attached to a Capability. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /** handleUpdateCapabilityContract attaches a contract to a Capability. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/capabilities/{id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** handleDiffVersions returns the structural diff between two Versions of a Capability. */
         get: {
             parameters: {
                 query?: never;
@@ -1753,7 +1909,250 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        /** DELETE datasets/{id} */
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/capabilities/{id}/reputation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** handleGetCapabilityReputation returns the derived trust score for a Capability. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/capabilities/{id}/self-evolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** handleUpdateSelfEvolveConfig is the API backing the `promptsheon selfevolve` CLI subcommand. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** handleCatalogSearch returns the Capabilities in the supplied workspace whose name matches the query string. Empty query returns every Capability in the workspace.  GET /api/v1/catalog/capabilities?workspace_id=ws1&q=foo&limit=100 CatalogSearch handles the request. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["object"][];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/datasets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GetDataset returns the dataset. GetDataset returns the dataset. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** DeleteDataset deletes the dataset. DeleteDataset deletes the dataset. */
         delete: {
             parameters: {
                 query?: never;
@@ -1817,7 +2216,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** PUT datasets/{id}/cases */
+        /** PutDatasetCases handles the request. PutDatasetCases handles the request. */
         put: {
             parameters: {
                 query?: never;
@@ -1882,7 +2281,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET evals/{id} */
+        /** GetEval returns the eval. GetEval returns the eval. */
         get: {
             parameters: {
                 query?: never;
@@ -1941,7 +2340,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET executions/{id} */
+        /** GetExecution returns the execution. GetExecution returns the execution. */
         get: {
             parameters: {
                 query?: never;
@@ -2000,7 +2399,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET logs/stream */
+        /** handleLogsStream streams backend log entries over Server-Sent Events. */
         get: {
             parameters: {
                 query?: never;
@@ -2059,7 +2458,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET metrics */
+        /** handleMetricsPrometheus returns the metrics collector in the Prometheus text exposition format. MetricsPrometheus handles the request. */
         get: {
             parameters: {
                 query?: never;
@@ -2118,7 +2517,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET metrics/dashboard */
+        /** handleMetricsSummary returns the in-memory metrics summary (counters, histograms, per-capability usage) for the operator dashboard. */
         get: {
             parameters: {
                 query?: never;
@@ -2177,7 +2576,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET metrics/summary */
+        /** handleMetricsSummary returns the in-memory metrics summary (counters, histograms, per-capability usage) for the operator dashboard. */
         get: {
             parameters: {
                 query?: never;
@@ -2236,7 +2635,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET metrics/top-capabilities */
+        /** handleTopCapabilities returns the top N most-used capabilities for the metrics dashboard. TopCapabilities handles the request. */
         get: {
             parameters: {
                 query?: never;
@@ -2296,10 +2695,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /**
-         * handleUpdatePrecondition applies a partial mutation to an
-         *     existing precondition.
-         */
+        /** handleUpdatePrecondition applies a partial mutation to an existing precondition. */
         put: {
             parameters: {
                 query?: never;
@@ -2360,7 +2756,7 @@ export interface paths {
             };
         };
         post?: never;
-        /** DELETE preconditions/{id} */
+        /** DeletePrecondition deletes the precondition. DeletePrecondition deletes the precondition. */
         delete: {
             parameters: {
                 query?: never;
@@ -2423,7 +2819,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET projects/{id} */
+        /** GetProject returns the project. GetProject returns the project. */
         get: {
             parameters: {
                 query?: never;
@@ -2467,7 +2863,7 @@ export interface paths {
                 };
             };
         };
-        /** PUT projects/{id} */
+        /** UpdateProject updates the project. UpdateProject updates the project. */
         put: {
             parameters: {
                 query?: never;
@@ -2526,7 +2922,7 @@ export interface paths {
             };
         };
         post?: never;
-        /** DELETE projects/{id} */
+        /** DeleteProject deletes the project. DeleteProject deletes the project. */
         delete: {
             parameters: {
                 query?: never;
@@ -2589,7 +2985,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET projects/{project_id}/capabilities */
+        /** Capability HTTP handlers (CRUD + self-evolve config). ListCapabilities lists the capabilities. */
         get: {
             parameters: {
                 query?: never;
@@ -2634,7 +3030,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** POST projects/{project_id}/capabilities */
+        /** CreateCapability creates the capability. CreateCapability creates the capability. */
         post: {
             parameters: {
                 query?: never;
@@ -2707,7 +3103,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET providers */
+        /** ListProviders lists the providers. ListProviders lists the providers. */
         get: {
             parameters: {
                 query?: never;
@@ -2766,7 +3162,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET providers/{name} */
+        /** GetProvider returns the provider. GetProvider returns the provider. */
         get: {
             parameters: {
                 query?: never;
@@ -2827,7 +3223,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** POST providers/{name}/test */
+        /** TestProvider handles the request. TestProvider handles the request. */
         post: {
             parameters: {
                 query?: never;
@@ -2890,6 +3286,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reasoning/compile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** handleReasoningCompile turns an Intent into a Plan.  POST /api/v1/reasoning/compile Body: Intent JSON 200 OK with Plan 404 Not Found: ErrNoMatch 409 Conflict: ErrConstraintViolation ReasoningCompile handles the request. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/releases/{id}": {
         parameters: {
             query?: never;
@@ -2897,7 +3357,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET releases/{id} */
+        /** GetRelease returns the release. GetRelease returns the release. */
         get: {
             parameters: {
                 query?: never;
@@ -2958,7 +3418,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** POST releases/{id}/activate */
+        /** ActivateRelease activates the release. ActivateRelease activates the release. */
         post: {
             parameters: {
                 query?: never;
@@ -3022,7 +3482,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET releases/{id}/approval */
+        /** GetReleaseApproval returns the releaseApproval. GetReleaseApproval returns the releaseApproval. */
         get: {
             parameters: {
                 query?: never;
@@ -3083,7 +3543,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** POST releases/{id}/invoke */
+        /** InvokeRelease invokes the release. InvokeRelease invokes the release. */
         post: {
             parameters: {
                 query?: never;
@@ -3149,7 +3609,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** POST releases/{id}/rollback */
+        /** RollbackRelease rolls back the release. RollbackRelease rolls back the release. */
         post: {
             parameters: {
                 query?: never;
@@ -3215,7 +3675,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** POST releases/{id}/votes */
+        /** VoteOnRelease records a vote on the release. VoteOnRelease records a vote on the release. */
         post: {
             parameters: {
                 query?: never;
@@ -3279,7 +3739,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET releases/{release_id}/evals */
+        /** ListEvals lists the evals. ListEvals lists the evals. */
         get: {
             parameters: {
                 query?: never;
@@ -3324,7 +3784,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** POST releases/{release_id}/evals */
+        /** RunEval runs the eval. RunEval runs the eval. */
         post: {
             parameters: {
                 query?: never;
@@ -3388,11 +3848,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * handleListSettings returns every non-tombstoned key.
-         *     Secret-shaped values are masked to "***" (see
-         *     internal/settings/secret_keys.go).
-         */
+        /** handleListSettings returns every non-tombstoned key. Secret-shaped values are masked to "***" (see internal/settings/secret_keys.go). ListSettings lists the settings. */
         get: {
             parameters: {
                 query?: never;
@@ -3451,7 +3907,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** handleGetSetting returns one key (or 404). */
+        /** handleGetSetting returns the effective value for one key (or 404). Unlike list, which contains persisted live rows only, this endpoint applies environment-over-database precedence. */
         get: {
             parameters: {
                 query?: never;
@@ -3618,11 +4074,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * handleBootstrap is the first-run endpoint that mints an admin
-         *     user and an admin API key when the deployment is brand-new and
-         *     running with authentication disabled.
-         */
+        /** handleBootstrap is the first-run endpoint that mints an admin user and an admin API key when the deployment is brand-new and running with authentication disabled. */
         post: {
             parameters: {
                 query?: never;
@@ -3691,7 +4143,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET users */
+        /** ListUsers lists the users. ListUsers lists the users. */
         get: {
             parameters: {
                 query?: never;
@@ -3736,7 +4188,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** POST users */
+        /** CreateUser creates the user. CreateUser creates the user. */
         post: {
             parameters: {
                 query?: never;
@@ -3806,7 +4258,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET users/{id} */
+        /** GetUser returns the user. GetUser returns the user. */
         get: {
             parameters: {
                 query?: never;
@@ -3850,7 +4302,7 @@ export interface paths {
                 };
             };
         };
-        /** PUT users/{id} */
+        /** UpdateUser updates the user. UpdateUser updates the user. */
         put: {
             parameters: {
                 query?: never;
@@ -3910,7 +4362,7 @@ export interface paths {
             };
         };
         post?: never;
-        /** DELETE users/{id} */
+        /** DeleteUser deletes the user. DeleteUser deletes the user. */
         delete: {
             parameters: {
                 query?: never;
@@ -3973,7 +4425,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET vault/keys */
+        /** ListVaultKeys lists the vaultKeys. ListVaultKeys lists the vaultKeys. */
         get: {
             parameters: {
                 query?: never;
@@ -4018,7 +4470,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** POST vault/keys */
+        /** SaveVaultKey saves the vaultKey. SaveVaultKey saves the vaultKey. */
         post: {
             parameters: {
                 query?: never;
@@ -4091,7 +4543,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** DELETE vault/keys/{id} */
+        /** DeleteVaultKey deletes the vaultKey. DeleteVaultKey deletes the vaultKey. */
         delete: {
             parameters: {
                 query?: never;
@@ -4213,7 +4665,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET versions/{id} */
+        /** GetVersion returns the version. GetVersion returns the version. */
         get: {
             parameters: {
                 query?: never;
@@ -4272,7 +4724,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET versions/{version_id}/executions */
+        /** Auto-split from handlers_capabilities.go ListExecutions lists the executions. */
         get: {
             parameters: {
                 query?: never;
@@ -4317,7 +4769,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** POST versions/{version_id}/executions */
+        /** errProviderMissing is an alias for the executor's typed sentinel. */
         post: {
             parameters: {
                 query?: never;
@@ -4391,7 +4843,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** POST versions/{version_id}/releases */
+        /** CreateRelease creates the release. CreateRelease creates the release. */
         post: {
             parameters: {
                 query?: never;
@@ -4455,7 +4907,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET webhooks */
+        /** ListWebhooks lists the webhooks. ListWebhooks lists the webhooks. */
         get: {
             parameters: {
                 query?: never;
@@ -4500,7 +4952,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** POST webhooks */
+        /** CreateWebhook creates the webhook. CreateWebhook creates the webhook. */
         post: {
             parameters: {
                 query?: never;
@@ -4573,7 +5025,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** DELETE webhooks/{id} */
+        /** DeleteWebhook deletes the webhook. DeleteWebhook deletes the webhook. */
         delete: {
             parameters: {
                 query?: never;
@@ -4638,10 +5090,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * handleRunWorkflow accepts a workflow Definition and runs it
-         *     through the configured workflow.Engine.
-         */
+        /** handleRunWorkflow accepts a workflow Definition and runs it through the configured workflow.Engine. */
         post: {
             parameters: {
                 query?: never;
@@ -4703,7 +5152,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET workspaces */
+        /** Auto-split from handlers_capabilities.go ListWorkspaces lists the workspaces. */
         get: {
             parameters: {
                 query?: never;
@@ -4748,7 +5197,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** POST workspaces */
+        /** CreateWorkspace creates the workspace. CreateWorkspace creates the workspace. */
         post: {
             parameters: {
                 query?: never;
@@ -4817,7 +5266,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET workspaces/{id} */
+        /** GetWorkspace returns the workspace. GetWorkspace returns the workspace. */
         get: {
             parameters: {
                 query?: never;
@@ -4861,7 +5310,7 @@ export interface paths {
                 };
             };
         };
-        /** PUT workspaces/{id} */
+        /** UpdateWorkspace updates the workspace. UpdateWorkspace updates the workspace. */
         put: {
             parameters: {
                 query?: never;
@@ -4920,7 +5369,7 @@ export interface paths {
             };
         };
         post?: never;
-        /** DELETE workspaces/{id} */
+        /** DeleteWorkspace deletes the workspace. DeleteWorkspace deletes the workspace. */
         delete: {
             parameters: {
                 query?: never;
@@ -4983,7 +5432,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET workspaces/{id}/observation */
+        /** handleGetWorkspaceObservation returns the per-Workspace rollup: invocation counts, token totals, error rate, and the most recent execution timestamp. */
         get: {
             parameters: {
                 query?: never;
@@ -5042,7 +5491,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET workspaces/{workspace_id}/projects */
+        /** Auto-split from handlers_capabilities.go ListProjects lists the projects. */
         get: {
             parameters: {
                 query?: never;
@@ -5087,7 +5536,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** POST workspaces/{workspace_id}/projects */
+        /** CreateProject creates the project. CreateProject creates the project. */
         post: {
             parameters: {
                 query?: never;
@@ -5331,23 +5780,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * handleReady returns 200 only when every downstream the daemon
-         *     depends on for correct operation is reachable:
-         *
-         *       - The SQLite database responds to Ping (operator's data).
-         *       - The OTel tracer is reachable (the daemon otherwise can't
-         *         ship traces to the operator's collector; failures here
-         *         will not stall the request path but they do mean the
-         *         observability story is broken).
-         *       - The audit worker queue has room (degraded audit means
-         *         we may be losing entries; the queue depth is exposed
-         *         so K8s readiness can shed traffic before drops begin).
-         *
-         *     A failed probe returns 503 with a body naming the failing
-         *     component so operators can triage from the kubelet log
-         *     without digging through the daemon log.
-         */
+        /** handleReady returns 200 only when every downstream the daemon depends on for correct operation is reachable:    - The SQLite database responds to Ping (operator's data).   - The OTel tracer is reachable (the daemon otherwise can't     ship traces to the operator's collector; failures here     will not stall the request path but they do mean the     observability story is broken).   - The audit worker queue has room (degraded audit means     we may be losing entries; the queue depth is exposed     so K8s readiness can shed traffic before drops begin).  A failed probe returns 503 with a body naming the failing component so operators can triage from the kubelet log without digging through the daemon log. Ready handles the request. */
         get: {
             parameters: {
                 query?: never;
@@ -5404,23 +5837,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * handleReady returns 200 only when every downstream the daemon
-         *     depends on for correct operation is reachable:
-         *
-         *       - The SQLite database responds to Ping (operator's data).
-         *       - The OTel tracer is reachable (the daemon otherwise can't
-         *         ship traces to the operator's collector; failures here
-         *         will not stall the request path but they do mean the
-         *         observability story is broken).
-         *       - The audit worker queue has room (degraded audit means
-         *         we may be losing entries; the queue depth is exposed
-         *         so K8s readiness can shed traffic before drops begin).
-         *
-         *     A failed probe returns 503 with a body naming the failing
-         *     component so operators can triage from the kubelet log
-         *     without digging through the daemon log.
-         */
+        /** handleReady returns 200 only when every downstream the daemon depends on for correct operation is reachable:    - The SQLite database responds to Ping (operator's data).   - The OTel tracer is reachable (the daemon otherwise can't     ship traces to the operator's collector; failures here     will not stall the request path but they do mean the     observability story is broken).   - The audit worker queue has room (degraded audit means     we may be losing entries; the queue depth is exposed     so K8s readiness can shed traffic before drops begin).  A failed probe returns 503 with a body naming the failing component so operators can triage from the kubelet log without digging through the daemon log. Ready handles the request. */
         get: {
             parameters: {
                 query?: never;
