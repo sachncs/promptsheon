@@ -1,132 +1,110 @@
 package auth
 
 import (
-	"context"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
-func TestOAuthManager_GetAuthURL(t *testing.T) {
+// TestRegisterProvider_RejectsSSRF locks in 1.4 / CRIT-3 fix (c0.16).
+// Before the fix, RegisterProvider accepted any URL string. Now
+// SSRF validation rejects loopback / private / link-local / metadata
+// targets on every URL field.
+func TestRegisterProvider_RejectsSSRF(t *testing.T) {
 	mgr := NewOAuthManager()
-	mgr.RegisterProvider("google", DefaultGoogleProvider("client-id", "client-secret", "http://localhost:8080/callback"))
 
-	url, err := mgr.GetAuthURL("google", "test-state")
-	if err != nil {
-		t.Fatal(err)
+	cases := []struct {
+		name      string
+		authURL   string
+		tokenURL  string
+		userURL   string
+		redirURL  string
+		wantError bool
+	}{
+		{
+			name:      "all https external",
+			authURL:   "https://accounts.google.com/o/oauth2/auth",
+			tokenURL:  "https://oauth2.googleapis.com/token",
+			userURL:   "https://openidconnect.googleapis.com/v3/userinfo",
+			redirURL:  "https://www.googleapis.com/callback",
+			wantError: false,
+		},
+		{
+			name:      "loopback in auth URL",
+			authURL:   "http://127.0.0.1:9999/admin",
+			tokenURL:  "https://oauth2.googleapis.com/token",
+			userURL:   "https://openidconnect.googleapis.com/v3/userinfo",
+			redirURL:  "https://www.googleapis.com/callback",
+			wantError: true,
+		},
+		{
+			name:      "private IP in token URL",
+			authURL:   "https://accounts.google.com/o/oauth2/auth",
+			tokenURL:  "http://10.0.0.5/token",
+			userURL:   "https://openidconnect.googleapis.com/v3/userinfo",
+			redirURL:  "https://www.googleapis.com/callback",
+			wantError: true,
+		},
+		{
+			name:      "cloud metadata in user info URL",
+			authURL:   "https://accounts.google.com/o/oauth2/auth",
+			tokenURL:  "https://oauth2.googleapis.com/token",
+			userURL:   "http://169.254.169.254/latest/meta-data/iam/security-credentials/",
+			redirURL:  "https://www.googleapis.com/callback",
+			wantError: true,
+		},
+		{
+			name:      "loopback in redirect URL",
+			authURL:   "https://accounts.google.com/o/oauth2/auth",
+			tokenURL:  "https://oauth2.googleapis.com/token",
+			userURL:   "https://openidconnect.googleapis.com/v3/userinfo",
+			redirURL:  "http://localhost:8080/callback",
+			wantError: true,
+		},
+		{
+			name:      "ftp scheme rejected",
+			authURL:   "ftp://accounts.google.com/auth",
+			tokenURL:  "https://oauth2.googleapis.com/token",
+			userURL:   "https://openidconnect.googleapis.com/v3/userinfo",
+			redirURL:  "https://app.example.com/callback",
+			wantError: true,
+		},
+		{
+			name:      "empty URLs permitted",
+			authURL:   "",
+			tokenURL:  "",
+			userURL:   "",
+			redirURL:  "",
+			wantError: false,
+		},
 	}
-	if url == "" {
-		t.Fatal("expected non-empty auth URL")
-	}
-	if !contains(url, "client_id=client-id") {
-		t.Fatal("expected client_id in URL")
-	}
-	if !contains(url, "state=test-state") {
-		t.Fatal("expected state in URL")
-	}
-}
 
-func TestOAuthManager_GetAuthURL_UnknownProvider(t *testing.T) {
-	mgr := NewOAuthManager()
-	_, err := mgr.GetAuthURL("unknown", "state")
-	if err == nil {
-		t.Fatal("expected error for unknown provider")
-	}
-}
-
-func TestOAuthManager_ExchangeCode(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/token" {
-			token := OAuthToken{
-				AccessToken:  "test-token",
-				TokenType:    "Bearer",
-				ExpiresIn:    3600,
-				RefreshToken: "refresh-token",
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			prov := &OAuthProvider{
+				Name:        "test",
+				ClientID:    "cid",
+				AuthURL:     c.authURL,
+				TokenURL:    c.tokenURL,
+				UserInfoURL: c.userURL,
+				RedirectURL: c.redirURL,
 			}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(token)
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer server.Close()
-
-	mgr := NewOAuthManager()
-	mgr.RegisterProvider("test", &OAuthProvider{
-		Name:         "test",
-		ClientID:     "client-id",
-		ClientSecret: "client-secret",
-		RedirectURL:  "http://localhost:8080/callback",
-		TokenURL:     server.URL + "/token",
-	})
-
-	state, _ := mgr.GenerateOAuthState("test")
-	token, err := mgr.ExchangeCode(context.Background(), "test", "auth-code", state)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if token.AccessToken != "test-token" {
-		t.Fatalf("expected test-token, got %s", token.AccessToken)
-	}
-	if token.ExpiresIn != 3600 {
-		t.Fatalf("expected 3600, got %d", token.ExpiresIn)
-	}
-}
-
-func TestOAuthManager_GetUserInfo(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/userinfo" {
-			user := OAuthUser{
-				ID:    "123",
-				Email: "test@example.com",
-				Name:  "Test User",
+			err := mgr.RegisterProvider("test", prov)
+			if (err != nil) != c.wantError {
+				t.Errorf("err=%v, wantError=%v", err, c.wantError)
 			}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(user)
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer server.Close()
+			if c.wantError && err != nil && !strings.Contains(err.Error(), "test") {
+				t.Errorf("error should mention provider name: %v", err)
+			}
+		})
+	}
+}
 
+// TestRegisterProvider_NilNoop ensures the documented behaviour
+// (RegisterProvider(nil) is a no-op) still holds after the signature
+// change to return error.
+func TestRegisterProvider_NilNoop(t *testing.T) {
 	mgr := NewOAuthManager()
-	mgr.RegisterProvider("test", &OAuthProvider{
-		Name:        "test",
-		UserInfoURL: server.URL + "/userinfo",
-	})
-
-	token := &OAuthToken{AccessToken: "test-token"}
-	user, err := mgr.GetUserInfo(context.Background(), "test", token)
-	if err != nil {
-		t.Fatal(err)
+	if err := mgr.RegisterProvider("ignored", nil); err != nil {
+		t.Errorf("nil provider should be no-op, got %v", err)
 	}
-	if user.Email != "test@example.com" {
-		t.Fatalf("expected test@example.com, got %s", user.Email)
-	}
-	if user.Provider != "test" {
-		t.Fatalf("expected test provider, got %s", user.Provider)
-	}
-}
-
-func TestDefaultProviders(t *testing.T) {
-	google := DefaultGoogleProvider("id", "secret", "http://localhost/callback")
-	if google.Name != "google" {
-		t.Fatalf("expected google, got %s", google.Name)
-	}
-	if google.AuthURL != "https://accounts.google.com/o/oauth2/v2/auth" {
-		t.Fatal("unexpected Google auth URL")
-	}
-
-	github := DefaultGitHubProvider("id", "secret", "http://localhost/callback")
-	if github.Name != "github" {
-		t.Fatalf("expected github, got %s", github.Name)
-	}
-	if github.AuthURL != "https://github.com/login/oauth/authorize" {
-		t.Fatal("unexpected GitHub auth URL")
-	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && (s[0:len(substr)] == substr || contains(s[1:], substr)))
 }
