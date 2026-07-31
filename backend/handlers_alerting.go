@@ -65,8 +65,9 @@ func (s *Server) handleCreateAlertRule(w http.ResponseWriter, r *http.Request) e
 	if err := validateNonEmpty("type", req.Type); err != nil {
 		return err
 	}
-	// API-VAL-4: severity must be a member of the closed set.
-	if req.Severity != "" && !validateEnum(req.Severity, validSeverities) {
+	// API-VAL-4: severity must be a member of the closed set. Empty
+	// strings are rejected — severity is not optional.
+	if !validateEnum(req.Severity, validSeverities) {
 		return badRequest("severity must be one of info, warning, critical")
 	}
 	// API-VAL-5: threshold must be strictly positive. A
