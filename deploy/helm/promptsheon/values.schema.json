@@ -83,6 +83,15 @@
         "required": ["leaderElection"],
         "properties": { "leaderElection": { "properties": { "enabled": { "const": true } } } }
       }
+    },
+    {
+      "if": {
+        "properties": { "replicaCount": { "minimum": 2 } }
+      },
+      "then": {
+        "required": ["leaderElection"],
+        "properties": { "leaderElection": { "properties": { "enabled": { "const": true } } } }
+      }
     }
   ]
 }
