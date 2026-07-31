@@ -1,0 +1,62 @@
+# OpenSSF Scorecard workflow. Runs on every push to master and
+# weekly (Monday 06:00 UTC). Uploads the SARIF to the Code Scanning
+# dashboard and posts a badge to the repo summary.
+#
+# PLANS-49/c3.10: replaces the previous state where no
+# vulnerability / supply-chain scoring existed. The threshold is
+# ≥5/10 (matches the project's documented OSS-readiness target).
+
+name: scorecard
+
+on:
+  push:
+    branches:
+      - master
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  # Read all permissions: required for the SARIF upload + badge.
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  analysis:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Run OpenSSF Scorecard
+        uses: ossf/scorecard-action@v2.4.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+          # scorecard-action flags PRs with score < threshold; we
+          # surface this via the SARIF upload so the Code Scanning
+          # dashboard shows regressions.
+
+      - name: Upload to Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+          category: scorecard
+
+      - name: Fail build if score < 5
+        if: always()
+        run: |
+          SCORE=$(jq '.score' results.sarif 2>/dev/null || echo 0)
+          echo "OpenSSF Scorecard score: $SCORE"
+          if [ "$(echo "$SCORE < 5" | bc -l)" = "1" ]; then
+            echo "::error::Scorecard score $SCORE is below the 5.0 threshold"
+            exit 1
+          fi
