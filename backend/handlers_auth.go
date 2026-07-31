@@ -495,7 +495,7 @@ func (s *Server) handleOAuthLogin(w http.ResponseWriter, r *http.Request) error 
 		Value:    state,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isRequestTLS(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   600,
 	})
@@ -650,7 +650,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isRequestTLS(r),
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   -1,
 	})

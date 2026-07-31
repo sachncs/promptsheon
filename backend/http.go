@@ -13,6 +13,15 @@ import (
 	"github.com/sachncs/promptsheon/backend/store"
 )
 
+// isRequestTLS reports whether the inbound request arrived over an
+// encrypted channel. It checks r.TLS (set by ListenAndServeTLS) and
+// X-Forwarded-Proto (set by a trusted TLS-terminating proxy). Used to
+// set Secure on cookies and HSTS on the response — both useless on
+// plaintext, both required on TLS.
+func isRequestTLS(r *http.Request) bool {
+	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+}
+
 // requirePerm returns middleware that requires a specific permission.
 func (s *Server) requirePerm(perm auth.Permission) func(Func) Func {
 	return func(fn Func) Func {
