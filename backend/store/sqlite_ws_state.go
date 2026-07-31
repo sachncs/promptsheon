@@ -40,6 +40,6 @@ func (s *SQLite) SetWSNextID(ctx context.Context, n int64) error {
 	return nil
 }
 
-// GetEnforcerBudget returns the persisted budget payload for a
-// workspace, or nil if none. OBS-13.
+// GetEnforcerBudget removed (c2.22). The PersistedEnforcer was
+// dropped; SetBudget / SetQuota are now in-memory only.
 

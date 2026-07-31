@@ -62,7 +62,6 @@ func newDB(repo *mockRepo) *store.DB {
 		Webhooks:             repo,
 		VaultState:           repo,
 		WSState:              repo,
-		EnforcerState:        repo,
 		Settings:             repo,
 		Lifecycle:            repo,
 		CapabilityRepository: repo,
@@ -866,22 +865,6 @@ func (m *mockRepo) GetWSNextID(_ context.Context) (int64, error) {
 }
 
 func (m *mockRepo) SetWSNextID(_ context.Context, _ int64) error {
-	return nil
-}
-
-func (m *mockRepo) GetEnforcerBudget(_ context.Context, _ string) ([]byte, error) {
-	return nil, nil
-}
-
-func (m *mockRepo) SetEnforcerBudget(_ context.Context, _ string, _ []byte) error {
-	return nil
-}
-
-func (m *mockRepo) GetEnforcerQuota(_ context.Context, _ string) ([]byte, error) {
-	return nil, nil
-}
-
-func (m *mockRepo) SetEnforcerQuota(_ context.Context, _ string, _ []byte) error {
 	return nil
 }
 

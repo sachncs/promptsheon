@@ -461,7 +461,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 	// success — the route surfaces it as 502 Bad Gateway.
 	// OBS-13: persisted enforcer. Budget + quota state survives
 	// process restarts via the enforcer_state table (migration 012).
-	enforcer := invoke.NewPersistedEnforcer(rootCtx, db, nil, logger)
+	enforcer := invoke.NewDefaultEnforcer(nil)
 	agg := observation.NewAggregator(nil)
 	// Recommendation loop: each invocation that lands in the
 	// observation aggregator can produce a Recommendation

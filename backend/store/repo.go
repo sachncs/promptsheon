@@ -72,12 +72,6 @@ type WSState interface {
 	GetWSNextID(context.Context) (int64, error)
 	SetWSNextID(context.Context, int64) error
 }
-type EnforcerState interface {
-	GetEnforcerBudget(context.Context, string) ([]byte, error)
-	SetEnforcerBudget(context.Context, string, []byte) error
-	GetEnforcerQuota(context.Context, string) ([]byte, error)
-	SetEnforcerQuota(context.Context, string, []byte) error
-}
 type Lifecycle interface {
 	Ping(context.Context) error
 	Close() error
@@ -110,7 +104,6 @@ type DB struct {
 	Webhooks
 	VaultState
 	WSState
-	EnforcerState
 	Settings
 	Lifecycle
 	CapabilityRepository
@@ -129,7 +122,6 @@ func NewDB(sqlite *SQLite) *DB {
 		Webhooks:             sqlite,
 		VaultState:           sqlite,
 		WSState:              sqlite,
-		EnforcerState:        sqlite,
 		Settings:             sqlite,
 		Lifecycle:            sqlite,
 		CapabilityRepository: sqlite,
