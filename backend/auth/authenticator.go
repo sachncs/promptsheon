@@ -94,15 +94,6 @@ func NewAuthenticator(store APIKeyStore, logger ...logger) *Authenticator {
 	return a
 }
 
-// NewAuthenticatorWithLogger is a thin wrapper kept for source
-// compatibility — callers that already pass an explicit logger
-// keep working. New callers should use NewAuthenticator(store, logger).
-//
-// Deprecated: use NewAuthenticator(store, logger) instead.
-func NewAuthenticatorWithLogger(store APIKeyStore, logger logger) *Authenticator {
-	return NewAuthenticator(store, logger)
-}
-
 // lastUsedWorker drains the lastUsedCh channel and applies updates on
 // a background goroutine. Errors are logged via slog and never
 // bubble up to the request path. The previous design called

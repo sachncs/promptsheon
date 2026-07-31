@@ -352,7 +352,7 @@ func (m *mockLogger) LogAuthFailure(_ context.Context, keyPrefix, reason, remote
 func TestNewAuthenticatorWithLogger(t *testing.T) {
 	logger := &mockLogger{}
 	s := &mockStore{keys: make(map[string]*APIKeyRecord)}
-	a := NewAuthenticatorWithLogger(s, logger)
+	a := NewAuthenticator(s, logger)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	_, err := a.Authenticate(req)

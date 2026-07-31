@@ -50,7 +50,7 @@ func WithAuth(db store.APIKeys) Option {
 	return func(s *Server) {
 		adapter := &storeAuthAdapter{db: db}
 		logger := &authAuditLogger{server: s}
-		s.authn = auth.NewAuthenticatorWithLogger(adapter, logger)
+		s.authn = auth.NewAuthenticator(adapter, logger)
 		s.requireAuth = true
 	}
 }
