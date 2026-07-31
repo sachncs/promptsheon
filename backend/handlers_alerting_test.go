@@ -71,6 +71,40 @@ func TestHandleCreateAlertRule_NilManager(t *testing.T) {
 	}
 }
 
+// TestHandleCreateAlertRule_EmptySeverityRejected locks in DEF-18 fix (c0.5).
+// Before the fix an empty severity string was accepted and persisted as
+// the zero value; downstream consumers received an empty label.
+func TestHandleCreateAlertRule_EmptySeverityRejected(t *testing.T) {
+	s := newTestServer(t)
+	s.alertingManager = alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil)
+
+	cases := []struct {
+		name     string
+		severity string
+		wantCode int
+	}{
+		{"empty severity rejected", "", http.StatusBadRequest},
+		{"unknown severity rejected", "nuclear", http.StatusBadRequest},
+		{"low accepted", "low", http.StatusCreated},
+		{"medium accepted", "medium", http.StatusCreated},
+		{"high accepted", "high", http.StatusCreated},
+		{"critical accepted", "critical", http.StatusCreated},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			body := mustMarshal(t, map[string]any{"name": "rule-" + c.name, "type": "threshold", "severity": c.severity, "threshold": 1.0})
+			req := httptest.NewRequest("POST", "/api/v1/alerts/rules", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
+			s.ServeHTTP(rr, req)
+			if rr.Code != c.wantCode {
+				t.Errorf("severity=%q: status=%d, want %d (body: %s)", c.severity, rr.Code, c.wantCode, rr.Body.String())
+			}
+		})
+	}
+}
+
 
 func TestHandleCreateAlertRule_MissingName(t *testing.T) {
 	s := newTestServer(t)
