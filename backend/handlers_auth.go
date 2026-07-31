@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -438,9 +437,6 @@ func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) erro
 		return unauthorized()
 	}
 	id := r.PathValue("id")
-	if id == "" {
-		id = strings.TrimPrefix(r.URL.Path, "/api/v1/apikeys/")
-	}
 	if id == "" {
 		return badRequest("key id is required")
 	}
