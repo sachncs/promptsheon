@@ -172,6 +172,14 @@ sdk:
 	@cp backend/spec/spec.yaml sdk/typescript/src/_generated/openapi.yaml
 	@echo "ok: SDK artifacts refreshed"
 
+# sdk-check verifies the SDK generated artifacts match the
+# canonical backend/spec/spec.yaml. The previous Makefile only
+# had openapi-check; the generated SDK copies were easy to drift
+# without anyone noticing (PR-3 c3.13 introduced the matching
+# codegen scripts).
+sdk-check: sdk
+	@git diff --exit-code sdk/python/src/promptsheon/_generated/openapi.yaml sdk/typescript/src/_generated/openapi.yaml || (echo "SDK artifacts out of date. Run 'make sdk' and commit."; exit 1)
+
 sdk-check: sdk
 	@git diff --exit-code sdk/ || (echo "SDK is out of date. Run 'make sdk' and commit the result."; exit 1)
 
