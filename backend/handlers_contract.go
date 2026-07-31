@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/sachncs/promptsheon/backend/capability"
 )
@@ -47,11 +48,13 @@ func (s *Server) handleUpdateCapabilityContract(w http.ResponseWriter, r *http.R
 		return &HTTPError{Status: http.StatusBadRequest, Message: err.Error()}
 	}
 	if err := s.capabilityRepo().SetCapabilityContract(r.Context(), id, &c); err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return &HTTPError{Status: http.StatusNotFound, Message: "capability not found"}
+		if dbErr := translateDBError(err, "capability contract"); dbErr != nil {
+			if httpErr, ok := dbErr.(*HTTPError); ok && httpErr.Status == http.StatusNotFound {
+				return &HTTPError{Status: http.StatusNotFound, Message: "capability not found"}
+			}
+			s.logger.Error("set contract failed", "capability_id", id, "err", err)
+			return &HTTPError{Status: http.StatusInternalServerError, Message: "internal error"}
 		}
-		s.logger.Error("set contract failed", "capability_id", id, "err", err)
-		return &HTTPError{Status: http.StatusInternalServerError, Message: "internal error"}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(c)
@@ -68,11 +71,13 @@ func (s *Server) handleGetCapabilityContract(w http.ResponseWriter, r *http.Requ
 	}
 	c, err := s.capabilityRepo().GetCapabilityContract(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return &HTTPError{Status: http.StatusNotFound, Message: "capability or contract not found"}
+		if dbErr := translateDBError(err, "capability contract"); dbErr != nil {
+			if httpErr, ok := dbErr.(*HTTPError); ok && httpErr.Status == http.StatusNotFound {
+				return &HTTPError{Status: http.StatusNotFound, Message: "capability or contract not found"}
+			}
+			s.logger.Error("get contract failed", "capability_id", id, "err", err)
+			return &HTTPError{Status: http.StatusInternalServerError, Message: "internal error"}
 		}
-		s.logger.Error("get contract failed", "capability_id", id, "err", err)
-		return &HTTPError{Status: http.StatusInternalServerError, Message: "internal error"}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(c)
@@ -143,22 +148,24 @@ func parseVersionDiffArgs(r *http.Request) (int, int, error) {
 	from := 1
 	to := 0
 	if v := q.Get("from"); v != "" {
-		_, err := fmt.Sscanf(v, "%d", &from)
+		n, err := strconv.Atoi(v)
 		if err != nil {
-			return 0, 0, fmt.Errorf("invalid from=%q", v)
+			return 0, 0, fmt.Errorf("invalid from=%q: must be an integer", v)
 		}
+		from = n
 	}
 	if v := q.Get("to"); v != "" {
-		_, err := fmt.Sscanf(v, "%d", &to)
+		n, err := strconv.Atoi(v)
 		if err != nil {
-			return 0, 0, fmt.Errorf("invalid to=%q", v)
+			return 0, 0, fmt.Errorf("invalid to=%q: must be an integer", v)
 		}
+		to = n
 	}
 	if to == 0 {
-		return 0, 0, errors.New("to is required")
+		return 0, 0, fmt.Errorf("to is required")
 	}
 	if to < from {
-		return 0, 0, errors.New("to must be >= from")
+		return 0, 0, fmt.Errorf("to must be >= from")
 	}
 	return from, to, nil
 }
@@ -177,7 +184,9 @@ func (s *Server) handleCatalogSearch(w http.ResponseWriter, r *http.Request) err
 	q := r.URL.Query().Get("q")
 	limit := 0
 	if v := r.URL.Query().Get("limit"); v != "" {
-		_, _ = fmt.Sscanf(v, "%d", &limit)
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
+		}
 	}
 	caps, err := s.capabilityRepo().CatalogSearch(r.Context(), ws, q, limit)
 	if err != nil {
