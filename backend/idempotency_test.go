@@ -92,3 +92,42 @@ func TestIdempotencyMiddleware_ReplaysHeaders(t *testing.T) {
 		t.Errorf("replay X-Custom = %q, want abc", got)
 	}
 }
+
+// TestIdempotencyMiddleware_PreservesStatusCode locks in DEF-11 fix (c0.19).
+// Before the fix, recordingResponseWriter auto-stamped status 200 on the
+// first Write even when the handler intended a different status. On
+// replay, the cached 200 was returned even if the original was 502.
+func TestIdempotencyMiddleware_PreservesStatusCode(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte(`{"err":"upstream"}`))
+	}
+
+	mw := IdempotencyMiddleware(nil)
+
+	body1 := strings.NewReader(`{"a":1}`)
+	req1 := httptest.NewRequest(http.MethodPost, "/api/v1/things", body1)
+	req1.Header.Set("Idempotency-Key", "test-status-key")
+	req1.Header.Set("Content-Type", "application/json")
+
+	body2 := strings.NewReader(`{"a":1}`)
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/things", body2)
+	req2.Header.Set("Idempotency-Key", "test-status-key")
+	req2.Header.Set("Content-Type", "application/json")
+
+	// Note: handler is called twice because 5xx is not cached, so
+	// replays re-run the handler. The replayed status must still be 502.
+	rec1 := httptest.NewRecorder()
+	mw(http.HandlerFunc(handler)).ServeHTTP(rec1, req1)
+
+	rec2 := httptest.NewRecorder()
+	mw(http.HandlerFunc(handler)).ServeHTTP(rec2, req2)
+
+	if rec1.Code != http.StatusBadGateway {
+		t.Errorf("first response: status=%d, want 502", rec1.Code)
+	}
+	if rec2.Code != http.StatusBadGateway {
+		t.Errorf("replayed response: status=%d, want 502 (not auto-stamped 200)", rec2.Code)
+	}
+}
