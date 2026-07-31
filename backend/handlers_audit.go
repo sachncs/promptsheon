@@ -17,11 +17,13 @@ const fieldUserID = "user_id"
 // ListAudit lists the audit.
 func (s *Server) handleListAudit(w http.ResponseWriter, r *http.Request) error {
 	filter := models.AuditFilter{
-		UserID:   r.URL.Query().Get("user_id"),
-		Resource: r.URL.Query().Get("resource"),
-		Action:   r.URL.Query().Get("action"),
-		Limit:    50,
-		Offset:   0,
+		UserID:       r.URL.Query().Get("user_id"),
+		Resource:     r.URL.Query().Get("resource"),
+		ResourceKind: r.URL.Query().Get("kind"),
+		ResourceID:   r.URL.Query().Get("id"),
+		Action:       r.URL.Query().Get("action"),
+		Limit:        50,
+		Offset:       0,
 	}
 
 	if v := r.URL.Query().Get("since"); v != "" {
