@@ -269,9 +269,12 @@ func (r *recordingResponseWriter) WriteHeader(s int) {
 	r.ResponseWriter.WriteHeader(s)
 }
 func (r *recordingResponseWriter) Write(b []byte) (int, error) {
-	if r.statusCode == 0 {
-		r.statusCode = http.StatusOK
-	}
+	// DEF-11: don't auto-stamp 200 if the handler hasn't called
+	// WriteHeader. The previous code recorded 200 on the first
+	// Write even when the handler intended a different status
+	// (e.g. streaming a 502 and then writing body bytes). On
+	// idempotency replay, the cached 200 was returned even if
+	// the original was 502. Trust the handler to set the status.
 	r.body.Write(b)
 	return r.ResponseWriter.Write(b)
 }
