@@ -19,13 +19,11 @@ locally. The contribution policy is in
 # Build all three binaries.
 make build
 
-# Or build individually.
-go build -o promptsheond     ./bin/promptsheond
-go build -o promptsheon      ./bin/promptsheon
-go build -o bin/promptsheon-healthcheck .
-
-# Build with the optional ClickHouse rollup writer.
-go build -o bin/promptsheond .
+# Or build individually. The package paths below match the cmd/
+# subdirectory layout; the repo has no package main at the root.
+go build -o promptsheond     ./cmd/promptsheond
+go build -o promptsheon      ./cmd/promptsheon
+go build -o bin/promptsheon-healthcheck ./cmd/promptsheon-healthcheck
 ```
 
 ## Test
