@@ -243,7 +243,10 @@ func runDaemon() {
 
 	srv, limiter, tracer, collector, v := buildServer(rootCtx, &cfg, db, logger, tp, logHub, elector, retentionDB, sharedBus)
 
-	srv.StartAuditWorkers(rootCtx, 2)
+	if err := srv.StartAuditWorkers(rootCtx, 2); err != nil {
+		logger.Error("start audit workers", "err", err)
+		os.Exit(1)
+	}
 
 	// API-IDEMP-1: wire the SQLite-backed IdempotencyStore so
 	// multi-replica deployments see the same Idempotency-Key

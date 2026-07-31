@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -83,6 +84,17 @@ func (s *Server) audit(ctx context.Context, action, resource string, details map
 // StartAuditWorkers launches the bounded worker pool. Call once at
 // server startup. Cancel the context to stop the workers gracefully.
 //
+// 1.8: the previous code re-zeroed s.auditStopOnce on every call.
+// StopAuditWorkers was guarded by sync.Once.Do, so a second
+// StartAuditWorkers allocated a fresh queue that nothing could
+// ever close via the Once; the workers exited only on
+// auditCancel(). Result: anything that called audit() in between
+// the two Starts lost entries forever.
+//
+// The function now returns an error on second-call; production
+// wiring (daemon.go) panics on the error so a misconfiguration is
+// caught at startup rather than silently dropping entries.
+//
 // The workers hold their own context (auditCtx), independent of the
 // server root context. This is the fix for the drain-barrier bug:
 // the previous design passed the rootCtx directly, so a SIGTERM
@@ -95,9 +107,12 @@ func (s *Server) audit(ctx context.Context, action, resource string, details map
 //  2. srv.StopAuditWorkers(drainCtx) — closes the queue; workers
 //     drain whatever is left
 //  3. auditCancel() — finally stop the worker goroutines
-func (s *Server) StartAuditWorkers(ctx context.Context, n int) {
+func (s *Server) StartAuditWorkers(ctx context.Context, n int) error {
 	if n < 1 {
 		n = 2
+	}
+	if s.auditCancel != nil {
+		return fmt.Errorf("audit workers already started; StartAuditWorkers is one-shot")
 	}
 	s.auditQueue = make(chan *models.AuditEntry, 1024)
 	s.auditStopOnce = sync.Once{}
@@ -113,6 +128,7 @@ func (s *Server) StartAuditWorkers(ctx context.Context, n int) {
 	}
 	// Reference ctx to keep the signature stable for callers.
 	_ = ctx
+	return nil
 }
 
 // StopAuditWorkers closes the audit queue and waits for the

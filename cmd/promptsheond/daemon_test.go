@@ -536,7 +536,7 @@ func TestStartHTTPServerAndWait_InProcess(t *testing.T) {
 	defer cancel()
 
 	srv, limiter, tracer, collector, _ := buildServer(ctx, &cfg, db, logger, nil, nil, nil, db.DB(), nil)
-	srv.StartAuditWorkers(ctx, 1)
+	if err := srv.StartAuditWorkers(ctx, 1); err != nil { t.Fatal(err) }
 
 	done := make(chan struct{})
 	go func() {
@@ -571,7 +571,7 @@ func TestStartHTTPServerAndWait_WithCORS(t *testing.T) {
 	defer cancel()
 
 	srv, limiter, tracer, collector, _ := buildServer(ctx, &cfg, db, logger, nil, nil, nil, db.DB(), nil)
-	srv.StartAuditWorkers(ctx, 1)
+	if err := srv.StartAuditWorkers(ctx, 1); err != nil { t.Fatal(err) }
 
 	done := make(chan struct{})
 	go func() {
