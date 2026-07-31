@@ -174,10 +174,11 @@ func TestNewSQLiteRunsAllMigrations(t *testing.T) {
 	// 013 idempotency_cache + 014 system_config +
 	// 015 seed_settings + 016 bandit_arm_counters +
 	// 017 system_config_crdt + 018 capability_contract +
-	// 019 self_evolve (closed-loop self-evolution), the count
-	// is 19.
-	if n != 19 {
-		t.Errorf("migrations applied = %d, want 19", n)
+	// 019 self_evolve (closed-loop self-evolution) +
+	// 020 audit_chain_state_immutability (PLAN-49 c0.12), the
+	// count is 20.
+	if n != 20 {
+		t.Errorf("migrations applied = %d, want 20", n)
 	}
 }
 

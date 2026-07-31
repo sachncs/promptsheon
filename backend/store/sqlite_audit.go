@@ -94,7 +94,7 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 		} else {
 			stateRes, err = tx.ExecContext(ctx,
 				`UPDATE audit_chain_state
-				 SET last_hash = ?, last_rowid = ?
+				 SET last_hash = ?, last_rowid = ?, updated_by_app = 1
 				 WHERE id = 0 AND last_rowid = ? AND last_hash = ?`,
 				entry.EntryHash, rowID, prevRowID, prevHash,
 			)

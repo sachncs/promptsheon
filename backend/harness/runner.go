@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/eval"
@@ -114,16 +113,12 @@ func (r *EvalRunner) Run(ctx context.Context, opts EvalRunOptions) (*EvalRun, er
 	if workers < 1 {
 		workers = 1
 	}
-	// PERF-EVAL-2: stream results to the DB as each case finishes
-	// so memory stays bounded for large datasets. The bulk
-	// CreateEvalResults is still kept at the end as a fallback
-	// in case CreateEvalResult is not implemented (the runner
-	// auto-detects via a type assertion).
-	var (
-		streamOK    atomic.Bool
-		persistedMu sync.Mutex
-	)
-	streamOK.Store(true)
+	// PERF-EVAL-2 / 1.7: stream results to the DB as each case
+	// finishes so memory stays bounded for large datasets.
+	// The previous code accumulated every EvalResult into a
+	// single slice and bulk-inserted at the end — a 100k-case
+	// run held 100k structs in memory before persistence.
+	var persistedMu sync.Mutex
 	type casesResult struct {
 		result EvalResult
 	}
@@ -161,12 +156,13 @@ func (r *EvalRunner) Run(ctx context.Context, opts EvalRunOptions) (*EvalRun, er
 		if r.Metrics != nil {
 			r.Metrics.RecordEvalCaseOutcome(cr.result.Passed)
 		}
-		// PERF-EVAL-2: stream to DB. Fall back to the bulk
-		// CreateEvalResults at the end if the per-result
-		// method is not implemented.
+		// PERF-EVAL-2 / 1.7: stream to DB per-result. The harness
+		// Repository already exposes CreateEvalResult(ctx, *EvalResult)
+		// (see harness/repo.go); we type-assert here so legacy stores
+		// implementing only the bulk path keep working.
 		if r.Repo != nil {
 			persistedMu.Lock()
-			results = append(results, cr.result)
+			_ = r.Repo.CreateEvalResult(ctx, &cr.result)
 			persistedMu.Unlock()
 		}
 	}
