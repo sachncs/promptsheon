@@ -2,6 +2,7 @@
 package ratelimit
 
 import (
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -15,19 +16,25 @@ import (
 
 // trustedProxies is the set of CIDRs that may set X-Forwarded-For
 // or X-Real-IP. Configured once at process start from
-// PROMPTSHEON_TRUSTED_PROXIES. A nil value disables trust
+// PROMPTSHEON_TRUSTED_PROXIES. An empty slice disables trust
 // entirely.
-var trustedProxies *net.IPNet
+var trustedProxies []*net.IPNet
 
 // ConfigureTrustedProxies parses a comma-separated CIDR list and
 // installs it as the trusted-proxy set. Exposed so tests can build
 // their own configuration without re-running init().
+//
+// 1.6: the previous implementation kept only the CIDR with the
+// smallest mask (largest range) and silently dropped invalid
+// entries. With 10.0.0.0/8 + 192.168.0.0/16 only 10.0.0.0/8
+// survived; the second CIDR was lost. Now keeps the union and
+// logs invalid CIDRs at warn level.
 func ConfigureTrustedProxies(raw string) {
 	if raw == "" {
 		trustedProxies = nil
 		return
 	}
-	var combined *net.IPNet
+	var out []*net.IPNet
 	for _, c := range strings.Split(raw, ",") {
 		c = strings.TrimSpace(c)
 		if c == "" {
@@ -35,21 +42,28 @@ func ConfigureTrustedProxies(raw string) {
 		}
 		_, n, err := net.ParseCIDR(c)
 		if err != nil {
+			slog.Warn("trusted_proxies: ignoring invalid CIDR",
+				"raw", c, "err", err)
 			continue
 		}
-		if combined == nil {
-			combined = n
-		} else if smallerMask(n, combined) {
-			combined = n
-		}
+		out = append(out, n)
 	}
-	trustedProxies = combined
+	trustedProxies = out
 }
 
-func smallerMask(a, b *net.IPNet) bool {
-	am, _ := a.Mask.Size()
-	bm, _ := b.Mask.Size()
-	return am < bm
+// isTrustedProxy reports whether ip falls in any of the configured
+// trusted CIDRs. Replaces the previous single-IPNet lookup that
+// only kept the largest range and silently dropped the rest.
+func isTrustedProxy(ip net.IP) bool {
+	if len(trustedProxies) == 0 {
+		return false
+	}
+	for _, n := range trustedProxies {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func init() {
@@ -303,7 +317,7 @@ func ExtractKey(r *http.Request) string {
 		return "user:" + u.ID
 	}
 	remote := realRemoteAddr(r)
-	if ip := net.ParseIP(remote); ip != nil && trustedProxies != nil && trustedProxies.Contains(ip) {
+	if ip := net.ParseIP(remote); ip != nil && isTrustedProxy(ip) {
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 			if i := strings.IndexByte(xff, ','); i >= 0 {
 				return "ip:" + strings.TrimSpace(xff[:i])
