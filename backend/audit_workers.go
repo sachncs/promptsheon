@@ -26,12 +26,25 @@ func (s *Server) audit(ctx context.Context, action, resource string, details map
 	if u, ok := auth.UserFromContext(ctx); ok && u != nil && u.ID != "" {
 		userID = u.ID
 	}
+	// HIGH-4 / DEF-15: shallow-copy the details map so subsequent
+	// mutations in this function don't affect the caller's map.
+	// The previous code aliased the caller's map header and then
+	// wrote "remote_addr" / "user_agent" into it; if the caller
+	// reused the map across requests, later audit rows would
+	// carry the previous request's remote address.
+	entryDetails := details
+	if details != nil {
+		entryDetails = make(map[string]any, len(details)+2)
+		for k, v := range details {
+			entryDetails[k] = v
+		}
+	}
 	entry := &models.AuditEntry{
 		ID:        generateID(),
 		UserID:    userID,
 		Action:    action,
 		Resource:  resource,
-		Details:   details,
+		Details:   entryDetails,
 		Timestamp: time.Now(),
 	}
 	// Add the request's remote address and user-agent so forensic
