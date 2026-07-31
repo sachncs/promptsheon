@@ -5,7 +5,12 @@
 # this file from the repository root and surfaces the reviewer in
 # the PR UI.
 #
-# The default owner below is the project maintainer. Path-specific
+# PLAN-49 c3.12 rewrite: the previous file used the old
+# /internal/<pkg>/ and /internal/api/ paths; the repo moved to
+# the cmd/<name>/ + backend/<pkg>/ layout in v0.2.x. Every
+# specific line below now matches the actual tree.
+#
+# The default owner is the project maintainer. Path-specific
 # overrides route the highest-risk areas (auth, crypto, persistence)
 # to the same person so the reviewer set is small enough to be
 # actionable for a single-maintainer project. As the project grows,
@@ -19,38 +24,33 @@
 # and the CAS engine. These encode the threat model from
 # docs/security.md and should never merge without an explicit
 # maintainer review.
-/internal/auth/                 @sachncs
-/internal/vault/                @sachncs
-/internal/audit/                @sachncs
-/internal/ratelimit/            @sachncs
-/internal/promptsheon/          @sachncs
-/internal/store/                @sachncs
+backend/auth/                 @sachncs
+backend/vault/                @sachncs
+backend/audit/                @sachncs
+backend/ratelimit/            @sachncs
+backend/store/                @sachncs
 
 # Public API surface: breaking changes here ripple to every SDK
 # consumer.
-/internal/api/                  @sachncs
-/sdk/                           @sachncs
-/api/openapi.yaml               @sachncs
+backend/handlers_*.go         @sachncs
+backend/routes.go              @sachncs
+backend/spec/                 @sachncs
+sdk/                          @sachncs
 
 # Server entry point and the OpenAPI generator.
-/cmd/                           @sachncs
-/scripts/genopenapi/            @sachncs
+cmd/                          @sachncs
+scripts/genopenapi/           @sachncs
 
 # Release / harness / scheduler / subprocess paths are
 # high-blast-radius: a wrong change can take the daemon down
-# or lose audit records. Each gets its own owner.
-# (OPS-CODEOWNERS-1)
-# Note that /.github/ (line above) already covers
-# /.github/workflows/ via the glob, so we don't need a
-# separate line. (OPS-CODEOWNERS-2)
-/internal/release/              @sachncs
-/internal/harness/              @sachncs
-/internal/llm/                  @sachncs
-/internal/rollups/              @sachncs
-/internal/scheduler/            @sachncs
-/internal/subprocess/           @sachncs
-/internal/supervisor/           @sachncs
-/internal/webhook/              @sachncs
+# or lose audit records.
+/backend/release/              @sachncs
+/backend/harness/              @sachncs
+/backend/llm/                  @sachncs
+/backend/rollups/              @sachncs
+/backend/scheduler/            @sachncs
+/backend/supervisor/           @sachncs
+/backend/webhook/              @sachncs
 
 # Tests, docs, scripts.
 /tests/                         @sachncs
@@ -58,14 +58,17 @@
 /scripts/                       @sachncs
 
 # CI, build, release. /.github/ already covers
-# /.github/workflows/ via the directory glob, so the explicit
-# `/.github/workflows/` line was redundant and is dropped
-# (OPS-CODEOWNERS-2).
+# /.github/workflows/ via the directory glob.
 /Dockerfile                     @sachncs
 /.goreleaser.yml                @sachncs
 /Makefile                       @sachncs
 /SECURITY.md                    @sachncs
 /CONTRIBUTING.md                @sachncs
+/CODE_OF_CONDUCT.md             @sachncs
+/cliff.toml                     @sachncs
 
 # Helm chart + deploy manifests.
 /deploy/                        @sachncs
+
+# Docs/refactor plan + audit docs (recently added).
+/docs/refactor/                 @sachncs
