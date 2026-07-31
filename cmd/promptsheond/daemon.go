@@ -921,24 +921,35 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *bac
 		if pprofAddr == "" {
 			pprofAddr = "127.0.0.1:6060"
 		}
-		pprofServer := &http.Server{
-			Addr:              pprofAddr,
-			Handler:           http.DefaultServeMux,
-			ReadHeaderTimeout: 5 * time.Second,
-		}
-		go func() {
-			logger.Info("pprof listener enabled", "addr", pprofAddr)
-			if err := pprofServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				logger.Warn("pprof listener exited", "err", err)
+		// DEF-9 / 1.9: pprof exposes the full heap, CPU, trace
+		// endpoints. Reject any non-loopback bind; an operator
+		// who sets PROMPTSHEON_PPROF_ADDR=0.0.0.0:6060 (or a
+		// typo'd public IP) would otherwise serve sensitive
+		// runtime data to the network with no auth.
+		if !backend.IsLoopbackAddr(pprofAddr) {
+			logger.Warn("pprof disabled: non-loopback address",
+				"addr", pprofAddr,
+				"hint", "set PROMPTSHEON_PPROF_ADDR to 127.0.0.1:6060 or omit")
+		} else {
+			pprofServer := &http.Server{
+				Addr:              pprofAddr,
+				Handler:           http.DefaultServeMux,
+				ReadHeaderTimeout: 5 * time.Second,
 			}
-		}()
-		// Best-effort stop on daemon shutdown.
-		go func() {
-			<-rootCtx.Done()
-			shutdown, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			_ = pprofServer.Shutdown(shutdown)
-		}()
+			go func() {
+				logger.Info("pprof listener enabled", "addr", pprofAddr)
+				if err := pprofServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+					logger.Warn("pprof listener exited", "err", err)
+				}
+			}()
+			// Best-effort stop on daemon shutdown.
+			go func() {
+				<-rootCtx.Done()
+				shutdown, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer cancel()
+				_ = pprofServer.Shutdown(shutdown)
+			}()
+		}
 	}
 
 	go func() {
