@@ -1,0 +1,11 @@
+# GitHub Issue templates configuration.
+# https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository
+
+blank_issues_enabled: false
+contact_links:
+  - name: Question or general discussion
+    url: https://github.com/sachncs/promptsheon/discussions
+    about: Please use GitHub Discussions for questions, support, and general feedback.
+  - name: Security disclosure
+    url: https://github.com/sachncs/promptsheon/security/advisories/new
+    about: Report security vulnerabilities privately via GitHub Security Advisories. Do NOT file a public issue for suspected security problems.
