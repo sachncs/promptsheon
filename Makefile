@@ -95,6 +95,7 @@ deps:
 # Clean build artifacts
 clean:
 	rm -rf $(BIN) promptsheon promptsheond promptsheon-healthcheck
+	rm -rf cmd/promptsheond/frontend
 	rm -f *.db *.db-journal *.db-wal *.db-shm
 	rm -f coverage.out coverage.html
 
