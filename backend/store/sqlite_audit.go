@@ -41,7 +41,13 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 	s.auditTail.mu.Lock()
 	defer s.auditTail.mu.Unlock()
 
-	for {
+	// CRIT-4 / DEF-14 sub-finding: bound the CAS retry loop.
+	// Without this, a sustained contention pattern (writers that
+	// always win the race) loops forever and the goroutine never
+	// returns. Bounded to appendAuditMaxAttempts; the request's
+	// context cancellation still aborts early via ctx.Err() above.
+	const appendAuditMaxAttempts = 32
+	for attempt := 0; attempt < appendAuditMaxAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("append audit: %w", err)
 		}
@@ -118,6 +124,7 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 		s.auditTail.rowid.Store(uint64(rowID))
 		return nil
 	}
+	return fmt.Errorf("append audit: CAS retry exhausted after %d attempts", appendAuditMaxAttempts)
 }
 
 // tailHashLocked returns the previous_hash for the next audit
