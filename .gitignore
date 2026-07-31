@@ -77,3 +77,9 @@ scripts/bench-current.txt
 .promptsheon/
 
 # vendor/ is committed for reproducible CI builds; not ignored.sdk/typescript/node_modules/
+
+# Python SDK egg-info (created by `pip install -e ./sdk/python`).
+sdk/python/src/promptsheon.egg-info/
+
+# Frontend node_modules (kept out of the tree).
+sdk/typescript/node_modules/
