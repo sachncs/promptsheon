@@ -82,9 +82,9 @@ func writePaginationHeaders(w http.ResponseWriter, r *http.Request, limit, offse
 			}
 			links = append(links, fmt.Sprintf(`<%s>; rel="prev"`, paginationLink(base, limit, prev)))
 		}
-		if offset > 0 {
-			links = append(links, fmt.Sprintf(`<%s>; rel="first"`, paginationLink(base, limit, 0)))
-		}
+		// rel="first" is always emitted so a client on any page can
+		// navigate to the first page without reconstructing the URL.
+		links = append(links, fmt.Sprintf(`<%s>; rel="first"`, paginationLink(base, limit, 0)))
 		if returned == limit && offset+limit < total {
 			next := offset + limit
 			links = append(links, fmt.Sprintf(`<%s>; rel="next"`, paginationLink(base, limit, next)))
