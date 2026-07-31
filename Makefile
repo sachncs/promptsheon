@@ -1,4 +1,4 @@
-.PHONY: all build build-server build-cli build-healthcheck test test-verbose test-integration test-e2e load-test lint lint-domain lint-deps fmt vet deps clean coverage coverage-raw run cli openapi openapi-check sdk sdk-check update-deps security helm-docs docs-check bench check purity help web-install web-dev web-build web-smoke
+.PHONY: all build build-server build-cli build-healthcheck build-public build-e2e test test-verbose test-integration test-e2e load-test lint lint-domain lint-deps fmt vet deps clean coverage coverage-raw run cli openapi openapi-check sdk sdk-check update-deps security helm-docs docs-check bench check check-public purity help web-install web-dev web-build web-smoke
 
 # Default target
 all: build
@@ -42,6 +42,25 @@ build-cli:
 build-healthcheck:
 	@mkdir -p $(BIN)
 	go build -o $(BIN)/promptsheon-healthcheck ./cmd/promptsheon-healthcheck
+
+# Build the public SDK facade (pkg/promptsheon/). The fence
+# //go:build promptsheon means the source compiles only when
+# GOFLAGS=-tags=promptsheon is set; `go build ./...` (the
+# default for tests) skips it. Production consumers import the
+# SDK via 'github.com/sachncs/promptsheon/sdk'.
+build-public:
+	GOFLAGS=-tags=promptsheon go build -o $(BIN)/promptsheon-sdk ./pkg/promptsheon
+
+# Build the e2e build of the daemon (includes the in-memory
+# LLM stub). Used by tests/e2e and the chaos test only.
+build-e2e:
+	go build -tags=e2e -o $(BIN)/promptsheond.e2e ./cmd/promptsheond
+
+# Verify the public SDK facade compiles and passes go vet. Used
+# in CI as part of `make check` (C-7 / X-13).
+check-public:
+	GOFLAGS=-tags=promptsheon go vet ./pkg/promptsheon/...
+	GOFLAGS=-tags=promptsheon go test -race -count=1 ./pkg/promptsheon/...
 
 # Run all tests
 test:
@@ -222,7 +241,7 @@ bench:
 # Catches format drift, vet issues, lint findings, test
 # regressions, OpenAPI drift, and stale doc references in one
 # invocation. Use this in pre-push hooks.
-check: fmt vet lint test openapi-check docs-check
+check: fmt vet lint test openapi-check docs-check check-public
 	@echo "ok: check"
 
 # `make purity` — the domain-purity gate. Runs the static
