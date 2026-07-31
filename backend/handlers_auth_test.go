@@ -494,10 +494,10 @@ func TestHandleOAuthCallback_WithRealOAuth(t *testing.T) {
 	})
 
 	stateVal := "test-oauthstate-123"
-	activeOAuthStates.put(stateVal, time.Now().Add(10*time.Minute))
 
 	s := newTestServer(t)
 	s.oauth = oauthMgr
+	s.oauthStates.put(stateVal, time.Now().Add(10*time.Minute))
 
 	req := httptest.NewRequest("GET", "/api/v1/auth/test/callback?code=test_code&state="+stateVal, nil)
 	req.AddCookie(&http.Cookie{Name: "oauth_state", Value: stateVal})
@@ -525,18 +525,18 @@ func TestHandleOAuthCallback_MissingStateCookie(t *testing.T) {
 
 
 func TestGenerateOAuthState(t *testing.T) {
-	activeOAuthStates = newOAuthStateStore()
-	state, err := generateOAuthState()
+	s := newTestServer(t)
+	state, err := s.generateOAuthState()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if state == "" {
 		t.Error("expected non-empty state")
 	}
-	if !validateOAuthState(state) {
+	if !s.validateOAuthState(state) {
 		t.Error("expected valid state")
 	}
-	if validateOAuthState(state) {
+	if s.validateOAuthState(state) {
 		t.Error("expected state to be consumed after first use")
 	}
 }
@@ -597,11 +597,12 @@ func TestOAuthStateStore_Janitor(t *testing.T) {
 }
 
 
-func TestStartOAuthStateJanitor(_ *testing.T) {
+func TestStartOAuthStateJanitor(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	StartOAuthStateJanitor(ctx)
-	StopOAuthStateJanitor()
+	s := newTestServer(t)
+	s.StartOAuthStateJanitor(ctx)
+	s.StopOAuthStateJanitor()
 }
 
 

@@ -95,35 +95,34 @@ func (s *oauthStateStore) consume(state string) bool {
 	return time.Now().Before(exp)
 }
 
-// activeOAuthStates is the package-level reference that helpers
-// (generateOAuthState, validateOAuthState, StartOAuthStateJanitor)
-// consult. It is set on Server construction and reset to nil on
-// shutdown. Tests that need a per-test store should set
-// activeOAuthStates to a fresh instance; the default points to the
-// most recently constructed server's store.
-var activeOAuthStates = newOAuthStateStore()
-
-// StartOAuthStateJanitor launches the cleanup goroutine for the
-// active server's state store.
-func StartOAuthStateJanitor(ctx context.Context) {
-	activeOAuthStates.start(ctx)
-}
-
-// StopOAuthStateJanitor stops the cleanup goroutine.
-func StopOAuthStateJanitor() { activeOAuthStates.stopJanitor() }
-
-func generateOAuthState() (string, error) {
+// P0-1: dropped the package-level activeOAuthStates global.
+// generateOAuthState / validateOAuthState now dispatch through
+// s.oauthStates (set on Server construction). Tests construct a
+// Server with the helper instead of mutating a global.
+func (s *Server) generateOAuthState() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
 	state := hex.EncodeToString(b)
-	activeOAuthStates.put(state, time.Now().Add(10*time.Minute))
+	s.oauthStates.put(state, time.Now().Add(10*time.Minute))
 	return state, nil
 }
 
-func validateOAuthState(state string) bool {
-	return activeOAuthStates.consume(state)
+func (s *Server) validateOAuthState(state string) bool {
+	return s.oauthStates.consume(state)
+}
+
+// StartOAuthStateJanitor launches the cleanup goroutine for the
+// server's OAuth state store. Replaces the package-level
+// StartOAuthStateJanitor function (c2.15).
+func (s *Server) StartOAuthStateJanitor(ctx context.Context) {
+	s.oauthStates.start(ctx)
+}
+
+// StopOAuthStateJanitor stops the cleanup goroutine.
+func (s *Server) StopOAuthStateJanitor() {
+	s.oauthStates.stopJanitor()
 }
 
 // --- API Key Handlers ---
@@ -477,7 +476,7 @@ func (s *Server) handleOAuthLogin(w http.ResponseWriter, r *http.Request) error 
 		return badRequest("provider is required")
 	}
 
-	state, err := generateOAuthState()
+	state, err := s.generateOAuthState()
 	if err != nil {
 		return err
 	}
@@ -531,7 +530,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 	if subtle.ConstantTimeCompare([]byte(stateCookie.Value), []byte(r.URL.Query().Get("state"))) != 1 {
 		return badRequest("invalid OAuth state")
 	}
-	if !validateOAuthState(stateCookie.Value) {
+	if !s.validateOAuthState(stateCookie.Value) {
 		return badRequest("OAuth state expired")
 	}
 

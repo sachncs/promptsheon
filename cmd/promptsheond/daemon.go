@@ -982,7 +982,10 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *bac
 		}
 	}()
 
-	backend.StartOAuthStateJanitor(rootCtx)
+	// P0-1: StartOAuthStateJanitor / StopOAuthStateJanitor are
+// *Server methods now (replacing the package-level functions
+// removed in c2.15). The cleanup goroutine starts here.
+srv.StartOAuthStateJanitor(rootCtx)
 
 	// OBS-1b (deferred): with OBS-TR-1 there is no SQLite writer to
 	// expose a drop count from. The metric wiring stays so a
@@ -1058,7 +1061,7 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *bac
 	srv.StopDependents()
 
 	limiter.Stop()
-	backend.StopOAuthStateJanitor()
+	srv.StopOAuthStateJanitor()
 	if srv.Authenticator() != nil {
 		srv.Authenticator().Stop()
 	}

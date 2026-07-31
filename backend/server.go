@@ -86,9 +86,8 @@ type Server struct {
 	// oauthStates holds in-flight OAuth state tokens for this
 	// server. Stored on the Server (not as a package-level var) so
 	// multiple servers in the same test binary do not share state.
-	// The package-level helpers (generateOAuthState,
-	// validateOAuthState) dispatch via activeOAuthStates which is
-	// set to the most recently constructed server.
+	// The helpers (s.generateOAuthState, s.validateOAuthState)
+	// dispatch via this field.
 	oauthStates *oauthStateStore
 
 	workflowEngine *workflow.Engine
@@ -124,13 +123,10 @@ func NewServer(db *store.Repositories, logger *slog.Logger, opts ...Option) *Ser
 		logger:      logger,
 		oauthStates: newOAuthStateStore(),
 	}
-	// Make this server the active one for the package-level OAuth
-	// helpers (generateOAuthState, validateOAuthState, etc.). The
-	// helpers retain a package-level pointer for backward
-	// compatibility with call sites that don't have a *Server in
-	// scope; the pointer is updated here so each NewServer call
-	// produces an isolated store.
-	activeOAuthStates = s.oauthStates
+	// P0-1: the activeOAuthStates package-level pointer is gone.
+	// Helpers dispatch through s.oauthStates (set above) and
+	// tests construct a Server with the helper rather than
+	// mutating a global.
 	for _, opt := range opts {
 		opt(s)
 	}
