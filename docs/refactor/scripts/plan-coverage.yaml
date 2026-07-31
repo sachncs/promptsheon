@@ -221,7 +221,7 @@ items:
 - id: M-7
   description: No benchmarks
   addressed_by:
-  - (deferred to v1.0.1)
+  - resolved-by-M-7-L-10-commits
 - id: M-8
   description: No annotated tag hygiene
   addressed_by:
@@ -280,7 +280,7 @@ items:
 - id: L-10
   description: Plan has 9 phases (not 8)
   addressed_by:
-  - "(meta \u2014 see README.md)"
+  - resolved-by-M-7-L-10-commits
 - id: X-1
   description: "CODE_OF_CONDUCT.md v2.0 \u2192 v2.1"
   addressed_by:
