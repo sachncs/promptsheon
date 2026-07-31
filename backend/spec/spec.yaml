@@ -7,7 +7,7 @@ info:
   # registrations in backend/routes.go and the handler
   # bodies in backend/handlers_*.go. Re-run the generator
   # whenever a route or handler changes.
-  version: "0.3.0"
+  version: "1.0.0"
 
 security:
   - BearerAuth: []
