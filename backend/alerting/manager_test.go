@@ -79,7 +79,7 @@ func newTestManager(t *testing.T) *Manager {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	collector := metrics.NewCollector()
-	return NewManager(logger, collector)
+	return NewManager(logger, collector, nil, nil)
 }
 
 func TestNewManagerInitialisesEmptyState(t *testing.T) {
@@ -279,7 +279,7 @@ func TestNewManagerWithDB(t *testing.T) {
 	// is constructed.
 	collector := metrics.NewCollector()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	m := NewManagerWithDB(logger, collector, nil)
+	m := NewManager(logger, collector, nil, nil)
 	if m == nil {
 		t.Fatal("expected non-nil manager")
 	}
@@ -362,13 +362,18 @@ func TestCheckCostOverrun(t *testing.T) {
 	}
 }
 
-func TestSetDeliveryFunc(t *testing.T) {
-	m := newTestManager(t)
+func TestNewManager_DeliveryFunc(t *testing.T) {
+	// c2.13: deliveryFn is now passed at construction, not via
+	// SetDeliveryFunc. The constructor returns a manager whose
+	// alerts route through the supplied fn.
 	called := make(chan struct{}, 1)
-	m.SetDeliveryFunc(func(_ *Alert, _ []string) error {
+	fn := func(_ *Alert, _ []string) error {
 		called <- struct{}{}
 		return nil
-	})
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	m := NewManager(logger, metrics.NewCollector(), nil, fn)
+
 	_ = m.TriggerAlert(&AlertRule{ID: "r", Name: "n", Type: "latency"}, "msg", nil)
 	select {
 	case <-called:
@@ -379,13 +384,11 @@ func TestSetDeliveryFunc(t *testing.T) {
 }
 
 func TestTriggerAlertBoundedConcurrency(t *testing.T) {
-	m := newTestManager(t)
-
 	var mu sync.Mutex
 	concurrent := 0
 	maxConcurrent := 0
 
-	m.SetDeliveryFunc(func(_ *Alert, _ []string) error {
+	deliveryFn := func(_ *Alert, _ []string) error {
 		mu.Lock()
 		concurrent++
 		if concurrent > maxConcurrent {
@@ -399,7 +402,10 @@ func TestTriggerAlertBoundedConcurrency(t *testing.T) {
 		}()
 		time.Sleep(50 * time.Millisecond)
 		return nil
-	})
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	m := NewManager(logger, metrics.NewCollector(), nil, deliveryFn)
 
 	// Trigger more alerts than MaxConcurrentDeliveries
 	for i := 0; i < MaxConcurrentDeliveries+10; i++ {
@@ -451,7 +457,7 @@ func TestLoadFromDB_LoadsRulesAlertsGroups(t *testing.T) {
 		},
 	}
 
-	m := NewManagerWithDB(logger, collector, ms)
+	m := NewManager(logger, collector, ms, nil)
 	if m == nil {
 		t.Fatal("expected non-nil manager")
 	}
@@ -480,7 +486,7 @@ func TestLoadFromDB_ListAlertRulesError(t *testing.T) {
 	ms := &mockStore{
 		listAlertRulesErr: errors.New("db error"),
 	}
-	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m := NewManager(logger, metrics.NewCollector(), ms, nil)
 	if len(m.rules) != 0 {
 		t.Errorf("expected 0 rules on error, got %d", len(m.rules))
 	}
@@ -494,7 +500,7 @@ func TestLoadFromDB_ListAlertsError(t *testing.T) {
 		},
 		listAlertsErr: errors.New("db error"),
 	}
-	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m := NewManager(logger, metrics.NewCollector(), ms, nil)
 	// Rules should still load
 	if len(m.rules) != 1 {
 		t.Errorf("expected 1 rule despite alerts error, got %d", len(m.rules))
@@ -509,7 +515,7 @@ func TestLoadFromDB_ListGroupsError(t *testing.T) {
 	ms := &mockStore{
 		listGroupsErr: errors.New("db error"),
 	}
-	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m := NewManager(logger, metrics.NewCollector(), ms, nil)
 	if len(m.groups) != 0 {
 		t.Errorf("expected 0 groups on error, got %d", len(m.groups))
 	}
@@ -539,7 +545,7 @@ func TestLoadFromDB_NilLogger(_ *testing.T) {
 func TestRemoveRuleWithDB(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	ms := &mockStore{}
-	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m := NewManager(logger, metrics.NewCollector(), ms, nil)
 	m.AddRule(&AlertRule{ID: "r1", Name: "n", Type: "latency"})
 	m.RemoveRule("r1")
 	_, ok := m.GetRule("r1")
@@ -551,7 +557,7 @@ func TestRemoveRuleWithDB(t *testing.T) {
 func TestRemoveRuleWithDB_DeleteError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	ms := &mockStore{deleteAlertRuleErr: errors.New("db error")}
-	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m := NewManager(logger, metrics.NewCollector(), ms, nil)
 	m.AddRule(&AlertRule{ID: "r1", Name: "n", Type: "latency"})
 	// Should not panic; rule removed from memory despite DB error
 	m.RemoveRule("r1")
@@ -582,7 +588,7 @@ func TestResolveAlertAlreadyResolved(t *testing.T) {
 func TestResolveAlertWithDB(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	ms := &mockStore{}
-	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m := NewManager(logger, metrics.NewCollector(), ms, nil)
 	rule := &AlertRule{ID: "r1", Name: "spike", Type: "latency", Severity: SeverityHigh}
 	m.AddRule(rule)
 	alert := m.TriggerAlert(rule, "msg", nil)
@@ -598,7 +604,7 @@ func TestResolveAlertWithDB(t *testing.T) {
 func TestResolveAlertWithDB_UpdateError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	ms := &mockStore{updateAlertErr: errors.New("db error")}
-	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m := NewManager(logger, metrics.NewCollector(), ms, nil)
 	rule := &AlertRule{ID: "r1", Name: "spike", Type: "latency", Severity: SeverityHigh}
 	m.AddRule(rule)
 	alert := m.TriggerAlert(rule, "msg", nil)
@@ -618,7 +624,7 @@ func TestResolveAlertWithDB_UpdateError(t *testing.T) {
 func TestTriggerAlertWithDB(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	ms := &mockStore{}
-	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m := NewManager(logger, metrics.NewCollector(), ms, nil)
 	rule := &AlertRule{ID: "r1", Name: "spike", Type: "latency", Severity: SeverityHigh}
 	m.AddRule(rule)
 	alert := m.TriggerAlert(rule, "latency too high", map[string]any{"ms": 1234})
@@ -633,7 +639,7 @@ func TestTriggerAlertWithDB(t *testing.T) {
 func TestTriggerAlertWithDB_SaveError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	ms := &mockStore{saveAlertErr: errors.New("db error")}
-	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m := NewManager(logger, metrics.NewCollector(), ms, nil)
 	rule := &AlertRule{ID: "r1", Name: "spike", Type: "latency", Severity: SeverityHigh}
 	m.AddRule(rule)
 	// Should not panic; alert still added in-memory
@@ -647,10 +653,11 @@ func TestTriggerAlertWithDB_SaveError(t *testing.T) {
 }
 
 func TestTriggerAlertWithDeliveryError(t *testing.T) {
-	m := newTestManager(t)
-	m.SetDeliveryFunc(func(_ *Alert, _ []string) error {
+	deliveryFn := func(_ *Alert, _ []string) error {
 		return errors.New("delivery failed")
-	})
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	m := NewManager(logger, metrics.NewCollector(), nil, deliveryFn)
 	rule := &AlertRule{ID: "r1", Name: "n", Type: "latency", Severity: SeverityHigh}
 	m.AddRule(rule)
 	alert := m.TriggerAlert(rule, "msg", nil)
@@ -664,7 +671,7 @@ func TestTriggerAlertWithDeliveryError(t *testing.T) {
 func TestAddRuleWithDB_SaveError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	ms := &mockStore{saveAlertRuleErr: errors.New("db error")}
-	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m := NewManager(logger, metrics.NewCollector(), ms, nil)
 	m.AddRule(&AlertRule{ID: "r1", Name: "n", Type: "latency"})
 	got, ok := m.GetRule("r1")
 	if !ok {
@@ -678,7 +685,7 @@ func TestAddRuleWithDB_SaveError(t *testing.T) {
 func TestAddNotificationGroupWithDB_SaveError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	ms := &mockStore{saveNotificationGroupErr: errors.New("db error")}
-	m := NewManagerWithDB(logger, metrics.NewCollector(), ms)
+	m := NewManager(logger, metrics.NewCollector(), ms, nil)
 	m.AddNotificationGroup(&NotificationGroup{ID: "g1", Name: "ops", Channels: []string{"slack"}})
 	if len(m.groups) != 1 {
 		t.Errorf("expected 1 group in memory despite DB error, got %d", len(m.groups))

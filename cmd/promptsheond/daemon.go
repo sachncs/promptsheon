@@ -391,17 +391,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 
 	_ = logHub
 
-		alertingManager := alerting.NewManagerWithDB(logger, collector, db)
-	alertingManager.StartMonitoring(rootCtx, collector, 1*time.Minute)
-
-	// Wire alert delivery. The delivery function emits
-	// "webhook" channels through the dispatcher; "log" channels
-	// are routed to the structured logger. Anything else is
-	// logged as "no delivery handler" so operators see the gap
-	// rather than the alert being silently dropped. Without
-	// this wiring the audit noted the previous behaviour: alerts
-	// persisted to the DB but no notification was sent.
-	alertingManager.SetDeliveryFunc(func(alert *alerting.Alert, channels []string) error {
+	alertDeliveryFn := func(alert *alerting.Alert, channels []string) error {
 		for _, ch := range channels {
 			switch ch {
 			case "webhook":
@@ -433,7 +423,17 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 			}
 		}
 		return nil
-	})
+	}
+
+	alertingManager := alerting.NewManager(logger, collector, db, alertDeliveryFn)
+	alertingManager.StartMonitoring(rootCtx, collector, 1*time.Minute)
+
+	// Alert delivery function is wired via the NewManager
+	// constructor (alertDeliveryFn defined above). The function
+	// emits "webhook" channels through the dispatcher; "log"
+	// channels are routed to the structured logger. Anything
+	// else is logged as "no delivery handler" so operators see
+	// the gap rather than the alert being silently dropped.
 
 	limiter := ratelimit.NewLimiter(ratelimit.LoadConfigFromEnv())
 

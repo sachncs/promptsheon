@@ -105,30 +105,26 @@ type Manager struct {
 	monitoringWg sync.WaitGroup
 }
 
-// NewManager creates a new alerting manager.
-func NewManager(logger *slog.Logger, collector *metrics.Collector) *Manager {
-	return &Manager{
-		rules:       make(map[string]*AlertRule),
-		alerts:      []*Alert{},
-		groups:      make(map[string]*NotificationGroup),
-		logger:      logger,
-		metrics:     collector,
-		deliverySem: make(chan struct{}, MaxConcurrentDeliveries),
-	}
-}
-
-// NewManagerWithDB creates a new alerting manager with database persistence.
-func NewManagerWithDB(logger *slog.Logger, collector *metrics.Collector, db repository) *Manager {
+// NewManager creates a new alerting manager. The optional db argument
+// enables database persistence; pass nil for an in-memory manager.
+// The optional deliveryFn receives each Alert + its channel list;
+// pass nil to skip delivery (alerts still persist to the database
+// if db != nil, but no notification is sent). Unifies the previous
+// NewManager + NewManagerWithDB + SetDeliveryFunc (c2.13).
+func NewManager(logger *slog.Logger, collector *metrics.Collector, db repository, deliveryFn func(alert *Alert, channels []string) error) *Manager {
 	m := &Manager{
-		rules:   make(map[string]*AlertRule),
-		alerts:  []*Alert{},
-		groups:  make(map[string]*NotificationGroup),
-		logger:  logger,
-		metrics: collector,
-		db:      db,
+		rules:        make(map[string]*AlertRule),
+		alerts:       []*Alert{},
+		groups:       make(map[string]*NotificationGroup),
+		logger:       logger,
+		metrics:      collector,
+		db:           db,
+		deliveryFunc: deliveryFn,
+		deliverySem:  make(chan struct{}, MaxConcurrentDeliveries),
 	}
-	// Load from database
-	m.loadFromDB()
+	if db != nil {
+		m.loadFromDB()
+	}
 	return m
 }
 
@@ -205,19 +201,16 @@ func (m *Manager) loadFromDB() {
 	}
 }
 
-// SetDeliveryFunc sets the function used to deliver alerts. The
-// function is responsible for honouring the channel list: a
+// SetDeliveryFunc removed (c2.13). Delivery function is now set via
+// the NewManager constructor (positional argument). The previous
+// two-step init (NewManager + SetDeliveryFunc) is replaced by
+// NewManager(logger, collector, db, fn).
+//
+// The function is responsible for honouring the channel list: a
 // "webhook" channel must produce an HTTP POST to the configured
 // endpoints (see internal/webhook); a "log" channel writes to
 // slog; future "slack"/"pagerduty" channels can be added without
 // touching this file.
-//
-// If SetDeliveryFunc is never called, alerts persist to the
-// database (visible via ListAlerts) and the channel list is
-// recorded in the alert's Details. No notification is sent. This
-// is the documented default; silent dropping was the previous
-// behaviour, but persisting means the alert is at least visible
-// to operators who look.
 func (m *Manager) SetDeliveryFunc(fn func(alert *Alert, channels []string) error) {
 	m.deliveryFunc = fn
 }

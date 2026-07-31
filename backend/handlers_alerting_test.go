@@ -12,7 +12,7 @@ import (
 
 func TestHandleListAlertRules(t *testing.T) {
 	s := newTestServer(t)
-	s.alertingManager = alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil)
+	s.alertingManager = alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil, nil, nil)
 
 	req := httptest.NewRequest("GET", "/api/v1/alerts/rules", nil)
 	rr := httptest.NewRecorder()
@@ -38,7 +38,7 @@ func TestHandleListAlertRules_NilManager(t *testing.T) {
 
 func TestHandleCreateAlertRule(t *testing.T) {
 	s := newTestServer(t)
-	s.alertingManager = alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil)
+	s.alertingManager = alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil, nil, nil)
 
 	body := mustMarshal(t, map[string]any{"name": "test-rule", "type": "threshold", "severity": "high", "threshold": 10.0})
 	req := httptest.NewRequest("POST", "/api/v1/alerts/rules", bytes.NewReader(body))
@@ -76,7 +76,7 @@ func TestHandleCreateAlertRule_NilManager(t *testing.T) {
 // the zero value; downstream consumers received an empty label.
 func TestHandleCreateAlertRule_EmptySeverityRejected(t *testing.T) {
 	s := newTestServer(t)
-	s.alertingManager = alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil)
+	s.alertingManager = alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil, nil, nil)
 
 	cases := []struct {
 		name     string
@@ -108,7 +108,7 @@ func TestHandleCreateAlertRule_EmptySeverityRejected(t *testing.T) {
 
 func TestHandleCreateAlertRule_MissingName(t *testing.T) {
 	s := newTestServer(t)
-	s.alertingManager = alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil)
+	s.alertingManager = alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil, nil, nil)
 
 	body := mustMarshal(t, map[string]any{"type": "threshold"})
 	req := httptest.NewRequest("POST", "/api/v1/alerts/rules", bytes.NewReader(body))
@@ -123,7 +123,7 @@ func TestHandleCreateAlertRule_MissingName(t *testing.T) {
 
 
 func TestHandleGetAlertRule(t *testing.T) {
-	am := alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil)
+	am := alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil, nil, nil)
 	rule := &alerting.AlertRule{ID: "rule1", Name: "test", Type: "threshold", Severity: alerting.SeverityHigh}
 	am.AddRule(rule)
 	s := newTestServer(t)
@@ -147,7 +147,7 @@ func TestHandleGetAlertRule(t *testing.T) {
 
 func TestHandleGetAlertRule_NotFound(t *testing.T) {
 	s := newTestServer(t)
-	s.alertingManager = alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil)
+	s.alertingManager = alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil, nil, nil)
 
 	req := httptest.NewRequest("GET", "/api/v1/alerts/rules/nonexistent", nil)
 	rr := httptest.NewRecorder()
@@ -172,7 +172,7 @@ func TestHandleGetAlertRule_NilManager(t *testing.T) {
 
 
 func TestHandleUpdateAlertRule(t *testing.T) {
-	am := alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil)
+	am := alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil, nil, nil)
 	rule := &alerting.AlertRule{ID: "rule1", Name: "test", Type: "threshold", Severity: alerting.SeverityHigh}
 	am.AddRule(rule)
 	s := newTestServer(t)
@@ -200,7 +200,7 @@ func TestHandleUpdateAlertRule(t *testing.T) {
 
 
 func TestHandleDeleteAlertRule(t *testing.T) {
-	am := alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil)
+	am := alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil, nil, nil)
 	am.AddRule(&alerting.AlertRule{ID: "rule1", Name: "test", Type: "threshold", Severity: alerting.SeverityHigh})
 	s := newTestServer(t)
 	s.alertingManager = am
@@ -216,7 +216,7 @@ func TestHandleDeleteAlertRule(t *testing.T) {
 
 
 func TestHandleListAlerts(t *testing.T) {
-	am := alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil)
+	am := alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil, nil, nil)
 	s := newTestServer(t)
 	s.alertingManager = am
 
@@ -243,7 +243,7 @@ func TestHandleListAlerts_NilManager(t *testing.T) {
 
 
 func TestHandleResolveAlert_NotFound(t *testing.T) {
-	am := alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil)
+	am := alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil, nil, nil)
 	s := newTestServer(t)
 	s.alertingManager = am
 
@@ -271,7 +271,7 @@ func TestHandleResolveAlert_NilManager(t *testing.T) {
 
 func TestHandleAddNotificationGroup(t *testing.T) {
 	s := newTestServer(t)
-	s.alertingManager = alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil)
+	s.alertingManager = alerting.NewManager(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil, nil, nil)
 
 	body := mustMarshal(t, map[string]any{"name": "slack-group", "channels": []string{"slack"}})
 	req := httptest.NewRequest("POST", "/api/v1/alerts/notifications", bytes.NewReader(body))
