@@ -563,7 +563,7 @@ jobs:
         # .pem files exist there (the .goreleaser.yml
         # `signs:` block signs archives and the checksum
         # next to themselves, not the SBOM).
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             dist/promptsheond_*.tar.gz
