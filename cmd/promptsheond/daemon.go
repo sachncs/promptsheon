@@ -513,14 +513,14 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 		// on a random provider, then be recorded as a successful
 		// "stub execution" because the Caller swallowed the error.
 		if req.Provider == "" {
-			return executor.InvokeResult{Status: "error", Error: "no provider specified in invocation"}, errs.ErrorExecutorProviderMissing
+			return executor.InvokeResult{Status: "error", Error: "no provider specified in invocation"}, errs.ErrProviderMissing
 		}
 		p, err := providers.Get(req.Provider)
 		if err != nil {
-			return executor.InvokeResult{Status: "error", Error: "provider not registered: " + req.Provider}, errs.ErrorExecutorProviderMissing
+			return executor.InvokeResult{Status: "error", Error: "provider not registered: " + req.Provider}, errs.ErrProviderMissing
 		}
 		if req.Model == "" || req.Model == "<unspecified>" {
-			return executor.InvokeResult{Status: "error", Error: "no model configured"}, errs.ErrorExecutorProviderMissing
+			return executor.InvokeResult{Status: "error", Error: "no model configured"}, errs.ErrProviderMissing
 		}
 		llmReq := &llm.Request{
 			Messages: []llm.Message{{Role: "user", Content: string(req.Input)}},

@@ -146,11 +146,11 @@ func newInvokeTestServerWithRepo(t *testing.T, repo *mockRepo, opts ...Option) *
 	bus := eventbus.NewMemory()
 	caller := executor.Caller(func(ctx context.Context, req executor.InvokeRequest) (executor.InvokeResult, error) {
 		if req.Provider == "" {
-			return executor.InvokeResult{Status: "error", Error: "no provider specified"}, errs.ErrorExecutorProviderMissing
+			return executor.InvokeResult{Status: "error", Error: "no provider specified"}, errs.ErrProviderMissing
 		}
 		p, err := providers.Get(req.Provider)
 		if err != nil {
-			return executor.InvokeResult{Status: "error", Error: "provider not registered: " + req.Provider}, errs.ErrorExecutorProviderMissing
+			return executor.InvokeResult{Status: "error", Error: "provider not registered: " + req.Provider}, errs.ErrProviderMissing
 		}
 		llmReq := &llm.Request{
 			Model: req.Model,

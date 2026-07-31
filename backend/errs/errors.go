@@ -41,7 +41,7 @@ var ErrorEvalUnsupportedSchema = errors.New("json_schema: schema uses unsupporte
 var ErrorEventBusAlreadyCanceled = errors.New("eventbus: subscription canceled")
 
 // ── Executor ────────────────────────────────────────────────────────
-var ErrorExecutorProviderMissing = errors.New("executor: provider missing")
+var ErrProviderMissing = errors.New("executor: provider missing")
 
 // ── Harness ─────────────────────────────────────────────────────────
 var ErrorHarnessPreconditionFailed = errors.New("harness: precondition failed")

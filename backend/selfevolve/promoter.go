@@ -90,7 +90,7 @@ func (p *Promoter) Promote(ctx context.Context, capabilityID, targetEnv string, 
 		Context:       oldManifest.Context,
 		Memory:        oldManifest.Memory,
 	}
-	manifestHash, err := capability.ComputeManifestHash(newManifest)
+	mHash, err := capability.ComputeManifestHash(newManifest)
 	if err != nil {
 		return nil, fmt.Errorf("selfevolve.promoter: compute manifest hash: %w", err)
 	}
@@ -105,7 +105,7 @@ func (p *Promoter) Promote(ctx context.Context, capabilityID, targetEnv string, 
 		CapabilityID: capabilityID,
 		Version:      nextVersion,
 		Manifest:     newManifest,
-		ManifestHash: manifestHash,
+		ManifestHash: mHash,
 		CreatedAt:    now,
 		CreatedBy:    "self_evolve",
 	}
@@ -139,7 +139,7 @@ func (p *Promoter) Promote(ctx context.Context, capabilityID, targetEnv string, 
 			"old_release_id":  oldReleaseID,
 			"new_prompt_hash": newHash,
 			"target_env":      targetEnv,
-			"manifest_hash":   manifestHash,
+			"manifest_hash":   mHash,
 		})
 	}
 	return &PromoteResult{

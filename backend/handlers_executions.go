@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/errs"
 	"github.com/sachncs/promptsheon/backend/executor"
 	"github.com/sachncs/promptsheon/backend/invoke"
 )
@@ -34,7 +35,7 @@ func (s *Server) handleListExecutions(w http.ResponseWriter, r *http.Request) er
 	return nil
 }
 
-// errProviderMissing is an alias for the executor's typed
+// errs.ErrProviderMissing is an alias for the executor's typed
 // sentinel. We map the executor's ErrProviderMissing (returned
 // by the daemon when no provider is registered for the
 // requested model) to 502 Bad Gateway with a provider_missing
@@ -94,7 +95,7 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 		// BUG-19: distinguish provider-missing from generic 5xx so
 		// the operator can tell at a glance whether the LLM provider
 		// was unregistered or the request simply failed.
-		if errors.Is(invErr, errProviderMissing) {
+		if errors.Is(invErr, errs.ErrProviderMissing) {
 			return &HTTPError{
 				Status:  http.StatusBadGateway,
 				Message: "no LLM provider configured for this invocation",
@@ -166,7 +167,7 @@ func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]
 	if err != nil {
 		return nil, err, 0
 	}
-	mh := manifestHash(versionID, model, provider)
+	mh := capability.ManifestHashPlaceholder(versionID, model, provider)
 	if v, err := s.db.GetVersion(r.Context(), versionID); err == nil {
 		if v.ManifestHash != "" {
 			mh = v.ManifestHash
@@ -176,10 +177,10 @@ func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]
 		WorkspaceID:   r.PathValue("workspace_id"),
 		ReleaseID:     versionID,
 		ManifestHash:  mh,
-		InputHash:     inputHash(input),
+		InputHash:     capability.InputHash(input),
 		Input:         input,
 		Model:         model,
-		ModelRevision: modelRevision(model, provider),
+		ModelRevision: capability.ModelRevision(model, provider),
 		Provider:      provider,
 	}
 	start := time.Now()

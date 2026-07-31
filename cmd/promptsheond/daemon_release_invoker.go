@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/sachncs/promptsheon/backend"
+	"github.com/sachncs/promptsheon/backend/capability"
 	"github.com/sachncs/promptsheon/backend/executor"
 	"github.com/sachncs/promptsheon/backend/invoke"
 	"github.com/sachncs/promptsheon/backend/release"
@@ -44,18 +45,18 @@ func (r *apiReleaseInvoker) Invoke(ctx context.Context, releaseID string, inputs
 	if err != nil {
 		return nil, err
 	}
-	manifestHash, err := backend.ComputeManifestHash(rel.Manifest)
+	mHash, err := backend.ManifestHash(rel.Manifest)
 	if err != nil {
 		return nil, fmt.Errorf("release %s: manifest hash: %w", releaseID, err)
 	}
 	rec, err := r.inv.Invoke(ctx, executor.InvokeRequest{
 		ReleaseID:     rel.ID,
-		ManifestHash:  manifestHash,
-		InputHash:     backend.InputHash(input),
+		ManifestHash:  mHash,
+		InputHash:     capability.InputHash(input),
 		Input:         input,
 		Provider:      plan.Provider,
 		Model:         plan.Model,
-		ModelRevision: backend.ModelRevision(plan.Model, plan.Provider),
+		ModelRevision: capability.ModelRevision(plan.Model, plan.Provider),
 		SystemPrompt:  plan.Prompt,
 	})
 	if err != nil {

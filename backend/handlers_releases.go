@@ -228,7 +228,7 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
-	manifestHash, err := manifestHashForRelease(rel)
+	mHash, err := manifestHashForRelease(rel)
 	if err != nil {
 		return fmt.Errorf("manifest hash: %w", err)
 	}
@@ -286,7 +286,7 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 		return err
 	}
 	s.audit(r.Context(), "invoke", "release:"+releaseID, map[string]any{
-		"manifest_hash":    manifestHash,
+		"manifest_hash":    mHash,
 		"tokens":           exec.TotalTokens,
 		"cost_usd":         exec.CostUSD,
 		"tokens_estimated": exec.TotalTokens > 0 || exec.CostUSD > 0,
@@ -331,7 +331,10 @@ func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, in
 	if err != nil {
 		return nil, err, 0
 	}
-	manifestHash, _ := computeManifestHash(rel.Manifest)
+	mHash, err := capability.ComputeManifestHash(rel.Manifest)
+	if err != nil {
+		return nil, err, 0
+	}
 	model := ""
 	provider := ""
 	if plan != nil {
@@ -341,11 +344,11 @@ func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, in
 	req := executor.InvokeRequest{
 		WorkspaceID:   r.PathValue("workspace_id"),
 		ReleaseID:     rel.ID,
-		ManifestHash:  manifestHash,
-		InputHash:     inputHash(input),
+		ManifestHash:  mHash,
+		InputHash:     capability.InputHash(input),
 		Input:         input,
 		Model:         model,
-		ModelRevision: modelRevision(model, provider),
+		ModelRevision: capability.ModelRevision(model, provider),
 		Provider:      provider,
 	}
 	// ponytail: same prompt-as-system fix as the harness path — the
@@ -372,7 +375,7 @@ func (s *Server) handleGetReleaseApproval(w http.ResponseWriter, r *http.Request
 }
 
 func manifestHashForRelease(rel *release.Release) (string, error) {
-	h, err := computeManifestHash(rel.Manifest)
+	h, err := capability.ComputeManifestHash(rel.Manifest)
 	if err != nil {
 		// BUG-20: previously this returned "" and the caller
 		// stored the empty hash in the audit row, silently
