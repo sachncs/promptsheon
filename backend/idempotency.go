@@ -155,7 +155,7 @@ func IdempotencyMiddleware(idempStore IdempotencyStore) func(http.Handler) http.
 			}
 
 			// Tee the response so we can cache it.
-			rec := &recordingResponseWriter{ResponseWriter: w, headers: http.Header{}}
+			rec := &recordingResponseWriter{ResponseWriter: w}
 			next.ServeHTTP(rec, r)
 
 			// Only cache 2xx responses. 4xx/5xx are not safe
@@ -165,7 +165,7 @@ func IdempotencyMiddleware(idempStore IdempotencyStore) func(http.Handler) http.
 				entry := store.IdempotencyEntry{
 					Expires:    time.Now().Add(idempotencyWindow),
 					StatusCode: rec.statusCode,
-					Headers:    rec.headers,
+					Headers:    rec.Header().Clone(),
 					Body:       rec.body.Bytes(),
 				}
 				if idempStore != nil {
@@ -253,17 +253,17 @@ func (r *replayBody) Close() error {
 }
 
 // recordingResponseWriter is an http.ResponseWriter that
-// captures the status, headers, and body so the idempotency
-// cache can replay them verbatim. Header setters are recorded
-// rather than forwarded so the original writer stays clean.
+// captures the status and body so the idempotency cache can
+// replay them verbatim. Header setters are forwarded to the
+// underlying writer so the live response carries Content-Type,
+// pagination Link, OAuth Set-Cookie, Location, etc.
 type recordingResponseWriter struct {
 	http.ResponseWriter
-	headers    http.Header
 	statusCode int
 	body       bytes.Buffer
 }
 
-func (r *recordingResponseWriter) Header() http.Header { return r.headers }
+func (r *recordingResponseWriter) Header() http.Header { return r.ResponseWriter.Header() }
 func (r *recordingResponseWriter) WriteHeader(s int) {
 	r.statusCode = s
 	r.ResponseWriter.WriteHeader(s)
