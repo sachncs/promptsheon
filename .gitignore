@@ -81,5 +81,9 @@ scripts/bench-current.txt
 # Python SDK egg-info (created by `pip install -e ./sdk/python`).
 sdk/python/src/promptsheon.egg-info/
 
+# Python bytecode cache (any __pycache__ tree).
+**/__pycache__/
+*.pyc
+
 # Frontend node_modules (kept out of the tree).
 sdk/typescript/node_modules/

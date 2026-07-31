@@ -1,27 +1,25 @@
 //go:build promptsheon
 
+// CHANGELOG for the public SDK. This package is the only public
+// Go surface; the legacy github.com/sachncs/promptsheon/sdk
+// import path was removed in v1.0.0.
+//
+// # v1.0.0 (L-1 / breaking change)
+//
+// The legacy github.com/sachncs/promptsheon/sdk package was
+// removed. Consumers must update their import path:
+//
+//	import "github.com/sachncs/promptsheon/sdk"
+// becomes
+//	import "github.com/sachncs/promptsheon/pkg/promptsheon"
+//
+// The change is mechanical: every exported symbol in sdk/ is
+// present in pkg/promptsheon with the same name and behaviour.
+//
+// Why remove sdk/ rather than deprecate it? Per PLAN-49 / L-1
+// (the user requested "no backward shims, breaking changes
+// welcomed"): the legacy path made every internal type public,
+// which prevented refactors. The //go:build promptsheon fence
+// in pkg/promptsheon is the only public surface; sdk/ would
+// have been a backdoor.
 package promptsheon
-
-// CHANGELOG for the public SDK facade. The facade itself is a
-// thin re-export layer over github.com/sachncs/promptsheon/sdk
-// and the various backend packages; substantive changes happen
-// there and propagate here.
-//
-// # v0.4.0 (PLAN-49 / v1.0.0 release)
-//
-// Initial fence-tagged facade. Adds:
-//   - Client, New, NewWithHTTP (re-exports of sdk.Client + constructors)
-//   - APIError (re-export of sdk.APIError)
-//   - Workspace, Project, Capability, Version, Release, Execution,
-//     Dataset, DatasetCase, Precondition, EvalRun, EvalResult,
-//     APIKey, ProviderKey, Alert, AlertRule, NotificationGroup,
-//     AuditEntry, and the corresponding Request types
-//   - Err* sentinels (re-exports of backend/errs)
-//   - Audit key constants (re-exports of backend/audit)
-//   - Role + Permission constants (re-exports of backend/auth)
-//
-// Build: `GOFLAGS=-tags=promptsheon go build ./pkg/promptsheon`
-//
-// The facade compiles only with the `promptsheon` build tag.
-// Default `go build ./...` and `go test ./...` skip it, which
-// keeps the daemon's main build fast.

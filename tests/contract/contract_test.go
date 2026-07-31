@@ -30,7 +30,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	sdk "github.com/sachncs/promptsheon/sdk"
+	"github.com/sachncs/promptsheon/pkg/promptsheon"
 )
 
 // routeEntry is a single OpenAPI path entry. Only the fields
@@ -107,26 +107,26 @@ func TestEveryRouteReachable(t *testing.T) {
 	}
 }
 
-// TestSDKExposesMandatoryMethods walks *sdk.Client's method
+// TestSDKExposesMandatoryMethods walks *promptsheon.Client's method
 // set with reflection and fails on any documented method
 // that's missing. The list is derived from the SDK's actual
-// exported method set, so adding a method to *sdk.Client
+// exported method set, so adding a method to *promptsheon.Client
 // automatically registers it as mandatory; removing one
 // fails the build.
 func TestSDKExposesMandatoryMethods(t *testing.T) {
-	rt := reflect.TypeOf((*sdk.Client)(nil))
+	rt := reflect.TypeOf((*promptsheon.Client)(nil))
 	for i := 0; i < rt.NumMethod(); i++ {
 		// The walk itself proves the method set compiled.
 		// The deeper check is below in TestSDKMethodCoverage.
 		_ = rt.Method(i)
 	}
 
-	// Snapshot every exported method name on *sdk.Client.
+	// Snapshot every exported method name on *promptsheon.Client.
 	// The test will fail if any future change drops one of
 	// them without also dropping the documentation that
 	// promised it.
 	want := sdkMandatoryMethods()
-	c := &sdk.Client{}
+	c := &promptsheon.Client{}
 	ctype := reflect.TypeOf(c)
 
 	have := map[string]bool{}
@@ -135,7 +135,7 @@ func TestSDKExposesMandatoryMethods(t *testing.T) {
 	}
 	for _, m := range want {
 		if !have[m] {
-			t.Errorf("sdk.Client is missing mandatory method %q", m)
+			t.Errorf("promptsheon.Client is missing mandatory method %q", m)
 		}
 	}
 }

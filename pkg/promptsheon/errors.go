@@ -2,7 +2,11 @@
 
 package promptsheon
 
-import "github.com/sachncs/promptsheon/backend/errs"
+import (
+	"errors"
+
+	"github.com/sachncs/promptsheon/backend/errs"
+)
 
 // Re-exported sentinel errors. All sentinels follow the
 // idiomatic Err* naming (PLAN-49 c2.8). Use errors.Is to compare.
@@ -24,11 +28,12 @@ var (
 )
 
 // IsAPIError reports whether err is an SDK APIError. Use the
-// returned *APIError to inspect status code and message.
-//
-// Deprecated: use the type assertion directly:
-//
-//	if apiErr := errors.As(err, &promptsheon.APIError{}); apiErr != nil { ... }
+// returned *APIError to inspect status code and message. Prefer
+// errors.As directly in new code.
 func IsAPIError(err error) (*APIError, bool) {
-	return isAPIError(err)
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		return apiErr, true
+	}
+	return nil, false
 }

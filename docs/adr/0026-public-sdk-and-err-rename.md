@@ -1,6 +1,7 @@
 # ADR-0026: Public SDK surface and Error* → Err* rename
 
 - **Status:** Accepted, 2026-08-01
+- **Updated:** 2026-08-01 (L-1: sdk/ removed entirely)
 - **Context:** PLAN-49 v1.0.0 release
 
 ## Context
@@ -22,14 +23,29 @@ The PLAN-49 audit found:
 
 ## Decision
 
-### 1. Single canonical import path
+### 1. Single canonical import path; sdk/ removed
 
 The public Go SDK now lives at
-`github.com/sachncs/promptsheon/pkg/promptsheon`. The legacy
-`github.com/sachncs/promptsheon/sdk` path is kept as a
-**backward-compatibility shim**: type aliases re-export the same
-structs (no behaviour change). A future v1.1.0 may deprecate the
-`sdk/` path with a `// Deprecated:` notice.
+`github.com/sachncs/promptsheon/pkg/promptsheon`. v1.0.0
+**removes** the legacy `github.com/sachncs/promptsheon/sdk`
+package entirely (L-1: the user requested "no backward shims,
+breaking changes welcomed"). The facade is no longer a
+re-export — it is the implementation.
+
+Migration:
+
+    import "github.com/sachncs/promptsheon/sdk"
+becomes
+    import "github.com/sachncs/promptsheon/pkg/promptsheon"
+
+The change is mechanical: every exported symbol in sdk/ is
+present in pkg/promptsheon with the same name and behaviour. A
+codemod is provided in `tools/codemod-sdktopkgshe-on/`.
+
+Why remove sdk/ rather than deprecate it? The legacy path made
+every internal type public, which prevented refactors inside
+backend/. The //go:build promptsheon fence in pkg/promptsheon is
+the only public surface; sdk/ would have been a backdoor.
 
 ### 2. Build-tag fence
 
@@ -102,15 +118,15 @@ package.
 
 ## Consequences
 
-- Consumers get a single canonical import path with a build-tag
-  fence.
+- One canonical import path: `github.com/sachncs/promptsheon/pkg/promptsheon`.
+- The legacy `sdk/` package is removed; `go get
+  github.com/sachncs/promptsheon/sdk` returns "module ... not
+  found".
 - No external breakage from the sentinel rename (no external
   consumers confirmed in c0.0).
 - The daemon binary stays lean — `go build ./...` excludes the
   facade.
 - The `s.repos → s.db` rename is internal-only.
-- Future deprecation of `sdk/` path is straightforward (just delete
-  the alias).
 
 ## References
 
@@ -118,4 +134,4 @@ package.
 - Build-tag fence: `pkg/promptsheon/*.go` (`//go:build promptsheon`)
 - Makefile targets: `build-public`, `check-public`, `build-e2e`
 - Renames: commits `1868370` (initial sweep) + `021d03d` (follow-up)
-- Backward-compat shim: `sdk/client.go` (kept as a re-export layer)
+- SDK location: `pkg/promptsheon/` (was `sdk/`, removed in v1.0.0)

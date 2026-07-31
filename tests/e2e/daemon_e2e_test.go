@@ -32,13 +32,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/sdk"
+	"github.com/sachncs/promptsheon/pkg/promptsheon"
 )
 
 var (
 	daemonBaseURL string
 	daemonAPIKey  string
-	testClient    *sdk.Client
+	testClient    *promptsheon.Client
 )
 
 func TestMain(m *testing.M) {
@@ -65,7 +65,7 @@ func TestMain(m *testing.M) {
 	// want an auth header read daemonAPIKey after TestMain
 	// populated it.
 	daemonAPIKey = bootstrapAdminKey(daemonBaseURL, "e2e-bootstrap-secret")
-	testClient = sdk.New(daemonBaseURL, daemonAPIKey)
+	testClient = promptsheon.New(daemonBaseURL, daemonAPIKey)
 	code := m.Run()
 	os.Exit(code)
 }
@@ -216,7 +216,7 @@ func TestCapabilityLifecycle(t *testing.T) {
 	}
 
 	// Step 1: workspace.
-	ws, err := testClient.CreateWorkspace(ctx, sdk.CreateWorkspaceRequest{Name: "e2e-" + randSuffix()})
+	ws, err := testClient.CreateWorkspace(ctx, promptsheon.CreateWorkspaceRequest{Name: "e2e-" + randSuffix()})
 	if err != nil {
 		t.Fatalf("CreateWorkspace: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestCapabilityLifecycle(t *testing.T) {
 
 	// Step 2: project under the workspace. The SDK does not
 	// expose CreateProject yet; use the raw HTTP path. Future
-	// work can replace this with sdk.CreateProject.
+	// work can replace this with promptsheon.CreateProject.
 	var project struct {
 		ID string `json:"id"`
 	}
@@ -233,7 +233,7 @@ func TestCapabilityLifecycle(t *testing.T) {
 	notEmpty(t, "project.id", project.ID)
 
 	// Step 3: capability under the project.
-	cap, err := testClient.CreateCapability(ctx, project.ID, sdk.CreateCapabilityRequest{
+	cap, err := testClient.CreateCapability(ctx, project.ID, promptsheon.CreateCapabilityRequest{
 		Name:        "e2e-cap-" + randSuffix(),
 		Description: "test capability",
 	})
@@ -254,14 +254,14 @@ const emptySHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b785
 	// must include the provider/model the invoke step will
 	// use; the harness promotes versions whose manifests
 	// match the registered providers.
-	version, err := testClient.AddVersion(ctx, cap.ID, sdk.AddVersionRequest{
+	version, err := testClient.AddVersion(ctx, cap.ID, promptsheon.AddVersionRequest{
 		Version: 1,
-		Manifest: sdk.Manifest{
-			Prompt:        sdk.ArtifactRef{Kind: "prompt", Hash: emptySHA256},
-			ModelPolicy:   sdk.ArtifactRef{Kind: "model_policy", Hash: emptySHA256},
-			RuntimePolicy: sdk.ArtifactRef{Kind: "runtime_policy", Hash: emptySHA256},
-			Context:       sdk.ArtifactRef{Kind: "context_contract", Hash: emptySHA256},
-			Memory:        sdk.ArtifactRef{Kind: "memory", Hash: emptySHA256},
+		Manifest: promptsheon.Manifest{
+			Prompt:        promptsheon.ArtifactRef{Kind: "prompt", Hash: emptySHA256},
+			ModelPolicy:   promptsheon.ArtifactRef{Kind: "model_policy", Hash: emptySHA256},
+			RuntimePolicy: promptsheon.ArtifactRef{Kind: "runtime_policy", Hash: emptySHA256},
+			Context:       promptsheon.ArtifactRef{Kind: "context_contract", Hash: emptySHA256},
+			Memory:        promptsheon.ArtifactRef{Kind: "memory", Hash: emptySHA256},
 		},
 	})
 	if err != nil {
@@ -270,7 +270,7 @@ const emptySHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b785
 	notEmpty(t, "version.id", version.ID)
 
 	// Step 5: release under the version.
-	rel, err := testClient.CreateRelease(ctx, version.ID, sdk.CreateReleaseRequest{
+	rel, err := testClient.CreateRelease(ctx, version.ID, promptsheon.CreateReleaseRequest{
 		Environment: "dev",
 	})
 	if err != nil {
@@ -285,8 +285,8 @@ const emptySHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b785
 	// vote. The reviewer key is minted by the admin via
 	// POST /api/v1/users + POST /api/v1/apikeys.
 	reviewerKey := createReviewer(t, "reviewer@e2e.local", "e2e-reviewer")
-	reviewerClient := sdk.New(daemonBaseURL, reviewerKey)
-	if _, err := reviewerClient.Vote(ctx, rel.ID, sdk.VoteRequest{
+	reviewerClient := promptsheon.New(daemonBaseURL, reviewerKey)
+	if _, err := reviewerClient.Vote(ctx, rel.ID, promptsheon.VoteRequest{
 		Decision: "approve",
 	}); err != nil {
 		t.Fatalf("Vote: %v", err)
@@ -308,7 +308,7 @@ const emptySHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b785
 	// artifact hashes) and surface as 502; we accept that
 	// because the lifecycle assertion is "invoke path
 	// reached and handler ran", not "real LLM answered".
-	exec, err := testClient.Invoke(ctx, rel.ID, sdk.InvokeRequest{
+	exec, err := testClient.Invoke(ctx, rel.ID, promptsheon.InvokeRequest{
 		Provider: providers[0],
 		Model:    "test-model",
 		Inputs:   map[string]any{"prompt": "ping"},
@@ -320,7 +320,7 @@ const emptySHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b785
 		// We fail only when Invoke itself refused (401,
 		// 403, 404, 409), which would mean the lifecycle
 		// wiring is broken.
-		apiErr := &sdk.APIError{}
+		apiErr := &promptsheon.APIError{}
 		if !errors.As(err, &apiErr) {
 			t.Fatalf("Invoke: %v", err)
 		}
