@@ -59,12 +59,29 @@ function resolve(route) {
 }
 
 function titleFromRoute(route) {
-  if (route.path === "/capabilities/{id}") return route.params.id ? `Capability ${route.params.id.slice(-8)}` : "Capability";
-  if (route.path === "/operations/{tab}") return route.params.tab ? `Operations · ${prettyTab(route.params.tab)}` : "Operations";
-  if (route.path === "/workspaces/{id}") return route.params.id ? `Workspace ${route.params.id.slice(-8)}` : "Workspace";
-  if (route.path === "/projects/{id}") return route.params.id ? `Project ${route.params.id.slice(-8)}` : "Project";
-  if (route.path === "/versions/{id}") return route.params.id ? `Version v${route.params.id.slice(-8)}` : "Version";
-  if (route.path === "/executions/{id}") return route.params.id ? `Execution ${route.params.id.slice(-8)}` : "Execution";
+  // X-7: the previous comparisons checked route.path against
+  // literal placeholders like "/capabilities/{id}" but the
+  // router returns the actual pathname ("/capabilities/abc123").
+  // The function always fell through to the default "Promptsheon"
+  // title. Match on real path prefixes now.
+  if (route.path.startsWith("/capabilities/") && route.path !== "/capabilities") {
+    return route.params.id ? `Capability ${route.params.id.slice(-8)}` : "Capability";
+  }
+  if (route.path.startsWith("/operations/") && route.path !== "/operations") {
+    return route.params.tab ? `Operations · ${prettyTab(route.params.tab)}` : "Operations";
+  }
+  if (route.path.startsWith("/workspaces/") && route.path !== "/workspaces") {
+    return route.params.id ? `Workspace ${route.params.id.slice(-8)}` : "Workspace";
+  }
+  if (route.path.startsWith("/projects/") && route.path !== "/projects") {
+    return route.params.id ? `Project ${route.params.id.slice(-8)}` : "Project";
+  }
+  if (route.path.startsWith("/versions/") && route.path !== "/versions") {
+    return route.params.id ? `Version v${route.params.id.slice(-8)}` : "Version";
+  }
+  if (route.path.startsWith("/executions/") && route.path !== "/executions") {
+    return route.params.id ? `Execution ${route.params.id.slice(-8)}` : "Execution";
+  }
   return null;
 }
 

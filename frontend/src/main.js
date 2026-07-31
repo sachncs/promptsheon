@@ -19,13 +19,13 @@ function bootstrap() {
       window.document.querySelectorAll("[data-nav]").forEach((el) => {
         el.classList.toggle("active", el.getAttribute("href") === `#${route.path}`);
       });
-      const subnav = window.document.querySelectorAll("[data-subnav]");
-      const operationsMatch = ["operations", "operations/alerts", "operations/webhooks", "operations/vault", "operations/providers", "operations/users", "operations/reasoning"];
-      subnav.forEach((el) => {
-        const match = el.getAttribute("href").slice(2);
-        const isOps = operationsMatch.includes(route.path);
-        el.classList.toggle("active", match === route.path || (isOps && match === "operations"));
-      });
+      // X-8: the previous code compared route.path against
+      // unprefixed paths ("operations/alerts") but the router
+      // always returns the leading slash ("/operations/alerts").
+      // includes() never matched; the whole block was unreachable.
+      // The operations subnav styling is handled by the
+      // tabNav() helper in views/operations/index.js; this block
+      // is now empty.
       renderView(route);
     }
   });
