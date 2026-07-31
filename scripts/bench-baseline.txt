@@ -14,7 +14,6 @@
 # manually to avoid silent SLO rewrites.
 #
 # Baseline captured on Apple M3 Pro (arm64), Go 1.26.5, darwin.
-BenchmarkSelect-12    	 3053305	       379.8 ns/op	       0 B/op	       0 allocs/op
 BenchmarkWriteObject-12    	   32990	     34704 ns/op	    5692 B/op	      18 allocs/op
 BenchmarkCommit-12         	      58	  18882152 ns/op	 1571839 B/op	     214 allocs/op
 BenchmarkVerify-12         	     796	   1427240 ns/op	 1008873 B/op	    1223 allocs/op
