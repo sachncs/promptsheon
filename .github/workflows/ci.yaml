@@ -93,6 +93,14 @@ jobs:
         # (backend) >= 60%. The per-package floors catch
         # silent regressions in the testable surface; the global
         # floor catches regressions in the testable aggregate.
+        # L-10: hard coverage floor enforcement. The global
+        # floor catches regressions in the testable aggregate; the
+        # per-package floors catch silent regressions in the
+        # testable surface (domain packages >= 50%, infrastructure
+        # >= 40%, api handlers >= 60%). The per-package floors are
+        # a hard gate — packages with no test coverage (0%) fail
+        # the build so contributors are nudged to add at least one
+        # test per package.
         run: |
           set -e
           COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | tr -d '%')
