@@ -21,12 +21,13 @@
       "schedule": ["before 6am on monday"]
     },
     {
-      "description": "Auto-merge patch-level Go module updates. The CI matrix runs go vet + go test on every PR, so patch-level bumps are safe to auto-merge.",
+      "description": "Auto-merge patch-level Go module updates only after CI's status checks report success. The previous config had no requiredStatusChecks gate (M-12); a red-CI PR would auto-merge. Now Renovate blocks the automerge until the PR's checks are green.",
       "matchDatasources": ["go"],
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true,
       "automergeType": "pr",
-      "platformAutomerge": true
+      "platformAutomerge": true,
+      "requiredStatusChecks": ["Test", "Lint", "Build"]
     }
   ],
   "ignorePaths": [
