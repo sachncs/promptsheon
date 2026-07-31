@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -327,7 +328,7 @@ func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, in
 	if s.invoker == nil {
 		return nil, errors.New("api: invoke.Invoker not wired on this server"), 0
 	}
-	input, err := marshalNoArgs(inputs)
+	input, err := json.Marshal(inputs)
 	if err != nil {
 		return nil, err, 0
 	}

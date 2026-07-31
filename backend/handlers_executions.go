@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -163,7 +164,7 @@ func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]
 	if s.invoker == nil {
 		return nil, errors.New("api: invoke.Invoker not wired on this server"), 0
 	}
-	input, err := marshalNoArgs(inputs)
+	input, err := json.Marshal(inputs)
 	if err != nil {
 		return nil, err, 0
 	}
