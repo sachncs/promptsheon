@@ -48,13 +48,7 @@ func (s *Server) handleUpdateCapabilityContract(w http.ResponseWriter, r *http.R
 		return &HTTPError{Status: http.StatusBadRequest, Message: err.Error()}
 	}
 	if err := s.capabilityRepo().SetCapabilityContract(r.Context(), id, &c); err != nil {
-		if dbErr := translateDBError(err, "capability contract"); dbErr != nil {
-			if httpErr, ok := dbErr.(*HTTPError); ok && httpErr.Status == http.StatusNotFound {
-				return &HTTPError{Status: http.StatusNotFound, Message: "capability not found"}
-			}
-			s.logger.Error("set contract failed", "capability_id", id, "err", err)
-			return &HTTPError{Status: http.StatusInternalServerError, Message: "internal error"}
-		}
+		return translateDBError(err, "capability contract")
 	}
 	w.Header().Set("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(c)
@@ -71,13 +65,7 @@ func (s *Server) handleGetCapabilityContract(w http.ResponseWriter, r *http.Requ
 	}
 	c, err := s.capabilityRepo().GetCapabilityContract(r.Context(), id)
 	if err != nil {
-		if dbErr := translateDBError(err, "capability contract"); dbErr != nil {
-			if httpErr, ok := dbErr.(*HTTPError); ok && httpErr.Status == http.StatusNotFound {
-				return &HTTPError{Status: http.StatusNotFound, Message: "capability or contract not found"}
-			}
-			s.logger.Error("get contract failed", "capability_id", id, "err", err)
-			return &HTTPError{Status: http.StatusInternalServerError, Message: "internal error"}
-		}
+		return translateDBError(err, "capability contract")
 	}
 	w.Header().Set("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(c)
