@@ -385,10 +385,14 @@ func scanRelease(scanner interface {
 		r.SupersededAt = &t
 	}
 	if manifestJSON != "" && manifestJSON != "{}" {
-		mustUnmarshal([]byte(manifestJSON), &r.Manifest)
+		if err := mustUnmarshal([]byte(manifestJSON), &r.Manifest); err != nil {
+			return nil, fmt.Errorf("release %s manifest: %w", r.ID, err)
+		}
 	}
 	if approvedByJSON != "" && approvedByJSON != "[]" {
-		mustUnmarshal([]byte(approvedByJSON), &r.ApprovedBy)
+		if err := mustUnmarshal([]byte(approvedByJSON), &r.ApprovedBy); err != nil {
+			return nil, fmt.Errorf("release %s approved_by: %w", r.ID, err)
+		}
 	}
 	return &r, nil
 }
@@ -454,7 +458,9 @@ func scanApproval(scanner interface {
 		return nil, fmt.Errorf("scan approval: %w", err)
 	}
 	if votesJSON != "" && votesJSON != "[]" {
-		mustUnmarshal([]byte(votesJSON), &a.Votes)
+		if err := mustUnmarshal([]byte(votesJSON), &a.Votes); err != nil {
+			return nil, fmt.Errorf("approval %s votes: %w", a.ReleaseID, err)
+		}
 	}
 	return &a, nil
 }

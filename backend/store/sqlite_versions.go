@@ -99,7 +99,9 @@ func scanCapabilityVersion(scanner interface {
 	}
 
 	if manifestJSON != "" && manifestJSON != "{}" {
-		mustUnmarshal([]byte(manifestJSON), &v.Manifest)
+		if err := mustUnmarshal([]byte(manifestJSON), &v.Manifest); err != nil {
+			return nil, fmt.Errorf("version %s manifest: %w", v.ID, err)
+		}
 	}
 
 	return &v, nil

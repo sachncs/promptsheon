@@ -127,8 +127,12 @@ func scanExecution(scanner interface {
 		return nil, fmt.Errorf("scan execution: %w", err)
 	}
 
-	mustUnmarshal([]byte(inputsJSON), &e.Inputs)
-	mustUnmarshal([]byte(outputsJSON), &e.Outputs)
+	if err := mustUnmarshal([]byte(inputsJSON), &e.Inputs); err != nil {
+		return nil, fmt.Errorf("execution %s inputs: %w", e.ID, err)
+	}
+	if err := mustUnmarshal([]byte(outputsJSON), &e.Outputs); err != nil {
+		return nil, fmt.Errorf("execution %s outputs: %w", e.ID, err)
+	}
 
 	if e.Timestamp.IsZero() {
 		e.Timestamp = time.Now()

@@ -3,15 +3,13 @@ import (
 	"context"
 	"database/sql"
 	"embed"
-
-	_ "modernc.org/sqlite"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	_ "modernc.org/sqlite"
 )
 
 // SQLite struct, core connection lifecycle, and shared helpers.
@@ -117,13 +115,19 @@ func marshalOrErr(v any) ([]byte, error) {
 }
 
 
-func mustUnmarshal(data []byte, v any) {
+func mustUnmarshal(data []byte, v any) error {
 	if len(data) == 0 {
-		return
+		return nil
 	}
 	if err := json.Unmarshal(data, v); err != nil {
-		slog.Error("failed to unmarshal JSON", "err", err)
+		// CRIT-1 / DEF-13: surface corruption to callers instead of
+		// silently zeroing the struct. The previous behaviour masked
+		// disk corruption, schema drift, and interrupted writes behind
+		// a slog.Error log; upstream validation failures had no audit
+		// trail pointing at the corrupted row.
+		return fmt.Errorf("unmarshal JSON: %w", err)
 	}
+	return nil
 }
 
 
