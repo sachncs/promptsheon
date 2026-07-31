@@ -247,8 +247,7 @@ items:
 - id: L-2
   description: Test infra not enumerated
   addressed_by:
-  - c4.0
-  - c4.1
+  - resolved-by-L-2-commits
 - id: L-3
   description: vendor/ consistency
   addressed_by:
