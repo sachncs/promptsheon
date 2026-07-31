@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/audit"
 )
 
 // Capability HTTP handlers (CRUD + self-evolve config).
@@ -66,7 +67,7 @@ func (s *Server) handleCreateCapability(w http.ResponseWriter, r *http.Request) 
 	if err := s.db.CreateCapability(r.Context(), capab); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "capability:"+capab.ID, map[string]any{auditKeyName: capab.Name, "project_id": projectID})
+	s.audit(r.Context(), "create", "capability:"+capab.ID, map[string]any{audit.KeyName: capab.Name, "project_id": projectID})
 	writeJSON(w, http.StatusCreated, capab)
 	return nil
 }

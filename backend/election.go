@@ -85,12 +85,12 @@ func (e *Elector) EnsureTable(ctx context.Context) error {
 	return nil
 }
 
-// errs.ErrNotLeader is returned by TryAcquire when this replica did
+// errs.ErrorElectionNotLeader is returned by TryAcquire when this replica did
 // not win the election. Callers should treat the local
 // replica as a read-only follower until Acquire succeeds.
 
 // Acquire tries to claim the leader row. Returns nil when this
-// replica becomes (or already was) the leader; errs.ErrNotLeader
+// replica becomes (or already was) the leader; errs.ErrorElectionNotLeader
 // when another replica currently holds the lease.
 //
 // The transaction is upgraded to a SQLite BEGIN IMMEDIATE so the
@@ -147,7 +147,7 @@ func (e *Elector) Acquire(ctx context.Context) error {
 			e.term = curTerm
 		} else if e.now().Before(expiresAt) {
 			// Held by someone else and the lease is still valid.
-			return errs.ErrNotLeader
+			return errs.ErrorElectionNotLeader
 		} else {
 			// Stale lease — steal it but only if the lease is
 			// actually expired. The expires_at <= now guard
@@ -166,7 +166,7 @@ func (e *Elector) Acquire(ctx context.Context) error {
 				// Lost the race: the prior leader renewed
 				// between our SELECT and our UPDATE. Stay as
 				// follower.
-				return errs.ErrNotLeader
+				return errs.ErrorElectionNotLeader
 			}
 			e.term = curTerm + 1
 		}
@@ -240,7 +240,7 @@ func (e *Elector) Run(ctx context.Context, errCh chan<- error) {
 			return
 		case <-ticker.C:
 			if err := e.Acquire(ctx); err != nil {
-				if !errors.Is(err, errs.ErrNotLeader) {
+				if !errors.Is(err, errs.ErrorElectionNotLeader) {
 					select {
 					case errCh <- err:
 					default:

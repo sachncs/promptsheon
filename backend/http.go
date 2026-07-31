@@ -11,6 +11,7 @@ import (
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/ratelimit"
 	"github.com/sachncs/promptsheon/backend/store"
+	"github.com/sachncs/promptsheon/backend/audit"
 )
 
 // isRequestTLS reports whether the inbound request arrived over an
@@ -99,7 +100,7 @@ func writeError(w http.ResponseWriter, err error) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	body := map[string]any{valError: err.Error()}
+	body := map[string]any{audit.FieldError: err.Error()}
 	if errors.As(err, &httpErr) && httpErr.Details != nil {
 		body["details"] = httpErr.Details
 	}
@@ -199,7 +200,7 @@ func callerID(r *http.Request) string {
 	if u, ok := auth.UserFromContext(r.Context()); ok && u != nil && u.ID != "" {
 		return u.ID
 	}
-	return auditDefaultUser
+	return audit.AnonUser
 }
 
 // --- Rate Limiting ---
@@ -261,7 +262,7 @@ type authAuditLogger struct {
 
 func (l *authAuditLogger) LogAuthFailure(ctx context.Context, keyPrefix, reason, remoteAddr string) {
 	l.server.audit(ctx, "auth_failure", "api_key", map[string]any{
-		fieldKeyPrefix: keyPrefix,
+		audit.FieldKeyPref: keyPrefix,
 		"reason":       reason,
 		"remote_addr":  remoteAddr,
 	})

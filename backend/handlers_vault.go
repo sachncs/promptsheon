@@ -5,11 +5,8 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/models"
+	"github.com/sachncs/promptsheon/backend/audit"
 )
-
-const fieldKeyName = "key_name"
-const fieldProviderName = "provider_name"
-
 // SaveVaultKey saves the vaultKey.
 // SaveVaultKey saves the vaultKey.
 func (s *Server) handleSaveVaultKey(w http.ResponseWriter, r *http.Request) error {
@@ -47,13 +44,13 @@ func (s *Server) handleSaveVaultKey(w http.ResponseWriter, r *http.Request) erro
 	if err := s.db.SaveProviderKey(r.Context(), pk); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "vault_key:"+pk.ID, map[string]any{keyProvider: pk.ProviderName, fieldKeyName: pk.KeyName})
+	s.audit(r.Context(), "create", "vault_key:"+pk.ID, map[string]any{audit.FieldProvider: pk.ProviderName, audit.FieldKeyName: pk.KeyName})
 
 	// Return without the encrypted key for security
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id":              pk.ID,
-		fieldProviderName: pk.ProviderName,
-		fieldKeyName:      pk.KeyName,
+		audit.FieldProviderName: pk.ProviderName,
+		audit.FieldKeyName:      pk.KeyName,
 		"created_at":      pk.CreatedAt,
 	})
 	return nil

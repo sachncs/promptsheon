@@ -107,7 +107,6 @@ func WithRequest(ctx context.Context, r *http.Request) context.Context {
 // worker pool to drain before dropping the entry. M-7 keeps the
 // value short so a slow audit pipeline never holds up the request
 // path.
-const auditDefaultUser = "api"
 const auditQueueBackpressure = 200 * time.Millisecond
 
 // NewServer creates a new API server with the given dependencies.

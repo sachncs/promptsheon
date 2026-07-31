@@ -8,10 +8,8 @@ import (
 
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/settings"
+	"github.com/sachncs/promptsheon/backend/audit"
 )
-
-const fieldSettingsValue = "value"
-
 // registerSettingsRoutes wires the four /api/v1/settings
 // routes. GET is PermSettingsRead (every role); PUT and
 // DELETE are PermSettingsWrite (admin-only by default).
@@ -128,7 +126,7 @@ func (s *Server) handleSetSetting(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 	s.audit(r.Context(), "create", "setting:"+key, map[string]any{
-		fieldAPIKey: key,
+		audit.FieldAPIKey: key,
 		"by":        updatedBy,
 	})
 	writeJSON(w, http.StatusOK, settingsResponse(key, req.Value, updatedBy, timeNow()))
@@ -159,7 +157,7 @@ func (s *Server) handleDeleteSetting(w http.ResponseWriter, r *http.Request) err
 		return err
 	}
 	s.audit(r.Context(), "delete", "setting:"+key, map[string]any{
-		fieldAPIKey: key,
+		audit.FieldAPIKey: key,
 		"by":        settingsUpdatedBy(r),
 	})
 	w.WriteHeader(http.StatusNoContent)
@@ -176,8 +174,8 @@ func settingsResponse(key, value, updatedBy string, updatedAt time.Time) map[str
 		display = "***"
 	}
 	return map[string]any{
-		fieldAPIKey:        key,
-		fieldSettingsValue: display,
+		audit.FieldAPIKey:        key,
+		audit.FieldValue: display,
 		"updated_by":       updatedBy,
 		"updated_at":       updatedAt,
 	}

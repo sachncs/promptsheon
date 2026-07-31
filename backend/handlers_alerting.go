@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/alerting"
+	"github.com/sachncs/promptsheon/backend/audit"
 )
 
 // validSeverities is the closed set for AlertRule.Severity.
@@ -93,7 +94,7 @@ func (s *Server) handleCreateAlertRule(w http.ResponseWriter, r *http.Request) e
 	}
 
 	s.alertingManager.AddRule(rule)
-	s.audit(r.Context(), "create", "alert_rule:"+rule.ID, map[string]any{auditKeyName: rule.Name})
+	s.audit(r.Context(), "create", "alert_rule:"+rule.ID, map[string]any{audit.KeyName: rule.Name})
 	writeJSON(w, http.StatusCreated, rule)
 	return nil
 }
@@ -215,7 +216,7 @@ func (s *Server) handleResolveAlert(w http.ResponseWriter, r *http.Request) erro
 	if !s.alertingManager.ResolveAlert(id) {
 		return ErrNotFound
 	}
-	writeJSON(w, http.StatusOK, map[string]any{auditKeyStatus: "resolved"})
+	writeJSON(w, http.StatusOK, map[string]any{audit.KeyStatus: "resolved"})
 	return nil
 }
 

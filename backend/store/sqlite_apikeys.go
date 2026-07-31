@@ -61,7 +61,7 @@ func (s *SQLite) GetAPIKeyByID(ctx context.Context, id string) (*models.APIKey, 
 		&k.Role, &k.ExpiresAt, &k.LastUsed, &k.CreatedAt, &k.Revoked,
 	)
 	if err == sql.ErrNoRows {
-		return nil, errs.ErrStoreNotFound
+		return nil, errs.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get api key by id: %w", err)

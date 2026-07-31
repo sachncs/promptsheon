@@ -8,6 +8,7 @@ import (
 
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/models"
+	"github.com/sachncs/promptsheon/backend/audit"
 )
 
 // audit writes an audit entry for a mutation. The user ID is taken
@@ -23,7 +24,7 @@ import (
 // the audit log lose entries under transient spikes that the worker
 // pool could otherwise have absorbed.
 func (s *Server) audit(ctx context.Context, action, resource string, details map[string]any) {
-	userID := auditDefaultUser
+	userID := audit.AnonUser
 	if u, ok := auth.UserFromContext(ctx); ok && u != nil && u.ID != "" {
 		userID = u.ID
 	}

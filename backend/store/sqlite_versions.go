@@ -92,7 +92,7 @@ func scanCapabilityVersion(scanner interface {
 		&manifestJSON, &v.ManifestHash, &v.CreatedAt, &v.CreatedBy,
 	)
 	if err == sql.ErrNoRows {
-		return nil, errs.ErrStoreNotFound
+		return nil, errs.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan version: %w", err)

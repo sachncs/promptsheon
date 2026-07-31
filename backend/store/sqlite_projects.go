@@ -80,7 +80,7 @@ func scanProject(scanner interface {
 	var p capability.Project
 	err := scanner.Scan(&p.ID, &p.WorkspaceID, &p.Name, &p.Description, &p.CreatedAt, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
-		return nil, errs.ErrStoreNotFound
+		return nil, errs.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan project: %w", err)

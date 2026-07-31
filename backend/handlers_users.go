@@ -7,12 +7,8 @@ import (
 
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/models"
+	"github.com/sachncs/promptsheon/backend/audit"
 )
-
-const roleReader = "reader"
-const fieldEmail = "email"
-const fieldRole = "role"
-
 // knownRoles is the closed set of valid user roles. Accepting
 // anything outside this set lets a caller grant themselves an
 // ad-hoc role (e.g. "superuser") that no downstream code maps
@@ -67,7 +63,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) error 
 		return badRequest("email is not a valid address")
 	}
 	if req.Role == "" {
-		req.Role = roleReader
+		req.Role = string(auth.RoleReader)
 	}
 	if !validRole(req.Role) {
 		return badRequest("role must be one of admin, writer, reader")
@@ -86,7 +82,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) error 
 	if err := s.db.CreateUser(r.Context(), u); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "user:"+u.ID, map[string]any{fieldEmail: u.Email, fieldRole: u.Role})
+	s.audit(r.Context(), "create", "user:"+u.ID, map[string]any{audit.FieldEmail: u.Email, audit.FieldRole: u.Role})
 	writeJSON(w, http.StatusCreated, u)
 	return nil
 }
@@ -166,15 +162,15 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) error 
 				continue
 			}
 			s.audit(r.Context(), "apikey_revoke", "api_key:"+k.ID, map[string]any{
-				fieldKeyPrefix: k.KeyPrefix,
+				audit.FieldKeyPref: k.KeyPrefix,
 				"target_user":  k.UserID,
 				"reason":       "role_change",
-				auditKeyName:   k.Name,
+				audit.KeyName:   k.Name,
 			})
 		}
 	}
 
-	s.audit(r.Context(), "update", "user:"+existing.ID, map[string]any{fieldEmail: existing.Email, fieldRole: existing.Role})
+	s.audit(r.Context(), "update", "user:"+existing.ID, map[string]any{audit.FieldEmail: existing.Email, audit.FieldRole: existing.Role})
 	writeJSON(w, http.StatusOK, existing)
 	return nil
 }

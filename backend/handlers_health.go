@@ -5,10 +5,8 @@ import (
 	"net/http"
 	"runtime"
 	"time"
+	"github.com/sachncs/promptsheon/backend/audit"
 )
-
-const dbStatusOK = "ok"
-
 var startTime = time.Now()
 
 // handleHealth is the liveness probe. It returns 200 whenever
@@ -19,8 +17,8 @@ var startTime = time.Now()
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
 	info := Get()
 	body := map[string]any{
-		auditKeyStatus:  "healthy",
-		auditKeyVersion: info.Version,
+		audit.KeyStatus:  "healthy",
+		audit.KeyVersion: info.Version,
 		"uptime":        time.Since(startTime).String(),
 	}
 	// PERF-MEM-1: include runtime.MemStats on /health when the
@@ -69,17 +67,17 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
 // Ready handles the request.
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 	ready := map[string]any{
-		auditKeyStatus: "ready",
+		audit.KeyStatus: "ready",
 		"go":           runtime.Version(),
 	}
 	if err := s.db.Ping(r.Context()); err != nil {
-		ready[auditKeyStatus] = "not_ready"
+		ready[audit.KeyStatus] = "not_ready"
 		ready["database"] = "unreachable"
 		ready["reason"] = "database ping failed: " + err.Error()
 		writeJSON(w, http.StatusServiceUnavailable, ready)
 		return nil
 	}
-	ready["database"] = dbStatusOK
+	ready["database"] = audit.FieldOK
 	// Leader election: report the current holder so operators
 	// can tell which replica is the writer.
 	if s.elector != nil {
@@ -100,7 +98,7 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 		ready["audit_queue_depth"] = depth
 		ready["audit_queue_capacity"] = cap(s.auditQueue)
 		if depth*4 > cap(s.auditQueue)*3 { // 75% threshold
-			ready[auditKeyStatus] = "degraded"
+			ready[audit.KeyStatus] = "degraded"
 			ready["reason"] = "audit worker queue near full"
 		}
 	}
@@ -113,13 +111,13 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 		ctx, cancel := context.WithTimeout(r.Context(), 200*time.Millisecond)
 		defer cancel()
 		if err := s.spans.Flush(ctx); err != nil {
-			ready[auditKeyStatus] = "degraded"
+			ready[audit.KeyStatus] = "degraded"
 			ready["otel_exporter"] = "flush failed: " + err.Error()
 		} else {
-			ready["otel_exporter"] = dbStatusOK
+			ready["otel_exporter"] = audit.FieldOK
 		}
 	}
-	if ready[auditKeyStatus] == "ready" {
+	if ready[audit.KeyStatus] == "ready" {
 		writeJSON(w, http.StatusOK, ready)
 	} else {
 		writeJSON(w, http.StatusServiceUnavailable, ready)

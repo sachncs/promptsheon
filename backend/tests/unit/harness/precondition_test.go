@@ -38,8 +38,8 @@ func TestPreconditionRunnerFails(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error from failing precondition")
 	}
-	if !errors.Is(err, errs.ErrPrecondition) {
-		t.Fatalf("expected errs.ErrPrecondition, got %v", err)
+	if !errors.Is(err, errs.ErrorHarnessPreconditionFailed) {
+		t.Fatalf("expected errs.ErrorHarnessPreconditionFailed, got %v", err)
 	}
 	if len(results) != 1 || results[0].Passed {
 		t.Fatalf("expected one failing result, got %+v", results)

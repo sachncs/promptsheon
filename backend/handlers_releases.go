@@ -15,6 +15,7 @@ import (
 	"github.com/sachncs/promptsheon/backend/executor"
 	"github.com/sachncs/promptsheon/backend/harness"
 	"github.com/sachncs/promptsheon/backend/release"
+	"github.com/sachncs/promptsheon/backend/audit"
 )
 
 // ---------------------------------------------------------------------------
@@ -158,19 +159,19 @@ func (s *Server) handleActivateRelease(w http.ResponseWriter, r *http.Request) e
 	releaseID := r.PathValue("id")
 	activated, err := s.releaseSvc.Activate(r.Context(), releaseID)
 	if err != nil {
-		if errors.Is(err, errs.ErrReleaseNotPending) {
+		if errors.Is(err, errs.ErrorReleaseNotPending) {
 			return &HTTPError{Status: http.StatusConflict, Message: err.Error()}
 		}
-		if errors.Is(err, errs.ErrSelfVote) || errors.Is(err, errs.ErrQuorum) {
+		if errors.Is(err, errs.ErrorApprovalCreatorVoted) || errors.Is(err, errs.ErrorApprovalQuorumNotMet) {
 			return &HTTPError{Status: http.StatusConflict, Message: err.Error()}
 		}
-		if errors.Is(err, errs.ErrApprovalNotFound) {
+		if errors.Is(err, errs.ErrorApprovalNotFound) {
 			return &HTTPError{Status: http.StatusConflict, Message: "no votes recorded; quorum not satisfied"}
 		}
-		if errors.Is(err, errs.ErrReleaseNotFound) {
+		if errors.Is(err, errs.ErrorReleaseNotFound) {
 			return ErrNotFound
 		}
-		if errors.Is(err, errs.ErrPrecondition) {
+		if errors.Is(err, errs.ErrorHarnessPreconditionFailed) {
 			var pe *harness.PreconditionError
 			if errors.As(err, &pe) {
 				return &HTTPError{
@@ -193,7 +194,7 @@ func (s *Server) handleActivateRelease(w http.ResponseWriter, r *http.Request) e
 func (s *Server) handleRollbackRelease(w http.ResponseWriter, r *http.Request) error {
 	rolled, err := s.releaseSvc.Rollback(r.Context(), r.PathValue("id"))
 	if err != nil {
-		if errors.Is(err, errs.ErrReleaseNotFound) {
+		if errors.Is(err, errs.ErrorReleaseNotFound) {
 			return ErrNotFound
 		}
 		return badRequest(err.Error())
@@ -289,7 +290,7 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 		"tokens":           exec.TotalTokens,
 		"cost_usd":         exec.CostUSD,
 		"tokens_estimated": exec.TotalTokens > 0 || exec.CostUSD > 0,
-		valError:           exec.Error,
+		audit.FieldError:           exec.Error,
 	})
 	if invErr != nil {
 		return &HTTPError{Status: http.StatusBadGateway, Message: invErr.Error()}

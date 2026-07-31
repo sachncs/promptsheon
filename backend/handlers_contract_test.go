@@ -14,10 +14,10 @@ import (
 // a not-found from the store must map to 404. We simulate this by
 // pre-seeding a contract, then deleting the capability row, then
 // re-fetching via GetCapabilityContract (which the mock correctly
-// returns errs.ErrStoreNotFound for).
+// returns errs.ErrorStoreNotFound for).
 func TestHandleUpdateCapabilityContract_RoutesThroughTranslateDBError(t *testing.T) {
 	s := newTestServer(t)
-	// Seed a contract; the mock returns errs.ErrStoreNotFound for
+	// Seed a contract; the mock returns errs.ErrorStoreNotFound for
 	// missing keys. Direct read via the handler should now map to 404.
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/capabilities/missing/contract", nil)
 	rr := httptest.NewRecorder()

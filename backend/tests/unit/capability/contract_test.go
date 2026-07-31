@@ -20,16 +20,16 @@ func TestContractValid(t *testing.T) {
 
 func TestContractEmptyIsError(t *testing.T) {
 	t.Parallel()
-	if err := (CapabilityContract{}).Validate(); !errors.Is(err, errs.ErrEmptyContract) {
-		t.Fatalf("empty contract must return errs.ErrEmptyContract, got %v", err)
+	if err := (CapabilityContract{}).Validate(); !errors.Is(err, errs.ErrorCapabilityEmptyContract) {
+		t.Fatalf("empty contract must return errs.ErrorCapabilityEmptyContract, got %v", err)
 	}
 }
 
 func TestContractInvalidBlastRadius(t *testing.T) {
 	t.Parallel()
 	c := CapabilityContract{BlastRadius: "catastrophic"}
-	if err := c.Validate(); !errors.Is(err, errs.ErrInvalidBlastRadius) {
-		t.Fatalf("invalid blast radius must return errs.ErrInvalidBlastRadius, got %v", err)
+	if err := c.Validate(); !errors.Is(err, errs.ErrorCapabilityInvalidBlastRadius) {
+		t.Fatalf("invalid blast radius must return errs.ErrorCapabilityInvalidBlastRadius, got %v", err)
 	}
 }
 

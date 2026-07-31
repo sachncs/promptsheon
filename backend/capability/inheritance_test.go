@@ -137,8 +137,8 @@ func TestResolveManifestDepthLimit(t *testing.T) {
 		resolver.versions[v.ID] = v
 	}
 	_, err := ResolveManifest(chain[len(chain)-1], resolver)
-	if !errors.Is(err, errs.ErrInheritanceTooDeep) {
-		t.Errorf("expected errs.ErrInheritanceTooDeep, got %v", err)
+	if !errors.Is(err, errs.ErrorCapabilityInheritanceTooDeep) {
+		t.Errorf("expected errs.ErrorCapabilityInheritanceTooDeep, got %v", err)
 	}
 }
 

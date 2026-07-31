@@ -47,8 +47,8 @@ func TestAcquireFirstCallerWins(t *testing.T) {
 	if !a.IsLeader() {
 		t.Fatal("pod-a should be leader")
 	}
-	if err := b.Acquire(context.Background()); err != errs.ErrNotLeader {
-		t.Fatalf("pod-b acquire: want errs.ErrNotLeader, got %v", err)
+	if err := b.Acquire(context.Background()); err != errs.ErrorElectionNotLeader {
+		t.Fatalf("pod-b acquire: want errs.ErrorElectionNotLeader, got %v", err)
 	}
 	if b.IsLeader() {
 		t.Fatal("pod-b should not be leader")

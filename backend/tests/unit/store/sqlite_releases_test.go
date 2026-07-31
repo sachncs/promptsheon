@@ -242,7 +242,7 @@ func TestActivateAtomicRollbackOnMissingNext(t *testing.T) {
 	// the not-found check. Both errors indicate the same outcome
 	// (operation rejected because next is missing); the test
 	// accepts either.
-	if !errors.Is(err, errs.ErrReleaseNotFound) && err == nil {
+	if !errors.Is(err, errs.ErrorReleaseNotFound) && err == nil {
 		t.Fatalf("expected ErrNotFound (or FK violation), got %v", err)
 	}
 	if err == nil {

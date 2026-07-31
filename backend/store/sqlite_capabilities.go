@@ -153,7 +153,7 @@ func (s *SQLite) DeleteCapability(ctx context.Context, id string) error {
 
 // UpdateSelfEvolveConfig sets the closed-loop self-evolution
 // policy on a Capability. Idempotent: same value on repeat is a
-// no-op. Returns errs.ErrStoreNotFound if the capability does not exist.
+// no-op. Returns errs.ErrorStoreNotFound if the capability does not exist.
 
 func (s *SQLite) UpdateSelfEvolveConfig(ctx context.Context, capabilityID string, cfg capability.SelfEvolveConfig) error {
 	dataset := cfg.DatasetID
@@ -181,7 +181,7 @@ func (s *SQLite) UpdateSelfEvolveConfig(ctx context.Context, capabilityID string
 		return fmt.Errorf("rows affected: %w", err)
 	}
 	if n == 0 {
-		return errs.ErrStoreNotFound
+		return errs.ErrorStoreNotFound
 	}
 	return nil
 }
@@ -301,7 +301,7 @@ func (s *SQLite) SetCapabilityContract(ctx context.Context, capabilityID string,
 }
 
 // GetCapabilityContract returns the contract attached to a
-// Capability. Returns errs.ErrStoreNotFound when no contract is attached
+// Capability. Returns errs.ErrorStoreNotFound when no contract is attached
 // or the capability id does not exist.
 
 func (s *SQLite) GetCapabilityContract(ctx context.Context, capabilityID string) (*capability.CapabilityContract, error) {
@@ -319,7 +319,7 @@ func (s *SQLite) GetCapabilityContract(ctx context.Context, capabilityID string)
 	).Scan(&blast, &rubric, &auto, &inJSON, &outJSON, &maxP95, &minSuccess, &maxHallu)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errs.ErrStoreNotFound
+			return nil, errs.ErrorStoreNotFound
 		}
 		return nil, fmt.Errorf("get contract: %w", err)
 	}
@@ -418,7 +418,7 @@ func scanCapability(scanner interface {
 		&seEnabled, &seMinScore, &seMaxRevisions, &seCooldownSec, &seTargetEnv, &seDatasetID,
 	)
 	if err == sql.ErrNoRows {
-		return nil, errs.ErrStoreNotFound
+		return nil, errs.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan capability: %w", err)

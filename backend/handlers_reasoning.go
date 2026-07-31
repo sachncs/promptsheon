@@ -36,9 +36,9 @@ func (s *Server) handleReasoningCompile(w http.ResponseWriter, r *http.Request) 
 	plan, err := NewCompiler(catalog).Compile(r.Context(), intent)
 	if err != nil {
 		switch {
-		case errors.Is(err, errs.ErrReasoningNoMatch):
+		case errors.Is(err, errs.ErrorReasoningNoMatch):
 			return &HTTPError{Status: http.StatusNotFound, Message: err.Error()}
-		case errors.Is(err, errs.ErrReasoningConstraintViolation):
+		case errors.Is(err, errs.ErrorReasoningConstraintViolation):
 			return &HTTPError{Status: http.StatusConflict, Message: err.Error()}
 		default:
 			return &HTTPError{Status: http.StatusBadRequest, Message: err.Error()}

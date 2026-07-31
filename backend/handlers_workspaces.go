@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/audit"
 )
 
 // Auto-split from handlers_capabilities.go
@@ -51,7 +52,7 @@ func (s *Server) handleCreateWorkspace(w http.ResponseWriter, r *http.Request) e
 	if err := s.db.CreateWorkspace(r.Context(), wksp); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "workspace:"+wksp.ID, map[string]any{auditKeyName: wksp.Name})
+	s.audit(r.Context(), "create", "workspace:"+wksp.ID, map[string]any{audit.KeyName: wksp.Name})
 	writeJSON(w, http.StatusCreated, wksp)
 	return nil
 }

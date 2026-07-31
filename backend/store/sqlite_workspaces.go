@@ -79,7 +79,7 @@ func scanWorkspace(scanner interface {
 	var w capability.Workspace
 	err := scanner.Scan(&w.ID, &w.Name, &w.Organization, &w.CreatedAt, &w.UpdatedAt)
 	if err == sql.ErrNoRows {
-		return nil, errs.ErrStoreNotFound
+		return nil, errs.ErrorStoreNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan workspace: %w", err)

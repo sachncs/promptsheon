@@ -35,7 +35,7 @@ func (s *SQLite) GetWebhookEndpoint(ctx context.Context, id string) (*models.Web
 		`SELECT id, url, secret_ciphertext, events, active, created_at FROM webhook_endpoints WHERE id = ?`, id)
 	ep, err := scanWebhookEndpoint(row)
 	if err == sql.ErrNoRows {
-		return nil, errs.ErrStoreNotFound
+		return nil, errs.ErrorStoreNotFound
 	}
 	return ep, err
 }

@@ -79,8 +79,8 @@ func TestApproveRejectsWrongState(t *testing.T) {
 		approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
 	)
 	r, _ = r.ApproveWith(a, approval.MajorityPolicy{Required: 1})
-	if _, err := r.ApproveWith(a, approval.MajorityPolicy{Required: 1}); !errors.Is(err, errs.ErrReleaseNotPending) {
-		t.Fatalf("expected errs.ErrReleaseNotPending, got %v", err)
+	if _, err := r.ApproveWith(a, approval.MajorityPolicy{Required: 1}); !errors.Is(err, errs.ErrorReleaseNotPending) {
+		t.Fatalf("expected errs.ErrorReleaseNotPending, got %v", err)
 	}
 }
 
@@ -217,7 +217,7 @@ func TestMakerCheckerPolicySelfEnforcesCreator(t *testing.T) {
 		approval.Vote{Identity: "alice", Decision: approval.Approve, Timestamp: time.Now()},
 	)
 	_, err := r.ApproveWith(a, approval.MakerCheckerPolicy{RequiredApprovers: 1, Creator: "alice"})
-	if !errors.Is(err, errs.ErrSelfVote) {
+	if !errors.Is(err, errs.ErrorApprovalCreatorVoted) {
 		t.Fatalf("expected ErrCreatorVoted, got %v", err)
 	}
 }

@@ -15,14 +15,7 @@ import (
 	"github.com/sachncs/promptsheon/backend/trace"
 )
 
-// Shared audit-detail keys. Handler packages reference these
-// constants when populating s.audit() details; centralising them
-// here keeps the audit vocabulary consistent across handlers.
-const (
-	auditKeyName    = "name"
-	auditKeyStatus  = "status"
-	auditKeyVersion = "version"
-)
+// ChainHTTP applies http.Handler middlewares in order.
 
 // ChainHTTP applies http.Handler middlewares in order.
 func ChainHTTP(h http.Handler, mws ...func(http.Handler) http.Handler) http.Handler {

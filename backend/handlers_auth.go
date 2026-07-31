@@ -18,13 +18,9 @@ import (
 	"github.com/sachncs/promptsheon/backend/errs"
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/models"
+	"github.com/sachncs/promptsheon/backend/audit"
 )
-
-const defaultAdminEmail = "admin@local"
 const oauthStateCookie = "oauth_state"
-const fieldAPIKey = "key"
-const fieldKeyPrefix = "key_prefix"
-
 // oauthStateStore holds in-flight OAuth state tokens. The previous
 // implementation used a package-level `var` shared across all Server
 // instances and tests, which made it impossible to run multiple
@@ -258,10 +254,10 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	s.audit(r.Context(), "apikey_create", "api_key:"+apiKey.ID, map[string]any{
-		fieldKeyPrefix: apiKey.KeyPrefix,
+		audit.FieldKeyPref: apiKey.KeyPrefix,
 		"target_user":  apiKey.UserID,
-		fieldRole:      apiKey.Role,
-		auditKeyName:   apiKey.Name,
+		audit.FieldRole:      apiKey.Role,
+		audit.KeyName:   apiKey.Name,
 	})
 
 	type response struct {
@@ -325,7 +321,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 		return badRequest("invalid json")
 	}
 	if req.Email == "" {
-		req.Email = defaultAdminEmail
+		req.Email = auth.DefaultAdminEmail
 	}
 	if req.Name == "" {
 		req.Name = "Bootstrap Admin"
@@ -360,7 +356,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 	// the writes, so two concurrent callers cannot both win:
 	// the second one sees ErrConflict and returns 409.
 	if err := s.db.BootstrapAdmin(r.Context(), admin, apiKey); err != nil {
-		if errors.Is(err, errs.ErrStoreConflict) {
+		if errors.Is(err, errs.ErrorStoreConflict) {
 			return &HTTPError{Status: http.StatusConflict, Message: "bootstrap is no longer available; the server already has users"}
 		}
 		return fmt.Errorf("bootstrap: %w", err)
@@ -372,7 +368,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 	if s.logger != nil {
 		s.logger.Warn("bootstrap endpoint used; admin key minted",
 			"user_id", admin.ID,
-			fieldKeyPrefix, apiKey.KeyPrefix,
+			audit.FieldKeyPref, apiKey.KeyPrefix,
 			"action", "rotate this key and enable PROMPTSHEON_AUTH=true before exposing the server")
 	}
 
@@ -462,11 +458,11 @@ func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	s.audit(r.Context(), "apikey_revoke", "api_key:"+id, map[string]any{
-		fieldKeyPrefix: key.KeyPrefix,
+		audit.FieldKeyPref: key.KeyPrefix,
 		"target_user":  key.UserID,
 	})
 
-	writeJSON(w, http.StatusOK, map[string]string{auditKeyStatus: "revoked"})
+	writeJSON(w, http.StatusOK, map[string]string{audit.KeyStatus: "revoked"})
 	return nil
 }
 
@@ -637,7 +633,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 	s.audit(r.Context(), "oauth_login", "user:"+existing.ID, map[string]any{
 		"provider":       providerName,
 		"email":          user.Email,
-		fieldKeyPrefix:   apiKeyModel.KeyPrefix,
+		audit.FieldKeyPref:   apiKeyModel.KeyPrefix,
 		"auto_provision": autoProvisioned,
 	})
 
@@ -653,7 +649,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user":      existing,
-		fieldAPIKey: apiKey,
+		audit.FieldAPIKey: apiKey,
 	})
 	return nil
 }

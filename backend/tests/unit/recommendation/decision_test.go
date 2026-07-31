@@ -67,8 +67,8 @@ func TestNewSuperseded(t *testing.T) {
 
 func TestNewRejectsUnknownOutcome(t *testing.T) {
 	t.Parallel()
-	if _, err := NewDecision("rec-1", Outcome("maybe"), "alice", "", 0, false); !errors.Is(err, errs.ErrRecommendationUnknown) {
-		t.Fatalf("expected errs.ErrRecommendationUnknown, got %v", err)
+	if _, err := NewDecision("rec-1", Outcome("maybe"), "alice", "", 0, false); !errors.Is(err, errs.ErrorRecommendationUnknownOutcome) {
+		t.Fatalf("expected errs.ErrorRecommendationUnknownOutcome, got %v", err)
 	}
 }
 

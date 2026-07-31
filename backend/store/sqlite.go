@@ -18,7 +18,7 @@ import (
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
-// errs.ErrStoreNotFound is returned when a requested resource is not found.
+// errs.ErrorStoreNotFound is returned when a requested resource is not found.
 
 
 type SQLite struct {

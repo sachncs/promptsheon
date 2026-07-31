@@ -9,6 +9,7 @@ import (
 
 	"github.com/sachncs/promptsheon/backend/errs"
 	"github.com/sachncs/promptsheon/backend/capability"
+	"github.com/sachncs/promptsheon/backend/audit"
 )
 
 // Auto-split from handlers_capabilities.go
@@ -77,7 +78,7 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 			if errors.As(err, &cycle) {
 				return &HTTPError{Status: http.StatusUnprocessableEntity, Message: err.Error()}
 			}
-			if errors.Is(err, errs.ErrInheritanceTooDeep) {
+			if errors.Is(err, errs.ErrorCapabilityInheritanceTooDeep) {
 				return &HTTPError{Status: http.StatusUnprocessableEntity, Message: err.Error()}
 			}
 			return &HTTPError{Status: http.StatusBadRequest, Message: err.Error()}
@@ -102,7 +103,7 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 	if err := s.db.CreateVersion(r.Context(), v); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "version:"+v.ID, map[string]any{"capability_id": capabilityID, auditKeyVersion: v.Version, "manifest_hash": hash, "parents": req.Parents})
+	s.audit(r.Context(), "create", "version:"+v.ID, map[string]any{"capability_id": capabilityID, audit.KeyVersion: v.Version, "manifest_hash": hash, "parents": req.Parents})
 	writeJSON(w, http.StatusCreated, v)
 	return nil
 }

@@ -10,8 +10,8 @@ import (
 func TestEnvKeyProviderMissing(t *testing.T) {
 	t.Parallel()
 	got, err := LoadFromEnv("PROMPTSHEON_VAULT_KEY_NOT_SET_XYZ")
-	if !errors.Is(err, errs.ErrVaultKeyUnavail) {
-		t.Fatalf("expected errs.ErrVaultKeyUnavail, got %v", err)
+	if !errors.Is(err, errs.ErrorVaultKeyUnavailable) {
+		t.Fatalf("expected errs.ErrorVaultKeyUnavailable, got %v", err)
 	}
 	if got != nil {
 		t.Fatalf("expected nil key, got %v", got)
@@ -72,7 +72,7 @@ func TestStaticSecretBrokerUnknownSecret(t *testing.T) {
 		v = &Vault{}
 	}
 	b := NewStaticSecretBroker(v, map[string][]byte{})
-	if _, err := b.Resolve(context.Background(), "missing"); !errors.Is(err, errs.ErrVaultUnknown) {
-		t.Fatalf("expected errs.ErrVaultUnknown, got %v", err)
+	if _, err := b.Resolve(context.Background(), "missing"); !errors.Is(err, errs.ErrorVaultUnknownSecret) {
+		t.Fatalf("expected errs.ErrorVaultUnknownSecret, got %v", err)
 	}
 }

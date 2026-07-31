@@ -24,6 +24,12 @@ const (
 	RoleReader Role = "reader"
 )
 
+// DefaultAdminEmail is the email of the bootstrap admin user
+// created on first daemon start. Operators can override the
+// generated password via PROMPTSHEON_BOOTSTRAP_TOKEN; the email
+// itself is fixed.
+const DefaultAdminEmail = "admin@local"
+
 // Permission represents a specific action that can be performed.
 type Permission string
 

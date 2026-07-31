@@ -9,6 +9,7 @@ import (
 	"github.com/sachncs/promptsheon/backend/auth"
 	"github.com/sachncs/promptsheon/backend/eval"
 	"github.com/sachncs/promptsheon/backend/harness"
+	"github.com/sachncs/promptsheon/backend/audit"
 )
 
 // ---------------------------------------------------------------------------
@@ -83,7 +84,7 @@ func (s *Server) handleCreateDataset(w http.ResponseWriter, r *http.Request) err
 			return err
 		}
 	}
-	s.audit(r.Context(), "create", "dataset:"+d.ID, map[string]any{auditKeyName: d.Name, "capability_id": capabilityID})
+	s.audit(r.Context(), "create", "dataset:"+d.ID, map[string]any{audit.KeyName: d.Name, "capability_id": capabilityID})
 	writeJSON(w, http.StatusCreated, d)
 	return nil
 }
@@ -202,7 +203,7 @@ func (s *Server) handleCreatePrecondition(w http.ResponseWriter, r *http.Request
 	if err := s.db.CreatePrecondition(r.Context(), p); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "precondition:"+p.ID, map[string]any{auditKeyName: p.Name, "capability_id": capabilityID})
+	s.audit(r.Context(), "create", "precondition:"+p.ID, map[string]any{audit.KeyName: p.Name, "capability_id": capabilityID})
 	writeJSON(w, http.StatusCreated, p)
 	return nil
 }
@@ -283,7 +284,7 @@ func (s *Server) handleUpdatePrecondition(w http.ResponseWriter, r *http.Request
 	if err := s.db.UpdatePrecondition(r.Context(), existing); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "update", "precondition:"+existing.ID, map[string]any{auditKeyName: existing.Name})
+	s.audit(r.Context(), "update", "precondition:"+existing.ID, map[string]any{audit.KeyName: existing.Name})
 	writeJSON(w, http.StatusOK, existing)
 	return nil
 }
@@ -359,12 +360,12 @@ func (s *Server) handleGetEval(w http.ResponseWriter, r *http.Request) error {
 	// BUG-26: distinguish 404 from 500 on DB failure. The
 	// previous form returned ErrNotFound for any error,
 	// masking DB outages as "run not found". The repo
-	// translates sql.ErrNoRows into errs.ErrStoreNotFound, so
+	// translates sql.ErrNoRows into errs.ErrorStoreNotFound, so
 	// match that sentinel here; anything else is a real
 	// failure and gets a 500.
 	run, err := s.db.GetEvalRun(r.Context(), r.PathValue("id"))
 	if err != nil {
-		if errors.Is(err, errs.ErrStoreNotFound) {
+		if errors.Is(err, errs.ErrorStoreNotFound) {
 			return ErrNotFound
 		}
 		return &HTTPError{Status: http.StatusInternalServerError, Message: "eval run lookup failed"}

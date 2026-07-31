@@ -10,8 +10,8 @@ import (
 
 func TestNewRejectsNonPositiveLimit(t *testing.T) {
 	t.Parallel()
-	if _, err := New(ScopeWorkspace, "ws", WindowMinute, 0, time.Now(), "alice"); !errors.Is(err, errs.ErrQuotaInvalid) {
-		t.Fatalf("expected errs.ErrQuotaInvalid, got %v", err)
+	if _, err := New(ScopeWorkspace, "ws", WindowMinute, 0, time.Now(), "alice"); !errors.Is(err, errs.ErrorQuotaLimitNotPositive) {
+		t.Fatalf("expected errs.ErrorQuotaLimitNotPositive, got %v", err)
 	}
 }
 
@@ -39,8 +39,8 @@ func TestChargeUnderLimitAdvances(t *testing.T) {
 		}
 		q = got
 	}
-	if got, err := q.Charge(time.Date(2026, 7, 10, 12, 0, 30, 0, time.UTC)); !errors.Is(err, errs.ErrQuota) {
-		t.Fatalf("expected errs.ErrQuota, got %v (used=%d)", err, got.Used)
+	if got, err := q.Charge(time.Date(2026, 7, 10, 12, 0, 30, 0, time.UTC)); !errors.Is(err, errs.ErrorQuotaOverLimit) {
+		t.Fatalf("expected errs.ErrorQuotaOverLimit, got %v (used=%d)", err, got.Used)
 	}
 }
 
@@ -50,8 +50,8 @@ func TestChargeResetsWindow(t *testing.T) {
 	q, _ := New(ScopeWorkspace, "ws", WindowSecond, 2, now, "alice")
 	q, _ = q.Charge(now)
 	q, _ = q.Charge(now)
-	if _, err := q.Charge(now); !errors.Is(err, errs.ErrQuota) {
-		t.Fatalf("expected errs.ErrQuota on third charge in same second")
+	if _, err := q.Charge(now); !errors.Is(err, errs.ErrorQuotaOverLimit) {
+		t.Fatalf("expected errs.ErrorQuotaOverLimit on third charge in same second")
 	}
 	next, err := q.Charge(now.Add(time.Second))
 	if err != nil {

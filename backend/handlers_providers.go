@@ -5,12 +5,8 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/backend/llm"
+	"github.com/sachncs/promptsheon/backend/audit"
 )
-
-const keyProvider = "provider"
-const valError = "error"
-const fieldModel = "model"
-
 // ListProviders lists the providers.
 // ListProviders lists the providers.
 func (s *Server) handleListProviders(w http.ResponseWriter, _ *http.Request) error {
@@ -42,8 +38,8 @@ func (s *Server) handleGetProvider(w http.ResponseWriter, r *http.Request) error
 		return notFound("provider not found: " + name)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		auditKeyName:   name,
-		auditKeyStatus: "registered",
+		audit.KeyName:   name,
+		audit.KeyStatus: "registered",
 	})
 	return nil
 }
@@ -87,19 +83,19 @@ func (s *Server) handleTestProvider(w http.ResponseWriter, r *http.Request) erro
 
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
-			keyProvider:    name,
-			fieldModel:     req.Model,
-			auditKeyStatus: valError,
-			valError:       err.Error(),
+			audit.FieldProvider:    name,
+			audit.FieldModel:     req.Model,
+			audit.KeyStatus: audit.FieldError,
+			audit.FieldError:       err.Error(),
 			"latency_ms":   latency.Milliseconds(),
 		})
 		return nil
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		keyProvider:    name,
-		fieldModel:     resp.Model,
-		auditKeyStatus: dbStatusOK,
+		audit.FieldProvider:    name,
+		audit.FieldModel:     resp.Model,
+		audit.KeyStatus: audit.FieldOK,
 		"content":      resp.Content,
 		"usage":        resp.Usage,
 		"latency_ms":   latency.Milliseconds(),

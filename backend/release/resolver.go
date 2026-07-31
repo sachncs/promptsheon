@@ -67,7 +67,7 @@ type ResolvedInvocation struct {
 	ResolvedAt time.Time
 }
 
-// errs.ErrReleaseNotActive is returned by Resolver.Resolve when the
+// errs.ErrorReleaseNotActive is returned by Resolver.Resolve when the
 // release is not in the Active state. The only way to invoke a
 // release is via the active, approved, currently-serving
 // (release_id, environment) pair.
@@ -135,7 +135,7 @@ func (r *Resolver) Resolve(ctx context.Context, releaseID string) (*ResolvedInvo
 		return nil, err
 	}
 	if rel.Status != StatusActive {
-		return nil, fmt.Errorf("%w: got status %q", errs.ErrReleaseNotActive, rel.Status)
+		return nil, fmt.Errorf("%w: got status %q", errs.ErrorReleaseNotActive, rel.Status)
 	}
 	if err := rel.Manifest.Validate(); err != nil {
 		return nil, fmt.Errorf("resolver: manifest: %w", err)

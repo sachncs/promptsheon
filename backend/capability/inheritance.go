@@ -24,7 +24,7 @@ func (e *ErrInheritanceCycle) Error() string {
 	return fmt.Sprintf("capability: inheritance cycle through %v", e.IDs)
 }
 
-// errs.ErrInheritanceTooDeep is returned when the parent chain
+// errs.ErrorCapabilityInheritanceTooDeep is returned when the parent chain
 // exceeds MaxInheritanceDepth.
 
 // InheritanceResolver resolves a Version's parent chain into
@@ -43,7 +43,7 @@ type InheritanceResolver interface {
 // parent's value is inherited.
 //
 // Cycles return ErrInheritanceCycle; chains longer than
-// MaxInheritanceDepth return errs.ErrInheritanceTooDeep.
+// MaxInheritanceDepth return errs.ErrorCapabilityInheritanceTooDeep.
 func ResolveManifest(v *Version, resolver InheritanceResolver) (Manifest, error) {
 	if v == nil {
 		return Manifest{}, errors.New("capability: nil version")
@@ -68,7 +68,7 @@ func ResolveManifest(v *Version, resolver InheritanceResolver) (Manifest, error)
 // records the visit stack for diagnostics.
 func resolveParent(parentID string, resolver InheritanceResolver, base Manifest, visited map[string]bool, chain []*Version, depth int) (Manifest, error) {
 	if depth > MaxInheritanceDepth {
-		return Manifest{}, errs.ErrInheritanceTooDeep
+		return Manifest{}, errs.ErrorCapabilityInheritanceTooDeep
 	}
 	parent, err := resolver.GetVersion(parentID)
 	if err != nil {
