@@ -18,7 +18,9 @@ import "testing"
 
 // AllTests is the registry of every test in this package. Append
 // new test functions here; the runner picks them up automatically.
-var AllTests = []func(t *testing.T){}
+var AllTests = []func(t *testing.T){
+	RunSmoke,
+}
 
 // RunAll iterates AllTests and invokes each function. The standard
 // testing.T framework accumulates per-test failures and reports
@@ -27,4 +29,15 @@ func RunAll(t *testing.T) {
 	for _, fn := range AllTests {
 		fn(t)
 	}
+}
+
+// RunSmoke is a placeholder test that verifies the runner wiring
+// is correct. It runs as part of `go test ./promptsheon/` and
+// succeeds with no side effects. As more tests are moved into
+// the tests/ package, their Run<Subject> functions are appended
+// to AllTests.
+func RunSmoke(t *testing.T) {
+	// Intentionally empty; the runner exercising RunAll is
+	// itself the verification.
+	_ = t
 }
