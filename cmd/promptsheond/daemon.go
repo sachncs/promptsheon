@@ -95,7 +95,7 @@ func runDaemon() {
 	}
 	if *backupPath != "" {
 		if err := runBackup(*backupPath); err != nil {
-			fmt.Fprintf(os.Stderr, "backup: %v\n", err)
+			slog.Error("backup", "err", err)
 			os.Exit(1)
 		}
 		fmt.Printf("backup: wrote %s\n", *backupPath)
@@ -104,7 +104,7 @@ func runDaemon() {
 
 	cfg, cfgErr := promptsheon.LoadConfig()
 	if cfgErr != nil {
-		fmt.Fprintln(os.Stderr, cfgErr)
+		slog.Error("config load", "err", cfgErr)
 		os.Exit(2)
 	}
 
@@ -113,8 +113,7 @@ func runDaemon() {
 	// endpoint would mint an admin key to the first caller. Refuse
 	// to start instead of warning and continuing.
 	if err := cfg.Validate(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+		slog.Error("config validate", "err", err); os.Exit(2)
 	}
 
 	// OTel tracer must outlive buildServer. The previous
@@ -127,7 +126,7 @@ func runDaemon() {
 		var terr error
 		tp, terr = trace.InitTracerProvider("promptsheond", cfg.OTelEndpoint, cfg.OTelInsecure)
 		if terr != nil {
-			fmt.Fprintf(os.Stderr, "OTel tracer init failed: %v\n", terr)
+			slog.Warn("OTel tracer init failed", "err", terr)
 		} else {
 			defer func() {
 				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -1025,7 +1024,7 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *pro
 	case sig := <-quit:
 		_ = sig
 		writeGoroutineDump("/tmp")
-		fmt.Fprintln(os.Stderr, "force-quit: second signal received; dumping goroutines and exiting")
+		slog.Warn("force-quit: second signal received; dumping goroutines and exiting")
 		os.Exit(130)
 	case <-time.After(200 * time.Millisecond):
 		// Normal drain path.
@@ -1033,7 +1032,7 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *pro
 
 	// Watchdog: 2-minute hard deadline.
 	watchdog := time.AfterFunc(2*time.Minute, func() {
-		fmt.Fprintln(os.Stderr, "shutdown watchdog: 2-minute deadline reached; exiting")
+		slog.Error("shutdown watchdog: 2-minute deadline reached; exiting")
 		os.Exit(124)
 	})
 	defer watchdog.Stop()
@@ -1095,7 +1094,7 @@ func writeGoroutineDump(dir string) {
 	buf := make([]byte, 1<<20)
 	n := runtime.Stack(buf, true)
 	if err := os.WriteFile(p, buf[:n], 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "writeGoroutineDump: %v\n", err)
+		slog.Error("writeGoroutineDump", "err", err)
 	}
 }
 
