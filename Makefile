@@ -37,13 +37,16 @@ check-public:
 	GOFLAGS=-tags=promptsheon go vet ./pkg/promptsheon/...
 	GOFLAGS=-tags=promptsheon go test -race -count=1 ./pkg/promptsheon/...
 
-# Run all tests
+# Run all tests via the single test runner (promptsheon_test.go).
+# The runner calls tests.RunAll() which iterates the tests/ package's
+# AllTests registry. To add a test, append to AllTests in
+# tests/promptsheon_tests.go.
 test:
-	go test -race -count=1 ./...
+	go test -race -count=1 ./promptsheon/...
 
 # Run tests with verbose output
 test-verbose:
-	go test -v -race -count=1 ./...
+	go test -v -race -count=1 ./promptsheon/...
 
 # Run integration tests
 test-integration:
