@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
-	. "github.com/sachncs/promptsheon/promptsheon"
+	. "github.com/sachncs/promptsheon/promptsheon/quota"
 )
 
 func TestNewRejectsNonPositiveLimit(t *testing.T) {
