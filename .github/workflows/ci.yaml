@@ -87,9 +87,9 @@ jobs:
         # the cmd entry points, examples/, and the OpenAPI
         # generator aren't unit-testable in the conventional
         # sense). We also enforce per-package floors for the
-        # testable layers: domain packages (backend/...,
+        # testable layers: domain packages (promptsheon/...,
         # excluding api/store) >= 50%, infrastructure
-        # (backend + backend/store) >= 40%, api handlers
+        # (promptsheon + promptsheon/store) >= 40%, api handlers
         # (backend) >= 60%. The per-package floors catch
         # silent regressions in the testable surface; the global
         # floor catches regressions in the testable aggregate.
@@ -118,13 +118,13 @@ jobs:
       - name: OpenAPI spec is in sync
         # Item 1 (openapi): CI fails the build if a developer
         # added a route or changed a handler without
-        # regenerating backend/spec/spec.yaml. The generator
+        # regenerating promptsheon/spec/spec.yaml. The generator
         # is invoked once on a clean tree and the output is
         # compared to the committed file via git diff.
         run: |
           go run ./scripts/genopenapi
-          git diff --exit-code backend/spec/spec.yaml || \
-            (echo "backend/spec/spec.yaml is out of date. Run 'make openapi' and commit the result."; exit 1)
+          git diff --exit-code promptsheon/spec/spec.yaml || \
+            (echo "promptsheon/spec/spec.yaml is out of date. Run 'make openapi' and commit the result."; exit 1)
 
       - name: Contract test
         # API-9: the contract test walks every registered
@@ -134,13 +134,13 @@ jobs:
 
       - name: SDK Python codegen + compile
         # API-7a: openapi-python-client regenerates the Python
-        # SDK from backend/spec/spec.yaml. compileall catches
+        # SDK from promptsheon/spec/spec.yaml. compileall catches
         # syntax errors that codegen might emit.
         run: bash sdk/python/scripts/codegen.sh
 
       - name: SDK TypeScript codegen + typecheck
         # API-7b: openapi-typescript regenerates the TS SDK
-        # from backend/spec/spec.yaml. tsc --noEmit catches
+        # from promptsheon/spec/spec.yaml. tsc --noEmit catches
         # type errors that codegen might emit.
         run: bash sdk/typescript/scripts/codegen.sh
 
@@ -244,7 +244,7 @@ jobs:
       - name: Lint domain-purity (no infra imports from domain packages)
         # CI gate: domain packages depend only on other domain
         # packages and the standard library. They MUST NOT import
-        # backend/llm, backend, backend/store, or cmd. See
+        # promptsheon/llm, backend, promptsheon/store, or cmd. See
         # ADR-0012.
         run: make lint-deps
 
@@ -267,7 +267,7 @@ jobs:
     # DOC-CI-3 / DOC-FRESH-1: deterministic doc-freshness gate.
     # Reports any markdown link in docs/ that resolves to a
     # missing file, and any path-shaped reference to source
-    # code (backend/...go, backend/spec/*.yaml,
+    # code (promptsheon/...go, promptsheon/spec/*.yaml,
     # deploy/, scripts/, .github/workflows/) that no longer
     # points at a real file. A trailing
     # `<!-- stale-ok: <reason> -->` comment on a line

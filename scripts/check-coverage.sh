@@ -4,10 +4,10 @@
 # Reads a Go coverage profile (cover.out) and enforces per-package
 # coverage floors on the production backend. Three buckets:
 #
-#   backend/<package>            floor 50%
+#   promptsheon/<package>            floor 50%
 #   backend (root pkg)           floor 40%
-#   backend/store                floor 40%
-#   backend/handlers_*.go files  floor 60%
+#   promptsheon/store                floor 40%
+#   promptsheon/handlers_*.go files  floor 60%
 #
 # Domain packages get a 50% floor; core wiring gets a 40% floor;
 # HTTP handlers get a 60% floor. The floors are intentionally
@@ -23,17 +23,17 @@ check_profile() {
       statements = $(NF-1)
       covered = ($NF > 0 ? statements : 0)
       package = ""
-      if (file ~ /\/backend\/store\//) package = "backend/store"
+      if (file ~ /\/backend\/store\//) package = "promptsheon/store"
       else if (file ~ /\/backend\/[^\/]+\.go$/) {
-        # Direct file in backend/, e.g. backend/server.go.
-        package = "backend"
+        # Direct file in promptsheon/, e.g. promptsheon/server.go.
+        package = "promptsheon"
       }
       else if (file ~ /\/backend\//) {
-        split(file, parts, "/backend/")
+        split(file, parts, "/promptsheon/")
         split(parts[2], name, "/")
         package = name[1]
       }
-      if (package == "backend" || package == "backend/store") {
+      if (package == "promptsheon" || package == "promptsheon/store") {
         total[package] += statements
         hit[package] += covered
       }
@@ -41,7 +41,7 @@ check_profile() {
         total["api handlers"] += statements
         hit["api handlers"] += covered
       }
-      if (package != "backend" && package != "backend/store" && package != "") {
+      if (package != "promptsheon" && package != "promptsheon/store" && package != "") {
         wanted = " " package " "
         if (index(" " domain_packages " ", wanted)) {
           total[package] += statements
@@ -52,17 +52,17 @@ check_profile() {
     END {
       failed = 0
       for (package in total) {
-        floor = (package == "api handlers" ? 60 : (package == "backend" || package == "backend/store" ? 40 : 50))
+        floor = (package == "api handlers" ? 60 : (package == "promptsheon" || package == "promptsheon/store" ? 40 : 50))
         pct = 100 * hit[package] / total[package]
         printf "%s: %s: %.2f%% (%d/%d statements, floor %d%%)\n", (pct >= floor ? "OK" : "FAIL"), package, pct, hit[package], total[package], floor
         if (pct < floor) failed = 1
       }
-      if (total["backend"] == 0) {
+      if (total["promptsheon"] == 0) {
         printf "FAIL: backend has no statements\n" > "/dev/stderr"
         failed = 1
       }
-      if (total["backend/store"] == 0) {
-        printf "FAIL: backend/store has no statements\n" > "/dev/stderr"
+      if (total["promptsheon/store"] == 0) {
+        printf "FAIL: promptsheon/store has no statements\n" > "/dev/stderr"
         failed = 1
       }
       if (total["api handlers"] == 0) {
@@ -80,14 +80,14 @@ if [[ "${1:-}" == "--self-test" ]]; then
   trap 'rm -f "$weak" "$pass"' EXIT
   cat >"$weak" <<'EOF'
 mode: atomic
-github.com/sachncs/promptsheon/backend/release/release.go:1.1,2.1 5 1
-github.com/sachncs/promptsheon/backend/release/release.go:3.1,4.1 15 0
-github.com/sachncs/promptsheon/backend/optimizer/optimizer.go:1.1,2.1 10 1
-github.com/sachncs/promptsheon/backend/optimizer/optimizer.go:3.1,4.1 10 1
-github.com/sachncs/promptsheon/backend/server.go:1.1,2.1 5 1
-github.com/sachncs/promptsheon/backend/server.go:3.1,4.1 5 0
-github.com/sachncs/promptsheon/backend/store/sqlite.go:1.1,2.1 10 1
-github.com/sachncs/promptsheon/backend/handlers_health.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/promptsheon/release/release.go:1.1,2.1 5 1
+github.com/sachncs/promptsheon/promptsheon/release/release.go:3.1,4.1 15 0
+github.com/sachncs/promptsheon/promptsheon/optimizer/optimizer.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/promptsheon/optimizer/optimizer.go:3.1,4.1 10 1
+github.com/sachncs/promptsheon/promptsheon/server.go:1.1,2.1 5 1
+github.com/sachncs/promptsheon/promptsheon/server.go:3.1,4.1 5 0
+github.com/sachncs/promptsheon/promptsheon/store/sqlite.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/promptsheon/handlers_health.go:1.1,2.1 10 1
 EOF
   if check_profile "$weak" >/dev/null 2>&1; then
     printf 'coverage self-test failed: weak package was hidden\n' >&2
@@ -95,11 +95,11 @@ EOF
   fi
   cat >"$pass" <<'EOF'
 mode: atomic
-github.com/sachncs/promptsheon/backend/release/release.go:1.1,2.1 10 1
-github.com/sachncs/promptsheon/backend/optimizer/optimizer.go:1.1,2.1 10 1
-github.com/sachncs/promptsheon/backend/server.go:1.1,2.1 10 1
-github.com/sachncs/promptsheon/backend/store/sqlite.go:1.1,2.1 10 1
-github.com/sachncs/promptsheon/backend/handlers_health.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/promptsheon/release/release.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/promptsheon/optimizer/optimizer.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/promptsheon/server.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/promptsheon/store/sqlite.go:1.1,2.1 10 1
+github.com/sachncs/promptsheon/promptsheon/handlers_health.go:1.1,2.1 10 1
 EOF
   check_profile "$pass" >/dev/null
   printf 'ok: coverage profile parser self-test\n'

@@ -6,9 +6,9 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-# Files we touch: every .go under backend/, cmd/, sdk/
+# Files we touch: every .go under promptsheon/, cmd/, sdk/
 # plus tooling in tools/.
-mapfile -t files < <(find backend cmd sdk tools -name '*.go' 2>/dev/null)
+mapfile -t files < <(find promptsheon cmd sdk tools -name '*.go' 2>/dev/null)
 
 count=0
 for f in "${files[@]}"; do

@@ -129,8 +129,8 @@ cli: build-cli
 	./$(BIN)/promptsheon
 
 # Regenerate promptsheon/spec/spec.yaml from the server's route
-# registrations. The generator parses backend/routes.go for routes
-# and backend/handlers_*.go for request schemas, then emits a real
+# registrations. The generator parses promptsheon/routes.go for routes
+# and promptsheon/handlers_*.go for request schemas, then emits a real
 # OpenAPI 3.0 spec. Re-run this target whenever a route or handler
 # changes.
 openapi:
