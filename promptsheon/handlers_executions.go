@@ -190,7 +190,6 @@ func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]
 }
 
 // GetExecution returns the execution.
-// GetExecution returns the execution.
 func (s *Server) handleGetExecution(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	e, err := s.db.GetExecution(r.Context(), id)

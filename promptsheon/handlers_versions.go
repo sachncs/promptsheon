@@ -36,7 +36,6 @@ func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request) erro
 }
 
 // CreateVersion creates the version.
-// CreateVersion creates the version.
 func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) error {
 	capabilityID := r.PathValue("capability_id")
 	var req struct {
@@ -118,7 +117,6 @@ func (a *versionResolverAdapter) GetVersion(id string) (*capability.Version, err
 }
 
 // GetVersion returns the version.
-// GetVersion returns the version.
 func (s *Server) handleGetVersion(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	v, err := s.db.GetVersion(r.Context(), id)
@@ -129,7 +127,6 @@ func (s *Server) handleGetVersion(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
-// GetLatestVersion returns the latestVersion.
 // GetLatestVersion returns the latestVersion.
 func (s *Server) handleGetLatestVersion(w http.ResponseWriter, r *http.Request) error {
 	capabilityID := r.PathValue("capability_id")

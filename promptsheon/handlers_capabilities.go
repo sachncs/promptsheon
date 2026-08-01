@@ -30,7 +30,6 @@ func (s *Server) handleListCapabilities(w http.ResponseWriter, r *http.Request) 
 }
 
 // CreateCapability creates the capability.
-// CreateCapability creates the capability.
 func (s *Server) handleCreateCapability(w http.ResponseWriter, r *http.Request) error {
 	projectID := r.PathValue("project_id")
 	var req struct {
@@ -72,7 +71,6 @@ func (s *Server) handleCreateCapability(w http.ResponseWriter, r *http.Request) 
 }
 
 // GetCapability returns the capability.
-// GetCapability returns the capability.
 func (s *Server) handleGetCapability(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	c, err := s.db.GetCapability(r.Context(), id)
@@ -83,7 +81,6 @@ func (s *Server) handleGetCapability(w http.ResponseWriter, r *http.Request) err
 	return nil
 }
 
-// UpdateCapability updates the capability.
 // UpdateCapability updates the capability.
 func (s *Server) handleUpdateCapability(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
@@ -121,7 +118,6 @@ func (s *Server) handleUpdateCapability(w http.ResponseWriter, r *http.Request) 
 	return nil
 }
 
-// DeleteCapability deletes the capability.
 // DeleteCapability deletes the capability.
 func (s *Server) handleDeleteCapability(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")

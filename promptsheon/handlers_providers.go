@@ -8,7 +8,6 @@ import (
 )
 
 // ListProviders lists the providers.
-// ListProviders lists the providers.
 func (s *Server) handleListProviders(w http.ResponseWriter, _ *http.Request) error {
 	if s.providers == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"providers": []string{}})
@@ -19,7 +18,6 @@ func (s *Server) handleListProviders(w http.ResponseWriter, _ *http.Request) err
 	return nil
 }
 
-// GetProvider returns the provider.
 // GetProvider returns the provider.
 func (s *Server) handleGetProvider(w http.ResponseWriter, r *http.Request) error {
 	if s.providers == nil {
