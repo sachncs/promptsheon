@@ -3,7 +3,6 @@ package promptsheon
 import (
 	"github.com/sachncs/promptsheon/promptsheon/webhook"
 	"bytes"
-	"context"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
