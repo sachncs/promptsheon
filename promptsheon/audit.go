@@ -1,3 +1,9 @@
+// Package promptsheon — audit log constants and the background
+// worker pool that persists audit entries.
+//
+// The constants here (FieldKeyPref, KeyStatus, etc.) are
+// re-exported via pkg/promptsheon for the SDK. The worker pool
+// runs in its own goroutines and is owned by Server.
 package promptsheon
 
 import (
@@ -5,9 +11,36 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/audit"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"github.com/sachncs/promptsheon/promptsheon/models"
+)
+
+// AnonUser is the user ID recorded on audit rows when no caller
+// is in scope (boot, unauthenticated routes, the auth-disabled
+// loopback profile).
+const AnonUser = "api"
+
+// Field key names. The values are the on-the-wire JSON keys in
+// the audit entry's Details map and in CSV exports.
+const (
+	KeyName       = "name"
+	KeyStatus     = "status"
+	KeyVersion    = "version"
+	FieldAPIKey   = "api_key" // was "key"; renamed to be unambiguous
+	FieldKeyPref  = "key_prefix"
+	FieldKeyName  = "key_name"
+	FieldProvider = "provider"
+	// FieldProviderName is the human-friendly name of the provider
+	// (e.g. "openai-production"). Distinct from FieldProvider
+	// which is the machine identifier ("openai").
+	FieldProviderName = "provider_name"
+	FieldModel        = "model"
+	FieldValue        = "value"
+	FieldUserID       = "user_id"
+	FieldEmail        = "email"
+	FieldRole         = "role"
+	FieldError        = "error"
+	FieldOK           = "ok"
 )
 
 // auditQueueBackpressure is the maximum time audit() waits for the
@@ -17,8 +50,8 @@ import (
 const auditQueueBackpressure = 200 * time.Millisecond
 
 // audit writes an audit entry for a mutation. The user ID is taken
-// from the request context (falling back to "anonymous" when auth is
-// disabled or no caller is set). Entries are written by a small worker
+// from the request context (falling back to "anonymous" when auth
+// is disabled or no caller is set). Entries are written by a small worker
 // pool so the request goroutine is never blocked by audit I/O and a
 // burst of mutations cannot spawn one goroutine per write.
 //
@@ -29,7 +62,7 @@ const auditQueueBackpressure = 200 * time.Millisecond
 // the audit log lose entries under transient spikes that the worker
 // pool could otherwise have absorbed.
 func (s *Server) audit(ctx context.Context, action, resource string, details map[string]any) {
-	userID := audit.AnonUser
+	userID := AnonUser
 	if u, ok := auth.UserFromContext(ctx); ok && u != nil && u.ID != "" {
 		userID = u.ID
 	}

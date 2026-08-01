@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/audit"
 	"github.com/sachncs/promptsheon/promptsheon/llm"
 )
 
@@ -39,8 +38,8 @@ func (s *Server) handleGetProvider(w http.ResponseWriter, r *http.Request) error
 		return notFound("provider not found: " + name)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		audit.KeyName:   name,
-		audit.KeyStatus: "registered",
+		KeyName:   name,
+		KeyStatus: "registered",
 	})
 	return nil
 }
@@ -86,19 +85,19 @@ func (s *Server) handleTestProvider(w http.ResponseWriter, r *http.Request) erro
 
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
-			audit.FieldProvider: name,
-			audit.FieldModel:    req.Model,
-			audit.KeyStatus:     audit.FieldError,
-			audit.FieldError:    err.Error(),
+			FieldProvider: name,
+			FieldModel:    req.Model,
+			KeyStatus:     FieldError,
+			FieldError:    err.Error(),
 			"latency_ms":        latency.Milliseconds(),
 		})
 		return nil
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		audit.FieldProvider: name,
-		audit.FieldModel:    resp.Model,
-		audit.KeyStatus:     audit.FieldOK,
+		FieldProvider: name,
+		FieldModel:    resp.Model,
+		KeyStatus:     FieldOK,
 		"content":           resp.Content,
 		"usage":             resp.Usage,
 		"latency_ms":        latency.Milliseconds(),

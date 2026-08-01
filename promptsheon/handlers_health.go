@@ -6,7 +6,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/audit"
 	"github.com/sachncs/promptsheon/buildinfo"
 )
 
@@ -18,8 +17,8 @@ import (
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
 	info := buildinfo.Get()
 	body := map[string]any{
-		audit.KeyStatus:  "healthy",
-		audit.KeyVersion: info.Version,
+		KeyStatus:  "healthy",
+		KeyVersion: info.Version,
 		"uptime":         time.Since(s.startTime).String(),
 	}
 	// PERF-MEM-1: include runtime.MemStats on /health when the
@@ -68,17 +67,17 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
 // Ready handles the request.
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 	ready := map[string]any{
-		audit.KeyStatus: "ready",
+		KeyStatus: "ready",
 		"go":            runtime.Version(),
 	}
 	if err := s.db.Ping(r.Context()); err != nil {
-		ready[audit.KeyStatus] = "not_ready"
+		ready[KeyStatus] = "not_ready"
 		ready["database"] = "unreachable"
 		ready["reason"] = "database ping failed: " + err.Error()
 		writeJSON(w, http.StatusServiceUnavailable, ready)
 		return nil
 	}
-	ready["database"] = audit.FieldOK
+	ready["database"] = FieldOK
 	// Leader election: report the current holder so operators
 	// can tell which replica is the writer.
 	if s.elector != nil {
@@ -99,7 +98,7 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 		ready["audit_queue_depth"] = depth
 		ready["audit_queue_capacity"] = cap(s.auditQueue)
 		if depth*4 > cap(s.auditQueue)*3 { // 75% threshold
-			ready[audit.KeyStatus] = "degraded"
+			ready[KeyStatus] = "degraded"
 			ready["reason"] = "audit worker queue near full"
 		}
 	}
@@ -112,13 +111,13 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 		ctx, cancel := context.WithTimeout(r.Context(), 200*time.Millisecond)
 		defer cancel()
 		if err := s.spans.Flush(ctx); err != nil {
-			ready[audit.KeyStatus] = "degraded"
+			ready[KeyStatus] = "degraded"
 			ready["otel_exporter"] = "flush failed: " + err.Error()
 		} else {
-			ready["otel_exporter"] = audit.FieldOK
+			ready["otel_exporter"] = FieldOK
 		}
 	}
-	if ready[audit.KeyStatus] == "ready" {
+	if ready[KeyStatus] == "ready" {
 		writeJSON(w, http.StatusOK, ready)
 	} else {
 		writeJSON(w, http.StatusServiceUnavailable, ready)

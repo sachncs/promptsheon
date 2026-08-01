@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/audit"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 )
@@ -83,7 +82,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) error 
 	if err := s.db.CreateUser(r.Context(), u); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "user:"+u.ID, map[string]any{audit.FieldEmail: u.Email, audit.FieldRole: u.Role})
+	s.audit(r.Context(), "create", "user:"+u.ID, map[string]any{FieldEmail: u.Email, FieldRole: u.Role})
 	writeJSON(w, http.StatusCreated, u)
 	return nil
 }
@@ -163,15 +162,15 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) error 
 				continue
 			}
 			s.audit(r.Context(), "apikey_revoke", "api_key:"+k.ID, map[string]any{
-				audit.FieldKeyPref: k.KeyPrefix,
+				FieldKeyPref: k.KeyPrefix,
 				"target_user":      k.UserID,
 				"reason":           "role_change",
-				audit.KeyName:      k.Name,
+				KeyName:      k.Name,
 			})
 		}
 	}
 
-	s.audit(r.Context(), "update", "user:"+existing.ID, map[string]any{audit.FieldEmail: existing.Email, audit.FieldRole: existing.Role})
+	s.audit(r.Context(), "update", "user:"+existing.ID, map[string]any{FieldEmail: existing.Email, FieldRole: existing.Role})
 	writeJSON(w, http.StatusOK, existing)
 	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/audit"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
@@ -45,13 +44,13 @@ func (s *Server) handleSaveVaultKey(w http.ResponseWriter, r *http.Request) erro
 	if err := s.db.SaveProviderKey(r.Context(), pk); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "vault_key:"+pk.ID, map[string]any{audit.FieldProvider: pk.ProviderName, audit.FieldKeyName: pk.KeyName})
+	s.audit(r.Context(), "create", "vault_key:"+pk.ID, map[string]any{FieldProvider: pk.ProviderName, FieldKeyName: pk.KeyName})
 
 	// Return without the encrypted key for security
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id":                    pk.ID,
-		audit.FieldProviderName: pk.ProviderName,
-		audit.FieldKeyName:      pk.KeyName,
+		FieldProviderName: pk.ProviderName,
+		FieldKeyName:      pk.KeyName,
 		"created_at":            pk.CreatedAt,
 	})
 	return nil

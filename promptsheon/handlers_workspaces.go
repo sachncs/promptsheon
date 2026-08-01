@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/audit"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
@@ -52,7 +51,7 @@ func (s *Server) handleCreateWorkspace(w http.ResponseWriter, r *http.Request) e
 	if err := s.db.CreateWorkspace(r.Context(), wksp); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "workspace:"+wksp.ID, map[string]any{audit.KeyName: wksp.Name})
+	s.audit(r.Context(), "create", "workspace:"+wksp.ID, map[string]any{KeyName: wksp.Name})
 	writeJSON(w, http.StatusCreated, wksp)
 	return nil
 }

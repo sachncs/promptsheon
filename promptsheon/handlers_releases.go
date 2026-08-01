@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/approval"
-	"github.com/sachncs/promptsheon/promptsheon/audit"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
@@ -291,7 +290,7 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 		"tokens":           exec.TotalTokens,
 		"cost_usd":         exec.CostUSD,
 		"tokens_estimated": exec.TotalTokens > 0 || exec.CostUSD > 0,
-		audit.FieldError:   exec.Error,
+		FieldError:   exec.Error,
 	})
 	if invErr != nil {
 		return &HTTPError{Status: http.StatusBadGateway, Message: invErr.Error()}

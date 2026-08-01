@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/audit"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"github.com/sachncs/promptsheon/promptsheon/settings"
 )
@@ -127,7 +126,7 @@ func (s *Server) handleSetSetting(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 	s.audit(r.Context(), "create", "setting:"+key, map[string]any{
-		audit.FieldAPIKey: key,
+		FieldAPIKey: key,
 		"by":              updatedBy,
 	})
 	writeJSON(w, http.StatusOK, settingsResponse(key, req.Value, updatedBy, timeNow()))
@@ -158,7 +157,7 @@ func (s *Server) handleDeleteSetting(w http.ResponseWriter, r *http.Request) err
 		return err
 	}
 	s.audit(r.Context(), "delete", "setting:"+key, map[string]any{
-		audit.FieldAPIKey: key,
+		FieldAPIKey: key,
 		"by":              settingsUpdatedBy(r),
 	})
 	w.WriteHeader(http.StatusNoContent)
@@ -175,8 +174,8 @@ func settingsResponse(key, value, updatedBy string, updatedAt time.Time) map[str
 		display = "***"
 	}
 	return map[string]any{
-		audit.FieldAPIKey: key,
-		audit.FieldValue:  display,
+		FieldAPIKey: key,
+		FieldValue:  display,
 		"updated_by":      updatedBy,
 		"updated_at":      updatedAt,
 	}

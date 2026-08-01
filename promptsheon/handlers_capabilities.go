@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/audit"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
@@ -67,7 +66,7 @@ func (s *Server) handleCreateCapability(w http.ResponseWriter, r *http.Request) 
 	if err := s.db.CreateCapability(r.Context(), capab); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "capability:"+capab.ID, map[string]any{audit.KeyName: capab.Name, "project_id": projectID})
+	s.audit(r.Context(), "create", "capability:"+capab.ID, map[string]any{KeyName: capab.Name, "project_id": projectID})
 	writeJSON(w, http.StatusCreated, capab)
 	return nil
 }

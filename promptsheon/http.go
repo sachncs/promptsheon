@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/sachncs/promptsheon/promptsheon/audit"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
 	"github.com/sachncs/promptsheon/promptsheon/store"
@@ -100,7 +99,7 @@ func writeError(w http.ResponseWriter, err error) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	body := map[string]any{audit.FieldError: err.Error()}
+	body := map[string]any{FieldError: err.Error()}
 	if errors.As(err, &httpErr) && httpErr.Details != nil {
 		body["details"] = httpErr.Details
 	}
@@ -200,7 +199,7 @@ func callerID(r *http.Request) string {
 	if u, ok := auth.UserFromContext(r.Context()); ok && u != nil && u.ID != "" {
 		return u.ID
 	}
-	return audit.AnonUser
+	return AnonUser
 }
 
 // --- Rate Limiting ---
@@ -262,7 +261,7 @@ type authAuditLogger struct {
 
 func (l *authAuditLogger) LogAuthFailure(ctx context.Context, keyPrefix, reason, remoteAddr string) {
 	l.server.audit(ctx, "auth_failure", "api_key", map[string]any{
-		audit.FieldKeyPref: keyPrefix,
+		FieldKeyPref: keyPrefix,
 		"reason":           reason,
 		"remote_addr":      remoteAddr,
 	})

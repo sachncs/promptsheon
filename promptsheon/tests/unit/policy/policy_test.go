@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/sachncs/promptsheon/promptsheon"
 )
 
 func TestAllowedProviders(t *testing.T) {

@@ -1,13 +1,13 @@
 package reasoning_test
 
 import (
+	. "github.com/sachncs/promptsheon/promptsheon"
 	"context"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
-	. "github.com/sachncs/promptsheon/promptsheon"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )
 

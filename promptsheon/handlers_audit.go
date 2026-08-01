@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/audit"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
@@ -118,7 +117,7 @@ func (s *Server) writeAuditCSV(w http.ResponseWriter, entries []*models.AuditEnt
 	writer := csv.NewWriter(w)
 
 	// Header
-	if err := writer.Write([]string{"id", audit.FieldUserID, "action", "resource", "details", "timestamp", "previous_hash", "entry_hash"}); err != nil {
+	if err := writer.Write([]string{"id", FieldUserID, "action", "resource", "details", "timestamp", "previous_hash", "entry_hash"}); err != nil {
 		return fmt.Errorf("csv write header: %w", err)
 	}
 

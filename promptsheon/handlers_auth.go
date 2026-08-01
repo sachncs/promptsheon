@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/audit"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 	"github.com/sachncs/promptsheon/promptsheon/models"
@@ -255,10 +254,10 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	s.audit(r.Context(), "apikey_create", "api_key:"+apiKey.ID, map[string]any{
-		audit.FieldKeyPref: apiKey.KeyPrefix,
+		FieldKeyPref: apiKey.KeyPrefix,
 		"target_user":      apiKey.UserID,
-		audit.FieldRole:    apiKey.Role,
-		audit.KeyName:      apiKey.Name,
+		FieldRole:    apiKey.Role,
+		KeyName:      apiKey.Name,
 	})
 
 	type response struct {
@@ -369,7 +368,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 	if s.logger != nil {
 		s.logger.Warn("bootstrap endpoint used; admin key minted",
 			"user_id", admin.ID,
-			audit.FieldKeyPref, apiKey.KeyPrefix,
+			FieldKeyPref, apiKey.KeyPrefix,
 			"action", "rotate this key and enable PROMPTSHEON_AUTH=true before exposing the server")
 	}
 
@@ -460,11 +459,11 @@ func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	s.audit(r.Context(), "apikey_revoke", "api_key:"+id, map[string]any{
-		audit.FieldKeyPref: key.KeyPrefix,
+		FieldKeyPref: key.KeyPrefix,
 		"target_user":      key.UserID,
 	})
 
-	writeJSON(w, http.StatusOK, map[string]string{audit.KeyStatus: "revoked"})
+	writeJSON(w, http.StatusOK, map[string]string{KeyStatus: "revoked"})
 	return nil
 }
 
@@ -636,7 +635,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 	s.audit(r.Context(), "oauth_login", "user:"+existing.ID, map[string]any{
 		"provider":         providerName,
 		"email":            user.Email,
-		audit.FieldKeyPref: apiKeyModel.KeyPrefix,
+		FieldKeyPref: apiKeyModel.KeyPrefix,
 		"auto_provision":   autoProvisioned,
 	})
 
@@ -652,7 +651,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user":            existing,
-		audit.FieldAPIKey: apiKey,
+		FieldAPIKey: apiKey,
 	})
 	return nil
 }

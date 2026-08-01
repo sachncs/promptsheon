@@ -3,7 +3,7 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/audit"
+	"github.com/sachncs/promptsheon/promptsheon"
 )
 
 // Re-exported audit constants. These are the JSON keys used in

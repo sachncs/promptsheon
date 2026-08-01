@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/audit"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 	"github.com/sachncs/promptsheon/promptsheon/eval"
@@ -84,7 +83,7 @@ func (s *Server) handleCreateDataset(w http.ResponseWriter, r *http.Request) err
 			return err
 		}
 	}
-	s.audit(r.Context(), "create", "dataset:"+d.ID, map[string]any{audit.KeyName: d.Name, "capability_id": capabilityID})
+	s.audit(r.Context(), "create", "dataset:"+d.ID, map[string]any{KeyName: d.Name, "capability_id": capabilityID})
 	writeJSON(w, http.StatusCreated, d)
 	return nil
 }
@@ -204,7 +203,7 @@ func (s *Server) handleCreatePrecondition(w http.ResponseWriter, r *http.Request
 	if err := s.db.CreatePrecondition(r.Context(), p); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "precondition:"+p.ID, map[string]any{audit.KeyName: p.Name, "capability_id": capabilityID})
+	s.audit(r.Context(), "create", "precondition:"+p.ID, map[string]any{KeyName: p.Name, "capability_id": capabilityID})
 	writeJSON(w, http.StatusCreated, p)
 	return nil
 }
@@ -285,7 +284,7 @@ func (s *Server) handleUpdatePrecondition(w http.ResponseWriter, r *http.Request
 	if err := s.db.UpdatePrecondition(r.Context(), existing); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "update", "precondition:"+existing.ID, map[string]any{audit.KeyName: existing.Name})
+	s.audit(r.Context(), "update", "precondition:"+existing.ID, map[string]any{KeyName: existing.Name})
 	writeJSON(w, http.StatusOK, existing)
 	return nil
 }

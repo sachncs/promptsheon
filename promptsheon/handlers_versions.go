@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/audit"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )
@@ -103,7 +102,7 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 	if err := s.db.CreateVersion(r.Context(), v); err != nil {
 		return err
 	}
-	s.audit(r.Context(), "create", "version:"+v.ID, map[string]any{"capability_id": capabilityID, audit.KeyVersion: v.Version, "manifest_hash": hash, "parents": req.Parents})
+	s.audit(r.Context(), "create", "version:"+v.ID, map[string]any{"capability_id": capabilityID, KeyVersion: v.Version, "manifest_hash": hash, "parents": req.Parents})
 	writeJSON(w, http.StatusCreated, v)
 	return nil
 }
