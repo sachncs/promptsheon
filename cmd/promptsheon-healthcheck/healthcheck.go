@@ -12,6 +12,7 @@
 package main
 
 import (
+	"log/slog"
 	"context"
 	"fmt"
 	"net/http"
@@ -25,7 +26,7 @@ func runHealthcheck() {
 	portStr := getenv("PROMPTSHEON_HEALTHCHECK_PORT", "8080")
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "invalid port %q: %v\n", portStr, err)
+		slog.Error("invalid port", "port", portStr, "err", err)
 		os.Exit(2)
 	}
 
@@ -44,12 +45,12 @@ func runHealthcheck() {
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "health probe failed: %v\n", err)
+		slog.Error("health probe failed", "err", err)
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		fmt.Fprintf(os.Stderr, "unhealthy: status %d\n", resp.StatusCode)
+		slog.Error("unhealthy", "status", resp.StatusCode)
 		os.Exit(1)
 	}
 }

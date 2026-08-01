@@ -111,7 +111,6 @@ var cliCommandHandlers = map[string]func([]string) error{
 func handleCmdError(err error) {
 	if errors.Is(err, errUsage) {
 		slog.Error("operation failed", "err", err)
-		fmt.Fprintln(os.Stderr)
 		slog.Info("Run 'promptsheon help' for usage.")
 		os.Exit(2)
 	}
@@ -211,7 +210,7 @@ func cmdRun(args []string) error {
 		return errf.Errorf("provider not available: %w", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "Running with %s/%s...\n", provider, model)
+	slog.Info("running with provider/model", "provider", provider, "model", model)
 	start := time.Now()
 	resp, err := p.Complete(context.Background(), &llm.Request{
 		Model: model,
