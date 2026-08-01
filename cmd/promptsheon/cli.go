@@ -16,6 +16,7 @@ import (
 	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/llm"
 	"context"
+	"log/slog"
 	"errors"
 	"fmt"
 	"os"
@@ -69,7 +70,7 @@ func handleEarlyExit() bool {
 func dispatchCommand(cmd string, args []string) error {
 	h, ok := cliCommandHandlers[cmd]
 	if !ok {
-		fmt.Fprintf(os.Stderr, "error: unknown command: %s\n", cmd)
+		slog.Error("unknown command", "command", cmd)
 		printUsage()
 		os.Exit(1)
 	}
@@ -109,7 +110,7 @@ var cliCommandHandlers = map[string]func([]string) error{
 
 func handleCmdError(err error) {
 	if errors.Is(err, errUsage) {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		slog.Error("operation failed", "err", err)
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Run 'promptsheon help' for usage.")
 		os.Exit(2)
@@ -266,7 +267,7 @@ func cmdProvider(args []string) error {
 		})
 		latency := time.Since(start)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error("test", "err", err)
 			return err
 		}
 		fmt.Printf("OK: %q\n", resp.Content)
