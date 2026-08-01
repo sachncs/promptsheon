@@ -22,8 +22,8 @@ differ. The CAS deduplication is a hash table: the Manifest
 references the same hash twice and the second reference is
 free.
 
-The `backend/cas` package is the production implementation. It
-lives at `backend/cas/` so other Go projects can import it
+The `promptsheon/cas` package is the production implementation. It
+lives at `promptsheon/cas/` so other Go projects can import it
 without dragging in the rest of Promptsheon.
 
 ## Hash-chained audit log
@@ -36,7 +36,7 @@ Each row records:
   where `\x1f` (US, 0x1F) is the field separator. The fields are
   written in order with no JSON wrapping; `details_json` is the
   pre-serialised JSON blob, not a re-serialised map. See
-  `backend/store/sqlite.go::computeAuditHash`.
+  `promptsheon/store/sqlite.go::computeAuditHash`.
 
 `store.VerifyAuditChain` walks the chain from `rowid 1`
 forward and asserts the invariant. Any tampering — row
@@ -102,7 +102,7 @@ unconfigured deployments don't accidentally execute hooks.
 
 ## LLM call flow
 
-The Invoke path (`backend/invoke.Invoker`):
+The Invoke path (`promptsheon/invoke.Invoker`):
 
 1. Enforce Quota (atomic counter, in-memory; backed by
    ClickHouse in production scale).
@@ -144,12 +144,12 @@ metric surfaces the running total per daemon.
 
 ## Source
 
-- `backend/store/sqlite.go` (`AppendAudit`, `computeAuditHash`,
+- `promptsheon/store/sqlite.go` (`AppendAudit`, `computeAuditHash`,
   `VerifyAuditChain`).
-- `backend/observation/observation.go` (windowed aggregator).
-- `backend/optimizer/optimizer.go` (rule engine).
-- `backend/invoke/invoke.go` (Budget / Quota / LLM call).
-- `backend/harness/precondition.go` (Precondition execution).
-- `backend/cas/` (content-addressed store).
+- `promptsheon/observation/observation.go` (windowed aggregator).
+- `promptsheon/optimizer/optimizer.go` (rule engine).
+- `promptsheon/invoke/invoke.go` (Budget / Quota / LLM call).
+- `promptsheon/harness/precondition.go` (Precondition execution).
+- `promptsheon/cas/` (content-addressed store).
 - [Design Decisions](design-decisions.md#hash-chained-audit-log) — audit chain
   design.

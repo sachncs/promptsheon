@@ -65,7 +65,7 @@ Tool invocations are sandboxed:
 
 ## Operator guide
 
-The `backend/workflow` package is the Workflow runtime. It
+The `promptsheon/workflow` package is the Workflow runtime. It
 is gated behind `PROMPTSHEON_HARNESS_PRECONDITIONS=true` —
 precondition execution is off by default so an unconfigured
 Workflow never runs any step.

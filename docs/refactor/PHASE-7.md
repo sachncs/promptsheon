@@ -10,7 +10,7 @@ c7.0  docs(adr): ADR-0026 — public SDK module + Error→Err rename rationale
       Refs: PLAN-49/M-5 X-12
 c7.1  docs(architecture): rewrite architecture.md for cmd/<name>/ layout
       Refs: PLAN-49/
-c7.2  docs(architecture): modules.md (remove backend/bandit)
+c7.2  docs(architecture): modules.md (remove promptsheon/bandit)
       Refs: PLAN-49/
 c7.3  docs(development): development.md (correct build paths + layout)
       Refs: PLAN-49/
@@ -65,7 +65,7 @@ Accepted, 2026-XX-XX
 The `promptsheon` repository has grown into a complex codebase with:
 - 198 commits planned in PLAN-49
 - 14 error sentinel types using `Error*` prefix (non-idiomatic)
-- 7-layer internal structure (`backend/` + `cmd/` + `sdk/` + `pkg/`)
+- 7-layer internal structure (`promptsheon/` + `cmd/` + `sdk/` + `pkg/`)
 - Multiple audit-driven review passes exposing naming inconsistencies
 
 ## Decision
@@ -77,7 +77,7 @@ This module:
 - Re-exports types from `sdk/` and `errs/` packages
 - Is not built by default (`go build ./...` skips it)
 - Requires `-tags=promptsheon` to compile (Makefile wrapper: `make build-public`)
-- Is fenced by `scripts/check-pkg-fence.sh` against direct `backend/` imports
+- Is fenced by `scripts/check-pkg-fence.sh` against direct `promptsheon/` imports
 
 Alternative considered: separate module `pkg-sheon/`. Rejected because:
 - Adds `replace` directive complexity

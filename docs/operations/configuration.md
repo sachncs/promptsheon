@@ -37,7 +37,7 @@ returns a clear error message naming the offending setting.
 The daemon supports **OpenAI** and **Anthropic**. To add a
 new provider, register it on the LLM `Registry` in
 `daemon.go` and write the SDK adapter under
-`backend/llm/`.
+`promptsheon/llm/`.
 
 ## Vault
 

@@ -43,7 +43,7 @@ c3.10 chore(ci): scorecard workflow
       Refs: PLAN-49/
 c3.11 chore(docs): move docs/security/audit-2026-07-26.md → docs/research/
       Refs: PLAN-49/
-c3.12 chore(codeowners): rewrite for current backend/<pkg>/ paths (no /internal/)
+c3.12 chore(codeowners): rewrite for current promptsheon/<pkg>/ paths (no /internal/)
       Refs: PLAN-49/
 c3.13 chore(renovate): requiredStatusChecks gate enabled
       Refs: PLAN-49/
@@ -187,17 +187,17 @@ keywords = ["PROMPTSHEON_BOOTSTRAP_TOKEN"]
 *                                       @sachncs
 
 # Backend domain areas
-/backend/auth/                          @sachncs
-/backend/audit/                         @sachncs
-/backend/release/                       @sachncs
-/backend/capability/                    @sachncs
-/backend/harness/                       @sachncs
-/backend/handlers_*.go                  @sachncs
-/backend/store/                         @sachncs
-/backend/vault/                         @sachncs
+/promptsheon/auth/                          @sachncs
+/promptsheon/audit/                         @sachncs
+/promptsheon/release/                       @sachncs
+/promptsheon/capability/                    @sachncs
+/promptsheon/harness/                       @sachncs
+/promptsheon/handlers_*.go                  @sachncs
+/promptsheon/store/                         @sachncs
+/promptsheon/vault/                         @sachncs
 
 # Specs and SDKs
-/backend/spec/                          @sachncs
+/promptsheon/spec/                          @sachncs
 /sdk/                                   @sachncs
 
 # Infrastructure

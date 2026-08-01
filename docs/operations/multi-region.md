@@ -41,7 +41,7 @@ A future multi-region design would look like:
   walks the per-region chain for the current region, then
   verifies the global root against a quorum of regional
   checkpoints.
-- **CAS (`backend/cas/`)**: the CAS is content-addressed and
+- **CAS (`promptsheon/cas/`)**: the CAS is content-addressed and
   immutable; multi-region replication is "just" object
   storage replication. S3-compatible cross-region replication
   works today with a single-line config change.

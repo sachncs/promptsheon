@@ -21,7 +21,7 @@ import (
 // streams results via CreateEvalResult so memory stays bounded.
 //
 // Run with: go test -bench=BenchmarkEvalRunStreaming1000Cases
-// -benchtime=1x -timeout=120s ./backend/tests/unit/harness/
+// -benchtime=1x -timeout=120s ./tests/unit/harness/
 func BenchmarkEvalRunStreaming1000Cases(b *testing.B) {
 	const numCases = 1000
 	r := harness.NewEvalRunner(nil, nil)

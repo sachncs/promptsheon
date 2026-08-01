@@ -64,22 +64,22 @@ c2.24 refactor(llm): drop AggregateMetrics, JudgeClient alias, ValidateBaseURLs
 |---|---|
 | `go.mod`, `go.sum` | c2.0-c2.7 |
 | `vendor/modules.txt`, `vendor/**` | c2.7 |
-| `backend/errs/errors.go` | c2.8 |
-| `backend/store/repo.go`, `backend/store/sqlite.go` | c2.9 |
-| `backend/server.go`, `backend/audit/keys.go` (new) | c2.10, c2.11 |
-| `backend/auth/authenticator.go` | c2.12 |
-| `backend/alerting/manager.go` | c2.13 |
-| `backend/webhook/webhook.go` | c2.14 |
-| `backend/handlers_auth.go` | c2.15 |
-| `backend/handlers_helpers.go` (delete), `backend/handlers_executions.go` | c2.16 |
-| `backend/capability/hash.go` (expand), `backend/handlers_executions.go` | c2.17 |
-| `backend/marshal_helper.go` (delete), `backend/handlers_executions.go` | c2.18 |
+| `promptsheon/errs/errors.go` | c2.8 |
+| `promptsheon/store/repo.go`, `promptsheon/store/sqlite.go` | c2.9 |
+| `promptsheon/server.go`, `promptsheon/audit/keys.go` (new) | c2.10, c2.11 |
+| `promptsheon/auth/authenticator.go` | c2.12 |
+| `promptsheon/alerting/manager.go` | c2.13 |
+| `promptsheon/webhook/webhook.go` | c2.14 |
+| `promptsheon/handlers_auth.go` | c2.15 |
+| `promptsheon/handlers_helpers.go` (delete), `promptsheon/handlers_executions.go` | c2.16 |
+| `promptsheon/capability/hash.go` (expand), `promptsheon/handlers_executions.go` | c2.17 |
+| `promptsheon/marshal_helper.go` (delete), `promptsheon/handlers_executions.go` | c2.18 |
 | `cmd/promptsheond/embed_frontend.go` (delete), `cmd/promptsheond/main.go` | c2.19 |
 | `cmd/promptsheond/daemon_evolver_adapter.go` (delete), `cmd/promptsheond/daemon_release_invoker.go` (delete), `cmd/promptsheond/daemon.go` | c2.20 |
-| `backend/usage.go` (delete), `backend/handlers_*.go`, `backend/routes.go` | c2.21 |
-| `backend/invoke/persisted_enforcer.go` (delete), `backend/invoke/enforcer.go` | c2.22 |
-| `backend/llm/transport.go` (delete), `backend/llm/cost.go` (delete), `backend/llm/tokenizer.go` (delete), `backend/llm/env.go` (delete) | c2.23 |
-| `backend/llm/middleware.go` (delete), `backend/llm/judge.go`, `backend/llm/registry.go` | c2.24 |
+| `promptsheon/usage.go` (delete), `promptsheon/handlers_*.go`, `promptsheon/routes.go` | c2.21 |
+| `promptsheon/invoke/persisted_enforcer.go` (delete), `promptsheon/invoke/enforcer.go` | c2.22 |
+| `promptsheon/llm/transport.go` (delete), `promptsheon/llm/cost.go` (delete), `promptsheon/llm/tokenizer.go` (delete), `promptsheon/llm/env.go` (delete) | c2.23 |
+| `promptsheon/llm/middleware.go` (delete), `promptsheon/llm/judge.go`, `promptsheon/llm/registry.go` | c2.24 |
 
 ## Error sentinel renames (c2.8)
 
@@ -145,7 +145,7 @@ with existing `s.db *sql.DB` — rename to `s.store`).
 
 ## Audit field consolidation (c2.10, c2.11)
 
-New file `backend/audit/keys.go`:
+New file `promptsheon/audit/keys.go`:
 
 ```go
 package audit
@@ -177,8 +177,8 @@ go build ./...
 go vet ./...
 go test -race -count=1 ./...
 golangci-lint run
-grep -rn 'Error[A-Z]' backend/errs/ --include='*.go'  # must return nothing
-grep -rn 'Repositories\b' backend/ --include='*.go' | grep -v _test  # must return nothing
+grep -rn 'Error[A-Z]' promptsheon/errs/ --include='*.go'  # must return nothing
+grep -rn 'Repositories\b' promptsheon/ --include='*.go' | grep -v _test  # must return nothing
 grep -rn 'BypassSSRF\|activeOAuthStates\|NewAuthenticatorWithLogger' . --include='*.go'  # must return nothing
 du -sh vendor/  # must be ≥ 30 MB smaller than before
 ```
@@ -190,5 +190,5 @@ du -sh vendor/  # must be ≥ 30 MB smaller than before
 | Agent | Files |
 |---|---|
 | 2A | go.mod, go.sum, vendor/ |
-| 2B | backend/errs/, backend/store/, backend/server.go, backend/middleware.go, backend/audit/ (new) |
-| 2C | backend/auth/, backend/alerting/, backend/webhook/, backend/handlers_*.go, backend/usage.go, backend/invoke/, backend/llm/, cmd/promptsheond/ |
+| 2B | promptsheon/errs/, promptsheon/store/, promptsheon/server.go, promptsheon/middleware.go, promptsheon/audit/ (new) |
+| 2C | promptsheon/auth/, promptsheon/alerting/, promptsheon/webhook/, promptsheon/handlers_*.go, promptsheon/usage.go, promptsheon/invoke/, promptsheon/llm/, cmd/promptsheond/ |

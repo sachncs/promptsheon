@@ -81,8 +81,8 @@ lint:
 lint-domain:
 	go run ./scripts/check-no-package-state.go -allow Version,Commit,BuildTime
 
-# Lint domain-purity: fail if any domain package imports backend/llm,
-# backend/store, or cmd. Domain packages depend only
+# Lint domain-purity: fail if any domain package imports promptsheon/llm,
+# promptsheon/store, or cmd. Domain packages depend only
 # on each other and the standard library (Charter Principle 5).
 lint-deps:
 	scripts/check-domain-purity.sh

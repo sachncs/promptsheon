@@ -28,7 +28,7 @@ export async function renderProjectDetail(route) {
     return;
   }
   const project = projRes.data;
-  // Capabilities are workspace-scoped at the backend but stored
+  // Capabilities are workspace-scoped at the server but stored
   // per-project. Load them via the existing listCapabilities
   // endpoint.
   const capsRes = await api.listCapabilities(id);

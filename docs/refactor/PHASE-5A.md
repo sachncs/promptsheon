@@ -51,22 +51,22 @@ c5.15 refactor: drop dead metrics + frontend dead exports (combined; resolves L-
 |---|---|
 | `.golangci.yml` (extend with custom plugin) | c5.0 |
 | `tools/golangci-lint-promptsheon/main.go` (new plugin) | c5.0 |
-| `backend/audit/keys.go` (consolidate) | c5.1 |
-| `backend/cas/diff.go` (DiffIntelligence → Compare) | c5.2 |
-| `backend/cas/branch.go`, `backend/cas/store.go` | c5.3 |
-| `backend/handler_observation.go` → `backend/handlers_observation.go` | c5.4 |
-| `backend/handlers_capabilities_merge_test.go` → `backend/handlers_capabilities_test.go` | c5.5 |
-| `backend/trace/exporter.go` (delete), `backend/trace/otel.go` (edit) | c5.6 |
+| `promptsheon/audit/keys.go` (consolidate) | c5.1 |
+| `promptsheon/cas/diff.go` (DiffIntelligence → Compare) | c5.2 |
+| `promptsheon/cas/branch.go`, `promptsheon/cas/store.go` | c5.3 |
+| `promptsheon/handler_observation.go` → `promptsheon/handlers_observation.go` | c5.4 |
+| `promptsheon/handlers_capabilities_merge_test.go` → `promptsheon/handlers_capabilities_test.go` | c5.5 |
+| `promptsheon/trace/exporter.go` (delete), `promptsheon/trace/otel.go` (edit) | c5.6 |
 | `promptsheon/evolve/loader.go` (delete), `promptsheon/evolve/evolver.go` (edit) | c5.7 |
-| `backend/release/resolver.go` (delete interface), `backend/release/service.go` | c5.8 |
-| `backend/release/id.go` (delete), `backend/release/service.go` | c5.9 |
+| `promptsheon/release/resolver.go` (delete interface), `promptsheon/release/service.go` | c5.8 |
+| `promptsheon/release/id.go` (delete), `promptsheon/release/service.go` | c5.9 |
 | `promptsheon/evolve/id.go` (delete), `promptsheon/evolve/promoter.go` | c5.9 |
-| `backend/store/sqlite.go` (delete cache) | c5.10 |
-| `backend/store/sqlite.go` (drop helpers) | c5.11 |
-| `backend/store/idempotency_sqlite.go` (delete), `backend/store/repo.go` | c5.12 |
-| `backend/store/migrate.go` (delete helpers) | c5.13 |
-| `backend/rollups/rollups.go` (delete Sink) | c5.14 |
-| `backend/metrics/collector.go` (drop dead counters) | c5.15 |
+| `promptsheon/store/sqlite.go` (delete cache) | c5.10 |
+| `promptsheon/store/sqlite.go` (drop helpers) | c5.11 |
+| `promptsheon/store/idempotency_sqlite.go` (delete), `promptsheon/store/repo.go` | c5.12 |
+| `promptsheon/store/migrate.go` (delete helpers) | c5.13 |
+| `promptsheon/rollups/rollups.go` (delete Sink) | c5.14 |
+| `promptsheon/metrics/collector.go` (drop dead counters) | c5.15 |
 | `frontend/src/views/settings-view.js` (drop dead exports) | c5.15 |
 | `frontend/src/views/catalog-view.js` (drop dead exports) | c5.15 |
 
@@ -188,7 +188,7 @@ golangci-lint run
 go build ./...
 go vet ./...
 go test -race -count=1 ./...
-grep -rn 'DiffIntelligence\|ListRefDetails\|HEADRefName' backend/ --include='*.go' | grep -v _test  # must return nothing
+grep -rn 'DiffIntelligence\|ListRefDetails\|HEADRefName' promptsheon/ --include='*.go' | grep -v _test  # must return nothing
 ```
 
 ## STOP gate
@@ -204,5 +204,5 @@ strict; no exceptions).
 | Agent | Files |
 |---|---|
 | 5A1 | tools/golangci-lint-promptsheon/, .golangci.yml |
-| 5A2 | backend/cas/, backend/store/sqlite*.go, backend/store/idempotency_sqlite.go, backend/store/migrate.go, backend/release/id.go, promptsheon/evolve/id.go |
-| 5A3 | backend/trace/, promptsheon/evolve/loader.go, backend/release/resolver.go (interface drop), backend/rollups/, backend/metrics/collector.go, frontend/src/views/{settings,catalog}-view.js |
+| 5A2 | promptsheon/cas/, promptsheon/store/sqlite*.go, promptsheon/store/idempotency_sqlite.go, promptsheon/store/migrate.go, promptsheon/release/id.go, promptsheon/evolve/id.go |
+| 5A3 | promptsheon/trace/, promptsheon/evolve/loader.go, promptsheon/release/resolver.go (interface drop), promptsheon/rollups/, promptsheon/metrics/collector.go, frontend/src/views/{settings,catalog}-view.js |

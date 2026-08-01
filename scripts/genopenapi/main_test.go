@@ -21,7 +21,7 @@ func TestGenerator_NoStubsInOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Run the generator from the repo root so it finds
-	// backend/api/server.go.
+	// promptsheon/api/server.go.
 	if e := os.Chdir(repoRoot(t)); e != nil {
 		t.Fatal(e)
 	}
@@ -61,7 +61,7 @@ func TestGenerator_NoStubsInOutput(t *testing.T) {
 
 // TestGenerator_Idempotent pins the second Item 1 requirement:
 // running the generator twice produces the same output. The
-// canonical way to keep backend/spec/spec.yaml in sync with the
+// canonical way to keep promptsheon/spec/spec.yaml in sync with the
 // code is to re-run the generator; idempotence is what makes
 // that safe to do on every PR.
 func TestGenerator_Idempotent(t *testing.T) {

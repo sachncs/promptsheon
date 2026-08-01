@@ -44,7 +44,7 @@ codemod is provided in `tools/codemod-sdktopkgshe-on/`.
 
 Why remove sdk/ rather than deprecate it? The legacy path made
 every internal type public, which prevented refactors inside
-backend/. The //go:build promptsheon fence in pkg/promptsheon is
+promptsheon/. The //go:build promptsheon fence in pkg/promptsheon is
 the only public surface; sdk/ would have been a backdoor.
 
 ### 2. Build-tag fence
@@ -64,7 +64,7 @@ accidental import of facade-only types into the runtime.
 
 ### 3. Error sentinel naming
 
-All sentinels in `backend/errs/` follow `Err*`. The original
+All sentinels in `promptsheon/errs/` follow `Err*`. The original
 `Error*` prefix was non-standard. 35 sentinels renamed across
 PR-2 (commit 1868370) and PR-6 (commit 021d03d, the follow-up
 sweep). Renames:

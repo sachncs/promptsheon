@@ -2,7 +2,7 @@
 
 **Version Control System for AI Agent Intelligence**
 
-Welcome to the Promptsheon documentation. This is the master index. The full source of truth for the wire format is [`backend/spec/spec.yaml`](../../backend/spec/spec.yaml); this site is the human-readable counterpart.
+Welcome to the Promptsheon documentation. This is the master index. The full source of truth for the wire format is [`promptsheon/spec/spec.yaml`](../../promptsheon/spec/spec.yaml); this site is the human-readable counterpart.
 
 ## Audience map
 
@@ -26,7 +26,7 @@ Welcome to the Promptsheon documentation. This is the master index. The full sou
 | [LLM Providers](../reference/llm-providers.md) | OpenAI and Anthropic provider wiring; how to add a new one. |
 | [CLI](../development/cli.md) | The `promptsheon` client binary. |
 | [SDK](../reference/sdk.md) | The Go, Python, and TypeScript client libraries. |
-| [API Reference](../reference/api-reference.md) | Human summary of the REST API. The [OpenAPI spec](../../backend/spec/spec.yaml) is the source of truth. |
+| [API Reference](../reference/api-reference.md) | Human summary of the REST API. The [OpenAPI spec](../../promptsheon/spec/spec.yaml) is the source of truth. |
 | [Workflows](../reference/workflows.md) | DAG-based multi-step agents. |
 | [Harness engineering](../reference/harness.md) | Why the harness surface exists; the Capability / Version / Release / Eval stack. |
 | [Evaluations](../reference/eval.md) | Datasets, preconditions, eval runs — the harness loop. |
@@ -54,11 +54,11 @@ Welcome to the Promptsheon documentation. This is the master index. The full sou
 | [Design Decisions](design-decisions.md) | The architectural rationale behind key choices. |
 | [Development](../development/development.md) | Setup, layout, Make targets, OpenAPI generator, migrations. |
 | [Testing](../development/testing.md) | Test layers, helpers, race detection, coverage. |
-| [API Reference — Generator](../reference/api-reference.md#generator) | How `backend/spec/spec.yaml` is produced. |
+| [API Reference — Generator](../reference/api-reference.md#generator) | How `promptsheon/spec/spec.yaml` is produced. |
 
 ## Quick links
 
-- **OpenAPI spec**: [`backend/spec/spec.yaml`](../../backend/spec/spec.yaml)
+- **OpenAPI spec**: [`promptsheon/spec/spec.yaml`](../../promptsheon/spec/spec.yaml)
 - **Server health**: `GET /health`
 - **Server readiness**: `GET /ready`
 - **Prometheus metrics**: `GET /metrics`
@@ -76,7 +76,7 @@ If you are adding a new doc:
 - Tables for parallel data, not bullet lists.
 - Code blocks must have a language tag (` ```bash `, ` ```go `, ` ```json `, ` ```text `, etc.).
 - Use the [Glossary](glossary.md) terms verbatim. No synonyms.
-- Link with relative paths inside `docs/`. Use `../../backend/spec/spec.yaml` for the OpenAPI spec.
+- Link with relative paths inside `docs/`. Use `../../promptsheon/spec/spec.yaml` for the OpenAPI spec.
 - End with a "See also" section if the doc is referenced from elsewhere.
 - Add a row to this index, in the right audience group.
 

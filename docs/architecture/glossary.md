@@ -69,7 +69,7 @@ must NOT override the release's runtime.
 
 ## CAS (Content-Addressable Storage)
 
-The backend/cas/ package. Every artifact is a content-addressed
+The promptsheon/cas/ package. Every artifact is a content-addressed
 blob keyed by its SHA-256 hash. The CAS is the deduplication
 primitive: two Manifests that reference the same hash share
 the same blob.
@@ -122,8 +122,8 @@ from rowid 1 forward and asserts the invariant.
 ## Recommendation
 
 A suggestion produced by the rules engine
-(`backend/optimizer`) or the bandit selector
-(`backend/bandit`). Recommendations are stored with a
+(`promptsheon/optimizer`) or the bandit selector
+(`promptsheon/bandit`). Recommendations are stored with a
 type (raise_max_tokens, drop_guardrail, change_temperature)
 and a target Release.
 

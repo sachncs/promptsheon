@@ -25,7 +25,7 @@ import (
 // ── ID generation ───────────────────────────────────────────────────
 
 // generateID produces a collision-resistant identifier.
-// (body moved from backend/generateid.go)
+// (body moved from generateid.go)
 func generateID() string {
 	var b [8]byte
 	if _, err := rand.Read(b[:]); err != nil {

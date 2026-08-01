@@ -33,7 +33,7 @@ Multi-region + canary + gRPC + pgx.
   `docs/research/`; this milestone lands the multi-region
   backend.
 - **pgx backend.** v0.3.0 ships the schema, RLS policies, and
-  in-memory adapter under `backend/store/postgres/`. v0.4.0
+  in-memory adapter under `promptsheon/store/postgres/`. v0.4.0
   replaces the in-memory adapter with a real pgx-backed
   implementation and adds the `DatabaseURL` config knob.
 - **Canary Release primitive.** `docs/reference/canary.md` already

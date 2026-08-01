@@ -29,7 +29,7 @@ func TestRoleConstants(t *testing.T) {
 }
 
 // TestSentinelErrors checks that the re-exported errors match the
-// canonical backend/errs sentinels (errors.Is).
+// canonical promptsheon/errs sentinels (errors.Is).
 func TestSentinelErrors(t *testing.T) {
 	cases := []struct {
 		reExported error

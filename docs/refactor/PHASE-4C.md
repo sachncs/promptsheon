@@ -22,11 +22,11 @@ c4.20 test(handlers): settings — persisted + audit asserts (incl. CRDT propert
 
 | File | Commits |
 |---|---|
-| `backend/handlers_releases_test.go` | c4.16 |
-| `backend/handlers_executions_test.go` | c4.17 |
-| `backend/handlers_harness_test.go` | c4.18 |
-| `backend/handlers_audit_test.go` | c4.19 |
-| `backend/handlers_settings_test.go` | c4.20 |
+| `promptsheon/handlers_releases_test.go` | c4.16 |
+| `promptsheon/handlers_executions_test.go` | c4.17 |
+| `promptsheon/handlers_harness_test.go` | c4.18 |
+| `promptsheon/handlers_audit_test.go` | c4.19 |
+| `promptsheon/handlers_settings_test.go` | c4.20 |
 
 ## Critical tests
 
@@ -189,7 +189,7 @@ func TestEvalRunner_ClockInjection(t *testing.T) {
 ## Exit criterion
 
 ```bash
-go test -race -count=1 ./backend/handlers_releases_test.go ./backend/handlers_executions_test.go ./backend/handlers_harness_test.go ./backend/handlers_audit_test.go ./backend/handlers_settings_test.go
+go test -race -count=1 ./promptsheon/handlers_releases_test.go ./promptsheon/handlers_executions_test.go ./promptsheon/handlers_harness_test.go ./promptsheon/handlers_audit_test.go ./promptsheon/handlers_settings_test.go
 bash scripts/check-coverage.sh coverage.out  # handlers_*.go ≥ 75%
 ```
 

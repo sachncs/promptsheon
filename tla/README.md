@@ -3,7 +3,7 @@
 The audit chain is a load-bearing invariant: every audit
 entry records the hash of the entry that came before it, so
 a tamper with any past entry is detectable by re-walking the
-chain. The runtime check is in `backend/store/sqlite.go`'s
+chain. The runtime check is in `promptsheon/store/sqlite.go`'s
 `VerifyAuditChainOnDB`; a tamper increments
 `audit_chain_verifications_total{result="fail"}` so the
 SLO alert fires.
@@ -70,7 +70,7 @@ referenced in the PR.
 
 `release_lifecycle.tla` models the Release state machine
 (`pending → approved → active → superseded | rolled_back`) the
-runtime Activate path in `backend/release/service.go`
+runtime Activate path in `promptsheon/release/service.go`
 enforces. It pins:
 
 - `ActiveExclusive` — at most `MaxReleases` active Releases

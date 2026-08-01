@@ -6,7 +6,7 @@
 
 | # | Commit | What |
 |---|---|---|
-| 1 | `a4b2876f` | `refactor: rename package backend to package promptsheon and move backend/ to promptsheon/` |
+| 1 | `a4b2876f` | `refactor: rename package backend to package promptsheon and move promptsheon/` |
 | 2 | `33ee1681` | `refactor: flatten audit/ to promptsheon/audit.go and combine with audit_workers.go` |
 | 3 | `42743b9c` | `refactor: flatten election/ to promptsheon/election.go` |
 | 4 | `72fe2f49` | `refactor: flatten 16 single-file subdirs into package promptsheon` |

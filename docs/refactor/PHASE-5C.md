@@ -26,12 +26,12 @@ c5.22 chore(lint): final golangci-lint pass; verify zero banned identifiers
 
 | File | Commits |
 |---|---|
-| `backend/release/resolver.go` (add Invoke method) | c5.20 |
+| `promptsheon/release/resolver.go` (add Invoke method) | c5.20 |
 | `cmd/promptsheond/daemon_release_invoker.go` (delete) | c5.20 |
 | `cmd/promptsheond/daemon.go` (use *release.Resolver directly) | c5.20 |
-| `backend/harness/runner.go` (ReleaseInvoker interface grows one method) | c5.20 |
-| `backend/handlers_releases.go` (consolidate invokeOne) | c5.21 |
-| `backend/handlers_executions.go` (consolidate invokeOne) | c5.21 |
+| `promptsheon/harness/runner.go` (ReleaseInvoker interface grows one method) | c5.20 |
+| `promptsheon/handlers_releases.go` (consolidate invokeOne) | c5.21 |
+| `promptsheon/handlers_executions.go` (consolidate invokeOne) | c5.21 |
 | (all files) | c5.22 |
 
 ## Key changes

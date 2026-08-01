@@ -24,17 +24,17 @@
 # and the CAS engine. These encode the threat model from
 # docs/security.md and should never merge without an explicit
 # maintainer review.
-backend/auth/                 @sachncs
-backend/vault/                @sachncs
-backend/audit/                @sachncs
-backend/ratelimit/            @sachncs
-backend/store/                @sachncs
+promptsheon/auth/                 @sachncs
+promptsheon/vault/                @sachncs
+promptsheon/audit/                @sachncs
+promptsheon/ratelimit/            @sachncs
+promptsheon/store/                @sachncs
 
 # Public API surface: breaking changes here ripple to every SDK
 # consumer.
-backend/handlers_*.go         @sachncs
-backend/routes.go              @sachncs
-backend/spec/                 @sachncs
+promptsheon/handlers_*.go         @sachncs
+promptsheon/routes.go              @sachncs
+promptsheon/spec/                 @sachncs
 sdk/                          @sachncs
 
 # Server entry point and the OpenAPI generator.
@@ -44,13 +44,13 @@ scripts/genopenapi/           @sachncs
 # Release / harness / scheduler / subprocess paths are
 # high-blast-radius: a wrong change can take the daemon down
 # or lose audit records.
-/backend/release/              @sachncs
-/backend/harness/              @sachncs
-/backend/llm/                  @sachncs
-/backend/rollups/              @sachncs
-/backend/scheduler/            @sachncs
-/backend/supervisor/           @sachncs
-/backend/webhook/              @sachncs
+/promptsheon/release/              @sachncs
+/promptsheon/harness/              @sachncs
+/promptsheon/llm/                  @sachncs
+/promptsheon/rollups/              @sachncs
+/promptsheon/scheduler/            @sachncs
+/promptsheon/supervisor/           @sachncs
+/promptsheon/webhook/              @sachncs
 
 # Tests, docs, scripts.
 /tests/                         @sachncs

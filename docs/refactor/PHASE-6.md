@@ -7,7 +7,7 @@ matrix, and grep guard.
 ## STOP gate after PR-6
 
 Verify `pkg/promptsheon/` builds with `-tags=promptsheon` and the grep guard
-catches no `backend/` imports.
+catches no `promptsheon/` imports.
 
 ## Commits
 
@@ -40,7 +40,7 @@ c6.12 refactor(sdk): sdk re-exports from pkg/promptsheon
       Refs: PLAN-49/M-4
 c6.13 chore(ci): ci.yaml job: `go build -tags=promptsheon ./pkg/...`
       Refs: PLAN-49/C-7
-c6.14 chore(ci): scripts/check-pkg-fence.sh greps pkg/ for backend/ imports
+c6.14 chore(ci): scripts/check-pkg-fence.sh greps pkg/ for promptsheon/ imports
       Refs: PLAN-49/C-7 M-10
 ```
 
@@ -116,7 +116,7 @@ package promptsheon
 import (
     "errors"
 
-    "github.com/sachncs/promptsheon/backend/errs"
+    "github.com/sachncs/promptsheon/promptsheon/errs"
 )
 
 var (
@@ -210,11 +210,11 @@ jobs:
 
 ```bash
 #!/usr/bin/env bash
-# Fails if any pkg/promptsheon/*.go imports backend/ directly.
+# Fails if any pkg/promptsheon/*.go imports promptsheon/ directly.
 set -euo pipefail
 violations=$(grep -rn 'github.com/sachncs/promptsheon/backend' pkg/promptsheon/ --include='*.go' || true)
 if [ -n "$violations" ]; then
-    echo "FAIL: pkg/promptsheon/* must not import backend/*"
+    echo "FAIL: pkg/promptsheon/* must not import promptsheon/*"
     echo "$violations"
     exit 1
 fi

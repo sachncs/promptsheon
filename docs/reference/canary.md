@@ -66,7 +66,7 @@ The only runtime feature flag today is
 operators who need to disable a specific route while
 upgrading (e.g. to avoid the rate limiter behaviour)
 configure the route via the existing Options in
-`backend/server.go`.
+`promptsheon/server.go`.
 
 ## Database migration ordering
 

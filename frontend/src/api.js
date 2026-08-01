@@ -275,7 +275,7 @@ export async function searchCatalog(workspaceId, query) {
   return apiFetch(`/api/v1/catalog/capabilities${tail ? "?" + tail : ""}`);
 }
 
-// getLatestVersion fetches the version the backend considers
+// getLatestVersion fetches the version the server considers
 // the capability's current head (largest version number). The
 // capability-detail page uses it to surface a "Latest" badge
 // alongside the version picker.
@@ -307,7 +307,7 @@ export async function getEval(id) {
 // listSettings / getSetting / setSetting / deleteSetting
 // surface the four /api/v1/settings routes. The list endpoint
 // returns the per-key mask; a value of "***" means the key is
-// secret-shaped (see backend/handlers_settings.go::secret_keys).
+// secret-shaped (see handlers_settings.go::secret_keys).
 export async function listSettings() {
   return apiFetch("/api/v1/settings");
 }
@@ -428,7 +428,7 @@ export async function createNotificationGroup(payload) {
 }
 
 // M2M link / unlink between an alert rule and a notification
-// group. The backend wraps LinkRuleToGroup + UnlinkRuleFromGroup;
+// group. The server wraps LinkRuleToGroup + UnlinkRuleFromGroup;
 // the response is 204 No Content on success.
 export async function linkRuleToGroup(ruleId, groupId) {
   return apiPost(`/api/v1/alerts/rules/${encodeURIComponent(ruleId)}/groups/${encodeURIComponent(groupId)}`, {});
@@ -439,9 +439,9 @@ export async function unlinkRuleFromGroup(ruleId, groupId) {
 }
 
 // listGroupsForRule fetches the notification groups wired to a
-// single rule. The backend exposes this via the groups endpoint
+// single rule. The server exposes this via the groups endpoint
 // (POST/DELETE for M2M); a dedicated GET per-rule would need a
-// backend handler. For now we filter the global group list
+// server handler. For now we filter the global group list
 // against the rule's id list at render time.
 export async function listGroupsForRule(ruleId) {
   const all = await api.listNotificationGroups();

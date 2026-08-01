@@ -105,7 +105,7 @@ are persisted alongside the aggregate.
 
 ## Scorers
 
-Five scorers are registered in `backend/eval` and
+Five scorers are registered in `promptsheon/eval` and
 discoverable via `eval.ValidScorers`. Four are wired at
 `init()`; the fifth (`llm_judge`) is registered lazily by
 the daemon with the production `JudgeClient`.
@@ -191,7 +191,7 @@ has elapsed, the evolver:
    scores with the chosen Scorer, returns a synthetic
    `EvalRun`. Writes a `self_evolve.validate` row.
 5. **Promote** — on validation success, writes the new
-   prompt to CAS (`backend/cas.WriteObject`), creates a new
+   prompt to CAS (`promptsheon/cas.WriteObject`), creates a new
    `capability.Version` reusing the active Release's
    `model_policy` and `runtime_policy` hashes, creates a
    `reference/release.md` row in the target env, and `Service.SelfActivate`s

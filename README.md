@@ -50,7 +50,7 @@ Beyond the deployment surface, Promptsheon ships:
   in this build. The Postgres backend was removed during the
   layout migration; only SQLite ships today. A future pgx
   adapter will satisfy the `store.Repository` interface at
-  `backend/store/repo.go` without touching domain packages
+  `promptsheon/store/repo.go` without touching domain packages
   (see [docs/operations/multi-region.md](docs/operations/multi-region.md)
   for the rationale).
 - **Recommendation Loop** — production telemetry → Observation
@@ -94,12 +94,12 @@ caches ship as design docs and follow-on milestones (see
 - **Workflow DAG** — Topological execution with tool integration
 - **Observability** — OpenTelemetry tracing, Prometheus metrics, audit logging
 - **Built-in Guardrails** — PII redaction and prompt-injection detection ship as in-process plugins through the supervisor
-- **Plugin SDK** — net/rpc over UDS subprocess transport (in-process supervisor at `backend/plugins/` + `backend/supervisor/`; v0.1.x production transport per `ADR-0024`); a future gRPC-over-UDS transport is on the roadmap (`ADR-0025`, not yet wired)
+- **Plugin SDK** — net/rpc over UDS subprocess transport (in-process supervisor at `promptsheon/plugins/` + `promptsheon/supervisor/`; v0.1.x production transport per `ADR-0024`); a future gRPC-over-UDS transport is on the roadmap (`ADR-0025`, not yet wired)
 - **Webhooks** — Event-driven integrations with HMAC signing and SSRF protection
 - **Secrets Management** — Encrypted vault for API keys and sensitive configuration
 - **Rate Limiting** — Configurable per-client rate limiting with burst support
 - **Per-Workspace Budgets and Quotas** — USD-cap and rate-cap enforcement via the `invoke` package
-- **REST API** — Full-featured HTTP API with auto-generated OpenAPI specification (`backend/spec/spec.yaml`)
+- **REST API** — Full-featured HTTP API with auto-generated OpenAPI specification (`promptsheon/spec/spec.yaml`)
 
 ---
 
@@ -214,7 +214,7 @@ Promptsheon is configured via environment variables. Key settings:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PROMPTSHEON_ADDR` | `:8080` | Listen address |
-| `PROMPTSHEON_DB_PATH` | `promptsheon.db` | SQLite database file. The daemon ships with SQLite; the Postgres backend (init + RLS bundles, in-memory fixture) is wired through `backend/store/postgres` and awaits the pgx follow-on. A shared backend (the prerequisite for multi-region replication) is tracked in [docs/multi-region.md](docs/operations/multi-region.md). |
+| `PROMPTSHEON_DB_PATH` | `promptsheon.db` | SQLite database file. The daemon ships with SQLite; the Postgres backend (init + RLS bundles, in-memory fixture) is wired through `promptsheon/store/postgres` and awaits the pgx follow-on. A shared backend (the prerequisite for multi-region replication) is tracked in [docs/multi-region.md](docs/operations/multi-region.md). |
 | `PROMPTSHEON_AUTH` | `true` | Enable authentication. Set `false` only for local dev (and never on a non-loopback bind — the daemon refuses to start). |
 | `PROMPTSHEON_LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
 | `PROMPTSHEON_APPROVAL_POLICY` | `maker_checker` | Approval policy: `maker_checker` (creator cannot approve their own release) or `majority`. See [docs/release.md](docs/reference/release.md). |
@@ -262,13 +262,13 @@ See [docs/eval.md](docs/reference/eval.md) for the eval primitive, [docs/harness
 | `Version` | struct | A specific immutable build of a Capability Manifest |
 | `Release` | struct | A pointer to a Version inside a tenant Environment |
 | `Manifest` | struct | Content-addressed composition of Prompt, ModelPolicy, RuntimePolicy, ContextContract, Memory, Guardrails, Tools, MCP, EvalSuite |
-| `CAS` | type | Content-addressable store (Merkle DAG), lives at `backend/cas/` |
+| `CAS` | type | Content-addressable store (Merkle DAG), lives at `promptsheon/cas/` |
 | `Vault` | type | AES-256-GCM vault (or KMS-backed `KeyProvider`) |
 | `PluginSupervisor` | type | Supervisor for in-process plugins and remote (net/rpc over UDS) subprocess plugins |
 | `Dataset` | struct | Named collection of `(inputs, expected)` test cases. The ground truth for harness eval. |
 | `Precondition` | struct | Named command hook on a Capability; Activate runs every enabled precondition. |
 | `EvalRun` | struct | Recorded scoring of a Release against a Dataset using a chosen Scorer. |
-| `OpenAPI` | resource | Auto-generated OpenAPI spec at `backend/spec/spec.yaml` |
+| `OpenAPI` | resource | Auto-generated OpenAPI spec at `promptsheon/spec/spec.yaml` |
 
 ---
 
@@ -306,7 +306,7 @@ The server is composed of layered modules:
 | **API** | HTTP handlers, middleware (auth, rate-limit, audit, CORS) |
 | **Capabilities** | Manifests, Releases, Approvals, Datasets, Preconditions, Evals |
 | **Harness** | The harness-engineering loop: datasets, preconditions, eval runs. See [docs/harness.md](docs/reference/harness.md). |
-| **Storage** | CAS (Merkle DAG, `backend/cas/`) + SQLite. The Postgres backend is not implemented in this build. |
+| **Storage** | CAS (Merkle DAG, `promptsheon/cas/`) + SQLite. The Postgres backend is not implemented in this build. |
 | **Providers** | Unified LLM provider abstraction layer (Anthropic + OpenAI) |
 | **Observability** | OpenTelemetry tracing, metrics collection, retention |
 | **Security** | AuthN/AuthZ, vault, guardrails, SSRF protection |
@@ -322,7 +322,7 @@ promptsheon/
 │   ├── promptsheond/        # Server daemon (daemon.go + adapters + embed + tests)
 │   ├── promptsheon/         # CLI (cli.go + cli_cas + cli_harness + cli_http + cli_selfevolve)
 │   └── promptsheon-healthcheck/  # Container probe (healthcheck.go)
-├── backend/                 # Server-side implementation (all sub-packages live here)
+├── promptsheon/                 # Server-side implementation (all sub-packages live here)
 │   ├── capability/          # Workspace / Project / Capability / Version / Release / Approval types
 │   ├── harness/             # Dataset / Precondition / EvalRun types + runner
 │   ├── eval/                # Scorer registry (exact_match, contains, regex, json_schema, llm_judge)
@@ -337,10 +337,10 @@ promptsheon/
 │   ├── cas/                 # Content-addressable store (Merkle DAG)
 │   ├── handlers_*.go        # HTTP handlers (auth, capability, releases, harness, ...)
 │   └── routes.go            # Mux registration; main entry point for the route table
-├── backend/spec/spec.yaml   # OpenAPI 3.0 spec (source of truth; regenerated by `make openapi`)
+├── promptsheon/spec/spec.yaml   # OpenAPI 3.0 spec (source of truth; regenerated by `make openapi`)
 ├── sdk/                     # Go SDK for embedding Promptsheon
-│   ├── python/              # Python client (codegen from backend/spec/spec.yaml)
-│   └── typescript/          # TypeScript client (codegen from backend/spec/spec.yaml)
+│   ├── python/              # Python client (codegen from promptsheon/spec/spec.yaml)
+│   └── typescript/          # TypeScript client (codegen from promptsheon/spec/spec.yaml)
 ├── deploy/                  # Helm chart, Grafana dashboard, Prometheus alerts
 ├── docs/                    # Architecture, deployment, ADRs, troubleshooting, FAQ
 │   ├── architecture/        # architecture.md, modules.md, design-decisions.md, glossary.md, algorithms.md, README.md (index)
@@ -454,9 +454,9 @@ See [docs/release.md](docs/reference/release.md) for the full process.
 | CLI | Hand-rolled command dispatcher under `cmd/promptsheon/` |
 | Storage | [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) (CGo-free SQLite). The Postgres backend is not implemented in this build. |
 | LLM SDKs | [`anthropics/anthropic-sdk-go`](https://github.com/anthropics/anthropic-sdk-go), [`openai/openai-go/v3`](https://github.com/openai/openai-go) (Responses API) |
-| RPC | `net/rpc` over UDS for plugin transport (`backend/plugins/` + `backend/supervisor/`; `ADR-0024`); a future gRPC-over-UDS transport is on the roadmap (`ADR-0025`, not yet wired) |
+| RPC | `net/rpc` over UDS for plugin transport (`promptsheon/plugins/` + `promptsheon/supervisor/`; `ADR-0024`); a future gRPC-over-UDS transport is on the roadmap (`ADR-0025`, not yet wired) |
 | Observability | [OpenTelemetry](https://opentelemetry.io/) (OTLP gRPC), Prometheus |
-| Auth | OAuth 2.0 (`backend/auth/oauth.go`), static API keys (`backend/auth/auth.go`) |
+| Auth | OAuth 2.0 (`promptsheon/auth/oauth.go`), static API keys (`promptsheon/auth/auth.go`) |
 | Vault | AES-256-GCM via [crypto/aes](https://pkg.go.dev/crypto/aes); KMS via pluggable `KeyProvider` |
 | Lint/Format | [golangci-lint](https://golangci-lint.run/) (see `.golangci.yml`) |
 | Releases | [GoReleaser](https://goreleaser.com/) (`.goreleaser.yml`) |
@@ -470,7 +470,7 @@ Full documentation lives in **[docs/](docs/)**:
 
 - [Getting Started](docs/development/getting-started.md)
 - [Configuration](docs/operations/configuration.md)
-- [API Reference](docs/reference/api-reference.md) — [OpenAPI spec](backend/spec/spec.yaml)
+- [API Reference](docs/reference/api-reference.md) — [OpenAPI spec](promptsheon/spec/spec.yaml)
 - [Architecture](docs/architecture/architecture.md) — [Modules](docs/architecture/modules.md)
 - [Harness engineering](docs/reference/harness.md) — why the eval/precondition/dataset surface exists
 - [Eval primitive](docs/reference/eval.md) — datasets, preconditions, eval runs in detail
@@ -487,7 +487,7 @@ Full documentation lives in **[docs/](docs/)**:
 ## Roadmap
 
 - **v0.3.0** — Current release: forward-only Capability / Version /
-  Release model, CAS + Merkle DAG (`backend/cas/`), MakerChecker
+  Release model, CAS + Merkle DAG (`promptsheon/cas/`), MakerChecker
   approval, harness engineering (datasets / preconditions /
   evals), Anthropic + OpenAI via official SDKs, REST API,
   OTLP-only tracing, SQLite. Adds audit archival + chain-state

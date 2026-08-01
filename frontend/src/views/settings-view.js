@@ -1,7 +1,7 @@
 // Settings view. Surfaces the four /api/v1/settings routes:
 // list, get, set, delete. Used as the "Settings" tab in the
 // operations area; the value column is the JSON-encoded value
-// (masked to "***" by the backend for secret-shaped keys).
+// (masked to "***" by the server for secret-shaped keys).
 import * as api from "../api.js";
 import { escape, formatRelative, apiStatusLabel } from "../utils.js";
 

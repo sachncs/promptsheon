@@ -53,7 +53,7 @@ the case's `EvalResult.Error` field and the case is marked
 
 ## Scorers
 
-Five scorers are registered in `backend/eval` and
+Five scorers are registered in `promptsheon/eval` and
 discoverable via `eval.ValidScorers`. Four are wired at
 `init()`; the fifth (`llm_judge`) is registered lazily by
 the daemon with the production `JudgeClient`.

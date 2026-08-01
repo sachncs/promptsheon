@@ -9,22 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Source layout**: the project is now root + `backend/`. All
+- **Source layout**: the project is now root + `promptsheon/`. All
   production code lives either at the repo root (`main.go`,
   `daemon.go`, `cli.go`, `cli_*.go`, `daemon_evolver.go`,
   `daemon_release_invoker.go`, `embed_frontend.go`, `healthcheck.go`,
-  `*_test.go`) or under `backend/<pkg>/`. There is no `cmd/`,
+  `*_test.go`) or under `promptsheon/<pkg>/`. There is no `cmd/`,
   `internal/`, or `pkg/` directory. `main.go` dispatches by
   `os.Args[0]` (`promptsheond` → daemon, `promptsheon` → CLI,
   `promptsheon-healthcheck` → probe) so the three binaries
   build from the same source via `make build`.
 - **OpenAPI source of truth**: the spec lives at
-  `backend/spec/spec.yaml`. `api/openapi.yaml` and the 24
-  per-resource splits under `backend/spec/` are deleted.
-  `scripts/genopenapi` parses `backend/routes.go` for routes
-  and `backend/handlers_*.go` for request schemas. The contract
+  `promptsheon/spec/spec.yaml`. `api/openapi.yaml` and the 24
+  per-resource splits under `promptsheon/spec/` are deleted.
+  `scripts/genopenapi` parses `promptsheon/routes.go` for routes
+  and `promptsheon/handlers_*.go` for request schemas. The contract
   test, the Python SDK codegen, and the TypeScript SDK codegen
-  all read from `backend/spec/spec.yaml`.
+  all read from `promptsheon/spec/spec.yaml`.
 - **Build + release**: `Makefile` builds all three binaries
   into `./bin/`; `bin/promptsheond`, `bin/promptsheon`, and
   `bin/promptsheon-healthcheck` are produced by three
@@ -54,18 +54,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `evolve.NewCasPromptLoader` (`promptsheon/evolve/loader.go`)
   is used directly. The `evolverLoaderAdapter` type is removed.
 - **ClickHouse**: `daemon_clickhouse.go`,
-  `daemon_noclickhouse.go`, and `backend/rollups/clickhouse/`
+  `daemon_noclickhouse.go`, and `promptsheon/rollups/clickhouse/`
   are deleted. The build tag `-tags clickhouse` is no longer
   wired; `PROMPTSHEON_CLICKHOUSE_DSN` is a no-op reserved env
   var. Rollups are kept in-memory only.
 - **Coverage gate**: `scripts/check-coverage.sh` profiles
-  `backend/` (was reading nonexistent `backend/api/`). Floors:
+  `promptsheon/` (was reading nonexistent `promptsheon/api/`). Floors:
   60% for `api handlers`, 50% for domain packages, 40% for
-  `backend` root and `backend/store`.
+  `backend` root and `promptsheon/store`.
 - **Domain-purity gate**: `scripts/check-no-package-state.go`
-  scans `backend/<pkg>` (was scanning nonexistent `internal/`).
-  `scripts/docs-check.py` recognises `backend/...go` and
-  `backend/spec/...yaml` refs (was matching the old
+  scans `promptsheon/<pkg>` (was scanning nonexistent `internal/`).
+  `scripts/docs-check.py` recognises `promptsheon/...go` and
+  `promptsheon/spec/...yaml` refs (was matching the old
   `internal/`/`pkg/`/`cmd/` layout).
 - **Bench regression gate**: `scripts/bench-baseline.txt` is
   committed with the 8 curated benchmarks at
@@ -98,7 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sdk/typescript/scripts/codegen.sh` previously did
   `tsc --noEmit` only.
 - **Fuzz paths**: `.github/workflows/fuzz.yaml` watches
-  `backend/{vault,tests/unit/redactor,tests/unit/injection,cas,schedule}/**`
+  `promptsheon/{vault,tests/unit/redactor,tests/unit/injection,cas,schedule}/**`
   (was watching nonexistent `internal/vault`,
   `internal/redactor`, `internal/injection`).
 - **TLC gate**: a soft-gate CI job runs `tlc` if installed;
@@ -112,8 +112,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Layout cruft**:
   - `api/openapi.yaml` and the entire `api/` directory.
   - 24 unread per-resource OpenAPI splits under
-    `backend/spec/` (`alerts.yaml`, `apikeys.yaml`, ...);
-    `backend/spec/spec.yaml` is the single remaining file.
+    `promptsheon/spec/` (`alerts.yaml`, `apikeys.yaml`, ...);
+    `promptsheon/spec/spec.yaml` is the single remaining file.
   - `scripts/generate-openapi-paths.sh` (no caller, referenced
     nonexistent paths).
   - `scripts/genproto.sh` (no caller, no `.proto` files exist).
@@ -128,7 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `backend.{InputHash,ComputeManifestHash,ModelRevision}`).
 - **Unwired build tags / dead sinks**:
   - `daemon_clickhouse.go`, `daemon_noclickhouse.go`,
-    `backend/rollups/clickhouse/`.
+    `promptsheon/rollups/clickhouse/`.
   - The discarded-writer block in `daemon.go` that initialised
     a ClickHouse sink and never persisted anywhere.
 
@@ -163,7 +163,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/design-decisions.md`, `docs/operations.md`,
   `docs/glossary.md`, `docs/multi-region.md`,
   `docs/upgrade.md` were rewritten to match the root +
-  `backend/` layout. `docs/audit.md` is renamed to
+  `promptsheon/` layout. `docs/audit.md` is renamed to
   `docs/audit-2026-07-26.md` and banner-tagged as a frozen
   historical snapshot.
 - **`.gitignore` cruft**: removed `arc-agi/`, `environment_files/`,

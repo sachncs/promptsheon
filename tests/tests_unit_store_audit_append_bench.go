@@ -14,7 +14,7 @@ import (
 // regressions in the CAS retry loop (c0.11). Run with
 //
 //	go test -bench=BenchmarkAppendAuditCASSerial -benchtime=2s \
-//	    -count=3 ./backend/tests/unit/store/
+//	    -count=3 ./tests/unit/store/
 func BenchmarkAppendAuditCASSerial(b *testing.B) {
 	s := newTestSQLite(b)
 	ctx := context.Background()

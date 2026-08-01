@@ -1,7 +1,7 @@
 # LLM Providers
 
 Promptsheon ships with two LLM providers: **OpenAI** and
-**Anthropic**. Both implement the `backend/llm.Provider`
+**Anthropic**. Both implement the `promptsheon/llm.Provider`
 interface and register a factory on the `llm.Registry` at
 boot.
 
@@ -66,7 +66,7 @@ Chat Completions API is not used.
 ## Adding a provider
 
 The shipped set is OpenAI + Anthropic. To add a new
-provider, implement the `backend/llm.Provider` interface
+provider, implement the `promptsheon/llm.Provider` interface
 (one method, `Complete(ctx, *Request) (*Response, error)`)
 and register a factory on the `Registry` in
 `daemon.go`. The registry is the integration
@@ -96,7 +96,7 @@ invalidates the cached instance.
 
 ## Circuit breaker
 
-`backend/llm/circuitbreaker.go` ships a circuit breaker
+`promptsheon/llm/circuitbreaker.go` ships a circuit breaker
 that wraps any `Provider` with success/failure tracking and
 state transitions (`closed` / `open` / `half-open`). The
 daemon does not wire it into the default providers by

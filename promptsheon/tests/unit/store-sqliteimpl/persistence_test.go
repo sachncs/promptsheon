@@ -63,5 +63,5 @@ func TestRecommendationRepositoryPersists(t *testing.T) {
 }
 
 func TestLineageRepositoryPersistsGraph(t *testing.T) {
-	t.Skip("backend/lineage package removed; lineage persistence is no longer wired")
+	t.Skip("promptsheon/lineage package removed; lineage persistence is no longer wired")
 }

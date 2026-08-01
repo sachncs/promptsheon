@@ -77,7 +77,7 @@ c0.29 fix(cofc): CODE_OF_CONDUCT.md Covenant v2.0 → v2.1
       Refs: PLAN-49/X-1
 c0.30 fix(scripts): clean target removes cmd/promptsheond/frontend/
       Refs: PLAN-49/X-10
-c0.31 fix(scripts): remove check-domain-purity.sh's forbidden backend/api entry
+c0.31 fix(scripts): remove check-domain-purity.sh's forbidden promptsheon/api entry
       Refs: PLAN-49/M9
 c0.32 fix(helm): values.schema.json replicaCount maximum=1 for SQLite
       Refs: PLAN-49/OS-15
@@ -134,23 +134,23 @@ c0.t19 test(oauth): GitHub OAuth URL is api.github.com/user
 
 | File | Commits |
 |---|---|
-| `backend/idempotency.go` | c0.2, c0.19, c0.t1, c0.t2 |
-| `backend/audit_workers.go` | c0.13, c0.20, c0.21, c0.t5-t0.t8, c0.t16, c0.t17 |
-| `backend/store/sqlite.go` | c0.10, c0.11, c0.22, c0.t5, c0.t6 |
-| `backend/store/sqlite_audit.go` | c0.11, c0.t6 |
-| `backend/store/migrations/00X_*.up.sql` | c0.12, c0.t7 |
-| `backend/store/sqlite_users.go` | c0.28, c0.t19 (impl) |
-| `backend/webhook/webhook.go` | c0.14, c0.t9 |
-| `backend/ratelimit/ratelimit.go` | c0.15, c0.t10 |
-| `backend/auth/oauth.go` | c0.16, c0.t3, c0.t19 |
+| `promptsheon/idempotency.go` | c0.2, c0.19, c0.t1, c0.t2 |
+| `promptsheon/audit_workers.go` | c0.13, c0.20, c0.21, c0.t5-t0.t8, c0.t16, c0.t17 |
+| `promptsheon/store/sqlite.go` | c0.10, c0.11, c0.22, c0.t5, c0.t6 |
+| `promptsheon/store/sqlite_audit.go` | c0.11, c0.t6 |
+| `promptsheon/store/migrations/00X_*.up.sql` | c0.12, c0.t7 |
+| `promptsheon/store/sqlite_users.go` | c0.28, c0.t19 (impl) |
+| `promptsheon/webhook/webhook.go` | c0.14, c0.t9 |
+| `promptsheon/ratelimit/ratelimit.go` | c0.15, c0.t10 |
+| `promptsheon/auth/oauth.go` | c0.16, c0.t3, c0.t19 |
 | `cmd/promptsheond/daemon.go` | c0.3, c0.17 |
-| `backend/handlers_auth.go` | c0.6, c0.7, c0.t4 |
-| `backend/handlers_alerting.go` | c0.5, c0.t12 |
-| `backend/handlers_contract.go` | c0.8, c0.t13 |
-| `backend/handlers_executions.go` | c0.9, c0.34, c0.t14 |
-| `backend/handlers_audit.go` | c0.18, c0.27, c0.t15 |
-| `backend/pagination.go` | c0.4, c0.t11 |
-| `backend/audit/*.go` (new for c0.18 split) | c0.18 |
+| `promptsheon/handlers_auth.go` | c0.6, c0.7, c0.t4 |
+| `promptsheon/handlers_alerting.go` | c0.5, c0.t12 |
+| `promptsheon/handlers_contract.go` | c0.8, c0.t13 |
+| `promptsheon/handlers_executions.go` | c0.9, c0.34, c0.t14 |
+| `promptsheon/handlers_audit.go` | c0.18, c0.27, c0.t15 |
+| `promptsheon/pagination.go` | c0.4, c0.t11 |
+| `promptsheon/audit/*.go` (new for c0.18 split) | c0.18 |
 | `Makefile` | c0.26, c0.30 |
 | `Dockerfile` | – |
 | `.github/workflows/*.yaml` | c0.24, c0.25 |

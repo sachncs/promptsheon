@@ -150,7 +150,7 @@ domain packages. The daemon ships SQLite-only as a
 deliberate simplification; the Postgres backend is **not
 implemented** in this build. Adding one is a future-work
 deliverable — the `store.Repository` interface in
-`backend/store/repo.go` is the consumer-defined boundary.
+`promptsheon/store/repo.go` is the consumer-defined boundary.
 See [docs/architecture.md](../architecture/architecture.md#storage-backends)
 for the storage layer.
 
@@ -174,5 +174,5 @@ Three extension surfaces:
 - **Plugins** (`PROMPTSHEON_PLUGINS_FILE`) — register a
   remote binary that implements the gRPC-over-UDS
   `PluginServer`. See [docs/architecture.md](../architecture/architecture.md#plugin-supervisor).
-- **Migrations** (`backend/store/migrations/`) — drop a
+- **Migrations** (`promptsheon/store/migrations/`) — drop a
   `NNN_your_migration.up.sql` and the next boot applies it.

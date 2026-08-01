@@ -27,7 +27,7 @@ func ComputeManifestHash(m Manifest) (string, error) {
 // InputHash returns the SHA-256 hex of the JSON-encoded inputs
 // passed to an LLM invoke. Empty input returns "" so callers can
 // distinguish "no inputs" from "input that happened to hash to
-// empty bytes". Moved here from backend/handlers_helpers.go in
+// empty bytes". Moved here from promptsheon/handlers_helpers.go in
 // PLAN-49 c2.17 so callers outside the backend package can use it.
 func InputHash(input []byte) string {
 	if len(input) == 0 {
@@ -40,7 +40,7 @@ func InputHash(input []byte) string {
 // ModelRevision returns the per-day revision stamp used by the
 // invoke path. The date is UTC; an empty model/provider still
 // produces a stable, distinguishable string. Moved here from
-// backend/handlers_helpers.go in PLAN-49 c2.17.
+// promptsheon/handlers_helpers.go in PLAN-49 c2.17.
 func ModelRevision(model, provider string) string {
 	return time.Now().UTC().Format("2006-01-02") + ":" + model + ":" + provider
 }

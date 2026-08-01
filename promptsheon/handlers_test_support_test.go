@@ -97,8 +97,8 @@ func (m *mockRepo) Close() error                 { return m.closeErr }
 func (m *mockRepo) Ping(_ context.Context) error { return m.pingErr }
 
 // Method implementations live in per-resource files:
-//   backend/handlers_test_support_settings_test.go
-//   backend/handlers_test_support_users_test.go
+//   handlers_test_support_settings_test.go
+//   handlers_test_support_users_test.go
 //   ... (one file per resource, see git log for the split)
 //
 // This file holds only the type, the constructor, and the test

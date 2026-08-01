@@ -8,7 +8,7 @@ upgrade". This page walks through both paths.
 ## In-place upgrade
 
 Promptsheon ships schema migrations as
-`backend/store/migrations/NNN_*.up.sql`. The next boot applies
+`promptsheon/store/migrations/NNN_*.up.sql`. The next boot applies
 every migration whose version is greater than the highest
 applied version in the daemon's `migrations` table.
 

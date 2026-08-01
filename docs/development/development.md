@@ -58,7 +58,7 @@ make lint
 
 The project enforces a gofmt-clean tree (`gofmt -l .` must
 return no files) and a `go vet` pass on every commit. Domain
-packages are kept infra-free (no imports from `backend/store`
+packages are kept infra-free (no imports from `promptsheon/store`
 or anything that pulls in `package main` at the repo root);
 `make lint-domain` and `make lint-deps` enforce that.
 
@@ -90,7 +90,7 @@ The generator walks every `register*Routes()` method on
 `api.Server` and emits a per-route entry with the request
 struct fields (when extractable from the AST). The output is
 deterministic; running it twice produces byte-identical
-output. CI fails if the committed `backend/spec/spec.yaml` is
+output. CI fails if the committed `promptsheon/spec/spec.yaml` is
 stale.
 
 When you add a new handler:
@@ -98,7 +98,7 @@ When you add a new handler:
 1. Implement the handler.
 2. Register it in the appropriate `register*Routes()`.
 3. Run `make openapi`.
-4. Commit the regenerated `backend/spec/spec.yaml` alongside the
+4. Commit the regenerated `promptsheon/spec/spec.yaml` alongside the
    handler.
 
 The contract test (`tests/contract/contract_test.go`) catches
@@ -109,7 +109,7 @@ the case where the spec is out of date.
 ```
 promptsheon/
 ├── main.go, daemon.go, cli.go, ...   # Single Go package; bin name picks mode
-├── backend/                          # Server-side implementation
+├── promptsheon/                          # Server-side implementation
 │   ├── capability/, release/, harness/, eval/, vault/, llm/, ...
 │   ├── handlers_*.go                 # HTTP handlers (one domain per file)
 │   ├── routes.go                     # Mux registration (single entry point)
@@ -127,13 +127,13 @@ promptsheon/
 
 ## Adding a new handler
 
-1. Add the handler function in `backend/handlers_*.go`
+1. Add the handler function in `promptsheon/handlers_*.go`
    (match the existing file's domain — capability, release,
    harness, webhooks, etc.).
 2. Register the route in the corresponding `register*Routes()`
-   method on `backend/server.go`.
+   method on `promptsheon/server.go`.
 3. Add validation rules if the body has required fields
-   (see `backend/validate.go`).
+   (see `promptsheon/validate.go`).
 4. Wire error responses to `HTTPError` so the daemon's
    consistent shape (`{error, details?}`) is preserved.
 5. Run `make openapi` to regenerate the spec.
@@ -151,7 +151,7 @@ promptsheon/
 
 ## Adding a new metric
 
-1. Add the field to `backend/metrics/collector.go` (counter,
+1. Add the field to `promptsheon/metrics/collector.go` (counter,
    histogram, or gauge).
 2. Initialise it in `NewCollector()`.
 3. Emit it in `prometheusFormat()`.
@@ -164,9 +164,9 @@ promptsheon/
 ## Adding a new migration
 
 1. Drop a `020_your_migration.up.sql` (and a `.down.sql`) in
-   `backend/store/migrations/`.
+   `promptsheon/store/migrations/`.
 2. Update the migration count in
-   `backend/store/migrate_test.go` (`TestNewSQLiteRunsAllMigrations`).
+   `promptsheon/store/migrate_test.go` (`TestNewSQLiteRunsAllMigrations`).
 3. Update the migration table in
    `docs/architecture/architecture.md`.
 4. The next `./promptsheond` boot applies it.

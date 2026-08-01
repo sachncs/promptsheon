@@ -29,15 +29,15 @@ c4.29 test(handlers): health/ready — persisted + audit asserts (incl. closed-D
 
 | File | Commits |
 |---|---|
-| `backend/handlers_alerting_test.go` | c4.21 |
-| `backend/handlers_webhooks_test.go` | c4.22 |
-| `backend/handlers_vault_test.go` | c4.23 |
-| `backend/handlers_auth_test.go` | c4.24 |
-| `backend/handlers_contract_test.go` | c4.25 |
-| `backend/handlers_providers_test.go` | c4.26 |
-| `backend/handlers_observation_test.go` | c4.27 |
-| `backend/handlers_ratelimit_test.go` | c4.28 |
-| `backend/handlers_health_test.go` | c4.29 |
+| `promptsheon/handlers_alerting_test.go` | c4.21 |
+| `promptsheon/handlers_webhooks_test.go` | c4.22 |
+| `promptsheon/handlers_vault_test.go` | c4.23 |
+| `promptsheon/handlers_auth_test.go` | c4.24 |
+| `promptsheon/handlers_contract_test.go` | c4.25 |
+| `promptsheon/handlers_providers_test.go` | c4.26 |
+| `promptsheon/handlers_observation_test.go` | c4.27 |
+| `promptsheon/handlers_ratelimit_test.go` | c4.28 |
+| `promptsheon/handlers_health_test.go` | c4.29 |
 
 ## Critical tests
 
@@ -183,7 +183,7 @@ func TestHandleReady_ClosedDB_Returns503(t *testing.T) {
 ## Exit criterion
 
 ```bash
-go test -race -count=1 ./backend/handlers_alerting_test.go ./backend/handlers_webhooks_test.go ./backend/handlers_vault_test.go ./backend/handlers_auth_test.go ./backend/handlers_contract_test.go ./backend/handlers_providers_test.go ./backend/handlers_observation_test.go ./backend/handlers_ratelimit_test.go ./backend/handlers_health_test.go
+go test -race -count=1 ./promptsheon/handlers_alerting_test.go ./promptsheon/handlers_webhooks_test.go ./promptsheon/handlers_vault_test.go ./promptsheon/handlers_auth_test.go ./promptsheon/handlers_contract_test.go ./promptsheon/handlers_providers_test.go ./promptsheon/handlers_observation_test.go ./promptsheon/handlers_ratelimit_test.go ./promptsheon/handlers_health_test.go
 bash scripts/check-coverage.sh coverage.out  # global floor ≥ 60%, handlers ≥ 75%
 ```
 

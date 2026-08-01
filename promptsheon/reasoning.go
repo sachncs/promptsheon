@@ -1,6 +1,6 @@
 package promptsheon
 
-// Flattened from backend/reasoning/compiler.go.
+// Flattened from reasoning/compiler.go.
 
 // Package reasoning implements the Reasoning Compiler — the
 // primitive that turns an Intent (a goal + constraints) into an

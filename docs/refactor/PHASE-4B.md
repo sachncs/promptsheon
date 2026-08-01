@@ -22,11 +22,11 @@ c4.15 test(handlers): versions — persisted + audit asserts (incl. Knowledge in
 
 | File | Commits |
 |---|---|
-| `backend/handlers_users_test.go` | c4.11 |
-| `backend/handlers_workspaces_test.go` | c4.12 |
-| `backend/handlers_projects_test.go` | c4.13 |
-| `backend/handlers_capabilities_test.go` | c4.14 |
-| `backend/handlers_versions_test.go` | c4.15 |
+| `promptsheon/handlers_users_test.go` | c4.11 |
+| `promptsheon/handlers_workspaces_test.go` | c4.12 |
+| `promptsheon/handlers_projects_test.go` | c4.13 |
+| `promptsheon/handlers_capabilities_test.go` | c4.14 |
+| `promptsheon/handlers_versions_test.go` | c4.15 |
 
 ## Test shape (every commit)
 
@@ -126,7 +126,7 @@ func TestHandleCreateVersion_InheritsKnowledge(t *testing.T) {
 ## Exit criterion
 
 ```bash
-go test -race -count=1 ./backend/handlers_users_test.go ./backend/handlers_workspaces_test.go ./backend/handlers_projects_test.go ./backend/handlers_capabilities_test.go ./backend/handlers_versions_test.go
+go test -race -count=1 ./promptsheon/handlers_users_test.go ./promptsheon/handlers_workspaces_test.go ./promptsheon/handlers_projects_test.go ./promptsheon/handlers_capabilities_test.go ./promptsheon/handlers_versions_test.go
 bash scripts/check-coverage.sh coverage.out  # handlers_*.go ≥ 75%
 ```
 

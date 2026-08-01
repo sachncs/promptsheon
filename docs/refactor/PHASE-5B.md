@@ -19,10 +19,10 @@ c5.19 rename: EvalRunOptions → RunOptions
 
 | File | Commits |
 |---|---|
-| `backend/release/release.go`, `backend/release/service.go`, `sdk/client.go` | c5.16 |
-| `backend/approval/approval.go`, `backend/handlers_releases.go`, `backend/release/service.go` | c5.17 |
-| `backend/capability/capability.go`, `backend/capability/evolve.go`, `promptsheon/evolve/evolver.go`, `promptsheon/evolve/types.go`, `sdk/client.go` | c5.18 |
-| `backend/harness/runner.go`, `backend/harness/runner_test.go`, `backend/handlers_harness.go` | c5.19 |
+| `promptsheon/release/release.go`, `promptsheon/release/service.go`, `sdk/client.go` | c5.16 |
+| `promptsheon/approval/approval.go`, `promptsheon/handlers_releases.go`, `promptsheon/release/service.go` | c5.17 |
+| `promptsheon/capability/capability.go`, `promptsheon/capability/evolve.go`, `promptsheon/evolve/evolver.go`, `promptsheon/evolve/types.go`, `sdk/client.go` | c5.18 |
+| `promptsheon/harness/runner.go`, `promptsheon/harness/runner_test.go`, `promptsheon/handlers_harness.go` | c5.19 |
 
 ## Key renames
 
@@ -101,7 +101,7 @@ type RunOptions struct {
 }
 ```
 
-Located in `backend/harness/runner.go`. Already in package `harness`, so
+Located in `promptsheon/harness/runner.go`. Already in package `harness`, so
 `harness.RunOptions` is unambiguous.
 
 ## Exit criterion

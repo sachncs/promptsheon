@@ -116,7 +116,7 @@ common case is resolved by step 1 or 2.
 - **Schema migration fails at boot** — the migration table
   records the highest applied version. If you jumped a
   version, run the missing migrations manually with
-  `sqlite3 promptsheon.db < backend/store/migrations/0NN_*.up.sql`.
+  `sqlite3 promptsheon.db < promptsheon/store/migrations/0NN_*.up.sql`.
   If two replicas race on the same `promptsheon.db`, enable
   `PROMPTSHEON_LEADER_ELECTION=true` so only the leader
   applies migrations.

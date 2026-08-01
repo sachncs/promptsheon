@@ -4,7 +4,7 @@ The Promptsheon API server backend.
 
 ## Layout
 
-The `backend/` tree has two tiers:
+The `promptsheon/` tree has two tiers:
 
 ### Tier 1: Subsystem packages (real cohesive domains)
 
@@ -38,7 +38,7 @@ domain with non-trivial internal structure:
 `metrics` is also kept as a package: it has 10 importers across the backend and
 its own internal structure (collector, middleware, transport).
 
-### Tier 2: Behavior-named files at `backend/` root
+### Tier 2: Behavior-named files at `promptsheon/` root
 
 Smaller cohesive units are flattened into top-level files in `package backend`.
 Each file owns one behavior. Notable files:
@@ -95,5 +95,5 @@ satisfy those interfaces implicitly. That work is documented as a follow-up.
 
 ```bash
 go build ./...
-go test -count=1 -timeout 120s ./backend/...
+go test -count=1 -timeout 120s ./promptsheon/...
 ```
