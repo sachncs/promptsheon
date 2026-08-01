@@ -192,24 +192,12 @@ type Collector struct {
 	WorkflowDuration  *Histogram
 	WorkflowActive    *Gauge
 
-	// Review metrics
-	ReviewPendingCount  *Gauge
-	ReviewTotalCount    *Counter
-	ReviewApprovedCount *Counter
-	ReviewRejectedCount *Counter
-	ReviewDuration      *Histogram
 
-	// Guardrail metrics
-	GuardrailViolations *Counter
-	GuardrailBlocks     *Counter
-	GuardrailPasses     *Counter
 
 	// Agent execution metrics
 	AgentExecutionsTotal  *Counter
 	AgentExecutionLatency *Histogram
 
-	// Hallucination score histogram
-	HallucinationScores *Histogram
 
 	// Self-evolution metrics. The evolver emits one event per
 	// cycle tick. Result ∈ {promoted, rejected, skipped}.
@@ -346,17 +334,8 @@ func NewCollector() *Collector {
 		WorkflowRunsTotal:        newCounter(nil),
 		WorkflowDuration:         newHistogram(nil),
 		WorkflowActive:           &Gauge{},
-		ReviewPendingCount:       &Gauge{},
-		ReviewTotalCount:         newCounter(nil),
-		ReviewApprovedCount:      newCounter(nil),
-		ReviewRejectedCount:      newCounter(nil),
-		ReviewDuration:           newHistogram(nil),
-		GuardrailViolations:      newCounter(nil),
-		GuardrailBlocks:          newCounter(nil),
-		GuardrailPasses:          newCounter(nil),
 		AgentExecutionsTotal:     newCounter(nil),
 		AgentExecutionLatency:    newHistogram(nil),
-		HallucinationScores:      newHistogram(nil),
 		AuditQueueLatency:        newHistogram(nil),
 		SelfEvolveRunsTotal:      newCounter(nil),
 		SelfEvolveRevisionsTotal: newCounter(nil),
@@ -471,21 +450,8 @@ func (c *Collector) GetSummary() *Summary {
 	s.WorkflowMetrics.ActiveCount = c.WorkflowActive.Value()
 	s.WorkflowMetrics.AvgDuration = c.WorkflowDuration.Avg() * 1000
 
-	s.ReviewMetrics.PendingCount = c.ReviewPendingCount.Value()
-	s.ReviewMetrics.TotalReviews = int64(c.ReviewTotalCount.Value())
-	s.ReviewMetrics.ApprovedCount = int64(c.ReviewApprovedCount.Value())
-	s.ReviewMetrics.RejectedCount = int64(c.ReviewRejectedCount.Value())
-	if s.ReviewMetrics.TotalReviews > 0 {
-		s.ReviewMetrics.ApprovalRate = float64(s.ReviewMetrics.ApprovedCount) / float64(s.ReviewMetrics.TotalReviews) * 100
-	}
-	s.ReviewMetrics.AvgDurationMs = c.ReviewDuration.Avg() * 1000
 
-	s.GuardrailMetrics.Violations = int64(c.GuardrailViolations.Value())
-	s.GuardrailMetrics.Blocks = int64(c.GuardrailBlocks.Value())
-	s.GuardrailMetrics.Passes = int64(c.GuardrailPasses.Value())
 
-	s.HallucinationMetrics.AvgScore = c.HallucinationScores.Avg()
-	s.HallucinationMetrics.P95Score = c.HallucinationScores.P95()
 
 	// OBS-7 / OBS-1b: surface the audit-pipeline drop and trace-pipeline
 	// drop counts as summary fields so /api/v1/metrics/summary can
@@ -553,14 +519,7 @@ func (c *Collector) prometheusFormat() string {
 	writeHistogram("promptsheon_workflow_duration_seconds", "Workflow run duration", c.WorkflowDuration)
 	writeGauge("promptsheon_workflow_active", "Currently active workflows", c.WorkflowActive.Value())
 
-	writeGauge("promptsheon_review_pending", "Pending reviews", c.ReviewPendingCount.Value())
-	writeCounter("promptsheon_review_total", "Total reviews", c.ReviewTotalCount.Value())
-	writeCounter("promptsheon_review_approved_total", "Approved reviews", c.ReviewApprovedCount.Value())
-	writeCounter("promptsheon_review_rejected_total", "Rejected reviews", c.ReviewRejectedCount.Value())
-	writeHistogram("promptsheon_review_duration_seconds", "Review duration", c.ReviewDuration)
 
-	writeCounter("promptsheon_guardrail_violations_total", "Guardrail violations", c.GuardrailViolations.Value())
-	writeCounter("promptsheon_guardrail_blocks_total", "Guardrail blocks", c.GuardrailBlocks.Value())
 	writeCounter("promptsheon_audit_dropped_total", "Audit entries dropped because the worker queue was full", float64(c.auditDropped.Load()))
 	writeCounter("promptsheon_self_evolve_runs_total", "Total self-evolve RunOnce ticks", c.SelfEvolveRunsTotal.Value())
 	writeCounter("promptsheon_self_evolve_revisions_total", "Total self-evolve revision attempts", c.SelfEvolveRevisionsTotal.Value())
@@ -572,9 +531,7 @@ func (c *Collector) prometheusFormat() string {
 		writeCounter("promptsheon_log_hub_drops_total", "Log entries dropped because the SSE broadcast channel was full", float64(c.hub.Dropped()))
 	}
 
-	writeCounter("promptsheon_guardrail_passes_total", "Guardrail passes", c.GuardrailPasses.Value())
 
-	writeHistogram("promptsheon_hallucination_scores", "Hallucination scores", c.HallucinationScores)
 
 	return sb.String()
 }
