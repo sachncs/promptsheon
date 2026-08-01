@@ -22,6 +22,7 @@
 package schedule
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/stringsutil"
 	"context"
 	"errors"
 	"fmt"
@@ -29,7 +30,6 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
-	"github.com/sachncs/promptsheon/promptsheon/stringsutil"
 )
 
 // Kind is how a Schedule decides when to fire.

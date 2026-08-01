@@ -1,6 +1,9 @@
 package store_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/store"
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"errors"
 	"testing"
@@ -8,10 +11,6 @@ import (
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 
-	"github.com/sachncs/promptsheon/promptsheon/approval"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/release"
-	"github.com/sachncs/promptsheon/promptsheon/store"
 	"github.com/sachncs/promptsheon/promptsheon/testdata"
 )
 
@@ -115,13 +114,13 @@ func TestReleaseActivateSupersedes(t *testing.T) {
 	}
 
 	// Approve+activate r1
-	a := &approval.Approval{ReleaseID: "r1", Votes: []approval.Vote{
-		{Identity: "bob", Decision: approval.Approve, Timestamp: now},
+	a := &promptsheon.Approval{ReleaseID: "r1", Votes: []promptsheon.Vote{
+		{Identity: "bob", Decision: promptsheon.Approve, Timestamp: now},
 	}, UpdatedAt: now}
 	if err := fx.db.CreateApproval(ctx, a); err != nil {
 		t.Fatalf("create approval: %v", err)
 	}
-	r1Approved, err := r1.ApproveWith(*a, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	r1Approved, err := r1.ApproveWith(*a, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
 	if err != nil {
 		t.Fatalf("approve: %v", err)
 	}
@@ -137,9 +136,9 @@ func TestReleaseActivateSupersedes(t *testing.T) {
 	}
 
 	// Activate r2 — supersedes r1
-	r2Approved, err := r2.ApproveWith(approval.Approval{ReleaseID: "r2", Votes: []approval.Vote{
-		{Identity: "bob", Decision: approval.Approve, Timestamp: now},
-	}, UpdatedAt: now}, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	r2Approved, err := r2.ApproveWith(promptsheon.Approval{ReleaseID: "r2", Votes: []promptsheon.Vote{
+		{Identity: "bob", Decision: promptsheon.Approve, Timestamp: now},
+	}, UpdatedAt: now}, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
 	if err != nil {
 		t.Fatalf("approve r2: %v", err)
 	}
@@ -183,8 +182,8 @@ func TestApprovalRoundTrip(t *testing.T) {
 		t.Fatalf("create release: %v", err)
 	}
 
-	a := &approval.Approval{ReleaseID: "r1", UpdatedAt: now}
-	recorded, err := a.Record(approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: now})
+	a := &promptsheon.Approval{ReleaseID: "r1", UpdatedAt: now}
+	recorded, err := a.Record(promptsheon.Vote{Identity: "bob", Decision: promptsheon.Approve, Timestamp: now})
 	if err != nil {
 		t.Fatalf("record vote: %v", err)
 	}
@@ -201,7 +200,7 @@ func TestApprovalRoundTrip(t *testing.T) {
 	}
 
 	// record another vote
-	recorded2, err := got.Record(approval.Vote{Identity: "carol", Decision: approval.Approve, Timestamp: now})
+	recorded2, err := got.Record(promptsheon.Vote{Identity: "carol", Decision: promptsheon.Approve, Timestamp: now})
 	if err != nil {
 		t.Fatalf("record second: %v", err)
 	}

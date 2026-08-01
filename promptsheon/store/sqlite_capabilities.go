@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -8,7 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )
 

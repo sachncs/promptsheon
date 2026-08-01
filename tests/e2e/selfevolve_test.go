@@ -1,6 +1,11 @@
 package e2e
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/store"
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/models"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"fmt"
 	"os"
@@ -8,13 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/approval"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
-	"github.com/sachncs/promptsheon/promptsheon/models"
-	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon"
 	"github.com/sachncs/promptsheon/promptsheon/selfevolve"
-	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 // casWritePrompt is a thin wrapper that chdirs the test
@@ -463,7 +463,7 @@ func seedCapabilityWithBadPrompt(ctx context.Context, db *store.SQLite, capID, d
 		return "", fmt.Errorf("upsert dataset cases: %w", err)
 	}
 	// Approval so SelfActivate doesn't fail.
-	if err := db.CreateApproval(ctx, &approval.Approval{
+	if err := db.CreateApproval(ctx, &promptsheon.Approval{
 		ReleaseID: relID, UpdatedAt: time.Now().UTC(),
 	}); err != nil {
 		return "", fmt.Errorf("create approval: %w", err)

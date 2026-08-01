@@ -1,12 +1,12 @@
 package selfevolve
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"strings"
 	"testing"
 
 	"github.com/sachncs/promptsheon/promptsheon/eval"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 )
 
 func validatorCases() []harness.DatasetCase {

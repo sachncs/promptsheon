@@ -1,6 +1,9 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -12,10 +15,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sachncs/promptsheon/promptsheon/approval"
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/release"
 	"github.com/sachncs/promptsheon/promptsheon/testdata"
 )
 
@@ -59,7 +58,7 @@ func decodeJSON(t *testing.T, r io.Reader, dst any) {
 func TestReleaseRoutesCreateVoteActivateInvoke(t *testing.T) {
 	repo := newMockRepo()
 	seedReleaseFixture(repo)
-	svc := release.NewService(repo, repo, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	svc := release.NewService(repo, repo, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
 
 	// Build a release-aware test server that uses the in-memory
 	// provider. newInvokeTestServerWithRepo mounts a real
@@ -130,7 +129,7 @@ func TestReleaseRoutesCreateVoteActivateInvoke(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("get approval: status=%d body=%s", w.Code, w.Body.String())
 	}
-	var a approval.Approval
+	var a promptsheon.Approval
 	decodeJSON(t, w.Body, &a)
 	if len(a.Votes) != 1 || a.Votes[0].Identity != "bob" {
 		t.Fatalf("votes = %+v want one from bob", a.Votes)
@@ -140,7 +139,7 @@ func TestReleaseRoutesCreateVoteActivateInvoke(t *testing.T) {
 func TestReleaseActivateQuorumConflict(t *testing.T) {
 	repo := newMockRepo()
 	seedReleaseFixture(repo)
-	svc := release.NewService(repo, repo, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	svc := release.NewService(repo, repo, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
 	srv := newReleaseTestServer(repo, svc)
 
 	body, _ := json.Marshal(map[string]string{"environment": "prod"})
@@ -170,7 +169,7 @@ func (failingArtifactLoader) Load(context.Context, capability.ArtifactKind, stri
 func TestReleaseInvokeResolverErrorReturns502(t *testing.T) {
 	repo := newMockRepo()
 	seedReleaseFixture(repo)
-	svc := release.NewService(repo, repo, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	svc := release.NewService(repo, repo, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
 	srv := newInvokeTestServerWithRepo(t, repo,
 		WithReleaseService(svc),
 		WithReleaseResolver(release.NewResolver(repo, failingArtifactLoader{})),
@@ -204,7 +203,7 @@ func TestReleaseInvokeResolverErrorReturns502(t *testing.T) {
 func TestReleaseInvokeNotActiveConflict(t *testing.T) {
 	repo := newMockRepo()
 	seedReleaseFixture(repo)
-	svc := release.NewService(repo, repo, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	svc := release.NewService(repo, repo, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
 	srv := newReleaseTestServer(repo, svc)
 
 	body, _ := json.Marshal(map[string]string{"environment": "prod"})

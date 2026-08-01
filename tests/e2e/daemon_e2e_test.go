@@ -15,6 +15,10 @@
 package e2e
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/scheduler"
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/executor"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -65,7 +69,7 @@ func TestMain(m *testing.M) {
 	// want an auth header read daemonAPIKey after TestMain
 	// populated it.
 	daemonAPIKey = bootstrapAdminKey(daemonBaseURL, "e2e-bootstrap-secret")
-	testClient = promptsheon.New(daemonBaseURL, daemonAPIKey)
+	testClient = scheduler.New(daemonBaseURL, daemonAPIKey)
 	code := m.Run()
 	os.Exit(code)
 }
@@ -285,7 +289,7 @@ func TestCapabilityLifecycle(t *testing.T) {
 	// vote. The reviewer key is minted by the admin via
 	// POST /api/v1/users + POST /api/v1/apikeys.
 	reviewerKey := createReviewer(t, "reviewer@e2e.local", "e2e-reviewer")
-	reviewerClient := promptsheon.New(daemonBaseURL, reviewerKey)
+	reviewerClient := scheduler.New(daemonBaseURL, reviewerKey)
 	if _, err := reviewerClient.Vote(ctx, rel.ID, promptsheon.VoteRequest{
 		Decision: "approve",
 	}); err != nil {
@@ -308,7 +312,7 @@ func TestCapabilityLifecycle(t *testing.T) {
 	// artifact hashes) and surface as 502; we accept that
 	// because the lifecycle assertion is "invoke path
 	// reached and handler ran", not "real LLM answered".
-	exec, err := testClient.Invoke(ctx, rel.ID, promptsheon.InvokeRequest{
+	exec, err := testClient.Invoke(ctx, rel.ID, executor.InvokeRequest{
 		Provider: providers[0],
 		Model:    "test-model",
 		Inputs:   map[string]any{"prompt": "ping"},

@@ -1,13 +1,13 @@
 package recommendation_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"errors"
 	"testing"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 	. "github.com/sachncs/promptsheon/promptsheon/recommendation"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
 func TestNewAdoptedRequiresVersion(t *testing.T) {

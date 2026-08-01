@@ -1,15 +1,15 @@
 package executor_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 	"context"
 	"encoding/json"
 	"errors"
 	"testing"
 
-	. "github.com/sachncs/promptsheon/promptsheon/executor"
+	. "github.com/sachncs/promptsheon/promptsheon"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 )
 
 func TestRunHappyPath(t *testing.T) {

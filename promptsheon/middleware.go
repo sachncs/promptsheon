@@ -1,6 +1,8 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/trace"
+	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"bufio"
 	"context"
 	"crypto/rand"
@@ -11,8 +13,6 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/trace"
 )
 
 // ChainHTTP applies http.Handler middlewares in order.

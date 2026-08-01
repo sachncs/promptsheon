@@ -20,6 +20,7 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/store"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -30,7 +31,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 const (

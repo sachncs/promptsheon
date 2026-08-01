@@ -19,15 +19,15 @@
 package recommendation
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/rules"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/observation"
+	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 	"context"
 	"log/slog"
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/eventbus"
-	"github.com/sachncs/promptsheon/promptsheon/observation"
-	"github.com/sachncs/promptsheon/promptsheon/rules"
 )
 
 // SourceFunc is the in-process bridge from Aggregator to Producer.
@@ -106,7 +106,7 @@ func (p *Producer) Tick(ctx context.Context, now time.Time) ([]capability.Recomm
 // Subscribe registers the Producer as a handler for the supplied
 // EventTypes on the EventBus. The handler ignores events that are
 // not Tick triggers; production schedules a periodic tick via
-// scheduler.New which calls Tick directly.
+// observation.New which calls Tick directly.
 func (p *Producer) Subscribe(bus eventbus.Publisher, kinds ...capability.EventType) (eventbus.Subscription, error) {
 	return bus.Subscribe(func(ev capability.Event) {
 		_, _ = p.Tick(context.Background(), time.Now().UTC())

@@ -1,6 +1,7 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -12,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/auth"
 )
 
 func TestServer_ServeHTTP(t *testing.T) {

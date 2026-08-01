@@ -21,6 +21,8 @@
 package supervisor
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 	"context"
 	"fmt"
 	"io"
@@ -28,8 +30,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 )
 
 // Plugin is the lifecycle interface a supervised plugin satisfies.
@@ -114,7 +114,7 @@ func New(p Publisher, logger *slog.Logger) *Supervisor {
 	}
 }
 
-// Adapter bridges a supervisor.Publisher to the broader
+// Adapter bridges a eventbus.Publisher to the broader
 // eventbus.Publisher so the supervisor lifecycle events surface
 // on the same in-memory bus as the scheduler and the
 // recommendation producer. Without an adapter the supervisor

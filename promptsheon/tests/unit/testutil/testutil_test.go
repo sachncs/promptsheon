@@ -1,6 +1,7 @@
 package testutil_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"io"
 	"os"
 	"testing"

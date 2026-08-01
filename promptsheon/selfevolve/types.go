@@ -17,12 +17,12 @@
 package selfevolve
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/store"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
-	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 // Audit action keys. The evolver writes one of these per

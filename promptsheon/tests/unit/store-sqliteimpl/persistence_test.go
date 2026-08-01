@@ -1,15 +1,15 @@
 package sqliteimpl_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/store"
+	"github.com/sachncs/promptsheon/promptsheon/recommendation"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"testing"
 	"time"
 
 	. "github.com/sachncs/promptsheon/promptsheon/store/sqliteimpl"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/recommendation"
-	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 func openTestDB(t *testing.T) *store.SQLite {

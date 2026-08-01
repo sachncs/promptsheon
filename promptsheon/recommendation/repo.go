@@ -8,9 +8,9 @@
 package recommendation
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
 // Repository persists Recommendations and their Decisions.

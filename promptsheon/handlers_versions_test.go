@@ -1,6 +1,7 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -8,7 +9,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
 func TestHandleCreateVersionWithManifest(t *testing.T) {

@@ -1,6 +1,7 @@
 package harness_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/eval"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 )
 
 // stubInvoker is a ReleaseInvoker that returns a canned output for

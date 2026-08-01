@@ -10,9 +10,9 @@
 package main
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/llm"
 	"log/slog"
 
-	"github.com/sachncs/promptsheon/promptsheon/llm"
 )
 
 // registerE2EProvider wires the in-memory LLM stub into the given

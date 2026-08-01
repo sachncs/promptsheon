@@ -1,12 +1,12 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/models"
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
 // knownRoles is the closed set of valid user roles. Accepting

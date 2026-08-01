@@ -1,10 +1,10 @@
 package selfevolve
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/cas"
 	"context"
 	"fmt"
 
-	"github.com/sachncs/promptsheon/promptsheon/cas"
 )
 
 // CasPromptLoader reads and writes prompt blobs in the local

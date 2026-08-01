@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/trace"
 	"context"
 	"fmt"
 	"log/slog"
@@ -8,7 +9,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/trace"
 )
 
 // HTTPMiddleware instruments HTTP requests with metrics and tracing.

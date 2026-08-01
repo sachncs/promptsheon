@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -11,7 +12,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
 // SQLite persistence for audit.

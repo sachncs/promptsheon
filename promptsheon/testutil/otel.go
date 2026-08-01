@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/sdk/trace"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
@@ -19,8 +19,8 @@ import (
 //		defer collector.Shutdown(ctx)
 //
 //		// Create a tracer that writes to the collector
-//		tracer := trace.NewTracerProvider(
-//		    trace.WithSyncer(collector.Exporter()),
+//		tracer := sdktrace.NewTracerProvider(
+//		    sdktrace.WithSyncer(collector.Exporter()),
 //	   ).Tracer("test")
 //
 //		// ... do work that produces spans ...
@@ -33,7 +33,7 @@ import (
 type InMemoryCollector struct {
 	mu       sync.Mutex
 	exporter *tracetest.InMemoryExporter
-	provider *trace.TracerProvider
+	provider *sdktrace.TracerProvider
 	spans    []tracetest.SpanStub
 }
 
@@ -42,9 +42,9 @@ type InMemoryCollector struct {
 // (including the one created by trace.NewOTelTracer) writes to it.
 func NewInMemoryCollector() *InMemoryCollector {
 	exporter := tracetest.NewInMemoryExporter()
-	provider := trace.NewTracerProvider(
-		trace.WithSyncer(exporter),
-		trace.WithSampler(trace.AlwaysSample()),
+	provider := sdktrace.NewTracerProvider(
+		sdktrace.WithSyncer(exporter),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
 
 	// Register as global provider so otel.Tracer() picks it up.
@@ -65,7 +65,7 @@ func (c *InMemoryCollector) Exporter() *tracetest.InMemoryExporter {
 
 // Provider returns the TracerProvider so callers can build
 // tracers that explicitly target the collector.
-func (c *InMemoryCollector) Provider() *trace.TracerProvider {
+func (c *InMemoryCollector) Provider() *sdktrace.TracerProvider {
 	return c.provider
 }
 

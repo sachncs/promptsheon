@@ -7,12 +7,12 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
 // AnonUser is the user ID recorded on audit rows when no caller

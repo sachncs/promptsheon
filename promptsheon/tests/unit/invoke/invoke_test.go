@@ -1,26 +1,27 @@
 package invoke_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/rollups"
+	"github.com/sachncs/promptsheon/promptsheon/scheduler"
+	"github.com/sachncs/promptsheon/promptsheon/budget"
+	"github.com/sachncs/promptsheon/promptsheon/observation"
+	"github.com/sachncs/promptsheon/promptsheon/executor"
 	"context"
 	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
-	. "github.com/sachncs/promptsheon/promptsheon/invoke"
+	. "github.com/sachncs/promptsheon/promptsheon"
 
-	"github.com/sachncs/promptsheon/promptsheon/budget"
-	"github.com/sachncs/promptsheon/promptsheon/executor"
-	"github.com/sachncs/promptsheon/promptsheon/observation"
-	"github.com/sachncs/promptsheon/promptsheon/quota"
 )
 
 func TestInvokeHappyPath(t *testing.T) {
 	t.Parallel()
 	now := func() time.Time { return time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC) }
 	enforcer := NewDefaultEnforcer(now)
-	agg := observation.NewAggregator(nil)
-	exec := executor.New(nil, func(_ context.Context, _ executor.InvokeRequest) (executor.InvokeResult, error) {
+	agg := rollups.New(nil, nil)
+	exec := scheduler.New(nil, func(_ context.Context, _ executor.InvokeRequest) (executor.InvokeResult, error) {
 		return executor.InvokeResult{Output: json.RawMessage(`{"ok":true}`), Status: "ok", PromptTokens: 10, OutputTokens: 5, CostUSDMicro: 100_000, LatencyMS: 50}, nil
 	})
 	inv := New(enforcer, agg, exec)
@@ -40,9 +41,9 @@ func TestInvokeRejectsQuota(t *testing.T) {
 	t.Parallel()
 	now := func() time.Time { return time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC) }
 	enforcer := NewDefaultEnforcer(now)
-	q, err := quota.New(quota.ScopeWorkspace, "ws", quota.WindowSecond, 1, now(), "alice")
+	q, err := scheduler.New(promptsheon.ScopeWorkspace, "ws", promptsheon.WindowSecond, 1, now(), "alice")
 	if err != nil {
-		t.Fatalf("quota.New: %v", err)
+		t.Fatalf("observation.New: %v", err)
 	}
 	enforcer.SetQuota(q)
 	// First call burns the only slot.
@@ -50,8 +51,8 @@ func TestInvokeRejectsQuota(t *testing.T) {
 		t.Fatalf("first call should pass: %v", err)
 	}
 
-	agg := observation.NewAggregator(nil)
-	exec := executor.New(nil, func(_ context.Context, _ executor.InvokeRequest) (executor.InvokeResult, error) {
+	agg := rollups.New(nil, nil)
+	exec := scheduler.New(nil, func(_ context.Context, _ executor.InvokeRequest) (executor.InvokeResult, error) {
 		return executor.InvokeResult{Status: "ok"}, nil
 	})
 	inv := New(enforcer, agg, exec)
@@ -71,8 +72,8 @@ func TestInvokeRejectsBudget(t *testing.T) {
 	b, _ := budget.New(budget.ScopeWorkspace, "ws", budget.PeriodDaily, 0.0001, now(), "alice")
 	enforcer.SetBudget(b)
 
-	agg := observation.NewAggregator(nil)
-	exec := executor.New(nil, func(_ context.Context, _ executor.InvokeRequest) (executor.InvokeResult, error) {
+	agg := rollups.New(nil, nil)
+	exec := scheduler.New(nil, func(_ context.Context, _ executor.InvokeRequest) (executor.InvokeResult, error) {
 		return executor.InvokeResult{Status: "ok", CostUSDMicro: 1_000_000}, nil
 	})
 	inv := New(enforcer, agg, exec)
@@ -100,7 +101,7 @@ func TestDefaultEnforcerAllowsWhenNoPolicySet(t *testing.T) {
 }
 
 // Compile-time guard that Aggregator implements AggregatorConsumer.
-var _ AggregatorConsumer = (*observation.Aggregator)(nil)
+var _ AggregatorConsumer = (*rollups.Aggregator)(nil)
 
 // Sentinel: the rules package is the entry-point for v1
 // recommendations. We import it for completeness so a later

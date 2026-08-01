@@ -4,6 +4,7 @@
 package harness_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/eval"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 )
 
 // BenchmarkEvalRun1000Cases pins PERF-DB-3: a 1000-case eval run

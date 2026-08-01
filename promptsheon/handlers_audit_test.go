@@ -1,6 +1,8 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -8,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
 func TestHandleListAudit(t *testing.T) {

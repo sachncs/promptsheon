@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/store"
 	"context"
 	"net/http"
 	"net/http/httptest"

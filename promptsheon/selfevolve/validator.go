@@ -1,6 +1,7 @@
 package selfevolve
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/eval"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 )
 
 // Validator scores a candidate prompt against the

@@ -1,6 +1,9 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -11,11 +14,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sachncs/promptsheon/promptsheon/approval"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
-	"github.com/sachncs/promptsheon/promptsheon/release"
 	"github.com/sachncs/promptsheon/promptsheon/testdata"
 )
 
@@ -93,7 +92,7 @@ func TestHarnessDatasetCRUD(t *testing.T) {
 func TestHarnessPreconditionBlocksActivate(t *testing.T) {
 	t.Setenv("PROMPTSHEON_HARNESS_PRECONDITIONS", "true")
 	repo := newMockRepo()
-	svc := release.NewService(repo, repo, approval.MakerCheckerPolicy{RequiredApprovers: 1}).
+	svc := release.NewService(repo, repo, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1}).
 		WithHarness(harness.NewPreconditionRunner(), repo)
 	_ = newReleaseTestServer(repo, svc)
 	seedHarnessFixture(repo)
@@ -108,7 +107,7 @@ func TestHarnessPreconditionBlocksActivate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	if _, err := svc.Vote(context.Background(), rel.ID, approval.Vote{Identity: "bob", Decision: approval.Approve}); err != nil {
+	if _, err := svc.Vote(context.Background(), rel.ID, promptsheon.Vote{Identity: "bob", Decision: promptsheon.Approve}); err != nil {
 		t.Fatalf("vote: %v", err)
 	}
 	_, err = svc.Activate(context.Background(), rel.ID)

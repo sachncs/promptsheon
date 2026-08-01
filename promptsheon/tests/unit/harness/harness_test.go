@@ -1,10 +1,10 @@
 package harness_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"strings"
 	"testing"
 
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 )
 
 func TestValidScorers(t *testing.T) {

@@ -1,10 +1,10 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/models"
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
 // SaveVaultKey saves the vaultKey.

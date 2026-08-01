@@ -1,6 +1,9 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/store"
+	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
+	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,9 +11,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
-	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 // isRequestTLS reports whether the inbound request arrived over an

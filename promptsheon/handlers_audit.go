@@ -1,6 +1,7 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/models"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -8,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
 // ListAudit lists the audit.

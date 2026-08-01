@@ -11,11 +11,11 @@
 package scheduler
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 	"context"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 	"github.com/sachncs/promptsheon/promptsheon/schedule"
 )
 

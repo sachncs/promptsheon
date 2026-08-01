@@ -1,11 +1,11 @@
 package selfevolve
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
 // Promoter turns a validated candidate prompt into an

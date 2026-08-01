@@ -1,12 +1,13 @@
 package models_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/models"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"encoding/json"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
 func TestUserJSONRoundTrip(t *testing.T) {

@@ -1,6 +1,7 @@
 package webhook
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"io"
 	"log/slog"
 	"net/http"

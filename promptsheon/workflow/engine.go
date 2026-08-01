@@ -2,10 +2,10 @@
 package workflow
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/trace"
+	"github.com/sachncs/promptsheon/promptsheon/metrics"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/metrics"
-	"github.com/sachncs/promptsheon/promptsheon/trace"
 )
 
 // Status represents a workflow execution status.

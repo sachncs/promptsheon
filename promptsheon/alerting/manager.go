@@ -2,6 +2,8 @@
 package alerting
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/metrics"
+	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
 	"fmt"
 	"log/slog"
@@ -9,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/metrics"
-	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
 // Severity levels for alerts.

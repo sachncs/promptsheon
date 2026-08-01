@@ -1,6 +1,13 @@
 package main
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/store"
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/metrics"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/llm"
+	"github.com/sachncs/promptsheon/promptsheon/models"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -11,14 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
-	"github.com/sachncs/promptsheon/promptsheon/llm"
-	"github.com/sachncs/promptsheon/promptsheon/metrics"
-	"github.com/sachncs/promptsheon/promptsheon/models"
-	"github.com/sachncs/promptsheon/promptsheon/release"
 	"github.com/sachncs/promptsheon/promptsheon/selfevolve"
-	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 // selfEvolveConfig is one parsed entry from the

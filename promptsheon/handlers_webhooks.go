@@ -1,6 +1,7 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/webhook"
 	"context"
 	"fmt"
 	"net"
@@ -9,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/webhook"
 )
 
 // ListWebhooks lists the webhooks.

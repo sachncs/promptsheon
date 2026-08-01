@@ -1,6 +1,8 @@
 package sqliteimpl
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/recommendation"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -9,8 +11,6 @@ import (
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/recommendation"
 )
 
 type RecommendationRepository struct{ db *sql.DB }

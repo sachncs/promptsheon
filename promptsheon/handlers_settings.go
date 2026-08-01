@@ -1,13 +1,13 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/settings"
+	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/settings"
 )
 
 // registerSettingsRoutes wires the four /api/v1/settings

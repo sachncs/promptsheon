@@ -1,14 +1,14 @@
 package promptsheon
 
 import (
-	"bytes"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+		"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
 // TestHandleUpdateSelfEvolveConfig_PartialPreserves exercises the

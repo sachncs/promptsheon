@@ -1,11 +1,11 @@
 package promptsheon
 
 import (
-	"context"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+		"context"
 	"database/sql"
 	"fmt"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )
 

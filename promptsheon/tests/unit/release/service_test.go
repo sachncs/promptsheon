@@ -1,6 +1,9 @@
 package release_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"errors"
 	"testing"
@@ -8,10 +11,6 @@ import (
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 
-	"github.com/sachncs/promptsheon/promptsheon/approval"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
-	"github.com/sachncs/promptsheon/promptsheon/release"
 	"github.com/sachncs/promptsheon/promptsheon/testdata"
 	"github.com/sachncs/promptsheon/promptsheon/testutil/harnessrepo"
 )
@@ -37,7 +36,7 @@ var errMemStoreNotFound = errors.New("memstore: not found")
 // needs them.
 type memStore struct {
 	releases  map[string]*release.Release
-	approvals map[string]*approval.Approval
+	approvals map[string]*promptsheon.Approval
 
 	// harnessRepo embeds the shared harness.Repository fixture
 	// so duplicate boilerplate (CreateDataset, GetPrecondition,
@@ -48,7 +47,7 @@ type memStore struct {
 func newMemStore() *memStore {
 	return &memStore{
 		releases:    make(map[string]*release.Release),
-		approvals:   make(map[string]*approval.Approval),
+		approvals:   make(map[string]*promptsheon.Approval),
 		harnessRepo: harnessrepo.New(),
 	}
 }
@@ -113,12 +112,12 @@ func (m *memStore) ActivateAtomic(_ context.Context, prior, next *release.Releas
 	m.releases[next.ID] = &cp
 	return nil
 }
-func (m *memStore) CreateApproval(_ context.Context, a *approval.Approval) error {
+func (m *memStore) CreateApproval(_ context.Context, a *promptsheon.Approval) error {
 	cp := *a
 	m.approvals[a.ReleaseID] = &cp
 	return nil
 }
-func (m *memStore) GetApproval(_ context.Context, releaseID string) (*approval.Approval, error) {
+func (m *memStore) GetApproval(_ context.Context, releaseID string) (*promptsheon.Approval, error) {
 	a, ok := m.approvals[releaseID]
 	if !ok {
 		return nil, errs.ErrApprovalNotFound
@@ -126,7 +125,7 @@ func (m *memStore) GetApproval(_ context.Context, releaseID string) (*approval.A
 	cp := *a
 	return &cp, nil
 }
-func (m *memStore) UpdateApproval(_ context.Context, a *approval.Approval) error {
+func (m *memStore) UpdateApproval(_ context.Context, a *promptsheon.Approval) error {
 	if _, ok := m.approvals[a.ReleaseID]; !ok {
 		return errs.ErrApprovalNotFound
 	}
@@ -146,7 +145,7 @@ func validManifest() capability.Manifest { return testdata.NewManifest() }
 // the PolicyKind-based constructor (DEAD-Rel-3): callers that
 // want a Maker-Checker or Majority policy use the package-level
 // helper functions.
-func newService(t *testing.T, policy approval.Policy) (*release.Service, *memStore) {
+func newService(t *testing.T, policy retention.Policy) (*release.Service, *memStore) {
 	t.Helper()
 	db := newMemStore()
 	svc := release.NewService(db, db, policy)
@@ -154,7 +153,7 @@ func newService(t *testing.T, policy approval.Policy) (*release.Service, *memSto
 }
 
 func TestServiceCreateVoteActivate(t *testing.T) {
-	svc, _ := newService(t, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	svc, _ := newService(t, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
 	ctx := context.Background()
 
 	r, err := svc.Create(ctx, "c1", 1, validManifest(), release.EnvProd, "alice")
@@ -166,7 +165,7 @@ func TestServiceCreateVoteActivate(t *testing.T) {
 	}
 
 	// bob approves (must be a non-creator identity)
-	if _, err := svc.Vote(ctx, r.ID, approval.Vote{Identity: "bob", Decision: approval.Approve}); err != nil {
+	if _, err := svc.Vote(ctx, r.ID, promptsheon.Vote{Identity: "bob", Decision: promptsheon.Approve}); err != nil {
 		t.Fatalf("vote: %v", err)
 	}
 
@@ -184,14 +183,14 @@ func TestServiceCreateVoteActivate(t *testing.T) {
 }
 
 func TestServiceActivateSupersedesPrior(t *testing.T) {
-	svc, _ := newService(t, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	svc, _ := newService(t, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
 	ctx := context.Background()
 
 	r1, err := svc.Create(ctx, "c1", 1, validManifest(), release.EnvProd, "alice")
 	if err != nil {
 		t.Fatalf("create r1: %v", err)
 	}
-	if _, err := svc.Vote(ctx, r1.ID, approval.Vote{Identity: "bob", Decision: approval.Approve}); err != nil {
+	if _, err := svc.Vote(ctx, r1.ID, promptsheon.Vote{Identity: "bob", Decision: promptsheon.Approve}); err != nil {
 		t.Fatalf("vote r1: %v", err)
 	}
 	if _, err := svc.Activate(ctx, r1.ID); err != nil {
@@ -202,7 +201,7 @@ func TestServiceActivateSupersedesPrior(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create r2: %v", err)
 	}
-	if _, err := svc.Vote(ctx, r2.ID, approval.Vote{Identity: "carol", Decision: approval.Approve}); err != nil {
+	if _, err := svc.Vote(ctx, r2.ID, promptsheon.Vote{Identity: "carol", Decision: promptsheon.Approve}); err != nil {
 		t.Fatalf("vote r2: %v", err)
 	}
 	if _, err := svc.Activate(ctx, r2.ID); err != nil {
@@ -227,7 +226,7 @@ func TestServiceActivateSupersedesPrior(t *testing.T) {
 }
 
 func TestServiceActivateQuorumNotMet(t *testing.T) {
-	svc, _ := newService(t, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	svc, _ := newService(t, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
 	ctx := context.Background()
 
 	r, err := svc.Create(ctx, "c1", 1, validManifest(), release.EnvProd, "alice")
@@ -241,10 +240,10 @@ func TestServiceActivateQuorumNotMet(t *testing.T) {
 }
 
 func TestServiceRollback(t *testing.T) {
-	svc, _ := newService(t, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	svc, _ := newService(t, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
 	ctx := context.Background()
 	r, _ := svc.Create(ctx, "c1", 1, validManifest(), release.EnvProd, "alice")
-	if _, err := svc.Vote(ctx, r.ID, approval.Vote{Identity: "bob", Decision: approval.Approve}); err != nil {
+	if _, err := svc.Vote(ctx, r.ID, promptsheon.Vote{Identity: "bob", Decision: promptsheon.Approve}); err != nil {
 		t.Fatalf("vote: %v", err)
 	}
 	if _, err := svc.Activate(ctx, r.ID); err != nil {
@@ -264,7 +263,7 @@ func TestServiceRollback(t *testing.T) {
 
 func TestServiceActivateRunsPreconditions(t *testing.T) {
 	t.Setenv("PROMPTSHEON_HARNESS_PRECONDITIONS", "true")
-	svc, db := newService(t, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	svc, db := newService(t, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
 	svc.WithHarness(harness.NewPreconditionRunner(), db)
 
 	ctx := context.Background()
@@ -286,7 +285,7 @@ func TestServiceActivateRunsPreconditions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if _, err := svc.Vote(ctx, r.ID, approval.Vote{Identity: "bob", Decision: approval.Approve}); err != nil {
+	if _, err := svc.Vote(ctx, r.ID, promptsheon.Vote{Identity: "bob", Decision: promptsheon.Approve}); err != nil {
 		t.Fatalf("Vote: %v", err)
 	}
 
@@ -315,7 +314,7 @@ func TestServiceActivateRunsPreconditions(t *testing.T) {
 }
 
 func TestServiceActivatePassesWhenAllPreconditionsPass(t *testing.T) {
-	svc, db := newService(t, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	svc, db := newService(t, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
 	svc.WithHarness(harness.NewPreconditionRunner(), db)
 
 	ctx := context.Background()
@@ -336,7 +335,7 @@ func TestServiceActivatePassesWhenAllPreconditionsPass(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if _, err := svc.Vote(ctx, r.ID, approval.Vote{Identity: "bob", Decision: approval.Approve}); err != nil {
+	if _, err := svc.Vote(ctx, r.ID, promptsheon.Vote{Identity: "bob", Decision: promptsheon.Approve}); err != nil {
 		t.Fatalf("Vote: %v", err)
 	}
 	activated, err := svc.Activate(ctx, r.ID)
@@ -349,12 +348,12 @@ func TestServiceActivatePassesWhenAllPreconditionsPass(t *testing.T) {
 }
 
 func TestServiceClockSeam(t *testing.T) {
-	svc, _ := newService(t, approval.MakerCheckerPolicy{RequiredApprovers: 1})
+	svc, _ := newService(t, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
 	fixed := time.Date(2030, 1, 2, 3, 4, 5, 0, time.UTC)
 	svc.Clock = func() time.Time { return fixed }
 	ctx := context.Background()
 	r, _ := svc.Create(ctx, "c1", 1, validManifest(), release.EnvProd, "alice")
-	if _, err := svc.Vote(ctx, r.ID, approval.Vote{Identity: "bob", Decision: approval.Approve}); err != nil {
+	if _, err := svc.Vote(ctx, r.ID, promptsheon.Vote{Identity: "bob", Decision: promptsheon.Approve}); err != nil {
 		t.Fatalf("vote: %v", err)
 	}
 	activated, err := svc.Activate(ctx, r.ID)

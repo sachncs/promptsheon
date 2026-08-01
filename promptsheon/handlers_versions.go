@@ -1,13 +1,13 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )
 

@@ -8,12 +8,12 @@
 package settings_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/vault"
 	"errors"
 	"testing"
 
 	. "github.com/sachncs/promptsheon/promptsheon/settings"
 
-	"github.com/sachncs/promptsheon/promptsheon/vault"
 )
 
 func TestNotifier_PublishReturnsSubscriberError(t *testing.T) {

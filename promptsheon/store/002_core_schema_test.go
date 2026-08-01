@@ -1,6 +1,9 @@
 package store
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/models"
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"database/sql"
 	"errors"
@@ -11,9 +14,6 @@ import (
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/models"
-	"github.com/sachncs/promptsheon/promptsheon/release"
 )
 
 // migrateOnce opens a fresh DB and runs the full migration set.

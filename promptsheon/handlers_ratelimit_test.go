@@ -1,12 +1,12 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
 )
 
 func TestRateLimit(t *testing.T) {
@@ -32,7 +32,7 @@ func TestRateLimit_Exceeded(t *testing.T) {
 	// exercise the deny path we need a non-zero Rate that the
 	// bucket can exhaust. Burst=0 with a single request means
 	// the second call hits the bucket drain.
-	limiter := ratelimit.NewLimiter(ratelimit.Config{Rate: 1, Interval: time.Hour, Burst: 0})
+	limiter := ratelimit.NewLimiter(promptsheon.Config{Rate: 1, Interval: time.Hour, Burst: 0})
 	t.Cleanup(limiter.Stop)
 
 	s := newTestServer(t, WithRateLimiter(limiter))

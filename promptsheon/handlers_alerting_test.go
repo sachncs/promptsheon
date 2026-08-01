@@ -1,13 +1,13 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/alerting"
 	"bytes"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sachncs/promptsheon/promptsheon/alerting"
 )
 
 func TestHandleListAlertRules(t *testing.T) {

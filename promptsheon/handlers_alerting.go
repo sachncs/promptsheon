@@ -1,11 +1,11 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/alerting"
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/alerting"
 )
 
 // validSeverities is the closed set for AlertRule.Severity.

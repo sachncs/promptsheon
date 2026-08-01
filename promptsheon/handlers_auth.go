@@ -1,7 +1,9 @@
 package promptsheon
 
 import (
-	"context"
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/models"
+			"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"database/sql"
@@ -15,9 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
-	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
 const oauthStateCookie = "oauth_state"

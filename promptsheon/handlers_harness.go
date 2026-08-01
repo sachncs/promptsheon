@@ -1,14 +1,14 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"errors"
 	"net/http"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 	"github.com/sachncs/promptsheon/promptsheon/eval"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 )
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,8 @@
 package harness_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/budget"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"errors"
 	"testing"
@@ -8,7 +10,6 @@ import (
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 )
 
 func TestPreconditionRunnerPasses(t *testing.T) {

@@ -1,6 +1,7 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/metrics"
 	"bytes"
 	"context"
 	"log/slog"
@@ -9,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/metrics"
 )
 
 func TestHandleMetricsSummary(t *testing.T) {

@@ -2,11 +2,11 @@
 package workflow
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/metrics"
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/metrics"
 )
 
 // Step is one node in a workflow DAG. The Engine runs steps in

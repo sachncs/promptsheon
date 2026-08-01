@@ -13,13 +13,13 @@
 package main
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/llm"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/llm"
 	"github.com/sachncs/promptsheon/buildinfo"
 )
 

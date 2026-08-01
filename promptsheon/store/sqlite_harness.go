@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"database/sql"
 	"errors"
@@ -9,7 +10,6 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 )
 
 // ---------------------------------------------------------------------------

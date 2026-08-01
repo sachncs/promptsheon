@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -9,7 +10,6 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
-	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
 // SQLite persistence for alerting.

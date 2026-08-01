@@ -2,6 +2,22 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/invoke"
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/metrics"
+	"github.com/sachncs/promptsheon/promptsheon/workflow"
+	"github.com/sachncs/promptsheon/promptsheon/settings"
+	"github.com/sachncs/promptsheon/promptsheon/alerting"
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/models"
+	"github.com/sachncs/promptsheon/promptsheon/llm"
+	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
+	"github.com/sachncs/promptsheon/promptsheon/store"
+	"github.com/sachncs/promptsheon/promptsheon/trace"
+	"github.com/sachncs/promptsheon/promptsheon/rollups"
+	"github.com/sachncs/promptsheon/promptsheon/webhook"
+	"github.com/sachncs/promptsheon/promptsheon/vault"
 	"context"
 	"log/slog"
 	"net/http"
@@ -9,24 +25,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/alerting"
-	"github.com/sachncs/promptsheon/promptsheon/auth"
 
 	_ "github.com/sachncs/promptsheon/promptsheon/eval" // Scorer registry (no Server dep yet)
-	"github.com/sachncs/promptsheon/promptsheon/harness"
-	"github.com/sachncs/promptsheon/promptsheon/invoke"
-	"github.com/sachncs/promptsheon/promptsheon/llm"
-	"github.com/sachncs/promptsheon/promptsheon/metrics"
-	"github.com/sachncs/promptsheon/promptsheon/models"
-	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
-	"github.com/sachncs/promptsheon/promptsheon/release"
-	"github.com/sachncs/promptsheon/promptsheon/rollups"
-	"github.com/sachncs/promptsheon/promptsheon/settings"
-	"github.com/sachncs/promptsheon/promptsheon/store"
-	"github.com/sachncs/promptsheon/promptsheon/trace"
-	"github.com/sachncs/promptsheon/promptsheon/vault"
-	"github.com/sachncs/promptsheon/promptsheon/webhook"
-	"github.com/sachncs/promptsheon/promptsheon/workflow"
 )
 
 // Func is the handler signature that returns errors for centralized handling.

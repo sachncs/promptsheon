@@ -1,6 +1,7 @@
 package harness_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/eval"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 )
 
 // BenchmarkEvalRunStreaming1000Cases pins M-7 / PERF-DB-3: a

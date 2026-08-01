@@ -1,10 +1,10 @@
 package rules
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"testing"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
 func baseObs() Observation {

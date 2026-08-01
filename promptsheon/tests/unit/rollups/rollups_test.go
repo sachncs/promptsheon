@@ -1,15 +1,17 @@
 package rollups_test
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/scheduler"
+	"github.com/sachncs/promptsheon/promptsheon/quota"
+	"github.com/sachncs/promptsheon/promptsheon/budget"
+	"github.com/sachncs/promptsheon/promptsheon/observation"
 	"context"
 	"errors"
 	"testing"
 	"time"
 
-	. "github.com/sachncs/promptsheon/promptsheon/rollups"
+	. "github.com/sachncs/promptsheon/promptsheon"
 
-	"github.com/sachncs/promptsheon/promptsheon/budget"
-	"github.com/sachncs/promptsheon/promptsheon/quota"
 )
 
 type fakeBudgetRepo struct {
@@ -129,9 +131,9 @@ func TestAggregatorWithBudgetNearLimit(t *testing.T) {
 func TestAggregatorWithExhaustedQuota(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
-	q, err := quota.New(quota.ScopeWorkspace, "ws-1", quota.WindowMinute, 1, now, "alice")
+	q, err := scheduler.New(promptsheon.ScopeWorkspace, "ws-1", promptsheon.WindowMinute, 1, now, "alice")
 	if err != nil {
-		t.Fatalf("quota.New: %v", err)
+		t.Fatalf("observation.New: %v", err)
 	}
 	q, _ = q.Charge(now)
 	qrepo := &fakeQuotaRepo{items: []*quota.Quota{&q}}

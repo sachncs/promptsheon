@@ -14,13 +14,13 @@
 package recommendation
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
 // Outcome is the disposition of a Recommendation.

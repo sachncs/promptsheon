@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"encoding/json"
 	"io"
 	"net/http"

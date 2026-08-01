@@ -14,14 +14,14 @@
 package release
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/approval"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 
-	"github.com/sachncs/promptsheon/promptsheon/approval"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
 // Status is the lifecycle state of a Release.

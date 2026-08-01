@@ -1,12 +1,12 @@
 package selfevolve
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
 type fakePromoterRepo struct {

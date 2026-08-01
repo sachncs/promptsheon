@@ -1,13 +1,13 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/llm"
 	"bytes"
 	"io"
 	"log/slog"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sachncs/promptsheon/promptsheon/llm"
 )
 
 // BenchmarkHandleHealth exercises the smallest possible handler

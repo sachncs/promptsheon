@@ -16,6 +16,16 @@ package promptsheon
 // surfaces those in the audit chain and the Execution record.
 
 import (
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/metrics"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/eventbus"
+	"github.com/sachncs/promptsheon/promptsheon/llm"
+	"github.com/sachncs/promptsheon/promptsheon/executor"
+	"github.com/sachncs/promptsheon/promptsheon/store"
+	"github.com/sachncs/promptsheon/promptsheon/rollups"
+	"github.com/sachncs/promptsheon/promptsheon/scheduler"
+	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"bytes"
 	"context"
 	"fmt"
@@ -25,15 +35,6 @@ import (
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/eventbus"
-	"github.com/sachncs/promptsheon/promptsheon/executor"
-	"github.com/sachncs/promptsheon/promptsheon/invoke"
-	"github.com/sachncs/promptsheon/promptsheon/llm"
-	"github.com/sachncs/promptsheon/promptsheon/metrics"
-	"github.com/sachncs/promptsheon/promptsheon/observation"
-	"github.com/sachncs/promptsheon/promptsheon/release"
-	"github.com/sachncs/promptsheon/promptsheon/store"
 	"github.com/sachncs/promptsheon/promptsheon/testutil"
 )
 
@@ -74,7 +75,7 @@ func (p *inMemoryProvider) Complete(ctx context.Context, req *llm.Request) (*llm
 	}, nil
 }
 
-// passthroughEnforcer satisfies invoke.Enforcer without enforcing
+// passthroughEnforcer satisfies promptsheon.Enforcer without enforcing
 // any budget or quota. Tests use it to drive the Invoker without
 // touching the budget/quota stores.
 type passthroughEnforcer struct{}
@@ -90,7 +91,7 @@ func (passthroughEnforcer) EnforceQuota(_ context.Context, _ string) error {
 // in-memory LLM provider and returns a Server with the invoker
 // attached via WithInvoker. The wiring mirrors production:
 //
-//	provider registry  ->  executor.Caller
+//	provider registry  ->  auth.Caller
 //	executor.Executor  ->  invoke.Invoker
 //	invoke.Invoker     ->  api.Server.WithInvoker
 //
@@ -145,7 +146,7 @@ func newInvokeTestServerWithRepo(t *testing.T, repo *mockRepo, opts ...Option) *
 	providers.Configure("stub", llm.ProviderConfig{APIKey: "sk-test"})
 
 	bus := eventbus.NewMemory()
-	caller := executor.Caller(func(ctx context.Context, req executor.InvokeRequest) (executor.InvokeResult, error) {
+	caller := auth.Caller(func(ctx context.Context, req executor.InvokeRequest) (executor.InvokeResult, error) {
 		if req.Provider == "" {
 			return executor.InvokeResult{Status: "error", Error: "no provider specified"}, errs.ErrProviderMissing
 		}
@@ -179,10 +180,10 @@ func newInvokeTestServerWithRepo(t *testing.T, repo *mockRepo, opts ...Option) *
 		}, nil
 	})
 
-	exec := executor.New(bus, caller)
-	agg := observation.NewAggregator(nil)
+	exec := scheduler.New(bus, caller)
+	agg := rollups.New(nil, nil)
 	enforcer := passthroughEnforcer{}
-	inv := invoke.New(enforcer, agg, exec)
+	inv := scheduler.New(enforcer, agg, exec)
 
 	collector := metrics.NewCollector()
 	inv.WithObservability(
