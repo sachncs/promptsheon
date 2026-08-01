@@ -5,9 +5,6 @@ import (
 	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"context"
-	"encoding/json"
-	"errors"
-	"log/slog"
 	"net/http"
 	"os"
 
@@ -17,10 +14,7 @@ import (
 // encrypted channel. It checks r.TLS (set by ListenAndServeTLS) and
 // X-Forwarded-Proto (set by a trusted TLS-terminating proxy). Used to
 // set Secure on cookies and HSTS on the response — both useless on
-// plaintext, both required on TLS.
-func isRequestTLS(r *http.Request) bool {
-	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
-}
+
 
 // requirePerm returns middleware that requires a specific permission.
 func (s *Server) requirePerm(perm auth.Permission) func(Func) Func {
@@ -59,70 +53,18 @@ func (s *Server) wrapHandler(fn Func) http.HandlerFunc {
 	}
 }
 
-// JSON writes a JSON response with the given status code.
-func JSON(w http.ResponseWriter, status int, value any) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	return json.NewEncoder(w).Encode(value)
-}
 
-// writeJSON writes a JSON response with the given status code.
-func writeJSON(w http.ResponseWriter, status int, data any) {
-	if err := JSON(w, status, data); err != nil {
-		slog.Error("failed to encode json response", "err", err)
-	}
-}
+
+
 
 // writeError writes a JSON error response, inferring the status code from
-// known error types.
-func writeError(w http.ResponseWriter, err error) {
-	status := http.StatusInternalServerError
-	var httpErr *HTTPError
-	var maxBytesErr *http.MaxBytesError
-	switch {
-	case errors.As(err, &maxBytesErr):
-		// http.MaxBytesReader returns *http.MaxBytesError when the
-		// body exceeds the configured limit. Map that to 413 so
-		// the client sees the actual problem (oversize body)
-		// rather than the generic 500 that previously leaked the
-		// wrapped decode error.
-		status = http.StatusRequestEntityTooLarge
-	case errors.As(err, &httpErr):
-		status = httpErr.Status
-	case errors.Is(err, ErrNotFound):
-		status = http.StatusNotFound
-	case errors.Is(err, ErrBadRequest):
-		status = http.StatusBadRequest
-	case errors.Is(err, ErrConflict):
-		status = http.StatusConflict
-	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	body := map[string]any{FieldError: err.Error()}
-	if errors.As(err, &httpErr) && httpErr.Details != nil {
-		body["details"] = httpErr.Details
-	}
-	if encErr := json.NewEncoder(w).Encode(body); encErr != nil {
-		slog.Error("failed to encode error json response", "err", encErr)
-	}
-}
 
-// readJSON decodes the request body into target.
-func readJSON(r *http.Request, target any) error {
-	defer func() { _ = r.Body.Close() }()
-	return json.NewDecoder(r.Body).Decode(target)
-}
+
 
 // httpRequestFromContext returns the *http.Request stored in the
 // context by the request middleware, if any. Returns nil if there is
-// none (e.g. background work).
-func httpRequestFromContext(ctx context.Context) *http.Request {
-	if r, ok := ctx.Value(httpRequestKey{}).(*http.Request); ok {
-		return r
-	}
-	return nil
-}
+
 
 // ReadOnlyMiddleware returns 503 Service Unavailable for any
 // non-GET request when the daemon is in read-only mode. Used
@@ -168,29 +110,6 @@ func (s *Server) handleMetricsPrometheus(w http.ResponseWriter, r *http.Request)
 	s.collector.Handler().ServeHTTP(w, r)
 	return nil
 }
-
-// Common API errors.
-var (
-	ErrNotFound   = errors.New("resource not found")
-	ErrBadRequest = errors.New("bad request")
-	ErrConflict   = errors.New("resource already exists")
-)
-
-// HTTPError represents an HTTP error with a specific status code.
-type HTTPError struct {
-	Status  int
-	Message string
-	Details any // optional structured payload (e.g. precondition failures)
-}
-
-func (e *HTTPError) Error() string { return e.Message }
-
-func badRequest(msg string) error { return &HTTPError{Status: http.StatusBadRequest, Message: msg} }
-func notFound(msg string) error   { return &HTTPError{Status: http.StatusNotFound, Message: msg} }
-func unauthorized() error {
-	return &HTTPError{Status: http.StatusUnauthorized, Message: "authentication required"}
-}
-func forbidden(msg string) error { return &HTTPError{Status: http.StatusForbidden, Message: msg} }
 
 // callerID returns the authenticated user's ID, or "api" if no user
 // is in the request context. Used to populate CreatedBy fields
