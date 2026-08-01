@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/sachncs/promptsheon/promptsheon/election"
+	. "github.com/sachncs/promptsheon/promptsheon"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 
 	_ "modernc.org/sqlite"

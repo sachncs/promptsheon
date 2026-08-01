@@ -15,7 +15,7 @@
 // replica that holds the row but stops renewing will be
 // detected within TTL. The election is NOT a quorum protocol;
 // it is a single-master advisory lock suitable for SQLite.
-package election
+package promptsheon
 
 import (
 	"context"

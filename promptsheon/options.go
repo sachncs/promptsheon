@@ -3,7 +3,6 @@ package promptsheon
 import (
 	"github.com/sachncs/promptsheon/promptsheon/alerting"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/election"
 	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"github.com/sachncs/promptsheon/promptsheon/invoke"
 	"github.com/sachncs/promptsheon/promptsheon/llm"
@@ -97,7 +96,7 @@ func WithLogHub(h *Hub) Option {
 // WithElector attaches a leader-election Elector. When set, the
 // readiness handler reports the current leader and the role of
 // this replica.
-func WithElector(e *election.Elector) Option {
+func WithElector(e *Elector) Option {
 	return func(s *Server) {
 		s.elector = e
 	}

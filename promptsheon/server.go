@@ -11,7 +11,6 @@ import (
 
 	"github.com/sachncs/promptsheon/promptsheon/alerting"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/election"
 
 	_ "github.com/sachncs/promptsheon/promptsheon/eval" // Scorer registry (no Server dep yet)
 	"github.com/sachncs/promptsheon/promptsheon/harness"
@@ -46,7 +45,7 @@ type Server struct {
 	vault           *vault.Vault
 	oauth           *auth.OAuthManager
 	logHub          *Hub
-	elector         *election.Elector
+	elector         *Elector
 	alertingManager *alerting.Manager
 	rateLimiter     *ratelimit.Limiter
 	providers       *llm.Registry
