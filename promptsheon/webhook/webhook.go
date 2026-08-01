@@ -2,6 +2,7 @@
 package webhook
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"context"
 	"crypto/hmac"
@@ -341,11 +342,11 @@ func (d *Dispatcher) validateURL(rawURL string) error {
 		return err
 	}
 	if u.Scheme != "https" && !(d.allowInsecure && (u.Scheme == "http" || u.Scheme == "https")) {
-		return fmt.Errorf("unsupported scheme %q (only https is accepted)", u.Scheme)
+		return errf.Errorf("unsupported scheme %q (only https is accepted)", u.Scheme)
 	}
 	host := u.Hostname()
 	if host == "" {
-		return fmt.Errorf("missing host")
+		return errf.Errorf("missing host")
 	}
 	if d.allowInsecure {
 		return nil
@@ -356,7 +357,7 @@ func (d *Dispatcher) validateURL(rawURL string) error {
 	}
 	for _, ip := range ips {
 		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
-			return fmt.Errorf("host %s resolves to disallowed address %s", host, ip)
+			return errf.Errorf("host %s resolves to disallowed address %s", host, ip)
 		}
 	}
 	return nil

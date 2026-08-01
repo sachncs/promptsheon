@@ -1,6 +1,7 @@
 package cas
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -59,25 +60,25 @@ func DiffIntelligence(a, b string) (*DiffResult, error) {
 	cleanA := sanitizeHash(a)
 	cleanB := sanitizeHash(b)
 	if err := validateHash(cleanA); err != nil {
-		return nil, fmt.Errorf("diff: a: %w", err)
+		return nil, errf.Errorf("diff: a: %w", err)
 	}
 	if err := validateHash(cleanB); err != nil {
-		return nil, fmt.Errorf("diff: b: %w", err)
+		return nil, errf.Errorf("diff: b: %w", err)
 	}
 
 	objA, err := ReadObject(cleanA)
 	if err != nil {
-		return nil, fmt.Errorf("diff: read a: %w", err)
+		return nil, errf.Errorf("diff: read a: %w", err)
 	}
 	if !objA.IsCommit() {
-		return nil, fmt.Errorf("%w: a is not a commit", ErrInvalidHash)
+		return nil, errf.Errorf("%w: a is not a commit", ErrInvalidHash)
 	}
 	objB, err := ReadObject(cleanB)
 	if err != nil {
-		return nil, fmt.Errorf("diff: read b: %w", err)
+		return nil, errf.Errorf("diff: read b: %w", err)
 	}
 	if !objB.IsCommit() {
-		return nil, fmt.Errorf("%w: b is not a commit", ErrInvalidHash)
+		return nil, errf.Errorf("%w: b is not a commit", ErrInvalidHash)
 	}
 
 	result := &DiffResult{CommitA: cleanA, CommitB: cleanB}
@@ -426,7 +427,7 @@ func toFloat64(v any) (float64, bool) {
 // it is what json.Number produces for large numbers.
 func parseFloatString(s string) (float64, error) {
 	if s == "" {
-		return 0, fmt.Errorf("empty string")
+		return 0, errf.Errorf("empty string")
 	}
 	// Quick reject for things json.Number would never produce.
 	for _, r := range s {
@@ -434,7 +435,7 @@ func parseFloatString(s string) (float64, error) {
 			continue
 		}
 		if r < '0' || r > '9' {
-			return 0, fmt.Errorf("non-numeric")
+			return 0, errf.Errorf("non-numeric")
 		}
 	}
 	f, err := parseFloat64(s)
@@ -442,7 +443,7 @@ func parseFloatString(s string) (float64, error) {
 		return 0, err
 	}
 	if math.IsNaN(f) || math.IsInf(f, 0) {
-		return 0, fmt.Errorf("non-finite")
+		return 0, errf.Errorf("non-finite")
 	}
 	return f, nil
 }
@@ -466,5 +467,5 @@ func jsonNumberParse(s string) (float64, error) {
 	if n, ok := v.(json.Number); ok {
 		return n.Float64()
 	}
-	return 0, fmt.Errorf("not a number")
+	return 0, errf.Errorf("not a number")
 }

@@ -1,7 +1,7 @@
 package cas
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 
 	"regexp"
 	"strings"
@@ -26,7 +26,7 @@ func sanitizeHash(raw string) string {
 // first.
 func validateHash(cleaned string) error {
 	if !hashPattern.MatchString(cleaned) {
-		return fmt.Errorf("%w: must be 64 lowercase hex characters", ErrInvalidHash)
+		return errf.Errorf("%w: must be 64 lowercase hex characters", ErrInvalidHash)
 	}
 	return nil
 }
@@ -49,30 +49,30 @@ var branchNamePattern = regexp.MustCompile(`^[!-~]+$`)
 //   - names starting with a dot (Git reserves those)
 func validateBranchName(name string) error {
 	if name == "" {
-		return fmt.Errorf("branch name is empty")
+		return errf.Errorf("branch name is empty")
 	}
 	if name == headFile {
-		return fmt.Errorf("branch name %q is reserved", name)
+		return errf.Errorf("branch name %q is reserved", name)
 	}
 	if strings.Contains(name, "..") {
-		return fmt.Errorf("branch name %q contains '..'", name)
+		return errf.Errorf("branch name %q contains '..'", name)
 	}
 	if len(name) > maxBranchLength {
-		return fmt.Errorf("branch name is %d characters, max is %d", len(name), maxBranchLength)
+		return errf.Errorf("branch name is %d characters, max is %d", len(name), maxBranchLength)
 	}
 	if strings.HasPrefix(name, ".") {
-		return fmt.Errorf("branch name %q starts with a dot", name)
+		return errf.Errorf("branch name %q starts with a dot", name)
 	}
 	for _, r := range name {
 		if r == '/' || r == '\\' {
-			return fmt.Errorf("branch name %q contains %q", name, string(r))
+			return errf.Errorf("branch name %q contains %q", name, string(r))
 		}
 		if unicode.IsSpace(r) || unicode.IsControl(r) {
-			return fmt.Errorf("branch name %q contains whitespace or control character", name)
+			return errf.Errorf("branch name %q contains whitespace or control character", name)
 		}
 	}
 	if !branchNamePattern.MatchString(name) {
-		return fmt.Errorf("branch name %q contains non-printable characters", name)
+		return errf.Errorf("branch name %q contains non-printable characters", name)
 	}
 	return nil
 }

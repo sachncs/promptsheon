@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"database/sql"
@@ -46,7 +46,7 @@ func (s *SQLite) CreateCapability(ctx context.Context, c *capability.Capability)
 		c.ID, c.ProjectID, c.Name, c.Description, c.CreatedAt, c.UpdatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("insert capability: %w", err)
+		return errf.Errorf("insert capability: %w", err)
 	}
 	return nil
 }
@@ -77,7 +77,7 @@ func (s *SQLite) ListCapabilities(ctx context.Context, projectID string) ([]*cap
 		 FROM capabilities WHERE project_id = ? ORDER BY name`, projectID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list capabilities: %w", err)
+		return nil, errf.Errorf("list capabilities: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -113,7 +113,7 @@ func (s *SQLite) CatalogSearch(ctx context.Context, workspaceID, query string, l
 		LIMIT ?`, workspaceID, query, query, limit,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("catalog search: %w", err)
+		return nil, errf.Errorf("catalog search: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var result []*capability.Capability
@@ -134,7 +134,7 @@ func (s *SQLite) UpdateCapability(ctx context.Context, c *capability.Capability)
 		c.Name, c.Description, c.UpdatedAt, c.ID,
 	)
 	if err != nil {
-		return fmt.Errorf("update capability: %w", err)
+		return errf.Errorf("update capability: %w", err)
 	}
 	return nil
 }
@@ -142,7 +142,7 @@ func (s *SQLite) UpdateCapability(ctx context.Context, c *capability.Capability)
 func (s *SQLite) DeleteCapability(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM capabilities WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("delete capability: %w", err)
+		return errf.Errorf("delete capability: %w", err)
 	}
 	return nil
 }
@@ -170,11 +170,11 @@ func (s *SQLite) UpdateSelfEvolveConfig(ctx context.Context, capabilityID string
 		cfg.TargetEnv, dataset, capabilityID,
 	)
 	if err != nil {
-		return fmt.Errorf("update self-evolve config: %w", err)
+		return errf.Errorf("update self-evolve config: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("rows affected: %w", err)
+		return errf.Errorf("rows affected: %w", err)
 	}
 	if n == 0 {
 		return errs.ErrStoreNotFound
@@ -200,7 +200,7 @@ func (s *SQLite) LoadSelfEvolveState(ctx context.Context, capabilityID, targetEn
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("load self_evolve_state: %w", err)
+		return nil, errf.Errorf("load self_evolve_state: %w", err)
 	}
 	if lastAttempt.Valid {
 		t := lastAttempt.Time
@@ -224,7 +224,7 @@ func (s *SQLite) LoadSelfEvolveState(ctx context.Context, capabilityID, targetEn
 
 func (s *SQLite) SaveSelfEvolveState(ctx context.Context, st *SelfEvolveState) error {
 	if st == nil {
-		return fmt.Errorf("save self_evolve_state: nil state")
+		return errf.Errorf("save self_evolve_state: nil state")
 	}
 	if st.LastAttemptAt == nil {
 		now := time.Now().UTC()
@@ -249,7 +249,7 @@ func (s *SQLite) SaveSelfEvolveState(ctx context.Context, st *SelfEvolveState) e
 		st.LastStatus, st.LastError,
 	)
 	if err != nil {
-		return fmt.Errorf("save self_evolve_state: %w", err)
+		return errf.Errorf("save self_evolve_state: %w", err)
 	}
 	return nil
 }
@@ -259,7 +259,7 @@ func (s *SQLite) SetCapabilityContract(ctx context.Context, capabilityID string,
 		if _, err := s.db.ExecContext(ctx,
 			`DELETE FROM capability_contracts WHERE capability_id = ?`, capabilityID,
 		); err != nil {
-			return fmt.Errorf("clear contract: %w", err)
+			return errf.Errorf("clear contract: %w", err)
 		}
 		return nil
 	}
@@ -290,7 +290,7 @@ func (s *SQLite) SetCapabilityContract(ctx context.Context, capabilityID string,
 		c.SLOTarget.MaxP95LatencyMS, c.SLOTarget.MinSuccessRate,
 		c.SLOTarget.MaxHallucinationRate)
 	if err != nil {
-		return fmt.Errorf("upsert contract: %w", err)
+		return errf.Errorf("upsert contract: %w", err)
 	}
 	return nil
 }
@@ -316,7 +316,7 @@ func (s *SQLite) GetCapabilityContract(ctx context.Context, capabilityID string)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errs.ErrStoreNotFound
 		}
-		return nil, fmt.Errorf("get contract: %w", err)
+		return nil, errf.Errorf("get contract: %w", err)
 	}
 	c := &capability.CapabilityContract{
 		BlastRadius:    capability.BlastRadius(blast),
@@ -415,7 +415,7 @@ func scanCapability(scanner interface {
 		return nil, errs.ErrStoreNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("scan capability: %w", err)
+		return nil, errf.Errorf("scan capability: %w", err)
 	}
 	c.SelfEvolve = capability.SelfEvolveConfig{
 		Enabled:      seEnabled != 0,

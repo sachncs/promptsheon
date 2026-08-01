@@ -21,6 +21,7 @@
 package main
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -75,7 +76,7 @@ func process(path string, info os.FileInfo) error {
 	}
 	file, err := parser.ParseFile(fset, path, src, parser.ParseComments)
 	if err != nil {
-		return fmt.Errorf("parse %s: %w", path, err)
+		return errf.Errorf("parse %s: %w", path, err)
 	}
 
 	renamed := false
@@ -113,7 +114,7 @@ func process(path string, info os.FileInfo) error {
 	}
 	var buf strings.Builder
 	if err := format.Node(&buf, fset, file); err != nil {
-		return fmt.Errorf("format %s: %w", path, err)
+		return errf.Errorf("format %s: %w", path, err)
 	}
 	return os.WriteFile(path, []byte(buf.String()), info.Mode())
 }

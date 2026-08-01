@@ -1,7 +1,7 @@
 package cas
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"errors"
 )
 
@@ -36,10 +36,10 @@ func Commit(treeHash string, parents []string, author, message string, telemetry
 	// would happily write a commit that nothing can reach.
 	cleanedTree := sanitizeHash(treeHash)
 	if err := validateHash(cleanedTree); err != nil {
-		return nil, fmt.Errorf("commit: %w", err)
+		return nil, errf.Errorf("commit: %w", err)
 	}
 	if _, err := ReadObject(cleanedTree); err != nil {
-		return nil, fmt.Errorf("commit: tree object: %w", err)
+		return nil, errf.Errorf("commit: tree object: %w", err)
 	}
 
 	// Validate every parent hash. A missing parent is a serious
@@ -49,10 +49,10 @@ func Commit(treeHash string, parents []string, author, message string, telemetry
 	for _, p := range parents {
 		cleaned := sanitizeHash(p)
 		if err := validateHash(cleaned); err != nil {
-			return nil, fmt.Errorf("commit: parent %q: %w", p, err)
+			return nil, errf.Errorf("commit: parent %q: %w", p, err)
 		}
 		if _, err := ReadObject(cleaned); err != nil {
-			return nil, fmt.Errorf("commit: parent object: %w", err)
+			return nil, errf.Errorf("commit: parent object: %w", err)
 		}
 		cleanedParents = append(cleanedParents, cleaned)
 	}
@@ -60,7 +60,7 @@ func Commit(treeHash string, parents []string, author, message string, telemetry
 	obj := NewCommitObject(cleanedTree, cleanedParents, author, message, telemetry)
 	newHash, err := canonicalHash(obj)
 	if err != nil {
-		return nil, fmt.Errorf("commit: hash: %w", err)
+		return nil, errf.Errorf("commit: hash: %w", err)
 	}
 
 	var result CommitResult
@@ -68,7 +68,7 @@ func Commit(treeHash string, parents []string, author, message string, telemetry
 	err = withRepoLock(func() error {
 		hash, werr := WriteObject(obj)
 		if werr != nil {
-			return fmt.Errorf("commit: write: %w", werr)
+			return errf.Errorf("commit: write: %w", werr)
 		}
 		result.Hash = hash
 
@@ -81,14 +81,14 @@ func Commit(treeHash string, parents []string, author, message string, telemetry
 		}
 		if ref != "" {
 			if werr := WriteRef(ref, hash); werr != nil {
-				return fmt.Errorf("commit: update ref: %w", werr)
+				return errf.Errorf("commit: update ref: %w", werr)
 			}
 			result.Ref = ref
 		} else {
 			// Detached HEAD: rewrite HEAD with the new commit hash so
 			// the working state is consistent.
 			if werr := WriteHEAD(hash); werr != nil {
-				return fmt.Errorf("commit: update HEAD: %w", werr)
+				return errf.Errorf("commit: update HEAD: %w", werr)
 			}
 		}
 		return nil
@@ -138,7 +138,7 @@ func CurrentCommitHash() (string, error) {
 func readHEADRef() (string, string, error) {
 	head, err := ReadHEAD()
 	if err != nil {
-		return "", "", fmt.Errorf("read HEAD: %w", err)
+		return "", "", errf.Errorf("read HEAD: %w", err)
 	}
 	return HEADRefName(head), head, nil
 }

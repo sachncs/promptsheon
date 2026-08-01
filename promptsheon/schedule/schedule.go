@@ -22,7 +22,7 @@
 package schedule
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/stringsutil"
 	"context"
 	"errors"
@@ -68,7 +68,7 @@ func New(workspaceID, releaseID string, kind Kind, cronExpr, webhookPath string)
 	switch kind {
 	case KindCron, KindWebhook, KindManual:
 	default:
-		return Schedule{}, fmt.Errorf("schedule: unknown kind %q", kind)
+		return Schedule{}, errf.Errorf("schedule: unknown kind %q", kind)
 	}
 	var next time.Time
 	if kind == KindCron {
@@ -98,7 +98,7 @@ func (s Schedule) Validate() error {
 		return nil
 	}
 	if _, err := nextCron(s.Cron, time.Now().UTC()); err != nil {
-		return fmt.Errorf("%w: %w", errs.ErrInvalidCron, err)
+		return errf.Errorf("%w: %w", errs.ErrInvalidCron, err)
 	}
 	return nil
 }
@@ -160,26 +160,26 @@ func nextCron(expr string, from time.Time) (time.Time, error) {
 	parts = parts2
 	minute, err := parseField(parts[0], 0, 59)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("minute: %w", err)
+		return time.Time{}, errf.Errorf("minute: %w", err)
 	}
 	hour, err := parseField(parts[1], 0, 23)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("hour: %w", err)
+		return time.Time{}, errf.Errorf("hour: %w", err)
 	}
 	if _, err := parseField(parts[2], 1, 31); err != nil {
-		return time.Time{}, fmt.Errorf("dom: %w", err)
+		return time.Time{}, errf.Errorf("dom: %w", err)
 	}
 	month, err := parseField(parts[3], 1, 12)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("month: %w", err)
+		return time.Time{}, errf.Errorf("month: %w", err)
 	}
 	dow, dowWild, err := parseFieldWithWildcard(parts[4], 0, 6)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("dow: %w", err)
+		return time.Time{}, errf.Errorf("dow: %w", err)
 	}
 	dom, domWild, err := parseFieldWithWildcard(parts[2], 1, 31)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("dom: %w", err)
+		return time.Time{}, errf.Errorf("dom: %w", err)
 	}
 
 	// Walk minute-by-minute from `from+1min` up to a 366-day cap.
@@ -241,23 +241,23 @@ func parseFieldWithWildcard(s string, lo, hi int) ([]bool, bool, error) {
 	}
 	for _, raw := range splitCSV(s) {
 		if raw == "" {
-			return nil, false, fmt.Errorf("%w: empty token", errs.ErrInvalidCron)
+			return nil, false, errf.Errorf("%w: empty token", errs.ErrInvalidCron)
 		}
 		if strings.Contains(raw, "/") {
 			if err := applyStep(out, raw, lo, hi); err != nil {
-				return nil, false, fmt.Errorf("%w: %w", errs.ErrInvalidCron, err)
+				return nil, false, errf.Errorf("%w: %w", errs.ErrInvalidCron, err)
 			}
 			continue
 		}
 		if strings.Contains(raw, "-") {
 			if err := applyRange(out, raw, lo, hi); err != nil {
-				return nil, false, fmt.Errorf("%w: %w", errs.ErrInvalidCron, err)
+				return nil, false, errf.Errorf("%w: %w", errs.ErrInvalidCron, err)
 			}
 			continue
 		}
 		v, err := atoiStrict(raw, lo, hi)
 		if err != nil {
-			return nil, false, fmt.Errorf("%w: %w", errs.ErrInvalidCron, err)
+			return nil, false, errf.Errorf("%w: %w", errs.ErrInvalidCron, err)
 		}
 		out[v] = true
 	}
@@ -269,17 +269,17 @@ func parseFieldWithWildcard(s string, lo, hi int) ([]bool, bool, error) {
 func applyStep(out []bool, raw string, lo, hi int) error {
 	parts := strings.SplitN(raw, "/", 2)
 	if len(parts) != 2 {
-		return fmt.Errorf("malformed step %q", raw)
+		return errf.Errorf("malformed step %q", raw)
 	}
 	step, err := atoiStrict(parts[1], 1, hi-lo+1)
 	if err != nil {
-		return fmt.Errorf("step %q: %w", raw, err)
+		return errf.Errorf("step %q: %w", raw, err)
 	}
 	start := lo
 	if parts[0] != "*" {
 		start, err = atoiStrict(parts[0], lo, hi)
 		if err != nil {
-			return fmt.Errorf("start %q: %w", raw, err)
+			return errf.Errorf("start %q: %w", raw, err)
 		}
 	}
 	for v := start; v <= hi; v += step {
@@ -292,18 +292,18 @@ func applyStep(out []bool, raw string, lo, hi int) error {
 func applyRange(out []bool, raw string, lo, hi int) error {
 	parts := strings.SplitN(raw, "-", 2)
 	if len(parts) != 2 {
-		return fmt.Errorf("malformed range %q", raw)
+		return errf.Errorf("malformed range %q", raw)
 	}
 	a, err := atoiStrict(parts[0], lo, hi)
 	if err != nil {
-		return fmt.Errorf("range start %q: %w", raw, err)
+		return errf.Errorf("range start %q: %w", raw, err)
 	}
 	b, err := atoiStrict(parts[1], lo, hi)
 	if err != nil {
-		return fmt.Errorf("range end %q: %w", raw, err)
+		return errf.Errorf("range end %q: %w", raw, err)
 	}
 	if a > b {
-		return fmt.Errorf("range %q is descending", raw)
+		return errf.Errorf("range %q is descending", raw)
 	}
 	for v := a; v <= b; v++ {
 		out[v] = true
@@ -339,12 +339,12 @@ func atoiStrict(s string, lo, hi int) (int, error) {
 	v := 0
 	for _, c := range s {
 		if c < '0' || c > '9' {
-			return 0, fmt.Errorf("invalid char %q in %q", c, s)
+			return 0, errf.Errorf("invalid char %q in %q", c, s)
 		}
 		v = v*10 + int(c-'0')
 	}
 	if v < lo || v > hi {
-		return 0, fmt.Errorf("%d out of range [%d,%d]", v, lo, hi)
+		return 0, errf.Errorf("%d out of range [%d,%d]", v, lo, hi)
 	}
 	return v, nil
 }

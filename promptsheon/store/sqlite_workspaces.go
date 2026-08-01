@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"database/sql"
@@ -18,7 +18,7 @@ func (s *SQLite) CreateWorkspace(ctx context.Context, w *capability.Workspace) e
 		w.ID, w.Name, w.Organization, w.CreatedAt, w.UpdatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("insert workspace: %w", err)
+		return errf.Errorf("insert workspace: %w", err)
 	}
 	return nil
 }
@@ -35,7 +35,7 @@ func (s *SQLite) ListWorkspaces(ctx context.Context) ([]*capability.Workspace, e
 		`SELECT id, name, organization, created_at, updated_at FROM workspaces ORDER BY name`,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list workspaces: %w", err)
+		return nil, errf.Errorf("list workspaces: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -56,7 +56,7 @@ func (s *SQLite) UpdateWorkspace(ctx context.Context, w *capability.Workspace) e
 		w.Name, w.Organization, w.UpdatedAt, w.ID,
 	)
 	if err != nil {
-		return fmt.Errorf("update workspace: %w", err)
+		return errf.Errorf("update workspace: %w", err)
 	}
 	return nil
 }
@@ -64,7 +64,7 @@ func (s *SQLite) UpdateWorkspace(ctx context.Context, w *capability.Workspace) e
 func (s *SQLite) DeleteWorkspace(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM workspaces WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("delete workspace: %w", err)
+		return errf.Errorf("delete workspace: %w", err)
 	}
 	return nil
 }
@@ -78,7 +78,7 @@ func scanWorkspace(scanner interface {
 		return nil, errs.ErrStoreNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("scan workspace: %w", err)
+		return nil, errf.Errorf("scan workspace: %w", err)
 	}
 	return &w, nil
 }

@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"database/sql"
 	"embed"
@@ -95,7 +95,7 @@ type scannable interface {
 func marshalOrErr(v any) ([]byte, error) {
 	b, err := json.Marshal(v)
 	if err != nil {
-		return nil, fmt.Errorf("marshal json: %w", err)
+		return nil, errf.Errorf("marshal json: %w", err)
 	}
 	return b, nil
 }
@@ -110,7 +110,7 @@ func mustUnmarshal(data []byte, v any) error {
 		// disk corruption, schema drift, and interrupted writes behind
 		// a slog.Error log; upstream validation failures had no audit
 		// trail pointing at the corrupted row.
-		return fmt.Errorf("unmarshal JSON: %w", err)
+		return errf.Errorf("unmarshal JSON: %w", err)
 	}
 	return nil
 }
@@ -125,7 +125,7 @@ func NewSQLite(dbPath string) (*SQLite, error) {
 	}
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("open database: %w", err)
+		return nil, errf.Errorf("open database: %w", err)
 	}
 
 	db.SetMaxOpenConns(4)
@@ -134,9 +134,9 @@ func NewSQLite(dbPath string) (*SQLite, error) {
 
 	if err := migrate(db, migrationsFS); err != nil {
 		if cerr := db.Close(); cerr != nil {
-			return nil, fmt.Errorf("migrate: %w (close: %v)", err, cerr)
+			return nil, errf.Errorf("migrate: %w (close: %v)", err, cerr)
 		}
-		return nil, fmt.Errorf("migrate: %w", err)
+		return nil, errf.Errorf("migrate: %w", err)
 	}
 
 	s := &SQLite{db: db}
@@ -149,7 +149,7 @@ func NewSQLite(dbPath string) (*SQLite, error) {
 	prep := func(query string) (*sql.Stmt, error) {
 		stmt, err := db.Prepare(query)
 		if err != nil {
-			return nil, fmt.Errorf("prepare statement: %w", err)
+			return nil, errf.Errorf("prepare statement: %w", err)
 		}
 		return stmt, nil
 	}

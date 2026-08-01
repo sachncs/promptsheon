@@ -1,7 +1,7 @@
 package promptsheon
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 	"net/http"
@@ -144,7 +144,7 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) error 
 		var lerr error
 		keysBefore, lerr = s.db.ListAPIKeysByUser(r.Context(), existing.ID)
 		if lerr != nil {
-			return fmt.Errorf("list keys for revocation audit: %w", lerr)
+			return errf.Errorf("list keys for revocation audit: %w", lerr)
 		}
 	}
 

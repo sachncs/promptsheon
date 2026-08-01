@@ -40,18 +40,8 @@ func generateID() string {
 // the error as a value. The %w verb is honoured.
 //
 // This is the single source of fmt usage in the promptsheon
-// package; all callers should use promptsheon.Errorf instead of
-// fmt.Errorf to keep the "fmt" dependency contained.
-func Errorf(format string, args ...any) error {
-	return fmt.Errorf(format, args...)
-}
-
-// NewError returns an error that formats as the given text.
-// The name avoids collision with election.New in the same
-// package.
-func NewError(text string) error {
-	return errors.New(text)
-}
+// package; all callers should use errf.Errorf directly to keep
+// the "fmt" dependency contained.
 
 // HTTPError represents an HTTP error with a specific status code.
 type HTTPError struct {

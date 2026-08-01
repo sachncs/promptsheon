@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
 	"database/sql"
@@ -19,7 +19,7 @@ func (s *SQLite) SaveProviderKey(ctx context.Context, pk *models.ProviderKey) er
 		pk.ID, pk.ProviderName, pk.KeyName, pk.EncryptedKey, pk.CreatedAt, pk.UpdatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("save provider key: %w", err)
+		return errf.Errorf("save provider key: %w", err)
 	}
 	return nil
 }
@@ -43,11 +43,11 @@ func (s *SQLite) GetProviderKeyByName(ctx context.Context, providerName, keyName
 func (s *SQLite) DeleteProviderKey(ctx context.Context, id string) error {
 	result, err := s.db.ExecContext(ctx, "DELETE FROM provider_keys WHERE id = ?", id)
 	if err != nil {
-		return fmt.Errorf("delete provider key: %w", err)
+		return errf.Errorf("delete provider key: %w", err)
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("provider key not found: %s", id)
+		return errf.Errorf("provider key not found: %s", id)
 	}
 	return nil
 }
@@ -58,7 +58,7 @@ func (s *SQLite) ListProviderKeys(ctx context.Context) ([]*models.ProviderKey, e
 		 FROM provider_keys ORDER BY created_at DESC`,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list provider keys: %w", err)
+		return nil, errf.Errorf("list provider keys: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -80,7 +80,7 @@ func scanProviderKey(row scannable) (*models.ProviderKey, error) {
 		if err == sql.ErrNoRows {
 			return nil, errs.ErrStoreNotFound
 		}
-		return nil, fmt.Errorf("scan provider key: %w", err)
+		return nil, errf.Errorf("scan provider key: %w", err)
 	}
 	return &pk, nil
 }

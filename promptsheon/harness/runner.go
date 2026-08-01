@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -66,17 +67,17 @@ func NewEvalRunner(repo Repository, inv ReleaseInvoker) *EvalRunner {
 func (r *EvalRunner) Run(ctx context.Context, opts EvalRunOptions) (*EvalRun, error) {
 	if opts.Scorer == nil {
 		if opts.ScorerName == "" {
-			return nil, fmt.Errorf("harness: scorer required")
+			return nil, errf.Errorf("harness: scorer required")
 		}
 		s, ok := eval.Lookup(opts.ScorerName)
 		if !ok {
-			return nil, fmt.Errorf("harness: unknown scorer %q", opts.ScorerName)
+			return nil, errf.Errorf("harness: unknown scorer %q", opts.ScorerName)
 		}
 		opts.Scorer = s
 	}
 
 	if _, err := r.Repo.GetDataset(ctx, opts.DatasetID); err != nil {
-		return nil, fmt.Errorf("harness: load dataset: %w", err)
+		return nil, errf.Errorf("harness: load dataset: %w", err)
 	}
 
 	run := &EvalRun{
@@ -88,12 +89,12 @@ func (r *EvalRunner) Run(ctx context.Context, opts EvalRunOptions) (*EvalRun, er
 		StartedAt: r.Clock(),
 	}
 	if err := r.Repo.CreateEvalRun(ctx, run); err != nil {
-		return nil, fmt.Errorf("harness: persist run: %w", err)
+		return nil, errf.Errorf("harness: persist run: %w", err)
 	}
 
 	cases, err := r.Repo.ListDatasetCases(ctx, opts.DatasetID)
 	if err != nil {
-		r.markFailed(ctx, run, fmt.Errorf("load cases: %w", err))
+		r.markFailed(ctx, run, errf.Errorf("load cases: %w", err))
 		return run, err
 	}
 
@@ -179,7 +180,7 @@ func (r *EvalRunner) Run(ctx context.Context, opts EvalRunOptions) (*EvalRun, er
 	}
 
 	if err := r.Repo.UpdateEvalRun(ctx, run); err != nil {
-		return run, fmt.Errorf("harness: persist run update: %w", err)
+		return run, errf.Errorf("harness: persist run update: %w", err)
 	}
 	// PERF-EVAL-2: bulk insert at the end. The streaming path
 	// is plumbed via CreateEvalResult for callers that want
@@ -187,7 +188,7 @@ func (r *EvalRunner) Run(ctx context.Context, opts EvalRunOptions) (*EvalRun, er
 	// CreateEvalResults so legacy stores that implement only
 	// the bulk path keep working.
 	if err := r.Repo.CreateEvalResults(ctx, results); err != nil {
-		return run, fmt.Errorf("harness: persist results: %w", err)
+		return run, errf.Errorf("harness: persist results: %w", err)
 	}
 	return run, nil
 }

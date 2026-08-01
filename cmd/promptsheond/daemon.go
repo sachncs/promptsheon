@@ -2,6 +2,7 @@
 package main
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/cas"
 	"github.com/sachncs/promptsheon/promptsheon/release"
 	"github.com/sachncs/promptsheon/promptsheon/metrics"
@@ -861,7 +862,7 @@ func (l *defaultArtifactLoader) Load(ctx context.Context, _ capability.ArtifactK
 		return nil, err
 	}
 	if !obj.IsBlob() {
-		return nil, fmt.Errorf("artifact %s is %s, want blob", hash, obj.Type())
+		return nil, errf.Errorf("artifact %s is %s, want blob", hash, obj.Type())
 	}
 	return []byte(obj.Data), nil
 }
@@ -1106,14 +1107,14 @@ func writeGoroutineDump(dir string) {
 // into the exit code.
 func validateVaultKey(s string) error {
 	if len(s) != 64 {
-		return fmt.Errorf("vault: master key must be exactly 64 hex chars (32 bytes), got %d", len(s))
+		return errf.Errorf("vault: master key must be exactly 64 hex chars (32 bytes), got %d", len(s))
 	}
 	b, err := hex.DecodeString(s)
 	if err != nil {
-		return fmt.Errorf("vault: master key is not valid hex: %w", err)
+		return errf.Errorf("vault: master key is not valid hex: %w", err)
 	}
 	if len(b) != 32 {
-		return fmt.Errorf("vault: master key decodes to %d bytes, want 32", len(b))
+		return errf.Errorf("vault: master key decodes to %d bytes, want 32", len(b))
 	}
 	return nil
 }
@@ -1227,7 +1228,7 @@ a non-empty PROMPTSHEON_CORS_ORIGINS allowlist.
 func runBackup(dst string) error {
 	src := os.Getenv("PROMPTSHEON_DB_PATH")
 	if src == "" {
-		return fmt.Errorf("backup: PROMPTSHEON_DB_PATH is not set")
+		return errf.Errorf("backup: PROMPTSHEON_DB_PATH is not set")
 	}
 	return runBackupVACUUMINTO(src, dst)
 }

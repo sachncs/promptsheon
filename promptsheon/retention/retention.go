@@ -5,7 +5,7 @@
 package retention
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/store"
 	"context"
 	"database/sql"
@@ -146,7 +146,7 @@ func (m *Manager) Enforce(ctx context.Context) error {
 			"DELETE FROM traces WHERE started_at < ?", cutoff)
 		if err != nil {
 			m.logger.Warn("failed to clean trace spans", "err", err)
-			m.lastErr = fmt.Errorf("trace cleanup: %w", err)
+			m.lastErr = errf.Errorf("trace cleanup: %w", err)
 		} else {
 			n, _ := result.RowsAffected()
 			traceDeleted = int(n)
@@ -160,7 +160,7 @@ func (m *Manager) Enforce(ctx context.Context) error {
 		if _, err := m.verifyChainForRetention(ctx); err != nil {
 			m.logger.Warn("retention: chain verification failed; skipping audit archive",
 				"err", err)
-			m.lastErr = fmt.Errorf("audit chain verify: %w", err)
+			m.lastErr = errf.Errorf("audit chain verify: %w", err)
 		} else {
 			// INSERT OR IGNORE: audit_archive.id is the PK, so a
 			// re-run after a partial failure would otherwise
@@ -177,7 +177,7 @@ func (m *Manager) Enforce(ctx context.Context) error {
 				WHERE timestamp < ?`, cutoff)
 			if err != nil {
 				m.logger.Warn("failed to archive audit rows", "err", err)
-				m.lastErr = fmt.Errorf("audit archive: %w", err)
+				m.lastErr = errf.Errorf("audit archive: %w", err)
 			} else {
 				n, _ := result.RowsAffected()
 				auditArchived = int(n)
@@ -194,7 +194,7 @@ func (m *Manager) Enforce(ctx context.Context) error {
 	}
 
 	if m.lastErr != nil {
-		return fmt.Errorf("retention: %w", m.lastErr)
+		return errf.Errorf("retention: %w", m.lastErr)
 	}
 	return nil
 }
@@ -209,7 +209,7 @@ func (m *Manager) verifyChainForRetention(ctx context.Context) (string, error) {
 		return "", err
 	}
 	if !res.Ok {
-		return "", fmt.Errorf("chain verify failed: %s", res.Reason)
+		return "", errf.Errorf("chain verify failed: %s", res.Reason)
 	}
 	return "ok", nil
 }

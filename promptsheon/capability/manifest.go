@@ -1,7 +1,7 @@
 package capability
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )
@@ -45,14 +45,14 @@ func (r ArtifactRef) Valid() error {
 		ArtifactContext, ArtifactMemory,
 		ArtifactGuardrail, ArtifactTool, ArtifactMCPServer:
 	default:
-		return fmt.Errorf("artifact: unknown kind %q", r.Kind)
+		return errf.Errorf("artifact: unknown kind %q", r.Kind)
 	}
 	if len(r.Hash) != 64 {
-		return fmt.Errorf("artifact: hash must be 64 hex characters (sha-256), got %d", len(r.Hash))
+		return errf.Errorf("artifact: hash must be 64 hex characters (sha-256), got %d", len(r.Hash))
 	}
 	for _, b := range r.Hash {
 		if !((b >= '0' && b <= '9') || (b >= 'a' && b <= 'f')) {
-			return fmt.Errorf("artifact: hash must be lowercase hex, got %q", r.Hash)
+			return errf.Errorf("artifact: hash must be lowercase hex, got %q", r.Hash)
 		}
 	}
 	return nil
@@ -107,13 +107,13 @@ func (m Manifest) Validate() error {
 	// required all five, which forced every test fixture to
 	// fabricate empty hashes for fields the system never used.
 	if err := m.Prompt.Valid(); err != nil {
-		return fmt.Errorf("manifest: prompt: %w", err)
+		return errf.Errorf("manifest: prompt: %w", err)
 	}
 	if err := m.ModelPolicy.Valid(); err != nil {
-		return fmt.Errorf("manifest: model_policy: %w", err)
+		return errf.Errorf("manifest: model_policy: %w", err)
 	}
 	if err := m.RuntimePolicy.Valid(); err != nil {
-		return fmt.Errorf("manifest: runtime_policy: %w", err)
+		return errf.Errorf("manifest: runtime_policy: %w", err)
 	}
 	if err := validateSlice(m.Guardrails, "guardrails"); err != nil {
 		return err
@@ -139,10 +139,10 @@ func validateSlice(refs []ArtifactRef, field string) error {
 	seen := make(map[string]struct{}, len(refs))
 	for i, r := range refs {
 		if err := r.Valid(); err != nil {
-			return fmt.Errorf("manifest: %s[%d]: %w", field, i, err)
+			return errf.Errorf("manifest: %s[%d]: %w", field, i, err)
 		}
 		if _, dup := seen[r.Hash]; dup {
-			return fmt.Errorf("manifest: %s contains duplicate hash %s", field, r.Hash)
+			return errf.Errorf("manifest: %s contains duplicate hash %s", field, r.Hash)
 		}
 		seen[r.Hash] = struct{}{}
 	}

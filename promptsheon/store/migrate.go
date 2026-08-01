@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"database/sql"
 	"fmt"
@@ -54,20 +55,20 @@ func migrate(db *sql.DB, migrationsFS fs.FS) error {
 			applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)
 	`); err != nil {
-		return fmt.Errorf("create migrations table: %w", err)
+		return errf.Errorf("create migrations table: %w", err)
 	}
 
 	// Read applied versions.
 	applied := make(map[int]bool)
 	rows, err := db.Query("SELECT version FROM schema_migrations")
 	if err != nil {
-		return fmt.Errorf("query migrations: %w", err)
+		return errf.Errorf("query migrations: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var v int
 		if e := rows.Scan(&v); e != nil {
-			return fmt.Errorf("scan migration version: %w", e)
+			return errf.Errorf("scan migration version: %w", e)
 		}
 		applied[v] = true
 	}
@@ -78,7 +79,7 @@ func migrate(db *sql.DB, migrationsFS fs.FS) error {
 	// Read migration files.
 	entries, err := fs.ReadDir(migrationsFS, "migrations")
 	if err != nil {
-		return fmt.Errorf("read migrations dir: %w", err)
+		return errf.Errorf("read migrations dir: %w", err)
 	}
 
 	var files []fs.DirEntry
@@ -108,7 +109,7 @@ func migrate(db *sql.DB, migrationsFS fs.FS) error {
 		}
 
 		if isDestructiveMigration(f.Name()) && !destructiveAllowed {
-			return fmt.Errorf(
+			return errf.Errorf(
 				"migration %s is destructive and requires %s=true; "+
 					"refusing to start. Take a backup of %s before retrying",
 				f.Name(), DestructiveMigrationEnv, "<db path>",
@@ -117,12 +118,12 @@ func migrate(db *sql.DB, migrationsFS fs.FS) error {
 
 		content, err := fs.ReadFile(migrationsFS, "migrations/"+f.Name())
 		if err != nil {
-			return fmt.Errorf("read migration %s: %w", f.Name(), err)
+			return errf.Errorf("read migration %s: %w", f.Name(), err)
 		}
 
 		// Apply migration in a transaction.
 		if err := applyMigration(db, version, string(content)); err != nil {
-			return fmt.Errorf("apply migration %s: %w", f.Name(), err)
+			return errf.Errorf("apply migration %s: %w", f.Name(), err)
 		}
 	}
 
@@ -146,7 +147,7 @@ func migrateUpTo(db *sql.DB, target int) error {
 	}
 	entries, err := fs.ReadDir(migrationsFS, "migrations")
 	if err != nil {
-		return fmt.Errorf("read migrations dir: %w", err)
+		return errf.Errorf("read migrations dir: %w", err)
 	}
 	var files []fs.DirEntry
 	for _, e := range entries {
@@ -166,10 +167,10 @@ func migrateUpTo(db *sql.DB, target int) error {
 		}
 		content, err := fs.ReadFile(migrationsFS, "migrations/"+f.Name())
 		if err != nil {
-			return fmt.Errorf("read migration %s: %w", f.Name(), err)
+			return errf.Errorf("read migration %s: %w", f.Name(), err)
 		}
 		if err := applyMigration(db, v, string(content)); err != nil {
-			return fmt.Errorf("apply migration %s: %w", f.Name(), err)
+			return errf.Errorf("apply migration %s: %w", f.Name(), err)
 		}
 	}
 	return nil
@@ -182,7 +183,7 @@ func ensureMigrationsTable(db *sql.DB) error {
 			applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`)
 	if err != nil {
-		return fmt.Errorf("create migrations table: %w", err)
+		return errf.Errorf("create migrations table: %w", err)
 	}
 	return nil
 }
@@ -190,14 +191,14 @@ func ensureMigrationsTable(db *sql.DB) error {
 func appliedVersions(db *sql.DB) (map[int]bool, error) {
 	rows, err := db.Query("SELECT version FROM schema_migrations")
 	if err != nil {
-		return nil, fmt.Errorf("query migrations: %w", err)
+		return nil, errf.Errorf("query migrations: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	out := make(map[int]bool)
 	for rows.Next() {
 		var v int
 		if e := rows.Scan(&v); e != nil {
-			return nil, fmt.Errorf("scan migration version: %w", e)
+			return nil, errf.Errorf("scan migration version: %w", e)
 		}
 		out[v] = true
 	}
@@ -219,7 +220,7 @@ func applyMigration(db *sql.DB, version int, sqlStr string) error {
 	body, post := splitTrailingPragma(body)
 	if pre != "" {
 		if _, err := db.Exec(pre); err != nil {
-			return fmt.Errorf("execute pre-tx pragma: %w", err)
+			return errf.Errorf("execute pre-tx pragma: %w", err)
 		}
 		sqlStr = body
 	} else {
@@ -228,25 +229,25 @@ func applyMigration(db *sql.DB, version int, sqlStr string) error {
 
 	tx, err := db.Begin()
 	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
+		return errf.Errorf("begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.Exec(sqlStr); err != nil {
-		return fmt.Errorf("execute migration: %w", err)
+		return errf.Errorf("execute migration: %w", err)
 	}
 
 	if _, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
-		return fmt.Errorf("record migration version: %w", err)
+		return errf.Errorf("record migration version: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
+		return errf.Errorf("commit transaction: %w", err)
 	}
 
 	if post != "" {
 		if _, err := db.Exec(post); err != nil {
-			return fmt.Errorf("execute post-tx pragma: %w", err)
+			return errf.Errorf("execute post-tx pragma: %w", err)
 		}
 	}
 	return nil
@@ -318,7 +319,7 @@ var destructiveNameRE = regexp.MustCompile(`^\d+_destructive`)
 func LoadDown(ctx context.Context, db *sql.DB, version int) error {
 	entries, err := fs.ReadDir(migrationsFS, "migrations")
 	if err != nil {
-		return fmt.Errorf("read migrations dir: %w", err)
+		return errf.Errorf("read migrations dir: %w", err)
 	}
 	target := fmt.Sprintf("%03d", version) + "_"
 	for _, e := range entries {
@@ -327,16 +328,16 @@ func LoadDown(ctx context.Context, db *sql.DB, version int) error {
 			continue
 		}
 		if isDestructiveMigration(name) && os.Getenv(DestructiveMigrationEnv) != "true" {
-			return fmt.Errorf("down %s is destructive and requires %s=true", name, DestructiveMigrationEnv)
+			return errf.Errorf("down %s is destructive and requires %s=true", name, DestructiveMigrationEnv)
 		}
 		content, err := fs.ReadFile(migrationsFS, "migrations/"+name)
 		if err != nil {
-			return fmt.Errorf("read down %s: %w", name, err)
+			return errf.Errorf("read down %s: %w", name, err)
 		}
 		if _, err := db.ExecContext(ctx, string(content)); err != nil {
-			return fmt.Errorf("apply down %s: %w", name, err)
+			return errf.Errorf("apply down %s: %w", name, err)
 		}
 		return nil
 	}
-	return fmt.Errorf("no down migration for version %d", version)
+	return errf.Errorf("no down migration for version %d", version)
 }

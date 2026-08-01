@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"database/sql"
 	"time"
@@ -20,7 +20,7 @@ func (s *SQLite) CreateSchedule(ctx context.Context, sc *schedule.Schedule) erro
 		sc.NextFireAt, sc.LastFireAt, sc.FiredCount, sc.Enabled, sc.CreatedAt, sc.CreatedBy,
 	)
 	if err != nil {
-		return fmt.Errorf("insert schedule: %w", err)
+		return errf.Errorf("insert schedule: %w", err)
 	}
 	return nil
 }
@@ -45,7 +45,7 @@ func (s *SQLite) ListDueSchedules(ctx context.Context, now time.Time, limit int)
 		now, limit,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list due schedules: %w", err)
+		return nil, errf.Errorf("list due schedules: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var out []*schedule.Schedule
@@ -77,11 +77,11 @@ func (s *SQLite) ClaimDueSchedule(ctx context.Context, sc *schedule.Schedule, ne
 		newNextFireAt, sc.LastFireAt, sc.Enabled, sc.ID, sc.NextFireAt,
 	)
 	if err != nil {
-		return false, fmt.Errorf("claim due schedule: %w", err)
+		return false, errf.Errorf("claim due schedule: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return false, fmt.Errorf("claim due schedule rows: %w", err)
+		return false, errf.Errorf("claim due schedule rows: %w", err)
 	}
 	return n == 1, nil
 }
@@ -93,7 +93,7 @@ func (s *SQLite) UpdateSchedule(ctx context.Context, sc *schedule.Schedule) erro
 		sc.NextFireAt, sc.LastFireAt, sc.FiredCount, sc.Enabled, sc.ID,
 	)
 	if err != nil {
-		return fmt.Errorf("update schedule: %w", err)
+		return errf.Errorf("update schedule: %w", err)
 	}
 	return nil
 }
@@ -109,7 +109,7 @@ func (s *SQLite) BulkUpdateSchedules(ctx context.Context, scs []*schedule.Schedu
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin bulk update tx: %w", err)
+		return errf.Errorf("begin bulk update tx: %w", err)
 	}
 	stmt, err := tx.PrepareContext(ctx,
 		`UPDATE schedules SET next_fire_at = ?, last_fire_at = ?, fired_count = ?, enabled = ?
@@ -117,17 +117,17 @@ func (s *SQLite) BulkUpdateSchedules(ctx context.Context, scs []*schedule.Schedu
 	)
 	if err != nil {
 		_ = tx.Rollback()
-		return fmt.Errorf("prepare bulk update: %w", err)
+		return errf.Errorf("prepare bulk update: %w", err)
 	}
 	defer stmt.Close()
 	for _, sc := range scs {
 		if _, err := stmt.ExecContext(ctx, sc.NextFireAt, sc.LastFireAt, sc.FiredCount, sc.Enabled, sc.ID); err != nil {
 			_ = tx.Rollback()
-			return fmt.Errorf("bulk update %s: %w", sc.ID, err)
+			return errf.Errorf("bulk update %s: %w", sc.ID, err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit bulk update: %w", err)
+		return errf.Errorf("commit bulk update: %w", err)
 	}
 	return nil
 }
@@ -146,7 +146,7 @@ func scanSchedule(scanner interface {
 		return nil, errs.ErrStoreNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("scan schedule: %w", err)
+		return nil, errf.Errorf("scan schedule: %w", err)
 	}
 	sc.Kind = schedule.Kind(kindStr)
 	return &sc, nil

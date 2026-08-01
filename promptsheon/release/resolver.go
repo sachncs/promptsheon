@@ -9,7 +9,7 @@
 package release
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"encoding/json"
@@ -136,10 +136,10 @@ func (r *Resolver) Resolve(ctx context.Context, releaseID string) (*ResolvedInvo
 		return nil, err
 	}
 	if rel.Status != StatusActive {
-		return nil, fmt.Errorf("%w: got status %q", errs.ErrReleaseNotActive, rel.Status)
+		return nil, errf.Errorf("%w: got status %q", errs.ErrReleaseNotActive, rel.Status)
 	}
 	if err := rel.Manifest.Validate(); err != nil {
-		return nil, fmt.Errorf("resolver: manifest: %w", err)
+		return nil, errf.Errorf("resolver: manifest: %w", err)
 	}
 
 	plan := &ResolvedInvocation{
@@ -158,17 +158,17 @@ func (r *Resolver) Resolve(ctx context.Context, releaseID string) (*ResolvedInvo
 	if r.Loader != nil {
 		promptBytes, err := r.Loader.Load(ctx, capability.ArtifactPrompt, rel.Manifest.Prompt.Hash)
 		if err != nil {
-			return nil, fmt.Errorf("resolver: load prompt: %w", err)
+			return nil, errf.Errorf("resolver: load prompt: %w", err)
 		}
 		plan.Prompt = promptBytes
 
 		mpBytes, err := r.Loader.Load(ctx, capability.ArtifactModelPolicy, rel.Manifest.ModelPolicy.Hash)
 		if err != nil {
-			return nil, fmt.Errorf("resolver: load model policy: %w", err)
+			return nil, errf.Errorf("resolver: load model policy: %w", err)
 		}
 		var mp ModelPolicyRecord
 		if err := json.Unmarshal(mpBytes, &mp); err != nil {
-			return nil, fmt.Errorf("resolver: model policy: %w", err)
+			return nil, errf.Errorf("resolver: model policy: %w", err)
 		}
 		plan.Provider = mp.Provider
 		plan.Model = mp.Model

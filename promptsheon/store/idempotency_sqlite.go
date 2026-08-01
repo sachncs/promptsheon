@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -65,7 +65,7 @@ func (s *SQLiteIdempotencyStore) GetIdempotency(ctx context.Context, key string)
 		return IdempotencyEntry{}, errs.ErrStoreIdempotencyMiss
 	}
 	if err != nil {
-		return IdempotencyEntry{}, fmt.Errorf("idempotency get: %w", err)
+		return IdempotencyEntry{}, errf.Errorf("idempotency get: %w", err)
 	}
 	if time.Now().After(expires) {
 		_, _ = s.db.ExecContext(ctx, `DELETE FROM idempotency_cache WHERE key = ?`, key)
@@ -73,7 +73,7 @@ func (s *SQLiteIdempotencyStore) GetIdempotency(ctx context.Context, key string)
 	}
 	var headers http.Header
 	if err := json.Unmarshal([]byte(headerJSON), &headers); err != nil {
-		return IdempotencyEntry{}, fmt.Errorf("idempotency decode headers: %w", err)
+		return IdempotencyEntry{}, errf.Errorf("idempotency decode headers: %w", err)
 	}
 	return IdempotencyEntry{
 		Expires:    expires,
@@ -89,7 +89,7 @@ func (s *SQLiteIdempotencyStore) GetIdempotency(ctx context.Context, key string)
 func (s *SQLiteIdempotencyStore) PutIdempotency(ctx context.Context, key string, entry IdempotencyEntry) error {
 	headerJSON, err := json.Marshal(entry.Headers)
 	if err != nil {
-		return fmt.Errorf("idempotency encode headers: %w", err)
+		return errf.Errorf("idempotency encode headers: %w", err)
 	}
 	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO idempotency_cache (key, expires_at, status_code, headers, body)
@@ -101,7 +101,7 @@ func (s *SQLiteIdempotencyStore) PutIdempotency(ctx context.Context, key string,
 			body        = excluded.body`,
 		key, entry.Expires, entry.StatusCode, string(headerJSON), entry.Body)
 	if err != nil {
-		return fmt.Errorf("idempotency put: %w", err)
+		return errf.Errorf("idempotency put: %w", err)
 	}
 	return nil
 }

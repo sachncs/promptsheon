@@ -6,6 +6,7 @@ package main
 // shares the httpGet / httpPost helpers in http.go.
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -88,7 +89,7 @@ func cmdDataset(args []string) error {
 		}
 		fmt.Println("deleted")
 	default:
-		return fmt.Errorf("unknown dataset subcommand: %s", args[0])
+		return errf.Errorf("unknown dataset subcommand: %s", args[0])
 	}
 	return nil
 }
@@ -145,7 +146,7 @@ func cmdPrecondition(args []string) error {
 		}
 		fmt.Println("deleted")
 	default:
-		return fmt.Errorf("unknown precondition subcommand: %s", args[0])
+		return errf.Errorf("unknown precondition subcommand: %s", args[0])
 	}
 	return nil
 }
@@ -198,7 +199,7 @@ func cmdEval(args []string) error {
 		}
 		fmt.Printf("%+v\n", result)
 	default:
-		return fmt.Errorf("unknown eval subcommand: %s", args[0])
+		return errf.Errorf("unknown eval subcommand: %s", args[0])
 	}
 	return nil
 }

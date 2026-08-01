@@ -1,7 +1,7 @@
 package cas
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"os"
 	"path/filepath"
 )
@@ -31,7 +31,7 @@ func GetStats() (*RepoStats, error) {
 	objectsDir := filepath.Join(PromptsheonDir, objectsDir)
 	shards, err := os.ReadDir(objectsDir)
 	if err != nil {
-		return nil, fmt.Errorf("read objects: %w", err)
+		return nil, errf.Errorf("read objects: %w", err)
 	}
 	for _, shard := range shards {
 		if !shard.IsDir() || len(shard.Name()) != 2 {
@@ -39,7 +39,7 @@ func GetStats() (*RepoStats, error) {
 		}
 		entries, e := os.ReadDir(filepath.Join(objectsDir, shard.Name()))
 		if e != nil {
-			return nil, fmt.Errorf("read shard %s: %w", shard.Name(), e)
+			return nil, errf.Errorf("read shard %s: %w", shard.Name(), e)
 		}
 		for _, entry := range entries {
 			if entry.IsDir() {

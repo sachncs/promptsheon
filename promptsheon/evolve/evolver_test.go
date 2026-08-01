@@ -1,6 +1,7 @@
 package evolve
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/store"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"github.com/sachncs/promptsheon/promptsheon/harness"
@@ -201,7 +202,7 @@ func (r *fakeRepo) GetCapability(ctx context.Context, id string) (*capability.Ca
 	defer r.mu.Unlock()
 	c, ok := r.capabilities[id]
 	if !ok {
-		return nil, fmt.Errorf("fakeRepo: capability not found: %s", id)
+		return nil, errf.Errorf("fakeRepo: capability not found: %s", id)
 	}
 	cp := *c
 	return &cp, nil
@@ -211,7 +212,7 @@ func (r *fakeRepo) GetVersion(ctx context.Context, id string) (*capability.Versi
 	defer r.mu.Unlock()
 	v, ok := r.versions[id]
 	if !ok {
-		return nil, fmt.Errorf("fakeRepo: version not found: %s", id)
+		return nil, errf.Errorf("fakeRepo: version not found: %s", id)
 	}
 	cp := *v
 	return &cp, nil
@@ -225,13 +226,13 @@ func (r *fakeRepo) GetVersionByNumber(ctx context.Context, capabilityID string, 
 			return &cp, nil
 		}
 	}
-	return nil, fmt.Errorf("fakeRepo: version %d not found for %s", version, capabilityID)
+	return nil, errf.Errorf("fakeRepo: version %d not found for %s", version, capabilityID)
 }
 func (r *fakeRepo) CreateVersion(ctx context.Context, v *capability.Version) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.versions[v.ID]; ok {
-		return fmt.Errorf("fakeRepo: version id %s exists", v.ID)
+		return errf.Errorf("fakeRepo: version id %s exists", v.ID)
 	}
 	r.versions[v.ID] = v
 	r.versionsByCap[v.CapabilityID] = append(r.versionsByCap[v.CapabilityID], v)
@@ -245,7 +246,7 @@ func (r *fakeRepo) UpdateSelfEvolveConfig(ctx context.Context, id string, cfg ca
 	defer r.mu.Unlock()
 	c, ok := r.capabilities[id]
 	if !ok {
-		return fmt.Errorf("fakeRepo: cap not found")
+		return errf.Errorf("fakeRepo: cap not found")
 	}
 	c.SelfEvolve = cfg
 	r.capabilities[id] = c
@@ -275,7 +276,7 @@ func (r *fakeRepo) GetDataset(ctx context.Context, id string) (*harness.Dataset,
 	defer r.mu.Unlock()
 	d, ok := r.datasets[id]
 	if !ok {
-		return nil, fmt.Errorf("dataset not found")
+		return nil, errf.Errorf("dataset not found")
 	}
 	cp := *d
 	return &cp, nil
@@ -339,7 +340,7 @@ func (r *fakeRepo) GetEvalRun(ctx context.Context, id string) (*harness.EvalRun,
 	defer r.mu.Unlock()
 	run, ok := r.evalRuns[id]
 	if !ok {
-		return nil, fmt.Errorf("eval run not found")
+		return nil, errf.Errorf("eval run not found")
 	}
 	cp := *run
 	return &cp, nil
@@ -403,7 +404,7 @@ func (r *fakeRepo) GetRelease(ctx context.Context, id string) (*ReleaseRecord, e
 	defer r.mu.Unlock()
 	rel, ok := r.releases[id]
 	if !ok {
-		return nil, fmt.Errorf("release not found")
+		return nil, errf.Errorf("release not found")
 	}
 	cp := *rel
 	return &cp, nil
@@ -430,7 +431,7 @@ func (r *fakeRepo) UpdateReleaseStatus(ctx context.Context, releaseID, status st
 	defer r.mu.Unlock()
 	rel, ok := r.releases[releaseID]
 	if !ok {
-		return fmt.Errorf("release not found")
+		return errf.Errorf("release not found")
 	}
 	rel.Status = status
 	r.releases[releaseID] = rel
@@ -530,7 +531,7 @@ func (l *fakeLoader) LoadPrompt(ctx context.Context, hash string) ([]byte, error
 	defer l.mu.Unlock()
 	t, ok := l.blobs[hash]
 	if !ok {
-		return nil, fmt.Errorf("fakeLoader: not found: %s", hash)
+		return nil, errf.Errorf("fakeLoader: not found: %s", hash)
 	}
 	return []byte(t), nil
 }
@@ -594,7 +595,7 @@ func (a *fakeActivator) SelfActivate(ctx context.Context, releaseID string) erro
 	defer a.repo.mu.Unlock()
 	rel, ok := a.repo.releases[releaseID]
 	if !ok {
-		return fmt.Errorf("fakeActivator: release %s not found", releaseID)
+		return errf.Errorf("fakeActivator: release %s not found", releaseID)
 	}
 	// Mark the prior active as superseded.
 	for k, rid := range a.repo.activeReleases {
@@ -817,7 +818,7 @@ func TestEvolver_RunOnce_RevisionLLMErrorContinues(t *testing.T) {
 	inner.recordEvalRun(rel, 0, 1, false)
 	inner.capabilities["c1"].SelfEvolve.MaxRevisions = 3
 	repo := inner
-	revision := &fakeRevisionLLM{err: fmt.Errorf("synthetic revise error")}
+	revision := &fakeRevisionLLM{err: errf.Errorf("synthetic revise error")}
 	validator := &fakeValidator{score: 1.0}
 	activator := &fakeActivator{repo: inner}
 	auditor := &fakeAuditor{}

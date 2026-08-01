@@ -2,7 +2,7 @@
 package auth
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -108,7 +108,7 @@ func (m *OAuthManager) RegisterProvider(name string, provider *OAuthProvider) er
 	}
 	for _, raw := range []string{provider.AuthURL, provider.TokenURL, provider.UserInfoURL, provider.RedirectURL} {
 		if err := validateOAuthURL(raw); err != nil {
-			return fmt.Errorf("oauth provider %q: %w", name, err)
+			return errf.Errorf("oauth provider %q: %w", name, err)
 		}
 	}
 	m.mu.Lock()
@@ -130,22 +130,22 @@ func validateOAuthURL(rawURL string) error {
 	}
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return fmt.Errorf("invalid URL %q: %w", rawURL, err)
+		return errf.Errorf("invalid URL %q: %w", rawURL, err)
 	}
 	if u.Scheme != "https" && u.Scheme != "http" {
-		return fmt.Errorf("URL %q has unsupported scheme %q (https required)", rawURL, u.Scheme)
+		return errf.Errorf("URL %q has unsupported scheme %q (https required)", rawURL, u.Scheme)
 	}
 	host := u.Hostname()
 	if host == "" {
-		return fmt.Errorf("URL %q missing host", rawURL)
+		return errf.Errorf("URL %q missing host", rawURL)
 	}
 	ips, err := net.LookupIP(host)
 	if err != nil {
-		return fmt.Errorf("URL %q: cannot resolve host %q: %w", rawURL, host, err)
+		return errf.Errorf("URL %q: cannot resolve host %q: %w", rawURL, host, err)
 	}
 	for _, ip := range ips {
 		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
-			return fmt.Errorf("URL %q resolves to disallowed address %s", rawURL, ip)
+			return errf.Errorf("URL %q resolves to disallowed address %s", rawURL, ip)
 		}
 	}
 	return nil
@@ -157,7 +157,7 @@ func validateOAuthURL(rawURL string) error {
 func (m *OAuthManager) GenerateOAuthState(providerName string) (string, error) {
 	var raw [32]byte
 	if _, err := rand.Read(raw[:]); err != nil {
-		return "", fmt.Errorf("generate state: %w", err)
+		return "", errf.Errorf("generate state: %w", err)
 	}
 	state := base64.RawURLEncoding.EncodeToString(raw[:])
 
@@ -181,11 +181,11 @@ func (m *OAuthManager) consumeOAuthState(state string) (string, error) {
 	m.gcOAuthStatesLocked(time.Now())
 	st, ok := m.oauthStates[state]
 	if !ok {
-		return "", fmt.Errorf("invalid state parameter")
+		return "", errf.Errorf("invalid state parameter")
 	}
 	delete(m.oauthStates, state)
 	if time.Now().After(st.expiresAt) {
-		return "", fmt.Errorf("state parameter expired")
+		return "", errf.Errorf("state parameter expired")
 	}
 	return st.provider, nil
 }
@@ -209,11 +209,11 @@ func (m *OAuthManager) GetAuthURL(providerName, state string) (string, error) {
 	defer m.mu.RUnlock()
 	provider, ok := m.providers[providerName]
 	if !ok {
-		return "", fmt.Errorf("provider %s not registered", providerName)
+		return "", errf.Errorf("provider %s not registered", providerName)
 	}
 
 	if state == "" {
-		return "", fmt.Errorf("empty state parameter: use GenerateOAuthState to produce one")
+		return "", errf.Errorf("empty state parameter: use GenerateOAuthState to produce one")
 	}
 
 	v := url.Values{}
@@ -225,7 +225,7 @@ func (m *OAuthManager) GetAuthURL(providerName, state string) (string, error) {
 
 	u, err := url.Parse(provider.AuthURL)
 	if err != nil {
-		return "", fmt.Errorf("auth url: %w", err)
+		return "", errf.Errorf("auth url: %w", err)
 	}
 	u.RawQuery = v.Encode()
 	return u.String(), nil
@@ -240,7 +240,7 @@ func (m *OAuthManager) ExchangeCode(ctx context.Context, providerName, code, sta
 	provider, ok := m.providers[providerName]
 	m.mu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("provider %s not registered", providerName)
+		return nil, errf.Errorf("provider %s not registered", providerName)
 	}
 
 	bound, err := m.consumeOAuthState(state)
@@ -248,7 +248,7 @@ func (m *OAuthManager) ExchangeCode(ctx context.Context, providerName, code, sta
 		return nil, err
 	}
 	if bound != providerName {
-		return nil, fmt.Errorf("state bound to %q, not %q", bound, providerName)
+		return nil, errf.Errorf("state bound to %q, not %q", bound, providerName)
 	}
 
 	v := url.Values{}
@@ -272,7 +272,7 @@ func (m *OAuthManager) ExchangeCode(ctx context.Context, providerName, code, sta
 
 	if resp.StatusCode != http.StatusOK {
 		_, _ = io.ReadAll(io.LimitReader(resp.Body, maxOAuthErrorBody))
-		return nil, fmt.Errorf("token exchange failed: status=%d", resp.StatusCode)
+		return nil, errf.Errorf("token exchange failed: status=%d", resp.StatusCode)
 	}
 
 	var token OAuthToken
@@ -293,7 +293,7 @@ func (m *OAuthManager) GetUserInfo(ctx context.Context, providerName string, tok
 	provider, ok := m.providers[providerName]
 	m.mu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("provider %s not registered", providerName)
+		return nil, errf.Errorf("provider %s not registered", providerName)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", provider.UserInfoURL, http.NoBody)
@@ -309,7 +309,7 @@ func (m *OAuthManager) GetUserInfo(ctx context.Context, providerName string, tok
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("user info failed: status=%d", resp.StatusCode)
+		return nil, errf.Errorf("user info failed: status=%d", resp.StatusCode)
 	}
 
 	var user OAuthUser

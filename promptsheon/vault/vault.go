@@ -3,7 +3,7 @@
 package vault
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -57,10 +57,10 @@ func New(hexKey string) (*Vault, error) {
 func parseVaultKey(hexKey string) ([]byte, error) {
 	key, err := hex.DecodeString(hexKey)
 	if err != nil {
-		return nil, fmt.Errorf("decode vault key: %w", err)
+		return nil, errf.Errorf("decode vault key: %w", err)
 	}
 	if len(key) != 32 {
-		return nil, fmt.Errorf("vault key must be 32 bytes (64 hex chars), got %d bytes", len(key))
+		return nil, errf.Errorf("vault key must be 32 bytes (64 hex chars), got %d bytes", len(key))
 	}
 	allZero := true
 	for _, b := range key {
@@ -70,7 +70,7 @@ func parseVaultKey(hexKey string) ([]byte, error) {
 		}
 	}
 	if allZero {
-		return nil, fmt.Errorf("vault key is all zeros; refusing to use a trivially-decryptable key")
+		return nil, errf.Errorf("vault key is all zeros; refusing to use a trivially-decryptable key")
 	}
 	return key, nil
 }
@@ -129,10 +129,10 @@ func (v *Vault) Reload(hexKey string) error {
 	// mode.
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return fmt.Errorf("create cipher: %w", err)
+		return errf.Errorf("create cipher: %w", err)
 	}
 	if _, err := cipher.NewGCM(block); err != nil {
-		return fmt.Errorf("create GCM: %w", err)
+		return errf.Errorf("create GCM: %w", err)
 	}
 
 	v.mu.Lock()
@@ -176,12 +176,12 @@ func (v *Vault) EncryptBytes(plaintext, additionalData []byte) ([]byte, error) {
 
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, fmt.Errorf("create GCM: %w", err)
+		return nil, errf.Errorf("create GCM: %w", err)
 	}
 
 	nonce := make([]byte, aesGCM.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, fmt.Errorf("generate nonce: %w", err)
+		return nil, errf.Errorf("generate nonce: %w", err)
 	}
 
 	ciphertext := aesGCM.Seal(nonce, nonce, plaintext, additionalData)
@@ -200,7 +200,7 @@ func (v *Vault) Decrypt(hexCiphertext string) (string, error) {
 func (v *Vault) DecryptBytesString(hexCiphertext string, additionalData []byte) ([]byte, error) {
 	ciphertext, err := hex.DecodeString(hexCiphertext)
 	if err != nil {
-		return nil, fmt.Errorf("decode ciphertext: %w", err)
+		return nil, errf.Errorf("decode ciphertext: %w", err)
 	}
 	return v.DecryptBytes(ciphertext, additionalData)
 }
@@ -215,18 +215,18 @@ func (v *Vault) DecryptBytes(ciphertext, additionalData []byte) ([]byte, error) 
 
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, fmt.Errorf("create GCM: %w", err)
+		return nil, errf.Errorf("create GCM: %w", err)
 	}
 
 	nonceSize := aesGCM.NonceSize()
 	if len(ciphertext) < nonceSize {
-		return nil, fmt.Errorf("ciphertext too short")
+		return nil, errf.Errorf("ciphertext too short")
 	}
 
 	nonce, ct := ciphertext[:nonceSize], ciphertext[nonceSize:]
 	plaintext, err := aesGCM.Open(nil, nonce, ct, additionalData)
 	if err != nil {
-		return nil, fmt.Errorf("decrypt: %w", err)
+		return nil, errf.Errorf("decrypt: %w", err)
 	}
 
 	return plaintext, nil

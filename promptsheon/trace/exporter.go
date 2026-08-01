@@ -1,7 +1,7 @@
 package trace
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"os"
 	"strconv"
@@ -139,7 +139,7 @@ func newSDKProvider(ctx context.Context, cfg Config) (*sdktrace.TracerProvider, 
 		}
 		exporter, err = otlptracegrpc.New(ctx, opts...)
 		if err != nil {
-			return nil, fmt.Errorf("create OTLP exporter: %w", err)
+			return nil, errf.Errorf("create OTLP exporter: %w", err)
 		}
 	} else {
 		exporter = newnoopExporter()

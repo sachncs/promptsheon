@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"database/sql"
@@ -23,7 +23,7 @@ func (s *SQLite) CreateDataset(ctx context.Context, d *harness.Dataset) error {
 		d.ID, d.CapabilityID, d.Name, d.Description, d.CreatedAt, d.UpdatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("insert dataset: %w", err)
+		return errf.Errorf("insert dataset: %w", err)
 	}
 	return nil
 }
@@ -42,7 +42,7 @@ func (s *SQLite) ListDatasetsForCapability(ctx context.Context, capabilityID str
 		 FROM datasets WHERE capability_id = ? ORDER BY created_at DESC`, capabilityID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list datasets: %w", err)
+		return nil, errf.Errorf("list datasets: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var out []*harness.Dataset
@@ -59,7 +59,7 @@ func (s *SQLite) ListDatasetsForCapability(ctx context.Context, capabilityID str
 func (s *SQLite) DeleteDataset(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM datasets WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("delete dataset: %w", err)
+		return errf.Errorf("delete dataset: %w", err)
 	}
 	return nil
 }
@@ -73,7 +73,7 @@ func scanDataset(scan interface {
 		return nil, errs.ErrStoreNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("scan dataset: %w", err)
+		return nil, errf.Errorf("scan dataset: %w", err)
 	}
 	return &d, nil
 }
@@ -85,12 +85,12 @@ func scanDataset(scan interface {
 func (s *SQLite) UpsertDatasetCases(ctx context.Context, datasetID string, cases []harness.DatasetCase) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
+		return errf.Errorf("begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, `DELETE FROM dataset_cases WHERE dataset_id = ?`, datasetID); err != nil {
-		return fmt.Errorf("delete cases: %w", err)
+		return errf.Errorf("delete cases: %w", err)
 	}
 	for _, c := range cases {
 		if _, err := tx.ExecContext(ctx,
@@ -98,17 +98,17 @@ func (s *SQLite) UpsertDatasetCases(ctx context.Context, datasetID string, cases
 			 VALUES (?, ?, ?, ?, ?, ?)`,
 			c.ID, datasetID, c.Seq, string(c.Inputs), string(c.Expected), c.Description,
 		); err != nil {
-			return fmt.Errorf("insert case: %w", err)
+			return errf.Errorf("insert case: %w", err)
 		}
 	}
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE datasets SET updated_at = ? WHERE id = ?`,
 		time.Now().UTC(), datasetID,
 	); err != nil {
-		return fmt.Errorf("touch dataset: %w", err)
+		return errf.Errorf("touch dataset: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
+		return errf.Errorf("commit: %w", err)
 	}
 	return nil
 }
@@ -119,7 +119,7 @@ func (s *SQLite) ListDatasetCases(ctx context.Context, datasetID string) ([]harn
 		 FROM dataset_cases WHERE dataset_id = ? ORDER BY seq`, datasetID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list cases: %w", err)
+		return nil, errf.Errorf("list cases: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var out []harness.DatasetCase
@@ -152,7 +152,7 @@ func (s *SQLite) CreatePrecondition(ctx context.Context, p *harness.Precondition
 		p.ID, p.CapabilityID, p.Name, p.Command, p.TimeoutSec, enabledInt, p.CreatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("insert precondition: %w", err)
+		return errf.Errorf("insert precondition: %w", err)
 	}
 	return nil
 }
@@ -185,11 +185,11 @@ func (s *SQLite) UpdatePrecondition(ctx context.Context, p *harness.Precondition
 		p.Name, p.Command, p.TimeoutSec, enabledInt, p.ID,
 	)
 	if err != nil {
-		return fmt.Errorf("update precondition: %w", err)
+		return errf.Errorf("update precondition: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("update precondition rows affected: %w", err)
+		return errf.Errorf("update precondition rows affected: %w", err)
 	}
 	if n == 0 {
 		return errs.ErrStoreNotFound
@@ -203,7 +203,7 @@ func (s *SQLite) ListPreconditionsForCapability(ctx context.Context, capabilityI
 		 FROM preconditions WHERE capability_id = ? ORDER BY created_at`, capabilityID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list preconditions: %w", err)
+		return nil, errf.Errorf("list preconditions: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var out []*harness.Precondition
@@ -220,7 +220,7 @@ func (s *SQLite) ListPreconditionsForCapability(ctx context.Context, capabilityI
 func (s *SQLite) DeletePrecondition(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM preconditions WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("delete precondition: %w", err)
+		return errf.Errorf("delete precondition: %w", err)
 	}
 	return nil
 }
@@ -235,7 +235,7 @@ func scanPrecondition(scan interface {
 		return nil, errs.ErrStoreNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("scan precondition: %w", err)
+		return nil, errf.Errorf("scan precondition: %w", err)
 	}
 	p.Enabled = enabled != 0
 	return &p, nil
@@ -259,7 +259,7 @@ func (s *SQLite) CreateEvalRun(ctx context.Context, r *harness.EvalRun) error {
 		r.StartedAt, finished,
 	)
 	if err != nil {
-		return fmt.Errorf("insert eval run: %w", err)
+		return errf.Errorf("insert eval run: %w", err)
 	}
 	return nil
 }
@@ -276,11 +276,11 @@ func (s *SQLite) UpdateEvalRun(ctx context.Context, r *harness.EvalRun) error {
 		r.Score, r.Passed, r.Failed, r.Total, string(r.Status), finished, r.ID,
 	)
 	if err != nil {
-		return fmt.Errorf("update eval run: %w", err)
+		return errf.Errorf("update eval run: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("rows affected: %w", err)
+		return errf.Errorf("rows affected: %w", err)
 	}
 	if n == 0 {
 		return errs.ErrStoreNotFound
@@ -302,7 +302,7 @@ func (s *SQLite) ListEvalRunsForRelease(ctx context.Context, releaseID string) (
 		 FROM eval_runs WHERE release_id = ? ORDER BY started_at DESC`, releaseID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list eval runs: %w", err)
+		return nil, errf.Errorf("list eval runs: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var out []*harness.EvalRun
@@ -331,7 +331,7 @@ func scanEvalRun(scan interface {
 		return nil, errs.ErrStoreNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("scan eval run: %w", err)
+		return nil, errf.Errorf("scan eval run: %w", err)
 	}
 	r.Scorer = harness.Scorer(scorer)
 	r.Status = harness.RunStatus(status)
@@ -365,7 +365,7 @@ func (s *SQLite) CreateEvalResults(ctx context.Context, results []harness.EvalRe
 		args = append(args, r.ID, r.RunID, r.CaseID, r.Seq, passedInt, string(r.Actual), r.Error, r.LatencyMs)
 	}
 	if _, err := s.db.ExecContext(ctx, b.String(), args...); err != nil {
-		return fmt.Errorf("insert eval results: %w", err)
+		return errf.Errorf("insert eval results: %w", err)
 	}
 	return nil
 }
@@ -383,7 +383,7 @@ func (s *SQLite) CreateEvalResult(ctx context.Context, r *harness.EvalResult) er
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		r.ID, r.RunID, r.CaseID, r.Seq, passedInt, string(r.Actual), r.Error, r.LatencyMs,
 	); err != nil {
-		return fmt.Errorf("insert eval result: %w", err)
+		return errf.Errorf("insert eval result: %w", err)
 	}
 	return nil
 }
@@ -394,7 +394,7 @@ func (s *SQLite) ListEvalResultsForRun(ctx context.Context, runID string) ([]har
 		 FROM eval_results WHERE run_id = ? ORDER BY seq`, runID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list eval results: %w", err)
+		return nil, errf.Errorf("list eval results: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var out []harness.EvalResult

@@ -1,10 +1,10 @@
 package evolve
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 
 )
@@ -30,7 +30,7 @@ func (f *fakePromoterRepo) GetRelease(ctx context.Context, id string) (*ReleaseR
 
 func (f *fakePromoterRepo) GetVersionByNumber(ctx context.Context, capID string, v int) (*capability.Version, error) {
 	if v != 1 {
-		return nil, fmt.Errorf("fakePromoterRepo: version %d not found", v)
+		return nil, errf.Errorf("fakePromoterRepo: version %d not found", v)
 	}
 	return &capability.Version{
 		ID:           "v-1",

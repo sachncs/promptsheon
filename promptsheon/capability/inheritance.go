@@ -1,6 +1,7 @@
 package capability
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"errors"
 	"fmt"
 
@@ -72,7 +73,7 @@ func resolveParent(parentID string, resolver InheritanceResolver, base Manifest,
 	}
 	parent, err := resolver.GetVersion(parentID)
 	if err != nil {
-		return Manifest{}, fmt.Errorf("capability: load parent %s: %w", parentID, err)
+		return Manifest{}, errf.Errorf("capability: load parent %s: %w", parentID, err)
 	}
 	key := parent.CapabilityID + "/" + versionID(parent)
 	if visited[key] {

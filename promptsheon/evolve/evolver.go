@@ -1,7 +1,7 @@
 package evolve
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/store"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"github.com/sachncs/promptsheon/promptsheon/harness"
@@ -71,14 +71,14 @@ func NewEvolver(
 // cooldown is stamped.
 func (e *Evolver) RunOnce(ctx context.Context, capabilityID string) (*Result, error) {
 	if capabilityID == "" {
-		return nil, fmt.Errorf("selfevolve: empty capabilityID")
+		return nil, errf.Errorf("selfevolve: empty capabilityID")
 	}
 	start := e.Now()
 	res := &Result{CapabilityID: capabilityID}
 
 	cap, err := e.Repo.GetCapability(ctx, capabilityID)
 	if err != nil {
-		return res, fmt.Errorf("selfevolve: get capability: %w", err)
+		return res, errf.Errorf("selfevolve: get capability: %w", err)
 	}
 	cfg := cap.SelfEvolve
 	if !cfg.Enabled {
@@ -90,12 +90,12 @@ func (e *Evolver) RunOnce(ctx context.Context, capabilityID string) (*Result, er
 		env = "dev"
 	}
 	if cfg.DatasetID == "" {
-		return res, fmt.Errorf("selfevolve: capability %s has SelfEvolveConfig.DatasetID empty", capabilityID)
+		return res, errf.Errorf("selfevolve: capability %s has SelfEvolveConfig.DatasetID empty", capabilityID)
 	}
 
 	state, err := e.Repo.LoadSelfEvolveState(ctx, capabilityID, env)
 	if err != nil {
-		return res, fmt.Errorf("selfevolve: load state: %w", err)
+		return res, errf.Errorf("selfevolve: load state: %w", err)
 	}
 	if state == nil {
 		state = &store.SelfEvolveState{
@@ -114,7 +114,7 @@ func (e *Evolver) RunOnce(ctx context.Context, capabilityID string) (*Result, er
 
 	activeReleaseID, err := e.Repo.ActiveReleaseID(ctx, capabilityID, env)
 	if err != nil {
-		return res, fmt.Errorf("selfevolve: active release: %w", err)
+		return res, errf.Errorf("selfevolve: active release: %w", err)
 	}
 	if activeReleaseID == "" {
 		e.Logger.Debug("selfevolve: no active release", "capability_id", capabilityID, "env", env)
@@ -125,7 +125,7 @@ func (e *Evolver) RunOnce(ctx context.Context, capabilityID string) (*Result, er
 
 	lastRun, err := e.Repo.LastEvalRun(ctx, activeReleaseID)
 	if err != nil {
-		return res, fmt.Errorf("selfevolve: last eval run: %w", err)
+		return res, errf.Errorf("selfevolve: last eval run: %w", err)
 	}
 	if lastRun == nil {
 		res.Skipped = true
@@ -180,7 +180,7 @@ func (e *Evolver) beginCycle(ctx context.Context, state *store.SelfEvolveState, 
 	state.LastRevisionIdx = 0
 	state.RevisionIndex = 0
 	if err := e.Repo.SaveSelfEvolveState(ctx, state); err != nil {
-		return fmt.Errorf("selfevolve: save state: %w", err)
+		return errf.Errorf("selfevolve: save state: %w", err)
 	}
 	if e.Auditor != nil {
 		e.Auditor.Audit(ctx, AuditDetect, "capability:"+capabilityID, map[string]any{
@@ -207,28 +207,28 @@ func (e *Evolver) collectFailing(ctx context.Context, capabilityID, activeReleas
 		state.LastError = err.Error()
 		state.LastStatus = StatusRejected
 		_ = e.Repo.SaveSelfEvolveState(ctx, state)
-		return nil, nil, "", fmt.Errorf("selfevolve: collect failing cases: %w", err)
+		return nil, nil, "", errf.Errorf("selfevolve: collect failing cases: %w", err)
 	}
 	activeRel, err := e.Repo.GetRelease(ctx, activeReleaseID)
 	if err != nil || activeRel == nil {
 		state.LastError = "cannot load active release"
 		state.LastStatus = StatusRejected
 		_ = e.Repo.SaveSelfEvolveState(ctx, state)
-		return nil, nil, "", fmt.Errorf("selfevolve: load active release: %w", err)
+		return nil, nil, "", errf.Errorf("selfevolve: load active release: %w", err)
 	}
 	activeVer, err := e.Repo.GetVersionByNumber(ctx, capabilityID, activeRel.CapabilityVersion)
 	if err != nil || activeVer == nil {
 		state.LastError = "cannot load active version"
 		state.LastStatus = StatusRejected
 		_ = e.Repo.SaveSelfEvolveState(ctx, state)
-		return nil, nil, "", fmt.Errorf("selfevolve: load active version: %w", err)
+		return nil, nil, "", errf.Errorf("selfevolve: load active version: %w", err)
 	}
 	currentPromptBytes, err := e.Loader.LoadPrompt(ctx, activeVer.Manifest.Prompt.Hash)
 	if err != nil {
 		state.LastError = "cannot load current prompt: " + err.Error()
 		state.LastStatus = StatusRejected
 		_ = e.Repo.SaveSelfEvolveState(ctx, state)
-		return nil, nil, "", fmt.Errorf("selfevolve: load current prompt: %w", err)
+		return nil, nil, "", errf.Errorf("selfevolve: load current prompt: %w", err)
 	}
 	return failing, currentPromptBytes, activeVer.Manifest.ModelPolicy.Hash, nil
 }
@@ -334,7 +334,7 @@ func (e *Evolver) failingCases(ctx context.Context, run *harness.EvalRun) ([]Fai
 	}
 	cases, err := e.Repo.ListDatasetCases(ctx, run.DatasetID)
 	if err != nil {
-		return nil, fmt.Errorf("selfevolve: list cases: %w", err)
+		return nil, errf.Errorf("selfevolve: list cases: %w", err)
 	}
 	bySeq := make(map[int]harness.DatasetCase, len(cases))
 	for _, c := range cases {

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
 	"crypto/sha256"
@@ -19,7 +20,7 @@ import (
 func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) error {
 	details, err := json.Marshal(entry.Details)
 	if err != nil {
-		return fmt.Errorf("marshal audit details: %w", err)
+		return errf.Errorf("marshal audit details: %w", err)
 	}
 	if entry.Timestamp.IsZero() {
 		entry.Timestamp = time.Now()
@@ -50,12 +51,12 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 	const appendAuditMaxAttempts = 32
 	for attempt := 0; attempt < appendAuditMaxAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("append audit: %w", err)
+			return errf.Errorf("append audit: %w", err)
 		}
 
 		tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 		if err != nil {
-			return fmt.Errorf("begin audit tx: %w", err)
+			return errf.Errorf("begin audit tx: %w", err)
 		}
 
 		prevRowID, prevHash, err := s.tailHashLocked(ctx, tx)
@@ -76,12 +77,12 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 		)
 		if err != nil {
 			_ = tx.Rollback()
-			return fmt.Errorf("insert audit: %w", err)
+			return errf.Errorf("insert audit: %w", err)
 		}
 		rowID, err := insertRes.LastInsertId()
 		if err != nil {
 			_ = tx.Rollback()
-			return fmt.Errorf("last insert id: %w", err)
+			return errf.Errorf("last insert id: %w", err)
 		}
 
 		var stateRes sql.Result
@@ -102,30 +103,30 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 		}
 		if err != nil {
 			_ = tx.Rollback()
-			return fmt.Errorf("update audit chain state: %w", err)
+			return errf.Errorf("update audit chain state: %w", err)
 		}
 		affected, err := stateRes.RowsAffected()
 		if err != nil {
 			_ = tx.Rollback()
-			return fmt.Errorf("audit chain state rows affected: %w", err)
+			return errf.Errorf("audit chain state rows affected: %w", err)
 		}
 		if affected == 0 {
 			rollbackErr := tx.Rollback()
 			s.auditTail.hash = ""
 			s.auditTail.rowid.Store(0)
 			if rollbackErr != nil {
-				return fmt.Errorf("rollback stale audit append: %w", rollbackErr)
+				return errf.Errorf("rollback stale audit append: %w", rollbackErr)
 			}
 			continue
 		}
 		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit audit: %w", err)
+			return errf.Errorf("commit audit: %w", err)
 		}
 		s.auditTail.hash = entry.EntryHash
 		s.auditTail.rowid.Store(uint64(rowID))
 		return nil
 	}
-	return fmt.Errorf("append audit: CAS retry exhausted after %d attempts", appendAuditMaxAttempts)
+	return errf.Errorf("append audit: CAS retry exhausted after %d attempts", appendAuditMaxAttempts)
 }
 
 // tailHashLocked returns the previous_hash for the next audit
@@ -218,7 +219,7 @@ func (s *SQLite) ListAudit(ctx context.Context, filter *models.AuditFilter) ([]*
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list audit: %w", err)
+		return nil, errf.Errorf("list audit: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -253,7 +254,7 @@ func (s *SQLite) tailHashLocked(ctx context.Context, tx *sql.Tx) (rowID int64, h
 	).Scan(&hash, &rowID)
 	if queryErr != nil {
 		if !errors.Is(queryErr, sql.ErrNoRows) {
-			return 0, "", fmt.Errorf("fetch previous audit hash: %w", queryErr)
+			return 0, "", errf.Errorf("fetch previous audit hash: %w", queryErr)
 		}
 	}
 	if hash != "" {
@@ -331,7 +332,7 @@ func verifyAuditChainOnDB(ctx context.Context, db *sql.DB, cache *auditVerifyEnt
 			cache.rowid,
 		).Scan(&cachedHash); err != nil {
 			if !errors.Is(err, sql.ErrNoRows) {
-				return nil, fmt.Errorf("audit cache lookup: %w", err)
+				return nil, errf.Errorf("audit cache lookup: %w", err)
 			}
 			// Cached rowid is gone; full walk.
 		} else if cachedHash == cache.hash {
@@ -365,7 +366,7 @@ func verifyAuditChainOnDB(ctx context.Context, db *sql.DB, cache *auditVerifyEnt
 	if err := db.QueryRowContext(ctx,
 		`SELECT last_rowid, last_hash FROM audit_chain_state LIMIT 1`).Scan(&stateLastRowID, &stateLastHash); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("audit chain state: %w", err)
+			return nil, errf.Errorf("audit chain state: %w", err)
 		}
 	}
 	if stateLastRowID != 0 && lastRowID != stateLastRowID {
@@ -401,7 +402,7 @@ func verifyAuditPageOnDB(ctx context.Context, db *sql.DB, prevHash string, after
 	           LIMIT ?`
 	rows, err := db.QueryContext(ctx, q, afterRowID, limit)
 	if err != nil {
-		return auditPageResult{err: fmt.Errorf("audit chain page query: %w", err)}
+		return auditPageResult{err: errf.Errorf("audit chain page query: %w", err)}
 	}
 	defer func() { _ = rows.Close() }()
 	var nextPrev string
@@ -411,7 +412,7 @@ func verifyAuditPageOnDB(ctx context.Context, db *sql.DB, prevHash string, after
 		var id, userID, action, resource, detailsJSON, storedPrev, storedHash, timestampStr string
 		var ts time.Time
 		if err := rows.Scan(&rowID, &id, &userID, &action, &resource, &detailsJSON, &ts, &storedPrev, &storedHash, &timestampStr); err != nil {
-			return auditPageResult{err: fmt.Errorf("audit chain scan: %w", err)}
+			return auditPageResult{err: errf.Errorf("audit chain scan: %w", err)}
 		}
 		if storedPrev != prevHash {
 			return auditPageResult{
@@ -458,7 +459,7 @@ func scanAuditRow(rows *sql.Rows) (*models.AuditEntry, error) {
 	var details, prevHash, entryHash string
 	err := rows.Scan(&e.ID, &e.UserID, &e.Action, &e.Resource, &details, &e.Timestamp, &prevHash, &entryHash)
 	if err != nil {
-		return nil, fmt.Errorf("scan audit entry: %w", err)
+		return nil, errf.Errorf("scan audit entry: %w", err)
 	}
 	if err := json.Unmarshal([]byte(details), &e.Details); err != nil {
 		slog.Error("failed to unmarshal audit details", "err", err, "id", e.ID)

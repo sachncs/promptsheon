@@ -21,6 +21,7 @@
 package main
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"flag"
 	"fmt"
@@ -202,7 +203,7 @@ func collectRoutes(path string) ([]route, error) {
 func collectRoutesDir(dir string) ([]route, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("read dir %s: %w", dir, err)
+		return nil, errf.Errorf("read dir %s: %w", dir, err)
 	}
 	fset := token.NewFileSet()
 	var routes []route
@@ -216,7 +217,7 @@ func collectRoutesDir(dir string) ([]route, error) {
 		path := filepath.Join(dir, e.Name())
 		file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", path, err)
+			return nil, errf.Errorf("parse %s: %w", path, err)
 		}
 		ast.Inspect(file, func(n ast.Node) bool {
 			routes = append(routes, collectHandleFuncCalls(n)...)
@@ -430,7 +431,7 @@ func collectHandlers(dir string) (map[string]*handlerInfo, error) {
 		fset := token.NewFileSet()
 		file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", path, err)
+			return nil, errf.Errorf("parse %s: %w", path, err)
 		}
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)

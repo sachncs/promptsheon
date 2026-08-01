@@ -1,7 +1,7 @@
 package evolve
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"encoding/json"
 )
@@ -27,10 +27,10 @@ func NewLLMRevisionStrategy(invoke LLMInvokeFn) *LLMRevisionStrategy {
 // responses are rejected.
 func (s *LLMRevisionStrategy) Revise(ctx context.Context, req ReviseRequest) (*ReviseResponse, error) {
 	if s.Invoke == nil {
-		return nil, fmt.Errorf("selfevolve: revision LLM not wired")
+		return nil, errf.Errorf("selfevolve: revision LLM not wired")
 	}
 	if req.CurrentPrompt == "" {
-		return nil, fmt.Errorf("selfevolve: empty current prompt")
+		return nil, errf.Errorf("selfevolve: empty current prompt")
 	}
 	payload, err := json.Marshal(struct {
 		CurrentPrompt   string        `json:"current_prompt"`
@@ -44,17 +44,17 @@ func (s *LLMRevisionStrategy) Revise(ctx context.Context, req ReviseRequest) (*R
 		FailingCases:    req.FailingCases,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("selfevolve: marshal revise request: %w", err)
+		return nil, errf.Errorf("selfevolve: marshal revise request: %w", err)
 	}
 	out, err := s.Invoke(ctx, LLMInvokeRequest{
 		System: DefaultRevisionLLMSystem,
 		User:   string(payload),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("selfevolve: revision LLM call: %w", err)
+		return nil, errf.Errorf("selfevolve: revision LLM call: %w", err)
 	}
 	if out == "" {
-		return nil, fmt.Errorf("selfevolve: revision LLM returned empty prompt")
+		return nil, errf.Errorf("selfevolve: revision LLM returned empty prompt")
 	}
 	return &ReviseResponse{NewPrompt: out}, nil
 }

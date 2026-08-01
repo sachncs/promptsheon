@@ -25,7 +25,7 @@
 package settings
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"database/sql"
 	"errors"
@@ -147,7 +147,7 @@ func (r *Resolver) Lookup(ctx context.Context, key string) (CRDTRecord, bool, er
 		return CRDTRecord{}, false, nil
 	}
 	if err != nil {
-		return CRDTRecord{}, false, fmt.Errorf("settings: lookup %q: %w", key, err)
+		return CRDTRecord{}, false, errf.Errorf("settings: lookup %q: %w", key, err)
 	}
 	return rec, true, nil
 }
@@ -173,7 +173,7 @@ func (r *Resolver) Set(ctx context.Context, key, value, updatedBy string) error 
 	if errors.Is(err, sql.ErrNoRows) {
 		cur = CRDTRecord{Key: key}
 	} else if err != nil {
-		return fmt.Errorf("settings: set %q: %w", key, err)
+		return errf.Errorf("settings: set %q: %w", key, err)
 	}
 	cur.Value = value
 	cur.UpdatedBy = updatedBy
@@ -182,11 +182,11 @@ func (r *Resolver) Set(ctx context.Context, key, value, updatedBy string) error 
 	cur.Tombstone = false
 	cur.ReplicaID = r.replicaID
 	if err := r.store.SetSystemConfig(ctx, cur); err != nil {
-		return fmt.Errorf("settings: set %q: %w", key, err)
+		return errf.Errorf("settings: set %q: %w", key, err)
 	}
 	if r.notif != nil {
 		if err := r.notif.Publish(key, value); err != nil {
-			return fmt.Errorf("settings: notifier %q: %w", key, err)
+			return errf.Errorf("settings: notifier %q: %w", key, err)
 		}
 	}
 	return nil
@@ -208,7 +208,7 @@ func (r *Resolver) Delete(ctx context.Context, key string) error {
 	if errors.Is(err, sql.ErrNoRows) {
 		cur = CRDTRecord{Key: key}
 	} else if err != nil {
-		return fmt.Errorf("settings: delete %q: %w", key, err)
+		return errf.Errorf("settings: delete %q: %w", key, err)
 	}
 	cur.Value = ""
 	cur.UpdatedBy = ""
@@ -217,11 +217,11 @@ func (r *Resolver) Delete(ctx context.Context, key string) error {
 	cur.Tombstone = true
 	cur.ReplicaID = r.replicaID
 	if err := r.store.SetSystemConfig(ctx, cur); err != nil {
-		return fmt.Errorf("settings: tombstone %q: %w", key, err)
+		return errf.Errorf("settings: tombstone %q: %w", key, err)
 	}
 	if r.notif != nil {
 		if err := r.notif.Publish(key, ""); err != nil {
-			return fmt.Errorf("settings: notifier %q: %w", key, err)
+			return errf.Errorf("settings: notifier %q: %w", key, err)
 		}
 	}
 	return nil

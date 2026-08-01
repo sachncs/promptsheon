@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"log/slog"
 	"net/http"
@@ -135,22 +135,22 @@ func (a *Authenticator) Authenticate(r *http.Request) (*User, error) {
 	key := ExtractAPIKey(r)
 	if key == "" {
 		a.authLogger.LogAuthFailure(r.Context(), "", "missing or malformed api key", r.RemoteAddr)
-		return nil, fmt.Errorf("missing api key")
+		return nil, errf.Errorf("missing api key")
 	}
 
 	hash := HashAPIKey(key)
 	rec, err := a.store.GetAPIKeyByHash(r.Context(), hash)
 	if err != nil {
 		a.authLogger.LogAuthFailure(r.Context(), "", "lookup error", r.RemoteAddr)
-		return nil, fmt.Errorf("lookup api key: %w", err)
+		return nil, errf.Errorf("lookup api key: %w", err)
 	}
 	if rec == nil || rec.Revoked {
 		a.authLogger.LogAuthFailure(r.Context(), "", "invalid or revoked", r.RemoteAddr)
-		return nil, fmt.Errorf("invalid api key")
+		return nil, errf.Errorf("invalid api key")
 	}
 	if rec.ExpiresAt != nil && rec.ExpiresAt.Before(time.Now()) {
 		a.authLogger.LogAuthFailure(r.Context(), rec.KeyPrefix, "expired", r.RemoteAddr)
-		return nil, fmt.Errorf("api key expired")
+		return nil, errf.Errorf("api key expired")
 	}
 
 	// H-5 fix: queue the last-used update on a background

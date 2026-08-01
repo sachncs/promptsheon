@@ -1,7 +1,7 @@
 package cas
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"sort"
 )
 
@@ -52,10 +52,10 @@ func Log(n int) ([]*LogEntry, error) {
 
 		obj, err := ReadObject(current)
 		if err != nil {
-			return nil, fmt.Errorf("log: read %s: %w", shortHash(current), err)
+			return nil, errf.Errorf("log: read %s: %w", shortHash(current), err)
 		}
 		if !obj.IsCommit() {
-			return nil, fmt.Errorf("log: %s is not a commit object", shortHash(current))
+			return nil, errf.Errorf("log: %s is not a commit object", shortHash(current))
 		}
 
 		parents := append([]string(nil), obj.Parents...)
@@ -155,10 +155,10 @@ func collectCommits(refs []RefDetail) (map[string]*Object, map[string][]string, 
 			}
 			obj, err := ReadObject(h)
 			if err != nil {
-				return nil, nil, fmt.Errorf("build graph: read %s: %w", shortHash(h), err)
+				return nil, nil, errf.Errorf("build graph: read %s: %w", shortHash(h), err)
 			}
 			if !obj.IsCommit() {
-				return nil, nil, fmt.Errorf("build graph: %s is not a commit", shortHash(h))
+				return nil, nil, errf.Errorf("build graph: %s is not a commit", shortHash(h))
 			}
 			commits[h] = obj
 			queue = append(queue, obj.Parents...)

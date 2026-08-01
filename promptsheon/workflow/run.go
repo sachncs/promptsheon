@@ -2,6 +2,7 @@
 package workflow
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/metrics"
 	"context"
 	"fmt"
@@ -65,17 +66,17 @@ func (e *Engine) runInstrumented(ctx context.Context, def Definition, initial ma
 	}
 	typed, ok := out.(*Result)
 	if !ok {
-		return nil, fmt.Errorf("workflow: middleware returned %T, want *Result", out)
+		return nil, errf.Errorf("workflow: middleware returned %T, want *Result", out)
 	}
 	return typed, nil
 }
 
 func (e *Engine) runRaw(ctx context.Context, def Definition, initial map[string]any) (*Result, error) {
 	if def.ID == "" {
-		return nil, fmt.Errorf("workflow: definition id is required")
+		return nil, errf.Errorf("workflow: definition id is required")
 	}
 	if len(def.Steps) == 0 {
-		return nil, fmt.Errorf("workflow: definition has no steps")
+		return nil, errf.Errorf("workflow: definition has no steps")
 	}
 	res := &Result{
 		WorkflowID: def.ID,
@@ -113,7 +114,7 @@ func (e *Engine) runStep(ctx context.Context, reg *Registry, step Step, inputs m
 			StepID: step.ID,
 			Status: StatusFailed,
 			Error:  fmt.Sprintf("tool %q is not registered", step.Tool),
-		}, fmt.Errorf("workflow: step %s references unregistered tool %q", step.ID, step.Tool)
+		}, errf.Errorf("workflow: step %s references unregistered tool %q", step.ID, step.Tool)
 	}
 	// Merge workflow outputs into the step input so a step can
 	// reference the previous step's named output. The step's

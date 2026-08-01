@@ -7,7 +7,7 @@
 package promptsheon
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 		"encoding/json"
 	"errors"
@@ -138,22 +138,22 @@ func parseVersionDiffArgs(r *http.Request) (int, int, error) {
 	if v := q.Get("from"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil {
-			return 0, 0, fmt.Errorf("invalid from=%q: must be an integer", v)
+			return 0, 0, errf.Errorf("invalid from=%q: must be an integer", v)
 		}
 		from = n
 	}
 	if v := q.Get("to"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil {
-			return 0, 0, fmt.Errorf("invalid to=%q: must be an integer", v)
+			return 0, 0, errf.Errorf("invalid to=%q: must be an integer", v)
 		}
 		to = n
 	}
 	if to == 0 {
-		return 0, 0, fmt.Errorf("to is required")
+		return 0, 0, errf.Errorf("to is required")
 	}
 	if to < from {
-		return 0, 0, fmt.Errorf("to must be >= from")
+		return 0, 0, errf.Errorf("to must be >= from")
 	}
 	return from, to, nil
 }

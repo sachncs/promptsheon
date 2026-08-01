@@ -12,7 +12,7 @@
 package promptsheon
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"errors"
 	"log/slog"
@@ -167,7 +167,7 @@ func LoadConfig() (Config, error) {
 	cfg := DefaultConfig()
 	if path := os.Getenv("PROMPTSHEON_CONFIG"); path != "" {
 		if err := loadYAMLFile(&cfg, path); err != nil {
-			return Config{}, fmt.Errorf("config: failed to load %q: %w", path, err)
+			return Config{}, errf.Errorf("config: failed to load %q: %w", path, err)
 		}
 	}
 
@@ -313,7 +313,7 @@ func (c *Config) Validate() error {
 		return errors.New("config: PROMPTSHEON_ADDR must not be empty")
 	}
 	if !c.Auth && !isLoopbackAddr(c.Addr) {
-		return fmt.Errorf(
+		return errf.Errorf(
 			"config: PROMPTSHEON_AUTH=false is only valid for loopback binds (got %q); "+
 				"refusing to start because POST /api/v1/setup would mint an admin key to "+
 				"any network-adjacent caller. Set PROMPTSHEON_AUTH=true, or bind to "+
@@ -325,7 +325,7 @@ func (c *Config) Validate() error {
 	if !isLoopbackAddr(c.Addr) {
 		for _, o := range c.CORSOrigins {
 			if o == "*" {
-				return fmt.Errorf(
+				return errf.Errorf(
 					"config: PROMPTSHEON_CORS_ORIGINS=* is not allowed for non-loopback binds (got %q); "+
 						"the wildcard allows any browser to make credentialed cross-origin "+
 						"requests. Set an explicit list of origins, or bind to 127.0.0.1 / ::1",
@@ -335,7 +335,7 @@ func (c *Config) Validate() error {
 		}
 	}
 	if !isLoopbackAddr(c.Addr) && c.TLSCertFile == "" && c.TLSKeyFile == "" {
-		return fmt.Errorf(
+		return errf.Errorf(
 			"config: non-loopback bind %q requires TLS — set PROMPTSHEON_TLS_CERT_FILE and "+
 				"PROMPTSHEON_TLS_KEY_FILE to terminate TLS in the daemon. (Bearer keys and audit "+
 				"details must not cross the wire in clear.)",
@@ -443,12 +443,12 @@ func (c *Config) Port() int {
 func loadYAMLFile(cfg *Config, path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("read: %w", err)
+		return errf.Errorf("read: %w", err)
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true) // strict: unknown keys are a config error
 	if err := dec.Decode(cfg); err != nil {
-		return fmt.Errorf("decode: %w", err)
+		return errf.Errorf("decode: %w", err)
 	}
 	return nil
 }

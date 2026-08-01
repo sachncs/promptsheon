@@ -1,6 +1,7 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/webhook"
 	"fmt"
 	"net"
@@ -92,7 +93,7 @@ func (s *Server) handleCreateWebhook(w http.ResponseWriter, r *http.Request) err
 		}
 		ct, err := s.vault.EncryptBytes([]byte(req.Secret), []byte("webhook:"+endpointID))
 		if err != nil {
-			return fmt.Errorf("encrypt webhook secret: %w", err)
+			return errf.Errorf("encrypt webhook secret: %w", err)
 		}
 		secretCiphertext = ct
 	}
@@ -150,14 +151,14 @@ func (s *Server) handleDeleteWebhook(w http.ResponseWriter, r *http.Request) err
 func ValidateWebhookURL(rawURL string) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return fmt.Errorf("parse url: %w", err)
+		return errf.Errorf("parse url: %w", err)
 	}
 	if u.Scheme != "https" {
-		return fmt.Errorf("unsupported scheme %q (only https is accepted)", u.Scheme)
+		return errf.Errorf("unsupported scheme %q (only https is accepted)", u.Scheme)
 	}
 	host := u.Hostname()
 	if host == "" {
-		return fmt.Errorf("missing host")
+		return errf.Errorf("missing host")
 	}
 	// Reject obvious loopback / metadata host names even if we cannot
 	// resolve them, so an operator cannot register `localhost` and have
@@ -165,7 +166,7 @@ func ValidateWebhookURL(rawURL string) error {
 	lower := strings.ToLower(host)
 	if lower == "localhost" || strings.HasSuffix(lower, ".localhost") ||
 		lower == "metadata.google.internal" || strings.HasSuffix(lower, ".internal") {
-		return fmt.Errorf("loopback / metadata hostnames are not allowed")
+		return errf.Errorf("loopback / metadata hostnames are not allowed")
 	}
 
 	// Resolve every IP that the host maps to. Reject the URL if any of
@@ -173,14 +174,14 @@ func ValidateWebhookURL(rawURL string) error {
 	// mitigation: validate at registration time AND at delivery time.
 	ips, err := net.LookupIP(host)
 	if err != nil {
-		return fmt.Errorf("resolve host: %v", err)
+		return errf.Errorf("resolve host: %v", err)
 	}
 	if len(ips) == 0 {
-		return fmt.Errorf("host did not resolve")
+		return errf.Errorf("host did not resolve")
 	}
 	for _, ip := range ips {
 		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
-			return fmt.Errorf("host resolves to disallowed address %s", ip)
+			return errf.Errorf("host resolves to disallowed address %s", ip)
 		}
 	}
 	return nil

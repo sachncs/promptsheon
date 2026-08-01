@@ -5,7 +5,7 @@
 package release
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/approval"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"github.com/sachncs/promptsheon/promptsheon/harness"
@@ -150,7 +150,7 @@ func (s *Service) activateWith(ctx context.Context, releaseID string, policy app
 
 	a, err := s.App.GetApproval(ctx, releaseID)
 	if err != nil {
-		return nil, fmt.Errorf("approval: %w", err)
+		return nil, errf.Errorf("approval: %w", err)
 	}
 
 	approved, err := r.ApproveWith(*a, policy)
@@ -165,7 +165,7 @@ func (s *Service) activateWith(ctx context.Context, releaseID string, policy app
 	if s.Harness != nil && s.HarnessDB != nil {
 		precs, err := s.HarnessDB.ListPreconditionsForCapability(ctx, r.CapabilityID)
 		if err != nil {
-			return nil, fmt.Errorf("harness: list preconditions: %w", err)
+			return nil, errf.Errorf("harness: list preconditions: %w", err)
 		}
 		if len(precs) > 0 {
 			precsVal := make([]harness.Precondition, len(precs))

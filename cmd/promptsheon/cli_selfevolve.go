@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -30,7 +31,7 @@ import (
 // is on, plus the persisted thresholds.
 func cmdSelfEvolve(args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("usage: promptsheon selfevolve <enable|disable|status> <capability>")
+		return errf.Errorf("usage: promptsheon selfevolve <enable|disable|status> <capability>")
 	}
 	op := args[0]
 	capID := args[1]
@@ -42,7 +43,7 @@ func cmdSelfEvolve(args []string) error {
 	case "status":
 		return selfEvolveStatus(capID)
 	default:
-		return fmt.Errorf("unknown selfevolve subcommand: %s", op)
+		return errf.Errorf("unknown selfevolve subcommand: %s", op)
 	}
 }
 
@@ -58,7 +59,7 @@ func selfEvolveParseFlags(args []string) (flags map[string]bool, values map[stri
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if !strings.HasPrefix(a, "--") {
-			return nil, nil, fmt.Errorf("unexpected positional arg: %s", a)
+			return nil, nil, errf.Errorf("unexpected positional arg: %s", a)
 		}
 		name := strings.TrimPrefix(a, "--")
 		if eq := strings.Index(name, "="); eq >= 0 {
@@ -84,7 +85,7 @@ func selfEvolveEnable(capID string, args []string) error {
 	}
 	dataset, ok := values["dataset"]
 	if !ok || dataset == "" {
-		return fmt.Errorf("--dataset is required")
+		return errf.Errorf("--dataset is required")
 	}
 	cfg := map[string]any{
 		"dataset_id":    dataset,
@@ -133,7 +134,7 @@ func selfEvolveStatus(capID string) error {
 		} `json:"self_evolve"`
 	}
 	if err := json.Unmarshal(body, &cap); err != nil {
-		return fmt.Errorf("decode capability: %w", err)
+		return errf.Errorf("decode capability: %w", err)
 	}
 	fmt.Printf("capability:  %s\n", cap.ID)
 	fmt.Printf("enabled:     %v\n", cap.SelfEvolve.Enabled)
@@ -174,7 +175,7 @@ func apiUpdateSelfEvolve(capID string, fields map[string]any) error {
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("daemon returned %s: %s", resp.Status, string(b))
+		return errf.Errorf("daemon returned %s: %s", resp.Status, string(b))
 	}
 	fmt.Printf("self-evolve: capability %s updated\n", capID)
 	return nil

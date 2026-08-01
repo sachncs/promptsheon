@@ -1,7 +1,7 @@
 package cas
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"os"
 	"path/filepath"
 )
@@ -16,7 +16,7 @@ func branchRefPath(name string) string {
 func openRepoRoot() (*os.Root, error) {
 	root, err := os.OpenRoot(PromptsheonDir)
 	if err != nil {
-		return nil, fmt.Errorf("open repo: %w", err)
+		return nil, errf.Errorf("open repo: %w", err)
 	}
 	return root, nil
 }

@@ -1,7 +1,7 @@
 package evolve
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"encoding/json"
@@ -58,24 +58,24 @@ func NewHarnessValidator(cases CaseLoader, invoke LLMInvokeFn) *HarnessValidator
 // activated and no row is written to eval_runs.
 func (v *HarnessValidator) Validate(ctx context.Context, capabilityID string, promptBytes []byte, datasetID string) (*harness.EvalRun, error) {
 	if v.Cases == nil {
-		return nil, fmt.Errorf("evolve.validator: no case loader wired")
+		return nil, errf.Errorf("evolve.validator: no case loader wired")
 	}
 	if v.Invoke == nil {
-		return nil, fmt.Errorf("evolve.validator: no LLM invoke wired")
+		return nil, errf.Errorf("evolve.validator: no LLM invoke wired")
 	}
 	if capabilityID == "" || datasetID == "" {
-		return nil, fmt.Errorf("evolve.validator: missing capabilityID or datasetID")
+		return nil, errf.Errorf("evolve.validator: missing capabilityID or datasetID")
 	}
 	cases, err := v.Cases.ListDatasetCases(ctx, datasetID)
 	if err != nil {
-		return nil, fmt.Errorf("evolve.validator: list cases: %w", err)
+		return nil, errf.Errorf("evolve.validator: list cases: %w", err)
 	}
 	if len(cases) == 0 {
-		return nil, fmt.Errorf("evolve.validator: dataset %s has no cases", datasetID)
+		return nil, errf.Errorf("evolve.validator: dataset %s has no cases", datasetID)
 	}
 	scorer, ok := eval.Lookup(v.Scorer)
 	if !ok {
-		return nil, fmt.Errorf("evolve.validator: unknown scorer %q", v.Scorer)
+		return nil, errf.Errorf("evolve.validator: unknown scorer %q", v.Scorer)
 	}
 	started := v.Now()
 	prompt := string(promptBytes)

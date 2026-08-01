@@ -7,7 +7,7 @@
 package eval
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -133,7 +133,7 @@ func (Regex) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 	pattern := stringof(expected)
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return false, fmt.Errorf("regex compile: %w", err)
+		return false, errf.Errorf("regex compile: %w", err)
 	}
 	return re.MatchString(stringof(actual)), nil
 }
@@ -167,14 +167,14 @@ func (JSONSchema) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 	}
 	var schema map[string]any
 	if err := json.Unmarshal(expected, &schema); err != nil {
-		return false, fmt.Errorf("json_schema: schema is not an object: %w", err)
+		return false, errf.Errorf("json_schema: schema is not an object: %w", err)
 	}
 	if u := unsupportedSchemaKeywords(schema); u != "" {
-		return false, fmt.Errorf("%w: %s", errs.ErrEvalUnsupportedSchema, u)
+		return false, errf.Errorf("%w: %s", errs.ErrEvalUnsupportedSchema, u)
 	}
 	var doc any
 	if err := json.Unmarshal(actual, &doc); err != nil {
-		return false, fmt.Errorf("json_schema: actual is not JSON: %w", err)
+		return false, errf.Errorf("json_schema: actual is not JSON: %w", err)
 	}
 	return validateSchema(doc, schema, "")
 }

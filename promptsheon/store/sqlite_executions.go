@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"database/sql"
@@ -15,11 +15,11 @@ import (
 func (s *SQLite) CreateExecution(ctx context.Context, e *capability.Execution) error {
 	inputs, err := marshalOrErr(e.Inputs)
 	if err != nil {
-		return fmt.Errorf("marshal execution inputs: %w", err)
+		return errf.Errorf("marshal execution inputs: %w", err)
 	}
 	outputs, err := marshalOrErr(e.Outputs)
 	if err != nil {
-		return fmt.Errorf("marshal execution outputs: %w", err)
+		return errf.Errorf("marshal execution outputs: %w", err)
 	}
 
 	// PERF-DB-2: RETURNING id. The execution row's id is set by
@@ -41,10 +41,10 @@ func (s *SQLite) CreateExecution(ctx context.Context, e *capability.Execution) e
 		e.TotalTokens, e.Error, e.TraceID, e.Environment,
 	).Scan(&gotID)
 	if err != nil {
-		return fmt.Errorf("insert execution: %w", err)
+		return errf.Errorf("insert execution: %w", err)
 	}
 	if gotID != e.ID {
-		return fmt.Errorf("insert execution: id mismatch (got %q, want %q)", gotID, e.ID)
+		return errf.Errorf("insert execution: id mismatch (got %q, want %q)", gotID, e.ID)
 	}
 	return nil
 }
@@ -92,7 +92,7 @@ func (s *SQLite) ListExecutions(ctx context.Context, filter capability.Execution
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list executions: %w", err)
+		return nil, errf.Errorf("list executions: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -122,14 +122,14 @@ func scanExecution(scanner interface {
 		return nil, errs.ErrStoreNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("scan execution: %w", err)
+		return nil, errf.Errorf("scan execution: %w", err)
 	}
 
 	if err := mustUnmarshal([]byte(inputsJSON), &e.Inputs); err != nil {
-		return nil, fmt.Errorf("execution %s inputs: %w", e.ID, err)
+		return nil, errf.Errorf("execution %s inputs: %w", e.ID, err)
 	}
 	if err := mustUnmarshal([]byte(outputsJSON), &e.Outputs); err != nil {
-		return nil, fmt.Errorf("execution %s outputs: %w", e.ID, err)
+		return nil, errf.Errorf("execution %s outputs: %w", e.ID, err)
 	}
 
 	if e.Timestamp.IsZero() {

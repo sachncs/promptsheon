@@ -13,6 +13,7 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -77,14 +78,14 @@ func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte,
 	if body != nil {
 		data, err := json.Marshal(body)
 		if err != nil {
-			return nil, fmt.Errorf("marshal body: %w", err)
+			return nil, errf.Errorf("marshal body: %w", err)
 		}
 		bodyReader = bytes.NewReader(data)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, bodyReader)
 	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
+		return nil, errf.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if c.apiKey != "" {
@@ -93,13 +94,13 @@ func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte,
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("http request: %w", err)
+		return nil, errf.Errorf("http request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
+		return nil, errf.Errorf("read response: %w", err)
 	}
 
 	if resp.StatusCode >= 400 {
@@ -158,7 +159,7 @@ func (c *Client) Health(ctx context.Context) (*HealthResponse, error) {
 	}
 	var h HealthResponse
 	if err := json.Unmarshal(data, &h); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+		return nil, errf.Errorf("decode response: %w", err)
 	}
 	return &h, nil
 }
@@ -184,7 +185,7 @@ func (c *Client) ListProviders(ctx context.Context) ([]string, error) {
 	}
 	var resp ProvidersResponse
 	if err := json.Unmarshal(data, &resp); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+		return nil, errf.Errorf("decode response: %w", err)
 	}
 	return resp.Providers, nil
 }
@@ -483,10 +484,10 @@ func (c *Client) Approval(ctx context.Context, releaseID string) (*Approval, err
 // maker-checker policy rejects the activation.
 func (c *Client) ApproveAndInvoke(ctx context.Context, releaseID, voterIdentity string, invokeReq InvokeRequest) (*Execution, error) {
 	if _, err := c.Vote(ctx, releaseID, VoteRequest{Identity: voterIdentity, Decision: "approve"}); err != nil {
-		return nil, fmt.Errorf("vote: %w", err)
+		return nil, errf.Errorf("vote: %w", err)
 	}
 	if _, err := c.Activate(ctx, releaseID); err != nil {
-		return nil, fmt.Errorf("activate: %w", err)
+		return nil, errf.Errorf("activate: %w", err)
 	}
 	return c.Invoke(ctx, releaseID, invokeReq)
 }
@@ -613,7 +614,7 @@ func (c *Client) CreatePrecondition(ctx context.Context, capabilityID string, re
 	}
 	var p Precondition
 	if err := json.Unmarshal(data, &p); err != nil {
-		return nil, fmt.Errorf("decode precondition: %w", err)
+		return nil, errf.Errorf("decode precondition: %w", err)
 	}
 	return &p, nil
 }
@@ -638,7 +639,7 @@ func (c *Client) UpdatePrecondition(ctx context.Context, id string, req UpdatePr
 	}
 	var p Precondition
 	if err := json.Unmarshal(data, &p); err != nil {
-		return nil, fmt.Errorf("decode precondition: %w", err)
+		return nil, errf.Errorf("decode precondition: %w", err)
 	}
 	return &p, nil
 }
@@ -787,7 +788,7 @@ func (c *Client) CreateAPIKey(ctx context.Context, req CreateAPIKeyRequest) (*AP
 	}
 	var k APIKey
 	if err := json.Unmarshal(data, &k); err != nil {
-		return nil, fmt.Errorf("decode api key: %w", err)
+		return nil, errf.Errorf("decode api key: %w", err)
 	}
 	return &k, nil
 }
@@ -805,7 +806,7 @@ func (c *Client) ListAPIKeys(ctx context.Context, userID string) ([]*APIKey, err
 	}
 	var ks []*APIKey
 	if err := json.Unmarshal(data, &ks); err != nil {
-		return nil, fmt.Errorf("decode api keys: %w", err)
+		return nil, errf.Errorf("decode api keys: %w", err)
 	}
 	return ks, nil
 }

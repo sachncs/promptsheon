@@ -1,7 +1,7 @@
 package llm
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"log/slog"
 	"net/http"
@@ -98,7 +98,7 @@ func (a *Anthropic) Complete(ctx context.Context, req *Request) (*Response, erro
 		)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("anthropic request: %w", err)
+		return nil, errf.Errorf("anthropic request: %w", err)
 	}
 
 	var content strings.Builder

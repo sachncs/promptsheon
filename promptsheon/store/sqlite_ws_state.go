@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"database/sql"
 	"errors"
@@ -18,7 +18,7 @@ func (s *SQLite) GetWSNextID(ctx context.Context) (int64, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
 		}
-		return 0, fmt.Errorf("get ws next id: %w", err)
+		return 0, errf.Errorf("get ws next id: %w", err)
 	}
 	return n, nil
 }
@@ -36,7 +36,7 @@ func (s *SQLite) SetWSNextID(ctx context.Context, n int64) error {
 		n,
 	)
 	if err != nil {
-		return fmt.Errorf("set ws next id: %w", err)
+		return errf.Errorf("set ws next id: %w", err)
 	}
 	return nil
 }

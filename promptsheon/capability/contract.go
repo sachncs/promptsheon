@@ -1,7 +1,7 @@
 package capability
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )
@@ -81,13 +81,13 @@ func (c CapabilityContract) Validate() error {
 		return errs.ErrEmptyContract
 	}
 	if !c.BlastRadius.Valid() {
-		return fmt.Errorf("%w: %q", errs.ErrInvalidBlastRadius, c.BlastRadius)
+		return errf.Errorf("%w: %q", errs.ErrInvalidBlastRadius, c.BlastRadius)
 	}
 	if c.SLOTarget.MinSuccessRate < 0 || c.SLOTarget.MinSuccessRate > 1 {
-		return fmt.Errorf("capability: success rate out of range: %f", c.SLOTarget.MinSuccessRate)
+		return errf.Errorf("capability: success rate out of range: %f", c.SLOTarget.MinSuccessRate)
 	}
 	if c.SLOTarget.MaxHallucinationRate < 0 || c.SLOTarget.MaxHallucinationRate > 1 {
-		return fmt.Errorf("capability: hallucination rate out of range: %f", c.SLOTarget.MaxHallucinationRate)
+		return errf.Errorf("capability: hallucination rate out of range: %f", c.SLOTarget.MaxHallucinationRate)
 	}
 	return nil
 }

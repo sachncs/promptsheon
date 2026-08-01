@@ -1,7 +1,7 @@
 package promptsheon
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 			"context"
@@ -264,7 +264,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 
 	key, hash, err := auth.GenerateAPIKey()
 	if err != nil {
-		return fmt.Errorf("bootstrap: generate key: %w", err)
+		return errf.Errorf("bootstrap: generate key: %w", err)
 	}
 	apiKey := &models.APIKey{
 		ID:        generateID(),
@@ -284,7 +284,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) error {
 		if errors.Is(err, errs.ErrStoreConflict) {
 			return &HTTPError{Status: http.StatusConflict, Message: "bootstrap is no longer available; the server already has users"}
 		}
-		return fmt.Errorf("bootstrap: %w", err)
+		return errf.Errorf("bootstrap: %w", err)
 	}
 
 	// Log loudly. The warning is the operator's signal that the

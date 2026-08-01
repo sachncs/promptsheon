@@ -7,7 +7,7 @@
 package promptsheon
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
@@ -130,7 +130,7 @@ func (s *Server) StartAuditWorkers(n int) error {
 	s.auditMu.Lock()
 	defer s.auditMu.Unlock()
 	if s.auditCancel != nil {
-		return fmt.Errorf("audit workers already started; StartAuditWorkers is one-shot")
+		return errf.Errorf("audit workers already started; StartAuditWorkers is one-shot")
 	}
 	s.auditQueue = make(chan *models.AuditEntry, 1024)
 	s.auditDone = make(chan struct{})

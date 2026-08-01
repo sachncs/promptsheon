@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
 	"database/sql"
@@ -17,7 +17,7 @@ import (
 func (s *SQLite) SaveAlertRule(ctx context.Context, r *models.AlertRuleRecord) error {
 	configJSON, err := marshalOrErr(r.Config)
 	if err != nil {
-		return fmt.Errorf("marshal alert rule config: %w", err)
+		return errf.Errorf("marshal alert rule config: %w", err)
 	}
 	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO alert_rules (id, name, type, severity, enabled, threshold, duration, window, config, created_at, updated_at)
@@ -35,7 +35,7 @@ func (s *SQLite) SaveAlertRule(ctx context.Context, r *models.AlertRuleRecord) e
 		r.ID, r.Name, r.Type, r.Severity, r.Enabled, r.Threshold, r.Duration, r.Window, configJSON, r.CreatedAt, r.UpdatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("save alert rule: %w", err)
+		return errf.Errorf("save alert rule: %w", err)
 	}
 	return nil
 }
@@ -50,7 +50,7 @@ func (s *SQLite) GetAlertRule(ctx context.Context, id string) (*models.AlertRule
 func (s *SQLite) DeleteAlertRule(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM alert_rules WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("delete alert rule: %w", err)
+		return errf.Errorf("delete alert rule: %w", err)
 	}
 	return nil
 }
@@ -60,7 +60,7 @@ func (s *SQLite) ListAlertRules(ctx context.Context) ([]*models.AlertRuleRecord,
 		SELECT id, name, type, severity, enabled, threshold, duration, window, config, created_at, updated_at
 		FROM alert_rules ORDER BY created_at DESC`)
 	if err != nil {
-		return nil, fmt.Errorf("list alert rules: %w", err)
+		return nil, errf.Errorf("list alert rules: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -78,7 +78,7 @@ func (s *SQLite) ListAlertRules(ctx context.Context) ([]*models.AlertRuleRecord,
 func (s *SQLite) SaveAlert(ctx context.Context, a *models.AlertRecord) error {
 	detailsJSON, err := marshalOrErr(a.Details)
 	if err != nil {
-		return fmt.Errorf("marshal alert details: %w", err)
+		return errf.Errorf("marshal alert details: %w", err)
 	}
 	_, err = s.db.ExecContext(ctx, `
 		INSERT OR REPLACE INTO alerts (id, rule_id, rule_name, severity, status, message, details, triggered_at, resolved_at)
@@ -86,7 +86,7 @@ func (s *SQLite) SaveAlert(ctx context.Context, a *models.AlertRecord) error {
 		a.ID, a.RuleID, a.RuleName, a.Severity, a.Status, a.Message, detailsJSON, a.TriggeredAt, a.ResolvedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("save alert: %w", err)
+		return errf.Errorf("save alert: %w", err)
 	}
 	return nil
 }
@@ -104,11 +104,11 @@ func (s *SQLite) UpdateAlert(ctx context.Context, a *models.AlertRecord) error {
 		a.Status, a.ResolvedAt, a.ID,
 	)
 	if err != nil {
-		return fmt.Errorf("update alert: %w", err)
+		return errf.Errorf("update alert: %w", err)
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("alert not found: %s", a.ID)
+		return errf.Errorf("alert not found: %s", a.ID)
 	}
 	return nil
 }
@@ -124,7 +124,7 @@ func (s *SQLite) ListAlerts(ctx context.Context, status string) ([]*models.Alert
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list alerts: %w", err)
+		return nil, errf.Errorf("list alerts: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -142,7 +142,7 @@ func (s *SQLite) ListAlerts(ctx context.Context, status string) ([]*models.Alert
 func (s *SQLite) SaveNotificationGroup(ctx context.Context, g *models.NotificationGroupRecord) error {
 	channelsJSON, err := marshalOrErr(g.Channels)
 	if err != nil {
-		return fmt.Errorf("marshal notification channels: %w", err)
+		return errf.Errorf("marshal notification channels: %w", err)
 	}
 	// INSERT ... ON CONFLICT DO UPDATE preserves any child rows in
 	// alert_rule_notification_groups that reference this group's
@@ -155,7 +155,7 @@ func (s *SQLite) SaveNotificationGroup(ctx context.Context, g *models.Notificati
 		g.ID, g.Name, channelsJSON,
 	)
 	if err != nil {
-		return fmt.Errorf("save notification group: %w", err)
+		return errf.Errorf("save notification group: %w", err)
 	}
 	return nil
 }
@@ -169,7 +169,7 @@ func (s *SQLite) GetNotificationGroup(ctx context.Context, id string) (*models.N
 func (s *SQLite) DeleteNotificationGroup(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM notification_groups WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("delete notification group: %w", err)
+		return errf.Errorf("delete notification group: %w", err)
 	}
 	return nil
 }
@@ -177,7 +177,7 @@ func (s *SQLite) DeleteNotificationGroup(ctx context.Context, id string) error {
 func (s *SQLite) ListNotificationGroups(ctx context.Context) ([]*models.NotificationGroupRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT id, name, channels FROM notification_groups ORDER BY name`)
 	if err != nil {
-		return nil, fmt.Errorf("list notification groups: %w", err)
+		return nil, errf.Errorf("list notification groups: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -213,7 +213,7 @@ func (s *SQLite) GetChannelsForAlertRule(ctx context.Context, ruleID string) ([]
 		  ORDER BY json_each.value`,
 		ruleID)
 	if err != nil {
-		return nil, fmt.Errorf("channels for alert rule: %w", err)
+		return nil, errf.Errorf("channels for alert rule: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -221,7 +221,7 @@ func (s *SQLite) GetChannelsForAlertRule(ctx context.Context, ruleID string) ([]
 	for rows.Next() {
 		var c string
 		if err := rows.Scan(&c); err != nil {
-			return nil, fmt.Errorf("scan channels: %w", err)
+			return nil, errf.Errorf("scan channels: %w", err)
 		}
 		channels = append(channels, c)
 	}
@@ -242,7 +242,7 @@ func scanAlertRule(row scannable) (*models.AlertRuleRecord, error) {
 		if err == sql.ErrNoRows {
 			return nil, errs.ErrStoreNotFound
 		}
-		return nil, fmt.Errorf("scan alert rule: %w", err)
+		return nil, errf.Errorf("scan alert rule: %w", err)
 	}
 	if configJSON != "" {
 		if err := json.Unmarshal([]byte(configJSON), &r.Config); err != nil {
@@ -266,7 +266,7 @@ func scanAlert(row scannable) (*models.AlertRecord, error) {
 		if err == sql.ErrNoRows {
 			return nil, errs.ErrStoreNotFound
 		}
-		return nil, fmt.Errorf("scan alert: %w", err)
+		return nil, errf.Errorf("scan alert: %w", err)
 	}
 	if detailsJSON != "" {
 		if err := json.Unmarshal([]byte(detailsJSON), &a.Details); err != nil {
@@ -287,7 +287,7 @@ func scanNotificationGroup(row scannable) (*models.NotificationGroupRecord, erro
 		if err == sql.ErrNoRows {
 			return nil, errs.ErrStoreNotFound
 		}
-		return nil, fmt.Errorf("scan notification group: %w", err)
+		return nil, errf.Errorf("scan notification group: %w", err)
 	}
 	if channelsJSON != "" {
 		if err := json.Unmarshal([]byte(channelsJSON), &g.Channels); err != nil {

@@ -1,6 +1,7 @@
 package cas
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"errors"
 	"fmt"
 	"os"
@@ -55,7 +56,7 @@ func collectAllObjects(result *VerifyResult) (map[string]string, error) {
 	objectsDirPath := filepath.Join(PromptsheonDir, objectsDir)
 	shards, err := os.ReadDir(objectsDirPath)
 	if err != nil {
-		return nil, fmt.Errorf("read objects: %w", err)
+		return nil, errf.Errorf("read objects: %w", err)
 	}
 	for _, shard := range shards {
 		if !shard.IsDir() || len(shard.Name()) != 2 {
@@ -63,7 +64,7 @@ func collectAllObjects(result *VerifyResult) (map[string]string, error) {
 		}
 		entries, e := os.ReadDir(filepath.Join(objectsDirPath, shard.Name()))
 		if e != nil {
-			return nil, fmt.Errorf("read shard %s: %w", shard.Name(), e)
+			return nil, errf.Errorf("read shard %s: %w", shard.Name(), e)
 		}
 		for _, e := range entries {
 			if e.IsDir() {

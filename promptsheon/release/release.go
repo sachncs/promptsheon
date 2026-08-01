@@ -14,7 +14,7 @@
 package release
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/approval"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"errors"
@@ -114,10 +114,10 @@ func New(capabilityID string, capabilityVersion int, manifest capability.Manifes
 		return Release{}, errors.New("release: created_by is required")
 	}
 	if !environment.Valid() {
-		return Release{}, fmt.Errorf("%w: %q", errs.ErrReleaseUnknownEnvironment, environment)
+		return Release{}, errf.Errorf("%w: %q", errs.ErrReleaseUnknownEnvironment, environment)
 	}
 	if err := manifest.Validate(); err != nil {
-		return Release{}, fmt.Errorf("release: manifest: %w", err)
+		return Release{}, errf.Errorf("release: manifest: %w", err)
 	}
 	return Release{
 		CapabilityID:      capabilityID,
@@ -158,10 +158,10 @@ func (r Release) ApproveWith(a approval.Approval, pol approval.Policy) (Release,
 	// Creator populated above; other policies never checked it.
 	state, satisfied, err := pol.Evaluate(a.Votes)
 	if err != nil {
-		return r, fmt.Errorf("release: policy: %w", err)
+		return r, errf.Errorf("release: policy: %w", err)
 	}
 	if !satisfied {
-		return r, fmt.Errorf("%w: state=%s, votes=%d", errs.ErrQuorum, state, len(a.Votes))
+		return r, errf.Errorf("%w: state=%s, votes=%d", errs.ErrQuorum, state, len(a.Votes))
 	}
 	for _, v := range a.Votes {
 		if v.Decision == approval.Approve {
@@ -180,7 +180,7 @@ func (r Release) ApproveWith(a approval.Approval, pol approval.Policy) (Release,
 // boundaries (test seams, replay buffers).
 func (r Release) Activate(at time.Time) (Release, error) {
 	if r.Status != StatusApproved {
-		return r, fmt.Errorf("release: activate requires Approved status, got %s", r.Status)
+		return r, errf.Errorf("release: activate requires Approved status, got %s", r.Status)
 	}
 	r.Status = StatusActive
 	r.ActivatedAt = &at
@@ -194,7 +194,7 @@ func (r Release) Activate(at time.Time) (Release, error) {
 // SupersededAt is set to the supplied time; again clocks are explicit.
 func (r Release) Supersede(byReleaseID string, at time.Time) (Release, error) {
 	if r.Status != StatusActive {
-		return r, fmt.Errorf("release: supersede requires Active status, got %s", r.Status)
+		return r, errf.Errorf("release: supersede requires Active status, got %s", r.Status)
 	}
 	if byReleaseID == "" {
 		return r, errors.New("release: supersede requires replacement release id")
@@ -210,7 +210,7 @@ func (r Release) Supersede(byReleaseID string, at time.Time) (Release, error) {
 // the domain of an incident, not this aggregate.
 func (r Release) Rollback(at time.Time) (Release, error) {
 	if r.Status != StatusActive && r.Status != StatusApproved {
-		return r, fmt.Errorf("release: rollback requires Active or Approved status, got %s", r.Status)
+		return r, errf.Errorf("release: rollback requires Active or Approved status, got %s", r.Status)
 	}
 	r.Status = StatusRolledBack
 	t := at

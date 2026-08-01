@@ -1,7 +1,7 @@
 package promptsheon
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/approval"
 	"github.com/sachncs/promptsheon/promptsheon/release"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
@@ -223,7 +223,7 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 	}
 	mHash, err := manifestHashForRelease(rel)
 	if err != nil {
-		return fmt.Errorf("manifest hash: %w", err)
+		return errf.Errorf("manifest hash: %w", err)
 	}
 	plan, err := s.resolveRelease(r.Context(), rel)
 	if err != nil {
@@ -236,7 +236,7 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 	// the real version row by (capability_id, version number).
 	ver, err := s.db.GetVersionByNumber(r.Context(), rel.CapabilityID, rel.CapabilityVersion)
 	if err != nil {
-		return fmt.Errorf("lookup capability version: %w", err)
+		return errf.Errorf("lookup capability version: %w", err)
 	}
 	exec := &capability.Execution{
 		ID:                  generateID(),

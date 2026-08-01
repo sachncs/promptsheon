@@ -16,6 +16,7 @@ package promptsheon
 // surfaces those in the audit chain and the Execution record.
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/release"
 	"github.com/sachncs/promptsheon/promptsheon/metrics"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
@@ -28,7 +29,6 @@ import (
 	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"bytes"
 	"context"
-	"fmt"
 	"log/slog"
 	"testing"
 	"time"
@@ -51,7 +51,7 @@ func (p *inMemoryProvider) Name() string { return p.name }
 
 func (p *inMemoryProvider) Complete(ctx context.Context, req *llm.Request) (*llm.Response, error) {
 	if req.Model == "" {
-		return nil, fmt.Errorf("inMemoryProvider: model required")
+		return nil, errf.Errorf("inMemoryProvider: model required")
 	}
 	var echo string
 	for _, m := range req.Messages {
@@ -123,7 +123,7 @@ func (inMemoryArtifactLoader) Load(ctx context.Context, kind capability.Artifact
 	case capability.ArtifactRuntimePolicy:
 		return []byte(`{"max_output_tokens":1024,"temperature":0.7}`), nil
 	}
-	return nil, fmt.Errorf("inMemoryArtifactLoader: unknown kind %q", kind)
+	return nil, errf.Errorf("inMemoryArtifactLoader: unknown kind %q", kind)
 }
 
 func newInvokeTestServerWithRepo(t *testing.T, repo *mockRepo, opts ...Option) *Server {

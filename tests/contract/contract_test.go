@@ -13,6 +13,7 @@
 package contract
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"fmt"
 	"io"
@@ -404,9 +405,9 @@ func repoRoot() (string, error) {
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return "", fmt.Errorf("go.mod not found above %s", wd)
+			return "", errf.Errorf("go.mod not found above %s", wd)
 		}
 		dir = parent
 	}
-	return "", fmt.Errorf("go.mod not found above %s", wd)
+	return "", errf.Errorf("go.mod not found above %s", wd)
 }

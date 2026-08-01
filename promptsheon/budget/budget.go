@@ -17,7 +17,7 @@
 package budget
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"errors"
 	"time"
@@ -67,12 +67,12 @@ func New(scope Scope, targetID string, period Period, capUSD float64, now time.T
 	switch scope {
 	case ScopeWorkspace, ScopeCapability:
 	default:
-		return Budget{}, fmt.Errorf("budget: unknown scope %q", scope)
+		return Budget{}, errf.Errorf("budget: unknown scope %q", scope)
 	}
 	switch period {
 	case PeriodDaily, PeriodWeekly, PeriodMonthly:
 	default:
-		return Budget{}, fmt.Errorf("budget: unknown period %q", period)
+		return Budget{}, errf.Errorf("budget: unknown period %q", period)
 	}
 	if targetID == "" {
 		return Budget{}, errors.New("budget: target_id is required")

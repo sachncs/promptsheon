@@ -1,7 +1,7 @@
 package promptsheon
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/alerting"
 	"net/http"
 	"time"
@@ -219,7 +219,7 @@ func (s *Server) handleListNotificationGroups(w http.ResponseWriter, r *http.Req
 	}
 	groups, err := s.db.ListNotificationGroups(r.Context())
 	if err != nil {
-		return fmt.Errorf("list notification groups: %w", err)
+		return errf.Errorf("list notification groups: %w", err)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"groups": groups})
 	return nil
@@ -265,7 +265,7 @@ func (s *Server) handleLinkAlertRuleGroup(w http.ResponseWriter, r *http.Request
 		return &HTTPError{Status: http.StatusBadRequest, Message: "rule_id and group_id are required"}
 	}
 	if err := s.db.LinkRuleToGroup(r.Context(), ruleID, groupID); err != nil {
-		return fmt.Errorf("link rule to group: %w", err)
+		return errf.Errorf("link rule to group: %w", err)
 	}
 	s.audit(r.Context(), "alert_link", "alert_rule:"+ruleID, map[string]any{
 		"notification_group_id": groupID,
@@ -284,7 +284,7 @@ func (s *Server) handleUnlinkAlertRuleGroup(w http.ResponseWriter, r *http.Reque
 		return &HTTPError{Status: http.StatusBadRequest, Message: "rule_id and group_id are required"}
 	}
 	if err := s.db.UnlinkRuleFromGroup(r.Context(), ruleID, groupID); err != nil {
-		return fmt.Errorf("unlink rule from group: %w", err)
+		return errf.Errorf("unlink rule from group: %w", err)
 	}
 	s.audit(r.Context(), "alert_unlink", "alert_rule:"+ruleID, map[string]any{
 		"notification_group_id": groupID,

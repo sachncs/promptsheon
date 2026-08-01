@@ -3,7 +3,7 @@
 package cas
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"errors"
 )
 
@@ -29,10 +29,10 @@ func CreateBranch(name, targetHash string) error {
 	return withRepoLock(func() error {
 		existing, err := ReadRef(name)
 		if err != nil && !errors.Is(err, ErrRefNotFound) {
-			return fmt.Errorf("read ref: %w", err)
+			return errf.Errorf("read ref: %w", err)
 		}
 		if existing != "" {
-			return fmt.Errorf("branch %q already exists", name)
+			return errf.Errorf("branch %q already exists", name)
 		}
 
 		hash := targetHash
@@ -52,17 +52,17 @@ func CreateBranch(name, targetHash string) error {
 
 		cleaned := sanitizeHash(hash)
 		if err := validateHash(cleaned); err != nil {
-			return fmt.Errorf("target hash: %w", err)
+			return errf.Errorf("target hash: %w", err)
 		}
 		obj, err := ReadObject(cleaned)
 		if err != nil {
-			return fmt.Errorf("target object: %w", err)
+			return errf.Errorf("target object: %w", err)
 		}
 		// Verify the target is actually a commit so the branch points at
 		// something usable. The current branch check (HEAD → commit) is
 		// not enforced here — a detached HEAD's commit hash is valid.
 		if !obj.IsCommit() {
-			return fmt.Errorf("target object is not a commit")
+			return errf.Errorf("target object is not a commit")
 		}
 		return WriteRef(name, cleaned)
 	})
@@ -91,7 +91,7 @@ func DeleteBranch(name string) error {
 			return err
 		}
 		if ref == name {
-			return fmt.Errorf("cannot delete the currently checked-out branch %q", name)
+			return errf.Errorf("cannot delete the currently checked-out branch %q", name)
 		}
 
 		root, err := openRepoRoot()
@@ -103,9 +103,9 @@ func DeleteBranch(name string) error {
 		rel := branchRefPath(name)
 		if err := root.Remove(rel); err != nil {
 			if isNotExist(err) {
-				return fmt.Errorf("%w: %s", ErrRefNotFound, name)
+				return errf.Errorf("%w: %s", ErrRefNotFound, name)
 			}
-			return fmt.Errorf("remove ref: %w", err)
+			return errf.Errorf("remove ref: %w", err)
 		}
 		logger().Debug("branch deleted", "name", name)
 		return nil
@@ -136,13 +136,13 @@ func Checkout(target string) error {
 		if hashPattern.MatchString(cleaned) {
 			obj, err := ReadObject(cleaned)
 			if err != nil {
-				return fmt.Errorf("checkout: target object: %w", err)
+				return errf.Errorf("checkout: target object: %w", err)
 			}
 			if !obj.IsCommit() {
-				return fmt.Errorf("checkout: target is not a commit object")
+				return errf.Errorf("checkout: target is not a commit object")
 			}
 			if err := WriteHEAD(cleaned); err != nil {
-				return fmt.Errorf("checkout: write HEAD: %w", err)
+				return errf.Errorf("checkout: write HEAD: %w", err)
 			}
 			logger().Debug("checkout (detached)", "hash", shortHash(cleaned))
 			return nil
@@ -153,16 +153,16 @@ func Checkout(target string) error {
 		// distinguish "branch does not exist" from "branch has no
 		// commit yet".
 		if err := validateBranchName(target); err != nil {
-			return fmt.Errorf("checkout: %w", err)
+			return errf.Errorf("checkout: %w", err)
 		}
 		if _, err := ReadRef(target); err != nil {
 			if errors.Is(err, ErrRefNotFound) {
-				return fmt.Errorf("%w: %s", ErrRefNotFound, target)
+				return errf.Errorf("%w: %s", ErrRefNotFound, target)
 			}
-			return fmt.Errorf("checkout: read ref: %w", err)
+			return errf.Errorf("checkout: read ref: %w", err)
 		}
 		if err := WriteHEAD("ref: refs/heads/" + target); err != nil {
-			return fmt.Errorf("checkout: write HEAD: %w", err)
+			return errf.Errorf("checkout: write HEAD: %w", err)
 		}
 		logger().Debug("checkout (branch)", "branch", target)
 		return nil
@@ -207,7 +207,7 @@ func ListRefDetails() ([]RefDetail, error) {
 				out = append(out, RefDetail{Name: n})
 				continue
 			}
-			return nil, fmt.Errorf("read ref %q: %w", n, err)
+			return nil, errf.Errorf("read ref %q: %w", n, err)
 		}
 		out = append(out, RefDetail{Name: n, Hash: hash})
 	}

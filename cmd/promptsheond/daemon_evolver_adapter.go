@@ -4,7 +4,7 @@
 package main
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/store"
 	"github.com/sachncs/promptsheon/promptsheon/release"
 	"github.com/sachncs/promptsheon/promptsheon/approval"
@@ -107,10 +107,10 @@ type evolverActivatorAdapter struct {
 
 func (a *evolverActivatorAdapter) SelfActivate(ctx context.Context, releaseID string) error {
 	if a.svc == nil {
-		return fmt.Errorf("evolver: activator not wired")
+		return errf.Errorf("evolver: activator not wired")
 	}
 	if a.selfApprover == "" {
-		return fmt.Errorf("evolver: activator not configured (self-approver identity missing)")
+		return errf.Errorf("evolver: activator not configured (self-approver identity missing)")
 	}
 	// SelfApprovePolicy evaluates the existing approval
 	// row's votes. The regular Activate path expects a
@@ -128,7 +128,7 @@ func (a *evolverActivatorAdapter) SelfActivate(ctx context.Context, releaseID st
 		}},
 		UpdatedAt: now,
 	}); err != nil {
-		return fmt.Errorf("evolver: write self-approval: %w", err)
+		return errf.Errorf("evolver: write self-approval: %w", err)
 	}
 	_, err := a.svc.SelfActivate(ctx, releaseID)
 	return err

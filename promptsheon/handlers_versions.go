@@ -1,7 +1,7 @@
 package promptsheon
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"errors"
@@ -85,7 +85,7 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) err
 	}
 	hash, err := capability.ComputeManifestHash(manifest)
 	if err != nil {
-		return fmt.Errorf("compute manifest hash: %w", err)
+		return errf.Errorf("compute manifest hash: %w", err)
 	}
 	now := time.Now()
 	v := &capability.Version{

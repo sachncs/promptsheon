@@ -1,7 +1,7 @@
 package sqliteimpl
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/recommendation"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
@@ -30,11 +30,11 @@ func (r *RecommendationRepository) CreateRecommendation(ctx context.Context, rec
 	}
 	payload, err := json.Marshal(rec)
 	if err != nil {
-		return fmt.Errorf("recommendation: marshal: %w", err)
+		return errf.Errorf("recommendation: marshal: %w", err)
 	}
 	_, err = r.db.ExecContext(ctx, `INSERT INTO recommendations (id, capability_version_id, type, payload, created_at) VALUES (?, ?, ?, ?, ?)`, rec.ID, rec.CapabilityVersionID, rec.Type, string(payload), rec.CreatedAt)
 	if err != nil {
-		return fmt.Errorf("recommendation: insert: %w", err)
+		return errf.Errorf("recommendation: insert: %w", err)
 	}
 	return nil
 }
@@ -50,7 +50,7 @@ func (r *RecommendationRepository) GetRecommendation(ctx context.Context, id str
 	}
 	var rec capability.Recommendation
 	if err := json.Unmarshal([]byte(payload), &rec); err != nil {
-		return nil, fmt.Errorf("recommendation: unmarshal: %w", err)
+		return nil, errf.Errorf("recommendation: unmarshal: %w", err)
 	}
 	return &rec, nil
 }
@@ -82,7 +82,7 @@ func (r *RecommendationRepository) UpdateRecommendation(ctx context.Context, rec
 	}
 	payload, err := json.Marshal(rec)
 	if err != nil {
-		return fmt.Errorf("recommendation: marshal: %w", err)
+		return errf.Errorf("recommendation: marshal: %w", err)
 	}
 	res, err := r.db.ExecContext(ctx, `UPDATE recommendations SET payload = ?, capability_version_id = ?, type = ? WHERE id = ?`, string(payload), rec.CapabilityVersionID, rec.Type, rec.ID)
 	if err != nil {

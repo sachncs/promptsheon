@@ -1,7 +1,7 @@
 package llm
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"log/slog"
 	"net/http"
@@ -149,7 +149,7 @@ func (o *OpenAI) Complete(ctx context.Context, req *Request) (*Response, error) 
 		)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("openai request: %w", err)
+		return nil, errf.Errorf("openai request: %w", err)
 	}
 
 	inTok, outTok := int64(resp.Usage.InputTokens), int64(resp.Usage.OutputTokens)

@@ -13,7 +13,7 @@
 package eval
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"encoding/json"
 	"errors"
@@ -65,7 +65,7 @@ func (j LLMJudge) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 	prompt := buildJudgePrompt(stringof(expected), stringof(actual))
 	raw, err := j.Judge.Complete(ctx, prompt)
 	if err != nil {
-		return false, fmt.Errorf("llm_judge: judge call: %w", err)
+		return false, errf.Errorf("llm_judge: judge call: %w", err)
 	}
 	verdict, rationale := parseJudgeResponse(raw)
 	switch verdict {
@@ -74,7 +74,7 @@ func (j LLMJudge) ScoreCase(actual, expected json.RawMessage) (bool, error) {
 	case verdictFail:
 		return false, nil
 	default:
-		return false, fmt.Errorf("llm_judge: unparseable verdict: %q (rationale: %q)", raw, rationale)
+		return false, errf.Errorf("llm_judge: unparseable verdict: %q (rationale: %q)", raw, rationale)
 	}
 }
 

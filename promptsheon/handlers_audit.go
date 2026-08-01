@@ -1,6 +1,7 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 	"encoding/csv"
 	"encoding/json"
@@ -116,7 +117,7 @@ func (s *Server) writeAuditCSV(w http.ResponseWriter, entries []*models.AuditEnt
 
 	// Header
 	if err := writer.Write([]string{"id", FieldUserID, "action", "resource", "details", "timestamp", "previous_hash", "entry_hash"}); err != nil {
-		return fmt.Errorf("csv write header: %w", err)
+		return errf.Errorf("csv write header: %w", err)
 	}
 
 	// Data
@@ -135,7 +136,7 @@ func (s *Server) writeAuditCSV(w http.ResponseWriter, entries []*models.AuditEnt
 			e.PreviousHash,
 			e.EntryHash,
 		}); err != nil {
-			return fmt.Errorf("csv write row %s: %w", e.ID, err)
+			return errf.Errorf("csv write row %s: %w", e.ID, err)
 		}
 	}
 

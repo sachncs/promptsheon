@@ -6,6 +6,7 @@ package main
 // capability/release commands live in capability.go and release.go.
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -20,7 +21,7 @@ import (
 
 func cmdInit() error {
 	if promptsheoncas.IsInitialized() {
-		return fmt.Errorf("repository already initialized")
+		return errf.Errorf("repository already initialized")
 	}
 	if err := promptsheoncas.Init(); err != nil {
 		return err
@@ -37,7 +38,7 @@ func cmdHashObject(args []string) error {
 	obj := promptsheoncas.NewBlobObject(data)
 	hash, err := promptsheoncas.ObjectHash(obj)
 	if err != nil {
-		return fmt.Errorf("compute hash: %w", err)
+		return errf.Errorf("compute hash: %w", err)
 	}
 	fmt.Println(hash)
 	return nil
@@ -67,7 +68,7 @@ func cmdReadObject(args []string) error {
 	}
 	data, err := json.MarshalIndent(obj, "", "  ")
 	if err != nil {
-		return fmt.Errorf("marshal object: %w", err)
+		return errf.Errorf("marshal object: %w", err)
 	}
 	fmt.Println(string(data))
 	return nil
@@ -119,7 +120,7 @@ func parseTelemetry() (map[string]any, error) {
 	}
 	var m map[string]any
 	if err := json.Unmarshal([]byte(tel), &m); err != nil {
-		return nil, fmt.Errorf("PROMPTSHEON_TELEMETRY: %w", err)
+		return nil, errf.Errorf("PROMPTSHEON_TELEMETRY: %w", err)
 	}
 	return m, nil
 }
@@ -247,20 +248,20 @@ func cmdDiff(args []string) error {
 
 func cmdStatus() error {
 	if !promptsheoncas.IsInitialized() {
-		return fmt.Errorf("not a promptsheon repository")
+		return errf.Errorf("not a promptsheon repository")
 	}
 
 	ref, err := promptsheoncas.CurrentRef()
 	if err != nil {
-		return fmt.Errorf("read ref: %w", err)
+		return errf.Errorf("read ref: %w", err)
 	}
 	headHash, err := promptsheoncas.CurrentCommitHash()
 	if err != nil {
-		return fmt.Errorf("read HEAD: %w", err)
+		return errf.Errorf("read HEAD: %w", err)
 	}
 	refs, err := promptsheoncas.ListRefs()
 	if err != nil {
-		return fmt.Errorf("list refs: %w", err)
+		return errf.Errorf("list refs: %w", err)
 	}
 
 	headLine := ""
@@ -387,7 +388,7 @@ func cmdLsTree(args []string) error {
 		return err
 	}
 	if len(obj.Entries) == 0 {
-		return fmt.Errorf("object %s is not a tree", hash[:12])
+		return errf.Errorf("object %s is not a tree", hash[:12])
 	}
 
 	var walkTree func(hash string, prefix string) error
@@ -423,7 +424,7 @@ func cmdCatFile(args []string) error {
 		return err
 	}
 	if obj.Data == "" {
-		return fmt.Errorf("object %s is not a blob", args[0][:12])
+		return errf.Errorf("object %s is not a blob", args[0][:12])
 	}
 	_, err = fmt.Print(obj.Data)
 	if !strings.HasSuffix(obj.Data, "\n") {
@@ -695,7 +696,7 @@ func cmdVerify() error {
 		for _, e := range result.Errors {
 			fmt.Printf("  - %s\n", e)
 		}
-		return fmt.Errorf("integrity check failed with %d issues", len(result.Errors))
+		return errf.Errorf("integrity check failed with %d issues", len(result.Errors))
 	}
 
 	fmt.Println("\nrepository is healthy")

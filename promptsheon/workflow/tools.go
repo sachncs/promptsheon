@@ -2,6 +2,7 @@
 package workflow
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -92,21 +93,21 @@ func (h *HTTPTool) Execute(ctx context.Context, input map[string]any) (map[strin
 	}
 	url := toString(input["url"])
 	if url == "" {
-		return nil, fmt.Errorf("http tool: url is required")
+		return nil, errf.Errorf("http tool: url is required")
 	}
 
 	var body io.Reader
 	if bodyRaw, ok := input["body"]; ok {
 		data, err := json.Marshal(bodyRaw)
 		if err != nil {
-			return nil, fmt.Errorf("http tool: marshal body: %w", err)
+			return nil, errf.Errorf("http tool: marshal body: %w", err)
 		}
 		body = bytes.NewReader(data)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
-		return nil, fmt.Errorf("http tool: create request: %w", err)
+		return nil, errf.Errorf("http tool: create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
@@ -120,13 +121,13 @@ func (h *HTTPTool) Execute(ctx context.Context, input map[string]any) (map[strin
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("http tool: %w", err)
+		return nil, errf.Errorf("http tool: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("http tool: read body: %w", err)
+		return nil, errf.Errorf("http tool: read body: %w", err)
 	}
 
 	result := map[string]any{
@@ -229,16 +230,16 @@ func (s *ShellTool) Name() string { return toolNameShell }
 // Execute runs a shell command with the given input parameters.
 func (s *ShellTool) Execute(ctx context.Context, input map[string]any) (map[string]any, error) {
 	if !globalShellPolicy.Enabled() {
-		return nil, fmt.Errorf("shell tool: disabled (set PROMPTSHEON_SHELL_ENABLED=true and configure PROMPTSHEON_SHELL_ALLOWLIST to enable)")
+		return nil, errf.Errorf("shell tool: disabled (set PROMPTSHEON_SHELL_ENABLED=true and configure PROMPTSHEON_SHELL_ALLOWLIST to enable)")
 	}
 	allowed := globalShellPolicy.Allowed()
 	if len(allowed) == 0 {
-		return nil, fmt.Errorf("shell tool: disabled (allowed-commands allowlist is empty)")
+		return nil, errf.Errorf("shell tool: disabled (allowed-commands allowlist is empty)")
 	}
 
 	command := toString(input["command"])
 	if command == "" {
-		return nil, fmt.Errorf("shell tool: command is required")
+		return nil, errf.Errorf("shell tool: command is required")
 	}
 
 	// Security: check blocked patterns. This is enforced AFTER the
@@ -247,7 +248,7 @@ func (s *ShellTool) Execute(ctx context.Context, input map[string]any) (map[stri
 	cmdLower := strings.ToLower(command)
 	for _, pattern := range blockedPatterns {
 		if strings.Contains(cmdLower, strings.ToLower(pattern)) {
-			return nil, fmt.Errorf("shell tool: command contains blocked pattern: %s", pattern)
+			return nil, errf.Errorf("shell tool: command contains blocked pattern: %s", pattern)
 		}
 	}
 
@@ -256,10 +257,10 @@ func (s *ShellTool) Execute(ctx context.Context, input map[string]any) (map[stri
 	// used to smuggle alternative basenames.
 	baseCmd, err := shellBaseCommand(command)
 	if err != nil {
-		return nil, fmt.Errorf("shell tool: %w", err)
+		return nil, errf.Errorf("shell tool: %w", err)
 	}
 	if !allowed[baseCmd] {
-		return nil, fmt.Errorf("shell tool: command %q is not in the allowlist", baseCmd)
+		return nil, errf.Errorf("shell tool: command %q is not in the allowlist", baseCmd)
 	}
 
 	timeout := 30 * time.Second
@@ -289,7 +290,7 @@ func (s *ShellTool) Execute(ctx context.Context, input map[string]any) (map[stri
 
 	// Return error on non-zero exit so the engine marks step as failed
 	if exitCode != 0 {
-		return result, fmt.Errorf("shell command failed with exit code %d: %s", exitCode, strings.TrimSpace(string(output)))
+		return result, errf.Errorf("shell command failed with exit code %d: %s", exitCode, strings.TrimSpace(string(output)))
 	}
 
 	return result, nil
@@ -312,7 +313,7 @@ func (j *JSONTransformTool) Execute(_ context.Context, input map[string]any) (ma
 	case opExtract:
 		path := toString(input["path"])
 		if path == "" {
-			return nil, fmt.Errorf("json_transform: path is required for extract")
+			return nil, errf.Errorf("json_transform: path is required for extract")
 		}
 		val := extractPath(data, path)
 		return map[string]any{keyResult: val}, nil
@@ -362,10 +363,10 @@ func extractPath(data any, path string) any {
 func shellBaseCommand(command string) (string, error) {
 	fields, err := shlexSplit(command)
 	if err != nil {
-		return "", fmt.Errorf("parse command: %w", err)
+		return "", errf.Errorf("parse command: %w", err)
 	}
 	if len(fields) == 0 {
-		return "", fmt.Errorf("empty command")
+		return "", errf.Errorf("empty command")
 	}
 	return fields[0], nil
 }
@@ -443,7 +444,7 @@ func shlexSplit(s string) ([]string, error) {
 		}
 	}
 	if quote != 0 {
-		return nil, fmt.Errorf("unterminated %c quote", quote)
+		return nil, errf.Errorf("unterminated %c quote", quote)
 	}
 	flush()
 	return out, nil
@@ -462,7 +463,7 @@ func (p *PromptCallTool) Name() string { return toolNamePromptCall }
 func (p *PromptCallTool) Execute(_ context.Context, input map[string]any) (map[string]any, error) {
 	prompt := toString(input["prompt"])
 	if prompt == "" {
-		return nil, fmt.Errorf("prompt_call tool: prompt is required")
+		return nil, errf.Errorf("prompt_call tool: prompt is required")
 	}
 
 	// Perform variable substitution

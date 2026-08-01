@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
 	"database/sql"
@@ -25,7 +25,7 @@ func (s *SQLite) SaveWebhookEndpoint(ctx context.Context, ep *models.WebhookEndp
 		ep.ID, ep.URL, ep.SecretCiphertext, events, ep.Active, ep.CreatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("save webhook endpoint: %w", err)
+		return errf.Errorf("save webhook endpoint: %w", err)
 	}
 	return nil
 }
@@ -43,7 +43,7 @@ func (s *SQLite) GetWebhookEndpoint(ctx context.Context, id string) (*models.Web
 func (s *SQLite) DeleteWebhookEndpoint(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM webhook_endpoints WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("delete webhook endpoint: %w", err)
+		return errf.Errorf("delete webhook endpoint: %w", err)
 	}
 	return nil
 }
@@ -52,7 +52,7 @@ func (s *SQLite) ListWebhookEndpoints(ctx context.Context) ([]*models.WebhookEnd
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, url, secret_ciphertext, events, active, created_at FROM webhook_endpoints ORDER BY created_at DESC`)
 	if err != nil {
-		return nil, fmt.Errorf("list webhook endpoints: %w", err)
+		return nil, errf.Errorf("list webhook endpoints: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var eps []*models.WebhookEndpointRecord

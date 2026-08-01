@@ -3,7 +3,7 @@
 package cas
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"os"
 	"syscall"
 )
@@ -13,7 +13,7 @@ import (
 // when f is nil or closed.
 func flockAcquire(f *os.File) error {
 	if f == nil {
-		return fmt.Errorf("flock: nil file")
+		return errf.Errorf("flock: nil file")
 	}
 	for {
 		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX)
@@ -28,7 +28,7 @@ func flockAcquire(f *os.File) error {
 			// block, so this should be unreachable, but guard anyway.
 			continue
 		}
-		return fmt.Errorf("flock LOCK_EX: %w", err)
+		return errf.Errorf("flock LOCK_EX: %w", err)
 	}
 }
 
@@ -46,6 +46,6 @@ func flockRelease(f *os.File) error {
 		if err == syscall.EINTR {
 			continue
 		}
-		return fmt.Errorf("flock LOCK_UN: %w", err)
+		return errf.Errorf("flock LOCK_UN: %w", err)
 	}
 }

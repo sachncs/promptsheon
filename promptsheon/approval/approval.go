@@ -10,7 +10,7 @@
 package approval
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"errors"
 	"time"
@@ -98,7 +98,7 @@ func (a Approval) Record(v Vote) (Approval, error) {
 	switch v.Decision {
 	case Approve, Reject, Abstain:
 	default:
-		return a, fmt.Errorf("%w: %q", errs.ErrApprovalUnknown, v.Decision)
+		return a, errf.Errorf("%w: %q", errs.ErrApprovalUnknown, v.Decision)
 	}
 	for _, existing := range a.Votes {
 		if existing.Identity == v.Identity {

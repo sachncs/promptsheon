@@ -15,10 +15,10 @@
 package e2e
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -163,13 +163,13 @@ func postJSON(ctx context.Context, path string, body any, apiKey string) (string
 	defer func() { _ = resp.Body.Close() }()
 	b, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 300 {
-		return "", fmt.Errorf("status %d body %s", resp.StatusCode, b)
+		return "", errf.Errorf("status %d body %s", resp.StatusCode, b)
 	}
 	var out struct {
 		ID string `json:"id"`
 	}
 	if err := json.Unmarshal(b, &out); err != nil {
-		return "", fmt.Errorf("decode %s: %w", b, err)
+		return "", errf.Errorf("decode %s: %w", b, err)
 	}
 	return out.ID, nil
 }

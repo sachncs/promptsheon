@@ -4,7 +4,7 @@
 package auth
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -141,7 +141,7 @@ func HasPermission(role Role, perm Permission) bool {
 func GenerateAPIKey() (key, hash string, err error) {
 	b := make([]byte, 32)
 	if _, err := io.ReadFull(rand.Reader, b); err != nil {
-		return "", "", fmt.Errorf("generate api key: %w", err)
+		return "", "", errf.Errorf("generate api key: %w", err)
 	}
 	key = "ps_" + hex.EncodeToString(b)
 	hash = HashAPIKey(key)

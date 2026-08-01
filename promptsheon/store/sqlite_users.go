@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
 	"database/sql"
@@ -19,7 +19,7 @@ func (s *SQLite) CreateUser(ctx context.Context, u *models.User) error {
 		u.ID, u.Email, u.Name, u.Role, u.CreatedAt, u.UpdatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("insert user: %w", err)
+		return errf.Errorf("insert user: %w", err)
 	}
 	return nil
 }
@@ -47,7 +47,7 @@ func (s *SQLite) CreateUser(ctx context.Context, u *models.User) error {
 func (s *SQLite) BootstrapAdmin(ctx context.Context, u *models.User, key *models.APIKey) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("bootstrap begin: %w", err)
+		return errf.Errorf("bootstrap begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
@@ -58,11 +58,11 @@ func (s *SQLite) BootstrapAdmin(ctx context.Context, u *models.User, key *models
 		u.ID, u.Email, u.Name, u.Role, u.CreatedAt, u.UpdatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("bootstrap insert user: %w", err)
+		return errf.Errorf("bootstrap insert user: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("bootstrap rows affected: %w", err)
+		return errf.Errorf("bootstrap rows affected: %w", err)
 	}
 	if n == 0 {
 		// Another caller won the race. Roll back the key insert
@@ -74,10 +74,10 @@ func (s *SQLite) BootstrapAdmin(ctx context.Context, u *models.User, key *models
 		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		key.ID, key.UserID, key.Name, key.KeyHash, key.KeyPrefix, key.Role, key.CreatedAt,
 	); err != nil {
-		return fmt.Errorf("bootstrap insert key: %w", err)
+		return errf.Errorf("bootstrap insert key: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("bootstrap commit: %w", err)
+		return errf.Errorf("bootstrap commit: %w", err)
 	}
 	return nil
 }
@@ -101,7 +101,7 @@ func (s *SQLite) ListUsers(ctx context.Context) ([]*models.User, error) {
 		`SELECT id, email, name, role, created_at, updated_at FROM users ORDER BY created_at DESC`,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list users: %w", err)
+		return nil, errf.Errorf("list users: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -119,7 +119,7 @@ func (s *SQLite) ListUsers(ctx context.Context) ([]*models.User, error) {
 func (s *SQLite) UpdateUser(ctx context.Context, u *models.User) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("update user begin: %w", err)
+		return errf.Errorf("update user begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
@@ -129,9 +129,9 @@ func (s *SQLite) UpdateUser(ctx context.Context, u *models.User) error {
 	var oldRole string
 	if err := tx.QueryRowContext(ctx, `SELECT role FROM users WHERE id=?`, u.ID).Scan(&oldRole); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("user not found: %s", u.ID)
+			return errf.Errorf("user not found: %s", u.ID)
 		}
-		return fmt.Errorf("update user lookup: %w", err)
+		return errf.Errorf("update user lookup: %w", err)
 	}
 
 	result, err := tx.ExecContext(ctx,
@@ -139,11 +139,11 @@ func (s *SQLite) UpdateUser(ctx context.Context, u *models.User) error {
 		u.Email, u.Name, u.Role, u.UpdatedAt, u.ID,
 	)
 	if err != nil {
-		return fmt.Errorf("update user: %w", err)
+		return errf.Errorf("update user: %w", err)
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("user not found: %s", u.ID)
+		return errf.Errorf("user not found: %s", u.ID)
 	}
 
 	// SEC-6: when the user's role changes (typically a demotion
@@ -156,12 +156,12 @@ func (s *SQLite) UpdateUser(ctx context.Context, u *models.User) error {
 			`UPDATE api_keys SET revoked = 1 WHERE user_id = ? AND revoked = 0`,
 			u.ID,
 		); err != nil {
-			return fmt.Errorf("revoke stale api keys: %w", err)
+			return errf.Errorf("revoke stale api keys: %w", err)
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("update user commit: %w", err)
+		return errf.Errorf("update user commit: %w", err)
 	}
 	return nil
 }
@@ -169,22 +169,22 @@ func (s *SQLite) UpdateUser(ctx context.Context, u *models.User) error {
 func (s *SQLite) DeleteUser(ctx context.Context, id string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("delete user begin: %w", err)
+		return errf.Errorf("delete user begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 	if _, err := tx.ExecContext(ctx, `UPDATE api_keys SET revoked = 1 WHERE user_id = ? AND revoked = 0`, id); err != nil {
-		return fmt.Errorf("revoke keys on delete: %w", err)
+		return errf.Errorf("revoke keys on delete: %w", err)
 	}
 	result, err := tx.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id)
 	if err != nil {
-		return fmt.Errorf("delete user: %w", err)
+		return errf.Errorf("delete user: %w", err)
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("user not found: %s", id)
+		return errf.Errorf("user not found: %s", id)
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("delete user commit: %w", err)
+		return errf.Errorf("delete user commit: %w", err)
 	}
 	return nil
 }
@@ -196,7 +196,7 @@ func scanUser(row scannable) (*models.User, error) {
 		if err == sql.ErrNoRows {
 			return nil, errs.ErrStoreNotFound
 		}
-		return nil, fmt.Errorf("scan user: %w", err)
+		return nil, errf.Errorf("scan user: %w", err)
 	}
 	return &u, nil
 }

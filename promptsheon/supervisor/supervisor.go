@@ -21,7 +21,7 @@
 package supervisor
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 	"context"
@@ -200,7 +200,7 @@ func (s *Supervisor) Run(ctx context.Context) error {
 		}
 	}
 	if len(failedStart) > 0 {
-		return fmt.Errorf("supervisor: %d plugins failed to start", len(failedStart))
+		return errf.Errorf("supervisor: %d plugins failed to start", len(failedStart))
 	}
 
 	for {

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/invoke"
 	"github.com/sachncs/promptsheon/promptsheon/release"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
@@ -30,7 +30,7 @@ func (r *apiReleaseInvoker) Invoke(ctx context.Context, releaseID string, inputs
 		return nil, err
 	}
 	if rel.Status != release.StatusActive {
-		return nil, fmt.Errorf("release %s is not active", releaseID)
+		return nil, errf.Errorf("release %s is not active", releaseID)
 	}
 	input, err := json.Marshal(inputs)
 	if err != nil {
@@ -46,7 +46,7 @@ func (r *apiReleaseInvoker) Invoke(ctx context.Context, releaseID string, inputs
 	}
 	mHash, err := capability.ComputeManifestHash(rel.Manifest)
 	if err != nil {
-		return nil, fmt.Errorf("release %s: manifest hash: %w", releaseID, err)
+		return nil, errf.Errorf("release %s: manifest hash: %w", releaseID, err)
 	}
 	rec, err := r.inv.Invoke(ctx, executor.InvokeRequest{
 		ReleaseID:     rel.ID,

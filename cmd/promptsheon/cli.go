@@ -13,6 +13,7 @@
 package main
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/llm"
 	"context"
 	"errors"
@@ -128,7 +129,7 @@ var errUsage = errors.New("invalid arguments")
 // [message]". The wrapping keeps the message visible to the user
 // while the sentinel lets main() pick the right exit code.
 func usageErrorf(format string) error {
-	return fmt.Errorf("%w: %s", errUsage, format)
+	return errf.Errorf("%w: %s", errUsage, format)
 }
 
 func printUsage() {
@@ -206,7 +207,7 @@ func cmdRun(args []string) error {
 	providers.LoadFromEnv("", nil)
 	p, err := providers.Get(provider)
 	if err != nil {
-		return fmt.Errorf("provider not available: %w", err)
+		return errf.Errorf("provider not available: %w", err)
 	}
 
 	fmt.Fprintf(os.Stderr, "Running with %s/%s...\n", provider, model)
@@ -252,7 +253,7 @@ func cmdProvider(args []string) error {
 		name := args[1]
 		p, err := providers.Get(name)
 		if err != nil {
-			return fmt.Errorf("provider not available: %w", err)
+			return errf.Errorf("provider not available: %w", err)
 		}
 		fmt.Fprintf(os.Stderr, "Testing %s...\n", name)
 		start := time.Now()
@@ -271,7 +272,7 @@ func cmdProvider(args []string) error {
 		fmt.Printf("OK: %q\n", resp.Content)
 		fmt.Fprintf(os.Stderr, "Latency: %v | Tokens: %d\n", latency.Round(time.Millisecond), resp.Usage.TotalTokens)
 	default:
-		return fmt.Errorf("unknown provider subcommand: %s", args[0])
+		return errf.Errorf("unknown provider subcommand: %s", args[0])
 	}
 	return nil
 }
@@ -321,7 +322,7 @@ func cmdWorkspace(args []string) error {
 		}
 		fmt.Println("deleted")
 	default:
-		return fmt.Errorf("unknown workspace subcommand: %s", args[0])
+		return errf.Errorf("unknown workspace subcommand: %s", args[0])
 	}
 	return nil
 }
@@ -370,7 +371,7 @@ func cmdProject(args []string) error {
 		}
 		fmt.Println("deleted")
 	default:
-		return fmt.Errorf("unknown project subcommand: %s", args[0])
+		return errf.Errorf("unknown project subcommand: %s", args[0])
 	}
 	return nil
 }
@@ -419,7 +420,7 @@ func cmdCapability(args []string) error {
 		}
 		fmt.Println("deleted")
 	default:
-		return fmt.Errorf("unknown capability subcommand: %s", args[0])
+		return errf.Errorf("unknown capability subcommand: %s", args[0])
 	}
 	return nil
 }
@@ -515,7 +516,7 @@ func cmdRelease(args []string) error {
 		}
 		fmt.Printf("%+v\n", result)
 	default:
-		return fmt.Errorf("unknown release subcommand: %s", args[0])
+		return errf.Errorf("unknown release subcommand: %s", args[0])
 	}
 	return nil
 }

@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
 	"database/sql"
@@ -42,7 +42,7 @@ func (s *SQLite) SaveVaultState(ctx context.Context, vs *models.VaultState) erro
 		vs.KMSKeyID, vs.WrappedDataKey, now, now,
 	)
 	if err != nil {
-		return fmt.Errorf("save vault state: %w", err)
+		return errf.Errorf("save vault state: %w", err)
 	}
 	vs.CreatedAt = now
 	vs.UpdatedAt = now

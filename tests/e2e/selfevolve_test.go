@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/store"
 	"github.com/sachncs/promptsheon/promptsheon/release"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
@@ -408,14 +409,14 @@ func (a *fakeAuditor) Audit(_ context.Context, action, target string, _ map[stri
 func seedCapabilityWithBadPrompt(ctx context.Context, db *store.SQLite, capID, datasetID string) (string, error) {
 	ws := "ws-" + capID
 	if err := db.CreateWorkspace(ctx, &capability.Workspace{ID: ws, Name: "e2e-ws"}); err != nil {
-		return "", fmt.Errorf("create workspace: %w", err)
+		return "", errf.Errorf("create workspace: %w", err)
 	}
 	proj := "p-" + capID
 	if err := db.CreateProject(ctx, &capability.Project{ID: proj, WorkspaceID: ws, Name: "e2e-p"}); err != nil {
-		return "", fmt.Errorf("create project: %w", err)
+		return "", errf.Errorf("create project: %w", err)
 	}
 	if err := db.CreateCapability(ctx, &capability.Capability{ID: capID, ProjectID: proj, Name: "e2e-cap"}); err != nil {
-		return "", fmt.Errorf("create capability: %w", err)
+		return "", errf.Errorf("create capability: %w", err)
 	}
 	// Bad prompt blob.
 	badText := "audit code"
@@ -435,7 +436,7 @@ func seedCapabilityWithBadPrompt(ctx context.Context, db *store.SQLite, capID, d
 		ID: vid, CapabilityID: capID, Version: 1, Manifest: manifest, ManifestHash: mh,
 		CreatedAt: time.Now().UTC(), CreatedBy: "seed",
 	}); err != nil {
-		return "", fmt.Errorf("create version: %w", err)
+		return "", errf.Errorf("create version: %w", err)
 	}
 	// CAS write the bad prompt.
 	if err := writeCASPrompt(badText, badHash); err != nil {
@@ -448,25 +449,25 @@ func seedCapabilityWithBadPrompt(ctx context.Context, db *store.SQLite, capID, d
 		Environment: release.Environment("dev"), Status: release.StatusActive,
 		CreatedBy: "seed", CreatedAt: time.Now().UTC(),
 	}); err != nil {
-		return "", fmt.Errorf("create release: %w", err)
+		return "", errf.Errorf("create release: %w", err)
 	}
 	// Dataset with 3 cases expecting "pong".
 	ds := &harness.Dataset{ID: datasetID, CapabilityID: capID, Name: datasetID}
 	if err := db.CreateDataset(ctx, ds); err != nil {
-		return "", fmt.Errorf("create dataset: %w", err)
+		return "", errf.Errorf("create dataset: %w", err)
 	}
 	if err := db.UpsertDatasetCases(ctx, datasetID, []harness.DatasetCase{
 		{ID: "k0", DatasetID: datasetID, Seq: 0, Inputs: []byte(`{"q":"ping"}`), Expected: []byte(`"pong"`)},
 		{ID: "k1", DatasetID: datasetID, Seq: 1, Inputs: []byte(`{"q":"hi"}`), Expected: []byte(`"pong"`)},
 		{ID: "k2", DatasetID: datasetID, Seq: 2, Inputs: []byte(`{"q":"yo"}`), Expected: []byte(`"pong"`)},
 	}); err != nil {
-		return "", fmt.Errorf("upsert dataset cases: %w", err)
+		return "", errf.Errorf("upsert dataset cases: %w", err)
 	}
 	// Approval so SelfActivate doesn't fail.
 	if err := db.CreateApproval(ctx, &promptsheon.Approval{
 		ReleaseID: relID, UpdatedAt: time.Now().UTC(),
 	}); err != nil {
-		return "", fmt.Errorf("create approval: %w", err)
+		return "", errf.Errorf("create approval: %w", err)
 	}
 	return capID, nil
 }

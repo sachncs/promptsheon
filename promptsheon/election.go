@@ -18,7 +18,7 @@
 package promptsheon
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 		"context"
 	"database/sql"
 	"errors"
@@ -78,7 +78,7 @@ func (e *Elector) EnsureTable(ctx context.Context) error {
 			term        INTEGER NOT NULL DEFAULT 0
 		)`)
 	if err != nil {
-		return fmt.Errorf("election: create table: %w", err)
+		return errf.Errorf("election: create table: %w", err)
 	}
 	return nil
 }
@@ -101,7 +101,7 @@ func (e *Elector) Acquire(ctx context.Context) error {
 	defer e.mu.Unlock()
 
 	if _, err := e.db.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
-		return fmt.Errorf("election: begin immediate: %w", err)
+		return errf.Errorf("election: begin immediate: %w", err)
 	}
 	committed := false
 	defer func() {
@@ -124,11 +124,11 @@ func (e *Elector) Acquire(ctx context.Context) error {
 		if _, err := e.db.ExecContext(ctx,
 			`INSERT INTO leader (name, identity, expires_at, term) VALUES ('promptsheon', ?, ?, 1)`,
 			e.identity, expiresAt); err != nil {
-			return fmt.Errorf("election: insert: %w", err)
+			return errf.Errorf("election: insert: %w", err)
 		}
 		e.term = 1
 	case err != nil:
-		return fmt.Errorf("election: scan: %w", err)
+		return errf.Errorf("election: scan: %w", err)
 	default:
 		if curIdentity == e.identity {
 			// Renew.
@@ -136,7 +136,7 @@ func (e *Elector) Acquire(ctx context.Context) error {
 			if _, err := e.db.ExecContext(ctx,
 				`UPDATE leader SET expires_at = ? WHERE name = 'promptsheon' AND identity = ? AND term = ?`,
 				expiresAt, e.identity, curTerm); err != nil {
-				return fmt.Errorf("election: renew: %w", err)
+				return errf.Errorf("election: renew: %w", err)
 			}
 			e.term = curTerm
 		} else if e.now().Before(expiresAt) {
@@ -153,7 +153,7 @@ func (e *Elector) Acquire(ctx context.Context) error {
 				 WHERE name = 'promptsheon' AND expires_at <= ?`,
 				e.identity, expiresAt, e.now())
 			if err != nil {
-				return fmt.Errorf("election: steal: %w", err)
+				return errf.Errorf("election: steal: %w", err)
 			}
 			n, _ := res.RowsAffected()
 			if n == 0 {
@@ -167,7 +167,7 @@ func (e *Elector) Acquire(ctx context.Context) error {
 	}
 
 	if _, err := e.db.ExecContext(ctx, "COMMIT"); err != nil {
-		return fmt.Errorf("election: commit: %w", err)
+		return errf.Errorf("election: commit: %w", err)
 	}
 	committed = true
 	e.isLeader = true
@@ -186,7 +186,7 @@ func (e *Elector) Release(ctx context.Context) error {
 	if _, err := e.db.ExecContext(ctx,
 		`DELETE FROM leader WHERE name = 'promptsheon' AND identity = ?`,
 		e.identity); err != nil {
-		return fmt.Errorf("election: release: %w", err)
+		return errf.Errorf("election: release: %w", err)
 	}
 	e.isLeader = false
 	return nil
@@ -212,7 +212,7 @@ func (e *Elector) Current(ctx context.Context) (Leader, error) {
 	case errors.Is(err, sql.ErrNoRows):
 		return Leader{}, nil
 	case err != nil:
-		return Leader{}, fmt.Errorf("election: query: %w", err)
+		return Leader{}, errf.Errorf("election: query: %w", err)
 	}
 	l.Identity = identity
 	l.ExpiresAt = expiresAt

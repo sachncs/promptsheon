@@ -1,7 +1,7 @@
 package llm
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"os"
 
@@ -64,10 +64,10 @@ func (j *registryJudge) Complete(ctx context.Context, prompt string) (string, er
 		MaxTokens: 256,
 	})
 	if err != nil {
-		return "", fmt.Errorf("judge %s: %w", j.name, err)
+		return "", errf.Errorf("judge %s: %w", j.name, err)
 	}
 	if out.Content == "" {
-		return "", fmt.Errorf("judge %s: empty response", j.name)
+		return "", errf.Errorf("judge %s: empty response", j.name)
 	}
 	return out.Content, nil
 }

@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/approval"
 	"github.com/sachncs/promptsheon/promptsheon/release"
 	"github.com/sachncs/promptsheon/promptsheon/harness"
@@ -31,11 +31,11 @@ func emptyAsNull(s string) sql.NullString {
 func (s *SQLite) CreateRelease(ctx context.Context, r *release.Release) error {
 	manifestJSON, err := marshalOrErr(r.Manifest)
 	if err != nil {
-		return fmt.Errorf("marshal release manifest: %w", err)
+		return errf.Errorf("marshal release manifest: %w", err)
 	}
 	approvedByJSON, err := marshalOrErr(r.ApprovedBy)
 	if err != nil {
-		return fmt.Errorf("marshal release approved_by: %w", err)
+		return errf.Errorf("marshal release approved_by: %w", err)
 	}
 	var activatedAt, supersededAt sql.NullTime
 	if r.ActivatedAt != nil {
@@ -57,7 +57,7 @@ func (s *SQLite) CreateRelease(ctx context.Context, r *release.Release) error {
 		r.CapabilityID, r.CapabilityVersion,
 	).Scan(&capabilityVersionID)
 	if err != nil {
-		return fmt.Errorf("resolve capability_version_id: %w", err)
+		return errf.Errorf("resolve capability_version_id: %w", err)
 	}
 
 	_, err = s.db.ExecContext(ctx,
@@ -74,7 +74,7 @@ func (s *SQLite) CreateRelease(ctx context.Context, r *release.Release) error {
 		r.CreatedAt, r.CreatedBy, activatedAt, supersededAt,
 	)
 	if err != nil {
-		return fmt.Errorf("insert release: %w", err)
+		return errf.Errorf("insert release: %w", err)
 	}
 	return nil
 }
@@ -107,7 +107,7 @@ func (s *SQLite) ListReleasesForCapability(ctx context.Context, capabilityID str
 		 FROM releases WHERE capability_id = ? ORDER BY created_at DESC`, capabilityID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list releases: %w", err)
+		return nil, errf.Errorf("list releases: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -131,7 +131,7 @@ func (s *SQLite) ListActiveReleasesForEnvironment(ctx context.Context, env relea
 		string(env), string(release.StatusActive),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list active releases: %w", err)
+		return nil, errf.Errorf("list active releases: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -163,7 +163,7 @@ func (s *SQLite) GetActiveReleaseID(ctx context.Context, capabilityID string) (s
 		return "", nil
 	}
 	if err != nil {
-		return "", fmt.Errorf("get active release: %w", err)
+		return "", errf.Errorf("get active release: %w", err)
 	}
 	return id, nil
 }
@@ -184,7 +184,7 @@ func (s *SQLite) GetActiveReleaseIDInEnv(ctx context.Context, capabilityID, env 
 		return "", nil
 	}
 	if err != nil {
-		return "", fmt.Errorf("get active release in env: %w", err)
+		return "", errf.Errorf("get active release in env: %w", err)
 	}
 	return id, nil
 }
@@ -207,7 +207,7 @@ func (s *SQLite) LastEvalRunForRelease(ctx context.Context, releaseID string) (*
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("last eval run: %w", err)
+		return nil, errf.Errorf("last eval run: %w", err)
 	}
 	if finishedAt.Valid {
 		t := finishedAt.Time
@@ -219,11 +219,11 @@ func (s *SQLite) LastEvalRunForRelease(ctx context.Context, releaseID string) (*
 func (s *SQLite) UpdateRelease(ctx context.Context, r *release.Release) error {
 	manifestJSON, err := marshalOrErr(r.Manifest)
 	if err != nil {
-		return fmt.Errorf("marshal release manifest: %w", err)
+		return errf.Errorf("marshal release manifest: %w", err)
 	}
 	approvedByJSON, err := marshalOrErr(r.ApprovedBy)
 	if err != nil {
-		return fmt.Errorf("marshal release approved_by: %w", err)
+		return errf.Errorf("marshal release approved_by: %w", err)
 	}
 	var activatedAt, supersededAt sql.NullTime
 	if r.ActivatedAt != nil {
@@ -244,11 +244,11 @@ func (s *SQLite) UpdateRelease(ctx context.Context, r *release.Release) error {
 		activatedAt, supersededAt, r.ID,
 	)
 	if err != nil {
-		return fmt.Errorf("update release: %w", err)
+		return errf.Errorf("update release: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("rows affected: %w", err)
+		return errf.Errorf("rows affected: %w", err)
 	}
 	if n == 0 {
 		return errs.ErrReleaseNotFound
@@ -263,18 +263,18 @@ func (s *SQLite) UpdateRelease(ctx context.Context, r *release.Release) error {
 func (s *SQLite) ActivateAtomic(ctx context.Context, prior, next *release.Release) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
+		return errf.Errorf("begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }() // no-op after Commit
 
 	if prior != nil {
 		priorManifestJSON, err := marshalOrErr(prior.Manifest)
 		if err != nil {
-			return fmt.Errorf("marshal prior manifest: %w", err)
+			return errf.Errorf("marshal prior manifest: %w", err)
 		}
 		priorApprovedByJSON, err := marshalOrErr(prior.ApprovedBy)
 		if err != nil {
-			return fmt.Errorf("marshal prior approved_by: %w", err)
+			return errf.Errorf("marshal prior approved_by: %w", err)
 		}
 		var activatedAt, supersededAt sql.NullTime
 		if prior.ActivatedAt != nil {
@@ -294,10 +294,10 @@ func (s *SQLite) ActivateAtomic(ctx context.Context, prior, next *release.Releas
 			activatedAt, supersededAt, prior.ID,
 		)
 		if err != nil {
-			return fmt.Errorf("update prior: %w", err)
+			return errf.Errorf("update prior: %w", err)
 		}
 		if n, err := res.RowsAffected(); err != nil {
-			return fmt.Errorf("rows affected: %w", err)
+			return errf.Errorf("rows affected: %w", err)
 		} else if n == 0 {
 			return errs.ErrReleaseNotFound
 		}
@@ -305,11 +305,11 @@ func (s *SQLite) ActivateAtomic(ctx context.Context, prior, next *release.Releas
 
 	nextManifestJSON, err := marshalOrErr(next.Manifest)
 	if err != nil {
-		return fmt.Errorf("marshal next manifest: %w", err)
+		return errf.Errorf("marshal next manifest: %w", err)
 	}
 	nextApprovedByJSON, err := marshalOrErr(next.ApprovedBy)
 	if err != nil {
-		return fmt.Errorf("marshal next approved_by: %w", err)
+		return errf.Errorf("marshal next approved_by: %w", err)
 	}
 	var activatedAt, supersededAt sql.NullTime
 	if next.ActivatedAt != nil {
@@ -329,16 +329,16 @@ func (s *SQLite) ActivateAtomic(ctx context.Context, prior, next *release.Releas
 		activatedAt, supersededAt, next.ID,
 	)
 	if err != nil {
-		return fmt.Errorf("update next: %w", err)
+		return errf.Errorf("update next: %w", err)
 	}
 	if n, err := res.RowsAffected(); err != nil {
-		return fmt.Errorf("rows affected: %w", err)
+		return errf.Errorf("rows affected: %w", err)
 	} else if n == 0 {
 		return errs.ErrReleaseNotFound
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
+		return errf.Errorf("commit: %w", err)
 	}
 	return nil
 }
@@ -362,7 +362,7 @@ func scanRelease(scanner interface {
 		return nil, errs.ErrReleaseNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("scan release: %w", err)
+		return nil, errf.Errorf("scan release: %w", err)
 	}
 
 	r.Environment = release.Environment(envStr)
@@ -386,12 +386,12 @@ func scanRelease(scanner interface {
 	}
 	if manifestJSON != "" && manifestJSON != "{}" {
 		if err := mustUnmarshal([]byte(manifestJSON), &r.Manifest); err != nil {
-			return nil, fmt.Errorf("release %s manifest: %w", r.ID, err)
+			return nil, errf.Errorf("release %s manifest: %w", r.ID, err)
 		}
 	}
 	if approvedByJSON != "" && approvedByJSON != "[]" {
 		if err := mustUnmarshal([]byte(approvedByJSON), &r.ApprovedBy); err != nil {
-			return nil, fmt.Errorf("release %s approved_by: %w", r.ID, err)
+			return nil, errf.Errorf("release %s approved_by: %w", r.ID, err)
 		}
 	}
 	return &r, nil
@@ -404,14 +404,14 @@ func scanRelease(scanner interface {
 func (s *SQLite) CreateApproval(ctx context.Context, a *approval.Approval) error {
 	votesJSON, err := marshalOrErr(a.Votes)
 	if err != nil {
-		return fmt.Errorf("marshal votes: %w", err)
+		return errf.Errorf("marshal votes: %w", err)
 	}
 	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO approvals (release_id, votes, updated_at) VALUES (?, ?, ?)`,
 		a.ReleaseID, string(votesJSON), a.UpdatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("insert approval: %w", err)
+		return errf.Errorf("insert approval: %w", err)
 	}
 	return nil
 }
@@ -426,18 +426,18 @@ func (s *SQLite) GetApproval(ctx context.Context, releaseID string) (*approval.A
 func (s *SQLite) UpdateApproval(ctx context.Context, a *approval.Approval) error {
 	votesJSON, err := marshalOrErr(a.Votes)
 	if err != nil {
-		return fmt.Errorf("marshal votes: %w", err)
+		return errf.Errorf("marshal votes: %w", err)
 	}
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE approvals SET votes = ?, updated_at = ? WHERE release_id = ?`,
 		string(votesJSON), a.UpdatedAt, a.ReleaseID,
 	)
 	if err != nil {
-		return fmt.Errorf("update approval: %w", err)
+		return errf.Errorf("update approval: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("rows affected: %w", err)
+		return errf.Errorf("rows affected: %w", err)
 	}
 	if n == 0 {
 		return errs.ErrApprovalNotFound
@@ -455,11 +455,11 @@ func scanApproval(scanner interface {
 		return nil, errs.ErrApprovalNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("scan approval: %w", err)
+		return nil, errf.Errorf("scan approval: %w", err)
 	}
 	if votesJSON != "" && votesJSON != "[]" {
 		if err := mustUnmarshal([]byte(votesJSON), &a.Votes); err != nil {
-			return nil, fmt.Errorf("approval %s votes: %w", a.ReleaseID, err)
+			return nil, errf.Errorf("approval %s votes: %w", a.ReleaseID, err)
 		}
 	}
 	return &a, nil

@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 )
 
@@ -18,7 +18,7 @@ func (s *SQLite) LinkRuleToGroup(ctx context.Context, ruleID, groupID string) er
 		ruleID, groupID,
 	)
 	if err != nil {
-		return fmt.Errorf("link rule to group: %w", err)
+		return errf.Errorf("link rule to group: %w", err)
 	}
 	return nil
 }
@@ -33,7 +33,7 @@ func (s *SQLite) UnlinkRuleFromGroup(ctx context.Context, ruleID, groupID string
 		ruleID, groupID,
 	)
 	if err != nil {
-		return fmt.Errorf("unlink rule from group: %w", err)
+		return errf.Errorf("unlink rule from group: %w", err)
 	}
 	return nil
 }

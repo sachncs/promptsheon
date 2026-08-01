@@ -14,7 +14,7 @@
 package recommendation
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"errors"
 	"time"
@@ -98,7 +98,7 @@ func NewDecision(recommendationID string, outcome Outcome, decidedBy, reason str
 	switch outcome {
 	case OutcomeAdopted, OutcomeRejected, OutcomeSuperseded:
 	default:
-		return Decision{}, fmt.Errorf("%w: %q", errs.ErrRecommendationUnknown, outcome)
+		return Decision{}, errf.Errorf("%w: %q", errs.ErrRecommendationUnknown, outcome)
 	}
 	if outcome == OutcomeAdopted && resultingVersion <= 0 {
 		return Decision{}, errors.New("decision: adopted requires positive resulting_version")

@@ -16,7 +16,7 @@ package promptsheon
 // the workflow Engine (LLM calls have variance) and in the
 // bandit (which arm to pick); the compiler itself is pure.
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"sort"
 	"strings"
@@ -126,7 +126,7 @@ func (c *Compiler) Compile(ctx context.Context, intent Intent) (*Plan, error) {
 		return nil, err
 	}
 	if strings.TrimSpace(intent.Goal) == "" {
-		return nil, fmt.Errorf("reasoning: empty goal")
+		return nil, errf.Errorf("reasoning: empty goal")
 	}
 	matched := c.matchIntent(intent)
 	if len(matched) == 0 {

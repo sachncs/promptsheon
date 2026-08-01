@@ -1,9 +1,9 @@
 package webhook
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -450,13 +450,13 @@ func TestDeliverWithSecretAnd500(t *testing.T) {
 type errorStore struct{}
 
 func (e *errorStore) SaveWebhookEndpoint(_ context.Context, _ *Endpoint) error {
-	return fmt.Errorf("save error")
+	return errf.Errorf("save error")
 }
 func (e *errorStore) DeleteWebhookEndpoint(_ context.Context, _ string) error {
-	return fmt.Errorf("delete error")
+	return errf.Errorf("delete error")
 }
 func (e *errorStore) ListWebhookEndpoints(_ context.Context) ([]*Endpoint, error) {
-	return nil, fmt.Errorf("list error")
+	return nil, errf.Errorf("list error")
 }
 
 // fakeStore is a minimal EndpointStore used to exercise

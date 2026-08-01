@@ -1,9 +1,9 @@
 package cas
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -222,29 +222,29 @@ func TestJSONNumberParseString(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestErrIsWrapped(t *testing.T) {
-	base := fmt.Errorf("base error")
-	wrapped := fmt.Errorf("wrapped: %w", base)
+	base := errf.Errorf("base error")
+	wrapped := errf.Errorf("wrapped: %w", base)
 	if !errors.Is(wrapped, base) {
 		t.Fatal("expected errors.Is to find base in wrapped")
 	}
 }
 
 func TestErrIsUnrelated(t *testing.T) {
-	base := fmt.Errorf("base error")
-	other := fmt.Errorf("other error")
+	base := errf.Errorf("base error")
+	other := errf.Errorf("other error")
 	if errors.Is(base, other) {
 		t.Fatal("expected errors.Is to return false for unrelated error")
 	}
 }
 
 func TestErrIsNil(t *testing.T) {
-	if errors.Is(nil, fmt.Errorf("err")) {
+	if errors.Is(nil, errf.Errorf("err")) {
 		t.Fatal("expected errors.Is(nil, err) to return false")
 	}
 }
 
 func TestErrIsExactMatch(t *testing.T) {
-	base := fmt.Errorf("base error")
+	base := errf.Errorf("base error")
 	if !errors.Is(base, base) {
 		t.Fatal("expected errors.Is to match identical error")
 	}
@@ -255,7 +255,7 @@ type notWrapping struct{ msg string }
 func (e *notWrapping) Error() string { return e.msg }
 
 func TestErrIsNoUnwrap(t *testing.T) {
-	base := fmt.Errorf("base error")
+	base := errf.Errorf("base error")
 	nw := &notWrapping{msg: "wrapping intentionally not implemented"}
 	if errors.Is(nw, base) {
 		t.Fatal("expected false when error does not implement Unwrap")

@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"database/sql"
@@ -18,7 +18,7 @@ func (s *SQLite) CreateProject(ctx context.Context, p *capability.Project) error
 		p.ID, p.WorkspaceID, p.Name, p.Description, p.CreatedAt, p.UpdatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("insert project: %w", err)
+		return errf.Errorf("insert project: %w", err)
 	}
 	return nil
 }
@@ -36,7 +36,7 @@ func (s *SQLite) ListProjects(ctx context.Context, workspaceID string) ([]*capab
 		workspaceID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list projects: %w", err)
+		return nil, errf.Errorf("list projects: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -57,7 +57,7 @@ func (s *SQLite) UpdateProject(ctx context.Context, p *capability.Project) error
 		p.Name, p.Description, p.UpdatedAt, p.ID,
 	)
 	if err != nil {
-		return fmt.Errorf("update project: %w", err)
+		return errf.Errorf("update project: %w", err)
 	}
 	return nil
 }
@@ -65,7 +65,7 @@ func (s *SQLite) UpdateProject(ctx context.Context, p *capability.Project) error
 func (s *SQLite) DeleteProject(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM projects WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("delete project: %w", err)
+		return errf.Errorf("delete project: %w", err)
 	}
 	return nil
 }
@@ -79,7 +79,7 @@ func scanProject(scanner interface {
 		return nil, errs.ErrStoreNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("scan project: %w", err)
+		return nil, errf.Errorf("scan project: %w", err)
 	}
 	return &p, nil
 }

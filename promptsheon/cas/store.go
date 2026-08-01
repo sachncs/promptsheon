@@ -1,7 +1,7 @@
 package cas
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
@@ -100,18 +100,18 @@ func SetLogger(l *slog.Logger) {
 func withRepoLock(fn func() error) error {
 	root, err := os.OpenRoot(PromptsheonDir)
 	if err != nil {
-		return fmt.Errorf("open repo: %w", err)
+		return errf.Errorf("open repo: %w", err)
 	}
 	defer func() { _ = root.Close() }()
 
 	f, err := root.OpenFile(lockFile, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
-		return fmt.Errorf("open lock: %w", err)
+		return errf.Errorf("open lock: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
 	if err := flockAcquire(f); err != nil {
-		return fmt.Errorf("flock: %w", err)
+		return errf.Errorf("flock: %w", err)
 	}
 	defer func() { _ = flockRelease(f) }()
 
@@ -149,12 +149,12 @@ func WriteObject(obj *Object) (string, error) {
 	relPath := filepath.Join(objectsDir, hash[:2], hash[2:])
 
 	if e := os.MkdirAll(filepath.Join(PromptsheonDir, filepath.Dir(relPath)), 0750); e != nil {
-		return "", fmt.Errorf("mkdir: %w", e)
+		return "", errf.Errorf("mkdir: %w", e)
 	}
 
 	root, err := os.OpenRoot(PromptsheonDir)
 	if err != nil {
-		return "", fmt.Errorf("open store: %w", err)
+		return "", errf.Errorf("open store: %w", err)
 	}
 	defer func() { _ = root.Close() }()
 
@@ -166,7 +166,7 @@ func WriteObject(obj *Object) (string, error) {
 			logger().Debug("object deduplicated", "hash", hash[:12])
 			return hash, nil
 		}
-		return "", fmt.Errorf("create: %w", err)
+		return "", errf.Errorf("create: %w", err)
 	}
 
 	logger().Debug("writing object", "hash", hash[:12])
@@ -179,7 +179,7 @@ func WriteObject(obj *Object) (string, error) {
 		if rerr := root.Remove(relPath); rerr != nil && !isNotExist(rerr) {
 			logger().Warn("cleanup after serialize failure", "err", rerr)
 		}
-		return "", fmt.Errorf("serialize: %w", err)
+		return "", errf.Errorf("serialize: %w", err)
 	}
 
 	var compressed bytes.Buffer
@@ -191,7 +191,7 @@ func WriteObject(obj *Object) (string, error) {
 		if rerr := root.Remove(relPath); rerr != nil && !isNotExist(rerr) {
 			logger().Warn("cleanup after gzip failure", "err", rerr)
 		}
-		return "", fmt.Errorf("gzip write: %w", err)
+		return "", errf.Errorf("gzip write: %w", err)
 	}
 	if err := gw.Close(); err != nil {
 		if cerr := f.Close(); cerr != nil {
@@ -200,7 +200,7 @@ func WriteObject(obj *Object) (string, error) {
 		if rerr := root.Remove(relPath); rerr != nil && !isNotExist(rerr) {
 			logger().Warn("cleanup after gzip close failure", "err", rerr)
 		}
-		return "", fmt.Errorf("gzip close: %w", err)
+		return "", errf.Errorf("gzip close: %w", err)
 	}
 
 	if _, err := f.Write(compressed.Bytes()); err != nil {
@@ -210,7 +210,7 @@ func WriteObject(obj *Object) (string, error) {
 		if rerr := root.Remove(relPath); rerr != nil && !isNotExist(rerr) {
 			logger().Warn("cleanup after write failure", "err", rerr)
 		}
-		return "", fmt.Errorf("write: %w", err)
+		return "", errf.Errorf("write: %w", err)
 	}
 	// fsync before close so the bytes survive a crash.
 	if err := f.Sync(); err != nil {
@@ -220,13 +220,13 @@ func WriteObject(obj *Object) (string, error) {
 		if rerr := root.Remove(relPath); rerr != nil && !isNotExist(rerr) {
 			logger().Warn("cleanup after fsync failure", "err", rerr)
 		}
-		return "", fmt.Errorf("fsync: %w", err)
+		return "", errf.Errorf("fsync: %w", err)
 	}
 	if err := f.Close(); err != nil {
 		if rerr := root.Remove(relPath); rerr != nil && !isNotExist(rerr) {
 			logger().Warn("cleanup after close failure", "err", rerr)
 		}
-		return "", fmt.Errorf("close: %w", err)
+		return "", errf.Errorf("close: %w", err)
 	}
 
 	logger().Debug("object written", "hash", hash[:12], "bytes", len(compressed.Bytes()))
@@ -251,54 +251,54 @@ func ReadObject(hash string) (*Object, error) {
 
 	root, err := os.OpenRoot(PromptsheonDir)
 	if err != nil {
-		return nil, fmt.Errorf("open store: %w", err)
+		return nil, errf.Errorf("open store: %w", err)
 	}
 	defer func() { _ = root.Close() }()
 
 	f, err := root.Open(relPath)
 	if err != nil {
 		if isNotExist(err) {
-			return nil, fmt.Errorf("%w: %s", ErrObjectNotFound, hash)
+			return nil, errf.Errorf("%w: %s", ErrObjectNotFound, hash)
 		}
-		return nil, fmt.Errorf("open: %w", err)
+		return nil, errf.Errorf("open: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
 	// Cap the on-disk read so a corrupt object cannot OOM the process.
 	compressed, err := io.ReadAll(io.LimitReader(f, maxObjectOnDiskBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("read object: %w", err)
+		return nil, errf.Errorf("read object: %w", err)
 	}
 	if int64(len(compressed)) > maxObjectOnDiskBytes {
-		return nil, fmt.Errorf("%w: on-disk size > %d bytes", ErrObjectTooLarge, maxObjectOnDiskBytes)
+		return nil, errf.Errorf("%w: on-disk size > %d bytes", ErrObjectTooLarge, maxObjectOnDiskBytes)
 	}
 
 	gr, err := gzip.NewReader(bytes.NewReader(compressed))
 	if err != nil {
-		return nil, fmt.Errorf("gzip reader: %w", err)
+		return nil, errf.Errorf("gzip reader: %w", err)
 	}
 	defer func() { _ = gr.Close() }()
 
 	jsonData, err := io.ReadAll(io.LimitReader(gr, maxObjectInflatedBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("decompress: %w", err)
+		return nil, errf.Errorf("decompress: %w", err)
 	}
 	if int64(len(jsonData)) > maxObjectInflatedBytes {
-		return nil, fmt.Errorf("%w: inflated size > %d bytes", ErrObjectTooLarge, maxObjectInflatedBytes)
+		return nil, errf.Errorf("%w: inflated size > %d bytes", ErrObjectTooLarge, maxObjectInflatedBytes)
 	}
 
 	var obj Object
 	if e := json.Unmarshal(jsonData, &obj); e != nil {
-		return nil, fmt.Errorf("unmarshal: %w", e)
+		return nil, errf.Errorf("unmarshal: %w", e)
 	}
 
 	computed, err := canonicalHash(&obj)
 	if err != nil {
-		return nil, fmt.Errorf("verify hash: %w", err)
+		return nil, errf.Errorf("verify hash: %w", err)
 	}
 	if computed != hash {
 		logger().Error("object corruption detected", "expected", hash[:12], "computed", computed[:12])
-		return nil, fmt.Errorf("%w: expected %s, computed %s", ErrObjectCorrupted, hash, computed)
+		return nil, errf.Errorf("%w: expected %s, computed %s", ErrObjectCorrupted, hash, computed)
 	}
 
 	logger().Debug("object read", "hash", hash[:12], "compressed_bytes", len(compressed))
@@ -314,7 +314,7 @@ func ObjectExists(hash string) (bool, error) {
 
 	root, err := os.OpenRoot(PromptsheonDir)
 	if err != nil {
-		return false, fmt.Errorf("open store: %w", err)
+		return false, errf.Errorf("open store: %w", err)
 	}
 	defer func() { _ = root.Close() }()
 
@@ -323,7 +323,7 @@ func ObjectExists(hash string) (bool, error) {
 		if isNotExist(err) {
 			return false, nil
 		}
-		return false, fmt.Errorf("stat object: %w", err)
+		return false, errf.Errorf("stat object: %w", err)
 	}
 	return true, nil
 }
@@ -338,16 +338,16 @@ func ObjectFileSize(hash string) (int64, error) {
 
 	root, err := os.OpenRoot(PromptsheonDir)
 	if err != nil {
-		return 0, fmt.Errorf("open store: %w", err)
+		return 0, errf.Errorf("open store: %w", err)
 	}
 	defer func() { _ = root.Close() }()
 
 	info, err := root.Stat(relPath)
 	if err != nil {
 		if isNotExist(err) {
-			return 0, fmt.Errorf("%w: %s", ErrObjectNotFound, hash)
+			return 0, errf.Errorf("%w: %s", ErrObjectNotFound, hash)
 		}
-		return 0, fmt.Errorf("stat: %w", err)
+		return 0, errf.Errorf("stat: %w", err)
 	}
 	return info.Size(), nil
 }
@@ -368,12 +368,12 @@ func WriteRef(name, targetHash string) error {
 	cleaned := sanitizeHash(targetHash)
 	if cleaned != "" {
 		if err := validateHash(cleaned); err != nil {
-			return fmt.Errorf("ref target: %w", err)
+			return errf.Errorf("ref target: %w", err)
 		}
 	}
 
 	if err := os.MkdirAll(filepath.Join(PromptsheonDir, headsDir, filepath.Dir(name)), 0750); err != nil {
-		return fmt.Errorf("mkdir refs: %w", err)
+		return errf.Errorf("mkdir refs: %w", err)
 	}
 
 	return writeFileAtomic(filepath.Join(headsDir, name), []byte(cleaned), 0o600)
@@ -388,22 +388,22 @@ func ReadRef(name string) (string, error) {
 
 	root, err := os.OpenRoot(PromptsheonDir)
 	if err != nil {
-		return "", fmt.Errorf("open store: %w", err)
+		return "", errf.Errorf("open store: %w", err)
 	}
 	defer func() { _ = root.Close() }()
 
 	f, err := root.Open(filepath.Join(headsDir, name))
 	if err != nil {
 		if isNotExist(err) {
-			return "", fmt.Errorf("%w: %s", ErrRefNotFound, name)
+			return "", errf.Errorf("%w: %s", ErrRefNotFound, name)
 		}
-		return "", fmt.Errorf("read ref: %w", err)
+		return "", errf.Errorf("read ref: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
 	data, err := io.ReadAll(f)
 	if err != nil {
-		return "", fmt.Errorf("read ref: %w", err)
+		return "", errf.Errorf("read ref: %w", err)
 	}
 	return sanitizeHash(string(bytes.TrimSpace(data))), nil
 }
@@ -416,7 +416,7 @@ func ListRefs() ([]string, error) {
 		if isNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("list refs: %w", err)
+		return nil, errf.Errorf("list refs: %w", err)
 	}
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
@@ -446,7 +446,7 @@ func ReadHEAD() (string, error) {
 		if isNotExist(err) {
 			return "", ErrRepoNotInitialized
 		}
-		return "", fmt.Errorf("open store: %w", err)
+		return "", errf.Errorf("open store: %w", err)
 	}
 	defer func() { _ = root.Close() }()
 
@@ -455,13 +455,13 @@ func ReadHEAD() (string, error) {
 		if isNotExist(err) {
 			return "", ErrRepoNotInitialized
 		}
-		return "", fmt.Errorf("read HEAD: %w", err)
+		return "", errf.Errorf("read HEAD: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
 	data, err := io.ReadAll(f)
 	if err != nil {
-		return "", fmt.Errorf("read HEAD: %w", err)
+		return "", errf.Errorf("read HEAD: %w", err)
 	}
 	return string(bytes.TrimSpace(data)), nil
 }
@@ -494,10 +494,10 @@ func HEADRefName(content string) string {
 // empty or contains dangerous characters.
 func validateRefName(name string) error {
 	if name == "" {
-		return fmt.Errorf("%w: must not be empty", ErrInvalidRefName)
+		return errf.Errorf("%w: must not be empty", ErrInvalidRefName)
 	}
 	if strings.Contains(name, "\x00") || strings.Contains(name, "\\") || strings.Contains(name, "..") {
-		return fmt.Errorf("%w: %q", ErrInvalidRefName, name)
+		return errf.Errorf("%w: %q", ErrInvalidRefName, name)
 	}
 	return nil
 }
@@ -517,7 +517,7 @@ func canonicalSerialize(obj *Object) ([]byte, error) {
 func canonicalHash(obj *Object) (string, error) {
 	data, err := canonicalSerialize(obj)
 	if err != nil {
-		return "", fmt.Errorf("canonical hash serialize: %w", err)
+		return "", errf.Errorf("canonical hash serialize: %w", err)
 	}
 	h := sha256.Sum256(data)
 	return hex.EncodeToString(h[:]), nil
@@ -530,17 +530,17 @@ func canonicalHash(obj *Object) (string, error) {
 func writeFileAtomic(relPath string, data []byte, mode os.FileMode) error {
 	root, err := os.OpenRoot(PromptsheonDir)
 	if err != nil {
-		return fmt.Errorf("open store: %w", err)
+		return errf.Errorf("open store: %w", err)
 	}
 	defer func() { _ = root.Close() }()
 
 	if err := os.MkdirAll(filepath.Join(PromptsheonDir, filepath.Dir(relPath)), 0o750); err != nil {
-		return fmt.Errorf("mkdir: %w", err)
+		return errf.Errorf("mkdir: %w", err)
 	}
 
 	tmp, err := os.CreateTemp(filepath.Join(PromptsheonDir, filepath.Dir(relPath)), ".tmp-*")
 	if err != nil {
-		return fmt.Errorf("create temp: %w", err)
+		return errf.Errorf("create temp: %w", err)
 	}
 	tmpName := tmp.Name()
 	cleanup := func() {
@@ -552,24 +552,24 @@ func writeFileAtomic(relPath string, data []byte, mode os.FileMode) error {
 	if _, err := tmp.Write(data); err != nil {
 		_ = tmp.Close()
 		cleanup()
-		return fmt.Errorf("write temp: %w", err)
+		return errf.Errorf("write temp: %w", err)
 	}
 	if err := tmp.Sync(); err != nil {
 		_ = tmp.Close()
 		cleanup()
-		return fmt.Errorf("fsync temp: %w", err)
+		return errf.Errorf("fsync temp: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
 		cleanup()
-		return fmt.Errorf("close temp: %w", err)
+		return errf.Errorf("close temp: %w", err)
 	}
 	if err := os.Chmod(tmpName, mode); err != nil {
 		cleanup()
-		return fmt.Errorf("chmod temp: %w", err)
+		return errf.Errorf("chmod temp: %w", err)
 	}
 	if err := renameAcrossRoot(root, relPath, tmpName); err != nil {
 		cleanup()
-		return fmt.Errorf("rename: %w", err)
+		return errf.Errorf("rename: %w", err)
 	}
 	return nil
 }
@@ -582,14 +582,14 @@ func renameAcrossRoot(_ *os.Root, relPath, tmpAbs string) error {
 	// Sanity: ensure the temp file is actually inside the repo.
 	absRepo, err := filepath.Abs(PromptsheonDir)
 	if err != nil {
-		return fmt.Errorf("abs repo: %w", err)
+		return errf.Errorf("abs repo: %w", err)
 	}
 	absTmp, err := filepath.Abs(tmpAbs)
 	if err != nil {
-		return fmt.Errorf("abs tmp: %w", err)
+		return errf.Errorf("abs tmp: %w", err)
 	}
 	if !strings.HasPrefix(absTmp, absRepo+string(filepath.Separator)) {
-		return fmt.Errorf("temp file %q is outside repo %q", absTmp, absRepo)
+		return errf.Errorf("temp file %q is outside repo %q", absTmp, absRepo)
 	}
 	target := filepath.Join(PromptsheonDir, relPath)
 	if err := os.Rename(tmpAbs, target); err != nil {

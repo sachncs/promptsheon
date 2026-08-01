@@ -13,6 +13,7 @@
 package executor
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 	"context"
@@ -120,7 +121,7 @@ func (e *Executor) HandleScheduleEvent(ctx context.Context, ev capability.Event)
 	}
 	rec, err := e.Run(ctx, workspaceID, releaseID, "", json.RawMessage(`{}`))
 	if err != nil {
-		return fmt.Errorf("executor: schedule.fired: %w", err)
+		return errf.Errorf("executor: schedule.fired: %w", err)
 	}
 	return e.publisher.Publish(capability.Event{
 		Type:          capability.EventExecutionFinished,

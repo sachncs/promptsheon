@@ -11,7 +11,7 @@
 package invoke
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/metrics"
 	"github.com/sachncs/promptsheon/promptsheon/budget"
 	"github.com/sachncs/promptsheon/promptsheon/observation"
@@ -119,7 +119,7 @@ func (i *Invoker) Invoke(ctx context.Context, req executor.InvokeRequest) (execu
 		if errors.Is(err, errs.ErrQuota) {
 			return executor.ExecutionRecord{}, ErrQuotaExceeded
 		}
-		return executor.ExecutionRecord{}, fmt.Errorf("%w: %w", ErrQuotaEnforcer, err)
+		return executor.ExecutionRecord{}, errf.Errorf("%w: %w", ErrQuotaEnforcer, err)
 	}
 	rec, err := i.invokeLLM(ctx, req, "prod")
 	if err != nil {
@@ -132,7 +132,7 @@ func (i *Invoker) Invoke(ctx context.Context, req executor.InvokeRequest) (execu
 			return rec, ErrBudgetExceeded
 		}
 		i.agg.Add(rec)
-		return rec, fmt.Errorf("%w: %w", ErrBudgetEnforcer, err)
+		return rec, errf.Errorf("%w: %w", ErrBudgetEnforcer, err)
 	}
 	i.agg.Add(rec)
 	return rec, nil
@@ -230,7 +230,7 @@ func (i *Invoker) invokeLLM(ctx context.Context, req executor.InvokeRequest, env
 	}
 	typed, ok := rec.(executor.ExecutionRecord)
 	if !ok {
-		return executor.ExecutionRecord{}, fmt.Errorf("invoke: middleware returned %T, want ExecutionRecord", rec)
+		return executor.ExecutionRecord{}, errf.Errorf("invoke: middleware returned %T, want ExecutionRecord", rec)
 	}
 	return typed, nil
 }

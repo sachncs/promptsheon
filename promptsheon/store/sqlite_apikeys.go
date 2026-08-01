@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
 	"database/sql"
@@ -20,7 +20,7 @@ func (s *SQLite) CreateAPIKey(ctx context.Context, key *models.APIKey) error {
 		key.Role, key.ExpiresAt, key.CreatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("create api key: %w", err)
+		return errf.Errorf("create api key: %w", err)
 	}
 	return nil
 }
@@ -46,7 +46,7 @@ func (s *SQLite) GetAPIKeyByHash(ctx context.Context, keyHash string) (*models.A
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("get api key by hash: %w", err)
+		return nil, errf.Errorf("get api key by hash: %w", err)
 	}
 	return &k, nil
 }
@@ -63,7 +63,7 @@ func (s *SQLite) GetAPIKeyByID(ctx context.Context, id string) (*models.APIKey, 
 		return nil, errs.ErrStoreNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("get api key by id: %w", err)
+		return nil, errf.Errorf("get api key by id: %w", err)
 	}
 	return &k, nil
 }
@@ -72,7 +72,7 @@ func (s *SQLite) DeleteAPIKey(ctx context.Context, id string) error {
 	const q = `UPDATE api_keys SET revoked = 1 WHERE id = ?`
 	_, err := s.db.ExecContext(ctx, q, id)
 	if err != nil {
-		return fmt.Errorf("delete api key: %w", err)
+		return errf.Errorf("delete api key: %w", err)
 	}
 	return nil
 }
@@ -82,7 +82,7 @@ func (s *SQLite) ListAPIKeysByUser(ctx context.Context, userID string) ([]*model
 		FROM api_keys WHERE user_id = ? ORDER BY created_at DESC`
 	rows, err := s.db.QueryContext(ctx, q, userID)
 	if err != nil {
-		return nil, fmt.Errorf("list api keys: %w", err)
+		return nil, errf.Errorf("list api keys: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -93,7 +93,7 @@ func (s *SQLite) ListAPIKeysByUser(ctx context.Context, userID string) ([]*model
 			&k.ID, &k.UserID, &k.Name, &k.KeyHash, &k.KeyPrefix,
 			&k.Role, &k.ExpiresAt, &k.LastUsed, &k.CreatedAt, &k.Revoked,
 		); err != nil {
-			return nil, fmt.Errorf("scan api key: %w", err)
+			return nil, errf.Errorf("scan api key: %w", err)
 		}
 		keys = append(keys, &k)
 	}
@@ -104,7 +104,7 @@ func (s *SQLite) UpdateAPIKeyLastUsed(ctx context.Context, id string) error {
 	const q = `UPDATE api_keys SET last_used = ? WHERE id = ?`
 	_, err := s.db.ExecContext(ctx, q, time.Now(), id)
 	if err != nil {
-		return fmt.Errorf("update api key last used: %w", err)
+		return errf.Errorf("update api key last used: %w", err)
 	}
 	return nil
 }

@@ -15,6 +15,7 @@
 package e2e
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/scheduler"
 	"github.com/sachncs/promptsheon/promptsheon/executor"
 	"bytes"
@@ -180,7 +181,7 @@ func waitForDaemon(addr string, timeout time.Duration) error {
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	return fmt.Errorf("daemon at %s did not become ready in %s", addr, timeout)
+	return errf.Errorf("daemon at %s did not become ready in %s", addr, timeout)
 }
 
 // TestCapabilityLifecycle walks the full Capability / Version /

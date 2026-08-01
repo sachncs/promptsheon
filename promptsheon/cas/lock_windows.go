@@ -3,7 +3,7 @@
 package cas
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"os"
 )
 
@@ -12,7 +12,7 @@ import (
 // build is intentionally conservative — the daemon is primarily POSIX.
 func flockAcquire(f *os.File) error {
 	if f == nil {
-		return fmt.Errorf("flock: nil file")
+		return errf.Errorf("flock: nil file")
 	}
 	// Use a best-effort advisory lock via LockFileEx; if the platform
 	// rejects it, we fail closed to avoid the silent split-brain the

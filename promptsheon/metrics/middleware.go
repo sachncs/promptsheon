@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/trace"
 	"context"
 	"fmt"
@@ -55,7 +56,7 @@ func HTTPMiddleware(collector *Collector, tracer trace.Tracer, logger *slog.Logg
 				span.SetAttribute("http.status", fmt.Sprintf("%d", rw.status))
 				span.SetAttribute("http.latency_ms", fmt.Sprintf("%d", latency.Milliseconds()))
 				if rw.status >= 500 {
-					fmt.Errorf("HTTP %d", rw.status)
+					errf.Errorf("HTTP %d", rw.status)
 				}
 				span.Finish()
 				if err := tracer.Finish(span); err != nil && logger != nil {

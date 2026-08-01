@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"database/sql"
@@ -14,7 +14,7 @@ import (
 func (s *SQLite) CreateVersion(ctx context.Context, v *capability.Version) error {
 	manifestJSON, err := marshalOrErr(v.Manifest)
 	if err != nil {
-		return fmt.Errorf("marshal version manifest: %w", err)
+		return errf.Errorf("marshal version manifest: %w", err)
 	}
 
 	_, err = s.db.ExecContext(ctx,
@@ -25,7 +25,7 @@ func (s *SQLite) CreateVersion(ctx context.Context, v *capability.Version) error
 		v.CreatedAt, v.CreatedBy,
 	)
 	if err != nil {
-		return fmt.Errorf("insert version: %w", err)
+		return errf.Errorf("insert version: %w", err)
 	}
 	return nil
 }
@@ -44,7 +44,7 @@ func (s *SQLite) ListVersions(ctx context.Context, capabilityID string) ([]*capa
 		 FROM capability_versions WHERE capability_id = ? ORDER BY version DESC`, capabilityID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list versions: %w", err)
+		return nil, errf.Errorf("list versions: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -92,12 +92,12 @@ func scanCapabilityVersion(scanner interface {
 		return nil, errs.ErrStoreNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("scan version: %w", err)
+		return nil, errf.Errorf("scan version: %w", err)
 	}
 
 	if manifestJSON != "" && manifestJSON != "{}" {
 		if err := mustUnmarshal([]byte(manifestJSON), &v.Manifest); err != nil {
-			return nil, fmt.Errorf("version %s manifest: %w", v.ID, err)
+			return nil, errf.Errorf("version %s manifest: %w", v.ID, err)
 		}
 	}
 

@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/settings"
 	"context"
 	"database/sql"
@@ -34,7 +34,7 @@ func (s *SQLite) GetSystemConfig(ctx context.Context, key string) (settings.CRDT
 func (s *SQLite) SetSystemConfig(ctx context.Context, rec settings.CRDTRecord) error {
 	vecJSON, err := encodeVersionVector(rec.VersionVector)
 	if err != nil {
-		return fmt.Errorf("set system_config %q: encode vector: %w", rec.Key, err)
+		return errf.Errorf("set system_config %q: encode vector: %w", rec.Key, err)
 	}
 	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO system_config
@@ -51,7 +51,7 @@ func (s *SQLite) SetSystemConfig(ctx context.Context, rec settings.CRDTRecord) e
 		rec.Key, rec.Value, rec.UpdatedBy, rec.ReplicaID, vecJSON, boolToInt(rec.Tombstone), rec.WriteTS,
 	)
 	if err != nil {
-		return fmt.Errorf("set system_config %q: %w", rec.Key, err)
+		return errf.Errorf("set system_config %q: %w", rec.Key, err)
 	}
 	return nil
 }
@@ -66,7 +66,7 @@ func (s *SQLite) ListSystemConfig(ctx context.Context) ([]settings.CRDTRecord, e
 		 FROM system_config ORDER BY key`,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list system_config: %w", err)
+		return nil, errf.Errorf("list system_config: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var out []settings.CRDTRecord
@@ -80,7 +80,7 @@ func (s *SQLite) ListSystemConfig(ctx context.Context) ([]settings.CRDTRecord, e
 		rec.Tombstone = tombstone != 0
 		vv, err := decodeVersionVector(vecJSON)
 		if err != nil {
-			return nil, fmt.Errorf("list system_config %q: decode vector: %w", rec.Key, err)
+			return nil, errf.Errorf("list system_config %q: decode vector: %w", rec.Key, err)
 		}
 		rec.VersionVector = vv
 		out = append(out, rec)
@@ -105,7 +105,7 @@ func (s *SQLite) MergeSystemConfig(ctx context.Context, _ string, records []sett
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("merge system_config: begin: %w", err)
+		return errf.Errorf("merge system_config: begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, remote := range records {
@@ -121,13 +121,13 @@ func (s *SQLite) MergeSystemConfig(ctx context.Context, _ string, records []sett
 		var tombstone int
 		err := row.Scan(&local.Value, &local.UpdatedAt, &local.UpdatedBy, &local.ReplicaID, &vecJSON, &tombstone, &local.WriteTS)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("merge system_config %q: scan: %w", remote.Key, err)
+			return errf.Errorf("merge system_config %q: scan: %w", remote.Key, err)
 		}
 		local.Tombstone = tombstone != 0
 		if err == nil {
 			vv, derr := decodeVersionVector(vecJSON)
 			if derr != nil {
-				return fmt.Errorf("merge system_config %q: decode vector: %w", remote.Key, derr)
+				return errf.Errorf("merge system_config %q: decode vector: %w", remote.Key, derr)
 			}
 			local.VersionVector = vv
 		}
@@ -137,7 +137,7 @@ func (s *SQLite) MergeSystemConfig(ctx context.Context, _ string, records []sett
 		}
 		vecJSON, err = encodeVersionVector(merged.VersionVector)
 		if err != nil {
-			return fmt.Errorf("merge system_config %q: encode vector: %w", merged.Key, err)
+			return errf.Errorf("merge system_config %q: encode vector: %w", merged.Key, err)
 		}
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO system_config
@@ -153,11 +153,11 @@ func (s *SQLite) MergeSystemConfig(ctx context.Context, _ string, records []sett
 			   write_ts       = excluded.write_ts`,
 			merged.Key, merged.Value, merged.UpdatedBy, merged.ReplicaID, vecJSON, boolToInt(merged.Tombstone), merged.WriteTS,
 		); err != nil {
-			return fmt.Errorf("merge system_config %q: upsert: %w", merged.Key, err)
+			return errf.Errorf("merge system_config %q: upsert: %w", merged.Key, err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("merge system_config: commit: %w", err)
+		return errf.Errorf("merge system_config: commit: %w", err)
 	}
 	return nil
 }

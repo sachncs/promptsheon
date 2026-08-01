@@ -1,7 +1,7 @@
 package llm
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"log/slog"
 	"net/url"
 	"os"
@@ -73,11 +73,11 @@ func (r *Registry) Get(name string) (Provider, error) {
 
 	factory, ok := r.providers[name]
 	if !ok {
-		return nil, fmt.Errorf("unknown provider: %s", name)
+		return nil, errf.Errorf("unknown provider: %s", name)
 	}
 	cfg, cfgOK := r.configs[name]
 	if !cfgOK {
-		return nil, fmt.Errorf("provider %s not configured", name)
+		return nil, errf.Errorf("provider %s not configured", name)
 	}
 
 	p := factory(cfg)
@@ -150,13 +150,13 @@ func loadFromEnvBaseURL(name, baseURL, bindAddr string, isLoopback func(string) 
 	}
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		return fmt.Errorf("provider %q base url: %w", name, err)
+		return errf.Errorf("provider %q base url: %w", name, err)
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return fmt.Errorf("provider %q base url scheme %q is not http or https", name, u.Scheme)
+		return errf.Errorf("provider %q base url scheme %q is not http or https", name, u.Scheme)
 	}
 	if u.Scheme == "http" && !isLoopback(bindAddr) {
-		return fmt.Errorf("provider %q base url %q uses http but daemon binds %q (non-loopback); http base URLs are only allowed on loopback binds", name, baseURL, bindAddr)
+		return errf.Errorf("provider %q base url %q uses http but daemon binds %q (non-loopback); http base URLs are only allowed on loopback binds", name, baseURL, bindAddr)
 	}
 	return nil
 }

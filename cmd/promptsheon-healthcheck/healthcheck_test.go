@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"fmt"
 	"net"
@@ -86,7 +87,7 @@ func healthCheckOnce() error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("status %d", resp.StatusCode)
+		return errf.Errorf("status %d", resp.StatusCode)
 	}
 	return nil
 }

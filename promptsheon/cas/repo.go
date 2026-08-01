@@ -1,7 +1,7 @@
 package cas
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"os"
 	"path/filepath"
 	"time"
@@ -57,13 +57,13 @@ func Init() error {
 	if _, err := os.Stat(PromptsheonDir); err == nil {
 		// Directory exists. Validate it.
 		if !IsInitialized() {
-			return fmt.Errorf("%s exists but is not a promptsheon repository", PromptsheonDir)
+			return errf.Errorf("%s exists but is not a promptsheon repository", PromptsheonDir)
 		}
 		// Already initialised: leave HEAD and refs alone.
 		logger().Debug("repository already initialised", "dir", PromptsheonDir)
 		return nil
 	} else if !isNotExist(err) {
-		return fmt.Errorf("stat %s: %w", PromptsheonDir, err)
+		return errf.Errorf("stat %s: %w", PromptsheonDir, err)
 	}
 
 	// Create the layout.
@@ -73,7 +73,7 @@ func Init() error {
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0o750); err != nil {
-			return fmt.Errorf("mkdir %s: %w", d, err)
+			return errf.Errorf("mkdir %s: %w", d, err)
 		}
 	}
 

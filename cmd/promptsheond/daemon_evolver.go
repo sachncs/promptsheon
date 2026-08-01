@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/store"
 	"github.com/sachncs/promptsheon/promptsheon/release"
 	"github.com/sachncs/promptsheon/promptsheon/metrics"
@@ -107,7 +108,7 @@ func buildEvolver(
 	validator := evolve.NewHarnessValidator(repo, invoke)
 	promoter, perr := evolve.NewPromoter(repo, loader, activator, auditor)
 	if perr != nil {
-		return nil, fmt.Errorf("build promoter: %w", perr)
+		return nil, errf.Errorf("build promoter: %w", perr)
 	}
 	ev := evolve.NewEvolver(repo, loader, revision, validator, promoter, auditor, logger)
 	return &selfEvolveLoop{
@@ -128,11 +129,11 @@ func makeEvolverLLMInvoke(providers *llm.Registry, logger *slog.Logger) evolve.L
 	return func(ctx context.Context, req evolve.LLMInvokeRequest) (string, error) {
 		names := providers.Providers()
 		if len(names) == 0 {
-			return "", fmt.Errorf("self_evolve: no LLM providers registered")
+			return "", errf.Errorf("self_evolve: no LLM providers registered")
 		}
 		p, err := providers.Get(names[0])
 		if err != nil {
-			return "", fmt.Errorf("self_evolve: get provider: %w", err)
+			return "", errf.Errorf("self_evolve: get provider: %w", err)
 		}
 		modelName := os.Getenv("PROMPTSHEON_SELF_EVOLVE_MODEL")
 		if modelName == "" {

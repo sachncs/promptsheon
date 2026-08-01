@@ -1,7 +1,7 @@
 package evolve
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"time"
@@ -39,13 +39,13 @@ type Auditor interface {
 // fast rather than discovering a nil dereference mid-cycle.
 func NewPromoter(repo Repository, loader PromptLoader, activator ReleaseActivator, auditor Auditor) (*Promoter, error) {
 	if repo == nil {
-		return nil, fmt.Errorf("selfevolve: promoter repo is required")
+		return nil, errf.Errorf("selfevolve: promoter repo is required")
 	}
 	if loader == nil {
-		return nil, fmt.Errorf("selfevolve: promoter loader is required")
+		return nil, errf.Errorf("selfevolve: promoter loader is required")
 	}
 	if activator == nil {
-		return nil, fmt.Errorf("selfevolve: promoter activator is required")
+		return nil, errf.Errorf("selfevolve: promoter activator is required")
 	}
 	return &Promoter{
 		Repo:      repo,
@@ -70,18 +70,18 @@ type PromoteResult struct {
 // validated revised prompt text.
 func (p *Promoter) Promote(ctx context.Context, capabilityID, targetEnv string, oldReleaseID string, newPrompt string) (*PromoteResult, error) {
 	if capabilityID == "" || targetEnv == "" {
-		return nil, fmt.Errorf("evolve.promoter: missing capabilityID or targetEnv")
+		return nil, errf.Errorf("evolve.promoter: missing capabilityID or targetEnv")
 	}
 	if newPrompt == "" {
-		return nil, fmt.Errorf("evolve.promoter: empty new prompt")
+		return nil, errf.Errorf("evolve.promoter: empty new prompt")
 	}
 	oldManifest, err := p.loadActiveManifest(ctx, capabilityID, oldReleaseID)
 	if err != nil {
-		return nil, fmt.Errorf("evolve.promoter: %w", err)
+		return nil, errf.Errorf("evolve.promoter: %w", err)
 	}
 	newHash, err := p.Loader.WritePrompt(ctx, newPrompt)
 	if err != nil {
-		return nil, fmt.Errorf("evolve.promoter: write prompt: %w", err)
+		return nil, errf.Errorf("evolve.promoter: write prompt: %w", err)
 	}
 	newManifest := capability.Manifest{
 		Prompt:        capability.ArtifactRef{Kind: capability.ArtifactPrompt, Hash: newHash},
@@ -92,11 +92,11 @@ func (p *Promoter) Promote(ctx context.Context, capabilityID, targetEnv string, 
 	}
 	mHash, err := capability.ComputeManifestHash(newManifest)
 	if err != nil {
-		return nil, fmt.Errorf("evolve.promoter: compute manifest hash: %w", err)
+		return nil, errf.Errorf("evolve.promoter: compute manifest hash: %w", err)
 	}
 	nextVersion, err := p.nextVersionNumber(ctx, capabilityID)
 	if err != nil {
-		return nil, fmt.Errorf("evolve.promoter: %w", err)
+		return nil, errf.Errorf("evolve.promoter: %w", err)
 	}
 	now := p.Now()
 	versionID := generateID("v")
@@ -110,7 +110,7 @@ func (p *Promoter) Promote(ctx context.Context, capabilityID, targetEnv string, 
 		CreatedBy:    "self_evolve",
 	}
 	if err := p.Repo.CreateVersion(ctx, version); err != nil {
-		return nil, fmt.Errorf("evolve.promoter: create version: %w", err)
+		return nil, errf.Errorf("evolve.promoter: create version: %w", err)
 	}
 	releaseID := generateID("rel")
 	rel := ReleaseRecord{
@@ -124,13 +124,13 @@ func (p *Promoter) Promote(ctx context.Context, capabilityID, targetEnv string, 
 		CreatedAt:         now,
 	}
 	if err := p.Repo.CreateRelease(ctx, rel); err != nil {
-		return nil, fmt.Errorf("evolve.promoter: create release: %w", err)
+		return nil, errf.Errorf("evolve.promoter: create release: %w", err)
 	}
 	if p.Activator == nil {
-		return nil, fmt.Errorf("evolve.promoter: activator not wired")
+		return nil, errf.Errorf("evolve.promoter: activator not wired")
 	}
 	if err := p.Activator.SelfActivate(ctx, releaseID); err != nil {
-		return nil, fmt.Errorf("evolve.promoter: self-activate: %w", err)
+		return nil, errf.Errorf("evolve.promoter: self-activate: %w", err)
 	}
 	if p.Auditor != nil {
 		p.Auditor.Audit(ctx, AuditPromote, "capability:"+capabilityID, map[string]any{
@@ -175,14 +175,14 @@ func (p *Promoter) loadActiveManifest(ctx context.Context, capabilityID, oldRele
 	for {
 		ver, err := p.Repo.GetVersionByNumber(ctx, capabilityID, v)
 		if err != nil {
-			return capability.Manifest{}, fmt.Errorf("evolve.promoter: no active manifest to copy model_policy / runtime_policy from (capabilityID=%q)", capabilityID)
+			return capability.Manifest{}, errf.Errorf("evolve.promoter: no active manifest to copy model_policy / runtime_policy from (capabilityID=%q)", capabilityID)
 		}
 		if ver != nil && ver.Manifest.Prompt.Hash != "" {
 			return ver.Manifest, nil
 		}
 		v++
 		if v > 10000 {
-			return capability.Manifest{}, fmt.Errorf("evolve.promoter: version probe exceeded 10000 for capability %s", capabilityID)
+			return capability.Manifest{}, errf.Errorf("evolve.promoter: version probe exceeded 10000 for capability %s", capabilityID)
 		}
 	}
 }

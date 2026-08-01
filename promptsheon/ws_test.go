@@ -1,6 +1,7 @@
 package promptsheon
 
 import (
+	"github.com/sachncs/promptsheon/errf"
 		"bytes"
 	"context"
 	"encoding/json"
@@ -452,7 +453,7 @@ func TestHandleSSE_DeliversLogEvent(t *testing.T) {
 type errHandler struct{}
 
 func (e errHandler) Enabled(context.Context, slog.Level) bool  { return true }
-func (e errHandler) Handle(context.Context, slog.Record) error { return fmt.Errorf("fail") }
+func (e errHandler) Handle(context.Context, slog.Record) error { return errf.Errorf("fail") }
 func (e errHandler) WithAttrs([]slog.Attr) slog.Handler        { return e }
 func (e errHandler) WithGroup(string) slog.Handler             { return e }
 

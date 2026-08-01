@@ -13,7 +13,7 @@
 package quota
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"errors"
 	"time"
@@ -65,12 +65,12 @@ func New(scope Scope, targetID string, window Window, limit int64, now time.Time
 	switch scope {
 	case ScopeWorkspace, ScopeProvider:
 	default:
-		return Quota{}, fmt.Errorf("quota: unknown scope %q", scope)
+		return Quota{}, errf.Errorf("quota: unknown scope %q", scope)
 	}
 	switch window {
 	case WindowSecond, WindowMinute, WindowHour:
 	default:
-		return Quota{}, fmt.Errorf("quota: unknown window %q", window)
+		return Quota{}, errf.Errorf("quota: unknown window %q", window)
 	}
 	if targetID == "" {
 		return Quota{}, errors.New("quota: target_id is required")

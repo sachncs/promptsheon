@@ -1,7 +1,7 @@
 package evolve
 
 import (
-	"fmt"
+	"github.com/sachncs/promptsheon/errf"
 	"github.com/sachncs/promptsheon/promptsheon/cas"
 	"context"
 
@@ -28,7 +28,7 @@ func (l *CasPromptLoader) LoadPrompt(ctx context.Context, hash string) ([]byte, 
 	}
 	obj, err := cas.ReadObject(hash)
 	if err != nil {
-		return nil, fmt.Errorf("evolve.cas: read %s: %w", hash, err)
+		return nil, errf.Errorf("evolve.cas: read %s: %w", hash, err)
 	}
 	return []byte(obj.Data), nil
 }
@@ -44,7 +44,7 @@ func (l *CasPromptLoader) WritePrompt(ctx context.Context, text string) (string,
 	}
 	hash, err := cas.WriteObject(cas.NewBlobObject(text))
 	if err != nil {
-		return "", fmt.Errorf("evolve.cas: write: %w", err)
+		return "", errf.Errorf("evolve.cas: write: %w", err)
 	}
 	return hash, nil
 }
