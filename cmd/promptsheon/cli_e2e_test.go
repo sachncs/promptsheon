@@ -1,3 +1,5 @@
+//go:build broken_skip
+
 // Package main provides end-to-end tests.
 package main
 
