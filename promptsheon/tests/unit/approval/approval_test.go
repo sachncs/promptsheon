@@ -1,5 +1,3 @@
-//go:build tests_migration
-
 
 package approval_test
 

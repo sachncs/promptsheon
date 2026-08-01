@@ -1,5 +1,3 @@
-//go:build tests_migration
-
 
 // Notifier propagation tests. The CRDT-aware settings layer
 // raises an error from Publish so a subscriber that fails to

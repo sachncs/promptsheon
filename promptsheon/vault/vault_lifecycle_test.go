@@ -1,5 +1,3 @@
-//go:build tests_migration
-
 
 // Tests for the Vault lifecycle (Stop) and the hot-reload (Reload)
 // contract. Lives in a separate file so the long-standing

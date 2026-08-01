@@ -1,5 +1,3 @@
-//go:build tests_migration
-
 
 // Property-based tests for the CAS layer. The library used
 // (testing/quick) is the standard-library property harness; this
