@@ -4,16 +4,17 @@
 package main
 
 import (
-	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend/approval"
-	"github.com/sachncs/promptsheon/backend/harness"
-	"github.com/sachncs/promptsheon/backend/release"
-	"github.com/sachncs/promptsheon/backend/selfevolve"
-	"github.com/sachncs/promptsheon/backend/store"
+	"github.com/sachncs/promptsheon/promptsheon/errs"
+
+	"github.com/sachncs/promptsheon/promptsheon/approval"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/selfevolve"
+	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 // evolverRepoAdapter wraps *store.SQLite and satisfies

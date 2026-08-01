@@ -2,8 +2,6 @@
 package main
 
 import (
-	"github.com/sachncs/promptsheon/backend"
-	"github.com/sachncs/promptsheon/backend/errs"
 	"context"
 	"database/sql"
 	"encoding/hex"
@@ -23,39 +21,45 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon"
+	"github.com/sachncs/promptsheon/promptsheon/errs"
+	"github.com/sachncs/promptsheon/buildinfo"
+
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
-	"github.com/sachncs/promptsheon/backend/alerting"
-	"github.com/sachncs/promptsheon/backend/auth"
-	"github.com/sachncs/promptsheon/backend/capability"
-	"github.com/sachncs/promptsheon/backend/eval"
-	"github.com/sachncs/promptsheon/backend/eventbus"
-	"github.com/sachncs/promptsheon/backend/executor"
-	"github.com/sachncs/promptsheon/backend/harness"
-	"github.com/sachncs/promptsheon/backend/invoke"
-	"github.com/sachncs/promptsheon/backend/llm"
-	"github.com/sachncs/promptsheon/backend/metrics"
-	"github.com/sachncs/promptsheon/backend/models"
-	"github.com/sachncs/promptsheon/backend/observation"
-	"github.com/sachncs/promptsheon/backend/rules"
-	"github.com/sachncs/promptsheon/backend/ratelimit"
-	"github.com/sachncs/promptsheon/backend/recommendation"
-	"github.com/sachncs/promptsheon/backend/approval"
-	"github.com/sachncs/promptsheon/backend/release"
-	"github.com/sachncs/promptsheon/backend/rollups"
-	"github.com/sachncs/promptsheon/backend/scheduler"
-	"github.com/sachncs/promptsheon/backend/settings"
-	"github.com/sachncs/promptsheon/backend/store"
-	"github.com/sachncs/promptsheon/backend/store/sqliteimpl"
-	"github.com/sachncs/promptsheon/backend/supervisor"
-	"github.com/sachncs/promptsheon/backend/trace"
-	"github.com/sachncs/promptsheon/backend/vault"
-	"github.com/sachncs/promptsheon/backend/webhook"
-	"github.com/sachncs/promptsheon/backend/workflow"
-	"github.com/sachncs/promptsheon/backend/cas"
+	"github.com/sachncs/promptsheon/promptsheon/alerting"
+	"github.com/sachncs/promptsheon/promptsheon/approval"
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/cas"
+	"github.com/sachncs/promptsheon/promptsheon/election"
+	"github.com/sachncs/promptsheon/promptsheon/eval"
+	"github.com/sachncs/promptsheon/promptsheon/retention"
+	"github.com/sachncs/promptsheon/promptsheon/eventbus"
+	"github.com/sachncs/promptsheon/promptsheon/executor"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
+	"github.com/sachncs/promptsheon/promptsheon/invoke"
+	"github.com/sachncs/promptsheon/promptsheon/llm"
+	"github.com/sachncs/promptsheon/promptsheon/metrics"
+	"github.com/sachncs/promptsheon/promptsheon/models"
+	"github.com/sachncs/promptsheon/promptsheon/observation"
+	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
+	"github.com/sachncs/promptsheon/promptsheon/recommendation"
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/rollups"
+	"github.com/sachncs/promptsheon/promptsheon/rules"
+	"github.com/sachncs/promptsheon/promptsheon/scheduler"
+	"github.com/sachncs/promptsheon/promptsheon/settings"
+	"github.com/sachncs/promptsheon/promptsheon/store"
+	"github.com/sachncs/promptsheon/promptsheon/store/sqliteimpl"
+	"github.com/sachncs/promptsheon/promptsheon/supervisor"
+	"github.com/sachncs/promptsheon/promptsheon/trace"
+	"github.com/sachncs/promptsheon/promptsheon/vault"
+	"github.com/sachncs/promptsheon/promptsheon/webhook"
+	"github.com/sachncs/promptsheon/promptsheon/workflow"
 )
 
 const logLevelDebug = "debug"
@@ -69,7 +73,6 @@ func runDaemon() {
 	// confirm a deployment, and we don't want a missing or invalid
 	// env var to mask the simple cases.
 	showVersion := flag.Bool("version", false, "print version information and exit")
-	_ = showVersion // referenced via flag.Parse below
 	showHelp := flag.Bool("help", false, "print configuration and runtime flags and exit")
 	// OPS-BAK-1: `promptsheond backup <path>` writes a consistent
 	// SQLite snapshot to <path> using the .backup API. The daemon
@@ -81,7 +84,7 @@ func runDaemon() {
 	flag.Parse()
 
 	if *showVersion {
-		info := backend.Get()
+		info := buildinfo.Get()
 		fmt.Printf("promptsheond %s (commit %s, built %s, %s/%s)\n",
 			info.Version, info.Commit, info.BuildTime, info.OS, info.Arch)
 		return
@@ -99,7 +102,7 @@ func runDaemon() {
 		return
 	}
 
-	cfg, cfgErr := backend.LoadConfig()
+	cfg, cfgErr := promptsheon.LoadConfig()
 	if cfgErr != nil {
 		fmt.Fprintln(os.Stderr, cfgErr)
 		os.Exit(2)
@@ -137,7 +140,7 @@ func runDaemon() {
 	// SECURITY: shell tool policy must be configured at startup, not
 	// mutated at runtime. An empty allowlist disables the tool
 	// regardless of the enabled flag.
-	configureShellTool(&cfg)
+	configureShellTool()
 
 	// rootCtx is cancelled on shutdown. All background goroutines
 	// (retention, oauth janitor, alert monitor) hang off this context.
@@ -146,9 +149,9 @@ func runDaemon() {
 
 	// Log hub is created early so the slog chain can broadcast
 	// every daemon log line over the SSE /api/v1/logs/stream
-	// endpoint (OBS-4). The hub is also passed to backend.NewServer
+	// endpoint (OBS-4). The hub is also passed to promptsheon.NewServer
 	// via WithLogHub so handlers can subscribe.
-	logHub := backend.NewHub(slog.Default())
+	logHub := promptsheon.NewHub(slog.Default())
 	go logHub.Run()
 
 	logger := setupLogger(&cfg, logHub)
@@ -174,7 +177,7 @@ func runDaemon() {
 	// Wire the plugin supervisor. The supervisor owns plugin
 	// lifecycle; the daemon owns the supervisor. The previous
 	// built-in guardrail plugins (pii-redactor,
-// prompt-injection) were no-ops whose CheckGuardrail methods
+	// prompt-injection) were no-ops whose CheckGuardrail methods
 	// were never called from a request path; the bodies and
 	// their fuzz/unit tests are removed. Reintroduce them when a
 	// handler route wires Redactor.CheckGuardrail or
@@ -203,20 +206,20 @@ func runDaemon() {
 	// when PROMPTSHEON_LEADER_ELECTION=true; the default is
 	// single-replica, where the daemon holds the lock itself
 	// the moment it starts.
-	var elector *backend.Elector
+	var elector *election.Elector
 	if os.Getenv("PROMPTSHEON_LEADER_ELECTION") == "true" {
 		podName := os.Getenv("POD_NAME")
 		if podName == "" {
 			podName, _ = os.Hostname()
 		}
-		elector = backend.New(db.DB(), podName, 30*time.Second)
+		elector = election.New(db.DB(), podName, 30*time.Second)
 		if err := elector.EnsureTable(rootCtx); err != nil {
 			logger.Warn("leader-election table init failed", "err", err)
 		}
 		go func() {
-			errs := make(chan error, 8)
-			go elector.Run(rootCtx, errs)
-			for e := range errs {
+			electionErrs := make(chan error, 8)
+			go elector.Run(rootCtx, electionErrs)
+			for e := range electionErrs {
 				logger.Warn("leader-election error", "err", e)
 			}
 		}()
@@ -243,7 +246,7 @@ func runDaemon() {
 
 	srv, limiter, tracer, collector, v := buildServer(rootCtx, &cfg, db, logger, tp, logHub, elector, retentionDB, sharedBus)
 
-	if err := srv.StartAuditWorkers(rootCtx, 2); err != nil {
+	if err := srv.StartAuditWorkers(2); err != nil {
 		logger.Error("start audit workers", "err", err)
 		os.Exit(1)
 	}
@@ -260,7 +263,7 @@ func runDaemon() {
 // configureShellTool loads the shell tool policy from environment. The
 // tool is disabled unless BOTH PROMPTSHEON_SHELL_ENABLED=true and
 // PROMPTSHEON_SHELL_ALLOWLIST contains at least one command.
-func configureShellTool(_ *backend.Config) {
+func configureShellTool() {
 	enabled := os.Getenv("PROMPTSHEON_SHELL_ENABLED") == "true"
 	raw := os.Getenv("PROMPTSHEON_SHELL_ALLOWLIST")
 	var allow []string
@@ -281,7 +284,7 @@ func configureShellTool(_ *backend.Config) {
 	workflow.SetShellToolPolicy(enabled, allow)
 }
 
-func setupLogger(cfg *backend.Config, hub *backend.Hub) *slog.Logger {
+func setupLogger(cfg *promptsheon.Config, hub *promptsheon.Hub) *slog.Logger {
 	var logLevel slog.Level
 	switch cfg.LogLevel {
 	case logLevelDebug:
@@ -300,13 +303,13 @@ func setupLogger(cfg *backend.Config, hub *backend.Hub) *slog.Logger {
 	// its own broadcast loop and is concurrency-safe.
 	var base slog.Handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
 	if hub != nil {
-		streamer := &backend.LogStreamer{Hub: hub}
+		streamer := &promptsheon.LogStreamer{Hub: hub}
 		base = streamer.StreamHandler(base)
 	}
 	return slog.New(base)
 }
 
-func openDB(cfg *backend.Config, logger *slog.Logger) *store.SQLite {
+func openDB(cfg *promptsheon.Config, logger *slog.Logger) *store.SQLite {
 	// PG-1: when PROMPTSHEON_DATABASE_URL=postgres://... is set,
 	// warn the operator that pgx is not yet wired and fall back
 	// to SQLite. The Postgres contract tests pass against the
@@ -327,7 +330,7 @@ func openDB(cfg *backend.Config, logger *slog.Logger) *store.SQLite {
 	return db
 }
 
-func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *backend.Hub, elector *backend.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*backend.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector, *vault.Vault) {
+func buildServer(rootCtx context.Context, cfg *promptsheon.Config, db *store.SQLite, logger *slog.Logger, tp *sdktrace.TracerProvider, logHub *promptsheon.Hub, elector *election.Elector, retentionDB *sql.DB, sharedBus eventbus.Publisher) (*promptsheon.Server, *ratelimit.Limiter, trace.Tracer, *metrics.Collector, *vault.Vault) {
 	// OBS-TR-1: no SQLite tracer; OTel-only export.
 	collector := metrics.NewCollector()
 	// OBS-LOG-2: wire the SSE hub's drop counter into the
@@ -345,12 +348,12 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 		logger.Info("OTel tracer initialised", "endpoint", cfg.OTelEndpoint, "insecure", cfg.OTelInsecure)
 	}
 
-	retentionPolicy := backend.LoadRetentionPolicyFromEnv()
+	retentionPolicy := retention.LoadPolicyFromEnv()
 	// DB-CONC-2: retentionDB is passed in from main() so its
 	// lifetime matches the daemon lifetime, not buildServer's.
 	// Closing it inside buildServer would tear down the DB
 	// before the retention goroutine ever runs a tick.
-	retention := backend.NewRetentionManager(retentionDB, retentionPolicy, logger)
+	retention := retention.New(retentionDB, retentionPolicy, logger)
 	retention.Start(rootCtx)
 
 	webhookDispatcher := webhook.NewDispatcher(logger).
@@ -444,7 +447,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 	// logs (via slog.Error inside LoadFromEnv) and skips the
 	// offending provider; it does not abort startup because
 	// providers without base URLs are valid.
-	providers.LoadFromEnv(cfg.Addr, backend.IsLoopbackAddr)
+	providers.LoadFromEnv(cfg.Addr, promptsheon.IsLoopbackAddr)
 
 	// Per-Workspace rollup aggregator (Tier 2.37). The production
 	// wiring supplies a backend-backed Budget/Quota repository.
@@ -538,10 +541,9 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 			return executor.InvokeResult{Status: "error", Error: err.Error()}, nil
 		}
 		usage := resp.Usage
-		// C2.23: llm.EstimateCost / PricingTable dropped; the
-		// per-token cost is now sourced from a model-specific
-		// pricing map in models.go (TODO c2.23.5). Until then the
-		// cost is recorded as 0 — observed in metrics, not
+		// C2.23: llm.EstimateCost / PricingTable dropped; per-token
+		// cost is recorded as 0 until a pricing map is wired in
+		// models.go. The value flows to metrics; it is not
 		// gateable on.
 		costUSD := 0.0
 		return executor.InvokeResult{
@@ -580,34 +582,34 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 	// pinned in internal/settings/notifier_test.go.
 	settingsNotifier := settings.NewNotifier()
 	settingsReplicaID := settings.LocalReplicaID()
-	var opts []backend.Option
+	var opts []promptsheon.Option
 	if cfg.Auth {
-		opts = append(opts, backend.WithAuth(repos))
+		opts = append(opts, promptsheon.WithAuth(repos))
 		logger.Info("authentication enabled")
 	}
 	if tracer != nil {
-		opts = append(opts, backend.WithTracing(tracer, collector))
+		opts = append(opts, promptsheon.WithTracing(tracer, collector))
 	}
 	if elector != nil {
-		opts = append(opts, backend.WithElector(elector))
+		opts = append(opts, promptsheon.WithElector(elector))
 	}
-	opts = append(opts, backend.WithWebhooks(webhookDispatcher))
+	opts = append(opts, promptsheon.WithWebhooks(webhookDispatcher))
 	if v != nil {
-		opts = append(opts, backend.WithVault(v))
+		opts = append(opts, promptsheon.WithVault(v))
 	}
 	opts = append(opts,
-		backend.WithLogHub(logHub),
-		backend.WithAlertingManager(alertingManager),
-		backend.WithRateLimiter(limiter),
-		backend.WithProviders(providers),
-		backend.WithWorkspaceRollups(rollupAgg),
-		backend.WithInvoker(inv),
-		backend.WithWorkflowEngine(
+		promptsheon.WithLogHub(logHub),
+		promptsheon.WithAlertingManager(alertingManager),
+		promptsheon.WithRateLimiter(limiter),
+		promptsheon.WithProviders(providers),
+		promptsheon.WithWorkspaceRollups(rollupAgg),
+		promptsheon.WithInvoker(inv),
+		promptsheon.WithWorkflowEngine(
 			workflow.NewEngine(workflow.DefaultRegistry()).
 				WithObservability(collector, tracer),
 		),
-		backend.WithOAuth(buildOAuthManager(cfg)),
-		backend.WithSettings(settingsNotifier, settingsReplicaID, cfg.SettingsMode),
+		promptsheon.WithOAuth(buildOAuthManager(cfg)),
+		promptsheon.WithSettings(settingsNotifier, settingsReplicaID, cfg.SettingsMode),
 	)
 
 	// releaseSvc is the application layer for the Release + Approval
@@ -617,7 +619,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 	// PROMPTSHEON_APPROVAL_POLICY=majority for a flat majority count.
 	releaseSvc := buildReleaseService(db, cfg.ApprovalPolicy)
 	if releaseSvc != nil {
-		opts = append(opts, backend.WithReleaseService(releaseSvc))
+		opts = append(opts, promptsheon.WithReleaseService(releaseSvc))
 		// Self-evolve needs a dedicated SelfApprove identity
 		// baked into the release service. We reuse the
 		// "self_evolve" identity as the auto-approver. The
@@ -634,7 +636,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 	// this, the live release path was a hard-coded
 	// "default / default" model and provider.
 	resolver := release.NewResolver(db, newDefaultArtifactLoader())
-	opts = append(opts, backend.WithReleaseResolver(resolver))
+	opts = append(opts, promptsheon.WithReleaseResolver(resolver))
 
 	// Harness engineering surface (datasets, preconditions, evals).
 	// When a ReleaseInvoker is available (i.e. an LLM provider is
@@ -646,7 +648,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 		releaseSvc.WithHarness(precondRunner, db)
 		evalRunner = harness.NewEvalRunner(db, &apiReleaseInvoker{inv: inv, svc: releaseSvc, resolver: resolver})
 		evalRunner.Metrics = collector
-		opts = append(opts, backend.WithHarnessRunner(evalRunner))
+		opts = append(opts, promptsheon.WithHarnessRunner(evalRunner))
 	}
 
 	// LLM-JUDGE-1 wiring: register the LLM-judge scorer with a
@@ -702,7 +704,7 @@ func buildServer(rootCtx context.Context, cfg *backend.Config, db *store.SQLite,
 		wireSelfEvolve(rootCtx, db, releaseSvc, evalRunner, repos, logger, providers, collector, selfEvolveCfg)
 	}
 
-	srv := backend.NewServer(repos, logger, opts...)
+	srv := promptsheon.NewServer(repos, logger, opts...)
 	frontendFS, ferr := fs.Sub(frontendDist, "frontend/dist")
 	if ferr != nil {
 		return nil, nil, nil, nil, v
@@ -772,7 +774,7 @@ func splitByColon(s string) []string {
 // CLIENT_SECRET, REDIRECT_URL) are present; otherwise they are
 // silently skipped. The login/callback routes work for any
 // provider that is registered.
-func buildOAuthManager(cfg *backend.Config) *auth.OAuthManager {
+func buildOAuthManager(cfg *promptsheon.Config) *auth.OAuthManager {
 	mgr := auth.NewOAuthManager()
 	if google := buildGoogleOAuth(cfg); google != nil {
 		mgr.RegisterProvider("google", google)
@@ -783,7 +785,7 @@ func buildOAuthManager(cfg *backend.Config) *auth.OAuthManager {
 	return mgr
 }
 
-func buildGoogleOAuth(cfg *backend.Config) *auth.OAuthProvider {
+func buildGoogleOAuth(cfg *promptsheon.Config) *auth.OAuthProvider {
 	clientID := os.Getenv("PROMPTSHEON_OAUTH_GOOGLE_CLIENT_ID")
 	clientSecret := os.Getenv("PROMPTSHEON_OAUTH_GOOGLE_CLIENT_SECRET")
 	redirectURL := os.Getenv("PROMPTSHEON_OAUTH_GOOGLE_REDIRECT_URL")
@@ -802,7 +804,7 @@ func buildGoogleOAuth(cfg *backend.Config) *auth.OAuthProvider {
 	}
 }
 
-func buildGitHubOAuth(cfg *backend.Config) *auth.OAuthProvider {
+func buildGitHubOAuth(cfg *promptsheon.Config) *auth.OAuthProvider {
 	clientID := os.Getenv("PROMPTSHEON_OAUTH_GITHUB_CLIENT_ID")
 	clientSecret := os.Getenv("PROMPTSHEON_OAUTH_GITHUB_CLIENT_SECRET")
 	redirectURL := os.Getenv("PROMPTSHEON_OAUTH_GITHUB_REDIRECT_URL")
@@ -865,21 +867,21 @@ func (l *defaultArtifactLoader) Load(ctx context.Context, _ capability.ArtifactK
 	return []byte(obj.Data), nil
 }
 
-func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *backend.Config, srv *backend.Server, logger *slog.Logger, limiter *ratelimit.Limiter, tracer trace.Tracer, collector *metrics.Collector, idempStore store.IdempotencyStore, v *vault.Vault) {
-	handler := backend.ChainHTTP(srv,
-		backend.Recovery(logger),
-		backend.MaxBytesReader(10<<20),
+func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *promptsheon.Config, srv *promptsheon.Server, logger *slog.Logger, limiter *ratelimit.Limiter, tracer trace.Tracer, collector *metrics.Collector, idempStore store.IdempotencyStore, v *vault.Vault) {
+	handler := promptsheon.ChainHTTP(srv,
+		promptsheon.Recovery(logger),
+		promptsheon.MaxBytesReader(10<<20),
 		// OPS-ROLLOUT-2: PROMPTSHEON_READ_ONLY=true blocks every
 		// non-GET request with 503. Used during canary /
 		// blue-green rollouts so the new code can run against
 		// live traffic with writes off.
-		backend.ReadOnlyMiddleware,
-		backend.SecurityHeaders,
-		backend.IdempotencyMiddleware(idempStore),
+		promptsheon.ReadOnlyMiddleware,
+		promptsheon.SecurityHeaders,
+		promptsheon.IdempotencyMiddleware(idempStore),
 		limiter.Middleware,
 		metrics.HTTPMiddleware(collector, tracer, logger),
-		backend.Logging(logger),
-		backend.CORS(cfg.CORSOrigins...),
+		promptsheon.Logging(logger),
+		promptsheon.CORS(cfg.CORSOrigins...),
 	)
 
 	writeTimeout := time.Duration(cfg.WriteTimeout) * time.Second
@@ -931,7 +933,7 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *bac
 		// who sets PROMPTSHEON_PPROF_ADDR=0.0.0.0:6060 (or a
 		// typo'd public IP) would otherwise serve sensitive
 		// runtime data to the network with no auth.
-		if !backend.IsLoopbackAddr(pprofAddr) {
+		if !promptsheon.IsLoopbackAddr(pprofAddr) {
 			logger.Warn("pprof disabled: non-loopback address",
 				"addr", pprofAddr,
 				"hint", "set PROMPTSHEON_PPROF_ADDR to 127.0.0.1:6060 or omit")
@@ -958,7 +960,7 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *bac
 	}
 
 	go func() {
-		info := backend.Get()
+		info := buildinfo.Get()
 		logger.Info("starting server",
 			"version", info.Version,
 			"commit", info.Commit,
@@ -985,9 +987,9 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *bac
 	}()
 
 	// P0-1: StartOAuthStateJanitor / StopOAuthStateJanitor are
-// *Server methods now (replacing the package-level functions
-// removed in c2.15). The cleanup goroutine starts here.
-srv.StartOAuthStateJanitor(rootCtx)
+	// *Server methods now (replacing the package-level functions
+	// removed in c2.15). The cleanup goroutine starts here.
+	srv.StartOAuthStateJanitor(rootCtx)
 
 	// OBS-1b (deferred): with OBS-TR-1 there is no SQLite writer to
 	// expose a drop count from. The metric wiring stays so a
@@ -1204,7 +1206,7 @@ Once running, the server exposes:
   POST /api/v1/setup       first-run admin bootstrap; only active
                            when PROMPTSHEON_AUTH=false and the
                            user table is empty
-  /api/v1/...              REST API (see api/openbackend.yaml)
+  /api/v1/...              REST API (see api/openpromptsheon.yaml)
 
 SECURITY: setting PROMPTSHEON_AUTH=false disables all
 authentication. The first caller of /api/v1/setup receives an

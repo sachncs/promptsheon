@@ -2,9 +2,10 @@
 package json
 
 import (
-	"github.com/openai/openai-go/v3/internal/encoding/json/shims"
 	"reflect"
 	"time"
+
+	"github.com/openai/openai-go/v3/internal/encoding/json/shims"
 )
 
 type TimeMarshaler interface {

@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend/store"
+	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 func init() {

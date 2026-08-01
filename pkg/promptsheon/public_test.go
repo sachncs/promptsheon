@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/sachncs/promptsheon/backend/errs"
+	"github.com/sachncs/promptsheon/promptsheon/errs"
 )
 
 // TestRoleConstants locks the role strings the SDK exposes. The
@@ -110,19 +110,19 @@ func TestTypeAliasesExist(t *testing.T) {
 	// were broken (e.g. upstream removed the type), compilation
 	// fails here.
 	var (
-		_ Workspace    = Workspace{}
-		_ Project      = Project{}
-		_ Capability   = Capability{}
-		_ Version      = Version{}
-		_ Release      = Release{}
-		_ Approval     = Approval{}
-		_ Execution    = Execution{}
-		_ Dataset      = Dataset{}
-		_ Precondition = Precondition{}
-		_ EvalRun      = EvalRun{}
-		_ APIKey       = APIKey{}
+		_ Workspace      = Workspace{}
+		_ Project        = Project{}
+		_ Capability     = Capability{}
+		_ Version        = Version{}
+		_ Release        = Release{}
+		_ Approval       = Approval{}
+		_ Execution      = Execution{}
+		_ Dataset        = Dataset{}
+		_ Precondition   = Precondition{}
+		_ EvalRun        = EvalRun{}
+		_ APIKey         = APIKey{}
 		_ HealthResponse = HealthResponse{}
-		_ *APIError     = (*APIError)(nil)
+		_ *APIError      = (*APIError)(nil)
 	)
 }
 

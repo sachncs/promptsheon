@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	promptsheoncas "github.com/sachncs/promptsheon/backend/cas"
+	promptsheoncas "github.com/sachncs/promptsheon/promptsheon/cas"
 )
 
 var cliBinary string

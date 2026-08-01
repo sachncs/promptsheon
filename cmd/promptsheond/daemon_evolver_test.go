@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/sachncs/promptsheon/backend/llm"
-	"github.com/sachncs/promptsheon/backend/selfevolve"
+	"github.com/sachncs/promptsheon/promptsheon/llm"
+	"github.com/sachncs/promptsheon/promptsheon/selfevolve"
 )
 
 func TestParseSelfEvolveEntry_Valid(t *testing.T) {

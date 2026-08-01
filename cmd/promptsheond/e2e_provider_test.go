@@ -11,7 +11,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sachncs/promptsheon/backend/llm"
+	"github.com/sachncs/promptsheon/promptsheon/llm"
 )
 
 func TestE2EProvider_Fence(t *testing.T) {
@@ -37,7 +37,7 @@ func TestE2EProvider_Fence(t *testing.T) {
 
 	// And a round-trip call increments the counter.
 	_, err = got.Complete(context.TODO(), &llm.Request{
-		Model: "test-model",
+		Model:    "test-model",
 		Messages: []llm.Message{{Role: "user", Content: "hi"}},
 	})
 	if err != nil {

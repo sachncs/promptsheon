@@ -460,19 +460,19 @@ func extractDocSummary(doc *ast.CommentGroup) string {
 	// Strip leading // and any leading package/function
 	// heading.
 	full = strings.TrimSpace(full)
-		if i := strings.IndexAny(full, "\n."); i > 0 {
-			// Prefer the first sentence (terminated by '.')
-			// over the first line, since the line might be a
-			// sub-heading like "Foo does X.". Strip embedded
-			// newlines so the YAML stays single-line.
-			end := strings.Index(full, ". ")
-			if end == -1 {
-				return strings.ReplaceAll(full, "\n", " ")
-			}
-			return strings.ReplaceAll(full[:end+1], "\n", " ")
+	if i := strings.IndexAny(full, "\n."); i > 0 {
+		// Prefer the first sentence (terminated by '.')
+		// over the first line, since the line might be a
+		// sub-heading like "Foo does X.". Strip embedded
+		// newlines so the YAML stays single-line.
+		end := strings.Index(full, ". ")
+		if end == -1 {
+			return strings.ReplaceAll(full, "\n", " ")
 		}
-		return strings.ReplaceAll(full, "\n", " ")
+		return strings.ReplaceAll(full[:end+1], "\n", " ")
 	}
+	return strings.ReplaceAll(full, "\n", " ")
+}
 
 // extractSkipSummary reads an explicit
 // `// genopenapi: skip-summary` marker from a handler's doc

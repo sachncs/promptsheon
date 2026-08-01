@@ -1,9 +1,10 @@
 package apiform
 
 import (
-	"github.com/openai/openai-go/v3/packages/param"
 	"mime/multipart"
 	"reflect"
+
+	"github.com/openai/openai-go/v3/packages/param"
 )
 
 func (e *encoder) newRichFieldTypeEncoder(t reflect.Type) encoderFunc {

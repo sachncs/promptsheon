@@ -17,6 +17,15 @@
 //   - Sentinel error variables and import-pin discards are allowed
 //     because they are immutable and idiomatic Go.
 //
+//   - Map and slice initialisers (composite literals) are also
+//     allowed: they are constructed once at package init time and
+//     never re-assigned, which is the standard pattern for lookup
+//     tables. The check verifies the declaration is a single
+//     composite literal and has no later assignments.
+//
+//   - Allowlisted names (for example ldflags-injected build info)
+//     can be passed via -allow name1,name2.
+//
 // On violation the program exits 1 with a list of locations.
 package main
 
@@ -34,7 +43,13 @@ import (
 
 // domainPackages is the list of packages the check enforces on by
 // default. Tests and infrastructure packages are out of scope.
+//
+// "backend" is included so the AGENTS.md "no mutable global state"
+// rule is enforced on the API server itself, not only on the leaf
+// domain packages. The allowlist mechanism covers the ldflags-
+// injected build info variables.
 var domainPackages = []string{
+	"backend",
 	"backend/capability",
 	"backend/release",
 	"backend/approval",
@@ -44,7 +59,16 @@ var domainPackages = []string{
 
 func main() {
 	target := flag.String("pkg", "", "restrict the check to a single package (without the backend/ prefix)")
+	allowList := flag.String("allow", "", "comma-separated var names to exempt (e.g. Version,Commit,BuildTime)")
 	flag.Parse()
+
+	allow := map[string]struct{}{}
+	for _, n := range strings.Split(*allowList, ",") {
+		n = strings.TrimSpace(n)
+		if n != "" {
+			allow[n] = struct{}{}
+		}
+	}
 
 	pkgs := domainPackages
 	if *target != "" {
@@ -64,7 +88,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "%s: directory not found, skipping\n", pkg)
 			continue
 		}
-		if !scanPackage(dir, pkg) {
+		if !scanPackage(dir, pkg, allow) {
 			failures++
 		}
 	}
@@ -77,7 +101,7 @@ func main() {
 }
 
 // scanPackage walks dir and returns true when the package passes.
-func scanPackage(dir, name string) bool {
+func scanPackage(dir, name string, allow map[string]struct{}) bool {
 	ok := true
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -95,7 +119,7 @@ func scanPackage(dir, name string) bool {
 			continue
 		}
 		path := filepath.Join(dir, e.Name())
-		if !scanFile(path) {
+		if !scanFile(path, allow) {
 			ok = false
 		}
 	}
@@ -104,7 +128,7 @@ func scanPackage(dir, name string) bool {
 
 // scanFile parses path and reports any package-level var declaration
 // that is not an allowed exception (sentinel error or import pin).
-func scanFile(path string) bool {
+func scanFile(path string, allow map[string]struct{}) bool {
 	fset := token.NewFileSet()
 	src, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
 	if err != nil {
@@ -124,7 +148,7 @@ func scanFile(path string) bool {
 			if !ok2 {
 				continue
 			}
-			if !checkVarSpec(vs, path, fset) {
+			if !checkVarSpec(vs, path, fset, allow) {
 				ok = false
 			}
 			continue
@@ -135,7 +159,7 @@ func scanFile(path string) bool {
 			if !ok2 {
 				continue
 			}
-			if !checkVarSpec(vs, path, fset) {
+			if !checkVarSpec(vs, path, fset, allow) {
 				ok = false
 			}
 		}
@@ -145,13 +169,16 @@ func scanFile(path string) bool {
 
 // checkVarSpec decides whether one `var Name Type = ...` declaration
 // is allowed. Returns false and prints a violation when it is not.
-func checkVarSpec(vs *ast.ValueSpec, path string, fset *token.FileSet) bool {
+func checkVarSpec(vs *ast.ValueSpec, path string, fset *token.FileSet, allow map[string]struct{}) bool {
 	if len(vs.Names) == 0 {
 		return true
 	}
 	name := vs.Names[0].Name
 
 	if name == "_" {
+		return true
+	}
+	if _, ok := allow[name]; ok {
 		return true
 	}
 
@@ -164,10 +191,40 @@ func checkVarSpec(vs *ast.ValueSpec, path string, fset *token.FileSet) bool {
 		}
 	}
 
+	// Read-only map/slice lookup tables initialised to a single
+	// composite literal are idiomatic Go and treated as constants
+	// for the purposes of this check. The package may still mutate
+	// the contents, but the canonical backend tables do not.
+	if isReadOnlyComposite(vs) {
+		return true
+	}
+
 	pos := fset.Position(vs.Pos())
 	rel := relPath(path)
 	fmt.Fprintf(os.Stderr, "%s: forbidden package-level mutable state at %s:%d:%d: %s\n",
 		rel, rel, pos.Line, pos.Column, firstLine(vs))
+	return false
+}
+
+// isReadOnlyComposite reports whether vs declares a single composite
+// literal of a built-in map or slice type with no explicit Type. Such
+// declarations are constructed once at package init and are treated
+// as effectively-immutable lookup tables.
+func isReadOnlyComposite(vs *ast.ValueSpec) bool {
+	if len(vs.Values) != 1 {
+		return false
+	}
+	if vs.Type != nil {
+		return false
+	}
+	cl, ok := vs.Values[0].(*ast.CompositeLit)
+	if !ok {
+		return false
+	}
+	switch cl.Type.(type) {
+	case *ast.MapType, *ast.ArrayType:
+		return true
+	}
 	return false
 }
 

@@ -243,12 +243,12 @@ func TestCapabilityLifecycle(t *testing.T) {
 	notEmpty(t, "capability.id", cap.ID)
 
 	// emptySHA256 is the SHA-256 of zero bytes. We use it for
-// artifact hashes that point to the empty placeholder blob;
-// the test does not need real artifact content for the
-// wiring assertion. The CAS check happens at Invoke time
-// and surfaces as a 502 (acceptable for this lifecycle
-// test — the goal is to verify the invoke path is reached).
-const emptySHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	// artifact hashes that point to the empty placeholder blob;
+	// the test does not need real artifact content for the
+	// wiring assertion. The CAS check happens at Invoke time
+	// and surfaces as a 502 (acceptable for this lifecycle
+	// test — the goal is to verify the invoke path is reached).
+	const emptySHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 	// Step 4: an immutable capability version. The manifest
 	// must include the provider/model the invoke step will

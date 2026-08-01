@@ -24,33 +24,8 @@ build-server: web-build
 
 # Build the frontend dashboard. Self-installs node_modules on
 # first run so a fresh checkout of frontend/src/ is sufficient.
-web-build:
-	@command -v node >/dev/null 2>&1 || { echo "node not installed; install Node 20+ from https://nodejs.org"; exit 1; }
-	@mkdir -p frontend/node_modules
-	@test -d frontend/node_modules/vite || (cd frontend && npm install --no-audit --no-fund)
-	cd frontend && npm run build
-	@mkdir -p cmd/promptsheond/frontend/dist
-	@rm -rf cmd/promptsheond/frontend/dist
-	cp -r frontend/dist cmd/promptsheond/frontend/dist
-
-# Build the CLI client
-build-cli:
-	@mkdir -p $(BIN)
-	go build -o $(BIN)/promptsheon ./cmd/promptsheon
-
-# Build the healthcheck probe
-build-healthcheck:
-	@mkdir -p $(BIN)
-	go build -o $(BIN)/promptsheon-healthcheck ./cmd/promptsheon-healthcheck
-
-# Build the public SDK facade (pkg/promptsheon/). The fence
-# //go:build promptsheon means the source compiles only when
-# GOFLAGS=-tags=promptsheon is set; `go build ./...` (the
-# default for tests) skips it. Production consumers import the
-# SDK via 'github.com/sachncs/promptsheon/sdk'.
-build-public:
-	GOFLAGS=-tags=promptsheon go build -o $(BIN)/promptsheon-sdk ./pkg/promptsheon
-
+# (Duplicate removed: kept the canonical recipe in the Dashboard
+# section below so the help text and the recipe stay together.)
 # Build the e2e build of the daemon (includes the in-memory
 # LLM stub). Used by tests/e2e and the chaos test only.
 build-e2e:
@@ -97,9 +72,11 @@ lint:
 # Lint domain packages: fail on any package-level mutable state
 # (Charter Principle 5). Runs as part of CI. The check is a small
 # AST walker at scripts/check-no-package-state.go; it allows error
-# sentinels and import-pin discards.
+# sentinels, import-pin discards, and read-only composite literal
+# lookup tables. Version/Commit/BuildTime are allowlisted because
+# they are injected by -ldflags at release time.
 lint-domain:
-	go run ./scripts/check-no-package-state.go
+	go run ./scripts/check-no-package-state.go -allow Version,Commit,BuildTime
 
 # Lint domain-purity: fail if any domain package imports backend/llm,
 # backend/store, or cmd. Domain packages depend only
@@ -197,9 +174,6 @@ sdk:
 # without anyone noticing (PR-3 c3.13 introduced the matching
 # codegen scripts).
 sdk-check: sdk
-	@git diff --exit-code sdk/python/src/promptsheon/_generated/openapi.yaml sdk/typescript/src/_generated/openapi.yaml || (echo "SDK artifacts out of date. Run 'make sdk' and commit."; exit 1)
-
-sdk-check: sdk
 	@git diff --exit-code sdk/ || (echo "SDK is out of date. Run 'make sdk' and commit the result."; exit 1)
 
 # Update dependencies
@@ -219,13 +193,22 @@ helm-docs:
 	helm-docs --sort-values-order=file -t deploy/helm/promptsheon/README.md deploy/helm/promptsheon
 
 # DOC-CI-3 / DOC-FRESH-1: deterministic doc-freshness check.
-# Currently a no-op — the previous python3 implementation
-# lived at scripts/docs-check.py and was removed when the
-# docs/ directory was reorganised into topic subdirectories.
-# Re-add a fresh check (link freshness + stale source-path
-# refs) once the new docs/ layout stabilises.
+# 1. The architecture index must exist and reference the
+#    canonical topic subdirectories.
+# 2. Every markdown link inside docs/architecture/README.md
+#    must point at a file that exists; broken references
+#    fail the build.
+# 3. Every code fence declaring `path: <file>` must point
+#    at a real file in the repository.
+#
+# A no-op docs-check was removed because it allowed stale
+# references to accumulate; the current implementation is a
+# self-contained POSIX shell + awk pass that has no Python or
+# Node dependencies.
 docs-check:
-	@echo "docs-check: no-op; see docs/architecture/README.md index"
+	@test -f docs/architecture/README.md || { echo "docs-check: docs/architecture/README.md is missing"; exit 1; }
+	@awk -f scripts/docs-freshness.awk docs/architecture/README.md
+	@echo "docs-check: ok"
 
 # PERF-BENCH-1: curated Go benchmark target. The list in
 # scripts/benchmarks.txt is the canonical eight trustworthy
@@ -309,6 +292,9 @@ web-build:
 	@mkdir -p frontend/node_modules
 	@test -d frontend/node_modules/vite || (cd frontend && npm install --no-audit --no-fund)
 	cd frontend && npm run build
+	@mkdir -p cmd/promptsheond/frontend/dist
+	@rm -rf cmd/promptsheond/frontend/dist
+	cp -r frontend/dist cmd/promptsheond/frontend/dist
 
 web-dev:
 	cd frontend && npm run dev

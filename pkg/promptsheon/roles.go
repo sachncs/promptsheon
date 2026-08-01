@@ -2,7 +2,7 @@
 
 package promptsheon
 
-import "github.com/sachncs/promptsheon/backend/auth"
+import "github.com/sachncs/promptsheon/promptsheon/auth"
 
 // Re-exported role + permission constants. Consumers reference
 // these when calling role-checking helpers in the SDK's auth
@@ -19,26 +19,26 @@ const (
 type Permission = auth.Permission
 
 const (
-	PermPromptCreate = auth.PermPromptCreate
-	PermPromptRead   = auth.PermPromptRead
-	PermPromptUpdate = auth.PermPromptUpdate
-	PermPromptDelete = auth.PermPromptDelete
-	PermAgentCreate  = auth.PermAgentCreate
-	PermAgentRead    = auth.PermAgentRead
-	PermAgentUpdate  = auth.PermAgentUpdate
-	PermAgentDelete  = auth.PermAgentDelete
+	PermPromptCreate  = auth.PermPromptCreate
+	PermPromptRead    = auth.PermPromptRead
+	PermPromptUpdate  = auth.PermPromptUpdate
+	PermPromptDelete  = auth.PermPromptDelete
+	PermAgentCreate   = auth.PermAgentCreate
+	PermAgentRead     = auth.PermAgentRead
+	PermAgentUpdate   = auth.PermAgentUpdate
+	PermAgentDelete   = auth.PermAgentDelete
 	PermDatasetCreate = auth.PermDatasetCreate
 	PermDatasetRead   = auth.PermDatasetRead
-	PermEvalRun        = auth.PermEvalRun
-	PermEvalRead       = auth.PermEvalRead
-	PermReviewCreate   = auth.PermReviewCreate
-	PermReviewApprove  = auth.PermReviewApprove
-	PermAuditRead       = auth.PermAuditRead
-	PermAPIKeyManage    = auth.PermAPIKeyManage
-	PermWebhookAdmin    = auth.PermWebhookAdmin
-	PermUserManage      = auth.PermUserManage
-	PermSettingsRead    = auth.PermSettingsRead
-	PermSettingsWrite   = auth.PermSettingsWrite
+	PermEvalRun       = auth.PermEvalRun
+	PermEvalRead      = auth.PermEvalRead
+	PermReviewCreate  = auth.PermReviewCreate
+	PermReviewApprove = auth.PermReviewApprove
+	PermAuditRead     = auth.PermAuditRead
+	PermAPIKeyManage  = auth.PermAPIKeyManage
+	PermWebhookAdmin  = auth.PermWebhookAdmin
+	PermUserManage    = auth.PermUserManage
+	PermSettingsRead  = auth.PermSettingsRead
+	PermSettingsWrite = auth.PermSettingsWrite
 )
 
 // DefaultAdminEmail is the email of the bootstrap admin user

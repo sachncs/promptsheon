@@ -1,0 +1,112 @@
+// Package scheduler runs the Schedule tick loop.
+//
+// One Scheduler instance ticks every TickInterval; on each tick it
+// reads due Schedules (NextFireAt <= now) from the store and emits
+// execution.started events for each. The handler that turns events
+// into actual Executions lives in internal/executor; the Scheduler
+// publishes a *replay.Record shape that the Execution path picks up.
+//
+// The Scheduler lives in cmd/promptsheond; production wires it into
+// the daemon at boot via WithScheduler().
+package scheduler
+
+import (
+	"context"
+	"time"
+
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/eventbus"
+	"github.com/sachncs/promptsheon/promptsheon/schedule"
+)
+
+// Scheduler holds the tick loop.
+type Scheduler struct {
+	schedules schedule.Repository
+	publisher eventbus.Publisher
+	tick      time.Duration
+}
+
+// New constructs a Scheduler. tick must be > 0; 5 seconds is the
+// sensible default for a control plane that schedules executions
+// down to one-minute cron resolution.
+func New(s schedule.Repository, p eventbus.Publisher, tick time.Duration) *Scheduler {
+	if tick <= 0 {
+		tick = 5 * time.Second
+	}
+	return &Scheduler{schedules: s, publisher: p, tick: tick}
+}
+
+// Start launches the tick goroutine and returns. Cancelling ctx
+// stops the loop cleanly. Start blocks until ctx is cancelled; it is
+// meant to run as a daemon-managed goroutine.
+func (s *Scheduler) Start(ctx context.Context) error {
+	t := time.NewTicker(s.tick)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case now := <-t.C:
+			s.TickOnce(ctx, now)
+		}
+	}
+}
+
+// TickOnce reads due Schedules and publishes an event per fired
+// schedule. Errors are logged by the caller; we never abort the
+// loop on a single bad schedule. TickOnce is exported so tests can
+// drive a single iteration without spinning the ticker.
+func (s *Scheduler) TickOnce(ctx context.Context, now time.Time) {
+	due, err := s.schedules.ListDueSchedules(ctx, now, 64)
+	if err != nil {
+		return
+	}
+	// PERF-SCH-1: collect all fired schedules and bulk-update
+	// them in a single transaction. The per-row UPDATE loop
+	// cost N round-trips; the bulk path is one.
+	published := make([]*schedule.Schedule, 0, len(due))
+	fired := make([]*schedule.Schedule, 0, len(due))
+	for i := range due {
+		sc := due[i]
+		if !sc.Enabled {
+			continue
+		}
+		u := sc.MarkFired(now)
+		fired = append(fired, &u)
+	}
+	if bulk, ok := s.schedules.(interface {
+		BulkUpdateSchedules(ctx context.Context, scs []*schedule.Schedule) error
+	}); ok {
+		if err := bulk.BulkUpdateSchedules(ctx, fired); err == nil {
+			published = fired
+		} else {
+			// Fall back to per-row on bulk failure. The per-row
+			// path tracks which rows actually persisted so the
+			// publish loop only fires for successfully updated
+			// schedules.
+			for _, f := range fired {
+				if err := s.schedules.UpdateSchedule(ctx, f); err == nil {
+					published = append(published, f)
+				}
+			}
+		}
+	} else {
+		for i := range fired {
+			if err := s.schedules.UpdateSchedule(ctx, fired[i]); err == nil {
+				published = append(published, fired[i])
+			}
+		}
+	}
+	for _, sc := range published {
+		_ = s.publisher.Publish(capability.Event{
+			Type:          capability.EventType("schedule.fired"),
+			AggregateID:   sc.ID,
+			AggregateType: "schedule",
+			Data: map[string]any{
+				"workspace_id": sc.WorkspaceID,
+				"release_id":   sc.ReleaseID,
+				"fired_at":     now,
+			},
+		})
+	}
+}

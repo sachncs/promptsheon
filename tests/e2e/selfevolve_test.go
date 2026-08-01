@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend/approval"
-	"github.com/sachncs/promptsheon/backend/capability"
-	"github.com/sachncs/promptsheon/backend/harness"
-	"github.com/sachncs/promptsheon/backend/models"
-	"github.com/sachncs/promptsheon/backend/release"
-	"github.com/sachncs/promptsheon/backend/selfevolve"
-	"github.com/sachncs/promptsheon/backend/store"
+	"github.com/sachncs/promptsheon/promptsheon/approval"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
+	"github.com/sachncs/promptsheon/promptsheon/models"
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/selfevolve"
+	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 // casWritePrompt is a thin wrapper that chdirs the test

@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/sachncs/promptsheon/backend"
-	"github.com/sachncs/promptsheon/backend/capability"
-	"github.com/sachncs/promptsheon/backend/executor"
-	"github.com/sachncs/promptsheon/backend/invoke"
-	"github.com/sachncs/promptsheon/backend/release"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/executor"
+	"github.com/sachncs/promptsheon/promptsheon/invoke"
+	"github.com/sachncs/promptsheon/promptsheon/release"
 )
 
 // apiReleaseInvoker adapts the daemon's invoke.Invoker into the
@@ -45,7 +44,7 @@ func (r *apiReleaseInvoker) Invoke(ctx context.Context, releaseID string, inputs
 	if err != nil {
 		return nil, err
 	}
-	mHash, err := backend.ManifestHash(rel.Manifest)
+	mHash, err := capability.ComputeManifestHash(rel.Manifest)
 	if err != nil {
 		return nil, fmt.Errorf("release %s: manifest hash: %w", releaseID, err)
 	}

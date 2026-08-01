@@ -7,12 +7,13 @@ package apijson
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/openai/openai-go/v3/packages/param"
 	"reflect"
 	"strconv"
 	"sync"
 	"time"
 	"unsafe"
+
+	"github.com/openai/openai-go/v3/packages/param"
 
 	"github.com/tidwall/gjson"
 )

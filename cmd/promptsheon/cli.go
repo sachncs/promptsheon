@@ -19,8 +19,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/sachncs/promptsheon/backend"
-	"github.com/sachncs/promptsheon/backend/llm"
+	"github.com/sachncs/promptsheon/promptsheon/llm"
+	"github.com/sachncs/promptsheon/buildinfo"
 )
 
 // Shared subcommand names. The CAS file and the API CRUD files each
@@ -53,7 +53,7 @@ func handleEarlyExit() bool {
 	if len(os.Args) >= 2 {
 		switch os.Args[1] {
 		case "--version", "-version", "-V":
-			info := backend.Get()
+			info := buildinfo.Get()
 			fmt.Printf("promptsheon %s (commit %s, built %s, %s/%s)\n",
 				info.Version, info.Commit, info.BuildTime, info.OS, info.Arch)
 			return true

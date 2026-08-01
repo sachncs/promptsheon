@@ -14,7 +14,6 @@ import (
 	"encoding"
 	"encoding/base64"
 	"fmt"
-	"github.com/anthropics/anthropic-sdk-go/internal/encoding/json/shims"
 	"reflect"
 	"strconv"
 	"strings"
@@ -22,6 +21,8 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 	_ "unsafe" // for linkname
+
+	"github.com/anthropics/anthropic-sdk-go/internal/encoding/json/shims"
 )
 
 // Unmarshal parses the JSON-encoded data and stores the result
