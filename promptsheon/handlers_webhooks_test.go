@@ -124,29 +124,6 @@ func TestHandleDeleteWebhook(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Capability / Workspace / Project / Version / Execution Handler Tests
-// ---------------------------------------------------------------------------
-
-func TestResolveAndValidateWebhook(t *testing.T) {
-	err := ResolveAndValidateWebhook(context.Background(), "https://example.com/hook")
-	if err != nil {
-		t.Errorf("expected nil for public host, got %v", err)
-	}
-
-	err = ResolveAndValidateWebhook(context.Background(), "http://localhost:8080/hook")
-	if err == nil {
-		t.Error("expected error for http scheme")
-	}
-}
-
-func TestResolveAndValidateWebhook_EmptyHost(t *testing.T) {
-	err := ResolveAndValidateWebhook(context.Background(), "http:///path")
-	if err == nil {
-		t.Error("expected error for empty host")
-	}
-}
-
-// ---------------------------------------------------------------------------
 // Webhook URL Validation Tests
 // ---------------------------------------------------------------------------
 

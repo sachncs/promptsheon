@@ -4,6 +4,7 @@ import (
 	"github.com/sachncs/promptsheon/promptsheon/store"
 	"github.com/sachncs/promptsheon/promptsheon/release"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/approval"
 	"github.com/sachncs/promptsheon/promptsheon/llm"
 	"github.com/sachncs/promptsheon/promptsheon/vault"
 	"github.com/sachncs/promptsheon/promptsheon/models"
@@ -36,7 +37,7 @@ type mockRepo struct {
 	versionsByCap map[string][]*capability.Version
 	releases      map[string]*release.Release
 	releasesByCap map[string][]*release.Release
-	approvals     map[string]*promptsheon.Approval
+	approvals     map[string]*approval.Approval
 	datasets      map[string]*harness.Dataset
 	datasetCases  map[string][]harness.DatasetCase
 	preconditions map[string]*harness.Precondition
@@ -80,7 +81,7 @@ func newMockRepo() *mockRepo {
 		versionsByCap: make(map[string][]*capability.Version),
 		releases:      make(map[string]*release.Release),
 		releasesByCap: make(map[string][]*release.Release),
-		approvals:     make(map[string]*promptsheon.Approval),
+		approvals:     make(map[string]*approval.Approval),
 		datasets:      make(map[string]*harness.Dataset),
 		datasetCases:  make(map[string][]harness.DatasetCase),
 		contracts:     make(map[string]*capability.CapabilityContract),
