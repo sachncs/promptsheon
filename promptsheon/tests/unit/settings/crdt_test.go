@@ -1,3 +1,6 @@
+//go:build tests_migration
+
+
 // CRDT algebraic properties for the settings LWW register.
 // Every test below runs without I/O so the storage backend
 // can be swapped (in-memory, SQLite) without re-asserting

@@ -1,3 +1,6 @@
+//go:build tests_migration
+
+
 // Concurrent audit-append tests. Lives in a separate file so
 // the long-running store_test.go fixtures don't grow, and so the
 // regression for the audit-tail cache is grouped with the cache

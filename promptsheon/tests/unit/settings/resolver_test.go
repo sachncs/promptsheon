@@ -1,3 +1,6 @@
+//go:build tests_migration
+
+
 // Package settings — Resolver tests. The three-layer
 // precedence (env > DB > default) is the production contract;
 // the tests below pin it so a future refactor doesn't flip

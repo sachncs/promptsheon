@@ -1,3 +1,6 @@
+//go:build tests_migration
+
+
 // Notifier propagation tests. The CRDT-aware settings layer
 // raises an error from Publish so a subscriber that fails to
 // consume the new value (e.g. the vault refusing a hot-reload

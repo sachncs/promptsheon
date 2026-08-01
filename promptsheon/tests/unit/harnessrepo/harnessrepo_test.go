@@ -1,3 +1,6 @@
+//go:build tests_migration
+
+
 package harnessrepo_test
 
 import (

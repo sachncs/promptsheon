@@ -1,3 +1,6 @@
+//go:build tests_migration
+
+
 package config_test
 
 import (

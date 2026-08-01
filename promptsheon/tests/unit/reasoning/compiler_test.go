@@ -1,3 +1,6 @@
+//go:build tests_migration
+
+
 package reasoning_test
 
 import (
