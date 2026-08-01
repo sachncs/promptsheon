@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/approval"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 	. "github.com/sachncs/promptsheon/promptsheon/release"
 
@@ -53,14 +54,14 @@ func TestNewRejectsBadInput(t *testing.T) {
 func TestApproveAdvancesPending(t *testing.T) {
 	t.Parallel()
 	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
-	a, err := promptsheon.Approval{ReleaseID: r.ID}.Record(
-		promptsheon.Vote{Identity: "bob", Decision: promptsheon.Approve, Timestamp: time.Now()},
+	a, err := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
 	)
 	if err != nil {
 		t.Fatalf("record: %v", err)
 	}
-	a, _ = a.Record(promptsheon.Vote{Identity: "carol", Decision: promptsheon.Approve, Timestamp: time.Now()})
-	got, err := r.ApproveWith(a, promptsheon.MajorityPolicy{Required: 2})
+	a, _ = a.Record(approval.Vote{Identity: "carol", Decision: approval.Approve, Timestamp: time.Now()})
+	got, err := r.ApproveWith(a, approval.MajorityPolicy{Required: 2})
 	if err != nil {
 		t.Fatalf("approve: %v", err)
 	}
@@ -75,11 +76,11 @@ func TestApproveAdvancesPending(t *testing.T) {
 func TestApproveRejectsWrongState(t *testing.T) {
 	t.Parallel()
 	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
-	a, _ := promptsheon.Approval{ReleaseID: r.ID}.Record(
-		promptsheon.Vote{Identity: "bob", Decision: promptsheon.Approve, Timestamp: time.Now()},
+	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
 	)
-	r, _ = r.ApproveWith(a, promptsheon.MajorityPolicy{Required: 1})
-	if _, err := r.ApproveWith(a, promptsheon.MajorityPolicy{Required: 1}); !errors.Is(err, errs.ErrReleaseNotPending) {
+	r, _ = r.ApproveWith(a, approval.MajorityPolicy{Required: 1})
+	if _, err := r.ApproveWith(a, approval.MajorityPolicy{Required: 1}); !errors.Is(err, errs.ErrReleaseNotPending) {
 		t.Fatalf("expected errs.ErrReleaseNotPending, got %v", err)
 	}
 }
@@ -87,10 +88,10 @@ func TestApproveRejectsWrongState(t *testing.T) {
 func TestApproveRejectsEmptyApprovers(t *testing.T) {
 	t.Parallel()
 	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
-	empty, _ := promptsheon.Approval{ReleaseID: r.ID}.Record(
-		promptsheon.Vote{Identity: "", Decision: promptsheon.Approve, Timestamp: time.Now()},
+	empty, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "", Decision: approval.Approve, Timestamp: time.Now()},
 	)
-	if _, err := r.ApproveWith(empty, promptsheon.MajorityPolicy{Required: 1}); err == nil {
+	if _, err := r.ApproveWith(empty, approval.MajorityPolicy{Required: 1}); err == nil {
 		t.Fatalf("expected error for empty approver identity")
 	}
 }
@@ -101,10 +102,10 @@ func TestActivateRequiresApproved(t *testing.T) {
 	if _, err := r.Activate(time.Now()); err == nil {
 		t.Fatalf("expected error activating Pending release")
 	}
-	a, _ := promptsheon.Approval{ReleaseID: r.ID}.Record(
-		promptsheon.Vote{Identity: "bob", Decision: promptsheon.Approve, Timestamp: time.Now()},
+	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
 	)
-	r, _ = r.ApproveWith(a, promptsheon.MajorityPolicy{Required: 1})
+	r, _ = r.ApproveWith(a, approval.MajorityPolicy{Required: 1})
 	got, err := r.Activate(time.Now())
 	if err != nil {
 		t.Fatalf("activate: %v", err)
@@ -125,10 +126,10 @@ func TestSupersedeRequiresActive(t *testing.T) {
 func TestRollbackFromActiveOrApproved(t *testing.T) {
 	t.Parallel()
 	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
-	a, _ := promptsheon.Approval{ReleaseID: r.ID}.Record(
-		promptsheon.Vote{Identity: "bob", Decision: promptsheon.Approve, Timestamp: time.Now()},
+	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
 	)
-	r, _ = r.ApproveWith(a, promptsheon.MajorityPolicy{Required: 1})
+	r, _ = r.ApproveWith(a, approval.MajorityPolicy{Required: 1})
 	got, err := r.Rollback(time.Now())
 	if err != nil {
 		t.Fatalf("rollback from Approved: %v", err)
@@ -141,20 +142,20 @@ func TestRollbackFromActiveOrApproved(t *testing.T) {
 func TestApproveWithEnforcesQuorum(t *testing.T) {
 	t.Parallel()
 	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
-	a, err := promptsheon.Approval{ReleaseID: r.ID}.Record(
-		promptsheon.Vote{Identity: "bob", Decision: promptsheon.Approve, Timestamp: time.Now()},
+	a, err := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
 	)
 	if err != nil {
 		t.Fatalf("record: %v", err)
 	}
 	// Required=2, only one Approve vote: quorum not yet satisfied.
-	_, err = r.ApproveWith(a, promptsheon.MajorityPolicy{Required: 2})
+	_, err = r.ApproveWith(a, approval.MajorityPolicy{Required: 2})
 	if err == nil {
 		t.Fatalf("expected ErrQuorumNotSatisfied, got nil")
 	}
 	// Second Approve reaches quorum.
-	a, _ = a.Record(promptsheon.Vote{Identity: "carol", Decision: promptsheon.Approve, Timestamp: time.Now()})
-	out, err := r.ApproveWith(a, promptsheon.MajorityPolicy{Required: 2})
+	a, _ = a.Record(approval.Vote{Identity: "carol", Decision: approval.Approve, Timestamp: time.Now()})
+	out, err := r.ApproveWith(a, approval.MajorityPolicy{Required: 2})
 	if err != nil {
 		t.Fatalf("approve: %v", err)
 	}
@@ -172,10 +173,10 @@ func TestApproveWithRejectsCreatorVote(t *testing.T) {
 	// on the release layer. MajorityPolicy intentionally allows the
 	// creator's own vote.
 	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
-	a, _ := promptsheon.Approval{ReleaseID: r.ID}.Record(
-		promptsheon.Vote{Identity: "alice", Decision: promptsheon.Approve, Timestamp: time.Now()},
+	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "alice", Decision: approval.Approve, Timestamp: time.Now()},
 	)
-	_, err := r.ApproveWith(a, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
+	_, err := r.ApproveWith(a, approval.MakerCheckerPolicy{RequiredApprovers: 1})
 	if err == nil {
 		t.Fatalf("expected maker-checker to reject creator's own vote")
 	}
@@ -184,10 +185,10 @@ func TestApproveWithRejectsCreatorVote(t *testing.T) {
 func TestApproveWithStopsOnReject(t *testing.T) {
 	t.Parallel()
 	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
-	a, _ := promptsheon.Approval{ReleaseID: r.ID}.Record(
-		promptsheon.Vote{Identity: "bob", Decision: promptsheon.Reject, Timestamp: time.Now()},
+	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "bob", Decision: promptsheon.Reject, Timestamp: time.Now()},
 	)
-	_, err := r.ApproveWith(a, promptsheon.MajorityPolicy{Required: 1})
+	_, err := r.ApproveWith(a, approval.MajorityPolicy{Required: 1})
 	if err == nil {
 		t.Fatalf("expected rejection error")
 	}
@@ -196,10 +197,10 @@ func TestApproveWithStopsOnReject(t *testing.T) {
 func TestApproveWithMakerCheckerPolicy(t *testing.T) {
 	t.Parallel()
 	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
-	a, _ := promptsheon.Approval{ReleaseID: r.ID}.Record(
-		promptsheon.Vote{Identity: "bob", Decision: promptsheon.Approve, Timestamp: time.Now()},
+	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
 	)
-	out, err := r.ApproveWith(a, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1})
+	out, err := r.ApproveWith(a, approval.MakerCheckerPolicy{RequiredApprovers: 1})
 	if err != nil {
 		t.Fatalf("approve: %v", err)
 	}
@@ -213,10 +214,10 @@ func TestMakerCheckerPolicySelfEnforcesCreator(t *testing.T) {
 	r, _ := New("cap", 1, goodManifest(), EnvProd, "alice")
 	// alice (the creator) votes Approve. The policy must reject
 	// even when the side-check has not been called.
-	a, _ := promptsheon.Approval{ReleaseID: r.ID}.Record(
-		promptsheon.Vote{Identity: "alice", Decision: promptsheon.Approve, Timestamp: time.Now()},
+	a, _ := approval.Approval{ReleaseID: r.ID}.Record(
+		approval.Vote{Identity: "alice", Decision: approval.Approve, Timestamp: time.Now()},
 	)
-	_, err := r.ApproveWith(a, promptsheon.MakerCheckerPolicy{RequiredApprovers: 1, Creator: "alice"})
+	_, err := r.ApproveWith(a, approval.MakerCheckerPolicy{RequiredApprovers: 1, Creator: "alice"})
 	if !errors.Is(err, errs.ErrSelfVote) {
 		t.Fatalf("expected ErrCreatorVoted, got %v", err)
 	}
@@ -225,8 +226,8 @@ func TestMakerCheckerPolicySelfEnforcesCreator(t *testing.T) {
 func TestMakerCheckerPolicyEmptyCreatorRejected(t *testing.T) {
 	// Direct policy test: the side-check is not on the call path,
 	// so the policy itself must refuse to evaluate without a creator.
-	_, _, err := promptsheon.MakerCheckerPolicy{RequiredApprovers: 1}.Evaluate([]promptsheon.Vote{
-		{Identity: "bob", Decision: promptsheon.Approve, Timestamp: time.Now()},
+	_, _, err := approval.MakerCheckerPolicy{RequiredApprovers: 1}.Evaluate([]approval.Vote{
+		{Identity: "bob", Decision: approval.Approve, Timestamp: time.Now()},
 	})
 	if err == nil {
 		t.Fatal("expected error when Creator is empty")
