@@ -63,7 +63,7 @@ func notFound(msg string) error {
 }
 
 func unauthorized() error {
-	return &HTTPError{Status: http.StatusUnauthorized, Message: "unauthorized"}
+	return &HTTPError{Status: http.StatusUnauthorized, Message: "authentication required"}
 }
 
 func forbidden(msg string) error {
@@ -99,6 +99,12 @@ func writeError(w http.ResponseWriter, err error) {
 	var httpErr *HTTPError
 	if errors.As(err, &httpErr) {
 		status = httpErr.Status
+	} else if errors.Is(err, ErrNotFound) {
+		status = http.StatusNotFound
+	} else if errors.Is(err, ErrBadRequest) {
+		status = http.StatusBadRequest
+	} else if errors.Is(err, ErrConflict) {
+		status = http.StatusConflict
 	}
 	body := map[string]any{"error": err.Error()}
 	if httpErr != nil && httpErr.Details != nil {
