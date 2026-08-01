@@ -112,7 +112,7 @@ func handleCmdError(err error) {
 	if errors.Is(err, errUsage) {
 		slog.Error("operation failed", "err", err)
 		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, "Run 'promptsheon help' for usage.")
+		slog.Info("Run 'promptsheon help' for usage.")
 		os.Exit(2)
 	}
 	fmt.Fprintf(os.Stderr, "error: %v\n", err)
