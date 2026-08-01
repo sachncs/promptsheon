@@ -1,26 +1,28 @@
-// Package tests is a non-_test.go test container.
+// Package tests — test bodies for the single-runner architecture.
 //
-// The conventional Go test runner picks up files matching *_test.go
-// in any package directory. This package uses files without the
-// _test.go suffix so the user can keep all test bodies in one
-// tree (per the compliance plan, Part F) without losing the
-// option to run them via a single entry point.
+// Each test function is added to the AllTests slice; the
+// promptsheon package's single _test.go entry point (TestPromptsheon)
+// dispatches into tests.RunAll which iterates the registry.
 //
-// The promptsheon package contains a single real _test.go file
-// (promptsheon/promptsheon_test.go) that calls tests.RunAll to
-// dispatch into the Run* functions defined here.
+// Convention:
+//   - Function name: Run<Subject> (exported; the test runner calls them)
+//   - File name:    <subject>.go (no _test.go suffix; the test runner
+//                    picks them up by name, not by file discovery)
+//   - Package:      tests
+//
+// To add a new test: drop a `func RunXxx(t *testing.T)` into
+// tests/<file>.go and append it to AllTests below.
 package tests
 
 import "testing"
 
-// AllTests is the registry of every test function in this
-// package. The promptsheon package's single test entry point
-// iterates this slice to run all tests in one go test invocation.
+// AllTests is the registry of every test in this package. Append
+// new test functions here; the runner picks them up automatically.
 var AllTests = []func(t *testing.T){}
 
-// RunAll iterates AllTests and invokes each one. Tests that
-// fail do not stop the iteration; the standard testing.T
-// framework accumulates the failures and reports them at the end.
+// RunAll iterates AllTests and invokes each function. The standard
+// testing.T framework accumulates per-test failures and reports
+// them at the end of the run.
 func RunAll(t *testing.T) {
 	for _, fn := range AllTests {
 		fn(t)
