@@ -2,7 +2,6 @@ package promptsheon
 
 import (
 	"github.com/sachncs/promptsheon/promptsheon/webhook"
-	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -187,30 +186,4 @@ func ValidateWebhookURL(rawURL string) error {
 	return nil
 }
 
-// ResolveAndValidateWebhook is the same as ValidateWebhookURL but is
-// intended to be called at delivery time as a DNS-rebinding defence: the
-// IP set can change between registration and invocation.
-func ResolveAndValidateWebhook(ctx context.Context, rawURL string) error {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return err
-	}
-	if u.Scheme != "https" {
-		return fmt.Errorf("unsupported scheme %q (only https is accepted)", u.Scheme)
-	}
-	host := u.Hostname()
-	if host == "" {
-		return fmt.Errorf("missing host")
-	}
-	resolver := &net.Resolver{}
-	ips, err := resolver.LookupIP(ctx, "ip", host)
-	if err != nil {
-		return err
-	}
-	for _, ip := range ips {
-		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
-			return fmt.Errorf("host resolves to disallowed address %s", ip)
-		}
-	}
-	return nil
-}
+
