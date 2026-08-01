@@ -113,7 +113,7 @@ func TestGenerator_AllServerRoutesCovered(t *testing.T) {
 
 	run(t, "-out", outPath)
 
-	routes, err := collectRoutes(filepath.Join(repoRoot(t), "backend/routes.go"))
+	routes, err := collectRoutes(filepath.Join(repoRoot(t), "promptsheon/routes.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestGenerator_RequestBodyOnWrites(t *testing.T) {
 
 	run(t, "-out", outPath)
 
-	handlers, err := collectHandlers(filepath.Join(repoRoot(t), "backend"))
+	handlers, err := collectHandlers(filepath.Join(repoRoot(t), "promptsheon"))
 	if err != nil {
 		t.Fatal(err)
 	}

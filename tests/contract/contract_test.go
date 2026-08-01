@@ -1,5 +1,5 @@
 // Package contract runs an end-to-end contract test that hits
-// every route registered in backend/spec/spec.yaml via the Go SDK
+// every route registered in promptsheon/spec/spec.yaml via the Go SDK
 // against a running daemon (or an in-process one when none is
 // configured). The test fails on any HTTP 5xx response, on any
 // response shape mismatch against the registered route list, or
@@ -71,7 +71,7 @@ func TestSpecIsValid(t *testing.T) {
 func TestEveryRouteReachable(t *testing.T) {
 	ops := specOps(t)
 	if len(ops) == 0 {
-		t.Fatal("no routes parsed from backend/spec/spec.yaml")
+		t.Fatal("no routes parsed from promptsheon/spec/spec.yaml")
 	}
 
 	srv := newTestServer(t)
@@ -180,7 +180,7 @@ func sdkMandatoryMethods() []string {
 	}
 }
 
-// loadSpec parses backend/spec/spec.yaml. Tests fail fast when the
+// loadSpec parses promptsheon/spec/spec.yaml. Tests fail fast when the
 // file is missing or malformed.
 func loadSpec(t *testing.T) map[string]interface{} {
 	t.Helper()
@@ -188,7 +188,7 @@ func loadSpec(t *testing.T) map[string]interface{} {
 	if err != nil {
 		t.Fatalf("repoRoot: %v", err)
 	}
-	data, err := os.ReadFile(filepath.Join(root, "backend/spec/spec.yaml"))
+	data, err := os.ReadFile(filepath.Join(root, "promptsheon/spec/spec.yaml"))
 	if err != nil {
 		t.Fatalf("read spec.yaml: %v", err)
 	}

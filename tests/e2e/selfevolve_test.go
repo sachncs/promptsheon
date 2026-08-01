@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon"
+	"github.com/sachncs/promptsheon/promptsheon/approval"
 	"github.com/sachncs/promptsheon/promptsheon/evolve"
 )
 
@@ -464,7 +464,7 @@ func seedCapabilityWithBadPrompt(ctx context.Context, db *store.SQLite, capID, d
 		return "", errf.Errorf("upsert dataset cases: %w", err)
 	}
 	// Approval so SelfActivate doesn't fail.
-	if err := db.CreateApproval(ctx, &promptsheon.Approval{
+	if err := db.CreateApproval(ctx, &approval.Approval{
 		ReleaseID: relID, UpdatedAt: time.Now().UTC(),
 	}); err != nil {
 		return "", errf.Errorf("create approval: %w", err)
