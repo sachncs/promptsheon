@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/selfevolve"
+	"github.com/sachncs/promptsheon/promptsheon/evolve"
 )
 
 // selfEvolveConfig is one parsed entry from the
@@ -96,20 +96,20 @@ func buildEvolver(
 ) (*selfEvolveLoop, error) {
 	repo := newEvolverRepoAdapter(db)
 	invoke := makeEvolverLLMInvoke(providers, logger)
-	loader := selfevolve.NewCasPromptLoader()
+	loader := evolve.NewCasPromptLoader()
 	activator := &evolverActivatorAdapter{
 		svc:          releaseSvc,
 		selfApprover: releaseSvc.SelfApprove,
 		repo:         repos,
 	}
 	auditor := &evolverAuditorAdapter{auditor: newEvolverAuditor(repos, logger)}
-	revision := selfevolve.NewLLMRevisionStrategy(invoke)
-	validator := selfevolve.NewHarnessValidator(repo, invoke)
-	promoter, perr := selfevolve.NewPromoter(repo, loader, activator, auditor)
+	revision := evolve.NewLLMRevisionStrategy(invoke)
+	validator := evolve.NewHarnessValidator(repo, invoke)
+	promoter, perr := evolve.NewPromoter(repo, loader, activator, auditor)
 	if perr != nil {
 		return nil, fmt.Errorf("build promoter: %w", perr)
 	}
-	ev := selfevolve.NewEvolver(repo, loader, revision, validator, promoter, auditor, logger)
+	ev := evolve.NewEvolver(repo, loader, revision, validator, promoter, auditor, logger)
 	return &selfEvolveLoop{
 		ev:       ev,
 		capID:    capabilityID,
@@ -124,8 +124,8 @@ func buildEvolver(
 // the first registered one (typically "openai" or
 // "anthropic" — set by the daemon's env). The model is
 // overridable via PROMPTSHEON_SELF_EVOLVE_MODEL.
-func makeEvolverLLMInvoke(providers *llm.Registry, logger *slog.Logger) selfevolve.LLMInvokeFn {
-	return func(ctx context.Context, req selfevolve.LLMInvokeRequest) (string, error) {
+func makeEvolverLLMInvoke(providers *llm.Registry, logger *slog.Logger) evolve.LLMInvokeFn {
+	return func(ctx context.Context, req evolve.LLMInvokeRequest) (string, error) {
 		names := providers.Providers()
 		if len(names) == 0 {
 			return "", fmt.Errorf("self_evolve: no LLM providers registered")
@@ -158,7 +158,7 @@ func makeEvolverLLMInvoke(providers *llm.Registry, logger *slog.Logger) selfevol
 // It ticks on a fixed cadence and calls Evolver.RunOnce.
 // The loop exits when the context is cancelled.
 type selfEvolveLoop struct {
-	ev       *selfevolve.Evolver
+	ev       *evolve.Evolver
 	capID    string
 	logger   *slog.Logger
 	metrics  *metrics.Collector

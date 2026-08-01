@@ -14,7 +14,7 @@ The remaining parts of the original 61-commit plan require substantial cleanup o
 
 - [ ] **C1–C2** — Kitchen-sink `utils.go` (http.go split + utility aggregation)
 - [ ] **D1–D2** — Move `handlers_*.go` into `promptsheon/handlers/` (blocked by `oauthStateStore` cross-package reference)
-- [ ] **D3** — Rename `selfevolve/` → `evolve/`
+- [ ] **D3** — Rename `evolve/` → `evolve/`
 - [ ] **E1** — Single test runner (`promptsheon/promptsheon_test.go` + `tests/`)
 - [ ] **F1–F10** — Move all tests to `tests/`
 - [ ] **G1–G9** — Drop dead code

@@ -5,7 +5,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/sachncs/promptsheon/promptsheon/selfevolve"
+	"github.com/sachncs/promptsheon/promptsheon/evolve"
 )
 
 func TestParseSelfEvolveEntry_Valid(t *testing.T) {
@@ -86,7 +86,7 @@ func TestMakeEvolverLLMInvoke_NoProviders(t *testing.T) {
 	// should return an error when called.
 	r := llm.NewRegistry()
 	invoke := makeEvolverLLMInvoke(r, nil)
-	_, err := invoke(context.Background(), selfevolve.LLMInvokeRequest{System: "s", User: "u"})
+	_, err := invoke(context.Background(), evolve.LLMInvokeRequest{System: "s", User: "u"})
 	if err == nil {
 		t.Errorf("expected error for no providers")
 	}

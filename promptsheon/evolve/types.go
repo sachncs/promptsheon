@@ -14,7 +14,7 @@
 // cycles, a dedicated SelfApprovePolicy that only the
 // evolver's activator uses, every state change in the
 // audit chain.
-package selfevolve
+package evolve
 
 import (
 	"github.com/sachncs/promptsheon/promptsheon/store"

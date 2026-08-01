@@ -51,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Eval cases and live `/releases/{id}/invoke` invocations now
   record the same `manifest_hash` and `input_hash`.
 - **CAS loader dedup**: `daemon_evolver_cas.go` is deleted.
-  `selfevolve.NewCasPromptLoader` (`backend/selfevolve/loader.go`)
+  `evolve.NewCasPromptLoader` (`promptsheon/evolve/loader.go`)
   is used directly. The `evolverLoaderAdapter` type is removed.
 - **ClickHouse**: `daemon_clickhouse.go`,
   `daemon_noclickhouse.go`, and `backend/rollups/clickhouse/`
@@ -119,7 +119,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `scripts/genproto.sh` (no caller, no `.proto` files exist).
 - **Duplicate code**:
   - `daemon_evolver_cas.go` — replaced by
-    `backend/selfevolve/loader.go`.
+    `promptsheon/evolve/loader.go`.
   - `evolverLoaderAdapter` type in `daemon_evolver_adapter.go`.
   - Dead `db *store.SQLite` field on `apiReleaseInvoker` in
     `daemon_release_invoker.go`.

@@ -1,4 +1,4 @@
-package selfevolve
+package evolve
 
 import (
 	"crypto/rand"

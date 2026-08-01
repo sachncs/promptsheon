@@ -115,7 +115,7 @@ sub-directories.
 | `retention` | `backend/retention.go` | Audit archive retention sweep. |
 | `usage` | `backend/usage.go` | `UsageTracker` + Prometheus exposition. |
 | `settings` | `backend/settings/` | System config CRDT + resolver. |
-| `selfevolve` | `backend/selfevolve/` | Closed-loop self-evolution orchestrator. |
+| `selfevolve` | `promptsheon/evolve/` | Closed-loop self-evolution orchestrator. |
 | `search` | `backend/search/` | Catalog search. |
 | `alerting` | `backend/alerting/` | Alert rule + notification groups. |
 | `policy` | `backend/policy.go` | Policy decision framework. |

@@ -1,4 +1,4 @@
-package selfevolve
+package evolve
 
 import (
 	"github.com/sachncs/promptsheon/promptsheon/harness"

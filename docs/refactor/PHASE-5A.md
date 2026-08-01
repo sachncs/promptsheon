@@ -29,7 +29,7 @@ c5.7  refactor: drop CasPromptLoader
       Refs: PLAN-49/
 c5.8  refactor: drop ArtifactLoader interface
       Refs: PLAN-49/
-c5.9  refactor: drop release/id.go + selfevolve/id.go (inline)
+c5.9  refactor: drop release/id.go + evolve/id.go (inline)
       Refs: PLAN-49/
 c5.10 refactor: drop auditVerifyCache + auditTail + 4 prepared statements
       Refs: PLAN-49/
@@ -57,10 +57,10 @@ c5.15 refactor: drop dead metrics + frontend dead exports (combined; resolves L-
 | `backend/handler_observation.go` → `backend/handlers_observation.go` | c5.4 |
 | `backend/handlers_capabilities_merge_test.go` → `backend/handlers_capabilities_test.go` | c5.5 |
 | `backend/trace/exporter.go` (delete), `backend/trace/otel.go` (edit) | c5.6 |
-| `backend/selfevolve/loader.go` (delete), `backend/selfevolve/evolver.go` (edit) | c5.7 |
+| `promptsheon/evolve/loader.go` (delete), `promptsheon/evolve/evolver.go` (edit) | c5.7 |
 | `backend/release/resolver.go` (delete interface), `backend/release/service.go` | c5.8 |
 | `backend/release/id.go` (delete), `backend/release/service.go` | c5.9 |
-| `backend/selfevolve/id.go` (delete), `backend/selfevolve/promoter.go` | c5.9 |
+| `promptsheon/evolve/id.go` (delete), `promptsheon/evolve/promoter.go` | c5.9 |
 | `backend/store/sqlite.go` (delete cache) | c5.10 |
 | `backend/store/sqlite.go` (drop helpers) | c5.11 |
 | `backend/store/idempotency_sqlite.go` (delete), `backend/store/repo.go` | c5.12 |
@@ -204,5 +204,5 @@ strict; no exceptions).
 | Agent | Files |
 |---|---|
 | 5A1 | tools/golangci-lint-promptsheon/, .golangci.yml |
-| 5A2 | backend/cas/, backend/store/sqlite*.go, backend/store/idempotency_sqlite.go, backend/store/migrate.go, backend/release/id.go, backend/selfevolve/id.go |
-| 5A3 | backend/trace/, backend/selfevolve/loader.go, backend/release/resolver.go (interface drop), backend/rollups/, backend/metrics/collector.go, frontend/src/views/{settings,catalog}-view.js |
+| 5A2 | backend/cas/, backend/store/sqlite*.go, backend/store/idempotency_sqlite.go, backend/store/migrate.go, backend/release/id.go, promptsheon/evolve/id.go |
+| 5A3 | backend/trace/, promptsheon/evolve/loader.go, backend/release/resolver.go (interface drop), backend/rollups/, backend/metrics/collector.go, frontend/src/views/{settings,catalog}-view.js |

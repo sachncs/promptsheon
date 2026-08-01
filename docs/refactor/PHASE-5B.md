@@ -21,7 +21,7 @@ c5.19 rename: EvalRunOptions → RunOptions
 |---|---|
 | `backend/release/release.go`, `backend/release/service.go`, `sdk/client.go` | c5.16 |
 | `backend/approval/approval.go`, `backend/handlers_releases.go`, `backend/release/service.go` | c5.17 |
-| `backend/capability/capability.go`, `backend/capability/selfevolve.go`, `backend/selfevolve/evolver.go`, `backend/selfevolve/types.go`, `sdk/client.go` | c5.18 |
+| `backend/capability/capability.go`, `backend/capability/evolve.go`, `promptsheon/evolve/evolver.go`, `promptsheon/evolve/types.go`, `sdk/client.go` | c5.18 |
 | `backend/harness/runner.go`, `backend/harness/runner_test.go`, `backend/handlers_harness.go` | c5.19 |
 
 ## Key renames

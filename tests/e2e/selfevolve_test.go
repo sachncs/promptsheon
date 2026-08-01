@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon"
-	"github.com/sachncs/promptsheon/promptsheon/selfevolve"
+	"github.com/sachncs/promptsheon/promptsheon/evolve"
 )
 
 // casWritePrompt is a thin wrapper that chdirs the test
@@ -23,7 +23,7 @@ import (
 // the loader (content-addressed), so callers should use
 // the returned string instead of the input hash.
 func casWritePrompt(text, _ string) (string, error) {
-	return (&selfevolve.CasPromptLoader{}).WritePrompt(context.Background(), text)
+	return (&evolve.CasPromptLoader{}).WritePrompt(context.Background(), text)
 }
 
 // TestSelfEvolve_OrchestratorEndToEnd exercises the full
@@ -70,11 +70,11 @@ func TestSelfEvolve_OrchestratorEndToEnd(t *testing.T) {
 
 	// 4. Wire the orchestrator with a fake LLM that always
 	//    returns "pong" (the dataset's expected output).
-	loader := selfevolve.NewCasPromptLoader()
-	invoke := func(_ context.Context, _ selfevolve.LLMInvokeRequest) (string, error) {
+	loader := evolve.NewCasPromptLoader()
+	invoke := func(_ context.Context, _ evolve.LLMInvokeRequest) (string, error) {
 		return "pong", nil
 	}
-	revision := selfevolve.NewLLMRevisionStrategy(invoke)
+	revision := evolve.NewLLMRevisionStrategy(invoke)
 	// 5. The fakeRepository implements the evolver's
 	//    Repository interface; the validator uses the
 	//    same LLM and gets a 1.0 score every call.
@@ -84,13 +84,13 @@ func TestSelfEvolve_OrchestratorEndToEnd(t *testing.T) {
 	if err := seedFailedEval(ctx, fake, 0, 3); err != nil {
 		t.Fatalf("seed failed eval: %v", err)
 	}
-	validator := selfevolve.NewHarnessValidator(fake, invoke)
+	validator := evolve.NewHarnessValidator(fake, invoke)
 	sharedAuditor := &fakeAuditor{}
-	promoter, perr := selfevolve.NewPromoter(fake, loader, &fakeActivator{repo: fake}, sharedAuditor)
+	promoter, perr := evolve.NewPromoter(fake, loader, &fakeActivator{repo: fake}, sharedAuditor)
 	if perr != nil {
 		t.Fatalf("NewPromoter: %v", perr)
 	}
-	ev := selfevolve.NewEvolver(fake, loader, revision, validator, promoter, sharedAuditor, nil)
+	ev := evolve.NewEvolver(fake, loader, revision, validator, promoter, sharedAuditor, nil)
 
 	// 7. Set the capability's self-evolve config.
 	if err := db.UpdateSelfEvolveConfig(ctx, capID, capability.SelfEvolveConfig{
@@ -194,15 +194,15 @@ func TestSelfEvolve_RejectsWhenLLMFails(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 	// LLM always returns "wrong" — validation will never pass.
-	invoke := func(_ context.Context, _ selfevolve.LLMInvokeRequest) (string, error) { return "wrong", nil }
-	revision := selfevolve.NewLLMRevisionStrategy(invoke)
-	loader := selfevolve.NewCasPromptLoader()
-	validator := selfevolve.NewHarnessValidator(fake, invoke)
-	promoter, perr := selfevolve.NewPromoter(fake, loader, &fakeActivator{repo: fake}, &fakeAuditor{})
+	invoke := func(_ context.Context, _ evolve.LLMInvokeRequest) (string, error) { return "wrong", nil }
+	revision := evolve.NewLLMRevisionStrategy(invoke)
+	loader := evolve.NewCasPromptLoader()
+	validator := evolve.NewHarnessValidator(fake, invoke)
+	promoter, perr := evolve.NewPromoter(fake, loader, &fakeActivator{repo: fake}, &fakeAuditor{})
 	if perr != nil {
 		t.Fatalf("NewPromoter: %v", perr)
 	}
-	ev := selfevolve.NewEvolver(fake, loader, revision, validator, promoter, &fakeAuditor{}, nil)
+	ev := evolve.NewEvolver(fake, loader, revision, validator, promoter, &fakeAuditor{}, nil)
 	if err := db.UpdateSelfEvolveConfig(ctx, capID, capability.SelfEvolveConfig{
 		Enabled: true, MinScore: 0.9, MaxRevisions: 3, CooldownSec: 0, TargetEnv: "dev", DatasetID: datasetID,
 	}); err != nil {
@@ -245,7 +245,7 @@ type fakeEvolverRepo struct {
 	db        *store.SQLite
 	capID     string
 	datasetID string
-	validator selfevolve.LLMInvokeFn
+	validator evolve.LLMInvokeFn
 }
 
 // All the methods below are passthroughs to db (or to the
@@ -279,12 +279,12 @@ func (f *fakeEvolverRepo) GetActiveReleaseID(ctx context.Context, capID string) 
 func (f *fakeEvolverRepo) ActiveReleaseID(ctx context.Context, capID, env string) (string, error) {
 	return f.db.GetActiveReleaseIDInEnv(ctx, capID, env)
 }
-func (f *fakeEvolverRepo) GetRelease(ctx context.Context, id string) (*selfevolve.ReleaseRecord, error) {
+func (f *fakeEvolverRepo) GetRelease(ctx context.Context, id string) (*evolve.ReleaseRecord, error) {
 	rel, err := f.db.GetRelease(ctx, id)
 	if err != nil || rel == nil {
 		return nil, err
 	}
-	return &selfevolve.ReleaseRecord{
+	return &evolve.ReleaseRecord{
 		ID: rel.ID, CapabilityID: rel.CapabilityID, CapabilityVersion: rel.CapabilityVersion,
 		Manifest: rel.Manifest, Environment: string(rel.Environment), Status: string(rel.Status),
 		CreatedBy: rel.CreatedBy, CreatedAt: rel.CreatedAt,
@@ -301,7 +301,7 @@ func (f *fakeEvolverRepo) UpdateReleaseStatus(ctx context.Context, releaseID, st
 	rel.Status = release.Status(status)
 	return f.db.UpdateRelease(ctx, rel)
 }
-func (f *fakeEvolverRepo) CreateRelease(ctx context.Context, rec selfevolve.ReleaseRecord) error {
+func (f *fakeEvolverRepo) CreateRelease(ctx context.Context, rec evolve.ReleaseRecord) error {
 	r := &release.Release{
 		ID: rec.ID, CapabilityID: rec.CapabilityID, CapabilityVersion: rec.CapabilityVersion,
 		Manifest: rec.Manifest, Environment: release.Environment(rec.Environment),
@@ -388,7 +388,7 @@ func (a *fakeActivator) SelfActivate(ctx context.Context, releaseID string) erro
 	return a.repo.db.UpdateRelease(ctx, rel)
 }
 
-// fakeAuditor is a test double for selfevolve.Auditor
+// fakeAuditor is a test double for evolve.Auditor
 // that records every audit call.
 type fakeAuditor struct{ rows []fakeAuditRow }
 

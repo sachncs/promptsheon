@@ -1,4 +1,4 @@
-package selfevolve
+package evolve
 
 import (
 	"github.com/sachncs/promptsheon/promptsheon/cas"
@@ -28,7 +28,7 @@ func (l *CasPromptLoader) LoadPrompt(ctx context.Context, hash string) ([]byte, 
 	}
 	obj, err := cas.ReadObject(hash)
 	if err != nil {
-		return nil, fmt.Errorf("selfevolve.cas: read %s: %w", hash, err)
+		return nil, fmt.Errorf("evolve.cas: read %s: %w", hash, err)
 	}
 	return []byte(obj.Data), nil
 }
@@ -44,7 +44,7 @@ func (l *CasPromptLoader) WritePrompt(ctx context.Context, text string) (string,
 	}
 	hash, err := cas.WriteObject(cas.NewBlobObject(text))
 	if err != nil {
-		return "", fmt.Errorf("selfevolve.cas: write: %w", err)
+		return "", fmt.Errorf("evolve.cas: write: %w", err)
 	}
 	return hash, nil
 }

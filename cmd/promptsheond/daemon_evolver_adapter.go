@@ -14,11 +14,11 @@ import (
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 
-	"github.com/sachncs/promptsheon/promptsheon/selfevolve"
+	"github.com/sachncs/promptsheon/promptsheon/evolve"
 )
 
 // evolverRepoAdapter wraps *store.SQLite and satisfies
-// selfevolve.Repository. The harness.Repository and
+// evolve.Repository. The harness.Repository and
 // capability.Repository methods are satisfied by the
 // embedded *store.SQLite; the evolver-only extensions
 // (env-filtered ActiveReleaseID, evolver-typed
@@ -31,7 +31,7 @@ func newEvolverRepoAdapter(s *store.SQLite) *evolverRepoAdapter {
 	return &evolverRepoAdapter{SQLite: s}
 }
 
-// ActiveReleaseID satisfies selfevolve.Repository. The
+// ActiveReleaseID satisfies evolve.Repository. The
 // harness.Repository's GetActiveReleaseID takes only
 // capabilityID; the evolver's variant also takes env.
 func (a *evolverRepoAdapter) ActiveReleaseID(ctx context.Context, capabilityID, env string) (string, error) {
@@ -40,12 +40,12 @@ func (a *evolverRepoAdapter) ActiveReleaseID(ctx context.Context, capabilityID, 
 
 // GetRelease returns the evolver's minimal ReleaseRecord
 // rather than the full release.Release struct.
-func (a *evolverRepoAdapter) GetRelease(ctx context.Context, id string) (*selfevolve.ReleaseRecord, error) {
+func (a *evolverRepoAdapter) GetRelease(ctx context.Context, id string) (*evolve.ReleaseRecord, error) {
 	rel, err := a.SQLite.GetRelease(ctx, id)
 	if err != nil || rel == nil {
 		return nil, err
 	}
-	return &selfevolve.ReleaseRecord{
+	return &evolve.ReleaseRecord{
 		ID:                rel.ID,
 		CapabilityID:      rel.CapabilityID,
 		CapabilityVersion: rel.CapabilityVersion,
@@ -81,7 +81,7 @@ func (a *evolverRepoAdapter) UpdateReleaseStatus(ctx context.Context, releaseID,
 // CreateRelease creates a Pending release. The evolver
 // then calls SelfActivate which drives the Status
 // transition.
-func (a *evolverRepoAdapter) CreateRelease(ctx context.Context, rec selfevolve.ReleaseRecord) error {
+func (a *evolverRepoAdapter) CreateRelease(ctx context.Context, rec evolve.ReleaseRecord) error {
 	r := &release.Release{
 		ID:                rec.ID,
 		CapabilityID:      rec.CapabilityID,
@@ -96,7 +96,7 @@ func (a *evolverRepoAdapter) CreateRelease(ctx context.Context, rec selfevolve.R
 }
 
 // evolverActivatorAdapter exposes release.Service.SelfActivate
-// as a selfevolve.ReleaseActivator. It also writes the
+// as a evolve.ReleaseActivator. It also writes the
 // synthetic Approve vote so the SelfApprovePolicy has
 // something to evaluate.
 type evolverActivatorAdapter struct {
@@ -135,7 +135,7 @@ func (a *evolverActivatorAdapter) SelfActivate(ctx context.Context, releaseID st
 }
 
 // evolverAuditorAdapter exposes the daemon's audit
-// recorder as a selfevolve.Auditor.
+// recorder as a evolve.Auditor.
 type evolverAuditorAdapter struct {
 	auditor AuditWriter
 }

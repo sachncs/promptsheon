@@ -54,7 +54,7 @@ that pulls in `package main` at the repo root).
 | `alerting` | `backend/alerting/` | Domain | Alert rule + notification groups. |
 | `rollups` | `backend/rollups/` | Domain | Per-Workspace Budget/Quota rollup aggregator (in-memory). |
 | `settings` | `backend/settings/` | Domain | System config CRDT + resolver. |
-| `selfevolve` | `backend/selfevolve/` | Domain | Closed-loop self-evolution orchestrator. |
+| `selfevolve` | `promptsheon/evolve/` | Domain | Closed-loop self-evolution orchestrator. |
 | `search` | `backend/search/` | Domain | Catalog search. |
 | `election` | `backend/election.go` | Domain | Leader election for HA. |
 | `reasoning` | `backend/reasoning.go` | Domain | Reasoning compiler primitives. |
@@ -66,7 +66,7 @@ that pulls in `package main` at the repo root).
 | `testutil` | `backend/testutil/` | Test | Shared test helpers (logger, sqlite, harness fixture). |
 | `testutil/harnessrepo` | `backend/testutil/harnessrepo/` | Test | Shared in-memory `harness.Repository` fixture. |
 | `cas` | `backend/cas/` | Domain | Content-addressable store (Merkle DAG). |
-| `../development/cli.md` | root `cli.go`, `cli_cas.go`, `cli_harness.go`, `cli_http.go`, `cli_selfevolve.go` | CLI | Command dispatcher + handlers (in `package main`). |
+| `../development/cli.md` | root `cli.go`, `cli_cas.go`, `cli_harness.go`, `cli_http.go`, `cli_evolve.go` | CLI | Command dispatcher + handlers (in `package main`). |
 | `daemon` | root `daemon.go`, `daemon_evolver.go`, `daemon_release_invoker.go`, `embed_frontend.go`, `healthcheck.go` | HTTP | Server entry point + dispatch (in `package main`). |
 | `client` (Go SDK) | `sdk/` | SDK | Go SDK; see [docs/sdk.md](../reference/sdk.md). |
 | `client` (Py SDK) | `sdk/python/src/promptsheon/` | SDK | Python SDK; generated from `backend/spec/spec.yaml`. |
