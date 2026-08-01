@@ -13,10 +13,10 @@
 package eval
 
 import (
+	"fmt"
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 )

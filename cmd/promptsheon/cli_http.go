@@ -6,8 +6,8 @@ package main
 // SDK so the CLI stays a thin wrapper around the running daemon.
 
 import (
-	"encoding/json"
 	"fmt"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"os"

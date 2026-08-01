@@ -11,6 +11,7 @@
 package invoke
 
 import (
+	"fmt"
 	"github.com/sachncs/promptsheon/promptsheon/metrics"
 	"github.com/sachncs/promptsheon/promptsheon/budget"
 	"github.com/sachncs/promptsheon/promptsheon/observation"
@@ -19,7 +20,6 @@ import (
 	"github.com/sachncs/promptsheon/promptsheon/quota"
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"

@@ -7,10 +7,10 @@
 package promptsheon
 
 import (
+	"fmt"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 		"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 

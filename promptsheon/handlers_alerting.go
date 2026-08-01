@@ -1,8 +1,8 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/alerting"
 	"fmt"
+	"github.com/sachncs/promptsheon/promptsheon/alerting"
 	"net/http"
 	"time"
 

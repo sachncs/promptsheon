@@ -14,9 +14,9 @@
 package recommendation
 
 import (
+	"fmt"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"

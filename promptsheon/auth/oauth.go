@@ -2,11 +2,11 @@
 package auth
 
 import (
+	"fmt"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net"
 	"net/http"

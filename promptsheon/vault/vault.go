@@ -3,11 +3,11 @@
 package vault
 
 import (
+	"fmt"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"

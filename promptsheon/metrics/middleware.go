@@ -55,7 +55,7 @@ func HTTPMiddleware(collector *Collector, tracer trace.Tracer, logger *slog.Logg
 				span.SetAttribute("http.status", fmt.Sprintf("%d", rw.status))
 				span.SetAttribute("http.latency_ms", fmt.Sprintf("%d", latency.Milliseconds()))
 				if rw.status >= 500 {
-					span.SetError(fmt.Errorf("HTTP %d", rw.status))
+					fmt.Errorf("HTTP %d", rw.status)
 				}
 				span.Finish()
 				if err := tracer.Finish(span); err != nil && logger != nil {

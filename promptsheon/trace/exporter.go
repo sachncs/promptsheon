@@ -1,8 +1,8 @@
 package trace
 
 import (
-	"context"
 	"fmt"
+	"context"
 	"os"
 	"strconv"
 	"sync"

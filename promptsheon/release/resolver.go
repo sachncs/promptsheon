@@ -9,10 +9,10 @@
 package release
 
 import (
+	"fmt"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"

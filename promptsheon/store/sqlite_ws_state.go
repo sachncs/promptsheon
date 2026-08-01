@@ -1,10 +1,10 @@
 package store
 
 import (
+	"fmt"
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 )
 
 // SQLite persistence for ws_state.

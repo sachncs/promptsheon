@@ -1,6 +1,7 @@
 package promptsheon
 
 import (
+	"fmt"
 	"github.com/sachncs/promptsheon/promptsheon/approval"
 	"github.com/sachncs/promptsheon/promptsheon/release"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
@@ -10,7 +11,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"

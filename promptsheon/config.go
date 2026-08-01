@@ -12,9 +12,9 @@
 package promptsheon
 
 import (
+	"fmt"
 	"bytes"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net"
 	"os"

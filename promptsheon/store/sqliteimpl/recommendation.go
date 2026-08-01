@@ -1,13 +1,13 @@
 package sqliteimpl
 
 import (
+	"fmt"
 	"github.com/sachncs/promptsheon/promptsheon/recommendation"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 

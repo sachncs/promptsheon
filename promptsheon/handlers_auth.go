@@ -1,6 +1,7 @@
 package promptsheon
 
 import (
+	"fmt"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"github.com/sachncs/promptsheon/promptsheon/models"
 			"context"
@@ -10,7 +11,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"os"

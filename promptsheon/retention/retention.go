@@ -5,10 +5,10 @@
 package retention
 
 import (
+	"fmt"
 	"github.com/sachncs/promptsheon/promptsheon/store"
 	"context"
 	"database/sql"
-	"fmt"
 	"log/slog"
 	"os"
 	"strconv"

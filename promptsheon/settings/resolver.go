@@ -25,10 +25,10 @@
 package settings
 
 import (
+	"fmt"
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"os"
 	"sync"
 )

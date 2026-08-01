@@ -1,8 +1,8 @@
 package cas
 
 import (
-	"errors"
 	"fmt"
+	"errors"
 )
 
 // CommitResult is the value returned by Commit. The Hash is the

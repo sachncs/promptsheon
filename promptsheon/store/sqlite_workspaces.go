@@ -1,10 +1,10 @@
 package store
 
 import (
+	"fmt"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )

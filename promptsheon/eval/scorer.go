@@ -7,10 +7,10 @@
 package eval
 
 import (
+	"fmt"
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"reflect"
 	"regexp"
 	"strings"

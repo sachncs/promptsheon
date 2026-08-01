@@ -1,9 +1,9 @@
 package promptsheon
 
 import (
+	"fmt"
 	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"github.com/sachncs/promptsheon/promptsheon/models"
-	"fmt"
 	"net/http"
 	"time"
 

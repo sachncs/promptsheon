@@ -1,8 +1,8 @@
 package store
 
 import (
-	"context"
 	"fmt"
+	"context"
 )
 
 // LinkRuleToGroup creates a row in the alert_rule_notification_groups

@@ -10,9 +10,9 @@
 package approval
 
 import (
+	"fmt"
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"

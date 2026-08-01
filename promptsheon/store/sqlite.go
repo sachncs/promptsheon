@@ -1,11 +1,11 @@
 package store
 
 import (
+	"fmt"
 	"context"
 	"database/sql"
 	"embed"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"

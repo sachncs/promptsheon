@@ -16,8 +16,8 @@ package promptsheon
 // the workflow Engine (LLM calls have variance) and in the
 // bandit (which arm to pick); the compiler itself is pure.
 import (
-	"context"
 	"fmt"
+	"context"
 	"sort"
 	"strings"
 	"time"

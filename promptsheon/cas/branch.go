@@ -3,8 +3,8 @@
 package cas
 
 import (
-	"errors"
 	"fmt"
+	"errors"
 )
 
 // CreateBranch creates a new branch pointing at targetHash. If

@@ -1,9 +1,9 @@
 package evolve
 
 import (
+	"fmt"
 	"context"
 	"encoding/json"
-	"fmt"
 )
 
 // LLMRevisionStrategy asks a revision LLM for a new

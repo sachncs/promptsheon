@@ -4,10 +4,10 @@
 package auth
 
 import (
+	"fmt"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"strings"
 )

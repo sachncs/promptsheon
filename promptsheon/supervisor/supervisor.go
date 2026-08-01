@@ -21,10 +21,10 @@
 package supervisor
 
 import (
+	"fmt"
 	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 	"context"
-	"fmt"
 	"io"
 	"log/slog"
 	"sync"

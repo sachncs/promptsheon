@@ -1,8 +1,8 @@
 package auth
 
 import (
-	"context"
 	"fmt"
+	"context"
 	"log/slog"
 	"net/http"
 	"strings"

@@ -1,8 +1,8 @@
 package llm
 
 import (
-	"context"
 	"fmt"
+	"context"
 	"log/slog"
 	"net/http"
 	"strings"
