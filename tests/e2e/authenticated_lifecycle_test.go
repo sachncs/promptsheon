@@ -15,7 +15,6 @@
 package e2e
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"bytes"
 	"context"
 	"encoding/json"

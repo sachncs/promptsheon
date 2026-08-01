@@ -2,7 +2,6 @@ package harnessrepo_test
 
 import (
 	"github.com/sachncs/promptsheon/promptsheon/release"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"errors"

@@ -2,7 +2,6 @@
 package main
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/cas"
 	"fmt"
 	"os"
 	"os/exec"

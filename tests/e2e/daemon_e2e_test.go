@@ -16,8 +16,6 @@ package e2e
 
 import (
 	"github.com/sachncs/promptsheon/promptsheon/scheduler"
-	"github.com/sachncs/promptsheon/promptsheon/release"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"github.com/sachncs/promptsheon/promptsheon/executor"
 	"bytes"
 	"context"

@@ -6,10 +6,6 @@
 package settings_test
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/llm"
-	"github.com/sachncs/promptsheon/promptsheon/vault"
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/webhook"
 	"context"
 	"database/sql"
 	"errors"

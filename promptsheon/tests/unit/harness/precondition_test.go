@@ -1,7 +1,6 @@
 package harness_test
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/budget"
 	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"errors"

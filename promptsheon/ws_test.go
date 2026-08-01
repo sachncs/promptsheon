@@ -1,7 +1,6 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/store"
 		"bytes"
 	"context"
 	"encoding/json"

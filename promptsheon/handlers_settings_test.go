@@ -3,7 +3,6 @@ package promptsheon
 import (
 	"github.com/sachncs/promptsheon/promptsheon/store"
 	"github.com/sachncs/promptsheon/promptsheon/settings"
-	"github.com/sachncs/promptsheon/promptsheon/webhook"
 		"bytes"
 	"encoding/json"
 	"net/http"

@@ -1,7 +1,6 @@
 package store
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/llm"
 	"database/sql"
 	"fmt"
 	"io/fs"

@@ -1,7 +1,6 @@
 package webhook
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/workflow"
 	"bytes"
 	"context"
 	"fmt"

@@ -2,7 +2,6 @@ package models_test
 
 import (
 	"github.com/sachncs/promptsheon/promptsheon/models"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"encoding/json"
 	"strings"
 	"testing"
