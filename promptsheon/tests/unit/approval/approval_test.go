@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/sachncs/promptsheon/promptsheon"
+	. "github.com/sachncs/promptsheon/promptsheon/approval"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )
 
