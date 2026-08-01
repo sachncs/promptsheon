@@ -242,9 +242,6 @@ type Collector struct {
 	// counter stays accurate without a sync loop.
 	hub HubDropper
 
-	banditSelections atomic.Int64
-	banditMu         sync.RWMutex
-	banditRunID      string
 }
 
 // HubDropper is the subset of *ws.Hub the metrics collector
@@ -257,13 +254,7 @@ type HubDropper interface {
 // Prometheus scrape can read the cumulative drop count. OBS-LOG-2.
 func (c *Collector) SetLogHub(h HubDropper) { c.hub = h }
 
-// RecordBanditSelection records one selection and replaces the current run marker.
-func (c *Collector) RecordBanditSelection(runID string) {
-	c.banditSelections.Add(1)
-	c.banditMu.Lock()
-	c.banditRunID = runID
-	c.banditMu.Unlock()
-}
+
 
 // ObserveAuditQueue records a single audit-queue latency
 // observation in seconds. Called by the audit worker once the
@@ -495,10 +486,6 @@ func (c *Collector) GetSummary() *Summary {
 
 	s.HallucinationMetrics.AvgScore = c.HallucinationScores.Avg()
 	s.HallucinationMetrics.P95Score = c.HallucinationScores.P95()
-	s.BanditMetrics.SelectionsTotal = c.banditSelections.Load()
-	c.banditMu.RLock()
-	s.BanditMetrics.CurrentRunID = c.banditRunID
-	c.banditMu.RUnlock()
 
 	// OBS-7 / OBS-1b: surface the audit-pipeline drop and trace-pipeline
 	// drop counts as summary fields so /api/v1/metrics/summary can
@@ -547,12 +534,6 @@ func (c *Collector) prometheusFormat() string {
 	writeCounter("promptsheon_http_requests_total", "Total HTTP requests", c.RequestsTotal.Value())
 	writeHistogram("promptsheon_http_request_duration_seconds", "HTTP request duration", c.RequestDuration)
 	writeCounter("promptsheon_http_errors_total", "Total HTTP errors", c.ErrorsTotal.Value())
-	writeCounter("promptsheon_bandit_selections_total", "Total bandit arm selections", float64(c.banditSelections.Load()))
-	c.banditMu.RLock()
-	if c.banditRunID != "" {
-		fmt.Fprintf(&sb, "# HELP promptsheon_bandit_current_run_info Current bandit run\n# TYPE promptsheon_bandit_current_run_info gauge\npromptsheon_bandit_current_run_info{run_id=\"%s\"} 1\n", c.banditRunID)
-	}
-	c.banditMu.RUnlock()
 
 	writeCounter("promptsheon_llm_calls_total", "Total LLM calls", c.LLMCallsTotal.Value())
 	writeHistogram("promptsheon_llm_latency_seconds", "LLM call latency", c.LLMLatency)
