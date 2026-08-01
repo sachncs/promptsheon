@@ -128,7 +128,7 @@ run: build-server
 cli: build-cli
 	./$(BIN)/promptsheon
 
-# Regenerate backend/spec/spec.yaml from the server's route
+# Regenerate promptsheon/spec/spec.yaml from the server's route
 # registrations. The generator parses backend/routes.go for routes
 # and backend/handlers_*.go for request schemas, then emits a real
 # OpenAPI 3.0 spec. Re-run this target whenever a route or handler
@@ -136,11 +136,11 @@ cli: build-cli
 openapi:
 	go run ./scripts/genopenapi
 
-# Check that backend/spec/spec.yaml is up to date. CI runs this
+# Check that promptsheon/spec/spec.yaml is up to date. CI runs this
 # target and fails the build if a developer added a route without
 # regenerating the spec.
 openapi-check: openapi
-	@git diff --exit-code backend/spec/spec.yaml || (echo "backend/spec/spec.yaml is out of date. Run 'make openapi' and commit the result."; exit 1)
+	@git diff --exit-code promptsheon/spec/spec.yaml || (echo "promptsheon/spec/spec.yaml is out of date. Run 'make openapi' and commit the result."; exit 1)
 
 # dist-check catches frontend/src drift: if any frontend/src/*
 # file is newer than cmd/promptsheond/frontend/dist/, the embed
@@ -158,21 +158,21 @@ dist-check:
 	fi
 
 # SDK regeneration. SDK-1: the Python and TypeScript SDKs are
-# derived from backend/spec/spec.yaml. The generator writes the
+# derived from promptsheon/spec/spec.yaml. The generator writes the
 # generated sources to sdk/python/src/promptsheon/_generated
 # and sdk/typescript/src/_generated respectively; the canonical
 # hand-written client wrappers in each SDK re-export the
 # generated surface. CI fails if a route was added without
 # regenerating.
 sdk:
-	@echo "regenerating Python + TypeScript SDKs from backend/spec/spec.yaml"
+	@echo "regenerating Python + TypeScript SDKs from promptsheon/spec/spec.yaml"
 	@mkdir -p sdk/python/src/promptsheon/_generated sdk/typescript/src/_generated
-	@cp backend/spec/spec.yaml sdk/python/src/promptsheon/_generated/openapi.yaml
-	@cp backend/spec/spec.yaml sdk/typescript/src/_generated/openapi.yaml
+	@cp promptsheon/spec/spec.yaml sdk/python/src/promptsheon/_generated/openapi.yaml
+	@cp promptsheon/spec/spec.yaml sdk/typescript/src/_generated/openapi.yaml
 	@echo "ok: SDK artifacts refreshed"
 
 # sdk-check verifies the SDK generated artifacts match the
-# canonical backend/spec/spec.yaml. The previous Makefile only
+# canonical promptsheon/spec/spec.yaml. The previous Makefile only
 # had openapi-check; the generated SDK copies were easy to drift
 # without anyone noticing (PR-3 c3.13 introduced the matching
 # codegen scripts).
@@ -264,9 +264,9 @@ help:
 	@echo "  coverage-raw       Show coverage in terminal"
 	@echo "  run                Build and run the server daemon"
 	@echo "  cli                Build and run the CLI"
-	@echo "  openapi            Regenerate backend/spec/spec.yaml"
+	@echo "  openapi            Regenerate promptsheon/spec/spec.yaml"
 	@echo "  openapi-check      Fail if spec.yaml is out of date"
-	@echo "  sdk                Refresh SDK stubs from backend/spec/spec.yaml"
+	@echo "  sdk                Refresh SDK stubs from promptsheon/spec/spec.yaml"
 	@echo "  sdk-check          Fail if SDK is out of date"
 	@echo "  check              Umbrella gate: fmt + vet + lint + test + openapi-check + docs-check"
 	@echo "  purity             Domain-purity gate: lint-domain + lint-deps"

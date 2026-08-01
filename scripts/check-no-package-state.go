@@ -1,7 +1,7 @@
 // Command check-no-package-state reports package-level mutable state in
 // domain packages. It is a structural static analysis pass:
 //
-//   - For each named package under backend/<name>/ it parses every
+//   - For each named package under promptsheon/<name>/ it parses every
 //     non-test Go file.
 //
 //   - At the file scope it inspects every GenDecl of token.VAR.
@@ -49,16 +49,16 @@ import (
 // domain packages. The allowlist mechanism covers the ldflags-
 // injected build info variables.
 var domainPackages = []string{
-	"backend",
-	"backend/capability",
-	"backend/release",
-	"backend/approval",
-	"backend/recommendation",
-	"backend/eventbus",
+	"promptsheon",
+	"promptsheon/capability",
+	"promptsheon/release",
+	"promptsheon/approval",
+	"promptsheon/recommendation",
+	"promptsheon/eventbus",
 }
 
 func main() {
-	target := flag.String("pkg", "", "restrict the check to a single package (without the backend/ prefix)")
+	target := flag.String("pkg", "", "restrict the check to a single package (without the promptsheon/ prefix)")
 	allowList := flag.String("allow", "", "comma-separated var names to exempt (e.g. Version,Commit,BuildTime)")
 	flag.Parse()
 
@@ -72,7 +72,7 @@ func main() {
 
 	pkgs := domainPackages
 	if *target != "" {
-		pkgs = []string{"backend/" + *target}
+		pkgs = []string{"promptsheon/" + *target}
 	}
 
 	wd, err := os.Getwd()
@@ -233,7 +233,7 @@ func isReadOnlyComposite(vs *ast.ValueSpec) bool {
 func relPath(path string) string {
 	dir := filepath.Base(filepath.Dir(path))
 	base := filepath.Base(path)
-	return filepath.Join("backend", dir, base)
+	return filepath.Join("promptsheon", dir, base)
 }
 
 func firstLine(vs *ast.ValueSpec) string {

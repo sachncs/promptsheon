@@ -7,17 +7,17 @@ DOMAIN=(
   alerting approval audit auth budget capability eventbus executor experiment
   lineage observation optimizer policy quota recommendation release replay schedule
 )
-FORBIDDEN=("$repo/backend/store" "$repo/backend/llm")
+FORBIDDEN=("$repo/promptsheon/store" "$repo/promptsheon/llm")
 errors=0
 
 for pkg in "${DOMAIN[@]}"; do
-  dir="./backend/$pkg"
+  dir="./promptsheon/$pkg"
   [[ -d "${dir#./}" ]] || continue
   imports=$(go list -f '{{join .Imports "\n"}}' "$dir")
   for bad in "${FORBIDDEN[@]}"; do
     while IFS= read -r imported; do
       if [[ "$imported" == "$bad" || "$imported" == "$bad/"* ]]; then
-        printf 'backend/%s imports forbidden dependency: %s\n' "$pkg" "$imported" >&2
+        printf 'promptsheon/%s imports forbidden dependency: %s\n' "$pkg" "$imported" >&2
         errors=$((errors + 1))
       fi
     done <<<"$imports"
