@@ -32,7 +32,7 @@ RUN npm run build
 RUN mkdir -p ../cmd/promptsheond/frontend && cp -r dist ../cmd/promptsheond/frontend/dist
 
 # ----- Go build stage ------------------------------------------------------
-FROM golang:1.23-alpine3.20 AS build
+FROM golang:1.24-alpine3.20 AS build
 WORKDIR /src
 
 # Cache go.mod first to maximise layer reuse.
