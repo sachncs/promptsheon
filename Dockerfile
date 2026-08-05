@@ -23,7 +23,7 @@
 # //go:embed directive picks it up at Go compile time. Without
 # this stage the binary ships an empty embed (the directory is
 # gitignored) and the dashboard 404s.
-FROM node:22-alpine AS frontend-build
+FROM node:25-alpine AS frontend-build
 WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
