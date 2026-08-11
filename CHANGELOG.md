@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Public SDK facade compiles**: `pkg/promptsheon/audit_keys.go`
+  referenced the obsolete `audit` sub-package, which was flattened
+  into `package promptsheon` (commit `33ee1681`). `go build
+  -tags=promptsheon ./pkg/promptsheon/...` failed with
+  `undefined: audit`; `make check-public` therefore failed. The
+  constants now live as literal strings in `audit_keys.go`, pinned
+  by `TestAuditKeys` in `public_test.go`.
+- **CLI default URL**: `cmd/promptsheon/cli_http.go` defaults to
+  `http://127.0.0.1:8080` instead of `http://localhost:8080`. On
+  macOS, `localhost` resolves to `::1` first, which routes to any
+  process bound to `[::]:8080`. Operators running the daemon on
+  the loopback address now reach it without setting
+  `PROMPTSHEON_SERVER`.
+- **README Quick Start**: the example now binds the daemon to
+  `127.0.0.1:8080`, sets `PROMPTSHEON_BOOTSTRAP_TOKEN`, and shows
+  the `POST /api/v1/setup` request with the `X-Bootstrap-Token`
+  header. Every subsequent curl in the Quick Start carries an
+  `Authorization: Bearer <admin-key>` header. The Go SDK section
+  imports `pkg/promptsheon` (the legacy `sdk/` import path was
+  removed in v1.0.0 per `pkg/promptsheon/CHANGELOG.md`).
+- **`--help` text**: `daemonHelpText` in `cmd/promptsheond/daemon.go`
+  now lists `PROMPTSHEON_BOOTSTRAP_TOKEN`, describes the bootstrap
+  endpoint as gated by `X-Bootstrap-Token`, and replaces the stale
+  "first caller wins" wording. The startup warning log was updated
+  to match.
+
+### Added
+
+- **CI step for the public SDK**: `.github/workflows/ci.yaml` now
+  runs `GOFLAGS=-tags=promptsheon go test -race -count=1 ./pkg/promptsheon/...`
+  so any future regression in the build-tagged SDK is caught on PR.
+
+## [Unreleased — prior layout pass]
+
 ### Changed
 
 - **Source layout**: the project is now root + `promptsheon/`. All

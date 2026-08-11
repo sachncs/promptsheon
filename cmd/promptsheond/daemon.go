@@ -970,7 +970,7 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *pro
 			"tls", cfg.TLSCertFile != "",
 		)
 		if !cfg.Auth {
-			logger.Warn("authentication is DISABLED; POST /api/v1/setup will mint an admin key to the first caller. Set PROMPTSHEON_AUTH=true before exposing this server.",
+			logger.Warn("authentication is DISABLED; POST /api/v1/setup remains gated by PROMPTSHEON_BOOTSTRAP_TOKEN. Set PROMPTSHEON_AUTH=true before exposing this server.",
 				"setup_endpoint", "POST /api/v1/setup")
 		}
 		var serveErr error
@@ -1186,13 +1186,14 @@ Flags:
 Configuration is read entirely from environment variables. The
 most common variables are:
 
-  PROMPTSHEON_ADDR           listen address (default ":8080")
-  PROMPTSHEON_DB_PATH        SQLite database path (default "promptsheon.db")
-  PROMPTSHEON_AUTH           enable authentication (default true)
-  PROMPTSHEON_LOG_LEVEL      debug | info | warn | error (default info)
-  PROMPTSHEON_VAULT_KEY      32-byte hex AES key for the provider vault
-  PROMPTSHEON_OTEL_ENDPOINT  OTLP gRPC endpoint for traces
-  PROMPTSHEON_CORS_ORIGINS   comma-separated CORS allowlist, or "*"
+  PROMPTSHEON_ADDR              listen address (default ":8080")
+  PROMPTSHEON_DB_PATH           SQLite database path (default "promptsheon.db")
+  PROMPTSHEON_AUTH              enable authentication (default true)
+  PROMPTSHEON_LOG_LEVEL         debug | info | warn | error (default info)
+  PROMPTSHEON_VAULT_KEY         32-byte hex AES key for the provider vault
+  PROMPTSHEON_OTEL_ENDPOINT     OTLP gRPC endpoint for traces
+  PROMPTSHEON_CORS_ORIGINS      comma-separated CORS allowlist, or "*"
+  PROMPTSHEON_BOOTSTRAP_TOKEN   secret required to call POST /api/v1/setup
 
 The full list is documented in docs/configuration.md.
 
@@ -1202,16 +1203,18 @@ Once running, the server exposes:
   GET /ready               readiness probe (checks the database)
   GET /api/v1/version      build info (always unauthenticated)
   GET /metrics             Prometheus metrics (always unauthenticated)
-  POST /api/v1/setup       first-run admin bootstrap; only active
-                           when PROMPTSHEON_AUTH=false and the
-                           user table is empty
-  /api/v1/...              REST API (see api/openpromptsheon.yaml)
+  POST /api/v1/setup       first-run admin bootstrap; gated by
+                           X-Bootstrap-Token: <PROMPTSHEON_BOOTSTRAP_TOKEN>.
+                           Returns 404 once any user exists.
+  /api/v1/...              REST API (see promptsheon/spec/spec.yaml)
 
 SECURITY: setting PROMPTSHEON_AUTH=false disables all
-authentication. The first caller of /api/v1/setup receives an
-admin key. Do not expose this server until you have set
-PROMPTSHEON_AUTH=true, rotated the bootstrap key, and configured
-a non-empty PROMPTSHEON_CORS_ORIGINS allowlist.
+authentication. POST /api/v1/setup remains gated by
+PROMPTSHEON_BOOTSTRAP_TOKEN regardless of auth mode. The daemon
+refuses to bind to a non-loopback address while auth is disabled;
+to expose the server externally, set PROMPTSHEON_AUTH=true, rotate
+the bootstrap token, and configure a non-empty
+PROMPTSHEON_CORS_ORIGINS allowlist.
 `
 }
 

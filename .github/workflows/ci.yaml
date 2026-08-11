@@ -115,6 +115,13 @@ jobs:
       - name: Build
         run: go build ./...
 
+      - name: Public SDK facade
+        # The pkg/promptsheon package is gated by the `promptsheon`
+        # build tag; the default test step skips it. Building and
+        # testing it explicitly catches breakage in the only public
+        # Go surface — see pkg/promptsheon/CHANGELOG.md.
+        run: GOFLAGS=-tags=promptsheon go test -race -count=1 ./pkg/promptsheon/...
+
       - name: OpenAPI spec is in sync
         # Item 1 (openapi): CI fails the build if a developer
         # added a route or changed a handler without
