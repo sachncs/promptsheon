@@ -19,7 +19,13 @@ const cliKeyName = "name"
 func serverURL() string {
 	u := os.Getenv("PROMPTSHEON_SERVER")
 	if u == "" {
-		u = "http://localhost:8080"
+		// 127.0.0.1 rather than localhost: on macOS localhost
+		// resolves to ::1 first, which routes to any process
+		// bound to [::]:8080. The CLI only talks to the local
+		// daemon; pinning to the IPv4 loopback keeps it on the
+		// same listener the daemon binds by default
+		// (PROMPTSHEON_ADDR=127.0.0.1:8080).
+		u = "http://127.0.0.1:8080"
 	}
 	return strings.TrimRight(u, "/")
 }

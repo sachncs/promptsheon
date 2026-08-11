@@ -117,8 +117,8 @@ func TestServerURL(t *testing.T) {
 
 	_ = os.Unsetenv("PROMPTSHEON_SERVER")
 	u := serverURL()
-	if u != "http://localhost:8080" {
-		t.Errorf("expected default http://localhost:8080, got %q", u)
+	if u != "http://127.0.0.1:8080" {
+		t.Errorf("expected default http://127.0.0.1:8080, got %q", u)
 	}
 
 	_ = os.Setenv("PROMPTSHEON_SERVER", "http://example.com:9090")
