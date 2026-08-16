@@ -155,7 +155,8 @@ func NewSQLite(dbPath string) (*SQLite, error) {
 	}
 	stmtGetRelease, err := prep(`SELECT id, capability_id, capability_version, manifest, environment, status,
 		approved_by, superseded_by, replaces_release_id,
-		created_at, created_by, activated_at, superseded_at
+		created_at, created_by, activated_at, superseded_at,
+		canary_percent
 	 FROM releases WHERE id = ?`)
 	if err != nil {
 		return nil, err

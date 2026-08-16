@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -217,6 +218,22 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 	if rel.Status != release.StatusActive {
 		return &HTTPError{Status: http.StatusConflict, Message: "release is not active"}
 	}
+
+	// PR-6 (v0.4.0) Canary Release primitive: when this release is a
+	// canary (CanaryPercent in [1, 99]), weighted-pick between it and
+	// the stable counterpart. The stable is the most recently activated
+	// release in the same (Capability, Environment) with CanaryPercent
+	// == 0. When the stable counterpart does not exist (e.g. the canary
+	// is the only active release), the canary receives 100% — the
+	// weighted pick deterministically returns the canary.
+	if rel.CanaryPercent > 0 {
+		stable, stableErr := s.db.GetStableReleaseInEnv(r.Context(), rel.CapabilityID, string(rel.Environment), releaseID)
+		if stableErr == nil && stable != nil {
+			if pick := weightedPickCanaryTarget(rel, stable); pick != nil {
+				rel = pick
+			}
+		}
+	}
 	var req invokeReleaseRequest
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
@@ -378,4 +395,40 @@ func manifestHashForRelease(rel *release.Release) (string, error) {
 		return "", err
 	}
 	return h, nil
+}
+
+// weightedPickCanaryTarget is the canary routing primitive. Given a
+// canary release and a stable release (both Active, same
+// CapabilityID+Environment), it returns one of them based on
+// canary.CanaryPercent. The pick uses math/rand so successive
+// invocations are statistically independent. The traffic-routing
+// decision does not require a CSPRNG — neither thread safety nor
+// adversarial prediction are properties we need here.
+//
+// Edge cases:
+//   - canary.CanaryPercent == 0 → stable (the caller treats 0 as
+//     "no canary routing"). Defensive: if a 0 canary reaches here,
+//     we still pick stable.
+//   - canary.CanaryPercent >= 100 → canary.
+//   - canary.CanaryPercent in [1, 99] → weighted pick.
+func weightedPickCanaryTarget(canary, stable *release.Release) *release.Release {
+	if canary == nil {
+		return stable
+	}
+	if stable == nil {
+		return canary
+	}
+	pct := canary.CanaryPercent
+	if pct <= 0 {
+		return stable
+	}
+	if pct >= 100 {
+		return canary
+	}
+	// rand.Intn(100) returns [0, 100). A value strictly less than
+	// pct lands on the canary; the complement lands on the stable.
+	if rand.Intn(100) < pct {
+		return canary
+	}
+	return stable
 }

@@ -31,4 +31,11 @@ type Repository interface {
 	// this as two separate writes (and document the gap); the call
 	// site does not need to know which.
 	ActivateAtomic(ctx context.Context, prior, next *Release) error
+
+	// GetStableReleaseInEnv returns the stable counterpart of a canary
+	// release — the most recently activated active release in the
+	// same (capability, environment) with canary_percent == 0,
+	// excluding excludeID. Returns (nil, nil) when no stable counterpart
+	// exists. PR-6 of docs/research/audit-fixes-plan.md.
+	GetStableReleaseInEnv(ctx context.Context, capabilityID, env, excludeID string) (*Release, error)
 }

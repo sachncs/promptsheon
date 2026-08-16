@@ -98,6 +98,18 @@ type Release struct {
 	CreatedBy         string              `json:"created_by"`
 	ActivatedAt       *time.Time          `json:"activated_at,omitempty"`
 	SupersededAt      *time.Time          `json:"superseded_at,omitempty"`
+	// CanaryPercent is the percentage of traffic the Release receives
+	// when there is also a stable Release in the same
+	// (CapabilityID, Environment). The value is in [0, 100]:
+	//
+	//   0     → the Release is not a canary; it is the stable (or retired).
+	//   100   → the Release is fully active (legacy behaviour).
+	//   1..99 → the Release shares traffic with the stable.
+	//
+	// PR-6 of docs/research/audit-fixes-plan.md introduces the
+	// in-process weighted canary; CanaryPercent is the schema
+	// primitive that carries the routing intent.
+	CanaryPercent int `json:"canary_percent,omitempty"`
 }
 
 // New constructs a Pending Release. Callers are responsible for

@@ -1,4 +1,3 @@
-
 package promptsheon
 
 import (
@@ -88,4 +87,11 @@ func (m *mockRepo) ActivateAtomic(_ context.Context, prior, next *release.Releas
 	cp := *next
 	m.releases[next.ID] = &cp
 	return nil
+}
+
+// GetStableReleaseInEnv returns (nil, nil) by default. Tests that
+// exercise canary routing override this method on a custom mock.
+// PR-6 of docs/research/audit-fixes-plan.md.
+func (m *mockRepo) GetStableReleaseInEnv(_ context.Context, _, _, _ string) (*release.Release, error) {
+	return nil, nil
 }

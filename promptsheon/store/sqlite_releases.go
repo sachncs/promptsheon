@@ -65,13 +65,15 @@ func (s *SQLite) CreateRelease(ctx context.Context, r *release.Release) error {
 		 (id, capability_id, capability_version, capability_version_id,
 		  manifest, environment, status,
 		  approved_by, superseded_by, replaces_release_id,
-		  created_at, created_by, activated_at, superseded_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		  created_at, created_by, activated_at, superseded_at,
+		  canary_percent)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		r.ID, r.CapabilityID, r.CapabilityVersion, capabilityVersionID,
 		string(manifestJSON),
 		string(r.Environment), string(r.Status), string(approvedByJSON),
 		emptyAsNull(r.SupersededBy), emptyAsNull(r.ReplacesReleaseID),
 		r.CreatedAt, r.CreatedBy, activatedAt, supersededAt,
+		r.CanaryPercent,
 	)
 	if err != nil {
 		return errf.Errorf("insert release: %w", err)
@@ -92,7 +94,8 @@ func (s *SQLite) GetRelease(ctx context.Context, id string) (*release.Release, e
 		row = s.db.QueryRowContext(ctx,
 			`SELECT id, capability_id, capability_version, manifest, environment, status,
 			        approved_by, superseded_by, replaces_release_id,
-			        created_at, created_by, activated_at, superseded_at
+			        created_at, created_by, activated_at, superseded_at,
+			        canary_percent
 			 FROM releases WHERE id = ?`, id,
 		)
 	}
@@ -103,7 +106,8 @@ func (s *SQLite) ListReleasesForCapability(ctx context.Context, capabilityID str
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, capability_id, capability_version, manifest, environment, status,
 		        approved_by, superseded_by, replaces_release_id,
-		        created_at, created_by, activated_at, superseded_at
+		        created_at, created_by, activated_at, superseded_at,
+		        canary_percent
 		 FROM releases WHERE capability_id = ? ORDER BY created_at DESC`, capabilityID,
 	)
 	if err != nil {
@@ -126,7 +130,8 @@ func (s *SQLite) ListActiveReleasesForEnvironment(ctx context.Context, env relea
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, capability_id, capability_version, manifest, environment, status,
 		        approved_by, superseded_by, replaces_release_id,
-		        created_at, created_by, activated_at, superseded_at
+		        created_at, created_by, activated_at, superseded_at,
+		        canary_percent
 		 FROM releases WHERE environment = ? AND status = ? ORDER BY created_at DESC`,
 		string(env), string(release.StatusActive),
 	)
@@ -187,6 +192,38 @@ func (s *SQLite) GetActiveReleaseIDInEnv(ctx context.Context, capabilityID, env 
 		return "", errf.Errorf("get active release in env: %w", err)
 	}
 	return id, nil
+}
+
+// GetStableReleaseInEnv returns the stable counterpart of a canary
+// release — the most recently activated active release in the same
+// (capability, environment) with canary_percent == 0. The excludeID
+// parameter is the canary's own ID; without it, the function would
+// always return the canary (the newest active release), which is
+// useless for routing.
+//
+// Returns (nil, nil) when no stable counterpart exists (the canary
+// is the only active release). The caller treats this as "canary
+// receives 100%".
+func (s *SQLite) GetStableReleaseInEnv(ctx context.Context, capabilityID, env, excludeID string) (*release.Release, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, capability_id, capability_version, manifest, environment, status,
+		        approved_by, superseded_by, replaces_release_id,
+		        created_at, created_by, activated_at, superseded_at,
+		        canary_percent
+		 FROM releases
+		 WHERE capability_id = ? AND environment = ? AND status = ?
+		   AND canary_percent = 0 AND id != ?
+		 ORDER BY activated_at DESC LIMIT 1`,
+		capabilityID, env, string(release.StatusActive), excludeID,
+	)
+	r, err := scanRelease(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errf.Errorf("get stable release: %w", err)
+	}
+	return r, nil
 }
 
 // LastEvalRunForRelease returns the most recent EvalRun
@@ -357,6 +394,7 @@ func scanRelease(scanner interface {
 		&envStr, &statusStr, &approvedByJSON,
 		&supersededBy, &replacesReleaseID,
 		&r.CreatedAt, &createdBy, &activatedAt, &supersededAt,
+		&r.CanaryPercent,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, errs.ErrReleaseNotFound

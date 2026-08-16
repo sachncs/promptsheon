@@ -1,4 +1,3 @@
-
 package store_test
 
 import (
@@ -177,10 +176,10 @@ func TestNewSQLiteRunsAllMigrations(t *testing.T) {
 	// 015 seed_settings + 016 bandit_arm_counters +
 	// 017 system_config_crdt + 018 capability_contract +
 	// 019 self_evolve (closed-loop self-evolution) +
-	// 020 audit_chain_state_immutability (PLAN-49 c0.12), the
-	// count is 20.
-	if n != 20 {
-		t.Errorf("migrations applied = %d, want 20", n)
+	// 020 audit_chain_state_immutability (PLAN-49 c0.12) +
+	// 021 canary (PR-6 / v0.4.0), the count is 21.
+	if n != 21 {
+		t.Errorf("migrations applied = %d, want 21", n)
 	}
 }
 
