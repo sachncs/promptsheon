@@ -1,10 +1,9 @@
-
 package store_test
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/store"
 	"testing"
 
+	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 func TestReleasesMigration024(t *testing.T) {

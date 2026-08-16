@@ -1,4 +1,3 @@
-
 // Notifier propagation tests. The CRDT-aware settings layer
 // raises an error from Publish so a subscriber that fails to
 // consume the new value (e.g. the vault refusing a hot-reload
@@ -9,12 +8,12 @@
 package settings_test
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/vault"
 	"errors"
 	"testing"
 
-	. "github.com/sachncs/promptsheon/promptsheon/settings"
+	"github.com/sachncs/promptsheon/promptsheon/vault"
 
+	. "github.com/sachncs/promptsheon/promptsheon/settings"
 )
 
 func TestNotifier_PublishReturnsSubscriberError(t *testing.T) {

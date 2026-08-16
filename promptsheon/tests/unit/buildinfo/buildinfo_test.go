@@ -1,4 +1,3 @@
-
 package buildinfo_test
 
 import (

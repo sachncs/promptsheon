@@ -1,4 +1,3 @@
-
 // Concurrent audit-append tests. Lives in a separate file so
 // the long-running store_test.go fixtures don't grow, and so the
 // regression for the audit-tail cache is grouped with the cache
@@ -6,13 +5,13 @@
 package store_test
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/store"
-	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/models"
+	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 // TestAppendAuditConcurrentChainPreserved hammers AppendAudit

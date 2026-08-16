@@ -1,13 +1,13 @@
-
 package harness_test
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"encoding/json"
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 
 	"github.com/sachncs/promptsheon/promptsheon/eval"
 )

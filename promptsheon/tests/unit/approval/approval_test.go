@@ -1,4 +1,3 @@
-
 package approval_test
 
 import (

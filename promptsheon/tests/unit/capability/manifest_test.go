@@ -1,4 +1,3 @@
-
 package capability_test
 
 import (

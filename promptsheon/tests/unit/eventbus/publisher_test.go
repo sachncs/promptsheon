@@ -1,16 +1,15 @@
-
 package eventbus_test
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"errors"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 	. "github.com/sachncs/promptsheon/promptsheon/eventbus"
-
 )
 
 func TestPublisherFiltersByType(t *testing.T) {

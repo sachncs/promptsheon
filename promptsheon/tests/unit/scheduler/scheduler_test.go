@@ -1,14 +1,14 @@
-
 package scheduler_test
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/scheduler"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 	"context"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/eventbus"
+	"github.com/sachncs/promptsheon/promptsheon/scheduler"
 
 	"github.com/sachncs/promptsheon/promptsheon/schedule"
 )

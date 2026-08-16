@@ -1,14 +1,13 @@
-
 package config_test
 
 import (
-	. "github.com/sachncs/promptsheon/promptsheon"
 	"bytes"
 	"log/slog"
 	"os"
 	"strings"
 	"testing"
 
+	. "github.com/sachncs/promptsheon/promptsheon"
 )
 
 func mustLoadConfig(t *testing.T) Config {

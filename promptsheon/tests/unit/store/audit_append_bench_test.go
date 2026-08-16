@@ -1,13 +1,12 @@
-
 package store_test
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/models"
 	"context"
 	"fmt"
 	"sync"
 	"testing"
 
+	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
 // BenchmarkAppendAuditCASSerial measures AppendAudit throughput

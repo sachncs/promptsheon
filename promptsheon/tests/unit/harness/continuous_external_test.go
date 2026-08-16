@@ -1,15 +1,15 @@
-
 package harness_test
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/release"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"encoding/json"
 	"log/slog"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/sachncs/promptsheon/promptsheon/harness"
+	"github.com/sachncs/promptsheon/promptsheon/release"
 
 	"github.com/sachncs/promptsheon/promptsheon/testutil/harnessrepo"
 )

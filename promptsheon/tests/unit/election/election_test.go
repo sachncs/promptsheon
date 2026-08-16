@@ -1,4 +1,3 @@
-
 package election_test
 
 import (

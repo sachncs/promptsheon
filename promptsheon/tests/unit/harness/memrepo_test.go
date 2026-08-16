@@ -1,4 +1,3 @@
-
 package harness_test
 
 import (

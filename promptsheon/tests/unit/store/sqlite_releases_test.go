@@ -1,15 +1,15 @@
-
 package store_test
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/approval"
-	"github.com/sachncs/promptsheon/promptsheon/store"
-	"github.com/sachncs/promptsheon/promptsheon/release"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/sachncs/promptsheon/promptsheon/approval"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/store"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 
