@@ -18,13 +18,13 @@
 package harnessrepo
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/release"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"errors"
 	"sync"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/harness"
+	"github.com/sachncs/promptsheon/promptsheon/release"
 )
 
 // ErrNotFound is returned for any lookup that misses. Tests

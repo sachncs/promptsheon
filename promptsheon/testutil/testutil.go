@@ -11,8 +11,6 @@
 package testutil
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/store"
-	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 	"context"
 	"database/sql"
 	"io"
@@ -22,8 +20,10 @@ import (
 	"testing"
 	"time"
 
-	_ "modernc.org/sqlite" // sqlite driver
+	"github.com/sachncs/promptsheon/promptsheon/eventbus"
+	"github.com/sachncs/promptsheon/promptsheon/store"
 
+	_ "modernc.org/sqlite" // sqlite driver
 )
 
 // DiscardLogger returns a *slog.Logger that writes to io.Discard.
