@@ -123,6 +123,10 @@ func (s *SQLite) AppendAudit(ctx context.Context, entry *models.AuditEntry) erro
 			return errf.Errorf("commit audit: %w", err)
 		}
 		s.auditTail.hash = entry.EntryHash
+		// #nosec G115 -- rowid is monotonically increasing from a
+		// SQLite auto-increment primary key; wrap-around to negative
+		// values would require >MaxInt64 inserts, which is not a
+		// realistic production scenario.
 		s.auditTail.rowid.Store(uint64(rowID))
 		return nil
 	}
@@ -247,6 +251,7 @@ func (s *SQLite) ExportAudit(ctx context.Context, filter *models.AuditFilter) ([
 
 func (s *SQLite) tailHashLocked(ctx context.Context, tx *sql.Tx) (rowID int64, hash string, err error) {
 	if cached := s.auditTail.rowid.Load(); cached != 0 && s.auditTail.hash != "" {
+		// #nosec G115 -- same rationale as the Store calls below.
 		return int64(cached), s.auditTail.hash, nil
 	}
 	queryErr := tx.QueryRowContext(ctx,
@@ -261,6 +266,7 @@ func (s *SQLite) tailHashLocked(ctx context.Context, tx *sql.Tx) (rowID int64, h
 		s.auditTail.hash = hash
 	}
 	if rowID != 0 {
+		// #nosec G115 -- see line 126.
 		s.auditTail.rowid.Store(uint64(rowID))
 	}
 	return rowID, hash, nil
