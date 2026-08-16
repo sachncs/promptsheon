@@ -329,11 +329,23 @@ func (s *SQLite) GetCapabilityContract(ctx context.Context, capabilityID string)
 			MaxHallucinationRate: maxHallu,
 		},
 	}
+	// P4.1: surface corrupt JSON to the caller as a
+	// contextual error rather than silently returning a
+	// capability with empty schemas. The capability is the
+	// surface the harness and SDK see; an empty schema is a
+	// silent contract drift. The CapabilityContract struct
+	// does not carry the capability id (it is the row's
+	// primary key in the join), so we use the function
+	// argument capabilityID for the error message.
 	if inJSON != "" && inJSON != "{}" {
-		_ = json.Unmarshal([]byte(inJSON), &c.InputSchema)
+		if err := json.Unmarshal([]byte(inJSON), &c.InputSchema); err != nil {
+			return nil, errf.Errorf("capability contract %s: decode input schema: %w", capabilityID, err)
+		}
 	}
 	if outJSON != "" && outJSON != "{}" {
-		_ = json.Unmarshal([]byte(outJSON), &c.OutputSchema)
+		if err := json.Unmarshal([]byte(outJSON), &c.OutputSchema); err != nil {
+			return nil, errf.Errorf("capability contract %s: decode output schema: %w", capabilityID, err)
+		}
 	}
 	return c, nil
 }

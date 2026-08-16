@@ -272,7 +272,9 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 	// use the Resolver's plan; otherwise we use the placeholder
 	// derived from the manifest hash, which surfaces as a 502
 	// at the provider call site.
-	rec, invErr, latency := s.invokeOneWithManifest(r, rel, req.Inputs, plan)
+	result, invErr := s.invokeOneWithManifest(r, rel, req.Inputs, plan)
+	rec := result.Record
+	latency := result.Duration
 	exec.LatencyMs = latency.Milliseconds()
 	// BUG-21/30: even on a failed invoke, when the executor
 	// returns a partial record (a record that has a token
@@ -334,17 +336,26 @@ func (s *Server) resolveRelease(ctx context.Context, rel *release.Release) (*rel
 //
 // Like invokeOne, requires s.invoker to be wired. A missing invoker
 // returns an error rather than a silent no-op.
-func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, inputs map[string]any, plan *release.ResolvedInvocation) (*executor.ExecutionRecord, error, time.Duration) {
+// invokeResult is the return tuple for invokeOneWithManifest.
+// The struct is exported so callers can name the fields at the
+// call site; the alternative (three return values, error in the
+// middle) was flagged by staticcheck as ST1008.
+type invokeResult struct {
+	Record   *executor.ExecutionRecord
+	Duration time.Duration
+}
+
+func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, inputs map[string]any, plan *release.ResolvedInvocation) (invokeResult, error) {
 	if s.invoker == nil {
-		return nil, errors.New("api: invoke.Invoker not wired on this server"), 0
+		return invokeResult{}, errors.New("api: invoke.Invoker not wired on this server")
 	}
 	input, err := json.Marshal(inputs)
 	if err != nil {
-		return nil, err, 0
+		return invokeResult{}, err
 	}
 	mHash, err := capability.ComputeManifestHash(rel.Manifest)
 	if err != nil {
-		return nil, err, 0
+		return invokeResult{}, err
 	}
 	model := ""
 	provider := ""
@@ -371,7 +382,7 @@ func (s *Server) invokeOneWithManifest(r *http.Request, rel *release.Release, in
 	}
 	start := time.Now()
 	rec, err := s.invoker.Invoke(r.Context(), req)
-	return &rec, err, time.Since(start)
+	return invokeResult{Record: &rec, Duration: time.Since(start)}, err
 }
 
 // GetReleaseApproval returns the releaseApproval.
@@ -413,6 +424,49 @@ func manifestHashForRelease(rel *release.Release) (string, error) {
 //   - canary.CanaryPercent >= 100 → canary.
 //   - canary.CanaryPercent in [1, 99] → weighted pick.
 func weightedPickCanaryTarget(canary, stable *release.Release) *release.Release {
+	return weightedPickCanaryTargetWith(canary, stable, defaultCanaryRNG)
+}
+
+// canaryRNG abstracts the random number source used by the
+// canary router. Tests substitute a deterministic source so the
+// weighted pick is reproducible; production uses
+// defaultCanaryRNG (math/rand) which is statistically uniform
+// for the canary routing decision. P3.5 of the audit made this
+// injectable so the routing decision is both reproducible in
+// tests and not silently relying on a CSPRNG.
+type canaryRNG interface {
+	Intn(n int) int
+}
+
+// defaultCanaryRNG is the production source. It wraps the
+// goroutine-safe math/rand top-level functions in a small
+// interface so weightedPickCanaryTargetWith can be tested
+// without exporting a private random handle.
+type mathRand struct{}
+
+// Intn returns the next int in [0, n) from the package-level
+// math/rand source. The decision the canary router makes is a
+// statistical A/B split, not a security decision: see the
+// P3.5 audit note on weightedPickCanaryTargetWith. gosec
+// flags every math/rand call as G404; this annotation covers
+// the wrapper itself.
+func (mathRand) Intn(n int) int { return rand.Intn(n) } // #nosec G404 -- A/B routing is statistical, not security-sensitive
+
+var defaultCanaryRNG canaryRNG = mathRand{}
+
+// weightedPickCanaryTargetWith is the testable core of the
+// canary router. It takes a random source so the routing
+// decision is reproducible; the canary/stable branch selection
+// logic itself is unchanged.
+//
+// G404: math/rand is intentional here. The canary routing
+// decision is a statistical A/B split, not a security
+// decision: a CSPRNG would be a misuse of the API. The
+// injectable canaryRNG interface lets tests substitute a
+// deterministic source, which is the audit's P3.5
+// recommendation (deterministic injectable selection for
+// tests and production behaviour tests).
+func weightedPickCanaryTargetWith(canary, stable *release.Release, rng canaryRNG) *release.Release { // #nosec G404 -- A/B routing is statistical, not security-sensitive
 	if canary == nil {
 		return stable
 	}
@@ -426,9 +480,9 @@ func weightedPickCanaryTarget(canary, stable *release.Release) *release.Release 
 	if pct >= 100 {
 		return canary
 	}
-	// rand.Intn(100) returns [0, 100). A value strictly less than
+	// rng.Intn(100) returns [0, 100). A value strictly less than
 	// pct lands on the canary; the complement lands on the stable.
-	if rand.Intn(100) < pct {
+	if rng.Intn(100) < pct {
 		return canary
 	}
 	return stable

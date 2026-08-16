@@ -5,12 +5,16 @@ name: fuzz
 # schedule next-fire. Failures abort the PR. Production:
 # nightly fuzz runs for 60s per harness via schedule +
 # workflow_dispatch.
+#
+# Path filters and target packages were migrated from
+# `backend/...` to the current `promptsheon/...` layout as
+# part of the compliance refactor.
 on:
   pull_request:
     paths:
-      - 'backend/vault/**'
-      - 'backend/cas/**'
-      - 'backend/schedule/**'
+      - 'promptsheon/vault/**'
+      - 'promptsheon/cas/**'
+      - 'promptsheon/schedule/**'
   schedule:
     # Nightly at 03:00 UTC
     - cron: '0 3 * * *'
@@ -32,12 +36,12 @@ jobs:
 
       - name: Fuzz vault
         run: |
-          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./backend/vault/...
+          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./promptsheon/vault/...
 
       - name: Fuzz CAS verification
         run: |
-          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./backend/cas/...
+          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./promptsheon/cas/...
 
       - name: Fuzz schedule next-fire
         run: |
-          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./backend/schedule/...
+          go test -run='^$' -fuzz='^Fuzz' -fuzztime=60s ./promptsheon/schedule/...

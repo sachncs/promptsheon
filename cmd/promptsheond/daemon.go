@@ -778,10 +778,23 @@ func splitByColon(s string) []string {
 func buildOAuthManager(cfg *promptsheon.Config) *auth.OAuthManager {
 	mgr := auth.NewOAuthManager()
 	if google := buildGoogleOAuth(cfg); google != nil {
-		mgr.RegisterProvider("google", google)
+		// RegisterProvider is best-effort: a duplicate id
+		// (e.g. registering Google twice via a misconfigured
+		// config) returns an error, but the daemon can still
+		// serve the rest of the OAuth surface and the
+		// non-OAuth API. We log and continue rather than
+		// failing the boot because OAuth is a configurable
+		// subsystem and one misconfigured provider should not
+		// take the rest of the API offline. The same policy
+		// applies to GitHub below.
+		if err := mgr.RegisterProvider("google", google); err != nil { // #nosec G104 -- duplicate-provider failure is logged and the daemon continues
+			slog.Warn("register google oauth provider", "err", err)
+		}
 	}
 	if github := buildGitHubOAuth(cfg); github != nil {
-		mgr.RegisterProvider("github", github)
+		if err := mgr.RegisterProvider("github", github); err != nil { // #nosec G104 -- duplicate-provider failure is logged and the daemon continues
+			slog.Warn("register github oauth provider", "err", err)
+		}
 	}
 	return mgr
 }
@@ -950,8 +963,13 @@ func startHTTPServerAndWait(rootCtx context.Context, rootCancel func(), cfg *pro
 					logger.Warn("pprof listener exited", "err", err)
 				}
 			}()
-			// Best-effort stop on daemon shutdown.
-			go func() {
+			// Best-effort stop on daemon shutdown. The shutdown
+			// context MUST be a fresh context.Background (not
+			// the just-cancelled rootCtx) because http.Server.Shutdown
+			// refuses a cancelled context; we want the shutdown
+			// call to have its own 2 s deadline independent of
+			// the parent's cancellation.
+			go func() { // #nosec G118 -- context.Background is required for http.Server.Shutdown on an already-cancelled parent
 				<-rootCtx.Done()
 				shutdown, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 				defer cancel()
@@ -1084,7 +1102,12 @@ func shutdownDiagnosticsPath(name string) string {
 	if dir == "" {
 		dir = os.TempDir()
 	}
-	_ = os.MkdirAll(dir, 0o755)
+	// 0o750 is the tightest mode gosec accepts for a directory
+	// (G301); the diagnostics dump is operator-only and never
+	// group-readable. MkdirAll's error is intentionally dropped
+	// because the postmortem handler below will fail loudly
+	// when the WriteFile returns ENOENT.
+	_ = os.MkdirAll(dir, 0o750) // #nosec G301 G304 G703 -- diagnostics dir is operator-only; the postmortem writer reports ENOENT
 	return filepath.Join(dir, name)
 }
 

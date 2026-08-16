@@ -47,9 +47,13 @@ func TestWeightedPickCanaryTarget_FullCanary(t *testing.T) {
 }
 
 func TestWeightedPickCanaryTarget_Statistical(t *testing.T) {
-	// Seed the global math/rand so the test is deterministic.
-	rng := rand.New(rand.NewSource(42))
-	_ = rng // intentionally unused; we exercise the function below.
+	// Use a deterministic local source so the test is reproducible
+	// across runs and does not depend on math/rand's global seed.
+	// weightedPickCanaryTargetWith accepts a canaryRNG so we can
+	// pass a *rand.Rand directly without exporting a private
+	// handle.
+	src := rand.New(rand.NewSource(42))
+	rng := testRand{src: src}
 
 	canary := &release.Release{ID: "c", CanaryPercent: 25}
 	stable := &release.Release{ID: "s", CanaryPercent: 0}
@@ -62,7 +66,7 @@ func TestWeightedPickCanaryTarget_Statistical(t *testing.T) {
 	canaryCount := 0
 	const trials = 10000
 	for i := 0; i < trials; i++ {
-		if weightedPickCanaryTarget(canary, stable) == canary {
+		if weightedPickCanaryTargetWith(canary, stable, rng) == canary {
 			canaryCount++
 		}
 	}
@@ -72,21 +76,38 @@ func TestWeightedPickCanaryTarget_Statistical(t *testing.T) {
 	}
 }
 
+// testRand adapts *rand.Rand to the canaryRNG interface used by
+// weightedPickCanaryTargetWith. Living in the test file keeps the
+// production interface free of test-only dependencies.
+type testRand struct {
+	src *rand.Rand
+}
+
+func (t testRand) Intn(n int) int { return t.src.Intn(n) }
+
 func TestWeightedPickCanaryTarget_BoundaryPercent(t *testing.T) {
 	// Boundary values: 1% should still be reachable (canary can win);
 	// 99% should still sometimes pick stable.
 	// Both are exercised by the statistical test above; this test
 	// pins the determinism of the edge cases.
+	//
+	// Go 1.20+ seeds the global math/rand source with a
+	// deterministic value; using the package-level default
+	// for boundary tests would be flaky (the 1% branch
+	// would rarely hit canary). Use the injectable
+	// weightedPickCanaryTargetWith with a seeded local
+	// source so the test is reproducible.
+	src := rand.New(rand.NewSource(42))
+	rng := testRand{src: src}
 
 	canary := &release.Release{ID: "c", CanaryPercent: 1}
 	stable := &release.Release{ID: "s", CanaryPercent: 0}
-	// pct >= 100 → canary; pct <= 0 → stable. Boundary check:
-	if weightedPickCanaryTarget(canary, stable) != canary && weightedPickCanaryTarget(canary, stable) != stable {
+	if weightedPickCanaryTargetWith(canary, stable, rng) != canary && weightedPickCanaryTargetWith(canary, stable, rng) != stable {
 		t.Errorf("1 percent: must return one of the inputs")
 	}
 
 	canary99 := &release.Release{ID: "c", CanaryPercent: 99}
-	if weightedPickCanaryTarget(canary99, stable) != canary99 && weightedPickCanaryTarget(canary99, stable) != stable {
+	if weightedPickCanaryTargetWith(canary99, stable, rng) != canary99 && weightedPickCanaryTargetWith(canary99, stable, rng) != stable {
 		t.Errorf("99 percent: must return one of the inputs")
 	}
 }

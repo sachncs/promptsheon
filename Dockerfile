@@ -32,7 +32,10 @@ RUN npm run build
 RUN mkdir -p ../cmd/promptsheond/frontend && cp -r dist ../cmd/promptsheond/frontend/dist
 
 # ----- Go build stage ------------------------------------------------------
-FROM golang:1.23-alpine3.20 AS build
+# Pin to the same Go version the project's go.mod declares so the
+# container build matches local development. Bump together with
+# go.mod and the CI matrix in .github/workflows/ci.yaml.
+FROM golang:1.26.5-alpine3.20 AS build
 WORKDIR /src
 
 # Cache go.mod first to maximise layer reuse.
@@ -51,14 +54,16 @@ ARG COMMIT_DATE=unknown
 
 # Build all three binaries. The package paths match the cmd/
 # subdirectory layout; there's no package main at the repo root.
+# Linker targets use the buildinfo package which the runtime
+# reads via buildinfo.Get() (see buildinfo/buildinfo.go).
 RUN CGO_ENABLED=0 go build \
-      -ldflags "-s -w -X github.com/sachncs/promptsheon/backend.Version=${VERSION} -X github.com/sachncs/promptsheon/backend.Commit=${COMMIT} -X github.com/sachncs/promptsheon/backend.BuildTime=${COMMIT_DATE}" \
+      -ldflags "-s -w -X github.com/sachncs/promptsheon/buildinfo.Version=${VERSION} -X github.com/sachncs/promptsheon/buildinfo.Commit=${COMMIT} -X github.com/sachncs/promptsheon/buildinfo.BuildTime=${COMMIT_DATE}" \
       -o /out/promptsheond ./cmd/promptsheond
 RUN CGO_ENABLED=0 go build \
-      -ldflags "-s -w -X github.com/sachncs/promptsheon/backend.Version=${VERSION} -X github.com/sachncs/promptsheon/backend.Commit=${COMMIT} -X github.com/sachncs/promptsheon/backend.BuildTime=${COMMIT_DATE}" \
+      -ldflags "-s -w -X github.com/sachncs/promptsheon/buildinfo.Version=${VERSION} -X github.com/sachncs/promptsheon/buildinfo.Commit=${COMMIT} -X github.com/sachncs/promptsheon/buildinfo.BuildTime=${COMMIT_DATE}" \
       -o /out/promptsheon ./cmd/promptsheon
 RUN CGO_ENABLED=0 go build \
-      -ldflags "-s -w -X github.com/sachncs/promptsheon/backend.Version=${VERSION} -X github.com/sachncs/promptsheon/backend.Commit=${COMMIT} -X github.com/sachncs/promptsheon/backend.BuildTime=${COMMIT_DATE}" \
+      -ldflags "-s -w -X github.com/sachncs/promptsheon/buildinfo.Version=${VERSION} -X github.com/sachncs/promptsheon/buildinfo.Commit=${COMMIT} -X github.com/sachncs/promptsheon/buildinfo.BuildTime=${COMMIT_DATE}" \
       -o /out/promptsheon-healthcheck ./cmd/promptsheon-healthcheck
 
 # ----- Runtime stage -------------------------------------------------------

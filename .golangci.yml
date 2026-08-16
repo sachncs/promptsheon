@@ -1,39 +1,44 @@
-# golangci-lint configuration for promptsheon
-# PR-0 c0.1: minimal setup with gofmt, govet, errcheck.
-# PR-5A c5.0: extends with custom promptsheon-bans plugin.
+version: "2"
 
+# golangci-lint v2 configuration for promptsheon.
+#
+# Migrated from v1 schema. The v1 file had no `version:` key
+# (which v2.x rejects) and used the `linters:` shorthand block
+# that v2.x removed. In v2, `gofmt` is a formatter (not a
+# linter) and lives under `formatters:`; the remaining checks
+# (govet, errcheck, ineffassign, unused, staticcheck) live
+# under `linters:`. The errcheck `check-blank` and
+# `check-type-assertions` settings remain under
+# `linters.settings`.
+#
+# Re-run `golangci-lint config verify` after editing this file;
+# v2.x validates the file against an embedded JSON schema and
+# rejects unknown keys with no obvious place to report them.
 run:
   timeout: 5m
   tests: true
   modules-download-mode: readonly
 
-linters:
-  disable-all: true
+formatters:
   enable:
     - gofmt
-    - govet
+  settings:
+    gofmt:
+      simplify: true
+
+linters:
+  default: standard
+  enable:
     - errcheck
     - ineffassign
-    - unused
     - staticcheck
-  fast-only: false
-
-linters-settings:
-  gofmt:
-    simplify: true
-  govet:
-    enable-all: true
-  errcheck:
-    check-blank: true
-    check-type-assertions: true
+  settings:
+    govet:
+      enable-all: true
+    errcheck:
+      check-blank: true
+      check-type-assertions: true
 
 issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
-        - ineffassign
-        - unused
   max-issues-per-linter: 0
   max-same-issues: 0
-  new: false

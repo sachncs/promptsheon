@@ -54,7 +54,9 @@ func (s *Server) handleCreateExecution(w http.ResponseWriter, r *http.Request) e
 	if err := readJSON(r, &req); err != nil {
 		return ErrBadRequest
 	}
-	rec, invErr, latency := s.invokeOne(r, capabilityVersionID, req.Inputs, req.Model, req.Provider)
+	result, invErr := s.invokeOne(r, capabilityVersionID, req.Inputs, req.Model, req.Provider)
+	rec := result.Record
+	latency := result.Duration
 	exec := &capability.Execution{
 		ID:                  generateID(),
 		CapabilityVersionID: capabilityVersionID,
@@ -161,13 +163,13 @@ func classifyInvokeError(err error) error {
 // "stub" path — a missing invoker is a programming error and
 // returns a clear error rather than a silent no-op so misconfigured
 // deployments fail loudly.
-func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]any, model, provider string) (*executor.ExecutionRecord, error, time.Duration) {
+func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]any, model, provider string) (invokeResult, error) {
 	if s.invoker == nil {
-		return nil, errors.New("api: invoke.Invoker not wired on this server"), 0
+		return invokeResult{}, errors.New("api: invoke.Invoker not wired on this server")
 	}
 	input, err := json.Marshal(inputs)
 	if err != nil {
-		return nil, err, 0
+		return invokeResult{}, err
 	}
 	mh := capability.ManifestHashPlaceholder(versionID, model, provider)
 	if v, err := s.db.GetVersion(r.Context(), versionID); err == nil {
@@ -187,7 +189,7 @@ func (s *Server) invokeOne(r *http.Request, versionID string, inputs map[string]
 	}
 	start := time.Now()
 	rec, err := s.invoker.Invoke(r.Context(), req)
-	return &rec, err, time.Since(start)
+	return invokeResult{Record: &rec, Duration: time.Since(start)}, err
 }
 
 // GetExecution returns the execution.

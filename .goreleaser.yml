@@ -38,22 +38,17 @@ builds:
       - arm64
     hooks:
       pre:
-        - cmd: sh
-          args:
-            - -c
-            - |
-              command -v node >/dev/null 2>&1 || { echo "node missing"; exit 1; }
-              cd frontend
-              [ -d node_modules ] || npm ci --no-audit --no-fund
-              npm run build
-              rm -rf ../cmd/promptsheond/frontend/dist
-              mkdir -p ../cmd/promptsheond/frontend/dist
-              cp -r dist/. ../cmd/promptsheond/frontend/dist/
+        # GoReleaser v2 collapses `cmd: sh` + `args: [-c, '<script>']`
+        # into a single `cmd: sh -c '<script>'` shape. The script is
+        # the v1 payload verbatim: ensure node is available, install
+        # deps if missing, build the dashboard, and refresh the
+        # //go:embed target at cmd/promptsheond/frontend/dist.
+        - cmd: sh -c "command -v node >/dev/null 2>&1 || { echo 'node missing'; exit 1; } && (cd frontend && ([ -d node_modules ] || npm ci --no-audit --no-fund) && npm run build && rm -rf ../cmd/promptsheond/frontend/dist && mkdir -p ../cmd/promptsheond/frontend/dist && cp -r dist/. ../cmd/promptsheond/frontend/dist/)"
     ldflags:
       - -s -w
-      - -X github.com/sachncs/promptsheon/backend.Version={{.Version}}
-      - -X github.com/sachncs/promptsheon/backend.Commit={{.Commit}}
-      - -X github.com/sachncs/promptsheon/backend.BuildTime={{.CommitDate}}
+      - -X github.com/sachncs/promptsheon/buildinfo.Version={{.Version}}
+      - -X github.com/sachncs/promptsheon/buildinfo.Commit={{.Commit}}
+      - -X github.com/sachncs/promptsheon/buildinfo.BuildTime={{.CommitDate}}
 
   - id: promptsheon-cli
     main: ./cmd/promptsheon
@@ -69,9 +64,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/sachncs/promptsheon/backend.Version={{.Version}}
-      - -X github.com/sachncs/promptsheon/backend.Commit={{.Commit}}
-      - -X github.com/sachncs/promptsheon/backend.BuildTime={{.CommitDate}}
+      - -X github.com/sachncs/promptsheon/buildinfo.Version={{.Version}}
+      - -X github.com/sachncs/promptsheon/buildinfo.Commit={{.Commit}}
+      - -X github.com/sachncs/promptsheon/buildinfo.BuildTime={{.CommitDate}}
 
   - id: promptsheon-healthcheck
     main: ./cmd/promptsheon-healthcheck
@@ -87,9 +82,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/sachncs/promptsheon/backend.Version={{.Version}}
-      - -X github.com/sachncs/promptsheon/backend.Commit={{.Commit}}
-      - -X github.com/sachncs/promptsheon/backend.BuildTime={{.CommitDate}}
+      - -X github.com/sachncs/promptsheon/buildinfo.Version={{.Version}}
+      - -X github.com/sachncs/promptsheon/buildinfo.Commit={{.Commit}}
+      - -X github.com/sachncs/promptsheon/buildinfo.BuildTime={{.CommitDate}}
 
 archives:
   - id: promptsheond

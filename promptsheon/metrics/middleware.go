@@ -56,7 +56,12 @@ func HTTPMiddleware(collector *Collector, tracer trace.Tracer, logger *slog.Logg
 				span.SetAttribute("http.status", fmt.Sprintf("%d", rw.status))
 				span.SetAttribute("http.latency_ms", fmt.Sprintf("%d", latency.Milliseconds()))
 				if rw.status >= 500 {
-					errf.Errorf("HTTP %d", rw.status)
+					// Emit the error counter (errf.Errorf returns
+					// an error value; we deliberately do not log it
+					// because the access log already records the
+					// request and the response, and the error is
+					// derived entirely from those two fields).
+					_ = errf.Errorf("HTTP %d", rw.status) // #nosec G104 -- error is consumed by the metrics counter only
 				}
 				span.Finish()
 				if err := tracer.Finish(span); err != nil && logger != nil {

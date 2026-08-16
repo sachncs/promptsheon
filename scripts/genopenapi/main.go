@@ -53,7 +53,10 @@ func main() {
 	if err != nil {
 		fail("getwd: %v", err)
 	}
-	versionData, err := os.ReadFile(filepath.Join(repoRoot, "VERSION"))
+	// repoRoot is the operator's CWD; the path is fixed
+	// (VERSION lives at the repo root). This is a code generator
+	// the operator runs from the repo root, not a request handler.
+	versionData, err := os.ReadFile(filepath.Join(repoRoot, "VERSION")) // #nosec G304 -- code generator reads fixed path under operator's CWD
 	if err != nil {
 		fail("read VERSION: %v", err)
 	}

@@ -441,8 +441,14 @@ func (c *Config) Port() int {
 // whose keys match the Config field names. We use a strict
 // YAML decoder so a typo (e.g. `db_path:` vs `DBPath:`) fails
 // the boot rather than silently loading defaults.
+//
+// The path is operator-supplied via $PROMPTSHEON_CONFIG; it is
+// not derived from request data. The daemon logs the path at
+// boot so any unexpected value is visible in the operational
+// log, and ReadFile's own error path covers both ENOENT and
+// permission denials.
 func loadYAMLFile(cfg *Config, path string) error {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 G703 -- path is from $PROMPTSHEON_CONFIG (operator-controlled), not from request data
 	if err != nil {
 		return errf.Errorf("read: %w", err)
 	}

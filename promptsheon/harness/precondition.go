@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
@@ -229,12 +228,28 @@ func (r *PreconditionRunner) runOne(ctx context.Context, p Precondition) Precond
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(cctx, "sh", "-c", p.Command)
+	// The precondition command string comes from a Capability
+	// version's `command:` field, which is operator-controlled
+	// at release time. The whole subsystem is gated by
+	// PROMPTSHEON_HARNESS_PRECONDITIONS (off by default), the
+	// env is scrubbed to EnvAllowlist (so secrets cannot leak
+	// into the child), the child runs in its own process group
+	// (so a forked grandchild cannot outlive the context), and
+	// the timeout is bounded by p.TimeoutSec. Operators who
+	// want strict argv-only execution should file a follow-on
+	// to change the Precondition schema from `command string`
+	// to `argv []string`; that's an API change and out of
+	// scope for this revision.
+	cmd := exec.CommandContext(cctx, "sh", "-c", p.Command) // #nosec G204 -- command is operator-controlled; precondition subsystem is off by default and the env is scrubbed
 	cmd.Dir = dir
 	cmd.Env = scrubEnv()
 	// Put the command in its own process group so we can kill
-	// the whole tree on timeout.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// the whole tree on timeout. The Setpgid / SIGKILL helpers
+	// live in precondition_unix.go and precondition_windows.go
+	// respectively because the syscall symbols involved
+	// (syscall.SysProcAttr.Setpgid, syscall.Kill on negative
+	// PID) are POSIX-only.
+	configureProcessGroup(cmd)
 
 	out, err := cmd.CombinedOutput()
 	res := PreconditionResult{
@@ -248,7 +263,7 @@ func (r *PreconditionRunner) runOne(ctx context.Context, p Precondition) Precond
 		// On timeout, ensure the whole process group is reaped
 		// so a forked child cannot outlive the cancellation.
 		if cmd.Process != nil {
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			killProcessGroup(cmd)
 		}
 		return res
 	}

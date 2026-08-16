@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 
 	"github.com/sachncs/promptsheon/errf"
@@ -163,20 +161,8 @@ func apiGetCapability(id string) ([]byte, error) {
 // config. The daemon accepts the partial update; fields not
 // in the body are preserved.
 func apiUpdateSelfEvolve(capID string, fields map[string]any) error {
-	body, _ := json.Marshal(fields)
-	req, err := http.NewRequest(http.MethodPut, serverURL()+"/api/v1/capabilities/"+capID+"/self-evolve", strings.NewReader(string(body)))
-	if err != nil {
+	if err := httpPut(serverURL()+"/api/v1/capabilities/"+capID+"/self-evolve", fields, nil); err != nil {
 		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode >= 300 {
-		b, _ := io.ReadAll(resp.Body)
-		return errf.Errorf("daemon returned %s: %s", resp.Status, string(b))
 	}
 	fmt.Printf("self-evolve: capability %s updated\n", capID)
 	return nil

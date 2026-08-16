@@ -18,7 +18,14 @@ import (
 
 // registerE2EProvider is a no-op in default builds. The matching
 // e2e-tagged version installs the in-memory LLM stub.
-func registerE2EProvider(reg *llm.Registry, logger *slog.Logger) any {
+//
+// U1000 (unused): the function is only called from the e2e
+// daemon (cmd/promptsheond/daemon.go inside the //go:build e2e
+// block). staticcheck can't see across build tags and reports
+// the stub as unused. The linter baseline accepts this single
+// finding; if a future change calls registerE2EProvider from
+// the default build, remove the stub file.
+func registerE2EProvider(reg *llm.Registry, logger *slog.Logger) any { // #nosec U1000 -- used only in e2e builds; see comment above
 	_ = reg
 	_ = logger
 	return nil

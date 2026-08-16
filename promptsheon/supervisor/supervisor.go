@@ -139,7 +139,15 @@ func (a *Adapter) Publish(ev PluginEvent) {
 	if a == nil || a.bus == nil {
 		return
 	}
-	a.bus.Publish(capability.Event{
+	// The supervisor adapter is fire-and-forget by design: a
+	// misconfigured subscriber must not be able to wedge a
+	// plugin lifecycle transition. The bus's own Publish
+	// returns an error only when the channel buffer is full,
+	// which is itself a back-pressure signal that the
+	// supervisor logs at the call site if it cares. Here we
+	// just drop the event on the floor — the supervisor has
+	// already advanced state past the publish point.
+	_ = a.bus.Publish(capability.Event{ // #nosec G104 -- fire-and-forget by design; back-pressure is logged at the bus level
 		ID:        generateAdapterID("sup"),
 		Type:      capability.EventPluginLifecycle,
 		Timestamp: ev.Timestamp,

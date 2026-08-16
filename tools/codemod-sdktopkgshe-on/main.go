@@ -68,7 +68,12 @@ func walk(root string) error {
 
 func process(path string, info os.FileInfo) error {
 	fset := token.NewFileSet()
-	src, err := os.ReadFile(path)
+	// path is the filepath.Walk-supplied argument for files
+	// under the repository root; the operator invokes the
+	// codemod from the repo root. Reading the file is the
+	// purpose of the tool; gosec's G304 false-positives every
+	// os.ReadFile call.
+	src, err := os.ReadFile(path) // #nosec G304 -- codemod reads every Go file under the operator-supplied root; this is the tool's purpose
 	if err != nil {
 		return err
 	}

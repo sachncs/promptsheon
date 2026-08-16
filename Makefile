@@ -102,7 +102,7 @@ lint-deps:
 # Format code
 fmt:
 	gofmt -s -w .
-	goimports -w .
+	@command -v goimports >/dev/null 2>&1 && goimports -w . || echo "goimports not installed; install with: go install golang.org/x/tools/cmd/goimports@latest"
 
 # Run go vet
 vet:

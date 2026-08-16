@@ -1,5 +1,3 @@
 cmd/promptsheond/daemon.go:59:2: "golang.org/x/net/http2/h2c" is deprecated: This package is deprecated.  (SA1019)
-cmd/promptsheond/daemon.go:905:18: h2c.NewHandler is deprecated: Set the [http.Server] Protocols field to use unencrypted HTTP/2 instead.  (SA1019)
-cmd/promptsheond/e2e_provider_stub.go:21:6: func registerE2EProvider is unused (U1000)
-promptsheon/handlers_executions.go:164:138: error should be returned as the last argument (ST1008)
-promptsheon/handlers_releases.go:337:164: error should be returned as the last argument (ST1008)
+cmd/promptsheond/daemon.go:918:18: h2c.NewHandler is deprecated: Set the [http.Server] Protocols field to use unencrypted HTTP/2 instead.  (SA1019)
+cmd/promptsheond/e2e_provider_stub.go:28:6: func registerE2EProvider is unused (U1000)

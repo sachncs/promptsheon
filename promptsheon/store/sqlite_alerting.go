@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"log/slog"
 	"time"
 
 	"github.com/sachncs/promptsheon/errf"
@@ -246,8 +245,13 @@ func scanAlertRule(row scannable) (*models.AlertRuleRecord, error) {
 		return nil, errf.Errorf("scan alert rule: %w", err)
 	}
 	if configJSON != "" {
+		// P4.1: surface corrupt JSON to the caller as a
+		// contextual error rather than silently returning a
+		// rule with an empty config. The previous code logged
+		// and continued, which produced a half-initialised
+		// rule that fired on the wrong conditions.
 		if err := json.Unmarshal([]byte(configJSON), &r.Config); err != nil {
-			slog.Error("failed to unmarshal alert rule config", "err", err, "id", r.ID)
+			return nil, errf.Errorf("alert rule %s: decode config: %w", r.ID, err)
 		}
 	}
 	return &r, nil
@@ -270,8 +274,13 @@ func scanAlert(row scannable) (*models.AlertRecord, error) {
 		return nil, errf.Errorf("scan alert: %w", err)
 	}
 	if detailsJSON != "" {
+		// P4.1: surface corrupt JSON to the caller as a
+		// contextual error rather than silently returning an
+		// alert with empty Details. The audit log records the
+		// failed lookup; operators can re-insert the row from a
+		// backup if needed.
 		if err := json.Unmarshal([]byte(detailsJSON), &a.Details); err != nil {
-			slog.Error("failed to unmarshal alert details", "err", err, "id", a.ID)
+			return nil, errf.Errorf("alert %s: decode details: %w", a.ID, err)
 		}
 	}
 	a.ResolvedAt = resolvedAt
@@ -291,8 +300,11 @@ func scanNotificationGroup(row scannable) (*models.NotificationGroupRecord, erro
 		return nil, errf.Errorf("scan notification group: %w", err)
 	}
 	if channelsJSON != "" {
+		// P4.1: surface corrupt JSON to the caller as a
+		// contextual error rather than silently returning a
+		// group with empty Channels.
 		if err := json.Unmarshal([]byte(channelsJSON), &g.Channels); err != nil {
-			slog.Error("failed to unmarshal notification channels", "err", err, "id", g.ID)
+			return nil, errf.Errorf("notification group %s: decode channels: %w", g.ID, err)
 		}
 	}
 	return &g, nil

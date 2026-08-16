@@ -127,8 +127,15 @@ func cmdPrecondition(args []string) error {
 		timeout := readStrFlag(args[2:], "--timeout")
 		body := map[string]any{"name": name, "command": cmd, "timeout_sec": 60}
 		if timeout != "" {
+			// Sscanf on a non-numeric string is a no-op (the
+			// destination stays at 0), so the parse error is
+			// not actionable here — a non-numeric --timeout
+			// falls back to the default below. Discarding the
+			// error is intentional; do not switch to a strict
+			// parse without coordinating with the API consumer
+			// documentation in docs/reference/harness.md.
 			var t int
-			fmt.Sscanf(timeout, "%d", &t)
+			_, _ = fmt.Sscanf(timeout, "%d", &t) // #nosec G104 -- non-numeric input falls back to the default below
 			if t > 0 {
 				body["timeout_sec"] = t
 			}
@@ -254,8 +261,14 @@ func readTwoFlags(args []string, a, b string) (string, string, error) {
 // [{"inputs": ..., "expected": ...}, ...] (or just the array) and
 // returns it as []harness.DatasetCase-shaped JSON. We accept both
 // shapes for ergonomic CLI use.
+//
+// The path is supplied via the CLI's --cases-file flag (or as a
+// positional argument) by a human operator; it is never derived
+// from a request. Path-traversal hardening for the CLI is out
+// of scope — the operator can already execute any process on
+// the host, and the file is read as-is by the OS layer.
 func loadCasesFile(path string) ([]map[string]any, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 G703 -- path is operator-supplied CLI argument, not request-derived
 	if err != nil {
 		return nil, err
 	}

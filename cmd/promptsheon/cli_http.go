@@ -110,3 +110,39 @@ func httpDelete(rawURL string) error {
 	}
 	return nil
 }
+
+// httpPut issues a PUT with a JSON body. The URL is validated
+// against the same loopback allowlist as httpGet/httpPost so the
+// CLI cannot be redirected against a non-local endpoint.
+func httpPut(rawURL string, body, v any) error {
+	if err := validateLocalURL(rawURL); err != nil {
+		return err
+	}
+	b, err := json.Marshal(body)
+	if err != nil {
+		return errf.Errorf("marshal body: %w", err)
+	}
+	// #nosec G704 -- URL validated to localhost by validateLocalURL above.
+	req, err := http.NewRequest(http.MethodPut, rawURL, strings.NewReader(string(b)))
+	if err != nil {
+		return errf.Errorf("PUT %s: %w", rawURL, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	// #nosec G704 -- URL validated to localhost by validateLocalURL above.
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return errf.Errorf("PUT %s: %w", rawURL, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode >= 400 {
+		var errBody map[string]string
+		if err := json.NewDecoder(resp.Body).Decode(&errBody); err != nil {
+			return errf.Errorf("PUT %s: %s", rawURL, resp.Status)
+		}
+		return errf.Errorf("PUT %s: %s (%s)", rawURL, resp.Status, errBody["error"])
+	}
+	if v != nil {
+		return json.NewDecoder(resp.Body).Decode(v)
+	}
+	return nil
+}

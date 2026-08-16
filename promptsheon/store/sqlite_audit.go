@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/sachncs/promptsheon/errf"
@@ -467,8 +466,13 @@ func scanAuditRow(rows *sql.Rows) (*models.AuditEntry, error) {
 	if err != nil {
 		return nil, errf.Errorf("scan audit entry: %w", err)
 	}
+	// P4.1: surface corrupt JSON to the caller as a
+	// contextual error rather than silently returning an
+	// audit entry with empty Details. The audit chain is the
+	// system of record for compliance; a corrupt Details
+	// payload must be loud, not quiet.
 	if err := json.Unmarshal([]byte(details), &e.Details); err != nil {
-		slog.Error("failed to unmarshal audit details", "err", err, "id", e.ID)
+		return nil, errf.Errorf("audit entry %s: decode details: %w", e.ID, err)
 	}
 	e.PreviousHash = prevHash
 	e.EntryHash = entryHash
