@@ -20,7 +20,7 @@ If you discover a security vulnerability, please report it responsibly:
 
 ## Security Model
 
-For the full threat model, controls, and the operator checklist, see [docs/security.md](docs/security.md).
+For the full threat model, controls, and the operator checklist, see [docs/security/security.md](docs/security/security.md).
 
 ## License
 

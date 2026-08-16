@@ -37,10 +37,10 @@ import (
 // rejected with exit code 2 to prevent the binary from being
 // redirected against a third-party endpoint (SSRF).
 var allowedHealthcheckHosts = map[string]struct{}{
-	"localhost":   {},
-	"127.0.0.1":   {},
-	"::1":         {},
-	"":            {}, // empty defaults to localhost in getenv below
+	"localhost": {},
+	"127.0.0.1": {},
+	"::1":       {},
+	"":          {}, // empty defaults to localhost in getenv below
 }
 
 func runHealthcheck() {
