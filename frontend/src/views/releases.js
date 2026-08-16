@@ -1,35 +1,34 @@
-import * as api from "../api.js";
-import { escape, formatRelative, apiStatusLabel } from "../utils.js";
+// src/views/releases.js — releases listing page.
+//
+// Surfaces every release across every workspace / project / capability
+// in a single flat table with environment and status filters. Uses
+// ui.js primitives so the page header, filter chips, table, and
+// status pills match the rest of the dashboard.
 
+import * as api from "../api.js";
+import { escape, formatRelative } from "../utils.js";
+import { statusPill, pageHeader, panel, chipGroup, dataTable, emptyState, errorState, badge } from "../ui.js";
+
+const ENV_TONES = { prod: "good", staging: "warn", dev: "neutral" };
 const STATUS_TONES = { active: "good", approved: "good", pending: "warn", superseded: "neutral", rolled_back: "danger" };
 const ENVS = ["prod", "staging", "dev"];
+const STATUS_OPTIONS = ["active", "approved", "pending", "superseded", "rolled_back"];
 
-function pill(text, tone = "neutral") {
-  return `<span class="status-pill ${tone} !px-2 !py-1"><span class="status-dot"></span>${escape(text)}</span>`;
-}
+function envTone(env) { return ENV_TONES[env] || "neutral"; }
+function statusTone(status) { return STATUS_TONES[status] || "neutral"; }
 
-function rowShell() {
-  return `<tr><td colspan="6" class="py-4"><div class="skeleton h-3 w-full"></div></td></tr>`;
-}
-
-function renderRow(release, capabilityName) {
-  const tone = STATUS_TONES[release.status] || "neutral";
-  const envTone = release.environment === "prod" ? "good" : release.environment === "staging" ? "warn" : "neutral";
-  return `<tr class="border-t border-line/60 cursor-pointer hover:bg-paper/40" data-open-release="${escape(release.id)}">
-    <td class="py-3 pr-3 text-[.66rem] text-muted whitespace-nowrap">${escape(formatRelative(release.created_at))}</td>
-    <td class="py-3 pr-3 text-[.7rem] font-bold whitespace-nowrap">${escape(capabilityName)}</td>
-    <td class="py-3 pr-3 mono text-[.66rem]">v${escape(release.capability_version)}</td>
-    <td class="py-3 pr-3">${pill(release.environment, envTone)}</td>
-    <td class="py-3 pr-3">${pill(release.status, tone)}</td>
-    <td class="py-3 pr-3 text-[.62rem] text-muted mono truncate max-w-[12rem]" title="${escape(release.id)}">${escape(release.id)}</td>
-  </tr>`;
-}
-
-function chips(legend, active, dataAttr) {
-  return legend.map((item) => {
-    const on = (active || "all") === item.value;
-    return `<button type="button" data-${dataAttr}="${escape(item.value)}" class="rounded-md ${on ? "bg-ink text-paper" : "bg-paper text-muted hover:text-ink"} px-2.5 py-1.5 text-[.66rem] font-${on ? "bold" : "semibold"}">${escape(item.label)}</button>`;
-  }).join("");
+function rowRenderer(capMap) {
+  return (release) => {
+    const capName = capMap.get(release.capability_id)?.name || "Unknown";
+    return {
+      when: `<span class="text-muted whitespace-nowrap">${escape(formatRelative(release.created_at))}</span>`,
+      capability: `<button type="button" data-open-release="${escape(release.id)}" class="text-[.7rem] font-bold text-left hover:underline">${escape(capName)}</button>`,
+      version: `<span class="mono text-[.66rem]">v${escape(release.capability_version)}</span>`,
+      environment: statusPill(release.environment, envTone(release.environment)),
+      status: statusPill(release.status, statusTone(release.status)),
+      id: `<span class="text-[.62rem] text-muted mono truncate max-w-[12rem] inline-block align-middle" title="${escape(release.id)}">${escape(release.id)}</span>`,
+    };
+  };
 }
 
 export async function renderReleases(route) {
@@ -41,9 +40,10 @@ export async function renderReleases(route) {
 
   const workspaces = await api.listWorkspaces();
   if (!workspaces.ok) {
-    root.innerHTML = `<p class="panel p-6 text-center text-[.78rem]">${escape(apiStatusLabel(workspaces))}</p>`;
+    root.innerHTML = `<p class="panel p-6 text-center text-[.78rem] text-muted">${escape(workspaces.error || "Failed to load workspaces.")}</p>`;
     return "";
   }
+
   const allProjects = [];
   const allCaps = [];
   const allRels = [];
@@ -62,61 +62,77 @@ export async function renderReleases(route) {
     if (rels.ok) for (const r of rels.data || []) allRels.push(r);
     await new Promise((r) => setTimeout(r, 60));
   }
+
   const capMap = new Map(allCaps.map((c) => [c.id, c]));
   const filtered = allRels.filter((r) =>
     (envFilter === "all" || r.environment === envFilter) &&
-    (statusFilter === "all" || r.status === statusFilter)
+    (statusFilter === "all" || r.status === statusFilter),
   ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  const envChips = chips([{ value: "all", label: "all envs" }, ...ENVS.map((e) => ({ value: e, label: e }))], envFilter, "release-env");
-  const statusChips = chips([{ value: "all", label: "all" }, { value: "active", label: "active" }, { value: "approved", label: "approved" }, { value: "pending", label: "pending" }, { value: "superseded", label: "superseded" }, { value: "rolled_back", label: "rolled back" }], statusFilter, "release-status");
+  const envItems = [{ key: "all", label: "all envs" }, ...ENVS.map((e) => ({ key: e, label: e }))];
+  const statusItems = [{ key: "all", label: "all" }, ...STATUS_OPTIONS.map((s) => ({ key: s, label: s.replace("_", " ") }))];
 
-  const shell = `
-    <section class="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <div class="eyebrow">Release pipeline</div>
-        <h1 class="mt-2 text-[1.4rem] font-bold tracking-[-.04em]">Releases (${allRels.length} total · ${filtered.length} shown)</h1>
-        <p class="mt-1 text-[.78rem] text-muted">Cross-workspace view of every release. Click a row to vote or rollback in the modal.</p>
-      </div>
-    </section>
-    <section class="panel p-5 sm:p-6 mt-5">
-      <div class="flex flex-wrap items-end gap-3">
-        <div><div class="eyebrow mb-2">Environment</div><div class="flex items-center gap-1 rounded-lg bg-paper p-1" data-release-env-chips>${envChips}</div></div>
-        <div><div class="eyebrow mb-2">Status</div><div class="flex items-center gap-1 rounded-lg bg-paper p-1" data-release-status-chips>${statusChips}</div></div>
-      </div>
-    </section>
-    <section class="panel overflow-hidden mt-5">
-      <div class="overflow-x-auto">
-        <table class="w-full text-[.7rem]">
-          <thead><tr class="bg-paper text-left text-[.6rem] uppercase tracking-wider text-muted"><th class="px-4 py-2 font-bold">When</th><th class="px-4 py-2 font-bold">Capability</th><th class="px-4 py-2 font-bold">Version</th><th class="px-4 py-2 font-bold">Environment</th><th class="px-4 py-2 font-bold">Status</th><th class="px-4 py-2 font-bold">Release id</th></tr></thead>
-          <tbody id="releases-tbody">${filtered.length ? filtered.map((r) => renderRow(r, capMap.get(r.capability_id)?.name)).join("") : `<tr><td colspan="6" class="py-8 text-center text-[.72rem] text-muted">No releases match this filter.</td></tr>`}</tbody>
-        </table>
-      </div>
-    </section>
-  `;
-  root.innerHTML = shell;
+  const table = dataTable({
+    columns: [
+      { key: "when", label: "When" },
+      { key: "capability", label: "Capability" },
+      { key: "version", label: "Version" },
+      { key: "environment", label: "Environment" },
+      { key: "status", label: "Status" },
+      { key: "id", label: "Release id" },
+    ],
+    rows: filtered.map((r) => rowRenderer(capMap)(r)),
+    emptyMessage: "No releases match this filter.",
+    emptyIcon: "icon-rocket",
+  });
+
+  const html = [
+    pageHeader({
+      eyebrow: "Release pipeline",
+      title: `Releases (${allRels.length} total · ${filtered.length} shown)`,
+      description: "Cross-workspace view of every release. Click a row to vote or rollback in the modal.",
+    }),
+    panel({
+      eyebrow: "Filter",
+      title: "Find releases",
+      body: `
+        <div class="flex flex-wrap items-end gap-3">
+          <div><div class="field-label">Environment</div>${chipGroup(envItems, { activeKey: envFilter, onClickDataAttr: "data-release-env" })}</div>
+          <div><div class="field-label">Status</div>${chipGroup(statusItems, { activeKey: statusFilter, onClickDataAttr: "data-release-status" })}</div>
+        </div>
+      `,
+    }),
+    panel({ title: "Releases", rightSlot: badge(`${filtered.length}`, { tone: "neutral" }), body: table, padded: false }),
+  ].join("");
+  root.innerHTML = html;
 
   root.querySelectorAll("[data-release-env]").forEach((b) => {
     b.addEventListener("click", () => {
-      window.location.hash = `#/releases?env=${encodeURIComponent(b.dataset.releaseEnv)}&status=${encodeURIComponent(statusFilter)}`;
+      const next = b.dataset.releaseEnv;
+      const params = new URLSearchParams();
+      if (next !== "all") params.set("env", next);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      window.location.hash = `#/releases${params.toString() ? `?${params}` : ""}`;
       window.location.reload();
     });
   });
   root.querySelectorAll("[data-release-status]").forEach((b) => {
     b.addEventListener("click", () => {
-      window.location.hash = `#/releases?env=${encodeURIComponent(envFilter)}&status=${encodeURIComponent(b.dataset.releaseStatus)}`;
+      const next = b.dataset.releaseStatus;
+      const params = new URLSearchParams();
+      if (envFilter !== "all") params.set("env", envFilter);
+      if (next !== "all") params.set("status", next);
+      window.location.hash = `#/releases${params.toString() ? `?${params}` : ""}`;
       window.location.reload();
     });
   });
-
-  root.querySelector("tbody")?.addEventListener("click", async (event) => {
-    const tr = event.target.closest("[data-open-release]");
-    if (!tr) return;
-    const id = tr.dataset.openRelease;
-    const { openReleaseModal } = await import("./release-modal.js");
-    const modalRoot = window.document.getElementById("modal-root");
-    await openReleaseModal(modalRoot, id);
+  root.querySelectorAll("[data-open-release]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const id = b.dataset.openRelease;
+      const mod = await import("./release-modal.js");
+      if (typeof mod.openReleaseModal === "function") mod.openReleaseModal(id);
+    });
   });
 
-  return shell;
+  return html;
 }
