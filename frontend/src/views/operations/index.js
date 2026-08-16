@@ -2,10 +2,9 @@ import * as api from "../../api.js";
 import { escape, formatRelative, apiStatusLabel } from "../../utils.js";
 import { renderSettingsTab as settingsTab } from "../settings-view.js";
 import { renderCatalogTab as catalogTab } from "../catalog-view.js";
+import { statusPill, pageHeader, panel, errorState } from "../../ui.js";
 
-function pill(text, tone = "neutral") {
-  return `<span class="status-pill ${tone} !px-2 !py-1"><span class="status-dot"></span>${escape(text)}</span>`;
-}
+const pill = statusPill;
 
 const TABS = [
   { key: "alerts", label: "Alerts", href: "#/operations/alerts" },
@@ -19,6 +18,18 @@ const TABS = [
   { key: "reasoning", label: "Reasoning", href: "#/operations/reasoning" }
 ];
 
+const TAB_TITLES = {
+  alerts: { eyebrow: "Operator surface", title: "Alerts", description: "Configure alert rules and notification groups; resolve incoming signals." },
+  webhooks: { eyebrow: "Operator surface", title: "Webhooks", description: "Outbound webhooks with HMAC signing and SSRF protection." },
+  vault: { eyebrow: "Operator surface", title: "Vault", description: "Encrypted secrets used by capability prompts and tools." },
+  providers: { eyebrow: "Operator surface", title: "Providers", description: "LLM providers available to capabilities; configure keys and model policies." },
+  apikeys: { eyebrow: "Operator surface", title: "API keys", description: "Tokens for the dashboard, CLI, and CI; new values are shown once." },
+  users: { eyebrow: "Operator surface", title: "Users", description: "Console users and their roles." },
+  settings: { eyebrow: "Operator surface", title: "Settings", description: "Workspace settings (CRDT-backed, last-write-wins with version vectors)." },
+  catalog: { eyebrow: "Operator surface", title: "Catalog", description: "Cross-workspace capability catalog." },
+  reasoning: { eyebrow: "Operator surface", title: "Reasoning", description: "Capability plan compilation from intents." },
+};
+
 export function tabNav(active) {
   return `<nav class="flex flex-wrap items-center gap-1 rounded-xl bg-paper p-1" aria-label="Operations navigation">${TABS.map((t) => {
     const on = t.key === active;
@@ -27,7 +38,7 @@ export function tabNav(active) {
 }
 
 function errorPanel(text) {
-  return `<p class="panel p-5 mt-5 text-[.78rem] text-muted">${escape(text)}</p>`;
+  return `<div class="mt-5">${errorState({ ok: false, error: text })}</div>`;
 }
 
 async function alertsTab() {
@@ -256,12 +267,13 @@ export async function renderOperations(route) {
   const renderer = renderers[tab] || alertsTab;
   const body = await renderer();
 
-  const shell = `
-    <section>
-      <div class="eyebrow">Operator surface</div>
-      <h1 class="mt-2 text-[1.4rem] font-bold tracking-[-.04em]">${escape(tab[0].toUpperCase() + tab.slice(1))}</h1>
-      <div class="mt-4">${tabNav(tab)}</div>
-    </section>
+  const tabInfo = TAB_TITLES[tab] || { eyebrow: "Operator surface", title: tab[0].toUpperCase() + tab.slice(1), description: "" };
+  const shell = `${pageHeader({
+    eyebrow: tabInfo.eyebrow,
+    title: tabInfo.title,
+    description: tabInfo.description,
+    actions: tabNav(tab),
+  })}
     ${body}
   `;
   // Settings and catalog render directly into the view (they
