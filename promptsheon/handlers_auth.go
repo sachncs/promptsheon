@@ -409,6 +409,9 @@ func (s *Server) handleOAuthLogin(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
+	// #nosec G124 -- Secure is set conditionally on the request's
+	// TLS state; on plain HTTP requests browsers ignore the Secure
+	// flag regardless.
 	http.SetCookie(w, &http.Cookie{
 		Name:     oauthStateCookie,
 		Value:    state,
@@ -565,6 +568,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 		"auto_provision": autoProvisioned,
 	})
 
+	// #nosec G124 -- see login cookie above.
 	http.SetCookie(w, &http.Cookie{
 		Name:     oauthStateCookie,
 		Value:    "",

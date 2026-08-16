@@ -11,7 +11,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" // #nosec G108 -- gated behind PROMPTSHEON_PPROF_ADDR loopback check
 	"os"
 	"os/signal"
 	"path/filepath"
