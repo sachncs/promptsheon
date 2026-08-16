@@ -796,7 +796,7 @@ func buildGoogleOAuth(cfg *promptsheon.Config) *auth.OAuthProvider {
 	return &auth.OAuthProvider{
 		Name:         "google",
 		ClientID:     clientID,
-		ClientSecret: clientSecret,
+		ClientSecret: clientSecret, // #nosec G101 -- populated from runtime config, not hardcoded
 		RedirectURL:  redirectURL,
 		AuthURL:      "https://accounts.google.com/o/oauth2/v2/auth",
 		TokenURL:     "https://oauth2.googleapis.com/token",
@@ -815,7 +815,7 @@ func buildGitHubOAuth(cfg *promptsheon.Config) *auth.OAuthProvider {
 	return &auth.OAuthProvider{
 		Name:         "github",
 		ClientID:     clientID,
-		ClientSecret: clientSecret,
+		ClientSecret: clientSecret, // #nosec G101 -- populated from runtime config, not hardcoded
 		RedirectURL:  redirectURL,
 		AuthURL:      "https://github.com/login/oauth/authorize",
 		TokenURL:     "https://github.com/login/oauth/access_token",
@@ -1095,7 +1095,7 @@ func writeGoroutineDump(dir string) {
 	p := shutdownDiagnosticsPath("promptsheon-goroutines-" + strconv.FormatInt(time.Now().UnixNano(), 10) + ".log")
 	buf := make([]byte, 1<<20)
 	n := runtime.Stack(buf, true)
-	if err := os.WriteFile(p, buf[:n], 0o644); err != nil {
+	if err := os.WriteFile(p, buf[:n], 0o600); err != nil {
 		slog.Error("writeGoroutineDump", "err", err)
 	}
 }
