@@ -1,11 +1,11 @@
-
 package evolve
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 
 	"github.com/sachncs/promptsheon/promptsheon/eval"
 )

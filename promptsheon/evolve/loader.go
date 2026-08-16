@@ -1,10 +1,10 @@
 package evolve
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/cas"
 	"context"
 
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/cas"
 )
 
 // CasPromptLoader reads and writes prompt blobs in the local

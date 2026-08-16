@@ -1,12 +1,13 @@
 package cas
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
 	"strings"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // DiffResult is the structured output of DiffIntelligence. The

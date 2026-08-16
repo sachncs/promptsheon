@@ -3,8 +3,9 @@
 package cas
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"os"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // flockAcquire is a Windows stub. The Go runtime on Windows does not expose

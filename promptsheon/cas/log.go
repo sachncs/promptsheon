@@ -1,8 +1,9 @@
 package cas
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"sort"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // LogEntry is one row in the output of Log. The Timestamp is in

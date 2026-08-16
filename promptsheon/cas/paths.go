@@ -1,9 +1,10 @@
 package cas
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"os"
 	"path/filepath"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // branchRefPath returns the relative path of a branch ref inside PromptsheonDir.

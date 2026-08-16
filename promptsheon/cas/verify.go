@@ -1,11 +1,12 @@
 package cas
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // VerifyResult is the structured output of Verify. The counters

@@ -1,10 +1,11 @@
 package cas
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // Filesystem layout for a promptsheon repository. These constants

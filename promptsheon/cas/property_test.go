@@ -1,4 +1,3 @@
-
 // Property-based tests for the CAS layer. The library used
 // (testing/quick) is the standard-library property harness; this
 // file pins the content-addressing invariants that the store

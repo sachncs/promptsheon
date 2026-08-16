@@ -1,7 +1,6 @@
 package cas
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
@@ -15,6 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // Sentinel errors returned by the store package.

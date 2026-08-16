@@ -3,8 +3,9 @@
 package cas
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"errors"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // CreateBranch creates a new branch pointing at targetHash. If

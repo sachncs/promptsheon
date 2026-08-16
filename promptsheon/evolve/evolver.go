@@ -1,16 +1,16 @@
 package evolve
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/store"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"encoding/json"
 	"log/slog"
 	"sort"
 	"time"
 
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
+	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 // Evolver is the closed-loop self-evolution orchestrator.

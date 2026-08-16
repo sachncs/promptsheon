@@ -1,12 +1,13 @@
 package evolve
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"encoding/json"
 	"strings"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 
 	"github.com/sachncs/promptsheon/promptsheon/eval"
 )

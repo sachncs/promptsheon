@@ -3,9 +3,10 @@
 package cas
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"os"
 	"syscall"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // flockAcquire takes an exclusive flock(2) on f. Blocks until the lock is

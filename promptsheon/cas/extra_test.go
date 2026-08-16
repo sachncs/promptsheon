@@ -1,8 +1,6 @@
-
 package cas
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"encoding/json"
 	"errors"
 	"io"
@@ -11,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // ---------------------------------------------------------------------------

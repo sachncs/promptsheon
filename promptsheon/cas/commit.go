@@ -1,8 +1,9 @@
 package cas
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"errors"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // CommitResult is the value returned by Commit. The Hash is the

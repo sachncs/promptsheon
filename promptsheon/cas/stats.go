@@ -1,9 +1,10 @@
 package cas
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"os"
 	"path/filepath"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // RepoStats summarises a repository. All counters are non-negative

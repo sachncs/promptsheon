@@ -1,9 +1,10 @@
 package evolve
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"encoding/json"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // LLMRevisionStrategy asks a revision LLM for a new
