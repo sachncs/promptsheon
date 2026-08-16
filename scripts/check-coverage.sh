@@ -43,9 +43,16 @@ check_profile() {
         package = "promptsheon"
       }
       else if (file ~ /\/promptsheon\//) {
-        split(file, parts, "/promptsheon/")
-        split(parts[2], name, "/")
-        package = name[1]
+        n = split(file, parts, "/")
+        package = ""
+        for (i = n; i >= 1; i--) {
+          if (parts[i] == "promptsheon") {
+            if (i + 1 <= n) {
+              package = parts[i + 1]
+            }
+            break
+          }
+        }
       }
       if (package == "promptsheon" || package == "promptsheon/store") {
         total[package] += statements
