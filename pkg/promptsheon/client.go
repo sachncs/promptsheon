@@ -853,27 +853,27 @@ func (c *Client) OAuthLoginURL(provider string) string {
 
 // Version calls GET /api/v1/version.
 func (c *Client) Version(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/version", nil)
+	return c.do(ctx, "GET", "/api/v1/version", nil)
 }
 
 // ListWorkspaces calls GET /api/v1/workspaces.
 func (c *Client) ListWorkspaces(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/workspaces", nil)
+	return c.do(ctx, "GET", "/api/v1/workspaces", nil)
 }
 
 // GetWorkspace calls GET /api/v1/workspaces/{id}.
 func (c *Client) GetWorkspace(ctx context.Context, id string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/workspaces/" + id, nil)
+	return c.do(ctx, "GET", "/api/v1/workspaces/"+id, nil)
 }
 
 // UpdateWorkspace calls PUT /api/v1/workspaces/{id}.
 func (c *Client) UpdateWorkspace(ctx context.Context, id string, req any) (json.RawMessage, error) {
-		return c.do(ctx, "PUT", "/api/v1/workspaces/" + id, req)
+	return c.do(ctx, "PUT", "/api/v1/workspaces/"+id, req)
 }
 
 // DeleteWorkspace calls DELETE /api/v1/workspaces/{id}.
 func (c *Client) DeleteWorkspace(ctx context.Context, id string) error {
-		if _, err := c.do(ctx, "DELETE", "/api/v1/workspaces/" + id, nil); err != nil {
+	if _, err := c.do(ctx, "DELETE", "/api/v1/workspaces/"+id, nil); err != nil {
 		return err
 	}
 	return nil
@@ -881,32 +881,32 @@ func (c *Client) DeleteWorkspace(ctx context.Context, id string) error {
 
 // GetWorkspaceObservation calls GET /api/v1/workspaces/{id}/observation.
 func (c *Client) GetWorkspaceObservation(ctx context.Context, id string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/workspaces/" + id + "/observation", nil)
+	return c.do(ctx, "GET", "/api/v1/workspaces/"+id+"/observation", nil)
 }
 
 // ListProjects calls GET /api/v1/workspaces/{workspace_id}/projects.
 func (c *Client) ListProjects(ctx context.Context, workspaceId string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/workspaces/" + workspaceId + "/projects", nil)
+	return c.do(ctx, "GET", "/api/v1/workspaces/"+workspaceId+"/projects", nil)
 }
 
 // CreateProject calls POST /api/v1/workspaces/{workspace_id}/projects.
 func (c *Client) CreateProject(ctx context.Context, workspaceId string, req any) (json.RawMessage, error) {
-		return c.do(ctx, "POST", "/api/v1/workspaces/" + workspaceId + "/projects", req)
+	return c.do(ctx, "POST", "/api/v1/workspaces/"+workspaceId+"/projects", req)
 }
 
 // GetProject calls GET /api/v1/projects/{id}.
 func (c *Client) GetProject(ctx context.Context, id string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/projects/" + id, nil)
+	return c.do(ctx, "GET", "/api/v1/projects/"+id, nil)
 }
 
 // UpdateProject calls PUT /api/v1/projects/{id}.
 func (c *Client) UpdateProject(ctx context.Context, id string, req any) (json.RawMessage, error) {
-		return c.do(ctx, "PUT", "/api/v1/projects/" + id, req)
+	return c.do(ctx, "PUT", "/api/v1/projects/"+id, req)
 }
 
 // DeleteProject calls DELETE /api/v1/projects/{id}.
 func (c *Client) DeleteProject(ctx context.Context, id string) error {
-		if _, err := c.do(ctx, "DELETE", "/api/v1/projects/" + id, nil); err != nil {
+	if _, err := c.do(ctx, "DELETE", "/api/v1/projects/"+id, nil); err != nil {
 		return err
 	}
 	return nil
@@ -914,22 +914,22 @@ func (c *Client) DeleteProject(ctx context.Context, id string) error {
 
 // ListCapabilities calls GET /api/v1/projects/{project_id}/capabilities.
 func (c *Client) ListCapabilities(ctx context.Context, projectId string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/projects/" + projectId + "/capabilities", nil)
+	return c.do(ctx, "GET", "/api/v1/projects/"+projectId+"/capabilities", nil)
 }
 
 // GetCapability calls GET /api/v1/capabilities/{id}.
 func (c *Client) GetCapability(ctx context.Context, id string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/capabilities/" + id, nil)
+	return c.do(ctx, "GET", "/api/v1/capabilities/"+id, nil)
 }
 
 // UpdateCapability calls PUT /api/v1/capabilities/{id}.
 func (c *Client) UpdateCapability(ctx context.Context, id string, req any) (json.RawMessage, error) {
-		return c.do(ctx, "PUT", "/api/v1/capabilities/" + id, req)
+	return c.do(ctx, "PUT", "/api/v1/capabilities/"+id, req)
 }
 
 // DeleteCapability calls DELETE /api/v1/capabilities/{id}.
 func (c *Client) DeleteCapability(ctx context.Context, id string) error {
-		if _, err := c.do(ctx, "DELETE", "/api/v1/capabilities/" + id, nil); err != nil {
+	if _, err := c.do(ctx, "DELETE", "/api/v1/capabilities/"+id, nil); err != nil {
 		return err
 	}
 	return nil
@@ -937,82 +937,82 @@ func (c *Client) DeleteCapability(ctx context.Context, id string) error {
 
 // GetCapabilityContract calls GET /api/v1/capabilities/{id}/contract.
 func (c *Client) GetCapabilityContract(ctx context.Context, id string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/capabilities/" + id + "/contract", nil)
+	return c.do(ctx, "GET", "/api/v1/capabilities/"+id+"/contract", nil)
 }
 
 // UpdateCapabilityContract calls PUT /api/v1/capabilities/{id}/contract.
 func (c *Client) UpdateCapabilityContract(ctx context.Context, id string, req any) (json.RawMessage, error) {
-		return c.do(ctx, "PUT", "/api/v1/capabilities/" + id + "/contract", req)
+	return c.do(ctx, "PUT", "/api/v1/capabilities/"+id+"/contract", req)
 }
 
 // DiffCapabilities calls GET /api/v1/capabilities/{id}/diff.
 func (c *Client) DiffCapabilities(ctx context.Context, id string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/capabilities/" + id + "/diff", nil)
+	return c.do(ctx, "GET", "/api/v1/capabilities/"+id+"/diff", nil)
 }
 
 // GetCapabilityReputation calls GET /api/v1/capabilities/{id}/reputation.
 func (c *Client) GetCapabilityReputation(ctx context.Context, id string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/capabilities/" + id + "/reputation", nil)
+	return c.do(ctx, "GET", "/api/v1/capabilities/"+id+"/reputation", nil)
 }
 
 // UpdateSelfEvolveConfig calls PUT /api/v1/capabilities/{id}/self-evolve.
 func (c *Client) UpdateSelfEvolveConfig(ctx context.Context, id string, req any) (json.RawMessage, error) {
-		return c.do(ctx, "PUT", "/api/v1/capabilities/" + id + "/self-evolve", req)
+	return c.do(ctx, "PUT", "/api/v1/capabilities/"+id+"/self-evolve", req)
 }
 
 // ListVersions calls GET /api/v1/capabilities/{capability_id}/versions.
 func (c *Client) ListVersions(ctx context.Context, capabilityId string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/capabilities/" + capabilityId + "/versions", nil)
+	return c.do(ctx, "GET", "/api/v1/capabilities/"+capabilityId+"/versions", nil)
 }
 
 // GetLatestVersion calls GET /api/v1/capabilities/{capability_id}/versions/latest.
 func (c *Client) GetLatestVersion(ctx context.Context, capabilityId string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/capabilities/" + capabilityId + "/versions/latest", nil)
+	return c.do(ctx, "GET", "/api/v1/capabilities/"+capabilityId+"/versions/latest", nil)
 }
 
 // GetVersion calls GET /api/v1/versions/{id}.
 func (c *Client) GetVersion(ctx context.Context, id string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/versions/" + id, nil)
+	return c.do(ctx, "GET", "/api/v1/versions/"+id, nil)
 }
 
 // ListExecutions calls GET /api/v1/versions/{version_id}/executions.
 func (c *Client) ListExecutions(ctx context.Context, versionId string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/versions/" + versionId + "/executions", nil)
+	return c.do(ctx, "GET", "/api/v1/versions/"+versionId+"/executions", nil)
 }
 
 // CreateExecution calls POST /api/v1/versions/{version_id}/executions.
 func (c *Client) CreateExecution(ctx context.Context, versionId string, req any) (json.RawMessage, error) {
-		return c.do(ctx, "POST", "/api/v1/versions/" + versionId + "/executions", req)
+	return c.do(ctx, "POST", "/api/v1/versions/"+versionId+"/executions", req)
 }
 
 // GetExecution calls GET /api/v1/executions/{id}.
 func (c *Client) GetExecution(ctx context.Context, id string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/executions/" + id, nil)
+	return c.do(ctx, "GET", "/api/v1/executions/"+id, nil)
 }
 
 // ListUsers calls GET /api/v1/users.
 func (c *Client) ListUsers(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/users", nil)
+	return c.do(ctx, "GET", "/api/v1/users", nil)
 }
 
 // CreateUser calls POST /api/v1/users.
 func (c *Client) CreateUser(ctx context.Context, req any) (json.RawMessage, error) {
-		return c.do(ctx, "POST", "/api/v1/users", req)
+	return c.do(ctx, "POST", "/api/v1/users", req)
 }
 
 // GetUser calls GET /api/v1/users/{id}.
 func (c *Client) GetUser(ctx context.Context, id string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/users/" + id, nil)
+	return c.do(ctx, "GET", "/api/v1/users/"+id, nil)
 }
 
 // UpdateUser calls PUT /api/v1/users/{id}.
 func (c *Client) UpdateUser(ctx context.Context, id string, req any) (json.RawMessage, error) {
-		return c.do(ctx, "PUT", "/api/v1/users/" + id, req)
+	return c.do(ctx, "PUT", "/api/v1/users/"+id, req)
 }
 
 // DeleteUser calls DELETE /api/v1/users/{id}.
 func (c *Client) DeleteUser(ctx context.Context, id string) error {
-		if _, err := c.do(ctx, "DELETE", "/api/v1/users/" + id, nil); err != nil {
+	if _, err := c.do(ctx, "DELETE", "/api/v1/users/"+id, nil); err != nil {
 		return err
 	}
 	return nil
@@ -1020,62 +1020,62 @@ func (c *Client) DeleteUser(ctx context.Context, id string) error {
 
 // ListAudit calls GET /api/v1/audit.
 func (c *Client) ListAudit(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/audit", nil)
+	return c.do(ctx, "GET", "/api/v1/audit", nil)
 }
 
 // ExportAudit calls GET /api/v1/audit/export.
 func (c *Client) ExportAudit(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/audit/export", nil)
+	return c.do(ctx, "GET", "/api/v1/audit/export", nil)
 }
 
 // VerifyAuditChain calls GET /api/v1/audit/verify.
 func (c *Client) VerifyAuditChain(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/audit/verify", nil)
+	return c.do(ctx, "GET", "/api/v1/audit/verify", nil)
 }
 
 // LogsStream calls GET /api/v1/logs/stream.
 func (c *Client) LogsStream(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/logs/stream", nil)
+	return c.do(ctx, "GET", "/api/v1/logs/stream", nil)
 }
 
 // MetricsSummary calls GET /api/v1/metrics/summary.
 func (c *Client) MetricsSummary(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/metrics/summary", nil)
+	return c.do(ctx, "GET", "/api/v1/metrics/summary", nil)
 }
 
 // MetricsDashboard calls GET /api/v1/metrics/dashboard.
 func (c *Client) MetricsDashboard(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/metrics/dashboard", nil)
+	return c.do(ctx, "GET", "/api/v1/metrics/dashboard", nil)
 }
 
 // Metrics calls GET /api/v1/metrics.
 func (c *Client) Metrics(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/metrics", nil)
+	return c.do(ctx, "GET", "/api/v1/metrics", nil)
 }
 
 // GetProvider calls GET /api/v1/providers/{name}.
 func (c *Client) GetProvider(ctx context.Context, name string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/providers/" + name, nil)
+	return c.do(ctx, "GET", "/api/v1/providers/"+name, nil)
 }
 
 // TestProvider calls POST /api/v1/providers/{name}/test.
 func (c *Client) TestProvider(ctx context.Context, name string, req any) (json.RawMessage, error) {
-		return c.do(ctx, "POST", "/api/v1/providers/" + name + "/test", req)
+	return c.do(ctx, "POST", "/api/v1/providers/"+name+"/test", req)
 }
 
 // ListVaultKeys calls GET /api/v1/vault/keys.
 func (c *Client) ListVaultKeys(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/vault/keys", nil)
+	return c.do(ctx, "GET", "/api/v1/vault/keys", nil)
 }
 
 // SaveVaultKey calls POST /api/v1/vault/keys.
 func (c *Client) SaveVaultKey(ctx context.Context, req any) (json.RawMessage, error) {
-		return c.do(ctx, "POST", "/api/v1/vault/keys", req)
+	return c.do(ctx, "POST", "/api/v1/vault/keys", req)
 }
 
 // DeleteVaultKey calls DELETE /api/v1/vault/keys/{id}.
 func (c *Client) DeleteVaultKey(ctx context.Context, id string) error {
-		if _, err := c.do(ctx, "DELETE", "/api/v1/vault/keys/" + id, nil); err != nil {
+	if _, err := c.do(ctx, "DELETE", "/api/v1/vault/keys/"+id, nil); err != nil {
 		return err
 	}
 	return nil
@@ -1083,27 +1083,27 @@ func (c *Client) DeleteVaultKey(ctx context.Context, id string) error {
 
 // ListAlertRules calls GET /api/v1/alerts/rules.
 func (c *Client) ListAlertRules(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/alerts/rules", nil)
+	return c.do(ctx, "GET", "/api/v1/alerts/rules", nil)
 }
 
 // CreateAlertRule calls POST /api/v1/alerts/rules.
 func (c *Client) CreateAlertRule(ctx context.Context, req any) (json.RawMessage, error) {
-		return c.do(ctx, "POST", "/api/v1/alerts/rules", req)
+	return c.do(ctx, "POST", "/api/v1/alerts/rules", req)
 }
 
 // GetAlertRule calls GET /api/v1/alerts/rules/{id}.
 func (c *Client) GetAlertRule(ctx context.Context, id string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/alerts/rules/" + id, nil)
+	return c.do(ctx, "GET", "/api/v1/alerts/rules/"+id, nil)
 }
 
 // UpdateAlertRule calls PUT /api/v1/alerts/rules/{id}.
 func (c *Client) UpdateAlertRule(ctx context.Context, id string, req any) (json.RawMessage, error) {
-		return c.do(ctx, "PUT", "/api/v1/alerts/rules/" + id, req)
+	return c.do(ctx, "PUT", "/api/v1/alerts/rules/"+id, req)
 }
 
 // DeleteAlertRule calls DELETE /api/v1/alerts/rules/{id}.
 func (c *Client) DeleteAlertRule(ctx context.Context, id string) error {
-		if _, err := c.do(ctx, "DELETE", "/api/v1/alerts/rules/" + id, nil); err != nil {
+	if _, err := c.do(ctx, "DELETE", "/api/v1/alerts/rules/"+id, nil); err != nil {
 		return err
 	}
 	return nil
@@ -1111,12 +1111,12 @@ func (c *Client) DeleteAlertRule(ctx context.Context, id string) error {
 
 // LinkAlertRuleGroup calls POST /api/v1/alerts/rules/{rule_id}/groups/{group_id}.
 func (c *Client) LinkAlertRuleGroup(ctx context.Context, ruleId string, groupId string, req any) (json.RawMessage, error) {
-		return c.do(ctx, "POST", "/api/v1/alerts/rules/" + ruleId + "/groups/" + groupId, req)
+	return c.do(ctx, "POST", "/api/v1/alerts/rules/"+ruleId+"/groups/"+groupId, req)
 }
 
 // UnlinkAlertRuleGroup calls DELETE /api/v1/alerts/rules/{rule_id}/groups/{group_id}.
 func (c *Client) UnlinkAlertRuleGroup(ctx context.Context, ruleId string, groupId string) error {
-		if _, err := c.do(ctx, "DELETE", "/api/v1/alerts/rules/" + ruleId + "/groups/" + groupId, nil); err != nil {
+	if _, err := c.do(ctx, "DELETE", "/api/v1/alerts/rules/"+ruleId+"/groups/"+groupId, nil); err != nil {
 		return err
 	}
 	return nil
@@ -1124,37 +1124,37 @@ func (c *Client) UnlinkAlertRuleGroup(ctx context.Context, ruleId string, groupI
 
 // ListActiveAlerts calls GET /api/v1/alerts/active.
 func (c *Client) ListActiveAlerts(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/alerts/active", nil)
+	return c.do(ctx, "GET", "/api/v1/alerts/active", nil)
 }
 
 // ResolveAlert calls PUT /api/v1/alerts/active/{id}/resolve.
 func (c *Client) ResolveAlert(ctx context.Context, id string, req any) (json.RawMessage, error) {
-		return c.do(ctx, "PUT", "/api/v1/alerts/active/" + id + "/resolve", req)
+	return c.do(ctx, "PUT", "/api/v1/alerts/active/"+id+"/resolve", req)
 }
 
 // ListNotificationGroups calls GET /api/v1/alerts/notifications.
 func (c *Client) ListNotificationGroups(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/alerts/notifications", nil)
+	return c.do(ctx, "GET", "/api/v1/alerts/notifications", nil)
 }
 
 // AddNotificationGroup calls POST /api/v1/alerts/notifications.
 func (c *Client) AddNotificationGroup(ctx context.Context, req any) (json.RawMessage, error) {
-		return c.do(ctx, "POST", "/api/v1/alerts/notifications", req)
+	return c.do(ctx, "POST", "/api/v1/alerts/notifications", req)
 }
 
 // ListWebhooks calls GET /api/v1/webhooks.
 func (c *Client) ListWebhooks(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/webhooks", nil)
+	return c.do(ctx, "GET", "/api/v1/webhooks", nil)
 }
 
 // CreateWebhook calls POST /api/v1/webhooks.
 func (c *Client) CreateWebhook(ctx context.Context, req any) (json.RawMessage, error) {
-		return c.do(ctx, "POST", "/api/v1/webhooks", req)
+	return c.do(ctx, "POST", "/api/v1/webhooks", req)
 }
 
 // DeleteWebhook calls DELETE /api/v1/webhooks/{id}.
 func (c *Client) DeleteWebhook(ctx context.Context, id string) error {
-		if _, err := c.do(ctx, "DELETE", "/api/v1/webhooks/" + id, nil); err != nil {
+	if _, err := c.do(ctx, "DELETE", "/api/v1/webhooks/"+id, nil); err != nil {
 		return err
 	}
 	return nil
@@ -1162,42 +1162,42 @@ func (c *Client) DeleteWebhook(ctx context.Context, id string) error {
 
 // RunWorkflow calls POST /api/v1/workflows/run.
 func (c *Client) RunWorkflow(ctx context.Context, req any) (json.RawMessage, error) {
-		return c.do(ctx, "POST", "/api/v1/workflows/run", req)
+	return c.do(ctx, "POST", "/api/v1/workflows/run", req)
 }
 
 // ReasoningCompile calls POST /api/v1/reasoning/compile.
 func (c *Client) ReasoningCompile(ctx context.Context, req any) (json.RawMessage, error) {
-		return c.do(ctx, "POST", "/api/v1/reasoning/compile", req)
+	return c.do(ctx, "POST", "/api/v1/reasoning/compile", req)
 }
 
 // CatalogSearch calls GET /api/v1/catalog/capabilities.
 func (c *Client) CatalogSearch(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/catalog/capabilities", nil)
+	return c.do(ctx, "GET", "/api/v1/catalog/capabilities", nil)
 }
 
 // OAuthCallback calls GET /api/v1/auth/{provider}/callback.
 func (c *Client) OAuthCallback(ctx context.Context, provider string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/auth/" + provider + "/callback", nil)
+	return c.do(ctx, "GET", "/api/v1/auth/"+provider+"/callback", nil)
 }
 
 // ListSettings calls GET /api/v1/settings.
 func (c *Client) ListSettings(ctx context.Context) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/settings", nil)
+	return c.do(ctx, "GET", "/api/v1/settings", nil)
 }
 
 // GetSetting calls GET /api/v1/settings/{key}.
 func (c *Client) GetSetting(ctx context.Context, key string) (json.RawMessage, error) {
-		return c.do(ctx, "GET", "/api/v1/settings/" + key, nil)
+	return c.do(ctx, "GET", "/api/v1/settings/"+key, nil)
 }
 
 // SetSetting calls PUT /api/v1/settings/{key}.
 func (c *Client) SetSetting(ctx context.Context, key string, req any) (json.RawMessage, error) {
-		return c.do(ctx, "PUT", "/api/v1/settings/" + key, req)
+	return c.do(ctx, "PUT", "/api/v1/settings/"+key, req)
 }
 
 // DeleteSetting calls DELETE /api/v1/settings/{key}.
 func (c *Client) DeleteSetting(ctx context.Context, key string) error {
-		if _, err := c.do(ctx, "DELETE", "/api/v1/settings/" + key, nil); err != nil {
+	if _, err := c.do(ctx, "DELETE", "/api/v1/settings/"+key, nil); err != nil {
 		return err
 	}
 	return nil
@@ -1205,7 +1205,5 @@ func (c *Client) DeleteSetting(ctx context.Context, key string) error {
 
 // Setup calls POST /api/v1/setup.
 func (c *Client) Setup(ctx context.Context, req any) (json.RawMessage, error) {
-		return c.do(ctx, "POST", "/api/v1/setup", req)
+	return c.do(ctx, "POST", "/api/v1/setup", req)
 }
-
-
