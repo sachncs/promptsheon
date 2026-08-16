@@ -22,12 +22,13 @@
 package schedule
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/stringsutil"
 	"context"
 	"errors"
 	"strings"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/stringsutil"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )

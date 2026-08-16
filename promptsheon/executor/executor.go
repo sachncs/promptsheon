@@ -13,9 +13,6 @@
 package executor
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -24,6 +21,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 )
 
 // Caller runs the actual LLM call and reports the result. The

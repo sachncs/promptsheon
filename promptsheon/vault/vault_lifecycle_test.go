@@ -1,4 +1,3 @@
-
 // Tests for the Vault lifecycle (Stop) and the hot-reload (Reload)
 // contract. Lives in a separate file so the long-standing
 // round-trip / wrong-key / invalid-input tests in vault_test.go

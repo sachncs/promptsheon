@@ -192,12 +192,9 @@ type Collector struct {
 	WorkflowDuration  *Histogram
 	WorkflowActive    *Gauge
 
-
-
 	// Agent execution metrics
 	AgentExecutionsTotal  *Counter
 	AgentExecutionLatency *Histogram
-
 
 	// Self-evolution metrics. The evolver emits one event per
 	// cycle tick. Result ∈ {promoted, rejected, skipped}.
@@ -229,7 +226,6 @@ type Collector struct {
 	// reads its current drop count on every scrape so the
 	// counter stays accurate without a sync loop.
 	hub HubDropper
-
 }
 
 // HubDropper is the subset of *ws.Hub the metrics collector
@@ -241,8 +237,6 @@ type HubDropper interface {
 // SetLogHub wires the live SSE hub into the collector so the
 // Prometheus scrape can read the cumulative drop count. OBS-LOG-2.
 func (c *Collector) SetLogHub(h HubDropper) { c.hub = h }
-
-
 
 // ObserveAuditQueue records a single audit-queue latency
 // observation in seconds. Called by the audit worker once the
@@ -450,9 +444,6 @@ func (c *Collector) GetSummary() *Summary {
 	s.WorkflowMetrics.ActiveCount = c.WorkflowActive.Value()
 	s.WorkflowMetrics.AvgDuration = c.WorkflowDuration.Avg() * 1000
 
-
-
-
 	// OBS-7 / OBS-1b: surface the audit-pipeline drop and trace-pipeline
 	// drop counts as summary fields so /api/v1/metrics/summary can
 	// report them. The Prometheus exposition is emitted by
@@ -519,7 +510,6 @@ func (c *Collector) prometheusFormat() string {
 	writeHistogram("promptsheon_workflow_duration_seconds", "Workflow run duration", c.WorkflowDuration)
 	writeGauge("promptsheon_workflow_active", "Currently active workflows", c.WorkflowActive.Value())
 
-
 	writeCounter("promptsheon_audit_dropped_total", "Audit entries dropped because the worker queue was full", float64(c.auditDropped.Load()))
 	writeCounter("promptsheon_self_evolve_runs_total", "Total self-evolve RunOnce ticks", c.SelfEvolveRunsTotal.Value())
 	writeCounter("promptsheon_self_evolve_revisions_total", "Total self-evolve revision attempts", c.SelfEvolveRevisionsTotal.Value())
@@ -530,8 +520,6 @@ func (c *Collector) prometheusFormat() string {
 	if c.hub != nil {
 		writeCounter("promptsheon_log_hub_drops_total", "Log entries dropped because the SSE broadcast channel was full", float64(c.hub.Dropped()))
 	}
-
-
 
 	return sb.String()
 }

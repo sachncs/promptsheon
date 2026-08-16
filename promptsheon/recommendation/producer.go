@@ -19,15 +19,15 @@
 package recommendation
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/rules"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/observation"
-	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 	"context"
 	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/eventbus"
+	"github.com/sachncs/promptsheon/promptsheon/observation"
+	"github.com/sachncs/promptsheon/promptsheon/rules"
 )
 
 // SourceFunc is the in-process bridge from Aggregator to Producer.

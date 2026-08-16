@@ -49,9 +49,9 @@ func TestConfigDefaults(t *testing.T) {
 // env vars: endpoint, insecure flag, sample ratio.
 func TestConfigFromEnv(t *testing.T) {
 	setEnv(t, map[string]string{
-		"PROMPTSHEON_OTEL_ENDPOINT":      "otel-collector:4317",
-		"PROMPTSHEON_OTEL_INSECURE":      "true",
-		"PROMPTSHEON_OTEL_SAMPLE_RATIO":   "0.25",
+		"PROMPTSHEON_OTEL_ENDPOINT":     "otel-collector:4317",
+		"PROMPTSHEON_OTEL_INSECURE":     "true",
+		"PROMPTSHEON_OTEL_SAMPLE_RATIO": "0.25",
 	})
 	cfg := trace.FromEnv("svc-env")
 	if cfg.Endpoint != "otel-collector:4317" {

@@ -25,12 +25,13 @@
 package settings
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"database/sql"
 	"errors"
 	"os"
 	"sync"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // Subscriber is the callback signature a hot-reload notifier

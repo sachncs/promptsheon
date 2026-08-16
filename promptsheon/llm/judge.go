@@ -1,9 +1,10 @@
 package llm
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"os"
+
+	"github.com/sachncs/promptsheon/errf"
 
 	"github.com/sachncs/promptsheon/promptsheon/eval"
 )

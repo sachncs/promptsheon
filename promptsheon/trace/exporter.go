@@ -1,11 +1,12 @@
 package trace
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"os"
 	"strconv"
 	"sync"
+
+	"github.com/sachncs/promptsheon/errf"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"

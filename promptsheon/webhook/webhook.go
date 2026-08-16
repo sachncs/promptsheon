@@ -2,7 +2,6 @@
 package webhook
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"context"
 	"crypto/hmac"
@@ -20,6 +19,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // EventType identifies the kind of event that triggered a webhook.

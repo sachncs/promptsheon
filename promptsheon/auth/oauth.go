@@ -2,7 +2,6 @@
 package auth
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // OAuthProvider represents an OAuth provider configuration.

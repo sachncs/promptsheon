@@ -1,13 +1,14 @@
 package auth
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // Authenticator validates API keys and attaches user info to requests.

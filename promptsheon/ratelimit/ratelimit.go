@@ -2,7 +2,6 @@
 package ratelimit
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"log/slog"
 	"net"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/auth"
 )
 
 // trustedProxies is the set of CIDRs that may set X-Forwarded-For

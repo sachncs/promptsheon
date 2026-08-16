@@ -5,8 +5,6 @@
 package retention
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/store"
 	"context"
 	"database/sql"
 	"log/slog"
@@ -14,6 +12,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 // Policy defines TTL for different log types.

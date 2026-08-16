@@ -7,7 +7,6 @@
 package eval
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -15,6 +14,8 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+
+	"github.com/sachncs/promptsheon/errf"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )

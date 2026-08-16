@@ -1,8 +1,6 @@
-
 package ratelimit
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"context"
 	"fmt"
 	"net/http"
@@ -12,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/auth"
 )
 
 // TestRateLimiterPartitionedConcurrency pins PERF-RL-1:

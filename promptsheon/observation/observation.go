@@ -16,13 +16,13 @@
 package observation
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/rules"
-	"github.com/sachncs/promptsheon/promptsheon/executor"
 	"sync"
 	"time"
 
-	"github.com/beorn7/perks/quantile"
+	"github.com/sachncs/promptsheon/promptsheon/executor"
+	"github.com/sachncs/promptsheon/promptsheon/rules"
 
+	"github.com/beorn7/perks/quantile"
 )
 
 // Source is anything that produces ExecutionRecord values; the

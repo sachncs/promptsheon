@@ -1,8 +1,6 @@
-
 package webhook
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"context"
 	"log/slog"
@@ -12,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // bypassDispatcher constructs a *Dispatcher with SSRF bypass

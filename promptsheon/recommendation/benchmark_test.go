@@ -8,7 +8,9 @@
 // selection path that production actually exercises today.
 //
 // Path covered:
-//   Producer.Tick -> aggregator -> rules.Engine.Evaluate
+//
+//	Producer.Tick -> aggregator -> rules.Engine.Evaluate
+//
 // The benchmark calls Evaluate directly because Tick also
 // touches the observation aggregator and eventbus publisher,
 // both of which have their own benchmarks (BenchmarkAppendAuditCAS*

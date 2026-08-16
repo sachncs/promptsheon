@@ -1,9 +1,10 @@
 package capability
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"errors"
 	"fmt"
+
+	"github.com/sachncs/promptsheon/errf"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )

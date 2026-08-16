@@ -1,11 +1,12 @@
 package llm
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"log/slog"
 	"net/url"
 	"os"
 	"sync"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // Registry manages provider construction and lookup.

@@ -18,13 +18,13 @@
 package eventbus
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"errors"
 	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
 // Handler processes one event. Handlers must be idempotent: the same

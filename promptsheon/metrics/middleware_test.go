@@ -1,8 +1,6 @@
-
 package metrics
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/trace"
 	"context"
 	"errors"
 	"io"
@@ -12,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sachncs/promptsheon/promptsheon/trace"
 )
 
 // noopTracer is a minimal in-memory tracer used so the

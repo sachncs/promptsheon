@@ -1,11 +1,10 @@
-
 package observation
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/executor"
 	"testing"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/executor"
 )
 
 func mk(cap, version, env string, status string, latencyMS int64, costUSD float64) executor.ExecutionRecord {

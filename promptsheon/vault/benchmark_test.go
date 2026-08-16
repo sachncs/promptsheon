@@ -1,4 +1,3 @@
-
 package vault
 
 import (

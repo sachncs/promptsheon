@@ -5,16 +5,16 @@
 package release
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/approval"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"context"
 	"errors"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/errs"
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/approval"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
 
+	"github.com/sachncs/promptsheon/promptsheon/errs"
 )
 
 // PolicyKind is removed (DEAD-Rel-3). Callers construct a concrete

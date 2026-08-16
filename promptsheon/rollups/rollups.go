@@ -13,12 +13,12 @@
 package rollups
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/quota"
-	"github.com/sachncs/promptsheon/promptsheon/budget"
 	"context"
 	"log/slog"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/budget"
+	"github.com/sachncs/promptsheon/promptsheon/quota"
 )
 
 // WorkspaceSummary is one Workspace's rollup at a moment in time.

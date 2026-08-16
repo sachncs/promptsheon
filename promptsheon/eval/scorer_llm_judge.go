@@ -13,12 +13,13 @@
 package eval
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"encoding/json"
 	"errors"
 	"strings"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // ScorerLLMJudge is the registered name of the LLM-judge scorer.

@@ -1,12 +1,13 @@
 package llm
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
 
 	anthropic "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"

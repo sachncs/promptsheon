@@ -1,11 +1,10 @@
-
 package observation
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/executor"
 	"testing"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/executor"
 )
 
 // TestAggregatorBoundedWindow verifies that adding more than

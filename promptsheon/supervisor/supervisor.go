@@ -21,15 +21,15 @@
 package supervisor
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 	"context"
 	"io"
 	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/eventbus"
 )
 
 // Plugin is the lifecycle interface a supervised plugin satisfies.

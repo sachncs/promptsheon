@@ -9,14 +9,14 @@
 package release
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"encoding/json"
 	"time"
 
-	"github.com/sachncs/promptsheon/promptsheon/errs"
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 
+	"github.com/sachncs/promptsheon/promptsheon/errs"
 )
 
 // ResolvedInvocation is the immutable plan for a single invoke. It

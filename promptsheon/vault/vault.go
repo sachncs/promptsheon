@@ -3,7 +3,6 @@
 package vault
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -11,6 +10,8 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
+
+	"github.com/sachncs/promptsheon/errf"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )

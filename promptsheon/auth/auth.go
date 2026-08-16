@@ -4,12 +4,13 @@
 package auth
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"io"
 	"strings"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // Role represents a user role with specific permissions.

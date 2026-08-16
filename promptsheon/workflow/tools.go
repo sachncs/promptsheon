@@ -2,7 +2,6 @@
 package workflow
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 const toolNameHTTP = "http"
