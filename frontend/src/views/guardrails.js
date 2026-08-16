@@ -1,26 +1,28 @@
+// src/views/guardrails.js — alerts view.
+//
+// Lists every alert grouped by severity, with inline resolve
+// controls. Surfaces the count of active vs. total signals as pills
+// in the page header so a glance at the URL tells the operator
+// whether anything needs their attention.
+
 import * as api from "../api.js";
 import { escape, formatRelative, apiStatusLabel } from "../utils.js";
+import { statusPill, pageHeader, panel, emptyState, errorState, inlineBanner } from "../ui.js";
 
-function pill(text, tone = "neutral") {
-  return `<span class="status-pill ${tone}"><span class="status-dot"></span>${escape(text)}</span>`;
-}
+const SEVERITY_TONES = { critical: "danger", high: "danger", medium: "warn", low: "neutral", informational: "info" };
+const STATUS_TONES = { active: "danger", pending: "warn", resolved: "good" };
 
-function severityTone(severity) {
-  return ({ critical: "danger", high: "danger", medium: "warn", low: "neutral" })[severity] || "neutral";
-}
+function severityTone(s) { return SEVERITY_TONES[s] || "neutral"; }
+function statusTone(s) { return STATUS_TONES[s] || "neutral"; }
 
-function statusTone(status) {
-  return ({ active: "danger", pending: "warn", resolved: "good" })[status] || "neutral";
-}
-
-function row(alert) {
-  const tone = severityTone(alert.severity);
+function alertCard(alert) {
+  const sev = severityTone(alert.severity);
   return `<article class="panel p-5" data-alert-id="${escape(alert.id)}">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-2">
-          ${pill(alert.severity, tone)}
-          ${pill(alert.status, statusTone(alert.status))}
+          ${statusPill(alert.severity, sev)}
+          ${statusPill(alert.status, statusTone(alert.status))}
           <span class="text-[.7rem] text-muted">Triggered ${escape(formatRelative(alert.triggered_at))}</span>
         </div>
         <h3 class="mt-2 text-[1rem] font-bold">${escape(alert.rule_name || alert.message || "Alert")}</h3>
@@ -49,7 +51,7 @@ export async function renderGuardrails(route) {
   root.innerHTML = `<section class="panel p-6"><div class="skeleton h-3 w-32"></div><div class="skeleton mt-4 h-12 w-full"></div></section>`;
   const alertsRes = await api.listAlerts();
   if (!alertsRes.ok) {
-    root.innerHTML = `<p class="panel p-6 text-center text-[.78rem]">${escape(apiStatusLabel(alertsRes))}</p>`;
+    root.innerHTML = `<div class="panel p-6">${errorState(alertsRes)}</div>`;
     return "";
   }
   const all = alertsRes.data || [];
@@ -60,24 +62,36 @@ export async function renderGuardrails(route) {
   }
   const total = all.length;
   const active = all.filter((a) => a.status === "active" || a.status === "pending").length;
-  const shell = `
-    <section class="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <div class="eyebrow">Risk surface</div>
-        <h1 class="mt-2 text-[1.4rem] font-bold tracking-[-.04em]">Guardrails</h1>
-        <p class="mt-1 text-[.78rem] text-muted">Active and resolved alerts ordered by severity. Resolve to clear from this view; rule CRUD lives in <a class="font-semibold text-ink hover:text-accent" href="#/operations/alerts">Operations / Alerts</a>.</p>
-      </div>
-      <div class="flex shrink-0 items-center gap-2">
-        ${pill(`${active} active`, active > 0 ? "danger" : "good")}
-        ${pill(`${total} total`, "neutral")}
-      </div>
-    </section>
-    <section class="mt-5 space-y-3">
-      ${total === 0 ? `<div class="rounded-xl border border-dashed border-line bg-paper p-8 text-center"><p class="text-[.78rem] font-bold">All clear</p><p class="mt-1 text-[.66rem] text-muted">No signals fired in the current window.</p></div>` : ""}
-      ${(["critical", "high", "medium", "low", "informational"]).map((sev) => grouped[sev].length ? `<section><div class="eyebrow mb-2">${escape(sev)} (${grouped[sev].length})</div>${grouped[sev].map(row).join("")}</section>` : "").join("")}
-    </section>
-  `;
-  root.innerHTML = shell;
+
+  const header = pageHeader({
+    eyebrow: "Risk surface",
+    title: "Guardrails",
+    description: `Active and resolved alerts ordered by severity. Resolve to clear from this view; rule CRUD lives in <a class="font-semibold text-ink hover:text-accent" href="#/operations/alerts">Operations / Alerts</a>.`,
+    actions: `
+      ${statusPill(`${active} active`, active > 0 ? "danger" : "good")}
+      ${statusPill(`${total} total`, "neutral")}
+    `,
+  });
+
+  const sections = ["critical", "high", "medium", "low", "informational"]
+    .map((sev) => {
+      const items = grouped[sev];
+      if (!items || !items.length) return "";
+      return `<section>
+        <div class="eyebrow mb-2">${escape(sev)} (${items.length})</div>
+        <div class="space-y-3">${items.map(alertCard).join("")}</div>
+      </section>`;
+    })
+    .join("");
+
+  const html = [
+    header,
+    `<section class="mt-5 space-y-4">
+      ${total === 0 ? inlineBanner({ tone: "good", message: "All clear — no signals fired in the current window." }) : ""}
+      ${sections}
+    </section>`,
+  ].join("");
+  root.innerHTML = html;
 
   root.querySelectorAll("[data-alert-id]").forEach((card) => {
     const id = card.dataset.alertId;
@@ -91,5 +105,5 @@ export async function renderGuardrails(route) {
       setTimeout(() => window.location.reload(), 400);
     });
   });
-  return shell;
+  return html;
 }
