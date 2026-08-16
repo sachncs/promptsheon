@@ -1,21 +1,18 @@
+// Release review modal. Opened from the releases table or any
+// "Pending releases" card. Surfaces the manifest, approval tally,
+// and the approve / reject / rollback / try-it controls.
+
 import { escape, formatRelative, apiStatusLabel } from "../utils.js";
 import * as api from "../api.js";
+import { openModal, closeModal } from "../dialog.js";
+import { statusPill, inlineBanner } from "../ui.js";
+import { toast } from "../toast.js";
 
-function modalSkeleton(releaseId) {
-  return `<div class="modal-backdrop" role="presentation">
-    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="release-title">
-      <div class="flex items-start justify-between border-b border-line/70 px-5 py-5 sm:px-6">
-        <div><div class="eyebrow">Release review</div><h2 id="release-title" class="mt-2 text-[1.1rem] font-bold tracking-[-.04em]">Loading ${escape(releaseId || "")}…</h2></div>
-        <button class="icon-button !h-8 !w-8 !bg-paper" data-close-modal aria-label="Close dialog"><svg class="h-4 w-4 fill-none stroke-current stroke-2"><use href="#icon-close"/></svg></button>
-      </div>
-      <div class="px-6 py-6 space-y-3">
-        <span class="skeleton block h-4 w-40"></span>
-        <span class="skeleton block h-4 w-72"></span>
-        <span class="skeleton block h-4 w-56"></span>
-        <span class="skeleton block h-24 w-full"></span>
-      </div>
-    </section>
-  </div>`;
+const STATUS_TONES = { active: "good", approved: "good", pending: "warn", superseded: "neutral", rolled_back: "danger" };
+function statusTone(s) { return STATUS_TONES[s] || "neutral"; }
+
+function statTile(label, value) {
+  return `<div class="rounded-lg bg-paper p-3"><span class="eyebrow">${escape(label)}</span><span class="mono mt-2 block text-[.8rem] font-bold">${escape(value)}</span></div>`;
 }
 
 function renderManifest(manifest) {
@@ -28,7 +25,7 @@ function renderManifest(manifest) {
   }).join("");
 }
 
-function renderApproval(approval) {
+function renderApprovalSummary(approval) {
   if (!approval) {
     return `<p class="mt-2 text-[.68rem] text-muted">Approval tally unavailable — quorum check will fail until the API responds.</p>`;
   }
@@ -37,59 +34,13 @@ function renderApproval(approval) {
   return `<p class="mt-2 text-[.68rem] text-muted">${votes.length} vote${votes.length === 1 ? "" : "s"} cast${updated ? ` · updated ${escape(formatRelative(updated))}` : ""}.</p>`;
 }
 
-function releaseModalHtml(release, capability, approval) {
-  const r = release || {};
-  const name = capability?.name || r.capability_id || "Unknown capability";
-  const tone = ({ active: "good", approved: "good", pending: "warn", superseded: "neutral", rolled_back: "danger" })[r.status] || "neutral";
-  const canVote = r.status === "pending";
-  const canRollback = r.status === "active" || r.status === "superseded";
-  const canInvoke = r.status === "active";
-  return `<div class="modal-backdrop" role="presentation">
-    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="release-title">
-      <div class="flex items-start justify-between border-b border-line/70 px-5 py-5 sm:px-6">
-        <div>
-          <div class="eyebrow">Release review · ${escape(r.environment || "?")}</div>
-          <h2 id="release-title" class="mt-2 text-[1.1rem] font-bold tracking-[-.04em]">${escape(name)}</h2>
-          <p class="mt-1 text-[.7rem] text-muted">v${escape(r.capability_version || "?")} · <span class="mono">${escape(r.id || "")}</span> · ${statusPillHtml(r.status || "?", tone)}</p>
-          ${renderApproval(approval)}
-        </div>
-        <button class="icon-button !h-8 !w-8 !bg-paper" data-close-modal aria-label="Close dialog"><svg class="h-4 w-4 fill-none stroke-current stroke-2"><use href="#icon-close"/></svg></button>
-      </div>
-      <div class="space-y-5 px-5 py-5 sm:px-6">
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          ${statTile("Version", r.capability_version ?? "—")}
-          ${statTile("Environment", r.environment ?? "—")}
-          ${statTile("Created", formatRelative(r.created_at))}
-          ${statTile("Status", r.status ?? "—")}
-        </div>
-        <div>
-          <div class="eyebrow">Manifest fingerprints</div>
-          <div class="mt-2 max-h-32 overflow-auto rounded-lg bg-paper p-3 text-[.65rem] mono text-[#50535a]">${renderManifest(r.manifest)}</div>
-        </div>
-        <div>
-          <div class="eyebrow">Approval activity</div>
-          <div class="mt-2 space-y-2">
-            ${renderVoteRows(approval)}
-            ${renderVoteRow("Required approver", "?", "Pending", "warn")}
-          </div>
-        </div>
-        <form id="vote-form" class="space-y-3" data-release-id="${escape(r.id || "")}">
-          <label class="eyebrow block" for="vote-note">Decision note</label>
-          <textarea id="vote-note" class="field min-h-20 resize-y" placeholder="Add context for the audit trail"></textarea>
-          <p id="vote-error" class="hidden rounded-lg bg-rose-50 px-3 py-2 text-[.68rem] text-rose-800"></p>
-          <div id="invoke-result" class="hidden"></div>
-          <div class="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-            ${canRollback ? `<button type="button" id="vote-rollback" data-rollback class="quiet-button">Rollback</button>` : ""}
-            ${canInvoke ? `<button type="button" data-invoke class="quiet-button">Try it</button>` : ""}
-            <button type="button" class="quiet-button" data-close-modal>Close</button>
-            ${canVote ? `
-              <button type="submit" name="decision" value="reject" class="quiet-button">Reject</button>
-              <button type="submit" name="decision" value="approve" class="primary-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-check"/></svg>Record approval</button>
-            ` : ""}
-          </div>
-        </form>
-      </div>
-    </section>
+function renderVoteRow(vote) {
+  const tone = vote.decision === "approve" ? "good" : vote.decision === "reject" ? "danger" : "neutral";
+  const initial = (vote.identity || "?")[0].toUpperCase();
+  return `<div class="flex items-center gap-3">
+    <span class="grid h-8 w-8 place-items-center rounded-lg bg-paper text-[.62rem] font-bold">${escape(initial)}</span>
+    <span class="flex-1 text-[.72rem]"><span class="font-bold">${escape(vote.identity)}</span><span class="block text-[.63rem] text-muted">${escape(vote.reason || "no reason")} · ${escape(formatRelative(vote.timestamp))}</span></span>
+    ${statusPill(vote.decision, tone)}
   </div>`;
 }
 
@@ -97,38 +48,74 @@ function renderVoteRows(approval) {
   if (!approval || !Array.isArray(approval.votes) || approval.votes.length === 0) {
     return `<p class="text-[.68rem] text-muted">No votes yet.</p>`;
   }
-  return approval.votes.map((vote) => {
-    const tone = vote.decision === "approve" ? "good" : vote.decision === "reject" ? "danger" : "neutral";
-    const initial = (vote.identity || "?")[0].toUpperCase();
-    return `<div class="flex items-center gap-3">
-      <span class="grid h-8 w-8 place-items-center rounded-lg bg-paper text-[.62rem] font-bold">${escape(initial)}</span>
-      <span class="flex-1 text-[.72rem]"><span class="font-bold">${escape(vote.identity)}</span><span class="block text-[.63rem] text-muted">${escape(vote.reason || "no reason")} · ${escape(formatRelative(vote.timestamp))}</span></span>
-      ${statusPillHtml(vote.decision, tone)}
-    </div>`;
-  }).join("");
+  return approval.votes.map(renderVoteRow).join("");
 }
 
-function renderVoteRow(label, initial, status, tone) {
-  return `<div class="flex items-center gap-3">
-    <span class="grid h-8 w-8 place-items-center rounded-lg border border-dashed border-[#c9cac5] text-[.7rem] text-muted">${escape(initial)}</span>
-    <span class="flex-1 text-[.72rem]"><span class="font-bold">${escape(label)}</span><span class="block text-[.63rem] text-muted">${escape(status)}</span></span>
-    ${statusPillHtml(status, tone)}
+function modalSkeleton(releaseId) {
+  return `<div>
+    <span class="skeleton block h-3 w-40"></span>
+    <span class="skeleton mt-4 block h-6 w-72"></span>
+    <span class="skeleton mt-4 block h-4 w-56"></span>
+    <span class="skeleton mt-4 block h-24 w-full"></span>
+    <span class="skeleton mt-4 block h-12 w-full"></span>
   </div>`;
 }
 
-function statTile(label, value) {
-  return `<div class="rounded-lg bg-paper p-3"><span class="eyebrow">${escape(label)}</span><span class="mono mt-2 block text-[.8rem] font-bold">${escape(value)}</span></div>`;
+function releaseBodyHtml(release, capability, approval) {
+  const r = release || {};
+  const name = capability?.name || r.capability_id || "Unknown capability";
+  const canVote = r.status === "pending";
+  const canRollback = r.status === "active" || r.status === "superseded";
+  const canInvoke = r.status === "active";
+  return `<div>
+    <p class="text-[.7rem] text-muted">v${escape(r.capability_version || "?")} · <span class="mono">${escape(r.id || "")}</span> · ${statusPill(r.status || "?", statusTone(r.status))}</p>
+    ${renderApprovalSummary(approval)}
+    <div class="mt-5 space-y-5">
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        ${statTile("Version", r.capability_version ?? "—")}
+        ${statTile("Environment", r.environment ?? "—")}
+        ${statTile("Created", formatRelative(r.created_at))}
+        ${statTile("Status", r.status ?? "—")}
+      </div>
+      <div>
+        <div class="eyebrow">Manifest fingerprints</div>
+        <div class="mt-2 max-h-32 overflow-auto rounded-lg bg-paper p-3 text-[.65rem] mono text-[#50535a]">${renderManifest(r.manifest)}</div>
+      </div>
+      <div>
+        <div class="eyebrow">Approval activity</div>
+        <div class="mt-2 space-y-2">
+          ${renderVoteRows(approval)}
+        </div>
+      </div>
+      <form id="vote-form" class="space-y-3" data-release-id="${escape(r.id || "")}">
+        <label class="field-label" for="vote-note">Decision note</label>
+        <textarea id="vote-note" class="field min-h-20 resize-y" placeholder="Add context for the audit trail"></textarea>
+        <p id="vote-error" class="hidden"></p>
+        <div id="invoke-result" class="hidden"></div>
+        <div class="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+          ${canRollback ? `<button type="button" id="vote-rollback" data-rollback class="quiet-button">Rollback</button>` : ""}
+          ${canInvoke ? `<button type="button" data-invoke class="quiet-button">Try it</button>` : ""}
+          <button type="button" class="quiet-button" data-close-modal>Close</button>
+          ${canVote ? `
+            <button type="submit" name="decision" value="reject" class="quiet-button">Reject</button>
+            <button type="submit" name="decision" value="approve" class="primary-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-check"/></svg>Record approval</button>
+          ` : ""}
+        </div>
+      </form>
+    </div>
+  </div>`;
 }
 
-function statusPillHtml(label, tone) {
-  return `<span class="status-pill ${tone} !px-2 !py-1"><span class="status-dot"></span>${escape(label)}</span>`;
-}
-
-async function open(root, releaseId) {
-  root.innerHTML = modalSkeleton(releaseId);
+export async function openReleaseModal(releaseId) {
+  const modal = openModal({
+    title: `Release review`,
+    subtitle: `Loading ${releaseId || ""}…`,
+    body: modalSkeleton(releaseId),
+    size: "wide",
+  });
   const [release, approval] = await Promise.all([
     api.getRelease(releaseId),
-    api.getReleaseApproval(releaseId)
+    api.getReleaseApproval(releaseId),
   ]);
   const releaseData = release.ok ? release.data : null;
   let capabilityData = null;
@@ -137,14 +124,22 @@ async function open(root, releaseId) {
     if (c.ok) capabilityData = c.data;
   }
   if (!release.ok) {
-    root.innerHTML = `<div class="modal-backdrop" role="presentation"><section class="modal-card" role="dialog" aria-modal="true"><div class="flex items-start justify-between border-b border-line/70 px-5 py-5 sm:px-6"><div><div class="eyebrow">Release</div><h2 class="mt-2 text-[1.1rem] font-bold tracking-[-.04em]">Cannot load release</h2></div><button class="icon-button !h-8 !w-8 !bg-paper" data-close-modal aria-label="Close dialog"><svg class="h-4 w-4 fill-none stroke-current stroke-2"><use href="#icon-close"/></svg></button></div><div class="px-6 py-6 text-[.78rem] text-muted">${escape(apiStatusLabel(release))}</div></section></div>`;
+    modal.body.innerHTML = `<p class="text-[.78rem] text-muted">${escape(apiStatusLabel(release))}</p>`;
     return;
   }
-  root.innerHTML = releaseModalHtml(releaseData, capabilityData, approval.ok ? approval.data : null);
-  attach(root, releaseData);
+  const name = capabilityData?.name || releaseData?.capability_id || "Release";
+  // Update subtitle + title now that data is loaded.
+  const subtitle = modal.root.querySelector(".modal-subtitle");
+  const title = modal.root.querySelector(".modal-title");
+  if (subtitle) subtitle.textContent = `Release review · ${releaseData?.environment || "?"}`;
+  if (title) title.textContent = name;
+
+  modal.body.innerHTML = releaseBodyHtml(releaseData, capabilityData, approval.ok ? approval.data : null);
+  attach(modal, releaseData);
 }
 
-function attach(root, release) {
+function attach(modal, release) {
+  const root = modal.root;
   const form = root.querySelector("#vote-form");
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -152,13 +147,13 @@ function attach(root, release) {
     const decision = submitter?.value || "approve";
     const reason = (root.querySelector("#vote-note")?.value || "").trim();
     const error = root.querySelector("#vote-error");
-    const buttons = form.querySelectorAll("button[type=submit], [data-rollback]");
+    const buttons = form.querySelectorAll('button[type="submit"], [data-rollback]');
     buttons.forEach((b) => (b.disabled = true));
     const response = await api.voteRelease(release.id, decision, reason);
     if (!response.ok) {
       buttons.forEach((b) => (b.disabled = false));
       if (error) {
-        error.textContent = apiStatusLabel(response);
+        error.innerHTML = inlineBanner({ tone: "danger", message: apiStatusLabel(response) });
         error.classList.remove("hidden");
       }
       return;
@@ -166,7 +161,9 @@ function attach(root, release) {
     if (decision === "approve") {
       await api.activateRelease(release.id);
     }
-    closeAndReload(form, root);
+    modal.close();
+    toast.success(decision === "approve" ? "Release approved" : "Release rejected", release.id);
+    setTimeout(() => window.location.reload(), 250);
   });
 
   const rollback = root.querySelector("[data-rollback]");
@@ -177,57 +174,38 @@ function attach(root, release) {
     rollback.disabled = false;
     if (!response.ok) {
       if (error) {
-        error.textContent = apiStatusLabel(response);
+        error.innerHTML = inlineBanner({ tone: "danger", message: apiStatusLabel(response) });
         error.classList.remove("hidden");
       }
       return;
     }
-    closeAndReload(form, root);
+    modal.close();
+    toast.success("Release rolled back", release.id);
+    setTimeout(() => window.location.reload(), 250);
   });
 
-  // Live invoke: send a sample call through the executor. The
-  // response body or 502 is surfaced inline. The form is reused
-  // as the input area; the note textarea becomes the input JSON.
   const invoke = root.querySelector("[data-invoke]");
   invoke?.addEventListener("click", async () => {
     const error = root.querySelector("#vote-error");
     const note = root.querySelector("#vote-note");
     const result = root.querySelector("#invoke-result");
-    if (error) { error.classList.add("hidden"); error.textContent = ""; }
+    if (error) { error.classList.add("hidden"); error.innerHTML = ""; }
     if (result) { result.classList.add("hidden"); result.innerHTML = ""; }
     invoke.disabled = true;
     const inputs = (() => {
       const raw = (note?.value || "").trim();
-      if (!raw) return {};
-      try { return JSON.parse(raw); } catch { return { _raw: raw }; }
+      if (!raw) return { q: "hello" };
+      try { return JSON.parse(raw); } catch { return { q: raw }; }
     })();
     const response = await api.invokeRelease(release.id, inputs);
     invoke.disabled = false;
-    if (!response.ok) {
-      if (error) {
-        error.textContent = `Invoke failed: ${apiStatusLabel(response)}`;
-        error.classList.remove("hidden");
-      }
-      return;
-    }
     if (result) {
-      const data = response.data || {};
-      const output = typeof data.output === "string" ? data.output : JSON.stringify(data, null, 2);
-      result.innerHTML = `<div class="rounded-xl bg-paper p-3"><div class="eyebrow">Invoke response</div><pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all text-[.66rem] mono">${escape(output)}</pre></div>`;
       result.classList.remove("hidden");
+      if (!response.ok) {
+        result.innerHTML = inlineBanner({ tone: "danger", message: `Invoke failed: ${apiStatusLabel(response)}` });
+      } else {
+        result.innerHTML = inlineBanner({ tone: "good", message: `Invoked (${response.data?.status || "ok"}) · ${escape(JSON.stringify(response.data?.outputs || response.data || {}).slice(0, 200))}` });
+      }
     }
   });
-
-  const close = root.querySelector("[data-close-modal]");
-  close?.addEventListener("click", () => root.replaceChildren());
-}
-
-function closeAndReload(form, root) {
-  root.replaceChildren();
-  window.location.reload();
-}
-
-export async function openReleaseModal(root, releaseId) {
-  if (!root) return;
-  await open(root, releaseId);
 }
