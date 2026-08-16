@@ -1,7 +1,6 @@
 package store
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"database/sql"
 	"fmt"
@@ -10,6 +9,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // DestructiveMigrationEnv is the env var an operator sets to opt into

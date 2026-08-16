@@ -1,4 +1,3 @@
-
 // Migration tests for the bandit CRDT (016) and settings
 // CRDT (017) schema changes. Each test isolates one migration's
 // effect by running migrateUpTo on a fresh DB at the target

@@ -1,8 +1,9 @@
 package store
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"context"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // LinkRuleToGroup creates a row in the alert_rule_notification_groups

@@ -1,10 +1,11 @@
 package store
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"database/sql"
 	"errors"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // SQLite persistence for ws_state.

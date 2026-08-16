@@ -1,13 +1,13 @@
 package store
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/settings"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/settings"
 )
 
 // SQLite persistence for system_config.

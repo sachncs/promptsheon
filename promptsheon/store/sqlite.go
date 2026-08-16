@@ -1,7 +1,6 @@
 package store
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"database/sql"
 	"embed"
@@ -9,6 +8,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
 
 	_ "modernc.org/sqlite"
 )

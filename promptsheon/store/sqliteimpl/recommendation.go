@@ -1,16 +1,16 @@
 package sqliteimpl
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/recommendation"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 
-	"github.com/sachncs/promptsheon/promptsheon/errs"
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/recommendation"
 
+	"github.com/sachncs/promptsheon/promptsheon/errs"
 )
 
 type RecommendationRepository struct{ db *sql.DB }
