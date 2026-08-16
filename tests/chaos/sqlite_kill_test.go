@@ -14,13 +14,13 @@
 package chaos
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/store"
 	"context"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 func init() {

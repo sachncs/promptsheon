@@ -13,7 +13,6 @@
 package contract
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"fmt"
 	"io"
@@ -28,6 +27,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
 
 	"gopkg.in/yaml.v3"
 
