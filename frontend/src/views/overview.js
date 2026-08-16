@@ -1,41 +1,35 @@
+// src/views/overview.js — command-center landing page.
+//
+// Pulls from /health, /ready, /api/v1/metrics/summary, /api/v1/providers,
+// /api/v1/alerts, /api/v1/audit, /api/v1/workspaces, the project lists,
+// and the per-project capability + release lists. Renders metric cards,
+// pending releases, audit activity, environment summary, and a catalog
+// preview.
+//
+// Refactored to consume the ui.js primitives — every status pill,
+// empty state, error panel, metric card, and panel header goes
+// through the same source as every other view.
+
 import * as api from "../api.js";
 import { escape, formatCompact, formatInteger, formatMoney, formatRelative } from "../utils.js";
 import { ownerName } from "../state/owners.js";
+import { statusPill, pageHeader, panel, emptyState, errorState, metricCard, metricGrid, dataTable, skeletonStack } from "../ui.js";
 
-const skeleton = (label, lines = 3) => `
-  <div class="panel p-5">
-    <div class="skeleton h-3 w-24"></div>
-    ${Array.from({ length: lines }).map(() => '<div class="skeleton mt-4 h-4"></div>').join("")}
-    <span class="sr-only">Loading ${escape(label)}…</span>
-  </div>`;
+const STATUS_LABELS = { active: "Production", approved: "Approved", pending: "Pending", superseded: "Superseded", rolled_back: "Rolled back" };
+const STATUS_TONES  = { active: "good",    approved: "Approved", pending: "Pending", superseded: "Superseded", rolled_back: "Rolled back" };
+const ENV_TONES     = { prod: "good", staging: "warn", dev: "neutral" };
+const ACTION_TONES  = { delete: "danger", update: "warn", create: "good", activate: "good", rollback: "danger", vote: "neutral", invoke: "neutral", approve: "good", reject: "danger", resolve: "good" };
 
-const card = (eyebrow, icon, value, sub, tone = "neutral") => `
-  <article class="panel p-5">
-    <div class="flex items-start justify-between"><span class="eyebrow">${escape(eyebrow)}</span><span class="grid h-8 w-8 place-items-center rounded-lg bg-paper"><svg class="h-4 w-4 fill-none stroke-current stroke-[1.7]"><use href="#icon-${escape(icon)}"/></svg></span></div>
-    <div class="mt-6 flex items-end justify-between gap-3"><span class="metric-value">${escape(value)}</span><span class="status-pill ${tone}"><span class="status-dot"></span>${escape(sub)}</span></div>
-  </article>`;
-
-function pill(text, tone = "neutral") {
-  return `<span class="status-pill ${tone}"><span class="status-dot"></span>${escape(text)}</span>`;
-}
-
-function sectionOpen(title, anchor) {
-  return `<div class="flex items-start justify-between"><div><div class="eyebrow">${escape(anchor)}</div><h2 class="mt-2 text-[1.05rem] font-bold tracking-[-.035em]">${escape(title)}</h2></div></div>`;
-}
-
-function errorPanel(message) {
-  return `<div class="panel p-5 text-[.72rem] text-muted">${escape(message)}</div>`;
-}
-
-function emptyPanel(text) {
-  return `<div class="rounded-xl border border-dashed border-line bg-paper p-4 text-center text-[.7rem] text-muted">${escape(text)}</div>`;
-}
+function actionTone(action) { return ACTION_TONES[action] || "neutral"; }
+function statusLabel(status) { return STATUS_LABELS[status] || status || "Draft"; }
+function statusTone(status) { return STATUS_TONES[status] || "neutral"; }
+function envTone(env) { return ENV_TONES[env] || "neutral"; }
 
 async function loadOverviewData(initialAuditFilter) {
   const out = {
     health: null, ready: null, metrics: null, providers: null,
     alerts: null, audit: null, auditFilter: initialAuditFilter || "all",
-    workspaces: null, projects: [], capabilities: [], releases: [], capabilityMap: new Map()
+    workspaces: null, projects: [], capabilities: [], releases: [], capabilityMap: new Map(),
   };
   out.health = await api.getHealth();
   out.ready = await api.getReady();
@@ -59,12 +53,12 @@ async function loadOverviewData(initialAuditFilter) {
       out.projects = projects.data || [];
       const capLists = await api.sequential(
         out.projects.map((p) => () => api.listCapabilities(p.id)),
-        { delayMs: 30, maxParallel: 1 }
+        { delayMs: 30, maxParallel: 1 },
       );
       out.capabilities = capLists.filter((r) => r.ok).flatMap((r) => r.data || []);
       const relLists = await api.sequential(
         out.capabilities.map((c) => () => api.listReleases(c.id)),
-        { delayMs: 30, maxParallel: 1 }
+        { delayMs: 30, maxParallel: 1 },
       );
       out.releases = relLists.filter((r) => r.ok).flatMap((r) => r.data || []);
       out.capabilityMap = new Map(out.capabilities.map((c) => [c.id, c]));
@@ -83,23 +77,23 @@ function renderMetrics(metrics) {
       : metrics?.status === 429 ? "Daemon is rate limiting requests. Slowing down."
       : metrics?.error ? `Live counters unavailable (${escape(metrics.error)}).`
       : "Live counters unavailable while the daemon warms up.";
-    return errorPanel(msg);
+    return errorState({ ...metrics, error: msg }, { prefix: "" });
   }
-  const api = metrics.data.api_metrics || {};
-  const llm = metrics.data.llm_metrics || {};
-  const review = metrics.data.review_metrics || {};
-  const guardrail = metrics.data.guardrail_metrics || {};
-  const errorRate = api.error_rate || 0;
+  const apiM = metrics.data.api_metrics || {};
+  const llm  = metrics.data.llm_metrics || {};
+  const rev  = metrics.data.review_metrics || {};
+  const gd   = metrics.data.guardrail_metrics || {};
+  const errorRate = apiM.error_rate || 0;
   const reqBadge = errorRate > 0 ? "warn" : "good";
   const reqLabel = errorRate > 0 ? "Attention" : "Healthy";
-  const reviewBadge = (review.pending_count || 0) > 0 ? "warn" : "good";
-  return `
-    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      ${card("API requests", "pulse", formatCompact(api.total_requests), reqLabel, reqBadge)}
-      ${card("LLM spend", "rocket", formatMoney(llm.total_cost_usd), `${formatCompact(llm.total_calls)} calls`, "neutral")}
-      ${card("Reviews", "scroll", formatInteger(review.total_reviews), `${formatInteger(review.pending_count)} pending`, reviewBadge)}
-      ${card("Guardrails", "shield", formatInteger((guardrail.passes || 0) + (guardrail.blocks || 0)), `${formatInteger(guardrail.blocks || 0)} blocks`, (guardrail.blocks || 0) > 0 ? "warn" : "good")}
-    </div>`;
+  const reviewBadge = (rev.pending_count || 0) > 0 ? "warn" : "good";
+  const guardBadge = (gd.blocks || 0) > 0 ? "warn" : "good";
+  return metricGrid([
+    metricCard({ eyebrow: "API requests", icon: "pulse", value: formatCompact(apiM.total_requests), sub: reqLabel, tone: reqBadge }),
+    metricCard({ eyebrow: "LLM spend",    icon: "rocket", value: formatMoney(llm.total_cost_usd), sub: `${formatCompact(llm.total_calls)} calls`, tone: "neutral" }),
+    metricCard({ eyebrow: "Reviews",      icon: "scroll", value: formatInteger(rev.total_reviews), sub: `${formatInteger(rev.pending_count)} pending`, tone: reviewBadge }),
+    metricCard({ eyebrow: "Guardrails",   icon: "shield", value: formatInteger((gd.passes || 0) + (gd.blocks || 0)), sub: `${formatInteger(gd.blocks || 0)} blocks`, tone: guardBadge }),
+  ]);
 }
 
 function renderEnvironments(releases, capabilitiesById) {
@@ -109,13 +103,15 @@ function renderEnvironments(releases, capabilitiesById) {
     const active = list.find((r) => r.status === "active");
     const pending = list.filter((r) => r.status === "pending").length;
     const cap = active ? capabilitiesById.get(active.capability_id) : null;
-    const label = active ? `${cap?.name || "capability"} v${active.capability_version}` : pending > 0 ? `${pending} pending review` : "no active release";
-    const tone = env === "prod" ? "good" : env === "staging" ? "warn" : "neutral";
+    const label = active
+      ? `${cap?.name || "capability"} v${active.capability_version}`
+      : pending > 0 ? `${pending} pending review` : "no active release";
+    const tone = envTone(env);
     const status = active ? "Active" : pending > 0 ? "Pending" : "Idle";
     return `<div class="flex items-center gap-3 rounded-xl bg-paper p-3">
       <span class="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-white text-[#5c5e63]"><svg class="h-4 w-4 fill-none stroke-current stroke-[1.7]"><use href="#icon-layers"/></svg></span>
       <span class="min-w-0 flex-1"><span class="flex items-center gap-2 text-[.75rem] font-bold">${escape(env)} <span class="mono text-[.58rem] font-medium text-muted">${escape(list.length)} total</span></span><span class="mt-1 block text-[.64rem] text-muted">${escape(label)}</span></span>
-      ${pill(status, tone)}
+      ${statusPill(status, tone)}
     </div>`;
   }).join("");
 }
@@ -123,16 +119,19 @@ function renderEnvironments(releases, capabilitiesById) {
 function renderPending(releases, capabilitiesById) {
   const pending = releases.filter((r) => r.status === "pending");
   if (!pending.length) {
-    return `<div class="mt-5 rounded-xl border border-dashed border-white/8 bg-white/[.04] p-5 text-center"><p class="text-[.78rem] font-bold text-white">Nothing waiting on you</p><p class="mt-1 text-[.66rem] text-[#9a9da4]">All releases are either approved or shipped.</p></div>`;
+    return `<div class="mt-5 rounded-xl border border-dashed border-white/8 bg-white/[.04] p-5 text-center">
+      <p class="text-[.78rem] font-bold text-white">Nothing waiting on you</p>
+      <p class="mt-1 text-[.66rem] text-[#9a9da4]">All releases are either approved or shipped.</p>
+    </div>`;
   }
   return `<div class="mt-5 space-y-2">${pending.slice(0, 6).map((r) => {
     const cap = capabilitiesById.get(r.capability_id);
     const name = cap?.name || "Unknown capability";
-    const initials = (name || "?").split(/\s+/).filter(Boolean).slice(0,2).map((p) => (p[0]||"").toUpperCase()).join("");
+    const initials = (name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((p) => (p[0] || "").toUpperCase()).join("");
     return `<button type="button" data-open-release="${escape(r.id)}" class="flex w-full items-center gap-3 rounded-xl border border-white/8 bg-white/[.045] p-3 text-left transition hover:bg-white/[.09]">
       <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#30323a] text-[.65rem] font-bold text-[#c5f06e]">${escape(initials)}</span>
       <span class="min-w-0 flex-1"><span class="block truncate text-[.75rem] font-bold">${escape(name)}</span><span class="mt-1 block text-[.65rem] text-[#898c94]">v${escape(r.capability_version)} · ${escape(r.environment)} · created ${escape(formatRelative(r.created_at))}</span></span>
-      ${pill("Review", "warn")}
+      ${statusPill("Review", "warn")}
       <svg class="h-3.5 w-3.5 shrink-0 fill-none stroke-[#777a83] stroke-2"><use href="#icon-arrow-right"/></svg>
     </button>`;
   }).join("")}</div>`;
@@ -140,16 +139,15 @@ function renderPending(releases, capabilitiesById) {
 
 function renderAudit(audit, filter) {
   if (!audit || !audit.ok || !audit.data) {
-    if (audit?.status === 429) return errorPanel("Audit log rate-limited. Retrying automatically.");
-    return errorPanel("Live activity unavailable" + (audit?.error ? ` (${escape(audit.error)})` : "") + ".");
+    if (audit?.status === 429) return errorState({ ...audit, error: "Audit log rate-limited. Retrying automatically." });
+    return errorState({ ...audit, error: audit?.error ? `Live activity unavailable (${audit.error}).` : "Live activity unavailable." });
   }
   const all = audit.data || [];
   const rows = all.slice(0, 12);
-  if (!rows.length) return emptyPanel("No activity yet. Create a capability or release to populate the audit trail.");
-  const tone = (action) => ({ delete: "danger", update: "warn", create: "good", activate: "good", rollback: "danger" }[action]) || "neutral";
+  if (!rows.length) return emptyState("No activity yet. Create a capability or release to populate the audit trail.", { icon: "icon-pulse" });
   const chips = ["all", "create", "update", "delete", "activate", "rollback"].map((action) => {
     const active = (filter || "all") === action;
-    return `<button type="button" data-audit-filter="${escape(action)}" class="rounded-md ${active ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"} px-2.5 py-1.5 text-[.66rem] font-${active ? "bold" : "semibold"}">${escape(action)}</button>`;
+    return `<button type="button" data-audit-filter="${escape(action)}" class="chip ${active ? "active" : ""}">${escape(action)}</button>`;
   }).join("");
   const list = rows.map((entry) => {
     const details = entry.details || {};
@@ -159,41 +157,54 @@ function renderAudit(audit, filter) {
     return `<div class="flex gap-3">
       <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-paper text-[#5c5e63]"><svg class="h-4 w-4 fill-none stroke-current stroke-[1.7]"><use href="#icon-pulse"/></svg></span>
       <div class="min-w-0 flex-1"><p class="text-[.74rem] leading-5"><span class="font-bold">${escape(subject)}</span> · <span class="font-semibold">${escape(entry.action)}</span> · <span class="font-bold">${escape(label)}</span></p><p class="mt-0.5 text-[.63rem] text-muted">${escape(formatRelative(entry.timestamp))} <span class="mx-1 text-[#c1c2bd]">·</span> <span class="mono">${escape(entry.resource)}</span></p></div>
-      ${pill(entry.action, tone(entry.action))}
+      ${statusPill(entry.action, actionTone(entry.action))}
     </div>`;
   }).join("");
   return `<div class="mt-5 space-y-3">${list}</div>
-  <div class="mt-4 flex items-center gap-1 rounded-lg bg-paper p-1" data-audit-chips>${chips}</div>
+  <div class="mt-4 chip-group" data-audit-chips>${chips}</div>
   <p class="mt-2 text-[.62rem] text-muted">Showing ${rows.length} of ${all.length} entries. Open <a class="font-bold text-ink hover:text-accent" href="#/audit${filter && filter !== "all" ? `?action=${encodeURIComponent(filter)}` : ""}">Audit trail →</a> for full history with filters.</p>`;
 }
 
 function renderCapabilities(capabilities, releases) {
   if (!capabilities.length) {
-    return `<div class="px-5 py-10 text-center"><p class="text-[.78rem] font-bold">No capabilities yet</p><p class="mt-1 text-[.66rem] text-muted">Use the <span class="font-semibold text-ink">New capability</span> button above to add the first one.</p></div>`;
+    return emptyState("No capabilities yet. Use the New capability button above to add the first one.", { icon: "icon-layers" });
   }
   const byCap = new Map();
   for (const r of releases) {
     if (!byCap.has(r.capability_id)) byCap.set(r.capability_id, []);
     byCap.get(r.capability_id).push(r);
   }
-  return capabilities.map((cap) => {
-    const rels = byCap.get(cap.id) || [];
-    const release = rels.find((r) => r.status === "active") || rels.find((r) => r.status === "pending") || rels[0];
-    const version = rels.reduce((m, r) => Math.max(m, r.capability_version || 0), 0) || 1;
-    const pillLabel = !release ? "Draft" : ({ active: "Production", approved: "Approved", pending: "Pending", superseded: "Superseded", rolled_back: "Rolled back" })[release.status] || "Draft";
-    const tone = release && release.environment === "prod" ? "good" : release && release.environment === "staging" ? "warn" : "neutral";
-    return `<a href="#/capabilities/${escape(cap.id)}" data-searchable class="data-row grid gap-3 py-4 md:grid-cols-[minmax(220px,1.7fr)_110px_120px_130px_120px_32px] md:items-center md:gap-4">
-      <div class="flex min-w-0 items-center gap-3">
-        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-[#e9ecff] text-blue"><svg class="h-4 w-4 fill-none stroke-current stroke-[1.7]"><use href="#icon-spark"/></svg></span>
-        <span class="min-w-0"><span class="block truncate text-[.78rem] font-bold">${escape(cap.name)}</span><span class="mt-1 block truncate text-[.64rem] text-muted">${escape(cap.description || (cap.tags && cap.tags.join(" · ")) || "No description")}</span></span>
-      </div>
-      <span class="mono text-[.68rem] text-[#62656a]">v${escape(version)}</span>
-      <span>${pill(pillLabel, tone)}</span>
-      <span class="text-[.74rem] font-bold">— <span class="block text-[.62rem] font-medium text-muted">no evals yet</span></span>
-      <span class="text-[.72rem] text-[#686b70]">${escape(ownerName(cap.owner))}</span>
-      <span class="icon-button !h-7 !w-7 !border-0 !bg-transparent"><svg class="h-4 w-4 fill-none stroke-current stroke-[1.8]"><use href="#icon-arrow-right"/></svg></span>
-    </a>`;
-  }).join("");
+  return dataTable({
+    columns: [
+      { key: "name", label: "Capability", render: (cap) => {
+          return `<div class="flex min-w-0 items-center gap-3">
+            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-[#e9ecff] text-blue"><svg class="h-4 w-4 fill-none stroke-current stroke-[1.7]"><use href="#icon-spark"/></svg></span>
+            <span class="min-w-0"><a href="#/capabilities/${escape(cap.id)}" class="block truncate text-[.78rem] font-bold hover:underline">${escape(cap.name)}</a><span class="mt-1 block truncate text-[.64rem] text-muted">${escape(cap.description || (cap.tags && cap.tags.join(" · ")) || "No description")}</span></span>
+          </div>`;
+        },
+      },
+      { key: "version", label: "Version", render: (cap) => {
+          const rels = byCap.get(cap.id) || [];
+          const version = rels.reduce((m, r) => Math.max(m, r.capability_version || 0), 0) || 1;
+          return `<span class="mono text-[.68rem] text-[#62656a]">v${escape(version)}</span>`;
+        },
+      },
+      { key: "status", label: "Status", render: (cap) => {
+          const rels = byCap.get(cap.id) || [];
+          const release = rels.find((r) => r.status === "active") || rels.find((r) => r.status === "pending") || rels[0];
+          const tone = release ? envTone(release.environment) : "neutral";
+          return statusPill(statusLabel(release?.status), tone);
+        },
+      },
+      { key: "reliability", label: "Reliability", render: () => `<span class="text-[.74rem] font-bold">— <span class="block text-[.62rem] font-medium text-muted">no evals yet</span></span>` },
+      { key: "owner", label: "Owner", render: (cap) => `<span class="text-[.72rem] text-[#686b70]">${escape(ownerName(cap.owner))}</span>` },
+      { key: "go", label: "", align: "right", render: (cap) => `<a href="#/capabilities/${escape(cap.id)}" class="icon-button !h-7 !w-7 !border-0 !bg-transparent" aria-label="Open"><svg class="h-4 w-4 fill-none stroke-current stroke-[1.8]"><use href="#icon-arrow-right"/></svg></a>` },
+    ],
+    rows: capabilities,
+    rowAttrs: (cap) => `data-searchable`,
+    emptyMessage: "No capabilities yet.",
+    emptyIcon: "icon-layers",
+  });
 }
 
 function renderStrips(providers, alerts) {
@@ -202,7 +213,7 @@ function renderStrips(providers, alerts) {
   const providerPanel = `<article class="panel flex items-center gap-4 p-5">
     <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e9ecff] text-blue"><svg class="h-5 w-5 fill-none stroke-current stroke-[1.6]"><use href="#icon-play"/></svg></span>
     <span class="min-w-0 flex-1"><span class="eyebrow">LLM providers</span><span class="mt-1 block text-[.78rem] font-bold">${escape(pl.length ? pl.join(" · ") : "none")}</span></span>
-    ${providers?.ok ? pill(`${pl.length} online`, "good") : pill(providers?.error || "unavailable", "warn")}
+    ${providers?.ok ? statusPill(`${pl.length} online`, "good") : statusPill(providers?.error || "unavailable", "warn")}
   </article>`;
   const alertPanel = al.length
     ? `<article class="panel flex items-center gap-4 p-5">
@@ -213,56 +224,47 @@ function renderStrips(providers, alerts) {
     : `<article class="panel flex items-center gap-4 p-5">
         <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#eaf6ed] text-[#4d9665]"><svg class="h-5 w-5 fill-none stroke-current stroke-[1.6]"><use href="#icon-check"/></svg></span>
         <span class="min-w-0 flex-1"><span class="eyebrow">Alerts</span><span class="mt-1 block text-[.78rem] font-bold">All clear</span></span>
-        ${pill("OK", "good")}
+        ${statusPill("OK", "good")}
       </article>`;
   return `${providerPanel}${alertPanel}`;
 }
 
-function shell(topActions, clock) {
+function shell(clock) {
+  const topActions = `<div class="flex shrink-0 items-center gap-2">
+    <button id="action-refresh" class="quiet-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-[1.8]"><use href="#icon-refresh"/></svg><span>Refresh</span></button>
+    <button id="action-new-capability" class="primary-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-[2]"><use href="#icon-plus"/></svg> New capability</button>
+  </div>`;
   return `
-    <section class="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+    <header class="page-header">
       <div>
         <div class="eyebrow flex items-center gap-2">Command center <span class="h-1 w-1 rounded-full bg-accent"></span> <span id="overview-clock">${escape(clock)}</span></div>
-        <h1 class="mt-3 max-w-2xl text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[.98] tracking-[-.075em]">Make every capability<br class="hidden sm:block" /> production-ready.</h1>
-        <p class="mt-4 max-w-xl text-[.86rem] leading-6 text-muted">One clear view of your intelligence stack. Review what changed, promote what works, and keep every decision traceable.</p>
+        <h1 class="page-title mt-3 !text-[clamp(2rem,4vw,3.25rem)] !tracking-[-.075em] !leading-[.98] !font-bold">Make every capability<br class="hidden sm:block" /> production-ready.</h1>
+        <p class="page-description mt-4 !max-w-xl !text-[.86rem] !leading-6">One clear view of your intelligence stack. Review what changed, promote what works, and keep every decision traceable.</p>
       </div>
       ${topActions}
-    </section>
-    <section id="overview-metrics" class="mt-8">${skeleton("metrics", 4)}</section>
+    </header>
+    <section id="overview-metrics" class="mt-8">${skeletonStack({ lines: 4 })}</section>
     <section class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(330px,.85fr)]">
-      <article class="panel overflow-hidden p-5 sm:p-6">${sectionOpen("Across the workspace", "Release velocity")}<div class="mt-7 flex items-end gap-3"><span id="overview-capability-count" class="text-[2rem] font-bold tracking-[-.07em]">—</span><span class="mb-1 text-[.72rem] font-semibold text-[#6d8c34]">capabilities tracked <span class="text-muted">across <span id="overview-project-count">—</span> projects</span></span></div><div id="overview-environment" class="mt-4 space-y-3">${skeleton("environments", 1)}${skeleton("environments", 1)}${skeleton("environments", 1)}</div><div class="soft-divider mt-5 pt-4"><div class="flex items-center justify-between text-[.68rem]"><span class="text-muted">Last activity</span><span id="overview-last-activity" class="font-bold text-[#646761]">—</span></span></div></div></article>
+      <article class="panel overflow-hidden p-5 sm:p-6">
+        <div class="eyebrow">Release velocity</div>
+        <h2 class="mt-2 text-[1.05rem] font-bold tracking-[-.035em]">Across the workspace</h2>
+        <div class="mt-7 flex items-end gap-3"><span id="overview-capability-count" class="text-[2rem] font-bold tracking-[-.07em]">—</span><span class="mb-1 text-[.72rem] font-semibold text-[#6d8c34]">capabilities tracked <span class="text-muted">across <span id="overview-project-count">—</span> projects</span></span></div>
+        <div id="overview-environment" class="mt-4 space-y-3">${skeletonStack({ lines: 1, width: "100%" })}${skeletonStack({ lines: 1, width: "100%" })}${skeletonStack({ lines: 1, width: "100%" })}</div>
+        <div class="soft-divider mt-5 pt-4"><div class="flex items-center justify-between text-[.68rem]"><span class="text-muted">Last activity</span><span id="overview-last-activity" class="font-bold text-[#646761]">—</span></span></div>
+      </article>
       <article class="panel-dark overflow-hidden p-5 sm:p-6">
         <div class="flex items-start justify-between"><div><div class="eyebrow !text-[#898b92]">Needs your attention</div><h2 class="mt-2 text-[1.05rem] font-bold tracking-[-.035em]">Pending releases</h2></div><span class="grid h-9 w-9 place-items-center rounded-xl bg-accent/15 text-accent"><svg class="h-4 w-4 fill-none stroke-current stroke-[1.8]"><use href="#icon-clock"/></svg></span></div>
-        <div id="overview-pending">${skeleton("pending", 2)}</div>
+        <div id="overview-pending">${skeletonStack({ lines: 2 })}</div>
         <p class="mt-5 text-[.66rem] text-[#898c94]">Releases are surfaced from <span class="mono">/api/v1/capabilities/{id}/releases</span>.</p>
       </article>
     </section>
     <section class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-      <article class="panel overflow-hidden p-5 sm:p-6">
-        <div class="flex items-start justify-between"><div><div class="eyebrow">Recent activity</div><h2 class="mt-2 text-[1.05rem] font-bold tracking-[-.035em]">Live from the audit log</h2></div></div>
-        <div id="overview-activity">${skeleton("audit", 3)}</div>
-      </article>
-      <article class="panel overflow-hidden p-5 sm:p-6">
-        <div class="flex items-start justify-between"><div><div class="eyebrow">Capability catalog</div><h2 class="mt-2 text-[1.05rem] font-bold tracking-[-.035em]">Everything in the workspace</h2></div><span class="text-[.6rem] text-muted" id="overview-capabilities-count">—</span></div>
-        <div class="hidden grid-cols-[minmax(220px,1.7fr)_110px_120px_130px_120px_32px] gap-4 border-b border-line/70 bg-paper/70 px-1 pb-3 pt-4 text-[.62rem] font-bold uppercase tracking-[.12em] text-muted md:grid"><span>Capability</span><span>Version</span><span>Status</span><span>Reliability</span><span>Owner</span><span></span></div>
-        <div id="overview-capabilities">${skeleton("capabilities", 3)}</div>
-      </article>
+      ${panel({ eyebrow: "Recent activity", title: "Live from the audit log", body: `<div id="overview-activity">${skeletonStack({ lines: 3 })}</div>`, className: "overflow-hidden" })}
+      ${panel({ eyebrow: "Capability catalog", title: "Everything in the workspace", rightSlot: `<span class="text-[.6rem] text-muted" id="overview-capabilities-count">—</span>`, body: `<div id="overview-capabilities">${skeletonStack({ lines: 3 })}</div>`, className: "overflow-hidden" })}
     </section>
-    <section class="mt-5 grid gap-5 md:grid-cols-2"><div id="overview-strip-1">${skeleton("providers", 1)}</div><div id="overview-strip-2">${skeleton("alerts", 1)}</div></section>
+    <section class="mt-5 grid gap-5 md:grid-cols-2"><div id="overview-strip-1">${skeletonStack({ lines: 1 })}</div><div id="overview-strip-2">${skeletonStack({ lines: 1 })}</div></section>
     <footer class="flex flex-col justify-between gap-2 py-8 text-[.64rem] text-muted sm:flex-row sm:items-center"><span>Promptsheon control plane <span class="mx-1 text-[#b7b8b3]">·</span> <span id="runtime-status-footer">Loading</span></span><span class="mono">build <span id="runtime-version-footer">v0.3.0</span></span></footer>
   `;
-}
-
-function topActions() {
-  return `<div class="flex shrink-0 items-center gap-2">
-    <button id="action-refresh" class="quiet-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-[1.8]"><use href="#icon-refresh"/></svg><span>Refresh</span></button>
-    <button id="action-new-capability" class="primary-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-[2]"><use href="#icon-plus"/></svg> New capability</button>
-  </div>`;
-}
-
-function renderInitialSkeleton(filter) {
-  const clock = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric" }).format(new Date());
-  return shell(topActions(), clock);
 }
 
 export async function renderOverview(route) {
@@ -271,7 +273,8 @@ export async function renderOverview(route) {
     return renderConnectPrompt();
   }
   const initialFilter = route?.query?.action || (window.localStorage.getItem("promptsheon.auditFilter") || "all");
-  const html = renderInitialSkeleton(initialFilter);
+  const clock = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric" }).format(new Date());
+  const html = shell(clock);
   window.document.getElementById("view").innerHTML = html;
   queueMicrotask(async () => {
     try {
@@ -289,8 +292,8 @@ export async function renderOverview(route) {
 function renderConnectPrompt() {
   const html = `<section class="panel p-8 text-center">
     <div class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-paper text-muted"><svg class="h-6 w-6 fill-none stroke-current stroke-2"><use href="#icon-key"/></svg></div>
-    <h1 class="mt-5 text-[1.4rem] font-bold tracking-[-.04em]">Connect the Promptsheon API</h1>
-    <p class="mt-2 text-[.78rem] text-muted">Open <span class="font-bold text-ink">Connection</span> in the sidebar to paste an API key or set a custom base URL.</p>
+    <h1 class="mt-5 page-title">Connect the Promptsheon API</h1>
+    <p class="mt-2 page-description mx-auto">Open <span class="font-bold text-ink">Connection</span> in the sidebar to paste an API key or set a custom base URL.</p>
     <div class="mt-5 flex justify-center gap-2">
       <button data-open-settings class="primary-button"><svg class="h-3.5 w-3.5 fill-none stroke-current stroke-2"><use href="#icon-settings"/></svg>Open Connection</button>
     </div>
@@ -377,27 +380,22 @@ function applyOverviewData(data) {
     }
   }
   const pendingSection = window.document.getElementById("overview-pending");
-  if (pendingSection) {
-    pendingSection.addEventListener("click", async (event) => {
-      const row = event.target.closest("[data-open-release]");
-      if (!row) return;
-      const { openReleaseModal } = await import("./release-modal.js");
-      const root = window.document.getElementById("modal-root");
-      await openReleaseModal(root, row.dataset.openRelease);
-    });
-  }
-  attachOverviewActions(data);
+  if (pendingSection) pendingSection.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-open-release]");
+    if (!button) return;
+    const id = button.dataset.openRelease;
+    if (!id) return;
+    import("./release-modal.js").then(({ openReleaseModal }) => openReleaseModal(id)).catch((e) => console.error("Failed to open release modal:", e));
+  });
 }
 
-function attachOverviewActions(data) {
+function attachOverviewActions() {
   const refresh = window.document.getElementById("action-refresh");
-  refresh?.addEventListener("click", () => window.location.reload());
+  if (refresh) refresh.addEventListener("click", () => window.location.reload());
   const newCap = window.document.getElementById("action-new-capability");
-  newCap?.addEventListener("click", async () => {
+  if (newCap) newCap.addEventListener("click", async () => {
+    const mod = await import("./new-capability-modal.js");
     const root = window.document.getElementById("modal-root");
-    if (root) {
-      const { openNewCapabilityModal } = await import("./new-capability-modal.js");
-      await openNewCapabilityModal(root, data.projects);
-    }
+    if (root) await mod.openNewCapabilityModal(root, { onCreated: () => window.location.reload() });
   });
 }
