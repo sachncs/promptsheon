@@ -5,6 +5,8 @@ environment_files/
 # Binaries (anchored so the pattern doesn't match nested paths
 # like deploy/helm/promptsheon/, frontend/, etc.)
 bin/
+# Local build of scripts/genopenapi (compiled from scripts/genopenapi/main.go).
+/genopenapi
 
 # Cross-platform build artifacts
 *.exe
