@@ -21,7 +21,6 @@
 package main
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -31,6 +30,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 const oldImport = `"github.com/sachncs/promptsheon/sdk"`
