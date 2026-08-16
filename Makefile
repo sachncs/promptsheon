@@ -1,4 +1,4 @@
-.PHONY: all build build-server build-cli build-healthcheck build-public build-e2e test test-verbose test-integration test-e2e load-test lint lint-domain lint-deps fmt vet deps clean coverage coverage-raw run cli openapi openapi-check sdk sdk-check update-deps security helm-docs docs-check bench check check-public purity help web-install web-dev web-build web-smoke
+.PHONY: all build build-server build-cli build-healthcheck build-public build-e2e test test-verbose test-integration test-e2e load-test lint lint-domain lint-deps fmt vet deps clean coverage coverage-raw run cli openapi openapi-check update-deps security helm-docs docs-check bench check check-public purity help web-install web-dev web-build web-smoke
 
 # Default target
 all: build
@@ -68,9 +68,21 @@ load-test:
 	  k6 run "$$scenario" --out json=/tmp/load-results/$$name.json || true; \
 	done
 
-# Run linter
+# Run linter. Per LINT-1 (replacing the broken golangci-lint
+# gate), this target uses staticcheck instead. golangci-lint v2.x
+# rejects the v1-schema .golangci.yml in this repo, so we
+# standardised on staticcheck — the same tool CI already runs as
+# a separate step (see .github/workflows/ci.yaml). Staticcheck
+# catches deprecations, unused identifiers, and other issues
+# without needing a config file. The repo's staticcheck baseline
+# is committed under scripts/lint-baseline.txt (one diagnostic
+# per line). On each invocation we diff against the baseline; only
+# new diagnostics fail the gate. This keeps legacy findings from
+# blocking shippable changes while still enforcing "no new lint
+# debt" (per AGENTS.md Phase 9).
+.PHONY: lint
 lint:
-	golangci-lint run
+	bash scripts/run-lint.sh
 
 # Lint domain packages: fail on any package-level mutable state
 # (Charter Principle 5). Runs as part of CI. The check is a small
@@ -157,28 +169,6 @@ dist-check:
 		echo "FAIL: cmd/promptsheond/frontend/dist does not exist; run make web-build"; exit 1; \
 	fi
 
-# SDK regeneration. SDK-1: the Python and TypeScript SDKs are
-# derived from promptsheon/spec/spec.yaml. The generator writes the
-# generated sources to sdk/python/src/promptsheon/_generated
-# and sdk/typescript/src/_generated respectively; the canonical
-# hand-written client wrappers in each SDK re-export the
-# generated surface. CI fails if a route was added without
-# regenerating.
-sdk:
-	@echo "regenerating Python + TypeScript SDKs from promptsheon/spec/spec.yaml"
-	@mkdir -p sdk/python/src/promptsheon/_generated sdk/typescript/src/_generated
-	@cp promptsheon/spec/spec.yaml sdk/python/src/promptsheon/_generated/openapi.yaml
-	@cp promptsheon/spec/spec.yaml sdk/typescript/src/_generated/openapi.yaml
-	@echo "ok: SDK artifacts refreshed"
-
-# sdk-check verifies the SDK generated artifacts match the
-# canonical promptsheon/spec/spec.yaml. The previous Makefile only
-# had openapi-check; the generated SDK copies were easy to drift
-# without anyone noticing (PR-3 c3.13 introduced the matching
-# codegen scripts).
-sdk-check: sdk
-	@git diff --exit-code sdk/ || (echo "SDK is out of date. Run 'make sdk' and commit the result."; exit 1)
-
 # Update dependencies
 update-deps:
 	go get -u ./...
@@ -253,7 +243,7 @@ help:
 	@echo "  test               Run all tests with race detection"
 	@echo "  test-verbose       Run tests with verbose output"
 	@echo "  test-integration   Run integration tests"
-	@echo "  lint               Run golangci-lint"
+	@echo "  lint               Run staticcheck (vs scripts/lint-baseline.txt)"
 	@echo "  lint-domain        Fail on package-level mutable state in domain packages"
 	@echo "  lint-deps          Fail if domain packages import the wrong things"
 	@echo "  fmt                Format code with gofmt and goimports"
@@ -266,8 +256,6 @@ help:
 	@echo "  cli                Build and run the CLI"
 	@echo "  openapi            Regenerate promptsheon/spec/spec.yaml"
 	@echo "  openapi-check      Fail if spec.yaml is out of date"
-	@echo "  sdk                Refresh SDK stubs from promptsheon/spec/spec.yaml"
-	@echo "  sdk-check          Fail if SDK is out of date"
 	@echo "  check              Umbrella gate: fmt + vet + lint + test + openapi-check + docs-check"
 	@echo "  purity             Domain-purity gate: lint-domain + lint-deps"
 	@echo "  helm-docs          Regenerate deploy/helm/promptsheon/README.md"

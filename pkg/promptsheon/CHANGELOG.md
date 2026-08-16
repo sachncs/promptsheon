@@ -22,4 +22,17 @@
 // which prevented refactors. The //go:build promptsheon fence
 // in pkg/promptsheon is the only public surface; sdk/ would
 // have been a backdoor.
+//
+// # v1.0.0 - Python and TypeScript SDK directories removed
+//
+// The sdk/python/ and sdk/typescript/ directories contained
+// only a copy of the OpenAPI spec and no actual client code.
+// They were misleading: the README, ROADMAP, and CI all
+// advertised Python + TypeScript SDKs that did not exist as
+// runnable code. They are deleted; the sdk-python and
+// sdk-typescript CI jobs and the make sdk / make sdk-check
+// Makefile targets are removed at the same time.
+//
+// This package remains the only SDK surface; see
+// docs/reference/sdk.md for the Go client documentation.
 package promptsheon

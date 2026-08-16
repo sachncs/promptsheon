@@ -139,18 +139,6 @@ jobs:
         # with the daemon. Fails CI on drift.
         run: go test -count=1 -timeout 60s ./tests/contract/...
 
-      - name: SDK Python codegen + compile
-        # API-7a: openapi-python-client regenerates the Python
-        # SDK from promptsheon/spec/spec.yaml. compileall catches
-        # syntax errors that codegen might emit.
-        run: bash sdk/python/scripts/codegen.sh
-
-      - name: SDK TypeScript codegen + typecheck
-        # API-7b: openapi-typescript regenerates the TS SDK
-        # from promptsheon/spec/spec.yaml. tsc --noEmit catches
-        # type errors that codegen might emit.
-        run: bash sdk/typescript/scripts/codegen.sh
-
   smoke:
     # API-6b: smoke-test the example bash scripts against a
     # freshly-started daemon. The job is intentionally its
@@ -255,20 +243,18 @@ jobs:
         # ADR-0012.
         run: make lint-deps
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: latest
-          # L-12: only fail CI on issues introduced by the
-          # current change. The repo has a large pre-existing
-          # baseline of lint debt (~320 findings across all
-          # linters); failing every release for legacy debt
-          # would block shippable changes for noise that is
-          # not in scope for the current PR. The `forbidigo`
-          # rule still checks new non-main os.Exit usage via
-          # the same config — only the scope is narrowed to
-          # the diff, not the ruleset.
-          only-new-issues: true
+      - name: Install staticcheck
+        # LINT-1: staticcheck replaces the broken golangci-lint
+        # gate. golangci-lint v2.x rejects the v1-schema
+        # .golangci.yml in this repo, so we standardised on
+        # staticcheck — the same tool the test job already
+        # runs as a separate step. The baseline of accepted
+        # legacy findings lives at scripts/lint-baseline.txt;
+        # only new findings fail the gate.
+        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+
+      - name: Lint (staticcheck)
+        run: make lint
 
   docs-check:
     # DOC-CI-3 / DOC-FRESH-1: deterministic doc-freshness gate.
@@ -287,63 +273,6 @@ jobs:
 
       - name: docs-check
         run: make docs-check
-
-  sdk-python:
-    # SDK-2: run the real pytest suite (not just compileall)
-    # for sdk/python. compileall catches syntax errors in
-    # generated code; pytest covers the hand-written client
-    # wrappers in sdk/python/tests/. The job runs the
-    # codegen first so the test sees the freshly-generated
-    # client surface, not a stale copy.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install SDK + test deps
-        run: |
-          python3 -m pip install --quiet -e ./sdk/python
-          python3 -m pip install --quiet pytest
-
-      - name: Regenerate SDK from spec
-        run: bash sdk/python/scripts/codegen.sh
-
-      - name: Run pytest
-        run: python3 -m pytest sdk/python/tests
-
-  sdk-typescript:
-    # SDK-3: run the real jest suite for sdk/typescript.
-    # The job regenerates the SDK first so jest exercises
-    # the freshly-generated types, not a stale copy.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-
-      - name: Regenerate SDK from spec
-        run: bash sdk/typescript/scripts/codegen.sh
-
-      - name: Install jest
-        run: npm --prefix sdk/typescript install --no-audit --no-fund
-
-      - name: Run jest
-        run: npm --prefix sdk/typescript test
 
   tla:
     # TLA-LIFECYCLE-2: model-check the release lifecycle spec

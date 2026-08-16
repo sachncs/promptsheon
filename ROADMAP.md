@@ -18,10 +18,24 @@ match the server.
 Day 1/2/3 closure pass. See CHANGELOG.md for the full list.
 
 **Acceptance**: `make check && make test && make bench &&
-make docs-check && make purity` all pass in CI; the Go SDK,
-Python SDK, and TypeScript SDK each cover every /api/v1
-route; the TLA+ specs (audit chain + release lifecycle) have
-their Go-side regression tests in place.
+make docs-check && make purity` all pass in CI; the Go SDK
+(`pkg/promptsheon`) covers every `/api/v1` route in the
+`promptsheon/spec/spec.yaml` OpenAPI surface (the parity
+gate is mechanical — see PR-5 in
+`docs/research/audit-fixes-plan.md`); the TLA+ specs
+(audit chain + release lifecycle) have their Go-side
+regression tests in place.
+
+**SDK scope change**: the `sdk/python/` and `sdk/typescript/`
+directories were removed in v1.0.0. They had only contained
+a copy of the OpenAPI spec and no actual client code; the
+`make sdk` / `make sdk-check` targets and the corresponding
+`sdk-python` / `sdk-typescript` CI jobs were removed at
+the same time. Only the Go SDK ships today. A future
+generator pass can re-introduce the Python and TypeScript
+clients — when it does, the parity gate from PR-5 will
+mechanically catch any drift between the spec and the
+generated SDK.
 
 ## v0.4.0
 

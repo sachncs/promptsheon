@@ -147,11 +147,13 @@ destructive-migration gate doesn't block test setup.
 
 ## SDK CI
 
-The Go SDK has its own tests under `sdk/client_test.go`; the
-Python SDK has `sdk/python/tests/` and the TypeScript SDK has
-`sdk/typescript/src/`. SDK CI is wired into the default `test`
-job (Go SDK) plus separate steps in the existing CI (Python
-and TypeScript) where their toolchains are available.
+The Go SDK lives at `pkg/promptsheon` and is exercised by
+`tests/contract/contract_test.go`, which walks every
+`promptsheon/spec/spec.yaml` route and asserts the
+`*promptsheon.Client` surface aligns with the daemon.
+The Python and TypeScript SDK directories were removed in
+v1.0.0 (PR-4 of `docs/research/audit-fixes-plan.md`); only
+the Go SDK ships today.
 
 ## Adding a new test
 

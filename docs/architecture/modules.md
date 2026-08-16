@@ -68,9 +68,7 @@ that pulls in `package main` at the repo root).
 | `cas` | `promptsheon/cas/` | Domain | Content-addressable store (Merkle DAG). |
 | `../development/cli.md` | root `cli.go`, `cli_cas.go`, `cli_harness.go`, `cli_http.go`, `cli_evolve.go` | CLI | Command dispatcher + handlers (in `package main`). |
 | `daemon` | root `daemon.go`, `daemon_evolver.go`, `daemon_release_invoker.go`, `embed_frontend.go`, `healthcheck.go` | HTTP | Server entry point + dispatch (in `package main`). |
-| `client` (Go SDK) | `sdk/` | SDK | Go SDK; see [docs/sdk.md](../reference/sdk.md). |
-| `client` (Py SDK) | `sdk/python/src/promptsheon/` | SDK | Python SDK; generated from `promptsheon/spec/spec.yaml`. |
-| `client` (TS SDK) | `sdk/typescript/src/` | SDK | TypeScript SDK; generated from `promptsheon/spec/spec.yaml`. |
+| `client` (Go SDK) | `pkg/promptsheon` | SDK | Go SDK; see [docs/reference/sdk.md](../reference/sdk.md). |
 
 ## Domain-package purity
 
