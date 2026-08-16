@@ -199,8 +199,8 @@ func (m *Multi) Flush(ctx context.Context) error {
 // OTel are disabled.
 type noopTracer struct{}
 
-func (noopTracer) Start(_ context.Context, _ string) *Span {
-	return &Span{ID: "noop", TraceID: "noop", StartedAt: time.Now()}
+func (noopTracer) Start(_ context.Context, operation string) *Span {
+	return &Span{ID: "noop", TraceID: "noop", Operation: operation, StartedAt: time.Now()}
 }
 func (noopTracer) StartChild(_ context.Context, parent *Span, operation string) *Span {
 	if parent == nil {
