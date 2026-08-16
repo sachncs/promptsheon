@@ -242,17 +242,3 @@ func (s *Server) handleAuditEntry(ctx context.Context, entry *models.AuditEntry)
 	}
 }
 
-// resetAuditForTest re-initialises the audit state for tests. It
-// must not be used outside of test code.
-func (s *Server) resetAuditForTest() {
-	s.auditMu.Lock()
-	defer s.auditMu.Unlock()
-	if s.auditCancel != nil {
-		s.auditCancel()
-	}
-	s.auditCancel = nil
-	s.auditQueue = nil
-	s.auditDone = nil
-	s.auditStopTriggered = false
-	s.auditDropped.Store(0)
-}

@@ -18,7 +18,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -116,30 +115,6 @@ func TestSQLiteSurvivesFileDelete(t *testing.T) {
 	// the path doesn't exist; that's a follow-on, not
 	// covered here.
 	_ = reopenErr
-}
-
-// isDBError returns true if err looks like a real database
-// error (sqlite, sql, or wrapped equivalent) rather than a
-// context error or a panic recovered error.
-func isDBError(err error) bool {
-	if err == nil {
-		return false
-	}
-	s := err.Error()
-	for _, marker := range []string{
-		"sql: ",
-		"database",
-		"SQLite",
-		"no such table",
-		"file",
-		"disk",
-		"closed",
-	} {
-		if strings.Contains(s, marker) {
-			return true
-		}
-	}
-	return false
 }
 
 // TestSQLitePanicOnHeldQueryAfterDelete verifies the chaos

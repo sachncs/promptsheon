@@ -87,7 +87,7 @@ func (t *OTelTracer) StartChild(ctx context.Context, parent *Span, operation str
 		}))
 	}
 
-	ctx, otelSpan := t.tracer.Start(ctx, operation, opts...)
+	_, otelSpan := t.tracer.Start(ctx, operation, opts...)
 
 	span := &Span{
 		ID:        otelSpan.SpanContext().SpanID().String(),
@@ -100,12 +100,12 @@ func (t *OTelTracer) StartChild(ctx context.Context, parent *Span, operation str
 		otelSpan:  otelSpan,
 	}
 
-	// Store OTel span in context for child span linking so
-	// downstream callers see the in-flight span via
-	// SpanFromContext. The new context is not propagated back
-	// to the caller because the Span value is the public handle.
-	ctx = context.WithValue(ctx, otelSpanKey{}, otelSpan)
-
+	// OTel SDK manages context propagation itself via the
+	// trace.ContextWithSpanContext API; the caller retrieves
+	// the in-flight span via trace.SpanFromContext on the
+	// returned child context (or via our SpanFromContext after
+	// the caller wraps it with WithSpanContext). No local
+	// context mutation is needed here.
 	return span
 }
 

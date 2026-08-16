@@ -495,18 +495,6 @@ func (r *fakeRepo) releaseByID(id string) *ReleaseRecord {
 	return &cp
 }
 
-// versionByNumber returns a copy of the version record.
-func (r *fakeRepo) versionByNumber(capID string, n int) *capability.Version {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	for _, v := range r.versionsByCap[capID] {
-		if v.Version == n {
-			cp := *v
-			return &cp
-		}
-	}
-	return nil
-}
 
 // fakeLoader is a CAS-free in-memory prompt store. Tests can
 // pre-load prompts; the evolver's WritePrompt will be

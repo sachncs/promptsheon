@@ -153,11 +153,10 @@ func nextCron(expr string, from time.Time) (time.Time, error) {
 	if len(parts) != 5 {
 		return time.Time{}, errs.ErrInvalidCron
 	}
-	parts2 := make([]string, 5)
-	for i, p := range parts {
-		parts2[i] = p
-	}
-	parts = parts2
+	// Defensive copy: callers retain ownership of their slice.
+	partsCopy := make([]string, len(parts))
+	copy(partsCopy, parts)
+	parts = partsCopy
 	minute, err := parseField(parts[0], 0, 59)
 	if err != nil {
 		return time.Time{}, errf.Errorf("minute: %w", err)

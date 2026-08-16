@@ -632,21 +632,6 @@ func (h *Hub) newTestClient(filter LogFilter) *Client {
 	return c
 }
 
-func assertMessage(t *testing.T, c *Client, want string) {
-	t.Helper()
-	select {
-	case msg := <-c.send:
-		var entry LogEntry
-		if err := json.Unmarshal(msg, &entry); err != nil {
-			t.Fatalf("unmarshal: %v", err)
-		}
-		if entry.Message != want {
-			t.Errorf("expected message %q, got %q", want, entry.Message)
-		}
-	case <-time.After(time.Second):
-		t.Fatalf("timeout waiting for %q", want)
-	}
-}
 
 func tryReceive(c *Client, d time.Duration) string {
 	select {

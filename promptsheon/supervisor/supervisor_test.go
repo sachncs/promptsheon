@@ -40,18 +40,6 @@ func (f *fakePlugin) Health(ctx context.Context) error {
 	return errors.New("not healthy")
 }
 
-// startErrOnce returns an error the first time Start is called, then
-// nil. Used to test the "started failing then recovered" path.
-type startErrOnce struct {
-	once sync.Once
-	err  error
-}
-
-func (s *startErrOnce) firstErr() error {
-	s.once.Do(func() { s.err = errors.New("startup boom") })
-	return s.err
-}
-
 type capturePublisher struct {
 	mu     sync.Mutex
 	events []PluginEvent

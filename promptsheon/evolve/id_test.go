@@ -18,7 +18,9 @@ func TestGenerateID_Format(t *testing.T) {
 		t.Errorf("id = %q, want 18 chars", id)
 	}
 	// Two calls return different ids (crypto/rand).
-	if generateID("x") == generateID("x") {
-		t.Errorf("generateID returned the same value twice")
+	first := generateID("x")
+	second := generateID("x")
+	if first == second {
+		t.Errorf("generateID returned the same value twice: %q", first)
 	}
 }
