@@ -34,17 +34,6 @@ import (
 	"github.com/sachncs/promptsheon/pkg/promptsheon"
 )
 
-// routeEntry is a single OpenAPI path entry. Only the fields
-// the contract test cares about are decoded.
-type routeEntry struct {
-	Path   string                 `yaml:"-"`
-	LineNo int                    `yaml:"-"`
-	Get    map[string]interface{} `yaml:"get,omitempty"`
-	Post   map[string]interface{} `yaml:"post,omitempty"`
-	Put    map[string]interface{} `yaml:"put,omitempty"`
-	Delete map[string]interface{} `yaml:"delete,omitempty"`
-}
-
 // TestSpecIsValid ensures the OpenAPI spec parses. Other tests
 // depend on this — a malformed spec means we can't enumerate
 // the routes.
@@ -108,76 +97,81 @@ func TestEveryRouteReachable(t *testing.T) {
 	}
 }
 
-// TestSDKExposesMandatoryMethods walks *promptsheon.Client's method
-// set with reflection and fails on any documented method
-// that's missing. The list is derived from the SDK's actual
-// exported method set, so adding a method to *promptsheon.Client
-// automatically registers it as mandatory; removing one
-// fails the build.
+// compositeSDKMethods is the small set of Client methods that
+// don't map to a single OpenAPI route. ApproveAndInvoke is a
+// composite of Approve + Invoke on the same release; OAuthLoginURL
+// is a URL-builder helper, not an API call. Everything else
+// must come from spec.yaml operationId (see sdkMethodNames below).
+var compositeSDKMethods = []string{
+	"ApproveAndInvoke",
+}
+
+// TestSDKExposesMandatoryMethods walks every operationId in
+// promptsheon/spec/spec.yaml and asserts that *promptsheon.Client
+// exposes a method of that name. It also asserts the small
+// set of composite SDK methods (above) exists. This is the
+// mechanical parity gate from PR-5 of
+// docs/research/audit-fixes-plan.md: adding a route to
+// routes.go / handlers_*.go without a corresponding Client
+// method fails this test.
 func TestSDKExposesMandatoryMethods(t *testing.T) {
-	rt := reflect.TypeOf((*promptsheon.Client)(nil))
-	for i := 0; i < rt.NumMethod(); i++ {
-		// The walk itself proves the method set compiled.
-		// The deeper check is below in TestSDKMethodCoverage.
-		_ = rt.Method(i)
-	}
+	want := sdkMethodNames(t)
 
-	// Snapshot every exported method name on *promptsheon.Client.
-	// The test will fail if any future change drops one of
-	// them without also dropping the documentation that
-	// promised it.
-	want := sdkMandatoryMethods()
-	c := &promptsheon.Client{}
-	ctype := reflect.TypeOf(c)
-
+	ctype := reflect.TypeOf(&promptsheon.Client{})
 	have := map[string]bool{}
 	for i := 0; i < ctype.NumMethod(); i++ {
 		have[ctype.Method(i).Name] = true
 	}
+
+	missing := []string{}
 	for _, m := range want {
 		if !have[m] {
-			t.Errorf("promptsheon.Client is missing mandatory method %q", m)
+			missing = append(missing, m)
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		t.Errorf("promptsheon.Client is missing %d SDK methods required by spec.yaml operationIds: %v", len(missing), missing)
+	}
+
+	for _, m := range compositeSDKMethods {
+		if !have[m] {
+			t.Errorf("promptsheon.Client is missing composite SDK method %q", m)
 		}
 	}
 }
 
-// sdkMandatoryMethods is the documented SDK surface. The
-// list is hand-maintained: every method here is one the
-// README + sdk/README promise. Removing one without
-// updating those docs is a breaking change.
-func sdkMandatoryMethods() []string {
-	return []string{
-		"Health",
-		"ListProviders",
-		"CreateWorkspace",
-		"CreateCapability",
-		"AddVersion",
-		"CreateRelease",
-		"GetRelease",
-		"ListReleases",
-		"Vote",
-		"Activate",
-		"Rollback",
-		"Invoke",
-		"Approval",
-		"ApproveAndInvoke",
-		"CreateDataset",
-		"ListDatasets",
-		"GetDataset",
-		"PutCases",
-		"DeleteDataset",
-		"CreatePrecondition",
-		"ListPreconditions",
-		"DeletePrecondition",
-		"RunEval",
-		"ListEvals",
-		"GetEval",
-		"CreateAPIKey",
-		"ListAPIKeys",
-		"RevokeAPIKey",
-		"OAuthLoginURL",
-		"UpdatePrecondition",
+// sdkMethodNames returns the set of method names that
+// *promptsheon.Client must expose, derived from the operationId
+// field of every (method, path) entry in spec.yaml. Routes
+// without an operationId (system probes like /health, /livez,
+// /metrics) are skipped — those endpoints are documented in
+// the OpenAPI spec but do not require a typed Client method.
+func sdkMethodNames(t *testing.T) []string {
+	t.Helper()
+	spec := loadSpec(t)
+	paths, _ := spec["paths"].(map[string]interface{})
+
+	var names []string
+	for _, raw := range paths {
+		entry, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		for _, method := range []string{"get", "post", "put", "delete"} {
+			methodEntry, ok := entry[method].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			opID, ok := methodEntry["operationId"].(string)
+			if !ok || opID == "" {
+				continue
+			}
+			names = append(names, opID)
+		}
 	}
+	sort.Strings(names)
+	return names
 }
 
 // loadSpec parses promptsheon/spec/spec.yaml. Tests fail fast when the
@@ -197,19 +191,6 @@ func loadSpec(t *testing.T) map[string]interface{} {
 		t.Fatalf("parse spec.yaml: %v", err)
 	}
 	return spec
-}
-
-// listPaths returns every path registered in the spec.
-func listPaths(t *testing.T) []string {
-	t.Helper()
-	spec := loadSpec(t)
-	paths, _ := spec["paths"].(map[string]interface{})
-	out := make([]string, 0, len(paths))
-	for p := range paths {
-		out = append(out, p)
-	}
-	sort.Strings(out)
-	return out
 }
 
 // specOp is a (method, path) pair registered in the spec.

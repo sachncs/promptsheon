@@ -21,7 +21,6 @@
 package main
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"flag"
 	"fmt"
@@ -33,6 +32,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // route is a (method, path) pair registered with mux.HandleFunc.
@@ -835,6 +836,18 @@ func writeMethod(buf *bytes.Buffer, method string, h *handlerInfo, path string, 
 			os.Exit(2)
 		}
 	}
+	// Emit operationId when the route is in the operationIDMap.
+	// Routes without an entry (system probes) get no operationId.
+	// The contract test in tests/contract/contract_test.go asserts
+	// every operationId maps to a *promptsheon.Client method, so
+	// a route added to the mux without a map entry here will
+	// fail the contract test (which is the desired behaviour —
+	// every route is supposed to have an SDK method).
+	key := method + " " + path
+	if opID, ok := operationIDMap[key]; ok {
+		fmt.Fprintf(buf, "      operationId: %q\n", opID)
+	}
+
 	fmt.Fprintf(buf, "      summary: %q\n", summary)
 
 	if path == pathHealth || path == pathReady {
@@ -1053,4 +1066,115 @@ func simpleResourceRef(segment string) string {
 		return "Workflow"
 	}
 	return ""
+}
+
+// operationIDMap maps a (method, path) pair to its
+// operationId. The map is the authoritative source for SDK method
+// names: the contract test derives the required *promptsheon.Client
+// method set from this map (via the spec.yaml operationId fields
+// emitted by genopenapi).
+//
+// Adding a route to routes.go / handlers_*.go without an entry
+// here fails the contract test. That is intentional: the SDK
+// surface must move in lockstep with the route surface.
+//
+// Routes that exist for system-probe purposes (/health, /livez,
+// /metrics, etc.) have no operationId and no SDK method; they
+// are deliberately omitted from the map.
+var operationIDMap = map[string]string{
+	"GET /health": "Health",
+	"GET /api/v1/version": "Version",
+	"GET /api/v1/workspaces": "ListWorkspaces",
+	"POST /api/v1/workspaces": "CreateWorkspace",
+	"GET /api/v1/workspaces/{id}": "GetWorkspace",
+	"PUT /api/v1/workspaces/{id}": "UpdateWorkspace",
+	"DELETE /api/v1/workspaces/{id}": "DeleteWorkspace",
+	"GET /api/v1/workspaces/{id}/observation": "GetWorkspaceObservation",
+	"GET /api/v1/workspaces/{workspace_id}/projects": "ListProjects",
+	"POST /api/v1/workspaces/{workspace_id}/projects": "CreateProject",
+	"GET /api/v1/projects/{id}": "GetProject",
+	"PUT /api/v1/projects/{id}": "UpdateProject",
+	"DELETE /api/v1/projects/{id}": "DeleteProject",
+	"GET /api/v1/projects/{project_id}/capabilities": "ListCapabilities",
+	"POST /api/v1/projects/{project_id}/capabilities": "CreateCapability",
+	"GET /api/v1/capabilities/{id}": "GetCapability",
+	"PUT /api/v1/capabilities/{id}": "UpdateCapability",
+	"DELETE /api/v1/capabilities/{id}": "DeleteCapability",
+	"GET /api/v1/capabilities/{id}/contract": "GetCapabilityContract",
+	"PUT /api/v1/capabilities/{id}/contract": "UpdateCapabilityContract",
+	"GET /api/v1/capabilities/{id}/diff": "DiffCapabilities",
+	"GET /api/v1/capabilities/{id}/reputation": "GetCapabilityReputation",
+	"PUT /api/v1/capabilities/{id}/self-evolve": "UpdateSelfEvolveConfig",
+	"GET /api/v1/capabilities/{capability_id}/versions": "ListVersions",
+	"POST /api/v1/capabilities/{capability_id}/versions": "AddVersion",
+	"GET /api/v1/capabilities/{capability_id}/versions/latest": "GetLatestVersion",
+	"GET /api/v1/versions/{id}": "GetVersion",
+	"GET /api/v1/versions/{version_id}/executions": "ListExecutions",
+	"POST /api/v1/versions/{version_id}/executions": "CreateExecution",
+	"GET /api/v1/executions/{id}": "GetExecution",
+	"POST /api/v1/versions/{version_id}/releases": "CreateRelease",
+	"GET /api/v1/capabilities/{capability_id}/releases": "ListReleases",
+	"GET /api/v1/releases/{id}": "GetRelease",
+	"POST /api/v1/releases/{id}/votes": "Vote",
+	"POST /api/v1/releases/{id}/activate": "Activate",
+	"POST /api/v1/releases/{id}/rollback": "Rollback",
+	"POST /api/v1/releases/{id}/invoke": "Invoke",
+	"GET /api/v1/releases/{id}/approval": "Approval",
+	"POST /api/v1/releases/{release_id}/evals": "RunEval",
+	"GET /api/v1/releases/{release_id}/evals": "ListEvals",
+	"GET /api/v1/evals/{id}": "GetEval",
+	"GET /api/v1/capabilities/{capability_id}/datasets": "ListDatasets",
+	"POST /api/v1/capabilities/{capability_id}/datasets": "CreateDataset",
+	"GET /api/v1/datasets/{id}": "GetDataset",
+	"PUT /api/v1/datasets/{id}/cases": "PutCases",
+	"DELETE /api/v1/datasets/{id}": "DeleteDataset",
+	"GET /api/v1/capabilities/{capability_id}/preconditions": "ListPreconditions",
+	"POST /api/v1/capabilities/{capability_id}/preconditions": "CreatePrecondition",
+	"PUT /api/v1/preconditions/{id}": "UpdatePrecondition",
+	"DELETE /api/v1/preconditions/{id}": "DeletePrecondition",
+	"GET /api/v1/apikeys": "ListAPIKeys",
+	"POST /api/v1/apikeys": "CreateAPIKey",
+	"DELETE /api/v1/apikeys/{id}": "RevokeAPIKey",
+	"GET /api/v1/users": "ListUsers",
+	"POST /api/v1/users": "CreateUser",
+	"GET /api/v1/users/{id}": "GetUser",
+	"PUT /api/v1/users/{id}": "UpdateUser",
+	"DELETE /api/v1/users/{id}": "DeleteUser",
+	"GET /api/v1/audit": "ListAudit",
+	"GET /api/v1/audit/export": "ExportAudit",
+	"GET /api/v1/audit/verify": "VerifyAuditChain",
+	"GET /api/v1/logs/stream": "LogsStream",
+	"GET /api/v1/metrics/summary": "MetricsSummary",
+	"GET /api/v1/metrics/dashboard": "MetricsDashboard",
+	"GET /api/v1/metrics": "Metrics",
+	"GET /api/v1/providers": "ListProviders",
+	"GET /api/v1/providers/{name}": "GetProvider",
+	"POST /api/v1/providers/{name}/test": "TestProvider",
+	"GET /api/v1/vault/keys": "ListVaultKeys",
+	"POST /api/v1/vault/keys": "SaveVaultKey",
+	"DELETE /api/v1/vault/keys/{id}": "DeleteVaultKey",
+	"GET /api/v1/alerts/rules": "ListAlertRules",
+	"POST /api/v1/alerts/rules": "CreateAlertRule",
+	"GET /api/v1/alerts/rules/{id}": "GetAlertRule",
+	"PUT /api/v1/alerts/rules/{id}": "UpdateAlertRule",
+	"DELETE /api/v1/alerts/rules/{id}": "DeleteAlertRule",
+	"POST /api/v1/alerts/rules/{rule_id}/groups/{group_id}": "LinkAlertRuleGroup",
+	"DELETE /api/v1/alerts/rules/{rule_id}/groups/{group_id}": "UnlinkAlertRuleGroup",
+	"GET /api/v1/alerts/active": "ListActiveAlerts",
+	"PUT /api/v1/alerts/active/{id}/resolve": "ResolveAlert",
+	"GET /api/v1/alerts/notifications": "ListNotificationGroups",
+	"POST /api/v1/alerts/notifications": "AddNotificationGroup",
+	"GET /api/v1/webhooks": "ListWebhooks",
+	"POST /api/v1/webhooks": "CreateWebhook",
+	"DELETE /api/v1/webhooks/{id}": "DeleteWebhook",
+	"POST /api/v1/workflows/run": "RunWorkflow",
+	"POST /api/v1/reasoning/compile": "ReasoningCompile",
+	"GET /api/v1/catalog/capabilities": "CatalogSearch",
+	"GET /api/v1/auth/{provider}/login": "OAuthLoginURL",
+	"GET /api/v1/auth/{provider}/callback": "OAuthCallback",
+	"GET /api/v1/settings": "ListSettings",
+	"GET /api/v1/settings/{key}": "GetSetting",
+	"PUT /api/v1/settings/{key}": "SetSetting",
+	"DELETE /api/v1/settings/{key}": "DeleteSetting",
+	"POST /api/v1/setup": "Setup",
 }
