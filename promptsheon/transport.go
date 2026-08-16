@@ -1,20 +1,19 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/store"
-	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
-	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"context"
 	"net/http"
 	"os"
 
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
+	"github.com/sachncs/promptsheon/promptsheon/store"
 )
 
 // isRequestTLS reports whether the inbound request arrived over an
 // encrypted channel. It checks r.TLS (set by ListenAndServeTLS) and
 // X-Forwarded-Proto (set by a trusted TLS-terminating proxy). Used to
 // set Secure on cookies and HSTS on the response — both useless on
-
 
 // requirePerm returns middleware that requires a specific permission.
 func (s *Server) requirePerm(perm auth.Permission) func(Func) Func {
@@ -53,18 +52,10 @@ func (s *Server) wrapHandler(fn Func) http.HandlerFunc {
 	}
 }
 
-
-
-
-
 // writeError writes a JSON error response, inferring the status code from
-
-
-
 
 // httpRequestFromContext returns the *http.Request stored in the
 // context by the request middleware, if any. Returns nil if there is
-
 
 // ReadOnlyMiddleware returns 503 Service Unavailable for any
 // non-GET request when the daemon is in read-only mode. Used
@@ -180,8 +171,8 @@ type authAuditLogger struct {
 
 func (l *authAuditLogger) LogAuthFailure(ctx context.Context, keyPrefix, reason, remoteAddr string) {
 	l.server.audit(ctx, "auth_failure", "api_key", map[string]any{
-		FieldKeyPref: keyPrefix,
-		"reason":           reason,
-		"remote_addr":      remoteAddr,
+		FieldKeyPref:  keyPrefix,
+		"reason":      reason,
+		"remote_addr": remoteAddr,
 	})
 }

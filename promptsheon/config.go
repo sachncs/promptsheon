@@ -12,7 +12,6 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"errors"
 	"log/slog"
@@ -20,6 +19,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/sachncs/promptsheon/errf"
 
 	"gopkg.in/yaml.v3"
 )

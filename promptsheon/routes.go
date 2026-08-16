@@ -1,10 +1,10 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-		"net/http"
+	"net/http"
 	"os"
 
+	"github.com/sachncs/promptsheon/promptsheon/auth"
 )
 
 func (s *Server) routes() {

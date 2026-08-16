@@ -1,6 +1,5 @@
 //go:build tests_migration
 
-
 // Package promptsheon — single test entry point.
 //
 // The conventional Go test runner picks up this _test.go file

@@ -18,12 +18,13 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-		"context"
+	"context"
 	"database/sql"
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )

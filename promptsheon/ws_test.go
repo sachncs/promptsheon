@@ -1,9 +1,7 @@
-
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-		"bytes"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -17,6 +15,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 func TestNewHub(t *testing.T) {
@@ -631,7 +631,6 @@ func (h *Hub) newTestClient(filter LogFilter) *Client {
 	h.mu.Unlock()
 	return c
 }
-
 
 func tryReceive(c *Client, d time.Duration) string {
 	select {

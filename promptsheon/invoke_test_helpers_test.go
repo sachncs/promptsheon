@@ -1,6 +1,5 @@
 //go:build broken_skip
 
-
 package promptsheon
 
 // invoke_test_helpers.go wires a production-shaped invoke.Invoker
@@ -19,22 +18,23 @@ package promptsheon
 // surfaces those in the audit chain and the Execution record.
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/release"
-	"github.com/sachncs/promptsheon/promptsheon/metrics"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/eventbus"
-	"github.com/sachncs/promptsheon/promptsheon/llm"
-	"github.com/sachncs/promptsheon/promptsheon/executor"
-	"github.com/sachncs/promptsheon/promptsheon/store"
-	"github.com/sachncs/promptsheon/promptsheon/rollups"
-	"github.com/sachncs/promptsheon/promptsheon/scheduler"
-	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"bytes"
 	"context"
 	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/eventbus"
+	"github.com/sachncs/promptsheon/promptsheon/executor"
+	"github.com/sachncs/promptsheon/promptsheon/llm"
+	"github.com/sachncs/promptsheon/promptsheon/metrics"
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/rollups"
+	"github.com/sachncs/promptsheon/promptsheon/scheduler"
+	"github.com/sachncs/promptsheon/promptsheon/store"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 
