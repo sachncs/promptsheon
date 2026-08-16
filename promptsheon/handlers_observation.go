@@ -1,13 +1,13 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/rollups"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-		"context"
+	"context"
 	"net/http"
 	"sort"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/rollups"
 )
 
 // handleGetWorkspaceObservation returns the per-Workspace rollup:

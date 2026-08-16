@@ -1,15 +1,6 @@
-
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/store"
-	"github.com/sachncs/promptsheon/promptsheon/release"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/approval"
-	"github.com/sachncs/promptsheon/promptsheon/llm"
-	"github.com/sachncs/promptsheon/promptsheon/vault"
-	"github.com/sachncs/promptsheon/promptsheon/models"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -17,6 +8,14 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/sachncs/promptsheon/promptsheon/approval"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
+	"github.com/sachncs/promptsheon/promptsheon/llm"
+	"github.com/sachncs/promptsheon/promptsheon/models"
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/store"
+	"github.com/sachncs/promptsheon/promptsheon/vault"
 )
 
 // ---------------------------------------------------------------------------

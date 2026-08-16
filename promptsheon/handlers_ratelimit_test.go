@@ -1,13 +1,12 @@
-
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
 )
 
 func TestRateLimit(t *testing.T) {

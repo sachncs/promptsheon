@@ -1,13 +1,6 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/approval"
-	"github.com/sachncs/promptsheon/promptsheon/release"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
-	"github.com/sachncs/promptsheon/promptsheon/executor"
 	"context"
 	"encoding/json"
 	"errors"
@@ -15,6 +8,14 @@ import (
 	"math/rand"
 	"net/http"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/approval"
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/executor"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
+	"github.com/sachncs/promptsheon/promptsheon/release"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )
@@ -300,7 +301,7 @@ func (s *Server) handleInvokeRelease(w http.ResponseWriter, r *http.Request) err
 		"tokens":           exec.TotalTokens,
 		"cost_usd":         exec.CostUSD,
 		"tokens_estimated": exec.TotalTokens > 0 || exec.CostUSD > 0,
-		FieldError:   exec.Error,
+		FieldError:         exec.Error,
 	})
 	if invErr != nil {
 		return &HTTPError{Status: http.StatusBadGateway, Message: invErr.Error()}

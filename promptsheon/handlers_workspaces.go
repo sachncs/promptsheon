@@ -1,10 +1,10 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"net/http"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
 // Auto-split from handlers_capabilities.go

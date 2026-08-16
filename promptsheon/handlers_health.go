@@ -19,7 +19,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
 	body := map[string]any{
 		KeyStatus:  "healthy",
 		KeyVersion: info.Version,
-		"uptime":         time.Since(s.startTime).String(),
+		"uptime":   time.Since(s.startTime).String(),
 	}
 	// PERF-MEM-1: include runtime.MemStats on /health when the
 	// caller asks for it via ?debug=1. Production probes do not
@@ -68,7 +68,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) error {
 	ready := map[string]any{
 		KeyStatus: "ready",
-		"go":            runtime.Version(),
+		"go":      runtime.Version(),
 	}
 	if err := s.db.Ping(r.Context()); err != nil {
 		ready[KeyStatus] = "not_ready"

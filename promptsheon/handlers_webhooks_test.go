@@ -1,14 +1,13 @@
-
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/webhook"
 	"bytes"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/sachncs/promptsheon/promptsheon/webhook"
 )
 
 func TestHandleListWebhooks_NilDispatcher(t *testing.T) {

@@ -1,9 +1,9 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/workflow"
 	"net/http"
 
+	"github.com/sachncs/promptsheon/promptsheon/workflow"
 )
 
 // handleRunWorkflow accepts a workflow Definition and runs it

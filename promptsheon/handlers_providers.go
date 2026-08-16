@@ -1,10 +1,10 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/llm"
 	"net/http"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/llm"
 )
 
 // ListProviders lists the providers.
@@ -87,7 +87,7 @@ func (s *Server) handleTestProvider(w http.ResponseWriter, r *http.Request) erro
 			FieldModel:    req.Model,
 			KeyStatus:     FieldError,
 			FieldError:    err.Error(),
-			"latency_ms":        latency.Milliseconds(),
+			"latency_ms":  latency.Milliseconds(),
 		})
 		return nil
 	}
@@ -96,9 +96,9 @@ func (s *Server) handleTestProvider(w http.ResponseWriter, r *http.Request) erro
 		FieldProvider: name,
 		FieldModel:    resp.Model,
 		KeyStatus:     FieldOK,
-		"content":           resp.Content,
-		"usage":             resp.Usage,
-		"latency_ms":        latency.Milliseconds(),
+		"content":     resp.Content,
+		"usage":       resp.Usage,
+		"latency_ms":  latency.Milliseconds(),
 	})
 	return nil
 }

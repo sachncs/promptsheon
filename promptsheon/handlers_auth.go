@@ -1,10 +1,7 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/models"
-			"context"
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"database/sql"
@@ -15,6 +12,10 @@ import (
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/models"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )
@@ -179,10 +180,10 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	s.audit(r.Context(), "apikey_create", "api_key:"+apiKey.ID, map[string]any{
-		FieldKeyPref: apiKey.KeyPrefix,
-		"target_user":      apiKey.UserID,
-		FieldRole:    apiKey.Role,
-		KeyName:      apiKey.Name,
+		FieldKeyPref:  apiKey.KeyPrefix,
+		"target_user": apiKey.UserID,
+		FieldRole:     apiKey.Role,
+		KeyName:       apiKey.Name,
 	})
 
 	type response struct {
@@ -384,8 +385,8 @@ func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	s.audit(r.Context(), "apikey_revoke", "api_key:"+id, map[string]any{
-		FieldKeyPref: key.KeyPrefix,
-		"target_user":      key.UserID,
+		FieldKeyPref:  key.KeyPrefix,
+		"target_user": key.UserID,
 	})
 
 	writeJSON(w, http.StatusOK, map[string]string{KeyStatus: "revoked"})
@@ -558,10 +559,10 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 	// that records only failures is the worst kind — it confirms
 	// an attacker is on a successful path without recording it.
 	s.audit(r.Context(), "oauth_login", "user:"+existing.ID, map[string]any{
-		"provider":         providerName,
-		"email":            user.Email,
-		FieldKeyPref: apiKeyModel.KeyPrefix,
-		"auto_provision":   autoProvisioned,
+		"provider":       providerName,
+		"email":          user.Email,
+		FieldKeyPref:     apiKeyModel.KeyPrefix,
+		"auto_provision": autoProvisioned,
 	})
 
 	http.SetCookie(w, &http.Cookie{
@@ -575,7 +576,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) err
 	})
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"user":            existing,
+		"user":      existing,
 		FieldAPIKey: apiKey,
 	})
 	return nil

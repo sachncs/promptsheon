@@ -1,10 +1,10 @@
-
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/models"
-		"context"
+	"context"
 	"database/sql"
+
+	"github.com/sachncs/promptsheon/promptsheon/models"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )

@@ -1,12 +1,8 @@
 //go:build broken_skip
 
-
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/release"
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -18,9 +14,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/release"
+
 	"github.com/sachncs/promptsheon/promptsheon/testdata"
 
-	"github.com/sachncs/promptsheon/promptsheon/approval")
+	"github.com/sachncs/promptsheon/promptsheon/approval"
+)
 
 func releaseTestManifest() capability.Manifest { return testdata.NewManifest() }
 

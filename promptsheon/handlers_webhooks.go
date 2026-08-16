@@ -1,8 +1,6 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/webhook"
 	"fmt"
 	"net"
 	"net/http"
@@ -10,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/webhook"
 )
 
 // ListWebhooks lists the webhooks.
@@ -186,5 +186,3 @@ func ValidateWebhookURL(rawURL string) error {
 	}
 	return nil
 }
-
-

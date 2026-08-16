@@ -1,10 +1,7 @@
-
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/models"
-		"bytes"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"net/http"
@@ -13,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
 func TestHandleCreateAPIKey_NoAuth(t *testing.T) {

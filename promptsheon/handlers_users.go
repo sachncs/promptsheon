@@ -1,12 +1,12 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/models"
 	"net/http"
 	"time"
 
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
 // knownRoles is the closed set of valid user roles. Accepting
@@ -158,10 +158,10 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) error 
 				continue
 			}
 			s.audit(r.Context(), "apikey_revoke", "api_key:"+k.ID, map[string]any{
-				FieldKeyPref: k.KeyPrefix,
-				"target_user":      k.UserID,
-				"reason":           "role_change",
-				KeyName:      k.Name,
+				FieldKeyPref:  k.KeyPrefix,
+				"target_user": k.UserID,
+				"reason":      "role_change",
+				KeyName:       k.Name,
 			})
 		}
 	}

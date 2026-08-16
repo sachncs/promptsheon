@@ -1,13 +1,13 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/settings"
-	"github.com/sachncs/promptsheon/promptsheon/auth"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/settings"
 )
 
 // registerSettingsRoutes wires the four /api/v1/settings
@@ -127,7 +127,7 @@ func (s *Server) handleSetSetting(w http.ResponseWriter, r *http.Request) error 
 	}
 	s.audit(r.Context(), "create", "setting:"+key, map[string]any{
 		FieldAPIKey: key,
-		"by":              updatedBy,
+		"by":        updatedBy,
 	})
 	writeJSON(w, http.StatusOK, settingsResponse(key, req.Value, updatedBy, timeNow()))
 	return nil
@@ -158,7 +158,7 @@ func (s *Server) handleDeleteSetting(w http.ResponseWriter, r *http.Request) err
 	}
 	s.audit(r.Context(), "delete", "setting:"+key, map[string]any{
 		FieldAPIKey: key,
-		"by":              settingsUpdatedBy(r),
+		"by":        settingsUpdatedBy(r),
 	})
 	w.WriteHeader(http.StatusNoContent)
 	return nil
@@ -174,10 +174,10 @@ func settingsResponse(key, value, updatedBy string, updatedAt time.Time) map[str
 		display = "***"
 	}
 	return map[string]any{
-		FieldAPIKey: key,
-		FieldValue:  display,
-		"updated_by":      updatedBy,
-		"updated_at":      updatedAt,
+		FieldAPIKey:  key,
+		FieldValue:   display,
+		"updated_by": updatedBy,
+		"updated_at": updatedAt,
 	}
 }
 

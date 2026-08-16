@@ -1,11 +1,11 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/capability"
 	"encoding/json"
 	"net/http"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
 // Capability HTTP handlers (CRUD + self-evolve config).

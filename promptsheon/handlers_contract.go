@@ -7,13 +7,13 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-		"encoding/json"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
 )
 
 // capabilityRepo returns the typed CapabilityRepository the

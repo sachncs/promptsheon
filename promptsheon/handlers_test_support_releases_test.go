@@ -1,8 +1,9 @@
 package promptsheon
 
 import (
+	"context"
+
 	"github.com/sachncs/promptsheon/promptsheon/release"
-		"context"
 
 	"github.com/sachncs/promptsheon/promptsheon/errs"
 )

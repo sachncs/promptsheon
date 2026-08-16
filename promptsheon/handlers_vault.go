@@ -1,10 +1,10 @@
 package promptsheon
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/models"
 	"net/http"
 	"time"
 
+	"github.com/sachncs/promptsheon/promptsheon/models"
 )
 
 // SaveVaultKey saves the vaultKey.
@@ -47,10 +47,10 @@ func (s *Server) handleSaveVaultKey(w http.ResponseWriter, r *http.Request) erro
 
 	// Return without the encrypted key for security
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"id":                    pk.ID,
+		"id":              pk.ID,
 		FieldProviderName: pk.ProviderName,
 		FieldKeyName:      pk.KeyName,
-		"created_at":            pk.CreatedAt,
+		"created_at":      pk.CreatedAt,
 	})
 	return nil
 }
