@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 // cmdSelfEvolve implements the promptsheon CLI's selfevolve

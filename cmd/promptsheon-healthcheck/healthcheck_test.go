@@ -1,8 +1,6 @@
-
 package main
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"context"
 	"fmt"
 	"net"
@@ -10,6 +8,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 func TestHealthCheckSucceeds(t *testing.T) {

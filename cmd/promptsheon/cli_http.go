@@ -6,12 +6,13 @@ package main
 // SDK so the CLI stays a thin wrapper around the running daemon.
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"encoding/json"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 const cliKeyName = "name"

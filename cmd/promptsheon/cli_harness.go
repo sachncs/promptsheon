@@ -6,11 +6,12 @@ package main
 // shares the httpGet / httpPost helpers in http.go.
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/sachncs/promptsheon/errf"
 )
 
 const opRun = "run"

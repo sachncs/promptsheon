@@ -6,7 +6,6 @@ package main
 // capability/release commands live in capability.go and release.go.
 
 import (
-	"github.com/sachncs/promptsheon/errf"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -15,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
 
 	promptsheoncas "github.com/sachncs/promptsheon/promptsheon/cas"
 )

@@ -2,33 +2,6 @@
 package main
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/cas"
-	"github.com/sachncs/promptsheon/promptsheon/release"
-	"github.com/sachncs/promptsheon/promptsheon/metrics"
-	"github.com/sachncs/promptsheon/promptsheon/capability"
-	"github.com/sachncs/promptsheon/promptsheon/eventbus"
-	"github.com/sachncs/promptsheon/promptsheon/observation"
-	"github.com/sachncs/promptsheon/promptsheon/executor"
-	"github.com/sachncs/promptsheon/promptsheon/workflow"
-	"github.com/sachncs/promptsheon/promptsheon/scheduler"
-	"github.com/sachncs/promptsheon/promptsheon/alerting"
-	"github.com/sachncs/promptsheon/promptsheon/recommendation"
-	"github.com/sachncs/promptsheon/promptsheon/settings"
-	"github.com/sachncs/promptsheon/promptsheon/auth"
-	"github.com/sachncs/promptsheon/promptsheon/models"
-	"github.com/sachncs/promptsheon/promptsheon/invoke"
-	"github.com/sachncs/promptsheon/promptsheon/approval"
-	"github.com/sachncs/promptsheon/promptsheon/llm"
-	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
-	"github.com/sachncs/promptsheon/promptsheon/harness"
-	"github.com/sachncs/promptsheon/promptsheon/store"
-	"github.com/sachncs/promptsheon/promptsheon/trace"
-	"github.com/sachncs/promptsheon/promptsheon/rollups"
-	"github.com/sachncs/promptsheon/promptsheon/webhook"
-	"github.com/sachncs/promptsheon/promptsheon/vault"
-	"github.com/sachncs/promptsheon/promptsheon/rules"
-	"github.com/sachncs/promptsheon/promptsheon/supervisor"
 	"context"
 	"database/sql"
 	"encoding/hex"
@@ -48,9 +21,37 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/alerting"
+	"github.com/sachncs/promptsheon/promptsheon/approval"
+	"github.com/sachncs/promptsheon/promptsheon/auth"
+	"github.com/sachncs/promptsheon/promptsheon/capability"
+	"github.com/sachncs/promptsheon/promptsheon/cas"
+	"github.com/sachncs/promptsheon/promptsheon/eventbus"
+	"github.com/sachncs/promptsheon/promptsheon/executor"
+	"github.com/sachncs/promptsheon/promptsheon/harness"
+	"github.com/sachncs/promptsheon/promptsheon/invoke"
+	"github.com/sachncs/promptsheon/promptsheon/llm"
+	"github.com/sachncs/promptsheon/promptsheon/metrics"
+	"github.com/sachncs/promptsheon/promptsheon/models"
+	"github.com/sachncs/promptsheon/promptsheon/observation"
+	"github.com/sachncs/promptsheon/promptsheon/ratelimit"
+	"github.com/sachncs/promptsheon/promptsheon/recommendation"
+	"github.com/sachncs/promptsheon/promptsheon/release"
+	"github.com/sachncs/promptsheon/promptsheon/rollups"
+	"github.com/sachncs/promptsheon/promptsheon/rules"
+	"github.com/sachncs/promptsheon/promptsheon/scheduler"
+	"github.com/sachncs/promptsheon/promptsheon/settings"
+	"github.com/sachncs/promptsheon/promptsheon/store"
+	"github.com/sachncs/promptsheon/promptsheon/supervisor"
+	"github.com/sachncs/promptsheon/promptsheon/trace"
+	"github.com/sachncs/promptsheon/promptsheon/vault"
+	"github.com/sachncs/promptsheon/promptsheon/webhook"
+	"github.com/sachncs/promptsheon/promptsheon/workflow"
+
+	"github.com/sachncs/promptsheon/buildinfo"
 	"github.com/sachncs/promptsheon/promptsheon"
 	"github.com/sachncs/promptsheon/promptsheon/errs"
-	"github.com/sachncs/promptsheon/buildinfo"
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
@@ -113,7 +114,8 @@ func runDaemon() {
 	// endpoint would mint an admin key to the first caller. Refuse
 	// to start instead of warning and continuing.
 	if err := cfg.Validate(); err != nil {
-		slog.Error("config validate", "err", err); os.Exit(2)
+		slog.Error("config validate", "err", err)
+		os.Exit(2)
 	}
 
 	// OTel tracer must outlive buildServer. The previous

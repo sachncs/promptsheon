@@ -6,12 +6,12 @@
 package main
 
 import (
-	"github.com/sachncs/promptsheon/promptsheon/llm"
 	"context"
 	"log/slog"
 	"os"
 	"testing"
 
+	"github.com/sachncs/promptsheon/promptsheon/llm"
 )
 
 func TestE2EProvider_Fence(t *testing.T) {

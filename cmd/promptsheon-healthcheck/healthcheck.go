@@ -12,9 +12,9 @@
 package main
 
 import (
-	"log/slog"
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"

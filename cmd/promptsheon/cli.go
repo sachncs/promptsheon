@@ -13,14 +13,15 @@
 package main
 
 import (
-	"github.com/sachncs/promptsheon/errf"
-	"github.com/sachncs/promptsheon/promptsheon/llm"
 	"context"
-	"log/slog"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
+
+	"github.com/sachncs/promptsheon/errf"
+	"github.com/sachncs/promptsheon/promptsheon/llm"
 
 	"github.com/sachncs/promptsheon/buildinfo"
 )
