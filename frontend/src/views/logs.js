@@ -1,29 +1,30 @@
-import * as api from "../api.js";
+// src/views/logs.js — live log stream view.
+//
+// Opens an SSE stream against /api/v1/logs/stream using fetch +
+// ReadableStream so the API key can ride the Authorization header
+// (the EventSource API can't carry custom headers). Renders the
+// streamed lines as a fixed-height scrolling table with level +
+// source + time + message columns.
+//
+// The view uses ui.js primitives for the page header, filter chips,
+// and status pills so the streaming page matches the rest of the
+// dashboard.
+
 import { loadSettings } from "../settings.js";
 import { escape } from "../utils.js";
+import { statusPill, pageHeader, panel, chipGroup } from "../ui.js";
 
-function pill(text, tone = "neutral") {
-  return `<span class="status-pill ${tone}"><span class="status-dot"></span>${escape(text)}</span>`;
-}
-
-function tone(level) {
-  return ({ error: "danger", warn: "warn", info: "neutral", debug: "neutral" })[level] || "neutral";
-}
+const LEVEL_TONES = { error: "danger", warn: "warn", info: "neutral", debug: "neutral" };
+const LEVELS = ["all", "info", "warn", "error", "debug"];
+function tone(level) { return LEVEL_TONES[level] || "neutral"; }
 
 function row(entry) {
   return `<div class="flex items-start gap-3 border-b border-line/40 px-3 py-2 font-mono text-[.7rem]">
     <span class="shrink-0 text-[.66rem] text-muted w-[88px]">${escape(entry.time || "")}</span>
-    <span class="shrink-0 w-[60px] text-right">${pill(entry.level || "info", tone(entry.level))}</span>
-    <span class="shrink-0 w-[80px] truncate text-[.66rem] text-muted">${escape(entry.source || "—")}</span>
+    <span class="shrink-0 w-[60px] text-right">${statusPill(entry.level || "info", tone(entry.level))}</span>
+    <span class="shrink-0 w-[80px] truncate text-[.62rem] text-muted">${escape(entry.source || "—")}</span>
     <span class="flex-1 break-words text-ink">${escape(entry.message || "")}</span>
   </div>`;
-}
-
-function levelChips(active) {
-  return ["all", "info", "warn", "error", "debug"].map((level) => {
-    const on = (active || "all") === level;
-    return `<button type="button" data-log-level="${escape(level)}" class="rounded-md ${on ? "bg-ink text-paper" : "bg-paper text-muted hover:text-ink"} px-2.5 py-1 text-[.66rem] font-${on ? "bold" : "semibold"}">${escape(level)}</button>`;
-  }).join("");
 }
 
 const buffer = [];
@@ -32,7 +33,6 @@ const MAX_BUFFER = 500;
 export async function renderLogs(route) {
   const root = window.document.getElementById("view");
   if (!root) return "";
-  const { loadSettings } = await import("../settings.js");
   if (!loadSettings().apiKey) {
     const { renderConnectPrompt } = await import("./index.js");
     const html = renderConnectPrompt("The live log stream requires an API key. Open Connection to paste one.");
@@ -43,30 +43,29 @@ export async function renderLogs(route) {
 
   root.innerHTML = `<section class="panel p-6"><div class="skeleton h-3 w-32"></div><div class="skeleton mt-4 h-12 w-full"></div></section>`;
 
-  const shell = `
-    <section class="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <div class="eyebrow">Telemetry</div>
-        <h1 class="mt-2 text-[1.4rem] font-bold tracking-[-.04em]">Live logs</h1>
-        <p class="mt-1 text-[.78rem] text-muted">Streamed from <span class="mono">/api/v1/logs/stream</span>. EventSource can't carry the API key, so the dashboard uses fetch + ReadableStream to preserve auth and reconnect automatically.</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <div class="flex items-center gap-1 rounded-lg bg-paper p-1" data-log-level-chips>${levelChips(levelFilter)}</div>
-        <button id="logs-pause" class="quiet-button">Pause</button>
-        <button id="logs-clear" class="quiet-button">Clear</button>
-      </div>
-    </section>
+  const levelItems = LEVELS.map((l) => ({ key: l, label: l }));
+  const header = pageHeader({
+    eyebrow: "Telemetry",
+    title: "Live logs",
+    description: `Streamed from <span class="mono">/api/v1/logs/stream</span>. EventSource can't carry the API key, so the dashboard uses fetch + ReadableStream to preserve auth and reconnect automatically.`,
+    actions: `
+      ${chipGroup(levelItems, { activeKey: levelFilter, onClickDataAttr: "data-log-level" })}
+      <button id="logs-pause" class="quiet-button">Pause</button>
+      <button id="logs-clear" class="quiet-button">Clear</button>
+    `,
+  });
+
+  const html = `${header}
     <section class="mt-5">
-      <div class="panel p-0 overflow-hidden">
+      <div class="panel overflow-hidden p-0">
         <div class="flex items-center justify-between border-b border-line bg-paper px-3 py-2 text-[.62rem] uppercase tracking-wider text-muted">
           <span>Status <span id="logs-status" class="ml-1 normal-case font-bold text-ink">connecting…</span></span>
           <span>Buffered <span id="logs-count" class="ml-1 normal-case font-bold text-ink">0</span> lines</span>
         </div>
         <div id="logs-stream" class="max-h-[520px] overflow-y-auto"></div>
       </div>
-    </section>
-  `;
-  root.innerHTML = shell;
+    </section>`;
+  root.innerHTML = html;
   buffer.length = 0;
   const stream = root.querySelector("#logs-stream");
   const status = root.querySelector("#logs-status");
@@ -80,7 +79,6 @@ export async function renderLogs(route) {
 
   function appendLines(lines) {
     if (paused) return;
-    const allowed = levelFilter === "all" || lines.every((l) => l.level === levelFilter);
     for (const line of lines) {
       if (levelFilter !== "all" && line.level !== levelFilter) continue;
       buffer.push(line);
@@ -94,7 +92,6 @@ export async function renderLogs(route) {
   async function openStream() {
     controller?.abort();
     status.textContent = "connecting…";
-    status.parentElement.querySelector(".status-pill, [data-state]")?.remove?.();
     controller = new AbortController();
     const settings = loadSettings();
     const url = settings.apiBase
@@ -106,7 +103,7 @@ export async function renderLogs(route) {
       const response = await fetch(url, {
         headers,
         signal: controller.signal,
-        credentials: "omit"
+        credentials: "omit",
       });
       if (!response.ok || !response.body) {
         status.textContent = `error ${response.status}`;
@@ -158,7 +155,7 @@ export async function renderLogs(route) {
     let source = "system";
     let message = "";
     let time = new Date().toISOString().slice(11, 19);
-    let dataLines = [];
+    const dataLines = [];
     for (const line of block.split("\n")) {
       if (line.startsWith("event:")) continue;
       if (line.startsWith("data:")) {
@@ -197,6 +194,7 @@ export async function renderLogs(route) {
   root.querySelector("#logs-pause")?.addEventListener("click", (event) => {
     paused = !paused;
     event.target.textContent = paused ? "Resume" : "Pause";
+    if (!paused) appendLines([]);
   });
   root.querySelector("#logs-clear")?.addEventListener("click", () => {
     buffer.length = 0;
@@ -205,6 +203,5 @@ export async function renderLogs(route) {
   });
 
   openStream();
-  record();
-  return shell;
+  return html;
 }
