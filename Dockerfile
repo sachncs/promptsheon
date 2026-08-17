@@ -67,7 +67,7 @@ RUN CGO_ENABLED=0 go build \
       -o /out/promptsheon-healthcheck ./cmd/promptsheon-healthcheck
 
 # ----- Runtime stage -------------------------------------------------------
-FROM alpine:3.20
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates tzdata \
  && addgroup -g 1000 promptsheon \
  && adduser -D -u 1000 -G promptsheon promptsheon
