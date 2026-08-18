@@ -24,3 +24,7 @@ export type { CapabilityContract } from './capability-contract.js';
 export type { SelfEvolveState, SelfEvolveStatus } from './self-evolve.js';
 export type { EnforcerState } from './enforcer.js';
 export type { NotificationGroup } from './notification.js';
+export type { BanditArm, BanditState } from './bandit.js';
+export type { VaultEntry } from './vault.js';
+export type { WsState } from './ws-state.js';
+export type { IdempotencyRecord } from './idempotency.js';
