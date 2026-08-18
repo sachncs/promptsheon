@@ -112,3 +112,58 @@ export const settingsApi = {
   get: (key: string) => client.get(`/settings/${key}`),
   set: (key: string, value: unknown) => client.put(`/settings/${key}`, { value }),
 };
+
+export const preconditionApi = {
+  list: (capabilityVersionId: string) => client.get('/preconditions', { params: { capabilityVersionId } }),
+  create: (data: { capabilityVersionId: string; name: string; command: string; enabled?: boolean }) =>
+    client.post('/preconditions', data),
+  update: (id: string, data: { name?: string; command?: string; enabled?: boolean }) => client.put(`/preconditions/${id}`, data),
+  delete: (id: string) => client.delete(`/preconditions/${id}`),
+};
+
+export const approvalApi = {
+  list: (releaseId: string) => client.get('/approvals', { params: { releaseId } }),
+  vote: (releaseId: string, data: { decision: 'approve' | 'reject'; comment?: string }) =>
+    client.post(`/releases/${releaseId}/approvals`, data),
+};
+
+export const compilerApi = {
+  compile: (prompt: string) => client.post('/compiler/compile', { prompt }),
+  decompile: (manifest: string) => client.post('/compiler/decompile', { manifest }),
+};
+
+export const selfEvolveApi = {
+  getState: (capabilityId: string) => client.get(`/capabilities/${capabilityId}/self-evolve`),
+  runCycle: (capabilityId: string) => client.post(`/capabilities/${capabilityId}/self-evolve/run`),
+};
+
+export const manifestApi = {
+  get: (versionId: string) => client.get(`/capability-versions/${versionId}/manifest`),
+};
+
+export const webhookApi = {
+  list: () => client.get('/webhooks'),
+  create: (data: { url: string; events: string[] }) => client.post('/webhooks', data),
+  update: (id: string, data: { url?: string; events?: string[]; active?: boolean }) => client.put(`/webhooks/${id}`, data),
+  delete: (id: string) => client.delete(`/webhooks/${id}`),
+};
+
+export const apiKeyApi = {
+  list: () => client.get('/api-keys'),
+  create: (data: { name: string; role: string }) => client.post('/api-keys', data),
+  revoke: (id: string) => client.delete(`/api-keys/${id}`),
+};
+
+export const userApi = {
+  list: () => client.get('/users'),
+  updateRole: (id: string, role: string) => client.put(`/users/${id}/role`, { role }),
+};
+
+export const featureFlagApi = {
+  list: () => client.get('/feature-flags'),
+  update: (key: string, data: { value: unknown; enabled?: boolean }) => client.put(`/feature-flags/${key}`, data),
+};
+
+export const auditApi = {
+  list: (params?: { resource?: string; action?: string }) => client.get('/audit', { params }),
+};
