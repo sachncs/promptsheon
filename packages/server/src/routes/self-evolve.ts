@@ -1,7 +1,13 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type { EvolutionAgent } from '../agents/evolution/evolution.js';
 import type { CapabilityRepo } from '../repos/capability.js';
 import type { EvalRepo } from '../repos/eval.js';
+import { parseBody } from './validate.js';
+
+const RunCycleSchema = z.object({
+  capabilityId: z.string().min(1),
+});
 
 export function registerSelfEvolveRoutes(
   app: FastifyInstance,
@@ -10,7 +16,9 @@ export function registerSelfEvolveRoutes(
   _evalRepo: EvalRepo,
 ) {
   app.post('/api/self-evolve/run', async (request, reply) => {
-    const { capabilityId } = request.body as { capabilityId: string };
+    const parsed = parseBody(reply, RunCycleSchema, request.body);
+    if (!parsed.ok) return;
+    const { capabilityId } = parsed.data;
     const capability = capabilityRepo.findById(capabilityId);
     if (!capability) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Capability not found' } });

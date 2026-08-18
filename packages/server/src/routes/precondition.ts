@@ -1,9 +1,18 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { CreatePreconditionSchema } from '@promptsheon/shared';
 import type { PreconditionRepo } from '../repos/precondition.js';
+import { parseBody, parseQuery } from './validate.js';
+
+const ListPreconditionsQuerySchema = z.object({
+  capabilityId: z.string().min(1).optional(),
+});
 
 export function registerPreconditionRoutes(app: FastifyInstance, repo: PreconditionRepo) {
   app.get('/api/preconditions', async (request, reply) => {
-    const { capabilityId } = request.query as { capabilityId?: string };
+    const parsed = parseQuery(reply, ListPreconditionsQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { capabilityId } = parsed.data;
     if (capabilityId) return reply.send(repo.findByCapabilityId(capabilityId));
     return reply.send([]);
   });
@@ -16,8 +25,9 @@ export function registerPreconditionRoutes(app: FastifyInstance, repo: Precondit
   });
 
   app.post('/api/preconditions', async (request, reply) => {
-    const data = request.body as { capabilityId: string; name: string; command: string; timeoutSec?: number; enabled?: boolean };
-    const item = repo.create(data);
+    const parsed = parseBody(reply, CreatePreconditionSchema, request.body);
+    if (!parsed.ok) return;
+    const item = repo.create(parsed.data);
     return reply.code(201).send(item);
   });
 

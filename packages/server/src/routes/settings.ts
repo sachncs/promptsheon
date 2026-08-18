@@ -1,5 +1,11 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type { SettingsResolver } from '../settings/resolver.js';
+import { parseBody } from './validate.js';
+
+const SetSettingSchema = z.object({
+  value: z.unknown(),
+});
 
 export function registerSettingsRoutes(app: FastifyInstance, resolver: SettingsResolver) {
   app.get('/api/settings', async (_request, reply) => {
@@ -15,8 +21,9 @@ export function registerSettingsRoutes(app: FastifyInstance, resolver: SettingsR
 
   app.put('/api/settings/:key', async (request, reply) => {
     const { key } = request.params as { key: string };
-    const { value } = request.body as { value: unknown };
-    await resolver.set(key, value);
-    return reply.send({ key, value });
+    const parsed = parseBody(reply, SetSettingSchema, request.body);
+    if (!parsed.ok) return;
+    await resolver.set(key, parsed.data.value);
+    return reply.send({ key, value: parsed.data.value });
   });
 }

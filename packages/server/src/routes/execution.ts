@@ -1,12 +1,21 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { InvokeExecutionSchema } from '@promptsheon/shared';
 import type { ExecutionRepo } from '../repos/execution.js';
 import type { InvocationAgent } from '../agents/invocation.js';
+import { parseBody, parseQuery } from './validate.js';
+
+const ListExecutionsQuerySchema = z.object({
+  capabilityVersionId: z.string().min(1).optional(),
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(100).default(20),
+});
 
 export function registerExecutionRoutes(app: FastifyInstance, repo: ExecutionRepo, invocationAgent: InvocationAgent) {
   app.get('/api/executions', async (request, reply) => {
-    const { capabilityVersionId, page = 1, pageSize = 20 } = request.query as {
-      capabilityVersionId?: string; page?: number; pageSize?: number;
-    };
+    const parsed = parseQuery(reply, ListExecutionsQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { capabilityVersionId, page, pageSize } = parsed.data;
     if (capabilityVersionId) return reply.send(repo.findByVersionId(capabilityVersionId, { page, pageSize }));
     return reply.send(repo.findMany({ page, pageSize }));
   });
@@ -19,12 +28,9 @@ export function registerExecutionRoutes(app: FastifyInstance, repo: ExecutionRep
   });
 
   app.post('/api/invoke', async (request, reply) => {
-    const { capabilityVersionId, inputs, environment, traceId } = request.body as {
-      capabilityVersionId: string;
-      inputs: Record<string, unknown>;
-      environment?: string;
-      traceId?: string;
-    };
+    const parsed = parseBody(reply, InvokeExecutionSchema, request.body);
+    if (!parsed.ok) return;
+    const { capabilityVersionId, inputs, environment, traceId } = parsed.data;
     const execution = await invocationAgent.invoke(capabilityVersionId, inputs, { environment, traceId });
     repo.create({
       capabilityVersionId,

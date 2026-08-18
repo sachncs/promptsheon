@@ -1,5 +1,12 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type { ApprovalRepo } from '../repos/approval.js';
+import { parseBody } from './validate.js';
+
+const UpsertApprovalSchema = z.object({
+  releaseId: z.string().min(1),
+  votes: z.string(),
+});
 
 export function registerApprovalRoutes(app: FastifyInstance, repo: ApprovalRepo) {
   app.get('/api/approvals/:releaseId', async (request, reply) => {
@@ -10,7 +17,9 @@ export function registerApprovalRoutes(app: FastifyInstance, repo: ApprovalRepo)
   });
 
   app.post('/api/approvals', async (request, reply) => {
-    const { releaseId, votes } = request.body as { releaseId: string; votes: string };
+    const parsed = parseBody(reply, UpsertApprovalSchema, request.body);
+    if (!parsed.ok) return;
+    const { releaseId, votes } = parsed.data;
     repo.upsert(releaseId, votes);
     return reply.code(201).send({ releaseId, votes });
   });
