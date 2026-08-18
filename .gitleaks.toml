@@ -1,32 +1,39 @@
 # gitleaks configuration. https://github.com/gitleaks/gitleaks
-# Tunes the default ruleset to recognise the promptsheon API
-# key prefix (ps_<64-hex>) and the bootstrap token env var.
+# Detects accidental secret commits in the TypeScript port.
 
 title = "promptsheon secrets"
 
 [extend]
 useDefault = true
 
-# promptsheon API keys: ps_<64 hex>
+# OpenAI API keys
 [[rules]]
-id = "promptsheon-api-key"
-description = "promptsheon API key (ps_ prefix + 64 hex)"
-regex = '''\bps_[a-f0-9]{64}\b'''
-keywords = ["ps_"]
-tags = ["api-key", "promptsheon"]
+id = "openai-api-key"
+description = "OpenAI API key"
+regex = '''\bsk-[a-zA-Z0-9]{32,}\b'''
+keywords = ["sk-"]
+tags = ["api-key", "openai"]
 
-# Bootstrap admin token env var
+# Anthropic API keys
 [[rules]]
-id = "promptsheon-bootstrap-token"
-description = "PROMPTSHEON_BOOTSTRAP_TOKEN env var leaked"
-regex = '''PROMPTSHEON_BOOTSTRAP_TOKEN[ ]*=[ ]*["']?[A-Za-z0-9+/=]{16,}'''
-keywords = ["PROMPTSHEON_BOOTSTRAP_TOKEN"]
-tags = ["secret", "promptsheon"]
+id = "anthropic-api-key"
+description = "Anthropic API key"
+regex = '''\bsk-ant-[a-zA-Z0-9-]{32,}\b'''
+keywords = ["sk-ant-"]
+tags = ["api-key", "anthropic"]
 
-# Allow-list: audit chain state and other generated JSON files
-[allowlist]
-description = "Generated files that legitimately mention key names"
-paths = [
-  '''docs/refactor/audit/.*''',
-  '''vendor/.*''',
-]
+# AWS Bedrock / generic AWS credentials
+[[rules]]
+id = "aws-access-token"
+description = "AWS access token"
+regex = '''\b(AKIA|ASIA)[0-9A-Z]{16}\b'''
+keywords = ["AKIA", "ASIA"]
+tags = ["aws", "credentials"]
+
+# Generic Bearer tokens in committed files
+[[rules]]
+id = "bearer-token"
+description = "Generic Bearer token"
+regex = '''[Bb]earer\s+[A-Za-z0-9._-]{20,}\b'''
+keywords = ["Bearer"]
+tags = ["api-key"]

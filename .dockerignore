@@ -3,14 +3,6 @@ bin/
 dist/
 out/
 
-# Vendored deps (rebuild via go mod vendor if needed)
-vendor/
-
-# Go test artifacts
-coverage.out
-coverage.html
-*.test
-
 # Local config / secrets
 .env
 .env.local
@@ -27,6 +19,6 @@ coverage.html
 .git/
 .gitignore
 
-# Documentation build
+# Node / TypeScript
 node_modules/
-site/
+coverage/

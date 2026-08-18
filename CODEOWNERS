@@ -4,71 +4,36 @@
 # reviewed by the matching owner before merge. GitHub auto-loads
 # this file from the repository root and surfaces the reviewer in
 # the PR UI.
-#
-# PLAN-49 c3.12 rewrite: the previous file used the old
-# /internal/<pkg>/ and /internal/api/ paths; the repo moved to
-# the cmd/<name>/ + backend/<pkg>/ layout in v0.2.x. Every
-# specific line below now matches the actual tree.
-#
-# The default owner is the project maintainer. Path-specific
-# overrides route the highest-risk areas (auth, crypto, persistence)
-# to the same person so the reviewer set is small enough to be
-# actionable for a single-maintainer project. As the project grows,
-# add domain owners here rather than letting reviews accumulate on
-# one person.
 
 # Default fallback: catch-all owner for any path not listed.
 *       @sachncs
 
-# Security-sensitive areas: vault, auth, audit, rate limiting,
-# and the CAS engine. These encode the threat model from
-# docs/security.md and should never merge without an explicit
-# maintainer review.
-promptsheon/auth/                 @sachncs
-promptsheon/vault/                @sachncs
-promptsheon/audit/                @sachncs
-promptsheon/ratelimit/            @sachncs
-promptsheon/store/                @sachncs
+# Security-sensitive areas: auth, audit, CAS, settings.
+# These encode the threat model and should never merge without
+# an explicit maintainer review.
+packages/server/src/middleware/auth.ts     @sachncs
+packages/server/src/audit/                 @sachncs
+packages/server/src/settings/              @sachncs
+packages/shared/src/cas/                   @sachncs
 
-# Public API surface: breaking changes here ripple to every SDK
-# consumer.
-promptsheon/handlers_*.go         @sachncs
-promptsheon/routes.go              @sachncs
-promptsheon/spec/                 @sachncs
-sdk/                          @sachncs
+# Public API surface: breaking changes here ripple to every consumer.
+packages/server/src/routes/                @sachncs
+packages/server/src/index.ts               @sachncs
+packages/server/API.md                     @sachncs
 
-# Server entry point and the OpenAPI generator.
-cmd/                          @sachncs
-scripts/genopenapi/           @sachncs
+# AI agents: Strands SDK integration is the most
+# blast-radius-heavy code in the TS port.
+/packages/server/src/agents/                @sachncs
 
-# Release / harness / scheduler / subprocess paths are
-# high-blast-radius: a wrong change can take the daemon down
-# or lose audit records.
-/promptsheon/release/              @sachncs
-/promptsheon/harness/              @sachncs
-/promptsheon/llm/                  @sachncs
-/promptsheon/rollups/              @sachncs
-/promptsheon/scheduler/            @sachncs
-/promptsheon/supervisor/           @sachncs
-/promptsheon/webhook/              @sachncs
+# Database layer: migrations are forward-only.
+/packages/shared/db/migrations/            @sachncs
 
-# Tests, docs, scripts.
-/tests/                         @sachncs
-/docs/                          @sachncs
-/scripts/                       @sachncs
+# Tests.
+/packages/server/test/                     @sachncs
 
-# CI, build, release. /.github/ already covers
-# /.github/workflows/ via the directory glob.
-/Dockerfile                     @sachncs
-/.goreleaser.yml                @sachncs
-/Makefile                       @sachncs
-/SECURITY.md                    @sachncs
-/CONTRIBUTING.md                @sachncs
-/CODE_OF_CONDUCT.md             @sachncs
-/cliff.toml                     @sachncs
-
-# Helm chart + deploy manifests.
-/deploy/                        @sachncs
-
-# Docs/refactor plan + audit docs (recently added).
-/docs/refactor/                 @sachncs
+# CI, build, release. /Dockerfile and /.github/workflows/
+# are already covered by directory globs.
+/Dockerfile                                @sachncs
+/SECURITY.md                               @sachncs
+/CONTRIBUTING.md                           @sachncs
+/CODE_OF_CONDUCT.md                        @sachncs
