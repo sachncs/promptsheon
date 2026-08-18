@@ -3,7 +3,12 @@ import type Database from 'better-sqlite3';
 import type { AuditEntry } from '@promptsheon/shared';
 
 export class AuditChain {
-  constructor(private db: Database.Database) {}
+  constructor(private db: Database.Database) {
+    db.prepare(
+      `INSERT OR IGNORE INTO audit_chain_state (id, last_hash, last_rowid)
+       VALUES (0, '', 0)`
+    ).run();
+  }
 
   append(entry: {
     userId: string;
@@ -36,7 +41,12 @@ export class AuditChain {
     `).run(id, entry.userId, entry.action, entry.resource, entry.details, now, previousHash, entryHash, now, entry.resourceKind, entry.resourceId);
 
     this.db.prepare(
-      'UPDATE audit_chain_state SET last_hash = ?, last_rowid = (SELECT last_insert_rowid()) WHERE id = 0'
+      `INSERT INTO audit_chain_state (id, last_hash, last_rowid, updated_by_app)
+       VALUES (0, ?, last_insert_rowid(), 1)
+       ON CONFLICT(id) DO UPDATE SET
+         last_hash = excluded.last_hash,
+         last_rowid = excluded.last_rowid,
+         updated_by_app = 1`
     ).run(entryHash);
 
     return {
@@ -56,7 +66,19 @@ export class AuditChain {
 
   verify(): { valid: boolean; brokenAt?: string } {
     const entries = this.db.prepare(
-      'SELECT * FROM audit_entries ORDER BY rowid ASC'
+      `SELECT id,
+              user_id AS userId,
+              action,
+              resource,
+              details,
+              timestamp,
+              previous_hash AS previousHash,
+              entry_hash AS entryHash,
+              timestamp_str AS timestampStr,
+              resource_kind AS resourceKind,
+              resource_id AS resourceId
+       FROM audit_entries
+       ORDER BY rowid ASC`
     ).all() as AuditEntry[];
     let expectedPrevious = '';
 
