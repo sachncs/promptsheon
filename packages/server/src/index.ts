@@ -1,4 +1,5 @@
 import Fastify, { type FastifyError } from 'fastify';
+import { randomUUID } from 'node:crypto';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import { loadConfig } from './config/env.js';
@@ -37,11 +38,38 @@ async function main() {
 
   const app = Fastify({ logger: true });
 
+  const corsOrigin = config.server.corsOrigin || 'http://localhost:5173';
+  if (!config.server.corsOrigin) {
+    app.log.warn(`CORS origin not set, defaulting to ${corsOrigin}`);
+  }
+
   await app.register(cors, {
-    origin: config.server.corsOrigin,
+    origin: corsOrigin,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key'],
     credentials: true,
+  });
+
+  app.addHook('onRequest', async (request, reply) => {
+    const requestIdHeader = request.headers['x-request-id'];
+    const requestId = typeof requestIdHeader === 'string' && requestIdHeader || randomUUID();
+    const requestMetadata = request as unknown as Record<string, string | number>;
+    requestMetadata.requestId = requestId;
+    requestMetadata.startTime = Date.now();
+    reply.header('X-Request-Id', requestId);
+  });
+
+  app.addHook('onResponse', async (request, reply) => {
+    const requestMetadata = request as unknown as Record<string, string | number>;
+    const requestId = requestMetadata.requestId;
+    const startTime = requestMetadata.startTime || Date.now();
+    app.log.info({
+      requestId,
+      method: request.method,
+      url: request.url,
+      status: reply.statusCode,
+      durationMs: Date.now() - Number(startTime),
+    }, 'request');
   });
 
   await app.register(rateLimit, {
