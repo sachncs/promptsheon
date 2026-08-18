@@ -16,6 +16,7 @@ import { registerSseRoutes } from './sse.js';
 import { registerSelfEvolveRoutes } from './self-evolve.js';
 import { registerApprovalRoutes } from './approval.js';
 import { registerCompilerRoutes } from './compiler.js';
+import { registerHealthRoutes } from './health.js';
 
 import type { WorkspaceRepo } from '../repos/workspace.js';
 import type { ProjectRepo } from '../repos/project.js';
@@ -35,8 +36,10 @@ import type { InvocationAgent } from '../agents/invocation.js';
 import type { EvaluationAgent } from '../agents/evaluation/evaluation.js';
 import type { EvolutionAgent } from '../agents/evolution/evolution.js';
 import type { ReasoningCompiler } from '../agents/compiler/compiler.js';
+import type Database from 'better-sqlite3';
 
 export interface AppDeps {
+  db: Database.Database;
   workspaceRepo: WorkspaceRepo;
   projectRepo: ProjectRepo;
   capabilityRepo: CapabilityRepo;
@@ -75,4 +78,5 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerSelfEvolveRoutes(app, deps.evolutionAgent, deps.capabilityRepo, deps.evalRepo);
   registerApprovalRoutes(app, deps.approvalRepo);
   registerCompilerRoutes(app, deps.compiler);
+  registerHealthRoutes(app, deps.db);
 }

@@ -13,6 +13,7 @@ import { InvocationAgent } from './agents/invocation.js';
 import { EvaluationAgent } from './agents/evaluation/evaluation.js';
 import { EvolutionAgent } from './agents/evolution/evolution.js';
 import { ReasoningCompiler } from './agents/compiler/compiler.js';
+import { CasStore } from '@promptsheon/shared';
 import { WorkspaceRepo } from './repos/workspace.js';
 import { ProjectRepo } from './repos/project.js';
 import { CapabilityRepo } from './repos/capability.js';
@@ -73,9 +74,12 @@ async function main() {
     systemConfigRepo,
   );
 
+  const casStore = new CasStore(config.server.casPath);
+  await casStore.init();
+
   const invocationAgent = new InvocationAgent(config);
   const evalAgent = new EvaluationAgent(config);
-  const evolutionAgent = new EvolutionAgent(config, { cas: null as any });
+  const evolutionAgent = new EvolutionAgent(config, { cas: casStore });
   const compiler = new ReasoningCompiler(config);
 
   app.addHook('preHandler', authMiddleware(config, apiKeyRepo));
@@ -92,6 +96,7 @@ async function main() {
   });
 
   await registerRoutes(app, {
+    db,
     workspaceRepo,
     projectRepo,
     capabilityRepo,
@@ -119,6 +124,16 @@ async function main() {
   const host = config.server.host;
   await app.listen({ port, host });
   app.log.info(`Promptsheon server listening on ${host}:${port}`);
+
+  const shutdown = async (signal: string) => {
+    app.log.info(`Received ${signal}, shutting down gracefully`);
+    scheduler.stop();
+    await app.close();
+    db.close();
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 main().catch((err) => {
