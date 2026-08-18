@@ -1,90 +1,67 @@
 # Dockerfile
 #
-# Multi-stage source build for `docker build .`. The release
-# path is Dockerfile.goreleaser (a slimmer binary-only
-# image consumed by GoReleaser); this file is the canonical
-# build for `docker build` / `docker compose` / CI smoke
-# images where the source tree is present.
+# Multi-stage build for the TypeScript port of Promptsheon.
+#
+# Stage 1 (deps): install pnpm and all workspace dependencies
+# Stage 2 (build): tsc the server, vite build the web
+# Stage 3 (runtime): minimal Node 22 image with built artifacts
 #
 # Usage:
 #   docker build -t promptsheon:dev .
-#   docker run --rm -p 8080:8080 promptsheon:dev
-#
-# The image builds all three binaries into /usr/local/bin/;
-# ENTRYPOINT is promptsheond (the daemon), but operators can
-# override with `docker run --entrypoint promptsheon ...` for
-# CLI use or `--entrypoint promptsheon-healthcheck ...` for
-# the probe.
+#   docker run --rm -p 8080:8080 \
+#     -v $(pwd)/data:/data \
+#     -e PROMPTSHEON_DB_PATH=/data/promptsheon.db \
+#     promptsheon:dev
 
 # syntax=docker/dockerfile:1.7
 
-# ----- Frontend build stage ------------------------------------------------
-# Builds the SPA into cmd/promptsheond/frontend/dist/ so the
-# //go:embed directive picks it up at Go compile time. Without
-# this stage the binary ships an empty embed (the directory is
-# gitignored) and the dashboard 404s.
-FROM node:22-alpine AS frontend-build
-WORKDIR /src/frontend
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci --no-audit --no-fund
-COPY frontend/ ./
-RUN npm run build
-RUN mkdir -p ../cmd/promptsheond/frontend && cp -r dist ../cmd/promptsheond/frontend/dist
-
-# ----- Go build stage ------------------------------------------------------
-# Pin to the same Go version the project's go.mod declares so the
-# container build matches local development. Bump together with
-# go.mod and the CI matrix in .github/workflows/ci.yaml.
-FROM golang:1.26.5-alpine3.20 AS build
+# ----- Dependencies stage ---------------------------------------------------
+FROM node:22-alpine AS deps
 WORKDIR /src
+RUN corepack enable
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/server/package.json ./packages/server/
+COPY packages/web/package.json ./packages/web/
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
-# Cache go.mod first to maximise layer reuse.
-COPY go.mod go.sum ./
-RUN go mod download
+# ----- Build stage ----------------------------------------------------------
+FROM deps AS build
+WORKDIR /src
+COPY packages ./packages
+COPY tsconfig.base.json* ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN cd packages/shared && pnpm build 2>/dev/null || true
+RUN cd packages/server && pnpm build
+RUN cd packages/web && pnpm build
 
-# Copy the rest of the source.
-COPY . .
-
-# Pull in the freshly built frontend embed.
-COPY --from=frontend-build /src/cmd/promptsheond/frontend/dist /src/cmd/promptsheond/frontend/dist
-
-ARG VERSION=dev
-ARG COMMIT=unknown
-ARG COMMIT_DATE=unknown
-
-# Build all three binaries. The package paths match the cmd/
-# subdirectory layout; there's no package main at the repo root.
-# Linker targets use the buildinfo package which the runtime
-# reads via buildinfo.Get() (see buildinfo/buildinfo.go).
-RUN CGO_ENABLED=0 go build \
-      -ldflags "-s -w -X github.com/sachncs/promptsheon/buildinfo.Version=${VERSION} -X github.com/sachncs/promptsheon/buildinfo.Commit=${COMMIT} -X github.com/sachncs/promptsheon/buildinfo.BuildTime=${COMMIT_DATE}" \
-      -o /out/promptsheond ./cmd/promptsheond
-RUN CGO_ENABLED=0 go build \
-      -ldflags "-s -w -X github.com/sachncs/promptsheon/buildinfo.Version=${VERSION} -X github.com/sachncs/promptsheon/buildinfo.Commit=${COMMIT} -X github.com/sachncs/promptsheon/buildinfo.BuildTime=${COMMIT_DATE}" \
-      -o /out/promptsheon ./cmd/promptsheon
-RUN CGO_ENABLED=0 go build \
-      -ldflags "-s -w -X github.com/sachncs/promptsheon/buildinfo.Version=${VERSION} -X github.com/sachncs/promptsheon/buildinfo.Commit=${COMMIT} -X github.com/sachncs/promptsheon/buildinfo.BuildTime=${COMMIT_DATE}" \
-      -o /out/promptsheon-healthcheck ./cmd/promptsheon-healthcheck
-
-# ----- Runtime stage -------------------------------------------------------
-FROM alpine:3.20
+# ----- Runtime stage --------------------------------------------------------
+FROM node:22-alpine AS runtime
 RUN apk add --no-cache ca-certificates tzdata \
- && addgroup -g 1000 promptsheon \
- && adduser -D -u 1000 -G promptsheon promptsheon
+  && addgroup -g 1000 promptsheon \
+  && adduser -D -u 1000 -G promptsheon promptsheon
 
-COPY --from=build /out/promptsheond /usr/local/bin/promptsheond
-COPY --from=build /out/promptsheon /usr/local/bin/promptsheon
-COPY --from=build /out/promptsheon-healthcheck /usr/local/bin/promptsheon-healthcheck
+WORKDIR /app
+COPY --from=build /src/packages/server/package.json ./server/package.json
+COPY --from=build /src/packages/server/dist ./server/dist
+COPY --from=build /src/packages/shared/package.json ./shared/package.json
+COPY --from=build /src/packages/shared/dist ./shared/dist
+COPY --from=build /src/packages/shared/db ./shared/db
+COPY --from=build /src/packages/web/dist ./web/dist
+COPY --from=build /src/node_modules ./node_modules
 
 WORKDIR /data
-RUN chown -R promptsheon:promptsheon /data
+RUN chown -R promptsheon:promptsheon /data /app
 
 USER promptsheon
 
-ENV PROMPTSHEON_ADDR=:8080 \
-    PROMPTSHEON_DB_PATH=/data/promptsheon.db
+ENV PROMPTSHEON_PORT=8080 \
+    PROMPTSHEON_HOST=0.0.0.0 \
+    PROMPTSHEON_DB_PATH=/data/promptsheon.db \
+    PROMPTSHEON_CAS_PATH=/data/.promptsheon
 
 EXPOSE 8080
 VOLUME ["/data"]
 
-ENTRYPOINT ["promptsheond"]
+WORKDIR /app
+CMD ["node", "server/dist/index.js"]
