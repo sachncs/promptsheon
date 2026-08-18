@@ -1,10 +1,27 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import {
+  CreateEvalRunSchema,
+  PaginationSchema,
+} from '@promptsheon/shared';
 import type { EvalRepo } from '../repos/eval.js';
 import type { EvaluationAgent } from '../agents/evaluation/evaluation.js';
+import { parseBody, parseQuery } from './validate.js';
+
+const ListQuerySchema = PaginationSchema.extend({
+  releaseId: z.string().uuid().optional(),
+});
+
+const RunEvalSchema = z.object({
+  evalRunId: z.string().uuid(),
+  getActualUrl: z.string().url(),
+});
 
 export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAgent: EvaluationAgent) {
   app.get('/api/eval-runs', async (request, reply) => {
-    const { releaseId, page = 1, pageSize = 20 } = request.query as { releaseId?: string; page?: number; pageSize?: number };
+    const parsed = parseQuery(reply, ListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { releaseId, page, pageSize } = parsed.data;
     if (releaseId) return reply.send(repo.findRunsByReleaseId(releaseId));
     return reply.send(repo.findMany({ page, pageSize }));
   });
@@ -17,8 +34,9 @@ export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAge
   });
 
   app.post('/api/eval-runs', async (request, reply) => {
-    const data = request.body as { releaseId: string; datasetId: string; scorer: string };
-    const item = repo.createRun(data);
+    const parsed = parseBody(reply, CreateEvalRunSchema, request.body);
+    if (!parsed.ok) return;
+    const item = repo.createRun(parsed.data);
     return reply.code(201).send(item);
   });
 
@@ -28,7 +46,9 @@ export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAge
   });
 
   app.post('/api/eval/run', async (request, reply) => {
-    const { evalRunId, getActualUrl } = request.body as { evalRunId: string; getActualUrl: string };
+    const parsed = parseBody(reply, RunEvalSchema, request.body);
+    if (!parsed.ok) return;
+    const { evalRunId, getActualUrl } = parsed.data;
     const evalRun = repo.findRunById(evalRunId);
     if (!evalRun) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Eval run not found' } });
 

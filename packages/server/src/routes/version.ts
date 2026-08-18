@@ -1,9 +1,26 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { PaginationSchema } from '@promptsheon/shared';
 import type { VersionRepo } from '../repos/version.js';
+import { parseBody, parseQuery } from './validate.js';
+
+const ListQuerySchema = PaginationSchema.extend({
+  capabilityId: z.string().uuid().optional(),
+});
+
+const CreateVersionSchema = z.object({
+  capabilityId: z.string().uuid(),
+  version: z.number().int().positive(),
+  manifest: z.string().min(1),
+  manifestHash: z.string().min(1),
+  createdBy: z.string().optional(),
+});
 
 export function registerVersionRoutes(app: FastifyInstance, repo: VersionRepo) {
   app.get('/api/capability-versions', async (request, reply) => {
-    const { capabilityId, page = 1, pageSize = 20 } = request.query as { capabilityId?: string; page?: number; pageSize?: number };
+    const parsed = parseQuery(reply, ListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { capabilityId, page, pageSize } = parsed.data;
     if (capabilityId) return reply.send(repo.findByCapabilityId(capabilityId));
     return reply.send(repo.findMany({ page, pageSize }));
   });
@@ -16,8 +33,9 @@ export function registerVersionRoutes(app: FastifyInstance, repo: VersionRepo) {
   });
 
   app.post('/api/capability-versions', async (request, reply) => {
-    const data = request.body as { capabilityId: string; version: number; manifest: string; manifestHash: string; createdBy?: string };
-    const item = repo.create(data);
+    const parsed = parseBody(reply, CreateVersionSchema, request.body);
+    if (!parsed.ok) return;
+    const item = repo.create(parsed.data);
     return reply.code(201).send(item);
   });
 

@@ -1,9 +1,22 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import {
+  CreateCapabilitySchema,
+  UpdateCapabilitySchema,
+  PaginationSchema,
+} from '@promptsheon/shared';
 import type { CapabilityRepo } from '../repos/capability.js';
+import { parseBody, parseQuery } from './validate.js';
+
+const ListQuerySchema = PaginationSchema.extend({
+  projectId: z.string().uuid().optional(),
+});
 
 export function registerCapabilityRoutes(app: FastifyInstance, repo: CapabilityRepo) {
   app.get('/api/capabilities', async (request, reply) => {
-    const { projectId, page = 1, pageSize = 20 } = request.query as { projectId?: string; page?: number; pageSize?: number };
+    const parsed = parseQuery(reply, ListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { projectId, page, pageSize } = parsed.data;
     if (projectId) return reply.send(repo.findByProjectId(projectId));
     return reply.send(repo.findMany({ page, pageSize }));
   });
@@ -16,15 +29,17 @@ export function registerCapabilityRoutes(app: FastifyInstance, repo: CapabilityR
   });
 
   app.post('/api/capabilities', async (request, reply) => {
-    const data = request.body as { projectId: string; name: string; description?: string };
-    const item = repo.create(data);
+    const parsed = parseBody(reply, CreateCapabilitySchema, request.body);
+    if (!parsed.ok) return;
+    const item = repo.create(parsed.data);
     return reply.code(201).send(item);
   });
 
   app.put('/api/capabilities/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const data = request.body as { name?: string; description?: string };
-    const item = repo.update(id, data);
+    const parsed = parseBody(reply, UpdateCapabilitySchema, request.body);
+    if (!parsed.ok) return;
+    const item = repo.update(id, parsed.data);
     return reply.send(item);
   });
 

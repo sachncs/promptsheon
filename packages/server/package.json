@@ -12,10 +12,13 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "@fastify/rate-limit": "^11.2.0",
     "@promptsheon/shared": "workspace:*",
     "@strands-agents/sdk": "^1.13.0",
     "better-sqlite3": "^11.8.0",
-    "fastify": "^5.2.0"
+    "fastify": "^5.2.0",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.0",

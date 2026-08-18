@@ -1,9 +1,27 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import {
+  CreateDatasetSchema,
+  PaginationSchema,
+} from '@promptsheon/shared';
 import type { DatasetRepo } from '../repos/dataset.js';
+import { parseBody, parseQuery } from './validate.js';
+
+const ListQuerySchema = PaginationSchema.extend({
+  capabilityId: z.string().uuid().optional(),
+});
+
+const CreateCaseSchema = z.object({
+  inputs: z.string().min(1),
+  expected: z.string().min(1),
+  description: z.string().max(2000).optional().default(''),
+});
 
 export function registerDatasetRoutes(app: FastifyInstance, repo: DatasetRepo) {
   app.get('/api/datasets', async (request, reply) => {
-    const { capabilityId, page = 1, pageSize = 20 } = request.query as { capabilityId?: string; page?: number; pageSize?: number };
+    const parsed = parseQuery(reply, ListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { capabilityId, page, pageSize } = parsed.data;
     if (capabilityId) return reply.send(repo.findByCapabilityId(capabilityId));
     return reply.send(repo.findMany({ page, pageSize }));
   });
@@ -16,8 +34,9 @@ export function registerDatasetRoutes(app: FastifyInstance, repo: DatasetRepo) {
   });
 
   app.post('/api/datasets', async (request, reply) => {
-    const data = request.body as { capabilityId: string; name: string; description?: string };
-    const item = repo.create(data);
+    const parsed = parseBody(reply, CreateDatasetSchema, request.body);
+    if (!parsed.ok) return;
+    const item = repo.create(parsed.data);
     return reply.code(201).send(item);
   });
 
@@ -34,8 +53,9 @@ export function registerDatasetRoutes(app: FastifyInstance, repo: DatasetRepo) {
 
   app.post('/api/datasets/:id/cases', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const data = request.body as { inputs: string; expected: string; description?: string };
-    const item = repo.addCase(id, data);
+    const parsed = parseBody(reply, CreateCaseSchema, request.body);
+    if (!parsed.ok) return;
+    const item = repo.addCase(id, parsed.data);
     return reply.code(201).send(item);
   });
 

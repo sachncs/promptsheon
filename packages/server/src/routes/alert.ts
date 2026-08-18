@@ -1,5 +1,15 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import {
+  CreateAlertRuleSchema,
+  UpdateAlertRuleSchema,
+} from '@promptsheon/shared';
 import type { AlertRepo } from '../repos/alert.js';
+import { parseBody, parseQuery } from './validate.js';
+
+const ListAlertsQuerySchema = z.object({
+  status: z.string().optional(),
+});
 
 export function registerAlertRoutes(app: FastifyInstance, repo: AlertRepo) {
   app.get('/api/alert-rules', async (_request, reply) => {
@@ -14,15 +24,19 @@ export function registerAlertRoutes(app: FastifyInstance, repo: AlertRepo) {
   });
 
   app.post('/api/alert-rules', async (request, reply) => {
-    const data = request.body as { name: string; type: string; severity: string; enabled?: boolean; threshold?: number; duration?: number; window?: number; config?: string };
-    const item = repo.createRule(data);
+    const parsed = parseBody(reply, CreateAlertRuleSchema, request.body);
+    if (!parsed.ok) return;
+    const { config, ...rest } = parsed.data;
+    const item = repo.createRule({ ...rest, config: config ? JSON.stringify(config) : undefined });
     return reply.code(201).send(item);
   });
 
   app.put('/api/alert-rules/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const data = request.body as { name?: string; threshold?: number; enabled?: boolean };
-    const item = repo.updateRule(id, data);
+    const parsed = parseBody(reply, UpdateAlertRuleSchema, request.body);
+    if (!parsed.ok) return;
+    const { config, ...rest } = parsed.data;
+    const item = repo.updateRule(id, { ...rest, config: config ? JSON.stringify(config) : undefined });
     return reply.send(item);
   });
 
@@ -33,8 +47,9 @@ export function registerAlertRoutes(app: FastifyInstance, repo: AlertRepo) {
   });
 
   app.get('/api/alerts', async (request, reply) => {
-    const { status } = request.query as { status?: string };
-    return reply.send(repo.findAlerts(status));
+    const parsed = parseQuery(reply, ListAlertsQuerySchema, request.query);
+    if (!parsed.ok) return;
+    return reply.send(repo.findAlerts(parsed.data.status));
   });
 
   app.put('/api/alerts/:id/acknowledge', async (request, reply) => {

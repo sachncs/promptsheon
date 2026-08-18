@@ -1,9 +1,24 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { CreateReleaseSchema, PaginationSchema } from '@promptsheon/shared';
 import type { ReleaseRepo } from '../repos/release.js';
+import { parseBody, parseQuery } from './validate.js';
+
+const ListQuerySchema = PaginationSchema.extend({
+  capabilityId: z.string().uuid().optional(),
+});
+
+const CreateBodySchema = CreateReleaseSchema.extend({
+  capabilityVersionId: z.string().uuid().nullable(),
+  manifest: z.string().min(1),
+  createdBy: z.string().optional(),
+});
 
 export function registerReleaseRoutes(app: FastifyInstance, repo: ReleaseRepo) {
   app.get('/api/releases', async (request, reply) => {
-    const { capabilityId, page = 1, pageSize = 20 } = request.query as { capabilityId?: string; page?: number; pageSize?: number };
+    const parsed = parseQuery(reply, ListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { capabilityId, page, pageSize } = parsed.data;
     if (capabilityId) return reply.send(repo.findByCapabilityId(capabilityId));
     return reply.send(repo.findMany({ page, pageSize }));
   });
@@ -16,16 +31,9 @@ export function registerReleaseRoutes(app: FastifyInstance, repo: ReleaseRepo) {
   });
 
   app.post('/api/releases', async (request, reply) => {
-    const data = request.body as {
-      capabilityId: string;
-      capabilityVersion: number;
-      capabilityVersionId: string | null;
-      manifest: string;
-      environment: string;
-      createdBy?: string;
-      canaryPercent?: number;
-    };
-    const item = repo.create(data);
+    const parsed = parseBody(reply, CreateBodySchema, request.body);
+    if (!parsed.ok) return;
+    const item = repo.create(parsed.data);
     return reply.code(201).send(item);
   });
 

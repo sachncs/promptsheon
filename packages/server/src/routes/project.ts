@@ -1,9 +1,22 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import {
+  CreateProjectSchema,
+  UpdateProjectSchema,
+  PaginationSchema,
+} from '@promptsheon/shared';
 import type { ProjectRepo } from '../repos/project.js';
+import { parseBody, parseQuery } from './validate.js';
+
+const ListQuerySchema = PaginationSchema.extend({
+  workspaceId: z.string().uuid().optional(),
+});
 
 export function registerProjectRoutes(app: FastifyInstance, repo: ProjectRepo) {
   app.get('/api/projects', async (request, reply) => {
-    const { workspaceId, page = 1, pageSize = 20 } = request.query as { workspaceId?: string; page?: number; pageSize?: number };
+    const parsed = parseQuery(reply, ListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { workspaceId, page, pageSize } = parsed.data;
     if (workspaceId) return reply.send(repo.findByWorkspaceId(workspaceId));
     return reply.send(repo.findMany({ page, pageSize }));
   });
@@ -16,15 +29,17 @@ export function registerProjectRoutes(app: FastifyInstance, repo: ProjectRepo) {
   });
 
   app.post('/api/projects', async (request, reply) => {
-    const data = request.body as { workspaceId: string; name: string; description?: string };
-    const item = repo.create(data);
+    const parsed = parseBody(reply, CreateProjectSchema, request.body);
+    if (!parsed.ok) return;
+    const item = repo.create(parsed.data);
     return reply.code(201).send(item);
   });
 
   app.put('/api/projects/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const data = request.body as { name?: string; description?: string };
-    const item = repo.update(id, data);
+    const parsed = parseBody(reply, UpdateProjectSchema, request.body);
+    if (!parsed.ok) return;
+    const item = repo.update(id, parsed.data);
     return reply.send(item);
   });
 

@@ -1,10 +1,17 @@
 import type { FastifyInstance } from 'fastify';
+import {
+  CreateWorkspaceSchema,
+  UpdateWorkspaceSchema,
+  PaginationSchema,
+} from '@promptsheon/shared';
 import type { WorkspaceRepo } from '../repos/workspace.js';
+import { parseBody, parseQuery } from './validate.js';
 
 export function registerWorkspaceRoutes(app: FastifyInstance, repo: WorkspaceRepo) {
   app.get('/api/workspaces', async (request, reply) => {
-    const { page = 1, pageSize = 20 } = request.query as { page?: number; pageSize?: number };
-    return reply.send(repo.findMany({ page, pageSize }));
+    const parsed = parseQuery(reply, PaginationSchema, request.query);
+    if (!parsed.ok) return;
+    return reply.send(repo.findMany(parsed.data));
   });
 
   app.get('/api/workspaces/:id', async (request, reply) => {
@@ -15,15 +22,17 @@ export function registerWorkspaceRoutes(app: FastifyInstance, repo: WorkspaceRep
   });
 
   app.post('/api/workspaces', async (request, reply) => {
-    const data = request.body as { name: string; organization?: string };
-    const item = repo.create(data);
+    const parsed = parseBody(reply, CreateWorkspaceSchema, request.body);
+    if (!parsed.ok) return;
+    const item = repo.create(parsed.data);
     return reply.code(201).send(item);
   });
 
   app.put('/api/workspaces/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const data = request.body as { name?: string; organization?: string };
-    const item = repo.update(id, data);
+    const parsed = parseBody(reply, UpdateWorkspaceSchema, request.body);
+    if (!parsed.ok) return;
+    const item = repo.update(id, parsed.data);
     return reply.send(item);
   });
 
