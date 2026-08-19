@@ -15,3 +15,5 @@ export { FeatureFlagRepo } from './feature-flag.js';
 export { ApprovalRepo } from './approval.js';
 export { SystemConfigRepo } from './system-config.js';
 export { IdempotencyRepo } from './idempotency.js';
+export { ManifestRepo, computeManifestHash } from './manifest.js';
+export type { CutoverReport } from './manifest.js';

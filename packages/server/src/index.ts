@@ -29,6 +29,7 @@ import { ScheduleRepo } from './repos/schedule.js';
 import { ApprovalRepo } from './repos/approval.js';
 import { ApiKeyRepo } from './repos/api-key.js';
 import { SystemConfigRepo } from './repos/system-config.js';
+import { ManifestRepo } from './repos/manifest.js';
 
 async function main() {
   const config = loadConfig();
@@ -104,6 +105,18 @@ async function main() {
 
   const casStore = new CasStore(config.server.casPath);
   await casStore.init();
+
+  const manifestRepo = new ManifestRepo(db);
+  const cutoverReport = manifestRepo.ensureCutover({ createdBy: 'system-cutover' });
+  app.log.info(
+    {
+      scanned: cutoverReport.scanned,
+      migrated: cutoverReport.migrated,
+      skipped: cutoverReport.skipped,
+      errors: cutoverReport.errors.length,
+    },
+    'manifest DAG cutover complete',
+  );
 
   const invocationAgent = new InvocationAgent(config);
   const evalAgent = new EvaluationAgent(config);
