@@ -23,23 +23,20 @@ export class InvocationAgent {
     options: { environment?: string; traceId?: string } = {},
   ): Promise<Execution> {
     const startTime = Date.now();
-    const prompt = JSON.stringify({
+    const result = await this.agent.invoke(JSON.stringify({
       action: 'invoke',
       capabilityVersionId,
       inputs,
       environment: options.environment ?? '',
       traceId: options.traceId ?? '',
-    });
-
-    const result = await this.agent.invoke(prompt);
-    const outputText = extractText(result);
+    }));
 
     return {
       id: crypto.randomUUID(),
       capabilityVersionId,
       timestamp: new Date().toISOString(),
       inputs: JSON.stringify(inputs),
-      outputs: outputText,
+      outputs: extractText(result),
       model: '',
       provider: '',
       latencyMs: Date.now() - startTime,
@@ -51,15 +48,5 @@ export class InvocationAgent {
       traceId: options.traceId ?? '',
       environment: options.environment ?? '',
     };
-  }
-
-  async *invokeStreaming(
-    capabilityVersionId: string,
-    inputs: Record<string, unknown>,
-  ): AsyncGenerator<unknown> {
-    const prompt = JSON.stringify({ action: 'invoke', capabilityVersionId, inputs });
-    for await (const event of this.agent.stream(prompt)) {
-      yield event;
-    }
   }
 }

@@ -3,22 +3,20 @@ import { Agent } from '@strands-agents/sdk';
 import { createModel } from '../model.js';
 import { extractText } from '../utils.js';
 
-export const REASONING_COMPILER_SYSTEM_PROMPT = `You are a reasoning compiler. Your job is to take a raw prompt and:
-1. Analyze the prompt's intent and requirements
-2. Add structured reasoning steps
-3. Include error handling instructions
-4. Add output format specifications
-5. Optimize for clarity and correctness
-
-Output a compiled prompt that is more reliable and consistent.`;
-
 export class ReasoningCompiler {
   private agent: Agent;
 
   constructor(config: AppConfig) {
     this.agent = new Agent({
       model: createModel(config),
-      systemPrompt: REASONING_COMPILER_SYSTEM_PROMPT,
+      systemPrompt: `You are a reasoning compiler. Your job is to take a raw prompt and:
+1. Analyze the prompt's intent and requirements
+2. Add structured reasoning steps
+3. Include error handling instructions
+4. Add output format specifications
+5. Optimize for clarity and correctness
+
+Output a compiled prompt that is more reliable and consistent.`,
     });
   }
 

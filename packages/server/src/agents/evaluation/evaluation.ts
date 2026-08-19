@@ -1,16 +1,11 @@
 import type { AppConfig, EvalRun, DatasetCase } from '@promptsheon/shared';
-import type { Scorer } from './scorers.js';
-import { LLMScorer, ExactMatchScorer, ContainsScorer } from './scorers.js';
+import { LLMScorer, type ScorerResult, type ScorerInput } from './scorers.js';
 
 export class EvaluationAgent {
-  private scorers: Map<string, Scorer>;
+  private scorer: LLMScorer;
 
   constructor(config: AppConfig) {
-    this.scorers = new Map<string, Scorer>([
-      ['llm-judge', new LLMScorer(config)],
-      ['exact-match', new ExactMatchScorer()],
-      ['contains', new ContainsScorer()],
-    ]);
+    this.scorer = new LLMScorer(config);
   }
 
   async runEval(
@@ -19,7 +14,6 @@ export class EvaluationAgent {
     getActual: (inputs: Record<string, unknown>) => Promise<string>,
     onProgress?: (completed: number, total: number) => void,
   ): Promise<EvalRun> {
-    const scorer = this.scorers.get(evalRun.scorer) ?? this.scorers.get('llm-judge')!;
     let passed = 0;
     let failed = 0;
 
@@ -29,11 +23,11 @@ export class EvaluationAgent {
       const expected = JSON.parse(testCase.expected);
 
       const actual = await getActual(inputs);
-      const result = await scorer.score({
+      const result: ScorerResult = await this.scorer.score({
         actual,
         expected: JSON.stringify(expected),
         inputs,
-      });
+      } satisfies ScorerInput);
 
       if (result.passed) passed++;
       else failed++;
