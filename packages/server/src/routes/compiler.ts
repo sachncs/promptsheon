@@ -1,17 +1,17 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { ManifestSchema } from '@promptsheon/shared';
+import type { Manifest } from '@promptsheon/shared';
 import type { ReasoningCompiler } from '../agents/compiler/compiler.js';
 import { parseBody } from './validate.js';
 
 const CompileSchema = z.object({
-  manifest: ManifestSchema,
+  manifest: z.unknown(),
   capabilityContext: z.string().optional(),
   constraints: z.array(z.string()).optional(),
 });
 
 const DecompileSchema = z.object({
-  manifest: ManifestSchema,
+  manifest: z.unknown(),
 });
 
 export function registerCompilerRoutes(app: FastifyInstance, compiler: ReasoningCompiler) {
@@ -19,7 +19,7 @@ export function registerCompilerRoutes(app: FastifyInstance, compiler: Reasoning
     const parsed = parseBody(reply, CompileSchema, request.body);
     if (!parsed.ok) return;
     const { manifest, capabilityContext, constraints } = parsed.data;
-    const compiled = await compiler.compile(manifest, { capabilityContext, constraints });
+    const compiled = await compiler.compile(manifest as Manifest, { capabilityContext, constraints });
     return reply.send(compiled);
   });
 
@@ -27,7 +27,7 @@ export function registerCompilerRoutes(app: FastifyInstance, compiler: Reasoning
     const parsed = parseBody(reply, DecompileSchema, request.body);
     if (!parsed.ok) return;
     const { manifest } = parsed.data;
-    const original = await compiler.decompile(manifest);
+    const original = await compiler.decompile(manifest as Manifest);
     return reply.send({ original });
   });
 }

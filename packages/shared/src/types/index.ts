@@ -2,7 +2,27 @@ export type { Workspace } from './workspace.js';
 export type { Project } from './project.js';
 export type { Capability } from './capability.js';
 export type { CapabilityVersion } from './capability-version.js';
-export type { Manifest, ManifestTool } from './manifest.js';
+export type {
+  Manifest,
+  SubCapabilityManifest,
+  ManifestEdge,
+  PromptConfig,
+  ModelPolicy,
+  RuntimePolicy,
+  ContextContract,
+  MemoryConfig,
+  GuardrailSpec,
+  ToolSpec,
+  McpServerSpec,
+  ObservabilityConfig,
+  HookConfig,
+  RetrySpec,
+  LimitsSpec,
+  StateConfig,
+  StorageConfig,
+  ConversationManagerConfig,
+  EvaluationConfig,
+} from './manifest.js';
 export type { Release, ReleaseStatus, Environment } from './release.js';
 export type { Execution } from './execution.js';
 export type { Dataset, DatasetCase } from './dataset.js';

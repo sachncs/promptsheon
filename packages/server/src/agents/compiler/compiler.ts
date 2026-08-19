@@ -25,7 +25,7 @@ Output a compiled prompt that is more reliable and consistent.`,
     options: { capabilityContext?: string; constraints?: string[] } = {},
   ): Promise<Manifest> {
     const prompt = `# Raw System Prompt
-${manifest.systemPrompt}
+${manifest.prompt.systemPrompt}
 
 # Capability Context
 ${options.capabilityContext ?? 'None'}
@@ -43,13 +43,16 @@ Output the compiled prompt as a JSON object with the same structure as the input
 
     return {
       ...manifest,
-      systemPrompt: compiled.systemPrompt ?? manifest.systemPrompt,
+      prompt: {
+        systemPrompt: compiled.systemPrompt ?? manifest.prompt.systemPrompt,
+        userTemplate: manifest.prompt.userTemplate,
+      },
     };
   }
 
   async decompile(compiledManifest: Manifest): Promise<string> {
     const prompt = `# Compiled Prompt
-${compiledManifest.systemPrompt}
+${compiledManifest.prompt.systemPrompt}
 
 # Task
 Extract the original user-facing prompt from this compiled prompt.
