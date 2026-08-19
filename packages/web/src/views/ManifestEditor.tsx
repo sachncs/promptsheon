@@ -5,10 +5,10 @@ import type { Edge } from '@xyflow/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, Save, Plus } from 'lucide-react';
+import { AlertCircle, Save, Plus, Play } from 'lucide-react';
 import { DagCanvas, type DagNode } from '@/components/dag/DagCanvas';
 import { NodeConfigPanel } from '@/components/dag/NodeConfigPanel';
-import { manifestApi, validateDagClient } from '@/lib/api';
+import { executionApi, manifestApi, validateDagClient } from '@/lib/api';
 import type { Manifest, SubCapabilityManifest } from '@promptsheon/shared';
 
 const blankManifest: Manifest = {
@@ -138,6 +138,11 @@ export function ManifestEditor() {
     },
   });
 
+  const runPreview = useCallback(() => {
+    if (!hash) return;
+    navigate(`/executions/new?hash=${hash}`);
+  }, [hash, navigate]);
+
   const isValid = validationErrors.length === 0;
 
   return (
@@ -148,6 +153,11 @@ export function ManifestEditor() {
           <Button variant="outline" onClick={handleAddNode}>
             <Plus className="mr-2 h-4 w-4" />Add Node
           </Button>
+          {hash && (
+            <Button variant="secondary" onClick={runPreview}>
+              <Play className="mr-2 h-4 w-4" />Run Preview
+            </Button>
+          )}
           <Button onClick={() => saveMutation.mutate()} disabled={!isValid}>
             <Save className="mr-2 h-4 w-4" />Save
           </Button>
