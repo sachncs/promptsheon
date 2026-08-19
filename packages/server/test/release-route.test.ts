@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { registerReleaseRoutes } from '../src/routes/release.js';
 import { ManifestRepo } from '../src/repos/manifest.js';
 import { ReleaseRepo } from '../src/repos/release.js';
+import { AuditChain } from '../src/audit/chain.js';
 import { applyMigrations } from '@promptsheon/shared';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -73,7 +74,7 @@ describe('POST /api/releases/:id/rollback', () => {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     });
     await app.register(async (instance) => {
-      await registerReleaseRoutes(instance, repo, { manifestRepo: new ManifestRepo(db) });
+      await registerReleaseRoutes(instance, repo, { manifestRepo: new ManifestRepo(db), auditChain: new AuditChain(db) });
     });
     await app.ready();
   });

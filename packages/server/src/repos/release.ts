@@ -45,6 +45,39 @@ export class ReleaseRepo extends BaseRepo<Release> {
   }
 
   /**
+   * Atomically rollback: supersede the current release and reactivate
+   * the target in a single transaction. The UNIQUE(active-per-cap-env)
+   * constraint is satisfied by superseding first.
+   *
+   * On success returns `{ superseded, reactivated }`. On any failure
+   * the entire transaction is rolled back and the pair is unchanged.
+   */
+  rollbackAtomically(
+    currentId: string,
+    targetId: string,
+  ): { superseded: Release; reactivated: Release } | null {
+    const current = this.findById(currentId);
+    const target = this.findById(targetId);
+    if (!current || !target) return null;
+    if (currentId === targetId) return null;
+
+    let superseded: Release | null = null;
+    let reactivated: Release | null = null;
+    this.db.transaction(() => {
+      this.db.prepare(
+        "UPDATE releases SET status = 'superseded', updated_at = ? WHERE id = ?",
+      ).run(new Date().toISOString(), currentId);
+      this.db.prepare(
+        "UPDATE releases SET status = 'active', updated_at = ? WHERE id = ?",
+      ).run(new Date().toISOString(), targetId);
+      superseded = { ...current, status: 'superseded' };
+      reactivated = { ...target, status: 'active' };
+    })();
+    if (!superseded || !reactivated) return null;
+    return { superseded, reactivated };
+  }
+
+  /**
    * Compute the deterministic manifest_hash for a stored release.manifest
    * blob. Used by the activation gate to look up approval state.
    */

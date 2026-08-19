@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { NotFoundError } from '@promptsheon/shared';
 import type { ManifestRepo } from '../repos/manifest.js';
 import { parseBody } from './validate.js';
+import { AuditChain } from '../audit/chain.js';
 
 const ManifestApprovalSchema = z.object({
   userId: z.string().min(1).max(255),
@@ -25,7 +26,10 @@ const ManifestRejectionSchema = z.object({
  * The DB table manifest_approvals uses manifest_dag.id (not manifest.id)
  * as FK, so the hash → manifest_dag lookup is required first.
  */
-export function registerManifestApprovalRoutes(app: FastifyInstance, deps: { manifestRepo: ManifestRepo }) {
+export function registerManifestApprovalRoutes(
+  app: FastifyInstance,
+  deps: { manifestRepo: ManifestRepo; auditChain: AuditChain },
+) {
   app.post('/api/manifests/:hash/approve', async (request, reply) => {
     const { hash } = request.params as { hash: string };
     const parsed = parseBody(reply, ManifestApprovalSchema, request.body);
@@ -35,6 +39,14 @@ export function registerManifestApprovalRoutes(app: FastifyInstance, deps: { man
     if (!manifest) throw new NotFoundError('manifest', hash);
 
     deps.manifestRepo.upsertApproval(hash, parsed.data.userId, 'approve', parsed.data.comment);
+    deps.auditChain.append({
+      userId: parsed.data.userId,
+      action: 'manifest.approve',
+      resource: 'manifest',
+      details: JSON.stringify({ manifestHash: hash, comment: parsed.data.comment }),
+      resourceKind: 'manifest',
+      resourceId: hash,
+    });
     const approvals = deps.manifestRepo.findApprovals(hash);
     return reply.send({
       hash,
@@ -52,6 +64,14 @@ export function registerManifestApprovalRoutes(app: FastifyInstance, deps: { man
     if (!manifest) throw new NotFoundError('manifest', hash);
 
     deps.manifestRepo.upsertApproval(hash, parsed.data.userId, 'reject', parsed.data.comment);
+    deps.auditChain.append({
+      userId: parsed.data.userId,
+      action: 'manifest.reject',
+      resource: 'manifest',
+      details: JSON.stringify({ manifestHash: hash, comment: parsed.data.comment }),
+      resourceKind: 'manifest',
+      resourceId: hash,
+    });
     const approvals = deps.manifestRepo.findApprovals(hash);
     return reply.send({
       hash,
