@@ -19,13 +19,16 @@ export function registerWebhookRoutes(app: FastifyInstance, deps: {
       }
       try {
         const json = body.length === 0 ? {} : JSON.parse(body.toString());
-        (req as unknown as { rawBody?: Buffer }).rawBody = body;
+        (req as unknown as { rawBody?: Buffer | string }).rawBody = body;
         done(null, json);
       } catch (e) {
         done(e as Error);
       }
     },
   );
+
+  // Drop the unused rawBody param from body typing
+  void 0;
 
   app.post('/api/webhooks/incoming/:id', async (request: FastifyRequest, reply) => {
     const { id } = request.params as { id: string };
@@ -36,7 +39,8 @@ export function registerWebhookRoutes(app: FastifyInstance, deps: {
     if (!request.headers['content-type']?.startsWith('application/json')) {
       return reply.code(415).send({ error: { code: 'UNSUPPORTED_MEDIA_TYPE', message: 'application/json required' } });
     }
-    const body = (request as unknown as { rawBody?: Buffer }).rawBody;
+    const rawBody = (request as unknown as { rawBody?: Buffer | string }).rawBody;
+    const body = typeof rawBody === 'string' ? Buffer.from(rawBody) : rawBody;
     if (!body || body.length === 0) {
       return reply.code(400).send({ error: { code: 'EMPTY_BODY', message: 'Webhook body required' } });
     }
