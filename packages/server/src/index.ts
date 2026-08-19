@@ -31,12 +31,14 @@ import { ApprovalRepo } from './repos/approval.js';
 import { ApiKeyRepo } from './repos/api-key.js';
 import { SystemConfigRepo } from './repos/system-config.js';
 import { ManifestRepo } from './repos/manifest.js';
+import { MembershipRepo } from './repos/org.js';
 import { IdeaPlannerAgent } from './agents/planner/index.js';
 import { ManifestGraphExecutor } from './agents/executor/index.js';
 import { setupObservability } from './observability/setup.js';
 import type { GoalSummary } from './routes/goals.js';
 import { SessionStore } from './sessions/store.js';
 import { SnapshotStore } from './snapshots/store.js';
+import { orgContextMiddleware } from './middleware/org-context.js';
 import type { Agent } from '@strands-agents/sdk';
 
 async function main() {
@@ -102,6 +104,7 @@ async function main() {
   const scheduleRepo = new ScheduleRepo(db);
   const approvalRepo = new ApprovalRepo(db);
   const apiKeyRepo = new ApiKeyRepo(db);
+  const membershipRepo = new MembershipRepo(db);
   const systemConfigRepo = new SystemConfigRepo(db);
 
   const sseHub = new SseHub();
@@ -150,6 +153,7 @@ async function main() {
   const agentRegistry = new Map<string, Agent>();
 
   app.addHook('preHandler', authMiddleware(config, apiKeyRepo));
+  app.addHook('preHandler', orgContextMiddleware({ membershipRepo }));
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
     if (error.name === 'NotFoundError') {
