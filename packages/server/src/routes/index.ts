@@ -21,6 +21,7 @@ import { registerIdeaRoutes } from './idea.js';
 import { registerGoalEvolveRoutes } from './goal-evolve.js';
 import { registerManifestApprovalRoutes } from './manifest-approval.js';
 import { registerGoalObservabilityRoutes } from './goals.js';
+import { registerSessionRoutes } from './sessions.js';
 
 import type { WorkspaceRepo } from '../repos/workspace.js';
 import type { ProjectRepo } from '../repos/project.js';
@@ -71,6 +72,7 @@ export interface AppDeps {
   manifestRepo: ManifestRepo;
   goalEvolver: GoalBasedEvolutionAgent;
   getActiveGoals: () => Array<{ manifestHash: string; bestScore: number; iterations: number; lastUpdated: string }>;
+  sessionStore: import('../sessions/store.js').SessionStore;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -103,4 +105,5 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     goalEvolver: deps.goalEvolver,
     getActiveGoals: deps.getActiveGoals,
   });
+  registerSessionRoutes(app, { store: deps.sessionStore });
 }

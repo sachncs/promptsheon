@@ -35,6 +35,7 @@ import { IdeaPlannerAgent } from './agents/planner/index.js';
 import { ManifestGraphExecutor } from './agents/executor/index.js';
 import { setupObservability } from './observability/setup.js';
 import type { GoalSummary } from './routes/goals.js';
+import { SessionStore } from './sessions/store.js';
 
 async function main() {
   const config = loadConfig();
@@ -133,6 +134,11 @@ async function main() {
   const executor = new ManifestGraphExecutor({ config, hub: sseHub });
   const goalEvolver = new GoalBasedEvolutionAgent({ config, hub: sseHub, executor, cas: casStore });
   const activeGoals = new Map<string, GoalSummary>();
+  const sessionStore = new SessionStore({
+    storageDir: `${config.server.casPath}/sessions`,
+    persist: true,
+  });
+  await sessionStore.init();
 
   app.addHook('preHandler', authMiddleware(config, apiKeyRepo));
 
@@ -175,6 +181,7 @@ async function main() {
     executor,
     manifestRepo,
     getActiveGoals: () => Array.from(activeGoals.values()),
+    sessionStore,
   });
 
   const scheduler = new Scheduler(scheduleRepo, sseHub);
