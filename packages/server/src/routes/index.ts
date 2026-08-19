@@ -28,6 +28,7 @@ import { registerOrgTeamRoutes } from './org-team.js';
 import { registerWebhookRoutes } from './webhooks-incoming.js';
 import { OrgRepo, TeamRepo } from '../repos/org.js';
 import { WebhookReceiver } from '../webhooks/receiver.js';
+import { registerChaosRoutes } from './chaos.js';
 
 import type { WorkspaceRepo } from '../repos/workspace.js';
 import type { ProjectRepo } from '../repos/project.js';
@@ -51,6 +52,7 @@ import type { IdeaPlannerAgent } from '../agents/planner/index.js';
 import type { ManifestGraphExecutor } from '../agents/executor/index.js';
 import type { ManifestRepo } from '../repos/manifest.js';
 import type { GoalBasedEvolutionAgent } from '../agents/evolution/goal-evolver.js';
+import type { ChaosConfig } from '../hardening/chaos.js';
 import type Database from 'better-sqlite3';
 
 export interface AppDeps {
@@ -83,6 +85,7 @@ export interface AppDeps {
   getAgent: (id: string) => import('@strands-agents/sdk').Agent | null;
   membershipRepo: import('../repos/org.js').MembershipRepo;
   webhookReceiver: WebhookReceiver;
+  chaosConfig?: ChaosConfig;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -94,6 +97,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerReleaseRoutes(app, deps.releaseRepo, { manifestRepo: deps.manifestRepo });
   registerExecutionRoutes(app, {
     executionRepo: deps.executionRepo,
+    releaseRepo: deps.releaseRepo,
     manifestRepo: deps.manifestRepo,
     executor: deps.executor,
   });
@@ -124,4 +128,14 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     membershipRepo: deps.membershipRepo,
   });
   registerWebhookRoutes(app, { receiver: deps.webhookReceiver });
+  if (deps.chaosConfig) {
+    registerChaosRoutes(app, {
+      chaos: deps.chaosConfig,
+      isAdmin: (request) => {
+        const meta = request as unknown as Record<string, unknown>;
+        const role = meta['userRole'];
+        return role === 'admin';
+      },
+    });
+  }
 }
