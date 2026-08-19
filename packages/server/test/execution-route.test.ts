@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerExecutionRoutes } from '../src/routes/execution.js';
 import { ExecutionRepo } from '../src/repos/execution.js';
+import { ReleaseRepo } from '../src/repos/release.js';
 import { ManifestRepo } from '../src/repos/manifest.js';
 import { ManifestGraphExecutor } from '../src/agents/executor/executor.js';
 import { SseHub } from '../src/sse/hub.js';

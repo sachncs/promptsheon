@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { ExecutionRepo } from '../repos/execution.js';
+import type { ReleaseRepo } from '../repos/release.js';
 import type { ManifestRepo } from '../repos/manifest.js';
 import type { ManifestGraphExecutor } from '../agents/executor/index.js';
+import { selectByCanary } from './release.js';
 import { parseBody, parseQuery } from './validate.js';
 import type { Manifest } from '@promptsheon/shared';
 import { NotFoundError } from '@promptsheon/shared';
@@ -29,6 +31,7 @@ export function registerExecutionRoutes(
   app: FastifyInstance,
   deps: {
     executionRepo: ExecutionRepo;
+    releaseRepo: ReleaseRepo;
     manifestRepo: ManifestRepo;
     executor: ManifestGraphExecutor;
   },
@@ -56,6 +59,18 @@ export function registerExecutionRoutes(
     if (!manifest) {
       throw new NotFoundError('manifest', manifestHash);
     }
+
+    // Canary routing: when multiple active releases exist for this
+    // manifest, distribute traffic by canaryPercent. With 0 or 1
+    // active release, no routing is needed.
+    const activeReleases = deps.releaseRepo.findActiveByManifestHash(manifestHash);
+    const pickedReleaseId = selectByCanary(
+      activeReleases.map((r) => ({ id: r.id, canaryPercent: r.canaryPercent })),
+    );
+    if (activeReleases.length === 0) {
+      return reply.code(404).send({ error: { code: 'NO_ACTIVE_RELEASE', message: 'No active release for manifest' } });
+    }
+
     const executionId = crypto.randomUUID();
     const controller = new AbortController();
     request.raw.on('close', () => {
@@ -83,6 +98,6 @@ export function registerExecutionRoutes(
       traceId: traceId ?? executionId,
       environment,
     });
-    return reply.send(trace);
+    return reply.send({ ...trace, pickedReleaseId });
   });
 }

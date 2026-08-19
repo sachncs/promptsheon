@@ -60,6 +60,26 @@ export class ReleaseRepo extends BaseRepo<Release> {
   }
 
   /**
+   * Find all active releases whose stored manifest matches the given
+   * manifest_hash. Used by the execution path to do canary routing.
+   */
+  findActiveByManifestHash(manifestHash: string): Release[] {
+    const all = this.db.prepare(
+      "SELECT * FROM releases WHERE status = 'active'",
+    ).all() as Release[];
+    return all.filter((r) => {
+      try {
+        const obj = JSON.parse(r.manifest) as Record<string, unknown>;
+        if (obj['manifestHash'] === manifestHash) return true;
+      } catch { /* ignore */ }
+      // Fallback: hash the manifest string and compare
+      const { createHash } = require('node:crypto') as typeof import('node:crypto');
+      const h = createHash('sha256').update(r.manifest).digest('hex');
+      return h === manifestHash;
+    });
+  }
+
+  /**
    * Find the most recent superseded release for a (capability, env) pair
    * with capability_version < currentVersion. Used by rollback to find
    * the previous known-good release.
