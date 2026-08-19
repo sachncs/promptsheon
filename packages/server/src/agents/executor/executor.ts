@@ -6,6 +6,8 @@ import { runAllGuardrails, type GuardrailBroadcast } from './guardrails.js';
 import { NotFoundError } from '@promptsheon/shared';
 import type { ManifestRepo } from '../../repos/manifest.js';
 import { ChaosConfig, ChaosFailureError } from '../../hardening/chaos.js';
+import { checkCostCap, recordCost, type CostLimitConfig } from '../../hardening/cost-caps.js';
+import { findRedTeamMatches } from '../../hardening/redteam.js';
 
 export interface ExecutionTrace {
   executionId: string;
@@ -59,7 +61,17 @@ export interface ExecuteOptions {
  * between nodes.
  */
 export class ManifestGraphExecutor {
-  constructor(private deps: { config: AppConfig; hub: SseHub; manifestRepo?: ManifestRepo; chaos?: ChaosConfig }) {}
+  constructor(
+    private deps: {
+      config: AppConfig;
+      hub: SseHub;
+      manifestRepo?: ManifestRepo;
+      chaos?: ChaosConfig;
+      costCap?: CostLimitConfig;
+      costOrgId?: string;
+      costCapabilityId?: string;
+    },
+  ) {}
 
   async execute(manifestHash: string, manifest: Manifest, options: ExecuteOptions): Promise<ExecutionTrace> {
     const validation = validateDag(manifest);
@@ -121,6 +133,52 @@ export class ManifestGraphExecutor {
         phase: 'pre',
       }, broadcast);
 
+      // Red-team scan: any of the configured patterns matching an
+      // input value fails the node with a 4xx-class error. The
+      // pattern set is global (config-driven) — see `hardening/redteam.ts`.
+      if (this.deps.costCap) {
+        const redteamHits = findRedTeamMatches(JSON.stringify(options.inputs));
+        if (redteamHits.length > 0) {
+          trace.nodeResults[node.id]!.status = 'failed';
+          trace.nodeResults[node.id]!.error = `red-team: ${redteamHits.join(', ')}`;
+          trace.status = 'failed';
+          trace.error = `red-team pattern matched on node ${node.id}: ${redteamHits.join(', ')}`;
+          this.deps.hub.broadcast({
+            type: 'error',
+            data: { kind: 'redteam_blocked', executionId: options.executionId, nodeId: node.id, patterns: redteamHits },
+            timestamp: new Date().toISOString(),
+          });
+          break;
+        }
+      }
+
+      // Pre-invocation cost-cap check. Per-org / per-capability / per-invocation.
+      if (this.deps.costCap) {
+        const estimatedTokens = JSON.stringify(options.inputs).length / 4;
+        const estimatedCost = (estimatedTokens / 1000) * 0.00003;
+        const capResult = checkCostCap(
+          {
+            orgId: this.deps.costOrgId ?? 'unknown',
+            capabilityId: this.deps.costCapabilityId ?? manifest.metadata['capabilityId'] as string ?? 'unknown',
+            estimatedCostUsd: estimatedCost,
+            config: this.deps.costCap,
+          },
+          { allowFailover: false },
+        );
+        if (!capResult.allowed) {
+          trace.nodeResults[node.id]!.status = 'failed';
+          trace.nodeResults[node.id]!.error = `cost-cap: ${capResult.reason}`;
+          trace.status = 'failed';
+          trace.error = `cost cap exceeded on node ${node.id}: ${capResult.reason}`;
+          this.deps.hub.broadcast({
+            type: 'error',
+            data: { kind: 'cost_cap_blocked', executionId: options.executionId, nodeId: node.id, reason: capResult.reason },
+            timestamp: new Date().toISOString(),
+          });
+          break;
+        }
+      }
+
       if (!preCheck.allowed) {
         trace.nodeResults[node.id]!.status = 'failed';
         trace.nodeResults[node.id]!.error = 'pre-guardrail blocked';
@@ -174,6 +232,15 @@ export class ManifestGraphExecutor {
         trace.totalCost += cost;
         trace.totalLatencyMs += latencyMs;
         trace.totalTokens += totalTokens;
+
+        if (this.deps.costCap) {
+          recordCost(
+            this.deps.costOrgId ?? 'unknown',
+            this.deps.costCapabilityId ?? manifest.metadata['capabilityId'] as string ?? 'unknown',
+            cost,
+            this.deps.costCap,
+          );
+        }
 
         this.deps.hub.broadcast({
           type: 'status',
