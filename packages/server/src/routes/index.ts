@@ -19,6 +19,7 @@ import { registerCompilerRoutes } from './compiler.js';
 import { registerHealthRoutes } from './health.js';
 import { registerIdeaRoutes } from './idea.js';
 import { registerGoalEvolveRoutes } from './goal-evolve.js';
+import { registerManifestApprovalRoutes } from './manifest-approval.js';
 
 import type { WorkspaceRepo } from '../repos/workspace.js';
 import type { ProjectRepo } from '../repos/project.js';
@@ -95,4 +96,5 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerHealthRoutes(app, deps.db);
   registerIdeaRoutes(app, { planner: deps.planner });
   registerGoalEvolveRoutes(app, { goalEvolver: deps.goalEvolver, manifestRepo: deps.manifestRepo });
+  registerManifestApprovalRoutes(app, { manifestRepo: deps.manifestRepo });
 }
