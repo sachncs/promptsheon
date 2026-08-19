@@ -10,6 +10,19 @@ export class AuditChain {
     ).run();
   }
 
+  /**
+   * Resolve the audit_entries.user_id to a real users.id. If the
+   * supplied userId doesn't exist, fall back to the system seed user
+   * (created by migration 005) so background processes don't violate
+   * the FK constraint.
+   */
+  private resolveUserId(userId: string): string {
+    if (userId === 'system' || !userId) return 'api';
+    const row = this.db.prepare('SELECT id FROM users WHERE id = ?').get(userId) as { id: string } | undefined;
+    if (row) return userId;
+    return 'api';
+  }
+
   append(entry: {
     userId: string;
     action: string;
@@ -23,8 +36,9 @@ export class AuditChain {
     ).get() as { last_hash: string } | undefined;
     const previousHash = chainState?.last_hash ?? '';
 
+    const userId = this.resolveUserId(entry.userId);
     const hashInput = JSON.stringify({
-      userId: entry.userId,
+      userId,
       action: entry.action,
       resource: entry.resource,
       details: entry.details,
@@ -38,7 +52,7 @@ export class AuditChain {
     this.db.prepare(`
       INSERT INTO audit_entries (id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str, resource_kind, resource_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, entry.userId, entry.action, entry.resource, entry.details, now, previousHash, entryHash, now, entry.resourceKind, entry.resourceId);
+    `).run(id, userId, entry.action, entry.resource, entry.details, now, previousHash, entryHash, now, entry.resourceKind, entry.resourceId);
 
     this.db.prepare(
       `INSERT INTO audit_chain_state (id, last_hash, last_rowid, updated_by_app)

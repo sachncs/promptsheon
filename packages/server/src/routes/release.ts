@@ -4,6 +4,7 @@ import { CreateReleaseSchema, PaginationSchema } from '@promptsheon/shared';
 import type { ReleaseRepo } from '../repos/release.js';
 import { ManifestRepo } from '../repos/manifest.js';
 import { parseBody, parseQuery } from './validate.js';
+import { AuditChain } from '../audit/chain.js';
 
 const ListQuerySchema = PaginationSchema.extend({
   capabilityId: z.string().uuid().optional(),
@@ -19,7 +20,20 @@ const CanaryBodySchema = z.object({
   percent: z.number().int().min(0).max(100),
 });
 
+const RollbackBodySchema = z.object({
+  toReleaseId: z.string().uuid().optional(),
+});
+
 const MIN_APPROVERS = 2;
+
+interface RequestUserContext {
+  userId?: string;
+}
+
+function actorOf(request: unknown): string {
+  const ctx = (request as RequestUserContext | undefined) ?? {};
+  return ctx.userId ?? 'system';
+}
 
 /**
  * Activation gate: requires 2+ distinct approvers, all different from
@@ -63,7 +77,11 @@ export function selectByCanary(
   return pool[pool.length - 1].id;
 }
 
-export function registerReleaseRoutes(app: FastifyInstance, repo: ReleaseRepo, deps: { manifestRepo: ManifestRepo }) {
+export function registerReleaseRoutes(
+  app: FastifyInstance,
+  repo: ReleaseRepo,
+  deps: { manifestRepo: ManifestRepo; auditChain: AuditChain },
+) {
   app.get('/api/releases', async (request, reply) => {
     const parsed = parseQuery(reply, ListQuerySchema, request.query);
     if (!parsed.ok) return;
@@ -83,6 +101,14 @@ export function registerReleaseRoutes(app: FastifyInstance, repo: ReleaseRepo, d
     const parsed = parseBody(reply, CreateBodySchema, request.body);
     if (!parsed.ok) return;
     const item = repo.create(parsed.data);
+    deps.auditChain.append({
+      userId: actorOf(request),
+      action: 'release.create',
+      resource: 'release',
+      details: JSON.stringify({ releaseId: item.id, capabilityId: item.capabilityId, environment: item.environment }),
+      resourceKind: 'release',
+      resourceId: item.id,
+    });
     return reply.code(201).send(item);
   });
 
@@ -96,12 +122,32 @@ export function registerReleaseRoutes(app: FastifyInstance, repo: ReleaseRepo, d
       return reply.code(409).send({ error: { code: 'APPROVAL_REQUIRED', message: gateFailure } });
     }
     const item = repo.updateStatus(id, 'active');
+    if (item) {
+      deps.auditChain.append({
+        userId: actorOf(request),
+        action: 'release.activate',
+        resource: 'release',
+        details: JSON.stringify({ releaseId: id, environment: item.environment }),
+        resourceKind: 'release',
+        resourceId: id,
+      });
+    }
     return reply.send(item);
   });
 
   app.put('/api/releases/:id/supersede', async (request, reply) => {
     const { id } = request.params as { id: string };
     const item = repo.updateStatus(id, 'superseded');
+    if (item) {
+      deps.auditChain.append({
+        userId: actorOf(request),
+        action: 'release.supersede',
+        resource: 'release',
+        details: JSON.stringify({ releaseId: id, environment: item.environment }),
+        resourceKind: 'release',
+        resourceId: id,
+      });
+    }
     return reply.send(item);
   });
 
@@ -112,6 +158,16 @@ export function registerReleaseRoutes(app: FastifyInstance, repo: ReleaseRepo, d
     const item = repo.findById(id);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
     const updated = repo.updateCanaryPercent(id, parsed.data.percent);
+    if (updated) {
+      deps.auditChain.append({
+        userId: actorOf(request),
+        action: 'release.canary',
+        resource: 'release',
+        details: JSON.stringify({ releaseId: id, canaryPercent: parsed.data.percent }),
+        resourceKind: 'release',
+        resourceId: id,
+      });
+    }
     return reply.send(updated);
   });
 
@@ -121,9 +177,10 @@ export function registerReleaseRoutes(app: FastifyInstance, repo: ReleaseRepo, d
     if (!current) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
 
     const row = current as unknown as { id: string; capability_id: string; environment: string; capability_version: number };
-    const body = (request.body as { toReleaseId?: string } | null) ?? null;
-    let target = body?.toReleaseId
-      ? repo.findById(body.toReleaseId)
+    const parsed = parseBody(reply, RollbackBodySchema, request.body ?? {});
+    if (!parsed.ok) return;
+    const target = parsed.data.toReleaseId
+      ? repo.findById(parsed.data.toReleaseId)
       : repo.findPreviousActive(row.capability_id, row.environment, row.capability_version);
 
     if (!target) {
@@ -133,10 +190,18 @@ export function registerReleaseRoutes(app: FastifyInstance, repo: ReleaseRepo, d
       return reply.code(400).send({ error: { code: 'INVALID_ROLLBACK', message: 'Cannot rollback to the current release' } });
     }
 
-    // Order matters: supersede current first (to free the unique-active slot),
-    // then activate target. Otherwise UNIQUE(active) constraint would fail.
-    const superseded = repo.updateStatus(current.id, 'superseded');
-    const reactivated = repo.updateStatus(target.id, 'active');
-    return reply.send({ reactivated, superseded });
+    const result = repo.rollbackAtomically(current.id, target.id);
+    if (!result) {
+      return reply.code(500).send({ error: { code: 'ROLLBACK_FAILED', message: 'Atomic rollback failed' } });
+    }
+    deps.auditChain.append({
+      userId: actorOf(request),
+      action: 'release.rollback',
+      resource: 'release',
+      details: JSON.stringify({ from: current.id, to: target.id, environment: current.environment }),
+      resourceKind: 'release',
+      resourceId: current.id,
+    });
+    return reply.send(result);
   });
 }

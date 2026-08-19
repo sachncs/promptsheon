@@ -29,6 +29,12 @@ import { registerWebhookRoutes } from './webhooks-incoming.js';
 import { OrgRepo, TeamRepo } from '../repos/org.js';
 import { WebhookReceiver } from '../webhooks/receiver.js';
 import { registerChaosRoutes } from './chaos.js';
+import { AuditChain } from '../audit/chain.js';
+import { registerAuditRoutes } from './audit.js';
+import { registerUserRoutes } from './users.js';
+import { registerApiKeyRoutes } from './api-keys.js';
+import type { UserRepo } from '../repos/user.js';
+import type { ApiKeyRepo } from '../repos/api-key.js';
 
 import type { WorkspaceRepo } from '../repos/workspace.js';
 import type { ProjectRepo } from '../repos/project.js';
@@ -86,6 +92,9 @@ export interface AppDeps {
   membershipRepo: import('../repos/org.js').MembershipRepo;
   webhookReceiver: WebhookReceiver;
   chaosConfig?: ChaosConfig;
+  auditChain: AuditChain;
+  apiKeyRepo: ApiKeyRepo;
+  userRepo: UserRepo;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -94,7 +103,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerCapabilityRoutes(app, deps.capabilityRepo);
   registerVersionRoutes(app, deps.versionRepo);
   registerManifestRoutes(app, deps.versionRepo);
-  registerReleaseRoutes(app, deps.releaseRepo, { manifestRepo: deps.manifestRepo });
+  registerReleaseRoutes(app, deps.releaseRepo, { manifestRepo: deps.manifestRepo, auditChain: deps.auditChain });
   registerExecutionRoutes(app, {
     executionRepo: deps.executionRepo,
     releaseRepo: deps.releaseRepo,
@@ -114,7 +123,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerHealthRoutes(app, deps.db);
   registerIdeaRoutes(app, { planner: deps.planner });
   registerGoalEvolveRoutes(app, { goalEvolver: deps.goalEvolver, manifestRepo: deps.manifestRepo });
-  registerManifestApprovalRoutes(app, { manifestRepo: deps.manifestRepo });
+  registerManifestApprovalRoutes(app, { manifestRepo: deps.manifestRepo, auditChain: deps.auditChain });
   registerGoalObservabilityRoutes(app, {
     goalEvolver: deps.goalEvolver,
     getActiveGoals: deps.getActiveGoals,
@@ -128,6 +137,9 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     membershipRepo: deps.membershipRepo,
   });
   registerWebhookRoutes(app, { receiver: deps.webhookReceiver });
+  registerAuditRoutes(app, { auditChain: deps.auditChain, db: deps.db });
+  registerUserRoutes(app, { userRepo: deps.userRepo, auditChain: deps.auditChain });
+  registerApiKeyRoutes(app, { apiKeyRepo: deps.apiKeyRepo, auditChain: deps.auditChain });
   if (deps.chaosConfig) {
     registerChaosRoutes(app, {
       chaos: deps.chaosConfig,

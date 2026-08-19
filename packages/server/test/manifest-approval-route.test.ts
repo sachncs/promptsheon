@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerManifestApprovalRoutes } from '../src/routes/manifest-approval.js';
+import { AuditChain } from '../src/audit/chain.js';
 import { ManifestRepo, computeManifestHash } from '../src/repos/manifest.js';
 import { applyMigrations } from '@promptsheon/shared';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -80,7 +81,7 @@ describe('POST /api/manifests/:hash/approve|reject', () => {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     });
     await app.register(async (instance) => {
-      await registerManifestApprovalRoutes(instance, { manifestRepo });
+      await registerManifestApprovalRoutes(instance, { manifestRepo, auditChain: new AuditChain(db) });
     });
     await app.ready();
   });

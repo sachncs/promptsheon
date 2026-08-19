@@ -29,6 +29,7 @@ import { AlertRepo } from './repos/alert.js';
 import { ScheduleRepo } from './repos/schedule.js';
 import { ApprovalRepo } from './repos/approval.js';
 import { ApiKeyRepo } from './repos/api-key.js';
+import { UserRepo } from './repos/user.js';
 import { SystemConfigRepo } from './repos/system-config.js';
 import { ManifestRepo } from './repos/manifest.js';
 import { MembershipRepo } from './repos/org.js';
@@ -224,6 +225,9 @@ async function main() {
     membershipRepo,
     webhookReceiver,
     chaosConfig,
+    auditChain,
+    apiKeyRepo,
+    userRepo: new UserRepo(db),
   });
 
   const scheduler = new Scheduler(scheduleRepo, sseHub);
