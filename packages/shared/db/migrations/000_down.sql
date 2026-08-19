@@ -1,5 +1,6 @@
 -- Down migration: drop all tables (for testing).
 DROP TABLE IF EXISTS node_runs;
+-- 024: updated_at column dropped with table (no separate DROP)
 DROP TABLE IF EXISTS manifest_approvals;
 DROP TABLE IF EXISTS manifest_edges;
 DROP TABLE IF EXISTS manifest_nodes;

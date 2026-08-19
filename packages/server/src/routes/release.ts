@@ -84,4 +84,29 @@ export function registerReleaseRoutes(app: FastifyInstance, repo: ReleaseRepo) {
     const updated = repo.updateCanaryPercent(id, parsed.data.percent);
     return reply.send(updated);
   });
+
+  app.post('/api/releases/:id/rollback', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const current = repo.findById(id);
+    if (!current) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
+
+    const row = current as unknown as { id: string; capability_id: string; environment: string; capability_version: number };
+    const body = (request.body as { toReleaseId?: string } | null) ?? null;
+    let target = body?.toReleaseId
+      ? repo.findById(body.toReleaseId)
+      : repo.findPreviousActive(row.capability_id, row.environment, row.capability_version);
+
+    if (!target) {
+      return reply.code(404).send({ error: { code: 'NO_PREVIOUS_RELEASE', message: 'No previous active release found for rollback' } });
+    }
+    if (target.id === current.id) {
+      return reply.code(400).send({ error: { code: 'INVALID_ROLLBACK', message: 'Cannot rollback to the current release' } });
+    }
+
+    // Order matters: supersede current first (to free the unique-active slot),
+    // then activate target. Otherwise UNIQUE(active) constraint would fail.
+    const superseded = repo.updateStatus(current.id, 'superseded');
+    const reactivated = repo.updateStatus(target.id, 'active');
+    return reply.send({ reactivated, superseded });
+  });
 }

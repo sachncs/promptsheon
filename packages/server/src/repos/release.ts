@@ -50,6 +50,17 @@ export class ReleaseRepo extends BaseRepo<Release> {
     ).all(capabilityId, environment) as Release[];
   }
 
+  /**
+   * Find the most recent superseded release for a (capability, env) pair
+   * with capability_version < currentVersion. Used by rollback to find
+   * the previous known-good release.
+   */
+  findPreviousActive(capabilityId: string, environment: string, currentVersion: number): Release | null {
+    return this.db.prepare(
+      "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'superseded' AND capability_version < ? ORDER BY capability_version DESC LIMIT 1",
+    ).get(capabilityId, environment, currentVersion) as Release | null;
+  }
+
   updateCanaryPercent(id: string, percent: number): Release | null {
     const existing = this.findById(id);
     if (!existing) return null;
