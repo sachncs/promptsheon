@@ -33,6 +33,7 @@ import { SystemConfigRepo } from './repos/system-config.js';
 import { ManifestRepo } from './repos/manifest.js';
 import { IdeaPlannerAgent } from './agents/planner/index.js';
 import { ManifestGraphExecutor } from './agents/executor/index.js';
+import { setupObservability } from './observability/setup.js';
 
 async function main() {
   const config = loadConfig();
@@ -110,6 +111,8 @@ async function main() {
   await casStore.init();
 
   const manifestRepo = new ManifestRepo(db);
+
+  setupObservability(config);
   const cutoverReport = manifestRepo.ensureCutover({ createdBy: 'system-cutover' });
   app.log.info(
     {
