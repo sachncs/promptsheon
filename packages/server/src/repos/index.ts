@@ -17,3 +17,4 @@ export { SystemConfigRepo } from './system-config.js';
 export { IdempotencyRepo } from './idempotency.js';
 export { ManifestRepo, computeManifestHash } from './manifest.js';
 export type { CutoverReport } from './manifest.js';
+export { OrgRepo, TeamRepo, MembershipRepo } from './org.js';
