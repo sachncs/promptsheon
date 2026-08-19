@@ -13,6 +13,7 @@ import { Scheduler } from './scheduler/scheduler.js';
 import { InvocationAgent } from './agents/invocation.js';
 import { EvaluationAgent } from './agents/evaluation/evaluation.js';
 import { EvolutionAgent } from './agents/evolution/evolution.js';
+import { GoalBasedEvolutionAgent } from './agents/evolution/goal-evolver.js';
 import { ReasoningCompiler } from './agents/compiler/compiler.js';
 import { CasStore } from '@promptsheon/shared';
 import { WorkspaceRepo } from './repos/workspace.js';
@@ -126,6 +127,7 @@ async function main() {
   const compiler = new ReasoningCompiler(config);
   const planner = new IdeaPlannerAgent(config);
   const executor = new ManifestGraphExecutor({ config, hub: sseHub });
+  const goalEvolver = new GoalBasedEvolutionAgent({ config, hub: sseHub, executor, cas: casStore });
 
   app.addHook('preHandler', authMiddleware(config, apiKeyRepo));
 

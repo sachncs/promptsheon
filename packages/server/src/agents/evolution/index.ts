@@ -1,2 +1,2 @@
-export { EvolutionAgent } from './evolution.js';
-export type { SelfEvolveState } from './evolution.js';
+export { GoalBasedEvolutionAgent } from './goal-evolver.js';
+export type { EvolutionOptions, EvolutionResult, IterationRecord } from './goal-evolver.js';
