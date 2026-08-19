@@ -1,0 +1,26 @@
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { ManifestSchema } from '@promptsheon/shared';
+import type { ManifestRepo } from '../repos/manifest.js';
+import { parseBody } from './validate.js';
+import { NotFoundError } from '@promptsheon/shared';
+
+export function registerManifestHashRoutes(app: FastifyInstance, deps: { manifestRepo: ManifestRepo }) {
+  app.post('/api/manifests', async (request, reply) => {
+    const parsed = parseBody(reply, ManifestSchema, request.body);
+    if (!parsed.ok) return;
+    const manifest = parsed.data as unknown as Parameters<typeof deps.manifestRepo.create>[0];
+    const meta = manifest.metadata as Record<string, unknown>;
+    const goal = typeof meta['goal'] === 'string' ? meta['goal'] : '';
+    const createdBy = typeof meta['createdBy'] === 'string' ? meta['createdBy'] : 'unknown';
+    const hash = deps.manifestRepo.create(manifest, { goal, createdBy });
+    return reply.code(201).send({ hash });
+  });
+
+  app.get('/api/manifests/:hash', async (request, reply) => {
+    const { hash } = request.params as { hash: string };
+    const manifest = deps.manifestRepo.findByHash(hash);
+    if (!manifest) throw new NotFoundError('manifest', hash);
+    return reply.send(manifest);
+  });
+}

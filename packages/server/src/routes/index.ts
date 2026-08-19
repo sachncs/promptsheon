@@ -23,6 +23,7 @@ import { registerManifestApprovalRoutes } from './manifest-approval.js';
 import { registerGoalObservabilityRoutes } from './goals.js';
 import { registerSessionRoutes } from './sessions.js';
 import { registerSnapshotRoutes } from './snapshots.js';
+import { registerManifestHashRoutes } from './manifest-hash.js';
 
 import type { WorkspaceRepo } from '../repos/workspace.js';
 import type { ProjectRepo } from '../repos/project.js';
@@ -110,4 +111,5 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   });
   registerSessionRoutes(app, { store: deps.sessionStore });
   registerSnapshotRoutes(app, { store: deps.snapshotStore, getAgent: deps.getAgent });
+  registerManifestHashRoutes(app, { manifestRepo: deps.manifestRepo });
 }
