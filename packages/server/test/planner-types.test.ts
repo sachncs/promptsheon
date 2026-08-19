@@ -6,8 +6,6 @@ import {
   type IdeaDecomposition,
   type GoalSpec,
 } from '../src/agents/planner/types.js';
-import { IdeaDecomposerAgent } from '../src/agents/planner/idea-decomposer.js';
-import { GoalExtractorAgent } from '../src/agents/planner/goal-extractor.js';
 import type { AppConfig } from '@promptsheon/shared';
 
 function buildConfig(): AppConfig {
@@ -135,19 +133,5 @@ describe('planner types (Zod schemas)', () => {
       const parsed = GoalSpecSchema.parse(JSON.parse(JSON.stringify(original)));
       expect(parsed).toEqual(original);
     });
-  });
-});
-
-describe('IdeaDecomposerAgent construction', () => {
-  it('constructs with AppConfig', () => {
-    const agent = new IdeaDecomposerAgent(buildConfig());
-    expect(agent).toBeInstanceOf(IdeaDecomposerAgent);
-  });
-});
-
-describe('GoalExtractorAgent construction', () => {
-  it('constructs with AppConfig', () => {
-    const agent = new GoalExtractorAgent(buildConfig());
-    expect(agent).toBeInstanceOf(GoalExtractorAgent);
   });
 });

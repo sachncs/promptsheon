@@ -232,7 +232,13 @@ async function main() {
     getActiveGoals: () => Array.from(activeGoals.values()),
     sessionStore,
     snapshotStore,
-    getAgent: (id: string) => agentRegistry.get(id) ?? null,
+    getAgent: (id: string) => {
+      const [executionId, nodeId] = id.includes(':') ? id.split(':') : ['', id];
+      if (executionId && nodeId) {
+        return executor.getLiveAgent(executionId, nodeId) ?? agentRegistry.get(id) ?? null;
+      }
+      return agentRegistry.get(id) ?? null;
+    },
     membershipRepo,
     webhookReceiver,
     chaosConfig,
