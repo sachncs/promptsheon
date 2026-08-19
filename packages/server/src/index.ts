@@ -34,6 +34,7 @@ import { ManifestRepo } from './repos/manifest.js';
 import { IdeaPlannerAgent } from './agents/planner/index.js';
 import { ManifestGraphExecutor } from './agents/executor/index.js';
 import { setupObservability } from './observability/setup.js';
+import type { GoalSummary } from './routes/goals.js';
 
 async function main() {
   const config = loadConfig();
@@ -131,6 +132,7 @@ async function main() {
   const planner = new IdeaPlannerAgent(config);
   const executor = new ManifestGraphExecutor({ config, hub: sseHub });
   const goalEvolver = new GoalBasedEvolutionAgent({ config, hub: sseHub, executor, cas: casStore });
+  const activeGoals = new Map<string, GoalSummary>();
 
   app.addHook('preHandler', authMiddleware(config, apiKeyRepo));
 
@@ -172,6 +174,7 @@ async function main() {
     planner,
     executor,
     manifestRepo,
+    getActiveGoals: () => Array.from(activeGoals.values()),
   });
 
   const scheduler = new Scheduler(scheduleRepo, sseHub);

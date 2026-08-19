@@ -20,6 +20,7 @@ import { registerHealthRoutes } from './health.js';
 import { registerIdeaRoutes } from './idea.js';
 import { registerGoalEvolveRoutes } from './goal-evolve.js';
 import { registerManifestApprovalRoutes } from './manifest-approval.js';
+import { registerGoalObservabilityRoutes } from './goals.js';
 
 import type { WorkspaceRepo } from '../repos/workspace.js';
 import type { ProjectRepo } from '../repos/project.js';
@@ -69,6 +70,7 @@ export interface AppDeps {
   executor: ManifestGraphExecutor;
   manifestRepo: ManifestRepo;
   goalEvolver: GoalBasedEvolutionAgent;
+  getActiveGoals: () => Array<{ manifestHash: string; bestScore: number; iterations: number; lastUpdated: string }>;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -97,4 +99,8 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerIdeaRoutes(app, { planner: deps.planner });
   registerGoalEvolveRoutes(app, { goalEvolver: deps.goalEvolver, manifestRepo: deps.manifestRepo });
   registerManifestApprovalRoutes(app, { manifestRepo: deps.manifestRepo });
+  registerGoalObservabilityRoutes(app, {
+    goalEvolver: deps.goalEvolver,
+    getActiveGoals: deps.getActiveGoals,
+  });
 }

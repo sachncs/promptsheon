@@ -344,6 +344,13 @@ Produce a revised sub-manifest with an improved system prompt. Output JSON match
   getSnapshot(iteration: number, currentManifest: Manifest, currentHash: string, score: number): EvolutionSnapshot {
     return { iteration, manifestHash: currentHash, manifest: currentManifest, score, timestamp: new Date().toISOString() };
   }
+
+  /** Returns the current state for a given manifest hash, if any. */
+  getCurrentState(hash: string): { currentHash: string; bestHash: string; bestScore: number; iteration: number } | undefined {
+    const s = this.state.get(hash);
+    if (!s) return undefined;
+    return { currentHash: s.currentHash, bestHash: s.bestHash, bestScore: s.bestScore, iteration: s.iteration };
+  }
 }
 
 interface GoalEvolutionState {
