@@ -30,6 +30,7 @@ import { ApprovalRepo } from './repos/approval.js';
 import { ApiKeyRepo } from './repos/api-key.js';
 import { SystemConfigRepo } from './repos/system-config.js';
 import { ManifestRepo } from './repos/manifest.js';
+import { IdeaPlannerAgent } from './agents/planner/index.js';
 
 async function main() {
   const config = loadConfig();
@@ -122,6 +123,7 @@ async function main() {
   const evalAgent = new EvaluationAgent(config);
   const evolutionAgent = new EvolutionAgent(config, { cas: casStore });
   const compiler = new ReasoningCompiler(config);
+  const planner = new IdeaPlannerAgent(config);
 
   app.addHook('preHandler', authMiddleware(config, apiKeyRepo));
 
@@ -159,6 +161,7 @@ async function main() {
     evalAgent,
     evolutionAgent,
     compiler,
+    planner,
   });
 
   const scheduler = new Scheduler(scheduleRepo, sseHub);
