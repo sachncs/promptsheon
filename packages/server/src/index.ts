@@ -40,6 +40,8 @@ import { SessionStore } from './sessions/store.js';
 import { SnapshotStore } from './snapshots/store.js';
 import { orgContextMiddleware } from './middleware/org-context.js';
 import { WebhookReceiver } from './webhooks/receiver.js';
+import { ChaosConfig } from './hardening/chaos.js';
+import { registerChaosRoutes } from './routes/chaos.js';
 import type { Agent } from '@strands-agents/sdk';
 
 async function main() {
@@ -137,7 +139,8 @@ async function main() {
   const evolutionAgent = new EvolutionAgent(config, { cas: casStore });
   const compiler = new ReasoningCompiler(config);
   const planner = new IdeaPlannerAgent(config);
-  const executor = new ManifestGraphExecutor({ config, hub: sseHub });
+  const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo });
+  const chaosConfig = new ChaosConfig();
   const goalEvolver = new GoalBasedEvolutionAgent({ config, hub: sseHub, executor, cas: casStore });
   const activeGoals = new Map<string, GoalSummary>();
   const sessionStore = new SessionStore({
@@ -220,6 +223,7 @@ async function main() {
     getAgent: (id: string) => agentRegistry.get(id) ?? null,
     membershipRepo,
     webhookReceiver,
+    chaosConfig,
   });
 
   const scheduler = new Scheduler(scheduleRepo, sseHub);

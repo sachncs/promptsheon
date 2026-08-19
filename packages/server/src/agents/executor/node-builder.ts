@@ -1,9 +1,10 @@
-import { Agent, Graph } from '@strands-agents/sdk';
-import type { Graph as GraphType } from '@strands-agents/sdk';
+import { Agent, Graph, AfterInvocationEvent, BeforeInvocationEvent } from '@strands-agents/sdk';
+import type { Graph as GraphType, HookCallback } from '@strands-agents/sdk';
 import type { AppConfig, Manifest, SubCapabilityManifest } from '@promptsheon/shared';
 import { createModel } from '../model.js';
 import { validateDag } from './dag-validator.js';
 import { NotFoundError } from '@promptsheon/shared';
+import { createMetricsHook, type MetricsHookContext } from '../../observability/metrics-hooks.js';
 
 const toolRegistry = new Map<string, Agent>();
 
@@ -15,6 +16,11 @@ export function registerTool(name: string, agent: Agent): void {
   toolRegistry.set(name, agent);
 }
 
+export interface BuildNodeAgentOptions {
+  metricsHookCtx?: MetricsHookContext;
+  extraHooks?: HookCallback<BeforeInvocationEvent | AfterInvocationEvent>[];
+}
+
 /**
  * Convert a SubCapabilityManifest into a fully-configured Strands Agent:
  * - model from manifest.model
@@ -24,19 +30,41 @@ export function registerTool(name: string, agent: Agent): void {
  * - conversation manager from manifest.conversationManager
  * - limits from manifest.limits
  *
+ * When `metricsHookCtx` is provided, an `AfterInvocationEvent` hook is
+ * registered to capture `accumulatedUsage` tokens and persist them as
+ * a `node_runs` row.
+ *
  * Tools and MCP server attachment happen at the Graph level (Strands limitation:
  * Agents accept only `tools` at construction, MCP is bound per-invocation).
  */
-export function buildNodeAgent(node: SubCapabilityManifest, config: AppConfig): Agent {
+export function buildNodeAgent(
+  node: SubCapabilityManifest,
+  config: AppConfig,
+  options: BuildNodeAgentOptions = {},
+): Agent {
   const conv = buildConversationManager(node.conversationManager);
   const retry = buildRetryStrategy(node.retry);
-  return new Agent({
+  const agent = new Agent({
     id: node.id,
     model: createModel(config),
     systemPrompt: node.manifest.prompt.systemPrompt,
     ...(conv ? { conversationManager: conv } : {}),
     ...(retry ? { retryStrategy: retry } : {}),
   });
+
+  if (options.metricsHookCtx) {
+    const cb = createMetricsHook(options.metricsHookCtx);
+    agent.addHook(AfterInvocationEvent, cb);
+  }
+  for (const cb of options.extraHooks ?? []) {
+    if (cb.length <= 1) {
+      agent.addHook(AfterInvocationEvent, cb as HookCallback<AfterInvocationEvent>);
+    } else {
+      agent.addHook(BeforeInvocationEvent, cb as HookCallback<BeforeInvocationEvent>);
+    }
+  }
+
+  return agent;
 }
 
 export function buildInvocationLimits(config: { turns?: number; outputTokens?: number; totalTokens?: number }): { turns?: number; outputTokens?: number; totalTokens?: number } | undefined {
@@ -75,14 +103,21 @@ function buildRetryStrategy(config: { kind: 'constant' | 'linear' | 'exponential
  *
  * Throws NotFoundError if the DAG is invalid (caught by global error handler
  * to return 404/422 depending on context).
+ *
+ * When `metricsHookCtx` is provided, every node agent gets the metrics
+ * persistence hook registered (see `buildNodeAgent`).
  */
-export function buildGraph(manifest: Manifest, config: AppConfig): GraphType {
+export function buildGraph(
+  manifest: Manifest,
+  config: AppConfig,
+  options: BuildNodeAgentOptions = {},
+): GraphType {
   const validation = validateDag(manifest);
   if (!validation.valid) {
     throw new NotFoundError(`invalid DAG: ${validation.errors.join('; ')}`, '');
   }
 
-  const agents = manifest.nodes.map((node) => buildNodeAgent(node, config));
+  const agents = manifest.nodes.map((node) => buildNodeAgent(node, config, options));
 
   const edges: [string, string][] = manifest.edges.map((e) => [e.from, e.to]);
 

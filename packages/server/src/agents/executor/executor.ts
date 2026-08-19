@@ -4,6 +4,8 @@ import { buildGraph, buildInvocationLimits, buildNodeAgent } from './node-builde
 import { validateDag } from './dag-validator.js';
 import { runAllGuardrails, type GuardrailBroadcast } from './guardrails.js';
 import { NotFoundError } from '@promptsheon/shared';
+import type { ManifestRepo } from '../../repos/manifest.js';
+import { ChaosConfig, ChaosFailureError } from '../../hardening/chaos.js';
 
 export interface ExecutionTrace {
   executionId: string;
@@ -57,7 +59,7 @@ export interface ExecuteOptions {
  * between nodes.
  */
 export class ManifestGraphExecutor {
-  constructor(private deps: { config: AppConfig; hub: SseHub }) {}
+  constructor(private deps: { config: AppConfig; hub: SseHub; manifestRepo?: ManifestRepo; chaos?: ChaosConfig }) {}
 
   async execute(manifestHash: string, manifest: Manifest, options: ExecuteOptions): Promise<ExecutionTrace> {
     const validation = validateDag(manifest);
@@ -65,7 +67,10 @@ export class ManifestGraphExecutor {
       throw new NotFoundError(`invalid DAG: ${validation.errors.join('; ')}`, '');
     }
 
-    const graph = buildGraph(manifest, this.deps.config);
+    const metricsHookCtx = this.deps.manifestRepo
+      ? { executionId: options.executionId, manifestHash, manifestRepo: this.deps.manifestRepo }
+      : undefined;
+    const graph = buildGraph(manifest, this.deps.config, metricsHookCtx ? { metricsHookCtx } : {});
     const startedAt = new Date().toISOString();
     const broadcast: GuardrailBroadcast = { hub: this.deps.hub, config: this.deps.config };
 
@@ -125,7 +130,15 @@ export class ManifestGraphExecutor {
       }
 
       try {
-        const agent = buildNodeAgent(node, this.deps.config);
+        const chaosFailure = this.deps.chaos?.shouldFail(node.id);
+        if (chaosFailure) {
+          if (chaosFailure.kind === 'timeout' && chaosFailure.delayMs) {
+            await new Promise((resolve) => setTimeout(resolve, chaosFailure.delayMs));
+          }
+          throw new ChaosFailureError(node.id, chaosFailure);
+        }
+
+        const agent = buildNodeAgent(node, this.deps.config, metricsHookCtx ? { metricsHookCtx } : {});
         const limits = buildInvocationLimits(node.limits);
         const result = await agent.invoke(
           this.buildPrompt(node, options.inputs, preCheck.redactedValues[0] as string | undefined),
