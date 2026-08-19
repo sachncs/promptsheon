@@ -4,7 +4,7 @@
   "workspaces": [
     "packages/shared",
     "packages/server",
-    "packages/web"
+    "frontend"
   ],
   "scripts": {
     "build": "npm run build --workspaces",

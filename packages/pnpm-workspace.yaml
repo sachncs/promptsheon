@@ -1,7 +1,7 @@
 packages:
   - "shared"
   - "server"
-  - "web"
+  - "../frontend"
 allowBuilds:
   better-sqlite3: true
   esbuild: true
