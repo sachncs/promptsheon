@@ -36,6 +36,8 @@ import { ManifestGraphExecutor } from './agents/executor/index.js';
 import { setupObservability } from './observability/setup.js';
 import type { GoalSummary } from './routes/goals.js';
 import { SessionStore } from './sessions/store.js';
+import { SnapshotStore } from './snapshots/store.js';
+import type { Agent } from '@strands-agents/sdk';
 
 async function main() {
   const config = loadConfig();
@@ -140,6 +142,13 @@ async function main() {
   });
   await sessionStore.init();
 
+  const snapshotStore = new SnapshotStore({ storageDir: `${config.server.casPath}/snapshots` });
+  await snapshotStore.init();
+
+  // In-memory agent registry (single-process); production would use a
+  // multi-tenant map keyed by tenantId + capabilityId.
+  const agentRegistry = new Map<string, Agent>();
+
   app.addHook('preHandler', authMiddleware(config, apiKeyRepo));
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
@@ -182,6 +191,8 @@ async function main() {
     manifestRepo,
     getActiveGoals: () => Array.from(activeGoals.values()),
     sessionStore,
+    snapshotStore,
+    getAgent: (id: string) => agentRegistry.get(id) ?? null,
   });
 
   const scheduler = new Scheduler(scheduleRepo, sseHub);
