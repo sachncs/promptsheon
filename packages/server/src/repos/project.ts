@@ -1,49 +1,32 @@
-import type Database from 'better-sqlite3';
-import { NotFoundError } from '@promptsheon/shared';
 import type { Project } from '@promptsheon/shared';
+import type Database from 'better-sqlite3';
+import { BaseRepo } from './base.js';
 
-export class ProjectRepo {
-  constructor(private db: Database.Database) {}
-
-  findById(id: string): Project | null {
-    return this.db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as Project | null;
+export class ProjectRepo extends BaseRepo<Project> {
+  constructor(db: Database.Database) {
+    super(db, 'projects');
   }
 
   findByWorkspaceId(workspaceId: string): Project[] {
-    return this.db.prepare('SELECT * FROM projects WHERE workspace_id = ? ORDER BY created_at DESC')
+    return this.db.prepare('SELECT * FROM projects WHERE workspace_id = ?')
       .all(workspaceId) as Project[];
-  }
-
-  findMany(opts: { page: number; pageSize: number }): { items: Project[]; total: number } {
-    const total = (this.db.prepare('SELECT COUNT(*) as count FROM projects').get() as { count: number }).count;
-    const items = this.db.prepare('SELECT * FROM projects LIMIT ? OFFSET ?')
-      .all(opts.pageSize, (opts.page - 1) * opts.pageSize) as Project[];
-    return { items, total };
   }
 
   create(data: { workspaceId: string; name: string; description?: string }): Project {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
-    this.db.prepare('INSERT INTO projects (id, workspace_id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+    this.db.prepare(`INSERT INTO projects (id, workspace_id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`)
       .run(id, data.workspaceId, data.name, data.description ?? '', now, now);
     return { id, workspaceId: data.workspaceId, name: data.name, description: data.description ?? '', createdAt: now, updatedAt: now };
   }
 
   update(id: string, data: Partial<Pick<Project, 'name' | 'description'>>): Project | null {
     const existing = this.findById(id);
-    if (!existing) throw new NotFoundError("resource", id);
-    const now = new Date().toISOString();
+    if (!existing) return null;
     const name = data.name ?? existing.name;
     const description = data.description ?? existing.description;
-    this.db.prepare('UPDATE projects SET name = ?, description = ?, updated_at = ? WHERE id = ?')
-      .run(name, description, now, id);
-    return { ...existing, name, description, updatedAt: now };
-  }
-
-  delete(id: string): boolean {
-    const existing = this.findById(id);
-    if (!existing) throw new NotFoundError("resource", id);
-    this.db.prepare('DELETE FROM projects WHERE id = ?').run(id);
-    return true;
+    this.db.prepare(`UPDATE projects SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+      .run(name, description, id);
+    return { ...existing, name, description };
   }
 }

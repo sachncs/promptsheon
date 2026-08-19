@@ -1,35 +1,25 @@
-import type Database from 'better-sqlite3';
-import { NotFoundError } from '@promptsheon/shared';
 import type { WebhookEndpoint } from '@promptsheon/shared';
+import type Database from 'better-sqlite3';
+import { BaseRepo } from './base.js';
 
-export class WebhookRepo {
-  constructor(private db: Database.Database) {}
-
-  findById(id: string): WebhookEndpoint | null {
-    return this.db.prepare('SELECT * FROM webhook_endpoints WHERE id = ?').get(id) as WebhookEndpoint | null;
+export class WebhookRepo extends BaseRepo<WebhookEndpoint> {
+  constructor(db: Database.Database) {
+    super(db, 'webhooks');
   }
 
   findByEvent(event: string): WebhookEndpoint[] {
-    return this.db.prepare("SELECT * FROM webhook_endpoints WHERE active = 1 AND (events = '' OR events LIKE ?)")
+    return this.db.prepare("SELECT * FROM webhooks WHERE active = 1 AND events LIKE ?")
       .all(`%${event}%`) as WebhookEndpoint[];
-  }
-
-  findMany(): WebhookEndpoint[] {
-    return this.db.prepare('SELECT * FROM webhook_endpoints ORDER BY created_at DESC').all() as WebhookEndpoint[];
   }
 
   create(data: { url: string; events: string; active?: boolean; secretCiphertext?: Buffer | null }): WebhookEndpoint {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
-    this.db.prepare('INSERT INTO webhook_endpoints (id, url, events, active, secret_ciphertext, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(id, data.url, data.events, data.active !== false ? 1 : 0, data.secretCiphertext ?? null, now);
-    return { id, url: data.url, events: data.events, active: data.active !== false, secretCiphertext: data.secretCiphertext ?? null, createdAt: now };
-  }
-
-  delete(id: string): boolean {
-    const existing = this.findById(id);
-    if (!existing) throw new NotFoundError("resource", id);
-    this.db.prepare('DELETE FROM webhook_endpoints WHERE id = ?').run(id);
-    return true;
+    this.db.prepare(`INSERT INTO webhooks (id, url, events, active, secret_ciphertext, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, data.url, data.events, data.active ? 1 : 0, data.secretCiphertext ?? null, now, now);
+    return {
+      id, url: data.url, events: data.events, active: data.active ?? true,
+      secretCiphertext: data.secretCiphertext ?? null, createdAt: now,
+    };
   }
 }
