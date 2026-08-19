@@ -6,6 +6,7 @@ import {
 } from '@promptsheon/shared';
 import type { EvalRepo } from '../repos/eval.js';
 import type { EvaluationAgent } from '../agents/evaluation/evaluation.js';
+import { buildEvaluatorRegistry, listEvaluators } from '../evaluation/evaluators.js';
 import { parseBody, parseQuery } from './validate.js';
 
 const ListQuerySchema = PaginationSchema.extend({
@@ -15,6 +16,14 @@ const ListQuerySchema = PaginationSchema.extend({
 const RunEvalSchema = z.object({
   evalRunId: z.string().uuid(),
   getActualUrl: z.string().url(),
+});
+
+const ScoreInputSchema = z.object({
+  actual: z.string(),
+  expected: z.string(),
+  inputs: z.record(z.string(), z.unknown()).default({}),
+  context: z.record(z.string(), z.unknown()).optional(),
+  evaluator: z.string().optional(),
 });
 
 export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAgent: EvaluationAgent) {
@@ -64,5 +73,33 @@ export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAge
     const result = await evalAgent.runEval(evalRun, [], getActual);
     repo.updateRun(evalRunId, result);
     return reply.send(result);
+  });
+
+  app.get('/api/eval/evaluators', async (_request, reply) => {
+    const config = (evalAgent as unknown as { config: import('@promptsheon/shared').AppConfig }).config;
+    const reg = buildEvaluatorRegistry(config);
+    return reply.send({ evaluators: listEvaluators(reg) });
+  });
+
+  app.post('/api/eval/score', async (request, reply) => {
+    const parsed = parseBody(reply, ScoreInputSchema, request.body);
+    if (!parsed.ok) return;
+    const config = (evalAgent as unknown as { config: import('@promptsheon/shared').AppConfig }).config;
+    const reg = buildEvaluatorRegistry(config);
+    const evaluatorName = parsed.data.evaluator || 'llm-judge';
+    const evaluator = reg.get(evaluatorName);
+    if (!evaluator) {
+      return reply.code(404).send({ error: { code: 'UNKNOWN_EVALUATOR', message: evaluatorName } });
+    }
+    const result = await evaluator.evaluate({
+      actual: parsed.data.actual,
+      expected: parsed.data.expected,
+      inputs: parsed.data.inputs,
+      context: parsed.data.context,
+    });
+    return reply.send({
+      evaluator: evaluatorName,
+      ...result,
+    });
   });
 }
