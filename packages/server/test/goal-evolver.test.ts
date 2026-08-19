@@ -175,5 +175,22 @@ describe('GoalBasedEvolutionAgent', () => {
       expect(result.passed).toBe(false);
       expect(result.error).toContain('cost budget');
     });
+
+    it('rollback: restores manifest when revision throws', async () => {
+      const m = buildManifest();
+      executor.trace.nodeResults = {
+        a: { nodeId: 'a', status: 'failed', output: '', latencyMs: 100, costUsd: 0, totalTokens: 10, error: 'fail' },
+      };
+      let calls = 0;
+      agent.setReviseOverride(async () => {
+        calls += 1;
+        if (calls === 1) throw new Error('LLM rate limit');
+        return { revisedSubManifest: { systemPrompt: 'x' }, changes: ['c'], reasoning: 'r' };
+      });
+      const snap = agent.getSnapshot(0, m, 'h', 0);
+      expect(snap.iteration).toBe(0);
+      const result = await agent.evolve('h', m, { maxIterations: 3, cooldownMs: 0, costBudget: 100 });
+      expect(result.error).toContain('LLM rate limit');
+    });
   });
 });

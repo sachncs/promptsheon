@@ -6,6 +6,14 @@ import { extractText } from '../utils.js';
 import { ManifestGraphExecutor, validateDag } from '../executor/index.js';
 import { SseHub } from '../../sse/hub.js';
 
+export interface EvolutionSnapshot {
+  iteration: number;
+  manifestHash: string;
+  manifest: Manifest;
+  score: number;
+  timestamp: string;
+}
+
 export interface EvolutionOptions {
   maxIterations: number;
   cooldownMs: number;
@@ -19,6 +27,14 @@ export interface IterationRecord {
   nodeId?: string;
   snapshotId?: string;
   revised: boolean;
+  timestamp: string;
+}
+
+export interface EvolutionSnapshot {
+  iteration: number;
+  manifestHash: string;
+  manifest: Manifest;
+  score: number;
   timestamp: string;
 }
 
@@ -114,6 +130,14 @@ Be conservative: small targeted edits, preserve what works.`,
     let totalCost = 0;
     let lastError: string | undefined;
     const history: IterationRecord[] = [];
+    const snapshots = new Map<number, EvolutionSnapshot>();
+    snapshots.set(0, {
+      iteration: 0,
+      manifestHash: currentHash,
+      manifest: currentManifest,
+      score: 0,
+      timestamp: new Date().toISOString(),
+    });
 
     const executionIdBase = `evol-${Date.now()}`;
 
@@ -147,6 +171,13 @@ Be conservative: small targeted edits, preserve what works.`,
         cost: iterCost,
         timestamp: new Date().toISOString(),
         revised: false,
+      });
+      snapshots.set(i + 1, {
+        iteration: i + 1,
+        manifestHash: currentHash,
+        manifest: currentManifest,
+        score,
+        timestamp: new Date().toISOString(),
       });
 
       if (passed) {
@@ -186,9 +217,14 @@ Be conservative: small targeted edits, preserve what works.`,
         currentManifest = nextManifest;
         currentHash = await this.persistManifest(nextManifest, currentHash, manifestHash);
         history[history.length - 1].revised = true;
-        history[history.length - 1].snapshotId = `snap-${executionIdBase}-${i + 1}`;
+        history[history.length - 1].snapshotId = `${currentHash}`;
       } catch (e) {
         lastError = `revision failed: ${(e as Error).message}`;
+        const prev = snapshots.get(i);
+        if (prev) {
+          currentManifest = prev.manifest;
+          currentHash = prev.manifestHash;
+        }
         break;
       }
 
@@ -302,6 +338,11 @@ Produce a revised sub-manifest with an improved system prompt. Output JSON match
 
   getState(key: string): GoalEvolutionState | undefined {
     return this.state.get(key);
+  }
+
+  /** Returns the manifest at the start of a given iteration (0-indexed). */
+  getSnapshot(iteration: number, currentManifest: Manifest, currentHash: string, score: number): EvolutionSnapshot {
+    return { iteration, manifestHash: currentHash, manifest: currentManifest, score, timestamp: new Date().toISOString() };
   }
 }
 
