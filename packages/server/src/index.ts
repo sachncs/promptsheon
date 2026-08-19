@@ -144,6 +144,17 @@ async function main() {
   const chaosConfig = new ChaosConfig();
   const goalEvolver = new GoalBasedEvolutionAgent({ config, hub: sseHub, executor, cas: casStore });
   const activeGoals = new Map<string, GoalSummary>();
+  setInterval(() => {
+    for (const [hash, state] of (goalEvolver as unknown as { state: Map<string, unknown> }).state ?? new Map()) {
+      const s = state as { currentHash: string; bestHash: string; bestScore: number; iteration: number };
+      activeGoals.set(hash, {
+        manifestHash: hash,
+        bestScore: s.bestScore,
+        iterations: s.iteration,
+        lastUpdated: new Date().toISOString(),
+      });
+    }
+  }, 1000).unref();
   const sessionStore = new SessionStore({
     storageDir: `${config.server.casPath}/sessions`,
     persist: true,

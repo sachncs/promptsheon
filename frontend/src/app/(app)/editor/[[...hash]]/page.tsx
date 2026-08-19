@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { manifestApi, validateDagClient } from '@/lib/api';
+import { manifestApi, validateDagClient, executionApi } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +53,7 @@ function makeLeafManifest(id: string, name: string, goal: string): SubCapability
 
 export default function ManifestEditorPage() {
   const params = useParams<{ hash?: string }>();
+  const router = useRouter();
   const hash = params?.hash;
   const queryClient = useQueryClient();
   const [manifest, setManifest] = React.useState<Manifest>(blankManifest);
@@ -142,6 +143,21 @@ export default function ManifestEditorPage() {
     },
   });
 
+  const runPreviewMutation = useMutation({
+    mutationFn: () =>
+      executionApi
+        .execute({ manifestHash: hash ?? '', inputs: { preview: true } })
+        .then((r: { data: { executionId: string } }) => r.data),
+    onSuccess: (data: { executionId: string }) => {
+      router.push(`/executions/${data.executionId}`);
+    },
+  });
+
+  const runPreview = React.useCallback(() => {
+    if (!hash) return;
+    runPreviewMutation.mutate();
+  }, [hash, runPreviewMutation]);
+
   const isValid = validationErrors.length === 0;
 
   return (
@@ -153,7 +169,7 @@ export default function ManifestEditorPage() {
             <Plus className="mr-2 h-4 w-4" />Add Node
           </Button>
           {hash && (
-            <Button variant="secondary">
+            <Button variant="secondary" onClick={runPreview} disabled={runPreviewMutation.isPending}>
               <Play className="mr-2 h-4 w-4" />Run Preview
             </Button>
           )}
