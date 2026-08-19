@@ -164,6 +164,7 @@ async function main() {
     invocationAgent,
     evalAgent,
     evolutionAgent,
+    goalEvolver,
     compiler,
     planner,
     executor,

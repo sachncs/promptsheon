@@ -18,6 +18,7 @@ import { registerApprovalRoutes } from './approval.js';
 import { registerCompilerRoutes } from './compiler.js';
 import { registerHealthRoutes } from './health.js';
 import { registerIdeaRoutes } from './idea.js';
+import { registerGoalEvolveRoutes } from './goal-evolve.js';
 
 import type { WorkspaceRepo } from '../repos/workspace.js';
 import type { ProjectRepo } from '../repos/project.js';
@@ -40,6 +41,7 @@ import type { ReasoningCompiler } from '../agents/compiler/compiler.js';
 import type { IdeaPlannerAgent } from '../agents/planner/index.js';
 import type { ManifestGraphExecutor } from '../agents/executor/index.js';
 import type { ManifestRepo } from '../repos/manifest.js';
+import type { GoalBasedEvolutionAgent } from '../agents/evolution/goal-evolver.js';
 import type Database from 'better-sqlite3';
 
 export interface AppDeps {
@@ -65,6 +67,7 @@ export interface AppDeps {
   planner: IdeaPlannerAgent;
   executor: ManifestGraphExecutor;
   manifestRepo: ManifestRepo;
+  goalEvolver: GoalBasedEvolutionAgent;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -91,4 +94,5 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerCompilerRoutes(app, deps.compiler);
   registerHealthRoutes(app, deps.db);
   registerIdeaRoutes(app, { planner: deps.planner });
+  registerGoalEvolveRoutes(app, { goalEvolver: deps.goalEvolver, manifestRepo: deps.manifestRepo });
 }
