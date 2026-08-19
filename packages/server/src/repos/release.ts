@@ -43,4 +43,18 @@ export class ReleaseRepo extends BaseRepo<Release> {
       .run(status, new Date().toISOString(), id);
     return { ...existing, status };
   }
+
+  findActiveByCapabilityAndEnv(capabilityId: string, environment: string): Release[] {
+    return this.db.prepare(
+      "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'active'",
+    ).all(capabilityId, environment) as Release[];
+  }
+
+  updateCanaryPercent(id: string, percent: number): Release | null {
+    const existing = this.findById(id);
+    if (!existing) return null;
+    this.db.prepare(`UPDATE releases SET canary_percent = ?, updated_at = ? WHERE id = ?`)
+      .run(percent, new Date().toISOString(), id);
+    return { ...existing, canaryPercent: percent };
+  }
 }

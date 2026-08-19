@@ -14,6 +14,32 @@ const CreateBodySchema = CreateReleaseSchema.extend({
   createdBy: z.string().optional(),
 });
 
+const CanaryBodySchema = z.object({
+  percent: z.number().int().min(0).max(100),
+});
+
+/**
+ * Select a release for an invocation using per-request random canary split.
+ * Each active release in the (capability, env) pool gets weight = canaryPercent.
+ * Falls back to the only active release if there's only one.
+ */
+export function selectByCanary(
+  pool: Array<{ id: string; canaryPercent: number }>,
+  rng: () => number = Math.random,
+): string | null {
+  if (pool.length === 0) return null;
+  if (pool.length === 1) return pool[0].id;
+  const total = pool.reduce((sum, r) => sum + r.canaryPercent, 0);
+  if (total <= 0) return pool[0].id;
+  const r = rng() * total;
+  let acc = 0;
+  for (const release of pool) {
+    acc += release.canaryPercent;
+    if (r < acc) return release.id;
+  }
+  return pool[pool.length - 1].id;
+}
+
 export function registerReleaseRoutes(app: FastifyInstance, repo: ReleaseRepo) {
   app.get('/api/releases', async (request, reply) => {
     const parsed = parseQuery(reply, ListQuerySchema, request.query);
@@ -47,5 +73,15 @@ export function registerReleaseRoutes(app: FastifyInstance, repo: ReleaseRepo) {
     const { id } = request.params as { id: string };
     const item = repo.updateStatus(id, 'superseded');
     return reply.send(item);
+  });
+
+  app.put('/api/releases/:id/canary', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = parseBody(reply, CanaryBodySchema, request.body);
+    if (!parsed.ok) return;
+    const item = repo.findById(id);
+    if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
+    const updated = repo.updateCanaryPercent(id, parsed.data.percent);
+    return reply.send(updated);
   });
 }
