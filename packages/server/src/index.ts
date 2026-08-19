@@ -197,6 +197,7 @@ async function main() {
     sessionStore,
     snapshotStore,
     getAgent: (id: string) => agentRegistry.get(id) ?? null,
+    membershipRepo,
   });
 
   const scheduler = new Scheduler(scheduleRepo, sseHub);

@@ -24,6 +24,8 @@ import { registerGoalObservabilityRoutes } from './goals.js';
 import { registerSessionRoutes } from './sessions.js';
 import { registerSnapshotRoutes } from './snapshots.js';
 import { registerManifestHashRoutes } from './manifest-hash.js';
+import { registerOrgTeamRoutes } from './org-team.js';
+import { OrgRepo, TeamRepo } from '../repos/org.js';
 
 import type { WorkspaceRepo } from '../repos/workspace.js';
 import type { ProjectRepo } from '../repos/project.js';
@@ -77,6 +79,7 @@ export interface AppDeps {
   sessionStore: import('../sessions/store.js').SessionStore;
   snapshotStore: import('../snapshots/store.js').SnapshotStore;
   getAgent: (id: string) => import('@strands-agents/sdk').Agent | null;
+  membershipRepo: import('../repos/org.js').MembershipRepo;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -112,4 +115,9 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerSessionRoutes(app, { store: deps.sessionStore });
   registerSnapshotRoutes(app, { store: deps.snapshotStore, getAgent: deps.getAgent });
   registerManifestHashRoutes(app, { manifestRepo: deps.manifestRepo });
+  registerOrgTeamRoutes(app, {
+    orgRepo: new OrgRepo(deps.db),
+    teamRepo: new TeamRepo(deps.db),
+    membershipRepo: deps.membershipRepo,
+  });
 }
