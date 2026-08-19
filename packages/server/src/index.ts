@@ -31,6 +31,7 @@ import { ApiKeyRepo } from './repos/api-key.js';
 import { SystemConfigRepo } from './repos/system-config.js';
 import { ManifestRepo } from './repos/manifest.js';
 import { IdeaPlannerAgent } from './agents/planner/index.js';
+import { ManifestGraphExecutor } from './agents/executor/index.js';
 
 async function main() {
   const config = loadConfig();
@@ -124,6 +125,7 @@ async function main() {
   const evolutionAgent = new EvolutionAgent(config, { cas: casStore });
   const compiler = new ReasoningCompiler(config);
   const planner = new IdeaPlannerAgent(config);
+  const executor = new ManifestGraphExecutor({ config, hub: sseHub });
 
   app.addHook('preHandler', authMiddleware(config, apiKeyRepo));
 
@@ -162,6 +164,8 @@ async function main() {
     evolutionAgent,
     compiler,
     planner,
+    executor,
+    manifestRepo,
   });
 
   const scheduler = new Scheduler(scheduleRepo, sseHub);

@@ -38,6 +38,8 @@ import type { EvaluationAgent } from '../agents/evaluation/evaluation.js';
 import type { EvolutionAgent } from '../agents/evolution/evolution.js';
 import type { ReasoningCompiler } from '../agents/compiler/compiler.js';
 import type { IdeaPlannerAgent } from '../agents/planner/index.js';
+import type { ManifestGraphExecutor } from '../agents/executor/index.js';
+import type { ManifestRepo } from '../repos/manifest.js';
 import type Database from 'better-sqlite3';
 
 export interface AppDeps {
@@ -61,6 +63,8 @@ export interface AppDeps {
   evolutionAgent: EvolutionAgent;
   compiler: ReasoningCompiler;
   planner: IdeaPlannerAgent;
+  executor: ManifestGraphExecutor;
+  manifestRepo: ManifestRepo;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -70,7 +74,11 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerVersionRoutes(app, deps.versionRepo);
   registerManifestRoutes(app, deps.versionRepo);
   registerReleaseRoutes(app, deps.releaseRepo);
-  registerExecutionRoutes(app, deps.executionRepo, deps.invocationAgent);
+  registerExecutionRoutes(app, {
+    executionRepo: deps.executionRepo,
+    manifestRepo: deps.manifestRepo,
+    executor: deps.executor,
+  });
   registerDatasetRoutes(app, deps.datasetRepo);
   registerEvalRoutes(app, deps.evalRepo, deps.evalAgent);
   registerPreconditionRoutes(app, deps.preconditionRepo);

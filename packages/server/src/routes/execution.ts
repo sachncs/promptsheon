@@ -1,9 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { InvokeExecutionSchema } from '@promptsheon/shared';
 import type { ExecutionRepo } from '../repos/execution.js';
-import type { InvocationAgent } from '../agents/invocation.js';
+import type { ManifestRepo } from '../repos/manifest.js';
+import type { ManifestGraphExecutor } from '../agents/executor/index.js';
 import { parseBody, parseQuery } from './validate.js';
+import type { Manifest } from '@promptsheon/shared';
+import { NotFoundError } from '@promptsheon/shared';
+import { createHash } from 'node:crypto';
 
 const ListExecutionsQuerySchema = z.object({
   capabilityVersionId: z.string().min(1).optional(),
@@ -11,42 +14,75 @@ const ListExecutionsQuerySchema = z.object({
   pageSize: z.number().int().min(1).max(100).default(20),
 });
 
-export function registerExecutionRoutes(app: FastifyInstance, repo: ExecutionRepo, invocationAgent: InvocationAgent) {
+const ExecuteManifestSchema = z.object({
+  manifestHash: z.string().min(1),
+  inputs: z.record(z.string(), z.unknown()),
+  environment: z.string().optional().default('dev'),
+  traceId: z.string().optional(),
+});
+
+function hashInputs(inputs: Record<string, unknown>): string {
+  return createHash('sha256').update(JSON.stringify(inputs)).digest('hex');
+}
+
+export function registerExecutionRoutes(
+  app: FastifyInstance,
+  deps: {
+    executionRepo: ExecutionRepo;
+    manifestRepo: ManifestRepo;
+    executor: ManifestGraphExecutor;
+  },
+) {
   app.get('/api/executions', async (request, reply) => {
     const parsed = parseQuery(reply, ListExecutionsQuerySchema, request.query);
     if (!parsed.ok) return;
     const { capabilityVersionId, page, pageSize } = parsed.data;
-    if (capabilityVersionId) return reply.send(repo.findByVersionId(capabilityVersionId, { page, pageSize }));
-    return reply.send(repo.findMany({ page, pageSize }));
+    if (capabilityVersionId) return reply.send(deps.executionRepo.findByVersionId(capabilityVersionId, { page, pageSize }));
+    return reply.send(deps.executionRepo.findMany({ page, pageSize }));
   });
 
   app.get('/api/executions/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const item = repo.findById(id);
+    const item = deps.executionRepo.findById(id);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
     return reply.send(item);
   });
 
-  app.post('/api/invoke', async (request, reply) => {
-    const parsed = parseBody(reply, InvokeExecutionSchema, request.body);
+  app.post('/api/executions', async (request, reply) => {
+    const parsed = parseBody(reply, ExecuteManifestSchema, request.body);
     if (!parsed.ok) return;
-    const { capabilityVersionId, inputs, environment, traceId } = parsed.data;
-    const execution = await invocationAgent.invoke(capabilityVersionId, inputs, { environment, traceId });
-    repo.create({
-      capabilityVersionId,
-      inputs: JSON.stringify(inputs),
-      outputs: execution.outputs,
-      model: execution.model,
-      provider: execution.provider,
-      latencyMs: execution.latencyMs,
-      costUsd: execution.costUsd,
-      promptTokens: execution.promptTokens,
-      completionTokens: execution.completionTokens,
-      totalTokens: execution.totalTokens,
-      error: execution.error,
-      traceId: execution.traceId,
-      environment: execution.environment,
+    const { manifestHash, inputs, environment, traceId } = parsed.data;
+    const manifest = deps.manifestRepo.findByHash(manifestHash);
+    if (!manifest) {
+      throw new NotFoundError('manifest', manifestHash);
+    }
+    const executionId = crypto.randomUUID();
+    const controller = new AbortController();
+    request.raw.on('close', () => {
+      if (!controller.signal.aborted) controller.abort();
     });
-    return reply.send(execution);
+    const trace = await deps.executor.execute(manifestHash, manifest, {
+      executionId,
+      inputs,
+      environment,
+      traceId,
+      signal: controller.signal,
+    });
+    deps.executionRepo.create({
+      capabilityVersionId: manifest.id,
+      inputs: hashInputs(inputs),
+      outputs: JSON.stringify(trace.nodeResults),
+      model: manifest.model.modelId,
+      provider: manifest.model.provider,
+      latencyMs: trace.totalLatencyMs,
+      costUsd: trace.totalCost,
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: trace.totalTokens,
+      error: trace.error ?? '',
+      traceId: traceId ?? executionId,
+      environment,
+    });
+    return reply.send(trace);
   });
 }
