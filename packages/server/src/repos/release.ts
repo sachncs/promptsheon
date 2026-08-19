@@ -44,6 +44,15 @@ export class ReleaseRepo extends BaseRepo<Release> {
     return { ...existing, status };
   }
 
+  /**
+   * Compute the deterministic manifest_hash for a stored release.manifest
+   * blob. Used by the activation gate to look up approval state.
+   */
+  computeManifestHash(manifestJson: string): string {
+    const { createHash } = require('node:crypto') as typeof import('node:crypto');
+    return createHash('sha256').update(manifestJson).digest('hex');
+  }
+
   findActiveByCapabilityAndEnv(capabilityId: string, environment: string): Release[] {
     return this.db.prepare(
       "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'active'",

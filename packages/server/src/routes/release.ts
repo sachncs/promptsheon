@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { CreateReleaseSchema, PaginationSchema } from '@promptsheon/shared';
 import type { ReleaseRepo } from '../repos/release.js';
+import { ManifestRepo } from '../repos/manifest.js';
 import { parseBody, parseQuery } from './validate.js';
 
 const ListQuerySchema = PaginationSchema.extend({
@@ -17,6 +18,28 @@ const CreateBodySchema = CreateReleaseSchema.extend({
 const CanaryBodySchema = z.object({
   percent: z.number().int().min(0).max(100),
 });
+
+const MIN_APPROVERS = 2;
+
+/**
+ * Activation gate: requires 2+ distinct approvers, all different from
+ * the release creator. Returns null if approved, otherwise reason.
+ */
+export function approvalGate(
+  release: { createdBy: string; manifest: string },
+  manifestRepo: ManifestRepo,
+): string | null {
+  const manifestHash = manifestRepo.computeManifestHash(release.manifest);
+  const approvers = manifestRepo.findApprovals(manifestHash);
+  const distinct = new Set(approvers.map((a) => a.userId));
+  if (distinct.has(release.createdBy)) {
+    return 'creator cannot approve their own release (maker-checker)';
+  }
+  if (distinct.size < MIN_APPROVERS) {
+    return `insufficient approvers (${distinct.size}/${MIN_APPROVERS})`;
+  }
+  return null;
+}
 
 /**
  * Select a release for an invocation using per-request random canary split.
@@ -40,7 +63,7 @@ export function selectByCanary(
   return pool[pool.length - 1].id;
 }
 
-export function registerReleaseRoutes(app: FastifyInstance, repo: ReleaseRepo) {
+export function registerReleaseRoutes(app: FastifyInstance, repo: ReleaseRepo, deps: { manifestRepo: ManifestRepo }) {
   app.get('/api/releases', async (request, reply) => {
     const parsed = parseQuery(reply, ListQuerySchema, request.query);
     if (!parsed.ok) return;
@@ -65,6 +88,13 @@ export function registerReleaseRoutes(app: FastifyInstance, repo: ReleaseRepo) {
 
   app.put('/api/releases/:id/activate', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const existing = repo.findById(id);
+    if (!existing) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Release not found' } });
+    const createdBy = (existing as unknown as { created_by?: string }).created_by ?? '';
+    const gateFailure = approvalGate({ createdBy, manifest: existing.manifest }, deps.manifestRepo);
+    if (gateFailure) {
+      return reply.code(409).send({ error: { code: 'APPROVAL_REQUIRED', message: gateFailure } });
+    }
     const item = repo.updateStatus(id, 'active');
     return reply.send(item);
   });

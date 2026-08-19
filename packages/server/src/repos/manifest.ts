@@ -26,6 +26,17 @@ export function computeManifestHash(manifest: Manifest): string {
 export class ManifestRepo {
   constructor(private db: Database.Database) {}
 
+  /**
+   * Compute the SHA-256 hash of a stored manifest JSON blob. Used by
+   * the release activation gate to look up approval state.
+   * Parses the stored JSON and re-uses the module hashing algorithm
+   * (key-sorted) so both call paths produce the same hash.
+   */
+  computeManifestHash(manifestJson: string): string {
+    const parsed = JSON.parse(manifestJson) as unknown as Parameters<typeof computeManifestHash>[0];
+    return computeManifestHash(parsed);
+  }
+
   findByHash(hash: string): Manifest | null {
     const dag = this.db
       .prepare('SELECT * FROM manifest_dag WHERE manifest_hash = ?')
