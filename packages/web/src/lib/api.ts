@@ -68,6 +68,8 @@ export const releaseApi = {
 export const executionApi = {
   list: (capabilityVersionId: string) => client.get('/executions', { params: { capabilityVersionId } }),
   get: (id: string) => client.get(`/executions/${id}`),
+  execute: (data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string }) =>
+    client.post('/executions', data),
 };
 
 export const invokeApi = {

@@ -6,6 +6,7 @@ import { ProjectList } from './views/ProjectList';
 import { CapabilityList } from './views/CapabilityList';
 import { CapabilityDetail } from './views/CapabilityDetail';
 import { ReleaseList } from './views/ReleaseList';
+import { ExecutionView } from './views/ExecutionView';
 import { ExecutionList } from './views/ExecutionList';
 import { DatasetDetail } from './views/DatasetDetail';
 import { EvalList } from './views/EvalList';
@@ -55,6 +56,8 @@ export function App() {
           <Route path="/feature-flags" element={<FeatureFlagList />} />
           <Route path="/audit" element={<AuditList />} />
           <Route path="/operations" element={<OperationsHub />} />
+          <Route path="/executions/new" element={<ExecutionView />} />
+          <Route path="/executions/:id" element={<ExecutionView />} />
           <Route path="/settings" element={<SettingsView />} />
           <Route path="*" element={<NotFound />} />
         </Route>
