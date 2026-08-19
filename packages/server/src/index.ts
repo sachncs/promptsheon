@@ -39,6 +39,7 @@ import type { GoalSummary } from './routes/goals.js';
 import { SessionStore } from './sessions/store.js';
 import { SnapshotStore } from './snapshots/store.js';
 import { orgContextMiddleware } from './middleware/org-context.js';
+import { WebhookReceiver } from './webhooks/receiver.js';
 import type { Agent } from '@strands-agents/sdk';
 
 async function main() {
@@ -47,7 +48,7 @@ async function main() {
   runMigrations(db);
   const auditChain = new AuditChain(db);
 
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: true, bodyLimit: 2_097_152 });
 
   const corsOrigin = config.server.corsOrigin || 'http://localhost:5173';
   if (!config.server.corsOrigin) {
@@ -152,6 +153,26 @@ async function main() {
   // multi-tenant map keyed by tenantId + capabilityId.
   const agentRegistry = new Map<string, Agent>();
 
+  const webhookReceiver = new WebhookReceiver(
+    [
+      {
+        id: 'github-push',
+        url: 'https://example.com/github',
+        events: ['push', 'pull_request'],
+        active: true,
+        secret: process.env['PROMPTSHEON_WEBHOOK_SECRET'] ?? 'dev-secret',
+      },
+    ],
+    [
+      {
+        endpointId: 'github-push',
+        eventType: 'push',
+        manifestHash: '',
+        inputMapping: { ref: 'ref' },
+      },
+    ],
+  );
+
   app.addHook('preHandler', authMiddleware(config, apiKeyRepo));
   app.addHook('preHandler', orgContextMiddleware({ membershipRepo }));
 
@@ -198,6 +219,7 @@ async function main() {
     snapshotStore,
     getAgent: (id: string) => agentRegistry.get(id) ?? null,
     membershipRepo,
+    webhookReceiver,
   });
 
   const scheduler = new Scheduler(scheduleRepo, sseHub);
