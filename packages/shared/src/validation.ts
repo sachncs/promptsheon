@@ -20,19 +20,224 @@ export const CreateCapabilitySchema = z.object({
 });
 export const UpdateCapabilitySchema = CreateCapabilitySchema.omit({ projectId: true }).partial();
 
-export const ManifestSchema = z.object({
+export const PromptConfigSchema = z.object({
   systemPrompt: z.string().min(1),
-  model: z.string().min(1),
+  userTemplate: z.string().default(''),
+});
+
+export const ModelPolicySchema = z.object({
   provider: z.string().min(1),
+  modelId: z.string().min(1),
   temperature: z.number().min(0).max(2).default(0.7),
   maxTokens: z.number().int().min(1).max(100000).default(4096),
-  tools: z.array(z.object({
-    name: z.string(),
-    enabled: z.boolean().default(true),
-    config: z.record(z.unknown()).default({}),
-  })).default([]),
-  metadata: z.record(z.unknown()).default({}),
+  topP: z.number().min(0).max(1).optional(),
+  stopSequences: z.array(z.string()).optional(),
 });
+
+export const RuntimePolicySchema = z.object({
+  timeoutMs: z.number().int().min(1).max(600000).default(30000),
+  nodeTimeoutMs: z.number().int().min(1).max(300000).default(10000),
+  totalTimeoutMs: z.number().int().min(1).max(3600000).default(300000),
+  maxRetries: z.number().int().min(0).max(10).default(3),
+  canaryPercent: z.number().int().min(0).max(100).default(0),
+  concurrencyLimit: z.number().int().min(1).max(1000).default(10),
+});
+
+export const ContextContractSchema = z.object({
+  inputsSchema: z.record(z.unknown()),
+  outputsSchema: z.record(z.unknown()),
+  requiredContextVars: z.array(z.string()).default([]),
+});
+
+export const MemoryConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  type: z.enum(['stateless', 'session', 'persistent']).default('stateless'),
+  retentionSec: z.number().int().min(0).optional(),
+});
+
+const GUARDRAIL_TYPES = ['regex', 'schema', 'llm-judge', 'blocklist', 'pii-redaction'] as const;
+const GUARDRAIL_FAILURE_MODES = ['block', 'warn', 'redact'] as const;
+
+export const GuardrailSpecSchema = z.object({
+  type: z.enum(GUARDRAIL_TYPES),
+  config: z.record(z.unknown()),
+  enabled: z.boolean().default(true),
+  onFailure: z.enum(GUARDRAIL_FAILURE_MODES).default('block'),
+});
+
+export const ToolSpecSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().min(1),
+  inputSchema: z.record(z.unknown()),
+  config: z.record(z.unknown()).default({}),
+});
+
+export const McpServerSpecSchema = z.object({
+  name: z.string().min(1),
+  url: z.string().url(),
+  tools: z.array(z.string()).default([]),
+  auth: z.record(z.unknown()).optional(),
+});
+
+export const ObservabilityConfigSchema = z.object({
+  logInputs: z.boolean().default(true),
+  logOutputs: z.boolean().default(true),
+  trackLatency: z.boolean().default(true),
+  trackCost: z.boolean().default(true),
+});
+
+export const HookConfigSchema = z.object({
+  beforeInvocation: z.boolean().default(false),
+  afterInvocation: z.boolean().default(false),
+  beforeModelCall: z.boolean().default(false),
+  afterModelCall: z.boolean().default(false),
+  beforeToolCall: z.boolean().default(false),
+  afterToolCall: z.boolean().default(false),
+});
+
+export const RetrySpecSchema = z.object({
+  kind: z.enum(['constant', 'linear', 'exponential']).default('exponential'),
+  maxAttempts: z.number().int().min(1).max(10).default(3),
+  baseDelayMs: z.number().int().min(100).default(1000),
+  maxDelayMs: z.number().int().min(1000).default(10000),
+});
+
+export const LimitsSpecSchema = z.object({
+  turns: z.number().int().min(1).optional(),
+  outputTokens: z.number().int().min(1).optional(),
+  totalTokens: z.number().int().min(1).optional(),
+});
+
+export const StateConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  type: z.enum(['stateless', 'session', 'persistent']).default('stateless'),
+  retentionSec: z.number().int().min(0).optional(),
+});
+
+export const StorageConfigSchema = z.object({
+  kind: z.enum(['test', 'custom']).default('test'),
+  path: z.string().optional(),
+});
+
+export const ConversationManagerConfigSchema = z.object({
+  kind: z.enum(['sliding-window', 'summarizing']).default('sliding-window'),
+  windowSize: z.number().int().min(1).optional(),
+  summaryRatio: z.number().min(0).max(1).optional(),
+});
+
+export const EvaluationConfigSchema = z.object({
+  datasets: z.array(z.string()),
+  scorers: z.array(z.string()),
+  passThreshold: z.number().min(0).max(1),
+  primaryScorer: z.string().optional(),
+});
+
+export const ManifestEdgeSchema = z.object({
+  from: z.string().min(1),
+  to: z.string().min(1),
+  mapping: z.record(z.string()).default({}),
+});
+
+export type ManifestNodeInput = z.infer<typeof SubCapabilityManifestSchema>;
+
+export const SubCapabilityManifestSchema: z.ZodType<unknown> = z.lazy(() =>
+  z.object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string().default(''),
+    goal: z.string().min(1),
+    manifest: ManifestSchema,
+    dependsOn: z.array(z.string()).default([]),
+    preGuardrails: z.array(GuardrailSpecSchema).default([]),
+    postGuardrails: z.array(GuardrailSpecSchema).default([]),
+    observability: ObservabilityConfigSchema,
+    hooks: HookConfigSchema,
+    retry: RetrySpecSchema,
+    conversationManager: ConversationManagerConfigSchema,
+    state: StateConfigSchema,
+    storage: StorageConfigSchema.optional(),
+    limits: LimitsSpecSchema,
+  }),
+);
+
+export const ManifestSchema = z.object({
+  id: z.string().min(1),
+  version: z.number().int().min(1),
+  prompt: PromptConfigSchema,
+  model: ModelPolicySchema,
+  runtime: RuntimePolicySchema,
+  context: ContextContractSchema,
+  memory: MemoryConfigSchema,
+  guardrails: z.object({
+    pre: z.array(GuardrailSpecSchema).default([]),
+    post: z.array(GuardrailSpecSchema).default([]),
+  }),
+  tools: z.array(ToolSpecSchema).default([]),
+  mcpServers: z.array(McpServerSpecSchema).default([]),
+  evaluation: EvaluationConfigSchema,
+  nodes: z.array(SubCapabilityManifestSchema).default([]),
+  edges: z.array(ManifestEdgeSchema).default([]),
+  metadata: z.record(z.unknown()).default({}),
+  createdAt: z.string().default(''),
+  updatedAt: z.string().default(''),
+}).superRefine((manifest, ctx) => {
+  validateDag(manifest as unknown as { nodes: Array<{ id: string }>; edges: Array<{ from: string; to: string }> }, ctx);
+});
+
+function validateDag(
+  manifest: { nodes: Array<{ id: string }>; edges: Array<{ from: string; to: string }> },
+  ctx: z.RefinementCtx,
+): void {
+  const ids = new Set(manifest.nodes.map((n) => n.id));
+  for (const node of manifest.nodes) {
+    if (!node.id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Node id must not be empty',
+      });
+    }
+  }
+  for (const edge of manifest.edges) {
+    if (!ids.has(edge.from)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Edge references missing source node: ${edge.from}`,
+      });
+    }
+    if (!ids.has(edge.to)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Edge references missing target node: ${edge.to}`,
+      });
+    }
+  }
+  const adj = new Map<string, string[]>();
+  for (const node of manifest.nodes) adj.set(node.id, []);
+  for (const edge of manifest.edges) {
+    adj.get(edge.from)?.push(edge.to);
+  }
+  const color = new Map<string, 0 | 1 | 2>();
+  for (const node of manifest.nodes) color.set(node.id, 0);
+  function visit(node: string, stack: string[]): void {
+    const c = color.get(node);
+    if (c === 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `DAG cycle detected: ${[...stack, node].join(' -> ')}`,
+      });
+      return;
+    }
+    if (c === 2) return;
+    color.set(node, 1);
+    for (const next of adj.get(node) ?? []) {
+      visit(next, [...stack, node]);
+    }
+    color.set(node, 2);
+  }
+  for (const node of manifest.nodes) {
+    if (color.get(node.id) === 0) visit(node.id, []);
+  }
+}
 
 export const CreateReleaseSchema = z.object({
   capabilityId: z.string().uuid(),
