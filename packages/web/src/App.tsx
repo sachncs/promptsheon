@@ -25,6 +25,7 @@ import { FeatureFlagList } from './views/FeatureFlagList';
 import { AuditList } from './views/AuditList';
 import { OperationsHub } from './views/OperationsHub';
 import { GoalsDashboard } from './views/GoalsDashboard';
+import { ManifestEditor } from './views/ManifestEditor';
 import { SettingsView } from './views/SettingsView';
 import { NotFound } from './views/NotFound';
 
@@ -58,6 +59,8 @@ export function App() {
           <Route path="/audit" element={<AuditList />} />
           <Route path="/operations" element={<OperationsHub />} />
           <Route path="/goals" element={<GoalsDashboard />} />
+          <Route path="/editor" element={<ManifestEditor />} />
+          <Route path="/editor/:hash" element={<ManifestEditor />} />
           <Route path="/executions/new" element={<ExecutionView />} />
           <Route path="/executions/:id" element={<ExecutionView />} />
           <Route path="/settings" element={<SettingsView />} />

@@ -141,7 +141,47 @@ export const selfEvolveApi = {
 
 export const manifestApi = {
   get: (versionId: string) => client.get(`/capability-versions/${versionId}/manifest`),
+  getByHash: (hash: string) => client.get(`/manifests/${hash}`),
+  create: (data: unknown) => client.post('/manifests', data),
 };
+
+/**
+ * Client-side DAG validation. Mirrors server-side validation in
+ * packages/shared/src/validation.ts. Reused by the editor for live feedback
+ * before round-tripping to the server.
+ */
+export function validateDagClient(manifest: { nodes: Array<{ id: string }>; edges: Array<{ from: string; to: string }> }): string[] {
+  const errors: string[] = [];
+  const ids = new Set<string>();
+  for (const n of manifest.nodes) {
+    if (ids.has(n.id)) errors.push(`duplicate node id: ${n.id}`);
+    ids.add(n.id);
+  }
+  for (const e of manifest.edges) {
+    if (e.from === e.to) errors.push(`self-loop on ${e.from}`);
+    if (!ids.has(e.from)) errors.push(`edge ${e.from}->${e.to} references missing source ${e.from}`);
+    if (!ids.has(e.to)) errors.push(`edge ${e.from}->${e.to} references missing target ${e.to}`);
+  }
+  const adj = new Map<string, string[]>();
+  for (const id of ids) adj.set(id, []);
+  for (const e of manifest.edges) {
+    if (ids.has(e.from) && ids.has(e.to)) adj.get(e.from)!.push(e.to);
+  }
+  const color = new Map<string, 0 | 1 | 2>();
+  for (const id of ids) color.set(id, 0);
+  const visit = (node: string, stack: string[]): void => {
+    const c = color.get(node);
+    if (c === 1) { errors.push(`cycle: ${[...stack, node].join(' -> ')}`); return; }
+    if (c === 2) return;
+    color.set(node, 1);
+    stack.push(node);
+    for (const next of adj.get(node) ?? []) visit(next, stack);
+    stack.pop();
+    color.set(node, 2);
+  };
+  for (const id of ids) if (color.get(id) === 0) visit(id, []);
+  return errors;
+}
 
 export const webhookApi = {
   list: () => client.get('/webhooks'),
