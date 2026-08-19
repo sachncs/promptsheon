@@ -28,8 +28,8 @@ jobs:
         run: cd packages/shared && pnpm typecheck
       - name: server typecheck
         run: cd packages/server && pnpm typecheck
-      - name: web typecheck
-        run: cd packages/web && pnpm typecheck
+      - name: frontend typecheck
+        run: cd frontend && pnpm typecheck
 
   test:
     name: Server Tests
@@ -64,7 +64,7 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @promptsheon/server build
-      - run: pnpm --filter @promptsheon/web build
+      - run: pnpm --filter @promptsheon/frontend build
 
   docker:
     name: Docker Build
