@@ -136,7 +136,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     teamRepo: new TeamRepo(deps.db),
     membershipRepo: deps.membershipRepo,
   });
-  registerWebhookRoutes(app, { receiver: deps.webhookReceiver });
+  registerWebhookRoutes(app, { receiver: deps.webhookReceiver, executor: deps.executor, manifestRepo: deps.manifestRepo });
   registerAuditRoutes(app, { auditChain: deps.auditChain, db: deps.db });
   registerUserRoutes(app, { userRepo: deps.userRepo, auditChain: deps.auditChain });
   registerApiKeyRoutes(app, { apiKeyRepo: deps.apiKeyRepo, auditChain: deps.auditChain });
