@@ -15,6 +15,7 @@ export class IdeaDecomposerAgent {
 
   constructor(config: AppConfig) {
     this.agent = new Agent({
+      id: 'ideaDecomposer',
       model: createModel(config),
       systemPrompt: `You are an Idea Decomposer. Your job is to take a user's free-form idea and identify the 2-7 distinct sub-ideas that, when combined, will achieve it.
 

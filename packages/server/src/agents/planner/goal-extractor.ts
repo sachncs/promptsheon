@@ -14,6 +14,7 @@ export class GoalExtractorAgent {
 
   constructor(config: AppConfig) {
     this.agent = new Agent({
+      id: 'goalExtractor',
       model: createModel(config),
       systemPrompt: `You are a Goal Extractor. Your job is to take a candidate goal and a set of sub-ideas and produce a final, measurable goal plus 1-5 explicit acceptance criteria.
 
