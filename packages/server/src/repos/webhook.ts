@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
+import { NotFoundError } from '@promptsheon/shared';
 import type { WebhookEndpoint } from '@promptsheon/shared';
-import { notFound } from '@promptsheon/shared';
 
 export class WebhookRepo {
   constructor(private db: Database.Database) {}
@@ -26,9 +26,10 @@ export class WebhookRepo {
     return { id, url: data.url, events: data.events, active: data.active !== false, secretCiphertext: data.secretCiphertext ?? null, createdAt: now };
   }
 
-  delete(id: string): void {
+  delete(id: string): boolean {
     const existing = this.findById(id);
-    if (!existing) throw notFound('webhook_endpoint', id);
+    if (!existing) throw new NotFoundError("resource", id);
     this.db.prepare('DELETE FROM webhook_endpoints WHERE id = ?').run(id);
+    return true;
   }
 }

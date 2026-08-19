@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
+import { NotFoundError } from '@promptsheon/shared';
 import type { Dataset, DatasetCase } from '@promptsheon/shared';
-import { notFound } from '@promptsheon/shared';
 
 export class DatasetRepo {
   constructor(private db: Database.Database) {}
@@ -29,10 +29,11 @@ export class DatasetRepo {
     return { id, capabilityId: data.capabilityId, name: data.name, description: data.description ?? '', createdAt: now, updatedAt: now };
   }
 
-  delete(id: string): void {
+  delete(id: string): boolean {
     const existing = this.findById(id);
-    if (!existing) throw notFound('dataset', id);
+    if (!existing) throw new NotFoundError("resource", id);
     this.db.prepare('DELETE FROM datasets WHERE id = ?').run(id);
+    return true;
   }
 
   findCases(datasetId: string): DatasetCase[] {
@@ -48,7 +49,8 @@ export class DatasetRepo {
     return { id, datasetId, seq: maxSeq + 1, inputs: data.inputs, expected: data.expected, description: data.description ?? '' };
   }
 
-  deleteCase(id: string): void {
-    this.db.prepare('DELETE FROM dataset_cases WHERE id = ?').run(id);
+  deleteCase(id: string): boolean {
+    const result = this.db.prepare('DELETE FROM dataset_cases WHERE id = ?').run(id);
+    return result.changes > 0;
   }
 }

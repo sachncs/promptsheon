@@ -26,7 +26,7 @@ export class EvalRepo {
     return { id, releaseId: data.releaseId, datasetId: data.datasetId, scorer: data.scorer, score: 0, passed: 0, failed: 0, total: 0, status: 'running', startedAt: now, finishedAt: null };
   }
 
-  updateRun(id: string, data: Partial<Pick<EvalRun, 'score' | 'passed' | 'failed' | 'total' | 'status'>>): EvalRun {
+  updateRun(id: string, data: Partial<Pick<EvalRun, 'score' | 'passed' | 'failed' | 'total' | 'status'>>): EvalRun | null {
     const existing = this.findRunById(id);
     if (!existing) throw new Error(`eval_run ${id} not found`);
     const finishedAt = data.status && data.status !== 'running' ? new Date().toISOString() : existing.finishedAt;

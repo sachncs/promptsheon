@@ -20,6 +20,7 @@ export type { LineageEdge, LineageSource } from './lineage.js';
 export type { WebhookEndpoint } from './webhook.js';
 export type { FeatureFlag } from './feature-flag.js';
 export type { SystemConfig } from './system-config.js';
+export type { AppConfig } from './config.js';
 export type { CapabilityContract } from './capability-contract.js';
 export type { SelfEvolveState, SelfEvolveStatus } from './self-evolve.js';
 export type { EnforcerState } from './enforcer.js';

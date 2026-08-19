@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
+import { NotFoundError } from '@promptsheon/shared';
 import type { CapabilityVersion } from '@promptsheon/shared';
-import { notFound } from '@promptsheon/shared';
 
 export class VersionRepo {
   constructor(private db: Database.Database) {}
@@ -34,9 +34,10 @@ export class VersionRepo {
     return { id, capabilityId: data.capabilityId, version: data.version, manifest: data.manifest, manifestHash: data.manifestHash, createdAt: now, createdBy: data.createdBy ?? '' };
   }
 
-  delete(id: string): void {
+  delete(id: string): boolean {
     const existing = this.findById(id);
-    if (!existing) throw notFound('capability_version', id);
+    if (!existing) throw new NotFoundError("resource", id);
     this.db.prepare('DELETE FROM capability_versions WHERE id = ?').run(id);
+    return true;
   }
 }

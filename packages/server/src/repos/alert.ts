@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
+import { NotFoundError } from '@promptsheon/shared';
 import type { AlertRule, Alert } from '@promptsheon/shared';
-import { notFound } from '@promptsheon/shared';
 
 export class AlertRepo {
   constructor(private db: Database.Database) {}
@@ -21,19 +21,20 @@ export class AlertRepo {
     return { id, name: data.name, type: data.type, severity: data.severity as AlertRule['severity'], enabled: data.enabled !== false, threshold: data.threshold ?? 0, duration: data.duration ?? 0, window: data.window ?? 0, config: data.config ?? null, createdAt: now, updatedAt: now };
   }
 
-  updateRule(id: string, data: Partial<Omit<AlertRule, 'id' | 'createdAt' | 'updatedAt'>>): AlertRule {
+  updateRule(id: string, data: Partial<Omit<AlertRule, 'id' | 'createdAt' | 'updatedAt'>>): AlertRule | null {
     const existing = this.findRuleById(id);
-    if (!existing) throw notFound('alert_rule', id);
+    if (!existing) throw new NotFoundError("resource", id);
     const now = new Date().toISOString();
     this.db.prepare('UPDATE alert_rules SET name = ?, type = ?, severity = ?, enabled = ?, threshold = ?, duration = ?, window = ?, config = ?, updated_at = ? WHERE id = ?')
       .run(data.name ?? existing.name, data.type ?? existing.type, data.severity ?? existing.severity, (data.enabled ?? existing.enabled) ? 1 : 0, data.threshold ?? existing.threshold, data.duration ?? existing.duration, data.window ?? existing.window, data.config ?? existing.config, now, id);
     return { ...existing, ...data, updatedAt: now };
   }
 
-  deleteRule(id: string): void {
+  deleteRule(id: string): boolean {
     const existing = this.findRuleById(id);
-    if (!existing) throw notFound('alert_rule', id);
+    if (!existing) throw new NotFoundError("resource", id);
     this.db.prepare('DELETE FROM alert_rules WHERE id = ?').run(id);
+    return true;
   }
 
   findAlertById(id: string): Alert | null {
@@ -55,9 +56,9 @@ export class AlertRepo {
     return { id, ruleId: data.ruleId, ruleName: data.ruleName, severity: data.severity as Alert['severity'], status: 'active', message: data.message, details: data.details ?? null, triggeredAt: now, resolvedAt: null, acknowledgedAt: null, acknowledgedBy: null };
   }
 
-  updateAlert(id: string, data: Partial<Pick<Alert, 'status' | 'resolvedAt' | 'acknowledgedAt' | 'acknowledgedBy'>>): Alert {
+  updateAlert(id: string, data: Partial<Pick<Alert, 'status' | 'resolvedAt' | 'acknowledgedAt' | 'acknowledgedBy'>>): Alert | null {
     const existing = this.findAlertById(id);
-    if (!existing) throw notFound('alert', id);
+    if (!existing) throw new NotFoundError("resource", id);
     const now = new Date().toISOString();
     this.db.prepare('UPDATE alerts SET status = ?, resolved_at = ?, acknowledged_at = ?, acknowledged_by = ? WHERE id = ?')
       .run(data.status ?? existing.status, data.resolvedAt ?? existing.resolvedAt, data.acknowledgedAt ?? existing.acknowledgedAt, data.acknowledgedBy ?? existing.acknowledgedBy, id);

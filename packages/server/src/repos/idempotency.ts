@@ -16,9 +16,10 @@ export class IdempotencyRepo {
       .get(key) as IdempotencyRecord | null;
   }
 
-  set(key: string, statusCode: number, headers: string, body: Buffer, expiresAt: string): void {
+  set(key: string, statusCode: number, headers: string, body: Buffer, expiresAt: string): boolean {
     this.db.prepare('INSERT OR REPLACE INTO idempotency_cache (key, expires_at, status_code, headers, body) VALUES (?, ?, ?, ?, ?)')
       .run(key, expiresAt, statusCode, headers, body);
+    return true;
   }
 
   cleanup(): number {

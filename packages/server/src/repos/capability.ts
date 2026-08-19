@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
+import { NotFoundError } from '@promptsheon/shared';
 import type { Capability } from '@promptsheon/shared';
-import { notFound } from '@promptsheon/shared';
 
 export class CapabilityRepo {
   constructor(private db: Database.Database) {}
@@ -38,9 +38,9 @@ export class CapabilityRepo {
     };
   }
 
-  update(id: string, data: Partial<Omit<Capability, 'id' | 'createdAt' | 'updatedAt'>>): Capability {
+  update(id: string, data: Partial<Omit<Capability, 'id' | 'createdAt' | 'updatedAt'>>): Capability | null {
     const existing = this.findById(id);
-    if (!existing) throw notFound('capability', id);
+    if (!existing) throw new NotFoundError("resource", id);
     const now = new Date().toISOString();
     const fields: string[] = [];
     const values: unknown[] = [];
@@ -59,9 +59,10 @@ export class CapabilityRepo {
     return { ...existing, ...data, updatedAt: now };
   }
 
-  delete(id: string): void {
+  delete(id: string): boolean {
     const existing = this.findById(id);
-    if (!existing) throw notFound('capability', id);
+    if (!existing) throw new NotFoundError("resource", id);
     this.db.prepare('DELETE FROM capabilities WHERE id = ?').run(id);
+    return true;
   }
 }

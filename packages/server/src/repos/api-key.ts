@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
+import { NotFoundError } from '@promptsheon/shared';
 import type { ApiKey } from '@promptsheon/shared';
-import { notFound } from '@promptsheon/shared';
 
 export class ApiKeyRepo {
   constructor(private db: Database.Database) {}
@@ -30,15 +30,17 @@ export class ApiKeyRepo {
     this.db.prepare('UPDATE api_keys SET last_used = CURRENT_TIMESTAMP WHERE id = ?').run(id);
   }
 
-  revoke(id: string): void {
+  revoke(id: string): boolean {
     const existing = this.findById(id);
-    if (!existing) throw notFound('api_key', id);
+    if (!existing) throw new NotFoundError("resource", id);
     this.db.prepare('UPDATE api_keys SET revoked = 1 WHERE id = ?').run(id);
+    return true;
   }
 
-  delete(id: string): void {
+  delete(id: string): boolean {
     const existing = this.findById(id);
-    if (!existing) throw notFound('api_key', id);
+    if (!existing) throw new NotFoundError("resource", id);
     this.db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
+    return true;
   }
 }

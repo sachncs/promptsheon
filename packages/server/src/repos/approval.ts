@@ -8,7 +8,7 @@ export class ApprovalRepo {
     return this.db.prepare('SELECT * FROM approvals WHERE release_id = ?').get(releaseId) as Approval | null;
   }
 
-  upsert(releaseId: string, votes: string): void {
+  upsert(releaseId: string, votes: string): boolean {
     const existing = this.getByReleaseId(releaseId);
     const now = new Date().toISOString();
     if (existing) {
@@ -18,5 +18,6 @@ export class ApprovalRepo {
       this.db.prepare('INSERT INTO approvals (release_id, votes, updated_at) VALUES (?, ?, ?)')
         .run(releaseId, votes, now);
     }
+    return true;
   }
 }

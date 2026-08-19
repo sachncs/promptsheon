@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
+import { NotFoundError } from '@promptsheon/shared';
 import type { Precondition } from '@promptsheon/shared';
-import { notFound } from '@promptsheon/shared';
 
 export class PreconditionRepo {
   constructor(private db: Database.Database) {}
@@ -22,9 +22,10 @@ export class PreconditionRepo {
     return { id, capabilityId: data.capabilityId, name: data.name, command: data.command, timeoutSec: data.timeoutSec ?? 60, enabled: data.enabled !== false, createdAt: now };
   }
 
-  delete(id: string): void {
+  delete(id: string): boolean {
     const existing = this.findById(id);
-    if (!existing) throw notFound('precondition', id);
+    if (!existing) throw new NotFoundError("resource", id);
     this.db.prepare('DELETE FROM preconditions WHERE id = ?').run(id);
+    return true;
   }
 }

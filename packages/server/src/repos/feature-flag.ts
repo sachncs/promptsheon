@@ -8,9 +8,10 @@ export class FeatureFlagRepo {
     return this.db.prepare('SELECT * FROM feature_flags WHERE name = ?').get(name) as FeatureFlag | null;
   }
 
-  setEnabled(name: string, enabled: boolean): void {
+  setEnabled(name: string, enabled: boolean): boolean {
     this.db.prepare('UPDATE feature_flags SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE name = ?')
       .run(enabled ? 1 : 0, name);
+    return true;
   }
 
   findMany(): FeatureFlag[] {

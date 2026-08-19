@@ -113,6 +113,9 @@ async function main() {
   app.addHook('preHandler', authMiddleware(config, apiKeyRepo));
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
+    if (error.name === 'NotFoundError') {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: error.message } });
+    }
     if (error.statusCode) {
       return reply.code(error.statusCode).send({ error: { code: 'APP_ERROR', message: error.message } });
     }

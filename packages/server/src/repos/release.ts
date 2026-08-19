@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
+import { NotFoundError } from '@promptsheon/shared';
 import type { Release } from '@promptsheon/shared';
-import { notFound } from '@promptsheon/shared';
 
 export class ReleaseRepo {
   constructor(private db: Database.Database) {}
@@ -51,9 +51,9 @@ export class ReleaseRepo {
     };
   }
 
-  updateStatus(id: string, status: Release['status']): Release {
+  updateStatus(id: string, status: Release['status']): Release | null {
     const existing = this.findById(id);
-    if (!existing) throw notFound('release', id);
+    if (!existing) throw new NotFoundError("resource", id);
     const now = new Date().toISOString();
     const activatedAt = status === 'active' ? now : existing.activatedAt;
     const supersededAt = status === 'superseded' ? now : existing.supersededAt;
@@ -62,9 +62,10 @@ export class ReleaseRepo {
     return { ...existing, status, activatedAt, supersededAt };
   }
 
-  delete(id: string): void {
+  delete(id: string): boolean {
     const existing = this.findById(id);
-    if (!existing) throw notFound('release', id);
+    if (!existing) throw new NotFoundError("resource", id);
     this.db.prepare('DELETE FROM releases WHERE id = ?').run(id);
+    return true;
   }
 }

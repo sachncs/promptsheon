@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
+import { NotFoundError } from '@promptsheon/shared';
 import type { Workspace } from '@promptsheon/shared';
-import { notFound } from '@promptsheon/shared';
 
 export class WorkspaceRepo {
   constructor(private db: Database.Database) {}
@@ -24,9 +24,9 @@ export class WorkspaceRepo {
     return { id, name: data.name, organization: data.organization ?? '', createdAt: now, updatedAt: now };
   }
 
-  update(id: string, data: Partial<Pick<Workspace, 'name' | 'organization'>>): Workspace {
+  update(id: string, data: Partial<Pick<Workspace, 'name' | 'organization'>>): Workspace | null {
     const existing = this.findById(id);
-    if (!existing) throw notFound('workspace', id);
+    if (!existing) throw new NotFoundError("resource", id);
     const now = new Date().toISOString();
     const name = data.name ?? existing.name;
     const organization = data.organization ?? existing.organization;
@@ -35,9 +35,10 @@ export class WorkspaceRepo {
     return { ...existing, name, organization, updatedAt: now };
   }
 
-  delete(id: string): void {
+  delete(id: string): boolean {
     const existing = this.findById(id);
-    if (!existing) throw notFound('workspace', id);
+    if (!existing) throw new NotFoundError("resource", id);
     this.db.prepare('DELETE FROM workspaces WHERE id = ?').run(id);
+    return true;
   }
 }

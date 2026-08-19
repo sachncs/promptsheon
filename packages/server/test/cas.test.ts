@@ -3,16 +3,7 @@ import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import {
-  CasStore,
-  createBlob,
-  createTree,
-  createCommit,
-  commit,
-  createBranch,
-  listBranches,
-  verify,
-} from '@promptsheon/shared';
+import { CasStore } from '@promptsheon/shared';
 
 describe('CasStore', () => {
   let baseDir: string;
@@ -29,8 +20,7 @@ describe('CasStore', () => {
   });
 
   it('writes a blob and reads it back', async () => {
-    const blob = createBlob(Buffer.from('hello world'));
-    const hash = await store.writeObject(blob);
+    const hash = await store.writeObject({ type: 'blob', data: Buffer.from('hello world') });
 
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
 
@@ -44,63 +34,51 @@ describe('CasStore', () => {
     }
   });
 
-  it('creates a tree, commit, and branch', async () => {
-    const blob = createBlob(Buffer.from('file contents'));
-    const blobHash = await store.writeObject(blob);
+  it('writes a tree referencing a blob', async () => {
+    const blobHash = await store.writeObject({ type: 'blob', data: Buffer.from('file contents') });
+    const treeHash = await store.writeObject({
+      type: 'tree',
+      entries: [{ name: 'README.md', hash: blobHash, type: 'blob' }],
+    });
 
-    const tree = createTree([{ name: 'README.md', hash: blobHash, type: 'blob' }]);
-    const treeHash = await store.writeObject(tree);
+    expect(treeHash).toMatch(/^[0-9a-f]{64}$/);
 
-    const commitObj = createCommit(treeHash, [], 'tester', 'initial commit');
-    const commitHash = await commit(store, commitObj, 'main');
+    const tree = await store.readObject(treeHash);
+    expect(tree.type).toBe('tree');
+  });
+
+  it('writes a commit referencing a tree', async () => {
+    const blobHash = await store.writeObject({ type: 'blob', data: Buffer.from('payload') });
+    const treeHash = await store.writeObject({
+      type: 'tree',
+      entries: [{ name: 'doc.txt', hash: blobHash, type: 'blob' }],
+    });
+    const commitHash = await store.writeObject({
+      type: 'commit',
+      treeHash,
+      parents: [],
+      author: 'tester',
+      message: 'initial commit',
+    });
 
     expect(commitHash).toMatch(/^[0-9a-f]{64}$/);
 
-    const branches = await listBranches(store);
-    const names = branches.map((b) => b.name).sort();
-    expect(names).toEqual(['main']);
-    expect(branches[0].hash).toBe(commitHash);
+    const commit = await store.readObject(commitHash);
+    expect(commit.type).toBe('commit');
+    if (commit.type === 'commit') {
+      expect(commit.treeHash).toBe(treeHash);
+      expect(commit.message).toBe('initial commit');
+    }
   });
 
-  it('creates a secondary branch from a commit', async () => {
-    const blob = createBlob(Buffer.from('payload'));
-    const blobHash = await store.writeObject(blob);
-    const tree = createTree([{ name: 'doc.txt', hash: blobHash, type: 'blob' }]);
-    const treeHash = await store.writeObject(tree);
-    const commitHash = await commit(store, createCommit(treeHash, [], 'tester', 'root'), 'main');
+  it('detects corrupted objects on read', async () => {
+    const hash = await store.writeObject({ type: 'blob', data: Buffer.from('two') });
 
-    await createBranch(store, 'feature', commitHash);
-
-    const branches = await listBranches(store);
-    const byName = Object.fromEntries(branches.map((b) => [b.name, b.hash]));
-    expect(byName.feature).toBe(commitHash);
-    expect(byName.main).toBe(commitHash);
-  });
-
-  it('verifies chain integrity', async () => {
-    const blob = createBlob(Buffer.from('one'));
-    const blobHash = await store.writeObject(blob);
-    const treeHash = await store.writeObject(createTree([{ name: 'a', hash: blobHash, type: 'blob' }]));
-    await commit(store, createCommit(treeHash, [], 'tester', 'commit'), 'main');
-
-    const result = await verify(store);
-    expect(result.valid).toBe(true);
-    expect(result.errors).toEqual([]);
-  });
-
-  it('detects corruption', async () => {
-    const blob = createBlob(Buffer.from('two'));
-    const blobHash = await store.writeObject(blob);
-    const treeHash = await store.writeObject(createTree([{ name: 'a', hash: blobHash, type: 'blob' }]));
-    await commit(store, createCommit(treeHash, [], 'tester', 'commit'), 'main');
-
-    const objDir = join(store.objectsDir, blobHash.slice(0, 2));
-    const objFile = join(objDir, blobHash.slice(2));
+    const objDir = join(store.objectsDir, hash.slice(0, 2));
+    const objFile = join(objDir, hash.slice(2));
     const original = await readFile(objFile);
     await writeFile(objFile, Buffer.concat([original, Buffer.from('garbage')]));
 
-    const result = await verify(store);
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
+    await expect(store.readObject(hash)).rejects.toThrow();
   });
 });

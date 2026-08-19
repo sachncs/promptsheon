@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
+import { NotFoundError } from '@promptsheon/shared';
 import type { Schedule } from '@promptsheon/shared';
-import { notFound } from '@promptsheon/shared';
 
 export class ScheduleRepo {
   constructor(private db: Database.Database) {}
@@ -34,9 +34,9 @@ export class ScheduleRepo {
     return { id, workspaceId: data.workspaceId, releaseId: data.releaseId, kind: data.kind, cron: data.cron, webhookPath: '', nextFireAt: now, lastFireAt: null, firedCount: 0, enabled: data.enabled !== false, createdAt: now, createdBy: '' };
   }
 
-  update(id: string, data: Partial<Pick<Schedule, 'cron' | 'enabled' | 'nextFireAt'>>): Schedule {
+  update(id: string, data: Partial<Pick<Schedule, 'cron' | 'enabled' | 'nextFireAt'>>): Schedule | null {
     const existing = this.findById(id);
-    if (!existing) throw notFound('schedule', id);
+    if (!existing) throw new NotFoundError("resource", id);
     const cron = data.cron ?? existing.cron;
     const enabled = data.enabled ?? existing.enabled;
     const nextFireAt = data.nextFireAt ?? existing.nextFireAt;
@@ -45,9 +45,10 @@ export class ScheduleRepo {
     return { ...existing, cron, enabled, nextFireAt };
   }
 
-  delete(id: string): void {
+  delete(id: string): boolean {
     const existing = this.findById(id);
-    if (!existing) throw notFound('schedule', id);
+    if (!existing) throw new NotFoundError("resource", id);
     this.db.prepare('DELETE FROM schedules WHERE id = ?').run(id);
+    return true;
   }
 }

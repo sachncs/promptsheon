@@ -8,7 +8,7 @@ export class SystemConfigRepo {
     return this.db.prepare('SELECT * FROM system_config WHERE key = ?').get(key) as SystemConfig | null;
   }
 
-  set(key: string, value: string, updatedBy?: string, tombstone = false): void {
+  set(key: string, value: string, updatedBy?: string, tombstone = false): boolean {
     const existing = this.get(key);
     if (existing) {
       this.db.prepare(`
@@ -23,6 +23,7 @@ export class SystemConfigRepo {
         VALUES (?, ?, ?, ?)
       `).run(key, value, updatedBy ?? 'system', tombstone ? 1 : 0);
     }
+    return true;
   }
 
   list(prefix?: string): SystemConfig[] {
@@ -33,7 +34,7 @@ export class SystemConfigRepo {
     return this.db.prepare('SELECT * FROM system_config').all() as SystemConfig[];
   }
 
-  delete(key: string, updatedBy?: string): void {
-    this.set(key, 'null', updatedBy, true);
+  delete(key: string, updatedBy?: string): boolean {
+    return this.set(key, 'null', updatedBy, true);
   }
 }
