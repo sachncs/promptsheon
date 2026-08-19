@@ -5,7 +5,7 @@
     "moduleResolution": "Node16",
     "lib": ["ES2022"],
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -16,6 +16,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "db/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

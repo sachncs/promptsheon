@@ -1,7 +1,7 @@
 export interface Migration {
   version: number;
   name: string;
-  up: string;
+  up?: string;
   down?: string;
 }
 
@@ -28,4 +28,5 @@ export const MIGRATIONS: Migration[] = [
   { version: 19, name: '019_self_evolve' },
   { version: 20, name: '020_audit_chain_state_immutability' },
   { version: 21, name: '021_canary' },
+  { version: 22, name: '022_manifest_dag' },
 ];

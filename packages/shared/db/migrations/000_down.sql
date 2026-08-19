@@ -1,4 +1,9 @@
 -- Down migration: drop all tables (for testing).
+DROP TABLE IF EXISTS node_runs;
+DROP TABLE IF EXISTS manifest_approvals;
+DROP TABLE IF EXISTS manifest_edges;
+DROP TABLE IF EXISTS manifest_nodes;
+DROP TABLE IF EXISTS manifest_dag;
 DROP TABLE IF EXISTS bandit_arm_counters;
 DROP TABLE IF EXISTS capability_contracts;
 DROP TABLE IF EXISTS self_evolve_state;
