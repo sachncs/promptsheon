@@ -30,4 +30,5 @@ export const MIGRATIONS: Migration[] = [
   { version: 21, name: '021_canary' },
   { version: 22, name: '022_manifest_dag' },
   { version: 24, name: '024_releases_updated_at' },
+  { version: 25, name: '025_user_org_team' },
 ];
