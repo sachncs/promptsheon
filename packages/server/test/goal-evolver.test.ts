@@ -221,5 +221,15 @@ describe('GoalBasedEvolutionAgent', () => {
       const result = await agent.evolve('h', m, { maxIterations: 1, cooldownMs: 0, costBudget: 100 });
       expect(result.iterations).toBe(1);
     });
+
+    it('aggregates multiple scorers via EvalSuiteRunner (no primaryScorer needed)', async () => {
+      const m = buildManifest({ evaluation: { datasets: [], scorers: ['helpfulness', 'coherence'], passThreshold: 0.5 } });
+      executor.trace.nodeResults = {
+        a: { nodeId: 'a', status: 'completed', output: 'good answer', latencyMs: 50, costUsd: 0, totalTokens: 5, error: '' },
+        b: { nodeId: 'b', status: 'completed', output: 'good answer', latencyMs: 50, costUsd: 0, totalTokens: 5, error: '' },
+      };
+      const result = await agent.evolve('h', m, { maxIterations: 1, cooldownMs: 0, costBudget: 100 });
+      expect(result.iterations).toBe(1);
+    });
   });
 });

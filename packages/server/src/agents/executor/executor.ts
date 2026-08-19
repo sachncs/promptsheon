@@ -79,6 +79,7 @@ export class ManifestGraphExecutor {
       throw new NotFoundError(`invalid DAG: ${validation.errors.join('; ')}`, '');
     }
 
+    const executionStartedAtMs = Date.now();
     const metricsHookCtx = this.deps.manifestRepo
       ? { executionId: options.executionId, manifestHash, manifestRepo: this.deps.manifestRepo }
       : undefined;
@@ -196,7 +197,10 @@ export class ManifestGraphExecutor {
           throw new ChaosFailureError(node.id, chaosFailure);
         }
 
-        const agent = buildNodeAgent(node, this.deps.config, metricsHookCtx ? { metricsHookCtx } : {});
+        const perNodeHookCtx = metricsHookCtx
+          ? { ...metricsHookCtx, invocationStartedAt: Date.now() }
+          : undefined;
+        const agent = buildNodeAgent(node, this.deps.config, perNodeHookCtx ? { metricsHookCtx: perNodeHookCtx } : {});
         const limits = buildInvocationLimits(node.limits);
         const result = await agent.invoke(
           this.buildPrompt(node, options.inputs, preCheck.redactedValues[0] as string | undefined),

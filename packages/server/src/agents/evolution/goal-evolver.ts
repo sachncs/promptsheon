@@ -6,6 +6,7 @@ import { extractText } from '../utils.js';
 import { ManifestGraphExecutor, validateDag } from '../executor/index.js';
 import { SseHub } from '../../sse/hub.js';
 import { StrandsEvaluatorAdapter } from '../evaluation/evaluator-adapter.js';
+import { EvalSuiteRunner } from '../evaluation/suite-runner.js';
 import { EvaluatorRegistry, EVALUATOR_NAMES } from '../evaluation/registry.js';
 import type { EvaluatorName } from '../evaluation/registry.js';
 
@@ -191,6 +192,12 @@ Be conservative: small targeted edits, preserve what works.`,
           data: { kind: 'evolution_passed', iteration: i + 1, score },
           timestamp: new Date().toISOString(),
         });
+        this.state.set(manifestHash, {
+          currentHash,
+          bestHash: currentHash,
+          bestScore: score,
+          iteration: i + 1,
+        });
         return {
           passed: true,
           manifestHash: currentHash,
@@ -238,6 +245,12 @@ Be conservative: small targeted edits, preserve what works.`,
       }
     }
 
+    this.state.set(manifestHash, {
+      currentHash,
+      bestHash: bestManifestHash,
+      bestScore,
+      iteration: history.length,
+    });
     return {
       passed: false,
       manifestHash: currentHash,
@@ -254,7 +267,6 @@ Be conservative: small targeted edits, preserve what works.`,
     trace: { nodeResults: Record<string, { output: string; status: string }> },
     manifest: Manifest,
   ): Promise<number> {
-    const scorerName = this.resolveScorerName(manifest);
     const nodeOutputs = Object.values(trace.nodeResults)
       .map((n) => n.output)
       .filter((o) => o && o.length > 0);
@@ -262,7 +274,24 @@ Be conservative: small targeted edits, preserve what works.`,
     const actual = nodeOutputs.join('\n\n');
     const goal = this.resolveGoal(manifest);
 
+    const declaredScorers = manifest.evaluation.scorers.filter((s): s is EvaluatorName =>
+      EVALUATOR_NAMES.includes(s as EvaluatorName),
+    );
+
     try {
+      // Multi-scorer path: run every declared scorer and aggregate.
+      if (declaredScorers.length > 1) {
+        const runner = new EvalSuiteRunner(this.deps.config);
+        const suiteResult = await runner.run(manifest, {
+          actual,
+          expected: goal,
+          inputs: { goal },
+        });
+        return suiteResult.aggregateScore;
+      }
+
+      // Single-scorer path: use the resolved primary scorer.
+      const scorerName = this.resolveScorerName(manifest);
       const adapter = new StrandsEvaluatorAdapter(this.deps.config, scorerName);
       const result = await adapter.score({
         actual,

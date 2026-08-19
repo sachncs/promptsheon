@@ -6,6 +6,13 @@ export interface MetricsHookContext {
   executionId: string;
   manifestHash: string;
   manifestRepo: ManifestRepo;
+  /**
+   * Optional wall-clock start time of the invocation (ms since epoch).
+   * When supplied, the hook stamps `startedAt` from this value and
+   * computes `latencyMs = now - startedAt` so the persisted row has
+   * a real duration instead of zero.
+   */
+  invocationStartedAt?: number;
 }
 
 /**
@@ -29,16 +36,17 @@ export function createMetricsHook(ctx: MetricsHookContext): (event: AfterInvocat
       const promptTokens = usage?.inputTokens ?? 0;
       const completionTokens = usage?.outputTokens ?? 0;
 
-      const startedAt = new Date().toISOString();
-      const endedAt = startedAt;
+      const endedAt = Date.now();
+      const startedAt = ctx.invocationStartedAt ?? endedAt;
+      const latencyMs = Math.max(0, endedAt - startedAt);
 
       ctx.manifestRepo.recordNodeRun({
         manifestHash: ctx.manifestHash,
         nodeId,
         executionId: ctx.executionId,
-        startedAt,
-        endedAt,
-        latencyMs: 0,
+        startedAt: new Date(startedAt).toISOString(),
+        endedAt: new Date(endedAt).toISOString(),
+        latencyMs,
         costUsd: totalTokens ? (totalTokens / 1000) * 0.00003 : 0,
         promptTokens,
         completionTokens,
