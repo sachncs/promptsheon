@@ -1,4 +1,5 @@
 import type { AppConfig, Manifest } from '@promptsheon/shared';
+import { Agent } from '@strands-agents/sdk';
 import { SseHub } from '../../sse/hub.js';
 import { buildGraph, buildInvocationLimits, buildNodeAgent } from './node-builder.js';
 import { validateDag } from './dag-validator.js';
@@ -61,6 +62,14 @@ export interface ExecuteOptions {
  * between nodes.
  */
 export class ManifestGraphExecutor {
+  /**
+   * Process-local registry of agents currently in flight, keyed by
+   * `<executionId>:<nodeId>`. Populated by `execute()` and cleared
+   * when the execution finishes. Allows `POST /api/snapshots` to
+   * resolve a running agent for `takeSnapshot` / `loadSnapshot`.
+   */
+  private readonly liveAgents = new Map<string, Agent>();
+
   constructor(
     private deps: {
       config: AppConfig;
@@ -83,7 +92,14 @@ export class ManifestGraphExecutor {
     const metricsHookCtx = this.deps.manifestRepo
       ? { executionId: options.executionId, manifestHash, manifestRepo: this.deps.manifestRepo }
       : undefined;
-    const graph = buildGraph(manifest, this.deps.config, metricsHookCtx ? { metricsHookCtx } : {});
+    // Validate DAG via buildGraph (which constructs a Strands Graph
+    // and runs validateDag() during construction). The Graph is built
+    // for type/dag validation; per-node execution happens in the
+    // loop below so the domain-specific guardrail/cost-cap/chaos/
+    // metrics/SSE-event semantics can be applied between Strands
+    // calls — a single Strands Graph.invoke() would drop all of
+    // these observability + safety surfaces.
+    buildGraph(manifest, this.deps.config, metricsHookCtx ? { metricsHookCtx } : {});
     const startedAt = new Date().toISOString();
     const broadcast: GuardrailBroadcast = { hub: this.deps.hub, config: this.deps.config };
 
@@ -201,11 +217,14 @@ export class ManifestGraphExecutor {
           ? { ...metricsHookCtx, invocationStartedAt: Date.now() }
           : undefined;
         const agent = buildNodeAgent(node, this.deps.config, perNodeHookCtx ? { metricsHookCtx: perNodeHookCtx } : {});
+        const agentKey = `${options.executionId}:${node.id}`;
+        this.liveAgents.set(agentKey, agent);
         const limits = buildInvocationLimits(node.limits);
         const result = await agent.invoke(
           this.buildPrompt(node, options.inputs, preCheck.redactedValues[0] as string | undefined),
           { ...(limits ? { limits } : {}) },
         );
+        this.liveAgents.delete(agentKey);
         const outputText = this.extractText(result);
         const metrics = result.metrics;
         const totalTokens = metrics?.accumulatedUsage?.totalTokens ?? 0;
@@ -275,6 +294,14 @@ export class ManifestGraphExecutor {
       timestamp: trace.endedAt,
     });
     return trace;
+  }
+
+  /**
+   * Resolve a live agent by `executionId:nodeId` for snapshot/restore.
+   * Returns null if the agent is not currently in flight.
+   */
+  getLiveAgent(executionId: string, nodeId: string): Agent | null {
+    return this.liveAgents.get(`${executionId}:${nodeId}`) ?? null;
   }
 
   private buildPrompt(node: Manifest['nodes'][number], inputs: Record<string, unknown>, redactedJson: string | undefined): string {

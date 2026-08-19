@@ -30,6 +30,15 @@ describe('IdeaPlannerAgent construction', () => {
     const agent = new IdeaPlannerAgent(buildConfig());
     expect(agent).toBeInstanceOf(IdeaPlannerAgent);
   });
+
+  it('constructs a Swarm with 4 agents + repetitiveHandoff detection', () => {
+    const agent = new IdeaPlannerAgent(buildConfig());
+    const swarm = (agent as unknown as { swarm: { config: { maxSteps: number; repetitiveHandoffDetectionWindow: number; repetitiveHandoffMinUniqueAgents: number }; start: { id: string } } }).swarm;
+    expect(swarm.config.maxSteps).toBe(10);
+    expect(swarm.config.repetitiveHandoffDetectionWindow).toBe(6);
+    expect(swarm.config.repetitiveHandoffMinUniqueAgents).toBe(3);
+    expect(swarm.start.id).toBe('ideaDecomposer');
+  });
 });
 
 describe('IdeaPlannerAgent.plan fallback', () => {
