@@ -24,9 +24,9 @@ describe('db & WorkspaceRepo', () => {
       version: number;
       name: string;
     }>;
-    expect(rows.length).toBe(24);
+    expect(rows.length).toBe(25);
     expect(rows[0].name).toBe('001_core_schema.up.sql');
-    expect(rows[rows.length - 1].name).toBe('025_user_org_team.up.sql');
+    expect(rows[rows.length - 1].name).toBe('026_eval_scorer_results.up.sql');
   });
 
   it('creates a workspace and finds it by id', () => {
