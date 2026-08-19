@@ -5,6 +5,9 @@ import { createModel } from '../model.js';
 import { extractText } from '../utils.js';
 import { ManifestGraphExecutor, validateDag } from '../executor/index.js';
 import { SseHub } from '../../sse/hub.js';
+import { StrandsEvaluatorAdapter } from '../evaluation/evaluator-adapter.js';
+import { EvaluatorRegistry, EVALUATOR_NAMES } from '../evaluation/registry.js';
+import type { EvaluatorName } from '../evaluation/registry.js';
 
 export interface EvolutionSnapshot {
   iteration: number;
@@ -78,6 +81,7 @@ type Revision = z.infer<typeof RevisionSchema>;
 export class GoalBasedEvolutionAgent {
   private revisionAgent: Agent;
   private state = new Map<string, GoalEvolutionState>();
+  private evaluatorRegistry: EvaluatorRegistry;
 
   constructor(
     private deps: { config: AppConfig; hub: SseHub; executor: ManifestGraphExecutor; cas: CasStore },
@@ -105,6 +109,7 @@ Be conservative: small targeted edits, preserve what works.`,
         backoff: new ExponentialBackoff({ baseMs: 1000, maxMs: 10000 }),
       }),
     });
+    this.evaluatorRegistry = new EvaluatorRegistry(deps.config);
   }
 
   async evolve(manifestHash: string, manifest: Manifest, options: EvolutionOptions): Promise<EvolutionResult> {
@@ -245,11 +250,50 @@ Be conservative: small targeted edits, preserve what works.`,
     };
   }
 
-  private async scoreAgainstGoal(trace: { nodeResults: Record<string, { output: string; status: string }> }, _manifest: Manifest): Promise<number> {
-    const nodeCount = Object.keys(trace.nodeResults).length;
-    if (nodeCount === 0) return 0;
-    const completed = Object.values(trace.nodeResults).filter((n) => n.status === 'completed').length;
-    return completed / nodeCount;
+  private async scoreAgainstGoal(
+    trace: { nodeResults: Record<string, { output: string; status: string }> },
+    manifest: Manifest,
+  ): Promise<number> {
+    const scorerName = this.resolveScorerName(manifest);
+    const nodeOutputs = Object.values(trace.nodeResults)
+      .map((n) => n.output)
+      .filter((o) => o && o.length > 0);
+    if (nodeOutputs.length === 0) return 0;
+    const actual = nodeOutputs.join('\n\n');
+    const goal = this.resolveGoal(manifest);
+
+    try {
+      const adapter = new StrandsEvaluatorAdapter(this.deps.config, scorerName);
+      const result = await adapter.score({
+        actual,
+        expected: goal,
+        inputs: { goal },
+        manifestHash: manifest.id,
+      });
+      return result.score;
+    } catch {
+      const nodeCount = Object.keys(trace.nodeResults).length;
+      const completed = Object.values(trace.nodeResults).filter((n) => n.status === 'completed').length;
+      return nodeCount === 0 ? 0 : completed / nodeCount;
+    }
+  }
+
+  private resolveScorerName(manifest: Manifest): EvaluatorName {
+    const meta = manifest.metadata['primaryScorer'];
+    if (typeof meta === 'string' && EVALUATOR_NAMES.includes(meta as EvaluatorName)) {
+      return meta as EvaluatorName;
+    }
+    const declared = manifest.evaluation.scorers[0];
+    if (typeof declared === 'string' && EVALUATOR_NAMES.includes(declared as EvaluatorName)) {
+      return declared as EvaluatorName;
+    }
+    return 'goal-success-rate';
+  }
+
+  private resolveGoal(manifest: Manifest): string {
+    const meta = manifest.metadata['goal'];
+    if (typeof meta === 'string') return meta;
+    return `passThreshold ${manifest.evaluation.passThreshold}`;
   }
 
   private findWeakestNode(trace: { nodeResults: Record<string, { latencyMs: number; status: string; error: string }> }): string | null {
