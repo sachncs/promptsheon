@@ -44,8 +44,8 @@ export const RuntimePolicySchema = z.object({
 });
 
 export const ContextContractSchema = z.object({
-  inputsSchema: z.record(z.unknown()),
-  outputsSchema: z.record(z.unknown()),
+  inputsSchema: z.record(z.string(), z.unknown()),
+  outputsSchema: z.record(z.string(), z.unknown()),
   requiredContextVars: z.array(z.string()).default([]),
 });
 
@@ -60,7 +60,7 @@ const GUARDRAIL_FAILURE_MODES = ['block', 'warn', 'redact'] as const;
 
 export const GuardrailSpecSchema = z.object({
   type: z.enum(GUARDRAIL_TYPES),
-  config: z.record(z.unknown()),
+  config: z.record(z.string(), z.unknown()),
   enabled: z.boolean().default(true),
   onFailure: z.enum(GUARDRAIL_FAILURE_MODES).default('block'),
 });
@@ -68,15 +68,15 @@ export const GuardrailSpecSchema = z.object({
 export const ToolSpecSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
-  inputSchema: z.record(z.unknown()),
-  config: z.record(z.unknown()).default({}),
+  inputSchema: z.record(z.string(), z.unknown()),
+  config: z.record(z.string(), z.unknown()).default({}),
 });
 
 export const McpServerSpecSchema = z.object({
   name: z.string().min(1),
   url: z.string().url(),
   tools: z.array(z.string()).default([]),
-  auth: z.record(z.unknown()).optional(),
+  auth: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const ObservabilityConfigSchema = z.object({
@@ -135,7 +135,7 @@ export const EvaluationConfigSchema = z.object({
 export const ManifestEdgeSchema = z.object({
   from: z.string().min(1),
   to: z.string().min(1),
-  mapping: z.record(z.string()).default({}),
+  mapping: z.record(z.string(), z.string()).default({}),
 });
 
 export type ManifestNodeInput = z.infer<typeof SubCapabilityManifestSchema>;
@@ -177,7 +177,7 @@ export const ManifestSchema = z.object({
   evaluation: EvaluationConfigSchema,
   nodes: z.array(SubCapabilityManifestSchema).default([]),
   edges: z.array(ManifestEdgeSchema).default([]),
-  metadata: z.record(z.unknown()).default({}),
+  metadata: z.record(z.string(), z.unknown()).default({}),
   createdAt: z.string().default(''),
   updatedAt: z.string().default(''),
 }).superRefine((manifest, ctx) => {
@@ -262,7 +262,7 @@ export const VoteApprovalSchema = z.object({
 
 export const InvokeExecutionSchema = z.object({
   capabilityVersionId: z.string().uuid(),
-  inputs: z.record(z.unknown()),
+  inputs: z.record(z.string(), z.unknown()),
   environment: z.string().optional().default(''),
   traceId: z.string().optional().default(''),
 });
@@ -273,8 +273,8 @@ export const CreateDatasetSchema = z.object({
   description: z.string().max(2000).optional().default(''),
 });
 export const CreateDatasetCaseSchema = z.object({
-  inputs: z.record(z.unknown()),
-  expected: z.record(z.unknown()),
+  inputs: z.record(z.string(), z.unknown()),
+  expected: z.record(z.string(), z.unknown()),
   description: z.string().max(2000).optional().default(''),
 });
 
@@ -292,7 +292,7 @@ export const CreateAlertRuleSchema = z.object({
   threshold: z.number().default(0),
   duration: z.number().int().default(0),
   window: z.number().int().default(0),
-  config: z.record(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
 });
 export const UpdateAlertRuleSchema = CreateAlertRuleSchema.partial();
 
@@ -345,11 +345,11 @@ export const CreateNotificationGroupSchema = z.object({
 export const CreateRecommendationSchema = z.object({
   capabilityVersionId: z.string().uuid(),
   type: z.string().min(1),
-  payload: z.record(z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
 });
 export const CreateDecisionSchema = z.object({
   recommendationId: z.string().uuid(),
-  payload: z.record(z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
 });
 
 export const CreateLineageEdgeSchema = z.object({
@@ -360,7 +360,7 @@ export const CreateLineageEdgeSchema = z.object({
   childVersion: z.number().int().positive(),
   source: z.enum(['recommendation', 'manual', 'migration']),
   recommendationId: z.string().uuid().optional(),
-  notes: z.record(z.unknown()).optional().default({}),
+  notes: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
 export const PaginationSchema = z.object({
