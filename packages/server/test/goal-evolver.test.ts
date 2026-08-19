@@ -192,5 +192,34 @@ describe('GoalBasedEvolutionAgent', () => {
       const result = await agent.evolve('h', m, { maxIterations: 3, cooldownMs: 0, costBudget: 100 });
       expect(result.error).toContain('LLM rate limit');
     });
+
+    it('falls back to heuristic when primary scorer is unavailable (no LLM key)', async () => {
+      const m = buildManifest();
+      executor.trace.nodeResults = {
+        a: { nodeId: 'a', status: 'completed', output: 'ok', latencyMs: 100, costUsd: 0, totalTokens: 10, error: '' },
+        b: { nodeId: 'b', status: 'completed', output: 'ok', latencyMs: 100, costUsd: 0, totalTokens: 10, error: '' },
+      };
+      const result = await agent.evolve('h', m, { maxIterations: 1, cooldownMs: 0, costBudget: 100 });
+      expect(result.passed).toBe(true);
+      expect(result.iterations).toBe(1);
+    });
+
+    it('honors manifest.metadata.primaryScorer override', async () => {
+      const m = buildManifest({ metadata: { primaryScorer: 'helpfulness' } });
+      executor.trace.nodeResults = {
+        a: { nodeId: 'a', status: 'completed', output: 'help me', latencyMs: 50, costUsd: 0, totalTokens: 5, error: '' },
+      };
+      const result = await agent.evolve('h', m, { maxIterations: 1, cooldownMs: 0, costBudget: 100 });
+      expect(result.iterations).toBe(1);
+    });
+
+    it('honors manifest.evaluation.scorers[0] when primaryScorer absent', async () => {
+      const m = buildManifest({ evaluation: { datasets: [], scorers: ['correctness'], passThreshold: 0.5 } });
+      executor.trace.nodeResults = {
+        a: { nodeId: 'a', status: 'completed', output: 'right answer', latencyMs: 50, costUsd: 0, totalTokens: 5, error: '' },
+      };
+      const result = await agent.evolve('h', m, { maxIterations: 1, cooldownMs: 0, costBudget: 100 });
+      expect(result.iterations).toBe(1);
+    });
   });
 });
