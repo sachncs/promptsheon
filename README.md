@@ -35,13 +35,16 @@ TypeScript rewrite of the Promptsheon prompt management platform. Strands Agents
 # 1. Install all workspace dependencies
 pnpm install
 
-# 2. Start the API server (port 8080)
-cd packages/server && pnpm dev
+# 2. Launch both servers in one command
+cd packages && pnpm dev
+# server  → http://localhost:8080 (Fastify)
+# frontend → http://localhost:3000 (Next.js 16 + Turbopack)
 
-# 3. Start the frontend (port 3000) — in a separate terminal
-cd frontend && pnpm dev
+# Or run them separately:
+cd packages && pnpm dev:server    # API only
+cd packages && pnpm dev:frontend  # Web only
 
-# 4. Open http://localhost:3000
+# 3. Open http://localhost:3000
 ```
 
 The frontend `next.config.ts` rewrites `/api/*` → `http://localhost:8080/api/*`, so you only need both servers running.
