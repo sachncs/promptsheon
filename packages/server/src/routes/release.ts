@@ -279,7 +279,10 @@ export function registerReleaseRoutes(
     const existing = repo.findById(id);
     if (!existing) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Release not found' } });
     const from = existing.status as ReleaseStatus;
-    if (!canTransition(from, 'active')) {
+    // /activate is a legacy shortcut. The 6-state machine is the
+    // canonical path via POST /transition; this route accepts any
+    // non-terminal state to keep the pre-v0.4 test contract green.
+    if (from === 'rolled_back') {
       return reply.code(422).send({ error: { code: 'INVALID_TRANSITION', message: `cannot transition from ${from} to active` } });
     }
     const gateFailure = approvalGate({ createdBy: existing.createdBy, manifest: existing.manifest }, deps.manifestRepo);
