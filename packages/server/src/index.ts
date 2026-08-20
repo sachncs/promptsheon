@@ -117,7 +117,10 @@ async function main() {
   const signingKeyRepo = new SigningKeyRepo(db);
   const evalSuiteRepo = new EvalSuiteRepo(db);
   const humanReviewRepo = new HumanReviewRepo(db);
-  const vaultRepo = new VaultRepo(db);
+  const vaultRepo = new VaultRepo(
+  db,
+  new (await import('./repos/vault.js')).LocalKms(db),
+);
   const orgExportService = new OrgExportService(db, vaultRepo);
   const costRollupRepo = new CostRollupRepo(db);
   const capabilityRepo = new CapabilityRepo(db);
@@ -303,6 +306,7 @@ async function main() {
       vaultRepo,
       orgExportService,
       costRollupRepo,
+      kms: vaultRepo.kms,
       adminOnly: (request: unknown) => {
         const ctx = request as { orgContext?: { role?: string } } | undefined;
         return ctx?.orgContext?.role === 'admin';

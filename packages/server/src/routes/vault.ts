@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { parseBody } from './validate.js';
-import type { VaultRepo } from '../repos/vault.js';
+import type { VaultRepo, Kms } from '../repos/vault.js';
 import type { OrgExportService } from '../repos/vault-extras.js';
 import type { CostRollupRepo } from '../repos/vault-extras.js';
 
@@ -32,16 +32,42 @@ const RollupIngestSchema = z.object({
   executions: z.number().int().min(0).optional(),
 });
 
+const RotateKeySchema = z.object({
+  label: z.string().min(1).max(120),
+  reencrypt: z.boolean().optional(),
+});
+
 export interface VaultRouteDeps {
   vaultRepo: VaultRepo;
   orgExportService: OrgExportService;
   costRollupRepo: CostRollupRepo;
+  kms: Kms;
   adminOnly: (request: unknown) => boolean;
 }
 
 function actorOf(request: unknown): string {
   const ctx = (request as { userId?: string } | undefined) ?? {};
   return ctx.userId ?? 'system';
+}
+
+function parseQuerySchema(
+  reply: { code: (n: number) => { send: (p: unknown) => void } },
+  query: unknown,
+): { ok: true; data: { organizationId: string; days?: number } } | { ok: false } {
+  const schema = z.object({
+    organizationId: z.string(),
+    days: z.coerce.number().int().min(1).max(365).optional(),
+  });
+  const result = schema.safeParse(query);
+  if (result.success) return { ok: true, data: result.data };
+  reply.code(422).send({
+    error: { code: 'VALIDATION_ERROR', message: 'Query validation failed' },
+  });
+  return { ok: false };
+}
+
+function escapeFts(s: string): string {
+  return s.replace(/[\u0000-\u001f]/g, ' ').split(/\s+/).filter(Boolean).map((w) => `${w}*`).join(' ');
 }
 
 export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps): void {
@@ -67,6 +93,32 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
       actorOf(request),
     );
     return reply.code(201).send(created);
+  });
+
+  // Keyring
+  app.get('/api/vault/keys', async (request, reply) => {
+    if (!deps.adminOnly(request)) {
+      return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
+    }
+    return reply.send(deps.vaultRepo.listKeyring());
+  });
+
+  app.post('/api/vault/keys/rotate', async (request, reply) => {
+    if (!deps.adminOnly(request)) {
+      return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
+    }
+    const parsed = parseBody(reply, RotateKeySchema, request.body);
+    if (!parsed.ok) return;
+    const current = deps.vaultRepo.listKeyring().find((k) => k.active);
+    if (!current) {
+      return reply.code(500).send({ error: { code: 'NO_ACTIVE_KEY', message: 'no active encryption key' } });
+    }
+    const next = deps.vaultRepo.rotate(current.fingerprint, parsed.data.label);
+    let re = 0;
+    if (parsed.data.reencrypt !== false) {
+      re = deps.vaultRepo.reencryptAllFromKey(current.fingerprint, next.fingerprint);
+    }
+    return reply.send({ key: next, reencrypted: re });
   });
 
   // Export + purge
@@ -118,34 +170,10 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
     const where = type ? 'AND kind = ?' : '';
     const params: unknown[] = [escapeFts(q)];
     if (type) params.push(type);
-    const stmt = deps.costRollupRepo['db'].prepare.bind(deps.costRollupRepo['db']);
-    void stmt;
-    // We use CostRollupRepo.db; read directly here. Alternative would be
-    // a dedicated SearchRepo; defer that until second pass.
-    const rows = (deps.costRollupRepo as unknown as { db: { prepare: (s: string) => { all: (...p: unknown[]) => Array<{ kind: string; resource_id: string; title: string; body: string }> } } })
-      .db
+    const db = (deps.costRollupRepo as unknown as { db: { prepare: (s: string) => { all: (...p: unknown[]) => Array<{ kind: string; resource_id: string; title: string; body: string }> } } }).db;
+    const rows = db
       .prepare(`SELECT kind, resource_id, title, body FROM search_index WHERE search_index MATCH ? ${where} ORDER BY rank LIMIT 50`)
       .all(...params);
     return reply.send(rows);
   });
-}
-
-function parseQuerySchema(
-  reply: { code: (n: number) => { send: (p: unknown) => void } },
-  query: unknown,
-): { ok: true; data: { organizationId: string; days?: number } } | { ok: false } {
-  const schema = z.object({
-    organizationId: z.string(),
-    days: z.coerce.number().int().min(1).max(365).optional(),
-  });
-  const result = schema.safeParse(query);
-  if (result.success) return { ok: true, data: result.data };
-  reply.code(422).send({
-    error: { code: 'VALIDATION_ERROR', message: 'Query validation failed' },
-  });
-  return { ok: false };
-}
-
-function escapeFts(s: string): string {
-  return s.replace(/[\u0000-\u001f]/g, ' ').split(/\s+/).filter(Boolean).map((w) => `${w}*`).join(' ');
 }
