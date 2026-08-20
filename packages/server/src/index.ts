@@ -28,6 +28,7 @@ import { SigningKeyRepo } from './repos/signing-key.js';
 import { EvalSuiteRepo, HumanReviewRepo } from './repos/eval-suite.js';
 import { VaultRepo } from './repos/vault.js';
 import { OrgExportService, CostRollupRepo } from './repos/vault-extras.js';
+import { RedteamRepo } from './repos/redteam.js';
 import { CapabilityRepo } from './repos/capability.js';
 import { VersionRepo } from './repos/version.js';
 import { ReleaseRepo } from './repos/release.js';
@@ -123,6 +124,7 @@ async function main() {
 );
   const orgExportService = new OrgExportService(db, vaultRepo);
   const costRollupRepo = new CostRollupRepo(db);
+  const redteamRepo = new RedteamRepo(db);
   const capabilityRepo = new CapabilityRepo(db);
   const versionRepo = new VersionRepo(db);
   const releaseRepo = new ReleaseRepo(db);
@@ -339,6 +341,13 @@ async function main() {
       };
       return { sweeper: retention, adminOnly };
     })(),
+    redteamDeps: {
+      redteamRepo,
+      adminOnly: (request: unknown) => {
+        const ctx = request as { orgContext?: { role?: string } } | undefined;
+        return ctx?.orgContext?.role === 'admin';
+      },
+    },
   });
 
   const scheduler = new Scheduler(scheduleRepo, sseHub);

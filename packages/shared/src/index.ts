@@ -5,3 +5,4 @@ export * from './sse.js';
 export * from './errors.js';
 export * from './db-migrate.js';
 export * from './eval/pass-at-k.js';
+export * from './redteam/seeds.js';
