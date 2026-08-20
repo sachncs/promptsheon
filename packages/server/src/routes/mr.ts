@@ -4,6 +4,7 @@ import type { RepoRepo } from '../repos/repo.js';
 import type { BranchRepo } from '../repos/branch.js';
 import type { MergeRequestRepo } from '../repos/mr.js';
 import { parseBody } from './validate.js';
+import { registerRouteDoc } from '../openapi.js';
 
 const OpenMRSchema = z.object({
   title: z.string().min(1).max(200),
@@ -47,6 +48,12 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
           : deps.mrRepo.listOpen(id);
     return reply.send(list);
   });
+  registerRouteDoc({
+    method: 'get',
+    path: '/api/repos/:id/merge-requests',
+    summary: 'List merge requests (filtered by ?status=open|closed|all)',
+    tags: ['merge-requests'],
+  });
 
   app.get('/api/merge-requests/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
@@ -57,6 +64,12 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
       approvals: deps.mrRepo.listApprovals(id),
       comments: deps.mrRepo.listComments(id),
     });
+  });
+  registerRouteDoc({
+    method: 'get',
+    path: '/api/merge-requests/:id',
+    summary: 'Fetch a merge request with approvals + comments',
+    tags: ['merge-requests'],
   });
 
   app.post('/api/repos/:id/merge-requests', async (request, reply) => {

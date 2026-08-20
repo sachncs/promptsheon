@@ -5,6 +5,7 @@ import type { RepoRepo } from '../repos/repo.js';
 import type { RepoStore } from '../repos/repo-store.js';
 import type { BranchRepo } from '../repos/branch.js';
 import { parseBody, parseQuery } from './validate.js';
+import { registerRouteDoc } from '../openapi.js';
 
 const PutFileSchema = z.object({
   path: z.string().min(1).max(500),
@@ -41,6 +42,13 @@ export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps)
     }
     return reply.send(deps.repoStore.list(id, parsed.data.ref));
   });
+  registerRouteDoc({
+    method: 'get',
+    path: '/api/repos/:id/contents',
+    summary: 'List staged files in a ref',
+    tags: ['contents'],
+    query: ListQuerySchema,
+  });
 
   app.get('/api/repos/:id/contents/*', async (request, reply) => {
     const { id, '*': pathRaw } = request.params as { id: string; '*': string };
@@ -59,6 +67,12 @@ export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps)
       content: content.toString('utf-8'),
     });
   });
+  registerRouteDoc({
+    method: 'get',
+    path: '/api/repos/:id/contents/*',
+    summary: 'Read a single file',
+    tags: ['contents'],
+  });
 
   app.put('/api/repos/:id/contents/*', async (request, reply) => {
     const { id, '*': pathRaw } = request.params as { id: string; '*': string };
@@ -71,7 +85,6 @@ export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps)
     const repo = deps.repoRepo.findById(id);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     const ref = parsedQ.data.ref;
-    // Stage on the ref's working tree; commit endpoint pins it.
     const entry = deps.repoStore.putFile(
       id,
       ref,
@@ -81,6 +94,13 @@ export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps)
         : parsedB.data.content,
     );
     return reply.send(entry);
+  });
+  registerRouteDoc({
+    method: 'put',
+    path: '/api/repos/:id/contents/*',
+    summary: 'Stage a file',
+    tags: ['contents'],
+    body: PutFileSchema,
   });
 
   app.delete('/api/repos/:id/contents/*', async (request, reply) => {
@@ -92,5 +112,11 @@ export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps)
     const ok = deps.repoStore.deleteFile(id, parsed.data.ref, path);
     if (!ok) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'path not found' } });
     return reply.code(204).send();
+  });
+  registerRouteDoc({
+    method: 'delete',
+    path: '/api/repos/:id/contents/*',
+    summary: 'Unstage a file',
+    tags: ['contents'],
   });
 }

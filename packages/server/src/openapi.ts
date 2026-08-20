@@ -7,8 +7,10 @@ import { z } from 'zod';
  * Zod schema registry, and emitting the docs at /api/openapi.json.
  */
 
+type PathMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
+
 interface RouteDoc {
-  method: 'get' | 'post' | 'put' | 'patch' | 'delete';
+  method: PathMethod;
   path: string;
   summary: string;
   tags: string[];
@@ -18,9 +20,45 @@ interface RouteDoc {
   responses?: Record<string, { description: string; schema?: z.ZodType<unknown> }>;
 }
 
+export interface RouteSpec {
+  method: PathMethod;
+  path: string;
+  summary: string;
+  tags: string[];
+  body?: z.ZodType<unknown>;
+  query?: z.ZodType<unknown>;
+  params?: z.ZodType<unknown>;
+  responses?: Record<string, { description: string; schema?: z.ZodType<unknown> }>;
+}
+
+/**
+ * Track a route on both Fastify and the OpenAPI registry. Most
+ * route files use this helper instead of calling `app.post()`
+ * directly so the OpenAPI document stays accurate.
+ */
+export function registerRoute<TApp>(
+  app: TApp & {
+    get: (path: string, opts: object, handler: (...args: unknown[]) => unknown) => void;
+    post: (path: string, opts: object, handler: (...args: unknown[]) => unknown) => void;
+    put: (path: string, opts: object, handler: (...args: unknown[]) => unknown) => void;
+    patch: (path: string, opts: object, handler: (...args: unknown[]) => unknown) => void;
+    delete: (path: string, opts: object, handler: (...args: unknown[]) => unknown) => void;
+  },
+  spec: RouteSpec,
+  handler: (...args: unknown[]) => unknown,
+): void {
+  registerRouteDoc(spec);
+  const opts = { schema: { hideFromOpenApi: true } };
+  if (spec.method === 'get') app.get(spec.path, opts, handler);
+  else if (spec.method === 'post') app.post(spec.path, opts, handler);
+  else if (spec.method === 'put') app.put(spec.path, opts, handler);
+  else if (spec.method === 'patch') app.patch(spec.path, opts, handler);
+  else if (spec.method === 'delete') app.delete(spec.path, opts, handler);
+}
+
 const docs = new Map<string, RouteDoc>();
 
-export function registerRouteDoc(d: RouteDoc): void {
+export function registerRouteDoc(d: RouteSpec): void {
   docs.set(`${d.method.toUpperCase()} ${d.path}`, d);
 }
 

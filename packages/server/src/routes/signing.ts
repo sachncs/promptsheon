@@ -6,6 +6,7 @@ import { CommitRepo, deriveCommitOid } from '../repos/commit.js';
 import { SigningKeyRepo, fingerprintSpki } from '../repos/signing-key.js';
 import { commitInputPayload } from '@promptsheon/shared';
 import { parseBody } from './validate.js';
+import { registerRouteDoc } from '../openapi.js';
 
 const UploadKeySchema = z.object({
   organizationId: z.string(),
@@ -71,6 +72,12 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
     const { id } = request.params as { id: string };
     return reply.send(deps.signingKeyRepo.list(id));
   });
+  registerRouteDoc({
+    method: 'get',
+    path: '/api/orgs/:id/signing-keys',
+    summary: 'List active operator signing keys',
+    tags: ['signing'],
+  });
 
   app.post('/api/orgs/:id/signing-keys', async (request, reply) => {
     const { id } = request.params as { id: string };
@@ -93,12 +100,25 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
     });
     return reply.code(201).send(created);
   });
+  registerRouteDoc({
+    method: 'post',
+    path: '/api/orgs/:id/signing-keys',
+    summary: 'Register an operator ed25519 public key (PEM/SPKI)',
+    tags: ['signing'],
+    body: UploadKeySchema,
+  });
 
   app.delete('/api/orgs/:id/signing-keys/:keyId', async (request, reply) => {
     const { keyId } = request.params as { keyId: string };
     const updated = deps.signingKeyRepo.deactivate(keyId);
     if (!updated) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'signing key not found' } });
     return reply.send(updated);
+  });
+  registerRouteDoc({
+    method: 'delete',
+    path: '/api/orgs/:id/signing-keys/:keyId',
+    summary: 'Deactivate a signing key (new signatures rejected; history remains valid)',
+    tags: ['signing'],
   });
 
   app.post('/api/commits/:oid/sign', async (request, reply) => {
@@ -133,6 +153,13 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
     void deriveCommitOid;
     return reply.send(updated);
   });
+  registerRouteDoc({
+    method: 'post',
+    path: '/api/commits/:oid/sign',
+    summary: 'Attach a detached ed25519 signature to a commit',
+    tags: ['signing'],
+    body: SignCommitSchema,
+  });
 
   app.get('/api/commits/:oid/verify', async (request, reply) => {
     const { oid } = request.params as { oid: string };
@@ -165,6 +192,12 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
       fingerprint: key.fingerprint,
       signedAt: commit.signedAt,
     });
+  });
+  registerRouteDoc({
+    method: 'get',
+    path: '/api/commits/:oid/verify',
+    summary: 'Re-derive the signed payload and verify',
+    tags: ['signing'],
   });
 
   app.post('/api/commits/_sign-helper', async (request, reply) => {

@@ -11,6 +11,7 @@ import {
 } from '../repos/eval-suite.js';
 import { GraderRunner } from '../agents/evaluation/grader-runner.js';
 import { parseBody } from './validate.js';
+import { registerRouteDoc } from '../openapi.js';
 
 function actorOf(request: unknown): string {
   const ctx = (request as { userId?: string } | undefined) ?? {};
@@ -128,6 +129,12 @@ export function registerEvalSuiteRoutes(
     const { capabilityId } = request.query as { capabilityId?: string };
     return reply.send(deps.suiteRepo.list(capabilityId));
   });
+  registerRouteDoc({
+    method: 'get',
+    path: '/api/eval-suites',
+    summary: 'List eval suites (?capabilityId=... to filter)',
+    tags: ['evals'],
+  });
 
   app.post('/api/eval-suites', async (request, reply) => {
     const parsed = parseBody(reply, CreateSuiteSchema, request.body);
@@ -154,12 +161,25 @@ export function registerEvalSuiteRoutes(
     });
     return reply.code(201).send(out);
   });
+  registerRouteDoc({
+    method: 'post',
+    path: '/api/eval-suites',
+    summary: 'Create an eval suite with version-1 grader config',
+    tags: ['evals'],
+    body: CreateSuiteSchema,
+  });
 
   app.get('/api/eval-suites/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     const suite = deps.suiteRepo.findById(id);
     if (!suite) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'suite not found' } });
     return reply.send({ suite, versions: deps.suiteRepo.listVersions(id) });
+  });
+  registerRouteDoc({
+    method: 'get',
+    path: '/api/eval-suites/:id',
+    summary: 'Fetch a suite and its version history',
+    tags: ['evals'],
   });
 
   app.post('/api/eval-suites/:id/run', async (request, reply) => {

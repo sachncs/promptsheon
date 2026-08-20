@@ -5,6 +5,7 @@ import type { RepoStore } from '../repos/repo-store.js';
 import type { BranchRepo } from '../repos/branch.js';
 import { CommitRepo } from '../repos/commit.js';
 import { parseBody } from './validate.js';
+import { registerRouteDoc } from '../openapi.js';
 
 const CreateCommitSchema = z.object({
   ref: z.string().min(1),
@@ -55,12 +56,26 @@ export function registerCommitRoutes(app: FastifyInstance, deps: CommitDeps): vo
 
     return reply.code(201).send(commit);
   });
+  registerRouteDoc({
+    method: 'post',
+    path: '/api/repos/:id/commits',
+    summary: 'Pin the working tree and create a commit',
+    tags: ['commits'],
+    params: z.object({ id: z.string().uuid() }),
+    body: CreateCommitSchema,
+  });
 
   app.get('/api/commits/:oid', async (request, reply) => {
     const { oid } = request.params as { oid: string };
     const commit = deps.commitRepo.findByOid(oid);
     if (!commit) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'commit not found' } });
     return reply.send(commit);
+  });
+  registerRouteDoc({
+    method: 'get',
+    path: '/api/commits/:oid',
+    summary: 'Fetch a commit by oid',
+    tags: ['commits'],
   });
 
   app.get('/api/repos/:id/commits', async (request, reply) => {
@@ -73,5 +88,11 @@ export function registerCommitRoutes(app: FastifyInstance, deps: CommitDeps): vo
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     }
     return reply.send(deps.commitRepo.listForRef(id, ref));
+  });
+  registerRouteDoc({
+    method: 'get',
+    path: '/api/repos/:id/commits',
+    summary: 'List commits for a ref',
+    tags: ['commits'],
   });
 }
