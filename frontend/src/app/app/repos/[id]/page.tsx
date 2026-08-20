@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, GitBranch, GitMerge, Save, Plus, History, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, GitBranch, GitMerge, Save, Plus, History, ShieldCheck, FileText } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
 import { repoApi, type RepoEntry, type BranchItem } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
@@ -12,6 +12,7 @@ import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
 import { HashChip } from '@/components/brand/hash-chip';
 import { StatusPill } from '@/components/brand/status-pill';
+import { Drawer, DrawerContent, DrawerTrigger } from '@/components/brand/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -55,6 +56,9 @@ export default function RepositoryDetail() {
   const [newPath, setNewPath] = useState('prompts/main.md');
   const [newContent, setNewContent] = useState('You are a careful assistant.');
   const [commitMsg, setCommitMsg] = useState('');
+  const [viewPath, setViewPath] = useState<string | null>(null);
+  const [viewContent, setViewContent] = useState<string | null>(null);
+  const [viewOid, setViewOid] = useState<string | null>(null);
 
   const putFile = useMutation({
     mutationFn: () => repoApi.putFile(id, newPath, newContent, ref),
@@ -129,6 +133,19 @@ export default function RepositoryDetail() {
               <DataTable
                 rows={(contents.data ?? []) as Array<Record<string, unknown>>}
                 rowKey={(r) => String(r['path'])}
+                onRowClick={async (r) => {
+                  const path = String(r['path']);
+                  setViewPath(path);
+                  setViewContent(null);
+                  setViewOid(String(r['blobOid']));
+                  try {
+                    const r2 = await repoApi.getFile(id, path, ref);
+                    const d = r2.data as unknown as { content?: string };
+                    setViewContent(typeof d.content === 'string' ? d.content : '(binary)');
+                  } catch {
+                    setViewContent('(failed to load)');
+                  }
+                }}
                 columns={[
                   {
                     key: 'path',
@@ -147,6 +164,22 @@ export default function RepositoryDetail() {
           </Surface>
 
           <Surface>
+            <Drawer open={viewPath !== null} onOpenChange={(o) => !o && setViewPath(null)}>
+              <DrawerTrigger asChild>
+                <span className="hidden" />
+              </DrawerTrigger>
+              <DrawerContent
+                title={viewPath ?? ''}
+                description={viewOid ? `blob ${viewOid.slice(0, 16)}…` : undefined}
+              >
+                <pre className="max-h-[60vh] overflow-auto rounded-md border border-border-subtle bg-surface-0 p-3 font-mono text-xs leading-relaxed text-text-default">
+{viewContent ?? 'loading…'}
+                </pre>
+                <div className="mt-3 text-xs text-text-muted">
+                  Read-only view. Edit by staging a new version of this file on the left.
+                </div>
+              </DrawerContent>
+            </Drawer>
             <SurfaceHeader title="Stage a file" description="Files written here are pinned the next time you commit." />
             <div className="grid gap-3 sm:grid-cols-2">
               <div>

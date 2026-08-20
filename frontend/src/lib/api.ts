@@ -257,6 +257,7 @@ export const repoApi = {
   listBranches: (repoId: string) => client.get(`/repos/${repoId}/branches`).then((r) => r.data),
   listTags: (repoId: string) => client.get(`/repos/${repoId}/tags`).then((r) => r.data),
   listContents: (repoId: string, ref = 'main') => client.get(`/repos/${repoId}/contents?ref=${encodeURIComponent(ref)}`).then((r) => r.data),
+  getFile: (repoId: string, path: string, ref = 'main') => client.get(`/repos/${repoId}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`),
   putFile: (repoId: string, path: string, content: string, ref = 'main') =>
     client.put(`/repos/${repoId}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`, { path, content, ref }).then((r) => r.data),
   commit: (repoId: string, ref: string, message: string, parents?: string[]) =>
