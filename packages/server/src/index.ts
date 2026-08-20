@@ -23,6 +23,7 @@ import { BranchRepo } from './repos/branch.js';
 import { TagRepo } from './repos/tag.js';
 import { RepoStore } from './repos/repo-store.js';
 import { CommitRepo } from './repos/commit.js';
+import { MergeRequestRepo } from './repos/mr.js';
 import { CapabilityRepo } from './repos/capability.js';
 import { VersionRepo } from './repos/version.js';
 import { ReleaseRepo } from './repos/release.js';
@@ -108,6 +109,7 @@ async function main() {
   const tagRepo = new TagRepo(db);
   const repoStore = new RepoStore(db);
   const commitRepo = new CommitRepo(db);
+  const mrRepo = new MergeRequestRepo(db);
   const capabilityRepo = new CapabilityRepo(db);
   const versionRepo = new VersionRepo(db);
   const releaseRepo = new ReleaseRepo(db);
@@ -272,6 +274,11 @@ async function main() {
       branchRepo,
       repoStore,
       commitRepo,
+    },
+    mrDeps: {
+      repoRepo,
+      branchRepo,
+      mrRepo,
     },
   });
 
