@@ -1,6 +1,12 @@
 export type { Org, Team, OrgRole, OrgMember, TeamMember } from './org.js';
 export type { Workspace } from './workspace.js';
 export type { Project } from './project.js';
+export type {
+  Repository,
+  RepositoryCreateInput,
+  RepositoryUpdateInput,
+  RepositoryVisibility,
+} from './repo.js';
 export type { Capability } from './capability.js';
 export type { CapabilityVersion } from './capability-version.js';
 export type {
