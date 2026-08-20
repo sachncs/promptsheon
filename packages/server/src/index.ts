@@ -24,6 +24,7 @@ import { TagRepo } from './repos/tag.js';
 import { RepoStore } from './repos/repo-store.js';
 import { CommitRepo } from './repos/commit.js';
 import { MergeRequestRepo } from './repos/mr.js';
+import { SigningKeyRepo } from './repos/signing-key.js';
 import { CapabilityRepo } from './repos/capability.js';
 import { VersionRepo } from './repos/version.js';
 import { ReleaseRepo } from './repos/release.js';
@@ -110,6 +111,7 @@ async function main() {
   const repoStore = new RepoStore(db);
   const commitRepo = new CommitRepo(db);
   const mrRepo = new MergeRequestRepo(db);
+  const signingKeyRepo = new SigningKeyRepo(db);
   const capabilityRepo = new CapabilityRepo(db);
   const versionRepo = new VersionRepo(db);
   const releaseRepo = new ReleaseRepo(db);
@@ -279,6 +281,11 @@ async function main() {
       repoRepo,
       branchRepo,
       mrRepo,
+    },
+    signingDeps: {
+      repoRepo,
+      commitRepo,
+      signingKeyRepo,
     },
   });
 
