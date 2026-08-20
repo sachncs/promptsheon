@@ -59,6 +59,19 @@ export { canTransition } from './release.js';
 export type { Execution } from './execution.js';
 export type { Dataset, DatasetCase } from './dataset.js';
 export type { EvalRun, EvalResult, EvalRunStatus } from './eval.js';
+export type {
+  EvalSuite,
+  EvalSuiteVersion,
+  GraderSpec,
+  GraderKind,
+  GraderConfig,
+  RegexMatchConfig,
+  SchemaStateCheckConfig,
+  ToolCallAssertionConfig,
+  TranscriptDiffConfig,
+  LlmRubricConfig,
+  EvalSuiteRunInput,
+} from './eval-suite.js';
 export type { AlertRule, Alert, AlertStatus, AlertSeverity } from './alert.js';
 export type { Precondition } from './precondition.js';
 export type { Schedule } from './schedule.js';
