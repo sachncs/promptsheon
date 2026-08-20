@@ -21,7 +21,7 @@ jobs:
           version: 9
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '26'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - name: shared typecheck
@@ -42,7 +42,7 @@ jobs:
           version: 9
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '26'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - name: approve native builds
@@ -60,7 +60,7 @@ jobs:
           version: 9
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '26'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @promptsheon/server build
