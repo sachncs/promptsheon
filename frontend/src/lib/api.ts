@@ -212,6 +212,7 @@ export const apiKeyApi = {
 export const userApi = {
   list: () => client.get('/users'),
   updateRole: (id: string, role: string) => client.put(`/users/${id}/role`, { role }),
+  me: () => client.get('/users/me'),
 };
 
 export const featureFlagApi = {

@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Activity } from 'lucide-react';
+import { useMemo } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
 import { workspaceApi, costApi } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
@@ -9,6 +10,7 @@ import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatCard } from '@/components/brand/stat-card';
 import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
+import { BarChart } from '@/components/brand/bar-chart';
 
 interface Rollup {
   capabilityId: string;
@@ -37,6 +39,27 @@ export default function CostPage() {
   const totalExec = rows.reduce((acc, r) => acc + r.executions, 0);
   const capabilityIds = new Set(rows.map((r) => r.capabilityId));
 
+  const byCapability = useMemo(() => {
+    const acc = new Map<string, number>();
+    for (const r of rows) {
+      acc.set(r.capabilityId, (acc.get(r.capabilityId) ?? 0) + r.costMicros);
+    }
+    return [...acc.entries()]
+      .map(([capabilityId, cost]) => ({ label: capabilityId.slice(0, 12), value: cost }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
+  }, [rows]);
+
+  const byDay = useMemo(() => {
+    const acc = new Map<string, number>();
+    for (const r of rows) {
+      acc.set(r.day, (acc.get(r.day) ?? 0) + r.costMicros);
+    }
+    return [...acc.entries()]
+      .map(([day, cost]) => ({ label: day, value: cost }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [rows]);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -56,6 +79,41 @@ export default function CostPage() {
           value={String(totalExec)}
           hint={`${capabilityIds.size} capability(s)`}
         />
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Surface>
+          <SurfaceHeader title="Cost by capability" description="Top capabilities by cumulative cost (30 d)" />
+          {byCapability.length === 0 ? (
+            <EmptyState
+              icon={Activity}
+              title="No rollups yet"
+              description="Ingest via POST /api/analytics/rollups to populate."
+              className="border-0 bg-transparent p-8"
+            />
+          ) : (
+            <BarChart
+              data={byCapability}
+              format={(n) => `$${(n / 1_000_000).toFixed(4)}`}
+            />
+          )}
+        </Surface>
+        <Surface>
+          <SurfaceHeader title="Cost by day" description="Daily totals across all capabilities" />
+          {byDay.length === 0 ? (
+            <EmptyState
+              icon={Activity}
+              title="No rollups yet"
+              description="Ingest via POST /api/analytics/rollups to populate."
+              className="border-0 bg-transparent p-8"
+            />
+          ) : (
+            <BarChart
+              data={byDay}
+              format={(n) => `$${(n / 1_000_000).toFixed(4)}`}
+            />
+          )}
+        </Surface>
       </div>
 
       <Surface padded={false}>
