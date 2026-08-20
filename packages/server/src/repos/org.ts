@@ -68,7 +68,18 @@ export class MembershipRepo {
   }
 
   findOrgMembers(orgId: string): OrgMember[] {
-    return this.db.prepare('SELECT * FROM org_members WHERE org_id = ?').all(orgId) as OrgMember[];
+    const rows = this.db.prepare('SELECT * FROM org_members WHERE org_id = ?').all(orgId) as Array<{
+      org_id: string;
+      user_id: string;
+      role: string;
+      joined_at: string;
+    }>;
+    return rows.map((row) => ({
+      orgId: row.org_id,
+      userId: row.user_id,
+      role: row.role as OrgRole,
+      joinedAt: row.joined_at,
+    }));
   }
 
   findOrgsForUser(userId: string): string[] {
