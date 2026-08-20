@@ -26,11 +26,11 @@ export class ReleaseRepo extends BaseRepo<Release> {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     this.db.prepare(`INSERT INTO releases (id, capability_id, capability_version, capability_version_id, manifest, environment, status, created_by, canary_percent, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(id, data.capabilityId, data.capabilityVersion, data.capabilityVersionId, data.manifest, data.environment, 'pending', data.createdBy ?? '', data.canaryPercent ?? 0, now, now);
+      .run(id, data.capabilityId, data.capabilityVersion, data.capabilityVersionId, data.manifest, data.environment, 'draft', data.createdBy ?? '', data.canaryPercent ?? 0, now, now);
     return {
       id, capabilityId: data.capabilityId, capabilityVersion: data.capabilityVersion,
       capabilityVersionId: data.capabilityVersionId, manifest: data.manifest,
-      environment: data.environment as Release['environment'], status: 'pending', createdBy: data.createdBy ?? '',
+      environment: data.environment as Release['environment'], status: 'draft', createdBy: data.createdBy ?? '',
       approvedBy: '', canaryPercent: data.canaryPercent ?? 0, createdAt: now,
       replacesReleaseId: null, activatedAt: null, supersededAt: null, supersededBy: null,
     };
@@ -45,36 +45,36 @@ export class ReleaseRepo extends BaseRepo<Release> {
   }
 
   /**
-   * Atomically rollback: supersede the current release and reactivate
+   * Atomically rollback: roll back the current release and reactivate
    * the target in a single transaction. The UNIQUE(active-per-cap-env)
-   * constraint is satisfied by superseding first.
+   * constraint is satisfied by rolling back first.
    *
-   * On success returns `{ superseded, reactivated }`. On any failure
+   * On success returns `{ rolledBack, reactivated }`. On any failure
    * the entire transaction is rolled back and the pair is unchanged.
    */
   rollbackAtomically(
     currentId: string,
     targetId: string,
-  ): { superseded: Release; reactivated: Release } | null {
+  ): { rolledBack: Release; reactivated: Release } | null {
     const current = this.findById(currentId);
     const target = this.findById(targetId);
     if (!current || !target) return null;
     if (currentId === targetId) return null;
 
-    let superseded: Release | null = null;
+    let rolledBack: Release | null = null;
     let reactivated: Release | null = null;
     this.db.transaction(() => {
       this.db.prepare(
-        "UPDATE releases SET status = 'superseded', updated_at = ? WHERE id = ?",
+        "UPDATE releases SET status = 'rolled_back', updated_at = ? WHERE id = ?",
       ).run(new Date().toISOString(), currentId);
       this.db.prepare(
         "UPDATE releases SET status = 'active', updated_at = ? WHERE id = ?",
       ).run(new Date().toISOString(), targetId);
-      superseded = { ...current, status: 'superseded' };
+      rolledBack = { ...current, status: 'rolled_back' };
       reactivated = { ...target, status: 'active' };
     })();
-    if (!superseded || !reactivated) return null;
-    return { superseded, reactivated };
+    if (!rolledBack || !reactivated) return null;
+    return { rolledBack, reactivated };
   }
 
   /**
@@ -92,10 +92,6 @@ export class ReleaseRepo extends BaseRepo<Release> {
     ).all(capabilityId, environment) as Release[];
   }
 
-  /**
-   * Find all active releases whose stored manifest matches the given
-   * manifest_hash. Used by the execution path to do canary routing.
-   */
   findActiveByManifestHash(manifestHash: string): Release[] {
     const all = this.db.prepare(
       "SELECT * FROM releases WHERE status = 'active'",
@@ -105,7 +101,6 @@ export class ReleaseRepo extends BaseRepo<Release> {
         const obj = JSON.parse(r.manifest) as Record<string, unknown>;
         if (obj['manifestHash'] === manifestHash) return true;
       } catch { /* ignore */ }
-      // Fallback: hash the manifest string and compare
       const { createHash } = require('node:crypto') as typeof import('node:crypto');
       const h = createHash('sha256').update(r.manifest).digest('hex');
       return h === manifestHash;
@@ -113,13 +108,13 @@ export class ReleaseRepo extends BaseRepo<Release> {
   }
 
   /**
-   * Find the most recent superseded release for a (capability, env) pair
+   * Find the most recent rolled-back release for a (capability, env) pair
    * with capability_version < currentVersion. Used by rollback to find
    * the previous known-good release.
    */
   findPreviousActive(capabilityId: string, environment: string, currentVersion: number): Release | null {
     return this.db.prepare(
-      "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'superseded' AND capability_version < ? ORDER BY capability_version DESC LIMIT 1",
+      "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'rolled_back' AND capability_version < ? ORDER BY capability_version DESC LIMIT 1",
     ).get(capabilityId, environment, currentVersion) as Release | null;
   }
 

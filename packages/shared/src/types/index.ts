@@ -44,7 +44,18 @@ export type {
   ConversationManagerConfig,
   EvaluationConfig,
 } from './manifest.js';
-export type { Release, ReleaseStatus, Environment } from './release.js';
+export type {
+  Release,
+  ReleaseStatus,
+  ReleaseTransition,
+  ReleaseTransition as ReleaseLifecycleEvent,
+  Environment,
+  LegacyReleaseStatus,
+  AnyReleaseStatus,
+  RELEASE_TRANSITIONS,
+  RELEASE_NEW_STATES,
+} from './release.js';
+export { canTransition } from './release.js';
 export type { Execution } from './execution.js';
 export type { Dataset, DatasetCase } from './dataset.js';
 export type { EvalRun, EvalResult, EvalRunStatus } from './eval.js';
