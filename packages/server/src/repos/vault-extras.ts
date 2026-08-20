@@ -198,12 +198,13 @@ export class CostRollupRepo {
         `SELECT cr.capability_id, cr.day, cr.cost_micros, cr.executions
          FROM capability_cost_rollups cr
          JOIN capabilities c ON c.id = cr.capability_id
-         JOIN workspaces w ON w.id = c.workspace_id
-         WHERE w.id IN (SELECT id FROM workspaces WHERE id = ?)
+         JOIN projects p ON p.id = c.project_id
+         JOIN workspaces w ON w.id = p.workspace_id
+         WHERE w.org_id IS NOT NULL
            AND cr.day >= date('now', ?)
          ORDER BY cr.day ASC`,
       )
-      .all(organizationId, `-${days} days`) as Array<{
+      .all(`-${days} days`) as Array<{
         capability_id: string;
         day: string;
         cost_micros: number;

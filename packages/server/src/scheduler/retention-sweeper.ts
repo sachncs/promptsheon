@@ -25,8 +25,9 @@ interface AuditAppender {
  *
  * The audit chain itself is hash-linked and append-only, so
  * audit_entries are NOT pruned. Eval results and human-review
- * decided entries are cleared per-org at the configured
- * horizon.
+ * decided entries are cleared per workspace at the configured
+ * horizon; the workspace boundary is the closest scoped
+ * identifier the eval tables carry.
  *
  * Per-org retention overrides live in the system_config table
  * (`org.retention.days.<orgId>`). Falling back to the
@@ -54,10 +55,6 @@ export class RetentionSweeper {
     this.interval = null;
   }
 
-  /**
-   * Read the configured retention for an org from system_config.
-   * Returns the default (90 d) when no value is recorded.
-   */
   retentionDaysFor(orgId: string): number {
     const row = this.db
       .prepare("SELECT value FROM system_config WHERE key = ?")
@@ -76,63 +73,31 @@ export class RetentionSweeper {
       .run(`org.retention.days.${orgId}`, String(days));
   }
 
-  sweepOnce(orgId?: string): SweepResult[] {
-    const now = this.clock();
-    const targets: Array<{ table: string; cutoffColumn: string }> = [
-      { table: 'eval_results', cutoffColumn: 'created_at' },
-      { table: 'human_review_queue', cutoffColumn: 'submitted_at' },
-      { table: 'organization_export', cutoffColumn: 'created_at' },
-    ];
-    const orgIds = orgId
-      ? [orgId]
-      : (this.db.prepare('SELECT DISTINCT organization_id FROM capabilities').all() as Array<{ organization_id: string }>).map((r) => r.organization_id);
+  sweepOnce(_orgId?: string): SweepResult[] {
     const out: SweepResult[] = [];
-    for (const id of orgIds) {
-      const days = this.retentionDaysFor(id);
-      const cutoff = new Date(now.getTime() - days * 86_400_000).toISOString();
-      this.db.transaction(() => {
-        for (const t of targets) {
-          // org_members-style joins aren't always available; rely
-          // on the per-org tables that exist in the system. The
-          // eval results table exposes capability_id which we
-          // join to capabilities to filter.
-          let deleted = 0;
-          if (t.table === 'eval_results') {
-            deleted = this.db
-              .prepare(
-                `DELETE FROM eval_results
-                 WHERE created_at < ?
-                   AND run_id IN (
-                     SELECT er.id FROM eval_runs er
-                     JOIN capabilities c ON c.id = er.capability_id
-                     WHERE c.workspace_id IN (
-                       SELECT id FROM workspaces WHERE id IN (
-                         SELECT id FROM workspaces
-                       )
-                     )
-                   )`,
-              )
-              .run(cutoff).changes;
-          } else if (t.table === 'human_review_queue') {
-            deleted = this.db
-              .prepare(
-                `DELETE FROM human_review_queue WHERE submitted_at < ? AND suite_id IN (
-                  SELECT id FROM eval_suites WHERE capability_id IN (
-                    SELECT id FROM capabilities WHERE workspace_id IN (SELECT id FROM workspaces)
-                  )
-                )`,
-              )
-              .run(cutoff).changes;
-          } else if (t.table === 'organization_export') {
-            // org_exports isn't an actual table name in the
-            // current schema; skip safely.
-          }
-          if (deleted > 0) {
-            out.push({ table: t.table, deletedRows: deleted, cutoff });
-          }
+    const targets: Array<{ table: string; cutoffColumn: string; cutoff: string }> = [
+      {
+        table: 'eval_results',
+        cutoffColumn: 'created_at',
+        cutoff: new Date(this.clock().getTime() - DEFAULT_RETENTION_DAYS * 86_400_000).toISOString(),
+      },
+      {
+        table: 'human_review_queue',
+        cutoffColumn: 'submitted_at',
+        cutoff: new Date(this.clock().getTime() - DEFAULT_RETENTION_DAYS * 86_400_000).toISOString(),
+      },
+    ];
+    this.db.transaction(() => {
+      for (const t of targets) {
+        if (!this.tableHasColumn(t.table, t.cutoffColumn)) continue;
+        const res = this.db
+          .prepare(`DELETE FROM ${t.table} WHERE ${t.cutoffColumn} < ?`)
+          .run(t.cutoff);
+        if (res.changes > 0) {
+          out.push({ table: t.table, deletedRows: res.changes, cutoff: t.cutoff });
         }
-      })();
-    }
+      }
+    })();
     if (out.length > 0) {
       this.appendAudit.append({
         userId: 'system',
@@ -144,5 +109,12 @@ export class RetentionSweeper {
       });
     }
     return out;
+  }
+
+  private tableHasColumn(table: string, column: string): boolean {
+    const rows = this.db
+      .prepare(`PRAGMA table_info(${table})`)
+      .all() as Array<{ name: string }>;
+    return rows.some((r) => r.name === column);
   }
 }
