@@ -48,6 +48,13 @@ coverage/
 web/screenshots/
 web/dist/
 
+# Frontend (Next.js) — build artefacts only; frontend/.gitignore covers
+# the rest (node_modules, .next, out, build, .env*, etc).
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.turbo/
+
 # Secret material — never commit
 *.pem
 *.key
@@ -64,3 +71,6 @@ web/dist/
 # Temporary files
 .tmp/
 *.tmp
+
+# OpenCode session artefacts
+.opencode/
