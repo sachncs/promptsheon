@@ -29,7 +29,8 @@ function toKey(row: Row): SigningKey {
 
 /**
  * Compute the SHA-256 fingerprint of an ed25519 SPKI DER encoding.
- * The same fingerprint is produced by openssl, ssh-keygen, etc.
+ * The full 64-char hex is returned so the value matches what
+ * openssl / ssh-keygen publish.
  */
 export function fingerprintSpki(publicKeyPem: string): string {
   const keyObject = createPublicKey(publicKeyPem);
