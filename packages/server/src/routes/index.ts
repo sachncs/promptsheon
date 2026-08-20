@@ -43,6 +43,8 @@ import { registerEvalSuiteRoutes, type EvalSuiteRouteDeps } from './eval-suite.j
 import { registerVaultRoutes, type VaultRouteDeps } from './vault.js';
 import { registerOpenApiRoutes } from '../openapi.js';
 import { registerRetentionRoutes, type RetentionRouteDeps } from './retention.js';
+import { registerRedteamRoutes, type RedteamDeps } from './redteam.js';
+import { registerExperimentRoutes, type ExperimentDeps } from './experiment.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -114,6 +116,8 @@ export interface AppDeps {
   evalSuiteDeps: EvalSuiteRouteDeps;
   vaultDeps: VaultRouteDeps;
   retentionDeps: RetentionRouteDeps;
+  redteamDeps: RedteamDeps;
+  experimentDeps: ExperimentDeps;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -174,6 +178,8 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerVaultRoutes(app, deps.vaultDeps);
   registerOpenApiRoutes(app);
   registerRetentionRoutes(app, deps.retentionDeps);
+  registerRedteamRoutes(app, deps.redteamDeps);
+  registerExperimentRoutes(app, deps.experimentDeps);
 
   if (deps.chaosConfig) {
     registerChaosRoutes(app, {
