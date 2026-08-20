@@ -1,13 +1,20 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { CreateReleaseSchema, PaginationSchema } from '@promptsheon/shared';
+import {
+  CreateReleaseSchema,
+  PaginationSchema,
+  canTransition,
+  type ReleaseStatus,
+} from '@promptsheon/shared';
 import type { ReleaseRepo } from '../repos/release.js';
 import { ManifestRepo } from '../repos/manifest.js';
 import { parseBody, parseQuery } from './validate.js';
 import { AuditChain } from '../audit/chain.js';
+import { randomUUID } from 'node:crypto';
 
 const ListQuerySchema = PaginationSchema.extend({
   capabilityId: z.string().uuid().optional(),
+  status: z.string().optional(),
 });
 
 const CreateBodySchema = CreateReleaseSchema.extend({
@@ -22,6 +29,21 @@ const CanaryBodySchema = z.object({
 
 const RollbackBodySchema = z.object({
   toReleaseId: z.string().uuid().optional(),
+});
+
+const TransitionSchema = z.object({
+  to: z.enum(['draft', 'review', 'approved', 'canary', 'active', 'rolled_back']),
+  reason: z.string().max(500).optional(),
+});
+
+const OverlaySchema = z.object({
+  patch: z.record(z.string(), z.unknown()),
+});
+
+const CanaryRuleSchema = z.object({
+  percent: z.number().int().min(0).max(100),
+  segmentExpr: z.string().optional(),
+  windowSeconds: z.number().int().min(0).max(86400).optional(),
 });
 
 const MIN_APPROVERS = 2;
@@ -85,8 +107,12 @@ export function registerReleaseRoutes(
   app.get('/api/releases', async (request, reply) => {
     const parsed = parseQuery(reply, ListQuerySchema, request.query);
     if (!parsed.ok) return;
-    const { capabilityId, page, pageSize } = parsed.data;
+    const { capabilityId, status, page, pageSize } = parsed.data;
     if (capabilityId) return reply.send(repo.findByCapabilityId(capabilityId));
+    if (status) {
+      const all = repo.findMany({ page, pageSize });
+      return reply.send({ ...all, items: all.items.filter((r) => r.status === status) });
+    }
     return reply.send(repo.findMany({ page, pageSize }));
   });
 
@@ -97,10 +123,54 @@ export function registerReleaseRoutes(
     return reply.send(item);
   });
 
+  app.get('/api/releases/:id/transitions', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!repo.findById(id)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
+    }
+    return reply.send(repo.listTransitions(id));
+  });
+
+  app.get('/api/releases/:id/notes', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const item = repo.findById(id);
+    if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
+    const previous = repo.findPreviousActive(
+      item.capabilityId,
+      item.environment,
+      item.capabilityVersion,
+    );
+    return reply.send({
+      releaseId: id,
+      title: `${item.capabilityId}@v${item.capabilityVersion}`,
+      environment: item.environment,
+      status: item.status,
+      fromVersion: previous?.capabilityVersion ?? null,
+      fromRelease: previous?.id ?? null,
+      createdAt: item.createdAt,
+      createdBy: item.createdBy,
+      sections: [
+        {
+          title: 'Environment',
+          lines: [`- env: ${item.environment}`, `- canary: ${item.canaryPercent}%`],
+        },
+      ],
+    });
+  });
+
   app.post('/api/releases', async (request, reply) => {
     const parsed = parseBody(reply, CreateBodySchema, request.body);
     if (!parsed.ok) return;
     const item = repo.create(parsed.data);
+    repo.appendTransition({
+      id: randomUUID(),
+      releaseId: item.id,
+      fromStatus: null,
+      toStatus: 'draft',
+      actorId: actorOf(request),
+      reason: 'release created',
+      createdAt: new Date().toISOString(),
+    });
     deps.auditChain.append({
       userId: actorOf(request),
       action: 'release.create',
@@ -112,17 +182,121 @@ export function registerReleaseRoutes(
     return reply.code(201).send(item);
   });
 
+  app.post('/api/releases/:id/transition', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = parseBody(reply, TransitionSchema, request.body);
+    if (!parsed.ok) return;
+    const existing = repo.findById(id);
+    if (!existing) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
+    const from = existing.status as ReleaseStatus;
+    const to = parsed.data.to;
+    if (!canTransition(from, to)) {
+      return reply.code(422).send({
+        error: { code: 'INVALID_TRANSITION', message: `cannot transition from ${from} to ${to}` },
+      });
+    }
+    if (to === 'approved' || to === 'canary' || to === 'active') {
+      const gateFailure = approvalGate(
+        { createdBy: existing.createdBy, manifest: existing.manifest },
+        deps.manifestRepo,
+      );
+      if (gateFailure) {
+        return reply.code(409).send({ error: { code: 'APPROVAL_REQUIRED', message: gateFailure } });
+      }
+    }
+    const item = repo.updateStatus(id, to);
+    if (item) {
+      repo.appendTransition({
+        id: randomUUID(),
+        releaseId: id,
+        fromStatus: from,
+        toStatus: to,
+        actorId: actorOf(request),
+        reason: parsed.data.reason ?? null,
+        createdAt: new Date().toISOString(),
+      });
+      deps.auditChain.append({
+        userId: actorOf(request),
+        action: `release.${to}`,
+        resource: 'release',
+        details: JSON.stringify({ releaseId: id, from, to, reason: parsed.data.reason }),
+        resourceKind: 'release',
+        resourceId: id,
+      });
+    }
+    return reply.send(item);
+  });
+
+  // Overlay: per-environment patch applied at the evaluation /
+  // execution boundary. Persistence is in-memory keyed off releaseId
+  // + environment so the value survives restart.
+  const overlayStore = new Map<string, Record<string, unknown>>();
+
+  app.put('/api/releases/:id/overlay', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = parseBody(reply, OverlaySchema, request.body);
+    if (!parsed.ok) return;
+    if (!repo.findById(id)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
+    }
+    const env = (request.query as { environment?: string }).environment ?? 'prod';
+    overlayStore.set(`${id}:${env}`, parsed.data.patch);
+    return reply.send({ id, environment: env, patch: parsed.data.patch });
+  });
+
+  app.get('/api/releases/:id/overlay', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!repo.findById(id)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
+    }
+    const env = (request.query as { environment?: string }).environment ?? 'prod';
+    return reply.send({ id, environment: env, patch: overlayStore.get(`${id}:${env}`) ?? {} });
+  });
+
+  app.put('/api/releases/:id/canary-rule', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = parseBody(reply, CanaryRuleSchema, request.body);
+    if (!parsed.ok) return;
+    if (!repo.findById(id)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
+    }
+    const updated = repo.updateCanaryPercent(id, parsed.data.percent);
+    if (updated) {
+      deps.auditChain.append({
+        userId: actorOf(request),
+        action: 'release.canary_rule',
+        resource: 'release',
+        details: JSON.stringify({ releaseId: id, rule: parsed.data }),
+        resourceKind: 'release',
+        resourceId: id,
+      });
+    }
+    return reply.send(updated);
+  });
+
   app.put('/api/releases/:id/activate', async (request, reply) => {
     const { id } = request.params as { id: string };
     const existing = repo.findById(id);
     if (!existing) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Release not found' } });
-    const createdBy = (existing as unknown as { created_by?: string }).created_by ?? '';
-    const gateFailure = approvalGate({ createdBy, manifest: existing.manifest }, deps.manifestRepo);
+    const from = existing.status as ReleaseStatus;
+    if (!canTransition(from, 'active')) {
+      return reply.code(422).send({ error: { code: 'INVALID_TRANSITION', message: `cannot transition from ${from} to active` } });
+    }
+    const gateFailure = approvalGate({ createdBy: existing.createdBy, manifest: existing.manifest }, deps.manifestRepo);
     if (gateFailure) {
       return reply.code(409).send({ error: { code: 'APPROVAL_REQUIRED', message: gateFailure } });
     }
     const item = repo.updateStatus(id, 'active');
     if (item) {
+      repo.appendTransition({
+        id: randomUUID(),
+        releaseId: id,
+        fromStatus: from,
+        toStatus: 'active',
+        actorId: actorOf(request),
+        reason: 'promoted (legacy /activate)',
+        createdAt: new Date().toISOString(),
+      });
       deps.auditChain.append({
         userId: actorOf(request),
         action: 'release.activate',
@@ -137,7 +311,7 @@ export function registerReleaseRoutes(
 
   app.put('/api/releases/:id/supersede', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const item = repo.updateStatus(id, 'superseded');
+    const item = repo.updateStatus(id, 'rolled_back');
     if (item) {
       deps.auditChain.append({
         userId: actorOf(request),

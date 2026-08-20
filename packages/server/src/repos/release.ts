@@ -125,4 +125,54 @@ export class ReleaseRepo extends BaseRepo<Release> {
       .run(percent, new Date().toISOString(), id);
     return { ...existing, canaryPercent: percent };
   }
+
+  listTransitions(releaseId: string): Array<{
+    id: string;
+    releaseId: string;
+    fromStatus: string | null;
+    toStatus: string;
+    actorId: string;
+    reason: string | null;
+    createdAt: string;
+  }> {
+    const rows = this.db
+      .prepare(
+        'SELECT * FROM release_transitions WHERE release_id = ? ORDER BY created_at ASC',
+      )
+      .all(releaseId) as Array<{
+        id: string;
+        release_id: string;
+        from_status: string | null;
+        to_status: string;
+        actor_id: string;
+        reason: string | null;
+        created_at: string;
+      }>;
+    return rows.map((r) => ({
+      id: r.id,
+      releaseId: r.release_id,
+      fromStatus: r.from_status,
+      toStatus: r.to_status,
+      actorId: r.actor_id,
+      reason: r.reason,
+      createdAt: r.created_at,
+    }));
+  }
+
+  appendTransition(row: {
+    id: string;
+    releaseId: string;
+    fromStatus: string | null;
+    toStatus: string;
+    actorId: string;
+    reason: string | null;
+    createdAt: string;
+  }): void {
+    this.db
+      .prepare(
+        `INSERT INTO release_transitions (id, release_id, from_status, to_status, actor_id, reason, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(row.id, row.releaseId, row.fromStatus, row.toStatus, row.actorId, row.reason, row.createdAt);
+  }
 }
