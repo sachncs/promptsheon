@@ -25,6 +25,7 @@ import { RepoStore } from './repos/repo-store.js';
 import { CommitRepo } from './repos/commit.js';
 import { MergeRequestRepo } from './repos/mr.js';
 import { SigningKeyRepo } from './repos/signing-key.js';
+import { EvalSuiteRepo, HumanReviewRepo } from './repos/eval-suite.js';
 import { CapabilityRepo } from './repos/capability.js';
 import { VersionRepo } from './repos/version.js';
 import { ReleaseRepo } from './repos/release.js';
@@ -112,6 +113,8 @@ async function main() {
   const commitRepo = new CommitRepo(db);
   const mrRepo = new MergeRequestRepo(db);
   const signingKeyRepo = new SigningKeyRepo(db);
+  const evalSuiteRepo = new EvalSuiteRepo(db);
+  const humanReviewRepo = new HumanReviewRepo(db);
   const capabilityRepo = new CapabilityRepo(db);
   const versionRepo = new VersionRepo(db);
   const releaseRepo = new ReleaseRepo(db);
@@ -286,6 +289,10 @@ async function main() {
       repoRepo,
       commitRepo,
       signingKeyRepo,
+    },
+    evalSuiteDeps: {
+      suiteRepo: evalSuiteRepo,
+      humanReviewRepo,
     },
   });
 

@@ -23,7 +23,7 @@ export interface EvalSuiteVersion {
   id: string;
   suiteId: string;
   version: number;
-  graderConfig: GraderConfig;
+  graderConfig: GraderSpec[];
   passThreshold: number;
   borderlineBand: number;
   k: number;

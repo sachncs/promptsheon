@@ -39,6 +39,7 @@ import { registerContentsRoutes, type ContentsDeps } from './contents.js';
 import { registerCommitRoutes, type CommitDeps } from './commits.js';
 import { registerMergeRequestRoutes, type MRDeps } from './mr.js';
 import { registerSigningRoutes, type SigningDeps } from './signing.js';
+import { registerEvalSuiteRoutes, type EvalSuiteRouteDeps } from './eval-suite.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -107,6 +108,7 @@ export interface AppDeps {
   commitDeps: CommitDeps;
   mrDeps: MRDeps;
   signingDeps: SigningDeps;
+  evalSuiteDeps: EvalSuiteRouteDeps;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -163,6 +165,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerCommitRoutes(app, deps.commitDeps);
   registerMergeRequestRoutes(app, deps.mrDeps);
   registerSigningRoutes(app, deps.signingDeps);
+  registerEvalSuiteRoutes(app, deps.evalSuiteDeps);
 
   if (deps.chaosConfig) {
     registerChaosRoutes(app, {
