@@ -18,6 +18,9 @@ import { ReasoningCompiler } from './agents/compiler/compiler.js';
 import { CasStore } from '@promptsheon/shared';
 import { WorkspaceRepo } from './repos/workspace.js';
 import { ProjectRepo } from './repos/project.js';
+import { RepoRepo } from './repos/repo.js';
+import { BranchRepo } from './repos/branch.js';
+import { TagRepo } from './repos/tag.js';
 import { CapabilityRepo } from './repos/capability.js';
 import { VersionRepo } from './repos/version.js';
 import { ReleaseRepo } from './repos/release.js';
@@ -98,6 +101,9 @@ async function main() {
 
   const workspaceRepo = new WorkspaceRepo(db);
   const projectRepo = new ProjectRepo(db);
+  const repoRepo = new RepoRepo(db);
+  const branchRepo = new BranchRepo(db);
+  const tagRepo = new TagRepo(db);
   const capabilityRepo = new CapabilityRepo(db);
   const versionRepo = new VersionRepo(db);
   const releaseRepo = new ReleaseRepo(db);
@@ -247,6 +253,11 @@ async function main() {
     apiKeyRepo,
     userRepo: new UserRepo(db),
     llmRouter: new LlmRouter(),
+    repoDeps: {
+      repoRepo,
+      branchRepo,
+      tagRepo,
+    },
   });
 
   const scheduler = new Scheduler(scheduleRepo, sseHub);
