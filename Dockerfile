@@ -16,7 +16,7 @@
 # syntax=docker/dockerfile:1.7
 
 # ----- Dependencies stage ---------------------------------------------------
-FROM node:22-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /src
 RUN corepack enable
 COPY packages/package.json packages/pnpm-workspace.yaml packages/pnpm-lock.yaml* ./
@@ -37,7 +37,7 @@ RUN cd packages/server && pnpm build
 RUN cd frontend && pnpm build
 
 # ----- Runtime stage --------------------------------------------------------
-FROM node:22-alpine AS runtime
+FROM node:26-alpine AS runtime
 RUN apk add --no-cache ca-certificates tzdata \
   && addgroup -g 1000 promptsheon \
   && adduser -D -u 1000 -G promptsheon promptsheon
