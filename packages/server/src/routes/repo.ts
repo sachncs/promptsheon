@@ -5,7 +5,7 @@ import type {
   RepositoryCreateInput,
   RepositoryUpdateInput,
 } from '@promptsheon/shared';
-import type { RepoRepo } from '../repos/repo.js';
+import { RepoRepo, RepositoryExistsError } from '../repos/repo.js';
 import type { BranchRepo } from '../repos/branch.js';
 import type { TagRepo } from '../repos/tag.js';
 import { parseBody } from './validate.js';
@@ -82,7 +82,15 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
   app.post('/api/repos', async (request, reply) => {
     const parsed = parseBody(reply, CreateRepoSchema, request.body);
     if (!parsed.ok) return;
-    const repo = deps.repoRepo.create(parsed.data);
+    let repo;
+    try {
+      repo = deps.repoRepo.create(parsed.data);
+    } catch (err) {
+      if (err instanceof RepositoryExistsError) {
+        return reply.code(409).send({ error: { code: 'REPO_EXISTS', message: err.message } });
+      }
+      throw err;
+    }
     deps.branchRepo.create({
       repositoryId: repo.id,
       name: repo.defaultBranch,

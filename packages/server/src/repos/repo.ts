@@ -60,27 +60,34 @@ export class RepoRepo extends BaseRepo<Repository> {
     const id = randomUUID();
     const now = new Date().toISOString();
     const slug = input.slug ?? slugify(input.name);
-    this.db
-      .prepare(
-        `INSERT INTO repositories (
-            id, workspace_id, name, slug, description,
-            default_branch, visibility, min_approvers, require_signed_releases,
-            created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
-        id,
-        input.workspaceId,
-        input.name,
-        slug,
-        input.description ?? null,
-        input.defaultBranch ?? 'main',
-        input.visibility ?? 'private',
-        input.minApprovers ?? 1,
-        input.requireSignedReleases ? 1 : 0,
-        now,
-        now,
-      );
+    try {
+      this.db
+        .prepare(
+          `INSERT INTO repositories (
+              id, workspace_id, name, slug, description,
+              default_branch, visibility, min_approvers, require_signed_releases,
+              created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          id,
+          input.workspaceId,
+          input.name,
+          slug,
+          input.description ?? null,
+          input.defaultBranch ?? 'main',
+          input.visibility ?? 'private',
+          input.minApprovers ?? 1,
+          input.requireSignedReleases ? 1 : 0,
+          now,
+          now,
+        );
+    } catch (err) {
+      if ((err as { code?: string }).code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        throw new RepositoryExistsError(input.workspaceId, slug);
+      }
+      throw err;
+    }
     return this.findById(id)!;
   }
 
@@ -134,4 +141,11 @@ function slugify(input: string): string {
     .trim()
     .replace(/\s+/g, '-')
     .slice(0, 60);
+}
+
+export class RepositoryExistsError extends Error {
+  constructor(workspaceId: string, slug: string) {
+    super(`repository already exists: ${workspaceId}/${slug}`);
+    this.name = 'RepositoryExistsError';
+  }
 }
