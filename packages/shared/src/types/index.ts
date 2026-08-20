@@ -19,6 +19,7 @@ export type {
   MergeRequestCreateInput,
   MergeRequestDecisionInput,
 } from './mr.js';
+export type { SigningKey, SigningKeyCreateInput } from './signing-key.js';
 export { commitInputPayload } from './commit.js';
 export type { Capability } from './capability.js';
 export type { CapabilityVersion } from './capability-version.js';
