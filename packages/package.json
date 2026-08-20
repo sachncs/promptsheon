@@ -1,19 +1,17 @@
 {
   "name": "promptsheon",
   "private": true,
-  "workspaces": [
-    "packages/shared",
-    "packages/server",
-    "frontend"
-  ],
+  "version": "0.1.0",
   "scripts": {
-    "build": "npm run build --workspaces",
-    "dev": "npm run dev -w packages/server",
-    "lint": "npm run lint --workspaces",
-    "typecheck": "npm run typecheck --workspaces",
-    "test": "npm run test --workspaces --if-present"
+    "dev": "concurrently -n server,frontend -c blue,green \"pnpm --dir server dev\" \"sh -c 'cd ../frontend && pnpm dev'\"",
+    "dev:server": "pnpm --dir server dev",
+    "dev:frontend": "sh -c 'cd ../frontend && pnpm dev'",
+    "build": "pnpm --dir shared build && pnpm --dir server build && sh -c 'cd ../frontend && pnpm build'",
+    "typecheck": "pnpm --dir shared typecheck && pnpm --dir server typecheck && sh -c 'cd ../frontend && pnpm typecheck'",
+    "test": "pnpm --dir server test"
   },
   "devDependencies": {
+    "concurrently": "^9.1.0",
     "typescript": "^5.7.0"
   },
   "engines": {
