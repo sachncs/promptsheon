@@ -42,6 +42,7 @@ import { registerSigningRoutes, type SigningDeps } from './signing.js';
 import { registerEvalSuiteRoutes, type EvalSuiteRouteDeps } from './eval-suite.js';
 import { registerVaultRoutes, type VaultRouteDeps } from './vault.js';
 import { registerOpenApiRoutes } from '../openapi.js';
+import { registerRetentionRoutes, type RetentionRouteDeps } from './retention.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -112,6 +113,7 @@ export interface AppDeps {
   signingDeps: SigningDeps;
   evalSuiteDeps: EvalSuiteRouteDeps;
   vaultDeps: VaultRouteDeps;
+  retentionDeps: RetentionRouteDeps;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -171,6 +173,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerEvalSuiteRoutes(app, deps.evalSuiteDeps);
   registerVaultRoutes(app, deps.vaultDeps);
   registerOpenApiRoutes(app);
+  registerRetentionRoutes(app, deps.retentionDeps);
 
   if (deps.chaosConfig) {
     registerChaosRoutes(app, {

@@ -231,6 +231,26 @@ async function main() {
     return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
   });
 
+  const RetentionSweeperModule = await import('./scheduler/retention-sweeper.js');
+  const RetentionSweeper = RetentionSweeperModule.RetentionSweeper;
+  const retention = new RetentionSweeper(
+    db,
+    {
+      append: (entry) => {
+        auditChain.append({
+          userId: entry.userId,
+          action: entry.action,
+          resource: entry.resource,
+          details: entry.details,
+          resourceKind: entry.resourceKind,
+          resourceId: entry.resourceId,
+        });
+      },
+    },
+    () => new Date(),
+  );
+  retention.start();
+
   await registerRoutes(app, {
     db,
     workspaceRepo,
@@ -312,6 +332,13 @@ async function main() {
         return ctx?.orgContext?.role === 'admin';
       },
     },
+    retentionDeps: (() => {
+      const adminOnly = (request: unknown): boolean => {
+        const ctx = request as { orgContext?: { role?: string } } | undefined;
+        return ctx?.orgContext?.role === 'admin';
+      };
+      return { sweeper: retention, adminOnly };
+    })(),
   });
 
   const scheduler = new Scheduler(scheduleRepo, sseHub);
