@@ -1,8 +1,20 @@
 import axios from 'axios';
+import { getSession } from './session';
 
 const client = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
+});
+
+client.interceptors.request.use((config) => {
+  const session = getSession();
+  if (session?.userId) {
+    config.headers.set('X-User-Id', session.userId);
+  }
+  if (session?.orgId) {
+    config.headers.set('X-Org-Id', session.orgId);
+  }
+  return config;
 });
 
 client.interceptors.response.use(
