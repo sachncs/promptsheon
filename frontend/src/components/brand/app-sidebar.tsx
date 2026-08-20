@@ -6,7 +6,7 @@ import * as React from 'react';
 import {
   LayoutDashboard, FolderOpen, Boxes, Workflow, Compass, Flag,
   GitBranch, Target, Activity, CalendarClock, FlaskConical,
-  ShieldCheck, ScrollText, Users, KeyRound, Webhook, Cog,
+  ShieldCheck, ScrollText, Users, KeyRound, Webhook, Cog, Search, GitMerge, ListChecks,
   ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { Logo } from '@/brand/logo';
@@ -31,6 +31,15 @@ const groups: NavGroup[] = [
     items: [{ href: '/app', label: 'Control plane', icon: LayoutDashboard }],
   },
   {
+    label: 'Repositories',
+    items: [
+      { href: '/app/repos', label: 'Repositories', icon: GitBranch },
+      { href: '/app/merge-requests', label: 'Merge requests', icon: GitMerge },
+      { href: '/app/signing-keys', label: 'Signing keys', icon: ShieldCheck },
+      { href: '/app/search', label: 'Search', icon: Search },
+    ],
+  },
+  {
     label: 'Capabilities',
     items: [
       { href: '/app/capabilities', label: 'Registry', icon: Boxes },
@@ -52,6 +61,7 @@ const groups: NavGroup[] = [
     label: 'Quality',
     items: [
       { href: '/app/eval', label: 'Eval runs', icon: FlaskConical },
+      { href: '/app/eval/suites', label: 'Suites', icon: ListChecks },
       { href: '/app/approvals', label: 'Approvals', icon: ShieldCheck },
       { href: '/app/audit', label: 'Audit log', icon: ScrollText },
     ],
@@ -59,6 +69,8 @@ const groups: NavGroup[] = [
   {
     label: 'Admin',
     items: [
+      { href: '/app/admin/cost', label: 'Cost & analytics', icon: Activity },
+      { href: '/app/vault', label: 'Vault', icon: KeyRound },
       { href: '/app/workspaces', label: 'Workspaces', icon: FolderOpen },
       { href: '/app/users', label: 'Users', icon: Users },
       { href: '/app/api-keys', label: 'API keys', icon: KeyRound },

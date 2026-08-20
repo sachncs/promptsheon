@@ -222,3 +222,116 @@ export const featureFlagApi = {
 export const auditApi = {
   list: (params?: { resource?: string; action?: string }) => client.get('/audit', { params }),
 };
+
+// ---- Phase 5 surface: repositories, branches, contents, commits, MRs, signing, evals, vault, search, cost
+
+export interface BranchItem {
+  id: string;
+  repositoryId: string;
+  name: string;
+  headCommitOid: string | null;
+  isProtected: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface TagItem {
+  id: string;
+  repositoryId: string;
+  name: string;
+  commitOid: string;
+  message: string | null;
+  taggerId: string;
+  createdAt: string;
+}
+export interface RepoEntry {
+  path: string;
+  blobOid: string;
+  size: number;
+}
+
+export const repoApi = {
+  list: (workspaceId: string) => client.get(`/repos?workspaceId=${encodeURIComponent(workspaceId)}`).then((r) => r.data),
+  get: (id: string) => client.get(`/repos/${id}`).then((r) => r.data),
+  create: (input: { workspaceId: string; name: string }) => client.post('/repos', input).then((r) => r.data),
+  listBranches: (repoId: string) => client.get(`/repos/${repoId}/branches`).then((r) => r.data),
+  listTags: (repoId: string) => client.get(`/repos/${repoId}/tags`).then((r) => r.data),
+  listContents: (repoId: string, ref = 'main') => client.get(`/repos/${repoId}/contents?ref=${encodeURIComponent(ref)}`).then((r) => r.data),
+  putFile: (repoId: string, path: string, content: string, ref = 'main') =>
+    client.put(`/repos/${repoId}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`, { path, content, ref }).then((r) => r.data),
+  commit: (repoId: string, ref: string, message: string, parents?: string[]) =>
+    client.post(`/repos/${repoId}/commits`, { ref, message, parents }).then((r) => r.data),
+  listCommits: (repoId: string, ref: string) => client.get(`/repos/${repoId}/commits?ref=${encodeURIComponent(ref)}`).then((r) => r.data),
+  listMRs: (repoId: string, status?: string) =>
+    client.get(`/repos/${repoId}/merge-requests${status ? `?status=${status}` : ''}`).then((r) => r.data),
+  openMR: (input: {
+    repositoryId: string;
+    title: string;
+    description?: string;
+    sourceBranch: string;
+    targetBranch: string;
+    sourceCommitOid: string;
+  }) => client.post(`/repos/${input.repositoryId}/merge-requests`, input).then((r) => r.data),
+  getMR: (id: string) => client.get(`/merge-requests/${id}`).then((r) => r.data),
+  decideMR: (id: string, decision: 'approve' | 'request_changes', comment?: string) =>
+    client.post(`/merge-requests/${id}/decisions`, { decision, comment }).then((r) => r.data),
+  commentMR: (id: string, body: string, path?: string) =>
+    client.post(`/merge-requests/${id}/comments`, { body, path }).then((r) => r.data),
+  mergeMR: (id: string, mergeCommitOid: string) =>
+    client.post(`/merge-requests/${id}/merge`, { mergeCommitOid }).then((r) => r.data),
+};
+
+export const signingKeysApi = {
+  list: (organizationId: string) =>
+    client.get(`/orgs/${organizationId}/signing-keys`).then((r) => r.data),
+  upload: (organizationId: string, label: string, publicKeyPem: string) =>
+    client.post(`/orgs/${organizationId}/signing-keys`, { organizationId, label, publicKeyPem }).then((r) => r.data),
+};
+
+export const evalSuiteApi = {
+  list: (capabilityId?: string) =>
+    client.get(`/eval-suites${capabilityId ? `?capabilityId=${capabilityId}` : ''}`).then((r) => r.data),
+  get: (id: string) => client.get(`/eval-suites/${id}`).then((r) => r.data),
+  create: (input: {
+    capabilityId: string;
+    name: string;
+    description?: string;
+    passThreshold?: number;
+    borderlineBand?: number;
+    initialGraders?: Array<{ name: string; kind: string; weight: number; config: unknown }>;
+  }) => client.post('/eval-suites', input).then((r) => r.data),
+  run: (suiteId: string, trials: unknown) =>
+    client.post(`/eval-suites/${suiteId}/run`, trials).then((r) => r.data),
+  gate: (repoId: string, trials: unknown) =>
+    client.post(`/repos/${repoId}/eval-gate`, { trials }).then((r) => r.data),
+};
+
+export const vaultApi = {
+  listSecrets: (organizationId: string) =>
+    client.get(`/vault/secrets?organizationId=${encodeURIComponent(organizationId)}`).then((r) => r.data),
+  listKeys: () => client.get('/vault/keys').then((r) => r.data),
+  rotateKey: (label: string, reencrypt = true) =>
+    client.post('/vault/keys/rotate', { label, reencrypt }).then((r) => r.data),
+  writeSecret: (organizationId: string, name: string, value: string) =>
+    client.post('/vault/secrets', { organizationId, name, value }).then((r) => r.data),
+};
+
+export const retentionApi = {
+  get: (organizationId: string) =>
+    client.get(`/orgs/${organizationId}/retention`).then((r) => r.data),
+  set: (organizationId: string, days: number) =>
+    client.put(`/orgs/${organizationId}/retention`, { organizationId, days }).then((r) => r.data),
+  sweep: (organizationId: string) =>
+    client.post(`/orgs/${organizationId}/retention/sweep`).then((r) => r.data),
+};
+
+export const costApi = {
+  forOrg: (organizationId: string, days = 30) =>
+    client.get(`/analytics/cost?organizationId=${encodeURIComponent(organizationId)}&days=${days}`).then((r) => r.data),
+  ingest: (row: { capabilityId: string; input?: number; output?: number; costMicros?: number; executions?: number }) =>
+    client.post('/analytics/rollups', row),
+};
+
+export const searchApi = {
+  q: (q: string, type?: string) =>
+    client.get(`/search?q=${encodeURIComponent(q)}${type ? `&type=${encodeURIComponent(type)}` : ''}`).then((r) => r.data),
+};
