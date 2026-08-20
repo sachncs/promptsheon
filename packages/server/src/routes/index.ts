@@ -3,7 +3,6 @@ import { registerWorkspaceRoutes } from './workspace.js';
 import { registerProjectRoutes } from './project.js';
 import { registerCapabilityRoutes } from './capability.js';
 import { registerVersionRoutes } from './version.js';
-import { registerManifestRoutes } from './manifest.js';
 import { registerReleaseRoutes } from './release.js';
 import { registerExecutionRoutes } from './execution.js';
 import { registerDatasetRoutes } from './dataset.js';
@@ -102,7 +101,6 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerProjectRoutes(app, deps.projectRepo);
   registerCapabilityRoutes(app, deps.capabilityRepo);
   registerVersionRoutes(app, deps.versionRepo);
-  registerManifestRoutes(app, deps.versionRepo);
   registerReleaseRoutes(app, deps.releaseRepo, { manifestRepo: deps.manifestRepo, auditChain: deps.auditChain });
   registerExecutionRoutes(app, {
     executionRepo: deps.executionRepo,

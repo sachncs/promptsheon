@@ -26,56 +26,65 @@ TypeScript rewrite of the Promptsheon prompt management platform. Strands Agents
 ## Packages
 
 - `packages/shared/` — Domain types, Zod schemas, CAS store, error handling
-- `packages/server/` — Fastify backend with 29 repos, 4 Strands agents, 17 route groups
-- `packages/web/` — React 19 frontend with 25 views, 15 UI components, 22 API modules
+- `packages/server/` — Fastify backend with 20 repos, 6 Strands agents (incl. Swarm + Graph), 30+ route groups
+- `frontend/` — Next.js 15 App Router with 26 routes, 16 shadcn/ui primitives, full DAG editor
 
 ## Quick Start
 
 ```bash
-# Install (from packages/)
-cd packages && pnpm install
+# 1. Install all workspace dependencies
+pnpm install
 
-# Start server (port 8080)
-cd server && npm run dev
+# 2. Start the API server (port 8080)
+cd packages/server && pnpm dev
 
-# Start web (port 5173)
-cd web && npm run dev
+# 3. Start the frontend (port 3000) — in a separate terminal
+cd frontend && pnpm dev
+
+# 4. Open http://localhost:3000
+```
+
+The frontend `next.config.ts` rewrites `/api/*` → `http://localhost:8080/api/*`, so you only need both servers running.
+
+### Production mode
+
+```bash
+cd packages/server && pnpm build && pnpm start
+cd frontend && pnpm build && pnpm start
 ```
 
 ## Tests
 
 ```bash
-cd packages/server && npm test
-# 5 files, 23 tests, all passing
+# Server tests (44 files, 290 tests)
+cd packages/server && pnpm test
+
+# Typecheck all packages
+cd packages && pnpm typecheck
 ```
 
 ## Documentation
 
 - [`packages/shared/README.md`](packages/shared/README.md)
 - [`packages/server/README.md`](packages/server/README.md)
-- [`packages/server/API.md`](packages/server/API.md) — 67 REST endpoints
-- [`packages/web/README.md`](packages/web/README.md)
-- [`plan/tier/`](plan/tier/) — 18-work-unit implementation plan
+- [`packages/server/API.md`](packages/server/API.md) — 80+ REST endpoints
 
 ## Stack
 
-- **Backend**: Node 22, Fastify, better-sqlite3, Zod, Strands Agents SDK
-- **Frontend**: React 19, Vite 6, Tailwind CSS v4, shadcn/ui, TanStack Query v5
-- **AI**: `@strands-agents/sdk` (Agent, BedrockModel, tool(), retry, conversation mgrs)
-- **Database**: SQLite 21 migrations (same as Go port, zero data migration)
-- **Tests**: vitest (5 test files, 23 tests)
+- **Backend**: Node 22, Fastify 5, better-sqlite3, Zod 4, Strands Agents SDK 1.13
+- **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS v4, shadcn/ui, TanStack Query v5, @xyflow/react
+- **AI**: `@strands-agents/sdk` (Agent, BedrockModel, Swarm, Graph, hooks, retry strategies)
+- **Database**: SQLite 26 migrations
+- **Tests**: vitest 4 (44 test files, 290 tests)
 
 ## Project Structure
 
 ```
 .
 ├── packages/
-│   ├── shared/        # domain types, CAS, errors, audit, SSE
-│   ├── server/        # Fastify + Strands agents
-│   └── web/           # React + shadcn/ui
-├── plan/
-│   └── tier/          # W01-W18 work-unit specs
-├── docs/              # (empty - moved to per-package READMEs)
+│   ├── shared/        # domain types, Zod schemas, CAS, errors, audit, SSE
+│   └── server/        # Fastify + Strands agents + observability + hardening
+├── frontend/          # Next.js 15 App Router + shadcn/ui
 ├── AGENTS.md          # engineering constitution
 ├── Dockerfile         # multi-stage Node 22 build
 ├── .github/workflows/ # CI (typecheck + test + build + docker)

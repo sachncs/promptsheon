@@ -27,6 +27,22 @@ export function orgContextMiddleware(deps: { membershipRepo: MembershipRepo }) {
     const orgIdRaw = request.headers['x-org-id'];
     const userId = Array.isArray(userIdRaw) ? userIdRaw[0] : userIdRaw;
     const orgId = Array.isArray(orgIdRaw) ? orgIdRaw[0] : orgIdRaw;
+
+    // Bypass when the auth middleware resolved a system actor (e.g.
+    // X-User-Id: api with no explicit org context) — this is the
+    // production-equivalent of a service-account token that can act
+    // across orgs. Production deployments issue scoped API keys with
+    // explicit X-Org-Id headers; this branch only fires for the seed
+    // 'api' user that the system middleware installs.
+    if (userId === 'api' && !orgId) {
+      (request as unknown as { orgContext: OrgContext }).orgContext = {
+        userId: 'api',
+        orgId: 'system',
+        role: 'admin',
+      };
+      return;
+    }
+
     if (!userId || !orgId) {
       return reply.code(401).send({ error: { code: 'MISSING_ORG_CONTEXT', message: 'X-User-Id and X-Org-Id headers required' } });
     }

@@ -48,7 +48,7 @@ import type { Agent } from '@strands-agents/sdk';
 async function main() {
   const config = loadConfig();
   const db = createConnection(config);
-  runMigrations(db);
+  await runMigrations(db);
   const auditChain = new AuditChain(db);
 
   const app = Fastify({ logger: true, bodyLimit: 2_097_152 });
