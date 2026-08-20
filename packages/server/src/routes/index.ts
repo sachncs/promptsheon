@@ -35,6 +35,7 @@ import { registerApiKeyRoutes } from './api-keys.js';
 import { registerBootstrapRoutes } from './bootstrap.js';
 import type { LlmRouter } from '../llm/router.js';
 import { registerRepoRoutes, type RepoDeps } from './repo.js';
+import { registerContentsRoutes, type ContentsDeps } from './contents.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -99,6 +100,7 @@ export interface AppDeps {
   userRepo: UserRepo;
   llmRouter: LlmRouter;
   repoDeps: RepoDeps;
+  contentsDeps: ContentsDeps;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -151,6 +153,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   });
 
   registerRepoRoutes(app, deps.repoDeps);
+  registerContentsRoutes(app, deps.contentsDeps);
 
   if (deps.chaosConfig) {
     registerChaosRoutes(app, {

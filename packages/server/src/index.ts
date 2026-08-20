@@ -21,6 +21,7 @@ import { ProjectRepo } from './repos/project.js';
 import { RepoRepo } from './repos/repo.js';
 import { BranchRepo } from './repos/branch.js';
 import { TagRepo } from './repos/tag.js';
+import { RepoStore } from './repos/repo-store.js';
 import { CapabilityRepo } from './repos/capability.js';
 import { VersionRepo } from './repos/version.js';
 import { ReleaseRepo } from './repos/release.js';
@@ -104,6 +105,7 @@ async function main() {
   const repoRepo = new RepoRepo(db);
   const branchRepo = new BranchRepo(db);
   const tagRepo = new TagRepo(db);
+  const repoStore = new RepoStore(db);
   const capabilityRepo = new CapabilityRepo(db);
   const versionRepo = new VersionRepo(db);
   const releaseRepo = new ReleaseRepo(db);
@@ -257,6 +259,11 @@ async function main() {
       repoRepo,
       branchRepo,
       tagRepo,
+    },
+    contentsDeps: {
+      repoRepo,
+      branchRepo,
+      repoStore,
     },
   });
 
