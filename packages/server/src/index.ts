@@ -43,6 +43,7 @@ import { orgContextMiddleware } from './middleware/org-context.js';
 import { WebhookReceiver } from './webhooks/receiver.js';
 import { ChaosConfig } from './hardening/chaos.js';
 import { registerChaosRoutes } from './routes/chaos.js';
+import { LlmRouter } from './llm/router.js';
 import type { Agent } from '@strands-agents/sdk';
 
 async function main() {
@@ -245,6 +246,7 @@ async function main() {
     auditChain,
     apiKeyRepo,
     userRepo: new UserRepo(db),
+    llmRouter: new LlmRouter(),
   });
 
   const scheduler = new Scheduler(scheduleRepo, sseHub);

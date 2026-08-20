@@ -3,8 +3,16 @@ import { createHash } from 'node:crypto';
 import type { AppConfig } from '@promptsheon/shared';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
+const BOOTSTRAP_PREFIX = '/api/bootstrap/';
+
 export function authMiddleware(config: AppConfig, apiKeyRepo: ApiKeyRepo) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
+    if (request.url.startsWith(BOOTSTRAP_PREFIX)) {
+      (request as unknown as Record<string, string>).userId = 'bootstrap';
+      (request as unknown as { orgContextBypass?: boolean }).orgContextBypass = true;
+      return;
+    }
+
     if (!config.auth.enabled) {
       (request as unknown as Record<string, string>).userId = 'api';
       return;

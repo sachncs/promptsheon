@@ -32,6 +32,8 @@ import { AuditChain } from '../audit/chain.js';
 import { registerAuditRoutes } from './audit.js';
 import { registerUserRoutes } from './users.js';
 import { registerApiKeyRoutes } from './api-keys.js';
+import { registerBootstrapRoutes } from './bootstrap.js';
+import type { LlmRouter } from '../llm/router.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -94,6 +96,7 @@ export interface AppDeps {
   auditChain: AuditChain;
   apiKeyRepo: ApiKeyRepo;
   userRepo: UserRepo;
+  llmRouter: LlmRouter;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -138,6 +141,13 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerAuditRoutes(app, { auditChain: deps.auditChain, db: deps.db });
   registerUserRoutes(app, { userRepo: deps.userRepo, auditChain: deps.auditChain });
   registerApiKeyRoutes(app, { apiKeyRepo: deps.apiKeyRepo, auditChain: deps.auditChain });
+  registerBootstrapRoutes(app, {
+    db: deps.db,
+    userRepo: deps.userRepo,
+    settingsResolver: deps.settingsResolver,
+    llmRouter: deps.llmRouter,
+  });
+
   if (deps.chaosConfig) {
     registerChaosRoutes(app, {
       chaos: deps.chaosConfig,
