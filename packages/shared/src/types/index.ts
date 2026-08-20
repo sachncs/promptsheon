@@ -9,6 +9,9 @@ export type {
 } from './repo.js';
 export type { Branch, BranchCreateInput, BranchUpdateInput } from './branch.js';
 export type { Tag, TagCreateInput } from './tag.js';
+export type { Tree, RepoTreeEntry, BlobRef, CommitRequest } from './tree.js';
+export type { RepoCommit, RepoCommitInput, SignedCommitPayload } from './commit.js';
+export { commitInputPayload } from './commit.js';
 export type { Capability } from './capability.js';
 export type { CapabilityVersion } from './capability-version.js';
 export type {
