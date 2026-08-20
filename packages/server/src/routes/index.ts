@@ -45,6 +45,7 @@ import { registerOpenApiRoutes } from '../openapi.js';
 import { registerRetentionRoutes, type RetentionRouteDeps } from './retention.js';
 import { registerRedteamRoutes, type RedteamDeps } from './redteam.js';
 import { registerExperimentRoutes, type ExperimentDeps } from './experiment.js';
+import { registerIncidentRoutes, type IncidentDeps } from './incident.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -118,6 +119,7 @@ export interface AppDeps {
   retentionDeps: RetentionRouteDeps;
   redteamDeps: RedteamDeps;
   experimentDeps: ExperimentDeps;
+  incidentDeps: IncidentDeps;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -180,6 +182,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerRetentionRoutes(app, deps.retentionDeps);
   registerRedteamRoutes(app, deps.redteamDeps);
   registerExperimentRoutes(app, deps.experimentDeps);
+  registerIncidentRoutes(app, deps.incidentDeps);
 
   if (deps.chaosConfig) {
     registerChaosRoutes(app, {
