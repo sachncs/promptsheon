@@ -41,6 +41,7 @@ import { registerMergeRequestRoutes, type MRDeps } from './mr.js';
 import { registerSigningRoutes, type SigningDeps } from './signing.js';
 import { registerEvalSuiteRoutes, type EvalSuiteRouteDeps } from './eval-suite.js';
 import { registerVaultRoutes, type VaultRouteDeps } from './vault.js';
+import { registerOpenApiRoutes } from '../openapi.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -169,6 +170,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerSigningRoutes(app, deps.signingDeps);
   registerEvalSuiteRoutes(app, deps.evalSuiteDeps);
   registerVaultRoutes(app, deps.vaultDeps);
+  registerOpenApiRoutes(app);
 
   if (deps.chaosConfig) {
     registerChaosRoutes(app, {
