@@ -1,0 +1,15 @@
+{
+  "name": "promptsheon-root",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Run both backend and frontend together from the repo root.",
+  "scripts": {
+    "dev": "pnpm --dir packages dev",
+    "dev:server": "pnpm --dir packages dev:server",
+    "dev:frontend": "pnpm --dir packages dev:frontend",
+    "build": "pnpm --dir packages build",
+    "typecheck": "pnpm --dir packages typecheck",
+    "test": "pnpm --dir packages test",
+    "stop": "lsof -ti:3000,8080 2>/dev/null | xargs -r kill -9 2>/dev/null; true"
+  }
+}
