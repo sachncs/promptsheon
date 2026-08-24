@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { PaginationSchema } from '@promptsheon/shared';
 import type { VersionRepo } from '../repos/version.js';
@@ -23,6 +23,7 @@ export function registerVersionRoutes(
   app: FastifyInstance,
   repo: VersionRepo,
   manifestRepo: ManifestRepo,
+  db?: import('better-sqlite3').Database,
 ) {
   app.get('/api/capability-versions', async (request, reply) => {
     const parsed = parseQuery(reply, ListQuerySchema, request.query);
@@ -41,22 +42,44 @@ export function registerVersionRoutes(
 
   app.get('/api/capability-versions/:versionId/manifest', async (request, reply) => {
     const { versionId } = request.params as { versionId: string };
-    const item = repo.findById(versionId);
-    if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'version not found' } });
+    const sqlite = (db ?? (app as unknown as { db?: import('better-sqlite3').Database }).db) as
+      | import('better-sqlite3').Database
+      | undefined;
+    if (!sqlite) {
+      return reply.code(500).send({ error: { code: 'INTERNAL', message: 'db not configured' } });
+    }
+    const row = sqlite
+      .prepare(
+        `SELECT id, capability_id, version, manifest, manifest_hash, created_by, created_at
+         FROM capability_versions WHERE id = ?`,
+      )
+      .get(versionId) as
+      | {
+          id: string;
+          capability_id: string;
+          version: number;
+          manifest: string;
+          manifest_hash: string;
+          created_by: string;
+          created_at: string;
+        }
+      | undefined;
+    if (!row) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'version not found' } });
     let parsed: unknown;
     try {
-      parsed = JSON.parse(item.manifest);
+      parsed = JSON.parse(row.manifest);
     } catch {
       parsed = null;
     }
     return reply.send({
-      hash: item.manifestHash,
+      id: row.id,
+      hash: row.manifest_hash,
       manifest: parsed,
-      capabilityId: item.capabilityId,
-      capabilityVersion: item.version,
-      createdAt: item.createdAt,
-      createdBy: item.createdBy,
-      size: item.manifest.length,
+      capabilityId: row.capability_id,
+      capabilityVersion: row.version,
+      createdAt: row.created_at,
+      createdBy: row.created_by,
+      size: row.manifest.length,
       approvals: [],
     });
   });
@@ -70,15 +93,11 @@ export function registerVersionRoutes(
     // maker-checker / approval flow can look it up by hash. Without
     // this, no release in the system can ever pass the gate.
     //
-    // The release activation gate derives the hash from
-    // release.manifest using key-sorted JSON canonicalization, so we
-    // compute the same hash here and store under it (rather than
-    // trusting the client's manifestHash, which may use a different
-    // hashing algorithm).
+    // The release activation gate computes the manifest hash by
+    // sha256-hashing the raw manifest string. We do the same here
+    // so the registered row matches what the gate will look up.
     try {
-      const parsedManifest = JSON.parse(parsed.data.manifest) as Record<string, unknown>;
-      const canonical = JSON.stringify(parsedManifest, Object.keys(parsedManifest).sort());
-      const canonicalHash = createHash('sha256').update(canonical).digest('hex');
+      const canonicalHash = createHash('sha256').update(parsed.data.manifest).digest('hex');
       manifestRepo.registerFromRaw({
         capabilityId: parsed.data.capabilityId,
         version: parsed.data.version,
