@@ -49,24 +49,27 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="rounded-2xl border border-border-subtle bg-surface-1 p-8 shadow-2">
-      <StepIndicator steps={steps} currentIndex={index} />
-      <div className="mt-8">
-        {index === 0 && <Welcome onNext={() => setIndex(1)} />}
-        {index === 1 && (
-          <AdminStep
-            onBack={() => setIndex(0)}
-            onNext={() => setIndex(2)}
-          />
-        )}
-        {index === 2 && (
-          <LlmStep
-            presetProvider={status.data?.provider ?? undefined}
-            onBack={() => setIndex(1)}
-            onNext={() => setIndex(3)}
-          />
-        )}
-        {index === 3 && <Finish onDone={() => router.push('/app')} />}
+    <div className="relative">
+      <div className="ps-aurora-bg pointer-events-none absolute -inset-x-12 -top-12 -bottom-12 -z-10 rounded-[3rem]" aria-hidden />
+      <div className="rounded-2xl border border-border-subtle bg-surface-1 p-8 shadow-2 sm:p-10">
+        <StepIndicator steps={steps} currentIndex={index} />
+        <div className="mt-8">
+          {index === 0 && <Welcome onNext={() => setIndex(1)} />}
+          {index === 1 && (
+            <AdminStep
+              onBack={() => setIndex(0)}
+              onNext={() => setIndex(2)}
+            />
+          )}
+          {index === 2 && (
+            <LlmStep
+              presetProvider={status.data?.provider ?? undefined}
+              onBack={() => setIndex(1)}
+              onNext={() => setIndex(3)}
+            />
+          )}
+          {index === 3 && <Finish onDone={() => router.push('/app')} />}
+        </div>
       </div>
     </div>
   );

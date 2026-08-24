@@ -12,7 +12,7 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
           </div>
         </header>
         <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12">
-          <div className="w-full max-w-2xl">{children}</div>
+          <div className="w-full max-w-3xl">{children}</div>
         </main>
       </div>
     </div>
