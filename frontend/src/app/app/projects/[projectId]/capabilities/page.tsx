@@ -1,98 +1,78 @@
 'use client';
 
-import * as React from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { Boxes } from 'lucide-react';
 import { capabilityApi } from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useRequireSession } from '@/hooks/use-session';
+import { PageHeader } from '@/components/brand/page-header';
+import { Surface, SurfaceHeader } from '@/components/brand/surface';
+import { DataTable } from '@/components/brand/data-table';
+import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, ChevronRight } from 'lucide-react';
 
-export default function CapabilitiesPage() {
+export default function ProjectCapabilitiesPage() {
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
-  const queryClient = useQueryClient();
-  const [name, setName] = React.useState('');
-  const { data: capabilities, isLoading } = useQuery({
+  const session = useRequireSession();
+  const router = useRouter();
+
+  const capabilities = useQuery({
     queryKey: ['capabilities', projectId],
-    queryFn: () => capabilityApi.list(projectId!).then((r) => r.data),
-    enabled: !!projectId,
+    queryFn: () => capabilityApi.list(projectId!).then((r) => r.data).catch(() => []),
+    enabled: Boolean(projectId) && Boolean(session),
   });
 
-  const create = useMutation({
-    mutationFn: () => capabilityApi.create({ projectId: projectId!, name }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['capabilities', projectId] });
-      setName('');
-    },
-  });
-
-  const remove = useMutation({
-    mutationFn: (id: string) => capabilityApi.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['capabilities', projectId] }),
-  });
+  const rows = (Array.isArray(capabilities.data) ? capabilities.data : []) as Array<{ id: string; name: string; description?: string }>;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Capabilities</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Create Capability</CardTitle>
-        </CardHeader>
-        <CardContent className="flex gap-2">
-          <Input placeholder="Capability name" value={name} onChange={(e) => setName(e.target.value)} />
-          <Button onClick={() => create.mutate()} disabled={!name || create.isPending}>
-            <Plus className="mr-2 h-4 w-4" />Create
-          </Button>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Self-Evolve</TableHead>
-                <TableHead className="w-24"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={3}>Loading...</TableCell>
-                </TableRow>
-              ) : (
-                capabilities?.map((c: { id: string; name: string; selfEvolveEnabled?: boolean }) => (
-                  <TableRow key={c.id}>
-                    <TableCell>
-                      <Link
-                        href={`/capabilities/${c.id}`}
-                        className="text-primary hover:underline font-medium flex items-center gap-1"
-                      >
-                        {c.name} <ChevronRight className="h-4 w-4" />
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={c.selfEvolveEnabled ? 'success' : 'secondary'}>
-                        {c.selfEvolveEnabled ? 'Enabled' : 'Disabled'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => remove.mutate(c.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <PageHeader
+        eyebrow="Project"
+        title="Capabilities"
+        subtitle="Capabilities in this project. Each one is a multi-agent DAG with versions, releases, evals, and audit history."
+      />
+
+      <Surface padded={false}>
+        <SurfaceHeader className="px-5 pt-5" title="Capabilities" description={`${rows.length} configured`} />
+        {rows.length === 0 ? (
+          <EmptyState
+            icon={Boxes}
+            title="No capabilities in this project"
+            description="Capabilities are the unit of version control here. Create one to start authoring a DAG."
+            action={
+              <Link href="/app/editor">
+                <Button>Author capability</Button>
+              </Link>
+            }
+            className="m-5 border-0 bg-transparent shadow-none p-12"
+          />
+        ) : (
+          <DataTable
+            className="rounded-none border-0 border-t border-border-subtle"
+            rows={rows as unknown as Array<Record<string, unknown>>}
+            rowKey={(r) => String(r['id'])}
+            onRowClick={(r) => router.push(`/app/capabilities/${String(r['id'])}`)}
+            columns={[
+              {
+                key: 'name',
+                header: 'Capability',
+                render: (r) => (
+                  <Link href={`/app/capabilities/${String(r['id'])}`} className="font-medium text-text-strong hover:underline">
+                    {String(r['name'])}
+                  </Link>
+                ),
+              },
+              {
+                key: 'description',
+                header: 'Description',
+                render: (r) => <span className="text-text-muted">{String(r['description'] ?? '—')}</span>,
+              },
+            ]}
+          />
+        )}
+      </Surface>
     </div>
   );
 }

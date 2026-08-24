@@ -1,84 +1,74 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useParams, useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { Play } from 'lucide-react';
 import { releaseApi } from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Play, Pause } from 'lucide-react';
+import { useRequireSession } from '@/hooks/use-session';
+import { PageHeader } from '@/components/brand/page-header';
+import { Surface, SurfaceHeader } from '@/components/brand/surface';
+import { DataTable } from '@/components/brand/data-table';
+import { StatusPill } from '@/components/brand/status-pill';
+import { EmptyState } from '@/components/brand/empty-state';
 
 export default function ReleasesPage() {
   const params = useParams<{ capabilityId: string }>();
   const capabilityId = params.capabilityId;
-  const queryClient = useQueryClient();
-  const { data: releases, isLoading } = useQuery({
+  const session = useRequireSession();
+  const router = useRouter();
+
+  const { data, isLoading } = useQuery({
     queryKey: ['releases', capabilityId],
     queryFn: () => releaseApi.list(capabilityId!).then((r) => r.data),
-    enabled: !!capabilityId,
+    enabled: Boolean(capabilityId) && Boolean(session),
   });
 
-  const activate = useMutation({
-    mutationFn: (id: string) => releaseApi.activate(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['releases', capabilityId] }),
-  });
-
-  const supersede = useMutation({
-    mutationFn: (id: string) => releaseApi.supersede(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['releases', capabilityId] }),
-  });
+  const rows = (Array.isArray(data) ? data : []) as Array<{ id: string; environment: string; status: string; createdAt: string }>;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Releases</h1>
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Environment</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="w-32"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={4}>Loading...</TableCell>
-                </TableRow>
-              ) : (
-                releases?.map((r: { id: string; environment: string; status: string; createdAt: string }) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.environment}</TableCell>
-                    <TableCell>
-                      <Badge variant={r.status === 'active' ? 'success' : r.status === 'superseded' ? 'secondary' : 'outline'}>
-                        {r.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        {r.status !== 'active' && (
-                          <Button variant="ghost" size="icon" onClick={() => activate.mutate(r.id)} title="Activate">
-                            <Play className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {r.status === 'active' && (
-                          <Button variant="ghost" size="icon" onClick={() => supersede.mutate(r.id)} title="Supersede">
-                            <Pause className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <PageHeader
+        eyebrow="Capability"
+        title="Releases"
+        subtitle="One row per environment. Click into a release to activate, route canary, or rollback."
+      />
+
+      <Surface padded={false}>
+        <SurfaceHeader className="px-5 pt-5" title="Releases" description={`${rows.length} configured`} />
+        {rows.length === 0 ? (
+          <EmptyState
+            icon={Play}
+            title="No releases yet"
+            description={isLoading ? 'Loading…' : 'Create a capability version and publish it as a release.'}
+            className="m-5 border-0 bg-transparent shadow-none p-12"
+          />
+        ) : (
+          <DataTable
+            className="rounded-none border-0 border-t border-border-subtle"
+            rows={rows as unknown as Array<Record<string, unknown>>}
+            rowKey={(r) => String(r['id'])}
+            onRowClick={(r) => router.push(`/app/releases/${String(r['id'])}`)}
+            columns={[
+              { key: 'env', header: 'Environment', render: (r) => <span className="font-medium">{String(r['environment'])}</span> },
+              {
+                key: 'state',
+                header: 'Status',
+                render: (r) => (
+                  <StatusPill
+                    kind={r['status'] === 'active' ? 'active' : r['status'] === 'canary' ? 'review' : 'neutral'}
+                    label={String(r['status'])}
+                  />
+                ),
+              },
+              {
+                key: 'created',
+                header: 'Created',
+                render: (r) => r['createdAt'] ? new Date(String(r['createdAt'])).toLocaleString() : '—',
+              },
+            ]}
+          />
+        )}
+      </Surface>
     </div>
   );
 }

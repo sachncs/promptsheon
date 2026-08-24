@@ -3,64 +3,91 @@
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { evalApi } from '@/lib/api';
-import { Card, CardContent } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { useRequireSession } from '@/hooks/use-session';
+import { PageHeader } from '@/components/brand/page-header';
+import { Surface, SurfaceHeader } from '@/components/brand/surface';
+import { DataTable } from '@/components/brand/data-table';
+import { StatusPill } from '@/components/brand/status-pill';
 import { Progress } from '@/components/ui/progress';
+import { EmptyState } from '@/components/brand/empty-state';
+import { FlaskConical } from 'lucide-react';
 
 export default function EvalRunsPage() {
   const params = useParams<{ capabilityId: string }>();
   const capabilityId = params.capabilityId;
+  const session = useRequireSession();
+
   const { data, isLoading } = useQuery({
     queryKey: ['eval-runs', capabilityId],
     queryFn: () => evalApi.list().then((r) => r.data),
-    enabled: !!capabilityId,
+    enabled: Boolean(capabilityId) && Boolean(session),
   });
+
+  const rows = (Array.isArray(data) ? data : []) as Array<{
+    id: string;
+    scorer: string;
+    score: number;
+    status: string;
+    startedAt: string;
+  }>;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Eval Runs</h1>
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Scorer</TableHead>
-                <TableHead>Score</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Started</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={5}>Loading...</TableCell>
-                </TableRow>
-              ) : (
-                data?.map((r: { id: string; scorer: string; score: number; status: string; startedAt: string }) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-mono text-xs">{r.id.slice(0, 8)}</TableCell>
-                    <TableCell>{r.scorer}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 w-32">
-                        <Progress value={r.score * 100} />
-                        <span className="text-xs text-muted-foreground">{(r.score * 100).toFixed(0)}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={r.status === 'passed' ? 'success' : r.status === 'failed' ? 'destructive' : 'secondary'}>
-                        {r.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{new Date(r.startedAt).toLocaleString()}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <PageHeader
+        eyebrow="Capability"
+        title="Eval runs"
+        subtitle="Run-on-save evals against this capability. Score is the per-case mean across the suite."
+      />
+
+      <Surface padded={false}>
+        <SurfaceHeader className="px-5 pt-5" title="Recent runs" description={`${rows.length} recorded`} />
+        {rows.length === 0 ? (
+          <EmptyState
+            icon={FlaskConical}
+            title="No eval runs yet"
+            description={isLoading ? 'Loading…' : 'Activate a release to start collecting eval runs.'}
+            className="m-5 border-0 bg-transparent shadow-none p-12"
+          />
+        ) : (
+          <DataTable
+            className="rounded-none border-0 border-t border-border-subtle"
+            rows={rows as unknown as Array<Record<string, unknown>>}
+            rowKey={(r) => String(r['id'])}
+            columns={[
+              { key: 'id', header: 'Run', render: (r) => <span className="font-mono text-xs">{String(r['id']).slice(0, 12)}…</span> },
+              { key: 'scorer', header: 'Scorer', render: (r) => String(r['scorer'] ?? '—') },
+              {
+                key: 'score',
+                header: 'Score',
+                render: (r) => {
+                  const s = Number(r['score'] ?? 0);
+                  return (
+                    <div className="flex items-center gap-2 w-40">
+                      <Progress value={s * 100} />
+                      <span className="text-xs text-text-muted">{(s * 100).toFixed(0)}%</span>
+                    </div>
+                  );
+                },
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (r) => (
+                  <StatusPill
+                    kind={r['status'] === 'passed' ? 'active' : r['status'] === 'failed' ? 'rejected' : 'review'}
+                    label={String(r['status'])}
+                  />
+                ),
+              },
+              {
+                key: 'started',
+                header: 'Started',
+                render: (r) => r['startedAt'] ? new Date(String(r['startedAt'])).toLocaleString() : '—',
+              },
+            ]}
+          />
+        )}
+      </Surface>
     </div>
   );
 }
