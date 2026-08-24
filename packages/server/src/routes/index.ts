@@ -147,7 +147,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerSettingsRoutes(app, deps.settingsResolver);
   registerSseRoutes(app, deps.sseHub);
   registerSelfEvolveRoutes(app, deps.evolutionAgent, deps.capabilityRepo, deps.evalRepo);
-  registerApprovalRoutes(app, deps.approvalRepo);
+  registerApprovalRoutes(app, deps.approvalRepo, { releaseRepo: deps.releaseRepo, manifestRepo: deps.manifestRepo });
   registerCompilerRoutes(app, deps.compiler);
   registerHealthRoutes(app, deps.db);
   registerIdeaRoutes(app, { planner: deps.planner });
