@@ -17,8 +17,8 @@ import { Timeline } from '@/components/brand/timeline';
 import { DataTable } from '@/components/brand/data-table';
 import { DagMini } from '@/components/brand/dag-mini';
 import { EmptyState } from '@/components/brand/empty-state';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 type Tab = 'overview' | 'versions' | 'graph' | 'releases';
 
@@ -93,116 +93,106 @@ export default function CapabilityDetailPage() {
         />
       </div>
 
-      <div className="border-b border-border-subtle">
-        <nav className="flex gap-1 -mb-px">
-          {(['overview', 'versions', 'graph', 'releases'] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={cn(
-                'px-4 py-2 text-sm border-b-2 transition-colors capitalize',
-                tab === t
-                  ? 'border-brand text-text-strong'
-                  : 'border-transparent text-text-muted hover:text-text-default',
+      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="versions">Versions</TabsTrigger>
+          <TabsTrigger value="graph">Graph</TabsTrigger>
+          <TabsTrigger value="releases">Releases</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Surface>
+              <SurfaceHeader title="Identity" />
+              <dl className="space-y-3 text-sm">
+                <Detail label="Identifier" value={c.id} mono />
+                <Detail label="Name" value={c.name ?? '—'} />
+                <Detail
+                  label="Manifest hash"
+                  value={<HashChip hash={c.manifestHash ?? '—'} />}
+                />
+                <Detail label="Versions" value={`${versionList.length}`} />
+                <Detail label="Open releases" value={`${releaseList.length}`} />
+              </dl>
+            </Surface>
+
+            <Surface>
+              <SurfaceHeader title="Recent versions" description="Append-only history of immutable artifacts." />
+              {versionList.length === 0 ? (
+                <EmptyState icon={Box} title="No versions yet" description="Compile a draft to create the first version." />
+              ) : (
+                <Timeline
+                  entries={versionList.slice(0, 6).map((v: Record<string, unknown>) => ({
+                    id: String(v['id']),
+                    title: `v${String(v['version'] ?? '?')}`,
+                    description: String(v['summary'] ?? 'Compiled'),
+                    timestamp: new Date(String(v['createdAt'] ?? Date.now())).toLocaleString(),
+                    icon: GitBranch,
+                    tone: 'info',
+                  }))}
+                />
               )}
-            >
-              {t}
-            </button>
-          ))}
-        </nav>
-      </div>
+            </Surface>
+          </div>
+        </TabsContent>
 
-      {tab === 'overview' && (
-        <div className="grid gap-5 lg:grid-cols-2">
-          <Surface>
-            <SurfaceHeader title="Identity" />
-            <dl className="space-y-3 text-sm">
-              <Detail label="Identifier" value={c.id} mono />
-              <Detail label="Name" value={c.name ?? '—'} />
-              <Detail
-                label="Manifest hash"
-                value={<HashChip hash={c.manifestHash ?? '—'} />}
-              />
-              <Detail label="Versions" value={`${versionList.length}`} />
-              <Detail label="Open releases" value={`${releaseList.length}`} />
-            </dl>
+        <TabsContent value="versions">
+          <Surface padded={false}>
+            <SurfaceHeader className="px-5 pt-5" title={`${versionList.length} versions`} />
+            <DataTable
+              className="rounded-none border-0 border-t border-border-subtle"
+              rows={versionList}
+              rowKey={(r: Record<string, unknown>) => String(r['id'])}
+              columns={[
+                { key: 'v', header: 'Version', render: (r: Record<string, unknown>) => <span className="font-mono text-xs">v{String(r['version'] ?? '?')}</span> },
+                { key: 'hash', header: 'Hash', render: (r: Record<string, unknown>) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} /> },
+                { key: 'author', header: 'Author', render: (r: Record<string, unknown>) => String(r['createdBy'] ?? 'system') },
+                { key: 'created', header: 'Created', render: (r: Record<string, unknown>) => new Date(String(r['createdAt'] ?? Date.now())).toLocaleString() },
+                {
+                  key: 'actions',
+                  header: '',
+                  render: (r: Record<string, unknown>) => (
+                    <Link href={`/app/diff?capability=${id}&version=${String(r['version'] ?? '')}`} className="text-xs text-brand-highlight hover:underline">
+                      Diff
+                    </Link>
+                  ),
+                },
+              ]}
+            />
           </Surface>
+        </TabsContent>
 
+        <TabsContent value="graph">
           <Surface>
-            <SurfaceHeader title="Recent versions" description="Append-only history of immutable artifacts." />
-            {versionList.length === 0 ? (
-              <EmptyState icon={Box} title="No versions yet" description="Compile a draft to create the first version." />
-            ) : (
-              <Timeline
-                entries={versionList.slice(0, 6).map((v: Record<string, unknown>) => ({
-                  id: String(v['id']),
-                  title: `v${String(v['version'] ?? '?')}`,
-                  description: String(v['summary'] ?? 'Compiled'),
-                  timestamp: new Date(String(v['createdAt'] ?? Date.now())).toLocaleString(),
-                  icon: GitBranch,
-                  tone: 'info',
-                }))}
-              />
-            )}
+            <SurfaceHeader title="Multi-agent DAG" description="The structure of this capability: agents, tools, memory, policies, and the edges between them." />
+            <DagMini
+              nodes={nodesForManifest(manifest.data as Record<string, unknown> | null)}
+              edges={edgesForManifest(manifest.data as Record<string, unknown> | null)}
+              className="mt-3 rounded-lg border border-border-subtle bg-surface-0"
+            />
           </Surface>
-        </div>
-      )}
+        </TabsContent>
 
-      {tab === 'versions' && (
-        <Surface padded={false}>
-          <SurfaceHeader className="px-5 pt-5" title={`${versionList.length} versions`} />
-          <DataTable
-            className="rounded-none border-0 border-t border-border-subtle"
-            rows={versionList}
-            rowKey={(r: Record<string, unknown>) => String(r['id'])}
-            columns={[
-              { key: 'v', header: 'Version', render: (r: Record<string, unknown>) => <span className="font-mono text-xs">v{String(r['version'] ?? '?')}</span> },
-              { key: 'hash', header: 'Hash', render: (r: Record<string, unknown>) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} /> },
-              { key: 'author', header: 'Author', render: (r: Record<string, unknown>) => String(r['createdBy'] ?? 'system') },
-              { key: 'created', header: 'Created', render: (r: Record<string, unknown>) => new Date(String(r['createdAt'] ?? Date.now())).toLocaleString() },
-              {
-                key: 'actions',
-                header: '',
-                render: (r: Record<string, unknown>) => (
-                  <Link href={`/app/diff?capability=${id}&version=${String(r['version'] ?? '')}`} className="text-xs text-brand-highlight hover:underline">
-                    Diff
-                  </Link>
-                ),
-              },
-            ]}
-          />
-        </Surface>
-      )}
-
-      {tab === 'graph' && (
-        <Surface>
-          <SurfaceHeader title="Multi-agent DAG" description="The structure of this capability: agents, tools, memory, policies, and the edges between them." />
-          <DagMini
-            nodes={nodesForManifest(manifest.data as Record<string, unknown> | null)}
-            edges={edgesForManifest(manifest.data as Record<string, unknown> | null)}
-            className="mt-3 rounded-lg border border-border-subtle bg-surface-0"
-          />
-        </Surface>
-      )}
-
-      {tab === 'releases' && (
-        <Surface padded={false}>
-          <SurfaceHeader className="px-5 pt-5" title={`${releaseList.length} releases`} />
-          <DataTable
-            className="rounded-none border-0 border-t border-border-subtle"
-            rows={releaseList}
-            rowKey={(r: Record<string, unknown>) => String(r['id'])}
-            onRowClick={(r) => { window.location.href = `/app/releases/${String(r['id'])}`; }}
-            columns={[
-              { key: 'v', header: 'Version', render: (r: Record<string, unknown>) => `v${String(r['capabilityVersion'] ?? '?')}` },
-              { key: 'env', header: 'Environment', render: (r: Record<string, unknown>) => <span className="font-mono text-xs">{String(r['environment'] ?? 'production')}</span> },
-              { key: 'state', header: 'State', render: (r: Record<string, unknown>) => <StatusPill kind={(r['state'] as never) ?? 'neutral'} /> },
-              { key: 'hash', header: 'Content', render: (r: Record<string, unknown>) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} /> },
-              { key: 'canary', header: 'Canary', render: (r: Record<string, unknown>) => r['canaryPercent'] != null ? `${String(r['canaryPercent'])}%` : '—' },
-            ]}
-          />
-        </Surface>
-      )}
+        <TabsContent value="releases">
+          <Surface padded={false}>
+            <SurfaceHeader className="px-5 pt-5" title={`${releaseList.length} releases`} />
+            <DataTable
+              className="rounded-none border-0 border-t border-border-subtle"
+              rows={releaseList}
+              rowKey={(r: Record<string, unknown>) => String(r['id'])}
+              onRowClick={(r) => { window.location.href = `/app/releases/${String(r['id'])}`; }}
+              columns={[
+                { key: 'v', header: 'Version', render: (r: Record<string, unknown>) => `v${String(r['capabilityVersion'] ?? '?')}` },
+                { key: 'env', header: 'Environment', render: (r: Record<string, unknown>) => <span className="font-mono text-xs">{String(r['environment'] ?? 'production')}</span> },
+                { key: 'state', header: 'State', render: (r: Record<string, unknown>) => <StatusPill kind={(r['state'] as never) ?? 'neutral'} /> },
+                { key: 'hash', header: 'Content', render: (r: Record<string, unknown>) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} /> },
+                { key: 'canary', header: 'Canary', render: (r: Record<string, unknown>) => r['canaryPercent'] != null ? `${String(r['canaryPercent'])}%` : '—' },
+              ]}
+            />
+          </Surface>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
