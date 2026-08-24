@@ -35,4 +35,30 @@ export function registerSelfEvolveRoutes(
     const state = evolutionAgent.getState(capabilityId);
     return reply.send(state ?? { status: 'idle', cycleCount: 0 });
   });
+
+  /**
+   * Capability-scoped shortcuts the frontend uses:
+   *   GET  /api/capabilities/:capabilityId/self-evolve          → state
+   *   POST /api/capabilities/:capabilityId/self-evolve/run      → cycle
+   */
+  app.get('/api/capabilities/:capabilityId/self-evolve', async (request, reply) => {
+    const { capabilityId } = request.params as { capabilityId: string };
+    const state = evolutionAgent.getState(capabilityId);
+    return reply.send(state ?? { status: 'idle', cycleCount: 0 });
+  });
+
+  app.post('/api/capabilities/:capabilityId/self-evolve/run', async (request, reply) => {
+    const { capabilityId } = request.params as { capabilityId: string };
+    const capability = capabilityRepo.findById(capabilityId);
+    if (!capability) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Capability not found' } });
+    }
+    const result = await evolutionAgent.runCycle(
+      capabilityId,
+      capability.selfEvolveTargetEnv,
+      [],
+      capability,
+    );
+    return reply.send(result);
+  });
 }
