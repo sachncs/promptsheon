@@ -307,7 +307,16 @@ export interface RepoEntry {
 export const repoApi = {
   list: (workspaceId: string) => client.get(`/repos?workspaceId=${encodeURIComponent(workspaceId)}`).then((r) => r.data),
   get: (id: string) => client.get(`/repos/${id}`).then((r) => r.data),
-  create: (input: { workspaceId: string; name: string }) => client.post('/repos', input).then((r) => r.data),
+  create: (input: {
+    workspaceId: string;
+    name: string;
+    slug?: string;
+    description?: string;
+    defaultBranch?: string;
+    visibility?: 'private' | 'internal' | 'public';
+    minApprovers?: number;
+    requireSignedReleases?: boolean;
+  }) => client.post('/repos', input).then((r) => r.data),
   listBranches: (repoId: string) => client.get(`/repos/${repoId}/branches`).then((r) => r.data),
   listTags: (repoId: string) => client.get(`/repos/${repoId}/tags`).then((r) => r.data),
   listContents: (repoId: string, ref = 'main') => client.get(`/repos/${repoId}/contents?ref=${encodeURIComponent(ref)}`).then((r) => r.data),

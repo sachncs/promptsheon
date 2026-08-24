@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { Plus, GitBranch, Search, Lock } from 'lucide-react';
+import { GitBranch, Search, Lock } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
 import { workspaceApi, repoApi } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
@@ -15,38 +15,60 @@ import { HashChip } from '@/components/brand/hash-chip';
 import { StatusPill } from '@/components/brand/status-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NewRepositoryDialog } from '@/components/brand/new-repository-dialog';
+
+interface WorkspaceRow {
+  id: string;
+  name: string;
+}
+interface RepoRow {
+  id: string;
+  name: string;
+  slug: string;
+  visibility: string;
+  minApprovers: number;
+  requireSignedReleases: boolean;
+  updatedAt: string;
+  defaultBranch: string;
+}
 
 export default function RepositoriesPage() {
   const session = useRequireSession();
   const router = useRouter();
-  const workspaces = useQuery({
+  const workspaces = useQuery<{ workspaces?: WorkspaceRow[] }>({
     queryKey: ['workspaces'],
-    queryFn: () => workspaceApi.list(1).then((r) => r.data),
+    queryFn: async () => {
+      const r = await workspaceApi.list(1);
+      return r.data as { workspaces?: WorkspaceRow[] };
+    },
   });
-  const wsFirst = Array.isArray(workspaces.data) ? workspaces.data[0] : undefined;
-  const wsId = (wsFirst as { id?: string } | undefined)?.id;
+  const wsList: WorkspaceRow[] = workspaces.data?.workspaces ?? [];
+  const wsFirst = wsList[0];
 
   const [query, setQuery] = useState('');
 
-  const repos = useQuery({
-    queryKey: ['repos', wsId],
-    queryFn: () => (wsId ? repoApi.list(wsId) : Promise.resolve([] as Array<Record<string, unknown>>)),
-    enabled: Boolean(wsId),
+  const repos = useQuery<RepoRow[]>({
+    queryKey: ['repos', wsFirst?.id ?? ''],
+    queryFn: async () => {
+      if (!wsFirst) return [] as RepoRow[];
+      const list = await repoApi.list(wsFirst.id);
+      return list as unknown as RepoRow[];
+    },
+    enabled: Boolean(wsFirst),
   });
 
   const filtered = useMemo(() => {
-    const list = (Array.isArray(repos.data) ? repos.data : []) as Array<Record<string, unknown>>;
+    const list = repos.data ?? [];
     if (!query.trim()) return list;
     const q = query.toLowerCase();
-    return list.filter((r) =>
-      String(r['name'] ?? '').toLowerCase().includes(q) ||
-      String(r['slug'] ?? '').toLowerCase().includes(q),
+    return list.filter(
+      (r) => r.name.toLowerCase().includes(q) || r.slug.toLowerCase().includes(q),
     );
   }, [repos.data, query]);
 
   if (!session) return null;
 
-  if (!wsId && workspaces.isFetched) {
+  if (!wsFirst && workspaces.isFetched) {
     return (
       <EmptyState
         icon={Lock}
@@ -74,12 +96,16 @@ export default function RepositoriesPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="pl-9 h-9 bg-surface-1 border-border-subtle"
+              aria-label="Filter repositories"
             />
           </div>
-          <Button>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            New repository
-          </Button>
+          {wsFirst && (
+            <NewRepositoryDialog
+              workspaceId={wsFirst.id}
+              workspaces={wsList}
+              disabled={repos.isLoading}
+            />
+          )}
         </div>
         {filtered.length === 0 ? (
           <EmptyState
@@ -89,50 +115,53 @@ export default function RepositoriesPage() {
             className="m-5 border-0 bg-transparent shadow-none p-12"
           />
         ) : (
-          <DataTable
+          <DataTable<RepoRow>
             className="rounded-none border-0 border-t border-border-subtle"
             rows={filtered}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => { router.push(`/app/repos/${String(r['id'])}`); }}
+            caption="All repositories in the active workspace"
+            rowKey={(r) => r.id}
+            onRowClick={(r) => router.push(`/app/repos/${r.id}`)}
             columns={[
               {
                 key: 'name',
                 header: 'Name',
                 render: (r) => (
-                  <Link href={`/app/repos/${String(r['id'])}`} className="font-medium text-text-strong hover:underline">
-                    {String(r['name'])}
+                  <Link href={`/app/repos/${r.id}`} className="font-medium text-text-strong hover:underline">
+                    {r.name}
                   </Link>
                 ),
+                sortable: true,
+                sortKey: 'name',
               },
               {
                 key: 'slug',
                 header: 'Slug',
-                render: (r) => <span className="font-mono text-xs text-text-muted">{String(r['slug'])}</span>,
+                render: (r) => <span className="font-mono text-xs text-text-muted">{r.slug}</span>,
               },
               {
                 key: 'visibility',
                 header: 'Visibility',
-                render: (r) => <StatusPill kind="neutral" label={String(r['visibility'] ?? 'private')} />,
+                render: (r) => <StatusPill kind="neutral" label={r.visibility || 'private'} />,
               },
               {
                 key: 'approvers',
                 header: 'Approvers',
-                render: (r) => `${Number(r['minApprovers'] ?? 1)}+`,
+                render: (r) => `${r.minApprovers}+`,
               },
               {
                 key: 'signed',
                 header: 'Signed releases',
-                render: (r) => (r['requireSignedReleases'] ? 'required' : '—'),
+                render: (r) => (r.requireSignedReleases ? 'required' : '—'),
               },
               {
                 key: 'updated',
                 header: 'Updated',
-                render: (r) => new Date(String(r['updatedAt'] ?? Date.now())).toLocaleString(),
+                render: (r) => new Date(r.updatedAt ?? Date.now()).toLocaleString(),
               },
               {
                 key: 'default',
                 header: 'Default',
-                render: (r) => <HashChip hash={String(r['defaultBranch'] ?? 'main')} length={16} />,
+                render: (r) => <HashChip hash={r.defaultBranch || 'main'} length={16} />,
               },
             ]}
           />
