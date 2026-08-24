@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { manifestApi, validateDagClient, executionApi } from '@/lib/api';
+import { useRequireSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatusPill } from '@/components/brand/status-pill';
@@ -61,9 +62,10 @@ function makeLeafManifest(id: string, name: string, goal: string): SubCapability
 }
 
 export default function ManifestEditorPage() {
+  const session = useRequireSession();
   const params = useParams<{ hash?: string }>();
-  const router = useRouter();
   const hash = params?.hash;
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [manifest, setManifest] = React.useState<Manifest>(blankManifest);
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);

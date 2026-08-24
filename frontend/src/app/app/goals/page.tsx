@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Target, Sparkles } from 'lucide-react';
+import { useRequireSession } from '@/hooks/use-session';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { EmptyState } from '@/components/brand/empty-state';
 import { StatusPill } from '@/components/brand/status-pill';
@@ -16,10 +17,12 @@ interface GoalSummary {
 }
 
 export default function GoalsPage() {
+  const session = useRequireSession();
   const goals = useQuery<{ goals: GoalSummary[] }>({
     queryKey: ['goals'],
     queryFn: () => fetch('/api/goals').then((r) => r.json()),
     refetchInterval: 5000,
+    enabled: Boolean(session),
   });
   const list = goals.data?.goals ?? [];
 

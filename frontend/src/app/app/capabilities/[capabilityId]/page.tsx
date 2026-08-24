@@ -9,6 +9,7 @@ import {
   Box, Boxes,
 } from 'lucide-react';
 import { capabilityApi, versionApi, manifestApi, releaseApi } from '@/lib/api';
+import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatusPill } from '@/components/brand/status-pill';
@@ -23,6 +24,7 @@ import { Button } from '@/components/ui/button';
 type Tab = 'overview' | 'versions' | 'graph' | 'releases';
 
 export default function CapabilityDetailPage() {
+  const session = useRequireSession();
   const params = useParams<{ capabilityId: string }>();
   const id = params.capabilityId;
   const router = useRouter();
@@ -31,13 +33,13 @@ export default function CapabilityDetailPage() {
   const cap = useQuery({
     queryKey: ['capability', id],
     queryFn: () => capabilityApi.get(id).then((r) => r.data),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && Boolean(session),
   });
 
   const versions = useQuery({
     queryKey: ['versions', id],
     queryFn: () => versionApi.list(id).then((r) => r.data).catch(() => []),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && Boolean(session),
   });
 
   const versionList = Array.isArray(versions.data) ? versions.data : [];
@@ -45,13 +47,13 @@ export default function CapabilityDetailPage() {
   const manifest = useQuery({
     queryKey: ['manifest', id],
     queryFn: () => manifestApi.get(id).then((r) => r.data).catch(() => null),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && Boolean(session),
   });
 
   const releases = useQuery({
     queryKey: ['releases', id],
     queryFn: () => releaseApi.list(id).then((r) => r.data).catch(() => []),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && Boolean(session),
   });
   const releaseList = Array.isArray(releases.data) ? releases.data : [];
 

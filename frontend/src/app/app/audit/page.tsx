@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2, ScrollText, ShieldCheck, AlertCircle } from 'lucide-react';
 import { auditApi } from '@/lib/api';
+import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
@@ -42,6 +43,7 @@ function withinRange(ts: string | undefined, range: DateRange): boolean {
 }
 
 export default function AuditPage() {
+  const session = useRequireSession();
   const [range, setRange] = useState<DateRange>('7d');
   const [resource, setResource] = useState<string>('');
   const [action, setAction] = useState<string>('');
@@ -51,6 +53,7 @@ export default function AuditPage() {
   const audit = useQuery({
     queryKey: ['audit', 'all'],
     queryFn: () => auditApi.list().then((r) => r.data).catch(() => []),
+    enabled: Boolean(session),
   });
   const allRows = ((audit.data ?? []) as AuditEntry[]);
 

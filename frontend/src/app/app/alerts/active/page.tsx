@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { alertApi } from '@/lib/api';
+import { useRequireSession } from '@/hooks/use-session';
 import { Bell } from 'lucide-react';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -9,9 +10,11 @@ import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 
 export default function AlertsActivePage() {
+  const session = useRequireSession();
   const alerts = useQuery({
     queryKey: ['alerts', 'active'],
     queryFn: () => alertApi.listAlerts().then((r) => r.data).catch(() => []),
+    enabled: Boolean(session),
   });
   const rows = Array.isArray(alerts.data) ? alerts.data : [];
 

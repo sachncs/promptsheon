@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, FlaskConical, ListChecks, TrendingDown } from 'lucide-react';
 import { evalApi } from '@/lib/api';
+import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
@@ -13,19 +14,20 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 
 export default function EvalRunPage() {
+  const session = useRequireSession();
   const params = useParams<{ runId: string }>();
   const id = params.runId;
 
   const run = useQuery({
     queryKey: ['eval-run', id],
     queryFn: () => evalApi.get(id).then((r) => r.data).catch(() => null),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && Boolean(session),
   });
 
   const results = useQuery({
     queryKey: ['eval-run', id, 'results'],
     queryFn: () => evalApi.getResults(id).then((r) => r.data).catch(() => []),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && Boolean(session),
   });
 
   if (run.isLoading) return <div className="text-text-muted text-sm">Loading run…</div>;

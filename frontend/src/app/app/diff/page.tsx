@@ -8,6 +8,7 @@ import {
   ArrowLeft, GitCompareArrows, ScrollText,
 } from 'lucide-react';
 import { versionApi, releaseApi } from '@/lib/api';
+import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { HashChip } from '@/components/brand/hash-chip';
@@ -19,6 +20,7 @@ import { cn } from '@/lib/utils';
 type Mode = 'unified' | 'split';
 
 export default function DiffPage() {
+  const session = useRequireSession();
   const search = useSearchParams();
   const capabilityParam = search.get('capability') ?? '';
   const initialFrom = search.get('from') ?? '';
@@ -28,7 +30,7 @@ export default function DiffPage() {
   const fromVer = useQuery({
     queryKey: ['versions', capabilityParam],
     queryFn: () => capabilityParam ? versionApi.list(capabilityParam).then((r) => r.data).catch(() => []) : Promise.resolve([]),
-    enabled: Boolean(capabilityParam),
+    enabled: Boolean(capabilityParam) && Boolean(session),
   });
 
   const versions = (Array.isArray(fromVer.data) ? fromVer.data : []) as Array<Record<string, unknown>>;
@@ -39,12 +41,12 @@ export default function DiffPage() {
   const fromData = useQuery({
     queryKey: ['manifest', fromId],
     queryFn: () => fromId ? releaseApi.get(fromId).then((r) => r.data).catch(() => null) : Promise.resolve(null),
-    enabled: Boolean(fromId),
+    enabled: Boolean(fromId) && Boolean(session),
   });
   const toData = useQuery({
     queryKey: ['manifest', toId],
     queryFn: () => toId ? releaseApi.get(toId).then((r) => r.data).catch(() => null) : Promise.resolve(null),
-    enabled: Boolean(toId),
+    enabled: Boolean(toId) && Boolean(session),
   });
 
   const fromText = useMemo(() => stringifyManifest(fromData.data), [fromData.data]);

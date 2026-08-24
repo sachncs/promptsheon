@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FlaskConical, Plus } from 'lucide-react';
 import { evalApi } from '@/lib/api';
+import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
@@ -13,10 +14,12 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 
 export default function EvalListPage() {
+  const session = useRequireSession();
   const router = useRouter();
   const evals = useQuery({
     queryKey: ['eval-runs'],
     queryFn: () => evalApi.list().then((r) => r.data).catch(() => []),
+    enabled: Boolean(session),
   });
   const rows = Array.isArray(evals.data) ? evals.data : [];
 
