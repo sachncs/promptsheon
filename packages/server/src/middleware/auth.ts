@@ -7,6 +7,8 @@ const BOOTSTRAP_PREFIX = '/api/bootstrap/';
 const PUBLIC_PATHS = new Set([
   '/api/openapi.json',
   '/api/health',
+  '/api/audit/verify',
+  '/api/audit/state',
 ]);
 
 /**
