@@ -14,6 +14,7 @@ export interface AppConfig {
     apiKeyEnvVar: string;
     maxRetries: number;
     timeoutMs: number;
+    baseUrl?: string;
   };
   auth: {
     enabled: boolean;
@@ -22,6 +23,6 @@ export interface AppConfig {
   selfEvolve: {
     enabled: boolean;
     defaultCooldownSec: number;
-    maxConcurrentCycles: number;
+    maxConcurrent: number;
   };
 }

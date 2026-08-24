@@ -58,6 +58,7 @@ export function loadConfig(): AppConfig {
       apiKeyEnvVar: envString('PROMPTSHEON_LLM_API_KEY_ENV', 'OPENAI_API_KEY'),
       maxRetries: envInt('PROMPTSHEON_LLM_MAX_RETRIES', 5),
       timeoutMs: envInt('PROMPTSHEON_LLM_TIMEOUT_MS', 120000),
+      baseUrl: process.env['LLM_BASE_URL'] || process.env['ANTHROPIC_BASE_URL'] || process.env['OPENAI_BASE_URL'] || undefined,
     },
     auth: {
       enabled: envBool('PROMPTSHEON_AUTH', true),
@@ -66,7 +67,7 @@ export function loadConfig(): AppConfig {
     selfEvolve: {
       enabled: envBool('PROMPTSHEON_SELF_EVOLVE_ENABLED', false),
       defaultCooldownSec: envInt('PROMPTSHEON_SELF_EVOLVE_COOLDOWN_SEC', 900),
-      maxConcurrentCycles: envInt('PROMPTSHEON_SELF_EVOLVE_MAX_CONCURRENT', 3),
+      maxConcurrent: envInt('PROMPTSHEON_SELF_EVOLVE_MAX_CONCURRENT', 3),
     },
   };
 }
