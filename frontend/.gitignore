@@ -33,5 +33,14 @@ next-env.d.ts.bak
 # Turbo
 .turbo
 
+# Playwright
+playwright-report/
+test-results/
+playwright/.cache/
+promptsheon-test.db
+promptsheon-test.db-journal
+promptsheon-test.db-wal
+promptsheon-test.db-shm
+
 # Vercel
 .vercel
