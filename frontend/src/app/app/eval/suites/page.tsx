@@ -10,6 +10,7 @@ import { PageHeader } from '@/components/brand/page-header';
 import { Surface } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
+import { ThemedSelect } from '@/components/brand/themed-select';
 import { Button } from '@/components/ui/button';
 
 export default function EvalSuitesPage() {
@@ -111,15 +112,19 @@ export default function EvalSuitesPage() {
           </div>
           <div>
             <label className="text-xs uppercase tracking-wider text-text-subtle">Match field</label>
-            <select
-              value={graderField}
-              onChange={(e) => setGraderField(e.target.value as 'output' | 'transcript' | 'metadata')}
-              className="mt-2 w-full rounded-md border border-border-subtle bg-surface-1 px-3 py-2 text-sm text-text-default focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
-            >
-              <option value="output">output</option>
-              <option value="transcript">transcript</option>
-              <option value="metadata">metadata</option>
-            </select>
+            <div className="mt-2">
+              <ThemedSelect
+                value={graderField}
+                onValueChange={(v) => setGraderField(v as 'output' | 'transcript' | 'metadata')}
+                options={[
+                  { value: 'output', label: 'output' },
+                  { value: 'transcript', label: 'transcript' },
+                  { value: 'metadata', label: 'metadata' },
+                ]}
+                ariaLabel="Grader match field"
+                triggerClassName="w-full"
+              />
+            </div>
           </div>
         </div>
         <div className="mt-4 flex items-center gap-2">

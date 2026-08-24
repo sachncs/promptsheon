@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
+import { ThemedSelect } from '@/components/brand/themed-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -128,28 +129,31 @@ export default function SchedulesPage() {
         <div className="grid gap-3 sm:grid-cols-4">
           <div>
             <label className="text-xs uppercase tracking-wider text-text-subtle">Release</label>
-            <select
-              value={releaseId}
-              onChange={(e) => setReleaseId(e.target.value)}
-              className="mt-2 w-full rounded-md border border-border-subtle bg-surface-1 px-3 py-2 text-sm text-text-default focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
-            >
-              <option value="">— pick a release —</option>
-              {releases.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {(r.capabilityName ?? '?') + ' v' + (r.capabilityVersion ?? '?') + ' · ' + (r.environment ?? '—')}
-                </option>
-              ))}
-            </select>
+            <div className="mt-2">
+              <ThemedSelect
+                value={releaseId || undefined}
+                onValueChange={setReleaseId}
+                placeholder="— pick a release —"
+                options={releases.map((r) => ({
+                  value: r.id,
+                  label: `${r.capabilityName ?? '?'} v${r.capabilityVersion ?? '?'} · ${r.environment ?? '—'}`,
+                }))}
+                ariaLabel="Pick a release"
+                triggerClassName="w-full"
+              />
+            </div>
           </div>
           <div>
             <label className="text-xs uppercase tracking-wider text-text-subtle">Kind</label>
-            <select
-              value={kind}
-              onChange={(e) => setKind(e.target.value as typeof KIND_OPTIONS[number]['value'])}
-              className="mt-2 w-full rounded-md border border-border-subtle bg-surface-1 px-3 py-2 text-sm text-text-default focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
-            >
-              {KIND_OPTIONS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-            </select>
+            <div className="mt-2">
+              <ThemedSelect
+                value={kind}
+                onValueChange={(v) => setKind(v as typeof KIND_OPTIONS[number]['value'])}
+                options={KIND_OPTIONS.map((k) => ({ value: k.value, label: k.label }))}
+                ariaLabel="Schedule kind"
+                triggerClassName="w-full"
+              />
+            </div>
           </div>
           <div>
             <label className="text-xs uppercase tracking-wider text-text-subtle">Cron</label>

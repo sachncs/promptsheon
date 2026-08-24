@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
+import { ThemedSelect } from '@/components/brand/themed-select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -93,14 +94,13 @@ export default function UsersPage() {
                     <div className="flex items-center gap-2">
                       <Badge>{role}</Badge>
                       {!isMe && (
-                        <select
+                        <ThemedSelect
                           value={role}
-                          onChange={(e) => updateRole.mutate({ id, role: e.target.value })}
-                          className="rounded-md border border-border-subtle bg-surface-1 px-2 py-1 text-xs text-text-default focus:border-brand focus:outline-none"
-                          aria-label={`Role for ${id.slice(0, 8)}`}
-                        >
-                          {ROLE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-                        </select>
+                          onValueChange={(v) => updateRole.mutate({ id, role: v })}
+                          options={ROLE_OPTIONS.map((opt) => ({ value: opt, label: opt }))}
+                          ariaLabel={`Role for ${id.slice(0, 8)}`}
+                          triggerClassName="h-8 text-xs w-32"
+                        />
                       )}
                     </div>
                   );

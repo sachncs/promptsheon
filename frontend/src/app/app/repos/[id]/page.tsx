@@ -13,6 +13,7 @@ import { DataTable } from '@/components/brand/data-table';
 import { HashChip } from '@/components/brand/hash-chip';
 import { StatusPill } from '@/components/brand/status-pill';
 import { Drawer, DrawerContent, DrawerTrigger } from '@/components/brand/drawer';
+import { ThemedSelect } from '@/components/brand/themed-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -92,16 +93,16 @@ export default function RepositoryDetail() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <select
+        <ThemedSelect
           value={ref}
-          onChange={(e) => setRef(e.target.value)}
-          className="h-8 rounded-md border border-border-subtle bg-surface-1 px-2 text-xs text-text-default focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
-        >
-          {(branches.data ?? []).map((b: BranchItem) => (
-            <option key={b.id} value={b.name}>{b.name}</option>
-          ))}
-          <option value="main">main</option>
-        </select>
+          onValueChange={setRef}
+          options={[
+            ...(branches.data ?? []).map((b: BranchItem) => ({ value: b.name, label: b.name })),
+            { value: 'main', label: 'main' },
+          ]}
+          ariaLabel="Branch"
+          triggerClassName="h-8 text-xs w-44"
+        />
         <span className="text-xs text-text-subtle">
           {String((branches.data ?? []).length)} branch(es)
         </span>

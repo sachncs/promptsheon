@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
+import { ThemedSelect } from '@/components/brand/themed-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -100,23 +101,27 @@ export default function AlertRulesPage() {
           </div>
           <div>
             <label className="text-xs uppercase tracking-wider text-text-subtle">Type</label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value as typeof TYPE_OPTIONS[number]['value'])}
-              className="mt-2 w-full rounded-md border border-border-subtle bg-surface-1 px-3 py-2 text-sm text-text-default focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
-            >
-              {TYPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
+            <div className="mt-2">
+              <ThemedSelect
+                value={type}
+                onValueChange={(v) => setType(v as typeof TYPE_OPTIONS[number]['value'])}
+                options={TYPE_OPTIONS.map((t) => ({ value: t.value, label: t.label }))}
+                ariaLabel="Alert type"
+                triggerClassName="w-full"
+              />
+            </div>
           </div>
           <div>
             <label className="text-xs uppercase tracking-wider text-text-subtle">Severity</label>
-            <select
-              value={severity}
-              onChange={(e) => setSeverity(e.target.value as typeof SEVERITY_OPTIONS[number])}
-              className="mt-2 w-full rounded-md border border-border-subtle bg-surface-1 px-3 py-2 text-sm text-text-default focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
-            >
-              {SEVERITY_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <div className="mt-2">
+              <ThemedSelect
+                value={severity}
+                onValueChange={(v) => setSeverity(v as typeof SEVERITY_OPTIONS[number])}
+                options={SEVERITY_OPTIONS.map((s) => ({ value: s, label: s }))}
+                ariaLabel="Severity"
+                triggerClassName="w-full"
+              />
+            </div>
           </div>
           <div>
             <label className="text-xs uppercase tracking-wider text-text-subtle">Threshold</label>

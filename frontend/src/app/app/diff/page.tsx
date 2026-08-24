@@ -11,6 +11,7 @@ import { versionApi, releaseApi } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { HashChip } from '@/components/brand/hash-chip';
+import { ThemedSelect } from '@/components/brand/themed-select';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/brand/empty-state';
 import { cn } from '@/lib/utils';
@@ -142,23 +143,21 @@ function SourcePicker({
   return (
     <div>
       <label className="block text-xs font-medium uppercase tracking-wider text-text-subtle">{label}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-2 w-full rounded-md border border-border-subtle bg-surface-1 px-3 py-2 text-sm text-text-default focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
-      >
-        <option value="">Choose a version…</option>
-        {versions.map((v) => {
-          const id = String(v['id']);
-          const vNum = String(v['version'] ?? '?');
-          const h = String(v['manifestHash'] ?? v['id']);
-          return (
-            <option key={id} value={id}>
-              v{vNum} · {h.slice(0, 8)}
-            </option>
-          );
-        })}
-      </select>
+      <div className="mt-2">
+        <ThemedSelect
+          value={value || undefined}
+          onValueChange={onChange}
+          placeholder="Choose a version…"
+          options={versions.map((v) => {
+            const id = String(v['id']);
+            const vNum = String(v['version'] ?? '?');
+            const h = String(v['manifestHash'] ?? v['id']);
+            return { value: id, label: `v${vNum} · ${h.slice(0, 8)}` };
+          })}
+          ariaLabel={label}
+          triggerClassName="w-full"
+        />
+      </div>
     </div>
   );
 }

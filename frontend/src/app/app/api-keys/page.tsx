@@ -8,6 +8,7 @@ import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
+import { ThemedSelect } from '@/components/brand/themed-select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,7 +43,7 @@ export default function ApiKeysPage() {
     },
   });
   const [name, setName] = useState('');
-  const [role, setRole] = useState<'admin' | 'editor' | 'reader' | 'system'>('reader');
+  const [role, setRole] = useState<string>('reader');
   const [issued, setIssued] = useState<{ key: string; id: string; name: string } | null>(null);
 
   const create = useMutation({
@@ -88,17 +89,21 @@ export default function ApiKeysPage() {
           </div>
           <div>
             <label className="text-xs uppercase tracking-wider text-text-subtle">Role</label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as 'admin' | 'editor' | 'reader' | 'system')}
-              className="mt-2 w-full rounded-md border border-border-subtle bg-surface-1 px-3 py-2 text-sm text-text-default focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
-            >
-              <option value="reader">reader</option>
-              <option value="editor">editor</option>
-              <option value="approver">approver</option>
-              <option value="admin">admin</option>
-              <option value="system">system</option>
-            </select>
+            <div className="mt-2">
+              <ThemedSelect
+                value={role}
+                onValueChange={setRole}
+                options={[
+                  { value: 'reader', label: 'reader' },
+                  { value: 'editor', label: 'editor' },
+                  { value: 'approver', label: 'approver' },
+                  { value: 'admin', label: 'admin' },
+                  { value: 'system', label: 'system' },
+                ]}
+                ariaLabel="API key role"
+                triggerClassName="w-full"
+              />
+            </div>
           </div>
           <div className="flex items-end">
             <Button onClick={() => create.mutate()} disabled={create.isPending} className="w-full">
