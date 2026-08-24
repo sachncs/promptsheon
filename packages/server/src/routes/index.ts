@@ -25,6 +25,7 @@ import { registerSnapshotRoutes } from './snapshots.js';
 import { registerManifestHashRoutes } from './manifest-hash.js';
 import { registerOrgTeamRoutes } from './org-team.js';
 import { registerWebhookRoutes } from './webhooks-incoming.js';
+import { registerWebhookCrudRoutes } from './webhooks-crud.js';
 import { OrgRepo, TeamRepo } from '../repos/org.js';
 import { WebhookReceiver } from '../webhooks/receiver.js';
 import { registerChaosRoutes } from './chaos.js';
@@ -163,6 +164,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     membershipRepo: deps.membershipRepo,
   });
   registerWebhookRoutes(app, { receiver: deps.webhookReceiver, executor: deps.executor, manifestRepo: deps.manifestRepo });
+  registerWebhookCrudRoutes(app, { auditChain: deps.auditChain });
   registerAuditRoutes(app, { auditChain: deps.auditChain, db: deps.db });
   registerUserRoutes(app, { userRepo: deps.userRepo, auditChain: deps.auditChain });
   registerApiKeyRoutes(app, { apiKeyRepo: deps.apiKeyRepo, auditChain: deps.auditChain });
