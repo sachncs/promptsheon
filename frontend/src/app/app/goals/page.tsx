@@ -7,7 +7,7 @@ import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { EmptyState } from '@/components/brand/empty-state';
 import { StatusPill } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
-import { Button } from '@/components/ui/button';
+import { client } from '@/lib/api';
 
 interface GoalSummary {
   manifestHash: string;
@@ -20,7 +20,10 @@ export default function GoalsPage() {
   const session = useRequireSession();
   const goals = useQuery<{ goals: GoalSummary[] }>({
     queryKey: ['goals'],
-    queryFn: () => fetch('/api/goals').then((r) => r.json()),
+    queryFn: async () => {
+      const res = await client.get('/goals');
+      return res.data as { goals: GoalSummary[] };
+    },
     refetchInterval: 5000,
     enabled: Boolean(session),
   });
