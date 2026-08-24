@@ -1,0 +1,17 @@
+{
+  "root": true,
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "ignorePatterns": [".next/", "out/", "node_modules/", "dist/"],
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/consistent-type-imports": "warn",
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "TSAsExpression[typeAnnotation.typeName.name='unknown']",
+        "message": "Avoid \`as unknown as X\` — prefer a properly typed generic."
+      }
+    ]
+  }
+}
