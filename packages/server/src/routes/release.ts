@@ -165,15 +165,14 @@ export function registerReleaseRoutes(
 
     // BUG-1 follow-on: a release has its own manifest distinct from
     // any version's. Register it in manifest_dag so the maker-checker
-    // approval flow can find it by hash.
+    // approval flow can find it by hash. Use the same raw-string
+    // SHA-256 the activation gate uses so the hash keys match.
     try {
-      const parsedManifest = JSON.parse(parsed.data.manifest) as Record<string, unknown>;
-      const canonical = JSON.stringify(parsedManifest, Object.keys(parsedManifest).sort());
-      const canonicalHash = createHash('sha256').update(canonical).digest('hex');
+      const manifestHash = createHash('sha256').update(parsed.data.manifest).digest('hex');
       deps.manifestRepo.registerFromRaw({
         capabilityId: parsed.data.capabilityId,
         version: parsed.data.capabilityVersion,
-        manifestHash: canonicalHash,
+        manifestHash,
         manifestJson: parsed.data.manifest,
         createdBy: parsed.data.createdBy,
       });
