@@ -20,12 +20,20 @@ const steps = [
   { id: 'finish', label: 'Finish', icon: CheckCircle2 },
 ];
 
-type Provider = 'openai' | 'anthropic' | 'bedrock';
+type Provider = 'openai' | 'anthropic' | 'bedrock' | 'custom';
 
-const providerDefaults: Record<Provider, { model: string; placeholder: string }> = {
-  openai: { model: 'gpt-4o-mini', placeholder: 'sk-…' },
-  anthropic: { model: 'claude-3-5-haiku-latest', placeholder: 'sk-ant-…' },
-  bedrock: { model: 'anthropic.claude-3-5-sonnet-20241022-v2:0', placeholder: '' },
+const providerDefaults: Record<Provider, { model: string; placeholder: string; baseUrl: string; apiStyle: 'anthropic' | 'openai' }> = {
+  openai:    { model: 'gpt-4o-mini',                       placeholder: 'sk-…',                                                                              baseUrl: 'https://api.openai.com',                    apiStyle: 'openai' },
+  anthropic: { model: 'claude-3-5-haiku-latest',          placeholder: 'sk-ant-…',                                                                           baseUrl: 'https://api.anthropic.com',                 apiStyle: 'anthropic' },
+  bedrock:   { model: 'anthropic.claude-3-5-sonnet-20241022-v2:0', placeholder: '',                                                                       baseUrl: '',                                          apiStyle: 'anthropic' },
+  custom:    { model: '',                                  placeholder: 'paste your model id',                                                                baseUrl: 'https://api.minimax.io/anthropic',          apiStyle: 'anthropic' },
+};
+
+const providerLabels: Record<Provider, { title: string; hint: string }> = {
+  openai:    { title: 'OpenAI',          hint: 'gpt-4o, gpt-4o-mini, gpt-4.1' },
+  anthropic: { title: 'Anthropic',       hint: 'claude-3-5-sonnet, claude-3-5-haiku' },
+  bedrock:   { title: 'AWS Bedrock',     hint: 'Claude on AWS' },
+  custom:    { title: 'Custom endpoint', hint: 'Any OpenAI- or Anthropic-compatible URL' },
 };
 
 export default function OnboardingPage() {
@@ -108,7 +116,7 @@ function Welcome({ onNext }: { onNext: () => void }) {
       <ul className="mt-7 mx-auto max-w-md space-y-2 text-left text-sm text-text-muted">
         {[
           'Create the first admin and organisation.',
-          'Connect OpenAI, Anthropic, or AWS Bedrock.',
+          'Connect any OpenAI- or Anthropic-compatible provider, or AWS Bedrock.',
           'Land in a workspace ready to author capabilities.',
         ].map((line) => (
           <li key={line} className="flex items-start gap-2">
@@ -200,6 +208,8 @@ function LlmStep({
   const [bedrockRegion, setBedrockRegion] = React.useState('us-east-1');
   const [bedrockAccess, setBedrockAccess] = React.useState('');
   const [bedrockSecret, setBedrockSecret] = React.useState('');
+  const [baseUrl, setBaseUrl] = React.useState(providerDefaults.openai.baseUrl);
+  const [formError, setFormError] = React.useState<string | null>(null);
 
   const [probeState, setProbeState] = React.useState<
     | { kind: 'idle' }
@@ -210,28 +220,42 @@ function LlmStep({
 
   React.useEffect(() => {
     setModel(providerDefaults[provider].model);
+    setBaseUrl(providerDefaults[provider].baseUrl);
     setProbeState({ kind: 'idle' });
+    setFormError(null);
   }, [provider]);
 
   async function probe(): Promise<void> {
+    setFormError(null);
+    if (!model.trim()) {
+      setFormError('Please add a model name before testing the connection.');
+      return;
+    }
+    if (provider === 'bedrock') {
+      if (!bedrockAccess.trim() || !bedrockSecret.trim()) {
+        setFormError('Enter the AWS access key id and secret before testing.');
+        return;
+      }
+    } else {
+      if (!apiKey.trim()) {
+        setFormError('Enter the API key before testing the connection.');
+        return;
+      }
+      if (provider === 'custom' && !baseUrl.trim()) {
+        setFormError('Enter the base URL for the custom provider.');
+        return;
+      }
+    }
     setProbeState({ kind: 'probing' });
     try {
-      const req: Parameters<typeof bootstrapApi.validateLlm>[0] = { provider, model };
-      if (provider === 'openai' || provider === 'anthropic') {
-        if (!apiKey.trim()) { setProbeState({ kind: 'error', message: 'Enter an API key first.' }); return; }
-        req.apiKey = apiKey.trim();
+      const baseReq: Parameters<typeof bootstrapApi.validateLlm>[0] = { provider, model: model.trim() };
+      if (provider === 'bedrock') {
+        baseReq.bedrock = { region: bedrockRegion, accessKeyId: bedrockAccess.trim(), secretAccessKey: bedrockSecret.trim() };
       } else {
-        if (!bedrockAccess.trim() || !bedrockSecret.trim()) {
-          setProbeState({ kind: 'error', message: 'Enter the AWS access key id and secret.' });
-          return;
-        }
-        req.bedrock = {
-          region: bedrockRegion,
-          accessKeyId: bedrockAccess.trim(),
-          secretAccessKey: bedrockSecret.trim(),
-        };
+        baseReq.apiKey = apiKey.trim();
+        if (provider === 'custom' && baseUrl.trim()) baseReq.baseUrl = baseUrl.trim();
       }
-      const res = await bootstrapApi.validateLlm(req);
+      const res = await bootstrapApi.validateLlm(baseReq);
       setProbeState({ kind: 'ok', latencyMs: res.latencyMs, model: res.model });
     } catch (err) {
       setProbeState({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
@@ -240,11 +264,15 @@ function LlmStep({
 
   const save = useMutation({
     mutationFn: async () => {
-      const req: Parameters<typeof bootstrapApi.saveLlm>[0] = { provider, model };
-      if (provider === 'openai' || provider === 'anthropic') req.apiKey = apiKey.trim();
-      else req.bedrock = { region: bedrockRegion, accessKeyId: bedrockAccess.trim(), secretAccessKey: bedrockSecret.trim() };
+      if (!model.trim()) throw new Error('Please add a model name before saving.');
+      const req: Parameters<typeof bootstrapApi.saveLlm>[0] = { provider, model: model.trim() };
+      if (provider === 'bedrock') {
+        req.bedrock = { region: bedrockRegion, accessKeyId: bedrockAccess.trim(), secretAccessKey: bedrockSecret.trim() };
+      } else {
+        req.apiKey = apiKey.trim();
+        if (provider === 'custom' && baseUrl.trim()) req.baseUrl = baseUrl.trim();
+      }
       await bootstrapApi.saveLlm(req);
-      // Update session provider.
       const existing = JSON.parse(window.localStorage.getItem('promptsheon:session:v1') ?? 'null');
       if (existing) {
         window.localStorage.setItem(
@@ -263,8 +291,8 @@ function LlmStep({
     <section>
       <Header title="Connect a model provider" subtitle="Promptsheon delegates every agent call through the provider you choose. The key is stored encrypted at rest and only ever returned as a masked value." />
 
-      <div className="grid gap-2 sm:grid-cols-3">
-        {(['openai', 'anthropic', 'bedrock'] as Provider[]).map((p) => (
+      <div className="grid gap-2 sm:grid-cols-4">
+        {(Object.keys(providerDefaults) as Provider[]).map((p) => (
           <button
             key={p}
             type="button"
@@ -276,33 +304,40 @@ function LlmStep({
                 : 'border-border-subtle bg-surface-2 text-text-muted hover:border-border-strong hover:text-text-default',
             )}
           >
-            <div className="text-sm font-semibold capitalize">{p === 'openai' ? 'OpenAI' : p === 'anthropic' ? 'Anthropic' : 'AWS Bedrock'}</div>
+            <div className="text-sm font-semibold">{providerLabels[p].title}</div>
             <div className="mt-0.5 text-xs text-text-muted">
-              {p === 'openai' && 'gpt-4o, gpt-4o-mini, gpt-4.1'}
-              {p === 'anthropic' && 'claude-3-5-sonnet, claude-3-5-haiku'}
-              {p === 'bedrock' && 'Claude on AWS'}
+              {providerLabels[p].hint}
             </div>
           </button>
         ))}
       </div>
 
       <div className="mt-5 grid gap-4">
-        <Field label="Model id" htmlFor="model-id">
-          <Input id="model-id" value={model} onChange={(e) => setModel(e.target.value)} />
-        </Field>
-        {provider === 'openai' || provider === 'anthropic' ? (
-          <Field label={provider === 'openai' ? 'OpenAI API key' : 'Anthropic API key'} htmlFor="api-key">
+        {provider === 'custom' && (
+          <Field label="Base URL" htmlFor="base-url" hint="Endpoint of any OpenAI- or Anthropic-compatible API (for example: https://api.minimax.io/anthropic).">
             <Input
-              id="api-key"
-              type="password"
-              autoComplete="off"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={providerDefaults[provider].placeholder}
+              id="base-url"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="https://api.minimax.io/anthropic"
               mono
             />
           </Field>
-        ) : (
+        )}
+        <Field
+          label="Model name"
+          htmlFor="model-id"
+          hint={provider === 'custom' ? 'The exact model id your endpoint expects.' : 'Pick any model your provider offers; this is just a sensible default.'}
+        >
+          <Input
+            id="model-id"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder={providerDefaults[provider].model || 'e.g. MiniMax-M2.7-highspeed'}
+            mono
+          />
+        </Field>
+        {provider === 'bedrock' ? (
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Region" htmlFor="region">
               <Input id="region" value={bedrockRegion} onChange={(e) => setBedrockRegion(e.target.value)} />
@@ -314,8 +349,31 @@ function LlmStep({
               <Input id="aws-secret" type="password" autoComplete="off" value={bedrockSecret} onChange={(e) => setBedrockSecret(e.target.value)} />
             </Field>
           </div>
+        ) : (
+          <Field
+            label="API key"
+            htmlFor="api-key"
+            hint={provider === 'custom' ? 'Sent as x-api-key (Anthropic) or Authorization: Bearer (OpenAI) depending on the URL.' : 'Stored encrypted at rest; never returned through the API.'}
+          >
+            <Input
+              id="api-key"
+              type="password"
+              autoComplete="off"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder={providerDefaults[provider].placeholder}
+              mono
+            />
+          </Field>
         )}
       </div>
+
+      {formError && (
+        <div className="mt-4 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground flex items-start gap-2">
+          <ShieldAlert className="mt-0.5 h-4 w-4" />
+          <span>{formError}</span>
+        </div>
+      )}
 
       <div className="mt-5 flex items-center gap-3">
         <Button variant="outline" onClick={probe} disabled={probeState.kind === 'probing'}>

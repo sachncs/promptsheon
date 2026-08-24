@@ -54,19 +54,21 @@ export const bootstrapApi = {
     return CreateAdminResponseSchema.parse(data);
   },
   validateLlm: async (input: {
-    provider: 'openai' | 'anthropic' | 'bedrock';
+    provider: 'openai' | 'anthropic' | 'bedrock' | 'custom';
     apiKey?: string | undefined;
     bedrock?: { region: string; accessKeyId: string; secretAccessKey: string } | undefined;
-    model?: string | undefined;
+    model: string;
+    baseUrl?: string | undefined;
   }): Promise<LlmProbeResponse> => {
     const { data } = await client.post('/bootstrap/validate-llm', input);
     return LlmProbeResponseSchema.parse(data);
   },
   saveLlm: async (input: {
-    provider: 'openai' | 'anthropic' | 'bedrock';
+    provider: 'openai' | 'anthropic' | 'bedrock' | 'custom';
     model: string;
     apiKey?: string | undefined;
     bedrock?: { region: string; accessKeyId: string; secretAccessKey: string } | undefined;
+    baseUrl?: string | undefined;
   }): Promise<{ ok: true }> => {
     const { data } = await client.post('/bootstrap/llm', input);
     return data as { ok: true };
