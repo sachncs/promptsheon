@@ -10,6 +10,8 @@ Version: 2.0
 
 This repository is expected to represent production-grade TypeScript engineering.
 
+The actual frontend stack is **Next.js 16 (App Router) + TanStack Query + axios + shadcn/ui** running on top of a **Fastify + better-sqlite3** backend. The repo is a pnpm workspace: `packages/{shared,server,cli,sdk}/` plus `frontend/`. **Not Vite, not React Router v7** — those references in earlier docs are stale.
+
 Every change must improve the repository.
 
 Every contribution must increase one or more of the following qualities:
