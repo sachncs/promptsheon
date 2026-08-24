@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
   Boxes, GitBranch, FlaskConical, ShieldCheck, Plus, ArrowRight,
-  Box, AlertCircle, Layers,
+  Box, AlertCircle, Layers, CalendarClock, Sparkles,
 } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -15,6 +15,8 @@ import { TrustScore } from '@/components/brand/trust-score';
 import { Timeline } from '@/components/brand/timeline';
 import { EmptyState } from '@/components/brand/empty-state';
 import { DataTable } from '@/components/brand/data-table';
+import { AnimatedNumber } from '@/components/brand/animated-number';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
 import { Button } from '@/components/ui/button';
 import { workspaceApi, projectApi, capabilityApi, releaseApi, evalApi, auditApi, approvalApi } from '@/lib/api';
 
@@ -107,6 +109,12 @@ function Dashboard() {
   const trustScore = computeTrust(evalList, approvalList, releaseList);
   const openReleases = releaseList.filter((r) => r['state'] === 'active' || r['state'] === 'canary').length;
 
+  const wsFirst = unwrapFirst(d.workspaces.data);
+  const wsName = wsFirst ? (wsFirst as { name?: string }).name : 'your workspace';
+  const noCapability = capabilityCount === 0;
+  const noRelease = releaseList.length === 0;
+  const onboard = noCapability || noRelease;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -122,18 +130,48 @@ function Dashboard() {
         }
       />
 
+      {onboard && (
+        <Surface className="ps-aurora-bg overflow-hidden border-brand/30">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-lg bg-brand text-brand-foreground">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-text-strong">
+                  Welcome to {wsName}
+                </div>
+                <p className="mt-1 text-sm text-text-muted">
+                  A quick three-step setup: author a capability in the DAG editor, compile it into an immutable manifest, and run your first release.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href="/app/editor"><Button size="sm"><Plus className="mr-1.5 h-3.5 w-3.5" />Author capability</Button></Link>
+              <Link href="/app/capabilities"><Button size="sm" variant="outline">Browse registry</Button></Link>
+              <Link href="/docs/quickstart"><Button size="sm" variant="ghost">Read the quickstart</Button></Link>
+            </div>
+          </div>
+        </Surface>
+      )}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Active capabilities" value={capabilityCount} hint="Across all projects" icon={Boxes} />
+        <StatCard
+          label="Active capabilities"
+          value={<AnimatedNumber value={capabilityCount} />}
+          hint="Across all projects"
+          icon={Boxes}
+        />
         <StatCard
           label="Pending approvals"
-          value={approvalList.length}
+          value={<AnimatedNumber value={approvalList.length} />}
           hint="Awaiting a second reviewer"
           icon={ShieldCheck}
           delta={approvalList.length > 0 ? { value: `${approvalList.length} pending`, trend: 'up' } : undefined}
         />
         <StatCard
           label="Latest eval pass rate"
-          value={`${passRate(evalList).toFixed(0)}%`}
+          value={<AnimatedNumber value={Math.round(passRate(evalList))} format={(n) => `${n}%`} />}
           hint="Across the last 8 runs"
           icon={FlaskConical}
           delta={
@@ -144,7 +182,7 @@ function Dashboard() {
         />
         <StatCard
           label="Open releases"
-          value={openReleases}
+          value={<AnimatedNumber value={openReleases} />}
           hint="Active + canary"
           icon={GitBranch}
         />
@@ -185,64 +223,90 @@ function Dashboard() {
         </Surface>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <Surface>
-          <SurfaceHeader
-            title="Pending review"
-            description="Releases waiting on a second pair of eyes."
-            actions={<Link href="/app/approvals" className="text-sm text-brand-highlight hover:underline">Open queue</Link>}
-          />
-          {approvalList.length === 0 ? (
-            <EmptyState
-              icon={ShieldCheck}
-              title="Nothing pending"
-              description="When a release is awaiting approval, it shows up here for the maker-checker flow."
-            />
-          ) : (
-            <ol className="space-y-3">
-              {approvalList.slice(0, 4).map((a) => (
-                <li key={String(a['id'])} className="flex items-center gap-3 rounded-lg border border-border-subtle bg-surface-2/40 p-3">
-                  <div className="grid h-8 w-8 place-items-center rounded-md bg-surface-2">
-                    <AlertCircle className="h-4 w-4 text-warning" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="truncate text-sm text-text-strong">{String(a['title'] ?? a['id'])}</div>
-                    <div className="text-xs text-text-muted">Awaiting approval</div>
-                  </div>
-                  <Link href={`/app/approvals/${a['releaseId'] ?? a['id']}`}>
-                    <Button variant="ghost" size="sm">Review <ArrowRight className="ml-1 h-3 w-3" /></Button>
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          )}
-        </Surface>
+      <Tabs defaultValue="pending">
+        <TabsList>
+          <TabsTrigger value="pending">Pending</TabsTrigger>
+          <TabsTrigger value="recent">Recent</TabsTrigger>
+          <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+        </TabsList>
 
-        <Surface>
-          <SurfaceHeader
-            title="Recent activity"
-            description="Audit-log events from the last few minutes."
-            actions={<Link href="/app/audit" className="text-sm text-brand-highlight hover:underline">Open audit</Link>}
-          />
-          {auditList.length === 0 ? (
+        <TabsContent value="pending">
+          <Surface>
+            <SurfaceHeader
+              title="Pending review"
+              description="Releases waiting on a second pair of eyes."
+              actions={<Link href="/app/approvals" className="text-sm text-brand-highlight hover:underline">Open queue</Link>}
+            />
+            {approvalList.length === 0 ? (
+              <EmptyState
+                icon={ShieldCheck}
+                title="Nothing pending"
+                description="When a release is awaiting approval, it shows up here for the maker-checker flow."
+              />
+            ) : (
+              <ol className="space-y-3">
+                {approvalList.slice(0, 4).map((a) => (
+                  <li key={String(a['id'])} className="flex items-center gap-3 rounded-lg border border-border-subtle bg-surface-2/40 p-3">
+                    <div className="grid h-8 w-8 place-items-center rounded-md bg-surface-2">
+                      <AlertCircle className="h-4 w-4 text-warning" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate text-sm text-text-strong">{String(a['title'] ?? a['id'])}</div>
+                      <div className="text-xs text-text-muted">Awaiting approval</div>
+                    </div>
+                    <Link href={`/app/approvals/${a['releaseId'] ?? a['id']}`}>
+                      <Button variant="ghost" size="sm">Review <ArrowRight className="ml-1 h-3 w-3" /></Button>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </Surface>
+        </TabsContent>
+
+        <TabsContent value="recent">
+          <Surface>
+            <SurfaceHeader
+              title="Recent activity"
+              description="Audit-log events from the last few minutes."
+              actions={<Link href="/app/audit" className="text-sm text-brand-highlight hover:underline">Open audit</Link>}
+            />
+            {auditList.length === 0 ? (
+              <EmptyState
+                icon={Box}
+                title="No activity yet"
+                description="Every action on a capability is recorded in the audit chain. The first move shows up here."
+              />
+            ) : (
+              <Timeline
+                entries={auditList.slice(0, 8).map((a) => ({
+                  id: String(a['id']),
+                  title: String(a['action'] ?? 'event'),
+                  description: String(a['resource'] ?? ''),
+                  timestamp: new Date(String(a['createdAt'] ?? a['timestamp'] ?? Date.now())).toLocaleString(),
+                  tone: 'neutral' as const,
+                }))}
+              />
+            )}
+          </Surface>
+        </TabsContent>
+
+        <TabsContent value="upcoming">
+          <Surface>
+            <SurfaceHeader
+              title="Upcoming"
+              description="Scheduled eval runs and self-evolve cycles."
+              actions={<Link href="/app/schedules" className="text-sm text-brand-highlight hover:underline">Schedules</Link>}
+            />
             <EmptyState
-              icon={Box}
-              title="No activity yet"
-              description="Every action on a capability is recorded in the audit chain. The first move shows up here."
+              icon={CalendarClock}
+              title="No upcoming runs scheduled"
+              description="Create a schedule to fire on a cron — nightly eval runs, weekly rotations, self-evolve cycles."
+              action={<Link href="/app/schedules"><Button variant="outline">Create schedule</Button></Link>}
             />
-          ) : (
-            <Timeline
-              entries={auditList.slice(0, 8).map((a) => ({
-                id: String(a['id']),
-                title: String(a['action'] ?? 'event'),
-                description: String(a['resource'] ?? ''),
-                timestamp: new Date(String(a['createdAt'] ?? a['timestamp'] ?? Date.now())).toLocaleString(),
-                tone: 'neutral' as const,
-              }))}
-            />
-          )}
-        </Surface>
-      </div>
+          </Surface>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
