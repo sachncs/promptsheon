@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -19,7 +20,7 @@ import { cn } from '@/lib/utils';
 
 type Mode = 'unified' | 'split';
 
-export default function DiffPage() {
+function DiffPageInner() {
   const session = useRequireSession();
   const search = useSearchParams();
   const capabilityParam = search.get('capability') ?? '';
@@ -233,4 +234,12 @@ function unifiedDiff(fromText: string, toText: string): DiffLineKind[] {
     out.push({ id: k++, type: 'remove', text: at(a, i++) });
   }
   return out;
+}
+
+export default function DiffPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-text-muted">Loading…</div>}>
+      <DiffPageInner />
+    </Suspense>
+  );
 }
