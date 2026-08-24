@@ -16,25 +16,37 @@ const CreateAdminSchema = z.object({
 });
 
 const ValidateLlmSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'bedrock']),
-  apiKey: z.string().min(8).optional(),
+  provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom']),
+  // For the OpenAI / Anthropic / Custom paths, apiKey is required.
+  // For Bedrock, the bedrock object is required instead.
+  apiKey: z.string().min(1).optional(),
   bedrock: z.object({
     region: z.string().min(1),
     accessKeyId: z.string().min(1),
     secretAccessKey: z.string().min(1),
   }).optional(),
-  model: z.string().min(1).optional(),
-});
+  model: z.string().min(1, 'Model name is required'),
+  // baseUrl is required when provider === 'custom'; ignored otherwise.
+  baseUrl: z.string().url().optional(),
+}).refine(
+  (data) => {
+    if (data.provider === 'bedrock') return Boolean(data.bedrock);
+    if (data.provider === 'custom') return Boolean(data.baseUrl) && Boolean(data.apiKey);
+    return Boolean(data.apiKey);
+  },
+  { message: 'Custom provider needs baseUrl + apiKey; Bedrock needs bedrock object; others need apiKey' },
+);
 
 const SaveLlmSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'bedrock']),
-  model: z.string().min(1),
-  apiKey: z.string().min(8).optional(),
+  provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom']),
+  model: z.string().min(1, 'Model name is required'),
+  apiKey: z.string().min(1).optional(),
   bedrock: z.object({
     region: z.string().min(1),
     accessKeyId: z.string().min(1),
     secretAccessKey: z.string().min(1),
   }).optional(),
+  baseUrl: z.string().url().optional(),
 });
 
 export function registerBootstrapRoutes(
@@ -119,8 +131,19 @@ export function registerBootstrapRoutes(
     const parsed = parseBody(reply, ValidateLlmSchema, request.body);
     if (!parsed.ok) return;
 
+    // ValidateLlmSchema accepts partial data (apiKey optional, baseUrl
+    // optional) and the .refine() at the bottom guarantees the
+    // required-field-for-provider combination. The router wants a
+    // non-undefined apiKey for the openai/anthropic/custom cases and
+    // a populated bedrock for the bedrock case, so narrow the union
+    // here.
+    const data = parsed.data;
+    const probeInput = data.provider === 'bedrock'
+      ? { provider: 'bedrock' as const, model: data.model, bedrock: data.bedrock!, apiKey: 'unused' }
+      : { provider: data.provider, model: data.model, apiKey: data.apiKey!, ...(data.baseUrl ? { baseUrl: data.baseUrl } : {}) };
+
     try {
-      const probe = await deps.llmRouter.probe(parsed.data);
+      const probe = await deps.llmRouter.probe(probeInput as Parameters<typeof deps.llmRouter.probe>[0]);
       return reply.send({ ok: true, latencyMs: probe.latencyMs, model: probe.model });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Validation failed';
@@ -141,12 +164,22 @@ export function registerBootstrapRoutes(
       mirrorEnv('PROMPTSHEON_LLM_PROVIDER', 'openai');
       mirrorEnv('PROMPTSHEON_LLM_MODEL', parsed.data.model);
       mirrorEnv('PROMPTSHEON_LLM_API_KEY_ENV', 'OPENAI_API_KEY');
+      if (parsed.data.baseUrl) mirrorEnv('OPENAI_BASE_URL', parsed.data.baseUrl);
     } else if (parsed.data.provider === 'anthropic' && parsed.data.apiKey) {
       await deps.settingsResolver.set('llm.anthropicApiKey', parsed.data.apiKey, 'bootstrap');
       mirrorEnv('ANTHROPIC_API_KEY', parsed.data.apiKey);
       mirrorEnv('PROMPTSHEON_LLM_PROVIDER', 'anthropic');
       mirrorEnv('PROMPTSHEON_LLM_MODEL', parsed.data.model);
       mirrorEnv('PROMPTSHEON_LLM_API_KEY_ENV', 'ANTHROPIC_API_KEY');
+      if (parsed.data.baseUrl) mirrorEnv('ANTHROPIC_BASE_URL', parsed.data.baseUrl);
+    } else if (parsed.data.provider === 'custom' && parsed.data.apiKey && parsed.data.baseUrl) {
+      await deps.settingsResolver.set('llm.customApiKey', parsed.data.apiKey, 'bootstrap');
+      await deps.settingsResolver.set('llm.baseUrl', parsed.data.baseUrl, 'bootstrap');
+      mirrorEnv('PROMPTSHEON_LLM_PROVIDER', 'custom');
+      mirrorEnv('PROMPTSHEON_LLM_MODEL', parsed.data.model);
+      mirrorEnv('PROMPTSHEON_LLM_API_KEY_ENV', 'LLM_CUSTOM_KEY');
+      mirrorEnv('LLM_CUSTOM_KEY', parsed.data.apiKey);
+      mirrorEnv('LLM_BASE_URL', parsed.data.baseUrl);
     } else if (parsed.data.provider === 'bedrock' && parsed.data.bedrock) {
       await deps.settingsResolver.set('llm.bedrockRegion', parsed.data.bedrock.region, 'bootstrap');
       await deps.settingsResolver.set('llm.bedrockAccessKeyId', parsed.data.bedrock.accessKeyId, 'bootstrap');
