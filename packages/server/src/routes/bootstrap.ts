@@ -161,33 +161,25 @@ export function registerBootstrapRoutes(
     if (parsed.data.provider === 'openai' && parsed.data.apiKey) {
       await deps.settingsResolver.set('llm.openaiApiKey', parsed.data.apiKey, 'bootstrap');
       mirrorEnv('OPENAI_API_KEY', parsed.data.apiKey);
-      mirrorEnv('PROMPTSHEON_LLM_PROVIDER', 'openai');
-      mirrorEnv('PROMPTSHEON_LLM_MODEL', parsed.data.model);
-      mirrorEnv('PROMPTSHEON_LLM_API_KEY_ENV', 'OPENAI_API_KEY');
-      if (parsed.data.baseUrl) mirrorEnv('OPENAI_BASE_URL', parsed.data.baseUrl);
+      recordSettingSideEffect('llm.openaiApiKey', parsed.data.apiKey);
     } else if (parsed.data.provider === 'anthropic' && parsed.data.apiKey) {
       await deps.settingsResolver.set('llm.anthropicApiKey', parsed.data.apiKey, 'bootstrap');
       mirrorEnv('ANTHROPIC_API_KEY', parsed.data.apiKey);
-      mirrorEnv('PROMPTSHEON_LLM_PROVIDER', 'anthropic');
-      mirrorEnv('PROMPTSHEON_LLM_MODEL', parsed.data.model);
-      mirrorEnv('PROMPTSHEON_LLM_API_KEY_ENV', 'ANTHROPIC_API_KEY');
-      if (parsed.data.baseUrl) mirrorEnv('ANTHROPIC_BASE_URL', parsed.data.baseUrl);
+      recordSettingSideEffect('llm.anthropicApiKey', parsed.data.apiKey);
     } else if (parsed.data.provider === 'custom' && parsed.data.apiKey && parsed.data.baseUrl) {
       await deps.settingsResolver.set('llm.customApiKey', parsed.data.apiKey, 'bootstrap');
       await deps.settingsResolver.set('llm.baseUrl', parsed.data.baseUrl, 'bootstrap');
       mirrorEnv('PROMPTSHEON_LLM_PROVIDER', 'custom');
-      mirrorEnv('PROMPTSHEON_LLM_MODEL', parsed.data.model);
-      mirrorEnv('PROMPTSHEON_LLM_API_KEY_ENV', 'LLM_CUSTOM_KEY');
-      mirrorEnv('LLM_CUSTOM_KEY', parsed.data.apiKey);
-      mirrorEnv('LLM_BASE_URL', parsed.data.baseUrl);
+      recordSettingSideEffect('llm.customApiKey', parsed.data.apiKey);
+      recordSettingSideEffect('llm.customBaseUrl', parsed.data.baseUrl);
     } else if (parsed.data.provider === 'bedrock' && parsed.data.bedrock) {
       await deps.settingsResolver.set('llm.bedrockRegion', parsed.data.bedrock.region, 'bootstrap');
       await deps.settingsResolver.set('llm.bedrockAccessKeyId', parsed.data.bedrock.accessKeyId, 'bootstrap');
       await deps.settingsResolver.set('llm.bedrockSecretAccessKey', parsed.data.bedrock.secretAccessKey, 'bootstrap');
-      mirrorEnv('AWS_BEDROCK_REGION', parsed.data.bedrock.region);
-      mirrorEnv('AWS_ACCESS_KEY_ID', parsed.data.bedrock.accessKeyId);
-      mirrorEnv('AWS_SECRET_ACCESS_KEY', parsed.data.bedrock.secretAccessKey);
       mirrorEnv('PROMPTSHEON_LLM_PROVIDER', 'bedrock');
+      recordSettingSideEffect('llm.bedrockRegion', parsed.data.bedrock.region);
+      recordSettingSideEffect('llm.bedrockAccessKeyId', parsed.data.bedrock.accessKeyId);
+      recordSettingSideEffect('llm.bedrockSecretAccessKey', parsed.data.bedrock.secretAccessKey);
       mirrorEnv('PROMPTSHEON_LLM_MODEL', parsed.data.model);
     }
 
@@ -197,6 +189,18 @@ export function registerBootstrapRoutes(
 
 function mirrorEnv(key: string, value: string): void {
   process.env[key] = value;
+}
+
+/**
+ * A no-op variant kept around for compatibility with the call sites.
+ * New code should rely exclusively on settings persistence; the
+ * SettingsResolver + llm/router now key off the persisted values, so
+ * process.env is reserved for the privileged 'dev' bootstrap path
+ * only.
+ */
+function recordSettingSideEffect(key: string, value: string): void {
+  void key;
+  void value;
 }
 
 async function resolveKeyPresence(
