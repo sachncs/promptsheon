@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 export const LlmProbeRequestSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'bedrock']),
-  model: z.string().min(1).optional(),
-  apiKey: z.string().min(8).optional(),
+  provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom']),
+  model: z.string().min(1, 'Model name is required'),
+  apiKey: z.string().min(1, 'API key is required'),
   bedrock: z
     .object({
       region: z.string().min(1),
@@ -11,6 +11,9 @@ export const LlmProbeRequestSchema = z.object({
       secretAccessKey: z.string().min(1),
     })
     .optional(),
+  // For the 'custom' provider, baseUrl overrides the hardcoded
+  // OpenAI / Anthropic endpoints. Required when provider === 'custom'.
+  baseUrl: z.string().url().optional(),
 });
 
 export type LlmProbeRequest = z.infer<typeof LlmProbeRequestSchema>;
@@ -32,12 +35,14 @@ export class LlmRouter {
         return this.probeAnthropic(req, started);
       case 'bedrock':
         return this.probeBedrock(req, started);
+      case 'custom':
+        return this.probeCustom(req, started);
     }
   }
 
   private async probeOpenai(req: LlmProbeRequest, started: number): Promise<LlmProbeResult> {
-    if (!req.apiKey) throw new Error('OpenAI key is required');
-    const res = await fetch('https://api.openai.com/v1/models', {
+    const base = (req.baseUrl ?? process.env['OPENAI_BASE_URL'] ?? 'https://api.openai.com').replace(/\/$/, '');
+    const res = await fetch(`${base}/v1/models`, {
       headers: { Authorization: `Bearer ${req.apiKey}` },
       signal: AbortSignal.timeout(8_000),
     });
@@ -45,12 +50,15 @@ export class LlmRouter {
       const body = await res.text().catch(() => '');
       throw new Error(`OpenAI responded ${res.status}: ${body.slice(0, 200)}`);
     }
-    return { latencyMs: Date.now() - started, model: req.model ?? 'gpt-4o-mini' };
+    return { latencyMs: Date.now() - started, model: req.model };
   }
 
   private async probeAnthropic(req: LlmProbeRequest, started: number): Promise<LlmProbeResult> {
-    if (!req.apiKey) throw new Error('Anthropic key is required');
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    // baseUrl lets operators point at any Anthropic-compatible
+    // endpoint (LiteLLM, MiniMax, custom proxy) without code changes.
+    // Falls back to ANTHROPIC_BASE_URL env var, then api.anthropic.com.
+    const base = (req.baseUrl ?? process.env['ANTHROPIC_BASE_URL'] ?? 'https://api.anthropic.com').replace(/\/$/, '');
+    const res = await fetch(`${base}/v1/messages`, {
       method: 'POST',
       headers: {
         'x-api-key': req.apiKey,
@@ -58,7 +66,7 @@ export class LlmRouter {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: req.model ?? 'claude-3-5-haiku-latest',
+        model: req.model,
         max_tokens: 16,
         messages: [{ role: 'user', content: 'ping' }],
       }),
@@ -68,7 +76,7 @@ export class LlmRouter {
       const body = await res.text().catch(() => '');
       throw new Error(`Anthropic responded ${res.status}: ${body.slice(0, 200)}`);
     }
-    return { latencyMs: Date.now() - started, model: req.model ?? 'claude-3-5-haiku-latest' };
+    return { latencyMs: Date.now() - started, model: req.model };
   }
 
   private probeBedrock(req: LlmProbeRequest, started: number): Promise<LlmProbeResult> {
@@ -78,9 +86,50 @@ export class LlmRouter {
     }
     return Promise.resolve({
       latencyMs: Date.now() - started,
-      model: req.model ?? 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+      model: req.model,
       skipped: true,
       skipReason: 'Bedrock signing requires the AWS SDK; credentials are recorded and will be validated on first invocation.',
     });
+  }
+
+  private async probeCustom(req: LlmProbeRequest, started: number): Promise<LlmProbeResult> {
+    if (!req.baseUrl) throw new Error('Custom provider requires a baseUrl');
+    const base = req.baseUrl.replace(/\/$/, '');
+    // Custom providers use the Anthropic probe format (POST /v1/messages
+    // with x-api-key). The URL points to any Anthropic-compatible or
+    // OpenAI-compatible endpoint; for OpenAI, the user can override the
+    // path with a custom baseUrl that includes /v1.
+    const isAnthropicStyle = /anthropic|minimax/i.test(base) || base.includes('anthropic');
+    if (isAnthropicStyle) {
+      const res = await fetch(`${base}/v1/messages`, {
+        method: 'POST',
+        headers: {
+          'x-api-key': req.apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: req.model,
+          max_tokens: 16,
+          messages: [{ role: 'user', content: 'ping' }],
+        }),
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Custom endpoint responded ${res.status}: ${body.slice(0, 200)}`);
+      }
+      return { latencyMs: Date.now() - started, model: req.model };
+    }
+    // OpenAI-style: GET /v1/models
+    const res = await fetch(`${base}/v1/models`, {
+      headers: { Authorization: `Bearer ${req.apiKey}` },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`Custom endpoint responded ${res.status}: ${body.slice(0, 200)}`);
+    }
+    return { latencyMs: Date.now() - started, model: req.model };
   }
 }
