@@ -40,6 +40,10 @@ export const bootstrapApi = {
     const { data } = await client.get('/bootstrap/status');
     return BootstrapStatusSchema.parse(data);
   },
+  admin: async (): Promise<CreateAdminResponse> => {
+    const { data } = await client.get('/bootstrap/admin');
+    return CreateAdminResponseSchema.parse(data);
+  },
   createAdmin: async (input: {
     adminName: string;
     adminEmail: string;

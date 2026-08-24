@@ -63,6 +63,32 @@ export function registerBootstrapRoutes(
     });
   });
 
+  // Re-establish a session after bootstrap. Safe to expose without auth
+  // because bootstrap is the only pre-auth state in a self-hosted install —
+  // there is no other user to authenticate as, and the endpoint returns
+  // no secrets (only the admin id/email/name and the org id/slug).
+  app.get('/api/bootstrap/admin', async (_request, reply) => {
+    const admin = deps.userRepo.list().find((u) => u.role === 'admin');
+    if (!admin) {
+      return reply.code(404).send({ error: { code: 'NO_ADMIN', message: 'No admin exists yet.' } });
+    }
+    const orgIds = membershipRepo.findOrgsForUser(admin.id);
+    const firstOrgId = orgIds[0];
+    if (!firstOrgId) {
+      return reply.code(404).send({ error: { code: 'NO_ORG', message: 'Admin has no organisation.' } });
+    }
+    const org = orgRepo.findById(firstOrgId);
+    if (!org) {
+      return reply.code(404).send({ error: { code: 'NO_ORG', message: 'Organisation not found.' } });
+    }
+    const provider = await deps.settingsResolver.get<string>('llm.provider').catch(() => undefined);
+    return reply.send({
+      user: { id: admin.id, email: admin.email, name: admin.name, role: admin.role },
+      org: { id: org.id, name: org.name, slug: org.slug },
+      provider: provider ?? null,
+    });
+  });
+
   app.post('/api/bootstrap/admin', async (request, reply) => {
     const parsed = parseBody(reply, CreateAdminSchema, request.body);
     if (!parsed.ok) return;

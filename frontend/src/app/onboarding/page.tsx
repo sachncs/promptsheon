@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { StepIndicator } from '@/components/brand/step-indicator';
 import { bootstrapApi, toSession } from '@/lib/bootstrap';
-import { setSession } from '@/lib/session';
+import { getSession, setSession } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
 const steps = [
@@ -34,8 +34,27 @@ export default function OnboardingPage() {
   const [index, setIndex] = React.useState(0);
 
   React.useEffect(() => {
-    if (status.data && !status.data.needsAdmin && !status.data.needsLlm) {
-      router.replace('/app');
+    if (!status.data) return;
+    // Bootstrap is complete. If we already have a session, head straight
+    // to the app. If localStorage was cleared (or never written — the
+    // admin step sets the session but localStorage can be wiped between
+    // dev runs), re-establish the session by fetching the admin record
+    // and then redirect.
+    if (!status.data.needsAdmin && !status.data.needsLlm) {
+      const existing = getSession();
+      if (existing) {
+        router.replace('/app');
+        return;
+      }
+      bootstrapApi.admin()
+        .then((data) => {
+          setSession(toSession(data, status.data?.provider ?? null));
+          router.replace('/app');
+        })
+        .catch(() => {
+          // No admin or no org — leave the user on the onboarding UI so
+          // they can run the steps. (If we got here, status must be stale.)
+        });
     }
   }, [status.data, router]);
 
