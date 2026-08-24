@@ -2,13 +2,21 @@
 
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { manifestApi, validateDagClient, executionApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatusPill } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
-import { AlertCircle, Save, Plus, Play } from 'lucide-react';
+import { Breadcrumb } from '@/components/brand/breadcrumb';
+import { ThemedTooltip } from '@/components/brand/themed-tooltip';
+import { Kbd } from '@/components/brand/kbd';
+import { useToast } from '@/components/brand/toast';
+import {
+  AlertCircle, Save, Plus, Play, LayoutTemplate, Layers,
+  Maximize2, Minimize2, Bot, Wrench, ShieldAlert, Workflow,
+} from 'lucide-react';
 import { DagCanvas } from '@/components/dag/DagCanvas';
 import { NodeConfigPanel } from '@/components/dag/NodeConfigPanel';
 import type { Manifest, SubCapabilityManifest } from '@promptsheon/shared';
@@ -160,33 +168,186 @@ export default function ManifestEditorPage() {
   }, [hash, runPreviewMutation]);
 
   const isValid = validationErrors.length === 0;
+  const [fullscreen, setFullscreen] = React.useState(false);
+  const { toast } = useToast();
+
+  const TEMPLATES: Array<{ id: string; label: string; description: string; build: () => Manifest }> = [
+    {
+      id: 'triage',
+      label: 'Customer support triage',
+      description: '4-node pipeline: classify → retrieve → decide → respond.',
+      build: () => ({
+        ...blankManifest,
+        nodes: [
+          makeLeafManifest('n1', 'Classify', 'Classify the inbound ticket into intent + urgency.'),
+          makeLeafManifest('n2', 'Retrieve', 'Look up the customer record and recent tickets.'),
+          makeLeafManifest('n3', 'Decide', 'Apply reviewer policy to choose a response path.'),
+          makeLeafManifest('n4', 'Respond', 'Draft a response and run the PII redaction guardrail.'),
+        ],
+        edges: [
+          { id: 'e1', from: 'n1', to: 'n2', mapping: {} },
+          { id: 'e2', from: 'n2', to: 'n3', mapping: {} },
+          { id: 'e3', from: 'n3', to: 'n4', mapping: {} },
+        ],
+      }),
+    },
+    {
+      id: 'qa',
+      label: 'Doc Q&A',
+      description: '3-node pipeline: classify → retrieve → answer.',
+      build: () => ({
+        ...blankManifest,
+        nodes: [
+          makeLeafManifest('n1', 'Classify', 'Identify whether the question is in scope.'),
+          makeLeafManifest('n2', 'Retrieve', 'Pull relevant docs from the index.'),
+          makeLeafManifest('n3', 'Answer', 'Compose a cited answer.'),
+        ],
+        edges: [
+          { id: 'e1', from: 'n1', to: 'n2', mapping: {} },
+          { id: 'e2', from: 'n2', to: 'n3', mapping: {} },
+        ],
+      }),
+    },
+    {
+      id: 'blank',
+      label: 'Blank canvas',
+      description: 'Start from an empty DAG.',
+      build: () => blankManifest,
+    },
+  ];
+
+  const applyTemplate = (templateId: string) => {
+    const tpl = TEMPLATES.find((t) => t.id === templateId);
+    if (!tpl) return;
+    setManifest(tpl.build());
+    setSelectedNodeId(null);
+    toast({ title: `Template applied: ${tpl.label}`, variant: 'success', description: tpl.description });
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-text-subtle">Capability</div>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-text-strong">DAG editor</h1>
-          <p className="mt-1 text-sm text-text-muted">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-2">
+          <Breadcrumb
+            items={[
+              { label: 'Capabilities', href: '/app/capabilities' },
+              { label: 'DAG editor' },
+            ]}
+          />
+          <h1 className="font-semibold text-h2 text-text-strong">DAG editor</h1>
+          <p className="text-sm text-text-muted">
             Compose a multi-agent capability. Add nodes, wire edges, configure each agent. Compile into an immutable manifest.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {hash && <HashChip hash={hash} />}
           <StatusPill kind={isValid ? 'approved' : 'review'} label={isValid ? 'valid DAG' : `${validationErrors.length} issue${validationErrors.length === 1 ? '' : 's'}`} />
-          <Button variant="outline" size="sm" onClick={handleAddNode}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />Add node
-          </Button>
-          {hash && (
-            <Button variant="outline" size="sm" onClick={runPreview} disabled={runPreviewMutation.isPending}>
-              <Play className="mr-1.5 h-3.5 w-3.5" />Run preview
-            </Button>
-          )}
-          <Button size="sm" onClick={() => saveMutation.mutate()} disabled={!isValid}>
-            <Save className="mr-1.5 h-3.5 w-3.5" />Save
-          </Button>
         </div>
       </div>
+
+      <Surface padded={false}>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-subtle px-4 py-2.5">
+          <div className="flex flex-wrap items-center gap-1">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle mr-2">Templates</div>
+            {TEMPLATES.map((tpl) => (
+              <ThemedTooltip key={tpl.id} content={tpl.description}>
+                <button
+                  type="button"
+                  onClick={() => applyTemplate(tpl.id)}
+                  className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-text-muted hover:bg-surface-2 hover:text-text-default"
+                >
+                  <LayoutTemplate className="size-3.5" />{tpl.label}
+                </button>
+              </ThemedTooltip>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <ThemedTooltip content={`Add a new node to the canvas`}>
+              <Button variant="outline" size="sm" onClick={handleAddNode}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" />Add node
+              </Button>
+            </ThemedTooltip>
+            {hash && (
+              <ThemedTooltip content="Run this manifest with a sample input. Opens the execution inspector.">
+                <Button variant="outline" size="sm" onClick={runPreview} disabled={runPreviewMutation.isPending}>
+                  <Play className="mr-1.5 h-3.5 w-3.5" />Run preview
+                </Button>
+              </ThemedTooltip>
+            )}
+            <ThemedTooltip content={fullscreen ? 'Exit fullscreen' : 'Fullscreen canvas'}>
+              <Button variant="ghost" size="icon" onClick={() => setFullscreen((v) => !v)} aria-label="Toggle fullscreen">
+                {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </Button>
+            </ThemedTooltip>
+            <ThemedTooltip content="Save as a new content-addressed manifest">
+              <Button size="sm" onClick={() => saveMutation.mutate()} disabled={!isValid}>
+                <Save className="mr-1.5 h-3.5 w-3.5" />Save <Kbd>S</Kbd>
+              </Button>
+            </ThemedTooltip>
+          </div>
+        </div>
+
+        <div className="flex flex-col lg:flex-row">
+          <aside className="w-full border-b border-border-subtle p-3 lg:w-56 lg:border-b-0 lg:border-r">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle">Palette</div>
+            <ul className="mt-2 space-y-1">
+              {[
+                { id: 'planner', label: 'Planner', icon: Workflow, desc: 'Decompose intent into subtasks' },
+                { id: 'agent', label: 'Agent', icon: Bot, desc: 'LLM-driven node with a system prompt' },
+                { id: 'tool', label: 'Tool', icon: Wrench, desc: 'External API call or computation' },
+                { id: 'guardrail', label: 'Guardrail', icon: ShieldAlert, desc: 'Pre/post invocation check' },
+              ].map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={handleAddNode}
+                    className="flex w-full items-start gap-2.5 rounded-md border border-border-subtle bg-surface-1 p-2 text-left text-xs hover:border-brand hover:bg-surface-2"
+                  >
+                    <p.icon className="mt-0.5 size-4 shrink-0 text-brand" />
+                    <div>
+                      <div className="font-medium text-text-strong">{p.label}</div>
+                      <div className="text-text-muted">{p.desc}</div>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 rounded-lg border border-border-subtle bg-surface-2/50 p-3 text-xs text-text-muted">
+              <Layers className="mb-1 size-3.5 text-text-subtle" />
+              Drag nodes onto the canvas, then connect them. Hit <Kbd>S</Kbd> to save when validation is green.
+            </div>
+          </aside>
+
+          <div className={fullscreen ? 'min-h-[80vh] flex-1' : 'min-h-[640px] flex-1'}>
+            <DagCanvas
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={handleNodesChange}
+              onEdgesChange={handleEdgesChange}
+              onConnect={handleConnect}
+              onNodeClick={setSelectedNodeId}
+            />
+          </div>
+
+          {!fullscreen && (
+            <aside className="w-full border-t border-border-subtle p-4 lg:w-80 lg:border-l lg:border-t-0">
+              <NodeConfigPanel
+                selectedNodeId={selectedNodeId}
+                manifest={manifest}
+                onChange={setManifest}
+              />
+              <Surface className="mt-4">
+                <SurfaceHeader title="Summary" description="Aggregate counts for this draft." />
+                <dl className="space-y-2 text-sm">
+                  <Stat label="Nodes" value={String(manifest.nodes.length)} />
+                  <Stat label="Edges" value={String(manifest.edges.length)} />
+                  <Stat label="Hash" value={hash ?? 'unsaved'} mono />
+                </dl>
+              </Surface>
+            </aside>
+          )}
+        </div>
+      </Surface>
 
       {validationErrors.length > 0 && (
         <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4">
@@ -199,34 +360,6 @@ export default function ManifestEditorPage() {
           </ul>
         </div>
       )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <DagCanvas
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={handleNodesChange}
-            onEdgesChange={handleEdgesChange}
-            onConnect={handleConnect}
-            onNodeClick={setSelectedNodeId}
-          />
-        </div>
-        <div className="space-y-4">
-          <NodeConfigPanel
-            selectedNodeId={selectedNodeId}
-            manifest={manifest}
-            onChange={setManifest}
-          />
-          <Surface>
-            <SurfaceHeader title="Summary" description="Aggregate counts for this draft." />
-            <dl className="space-y-2 text-sm">
-              <Stat label="Nodes" value={String(manifest.nodes.length)} />
-              <Stat label="Edges" value={String(manifest.edges.length)} />
-              <Stat label="Hash" value={hash ?? 'unsaved'} mono />
-            </dl>
-          </Surface>
-        </div>
-      </div>
     </div>
   );
 }
