@@ -3,118 +3,213 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* -------------------------------------------------------------------------- */
+/*  Design tokens — light is the default; .dark overrides mode-aware values.  */
+/* -------------------------------------------------------------------------- */
+
 :root {
-  --background: oklch(0.985 0 0);
-  --foreground: oklch(0.18 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0 0);
-  --primary: oklch(0.18 0 0);
-  --primary-foreground: oklch(0.97 0 0);
-  --secondary: oklch(0.96 0 0);
-  --secondary-foreground: oklch(0.18 0 0);
-  --muted: oklch(0.96 0 0);
-  --muted-foreground: oklch(0.46 0 0);
-  --accent: oklch(0.78 0.06 240);
-  --accent-foreground: oklch(0.18 0 0);
-  --destructive: oklch(0.58 0.21 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --success: oklch(0.66 0.15 155);
-  --success-foreground: oklch(0.15 0 0);
-  --warning: oklch(0.78 0.16 75);
-  --warning-foreground: oklch(0.18 0 0);
-  --info: oklch(0.66 0.10 230);
-  --info-foreground: oklch(0.16 0 0);
-  --border: oklch(0.91 0 0);
-  --input: oklch(0.91 0 0);
-  --ring: oklch(0.55 0.04 240);
-  --brand: oklch(0.78 0.06 240);
-  --brand-foreground: oklch(0.16 0 0);
-  --brand-highlight: oklch(0.86 0.03 250);
-  --chart-1: oklch(0.62 0.18 255);
-  --chart-2: oklch(0.66 0.15 155);
-  --chart-3: oklch(0.78 0.16 75);
-  --chart-4: oklch(0.66 0.21 25);
-  --chart-5: oklch(0.62 0.18 290);
-  --sidebar: oklch(0.98 0 0);
-  --sidebar-foreground: oklch(0.18 0 0);
-  --sidebar-primary: oklch(0.18 0 0);
-  --sidebar-primary-foreground: oklch(0.97 0 0);
-  --sidebar-accent: oklch(0.94 0 0);
-  --sidebar-accent-foreground: oklch(0.18 0 0);
-  --sidebar-border: oklch(0.91 0 0);
-  --sidebar-ring: oklch(0.55 0.04 240);
-  --radius: 0.625rem;
+  /* Brand ladder — global, identical in light and dark. */
+  --brand-50: oklch(0.972 0.018 265);
+  --brand-100: oklch(0.942 0.038 265);
+  --brand-200: oklch(0.886 0.070 265);
+  --brand-300: oklch(0.802 0.110 265);
+  --brand-400: oklch(0.722 0.150 265);
+  --brand-500: oklch(0.620 0.180 265);
+  --brand-600: oklch(0.548 0.198 265);
+  --brand-700: oklch(0.464 0.180 265);
+  --brand-800: oklch(0.380 0.148 265);
+  --brand-900: oklch(0.300 0.116 265);
+  --brand-950: oklch(0.204 0.082 265);
 
-  --surface-0: oklch(0.07 0.005 270);
-  --surface-1: oklch(0.10 0.005 270);
-  --surface-2: oklch(0.14 0.005 270);
-  --surface-3: oklch(0.19 0.005 270);
-  --text-strong: oklch(0.97 0 0);
-  --text-default: oklch(0.86 0.005 270);
-  --text-muted: oklch(0.62 0.005 270);
-  --text-subtle: oklch(0.48 0.005 270);
-  --border-strong: oklch(0.26 0.005 270);
-  --border-subtle: oklch(0.18 0.005 270);
+  /* Surfaces — light. */
+  --surface-0: oklch(0.990 0.005 270);
+  --surface-1: oklch(1 0 0);
+  --surface-2: oklch(0.974 0.005 270);
+  --surface-3: oklch(0.946 0.005 270);
+  --surface-inset: oklch(0.962 0.005 270);
 
-  --shadow-1: 0 1px 0 0 oklch(1 0 0 / 4%) inset, 0 1px 2px oklch(0 0 0 / 30%);
-  --shadow-2: 0 1px 0 0 oklch(1 0 0 / 5%) inset, 0 8px 24px oklch(0 0 0 / 40%);
-  --shadow-3: 0 1px 0 0 oklch(1 0 0 / 6%) inset, 0 24px 60px oklch(0 0 0 / 50%);
+  /* Text ladder — light. */
+  --text-strong: oklch(0.158 0.006 270);
+  --text-default: oklch(0.282 0.006 270);
+  --text-muted: oklch(0.498 0.006 270);
+  --text-subtle: oklch(0.660 0.005 270);
 
+  /* Borders — light. */
+  --border-strong: oklch(0.852 0.005 270);
+  --border-subtle: oklch(0.930 0.005 270);
+
+  /* Semantic shadcn mappings — light. */
+  --background: var(--surface-0);
+  --foreground: var(--text-default);
+  --card: var(--surface-1);
+  --card-foreground: var(--text-default);
+  --popover: var(--surface-1);
+  --popover-foreground: var(--text-default);
+  --primary: var(--text-strong);
+  --primary-foreground: var(--surface-1);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--text-default);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--brand-50);
+  --accent-foreground: var(--brand-700);
+
+  --destructive: oklch(0.582 0.214 25);
+  --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.660 0.150 155);
+  --success-foreground: oklch(0.150 0 0);
+  --warning: oklch(0.780 0.160 75);
+  --warning-foreground: oklch(0.180 0 0);
+  --info: oklch(0.660 0.100 230);
+  --info-foreground: oklch(0.160 0 0);
+
+  --border: var(--border-subtle);
+  --input: var(--border-strong);
+  --ring: var(--brand-500);
+
+  /* Brand semantic — light picks the deeper stop for contrast on white. */
+  --brand: var(--brand-500);
+  --brand-foreground: var(--surface-1);
+  --brand-highlight: var(--brand-100);
+
+  /* Charts. */
+  --chart-1: var(--brand-500);
+  --chart-2: oklch(0.660 0.150 155);
+  --chart-3: oklch(0.780 0.160 75);
+  --chart-4: oklch(0.660 0.214 25);
+  --chart-5: oklch(0.620 0.180 290);
+
+  /* Sidebar — light. */
+  --sidebar: var(--surface-1);
+  --sidebar-foreground: var(--text-default);
+  --sidebar-primary: var(--brand-500);
+  --sidebar-primary-foreground: var(--surface-1);
+  --sidebar-accent: var(--surface-2);
+  --sidebar-accent-foreground: var(--text-default);
+  --sidebar-border: var(--border-subtle);
+  --sidebar-ring: var(--brand-500);
+
+  /* Radius scale — global. */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+  --radius-3xl: 2.5rem;
+  /* Legacy alias — preserves shadcn `rounded-lg` semantics. */
+  --radius: 1rem;
+
+  /* Shadows — light (soft, layered). */
+  --shadow-1: 0 1px 2px oklch(0.158 0.060 270 / 4%);
+  --shadow-2: 0 1px 3px oklch(0.158 0.060 270 / 6%), 0 8px 24px oklch(0.158 0.060 270 / 8%);
+  --shadow-3: 0 4px 12px oklch(0.158 0.060 270 / 8%), 0 24px 60px oklch(0.158 0.060 270 / 12%);
+  --shadow-glow: 0 0 0 1px var(--brand-200), 0 8px 24px oklch(0.548 0.198 265 / 18%);
+
+  /* Motion — global. */
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
   --dur-fast: 120ms;
   --dur-base: 200ms;
   --dur-slow: 320ms;
+  --dur-slower: 480ms;
 }
 
 .dark {
+  /* Surfaces — dark. */
+  --surface-0: oklch(0.072 0.006 270);
+  --surface-1: oklch(0.104 0.006 270);
+  --surface-2: oklch(0.142 0.006 270);
+  --surface-3: oklch(0.190 0.006 270);
+  --surface-inset: oklch(0.092 0.006 270);
+
+  /* Text ladder — dark. */
+  --text-strong: oklch(0.972 0 0);
+  --text-default: oklch(0.862 0.005 270);
+  --text-muted: oklch(0.620 0.005 270);
+  --text-subtle: oklch(0.480 0.005 270);
+
+  /* Borders — dark. */
+  --border-strong: oklch(0.260 0.005 270);
+  --border-subtle: oklch(0.180 0.005 270);
+
+  /* Semantic shadcn mappings — dark. */
   --background: var(--surface-0);
   --foreground: var(--text-default);
   --card: var(--surface-1);
   --card-foreground: var(--text-default);
   --popover: var(--surface-2);
   --popover-foreground: var(--text-default);
-  --primary: oklch(0.92 0.005 270);
-  --primary-foreground: oklch(0.12 0 0);
+  --primary: oklch(0.922 0.005 270);
+  --primary-foreground: oklch(0.120 0 0);
   --secondary: var(--surface-2);
   --secondary-foreground: var(--text-default);
   --muted: var(--surface-2);
   --muted-foreground: var(--text-muted);
-  --accent: var(--brand);
-  --accent-foreground: var(--brand-foreground);
-  --destructive: oklch(0.66 0.21 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --success: oklch(0.74 0.15 155);
-  --success-foreground: oklch(0.10 0 0);
-  --warning: oklch(0.82 0.16 75);
-  --warning-foreground: oklch(0.14 0 0);
-  --info: oklch(0.74 0.10 230);
-  --info-foreground: oklch(0.10 0 0);
+  --accent: var(--brand-500);
+  --accent-foreground: var(--surface-1);
+
+  --destructive: oklch(0.660 0.214 25);
+  --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.740 0.150 155);
+  --success-foreground: oklch(0.100 0 0);
+  --warning: oklch(0.820 0.160 75);
+  --warning-foreground: oklch(0.140 0 0);
+  --info: oklch(0.740 0.100 230);
+  --info-foreground: oklch(0.100 0 0);
+
   --border: var(--border-strong);
   --input: var(--border-strong);
-  --ring: var(--brand);
-  --brand: oklch(0.78 0.06 240);
-  --brand-foreground: oklch(0.10 0 0);
-  --brand-highlight: oklch(0.92 0.02 250);
-  --chart-1: oklch(0.74 0.10 230);
-  --chart-2: oklch(0.74 0.15 155);
-  --chart-3: oklch(0.82 0.16 75);
-  --chart-4: oklch(0.74 0.21 25);
-  --chart-5: oklch(0.74 0.18 290);
+  --ring: var(--brand-500);
+
+  /* Brand semantic — dark picks a brighter stop for contrast on near-black. */
+  --brand: var(--brand-400);
+  --brand-foreground: oklch(0.100 0 0);
+  --brand-highlight: var(--brand-300);
+
+  /* Charts — dark. */
+  --chart-1: var(--brand-400);
+  --chart-2: oklch(0.740 0.150 155);
+  --chart-3: oklch(0.820 0.160 75);
+  --chart-4: oklch(0.740 0.214 25);
+  --chart-5: oklch(0.740 0.180 290);
+
+  /* Sidebar — dark. */
   --sidebar: var(--surface-1);
   --sidebar-foreground: var(--text-default);
-  --sidebar-primary: var(--brand);
-  --sidebar-primary-foreground: var(--brand-foreground);
+  --sidebar-primary: var(--brand-500);
+  --sidebar-primary-foreground: var(--surface-1);
   --sidebar-accent: var(--surface-2);
   --sidebar-accent-foreground: var(--text-default);
   --sidebar-border: var(--border-subtle);
-  --sidebar-ring: var(--brand);
-  --radius: 0.625rem;
+  --sidebar-ring: var(--brand-500);
+
+  /* Shadows — dark. */
+  --shadow-1: 0 1px 0 0 oklch(1 0 0 / 4%) inset, 0 1px 2px oklch(0 0 0 / 30%);
+  --shadow-2: 0 1px 0 0 oklch(1 0 0 / 5%) inset, 0 8px 24px oklch(0 0 0 / 40%);
+  --shadow-3: 0 1px 0 0 oklch(1 0 0 / 6%) inset, 0 24px 60px oklch(0 0 0 / 50%);
+  --shadow-glow: 0 0 0 1px var(--brand-400), 0 8px 24px oklch(0.548 0.198 265 / 30%);
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Tailwind theme bridge — every CSS variable above becomes a utility.      */
+/* -------------------------------------------------------------------------- */
+
 @theme inline {
+  /* Brand ladder. */
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+  --color-brand-950: var(--brand-950);
+
+  /* shadcn semantic mapping. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -156,29 +251,51 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Surfaces. */
   --color-surface-0: var(--surface-0);
   --color-surface-1: var(--surface-1);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
+  --color-surface-inset: var(--surface-inset);
+
+  /* Text ladder. */
   --color-text-strong: var(--text-strong);
   --color-text-default: var(--text-default);
   --color-text-muted: var(--text-muted);
   --color-text-subtle: var(--text-subtle);
+
+  /* Borders. */
   --color-border-strong: var(--border-strong);
   --color-border-subtle: var(--border-subtle);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Radius — Tailwind v4 namespace: --radius-* generates rounded-*. */
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+  --radius-3xl: var(--radius-3xl);
+
+  /* Shadows. */
   --shadow-1: var(--shadow-1);
   --shadow-2: var(--shadow-2);
   --shadow-3: var(--shadow-3);
+  --shadow-glow: var(--shadow-glow);
+
+  /* Motion. */
   --ease-out-quart: var(--ease-out-quart);
   --ease-in-out-quart: var(--ease-in-out-quart);
   --dur-fast: var(--dur-fast);
   --dur-base: var(--dur-base);
   --dur-slow: var(--dur-slow);
+  --dur-slower: var(--dur-slower);
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Base                                                                       */
+/* -------------------------------------------------------------------------- */
 
 html,
 body {
@@ -209,6 +326,14 @@ pre,
   color: var(--brand-foreground);
 }
 
+/* Honor the system preference for native UI (scrollbars, form controls). */
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
 @layer base {
   body {
     @apply bg-background text-foreground;
@@ -231,11 +356,17 @@ pre,
   }
   .ps-mark-bg {
     background-image:
-      radial-gradient(circle at 20% 30%, oklch(0.45 0.04 240 / 12%), transparent 50%),
-      radial-gradient(circle at 80% 70%, oklch(0.65 0.05 250 / 10%), transparent 50%);
+      radial-gradient(circle at 20% 30%, oklch(0.548 0.198 265 / 8%), transparent 50%),
+      radial-gradient(circle at 80% 70%, oklch(0.722 0.150 265 / 8%), transparent 50%);
+  }
+  .ps-aurora-bg {
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% 0%, var(--brand-100), transparent 70%),
+      radial-gradient(ellipse 60% 40% at 100% 100%, oklch(0.660 0.150 155 / 14%), transparent 70%),
+      radial-gradient(ellipse 60% 40% at 0% 100%, oklch(0.620 0.180 290 / 12%), transparent 70%);
   }
   .ps-gradient-text {
-    background-image: linear-gradient(135deg, var(--brand-highlight), var(--text-default));
+    background-image: linear-gradient(135deg, var(--brand-700), var(--brand-500) 60%, var(--brand-400));
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
