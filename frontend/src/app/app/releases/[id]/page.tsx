@@ -16,6 +16,7 @@ import { StepRail, type Step } from '@/components/brand/step-rail';
 import { HashChip } from '@/components/brand/hash-chip';
 import { Timeline } from '@/components/brand/timeline';
 import { EmptyState } from '@/components/brand/empty-state';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
 import { useToast } from '@/components/brand/toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -167,47 +168,117 @@ export default function ReleaseDetailPage() {
             </Button>
           </div>
         </Surface>
-
-        <Surface>
-          <SurfaceHeader title="Approvals" description="Maker-checker coverage on this release." />
-          {(approvals.data as unknown[] | undefined)?.length ? (
-            <ul className="space-y-3">
-              {((approvals.data as Array<{ id: string; actor?: string; decision?: string; createdAt?: string }>) ?? []).map((a) => (
-                <li key={a.id} className="flex items-center gap-3">
-                  <ShieldCheck className={`h-4 w-4 ${a.decision === 'approve' ? 'text-success' : a.decision === 'reject' ? 'text-destructive' : 'text-info'}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm text-text-strong">{a.actor ?? a.id}</div>
-                    <div className="text-xs text-text-muted">{a.decision === 'approve' ? 'approved' : a.decision === 'reject' ? 'rejected' : 'pending'} · {new Date(a.createdAt ?? Date.now()).toLocaleString()}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState
-              icon={AlertCircle}
-              title="No approvals yet"
-              description="When a second reviewer signs off, the approval will be shown here."
-            />
-          )}
-        </Surface>
-
-        <Surface>
-          <SurfaceHeader title="Lifecycle" description="Append-only audit events for this release." />
-          {(audit.data as unknown[] | undefined)?.length ? (
-            <Timeline
-              entries={((audit.data as Array<{ id: string; action?: string; actor?: string; createdAt?: string }>) ?? []).map((a) => ({
-                id: a.id,
-                title: String(a.action ?? 'event'),
-                actor: a.actor,
-                timestamp: new Date(a.createdAt ?? Date.now()).toLocaleString(),
-                tone: 'info' as const,
-              }))}
-            />
-          ) : (
-            <EmptyState icon={AlertCircle} title="No lifecycle events yet" description="State transitions are appended to the audit chain." />
-          )}
-        </Surface>
       </div>
+
+      <Tabs defaultValue="overview">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="approvals">Approvals</TabsTrigger>
+          <TabsTrigger value="canary">Canary</TabsTrigger>
+          <TabsTrigger value="audit">Audit</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <Surface>
+            <SurfaceHeader title="Identity" />
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <div>
+                <dt className="text-xs uppercase tracking-wider text-text-subtle">Capability</dt>
+                <dd className="mt-1 text-text-default">{r.capabilityName ?? '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wider text-text-subtle">Version</dt>
+                <dd className="mt-1 font-mono text-xs text-text-default">v{r.capabilityVersion ?? '?'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wider text-text-subtle">Environment</dt>
+                <dd className="mt-1 text-text-default">{r.environment ?? 'production'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wider text-text-subtle">State</dt>
+                <dd className="mt-1"><StatusPill kind={(r.state as StatusKind) ?? 'draft'} /></dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wider text-text-subtle">Updated</dt>
+                <dd className="mt-1 text-text-default">{r.updatedAt ? new Date(r.updatedAt).toLocaleString() : '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wider text-text-subtle">Created</dt>
+                <dd className="mt-1 text-text-default">{r.createdAt ? new Date(r.createdAt).toLocaleString() : '—'}</dd>
+              </div>
+            </dl>
+          </Surface>
+        </TabsContent>
+
+        <TabsContent value="approvals">
+          <Surface>
+            <SurfaceHeader title="Approvals" description="Maker-checker coverage on this release." />
+            {(approvals.data as unknown[] | undefined)?.length ? (
+              <ul className="space-y-3">
+                {((approvals.data as Array<{ id: string; actor?: string; decision?: string; createdAt?: string }>) ?? []).map((a) => (
+                  <li key={a.id} className="flex items-center gap-3">
+                    <ShieldCheck className={`h-4 w-4 ${a.decision === 'approve' ? 'text-success' : a.decision === 'reject' ? 'text-destructive' : 'text-info'}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-text-strong">{a.actor ?? a.id}</div>
+                      <div className="text-xs text-text-muted">{a.decision === 'approve' ? 'approved' : a.decision === 'reject' ? 'rejected' : 'pending'} · {new Date(a.createdAt ?? Date.now()).toLocaleString()}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState
+                icon={AlertCircle}
+                title="No approvals yet"
+                description="When a second reviewer signs off, the approval will be shown here."
+              />
+            )}
+          </Surface>
+        </TabsContent>
+
+        <TabsContent value="canary">
+          <Surface>
+            <SurfaceHeader title="Canary" description="Weighted traffic split for this release." />
+            {(() => {
+              const pct = Number(r.canaryPercent ?? 0);
+              return (
+                <div className="space-y-4">
+                  <div className="flex items-baseline justify-between">
+                    <div className="font-mono text-3xl font-semibold text-text-strong">{pct}%</div>
+                    <div className="text-xs text-text-muted">of production traffic</div>
+                  </div>
+                  <div className="h-3 overflow-hidden rounded-full bg-surface-2">
+                    <div className="h-full bg-brand" style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className="text-sm text-text-muted leading-relaxed">
+                    Canary releases route a configurable percentage of traffic to the new manifest while
+                    live eval scores monitor for drift. Increase the canary percent over time, or activate to
+                    send 100% of traffic to this release.
+                  </p>
+                </div>
+              );
+            })()}
+          </Surface>
+        </TabsContent>
+
+        <TabsContent value="audit">
+          <Surface>
+            <SurfaceHeader title="Lifecycle" description="Append-only audit events for this release." />
+            {(audit.data as unknown[] | undefined)?.length ? (
+              <Timeline
+                entries={((audit.data as Array<{ id: string; action?: string; actor?: string; createdAt?: string }>) ?? []).map((a) => ({
+                  id: a.id,
+                  title: String(a.action ?? 'event'),
+                  actor: a.actor,
+                  timestamp: new Date(a.createdAt ?? Date.now()).toLocaleString(),
+                  tone: 'info' as const,
+                }))}
+              />
+            ) : (
+              <EmptyState icon={AlertCircle} title="No lifecycle events yet" description="State transitions are appended to the audit chain." />
+            )}
+          </Surface>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={canaryOpen} onOpenChange={setCanaryOpen}>
         <DialogContent className="sm:max-w-sm">
