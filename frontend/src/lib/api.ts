@@ -27,15 +27,63 @@ client.interceptors.response.use(
 
 export { client };
 
+/**
+ * Backend list endpoints come back in two shapes:
+ *
+ *   - Bare array:                    GET /api/...
+ *   - { items: T[], total: number }  GET /api/...?page=N
+ *   - { <noun>s: T[] }               GET /api/...   (e.g. {webhooks, flags, keys})
+ *
+ * Many pages today write `unwrapArray(unknownResponse)` inline.
+ * The unwrapList helper centralizes that.
+ */
+export function unwrapList<T>(raw: unknown, pluralKey?: string): T[] {
+  if (Array.isArray(raw)) return raw as T[];
+  if (raw && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    if (Array.isArray(obj['items'])) return obj['items'] as T[];
+    if (Array.isArray(obj['results'])) return obj['results'] as T[];
+    if (pluralKey && Array.isArray(obj[pluralKey])) return obj[pluralKey] as T[];
+    // Heuristic fallback: pick the first array-valued key.
+    for (const k of Object.keys(obj)) {
+      const v = obj[k];
+      if (Array.isArray(v)) return v as T[];
+    }
+  }
+  return [];
+}
+
+export function unwrapFirst<T>(raw: unknown, pluralKey?: string): T | null {
+  const items = unwrapList<T>(raw, pluralKey);
+  return items[0] ?? null;
+}
+
 export function subscribeSSE(channel: string, onEvent: (event: unknown) => void): () => void {
   if (typeof window === 'undefined') return () => undefined;
-  const eventSource = new EventSource(`/api/events/${channel}`);
-  eventSource.onmessage = (e) => onEvent(JSON.parse(e.data));
-  eventSource.onerror = () => {
-    eventSource.close();
-    setTimeout(() => subscribeSSE(channel, onEvent), 3000);
+  let cancelled = false;
+  let active: EventSource | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const open = () => {
+    if (cancelled) return;
+    active = new EventSource(`/api/events/${channel}`);
+    active.onmessage = (e) => onEvent(JSON.parse(e.data));
+    active.onerror = () => {
+      active?.close();
+      active = null;
+      if (cancelled) return;
+      reconnectTimer = setTimeout(open, 3000);
+    };
   };
-  return () => eventSource.close();
+
+  open();
+
+  return () => {
+    cancelled = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    active?.close();
+    active = null;
+  };
 }
 
 export const workspaceApi = {
