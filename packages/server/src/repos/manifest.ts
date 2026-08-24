@@ -62,6 +62,45 @@ export class ManifestRepo {
   }
 
   /**
+   * Upsert a manifest_dag row under a caller-specified (capabilityId, version)
+   * tuple with a caller-specified manifest_hash. Use this when you already
+   * have the JSON-encoded manifest string and the hash, e.g. after the
+   * version-create or release-create endpoints receive a payload. The row
+   * being present in manifest_dag is what the maker-checker approval flow
+   * queries via findByHash().
+   */
+  registerFromRaw(opts: {
+    capabilityId: string;
+    version: number;
+    manifestHash: string;
+    manifestJson: string;
+    goal?: string;
+    createdBy?: string;
+  }): void {
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO manifest_dag (
+        id, capability_id, version, manifest_hash, parent_manifest_hash,
+        goal, goal_metrics, manifest_json, created_by, created_at
+      ) VALUES (?, ?, ?, ?, NULL, ?, '{}', ?, ?, ?)
+      ON CONFLICT(capability_id, version) DO UPDATE SET
+        manifest_hash = excluded.manifest_hash,
+        manifest_json = excluded.manifest_json,
+        goal = excluded.goal,
+        created_by = excluded.created_by
+    `).run(
+      crypto.randomUUID(),
+      opts.capabilityId,
+      opts.version,
+      opts.manifestHash,
+      opts.goal ?? '',
+      opts.manifestJson,
+      opts.createdBy ?? '',
+      now,
+    );
+  }
+
+  /**
    * Persist a Manifest DAG to manifest_dag + manifest_nodes + manifest_edges.
    * Returns the computed manifest_hash.
    *
