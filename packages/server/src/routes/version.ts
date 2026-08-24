@@ -39,6 +39,28 @@ export function registerVersionRoutes(
     return reply.send(item);
   });
 
+  app.get('/api/capability-versions/:versionId/manifest', async (request, reply) => {
+    const { versionId } = request.params as { versionId: string };
+    const item = repo.findById(versionId);
+    if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'version not found' } });
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(item.manifest);
+    } catch {
+      parsed = null;
+    }
+    return reply.send({
+      hash: item.manifestHash,
+      manifest: parsed,
+      capabilityId: item.capabilityId,
+      capabilityVersion: item.version,
+      createdAt: item.createdAt,
+      createdBy: item.createdBy,
+      size: item.manifest.length,
+      approvals: [],
+    });
+  });
+
   app.post('/api/capability-versions', async (request, reply) => {
     const parsed = parseBody(reply, CreateVersionSchema, request.body);
     if (!parsed.ok) return;
