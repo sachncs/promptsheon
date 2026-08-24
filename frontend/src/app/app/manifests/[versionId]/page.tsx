@@ -1,18 +1,144 @@
-import { ScrollText } from 'lucide-react';
-import { StubPage } from '@/components/brand/stub-page';
+'use client';
 
-export default function ManifestStub() {
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+import { ScrollText, ArrowLeft } from 'lucide-react';
+import { manifestApi } from '@/lib/api';
+import { useRequireSession } from '@/hooks/use-session';
+import { PageHeader } from '@/components/brand/page-header';
+import { Surface, SurfaceHeader } from '@/components/brand/surface';
+import { HashChip } from '@/components/brand/hash-chip';
+import { EmptyState } from '@/components/brand/empty-state';
+import { Button } from '@/components/ui/button';
+
+interface ManifestDetail {
+  hash: string;
+  manifest?: string;
+  capabilityId?: string;
+  capabilityName?: string;
+  capabilityVersion?: number;
+  createdAt?: string;
+  createdBy?: string;
+  approvals?: Array<{ id: string; voter: string; decision: string; comment?: string; at: string }>;
+  size?: number;
+}
+
+export default function ManifestDetailPage() {
+  const session = useRequireSession();
+  const params = useParams<{ versionId: string }>();
+  const versionId = params.versionId;
+
+  const detail = useQuery({
+    queryKey: ['manifest', versionId],
+    queryFn: () => manifestApi.get(versionId).then((r) => r.data as ManifestDetail),
+    enabled: Boolean(versionId),
+    retry: false,
+  });
+
+  if (!session) return null;
+
+  const data = detail.data;
+  const isError = detail.isError;
+
   return (
-    <StubPage
-      eyebrow="Capabilities"
-      title="Manifest"
-      description="A content-addressed, compiled artifact. Its hash is its identity; its lineage is preserved."
-      icon={ScrollText}
-      primary={{
-        title: 'No manifest selected',
-        description: 'Open a capability to view its compiled manifests and hashes.',
-        action: { label: 'Open registry', href: '/app/capabilities' },
-      }}
-    />
+    <div className="space-y-6">
+      <div>
+        <Link href="/app/capabilities" className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-text-default">
+          <ArrowLeft className="size-3" /> Back to registry
+        </Link>
+      </div>
+
+      <PageHeader
+        eyebrow="Manifest"
+        title={data?.capabilityName ? `${data.capabilityName} v${data.capabilityVersion ?? '?'}` : 'Manifest detail'}
+        subtitle="A content-addressed, compiled artifact. Its hash is its identity; its lineage is preserved."
+        actions={data?.hash ? <HashChip hash={data.hash} /> : undefined}
+      />
+
+      {isError ? (
+        <EmptyState
+          icon={ScrollText}
+          title="Manifest not found"
+          description={`No manifest matches versionId ${versionId.slice(0, 16)}. Open a capability to inspect its compiled manifests.`}
+          action={
+            <Link href="/app/capabilities">
+              <Button>Open registry</Button>
+            </Link>
+          }
+        />
+      ) : !data ? (
+        <Surface>
+          <div className="text-sm text-text-muted">{detail.isLoading ? 'Loading manifest…' : 'No manifest data.'}</div>
+        </Surface>
+      ) : (
+        <>
+          <Surface>
+            <SurfaceHeader title="Metadata" />
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <div>
+                <dt className="text-xs uppercase tracking-wider text-text-subtle">Hash</dt>
+                <dd className="mt-1 font-mono text-xs text-text-default">{data.hash}</dd>
+              </div>
+              {data.capabilityId && (
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-text-subtle">Capability</dt>
+                  <dd className="mt-1 text-text-default">
+                    <Link href={`/app/capabilities/${data.capabilityId}`} className="hover:underline">
+                      {data.capabilityName ?? data.capabilityId}
+                    </Link>
+                  </dd>
+                </div>
+              )}
+              {data.createdAt && (
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-text-subtle">Created</dt>
+                  <dd className="mt-1 text-text-default">{new Date(data.createdAt).toLocaleString()}</dd>
+                </div>
+              )}
+              {data.createdBy && (
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-text-subtle">Author</dt>
+                  <dd className="mt-1 text-text-default">{data.createdBy}</dd>
+                </div>
+              )}
+              {data.size !== undefined && (
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-text-subtle">Size</dt>
+                  <dd className="mt-1 text-text-default">{data.size.toLocaleString()} bytes</dd>
+                </div>
+              )}
+            </dl>
+          </Surface>
+
+          <Surface padded={false}>
+            <SurfaceHeader className="px-5 pt-5" title="Source" description="The compiled manifest content." />
+            <pre className="mx-5 mb-5 max-h-[28rem] overflow-auto rounded-md bg-surface-0 p-4 font-mono text-xs leading-relaxed text-text-default">
+              {data.manifest ?? '(no source available)'}
+            </pre>
+          </Surface>
+
+          {data.approvals && data.approvals.length > 0 && (
+            <Surface padded={false}>
+              <SurfaceHeader className="px-5 pt-5" title="Approvals" description="Maker-checker signatures on this manifest." />
+              <ul className="divide-y divide-border-subtle">
+                {data.approvals.map((a) => (
+                  <li key={a.id} className="flex items-start gap-3 px-5 py-3 text-sm">
+                    <span className={`mt-0.5 inline-block size-2 shrink-0 rounded-full ${a.decision === 'approve' ? 'bg-success' : 'bg-destructive'}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="font-medium text-text-strong">{a.voter}</span>
+                        <span className="text-xs text-text-subtle">{new Date(a.at).toLocaleString()}</span>
+                      </div>
+                      {a.comment && <p className="mt-1 text-text-muted">{a.comment}</p>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Surface>
+          )}
+        </>
+      )}
+    </div>
   );
 }
