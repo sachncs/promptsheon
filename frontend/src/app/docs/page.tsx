@@ -6,11 +6,11 @@ export default function DocsIndex() {
   return (
     <article className="prose prose-invert max-w-none space-y-10">
       <header>
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-text-subtle">Promptsheon</div>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-text-strong">
+        <div className="text-micro font-semibold uppercase tracking-[0.16em] text-text-subtle">Promptsheon</div>
+        <h1 className="mt-3 font-semibold text-h1 text-text-strong">
           The control plane for AI capabilities.
         </h1>
-        <p className="mt-3 max-w-2xl text-text-muted">
+        <p className="mt-4 max-w-2xl text-text-muted text-base leading-relaxed">
           Git-native version control, content-addressed artifacts, governed releases, evaluation
           gates, audit chain, and an operator-managed signing path — all backed by a single repository
           per workspace. Self-hosted. Apache-2.0.
@@ -18,7 +18,7 @@ export default function DocsIndex() {
       </header>
 
       <section>
-        <h2 className="text-2xl font-semibold tracking-tight text-text-strong">What you get</h2>
+        <h2 className="font-semibold text-h2 text-text-strong">What you get</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           {[
             { tag: 'Repository', body: 'Files, branches, tags, commits, merge requests, deterministic oid-space. Each capability is a DAG of agents.' },
@@ -37,8 +37,8 @@ export default function DocsIndex() {
       </section>
 
       <section>
-        <h2 className="text-2xl font-semibold tracking-tight text-text-strong">A capability is a multi-agent DAG</h2>
-        <p className="mt-3 text-text-muted">
+        <h2 className="font-semibold text-h2 text-text-strong">A capability is a multi-agent DAG</h2>
+        <p className="mt-3 text-text-muted text-base leading-relaxed">
           A capability lives in a repository on a branch. The DAG inside it composes agents, prompts,
           tools, MCP servers, guardrails, evaluation hooks, and memory contracts. Compiling the tree
           yields a content-addressed manifest that drives execution and authoring review.
@@ -68,7 +68,7 @@ export default function DocsIndex() {
       </section>
 
       <section>
-        <h2 className="text-2xl font-semibold tracking-tight text-text-strong">Next</h2>
+        <h2 className="font-semibold text-h2 text-text-strong">Next</h2>
         <ul className="mt-3 space-y-2 text-text-muted">
           <li>· <Link href="/docs/quickstart" className="text-text-strong underline-offset-4 hover:underline">Set up your workspace</Link></li>
           <li>· <Link href="/docs/repos" className="text-text-strong underline-offset-4 hover:underline">Repositories &amp; the multi-agent DAG</Link></li>

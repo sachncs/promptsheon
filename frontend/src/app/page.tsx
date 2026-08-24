@@ -39,11 +39,11 @@ export default function LandingPage() {
                 <span className="h-1.5 w-1.5 rounded-full bg-success" />
                 v0.1 — Self-host. No telemetry. Apache-2.0.
               </div>
-              <h1 className="mt-6 text-5xl font-semibold tracking-tight md:text-6xl leading-[1.02]">
+              <h1 className="mt-6 font-semibold text-h1 md:text-display">
                 The control plane for<br />
                 <span className="ps-gradient-text">AI capabilities.</span>
               </h1>
-              <p className="mt-6 max-w-2xl text-lg text-text-muted">
+              <p className="mt-6 max-w-2xl text-lg leading-relaxed text-text-muted">
                 Promptsheon manages prompts, agents, policies, tools, MCP servers,
                 guardrails, and evaluation suites as content-addressed, governed,
                 version-controlled release artifacts. Not chat. Not notebooks.
@@ -123,10 +123,10 @@ export default function LandingPage() {
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-text-subtle">
               Three pillars
             </div>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl text-text-strong">
+            <h2 className="mt-3 font-semibold text-h2 md:text-h1 text-text-strong">
               Treat AI capabilities like software.
             </h2>
-            <p className="mt-3 text-text-muted max-w-2xl mx-auto">
+            <p className="mt-4 text-text-muted max-w-2xl mx-auto text-base leading-relaxed">
               The same practices you expect from infrastructure: addressable artifacts,
               reproducible builds, gated releases, and an audit chain.
             </p>
@@ -162,7 +162,7 @@ export default function LandingPage() {
                     {detail}
                   </span>
                 </div>
-                <h3 className="mt-5 text-lg font-semibold tracking-tight text-text-strong">{title}</h3>
+                <h3 className="mt-5 font-semibold text-h4 text-text-strong">{title}</h3>
                 <p className="mt-2 text-sm text-text-muted leading-relaxed">{text}</p>
               </article>
             ))}
@@ -178,10 +178,10 @@ export default function LandingPage() {
               <div className="text-xs font-semibold uppercase tracking-[0.16em] text-text-subtle">
                 Workflow
               </div>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl text-text-strong">
+              <h2 className="mt-3 font-semibold text-h2 md:text-h1 text-text-strong">
                 From intent to release.
               </h2>
-              <p className="mt-3 text-text-muted">
+              <p className="mt-4 text-text-muted text-base leading-relaxed">
                 Capabilities move through a deterministic state machine. Every transition
                 records who acted and on what evidence.
               </p>
@@ -217,10 +217,10 @@ export default function LandingPage() {
               <div className="text-xs font-semibold uppercase tracking-[0.16em] text-text-subtle">
                 Trust & governance
               </div>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-text-strong">
+              <h2 className="mt-3 font-semibold text-h2 text-text-strong">
                 Built for procurement, security, and risk.
               </h2>
-              <p className="mt-3 text-text-muted">
+              <p className="mt-4 text-text-muted text-base leading-relaxed">
                 Every capability has a reproducible history. Every release has an
                 approver. Every audit row is hash-linked.
               </p>
@@ -247,10 +247,10 @@ export default function LandingPage() {
       <section className="border-t border-border-subtle bg-surface-0">
         <Container className="py-20 text-center">
           <LogoMark size={48} className="mx-auto" />
-          <h2 className="mt-6 text-3xl font-semibold tracking-tight md:text-4xl text-text-strong">
+          <h2 className="mt-6 font-semibold text-h2 md:text-h1 text-text-strong">
             Ship AI capabilities, not prompts.
           </h2>
-          <p className="mt-3 text-text-muted max-w-xl mx-auto">
+          <p className="mt-4 text-text-muted max-w-xl mx-auto text-base leading-relaxed">
             Set up Promptsheon on your own infrastructure. Configure your provider,
             create your first capability, route a release.
           </p>
