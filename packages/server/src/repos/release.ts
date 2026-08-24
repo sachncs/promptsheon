@@ -1,5 +1,6 @@
 import type { Release } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
+import { createHash } from 'node:crypto';
 import { BaseRepo } from './base.js';
 
 export class ReleaseRepo extends BaseRepo<Release> {
@@ -82,7 +83,6 @@ export class ReleaseRepo extends BaseRepo<Release> {
    * blob. Used by the activation gate to look up approval state.
    */
   computeManifestHash(manifestJson: string): string {
-    const { createHash } = require('node:crypto') as typeof import('node:crypto');
     return createHash('sha256').update(manifestJson).digest('hex');
   }
 

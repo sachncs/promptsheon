@@ -58,7 +58,7 @@ describe('GET /api/capability-versions/:versionId/manifest', () => {
     });
     const manifestRepo = new ManifestRepo(db);
     const app = Fastify({ logger: false });
-    registerVersionRoutes(app, repo, manifestRepo);
+    registerVersionRoutes(app, repo, manifestRepo, db);
     await app.ready();
     const r = await app.inject({ method: 'GET', url: `/api/capability-versions/${created.id}/manifest` });
     expect(r.statusCode).toBe(200);
@@ -71,7 +71,7 @@ describe('GET /api/capability-versions/:versionId/manifest', () => {
     const db = openDb();
     const manifestRepo = new ManifestRepo(db);
     const app = Fastify({ logger: false });
-    registerVersionRoutes(app, new VersionRepo(db), manifestRepo);
+    registerVersionRoutes(app, new VersionRepo(db), manifestRepo, db);
     await app.ready();
     const r = await app.inject({ method: 'GET', url: '/api/capability-versions/missing/manifest' });
     expect(r.statusCode).toBe(404);
