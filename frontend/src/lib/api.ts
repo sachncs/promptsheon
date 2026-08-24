@@ -27,6 +27,14 @@ client.interceptors.response.use(
 
 export { client };
 
+export interface WorkspaceRow {
+  id: string;
+  name: string;
+  organization: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /**
  * Backend list endpoints come back in two shapes:
  *
@@ -87,10 +95,18 @@ export function subscribeSSE(channel: string, onEvent: (event: unknown) => void)
 }
 
 export const workspaceApi = {
-  list: (page = 1) => client.get('/workspaces', { params: { page } }),
-  get: (id: string) => client.get(`/workspaces/${id}`),
-  create: (data: { name: string; organization?: string }) => client.post('/workspaces', data),
-  update: (id: string, data: { name?: string; organization?: string }) => client.put(`/workspaces/${id}`, data),
+  list: async (page = 1): Promise<{ data: WorkspaceRow[] }> => {
+    const r = await client.get<{ items?: WorkspaceRow[]; total?: number }>('/workspaces', {
+      params: { page },
+    });
+    return { data: unwrapList<WorkspaceRow>(r.data) };
+  },
+  get: (id: string): Promise<{ data: WorkspaceRow }> =>
+    client.get(`/workspaces/${id}`).then((r) => ({ data: r.data as WorkspaceRow })),
+  create: (data: { name: string; organization?: string }): Promise<{ data: WorkspaceRow }> =>
+    client.post('/workspaces', data).then((r) => ({ data: r.data as WorkspaceRow })),
+  update: (id: string, data: { name?: string; organization?: string }): Promise<{ data: WorkspaceRow }> =>
+    client.put(`/workspaces/${id}`, data).then((r) => ({ data: r.data as WorkspaceRow })),
   delete: (id: string) => client.delete(`/workspaces/${id}`),
 };
 
