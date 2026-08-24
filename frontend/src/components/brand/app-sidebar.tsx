@@ -2,16 +2,23 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 import {
   LayoutDashboard, FolderOpen, Boxes, Workflow, Compass, Flag,
   GitBranch, Target, Activity, CalendarClock, FlaskConical,
   ShieldCheck, ScrollText, Users, KeyRound, Webhook, Cog, Search, GitMerge, ListChecks,
-  ChevronDown, ChevronRight,
+  ChevronDown, ChevronRight, ChevronUp, LogOut, Monitor, Moon, Sun,
 } from 'lucide-react';
 import { Logo } from '@/brand/logo';
+import { ThemedSelect } from '@/components/brand/themed-select';
+import { Avatar } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { getSession } from '@/lib/session';
+import { workspaceApi } from '@/lib/api';
+import { clearSession, getSession } from '@/lib/session';
+import { useTheme } from '@/components/theme/theme-provider';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -39,7 +46,7 @@ const groups: NavGroup[] = [
     ],
   },
   {
-    label: 'Capabilities',
+    label: 'Build',
     items: [
       { href: '/app/capabilities', label: 'Registry', icon: Boxes },
       { href: '/app/editor', label: 'DAG editor', icon: Workflow },
@@ -66,7 +73,7 @@ const groups: NavGroup[] = [
     ],
   },
   {
-    label: 'Admin',
+    label: 'Settings',
     items: [
       { href: '/app/admin/cost', label: 'Cost & analytics', icon: Activity },
       { href: '/app/vault', label: 'Vault', icon: KeyRound },
@@ -79,7 +86,7 @@ const groups: NavGroup[] = [
   },
 ];
 
-function NavGroupSection({ group }: { group: NavGroup }) {
+function NavGroupSection({ group, last }: { group: NavGroup; last?: boolean }) {
   const pathname = usePathname();
   const hasActive = group.items.some(
     (item) => pathname === item.href || pathname.startsWith(item.href + '/'),
@@ -87,7 +94,7 @@ function NavGroupSection({ group }: { group: NavGroup }) {
   const [open, setOpen] = React.useState(hasActive);
 
   return (
-    <div className="py-2">
+    <div className={cn('py-2', !last && 'border-b border-border-subtle')}>
       <button
         onClick={() => setOpen(!open)}
         className="flex w-full items-center justify-between px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle hover:text-text-muted"
@@ -107,7 +114,7 @@ function NavGroupSection({ group }: { group: NavGroup }) {
                 className={cn(
                   'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors',
                   isActive
-                    ? 'bg-surface-2 text-text-strong ring-1 ring-border-subtle'
+                    ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200 dark:bg-surface-2 dark:text-text-strong dark:ring-border-subtle'
                     : 'text-text-muted hover:bg-surface-2/60 hover:text-text-default',
                 )}
               >
@@ -124,29 +131,132 @@ function NavGroupSection({ group }: { group: NavGroup }) {
 
 export function AppSidebar() {
   const session = getSession();
+  const router = useRouter();
+  const [userOpen, setUserOpen] = React.useState(false);
+  const { theme, setTheme } = useTheme();
+  const userMenuRef = React.useRef<HTMLDivElement | null>(null);
+
+  const workspaces = useQuery({
+    queryKey: ['workspaces'],
+    queryFn: () => workspaceApi.list(1).then((r) => r.data).catch(() => []),
+  });
+  const workspaceList = Array.isArray(workspaces.data) ? workspaces.data as Array<{ id: string; name?: string }> : [];
+  const currentWsId = session?.orgId ?? workspaceList[0]?.id;
+  const currentWs = workspaceList.find((w) => w.id === currentWsId);
+
+  React.useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+
   return (
-    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border-subtle bg-surface-1">
+    <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border-subtle bg-surface-1">
       <div className="flex h-14 items-center border-b border-border-subtle px-4">
         <Link href="/app" aria-label="Promptsheon home">
           <Logo size="sm" />
         </Link>
       </div>
-      <div className="flex-1 overflow-y-auto py-2">
-        {groups.map((group) => (
-          <NavGroupSection key={group.label} group={group} />
+
+      {workspaceList.length > 0 && (
+        <div className="border-b border-border-subtle p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle">Workspace</div>
+          <div className="mt-2">
+            <ThemedSelect
+              value={currentWsId}
+              onValueChange={(id) => {
+                router.push(`/app/workspaces/${id}`);
+              }}
+              options={workspaceList.map((w) => ({ value: w.id, label: w.name ?? w.id.slice(0, 8) }))}
+              ariaLabel="Active workspace"
+              triggerClassName="w-full text-sm"
+            />
+          </div>
+          {currentWs?.name && (
+            <div className="mt-2 flex items-center justify-between text-xs text-text-subtle">
+              <span className="truncate">{workspaceList.length} workspace(s)</span>
+              <Badge>Self-hosted</Badge>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto">
+        {groups.map((group, i) => (
+          <NavGroupSection key={group.label} group={group} last={i === groups.length - 1} />
         ))}
       </div>
+
       <Separator />
-      <div className="px-4 py-3">
+      <div className="relative px-4 py-3" ref={userMenuRef}>
         {session ? (
-          <div>
-            <div className="text-[13px] font-medium text-text-strong">{session.userName}</div>
-            <div className="text-xs text-text-subtle">{session.orgName}</div>
-          </div>
+          <button
+            type="button"
+            onClick={() => setUserOpen((v) => !v)}
+            className="flex w-full items-center gap-3 rounded-md px-1 py-1 text-left hover:bg-surface-2"
+          >
+            <Avatar className="h-8 w-8 bg-brand text-brand-foreground text-xs">
+              {session.userName?.slice(0, 2).toUpperCase() ?? 'U'}
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <div className="truncate text-[13px] font-medium text-text-strong">{session.userName}</div>
+              <div className="truncate text-xs text-text-subtle">{session.orgName}</div>
+            </div>
+            {userOpen ? <ChevronDown className="h-3 w-3 text-text-subtle" /> : <ChevronUp className="h-3 w-3 text-text-subtle" />}
+          </button>
         ) : (
           <Link href="/onboarding" className="text-xs text-brand-highlight hover:underline">
             Set up workspace
           </Link>
+        )}
+        {session && userOpen && (
+          <div className="absolute bottom-full left-3 right-3 mb-2 rounded-xl border border-border-subtle bg-surface-1 p-2 shadow-3">
+            <div className="px-2 py-1 text-xs text-text-subtle">Theme</div>
+            <div className="mt-1 grid grid-cols-3 gap-1">
+              <button
+                type="button"
+                onClick={() => setTheme('light')}
+                className={cn(
+                  'flex flex-col items-center gap-1 rounded-md py-2 text-xs transition-colors',
+                  theme === 'light' ? 'bg-brand-50 text-brand-700 dark:bg-surface-2 dark:text-text-strong' : 'text-text-muted hover:bg-surface-2',
+                )}
+              >
+                <Sun className="size-3.5" /> Light
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme('dark')}
+                className={cn(
+                  'flex flex-col items-center gap-1 rounded-md py-2 text-xs transition-colors',
+                  theme === 'dark' ? 'bg-brand-50 text-brand-700 dark:bg-surface-2 dark:text-text-strong' : 'text-text-muted hover:bg-surface-2',
+                )}
+              >
+                <Moon className="size-3.5" /> Dark
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                  setTheme(next);
+                }}
+                className="flex flex-col items-center gap-1 rounded-md py-2 text-xs text-text-muted hover:bg-surface-2"
+              >
+                <Monitor className="size-3.5" /> System
+              </button>
+            </div>
+            <div className="my-2 border-t border-border-subtle" />
+            <button
+              type="button"
+              onClick={() => { clearSession(); window.location.href = '/'; }}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-text-muted hover:bg-surface-2 hover:text-text-strong"
+            >
+              <LogOut className="size-3.5" /> Sign out
+            </button>
+          </div>
         )}
       </div>
     </aside>
