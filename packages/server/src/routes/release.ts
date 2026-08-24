@@ -10,7 +10,7 @@ import type { ReleaseRepo } from '../repos/release.js';
 import { ManifestRepo } from '../repos/manifest.js';
 import { parseBody, parseQuery } from './validate.js';
 import { AuditChain } from '../audit/chain.js';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 const ListQuerySchema = PaginationSchema.extend({
   capabilityId: z.string().uuid().optional(),
@@ -162,6 +162,25 @@ export function registerReleaseRoutes(
     const parsed = parseBody(reply, CreateBodySchema, request.body);
     if (!parsed.ok) return;
     const item = repo.create(parsed.data);
+
+    // BUG-1 follow-on: a release has its own manifest distinct from
+    // any version's. Register it in manifest_dag so the maker-checker
+    // approval flow can find it by hash.
+    try {
+      const parsedManifest = JSON.parse(parsed.data.manifest) as Record<string, unknown>;
+      const canonical = JSON.stringify(parsedManifest, Object.keys(parsedManifest).sort());
+      const canonicalHash = createHash('sha256').update(canonical).digest('hex');
+      deps.manifestRepo.registerFromRaw({
+        capabilityId: parsed.data.capabilityId,
+        version: parsed.data.capabilityVersion,
+        manifestHash: canonicalHash,
+        manifestJson: parsed.data.manifest,
+        createdBy: parsed.data.createdBy,
+      });
+    } catch (err) {
+      app.log.error({ err }, 'release manifest_dag upsert failed (non-fatal)');
+    }
+
     repo.appendTransition({
       id: randomUUID(),
       releaseId: item.id,
