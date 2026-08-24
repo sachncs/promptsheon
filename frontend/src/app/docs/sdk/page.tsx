@@ -17,7 +17,7 @@ export default function SdkDoc() {
       <DocCurl
         cmd={`const client = new PromptsheonClient({
   baseUrl: 'https://control.example.com',
-  apiKey: process.env.PROMPTSHEON_API_KEY!,
+  apiKey: '<paste your API key from /app/api-keys>',
 });`}
       />
 
