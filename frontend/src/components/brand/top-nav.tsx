@@ -5,6 +5,7 @@ import * as React from 'react';
 import { Github, Menu } from 'lucide-react';
 import { Logo } from '@/brand/logo';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/theme/theme-toggle';
 import { cn } from '@/lib/utils';
 
 export interface TopNavLink {
@@ -47,6 +48,7 @@ export function TopNav({ links, className }: { links: TopNavLink[]; className?: 
           >
             <Github className="h-4 w-4" />
           </a>
+          <ThemeToggle className="text-text-muted hover:text-text-default" />
           <Link href="/onboarding">
             <Button variant="ghost" size="sm" className="text-text-default">
               Sign in

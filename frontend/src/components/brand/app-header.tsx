@@ -6,6 +6,7 @@ import { Command, LogOut, Plus, Search } from 'lucide-react';
 import { Logo } from '@/brand/logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ThemeToggle } from '@/components/theme/theme-toggle';
 import { getSession, clearSession } from '@/lib/session';
 
 export function AppHeader() {
@@ -33,6 +34,7 @@ export function AppHeader() {
         </kbd>
       </div>
       <div className="flex items-center gap-2 ml-auto">
+        <ThemeToggle className="text-text-muted hover:text-text-default" />
         <Link href="/app/capabilities">
           <Button size="sm" variant="default">
             <Plus className="h-3.5 w-3.5 mr-1.5" />New capability
