@@ -8,6 +8,13 @@ const ListPreconditionsQuerySchema = z.object({
   capabilityId: z.string().min(1).optional(),
 });
 
+const UpdatePreconditionSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  command: z.string().min(1).optional(),
+  timeoutSec: z.number().int().min(1).max(3600).optional(),
+  enabled: z.boolean().optional(),
+});
+
 export function registerPreconditionRoutes(app: FastifyInstance, repo: PreconditionRepo) {
   app.get('/api/preconditions', async (request, reply) => {
     const parsed = parseQuery(reply, ListPreconditionsQuerySchema, request.query);
@@ -29,6 +36,15 @@ export function registerPreconditionRoutes(app: FastifyInstance, repo: Precondit
     if (!parsed.ok) return;
     const item = repo.create(parsed.data);
     return reply.code(201).send(item);
+  });
+
+  app.put('/api/preconditions/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = parseBody(reply, UpdatePreconditionSchema, request.body);
+    if (!parsed.ok) return;
+    const updated = repo.update(id, parsed.data);
+    if (!updated) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'precondition not found' } });
+    return reply.send(updated);
   });
 
   app.delete('/api/preconditions/:id', async (request, reply) => {

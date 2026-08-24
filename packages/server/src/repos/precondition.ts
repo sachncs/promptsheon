@@ -20,7 +20,40 @@ export class PreconditionRepo extends BaseRepo<Precondition> {
     return {
       id, capabilityId: data.capabilityId, name: data.name, command: data.command,
       timeoutSec: data.timeoutSec ?? 30, enabled: data.enabled ?? true,
-      createdAt: now,
+      createdAt: now, updatedAt: now,
     };
+  }
+
+  update(id: string, data: { name?: string; command?: string; timeoutSec?: number; enabled?: boolean }): Precondition | null {
+    const row = this.db.prepare(
+      'SELECT id, capability_id, name, command, timeout_sec, enabled, created_at, updated_at FROM preconditions WHERE id = ?',
+    ).get(id) as
+      | {
+          id: string;
+          capability_id: string;
+          name: string;
+          command: string;
+          timeout_sec: number;
+          enabled: number;
+          created_at: string;
+          updated_at: string;
+        }
+      | undefined;
+    if (!row) return null;
+    const now = new Date().toISOString();
+    const next = {
+      id: row.id,
+      capabilityId: row.capability_id,
+      name: data.name ?? row.name,
+      command: data.command ?? row.command,
+      timeoutSec: data.timeoutSec ?? row.timeout_sec,
+      enabled: (data.enabled ?? row.enabled === 1),
+      createdAt: row.created_at,
+    };
+    this.db.prepare(
+      `UPDATE preconditions SET name = ?, command = ?, timeout_sec = ?, enabled = ?, updated_at = ?
+       WHERE id = ?`,
+    ).run(next.name, next.command, next.timeoutSec, next.enabled ? 1 : 0, now, id);
+    return { ...next, updatedAt: now };
   }
 }

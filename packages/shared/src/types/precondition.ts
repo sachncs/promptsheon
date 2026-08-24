@@ -6,4 +6,5 @@ export interface Precondition {
   timeoutSec: number;
   enabled: boolean;
   createdAt: string;
+  updatedAt?: string;
 }
