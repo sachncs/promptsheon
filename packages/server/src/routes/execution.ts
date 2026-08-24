@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { ExecutionRepo } from '../repos/execution.js';
 import type { ReleaseRepo } from '../repos/release.js';
 import type { ManifestRepo } from '../repos/manifest.js';
+import type { VersionRepo } from '../repos/version.js';
 import type { ManifestGraphExecutor } from '../agents/executor/index.js';
 import { selectByCanary } from './release.js';
 import { parseBody, parseQuery } from './validate.js';
@@ -23,6 +24,13 @@ const ExecuteManifestSchema = z.object({
   traceId: z.string().optional(),
 });
 
+const InvokeSchema = z.object({
+  capabilityVersionId: z.string().min(1),
+  inputs: z.record(z.string(), z.unknown()),
+  environment: z.string().optional().default('dev'),
+  traceId: z.string().optional(),
+});
+
 function hashInputs(inputs: Record<string, unknown>): string {
   return createHash('sha256').update(JSON.stringify(inputs)).digest('hex');
 }
@@ -33,6 +41,7 @@ export function registerExecutionRoutes(
     executionRepo: ExecutionRepo;
     releaseRepo: ReleaseRepo;
     manifestRepo: ManifestRepo;
+    versionRepo: VersionRepo;
     executor: ManifestGraphExecutor;
   },
 ) {
@@ -99,5 +108,72 @@ export function registerExecutionRoutes(
       environment,
     });
     return reply.send({ ...trace, pickedReleaseId });
+  });
+
+  // Legacy alias kept for SDK + curl examples. Accepts a
+  // capabilityVersionId (version row id), looks up its manifest
+  // hash, and forwards to the canonical execute path so SDK
+  // consumers can still use the historic /api/invoke contract.
+  app.post('/api/invoke', async (request, reply) => {
+    const parsed = parseBody(reply, InvokeSchema, request.body);
+    if (!parsed.ok) return;
+    const { capabilityVersionId, inputs, environment, traceId } = parsed.data;
+    const version = deps.versionRepo.findById(capabilityVersionId);
+    if (!version) {
+      return reply.code(404).send({
+        error: { code: 'VERSION_NOT_FOUND', message: 'capabilityVersionId not found' },
+      });
+    }
+    const manifestHash = version.manifestHash;
+    if (!manifestHash) {
+      return reply.code(409).send({
+        error: { code: 'NO_MANIFEST_HASH', message: 'version has no manifestHash' },
+      });
+    }
+    // Synthesise a forward-compatible execute request and call
+    // the canonical POST /api/executions handler by inlining its
+    // body. We avoid a self-fetch (which would re-introduce auth
+    // + a round-trip) by reusing the same controller below.
+    const manifest = deps.manifestRepo.findByHash(manifestHash);
+    if (!manifest) {
+      throw new NotFoundError('manifest', manifestHash);
+    }
+    const activeReleases = deps.releaseRepo.findActiveByManifestHash(manifestHash);
+    if (activeReleases.length === 0) {
+      return reply
+        .code(404)
+        .send({ error: { code: 'NO_ACTIVE_RELEASE', message: 'No active release for manifest' } });
+    }
+    const pickedReleaseId = selectByCanary(
+      activeReleases.map((r) => ({ id: r.id, canaryPercent: r.canaryPercent })),
+    );
+    const executionId = crypto.randomUUID();
+    const controller = new AbortController();
+    request.raw.on('close', () => {
+      if (!controller.signal.aborted) controller.abort();
+    });
+    const trace = await deps.executor.execute(manifestHash, manifest, {
+      executionId,
+      inputs,
+      environment,
+      traceId,
+      signal: controller.signal,
+    });
+    deps.executionRepo.create({
+      capabilityVersionId: manifest.id,
+      inputs: hashInputs(inputs),
+      outputs: JSON.stringify(trace.nodeResults),
+      model: manifest.model.modelId,
+      provider: manifest.model.provider,
+      latencyMs: trace.totalLatencyMs,
+      costUsd: trace.totalCost,
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: trace.totalTokens,
+      error: trace.error ?? '',
+      traceId: traceId ?? executionId,
+      environment,
+    });
+    return reply.send({ ...trace, pickedReleaseId, capabilityVersionId });
   });
 }

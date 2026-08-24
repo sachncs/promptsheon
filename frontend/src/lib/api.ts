@@ -158,6 +158,9 @@ export const executionApi = {
 export const invokeApi = {
   invoke: (data: { capabilityVersionId: string; inputs: Record<string, unknown>; environment?: string; traceId?: string }) =>
     client.post('/invoke', data),
+  // Use the canonical manifest-driven path for in-product calls.
+  execute: (data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string }) =>
+    client.post('/executions', data),
 };
 
 export const datasetApi = {

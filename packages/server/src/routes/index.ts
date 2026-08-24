@@ -137,6 +137,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     executionRepo: deps.executionRepo,
     releaseRepo: deps.releaseRepo,
     manifestRepo: deps.manifestRepo,
+    versionRepo: deps.versionRepo,
     executor: deps.executor,
   });
   registerDatasetRoutes(app, deps.datasetRepo);
