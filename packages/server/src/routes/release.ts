@@ -304,8 +304,8 @@ export function registerReleaseRoutes(
       return reply.code(422).send({ error: { code: 'INVALID_TRANSITION', message: `cannot transition from ${from} to active` } });
     }
     const gateFailure = approvalGate({
-      createdBy: (existing as unknown as { created_by?: string }).created_by ?? '',
-      manifest: (existing as unknown as { manifest?: string }).manifest ?? '',
+      createdBy: existing.createdBy,
+      manifest: existing.manifest,
     }, deps.manifestRepo);
     if (gateFailure) {
       return reply.code(409).send({ error: { code: 'APPROVAL_REQUIRED', message: gateFailure } });
@@ -374,12 +374,11 @@ export function registerReleaseRoutes(
     const current = repo.findById(id);
     if (!current) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
 
-    const row = current as unknown as { id: string; capability_id: string; environment: string; capability_version: number };
     const parsed = parseBody(reply, RollbackBodySchema, request.body ?? {});
     if (!parsed.ok) return;
     const target = parsed.data.toReleaseId
       ? repo.findById(parsed.data.toReleaseId)
-      : repo.findPreviousActive(row.capability_id, row.environment, row.capability_version);
+      : repo.findPreviousActive(current.capabilityId, current.environment, current.capabilityVersion);
 
     if (!target) {
       return reply.code(404).send({ error: { code: 'NO_PREVIOUS_RELEASE', message: 'No previous active release found for rollback' } });
