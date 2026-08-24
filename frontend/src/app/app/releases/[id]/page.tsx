@@ -1,12 +1,12 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
   ArrowLeft, GitBranch, ShieldCheck, AlertCircle, Play, RotateCcw, FastForward,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
 import { releaseApi, approvalApi, auditApi } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
@@ -16,7 +16,12 @@ import { StepRail, type Step } from '@/components/brand/step-rail';
 import { HashChip } from '@/components/brand/hash-chip';
 import { Timeline } from '@/components/brand/timeline';
 import { EmptyState } from '@/components/brand/empty-state';
+import { useToast } from '@/components/brand/toast';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 
 const RAIL_STEPS: Step[] = [
   { id: 'draft', label: 'Draft', description: 'Initial capability manifest.', status: 'draft' },
@@ -31,6 +36,11 @@ export default function ReleaseDetailPage() {
   const session = useRequireSession();
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [canaryOpen, setCanaryOpen] = useState(false);
+  const [canaryPercent, setCanaryPercent] = useState('10');
+  const [rollbackOpen, setRollbackOpen] = useState(false);
 
   const release = useQuery({
     queryKey: ['release', id],
@@ -57,6 +67,45 @@ export default function ReleaseDetailPage() {
     return 'draft';
   }, [release.data]);
 
+  const refreshRelease = () => qc.invalidateQueries({ queryKey: ['release', id] });
+
+  const handleActivate = async () => {
+    try {
+      await releaseApi.activate(id);
+      refreshRelease();
+      toast({ title: 'Release activated', variant: 'success', description: 'Now receiving 100% of production traffic.' });
+    } catch (err) {
+      toast({ title: 'Activate failed', variant: 'destructive', description: (err as Error).message });
+    }
+  };
+
+  const handleCanary = async () => {
+    const pct = Number(canaryPercent);
+    if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+      toast({ title: 'Invalid percent', variant: 'warning', description: 'Canary percent must be 0-100.' });
+      return;
+    }
+    try {
+      await releaseApi.canary(id, Math.round(pct));
+      setCanaryOpen(false);
+      refreshRelease();
+      toast({ title: `Canary at ${pct}%`, variant: 'success', description: 'Weighted rollout updated.' });
+    } catch (err) {
+      toast({ title: 'Canary failed', variant: 'destructive', description: (err as Error).message });
+    }
+  };
+
+  const handleRollback = async () => {
+    try {
+      await releaseApi.rollback(id);
+      setRollbackOpen(false);
+      refreshRelease();
+      toast({ title: 'Rolled back', variant: 'success', description: 'Atomic rollback completed.' });
+    } catch (err) {
+      toast({ title: 'Rollback failed', variant: 'destructive', description: (err as Error).message });
+    }
+  };
+
   if (!session) return null;
   if (release.isLoading) return <div className="text-text-muted text-sm">Loading release…</div>;
   if (!release.data) {
@@ -79,6 +128,9 @@ export default function ReleaseDetailPage() {
     manifestHash?: string; environment?: string; canaryPercent?: number;
     createdAt?: string; updatedAt?: string;
   };
+
+  const isActive = r.state === 'active';
+  const isTerminal = r.state === 'rolled-back';
 
   return (
     <div className="space-y-6">
@@ -104,9 +156,15 @@ export default function ReleaseDetailPage() {
           <SurfaceHeader title="Release path" description="Where this release is in the state machine." />
           <StepRail steps={RAIL_STEPS} current={currentStep} className="mt-3" />
           <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
-            <Button size="sm"><Play className="mr-1.5 h-3.5 w-3.5" />Activate</Button>
-            <Button size="sm" variant="outline"><FastForward className="mr-1.5 h-3.5 w-3.5" />Canary 10%</Button>
-            <Button size="sm" variant="outline"><RotateCcw className="mr-1.5 h-3.5 w-3.5" />Roll back</Button>
+            <Button size="sm" onClick={handleActivate} disabled={isActive || isTerminal}>
+              <Play className="mr-1.5 h-3.5 w-3.5" />Activate
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setCanaryOpen(true)} disabled={isTerminal}>
+              <FastForward className="mr-1.5 h-3.5 w-3.5" />Canary {r.canaryPercent ?? 10}%
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setRollbackOpen(true)} disabled={isTerminal}>
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />Roll back
+            </Button>
           </div>
         </Surface>
 
@@ -150,6 +208,45 @@ export default function ReleaseDetailPage() {
           )}
         </Surface>
       </div>
+
+      <Dialog open={canaryOpen} onOpenChange={setCanaryOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Set canary percent</DialogTitle>
+            <DialogDescription>Weighted traffic split for this release. Live eval scores are watched while canary is non-zero.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-xs uppercase tracking-wider text-text-subtle">Percent</label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              value={canaryPercent}
+              onChange={(e) => setCanaryPercent(e.target.value)}
+              className="font-mono"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCanaryOpen(false)}>Cancel</Button>
+            <Button onClick={handleCanary}>Apply</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={rollbackOpen} onOpenChange={setRollbackOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Roll back this release</DialogTitle>
+            <DialogDescription>Atomically revert to the most recent active release in the same environment. This is recorded in the audit chain.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRollbackOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleRollback}>
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />Roll back
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -75,7 +75,13 @@ export const releaseApi = {
   create: (data: { capabilityId: string; capabilityVersion: number; capabilityVersionId: string | null; manifest: string; environment: string }) =>
     client.post('/releases', data),
   activate: (id: string) => client.put(`/releases/${id}/activate`),
+  canary: (id: string, percent: number) => client.put(`/releases/${id}/canary`, { percent }),
   supersede: (id: string) => client.put(`/releases/${id}/supersede`),
+  rollback: (id: string, toReleaseId?: string) => {
+    const body: { toReleaseId?: string } = {};
+    if (toReleaseId !== undefined) body.toReleaseId = toReleaseId;
+    return client.post(`/releases/${id}/rollback`, body);
+  },
 };
 
 export const executionApi = {
