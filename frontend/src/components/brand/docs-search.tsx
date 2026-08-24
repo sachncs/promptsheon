@@ -5,14 +5,11 @@ import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 
 const ALL_LINKS: Array<{ href: string; label: string; section: string }> = [
+  { href: '/docs', label: 'Docs overview', section: 'Quickstart' },
   { href: '/docs/quickstart', label: 'Set up your workspace', section: 'Quickstart' },
-  { href: '/docs/onboarding', label: 'Connect a model provider', section: 'Quickstart' },
   { href: '/docs/repos', label: 'Repositories', section: 'Capabilities' },
-  { href: '/docs/dag', label: 'Multi-agent DAG', section: 'Capabilities' },
   { href: '/docs/releases', label: 'Release workflow', section: 'Capabilities' },
   { href: '/docs/evals', label: 'Evaluation engine', section: 'Quality' },
-  { href: '/docs/grading', label: 'Graders', section: 'Quality' },
-  { href: '/docs/calibration', label: 'Human review & calibration', section: 'Quality' },
   { href: '/docs/vault', label: 'Vault & secret manager', section: 'Security' },
   { href: '/docs/signing', label: 'Operator signing keys', section: 'Security' },
   { href: '/docs/retention', label: 'Retention & purge', section: 'Platform' },
