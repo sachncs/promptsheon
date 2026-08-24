@@ -218,6 +218,10 @@ async function resolveKeyPresence(
     return (Boolean(id) && Boolean(secret)) ||
       (Boolean(process.env['AWS_ACCESS_KEY_ID']) && Boolean(process.env['AWS_SECRET_ACCESS_KEY']));
   }
+  if (provider === 'custom') {
+    const v = await resolver.get<string>('llm.customApiKey');
+    return Boolean(v) || Boolean(process.env['LLM_CUSTOM_KEY']);
+  }
   return false;
 }
 
