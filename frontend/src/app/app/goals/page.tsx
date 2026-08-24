@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Target, Sparkles } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
@@ -54,21 +55,26 @@ export default function GoalsPage() {
         ) : (
           <ul className="divide-y divide-border-subtle">
             {list.map((g) => (
-              <li key={g.manifestHash} className="flex items-center gap-5 px-5 py-4">
-                <div className="grid h-10 w-10 place-items-center rounded-lg bg-surface-2 text-brand-highlight">
-                  <Sparkles className="h-4 w-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-text-strong">Evolution cycle</div>
-                  <div className="mt-0.5 flex items-center gap-2">
-                    <HashChip hash={g.manifestHash} />
-                    <StatusPill kind={g.bestScore >= 0.7 ? 'active' : 'review'} label={`iter ${g.iterations}`} />
+              <li key={g.manifestHash}>
+                <Link
+                  href={`/app/goals/${g.manifestHash}`}
+                  className="flex items-center gap-5 px-5 py-4 hover:bg-surface-2/40"
+                >
+                  <div className="grid h-10 w-10 place-items-center rounded-lg bg-surface-2 text-brand-highlight">
+                    <Sparkles className="h-4 w-4" />
                   </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono text-sm text-text-strong">{(g.bestScore * 100).toFixed(1)}%</div>
-                  <div className="text-xs text-text-muted">{new Date(g.lastUpdated).toLocaleTimeString()}</div>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-text-strong">Evolution cycle</div>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <HashChip hash={g.manifestHash} />
+                      <StatusPill kind={g.bestScore >= 0.7 ? 'active' : 'review'} label={`iter ${g.iterations}`} />
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-mono text-sm text-text-strong">{(g.bestScore * 100).toFixed(1)}%</div>
+                    <div className="text-xs text-text-muted">{new Date(g.lastUpdated).toLocaleTimeString()}</div>
+                  </div>
+                </Link>
               </li>
             ))}
           </ul>

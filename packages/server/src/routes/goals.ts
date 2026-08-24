@@ -53,9 +53,15 @@ export function registerGoalObservabilityRoutes(
       bestScore: state.bestScore,
       bestManifestHash: state.bestHash,
       iterations: state.iteration,
-      totalCost: 0,
-      snapshots: [],
-      history: [],
+      totalCost: state.totalCost ?? 0,
+      snapshots: state.snapshots ?? [],
+      history: (state.history ?? []).map((h) => ({
+        iteration: h.iteration,
+        score: h.score,
+        cost: 0,
+        revised: false,
+        timestamp: h.at,
+      })),
     };
     return reply.send(detail);
   });

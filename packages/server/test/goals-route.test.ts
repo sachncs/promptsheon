@@ -15,8 +15,18 @@ function buildConfig(): AppConfig {
 }
 
 class StubAgent {
-  state = new Map<string, { currentHash: string; bestHash: string; bestScore: number; iteration: number }>();
-  getState(key: string) { return this.state.get(key); }
+  state = new Map<string, {
+    currentHash: string;
+    bestHash: string;
+    bestScore: number;
+    iteration: number;
+    history?: Array<{ iteration: number; score: number; manifestHash: string; at: string }>;
+    totalCost?: number;
+    snapshots?: unknown[];
+  }>();
+  getState(key: string) {
+    return this.state.get(key);
+  }
 }
 
 describe('Goal observability routes', () => {

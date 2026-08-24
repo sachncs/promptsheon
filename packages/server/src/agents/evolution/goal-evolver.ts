@@ -197,6 +197,17 @@ Be conservative: small targeted edits, preserve what works.`,
           bestHash: currentHash,
           bestScore: score,
           iteration: i + 1,
+          history: [{ iteration: i + 1, score, manifestHash: currentHash, at: new Date().toISOString() }],
+          totalCost: 0,
+          snapshots: [
+            {
+              iteration: i + 1,
+              manifestHash: currentHash,
+              manifest: currentManifest,
+              score,
+              timestamp: new Date().toISOString(),
+            },
+          ],
         });
         return {
           passed: true,
@@ -250,6 +261,15 @@ Be conservative: small targeted edits, preserve what works.`,
       bestHash: bestManifestHash,
       bestScore,
       iteration: history.length,
+      history: history.map((h) => ({
+        iteration: h.iteration,
+        score: h.score,
+        manifestHash: h.revised ? currentHash : currentHash,
+        at: h.timestamp,
+      })),
+      bestManifest: bestManifest ?? undefined,
+      totalCost,
+      snapshots: Array.from(snapshots.values()).slice(-50),
     });
     return {
       passed: false,
@@ -431,4 +451,13 @@ interface GoalEvolutionState {
   bestHash: string;
   bestScore: number;
   iteration: number;
+  /** Persisted iteration history so /api/goals/:hash drilldown
+   *  has real data after a cycle. Updated atomically with state. */
+  history: Array<{ iteration: number; score: number; manifestHash: string; at: string }>;
+  /** Best-so-far snapshot (manifest + score). Persists alongside state. */
+  bestManifest?: unknown;
+  /** Total $ spent by this goal's runs. */
+  totalCost: number;
+  /** Per-iteration snapshots (cap to last 50 to bound memory). */
+  snapshots: EvolutionSnapshot[];
 }
