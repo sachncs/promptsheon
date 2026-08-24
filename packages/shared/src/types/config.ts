@@ -7,6 +7,7 @@ export interface AppConfig {
     frontendPath: string;
     corsOrigin: string;
     logLevel: string;
+    nodeEnv: string;
   };
   llm: {
     defaultProvider: string;

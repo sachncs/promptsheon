@@ -51,6 +51,7 @@ export function loadConfig(): AppConfig {
       frontendPath: envString('PROMPTSHEON_FRONTEND_PATH', './frontend/dist'),
       corsOrigin: envString('PROMPTSHEON_CORS_ORIGIN', ''),
       logLevel: envString('PROMPTSHEON_LOG_LEVEL', 'info'),
+      nodeEnv: envString('PROMPTSHEON_NODE_ENV', envString('NODE_ENV', 'development')),
     },
     llm: {
       defaultProvider: envString('PROMPTSHEON_LLM_PROVIDER', 'openai'),

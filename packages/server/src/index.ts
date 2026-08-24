@@ -211,7 +211,14 @@ async function main() {
         url: 'https://example.com/github',
         events: ['push', 'pull_request'],
         active: true,
-        secret: process.env['PROMPTSHEON_WEBHOOK_SECRET'] ?? 'dev-secret',
+        secret: (() => {
+          const v = process.env['PROMPTSHEON_WEBHOOK_SECRET'];
+          if (v && v.length > 0) return v;
+          if (config.server.nodeEnv !== 'production') return 'dev-secret';
+          throw new Error(
+            'PROMPTSHEON_WEBHOOK_SECRET is required in production. Refusing to boot with the dev fallback.',
+          );
+        })(),
       },
     ],
     [
