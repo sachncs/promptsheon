@@ -1,6 +1,11 @@
 import Link from 'next/link';
+import { Github } from 'lucide-react';
 import { Logo } from '@/brand/logo';
 import { Surface } from '@/components/brand/surface';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Breadcrumb } from '@/components/brand/breadcrumb';
+import { useState } from 'react';
 
 const sections = [
   {
@@ -49,7 +54,14 @@ export const metadata = {
   description: 'Git-native, content-addressed control plane for AI capabilities.',
 };
 
+const ALL_LINKS = sections.flatMap((s) => s.links.map((l) => ({ ...l, section: s.title })));
+
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
+  const [search, setSearch] = useState('');
+  const filtered = search
+    ? ALL_LINKS.filter((l) => l.label.toLowerCase().includes(search.toLowerCase()))
+    : ALL_LINKS;
+
   return (
     <div className="min-h-screen bg-surface-0">
       <header className="sticky top-0 z-40 border-b border-border-subtle bg-surface-0/85 backdrop-blur">
@@ -69,16 +81,45 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <Link href="/app" className="rounded-md border border-border-subtle bg-surface-1 px-3 py-1.5 text-sm text-text-default hover:border-border-strong">
-              Open dashboard
+            <a
+              href="https://github.com/sachncs/promptsheon"
+              target="_blank"
+              rel="noreferrer"
+              className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text-default"
+              aria-label="GitHub"
+            >
+              <Github className="h-4 w-4" />
+            </a>
+            <Link href="/app">
+              <Button size="sm">Open dashboard</Button>
             </Link>
           </div>
         </div>
       </header>
-      <div className="mx-auto flex w-full max-w-6xl gap-8 px-6 py-12">
+      <div className="mx-auto flex w-full max-w-6xl gap-8 px-6 py-10">
         <aside className="hidden w-56 shrink-0 lg:block">
           <div className="sticky top-24 space-y-6">
-            {sections.map((s) => (
+            <Input
+              placeholder="Search docs…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="text-sm"
+            />
+            {search && (
+              <ul className="space-y-1.5">
+                {filtered.length === 0 ? (
+                  <li className="text-xs text-text-muted">No matches.</li>
+                ) : filtered.map((l) => (
+                  <li key={l.href}>
+                    <Link href={l.href} className="block rounded-md px-2 py-1 text-sm text-text-default hover:bg-surface-2">
+                      <span className="font-medium">{l.label}</span>
+                      <span className="block text-[11px] uppercase tracking-wider text-text-subtle">{l.section}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {!search && sections.map((s) => (
               <section key={s.title}>
                 <h4 id={s.title.toLowerCase().replace(/ /g, '-')} className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-subtle">
                   {s.title}
@@ -96,13 +137,27 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
             ))}
           </div>
         </aside>
-        <main className="min-w-0 flex-1">
+        <main className="min-w-0 flex-1 space-y-4">
+          <Breadcrumb
+            items={[
+              { label: 'Docs', href: '/docs' },
+              { label: 'Page' },
+            ]}
+          />
           <Surface>{children}</Surface>
+          <div className="flex items-center justify-between text-xs text-text-subtle">
+            <a
+              href="https://github.com/sachncs/promptsheon/edit/master/frontend/src/app/docs"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-text-default"
+            >
+              Edit this page on GitHub →
+            </a>
+            <span>Apache-2.0 · Promptsheon self-hosted</span>
+          </div>
         </main>
       </div>
-      <footer className="border-t border-border-subtle py-8 text-center text-xs text-text-subtle">
-        Apache-2.0 · Promptsheon self-hosted
-      </footer>
     </div>
   );
 }
