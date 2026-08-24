@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { bootstrapAdminViaApi, seedSession, clearClientState, type SessionInfo } from './helpers/seed-session';
 
 const ROUTES = [
   '/',
@@ -31,6 +32,7 @@ const ROUTES = [
   '/app/search',
   '/app/workspaces',
   '/app/goals',
+  '/app/goals/test-hash',
   '/app/eval',
   '/app/eval/suites',
   '/app/diff',
@@ -42,9 +44,28 @@ const ROUTES = [
   '/app/projects/test-id/capabilities',
 ];
 
-test.describe('tier 1: route smoke', () => {
+let cachedSession: SessionInfo | null = null;
+
+test.describe('tier 1: route smoke (authenticated)', () => {
+  test.beforeAll(async ({ baseURL }) => {
+    if (!cachedSession && baseURL) {
+      cachedSession = await bootstrapAdminViaApi(baseURL, {
+        baseUrl: baseURL,
+        orgName: 'Tier1 Org',
+        adminName: 'Tier1 Admin',
+        adminEmail: 'tier1@promptsheon.test',
+      });
+    }
+  });
+
   for (const path of ROUTES) {
-    test(`renders ${path} without a console error`, async ({ page }) => {
+    test(`renders ${path} without a console error`, async ({ page, baseURL }) => {
+      if (!cachedSession) throw new Error('session not bootstrapped');
+
+      // Wipe per-test and seed fresh.
+      await clearClientState(page);
+      await seedSession(page, cachedSession);
+
       const consoleErrors: string[] = [];
       page.on('pageerror', (err) => consoleErrors.push(String(err)));
       page.on('console', (msg) => {
@@ -52,15 +73,16 @@ test.describe('tier 1: route smoke', () => {
       });
 
       const response = await page.goto(path, { waitUntil: 'domcontentloaded' });
-      expect(response, `expected 2xx for ${path}`).not.toBeNull();
-      expect(response!.status(), `${path} status`).toBeLessThan(400);
+      expect(response, `expected a response for ${path}`).not.toBeNull();
+      const status = response!.status();
+      // 404 for deliberately-bad IDs is fine (e.g. /app/executions/test-id);
+      // 5xx is not. The page may 200 or 404; the route shell must mount.
+      expect(status, `${path} status`).toBeLessThan(500);
 
-      // Filter out:
-      //  - React hydration warnings (dev server quirk)
-      //  - 401/403/404 from API calls: expected when no session is
-      //    present; tier 1 deliberately runs unauthenticated to
-      //    verify the page shell mounts. Auth-gated testing lives in
-      //    tier 3+.
+      // Filter out React-hydration warnings (dev server) and
+      // 401/403/404 from optional API calls the page made before
+      // a session token was attached. We don't filter 5xx — that's
+      // a real failure.
       const real = consoleErrors.filter(
         (m) => !/hydrat|did not match|Warning:|401|403|404|Failed to load resource/i.test(m),
       );
