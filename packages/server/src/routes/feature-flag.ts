@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { parseBody } from './validate.js';
 import type { FeatureFlagRepo } from '../repos/feature-flag.js';
 import type { AuditChain } from '../audit/chain.js';
+import { requireAdmin } from '../middleware/admin.js';
 
 const PutFeatureFlagSchema = z.object({
   name: z.string().min(1).max(120).regex(/^[a-z0-9._-]+$/, {
@@ -26,11 +27,11 @@ export function registerFeatureFlagRoutes(
   app: FastifyInstance,
   deps: { repo: FeatureFlagRepo; auditChain: AuditChain },
 ) {
-  app.get('/api/feature-flags', async (_request, reply) => {
+  app.get('/api/feature-flags', { preHandler: requireAdmin() }, async (_request, reply) => {
     return reply.send({ flags: deps.repo.findMany() });
   });
 
-  app.put('/api/feature-flags/:name', async (request, reply) => {
+  app.put('/api/feature-flags/:name', { preHandler: requireAdmin() }, async (request, reply) => {
     const { name } = request.params as { name: string };
     const merged = { ...(request.body as Record<string, unknown> | undefined), name };
     const parsed = parseBody(reply, PutFeatureFlagSchema, merged);
@@ -48,7 +49,7 @@ export function registerFeatureFlagRoutes(
     return reply.send(flag);
   });
 
-  app.delete('/api/feature-flags/:name', async (request, reply) => {
+  app.delete('/api/feature-flags/:name', { preHandler: requireAdmin() }, async (request, reply) => {
     const { name } = request.params as { name: string };
     const removed = deps.repo.delete(name);
     if (!removed) {

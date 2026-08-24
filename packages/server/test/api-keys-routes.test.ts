@@ -40,6 +40,11 @@ describe('api-keys routes', () => {
       if (error.statusCode) return reply.code(error.statusCode).send({ error: { code: 'APP_ERROR', message: error.message } });
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     });
+    app.addHook('preHandler', (request, _reply, done) => {
+      (request as Record<string, unknown>)['userId'] = 'u-admin';
+      (request as Record<string, unknown>)['orgContext'] = { organizationId: '00000000-0000-4000-8000-000000000001', role: 'admin' };
+      done();
+    });
     await app.register(async (instance) => {
       registerApiKeyRoutes(instance, { apiKeyRepo: repo, auditChain: audit });
     });

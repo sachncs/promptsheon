@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { UserRepo } from '../repos/user.js';
 import { parseBody } from './validate.js';
 import { AuditChain } from '../audit/chain.js';
+import { requireAdmin } from '../middleware/admin.js';
 
 const CreateUserSchema = z.object({
   email: z.string().email().max(255),
@@ -27,7 +28,7 @@ export function registerUserRoutes(
   app: FastifyInstance,
   deps: { userRepo: UserRepo; auditChain: AuditChain },
 ) {
-  app.get('/api/users', async (_request, reply) => {
+  app.get('/api/users', { preHandler: requireAdmin() }, async (_request, reply) => {
     return reply.send({ users: deps.userRepo.list() });
   });
 
@@ -49,7 +50,7 @@ export function registerUserRoutes(
     return reply.send(user);
   });
 
-  app.post('/api/users', async (request, reply) => {
+  app.post('/api/users', { preHandler: requireAdmin() }, async (request, reply) => {
     const parsed = parseBody(reply, CreateUserSchema, request.body);
     if (!parsed.ok) return;
     const user = deps.userRepo.create(parsed.data);
@@ -64,7 +65,7 @@ export function registerUserRoutes(
     return reply.code(201).send(user);
   });
 
-  app.put('/api/users/:id/role', async (request, reply) => {
+  app.put('/api/users/:id/role', { preHandler: requireAdmin() }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, UpdateRoleSchema, request.body);
     if (!parsed.ok) return;

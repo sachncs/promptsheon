@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { parseBody } from './validate.js';
 import type { AuditChain } from '../audit/chain.js';
+import { requireAdmin } from '../middleware/admin.js';
 
 /**
  * Outgoing-webhook subscription store. The frontend `/app/webhooks` page
@@ -103,7 +104,7 @@ export function registerWebhookCrudRoutes(
 ): { store: WebhookCrudStore } {
   const store = deps.store ?? new WebhookCrudStore();
 
-  app.get('/api/webhooks', async (request, reply) => {
+  app.get('/api/webhooks', { preHandler: requireAdmin() }, async (request, reply) => {
     const orgId = orgOf(request);
     if (!orgId) {
       return reply
@@ -113,7 +114,7 @@ export function registerWebhookCrudRoutes(
     return reply.send({ webhooks: store.listByOrg(orgId) });
   });
 
-  app.post('/api/webhooks', async (request, reply) => {
+  app.post('/api/webhooks', { preHandler: requireAdmin() }, async (request, reply) => {
     const parsed = parseBody(reply, CreateWebhookSchema, request.body);
     if (!parsed.ok) return;
     const item = store.create({ ...parsed.data, active: true, createdBy: actorOf(request) });
@@ -128,7 +129,7 @@ export function registerWebhookCrudRoutes(
     return reply.code(201).send(item);
   });
 
-  app.put('/api/webhooks/:id', async (request, reply) => {
+  app.put('/api/webhooks/:id', { preHandler: requireAdmin() }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, UpdateWebhookSchema, request.body);
     if (!parsed.ok) return;
@@ -147,7 +148,7 @@ export function registerWebhookCrudRoutes(
     return reply.send(updated);
   });
 
-  app.delete('/api/webhooks/:id', async (request, reply) => {
+  app.delete('/api/webhooks/:id', { preHandler: requireAdmin() }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const removed = store.delete(id);
     if (!removed) {

@@ -166,7 +166,7 @@ describe('org scoping', () => {
     const appA = Fastify();
     appA.addHook('preHandler', (req, _r, d) => {
       (req as Record<string, unknown>)['userId'] = 'uA';
-      (req as Record<string, unknown>)['orgContext'] = { organizationId: ORG_A };
+      (req as Record<string, unknown>)['orgContext'] = { organizationId: ORG_A, role: 'admin' };
       d();
     });
     registerWebhookCrudRoutes(appA, {
@@ -188,7 +188,7 @@ describe('org scoping', () => {
     const appB = Fastify();
     appB.addHook('preHandler', (req, _r, d) => {
       (req as Record<string, unknown>)['userId'] = 'uB';
-      (req as Record<string, unknown>)['orgContext'] = { organizationId: ORG_B };
+      (req as Record<string, unknown>)['orgContext'] = { organizationId: ORG_B, role: 'admin' };
       d();
     });
     registerWebhookCrudRoutes(appB, {
@@ -197,6 +197,8 @@ describe('org scoping', () => {
     });
     await appB.ready();
     const listB = await appB.inject({ method: 'GET', url: '/api/webhooks' });
-    expect((listB.json() as { webhooks: unknown[] }).webhooks).toHaveLength(0);
+    expect(listB.statusCode).toBe(200);
+    const body = listB.json() as { webhooks: unknown[] };
+    expect(body.webhooks).toHaveLength(0);
   });
 });
