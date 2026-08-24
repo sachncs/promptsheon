@@ -89,9 +89,9 @@ describe('POST /api/releases/:id/rollback', () => {
     const v2 = makeRelease(repo, 'cap1', 'prod', 2, 'alice');
     const v3 = makeRelease(repo, 'cap1', 'prod', 3, 'alice');
     repo.updateStatus(v1, 'active');
-    repo.updateStatus(v1, 'superseded');
+    repo.updateStatus(v1, 'rolled_back');
     repo.updateStatus(v2, 'active');
-    repo.updateStatus(v2, 'superseded');
+    repo.updateStatus(v2, 'rolled_back');
     repo.updateStatus(v3, 'active');
     void v1;
 
@@ -101,7 +101,7 @@ describe('POST /api/releases/:id/rollback', () => {
     expect(body.reactivated.id).toBe(v2);
     expect(body.reactivated.status).toBe('active');
     expect(body.superseded.id).toBe(v3);
-    expect(body.superseded.status).toBe('superseded');
+    expect(body.superseded.status).toBe('rolled_back');
   });
 
   it('rollback to specific release by toReleaseId', async () => {

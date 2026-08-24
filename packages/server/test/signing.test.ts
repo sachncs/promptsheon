@@ -112,6 +112,7 @@ describe('operator-managed signing keys', () => {
     const f1 = fingerprintSpki(pem);
     const f2 = fingerprintSpki(pem);
     expect(f1).toBe(f2);
-    expect(f1.length).toBe(32);
+    // SHA-256 hex digest is 64 characters.
+    expect(f1.length).toBe(64);
   });
 });

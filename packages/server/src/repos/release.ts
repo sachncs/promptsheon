@@ -113,8 +113,11 @@ export class ReleaseRepo extends BaseRepo<Release> {
    * the previous known-good release.
    */
   findPreviousActive(capabilityId: string, environment: string, currentVersion: number): Release | null {
+    // Pre-v0.4 releases use 'superseded'; the 6-state machine uses
+    // 'rolled_back'. Both are terminal states; either should be a
+    // valid rollback target.
     return this.db.prepare(
-      "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'rolled_back' AND capability_version < ? ORDER BY capability_version DESC LIMIT 1",
+      "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status IN ('rolled_back', 'superseded') AND capability_version < ? ORDER BY capability_version DESC LIMIT 1",
     ).get(capabilityId, environment, currentVersion) as Release | null;
   }
 

@@ -67,6 +67,10 @@ describe('PUT /api/releases/:id/activate (approval gate)', () => {
     db.prepare(`INSERT INTO workspaces (id, name, organization, created_at, updated_at) VALUES ('ws1', 'ws', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
     db.prepare(`INSERT INTO projects (id, workspace_id, name, description, created_at, updated_at) VALUES ('proj1', 'ws1', 'p', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
     db.prepare(`INSERT INTO capabilities (id, project_id, name, description, created_at, updated_at) VALUES ('cap1', 'proj1', 'c', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
+    db.prepare(`INSERT INTO users (id, email, name, role, created_at, updated_at) VALUES ('system', 'system@local', 'System', 'admin', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
+    db.prepare(`INSERT OR IGNORE INTO users (id, email, name, role, created_at, updated_at) VALUES ('alice', 'alice@local', 'Alice', 'admin', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
+    db.prepare(`INSERT OR IGNORE INTO users (id, email, name, role, created_at, updated_at) VALUES ('bob', 'bob@local', 'Bob', 'admin', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
+    db.prepare(`INSERT OR IGNORE INTO users (id, email, name, role, created_at, updated_at) VALUES ('carol', 'carol@local', 'Carol', 'admin', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
     releaseRepo = new ReleaseRepo(db);
     manifestRepo = new ManifestRepo(db);
 

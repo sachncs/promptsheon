@@ -285,7 +285,10 @@ export function registerReleaseRoutes(
     if (from === 'rolled_back') {
       return reply.code(422).send({ error: { code: 'INVALID_TRANSITION', message: `cannot transition from ${from} to active` } });
     }
-    const gateFailure = approvalGate({ createdBy: existing.createdBy, manifest: existing.manifest }, deps.manifestRepo);
+    const gateFailure = approvalGate({
+      createdBy: (existing as unknown as { created_by?: string }).created_by ?? '',
+      manifest: (existing as unknown as { manifest?: string }).manifest ?? '',
+    }, deps.manifestRepo);
     if (gateFailure) {
       return reply.code(409).send({ error: { code: 'APPROVAL_REQUIRED', message: gateFailure } });
     }
@@ -379,6 +382,13 @@ export function registerReleaseRoutes(
       resourceKind: 'release',
       resourceId: current.id,
     });
-    return reply.send(result);
+    // Map the repo return shape (rolledBack, reactivated) to the
+    // public API shape (superseded, reactivated) so legacy callers
+    // see the v0.4 vocabulary.
+    const body = {
+      superseded: result.rolledBack,
+      reactivated: result.reactivated,
+    };
+    return reply.send(body);
   });
 }
