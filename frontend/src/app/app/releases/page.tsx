@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Tabs, TabsList, TabsTrigger } from '@/components/brand/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NewReleaseDialog } from '@/components/brand/new-release-dialog';
 
 type FilterState = 'all' | 'draft' | 'review' | 'approved' | 'canary' | 'active' | 'rolled-back';
 
@@ -90,11 +91,7 @@ export default function ReleasesPage() {
         eyebrow="Release"
         title="Releases"
         subtitle="Every promotion of a capability is a first-class artifact. Draft → review → approved → canary → active → rolled back."
-        actions={
-          <Link href="/app/capabilities">
-            <Button><Plus className="mr-1.5 h-3.5 w-3.5" />New release</Button>
-          </Link>
-        }
+        actions={<NewReleaseDialog />}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
