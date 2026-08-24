@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, GitBranch, GitMerge, Save, Plus, History, ShieldCheck, FileText } from 'lucide-react';
@@ -22,6 +22,7 @@ type Tab = 'tree' | 'branches' | 'merge-requests' | 'commits';
 
 export default function RepositoryDetail() {
   const session = useRequireSession();
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params.id;
   const [tab, setTab] = useState<Tab>('tree');
@@ -280,7 +281,7 @@ export default function RepositoryDetail() {
                 className="rounded-none border-0 border-t border-border-subtle"
                 rows={(mrs.data ?? []) as Array<Record<string, unknown>>}
                 rowKey={(r) => String(r['id'])}
-                onRowClick={(r) => { window.location.href = `/app/merge-requests/${String(r['id'])}`; }}
+                onRowClick={(r) => { router.push(`/app/merge-requests/${String(r['id'])}`); }}
                 columns={[
                   { key: 'n', header: '#', render: (r) => `#${String(r['number'])}` },
                   { key: 'title', header: 'Title', render: (r) => <span className="font-medium text-text-strong">{String(r['title'])}</span> },

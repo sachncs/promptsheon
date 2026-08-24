@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Boxes, Plus, Trash2 } from 'lucide-react';
 import { projectApi, workspaceApi } from '@/lib/api';
@@ -26,6 +27,7 @@ interface ProjectItem {
 
 export default function ProjectsPage() {
   const session = useRequireSession();
+  const router = useRouter();
   const qc = useQueryClient();
 
   const workspaces = useQuery({
@@ -126,7 +128,7 @@ export default function ProjectsPage() {
             className="rounded-none border-0 border-t border-border-subtle"
             rows={rows as unknown as Array<Record<string, unknown>>}
             rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => { window.location.href = `/app/workspaces/${String(r['workspaceId'] ?? wsId)}/projects`; }}
+            onRowClick={(r) => { router.push(`/app/workspaces/${String(r['workspaceId'] ?? wsId)}/projects`); }}
             columns={[
               {
                 key: 'name',

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { GitMerge, ArrowRight } from 'lucide-react';
 import { workspaceApi, repoApi } from '@/lib/api';
@@ -27,6 +28,7 @@ interface MergeRequestRow {
 
 export default function MergeRequestsIndex() {
   const session = useRequireSession();
+  const router = useRouter();
 
   const workspaces = useQuery({
     queryKey: ['workspaces'],
@@ -112,7 +114,7 @@ export default function MergeRequestsIndex() {
             className="rounded-none border-0 border-t border-border-subtle"
             rows={rows as unknown as Array<Record<string, unknown>>}
             rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => { window.location.href = `/app/merge-requests/${String(r['id'])}`; }}
+            onRowClick={(r) => { router.push(`/app/merge-requests/${String(r['id'])}`); }}
             columns={[
               {
                 key: 'title',

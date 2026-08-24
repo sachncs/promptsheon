@@ -3,6 +3,7 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { FlaskConical, Plus, Beaker } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
 import { evalSuiteApi } from '@/lib/api';
@@ -15,6 +16,7 @@ import { Button } from '@/components/ui/button';
 
 export default function EvalSuitesPage() {
   const session = useRequireSession();
+  const router = useRouter();
   const suites = useQuery({
     queryKey: ['eval-suites'],
     queryFn: () => evalSuiteApi.list(),
@@ -150,7 +152,7 @@ export default function EvalSuitesPage() {
             className="rounded-none border-0 border-t border-border-subtle"
             rows={rows}
             rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => { window.location.href = `/app/eval/suites/${String(r['id'])}`; }}
+            onRowClick={(r) => { router.push(`/app/eval/suites/${String(r['id'])}`); }}
             columns={[
               { key: 'name', header: 'Name', render: (r) => <span className="font-medium text-text-strong">{String(r['name'])}</span> },
               { key: 'capability', header: 'Capability', render: (r) => <span className="font-mono text-xs">{String(r['capabilityId'])}</span> },

@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { Boxes, Workflow, Plus } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/button';
 
 export default function CapabilitiesRegistryPage() {
   const session = useRequireSession();
+  const router = useRouter();
   const workspaces = useQuery({ queryKey: ['workspaces'], queryFn: () => workspaceApi.list(1).then((r) => r.data) });
   const wsFirst = unwrapFirst<{ id: string; name: string }>(workspaces.data);
   const projects = useQuery({
@@ -83,7 +85,7 @@ export default function CapabilitiesRegistryPage() {
             className="rounded-none border-0 border-t border-border-subtle"
             rows={rows}
             rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => { window.location.href = `/app/capabilities/${String(r['id'])}`; }}
+            onRowClick={(r) => { router.push(`/app/capabilities/${String(r['id'])}`); }}
             columns={[
               {
                 key: 'name',

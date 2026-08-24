@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import {
   ArrowLeft, Workflow, FlaskConical, GitBranch, ScrollText, ShieldCheck,
@@ -25,6 +25,7 @@ type Tab = 'overview' | 'versions' | 'graph' | 'releases';
 export default function CapabilityDetailPage() {
   const params = useParams<{ capabilityId: string }>();
   const id = params.capabilityId;
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>('overview');
 
   const cap = useQuery({
@@ -181,7 +182,7 @@ export default function CapabilityDetailPage() {
               className="rounded-none border-0 border-t border-border-subtle"
               rows={releaseList}
               rowKey={(r: Record<string, unknown>) => String(r['id'])}
-              onRowClick={(r) => { window.location.href = `/app/releases/${String(r['id'])}`; }}
+              onRowClick={(r) => { router.push(`/app/releases/${String(r['id'])}`); }}
               columns={[
                 { key: 'v', header: 'Version', render: (r: Record<string, unknown>) => `v${String(r['capabilityVersion'] ?? '?')}` },
                 { key: 'env', header: 'Environment', render: (r: Record<string, unknown>) => <span className="font-mono text-xs">{String(r['environment'] ?? 'production')}</span> },

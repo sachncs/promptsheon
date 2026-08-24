@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ShieldCheck, ShieldAlert, Inbox } from 'lucide-react';
 import { workspaceApi, projectApi, releaseApi } from '@/lib/api';
@@ -28,6 +29,7 @@ interface Release {
 
 export default function ApprovalsPage() {
   const session = useRequireSession();
+  const router = useRouter();
 
   const workspaces = useQuery({
     queryKey: ['workspaces'],
@@ -102,7 +104,7 @@ export default function ApprovalsPage() {
             className="rounded-none border-0 border-t border-border-subtle"
             rows={rows as unknown as Array<Record<string, unknown>>}
             rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => { window.location.href = `/app/releases/${String(r['id'])}`; }}
+            onRowClick={(r) => { router.push(`/app/releases/${String(r['id'])}`); }}
             columns={[
               {
                 key: 'cap',

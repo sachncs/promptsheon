@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { FlaskConical, Plus } from 'lucide-react';
 import { evalApi } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
@@ -12,6 +13,7 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 
 export default function EvalListPage() {
+  const router = useRouter();
   const evals = useQuery({
     queryKey: ['eval-runs'],
     queryFn: () => evalApi.list().then((r) => r.data).catch(() => []),
@@ -47,7 +49,7 @@ export default function EvalListPage() {
             className="rounded-none border-0 border-t border-border-subtle"
             rows={rows}
             rowKey={(r: Record<string, unknown>) => String(r['id'])}
-            onRowClick={(r) => { window.location.href = `/app/eval/${String(r['id'])}`; }}
+            onRowClick={(r) => { router.push(`/app/eval/${String(r['id'])}`); }}
             columns={[
               { key: 'release', header: 'Release', render: (r) => String(r['releaseId'] ?? '—') },
               { key: 'dataset', header: 'Dataset', render: (r) => String(r['datasetId'] ?? '—') },

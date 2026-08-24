@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Plus, GitBranch, Search, Lock } from 'lucide-react';
@@ -17,6 +18,7 @@ import { Input } from '@/components/ui/input';
 
 export default function RepositoriesPage() {
   const session = useRequireSession();
+  const router = useRouter();
   const workspaces = useQuery({
     queryKey: ['workspaces'],
     queryFn: () => workspaceApi.list(1).then((r) => r.data),
@@ -91,7 +93,7 @@ export default function RepositoriesPage() {
             className="rounded-none border-0 border-t border-border-subtle"
             rows={filtered}
             rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => { window.location.href = `/app/repos/${String(r['id'])}`; }}
+            onRowClick={(r) => { router.push(`/app/repos/${String(r['id'])}`); }}
             columns={[
               {
                 key: 'name',

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Activity, AlertTriangle, GitMerge, ShieldAlert } from 'lucide-react';
 import { releaseApi, workspaceApi, projectApi, evalApi, alertApi } from '@/lib/api';
@@ -46,6 +47,7 @@ interface AlertItem {
 
 export default function OperationsPage() {
   const session = useRequireSession();
+  const router = useRouter();
 
   const workspaces = useQuery({
     queryKey: ['workspaces'],
@@ -171,7 +173,7 @@ export default function OperationsPage() {
               className="rounded-none border-0 border-t border-border-subtle"
               rows={canaryReleases as unknown as Array<Record<string, unknown>>}
               rowKey={(r) => String(r['id'])}
-              onRowClick={(r) => { window.location.href = `/app/releases/${String(r['id'])}`; }}
+              onRowClick={(r) => { router.push(`/app/releases/${String(r['id'])}`); }}
               columns={[
                 {
                   key: 'cap',
@@ -227,7 +229,7 @@ export default function OperationsPage() {
               className="rounded-none border-0 border-t border-border-subtle"
               rows={evals.slice(0, 8) as unknown as Array<Record<string, unknown>>}
               rowKey={(r) => String(r['id'])}
-              onRowClick={(r) => { window.location.href = `/app/eval/${String(r['id'])}`; }}
+              onRowClick={(r) => { router.push(`/app/eval/${String(r['id'])}`); }}
               columns={[
                 { key: 'run', header: 'Run', render: (r) => <span className="font-mono text-xs">{String(r['id']).slice(0, 12)}…</span> },
                 {

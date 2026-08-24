@@ -151,7 +151,7 @@ export default function ManifestEditorPage() {
     mutationFn: () => manifestApi.create(manifest).then((r) => r.data as { hash: string }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['manifests'] });
-      if (typeof window !== 'undefined') window.location.href = '/editor';
+      router.push('/app/editor');
     },
   });
 
