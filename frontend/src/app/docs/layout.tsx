@@ -3,9 +3,8 @@ import { Github } from 'lucide-react';
 import { Logo } from '@/brand/logo';
 import { Surface } from '@/components/brand/surface';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Breadcrumb } from '@/components/brand/breadcrumb';
-import { useState } from 'react';
+import { DocsSearch } from '@/components/brand/docs-search';
 
 const sections = [
   {
@@ -54,14 +53,7 @@ export const metadata = {
   description: 'Git-native, content-addressed control plane for AI capabilities.',
 };
 
-const ALL_LINKS = sections.flatMap((s) => s.links.map((l) => ({ ...l, section: s.title })));
-
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
-  const [search, setSearch] = useState('');
-  const filtered = search
-    ? ALL_LINKS.filter((l) => l.label.toLowerCase().includes(search.toLowerCase()))
-    : ALL_LINKS;
-
   return (
     <div className="min-h-screen bg-surface-0">
       <header className="sticky top-0 z-40 border-b border-border-subtle bg-surface-0/85 backdrop-blur">
@@ -99,27 +91,8 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
       <div className="mx-auto flex w-full max-w-6xl gap-8 px-6 py-10">
         <aside className="hidden w-56 shrink-0 lg:block">
           <div className="sticky top-24 space-y-6">
-            <Input
-              placeholder="Search docs…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="text-sm"
-            />
-            {search && (
-              <ul className="space-y-1.5">
-                {filtered.length === 0 ? (
-                  <li className="text-xs text-text-muted">No matches.</li>
-                ) : filtered.map((l) => (
-                  <li key={l.href}>
-                    <Link href={l.href} className="block rounded-md px-2 py-1 text-sm text-text-default hover:bg-surface-2">
-                      <span className="font-medium">{l.label}</span>
-                      <span className="block text-[11px] uppercase tracking-wider text-text-subtle">{l.section}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {!search && sections.map((s) => (
+            <DocsSearch />
+            {sections.map((s) => (
               <section key={s.title}>
                 <h4 id={s.title.toLowerCase().replace(/ /g, '-')} className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-subtle">
                   {s.title}
