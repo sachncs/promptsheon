@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { requireAdmin } from '../middleware/admin.js';
 import { registerWorkspaceRoutes } from './workspace.js';
 import { registerProjectRoutes } from './project.js';
 import { registerCapabilityRoutes } from './capability.js';
@@ -49,6 +50,7 @@ import { registerRedteamRoutes, type RedteamDeps } from './redteam.js';
 import { registerExperimentRoutes, type ExperimentDeps } from './experiment.js';
 import { registerIncidentRoutes, type IncidentDeps } from './incident.js';
 import { registerOrgSettingsRoutes, type OrgSettingsRouteDeps } from './org-settings.js';
+import { registerTraceRoutes } from './trace.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -125,6 +127,7 @@ export interface AppDeps {
   incidentDeps: IncidentDeps;
   orgSettingsDeps: OrgSettingsRouteDeps;
   featureFlagRepo: import('../repos/feature-flag.js').FeatureFlagRepo;
+  traceRepo: import('../repos/trace.js').TraceRepo;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -138,6 +141,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     releaseRepo: deps.releaseRepo,
     manifestRepo: deps.manifestRepo,
     versionRepo: deps.versionRepo,
+    traceRepo: deps.traceRepo,
     executor: deps.executor,
   });
   registerDatasetRoutes(app, deps.datasetRepo);
@@ -203,4 +207,8 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
       },
     });
   }
+  registerTraceRoutes(app, {
+    traceRepo: deps.traceRepo,
+    requireAdmin: () => requireAdmin() as unknown as (request: unknown, reply: unknown) => Promise<void>,
+  });
 }

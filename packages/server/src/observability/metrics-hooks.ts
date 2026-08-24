@@ -1,11 +1,14 @@
 import type Database from 'better-sqlite3';
 import type { AfterInvocationEvent } from '@strands-agents/sdk';
 import type { ManifestRepo } from '../repos/manifest.js';
+import type { TraceRepo } from '../repos/trace.js';
 
 export interface MetricsHookContext {
   executionId: string;
   manifestHash: string;
   manifestRepo: ManifestRepo;
+  traceRepo?: TraceRepo;
+  traceRunId?: string;
   /**
    * Optional wall-clock start time of the invocation (ms since epoch).
    * When supplied, the hook stamps `startedAt` from this value and
@@ -54,6 +57,46 @@ export function createMetricsHook(ctx: MetricsHookContext): (event: AfterInvocat
         error: '',
         status: 'completed',
       });
+
+      // Mirror to the trace store so /api/traces can show per-node
+      // spans for the same execution. The trace_run_id is shared
+      // across all nodes of the same execution; we add a span under
+      // it on every invocation. Errors are swallowed — span
+      // persistence is best-effort.
+      if (ctx.traceRepo && ctx.traceRunId) {
+        try {
+          ctx.traceRepo.addSpan({
+            traceRunId: ctx.traceRunId,
+            name: nodeId,
+            kind: 'agent',
+            startTime: new Date(startedAt).toISOString(),
+            attributes: {
+              manifestHash: ctx.manifestHash,
+              executionId: ctx.executionId,
+            },
+            model: undefined,
+            promptTokens,
+            completionTokens,
+            totalTokens: totalTokens || undefined,
+            costUsd: totalTokens ? (totalTokens / 1000) * 0.00003 : undefined,
+            inputText: undefined,
+            outputText: undefined,
+          });
+          const span = ctx.traceRepo
+            .findSpansByRun(ctx.traceRunId)
+            .reverse()
+            .find((s) => s.name === nodeId);
+          if (span) {
+            ctx.traceRepo.finishSpan(span.id, {
+              endTime: new Date(endedAt).toISOString(),
+              totalTokens: totalTokens || undefined,
+              costUsd: totalTokens ? (totalTokens / 1000) * 0.00003 : undefined,
+            });
+          }
+        } catch {
+          // never let span persistence break execution
+        }
+      }
     } catch {
       // never let metrics persistence break execution
     }

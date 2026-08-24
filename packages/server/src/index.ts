@@ -27,6 +27,7 @@ import { MergeRequestRepo } from './repos/mr.js';
 import { SigningKeyRepo } from './repos/signing-key.js';
 import { EvalSuiteRepo, HumanReviewRepo } from './repos/eval-suite.js';
 import { VaultRepo } from './repos/vault.js';
+import { TraceRepo } from './repos/trace.js';
 import { OrgExportService, CostRollupRepo } from './repos/vault-extras.js';
 import { RedteamRepo } from './repos/redteam.js';
 import { ExperimentRepo } from './repos/experiment.js';
@@ -128,6 +129,7 @@ async function main() {
 );
   const orgExportService = new OrgExportService(db, vaultRepo);
   const costRollupRepo = new CostRollupRepo(db);
+  const traceRepo = new TraceRepo(db);
   const redteamRepo = new RedteamRepo(db);
   const experimentRepo = new ExperimentRepo(db);
   const incidentRepo = new IncidentRepo(db);
@@ -366,6 +368,7 @@ async function main() {
     experimentDeps: { experimentRepo },
     incidentDeps: { incidentRepo, actorId: () => 'system' },
     featureFlagRepo,
+    traceRepo,
     orgSettingsDeps: {
       orgSettingsRepo,
       vaultRepo,

@@ -4,6 +4,7 @@ import type { ExecutionRepo } from '../repos/execution.js';
 import type { ReleaseRepo } from '../repos/release.js';
 import type { ManifestRepo } from '../repos/manifest.js';
 import type { VersionRepo } from '../repos/version.js';
+import type { TraceRepo } from '../repos/trace.js';
 import type { ManifestGraphExecutor } from '../agents/executor/index.js';
 import { selectByCanary } from './release.js';
 import { parseBody, parseQuery } from './validate.js';
@@ -42,6 +43,7 @@ export function registerExecutionRoutes(
     releaseRepo: ReleaseRepo;
     manifestRepo: ManifestRepo;
     versionRepo: VersionRepo;
+    traceRepo: TraceRepo;
     executor: ManifestGraphExecutor;
   },
 ) {
@@ -81,6 +83,14 @@ export function registerExecutionRoutes(
     }
 
     const executionId = crypto.randomUUID();
+    const traceRun = deps.traceRepo.startRun({
+      organizationId: 'unscoped',
+      executionId,
+      environment,
+      name: `manifest:${manifestHash.slice(0, 12)}`,
+      model: manifest.model?.modelId ?? null,
+      attributes: { manifestHash, route: '/api/executions' },
+    });
     const controller = new AbortController();
     request.raw.on('close', () => {
       if (!controller.signal.aborted) controller.abort();
@@ -91,6 +101,11 @@ export function registerExecutionRoutes(
       environment,
       traceId,
       signal: controller.signal,
+      traceRunId: traceRun.id,
+    });
+    deps.traceRepo.finalize(traceRun.id, trace.status === 'completed' ? 'success' : 'error', {
+      tokens: trace.totalTokens,
+      costUsd: trace.totalCost,
     });
     deps.executionRepo.create({
       capabilityVersionId: manifest.id,
@@ -148,6 +163,14 @@ export function registerExecutionRoutes(
       activeReleases.map((r) => ({ id: r.id, canaryPercent: r.canaryPercent })),
     );
     const executionId = crypto.randomUUID();
+    const traceRun = deps.traceRepo.startRun({
+      organizationId: 'unscoped',
+      executionId,
+      environment,
+      name: `manifest:${manifestHash.slice(0, 12)}`,
+      model: manifest.model?.modelId ?? null,
+      attributes: { manifestHash, route: '/api/invoke' },
+    });
     const controller = new AbortController();
     request.raw.on('close', () => {
       if (!controller.signal.aborted) controller.abort();
@@ -158,6 +181,11 @@ export function registerExecutionRoutes(
       environment,
       traceId,
       signal: controller.signal,
+      traceRunId: traceRun.id,
+    });
+    deps.traceRepo.finalize(traceRun.id, trace.status === 'completed' ? 'success' : 'error', {
+      tokens: trace.totalTokens,
+      costUsd: trace.totalCost,
     });
     deps.executionRepo.create({
       capabilityVersionId: manifest.id,
