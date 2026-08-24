@@ -1,12 +1,15 @@
 import Link from 'next/link';
 import {
   ArrowRight, Boxes, FlaskConical, GitBranch, Workflow, Lock, ShieldCheck,
-  Layers, Activity, ScrollText, Terminal,
+  Layers, Activity, ScrollText, Terminal, CheckCircle2, Sparkles,
+  Compass, Fingerprint, Network, Rocket, Telescope,
 } from 'lucide-react';
 import { Logo } from '@/brand/logo';
 import { LogoMark } from '@/brand/logo-mark';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { HashChip } from '@/components/brand/hash-chip';
+import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { TopNav } from '@/components/brand/top-nav';
 
 const topLinks = [
@@ -265,24 +268,226 @@ export default function LandingPage() {
         </Container>
       </section>
 
+      {/* Logo cloud */}
+      <section className="border-t border-border-subtle">
+        <Container className="py-12">
+          <div className="text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-text-subtle">
+            Self-hosted by teams running agents in production
+          </div>
+          <div className="mt-6 grid grid-cols-3 gap-6 sm:grid-cols-5">
+            {[':: / /acme', ':: / /northwind', ':: / /lyra', ':: / /octant', ':: / /orbital'].map((name) => (
+              <div key={name} className="flex h-12 items-center justify-center rounded-lg border border-border-subtle bg-surface-1 font-mono text-xs text-text-subtle">
+                {name}
+              </div>
+            ))}
+          </div>
+        </Container>
+      </section>
+
+      {/* Feature grid */}
+      <section id="features" className="border-t border-border-subtle bg-surface-1/40">
+        <Container className="py-20">
+          <div className="text-center">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-text-subtle">
+              What you get
+            </div>
+            <h2 className="mt-3 font-semibold text-h2 md:text-h1 text-text-strong">
+              Six capabilities that ship together.
+            </h2>
+          </div>
+          <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {[
+              { icon: Compass, title: 'Visual DAG editor', text: 'Compose agents, policies, tools, and memory into a graph. Live preview against a real execution.' },
+              { icon: Network, title: 'Releases with canary', text: 'Weighted traffic split. Live eval scores monitor canary. One-click rollback, hash-linked.' },
+              { icon: ShieldCheck, title: 'Maker-checker approvals', text: 'Creator cannot approve their own release. Reason + voter persisted with the audit row.' },
+              { icon: Fingerprint, title: 'Content-addressed CAS', text: 'Every compiled manifest is hashed and stored by content. Same input, same hash.' },
+              { icon: FlaskConical, title: 'Evaluation engine', text: 'Declarative datasets, pluggable scorers, regression gates, parallel runs.' },
+              { icon: Telescope, title: 'Self-evolution loop', text: 'Watches live eval scores; on regression, re-plans and re-releases with cooldown.' },
+            ].map(({ icon: Icon, title, text }) => (
+              <article
+                key={title}
+                className="group rounded-2xl border border-border-subtle bg-surface-1 p-6 transition-colors hover:border-border-strong"
+              >
+                <div className="grid h-10 w-10 place-items-center rounded-lg bg-brand/15 text-brand">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="mt-5 font-semibold text-h4 text-text-strong">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-text-muted">{text}</p>
+              </article>
+            ))}
+          </div>
+        </Container>
+      </section>
+
+      {/* Comparison */}
+      <section id="compare" className="border-t border-border-subtle">
+        <Container className="py-20">
+          <div className="text-center">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-text-subtle">
+              Comparison
+            </div>
+            <h2 className="mt-3 font-semibold text-h2 md:text-h1 text-text-strong">
+              Not a notebook. Not hosted SaaS.
+            </h2>
+            <p className="mt-4 max-w-2xl mx-auto text-base text-text-muted leading-relaxed">
+              Promptsheon sits between ad-hoc notebooks and hosted agent platforms. You own the infrastructure; we give you the engineering.
+            </p>
+          </div>
+          <div className="mt-10 grid gap-3 md:grid-cols-3">
+            {[
+              { label: 'Notebooks', tone: 'text-text-subtle', rows: [
+                ['Visibility', '—'],
+                ['Audit chain', '—'],
+                ['Maker-checker', '—'],
+                ['Canary rollout', '—'],
+              ] },
+              { label: 'Hosted SaaS', tone: 'text-text-subtle', rows: [
+                ['Visibility', 'partial'],
+                ['Audit chain', 'provider-side'],
+                ['Maker-checker', 'optional'],
+                ['Canary rollout', 'beta'],
+              ] },
+              { label: 'Promptsheon', tone: 'text-brand', rows: [
+                ['Visibility', 'self-hosted, full'],
+                ['Audit chain', 'hash-linked, verifiable'],
+                ['Maker-checker', 'enforced'],
+                ['Canary rollout', 'first-class'],
+              ], highlight: true },
+            ].map((col) => (
+              <div
+                key={col.label}
+                className={`rounded-2xl border p-5 ${col.highlight ? 'border-brand bg-brand/5 shadow-glow' : 'border-border-subtle bg-surface-1'}`}
+              >
+                <div className={`text-sm font-semibold ${col.tone}`}>{col.label}</div>
+                <dl className="mt-3 space-y-2">
+                  {col.rows.map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between text-sm">
+                      <dt className="text-text-muted">{k}</dt>
+                      <dd className={col.highlight ? 'text-text-strong font-medium' : 'text-text-muted'}>{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ))}
+          </div>
+        </Container>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing" className="border-t border-border-subtle bg-surface-1/40">
+        <Container className="py-20">
+          <div className="text-center">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-text-subtle">
+              Pricing
+            </div>
+            <h2 className="mt-3 font-semibold text-h2 md:text-h1 text-text-strong">
+              One tier. Self-hosted. Apache-2.0.
+            </h2>
+            <p className="mt-4 max-w-2xl mx-auto text-base text-text-muted leading-relaxed">
+              No per-seat pricing, no cloud bill. Run it on your own metal, behind your own firewall.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-5 md:grid-cols-3">
+            <Surface>
+              <SurfaceHeader title="Self-host" />
+              <div className="text-3xl font-semibold text-text-strong">Free</div>
+              <p className="mt-1 text-sm text-text-muted">Apache-2.0. Run anywhere you can run Node.</p>
+              <ul className="mt-5 space-y-2 text-sm">
+                {['All 76 REST endpoints', 'DAG editor, eval engine, audit chain', 'Multi-provider LLM', 'No telemetry'].map((f) => (
+                  <li key={f} className="flex items-start gap-2">
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+                    <span className="text-text-default">{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-6">
+                <Link href="/onboarding"><Button className="w-full">Get started</Button></Link>
+              </div>
+            </Surface>
+            <Surface>
+              <SurfaceHeader
+                title="Cloud (soon)"
+                actions={<Badge>Waitlist</Badge>}
+              />
+              <div className="text-3xl font-semibold text-text-strong">TBD</div>
+              <p className="mt-1 text-sm text-text-muted">Hosted Promptsheon with managed upgrades.</p>
+              <ul className="mt-5 space-y-2 text-sm">
+                {['Same Apache-2.0 codebase', 'Zero-ops upgrade path', 'Backups + observability included', 'Region-pinned'].map((f) => (
+                  <li key={f} className="flex items-start gap-2">
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-text-muted" />
+                    <span className="text-text-muted">{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-6">
+                <Button variant="outline" className="w-full" disabled>Join waitlist</Button>
+              </div>
+            </Surface>
+            <Surface>
+              <SurfaceHeader title="Enterprise" />
+              <div className="text-3xl font-semibold text-text-strong">Talk to us</div>
+              <p className="mt-1 text-sm text-text-muted">Air-gapped installs, SSO, custom integrations.</p>
+              <ul className="mt-5 space-y-2 text-sm">
+                {['On-prem deployment playbook', 'SSO via your IdP', 'Custom audit retention', 'Engineering contact'].map((f) => (
+                  <li key={f} className="flex items-start gap-2">
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-text-muted" />
+                    <span className="text-text-muted">{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-6">
+                <a href="mailto:sachncs@gmail.com"><Button variant="outline" className="w-full">Email us</Button></a>
+              </div>
+            </Surface>
+          </div>
+        </Container>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-border-subtle bg-surface-1/50">
-        <Container className="py-10">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <Logo size="xs" showWordmark />
-              <span className="text-xs text-text-subtle">Apache-2.0</span>
+        <Container className="py-12">
+          <div className="grid gap-10 md:grid-cols-5">
+            <div className="md:col-span-2">
+              <Logo size="sm" showWordmark />
+              <p className="mt-3 max-w-xs text-sm text-text-muted">
+                The control plane for AI capabilities. Self-hosted, content-addressed, governed.
+              </p>
+              <div className="mt-4 flex items-center gap-2">
+                <Badge>Apache-2.0</Badge>
+                <Badge>Self-hosted</Badge>
+                <Badge>No telemetry</Badge>
+              </div>
             </div>
-            <div className="flex gap-6 text-xs text-text-muted">
-              <Link href="/onboarding">Setup</Link>
-              <a href="https://github.com/sachncs/promptsheon" className="hover:text-text-default">GitHub</a>
-              <Link href="/#docs" className="hover:text-text-default">Docs</Link>
-              <Link href="/#governance" className="hover:text-text-default">Security</Link>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-text-subtle">Product</div>
+              <ul className="mt-3 space-y-2 text-sm text-text-muted">
+                <li><Link href="/#product" className="hover:text-text-default">Capabilities</Link></li>
+                <li><Link href="/#features" className="hover:text-text-default">Features</Link></li>
+                <li><Link href="/#compare" className="hover:text-text-default">Compare</Link></li>
+                <li><Link href="/#pricing" className="hover:text-text-default">Pricing</Link></li>
+              </ul>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-text-subtle">Resources</div>
+              <ul className="mt-3 space-y-2 text-sm text-text-muted">
+                <li><Link href="/docs" className="hover:text-text-default">Documentation</Link></li>
+                <li><Link href="/docs/quickstart" className="hover:text-text-default">Quickstart</Link></li>
+                <li><a href="https://github.com/sachncs/promptsheon" className="hover:text-text-default">GitHub</a></li>
+                <li><a href="https://github.com/sachncs/promptsheon/issues/new" className="hover:text-text-default">Issues</a></li>
+              </ul>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-text-subtle">Company</div>
+              <ul className="mt-3 space-y-2 text-sm text-text-muted">
+                <li><Link href="/#governance" className="hover:text-text-default">Security</Link></li>
+                <li><a href="mailto:sachncs@gmail.com" className="hover:text-text-default">Contact</a></li>
+                <li><a href="LICENSE" className="hover:text-text-default">License</a></li>
+              </ul>
             </div>
           </div>
-          <div className="mt-6 text-[11px] text-text-subtle">
-            Promptsheon is self-hosted infrastructure. By using the software you
-            accept responsibility for the content your capabilities produce.
+          <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-border-subtle pt-6 text-xs text-text-subtle">
+            <span>© 2026 Sachin · Apache-2.0</span>
+            <span>Promptsheon is self-hosted infrastructure. By using the software you accept responsibility for the content your capabilities produce.</span>
           </div>
         </Container>
       </footer>
