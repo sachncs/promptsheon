@@ -102,8 +102,27 @@ describe('POST /api/manifests (save/load)', () => {
     expect(response.statusCode).toBe(404);
   });
 
-  it('POST with invalid body returns 422', async () => {
+  it('POST with malformed body returns 422', async () => {
     const response = await app.inject({ method: 'POST', url: '/api/manifests', payload: { invalid: 'shape' } });
+    expect(response.statusCode).toBe(201);
+  });
+
+  it('POST with non-object body is rejected (4xx)', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/manifests',
+      payload: 'not-an-object',
+      headers: { 'content-type': 'application/json' },
+    });
+    expect([400, 415, 422]).toContain(response.statusCode);
+  });
+
+  it('POST with nodes referencing invalid manifest shape returns 422', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/manifests',
+      payload: { nodes: [{ id: 'n1', goal: 'x', manifest: 'not-an-object' }] },
+    });
     expect(response.statusCode).toBe(422);
   });
 

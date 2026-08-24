@@ -83,11 +83,11 @@ export class ManifestRepo {
         id, capability_id, version, manifest_hash, parent_manifest_hash,
         goal, goal_metrics, manifest_json, created_by, created_at
       ) VALUES (?, ?, ?, ?, NULL, ?, '{}', ?, ?, ?)
-      ON CONFLICT(capability_id, version) DO UPDATE SET
-        manifest_hash = excluded.manifest_hash,
+      ON CONFLICT(manifest_hash) DO UPDATE SET
         manifest_json = excluded.manifest_json,
         goal = excluded.goal,
-        created_by = excluded.created_by
+        created_by = excluded.created_by,
+        capability_id = excluded.capability_id
     `).run(
       crypto.randomUUID(),
       opts.capabilityId,

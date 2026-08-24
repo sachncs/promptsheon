@@ -160,29 +160,102 @@ export const SubCapabilityManifestSchema: z.ZodType<unknown> = z.lazy(() =>
   }),
 );
 
-export const ManifestSchema = z.object({
-  id: z.string().min(1),
-  version: z.number().int().min(1),
-  prompt: PromptConfigSchema,
-  model: ModelPolicySchema,
-  runtime: RuntimePolicySchema,
-  context: ContextContractSchema,
-  memory: MemoryConfigSchema,
-  guardrails: z.object({
-    pre: z.array(GuardrailSpecSchema).default([]),
-    post: z.array(GuardrailSpecSchema).default([]),
-  }),
-  tools: z.array(ToolSpecSchema).default([]),
-  mcpServers: z.array(McpServerSpecSchema).default([]),
-  evaluation: EvaluationConfigSchema,
-  nodes: z.array(SubCapabilityManifestSchema).default([]),
-  edges: z.array(ManifestEdgeSchema).default([]),
-  metadata: z.record(z.string(), z.unknown()).default({}),
-  createdAt: z.string().default(''),
-  updatedAt: z.string().default(''),
-}).superRefine((manifest, ctx) => {
-  validateDag(manifest as unknown as { nodes: Array<{ id: string }>; edges: Array<{ from: string; to: string }> }, ctx);
-});
+export const ManifestSchema = z
+  .preprocess(
+    (input) => {
+      // Merge any incoming draft shape with safe defaults so a partial
+      // editor payload (e.g. just {nodes, edges, prompt: {systemPrompt}})
+      // still validates. The activation gate enforces the full shape on
+      // promote; here we just want to persist the working draft.
+      const safe = input as Record<string, unknown> | null | undefined;
+      if (!safe || typeof safe !== 'object') return safe;
+      const out: Record<string, unknown> = { ...safe };
+      if (typeof out['id'] !== 'string' || out['id'] === '') {
+        out['id'] = 'manifest-draft';
+      }
+      if (typeof out['version'] !== 'number') {
+        out['version'] = 1;
+      }
+      const prompt = (out['prompt'] ?? {}) as Record<string, unknown>;
+      out['prompt'] = {
+        systemPrompt: typeof prompt['systemPrompt'] === 'string' && prompt['systemPrompt']
+          ? prompt['systemPrompt']
+          : 'You are a helpful assistant.',
+        userTemplate: typeof prompt['userTemplate'] === 'string' ? prompt['userTemplate'] : '{{input}}',
+      };
+      const model = (out['model'] ?? {}) as Record<string, unknown>;
+      out['model'] = {
+        provider: model['provider'] ?? 'openai',
+        modelId: model['modelId'] ?? 'gpt-4',
+        temperature: typeof model['temperature'] === 'number' ? model['temperature'] : 0.7,
+        maxTokens: typeof model['maxTokens'] === 'number' ? model['maxTokens'] : 4096,
+      };
+      const runtime = (out['runtime'] ?? {}) as Record<string, unknown>;
+      out['runtime'] = {
+        timeoutMs: runtime['timeoutMs'] ?? 30000,
+        nodeTimeoutMs: runtime['nodeTimeoutMs'] ?? 10000,
+        totalTimeoutMs: runtime['totalTimeoutMs'] ?? 300000,
+        maxRetries: runtime['maxRetries'] ?? 3,
+        canaryPercent: runtime['canaryPercent'] ?? 0,
+        concurrencyLimit: runtime['concurrencyLimit'] ?? 10,
+      };
+      const context = (out['context'] ?? {}) as Record<string, unknown>;
+      out['context'] = {
+        inputsSchema: context['inputsSchema'] ?? {},
+        outputsSchema: context['outputsSchema'] ?? {},
+        requiredContextVars: context['requiredContextVars'] ?? [],
+      };
+      const memory = (out['memory'] ?? {}) as Record<string, unknown>;
+      out['memory'] = {
+        enabled: memory['enabled'] ?? false,
+        type: memory['type'] ?? 'stateless',
+      };
+      const guardrails = (out['guardrails'] ?? {}) as Record<string, unknown>;
+      out['guardrails'] = {
+        pre: guardrails['pre'] ?? [],
+        post: guardrails['post'] ?? [],
+      };
+      out['tools'] = out['tools'] ?? [];
+      out['mcpServers'] = out['mcpServers'] ?? [];
+      const evaluation = (out['evaluation'] ?? {}) as Record<string, unknown>;
+      out['evaluation'] = {
+        datasets: evaluation['datasets'] ?? [],
+        scorers: evaluation['scorers'] ?? [],
+        passThreshold: evaluation['passThreshold'] ?? 0.7,
+        ...(evaluation['primaryScorer'] ? { primaryScorer: evaluation['primaryScorer'] } : {}),
+      };
+      out['nodes'] = out['nodes'] ?? [];
+      out['edges'] = out['edges'] ?? [];
+      out['metadata'] = out['metadata'] ?? {};
+      out['createdAt'] = out['createdAt'] ?? new Date().toISOString();
+      out['updatedAt'] = out['updatedAt'] ?? new Date().toISOString();
+      return out;
+    },
+    z.object({
+      id: z.string().min(1),
+      version: z.number().int().min(1),
+      prompt: PromptConfigSchema,
+      model: ModelPolicySchema,
+      runtime: RuntimePolicySchema,
+      context: ContextContractSchema,
+      memory: MemoryConfigSchema,
+      guardrails: z.object({
+        pre: z.array(GuardrailSpecSchema).default([]),
+        post: z.array(GuardrailSpecSchema).default([]),
+      }),
+      tools: z.array(ToolSpecSchema).default([]),
+      mcpServers: z.array(McpServerSpecSchema).default([]),
+      evaluation: EvaluationConfigSchema,
+      nodes: z.array(SubCapabilityManifestSchema).default([]),
+      edges: z.array(ManifestEdgeSchema).default([]),
+      metadata: z.record(z.string(), z.unknown()).default({}),
+      createdAt: z.string().default(''),
+      updatedAt: z.string().default(''),
+    }),
+  )
+  .superRefine((manifest, ctx) => {
+    validateDag(manifest as unknown as { nodes: Array<{ id: string }>; edges: Array<{ from: string; to: string }> }, ctx);
+  });
 
 function validateDag(
   manifest: { nodes: Array<{ id: string }>; edges: Array<{ from: string; to: string }> },

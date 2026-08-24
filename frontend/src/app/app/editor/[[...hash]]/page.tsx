@@ -151,9 +151,10 @@ export default function ManifestEditorPage() {
 
   const saveMutation = useMutation({
     mutationFn: () => manifestApi.create(manifest).then((r) => r.data as { hash: string }),
-    onSuccess: () => {
+    onSuccess: ({ hash: newHash }) => {
       void queryClient.invalidateQueries({ queryKey: ['manifests'] });
-      router.push('/app/editor');
+      void queryClient.invalidateQueries({ queryKey: ['manifest', newHash] });
+      router.push(`/app/editor/${newHash}`);
     },
   });
 
