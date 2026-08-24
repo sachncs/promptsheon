@@ -141,7 +141,10 @@ export default function ManifestEditorPage() {
 
   const handleAddNode = React.useCallback(() => {
     const id = `n${manifest.nodes.length + 1}`;
-    setManifest((prev) => ({ ...prev, nodes: [...prev.nodes, makeLeafManifest(id, `Node ${id}`, 'TODO')] }));
+    setManifest((prev) => ({
+      ...prev,
+      nodes: [...prev.nodes, makeLeafManifest(id, `Node ${id}`, 'Describe what this node does and what it returns.')],
+    }));
   }, [manifest.nodes.length]);
 
   const saveMutation = useMutation({
