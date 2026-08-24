@@ -18,7 +18,7 @@ export default function AuditPage() {
   return (
     <div className="space-y-6">
       <div>
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-text-subtle">Quality</div>
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-text-subtle">Release</div>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-text-strong">Audit log</h1>
         <p className="mt-1.5 text-sm text-text-muted">
           Hash-linked, append-only record of every mutation. Verifiable at <code className="font-mono text-text-default">/api/audit/verify</code>.

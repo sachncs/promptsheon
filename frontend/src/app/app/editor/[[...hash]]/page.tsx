@@ -150,7 +150,7 @@ export default function ManifestEditorPage() {
         .execute({ manifestHash: hash ?? '', inputs: { preview: true } })
         .then((r: { data: { executionId: string } }) => r.data),
     onSuccess: (data: { executionId: string }) => {
-      router.push(`/executions/${data.executionId}`);
+      router.push(`/app/executions/${data.executionId}`);
     },
   });
 

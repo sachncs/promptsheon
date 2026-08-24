@@ -35,7 +35,6 @@ const groups: NavGroup[] = [
     items: [
       { href: '/app/repos', label: 'Repositories', icon: GitBranch },
       { href: '/app/merge-requests', label: 'Merge requests', icon: GitMerge },
-      { href: '/app/signing-keys', label: 'Signing keys', icon: ShieldCheck },
       { href: '/app/search', label: 'Search', icon: Search },
     ],
   },
