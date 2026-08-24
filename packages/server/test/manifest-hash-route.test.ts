@@ -102,7 +102,7 @@ describe('POST /api/manifests (save/load)', () => {
     expect(response.statusCode).toBe(404);
   });
 
-  it('POST with malformed body returns 422', async () => {
+  it('POST with malformed body synthesizes a draft manifest and saves it as 201', async () => {
     const response = await app.inject({ method: 'POST', url: '/api/manifests', payload: { invalid: 'shape' } });
     expect(response.statusCode).toBe(201);
   });
