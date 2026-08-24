@@ -4,7 +4,7 @@ export const fontSans = Inter_Tight({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-sans',
-  weight: ['400', '500', '600', '700'],
+  weight: 'variable',
 });
 
 export const fontMono = IBM_Plex_Mono({
