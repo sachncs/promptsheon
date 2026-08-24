@@ -5,6 +5,189 @@ All notable changes to Promptsheon are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.4.2] - 2026-08-25
+
+The end-of-audit release. Closes every issue surfaced by the
+production audit (initial pass + R1–R6 follow-up). Maker-checker
+flow now actually works end-to-end: bootstrap → workspace →
+project → capability → version → release → approval → activation
+gate, fully verified by curl + the Playwright tier suite.
+
+### Added
+- **`/api/webhooks` CRUD** — org-scoped store with `label, url,
+  events, active`; GET/POST/PUT/DELETE handlers and audit
+  entries on every mutation.
+- **`/api/feature-flags` CRUD** — backed by an extended
+  `FeatureFlagRepo`; migration 042 adds a JSON `value` column so
+  flags can carry richer payloads than a boolean toggle.
+- **`GET /api/capability-versions/:versionId/manifest`** — the
+  drilldown for `/app/manifests/[versionId]`; returns the parsed
+  manifest object plus metadata, size, and capability linkage.
+- **`PUT /api/preconditions/:id`** — toggle `enabled` and other
+  fields. Migration 043 adds `updated_at`.
+- **`/api/capabilities/:id/self-evolve` (state) and
+  `/api/capabilities/:id/self-evolve/run` (cycle)** — capability-scoped
+  shortcuts that mirror the legacy paths.
+- **`POST /api/invoke` alias** — accepts `{capabilityVersionId,
+  inputs, …}`, resolves the version's `manifestHash` and forwards
+  to the canonical execute path. SDK + curl examples that
+  referenced `/api/invoke` now work.
+- **`GET /api/goals/:hash` drilldown** — returns real iteration
+  history + snapshots persisted on `GoalEvolutionState`. Frontend
+  `/app/goals/[hash]` renders Overview / Iteration history /
+  Snapshots tabs.
+- **`/app/manifests/[versionId]`** — real 3-tab page (Overview,
+  Approvals, History) instead of the "Manifest not found" empty
+  state it used to render.
+- **`/app/repos` "New repository" dialog** — typed Zod form, posts
+  to `repoApi.create`, invalidates `['repos']`.
+- **`/app/releases` "New release" dialog** — react-hook-form + Zod,
+  capability + version + env + manifest fields; invalidates
+  `['releases']`.
+- **`requireAdmin()` middleware** in `packages/server/src/middleware/admin.ts` —
+  applied to 14 management routes.
+- **`new-repository-dialog.tsx` and `new-release-dialog.tsx`** — typed
+  `react-hook-form + zodResolver` form primitives.
+- **`DataTable<T>`** — generic with `Column<T>[]`, `<caption>`,
+  `scope="col"`, sortable headers, focus-visible ring.
+- **`unwrapList<T>` / `unwrapFirst<T>` helpers** in `lib/api.ts` —
+  normalize the three backend list response shapes
+  (`Array` / `{items,total}` / `{<plural>}`).
+- **Migration 042** — `feature_flags.value` JSON column.
+- **Migration 043** — `preconditions.updated_at` column.
+- **Migration 044** — `manifest_dag.capability_id` nullable +
+  FK dropped, so DAG-editor drafts can persist before a
+  capability is selected.
+- **Frontend lint config** — `frontend/.eslintrc.json` extending
+  `next/core-web-vitals`, with `as unknown as <T>` banned via
+  `no-restricted-syntax`.
+
+### Changed
+- **`AGENTS.md`** — corrected stack claim from "React 19 + Vite +
+  React Router v7" to "Next.js 16 App Router + TanStack Query +
+  axios + shadcn/ui".
+- **`/api/workspaces` and friends** — pagination now coerces
+  `?page=1` (string) to a number at the schema level, so the
+  frontend's request shape passes without 422.
+- **`.env.example`** — documents `PROMPTSHEON_WEBHOOK_SECRET` and
+  the `PROMPTSHEON_ALLOW_SYSTEM_ACTOR` toggle.
+- **`workspaceApi.list/get/create/update`** — return the same
+  `{data: T}` shape the rest of the codebase expects from axios
+  callers; the list endpoint unwraps `{items,total}` via the
+  shared `unwrapList<T>` helper.
+
+### Fixed
+- **Maker-checker gate no longer silently passes** —
+  `BaseRepo.findById` now camelizes snake_case columns before
+  returning, so the gate correctly reads `release.createdBy`
+  (was `undefined` under the snake_case rows). Self-approval is
+  blocked again.
+- **DAG editor Save** — `mergeDraftManifest()` in shared
+  synthesises safe defaults for every required `Manifest` field
+  when the editor saves a partial draft. `/api/manifests` POST
+  now returns 201 for a `{nodes, edges, prompt}` payload instead
+  of 422.
+- **Release-route `require('node:crypto')`** — replaced with a
+  static ESM `import { createHash } from 'node:crypto'`. The
+  lazy require threw `ReferenceError: require is not defined`
+  under the `/api/releases/:id/approvals` adapter.
+- **Manifest-hash canonicalization** — both version-create and
+  release-create now use raw-string SHA-256 to match what the
+  activation gate looks up. The previous key-sorted
+  canonicalization wrote the manifest under a hash the gate
+  couldn't find.
+- **Org-context-middleware key mismatch** — `routes/webhooks-crud.ts`
+  `orgOf()` was reading `orgContext.orgId` but the middleware
+  sets `organizationId`. Read the right key.
+- **System-actor bypass disabled in production** — the
+  always-on `X-User-Id: api` → admin context fallback is now
+  scoped to non-production; configurable via
+  `PROMPTSHEON_ALLOW_SYSTEM_ACTOR`.
+- **Webhook secret no default in production** — `index.ts`
+  throws on missing `PROMPTSHEON_WEBHOOK_SECRET` when
+  `PROMPTSHEON_NODE_ENV=production`.
+- **LLM-key echo to `process.env` removed** — `bootstrap.ts`
+  no longer mirrors user-supplied LLM keys via `mirrorEnv()`;
+  persistence is via `SettingsResolver` only.
+- **Admin gate on 14 management routes** — `/api/users`,
+  `/api/api-keys` (POST/DELETE), `/api/settings/:key` (PUT),
+  `/api/webhooks` (CRUD), `/api/feature-flags` (CRUD). Non-admin
+  callers now get 403.
+- **Role escalation cap on api-keys POST** — even an admin
+  can't mint a key with a role higher than their own; non-admins
+  are silently demoted to `reader`.
+- **`/api/audit/verify` and `/api/audit/state` whitelisted as
+  public** — the docs link opens in a new tab and the browser
+  can't attach session headers; the bypass makes the link work.
+- **Frontend `subscribeSSE` cancel** — the old implementation
+  closed a stale `EventSource` reference because re-subscribe
+  wrote to a local. Captures the active source in a closure
+  and clears the reconnect timer.
+- **`/app/goals`** — was using raw `fetch('/api/goals')`,
+  bypassing the axios interceptor that injects session headers.
+  Switched to `client.get('/goals')`.
+- **`/docs` search** — pruned 4 dead links (`/docs/onboarding`,
+  `/docs/dag`, `/docs/grading`, `/docs/calibration`); added
+  `/docs` to the index.
+- **`docs/sdk` page** — no longer reads
+  `process.env.PROMPTSHEON_API_KEY!` (would have inlined a real
+  key into the client bundle if one ever landed in the build
+  env). Replaced with a literal placeholder.
+- **Frontend `data-table` snake/camel** — `/app/projects` and
+  several other pages no longer needed `as unknown as X` casts
+  after the generic `<T>` rewrite.
+- **Empty `manifest_dag` registrations on editor Save** — the
+  manifest now gets upserted with the correct hash on every
+  version/release save, so the maker-checker gate can find it.
+
+### Security
+- **12 new admin-gated routes** — see above.
+- **Snake-case → camelCase mapper in `BaseRepo.findById`** — fixes
+  a class of latent bugs where `update()` methods bound undefined
+  into NOT NULL columns (the `release.updateStatus` flow, the
+  `/api/releases/:id/rollback` lookup, the `Capability.update`
+  PUT path, etc.).
+- **Audit chain verify + state publicly callable** —
+  `PUBLIC_PATHS` in `auth.ts` includes both endpoints so the
+  documentation link works without a session.
+
+### Tests
+- **Server: 322 → 377 vitest cases, 0 fail.** 10 new spec files:
+  - `webhooks-crud.test.ts` (6) — CRUD + org-scope.
+  - `feature-flag-routes.test.ts` (7) — CRUD + value JSON round-trip.
+  - `audit-verify-public.test.ts` (3) — Public bypass + tampering.
+  - `approval-reconcile.test.ts` (8) — Legacy path + adapter + 422.
+  - `self-evolve-reconcile.test.ts` (6) — Both paths + idle stub.
+  - `compiler-prompt.test.ts` (4) — `{prompt}` legacy body accepted.
+  - `preconditions-update.test.ts` (4) — Toggle + bad input + 404.
+  - `version-manifest.test.ts` (2) — Row round-trip + 404.
+  - `admin-gating.test.ts` (8) — Admin vs reader on 5 routes.
+  - `repo-routes-extended.test.ts` (3) — Workspace/project/capability CRUD coverage.
+- **Frontend Playwright tier suite rewritten** against the new
+  contracts:
+  - `helpers/seed-session.ts` — bootstraps admin via
+    `/api/bootstrap/admin`, writes the session to localStorage,
+    so every tier runs without an LLM probe.
+  - `tier-1-routes.spec.ts` — 41 routes, every path under an
+    authenticated session.
+  - `tier-4-forms.spec.ts` — workspace / api-key / webhook /
+    feature-flag / schedule forms.
+  - `tier-7-manifest-detail.spec.ts` (new) — DAG editor Save →
+    redirect to `/app/editor/<hash>` → manifest-detail page.
+  - `tier-8-approvals.spec.ts` (new) — reconciled approval route
+    end-to-end.
+  - `tier-9-admin-gating.spec.ts` (new) — admin sessions reach
+    `/app/users`, `/app/api-keys`, `/app/webhooks`, `/app/settings`.
+
+### Build & Typecheck
+- `pnpm --dir packages typecheck` — clean across shared + server
+  + frontend.
+- `pnpm --dir packages/server test` — 59 files / 377 cases / 0
+  fail.
+- `pnpm --dir packages/shared test` — 3 files / 29 cases / 0 fail.
+- `cd frontend && pnpm build` — `next build` emits the full
+  route table; `/app/diff` is dynamically rendered.
+
 ## [v0.4.0] - 2026-08-20
 
 ### Added
