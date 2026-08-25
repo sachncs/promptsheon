@@ -51,6 +51,7 @@ import { registerExperimentRoutes, type ExperimentDeps } from './experiment.js';
 import { registerIncidentRoutes, type IncidentDeps } from './incident.js';
 import { registerOrgSettingsRoutes, type OrgSettingsRouteDeps } from './org-settings.js';
 import { registerTraceRoutes } from './trace.js';
+import { registerTraceScoreRoutes } from './trace-score.js';
 import { registerPlaygroundRoutes } from './playground.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
@@ -130,6 +131,8 @@ export interface AppDeps {
   orgSettingsDeps: OrgSettingsRouteDeps;
   featureFlagRepo: import('../repos/feature-flag.js').FeatureFlagRepo;
   traceRepo: import('../repos/trace.js').TraceRepo;
+  traceScoreRepo: import('../repos/trace-score.js').TraceScoreRepo;
+  autoEval: import('../observability/auto-eval.js').AutoEval;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -212,6 +215,11 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerTraceRoutes(app, {
     traceRepo: deps.traceRepo,
     requireAdmin: () => requireAdmin() as unknown as (request: unknown, reply: unknown) => Promise<void>,
+  });
+  registerTraceScoreRoutes(app, {
+    traceRepo: deps.traceRepo,
+    scoreRepo: deps.traceScoreRepo,
+    autoEval: deps.autoEval,
   });
   registerPlaygroundRoutes(app, { gateway: deps.gateway });
 }

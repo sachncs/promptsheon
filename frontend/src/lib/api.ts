@@ -507,6 +507,34 @@ export const traceApi = {
       .then((r) => r.data),
 };
 
+export interface TraceScore {
+  id: string;
+  evaluator: string;
+  name: string;
+  value: number | null;
+  label: string | null;
+  rationale: string | null;
+  createdAt: string;
+}
+
+export const traceScoreApi = {
+  list: (traceRunId: string) =>
+    client
+      .get<{ run: TraceRunSummary; items: TraceScore[]; total: number }>(`/traces/${traceRunId}/scores`)
+      .then((r) => r.data),
+  autoEval: (traceRunId: string, opts: { judgeModel?: string; judgePrompt?: string } = {}) =>
+    client
+      .post<{ traceRunId: string; written: number }>(`/traces/${traceRunId}/auto-eval`, opts)
+      .then((r) => r.data),
+  summary: (days = 7, evaluator?: string) =>
+    client
+      .get<{ orgId: string; days: number; totals: number; perEvaluator: Array<{ evaluator: string; count: number }> }>(
+        `/scores/summary`,
+        { params: { days, ...(evaluator ? { evaluator } : {}) } },
+      )
+      .then((r) => r.data),
+};
+
 export const searchApi = {
   q: (q: string, type?: string) =>
     client.get(`/search?q=${encodeURIComponent(q)}${type ? `&type=${encodeURIComponent(type)}` : ''}`).then((r) => r.data),

@@ -2,10 +2,11 @@
 
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, AlertCircle, Clock, Cpu, DollarSign, GitBranch, type LucideIcon } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, AlertCircle, Beaker, Clock, Cpu, DollarSign, GitBranch, type LucideIcon } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
-import { traceApi, type TraceSpan } from '@/lib/api';
+import { traceApi, traceScoreApi, type TraceScore, type TraceSpan } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { HashChip } from '@/components/brand/hash-chip';
 import { StatusPill } from '@/components/brand/status-pill';
@@ -15,11 +16,21 @@ export default function TraceDetailPage() {
   const session = useRequireSession();
   const params = useParams<{ id: string }>();
   const id = params?.id ?? '';
+  const qc = useQueryClient();
 
   const trace = useQuery({
     queryKey: ['trace', id],
     queryFn: () => traceApi.get(id),
     enabled: Boolean(session && id),
+  });
+  const scores = useQuery({
+    queryKey: ['trace-scores', id],
+    queryFn: () => traceScoreApi.list(id),
+    enabled: Boolean(session && id),
+  });
+  const autoEval = useMutation({
+    mutationFn: () => traceScoreApi.autoEval(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['trace-scores', id] }),
   });
 
   if (!session) return null;
@@ -100,7 +111,67 @@ export default function TraceDetailPage() {
           ))}
         </ul>
       </Surface>
+
+      <Surface padded={false}>
+        <SurfaceHeader
+          className="px-5 pt-5"
+          title="Eval scores"
+          description={`${scores.data?.items.length ?? 0} score(s) from built-in + registered evaluators.`}
+          actions={
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => autoEval.mutate()}
+              disabled={autoEval.isPending}
+            >
+              <Beaker className="mr-1.5 h-3.5 w-3.5" />
+              {autoEval.isPending ? 'Running…' : 'Run auto-eval'}
+            </Button>
+          }
+        />
+        {scores.data && scores.data.items.length > 0 ? (
+          <ul className="divide-y divide-border-subtle">
+            {scores.data.items.map((s) => (
+              <ScoreRow key={s.id} score={s} />
+            ))}
+          </ul>
+        ) : (
+          <EmptyState
+            className="m-5 border-0 bg-transparent shadow-none p-12"
+            icon={Beaker}
+            title="No eval scores yet"
+            description="Click 'Run auto-eval' to compute latency, error rate, output shape, and cost thresholds against this trace."
+          />
+        )}
+      </Surface>
     </div>
+  );
+}
+
+function ScoreRow({ score }: { score: TraceScore }) {
+  const status: 'active' | 'review' | 'error' =
+    score.label === 'pass' || score.label === 'clean' || score.label === 'complete' || score.label === 'within_budget'
+      ? 'active'
+      : score.label === 'fail' || score.label === 'high' || score.label === 'over_budget' || score.label === 'invalid' || score.label === 'missing_fields'
+        ? 'review'
+        : 'error';
+  return (
+    <li className="flex items-start gap-3 px-5 py-3 text-sm">
+      <StatusPill kind={status} label={score.label ?? 'unknown'} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          <span className="font-mono text-xs text-text-muted">{score.evaluator}</span>
+          <span className="text-text-subtle">·</span>
+          <span className="font-medium text-text-strong">{score.name}</span>
+        </div>
+        {score.rationale && (
+          <p className="mt-0.5 text-xs text-text-muted">{score.rationale}</p>
+        )}
+      </div>
+      <div className="font-mono text-xs text-text-default">
+        {score.value === null || score.value === undefined ? '—' : score.value}
+      </div>
+    </li>
   );
 }
 
