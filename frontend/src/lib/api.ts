@@ -559,6 +559,58 @@ export const analyticsApi = {
       .then((r) => r.data),
 };
 
+export interface TeamSummary {
+  id: string;
+  organizationId: string;
+  name: string;
+  slug: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeamMember {
+  teamId: string;
+  userId: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer';
+  createdAt: string;
+}
+
+export interface SsoConfigView {
+  configured: boolean;
+  provider?: string;
+  issuer?: string;
+  clientId?: string;
+  scopes?: string;
+  audience?: string | null;
+  groupsClaim?: string;
+  emailClaim?: string;
+  nameClaim?: string;
+  enabled?: boolean;
+}
+
+export const teamApi = {
+  list: () => client.get<{ items: TeamSummary[] }>('/teams').then((r) => r.data),
+  create: (data: { name: string; slug: string; description?: string }) =>
+    client.post<TeamSummary>('/teams', data).then((r) => r.data),
+  addMember: (teamId: string, data: { userId: string; role?: TeamMember['role'] }) =>
+    client.post<TeamMember>(`/teams/${teamId}/members`, data).then((r) => r.data),
+  removeMember: (teamId: string, userId: string) =>
+    client.delete<unknown>(`/teams/${teamId}/members/${userId}`).then((r) => r.data),
+  ssoGet: () => client.get<SsoConfigView>('/auth/oidc/config').then((r) => r.data),
+  ssoSet: (data: {
+    provider: string;
+    issuer: string;
+    clientId: string;
+    clientSecret: string;
+    scopes?: string;
+    audience?: string;
+    groupsClaim?: string;
+    emailClaim?: string;
+    nameClaim?: string;
+  }) => client.post<{ status: string; provider: string }>('/auth/oidc/config', data).then((r) => r.data),
+};
+
 export const traceScoreApi = {
   list: (traceRunId: string) =>
     client

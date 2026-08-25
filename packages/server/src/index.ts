@@ -31,6 +31,7 @@ import { TraceRepo } from './repos/trace.js';
 import { TraceScoreRepo } from './repos/trace-score.js';
 import { AutoEval } from './observability/auto-eval.js';
 import { UserAnalyticsRepo } from './repos/user-analytics.js';
+import { TeamRepo, SsoConfigRepo } from './repos/team.js';
 import { OrgExportService, CostRollupRepo } from './repos/vault-extras.js';
 import { RedteamRepo } from './repos/redteam.js';
 import { ExperimentRepo } from './repos/experiment.js';
@@ -136,6 +137,8 @@ async function main() {
   const traceRepo = new TraceRepo(db);
   const traceScoreRepo = new TraceScoreRepo(db);
   const userAnalyticsRepo = new UserAnalyticsRepo(db);
+  const teamRepo = new TeamRepo(db);
+  const ssoConfigRepo = new SsoConfigRepo(db);
   const redteamRepo = new RedteamRepo(db);
   const experimentRepo = new ExperimentRepo(db);
   const incidentRepo = new IncidentRepo(db);
@@ -386,6 +389,8 @@ async function main() {
     traceScoreRepo,
     autoEval,
     userAnalyticsRepo,
+    teamRepo,
+    ssoConfigRepo,
     gateway,
     orgSettingsDeps: {
       orgSettingsRepo,

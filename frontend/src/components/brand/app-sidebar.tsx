@@ -84,6 +84,7 @@ const groups: NavGroup[] = [
     items: [
       { href: '/app/admin/cost', label: 'Cost & analytics', icon: Activity },
       { href: '/app/admin/analytics', label: 'Per-user analytics', icon: Users },
+      { href: '/app/admin/teams', label: 'Teams + SSO', icon: Users },
       { href: '/app/vault', label: 'Vault', icon: KeyRound },
       { href: '/app/workspaces', label: 'Workspaces', icon: FolderOpen },
       { href: '/app/users', label: 'Users', icon: Users },
