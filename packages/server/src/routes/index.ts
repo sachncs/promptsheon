@@ -55,6 +55,7 @@ import { registerTraceScoreRoutes } from './trace-score.js';
 import { registerPlaygroundRoutes } from './playground.js';
 import { registerAnalyticsRoutes } from './analytics.js';
 import { registerTeamRoutes } from './team.js';
+import { registerSecurityRoutes } from './security.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -138,6 +139,7 @@ export interface AppDeps {
   userAnalyticsRepo: import('../repos/user-analytics.js').UserAnalyticsRepo;
   teamRepo: import('../repos/team.js').TeamRepo;
   ssoConfigRepo: import('../repos/team.js').SsoConfigRepo;
+  promptScanRepo: import('../repos/prompt-scan.js').PromptScanRepo;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -234,4 +236,5 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     auditChain: deps.auditChain,
     scimBearerToken: process.env['PROMPTSHEON_SCIM_TOKEN'] ?? 'dev-scim-token',
   });
+  registerSecurityRoutes(app, { scanRepo: deps.promptScanRepo });
 }
