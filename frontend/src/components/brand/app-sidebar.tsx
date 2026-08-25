@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 import {
   LayoutDashboard, FolderOpen, Boxes, Workflow, Compass, Flag,
-  GitBranch, Target, Activity, CalendarClock, FlaskConical,
+  GitBranch, Target, Activity, CalendarClock, FlaskConical, Beaker,
   ShieldCheck, ScrollText, Users, KeyRound, Webhook, Cog, Search, GitMerge, ListChecks,
   ChevronDown, ChevronRight, ChevronUp, LogOut, Monitor, Moon, Sun,
 } from 'lucide-react';
@@ -67,6 +67,7 @@ const groups: NavGroup[] = [
     label: 'Observability',
     items: [
       { href: '/app/traces', label: 'Traces', icon: Activity },
+      { href: '/app/playground', label: 'Playground', icon: Beaker },
       { href: '/app/audit', label: 'Audit log', icon: ScrollText },
     ],
   },

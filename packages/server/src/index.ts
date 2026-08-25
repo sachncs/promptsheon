@@ -60,6 +60,7 @@ import { WebhookReceiver } from './webhooks/receiver.js';
 import { ChaosConfig } from './hardening/chaos.js';
 import { registerChaosRoutes } from './routes/chaos.js';
 import { LlmRouter } from './llm/router.js';
+import { Gateway, ResponseCache, FallbackChain, RateLimiter } from './llm/gateway.js';
 import type { Agent } from '@strands-agents/sdk';
 
 async function main() {
@@ -179,6 +180,13 @@ async function main() {
   const compiler = new ReasoningCompiler(config);
   const planner = new IdeaPlannerAgent(config);
   const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo });
+  const llmRouter = new LlmRouter();
+  const gateway = new Gateway({
+    cache: new ResponseCache(2048),
+    fallback: new FallbackChain(['custom', 'anthropic', 'openai']),
+    rateLimiter: new RateLimiter({ capacity: 60, refillPerSecond: 1 }),
+    router: llmRouter,
+  });
   const chaosConfig = new ChaosConfig();
   const goalEvolver = new GoalBasedEvolutionAgent({ config, hub: sseHub, executor, cas: casStore });
   const activeGoals = new Map<string, GoalSummary>();
@@ -310,11 +318,11 @@ async function main() {
     auditChain,
     apiKeyRepo,
     userRepo: new UserRepo(db),
-    llmRouter: new LlmRouter(),
+    llmRouter,
     repoDeps: {
-      repoRepo,
-      branchRepo,
-      tagRepo,
+    repoRepo,
+    branchRepo,
+    tagRepo,
     },
     contentsDeps: {
       repoRepo,
@@ -369,6 +377,7 @@ async function main() {
     incidentDeps: { incidentRepo, actorId: () => 'system' },
     featureFlagRepo,
     traceRepo,
+    gateway,
     orgSettingsDeps: {
       orgSettingsRepo,
       vaultRepo,

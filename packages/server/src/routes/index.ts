@@ -51,6 +51,7 @@ import { registerExperimentRoutes, type ExperimentDeps } from './experiment.js';
 import { registerIncidentRoutes, type IncidentDeps } from './incident.js';
 import { registerOrgSettingsRoutes, type OrgSettingsRouteDeps } from './org-settings.js';
 import { registerTraceRoutes } from './trace.js';
+import { registerPlaygroundRoutes } from './playground.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -114,6 +115,7 @@ export interface AppDeps {
   apiKeyRepo: ApiKeyRepo;
   userRepo: UserRepo;
   llmRouter: LlmRouter;
+  gateway: import('../llm/gateway.js').Gateway;
   repoDeps: RepoDeps;
   contentsDeps: ContentsDeps;
   commitDeps: CommitDeps;
@@ -211,4 +213,5 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     traceRepo: deps.traceRepo,
     requireAdmin: () => requireAdmin() as unknown as (request: unknown, reply: unknown) => Promise<void>,
   });
+  registerPlaygroundRoutes(app, { gateway: deps.gateway });
 }

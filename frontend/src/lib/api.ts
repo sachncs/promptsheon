@@ -448,6 +448,49 @@ export interface TraceSpan {
   outputText: string | null;
 }
 
+export interface PlaygroundRun {
+  content: string;
+  provider: string;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  costUsd: number;
+  cacheHit: boolean;
+  latencyMs: number;
+}
+
+export const playgroundApi = {
+  complete: (data: {
+    prompt: string;
+    model: string;
+    provider: 'openai' | 'anthropic' | 'bedrock' | 'custom';
+    temperature?: number;
+    baseUrl?: string;
+    apiKey?: string;
+  }) => client.post<PlaygroundRun>('/playground/complete', data).then((r) => r.data),
+  sweep: (data: {
+    base: {
+      prompt: string;
+      model: string;
+      provider: 'openai' | 'anthropic' | 'bedrock' | 'custom';
+      baseUrl?: string;
+      apiKey?: string;
+    };
+    variants: Array<{ prompt: string; temperature: number }>;
+  }) =>
+    client
+      .post<{
+        base: { model: string; provider: string };
+        variants: Array<{
+          variant: { prompt: string; temperature: number };
+          status: 'fulfilled' | 'rejected';
+          value?: PlaygroundRun;
+          error?: string;
+        }>;
+      }>('/playground/sweep', data)
+      .then((r) => r.data),
+};
+
 export const traceApi = {
   list: (opts: { page?: number; pageSize?: number; environment?: string; status?: string; nameLike?: string } = {}) =>
     client
