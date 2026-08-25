@@ -517,6 +517,48 @@ export interface TraceScore {
   createdAt: string;
 }
 
+export interface UserDailyUsage {
+  day: string;
+  runs: number;
+  tokens: number;
+  cost: number;
+}
+
+export interface UserRollup {
+  actorId: string;
+  runs: number;
+  tokens: number;
+  cost: number;
+  days: number;
+}
+
+export const analyticsApi = {
+  userPerDay: (userId: string, days = 30) =>
+    client
+      .get<{ userId: string; days: number; perDay: UserDailyUsage[] }>(
+        `/analytics/users/${encodeURIComponent(userId)}`,
+        { params: { days } },
+      )
+      .then((r) => r.data),
+  leaderboard: (days = 30, limit = 25) =>
+    client
+      .get<{
+        orgId: string;
+        days: number;
+        limit: number;
+        items: UserRollup[];
+      }>('/analytics/leaderboard', { params: { days, limit } })
+      .then((r) => r.data),
+  orgTotals: (days = 30) =>
+    client
+      .get<{
+        orgId: string;
+        days: number;
+        totals: { runs: number; tokens: number; cost: number; activeDays: number };
+      }>('/analytics/org-totals', { params: { days } })
+      .then((r) => r.data),
+};
+
 export const traceScoreApi = {
   list: (traceRunId: string) =>
     client

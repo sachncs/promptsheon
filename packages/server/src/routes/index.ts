@@ -53,6 +53,7 @@ import { registerOrgSettingsRoutes, type OrgSettingsRouteDeps } from './org-sett
 import { registerTraceRoutes } from './trace.js';
 import { registerTraceScoreRoutes } from './trace-score.js';
 import { registerPlaygroundRoutes } from './playground.js';
+import { registerAnalyticsRoutes } from './analytics.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -133,6 +134,7 @@ export interface AppDeps {
   traceRepo: import('../repos/trace.js').TraceRepo;
   traceScoreRepo: import('../repos/trace-score.js').TraceScoreRepo;
   autoEval: import('../observability/auto-eval.js').AutoEval;
+  userAnalyticsRepo: import('../repos/user-analytics.js').UserAnalyticsRepo;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -222,4 +224,5 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     autoEval: deps.autoEval,
   });
   registerPlaygroundRoutes(app, { gateway: deps.gateway });
+  registerAnalyticsRoutes(app, { repo: deps.userAnalyticsRepo });
 }
