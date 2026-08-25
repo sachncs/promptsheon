@@ -415,6 +415,55 @@ export const costApi = {
     client.post('/analytics/rollups', row),
 };
 
+export interface TraceRunSummary {
+  id: string;
+  organizationId: string;
+  executionId: string | null;
+  environment: string;
+  name: string;
+  startTime: string;
+  endTime: string | null;
+  status: 'running' | 'success' | 'error';
+  totalTokens: number;
+  totalCostUsd: number;
+  model: string | null;
+}
+
+export interface TraceSpan {
+  id: string;
+  traceRunId: string;
+  parentSpanId: string | null;
+  name: string;
+  kind: 'internal' | 'llm' | 'tool' | 'retrieval' | 'agent';
+  startTime: string;
+  endTime: string | null;
+  status: 'ok' | 'error';
+  attributes: Record<string, unknown>;
+  model: string | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  costUsd: number | null;
+  inputText: string | null;
+  outputText: string | null;
+}
+
+export const traceApi = {
+  list: (opts: { page?: number; pageSize?: number; environment?: string; status?: string; nameLike?: string } = {}) =>
+    client
+      .get<{ items: TraceRunSummary[]; total: number }>('/traces', { params: opts })
+      .then((r) => r.data),
+  get: (id: string) =>
+    client.get<{ run: TraceRunSummary; spans: TraceSpan[] }>(`/traces/${id}`).then((r) => r.data),
+  rollup: (days = 30) =>
+    client
+      .get<{ days: number; items: Array<{ day: string; tokens: number; cost: number; runs: number }> }>(
+        `/traces/rollup`,
+        { params: { days } },
+      )
+      .then((r) => r.data),
+};
+
 export const searchApi = {
   q: (q: string, type?: string) =>
     client.get(`/search?q=${encodeURIComponent(q)}${type ? `&type=${encodeURIComponent(type)}` : ''}`).then((r) => r.data),

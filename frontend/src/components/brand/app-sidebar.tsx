@@ -64,12 +64,18 @@ const groups: NavGroup[] = [
     ],
   },
   {
+    label: 'Observability',
+    items: [
+      { href: '/app/traces', label: 'Traces', icon: Activity },
+      { href: '/app/audit', label: 'Audit log', icon: ScrollText },
+    ],
+  },
+  {
     label: 'Quality',
     items: [
       { href: '/app/eval', label: 'Eval runs', icon: FlaskConical },
       { href: '/app/eval/suites', label: 'Suites', icon: ListChecks },
       { href: '/app/approvals', label: 'Approvals', icon: ShieldCheck },
-      { href: '/app/audit', label: 'Audit log', icon: ScrollText },
     ],
   },
   {
