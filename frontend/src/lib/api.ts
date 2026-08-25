@@ -293,10 +293,6 @@ export const featureFlagApi = {
   update: (key: string, data: { value: unknown; enabled?: boolean }) => client.put(`/feature-flags/${key}`, data),
 };
 
-export const auditApi = {
-  list: (params?: { resource?: string; action?: string }) => client.get('/audit', { params }),
-};
-
 // ---- Phase 5 surface: repositories, branches, contents, commits, MRs, signing, evals, vault, search, cost
 
 export interface BranchItem {
@@ -557,6 +553,59 @@ export const analyticsApi = {
         totals: { runs: number; tokens: number; cost: number; activeDays: number };
       }>('/analytics/org-totals', { params: { days } })
       .then((r) => r.data),
+};
+
+export interface AuditReportEntry {
+  id: string;
+  timestamp: string;
+  actor: string;
+  action: string;
+  resource: string;
+  details: string;
+}
+
+export interface AuditReport {
+  id: string;
+  generatedAt: string;
+  generatedBy: string | null;
+  organizationId: string;
+  range: { from: string | null; to: string | null };
+  filters: Record<string, string | number | undefined>;
+  entryCount: number;
+  chainValid: boolean;
+  chainHead: string;
+  chainVerifiedAt: string;
+  signature: { algorithm: string; value: string };
+  entries: AuditReportEntry[];
+}
+
+export const auditApi = {
+  list: (params?: { resource?: string; action?: string }) => client.get('/audit', { params }),
+  report: (opts: {
+    fromTime?: string;
+    toTime?: string;
+    actor?: string;
+    resource?: string;
+    action?: string;
+    limit?: number;
+  } = {}) => {
+    const params: Record<string, string | number> = {};
+    if (opts.fromTime) params['fromTime'] = opts.fromTime;
+    if (opts.toTime) params['toTime'] = opts.toTime;
+    if (opts.actor) params['actor'] = opts.actor;
+    if (opts.resource) params['resource'] = opts.resource;
+    if (opts.action) params['action'] = opts.action;
+    if (opts.limit) params['limit'] = opts.limit;
+    return client
+      .get<ArrayBuffer>('/audit/report', {
+        params,
+        responseType: 'arraybuffer',
+      })
+      .then((r) => {
+        const text = new TextDecoder().decode(r.data);
+        return JSON.parse(text) as AuditReport;
+      });
+  },
 };
 
 export interface TeamSummary {

@@ -56,6 +56,7 @@ import { registerPlaygroundRoutes } from './playground.js';
 import { registerAnalyticsRoutes } from './analytics.js';
 import { registerTeamRoutes } from './team.js';
 import { registerSecurityRoutes } from './security.js';
+import { registerAuditReportRoutes } from './audit-report.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -237,4 +238,5 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     scimBearerToken: process.env['PROMPTSHEON_SCIM_TOKEN'] ?? 'dev-scim-token',
   });
   registerSecurityRoutes(app, { scanRepo: deps.promptScanRepo });
+  registerAuditReportRoutes(app, { auditChain: deps.auditChain });
 }

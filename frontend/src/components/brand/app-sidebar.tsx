@@ -69,6 +69,7 @@ const groups: NavGroup[] = [
       { href: '/app/traces', label: 'Traces', icon: Activity },
       { href: '/app/playground', label: 'Playground', icon: Beaker },
       { href: '/app/audit', label: 'Audit log', icon: ScrollText },
+      { href: '/app/audit/reports', label: 'Audit reports', icon: ScrollText },
     ],
   },
   {
