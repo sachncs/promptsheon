@@ -37,4 +37,35 @@ export function registerManifestHashRoutes(app: FastifyInstance, deps: { manifes
     if (!manifest) throw new NotFoundError('manifest', hash);
     return reply.send(manifest);
   });
+
+  /**
+   * Pure-validation endpoint. Accepts a manifest body (possibly
+   * incomplete — a draft from the editor), runs the same Zod
+   * schema as POST /api/manifests, and returns the parsed issue
+   * list. Never persists. Used by the VS Code extension's
+   * validate-on-save hook.
+   */
+  app.post('/api/manifests/validate', async (request, reply) => {
+    let merged: Record<string, unknown>;
+    try {
+      merged = mergeDraftManifest(request.body);
+    } catch {
+      return reply.code(400).send({
+        valid: false,
+        issues: [{ path: [], message: 'manifest body must be a JSON object' }],
+      });
+    }
+    const parsed = ManifestSchema.safeParse(merged);
+    if (!parsed.success) {
+      return reply.code(200).send({
+        valid: false,
+        issues: parsed.error.issues.map((i) => ({
+          path: i.path,
+          message: i.message,
+          code: i.code,
+        })),
+      });
+    }
+    return reply.code(200).send({ valid: true, issues: [] });
+  });
 }

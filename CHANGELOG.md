@@ -106,6 +106,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   framework-package-free; consumers install the framework
   themselves. 9 vitest cases exercise the wire format against
   an in-process OpenAI-shaped stub.
+- **T4 VS Code extension** — `extensions/promptsheon/` ships an
+  extension that activates on `.promptsheon.json|yaml|yml`
+  files. Pure validation logic in `src/validate.ts` runs the
+  shared `ManifestSchema` locally, then posts the body to the
+  server's new `POST /api/manifests/validate` endpoint for
+  the canonical verdict; issues surface as VS Code
+  diagnostics. Hover provider surfaces `Planner` / `Agent` /
+  `Tool` / `Guardrail` documentation. The `promptsheon: Send to
+  Playground` command opens `/app/playground?manifest=...` with
+  the current buffer pre-loaded. The repo root's pnpm-workspace
+  config now also lists `extensions/promptsheon` so the extension
+  shares the workspace's `@promptsheon/shared` dep. Node:test
+  coverage of the pure validation (9 cases).
 
 ### Changed
 - `POST /api/executions` and `POST /api/invoke` now persist

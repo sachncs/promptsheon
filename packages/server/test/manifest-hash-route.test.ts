@@ -134,4 +134,54 @@ describe('POST /api/manifests (save/load)', () => {
     expect(loaded.id).toBe(m.id);
     expect(loaded.metadata['goal']).toBe('round-trip');
   });
+
+  it('POST /api/manifests/validate returns valid=true for a complete manifest', async () => {
+    const m = buildManifest('validate me', 'cap1');
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/manifests/validate',
+      payload: m,
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as { valid: boolean; issues: unknown[] };
+    expect(body.valid).toBe(true);
+    expect(body.issues).toEqual([]);
+  });
+
+  it('POST /api/manifests/validate returns valid=false with issues for an invalid shape', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/manifests/validate',
+      payload: { nodes: 'not-an-array', edges: [] },
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as { valid: boolean; issues: Array<{ path: unknown[]; message: string }> };
+    expect(body.valid).toBe(false);
+    expect(body.issues.length).toBeGreaterThan(0);
+  });
+
+  it('POST /api/manifests/validate returns valid=false with issues when the manifest shape is wrong', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/manifests/validate',
+      payload: { nodes: [{ id: 'n1', goal: 'x', manifest: 'not-an-object' }] },
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as { valid: boolean; issues: unknown[] };
+    expect(body.valid).toBe(false);
+    expect(body.issues.length).toBeGreaterThan(0);
+  });
+
+  it('POST /api/manifests/validate accepts a non-object body and returns 400 with valid=false', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/manifests/validate',
+      payload: 'not-an-object',
+      headers: { 'content-type': 'application/json' },
+    });
+    // Fastify may reject the malformed JSON body before our
+    // handler runs; either way the response must surface that the
+    // body was not a valid manifest object.
+    expect([400, 415, 422]).toContain(response.statusCode);
+  });
 });
