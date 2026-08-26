@@ -84,6 +84,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Anthropic shapes), `FirewallPolicy` (clean / warn / block
   thresholds), and the middleware round-trip with a stub
   upstream asserting the forwarded body + the audit row.
+- **T4 CLI improvements** — `packages/cli/` restructured into
+  `version.ts` + `errors.ts` + `output.ts` + `commands.ts` +
+  dispatcher `index.ts`. Stable `PROMPTSHEON_CLI_VERSION = 0.5.0`
+  constant. Locked exit-code contract (`EXIT.OK = 0`,
+  `EXIT.BAD_ARGS = 2`, `EXIT.API_ERROR = 3`, `EXIT.NETWORK_ERROR = 4`,
+  `EXIT.AUTH_ERROR = 5`, `EXIT.NOT_FOUND = 6`,
+  `EXIT.CONFLICT = 7`, `EXIT.PRECONDITION_FAILED = 8`).
+  Every command accepts `--json` (raw response) and mutating
+  commands accept `--dry-run` (print the would-be request,
+  exit 0). New commands: `release get <id>`, `release approve
+  <id>`, `manifest scan <hash>`. 22 vitest cases covering
+  argument validation, dry-run paths, and exit-code mapping.
 
 ### Changed
 - `POST /api/executions` and `POST /api/invoke` now persist
