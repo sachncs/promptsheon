@@ -63,12 +63,27 @@ import type { GoalSummary } from './routes/goals.js';
 import { SessionStore } from './sessions/store.js';
 import { SnapshotStore } from './snapshots/store.js';
 import { orgContextMiddleware } from './middleware/org-context.js';
+import { CedarAuthorizer, installDefaultAuthorizer } from './policy/gate.js';
 import { WebhookReceiver } from './webhooks/receiver.js';
 import { ChaosConfig } from './hardening/chaos.js';
 import { registerChaosRoutes } from './routes/chaos.js';
 import { LlmRouter } from './llm/router.js';
 import { Gateway, ResponseCache, FallbackChain, RateLimiter } from './llm/gateway.js';
 import type { Agent } from '@strands-agents/sdk';
+
+/**
+ * Load the Cedar policy file at boot and install the singleton
+ * authorizer. The policy file is the single source of truth for
+ * every authorization decision in the platform; failing to
+ * load it is a fatal error.
+ */
+async function setupPolicy(): Promise<void> {
+  const policyPath = process.env['PROMPTSHEON_POLICY_FILE']
+    ?? `${process.cwd()}/packages/server/policies/promptsheon.cedar`;
+  const authorizer = new CedarAuthorizer({ policyPath });
+  authorizer.load();
+  installDefaultAuthorizer(authorizer);
+}
 
 async function main() {
   const config = loadConfig();
@@ -186,6 +201,7 @@ async function main() {
   const manifestRepo = new ManifestRepo(db);
 
   setupObservability(config);
+  await setupPolicy();
   const cutoverReport = manifestRepo.ensureCutover({ createdBy: 'system-cutover' });
   app.log.info(
     {
