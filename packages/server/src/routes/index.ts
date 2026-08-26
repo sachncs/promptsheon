@@ -58,6 +58,7 @@ import { registerTeamRoutes } from './team.js';
 import { registerSecurityRoutes } from './security.js';
 import { registerAuditReportRoutes } from './audit-report.js';
 import { registerBudgetRoutes } from './budget.js';
+import { registerIdentityRoutes } from './identity.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -246,4 +247,5 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   if (deps.budgetDeps) {
     registerBudgetRoutes(app, deps.budgetDeps);
   }
+  registerIdentityRoutes(app, { db: deps.db });
 }
