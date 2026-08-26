@@ -1,1 +1,1 @@
-export { AuditChain } from './chain.js';
+export { AuditChain, computeHash } from './chain.js';

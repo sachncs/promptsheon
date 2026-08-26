@@ -8,6 +8,7 @@ export interface AppConfig {
     corsOrigin: string;
     logLevel: string;
     nodeEnv: string;
+    fipsMode: boolean;
   };
   llm: {
     defaultProvider: string;

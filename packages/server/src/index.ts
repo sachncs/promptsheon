@@ -72,9 +72,13 @@ async function main() {
   const config = loadConfig();
   const db = createConnection(config);
   await runMigrations(db);
-  const auditChain = new AuditChain(db);
+  const auditChain = new AuditChain(db, config.server.fipsMode);
 
   const app = Fastify({ logger: true, bodyLimit: 2_097_152 });
+
+  if (config.server.fipsMode) {
+    app.log.warn('PROMPTSHEON_FIPS_MODE=true — audit chain requires a FIPS-validated Node build');
+  }
 
   const corsOrigin = config.server.corsOrigin || 'http://localhost:5173';
   if (!config.server.corsOrigin) {
