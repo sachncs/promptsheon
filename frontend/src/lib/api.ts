@@ -153,7 +153,72 @@ export const executionApi = {
   get: (id: string) => client.get(`/executions/${id}`),
   execute: (data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string }) =>
     client.post('/executions', data),
+  replay: (id: string) => client.post(`/executions/${id}/replay`),
+  replays: (id: string) => client.get(`/executions/${id}/replays`),
+  /**
+   * Open a server-sent event connection to a streaming execution.
+   * Returns an `AbortController` so the caller can cancel.
+   */
+  stream: (
+    data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string },
+    onFrame: (frame: { event: string; data: Record<string, unknown>; timestamp: string }) => void,
+  ): AbortController => {
+    const controller = new AbortController();
+    const base = baseURL();
+    const url = `${base}/api/executions`;
+    void fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'text/event-stream',
+      },
+      body: JSON.stringify(data),
+      signal: controller.signal,
+    }).then(async (res) => {
+      if (!res.ok || !res.body) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buffer.indexOf('\n\n')) !== -1) {
+          const block = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          const frame = parseSseBlock(block);
+          if (frame) onFrame(frame);
+        }
+      }
+    }).catch(() => undefined);
+    return controller;
+  },
 };
+
+function baseURL(): string {
+  if (typeof window !== 'undefined') return '';
+  return process.env['NEXT_PUBLIC_API_BASE'] ?? '';
+}
+
+function parseSseBlock(block: string): { event: string; data: Record<string, unknown>; timestamp: string } | null {
+  const lines = block.split('\n');
+  let event = '';
+  let data = '';
+  for (const line of lines) {
+    if (line.startsWith('event: ')) event = line.slice(7).trim();
+    else if (line.startsWith('data: ')) data += line.slice(6);
+  }
+  if (!event || !data) return null;
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = JSON.parse(data) as Record<string, unknown>;
+  } catch {
+    parsed = { raw: data };
+  }
+  return { event, data: parsed, timestamp: '' };
+}
 
 export const invokeApi = {
   invoke: (data: { capabilityVersionId: string; inputs: Record<string, unknown>; environment?: string; traceId?: string }) =>
