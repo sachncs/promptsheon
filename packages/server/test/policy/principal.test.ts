@@ -105,6 +105,12 @@ describe('principalToUid', () => {
       __entity: { type: 'promptsheon::User', id: 'u-1' },
     });
   });
+  it('Role → promptsheon::Role UID', () => {
+    const r = { type: 'Role', id: 'admin', orgId: 'org-1', role: 'admin' } as const;
+    expect(principalToUid(r)).toEqual({
+      __entity: { type: 'promptsheon::Role', id: 'admin' },
+    });
+  });
   it('Agent → promptsheon::Agent UID', () => {
     const a = { type: 'Agent', id: 'a-1', orgId: 'org-1', classification: 'public' } as const;
     expect(principalToUid(a)).toEqual({

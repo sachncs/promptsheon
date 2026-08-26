@@ -1,0 +1,103 @@
+{
+  "description": "Regression matrix for packages/server/policies/promptsheon.cedar. Edit a case only when the policy intentionally changes and the new decision is the intended behaviour. A Cedar policy change that breaks an existing case will fail `pnpm policy:eval` with exit 1.",
+  "cases": [
+    {
+      "name": "admin can publish agents",
+      "principal": { "type": "Role", "id": "admin", "orgId": "org-1", "role": "admin" },
+      "action": { "type": "promptsheon::Action", "id": "Agent::Publish" },
+      "resource": { "type": "promptsheon::Resource", "id": "default" },
+      "expected": "allow"
+    },
+    {
+      "name": "admin can read memory",
+      "principal": { "type": "Role", "id": "admin", "orgId": "org-1", "role": "admin" },
+      "action": { "type": "promptsheon::Action", "id": "Memory::Read" },
+      "resource": { "type": "promptsheon::Resource", "id": "default" },
+      "expected": "allow"
+    },
+    {
+      "name": "viewer can read agent",
+      "principal": { "type": "Role", "id": "viewer", "orgId": "org-1", "role": "viewer" },
+      "action": { "type": "promptsheon::Action", "id": "Agent::Read" },
+      "resource": { "type": "promptsheon::Resource", "id": "default" },
+      "expected": "allow"
+    },
+    {
+      "name": "viewer can read memory",
+      "principal": { "type": "Role", "id": "viewer", "orgId": "org-1", "role": "viewer" },
+      "action": { "type": "promptsheon::Action", "id": "Memory::Read" },
+      "resource": { "type": "promptsheon::Resource", "id": "default" },
+      "expected": "allow"
+    },
+    {
+      "name": "viewer cannot publish agents",
+      "principal": { "type": "Role", "id": "viewer", "orgId": "org-1", "role": "viewer" },
+      "action": { "type": "promptsheon::Action", "id": "Agent::Publish" },
+      "resource": { "type": "promptsheon::Resource", "id": "default" },
+      "expected": "deny"
+    },
+    {
+      "name": "viewer cannot write memory",
+      "principal": { "type": "Role", "id": "viewer", "orgId": "org-1", "role": "viewer" },
+      "action": { "type": "promptsheon::Action", "id": "Memory::Write" },
+      "resource": { "type": "promptsheon::Resource", "id": "default" },
+      "expected": "deny"
+    },
+    {
+      "name": "editor can write memory",
+      "principal": { "type": "Role", "id": "editor", "orgId": "org-1", "role": "editor" },
+      "action": { "type": "promptsheon::Action", "id": "Memory::Write" },
+      "resource": { "type": "promptsheon::Resource", "id": "default" },
+      "expected": "allow"
+    },
+    {
+      "name": "editor cannot publish agents",
+      "principal": { "type": "Role", "id": "editor", "orgId": "org-1", "role": "editor" },
+      "action": { "type": "promptsheon::Action", "id": "Agent::Publish" },
+      "resource": { "type": "promptsheon::Resource", "id": "default" },
+      "expected": "deny"
+    },
+    {
+      "name": "approver can publish agents",
+      "principal": { "type": "Role", "id": "approver", "orgId": "org-1", "role": "approver" },
+      "action": { "type": "promptsheon::Action", "id": "Agent::Publish" },
+      "resource": { "type": "promptsheon::Resource", "id": "default" },
+      "expected": "allow"
+    },
+    {
+      "name": "agent can call tools",
+      "principal": { "type": "Agent", "id": "a-1", "orgId": "org-1", "classification": "internal" },
+      "action": { "type": "promptsheon::Action", "id": "Tool::Call" },
+      "resource": { "type": "promptsheon::Resource", "id": "default" },
+      "expected": "allow"
+    },
+    {
+      "name": "agent can read memory",
+      "principal": { "type": "Agent", "id": "a-1", "orgId": "org-1", "classification": "internal" },
+      "action": { "type": "promptsheon::Action", "id": "Memory::Read" },
+      "resource": { "type": "promptsheon::Resource", "id": "default" },
+      "expected": "allow"
+    },
+    {
+      "name": "agent cannot publish agents",
+      "principal": { "type": "Agent", "id": "a-1", "orgId": "org-1", "classification": "internal" },
+      "action": { "type": "promptsheon::Action", "id": "Agent::Publish" },
+      "resource": { "type": "promptsheon::Resource", "id": "default" },
+      "expected": "deny"
+    },
+    {
+      "name": "system can do anything",
+      "principal": { "type": "System", "id": "bootstrap" },
+      "action": { "type": "promptsheon::Action", "id": "Agent::Publish" },
+      "resource": { "type": "promptsheon::Resource", "id": "default" },
+      "expected": "allow"
+    },
+    {
+      "name": "random unknown action denies",
+      "principal": { "type": "Role", "id": "viewer", "orgId": "org-1", "role": "viewer" },
+      "action": { "type": "promptsheon::Action", "id": "Unknown::Action" },
+      "resource": { "type": "promptsheon::Resource", "id": "default" },
+      "expected": "deny"
+    }
+  ]
+}

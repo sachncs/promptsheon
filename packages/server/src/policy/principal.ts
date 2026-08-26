@@ -18,6 +18,7 @@ import * as cedar from '@cedar-policy/cedar-wasm';
  */
 export type Principal =
   | { type: 'User'; id: string; orgId: string; role: string }
+  | { type: 'Role'; id: string; orgId: string; role: string }
   | { type: 'Agent'; id: string; orgId: string; classification: string }
   | { type: 'System'; id: string };
 
@@ -39,6 +40,8 @@ function uid(principal: Principal): cedar.EntityUidJson {
   switch (principal.type) {
     case 'User':
       return { __entity: { type: `${NAMESPACE}::User`, id: principal.id } };
+    case 'Role':
+      return { __entity: { type: `${NAMESPACE}::Role`, id: principal.id } };
     case 'Agent':
       return { __entity: { type: `${NAMESPACE}::Agent`, id: principal.id } };
     case 'System':

@@ -14,7 +14,8 @@
     "bench:security": "node --import tsx src/security/benchmark-cli.ts",
     "firewall": "node --import tsx src/firewall/cli.ts",
     "db:replicate": "node --import tsx src/replication/cli.ts",
-    "db:failover": "node --import tsx src/replication/failover-cli.ts"
+    "db:failover": "node --import tsx src/replication/failover-cli.ts",
+    "policy:eval": "node --import tsx src/policy/eval-cli.ts"
   },
   "dependencies": {
     "@cedar-policy/cedar-wasm": "^4.12.0",
