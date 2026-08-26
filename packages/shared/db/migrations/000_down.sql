@@ -49,3 +49,6 @@ DROP TABLE IF EXISTS audit_entries;
 DROP TABLE IF EXISTS provider_keys;
 DROP TABLE IF EXISTS api_keys;
 DROP TABLE IF EXISTS users;
+
+DROP TABLE IF EXISTS svid_revocations;
+DROP TABLE IF EXISTS agent_identities;
