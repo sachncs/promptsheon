@@ -7,67 +7,68 @@
 // and require team-membership where the doc names it (Agent
 // publishing, agent registry signing).
 //
-// Schema is intentionally explicit so a policy:eval regression
-// run can assert the principal/action/resource shapes.
+// Cedar 4.x does not support `Action::"..."` wildcards for the
+// implicit Action type. `action` (unbound) matches any action;
+// enumerated lists are used when the role's reach is limited.
 
 permit (
-    principal in Role::"admin",
-    action in [Action::"all"],
-    resource in Resource::"all"
+    principal == promptsheon::Role::"admin",
+    action,
+    resource
 );
 
 // Org-scoped read for human users in the same org.
 permit (
-    principal in Role::"viewer",
+    principal == promptsheon::Role::"viewer",
     action in [
-        Action::"Agent::Read",
-        Action::"Tool::Read",
-        Action::"Memory::Read",
-        Action::"Audit::Read",
-        Action::"Observability::Read"
+        promptsheon::Action::"Agent::Read",
+        promptsheon::Action::"Tool::Read",
+        promptsheon::Action::"Memory::Read",
+        promptsheon::Action::"Audit::Read",
+        promptsheon::Action::"Observability::Read"
     ],
-    resource in Resource::"all"
+    resource
 );
 
 // Editor + admin can mutate manifests + agent registry.
 permit (
-    principal in Role::"editor",
+    principal == promptsheon::Role::"editor",
     action in [
-        Action::"Agent::Read",
-        Action::"Agent::Write",
-        Action::"Tool::Read",
-        Action::"Tool::Register",
-        Action::"Memory::Read",
-        Action::"Memory::Write",
-        Action::"Audit::Read",
-        Action::"Observability::Read",
-        Action::"Gateway::Invoke",
-        Action::"Armor::Configure"
+        promptsheon::Action::"Agent::Read",
+        promptsheon::Action::"Agent::Write",
+        promptsheon::Action::"Tool::Read",
+        promptsheon::Action::"Tool::Register",
+        promptsheon::Action::"Memory::Read",
+        promptsheon::Action::"Memory::Write",
+        promptsheon::Action::"Audit::Read",
+        promptsheon::Action::"Observability::Read",
+        promptsheon::Action::"Gateway::Invoke",
+        promptsheon::Action::"Armor::Configure"
     ],
-    resource in Resource::"all"
+    resource
 );
 
 // Approver + admin can publish agents + manage budgets.
 permit (
-    principal in Role::"approver",
+    principal == promptsheon::Role::"approver",
     action in [
-        Action::"Agent::Read",
-        Action::"Agent::Write",
-        Action::"Agent::Publish",
-        Action::"Tool::Read",
-        Action::"Tool::Register",
-        Action::"Memory::Read",
-        Action::"Memory::Write",
-        Action::"Audit::Read",
-        Action::"Observability::Read",
-        Action::"Budget::Create",
-        Action::"Budget::Read",
-        Action::"Budget::Update",
-        Action::"Budget::Delete",
-        Action::"Armor::Configure",
-        Action::"Registry::Sign"
+        promptsheon::Action::"Agent::Read",
+        promptsheon::Action::"Agent::Write",
+        promptsheon::Action::"Agent::Publish",
+        promptsheon::Action::"Tool::Read",
+        promptsheon::Action::"Tool::Register",
+        promptsheon::Action::"Memory::Read",
+        promptsheon::Action::"Memory::Write",
+        promptsheon::Action::"Audit::Read",
+        promptsheon::Action::"Observability::Read",
+        promptsheon::Action::"Budget::Create",
+        promptsheon::Action::"Budget::Read",
+        promptsheon::Action::"Budget::Update",
+        promptsheon::Action::"Budget::Delete",
+        promptsheon::Action::"Armor::Configure",
+        promptsheon::Action::"Registry::Sign"
     ],
-    resource in Resource::"all"
+    resource
 );
 
 // Agent principal: can invoke tools + read/write its own memory
@@ -75,23 +76,23 @@ permit (
 // `target.classification` ≤ principal's `classification` (enforced
 // at the gateway).
 permit (
-    principal is Agent,
+    principal is promptsheon::Agent,
     action in [
-        Action::"Agent::Invoke",
-        Action::"Agent::Resume",
-        Action::"Tool::Call",
-        Action::"Memory::Read",
-        Action::"Memory::Write",
-        Action::"Gateway::Invoke",
-        Action::"Observability::Export"
+        promptsheon::Action::"Agent::Invoke",
+        promptsheon::Action::"Agent::Resume",
+        promptsheon::Action::"Tool::Call",
+        promptsheon::Action::"Memory::Read",
+        promptsheon::Action::"Memory::Write",
+        promptsheon::Action::"Gateway::Invoke",
+        promptsheon::Action::"Observability::Export"
     ],
-    resource in Resource::"all"
+    resource
 );
 
 // System principal: full reach, used for bootstrap + replication.
 // Disabled unless PROMPTSHEON_ALLOW_SYSTEM_ACTOR=true.
 permit (
-    principal is System,
-    action in [Action::"all"],
-    resource in Resource::"all"
+    principal is promptsheon::System,
+    action,
+    resource
 );
