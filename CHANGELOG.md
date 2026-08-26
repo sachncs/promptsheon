@@ -5,6 +5,68 @@ All notable changes to Promptsheon are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **T3-1 time-travel debugging** (`/api/executions/:id/replay`).
+  Re-runs any past execution with the same manifest, model,
+  environment, and inputs; the new execution is linked to the
+  original via `replay_of` and the original's `replay_count` is
+  incremented. A per-node diff summary is returned alongside
+  the new execution so callers can see what changed (the diff
+  is the value-add because LLMs are not deterministic). A
+  companion `GET /api/executions/:id/replays` lists every
+  replay attempt with outcome + diff. Migration 049 adds the
+  lineage columns + the `execution_replays` log table.
+- **`Replay` button on `/app/executions/[id]`** — fires the
+  endpoint and navigates to the replay's detail page; replays
+  themselves show "Replay of …" in the header and link back to
+  the original.
+- **T3-5 prompt-security benchmark** — `docs/security/benchmark/dataset.json`
+  with 53 curated cases across OWASP LLM01..LLM10 plus MIX/EDGE
+  categories. Run `pnpm --filter @promptsheon/server bench:security`
+  to execute the corpus against the scanner and emit
+  `docs/security/benchmark/RESULTS.md`. The runner exits non-zero
+  on any regression so a regex tweak can never silently weaken
+  coverage.
+- **T4 streamed completions over SSE** — `POST /api/executions`
+  now detects `Accept: text/event-stream` and streams per-node
+  events (`execution_start`, `node_start`, `node_complete`,
+  `execution_complete`, …) followed by a terminal `done` frame.
+  Buffered JSON mode remains the default for non-SSE clients.
+  The streamer (`packages/server/src/sse/streamer.ts`) implements
+  `SseClient` directly so it filters by executionId before
+  forwarding. The frontend gains `executionApi.stream(...)` so
+  callers can opt into the live token flow from the playground.
+- **T4 on-prem RHEL deployment guide** — `docs/operations/air-gap-rhel.md`
+  is the §7 deliverable: a step-by-step runbook for taking the
+  offline installer tarball to an air-gapped host, covering
+  pre-flight checks, FIPS-mode install, the FIPS gate's
+  refuse-to-boot contract, upgrades, backups, DR, and the audit
+  chain's "valid: false" failure mode.
+- **T4 A/B statistical significance** — `packages/server/src/analysis/significance.ts`
+  ships frequentist (two-proportion z-test, Wald CI for the
+  difference) and Bayesian (beta-binomial Monte Carlo with 10k
+  draws, 95% credible intervals) summaries. `ExperimentRepo.summarize(releaseId)`
+  produces a typed `SignificanceReport` (per-variant stats,
+  pairwise tests, ranking, winner verdict) and
+  `GET /api/releases/:id/experiments/summary?alpha=0.05&bayesSamples=10000`
+  exposes it. The winner verdict is only set when the pairwise
+  test against the runner-up is significant at α=0.05.
+
+### Changed
+- `POST /api/executions` and `POST /api/invoke` now persist
+  the full inputs JSON in `executions.inputs` (was a SHA-256
+  hash that prevented replay). The hash is preserved in a new
+  `input_hash` column for dedup.
+- Extended the scanner regexes to close real gaps the benchmark
+  exposed: phone numbers with dot separators, multi-word
+  role-switch / tool-abuse patterns, "from registry https://…attacker"
+  supply-chain payloads, "no auth check" plugin misconfigurations,
+  "jailbroken" (the adjective, not just "jailbreak"), and a
+  tightened `jailbreak.dan` regex that no longer fires on the
+  DAN-group acronym.
+
 ## [v0.4.2] - 2026-08-25
 
 The end-of-audit release. Closes every issue surfaced by the

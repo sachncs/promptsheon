@@ -393,6 +393,37 @@ you are expected to uphold that standard.
 Please do **not** file security vulnerabilities as public GitHub
 issues. See [`SECURITY.md`](SECURITY.md) for the disclosure policy.
 
+### Prompt-security benchmark
+
+The shipped scanner (`packages/server/src/security/prompt-scanner.ts`)
+is exercised by a curated dataset at
+[`docs/security/benchmark/dataset.json`](docs/security/benchmark/dataset.json)
+covering OWASP LLM01..LLM10 plus edge cases. Run it with:
+
+```
+pnpm --filter @promptsheon/server bench:security
+```
+
+It writes [`docs/security/benchmark/RESULTS.md`](docs/security/benchmark/RESULTS.md)
+with a per-case verdict + the rules that fired. CI should gate on a
+100% pass rate so a regex tweak never silently regresses coverage.
+
+### On-prem / air-gapped deploys
+
+Government, defense, and regulated customers run on hosts with no
+outbound internet. The repo ships an offline installer that bundles
+every dependency, the SBOM, and a `systemd` bootstrap:
+
+```
+bash scripts/build-offline-installer.sh    # build the tarball
+sudo bash bin/bootstrap.sh --fips          # install + FIPS mode
+```
+
+The step-by-step runbook —
+[`docs/operations/air-gap-rhel.md`](docs/operations/air-gap-rhel.md) —
+covers pre-flight, FIPS-mode requirements, upgrades, backups,
+DR, and the FIPS gate's `refuse to boot` contract.
+
 ## License
 
 [Apache-2.0](LICENSE) © 2026 Sachin — **sachncs@gmail.com**.
