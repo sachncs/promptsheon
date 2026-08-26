@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 import {
   LayoutDashboard, FolderOpen, Boxes, Workflow, Compass, Flag,
-  GitBranch, Target, Activity, CalendarClock, FlaskConical,
+  GitBranch, Target, Activity, CalendarClock, FlaskConical, Beaker,
   ShieldCheck, ScrollText, Users, KeyRound, Webhook, Cog, Search, GitMerge, ListChecks,
   ChevronDown, ChevronRight, ChevronUp, LogOut, Monitor, Moon, Sun,
 } from 'lucide-react';
@@ -64,18 +64,29 @@ const groups: NavGroup[] = [
     ],
   },
   {
+    label: 'Observability',
+    items: [
+      { href: '/app/traces', label: 'Traces', icon: Activity },
+      { href: '/app/playground', label: 'Playground', icon: Beaker },
+      { href: '/app/audit', label: 'Audit log', icon: ScrollText },
+      { href: '/app/audit/reports', label: 'Audit reports', icon: ScrollText },
+    ],
+  },
+  {
     label: 'Quality',
     items: [
       { href: '/app/eval', label: 'Eval runs', icon: FlaskConical },
       { href: '/app/eval/suites', label: 'Suites', icon: ListChecks },
       { href: '/app/approvals', label: 'Approvals', icon: ShieldCheck },
-      { href: '/app/audit', label: 'Audit log', icon: ScrollText },
     ],
   },
   {
     label: 'Settings',
     items: [
       { href: '/app/admin/cost', label: 'Cost & analytics', icon: Activity },
+      { href: '/app/admin/analytics', label: 'Per-user analytics', icon: Users },
+      { href: '/app/admin/teams', label: 'Teams + SSO', icon: Users },
+      { href: '/app/admin/security', label: 'Prompt security', icon: Users },
       { href: '/app/vault', label: 'Vault', icon: KeyRound },
       { href: '/app/workspaces', label: 'Workspaces', icon: FolderOpen },
       { href: '/app/users', label: 'Users', icon: Users },

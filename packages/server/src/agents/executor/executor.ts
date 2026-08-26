@@ -40,6 +40,12 @@ export interface ExecuteOptions {
   environment?: string;
   traceId?: string;
   signal?: AbortSignal;
+  /**
+   * Optional trace_run id. If supplied, the metrics hooks mirror
+   * per-node span rows under this trace; otherwise the execution
+   * route creates one on the fly.
+   */
+  traceRunId?: string;
 }
 
 /**
@@ -79,6 +85,7 @@ export class ManifestGraphExecutor {
       costCap?: CostLimitConfig;
       costOrgId?: string;
       costCapabilityId?: string;
+      traceRepo?: import('../../repos/trace.js').TraceRepo;
     },
   ) {}
 
@@ -90,7 +97,13 @@ export class ManifestGraphExecutor {
 
     const executionStartedAtMs = Date.now();
     const metricsHookCtx = this.deps.manifestRepo
-      ? { executionId: options.executionId, manifestHash, manifestRepo: this.deps.manifestRepo }
+      ? {
+          executionId: options.executionId,
+          manifestHash,
+          manifestRepo: this.deps.manifestRepo,
+          traceRepo: this.deps.traceRepo,
+          traceRunId: (options as { traceRunId?: string }).traceRunId,
+        }
       : undefined;
     // Validate DAG via buildGraph (which constructs a Strands Graph
     // and runs validateDag() during construction). The Graph is built

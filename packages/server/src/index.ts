@@ -27,7 +27,15 @@ import { MergeRequestRepo } from './repos/mr.js';
 import { SigningKeyRepo } from './repos/signing-key.js';
 import { EvalSuiteRepo, HumanReviewRepo } from './repos/eval-suite.js';
 import { VaultRepo } from './repos/vault.js';
+import { TraceRepo } from './repos/trace.js';
+import { TraceScoreRepo } from './repos/trace-score.js';
+import { AutoEval } from './observability/auto-eval.js';
+import { UserAnalyticsRepo } from './repos/user-analytics.js';
+import { TeamRepo, SsoConfigRepo } from './repos/team.js';
+import { PromptScanRepo } from './repos/prompt-scan.js';
 import { OrgExportService, CostRollupRepo } from './repos/vault-extras.js';
+import { CostBudgetRepo } from './repos/budget.js';
+import { CostForecastService } from './analysis/forecast.js';
 import { RedteamRepo } from './repos/redteam.js';
 import { ExperimentRepo } from './repos/experiment.js';
 import { IncidentRepo } from './repos/incident.js';
@@ -59,15 +67,20 @@ import { WebhookReceiver } from './webhooks/receiver.js';
 import { ChaosConfig } from './hardening/chaos.js';
 import { registerChaosRoutes } from './routes/chaos.js';
 import { LlmRouter } from './llm/router.js';
+import { Gateway, ResponseCache, FallbackChain, RateLimiter } from './llm/gateway.js';
 import type { Agent } from '@strands-agents/sdk';
 
 async function main() {
   const config = loadConfig();
   const db = createConnection(config);
   await runMigrations(db);
-  const auditChain = new AuditChain(db);
+  const auditChain = new AuditChain(db, config.server.fipsMode);
 
   const app = Fastify({ logger: true, bodyLimit: 2_097_152 });
+
+  if (config.server.fipsMode) {
+    app.log.warn('PROMPTSHEON_FIPS_MODE=true — audit chain requires a FIPS-validated Node build');
+  }
 
   const corsOrigin = config.server.corsOrigin || 'http://localhost:5173';
   if (!config.server.corsOrigin) {
@@ -128,6 +141,19 @@ async function main() {
 );
   const orgExportService = new OrgExportService(db, vaultRepo);
   const costRollupRepo = new CostRollupRepo(db);
+  const budgetRepo = new CostBudgetRepo(db);
+  const forecastService = new CostForecastService(db, {
+    rollups: costRollupRepo,
+    persistSnapshot: (snap) => budgetRepo.insertForecastSnapshot(snap),
+    listBudgets: (orgId) => budgetRepo.listForOrg(orgId),
+    updateLastAlerted: (id, ts) => budgetRepo.updateLastAlerted(id, ts),
+  });
+  const traceRepo = new TraceRepo(db);
+  const traceScoreRepo = new TraceScoreRepo(db);
+  const userAnalyticsRepo = new UserAnalyticsRepo(db);
+  const teamRepo = new TeamRepo(db);
+  const ssoConfigRepo = new SsoConfigRepo(db);
+  const promptScanRepo = new PromptScanRepo(db);
   const redteamRepo = new RedteamRepo(db);
   const experimentRepo = new ExperimentRepo(db);
   const incidentRepo = new IncidentRepo(db);
@@ -177,6 +203,14 @@ async function main() {
   const compiler = new ReasoningCompiler(config);
   const planner = new IdeaPlannerAgent(config);
   const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo });
+  const llmRouter = new LlmRouter();
+  const autoEval = new AutoEval({ traceRepo, scoreRepo: traceScoreRepo, router: llmRouter });
+  const gateway = new Gateway({
+    cache: new ResponseCache(2048),
+    fallback: new FallbackChain(['custom', 'anthropic', 'openai']),
+    rateLimiter: new RateLimiter({ capacity: 60, refillPerSecond: 1 }),
+    router: llmRouter,
+  });
   const chaosConfig = new ChaosConfig();
   const goalEvolver = new GoalBasedEvolutionAgent({ config, hub: sseHub, executor, cas: casStore });
   const activeGoals = new Map<string, GoalSummary>();
@@ -308,11 +342,11 @@ async function main() {
     auditChain,
     apiKeyRepo,
     userRepo: new UserRepo(db),
-    llmRouter: new LlmRouter(),
+    llmRouter,
     repoDeps: {
-      repoRepo,
-      branchRepo,
-      tagRepo,
+    repoRepo,
+    branchRepo,
+    tagRepo,
     },
     contentsDeps: {
       repoRepo,
@@ -366,6 +400,18 @@ async function main() {
     experimentDeps: { experimentRepo },
     incidentDeps: { incidentRepo, actorId: () => 'system' },
     featureFlagRepo,
+    traceRepo,
+    traceScoreRepo,
+    autoEval,
+    userAnalyticsRepo,
+    teamRepo,
+    ssoConfigRepo,
+    promptScanRepo,
+    gateway,
+    budgetDeps: {
+      budgetRepo,
+      forecastService,
+    },
     orgSettingsDeps: {
       orgSettingsRepo,
       vaultRepo,

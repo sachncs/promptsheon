@@ -52,6 +52,7 @@ export function loadConfig(): AppConfig {
       corsOrigin: envString('PROMPTSHEON_CORS_ORIGIN', ''),
       logLevel: envString('PROMPTSHEON_LOG_LEVEL', 'info'),
       nodeEnv: envString('PROMPTSHEON_NODE_ENV', envString('NODE_ENV', 'development')),
+      fipsMode: envBool('PROMPTSHEON_FIPS_MODE', false),
     },
     llm: {
       defaultProvider: envString('PROMPTSHEON_LLM_PROVIDER', 'openai'),

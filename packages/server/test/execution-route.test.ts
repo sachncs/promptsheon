@@ -99,7 +99,15 @@ describe('POST /api/executions', () => {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     });
     await app.register(async (instance) => {
-      await registerExecutionRoutes(instance, { executionRepo, manifestRepo, executor });
+      await registerExecutionRoutes(instance, {
+        executionRepo,
+        manifestRepo,
+        executor,
+        sseHub: hub,
+        releaseRepo: { findActiveByManifestHash: () => [{ id: 'rel-sse', canaryPercent: 0 }] } as never,
+        versionRepo: { findById: () => null } as never,
+        traceRepo: { startRun: () => ({ id: 'stub-trace' }), finalize: () => undefined } as never,
+      });
     });
     await app.ready();
   });

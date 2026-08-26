@@ -1,0 +1,45 @@
+{
+  "name": "promptsheon",
+  "displayName": "promptsheon",
+  "description": "Author, validate, and ship prompt manifests from VS Code.",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "promptsheon",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:json",
+    "onLanguage:yaml",
+    "workspaceContains:**/.promptsheon.json",
+    "workspaceContains:**/.promptsheon.yaml",
+    "workspaceContains:**/.promptsheon.yml"
+  ],
+  "main": "./dist/extension.js",
+  "files": [
+    "dist",
+    "sn",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "@promptsheon/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.85.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

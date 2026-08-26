@@ -1,9 +1,34 @@
-import { createHash } from 'node:crypto';
+import { createHash, getFips, randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import type { AuditEntry } from '@promptsheon/shared';
 
+/**
+ * Compute the SHA-256 of an audit entry's hash input.
+ *
+ * When `fipsMode` is true the function requires Node to be running
+ * against a FIPS-validated OpenSSL provider (`crypto.getFips() === 1`).
+ * If FIPS isn't actually active the call throws rather than silently
+ * downgrading to non-FIPS crypto — that would defeat the purpose of
+ * the gate.
+ *
+ * Pure function: no module-level state, so it's safe to call from
+ * tests and from both the append and verify paths.
+ */
+export function computeHash(data: string, fipsMode: boolean): string {
+  if (fipsMode && getFips() !== 1) {
+    throw new Error(
+      'PROMPTSHEON_FIPS_MODE=true but Node is not running against a ' +
+        'FIPS-validated OpenSSL provider. Refusing to compute the audit hash.',
+    );
+  }
+  return createHash('sha256').update(data).digest('hex');
+}
+
 export class AuditChain {
-  constructor(private db: Database.Database) {
+  constructor(
+    private db: Database.Database,
+    private fipsMode = false,
+  ) {
     db.prepare(
       `INSERT OR IGNORE INTO audit_chain_state (id, last_hash, last_rowid)
        VALUES (0, '', 0)`
@@ -44,9 +69,9 @@ export class AuditChain {
       details: entry.details,
       previousHash,
     });
-    const entryHash = createHash('sha256').update(hashInput).digest('hex');
+    const entryHash = computeHash(hashInput, this.fipsMode);
 
-    const id = crypto.randomUUID();
+    const id = randomUUID();
     const now = new Date().toISOString();
 
     this.db.prepare(`
@@ -107,7 +132,9 @@ export class AuditChain {
         details: entry.details,
         previousHash: entry.previousHash,
       });
-      const computedHash = createHash('sha256').update(hashInput).digest('hex');
+      // Same hash function as append() so FIPS mode is enforced
+      // consistently on write and verify.
+      const computedHash = computeHash(hashInput, this.fipsMode);
       if (computedHash !== entry.entryHash) {
         return { valid: false, brokenAt: entry.id };
       }

@@ -72,6 +72,6 @@ jobs:
     needs: [test, build]
     if: github.event_name == 'push'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t promptsheon:ci .
       - run: docker run --rm promptsheon:ci node server/dist/index.js --check

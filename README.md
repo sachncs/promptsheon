@@ -393,6 +393,100 @@ you are expected to uphold that standard.
 Please do **not** file security vulnerabilities as public GitHub
 issues. See [`SECURITY.md`](SECURITY.md) for the disclosure policy.
 
+### Prompt-security benchmark
+
+The shipped scanner (`packages/server/src/security/prompt-scanner.ts`)
+is exercised by a curated dataset at
+[`docs/security/benchmark/dataset.json`](docs/security/benchmark/dataset.json)
+covering OWASP LLM01..LLM10 plus edge cases. Run it with:
+
+```
+pnpm --filter @promptsheon/server bench:security
+```
+
+It writes [`docs/security/benchmark/RESULTS.md`](docs/security/benchmark/RESULTS.md)
+with a per-case verdict + the rules that fired. CI should gate on a
+100% pass rate so a regex tweak never silently regresses coverage.
+
+### On-prem / air-gapped deploys
+
+Government, defense, and regulated customers run on hosts with no
+outbound internet. The repo ships an offline installer that bundles
+every dependency, the SBOM, and a `systemd` bootstrap:
+
+```
+bash scripts/build-offline-installer.sh    # build the tarball
+sudo bash bin/bootstrap.sh --fips          # install + FIPS mode
+```
+
+The step-by-step runbook —
+[`docs/operations/air-gap-rhel.md`](docs/operations/air-gap-rhel.md) —
+covers pre-flight, FIPS-mode requirements, upgrades, backups,
+DR, and the FIPS gate's `refuse to boot` contract.
+
+### Running the firewall sidecar
+
+The firewall sits in front of *any* LLM application (not just
+promptsheon-managed ones) and inspects every prompt + response
+against the T2-3 scanner. Block / warn / allow decisions are
+written to the audit chain so `/api/audit/verify` covers sidecar
+traffic end-to-end.
+
+```bash
+# Start the sidecar with an OpenAI-compatible upstream:
+PROMPTSHEON_FIREWALL_UPSTREAM_URL=https://api.openai.com \
+PROMPTSHEON_FIREWALL_PORT=9090 \
+  pnpm --filter @promptsheon/server firewall
+```
+
+Point any client at `http://127.0.0.1:9090/v1/chat/completions`
+instead of the upstream URL. The firewall transparently forwards
+when the scanner verdict is `clean`, attaches an
+`X-Promptsheon-Warning` header on `warn`, and rejects with
+`422 PROMPT_BLOCKED`. The implementation lives at
+`packages/server/src/firewall/`; the policy + scanner extension
+shipped with T3-5 carries over unchanged.
+
+### Framework integrations
+
+`packages/sdk/src/integrations/` ships adapters for the three
+agent frameworks the doc names. All three route through the
+promptsheon OpenAI-compatible gateway so caching + the audit
+chain apply transparently.
+
+```ts
+// Vercel AI SDK
+import { openai } from '@ai-sdk/openai';
+import { withPromptsheon } from '@promptsheon/sdk/integrations/vercel-ai-sdk';
+const model = withPromptsheon(openai('gpt-4'), {
+  gatewayUrl: 'https://promptsheon.example.com',
+  apiKey: process.env.PROMPTSHEON_API_KEY!,
+});
+
+// LlamaIndex
+import { PromptsheonLLM } from '@promptsheon/sdk/integrations/llamaindex';
+const llm = new PromptsheonLLM({
+  gatewayUrl: 'https://promptsheon.example.com',
+  apiKey: process.env.PROMPTSHEON_API_KEY!,
+  model: 'gpt-4',
+});
+
+// Haystack
+import { PromptsheonGenerator } from '@promptsheon/sdk/integrations/haystack';
+const generator = new PromptsheonGenerator({
+  gatewayUrl: 'https://promptsheon.example.com',
+  apiKey: process.env.PROMPTSHEON_API_KEY!,
+  model: 'gpt-4',
+});
+```
+
+The adapters use structural typing (no `@ai-sdk/provider`,
+`llama-index-core`, or `@haystack/core` runtime dep) so the SDK
+stays framework-optional — install the framework package
+yourself and pass a model that satisfies the shape. 9 vitest
+cases exercise the wire format against an in-process
+OpenAI-shaped stub.
+
 ## License
 
 [Apache-2.0](LICENSE) © 2026 Sachin — **sachncs@gmail.com**.

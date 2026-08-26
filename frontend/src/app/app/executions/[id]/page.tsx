@@ -1,9 +1,9 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { Play, ArrowLeft, Clock, DollarSign, Hash, Activity } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Play, ArrowLeft, Clock, DollarSign, Hash, Activity, RotateCcw } from 'lucide-react';
 import { executionApi } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
@@ -29,12 +29,16 @@ interface ExecutionDetail {
   costMicros?: number;
   trace?: Array<{ node: string; at: string; event: string; data?: Record<string, unknown> }>;
   error?: { message: string; stack?: string };
+  replayOf?: string | null;
+  replayCount?: number;
 }
 
 export default function ExecutionDetailPage() {
   const session = useRequireSession();
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
   const detail = useQuery({
     queryKey: ['execution', id],
@@ -43,10 +47,23 @@ export default function ExecutionDetailPage() {
     retry: false,
   });
 
+  const replayMutation = useMutation({
+    mutationFn: () => executionApi.replay(id),
+    onSuccess: (response) => {
+      const replayId = response.data?.replayExecutionId;
+      if (replayId) {
+        queryClient.invalidateQueries({ queryKey: ['execution', id] });
+        queryClient.invalidateQueries({ queryKey: ['execution', replayId] });
+        router.push(`/app/executions/${replayId}`);
+      }
+    },
+  });
+
   if (!session) return null;
 
   const data = detail.data;
   const isError = detail.isError;
+  const canReplay = !data?.replayOf;
 
   return (
     <div className="space-y-6">
@@ -59,8 +76,27 @@ export default function ExecutionDetailPage() {
       <PageHeader
         eyebrow="Execution"
         title={data?.capabilityName ? `${data.capabilityName} execution` : `Execution ${id.slice(0, 12)}…`}
-        subtitle="A single invocation of a capability. Inputs, outputs, and trace."
-        actions={data?.manifestHash ? <HashChip hash={data.manifestHash} /> : undefined}
+        subtitle={
+          data?.replayOf
+            ? `Replay of execution ${data.replayOf.slice(0, 12)}… — same manifest, model, environment, and inputs.`
+            : 'A single invocation of a capability. Inputs, outputs, and trace.'
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            {data?.manifestHash ? <HashChip hash={data.manifestHash} /> : null}
+            {canReplay ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={replayMutation.isPending || !data?.id}
+                onClick={() => replayMutation.mutate()}
+              >
+                <RotateCcw className="size-3.5" />
+                {replayMutation.isPending ? 'Replaying…' : 'Replay'}
+              </Button>
+            ) : null}
+          </div>
+        }
       />
 
       {isError ? (
@@ -106,6 +142,25 @@ export default function ExecutionDetailPage() {
               hint={data.capabilityVersionId ? `version ${data.capabilityVersionId.slice(0, 8)}` : undefined}
             />
           </div>
+
+          {(data.replayCount !== undefined && data.replayCount > 0) || data.replayOf ? (
+            <div className="flex flex-wrap items-center gap-3 rounded-md border border-border-subtle bg-surface-1 px-4 py-2 text-xs text-text-muted">
+              {data.replayCount !== undefined && data.replayCount > 0 ? (
+                <span>
+                  Replayed <strong className="text-text-default">{data.replayCount}</strong>{' '}
+                  {data.replayCount === 1 ? 'time' : 'times'}
+                </span>
+              ) : null}
+              {data.replayOf ? (
+                <Link
+                  href={`/app/executions/${data.replayOf}`}
+                  className="text-text-default underline-offset-2 hover:underline"
+                >
+                  View original execution
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
 
           {data.status && (
             <div className="flex items-center gap-2">

@@ -47,6 +47,9 @@ export class InvocationAgent {
       error: '',
       traceId: options.traceId ?? '',
       environment: options.environment ?? '',
+      replayOf: null,
+      replayCount: 0,
+      inputHash: null,
     };
   }
 }

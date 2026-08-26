@@ -42,8 +42,11 @@ export class TeamRepo extends BaseRepo<Team> {
   create(data: { orgId: string; name: string }): Team {
     const id = randomUUID();
     const now = new Date().toISOString();
-    this.db.prepare(`INSERT INTO teams (id, org_id, name, created_at) VALUES (?, ?, ?, ?)`)
-      .run(id, data.orgId, data.name, now);
+    const slug = data.name.toLowerCase().replace(/\s+/g, '-');
+    this.db.prepare(
+      `INSERT INTO teams (id, org_id, name, organisation_id, slug, description, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, '', ?, ?)`,
+    ).run(id, data.orgId, data.name, data.orgId, slug, now, now);
     return { id, orgId: data.orgId, name: data.name, createdAt: now };
   }
 }

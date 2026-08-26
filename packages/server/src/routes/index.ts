@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { requireAdmin } from '../middleware/admin.js';
 import { registerWorkspaceRoutes } from './workspace.js';
 import { registerProjectRoutes } from './project.js';
 import { registerCapabilityRoutes } from './capability.js';
@@ -49,6 +50,14 @@ import { registerRedteamRoutes, type RedteamDeps } from './redteam.js';
 import { registerExperimentRoutes, type ExperimentDeps } from './experiment.js';
 import { registerIncidentRoutes, type IncidentDeps } from './incident.js';
 import { registerOrgSettingsRoutes, type OrgSettingsRouteDeps } from './org-settings.js';
+import { registerTraceRoutes } from './trace.js';
+import { registerTraceScoreRoutes } from './trace-score.js';
+import { registerPlaygroundRoutes } from './playground.js';
+import { registerAnalyticsRoutes } from './analytics.js';
+import { registerTeamRoutes } from './team.js';
+import { registerSecurityRoutes } from './security.js';
+import { registerAuditReportRoutes } from './audit-report.js';
+import { registerBudgetRoutes } from './budget.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -76,6 +85,7 @@ import type { ManifestRepo } from '../repos/manifest.js';
 import type { GoalBasedEvolutionAgent } from '../agents/evolution/goal-evolver.js';
 import type { ChaosConfig } from '../hardening/chaos.js';
 import type Database from 'better-sqlite3';
+import type { BudgetDeps } from './budget.js';
 
 export interface AppDeps {
   db: Database.Database;
@@ -108,10 +118,12 @@ export interface AppDeps {
   membershipRepo: import('../repos/org.js').MembershipRepo;
   webhookReceiver: WebhookReceiver;
   chaosConfig?: ChaosConfig;
+  budgetDeps?: BudgetDeps;
   auditChain: AuditChain;
   apiKeyRepo: ApiKeyRepo;
   userRepo: UserRepo;
   llmRouter: LlmRouter;
+  gateway: import('../llm/gateway.js').Gateway;
   repoDeps: RepoDeps;
   contentsDeps: ContentsDeps;
   commitDeps: CommitDeps;
@@ -125,6 +137,13 @@ export interface AppDeps {
   incidentDeps: IncidentDeps;
   orgSettingsDeps: OrgSettingsRouteDeps;
   featureFlagRepo: import('../repos/feature-flag.js').FeatureFlagRepo;
+  traceRepo: import('../repos/trace.js').TraceRepo;
+  traceScoreRepo: import('../repos/trace-score.js').TraceScoreRepo;
+  autoEval: import('../observability/auto-eval.js').AutoEval;
+  userAnalyticsRepo: import('../repos/user-analytics.js').UserAnalyticsRepo;
+  teamRepo: import('../repos/team.js').TeamRepo;
+  ssoConfigRepo: import('../repos/team.js').SsoConfigRepo;
+  promptScanRepo: import('../repos/prompt-scan.js').PromptScanRepo;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -138,7 +157,9 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     releaseRepo: deps.releaseRepo,
     manifestRepo: deps.manifestRepo,
     versionRepo: deps.versionRepo,
+    traceRepo: deps.traceRepo,
     executor: deps.executor,
+    sseHub: deps.sseHub,
   });
   registerDatasetRoutes(app, deps.datasetRepo);
   registerEvalRoutes(app, deps.evalRepo, deps.evalAgent);
@@ -202,5 +223,27 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
         return role === 'admin';
       },
     });
+  }
+  registerTraceRoutes(app, {
+    traceRepo: deps.traceRepo,
+    requireAdmin: () => requireAdmin() as unknown as (request: unknown, reply: unknown) => Promise<void>,
+  });
+  registerTraceScoreRoutes(app, {
+    traceRepo: deps.traceRepo,
+    scoreRepo: deps.traceScoreRepo,
+    autoEval: deps.autoEval,
+  });
+  registerPlaygroundRoutes(app, { gateway: deps.gateway });
+  registerAnalyticsRoutes(app, { repo: deps.userAnalyticsRepo });
+  registerTeamRoutes(app, {
+    teamRepo: deps.teamRepo,
+    ssoConfigRepo: deps.ssoConfigRepo,
+    auditChain: deps.auditChain,
+    scimBearerToken: process.env['PROMPTSHEON_SCIM_TOKEN'] ?? 'dev-scim-token',
+  });
+  registerSecurityRoutes(app, { scanRepo: deps.promptScanRepo });
+  registerAuditReportRoutes(app, { auditChain: deps.auditChain });
+  if (deps.budgetDeps) {
+    registerBudgetRoutes(app, deps.budgetDeps);
   }
 }

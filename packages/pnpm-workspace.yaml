@@ -1,8 +1,0 @@
-packages:
-  - "shared"
-  - "server"
-  - "cli"
-  - "sdk"
-allowBuilds:
-  better-sqlite3: true
-  esbuild: true

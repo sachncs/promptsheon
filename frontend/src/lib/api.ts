@@ -153,7 +153,72 @@ export const executionApi = {
   get: (id: string) => client.get(`/executions/${id}`),
   execute: (data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string }) =>
     client.post('/executions', data),
+  replay: (id: string) => client.post(`/executions/${id}/replay`),
+  replays: (id: string) => client.get(`/executions/${id}/replays`),
+  /**
+   * Open a server-sent event connection to a streaming execution.
+   * Returns an `AbortController` so the caller can cancel.
+   */
+  stream: (
+    data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string },
+    onFrame: (frame: { event: string; data: Record<string, unknown>; timestamp: string }) => void,
+  ): AbortController => {
+    const controller = new AbortController();
+    const base = baseURL();
+    const url = `${base}/api/executions`;
+    void fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'text/event-stream',
+      },
+      body: JSON.stringify(data),
+      signal: controller.signal,
+    }).then(async (res) => {
+      if (!res.ok || !res.body) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buffer.indexOf('\n\n')) !== -1) {
+          const block = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          const frame = parseSseBlock(block);
+          if (frame) onFrame(frame);
+        }
+      }
+    }).catch(() => undefined);
+    return controller;
+  },
 };
+
+function baseURL(): string {
+  if (typeof window !== 'undefined') return '';
+  return process.env['NEXT_PUBLIC_API_BASE'] ?? '';
+}
+
+function parseSseBlock(block: string): { event: string; data: Record<string, unknown>; timestamp: string } | null {
+  const lines = block.split('\n');
+  let event = '';
+  let data = '';
+  for (const line of lines) {
+    if (line.startsWith('event: ')) event = line.slice(7).trim();
+    else if (line.startsWith('data: ')) data += line.slice(6);
+  }
+  if (!event || !data) return null;
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = JSON.parse(data) as Record<string, unknown>;
+  } catch {
+    parsed = { raw: data };
+  }
+  return { event, data: parsed, timestamp: '' };
+}
 
 export const invokeApi = {
   invoke: (data: { capabilityVersionId: string; inputs: Record<string, unknown>; environment?: string; traceId?: string }) =>
@@ -293,10 +358,6 @@ export const featureFlagApi = {
   update: (key: string, data: { value: unknown; enabled?: boolean }) => client.put(`/feature-flags/${key}`, data),
 };
 
-export const auditApi = {
-  list: (params?: { resource?: string; action?: string }) => client.get('/audit', { params }),
-};
-
 // ---- Phase 5 surface: repositories, branches, contents, commits, MRs, signing, evals, vault, search, cost
 
 export interface BranchItem {
@@ -413,6 +474,273 @@ export const costApi = {
     client.get(`/analytics/cost?organizationId=${encodeURIComponent(organizationId)}&days=${days}`).then((r) => r.data),
   ingest: (row: { capabilityId: string; input?: number; output?: number; costMicros?: number; executions?: number }) =>
     client.post('/analytics/rollups', row),
+};
+
+export interface TraceRunSummary {
+  id: string;
+  organizationId: string;
+  executionId: string | null;
+  environment: string;
+  name: string;
+  startTime: string;
+  endTime: string | null;
+  status: 'running' | 'success' | 'error';
+  totalTokens: number;
+  totalCostUsd: number;
+  model: string | null;
+}
+
+export interface TraceSpan {
+  id: string;
+  traceRunId: string;
+  parentSpanId: string | null;
+  name: string;
+  kind: 'internal' | 'llm' | 'tool' | 'retrieval' | 'agent';
+  startTime: string;
+  endTime: string | null;
+  status: 'ok' | 'error';
+  attributes: Record<string, unknown>;
+  model: string | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  costUsd: number | null;
+  inputText: string | null;
+  outputText: string | null;
+}
+
+export interface PlaygroundRun {
+  content: string;
+  provider: string;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  costUsd: number;
+  cacheHit: boolean;
+  latencyMs: number;
+}
+
+export const playgroundApi = {
+  complete: (data: {
+    prompt: string;
+    model: string;
+    provider: 'openai' | 'anthropic' | 'bedrock' | 'custom';
+    temperature?: number;
+    baseUrl?: string;
+    apiKey?: string;
+  }) => client.post<PlaygroundRun>('/playground/complete', data).then((r) => r.data),
+  sweep: (data: {
+    base: {
+      prompt: string;
+      model: string;
+      provider: 'openai' | 'anthropic' | 'bedrock' | 'custom';
+      baseUrl?: string;
+      apiKey?: string;
+    };
+    variants: Array<{ prompt: string; temperature: number }>;
+  }) =>
+    client
+      .post<{
+        base: { model: string; provider: string };
+        variants: Array<{
+          variant: { prompt: string; temperature: number };
+          status: 'fulfilled' | 'rejected';
+          value?: PlaygroundRun;
+          error?: string;
+        }>;
+      }>('/playground/sweep', data)
+      .then((r) => r.data),
+};
+
+export const traceApi = {
+  list: (opts: { page?: number; pageSize?: number; environment?: string; status?: string; nameLike?: string } = {}) =>
+    client
+      .get<{ items: TraceRunSummary[]; total: number }>('/traces', { params: opts })
+      .then((r) => r.data),
+  get: (id: string) =>
+    client.get<{ run: TraceRunSummary; spans: TraceSpan[] }>(`/traces/${id}`).then((r) => r.data),
+  rollup: (days = 30) =>
+    client
+      .get<{ days: number; items: Array<{ day: string; tokens: number; cost: number; runs: number }> }>(
+        `/traces/rollup`,
+        { params: { days } },
+      )
+      .then((r) => r.data),
+};
+
+export interface TraceScore {
+  id: string;
+  evaluator: string;
+  name: string;
+  value: number | null;
+  label: string | null;
+  rationale: string | null;
+  createdAt: string;
+}
+
+export interface UserDailyUsage {
+  day: string;
+  runs: number;
+  tokens: number;
+  cost: number;
+}
+
+export interface UserRollup {
+  actorId: string;
+  runs: number;
+  tokens: number;
+  cost: number;
+  days: number;
+}
+
+export const analyticsApi = {
+  userPerDay: (userId: string, days = 30) =>
+    client
+      .get<{ userId: string; days: number; perDay: UserDailyUsage[] }>(
+        `/analytics/users/${encodeURIComponent(userId)}`,
+        { params: { days } },
+      )
+      .then((r) => r.data),
+  leaderboard: (days = 30, limit = 25) =>
+    client
+      .get<{
+        orgId: string;
+        days: number;
+        limit: number;
+        items: UserRollup[];
+      }>('/analytics/leaderboard', { params: { days, limit } })
+      .then((r) => r.data),
+  orgTotals: (days = 30) =>
+    client
+      .get<{
+        orgId: string;
+        days: number;
+        totals: { runs: number; tokens: number; cost: number; activeDays: number };
+      }>('/analytics/org-totals', { params: { days } })
+      .then((r) => r.data),
+};
+
+export interface AuditReportEntry {
+  id: string;
+  timestamp: string;
+  actor: string;
+  action: string;
+  resource: string;
+  details: string;
+}
+
+export interface AuditReport {
+  id: string;
+  generatedAt: string;
+  generatedBy: string | null;
+  organizationId: string;
+  range: { from: string | null; to: string | null };
+  filters: Record<string, string | number | undefined>;
+  entryCount: number;
+  chainValid: boolean;
+  chainHead: string;
+  chainVerifiedAt: string;
+  signature: { algorithm: string; value: string };
+  entries: AuditReportEntry[];
+}
+
+export const auditApi = {
+  list: (params?: { resource?: string; action?: string }) => client.get('/audit', { params }),
+  report: (opts: {
+    fromTime?: string;
+    toTime?: string;
+    actor?: string;
+    resource?: string;
+    action?: string;
+    limit?: number;
+  } = {}) => {
+    const params: Record<string, string | number> = {};
+    if (opts.fromTime) params['fromTime'] = opts.fromTime;
+    if (opts.toTime) params['toTime'] = opts.toTime;
+    if (opts.actor) params['actor'] = opts.actor;
+    if (opts.resource) params['resource'] = opts.resource;
+    if (opts.action) params['action'] = opts.action;
+    if (opts.limit) params['limit'] = opts.limit;
+    return client
+      .get<ArrayBuffer>('/audit/report', {
+        params,
+        responseType: 'arraybuffer',
+      })
+      .then((r) => {
+        const text = new TextDecoder().decode(r.data);
+        return JSON.parse(text) as AuditReport;
+      });
+  },
+};
+
+export interface TeamSummary {
+  id: string;
+  organizationId: string;
+  name: string;
+  slug: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeamMember {
+  teamId: string;
+  userId: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer';
+  createdAt: string;
+}
+
+export interface SsoConfigView {
+  configured: boolean;
+  provider?: string;
+  issuer?: string;
+  clientId?: string;
+  scopes?: string;
+  audience?: string | null;
+  groupsClaim?: string;
+  emailClaim?: string;
+  nameClaim?: string;
+  enabled?: boolean;
+}
+
+export const teamApi = {
+  list: () => client.get<{ items: TeamSummary[] }>('/teams').then((r) => r.data),
+  create: (data: { name: string; slug: string; description?: string }) =>
+    client.post<TeamSummary>('/teams', data).then((r) => r.data),
+  addMember: (teamId: string, data: { userId: string; role?: TeamMember['role'] }) =>
+    client.post<TeamMember>(`/teams/${teamId}/members`, data).then((r) => r.data),
+  removeMember: (teamId: string, userId: string) =>
+    client.delete<unknown>(`/teams/${teamId}/members/${userId}`).then((r) => r.data),
+  ssoGet: () => client.get<SsoConfigView>('/auth/oidc/config').then((r) => r.data),
+  ssoSet: (data: {
+    provider: string;
+    issuer: string;
+    clientId: string;
+    clientSecret: string;
+    scopes?: string;
+    audience?: string;
+    groupsClaim?: string;
+    emailClaim?: string;
+    nameClaim?: string;
+  }) => client.post<{ status: string; provider: string }>('/auth/oidc/config', data).then((r) => r.data),
+};
+
+export const traceScoreApi = {
+  list: (traceRunId: string) =>
+    client
+      .get<{ run: TraceRunSummary; items: TraceScore[]; total: number }>(`/traces/${traceRunId}/scores`)
+      .then((r) => r.data),
+  autoEval: (traceRunId: string, opts: { judgeModel?: string; judgePrompt?: string } = {}) =>
+    client
+      .post<{ traceRunId: string; written: number }>(`/traces/${traceRunId}/auto-eval`, opts)
+      .then((r) => r.data),
+  summary: (days = 7, evaluator?: string) =>
+    client
+      .get<{ orgId: string; days: number; totals: number; perEvaluator: Array<{ evaluator: string; count: number }> }>(
+        `/scores/summary`,
+        { params: { days, ...(evaluator ? { evaluator } : {}) } },
+      )
+      .then((r) => r.data),
 };
 
 export const searchApi = {

@@ -31,6 +31,24 @@ export function registerExperimentRoutes(app: FastifyInstance, deps: ExperimentD
     });
   });
 
+  /**
+   * Statistical-significance summary: which variant actually
+   * beats the others, with both a frequentist p-value and a
+   * Bayesian posterior summary. Returns 200 with `{ summary: null }`
+   * when the release has no observations yet — not 404 — because
+   * "no data yet" is a normal experiment state.
+   */
+  app.get('/api/releases/:id/experiments/summary', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const alpha = Number((request.query as { alpha?: string }).alpha ?? '0.05');
+    const bayesSamples = Number((request.query as { bayesSamples?: string }).bayesSamples ?? '10000');
+    const summary = deps.experimentRepo.summarize(id, {
+      alpha: Number.isFinite(alpha) ? alpha : 0.05,
+      bayesSamples: Number.isFinite(bayesSamples) ? bayesSamples : 10_000,
+    });
+    return reply.send({ summary });
+  });
+
   app.post('/api/releases/:id/experiments', async (request, reply) => {
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, VariantSchema, request.body);

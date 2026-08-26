@@ -5,6 +5,160 @@ All notable changes to Promptsheon are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **T3-1 time-travel debugging** (`/api/executions/:id/replay`).
+  Re-runs any past execution with the same manifest, model,
+  environment, and inputs; the new execution is linked to the
+  original via `replay_of` and the original's `replay_count` is
+  incremented. A per-node diff summary is returned alongside
+  the new execution so callers can see what changed (the diff
+  is the value-add because LLMs are not deterministic). A
+  companion `GET /api/executions/:id/replays` lists every
+  replay attempt with outcome + diff. Migration 049 adds the
+  lineage columns + the `execution_replays` log table.
+- **`Replay` button on `/app/executions/[id]`** — fires the
+  endpoint and navigates to the replay's detail page; replays
+  themselves show "Replay of …" in the header and link back to
+  the original.
+- **T3-5 prompt-security benchmark** — `docs/security/benchmark/dataset.json`
+  with 53 curated cases across OWASP LLM01..LLM10 plus MIX/EDGE
+  categories. Run `pnpm --filter @promptsheon/server bench:security`
+  to execute the corpus against the scanner and emit
+  `docs/security/benchmark/RESULTS.md`. The runner exits non-zero
+  on any regression so a regex tweak can never silently weaken
+  coverage.
+- **T4 streamed completions over SSE** — `POST /api/executions`
+  now detects `Accept: text/event-stream` and streams per-node
+  events (`execution_start`, `node_start`, `node_complete`,
+  `execution_complete`, …) followed by a terminal `done` frame.
+  Buffered JSON mode remains the default for non-SSE clients.
+  The streamer (`packages/server/src/sse/streamer.ts`) implements
+  `SseClient` directly so it filters by executionId before
+  forwarding. The frontend gains `executionApi.stream(...)` so
+  callers can opt into the live token flow from the playground.
+- **T4 on-prem RHEL deployment guide** — `docs/operations/air-gap-rhel.md`
+  is the §7 deliverable: a step-by-step runbook for taking the
+  offline installer tarball to an air-gapped host, covering
+  pre-flight checks, FIPS-mode install, the FIPS gate's
+  refuse-to-boot contract, upgrades, backups, DR, and the audit
+  chain's "valid: false" failure mode.
+- **T4 A/B statistical significance** — `packages/server/src/analysis/significance.ts`
+  ships frequentist (two-proportion z-test, Wald CI for the
+  difference) and Bayesian (beta-binomial Monte Carlo with 10k
+  draws, 95% credible intervals) summaries. `ExperimentRepo.summarize(releaseId)`
+  produces a typed `SignificanceReport` (per-variant stats,
+  pairwise tests, ranking, winner verdict) and
+  `GET /api/releases/:id/experiments/summary?alpha=0.05&bayesSamples=10000`
+  exposes it. The winner verdict is only set when the pairwise
+  test against the runner-up is significant at α=0.05.
+- **T4 cost forecast + budget alerts** — per-org `cost_budgets`
+  with weekly/monthly periods + `alert_threshold` (fraction of
+  `limit_micros`). Migration 050 also adds `cost_forecast_snapshots`
+  for the dashboard cache. `analysis/forecast.ts` ships an
+  OLS linear-regression projection with a 95% confidence band,
+  blended against the naive "current spend × (total/remaining)"
+  estimate so day-1 of the period doesn't under-report.
+  `CostForecastService.compute(orgId)` returns the snapshot +
+  the alerts that would fire right now; `updateLastAlerted`
+  applies a 1-hour cooldown so the webhook doesn't storm on
+  every dashboard load. CRUD lives at `/api/admin/budgets`;
+  the projection at `/api/admin/cost-forecast?organizationId=&windowDays=`.
+  26 new vitest cases across the math, repo, and route layers.
+- **T3-2 prompt firewall sidecar** — `packages/server/src/firewall/`
+  ships the sidecar as both a Fastify plugin (mount on the same
+  app as the rest of the routes) and a standalone CLI launcher
+  (`pnpm --filter @promptsheon/server firewall`). The policy
+  extracts the prompt text out of OpenAI- and Anthropic-shaped
+  bodies, runs the T2-3 scanner, and either forwards as-is,
+  forwards with an `X-Promptsheon-Warning` header, or rejects
+  with `422 PROMPT_BLOCKED`. Every call — allow, warn, block —
+  writes an `audit_entries` row tagged `action: 'firewall'` so
+  `/api/audit/verify` covers sidecar activity end-to-end. CLI
+  reads `PROMPTSHEON_FIREWALL_UPSTREAM_URL`,
+  `PROMPTSHEON_FIREWALL_PORT`,
+  `PROMPTSHEON_FIREWALL_BLOCK_THRESHOLD`, and a JSON-encoded
+  `PROMPTSHEON_FIREWALL_UPSTREAM_HEADERS` for auth passthrough.
+  18 new vitest cases covering `extractPromptText` (OpenAI +
+  Anthropic shapes), `FirewallPolicy` (clean / warn / block
+  thresholds), and the middleware round-trip with a stub
+  upstream asserting the forwarded body + the audit row.
+- **T4 CLI improvements** — `packages/cli/` restructured into
+  `version.ts` + `errors.ts` + `output.ts` + `commands.ts` +
+  dispatcher `index.ts`. Stable `PROMPTSHEON_CLI_VERSION = 0.5.0`
+  constant. Locked exit-code contract (`EXIT.OK = 0`,
+  `EXIT.BAD_ARGS = 2`, `EXIT.API_ERROR = 3`, `EXIT.NETWORK_ERROR = 4`,
+  `EXIT.AUTH_ERROR = 5`, `EXIT.NOT_FOUND = 6`,
+  `EXIT.CONFLICT = 7`, `EXIT.PRECONDITION_FAILED = 8`).
+  Every command accepts `--json` (raw response) and mutating
+  commands accept `--dry-run` (print the would-be request,
+  exit 0). New commands: `release get <id>`, `release approve
+  <id>`, `manifest scan <hash>`. 22 vitest cases covering
+  argument validation, dry-run paths, and exit-code mapping.
+- **T4 framework integrations** — `packages/sdk/src/integrations/`
+  ships adapters for Vercel AI SDK (`withPromptsheon` wraps
+  any `LanguageModelV1`), LlamaIndex (`PromptsheonLLM` exposing
+  `complete` / `chat`), and Haystack (`PromptsheonGenerator`
+  with `run` / `stream`). All three route through promptsheon's
+  OpenAI-compatible gateway so caching + audit chain apply
+  transparently. Structural typing keeps the SDK
+  framework-package-free; consumers install the framework
+  themselves. 9 vitest cases exercise the wire format against
+  an in-process OpenAI-shaped stub.
+- **T4 VS Code extension** — `extensions/promptsheon/` ships an
+  extension that activates on `.promptsheon.json|yaml|yml`
+  files. Pure validation logic in `src/validate.ts` runs the
+  shared `ManifestSchema` locally, then posts the body to the
+  server's new `POST /api/manifests/validate` endpoint for
+  the canonical verdict; issues surface as VS Code
+  diagnostics. Hover provider surfaces `Planner` / `Agent` /
+  `Tool` / `Guardrail` documentation. The `promptsheon: Send to
+  Playground` command opens `/app/playground?manifest=...` with
+  the current buffer pre-loaded. The repo root's pnpm-workspace
+  config now also lists `extensions/promptsheon` so the extension
+  shares the workspace's `@promptsheon/shared` dep. Node:test
+  coverage of the pure validation (9 cases).
+- **T4 multi-region replication + failover** —
+  `packages/server/src/replication/` ships the audit-chain
+  replicator. `FileTarget` ships frames to a sibling SQLite
+  replica (idempotent on `id`; works around the
+  `audit_chain_state_no_update` trigger by setting
+  `updated_by_app = 1`). `HttpTarget` POSTs frames to a
+  remote replica's new `/api/audit/ingest` endpoint with a
+  `/api/audit/replication-state` companion that returns the
+  replica's high-water mark. The replicator daemon
+  (`pnpm --filter @promptsheon/server db:replicate`) tails
+  the primary in batches of 500 frames, polling every
+  `PROMPTSHEON_REPLICA_INTERVAL_MS` ms; `PROMPTSHEON_REPLICA_ONESHOT=1`
+  exits after a single batch for tests. The failover CLI
+  (`pnpm --filter @promptsheon/server db:failover`) compares
+  primary vs replica `audit_chain_state.last_rowid`, refuses
+  to cut over if the replica is behind, and supports a
+  `PROMPTSHEON_FAILOVER_FORCE=1` override for the documented
+  accept-the-data-loss case. 7 vitest cases cover
+  single-frame ship, idempotency, 10k-frame batch, chain
+  continuity, and bounded lag measurement. Scope decision:
+  the doc bundled "replication" + "active-active failover" in
+  one bullet; better-sqlite3 is single-writer, so we ship
+  audit-chain-only replication ( (the only data auditors
+  require durable multi-region copies of) and treat failover
+  as a documented operator runbook + safety belt rather than
+  transparent active-active.
+
+### Changed
+- `POST /api/executions` and `POST /api/invoke` now persist
+  the full inputs JSON in `executions.inputs` (was a SHA-256
+  hash that prevented replay). The hash is preserved in a new
+  `input_hash` column for dedup.
+- Extended the scanner regexes to close real gaps the benchmark
+  exposed: phone numbers with dot separators, multi-word
+  role-switch / tool-abuse patterns, "from registry https://…attacker"
+  supply-chain payloads, "no auth check" plugin misconfigurations,
+  "jailbroken" (the adjective, not just "jailbreak"), and a
+  tightened `jailbreak.dan` regex that no longer fires on the
+  DAN-group acronym.
+
 ## [v0.4.2] - 2026-08-25
 
 The end-of-audit release. Closes every issue surfaced by the
