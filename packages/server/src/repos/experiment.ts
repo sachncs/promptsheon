@@ -1,5 +1,10 @@
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
+import {
+  buildSignificanceReport,
+  type SignificanceReport,
+  type VariantStats,
+} from '../analysis/significance.js';
 
 export interface ExperimentVariant {
   id: string;
@@ -139,5 +144,40 @@ export class ExperimentRepo {
         weight: v.weight,
       };
     });
+  }
+
+  /**
+   * Per-variant counts in the shape the significance module
+   * expects: label, passes, fails, total, pass-rate.
+   */
+  variantStats(releaseId: string): VariantStats[] {
+    return this.listVariants(releaseId).map((v) => {
+      const assignments = this.listAssignments(v.id);
+      const passes = assignments.filter((a) => a.outcome === 'pass').length;
+      const fails = assignments.filter((a) => a.outcome === 'fail').length;
+      const cases = assignments.length;
+      return {
+        label: v.label,
+        cases,
+        passes,
+        fails,
+        passRate: cases > 0 ? passes / cases : 0,
+      };
+    });
+  }
+
+  /**
+   * Statistical-significance summary for a release's variants:
+   * pairwise two-proportion z-tests + Bayesian beta-binomial
+   * Monte Carlo, plus a winner verdict when at least one pair is
+   * significant at the supplied alpha.
+   *
+   * Returns null when no variant has any observations.
+   */
+  summarize(
+    releaseId: string,
+    options: { alpha?: number; bayesSamples?: number } = {},
+  ): SignificanceReport | null {
+    return buildSignificanceReport(this.variantStats(releaseId), options);
   }
 }
