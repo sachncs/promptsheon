@@ -443,9 +443,49 @@ Point any client at `http://127.0.0.1:9090/v1/chat/completions`
 instead of the upstream URL. The firewall transparently forwards
 when the scanner verdict is `clean`, attaches an
 `X-Promptsheon-Warning` header on `warn`, and rejects with
-`422 PROMPT_BLOCKED` on `block`. The implementation lives at
+`422 PROMPT_BLOCKED`. The implementation lives at
 `packages/server/src/firewall/`; the policy + scanner extension
 shipped with T3-5 carries over unchanged.
+
+### Framework integrations
+
+`packages/sdk/src/integrations/` ships adapters for the three
+agent frameworks the doc names. All three route through the
+promptsheon OpenAI-compatible gateway so caching + the audit
+chain apply transparently.
+
+```ts
+// Vercel AI SDK
+import { openai } from '@ai-sdk/openai';
+import { withPromptsheon } from '@promptsheon/sdk/integrations/vercel-ai-sdk';
+const model = withPromptsheon(openai('gpt-4'), {
+  gatewayUrl: 'https://promptsheon.example.com',
+  apiKey: process.env.PROMPTSHEON_API_KEY!,
+});
+
+// LlamaIndex
+import { PromptsheonLLM } from '@promptsheon/sdk/integrations/llamaindex';
+const llm = new PromptsheonLLM({
+  gatewayUrl: 'https://promptsheon.example.com',
+  apiKey: process.env.PROMPTSHEON_API_KEY!,
+  model: 'gpt-4',
+});
+
+// Haystack
+import { PromptsheonGenerator } from '@promptsheon/sdk/integrations/haystack';
+const generator = new PromptsheonGenerator({
+  gatewayUrl: 'https://promptsheon.example.com',
+  apiKey: process.env.PROMPTSHEON_API_KEY!,
+  model: 'gpt-4',
+});
+```
+
+The adapters use structural typing (no `@ai-sdk/provider`,
+`llama-index-core`, or `@haystack/core` runtime dep) so the SDK
+stays framework-optional — install the framework package
+yourself and pass a model that satisfies the shape. 9 vitest
+cases exercise the wire format against an in-process
+OpenAI-shaped stub.
 
 ## License
 

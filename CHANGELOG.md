@@ -96,6 +96,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exit 0). New commands: `release get <id>`, `release approve
   <id>`, `manifest scan <hash>`. 22 vitest cases covering
   argument validation, dry-run paths, and exit-code mapping.
+- **T4 framework integrations** — `packages/sdk/src/integrations/`
+  ships adapters for Vercel AI SDK (`withPromptsheon` wraps
+  any `LanguageModelV1`), LlamaIndex (`PromptsheonLLM` exposing
+  `complete` / `chat`), and Haystack (`PromptsheonGenerator`
+  with `run` / `stream`). All three route through promptsheon's
+  OpenAI-compatible gateway so caching + audit chain apply
+  transparently. Structural typing keeps the SDK
+  framework-package-free; consumers install the framework
+  themselves. 9 vitest cases exercise the wire format against
+  an in-process OpenAI-shaped stub.
 
 ### Changed
 - `POST /api/executions` and `POST /api/invoke` now persist

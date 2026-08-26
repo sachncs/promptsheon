@@ -7,7 +7,7 @@
     "dev:server": "pnpm --dir server dev",
     "dev:frontend": "sh -c 'cd ../frontend && pnpm dev'",
     "build": "pnpm --dir shared build && pnpm --dir server build && sh -c 'cd ../frontend && pnpm build'",
-    "typecheck": "pnpm --dir shared typecheck && pnpm --dir server typecheck && sh -c 'cd ../frontend && pnpm typecheck' && pnpm --dir cli typecheck",
+    "typecheck": "pnpm --dir shared typecheck && pnpm --dir server typecheck && sh -c 'cd ../frontend && pnpm typecheck' && pnpm --dir cli typecheck && pnpm --dir sdk typecheck",
     "test": "pnpm --dir server test"
   },
   "devDependencies": {

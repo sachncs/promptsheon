@@ -154,3 +154,24 @@ export class PromptsheonClient {
     return this.call({ method: 'POST', path: `/repos/${repoId}/eval-gate`, body: { trials } });
   }
 }
+
+// Re-export the framework integrations from sub-paths so callers
+// can import everything from the package root.
+export {
+  withPromptsheon,
+  type PromptsheonVercelOptions,
+  type VercelLanguageModel,
+} from './integrations/vercel-ai-sdk.js';
+export {
+  PromptsheonLLM,
+  type PromptsheonLlamaindexOptions,
+  type LlamaindexMessageLike,
+  type LlamaindexCompletionRequest,
+  type LlamaindexCompletionResponse,
+} from './integrations/llamaindex.js';
+export {
+  PromptsheonGenerator,
+  type PromptsheonHaystackOptions,
+  type HaystackPrompt,
+  type HaystackAnswer,
+} from './integrations/haystack.js';
