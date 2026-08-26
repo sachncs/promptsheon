@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Cedar authorization (IN-0)** — `packages/server/src/policy/`
+  ships the single source of truth for every authorization
+  decision in the platform. New: `authorizer.ts` (loads +
+  caches the policy + schema), `principal.ts` (extracts the
+  principal from request headers, including a `Role` path
+  for tests + replay tooling), `gate.ts` (Fastify preHandler
+  that calls the authorizer), `regression.ts` + `eval-cli.ts`
+  (the `pnpm policy:eval` script that fails CI on any drift
+  in `policies/promptsheon.cedar`), and the schema + policy
+  files at `packages/server/policies/promptsheon.cedar` and
+  `packages/server/test/policy/cases.json`. The smoke-test
+  route migration is in `routes/org-team.ts`; the existing
+  `requireRole` helper in `middleware/org-context.ts` is left
+  in place for callers that haven't migrated yet. The boot
+  sequence (`src/index.ts`) installs the singleton authorizer
+  at boot. Tests: 9 authorizer + 15 principal + 2 regression
+  + 4 gate = 30 new vitest cases. `pnpm policy:eval` exits 0
+  with 14/14 cases passing.
+
 - **T3-1 time-travel debugging** (`/api/executions/:id/replay`).
   Re-runs any past execution with the same manifest, model,
   environment, and inputs; the new execution is linked to the
