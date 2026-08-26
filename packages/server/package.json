@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "bench:security": "node --import tsx src/security/benchmark-cli.ts",
-    "firewall": "node --import tsx src/firewall/cli.ts"
+    "firewall": "node --import tsx src/firewall/cli.ts",
+    "db:replicate": "node --import tsx src/replication/cli.ts",
+    "db:failover": "node --import tsx src/replication/failover-cli.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

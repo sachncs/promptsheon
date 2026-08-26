@@ -119,6 +119,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   config now also lists `extensions/promptsheon` so the extension
   shares the workspace's `@promptsheon/shared` dep. Node:test
   coverage of the pure validation (9 cases).
+- **T4 multi-region replication + failover** —
+  `packages/server/src/replication/` ships the audit-chain
+  replicator. `FileTarget` ships frames to a sibling SQLite
+  replica (idempotent on `id`; works around the
+  `audit_chain_state_no_update` trigger by setting
+  `updated_by_app = 1`). `HttpTarget` POSTs frames to a
+  remote replica's new `/api/audit/ingest` endpoint with a
+  `/api/audit/replication-state` companion that returns the
+  replica's high-water mark. The replicator daemon
+  (`pnpm --filter @promptsheon/server db:replicate`) tails
+  the primary in batches of 500 frames, polling every
+  `PROMPTSHEON_REPLICA_INTERVAL_MS` ms; `PROMPTSHEON_REPLICA_ONESHOT=1`
+  exits after a single batch for tests. The failover CLI
+  (`pnpm --filter @promptsheon/server db:failover`) compares
+  primary vs replica `audit_chain_state.last_rowid`, refuses
+  to cut over if the replica is behind, and supports a
+  `PROMPTSHEON_FAILOVER_FORCE=1` override for the documented
+  accept-the-data-loss case. 7 vitest cases cover
+  single-frame ship, idempotency, 10k-frame batch, chain
+  continuity, and bounded lag measurement. Scope decision:
+  the doc bundled "replication" + "active-active failover" in
+  one bullet; better-sqlite3 is single-writer, so we ship
+  audit-chain-only replication ( (the only data auditors
+  require durable multi-region copies of) and treat failover
+  as a documented operator runbook + safety belt rather than
+  transparent active-active.
 
 ### Changed
 - `POST /api/executions` and `POST /api/invoke` now persist
