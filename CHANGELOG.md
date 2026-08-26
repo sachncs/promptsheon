@@ -53,6 +53,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GET /api/releases/:id/experiments/summary?alpha=0.05&bayesSamples=10000`
   exposes it. The winner verdict is only set when the pairwise
   test against the runner-up is significant at α=0.05.
+- **T4 cost forecast + budget alerts** — per-org `cost_budgets`
+  with weekly/monthly periods + `alert_threshold` (fraction of
+  `limit_micros`). Migration 050 also adds `cost_forecast_snapshots`
+  for the dashboard cache. `analysis/forecast.ts` ships an
+  OLS linear-regression projection with a 95% confidence band,
+  blended against the naive "current spend × (total/remaining)"
+  estimate so day-1 of the period doesn't under-report.
+  `CostForecastService.compute(orgId)` returns the snapshot +
+  the alerts that would fire right now; `updateLastAlerted`
+  applies a 1-hour cooldown so the webhook doesn't storm on
+  every dashboard load. CRUD lives at `/api/admin/budgets`;
+  the projection at `/api/admin/cost-forecast?organizationId=&windowDays=`.
+  26 new vitest cases across the math, repo, and route layers.
 
 ### Changed
 - `POST /api/executions` and `POST /api/invoke` now persist

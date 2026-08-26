@@ -57,6 +57,7 @@ import { registerAnalyticsRoutes } from './analytics.js';
 import { registerTeamRoutes } from './team.js';
 import { registerSecurityRoutes } from './security.js';
 import { registerAuditReportRoutes } from './audit-report.js';
+import { registerBudgetRoutes } from './budget.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 
@@ -84,6 +85,7 @@ import type { ManifestRepo } from '../repos/manifest.js';
 import type { GoalBasedEvolutionAgent } from '../agents/evolution/goal-evolver.js';
 import type { ChaosConfig } from '../hardening/chaos.js';
 import type Database from 'better-sqlite3';
+import type { BudgetDeps } from './budget.js';
 
 export interface AppDeps {
   db: Database.Database;
@@ -116,6 +118,7 @@ export interface AppDeps {
   membershipRepo: import('../repos/org.js').MembershipRepo;
   webhookReceiver: WebhookReceiver;
   chaosConfig?: ChaosConfig;
+  budgetDeps?: BudgetDeps;
   auditChain: AuditChain;
   apiKeyRepo: ApiKeyRepo;
   userRepo: UserRepo;
@@ -240,4 +243,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   });
   registerSecurityRoutes(app, { scanRepo: deps.promptScanRepo });
   registerAuditReportRoutes(app, { auditChain: deps.auditChain });
+  if (deps.budgetDeps) {
+    registerBudgetRoutes(app, deps.budgetDeps);
+  }
 }

@@ -34,6 +34,8 @@ import { UserAnalyticsRepo } from './repos/user-analytics.js';
 import { TeamRepo, SsoConfigRepo } from './repos/team.js';
 import { PromptScanRepo } from './repos/prompt-scan.js';
 import { OrgExportService, CostRollupRepo } from './repos/vault-extras.js';
+import { CostBudgetRepo } from './repos/budget.js';
+import { CostForecastService } from './analysis/forecast.js';
 import { RedteamRepo } from './repos/redteam.js';
 import { ExperimentRepo } from './repos/experiment.js';
 import { IncidentRepo } from './repos/incident.js';
@@ -139,6 +141,13 @@ async function main() {
 );
   const orgExportService = new OrgExportService(db, vaultRepo);
   const costRollupRepo = new CostRollupRepo(db);
+  const budgetRepo = new CostBudgetRepo(db);
+  const forecastService = new CostForecastService(db, {
+    rollups: costRollupRepo,
+    persistSnapshot: (snap) => budgetRepo.insertForecastSnapshot(snap),
+    listBudgets: (orgId) => budgetRepo.listForOrg(orgId),
+    updateLastAlerted: (id, ts) => budgetRepo.updateLastAlerted(id, ts),
+  });
   const traceRepo = new TraceRepo(db);
   const traceScoreRepo = new TraceScoreRepo(db);
   const userAnalyticsRepo = new UserAnalyticsRepo(db);
@@ -399,6 +408,10 @@ async function main() {
     ssoConfigRepo,
     promptScanRepo,
     gateway,
+    budgetDeps: {
+      budgetRepo,
+      forecastService,
+    },
     orgSettingsDeps: {
       orgSettingsRepo,
       vaultRepo,
