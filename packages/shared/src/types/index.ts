@@ -57,6 +57,7 @@ export type {
 } from './release.js';
 export { canTransition } from './release.js';
 export type { Execution, ExecutionReplay, ReplayDiffSummary } from './execution.js';
+export type { CostBudget, CostForecast, CostForecastSnapshot, BudgetPeriod } from './budget.js';
 export type { Dataset, DatasetCase } from './dataset.js';
 export type { EvalRun, EvalResult, EvalRunStatus } from './eval.js';
 export type {

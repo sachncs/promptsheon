@@ -38,6 +38,8 @@ DROP TABLE IF EXISTS approvals;
 DROP TABLE IF EXISTS releases;
 DROP TABLE IF EXISTS executions;
 DROP TABLE IF EXISTS execution_replays;
+DROP TABLE IF EXISTS cost_forecast_snapshots;
+DROP TABLE IF EXISTS cost_budgets;
 DROP TABLE IF EXISTS capability_versions;
 DROP TABLE IF EXISTS capabilities;
 DROP TABLE IF EXISTS projects;
