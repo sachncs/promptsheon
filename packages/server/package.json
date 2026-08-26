@@ -10,7 +10,8 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "bench:security": "node --import tsx src/security/benchmark-cli.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

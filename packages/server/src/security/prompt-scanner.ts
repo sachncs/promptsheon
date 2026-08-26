@@ -62,7 +62,7 @@ const PII_RULES: RuleHit[] = [
     rule: 'pii.phone',
     severity: 'warn',
     description: 'Phone number detected',
-    re: /\b(?:\+?\d{1,3}[ -]?)?\(?\d{3}\)?[ -]?\d{3}[ -]?\d{4}\b/g,
+    re: /\b(?:\+?\d{1,3}[ .-]?)?\(?\d{3}\)?[ .-]?\d{3}[ .-]?\d{4}\b/g,
   },
   {
     rule: 'pii.iban',
@@ -95,7 +95,7 @@ const INJECTION_RULES: RuleHit[] = [
     rule: 'injection.ignore-previous',
     severity: 'block',
     description: 'Prompt-injection: "ignore previous instructions" pattern',
-    re: /\b(?:ignore|disregard|forget|skip)\b[^.\n]*\b(?:previous|prior|above|earlier)\b[^.\n]*\b(?:instructions?|rules?|prompts?|directives?)\b/gi,
+    re: /\b(?:ignore|disregard|forget|skip|drop)\b[^.\n]{0,120}\b(?:previous|prior|above|earlier|told|given|everything)\b(?:[^.\n]{0,80}\b(?:instructions?|rules?|prompts?|directives?|guidelines?))?/gi,
   },
   {
     rule: 'injection.system-override',
@@ -107,19 +107,19 @@ const INJECTION_RULES: RuleHit[] = [
     rule: 'injection.role-switch',
     severity: 'block',
     description: 'Prompt-injection: explicit role-switch instruction',
-    re: /\b(?:you are now|act as|pretend to be|roleplay as|simulate being)\b[^.\n]{0,80}\b(?:developer|admin|root|jailbreak)\b/gi,
+    re: /\b(?:you are (?:now )?a?|you're (?:now )?a|act as|pretend to be|roleplay as|simulate being|from this point on[,.]\s*you are|bump your role|promote to|elevat\w* to)\b[^.\n]{0,120}\b(?:developer|admin(?:istrator)?|superuser|root|jailbreak(?:er|ers)?|jailbroken|unrestrict\w*|unfiltered|system)\b/gi,
   },
   {
     rule: 'injection.instruction-injection',
     severity: 'block',
     description: 'Prompt-injection: instruction-bypass attempt',
-    re: /\b(?:reveal|print|leak|exfiltrate|disclose)\b[^.\n]{0,80}\b(?:system\s*prompt|hidden\s*instructions?|developer\s*message|secret)\b/gi,
+    re: /\b(?:reveal|print|leak|exfiltrate|disclose|output|repeat|show)\b[^.\n]{0,120}\b(?:system\s*prompt|hidden\s*instructions?|developer\s*message|secret|conversation\s*history|above\s*prompt|prior\s*prompt|model\s*weights|architecture)\b/gi,
   },
   {
     rule: 'injection.tool-abuse',
     severity: 'warn',
     description: 'Suspicious tool-call instruction (potential data exfiltration)',
-    re: /\b(?:curl|wget|fetch|exec|eval)\s*\(?[^.\n]{0,80}\b(?:https?:\/\/|env|secret|token)\b/gi,
+    re: /\b(?:(?:curl|wget|fetch|exec|eval|drop|delete|truncate|pip\s+install|npm\s+install|auto-approve|run\s+tool|email\s+the\s+contents|replicate\s+(?:your|the)|distill\w*|with\s+no\s+(?:rate\s*limit|auth(?:entication)?|authorization)|from\s+(?:registry\s+)?https?:\/\/)[^\n]{0,120}(?:https?:\/\/|env|secret|token|production|database|role|attacker|evil|c2|burpcollaborator|interactsh|contents|limit|behaviour|behavior)?|no\s+auth(?:entication)?\s+check|delete-everything)\b/gi,
   },
 ];
 
@@ -128,25 +128,25 @@ const JAILBREAK_RULES: RuleHit[] = [
     rule: 'jailbreak.dan',
     severity: 'block',
     description: 'Jailbreak: "do-anything-now" pattern',
-    re: /\b(?:do anything now|DAN|jailbreak)\b/gi,
+    re: /\b(?:do anything now|DAN(?:\s+mode|\s+can|\s+will|\s+is)|jailbreak(?:er|ers)?|jailbroken)\b/gi,
   },
   {
     rule: 'jailbreak.token-leak',
     severity: 'block',
     description: 'Jailbreak: attempt to leak hidden prompt',
-    re: /\b(?:print|repeat|reveal)\b[^.\n]{0,80}\b(?:above|previous|hidden)\b[^.\n]{0,80}\b(?:prompt|instructions?|system)\b/gi,
+    re: /\b(?:print|repeat|reveal|show|output)\b[^.\n]{0,120}\b(?:above|previous|hidden)\b[^.\n]{0,80}\b(?:prompt|instructions?|system)\b/gi,
   },
   {
     rule: 'jailbreak.evil-twin',
     severity: 'warn',
     description: 'Jailbreak: "DAN-style" persona request',
-    re: /\b(?:you are (?:now )?a|act as|roleplay|impersonate)\b[^.\n]{0,80}\b(?:jailbroken|unethical|unfiltered)\b/gi,
+    re: /\b(?:you are (?:now )?a?|act as|roleplay|impersonate|simulate being)\b[^.\n]{0,120}\b(?:jailbreak(?:er|ers)?|jailbroken|unethical|unfiltered|unrestrict\w*)\b/gi,
   },
   {
     rule: 'jailbreak.reverse-shell',
     severity: 'block',
     description: 'Jailbreak: payload exfiltration / reverse shell pattern',
-    re: /\b(?:curl|wget|fetch)\b[^.\n]{0,80}\b(?:attacker|evil|c2|webhook|burpcollaborator|interactsh)\b/gi,
+    re: /\b(?:curl|wget|fetch)\b[^.\n]{0,120}\b(?:attacker|evil|c2|webhook|burpcollaborator|interactsh)\b/gi,
   },
 ];
 
