@@ -100,6 +100,14 @@ export function principalFromRequest(
     }
     return null;
   }
+  // Role principal: explicit `X-Principal-Type: role` + `X-Principal-Id`
+  // headers. Used by tests + Cedar-replay tooling to evaluate the
+  // policy against a specific role without a real session.
+  const principalType = (headers as Record<string, string | undefined>)['x-principal-type'];
+  const principalId = (headers as Record<string, string | undefined>)['x-principal-id'];
+  if (principalType === 'role' && typeof principalId === 'string' && principalId.length > 0) {
+    return { type: 'Role', id: principalId, orgId: orgId ?? 'unscoped', role: principalId };
+  }
   return null;
 }
 
