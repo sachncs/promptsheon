@@ -424,6 +424,29 @@ The step-by-step runbook —
 covers pre-flight, FIPS-mode requirements, upgrades, backups,
 DR, and the FIPS gate's `refuse to boot` contract.
 
+### Running the firewall sidecar
+
+The firewall sits in front of *any* LLM application (not just
+promptsheon-managed ones) and inspects every prompt + response
+against the T2-3 scanner. Block / warn / allow decisions are
+written to the audit chain so `/api/audit/verify` covers sidecar
+traffic end-to-end.
+
+```bash
+# Start the sidecar with an OpenAI-compatible upstream:
+PROMPTSHEON_FIREWALL_UPSTREAM_URL=https://api.openai.com \
+PROMPTSHEON_FIREWALL_PORT=9090 \
+  pnpm --filter @promptsheon/server firewall
+```
+
+Point any client at `http://127.0.0.1:9090/v1/chat/completions`
+instead of the upstream URL. The firewall transparently forwards
+when the scanner verdict is `clean`, attaches an
+`X-Promptsheon-Warning` header on `warn`, and rejects with
+`422 PROMPT_BLOCKED` on `block`. The implementation lives at
+`packages/server/src/firewall/`; the policy + scanner extension
+shipped with T3-5 carries over unchanged.
+
 ## License
 
 [Apache-2.0](LICENSE) © 2026 Sachin — **sachncs@gmail.com**.

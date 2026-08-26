@@ -66,6 +66,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every dashboard load. CRUD lives at `/api/admin/budgets`;
   the projection at `/api/admin/cost-forecast?organizationId=&windowDays=`.
   26 new vitest cases across the math, repo, and route layers.
+- **T3-2 prompt firewall sidecar** — `packages/server/src/firewall/`
+  ships the sidecar as both a Fastify plugin (mount on the same
+  app as the rest of the routes) and a standalone CLI launcher
+  (`pnpm --filter @promptsheon/server firewall`). The policy
+  extracts the prompt text out of OpenAI- and Anthropic-shaped
+  bodies, runs the T2-3 scanner, and either forwards as-is,
+  forwards with an `X-Promptsheon-Warning` header, or rejects
+  with `422 PROMPT_BLOCKED`. Every call — allow, warn, block —
+  writes an `audit_entries` row tagged `action: 'firewall'` so
+  `/api/audit/verify` covers sidecar activity end-to-end. CLI
+  reads `PROMPTSHEON_FIREWALL_UPSTREAM_URL`,
+  `PROMPTSHEON_FIREWALL_PORT`,
+  `PROMPTSHEON_FIREWALL_BLOCK_THRESHOLD`, and a JSON-encoded
+  `PROMPTSHEON_FIREWALL_UPSTREAM_HEADERS` for auth passthrough.
+  18 new vitest cases covering `extractPromptText` (OpenAI +
+  Anthropic shapes), `FirewallPolicy` (clean / warn / block
+  thresholds), and the middleware round-trip with a stub
+  upstream asserting the forwarded body + the audit row.
 
 ### Changed
 - `POST /api/executions` and `POST /api/invoke` now persist
