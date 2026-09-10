@@ -45,9 +45,10 @@ describe('Migration 025 (orgs/teams/users)', () => {
     db.prepare(`INSERT INTO orgs (id, name, slug, created_at, updated_at) VALUES ('o1', 'Org', 'org', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
     const cols = db.prepare("PRAGMA table_info(teams)").all() as Array<{ name: string }>;
     expect(cols.map((c) => c.name)).toContain('org_id');
-    db.prepare(`INSERT INTO teams (id, org_id, name, created_at) VALUES ('t1', 'o1', 'Engineering', '2026-01-01T00:00:00Z')`).run();
-    const row = db.prepare("SELECT * FROM teams WHERE id = 't1'").get() as { org_id: string };
+    db.prepare(`INSERT INTO teams (id, org_id, organisation_id, name, slug, description, created_at, updated_at) VALUES ('t1', 'o1', 'o1', 'Engineering', 'engineering', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
+    const row = db.prepare("SELECT * FROM teams WHERE id = 't1'").get() as { org_id: string; organisation_id: string };
     expect(row.org_id).toBe('o1');
+    expect(row.organisation_id).toBe('o1');
   });
 
   it('orgs.slug is unique', () => {
@@ -75,17 +76,13 @@ describe('Migration 025 (orgs/teams/users)', () => {
   it('org cascade deletes teams and members (user removed via FK)', () => {
     db.prepare(`INSERT INTO orgs (id, name, slug, created_at, updated_at) VALUES ('o1', 'Org', 'org', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
     db.prepare(`INSERT INTO users (id, org_id, email, name, role, created_at, updated_at) VALUES ('u1', 'o1', 'a@b.com', 'A', 'viewer', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
-    db.prepare(`INSERT INTO teams (id, org_id, name, created_at) VALUES ('t1', 'o1', 'Eng', '2026-01-01T00:00:00Z')`).run();
+    db.prepare(`INSERT INTO teams (id, org_id, organisation_id, name, slug, description, created_at, updated_at) VALUES ('t1', 'o1', 'o1', 'Eng', 'eng', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
     db.prepare(`INSERT INTO team_members (team_id, user_id, joined_at) VALUES ('t1', 'u1', '2026-01-01T00:00:00Z')`).run();
     db.prepare(`INSERT INTO org_members (org_id, user_id, role, joined_at) VALUES ('o1', 'u1', 'viewer', '2026-01-01T00:00:00Z')`).run();
-    // Add team_members FKs visible in PRAGMA
-    const fks = db.prepare("PRAGMA foreign_key_list(teams)").all() as Array<{ table: string; on_delete: string }>;
-    console.log('teams FKs:', JSON.stringify(fks));
     db.prepare("DELETE FROM orgs WHERE id = 'o1'").run();
     const teamsCount = (db.prepare("SELECT COUNT(*) as c FROM teams").get() as { c: number }).c;
     const tmCount = (db.prepare("SELECT COUNT(*) as c FROM team_members").get() as { c: number }).c;
     const omCount = (db.prepare("SELECT COUNT(*) as c FROM org_members").get() as { c: number }).c;
-    console.log(`after delete: teams=${teamsCount} team_members=${tmCount} org_members=${omCount}`);
     expect(omCount).toBe(0);
   });
 });
