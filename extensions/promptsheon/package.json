@@ -37,7 +37,7 @@
     "@promptsheon/shared": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.4.1",
     "@types/vscode": "^1.85.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
