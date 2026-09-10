@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { authMiddleware } from '../src/middleware/auth.js';
 import type { AppConfig } from '@promptsheon/shared';
@@ -12,8 +12,14 @@ function makeReq(headers: HeaderMap, url = '/api/workspaces'): FastifyRequest {
   } as unknown as FastifyRequest;
 }
 
-function makeReply(): { reply: FastifyReply; code: number; body: unknown } {
-  const state = { code: 200, body: undefined as unknown };
+interface MockReply {
+  code: number;
+  body: unknown;
+  reply: FastifyReply;
+}
+
+function makeReply(): MockReply {
+  const state = { code: 200 as number, body: undefined as unknown };
   const reply = {
     code(c: number) {
       state.code = c;
@@ -24,7 +30,11 @@ function makeReply(): { reply: FastifyReply; code: number; body: unknown } {
       return this;
     },
   } as unknown as FastifyReply;
-  return { reply, get code() { return state.code; }, get body() { return state.body; } } as never;
+  return {
+    reply,
+    get code() { return state.code; },
+    get body() { return state.body; },
+  };
 }
 
 function makeApiKeyRepo(opts: {
@@ -75,10 +85,10 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
       'x-user-id': 'admin',
       'x-org-id': 'o1',
     });
-    const reply = makeReply();
-    await mw(req, reply as never);
-    expect(reply.code).toBe(401);
-    expect(reply.body).toEqual({
+    const mock = makeReply();
+    await mw(req, mock.reply);
+    expect(mock.code).toBe(401);
+    expect(mock.body).toEqual({
       error: { code: 'UNAUTHORIZED', message: 'Missing authorization header' },
     });
   });
@@ -87,9 +97,9 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
     const apiKeyRepo = makeApiKeyRepo({});
     const mw = authMiddleware(baseConfig, apiKeyRepo);
     const req = makeReq({});
-    const reply = makeReply();
-    await mw(req, reply as never);
-    expect(reply.code).toBe(401);
+    const mock = makeReply();
+    await mw(req, mock.reply);
+    expect(mock.code).toBe(401);
   });
 
   it('accepts Bearer token and stamps userId + userRole on the request', async () => {
@@ -104,9 +114,9 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
     });
     const mw = authMiddleware(baseConfig, apiKeyRepo);
     const req = makeReq({ authorization: 'Bearer abc123' });
-    const reply = makeReply();
-    await mw(req, reply as never);
-    expect(reply.code).toBe(200);
+    const mock = makeReply();
+    await mw(req, mock.reply);
+    expect(mock.code).toBe(200);
     expect((req as unknown as Record<string, string>).userId).toBe('u1');
     expect((req as unknown as Record<string, string>).userRole).toBe('admin');
   });
@@ -117,9 +127,9 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
     });
     const mw = authMiddleware(baseConfig, apiKeyRepo);
     const req = makeReq({ authorization: 'Bearer abc' });
-    const reply = makeReply();
-    await mw(req, reply as never);
-    expect(reply.code).toBe(401);
+    const mock = makeReply();
+    await mw(req, mock.reply);
+    expect(mock.code).toBe(401);
   });
 
   it('rejects expired Bearer tokens with 401', async () => {
@@ -134,9 +144,9 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
     });
     const mw = authMiddleware(baseConfig, apiKeyRepo);
     const req = makeReq({ authorization: 'Bearer abc' });
-    const reply = makeReply();
-    await mw(req, reply as never);
-    expect(reply.code).toBe(401);
+    const mock = makeReply();
+    await mw(req, mock.reply);
+    expect(mock.code).toBe(401);
   });
 
   it('honours X-User-Id fallback only when auth is disabled', async () => {
@@ -146,18 +156,18 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
     };
     const mw = authMiddleware(config, makeApiKeyRepo({}));
     const req = makeReq({ 'x-user-id': 'dev' });
-    const reply = makeReply();
-    await mw(req, reply as never);
-    expect(reply.code).toBe(200);
+    const mock = makeReply();
+    await mw(req, mock.reply);
+    expect(mock.code).toBe(200);
     expect((req as unknown as Record<string, string>).userId).toBe('dev');
   });
 
   it('tags the request as bootstrap on /api/bootstrap/* paths', async () => {
     const mw = authMiddleware(baseConfig, makeApiKeyRepo({}));
     const req = makeReq({}, '/api/bootstrap/admin');
-    const reply = makeReply();
-    await mw(req, reply as never);
-    expect(reply.code).toBe(200);
+    const mock = makeReply();
+    await mw(req, mock.reply);
+    expect(mock.code).toBe(200);
     expect((req as unknown as Record<string, string>).userId).toBe('bootstrap');
   });
 
@@ -165,9 +175,9 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
     const mw = authMiddleware(baseConfig, makeApiKeyRepo({}));
     for (const path of ['/api/health', '/api/openapi.json', '/api/audit/verify', '/api/audit/state']) {
       const req = makeReq({}, path);
-      const reply = makeReply();
-      await mw(req, reply as never);
-      expect(reply.code).toBe(200);
+      const mock = makeReply();
+      await mw(req, mock.reply);
+      expect(mock.code).toBe(200);
       expect((req as unknown as Record<string, string>).userId).toBe('public');
     }
   });
