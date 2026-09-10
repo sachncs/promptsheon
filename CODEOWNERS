@@ -33,10 +33,8 @@ packages/server/API.md                     @sachncs
 
 # CI, build, release. /.github/workflows/ is covered by
 # the directory glob above.
-# A /Dockerfile rule will land alongside the multi-stage
-# build that closes #63; do not add it prematurely — a
-# rule for a path that does not exist is a no-op and
-# confuses new contributors.
+/Dockerfile                                @sachncs
+/.dockerignore                             @sachncs
 /SECURITY.md                               @sachncs
 /CONTRIBUTING.md                           @sachncs
 /CODE_OF_CONDUCT.md                        @sachncs

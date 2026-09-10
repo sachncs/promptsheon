@@ -72,6 +72,20 @@ jobs:
     needs: [test, build]
     if: github.event_name == 'push'
     steps:
-      - uses: actions/checkout@v7
-      - run: docker build -t promptsheon:ci .
-      - run: docker run --rm promptsheon:ci node server/dist/index.js --check
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build the promptsheon image
+        run: docker build -t promptsheon:ci .
+      - name: Smoke check (syntax + import graph)
+        run: docker run --rm promptsheon:ci node server/dist/index.js --check
+      - name: Boot the server and hit /api/health
+        run: |
+          docker run --rm -d --name promptsheon-ci \
+            -p 8080:8080 \
+            -e PROMPTSHEON_DB_PATH=/tmp/promptsheon.db \
+            -e PROMPTSHEON_CAS_PATH=/tmp/.promptsheon \
+            promptsheon:ci
+          sleep 5
+          curl -fsS http://127.0.0.1:8080/api/health | jq .
+          docker stop promptsheon-ci

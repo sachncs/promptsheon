@@ -1,0 +1,72 @@
+# Promptsheon build context — exclude everything that isn't
+# needed to build the Docker image. Keeps the build context
+# small and the cache layers focused on source changes.
+
+.git
+.github
+.opencode
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+
+# Build output that the Docker builder stage will re-emit.
+node_modules
+packages/*/node_modules
+packages/*/dist
+packages/shared/dist
+frontend/node_modules
+frontend/.next
+frontend/out
+frontend/test-results
+frontend/playwright-report
+extensions/*/node_modules
+
+# Documentation sites — published separately via GitHub Pages.
+index.md
+getting-started.md
+installation.md
+configuration.md
+core-concepts.md
+api-reference.md
+architecture.md
+tutorials.md
+recipes.md
+faq.md
+contributing.md
+security.md
+SUPPORT.md
+_includes
+_layouts
+_sass
+_config.yml
+assets
+_site
+
+# The operator-facing docs that aren't needed for the server.
+docs/MARKET-GAPS.md
+docs/compliance
+docs/operations
+docs/security
+
+# Tests + dev scripts.
+packages/server/test-results
+packages/server/coverage
+packages/shared/test-results
+packages/shared/coverage
+**/coverage
+**/.nyc_output
+
+# Sandbox + installer scripts that aren't part of the runtime.
+scripts/build-offline-installer.sh
+scripts/build-sbom.sh
+scripts/build-social-preview.py
+
+# Editor + IDE state.
+.vscode
+.idea
+*.swp
+*.swo
+*~

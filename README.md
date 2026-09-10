@@ -151,8 +151,15 @@ pnpm dev:frontend  # Next.js + Turbopack, :3000
 
 ### Option 3 — Docker (no Node install needed)
 
-Not shipped yet. Docker packaging is on the roadmap (see
-[Roadmap](#roadmap)).
+```bash
+docker build -t promptsheon:latest .
+docker run --rm -p 8080:8080 \
+  -e OPENAI_API_KEY=$OPENAI_API_KEY \
+  -v $PWD/.promptsheon:/data \
+  promptsheon:latest
+```
+
+The image ships a multi-stage build that compiles the shared, server, and frontend workspaces into a single non-root container. It listens on `:8080` and serves both the API and the UI from the same port. The audit chain and SQLite database live on the volume you mount at `/data`.
 
 ---
 
@@ -364,11 +371,12 @@ chore: bump @strands-agents/sdk to 1.14
   `/api/invoke` SDK alias, `/api/goals/:hash` drilldown, DAG
   editor drafts persist, `BaseRepo` camelCase mapper,
   Playwright tier suite rewritten against the new contracts
-  (377 server tests + 41-route smoke + 5 new auth/forms/audit/
+  (619 server tests + 41-route smoke + 5 new auth/forms/audit/
   manifest-detail/approvals/admin-gating tier specs).
-- **v0.5.0** (next) — Docker packaging (`Dockerfile` +
-  multi-stage build), production deployment guide, RBAC refinement
-  on the maker-checker flow, dataset import/export.
+- **v0.5.0** (next) — Docker packaging shipped
+  (`Dockerfile` + multi-stage build), production deployment
+  guide, RBAC refinement on the maker-checker flow, dataset
+  import/export.
 - **Backlog** — gRPC interface alongside HTTP, multi-tenant SSO,
   Postgres adapter behind the better-sqlite3 repo layer, Helm chart
   for Kubernetes, OpenAPI → typed client codegen.

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Docker packaging** — multi-stage `Dockerfile` that compiles
+  the shared + server + frontend workspaces into a single
+  non-root container. The runtime image is based on
+  `node:26-alpine`, exposes `:8080`, ships a healthcheck
+  against `/api/health`, and stores the SQLite + CAS on a
+  `/data` volume. The CI workflow's docker job now builds
+  the image on every push to master and runs a smoke check
+  (`node --check` + a live `/api/health` curl). README
+  Installation > Option 3 documents the `docker build` /
+  `docker run` flow.
+
 - **Cedar authorization (IN-0)** — `packages/server/src/policy/`
   ships the single source of truth for every authorization
   decision in the platform: `authorizer.ts` (loads + caches the
