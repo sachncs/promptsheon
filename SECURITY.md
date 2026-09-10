@@ -20,7 +20,13 @@ If you discover a security vulnerability, please report it responsibly:
 
 ## Security Model
 
-For the full threat model, controls, and the operator checklist, see [docs/security/security.md](docs/security/security.md).
+For the full threat model, controls, and the operator checklist, see [docs/security/README.md](docs/security/README.md). That index links out to the canonical documents:
+
+- [Threat model](docs/compliance/threat-model.md)
+- [SOC2 controls](docs/compliance/SOC2-controls.md)
+- [Pen-test plan](docs/compliance/pen-test-plan.md)
+- [Incident response](docs/compliance/incident-response.md)
+- [Prompt-security benchmark](docs/security/benchmark/RESULTS.md)
 
 ## License
 
