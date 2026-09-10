@@ -1,8 +1,65 @@
-title: "promptsheon"
-description: "Git-native version control for AI agents — content-addressable prompt management, evaluation engine, and agent configuration versioning built in Go."
+title: "Promptsheon"
+description: "Git-native version control for AI agents. Author multi-agent prompts, ship them safely to production, prove they don't regress, and roll back when they do."
 theme: minima
 logo: /assets/logo.svg
 show_downloads: false
 permalink: /:title/
 plugins:
   - jekyll-feed
+exclude:
+  - CHANGELOG.md
+  - AGENTS.md
+  - CODE_OF_CONDUCT.md
+  - SECURITY.md
+  - CONTRIBUTING.md
+  - SUPPORT.md
+  - LICENSE
+  - NOTICE
+  - CODEOWNERS
+  - README.md
+  - package.json
+  - pnpm-workspace.yaml
+  - pnpm-lock.yaml
+  - packages/
+  - frontend/
+  - extensions/
+  - scripts/
+  - docs/
+  - node_modules/
+  - .github/
+  - .git/
+  - .gitignore
+  - .editorconfig
+  - .pre-commit-config.yaml
+  - .gitleaks.toml
+  - .markdownlint.json
+  - .vale.ini
+  - .env
+  - .env.example
+
+# Site navigation
+nav_pages:
+  - title: "Overview"
+    url: "/"
+  - title: "Getting started"
+    url: "/getting-started/"
+  - title: "Installation"
+    url: "/installation/"
+  - title: "Configuration"
+    url: "/configuration/"
+  - title: "Core concepts"
+    url: "/core-concepts/"
+  - title: "API reference"
+    url: "/api-reference/"
+  - title: "Architecture"
+    url: "/architecture/"
+  - title: "Tutorials"
+    url: "/tutorials/"
+  - title: "Recipes"
+    url: "/recipes/"
+  - title: "FAQ"
+    url: "/faq/"
+  - title: "Contributing"
+    url: "/contributing/"
+  - title: "Security"
+    url: "/security/"

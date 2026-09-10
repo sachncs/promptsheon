@@ -1,0 +1,231 @@
+/* Promptsheon docs theme overrides on top of minima.
+ * - Sticky left sidebar with the brand mark + nav links.
+ * - Constrained main content column for line length.
+ * - Dark accent on active nav link.
+ * - Subtle "card" treatment for code blocks and callouts.
+ */
+
+:root {
+  --ps-accent: #6C7591;
+  --ps-accent-strong: #1E2233;
+  --ps-bg: #FFFFFF;
+  --ps-bg-muted: #F6F7FB;
+  --ps-text: #1A1D26;
+  --ps-text-muted: #4C5468;
+  --ps-border: #E2E5EE;
+  --ps-link: #2C5BFF;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ps-bg: #0B0D14;
+    --ps-bg-muted: #11141E;
+    --ps-text: #E8ECF5;
+    --ps-text-muted: #9DA6BD;
+    --ps-border: #1E2233;
+    --ps-link: #8FA6FF;
+  }
+}
+
+html, body {
+  background: var(--ps-bg);
+  color: var(--ps-text);
+}
+
+body {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 100vh;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.55;
+}
+
+.ps-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  align-self: start;
+  padding: 24px 18px;
+  border-right: 1px solid var(--ps-border);
+  background: var(--ps-bg-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  font-size: 15px;
+}
+
+.ps-sidebar__brand {
+  display: flex;
+  align-items: center;
+}
+
+.ps-sidebar__home {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--ps-text);
+  text-decoration: none;
+  letter-spacing: -0.02em;
+}
+
+.ps-sidebar__nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ps-sidebar__nav a {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--ps-text-muted);
+  text-decoration: none;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.ps-sidebar__nav a:hover {
+  background: rgba(108, 117, 145, 0.12);
+  color: var(--ps-text);
+}
+
+.ps-sidebar__link--active {
+  background: var(--ps-accent-strong) !important;
+  color: #FFFFFF !important;
+}
+
+.ps-sidebar__foot {
+  margin-top: auto;
+  font-size: 13px;
+  color: var(--ps-text-muted);
+}
+
+.ps-sidebar__foot a {
+  color: var(--ps-text-muted);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--ps-border);
+}
+
+.ps-sidebar__foot a:hover {
+  color: var(--ps-link);
+  border-bottom-color: var(--ps-link);
+}
+
+.ps-main {
+  max-width: 920px;
+  padding: 56px 72px 96px;
+  margin: 0 auto;
+}
+
+.ps-content__title {
+  font-size: 38px;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+}
+
+.ps-content__subtitle {
+  margin: 0 0 32px;
+  color: var(--ps-text-muted);
+  font-size: 18px;
+}
+
+.ps-content h2 {
+  font-size: 26px;
+  letter-spacing: -0.01em;
+  margin-top: 40px;
+  margin-bottom: 12px;
+}
+
+.ps-content h3 {
+  font-size: 20px;
+  margin-top: 28px;
+  margin-bottom: 8px;
+}
+
+.ps-content p, .ps-content li {
+  font-size: 16px;
+}
+
+.ps-content a {
+  color: var(--ps-link);
+}
+
+.ps-content code {
+  background: var(--ps-bg-muted);
+  border: 1px solid var(--ps-border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 13.5px;
+}
+
+.ps-content pre {
+  background: var(--ps-bg-muted);
+  border: 1px solid var(--ps-border);
+  border-radius: 8px;
+  padding: 14px 18px;
+  overflow-x: auto;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.ps-content pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+}
+
+.ps-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0 24px;
+  font-size: 14.5px;
+}
+
+.ps-content th, .ps-content td {
+  border: 1px solid var(--ps-border);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.ps-content th {
+  background: var(--ps-bg-muted);
+  font-weight: 600;
+}
+
+.ps-content blockquote {
+  margin: 16px 0;
+  padding: 12px 18px;
+  border-left: 4px solid var(--ps-accent);
+  background: var(--ps-bg-muted);
+  color: var(--ps-text-muted);
+  border-radius: 0 8px 8px 0;
+}
+
+.ps-footer {
+  margin-top: 64px;
+  padding-top: 24px;
+  border-top: 1px solid var(--ps-border);
+  color: var(--ps-text-muted);
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  body {
+    grid-template-columns: 1fr;
+  }
+  .ps-sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--ps-border);
+  }
+  .ps-main {
+    padding: 24px 18px 64px;
+  }
+}

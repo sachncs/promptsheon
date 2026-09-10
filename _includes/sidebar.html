@@ -1,0 +1,33 @@
+{%- comment -%}
+Custom sidebar for the Promptsheon docs site. Renders the
+nav_pages collection declared in _config.yml as a sticky left
+rail. Each page has a brand header with logo + wordmark.
+{%- endcomment -%}
+<aside class="ps-sidebar" aria-label="Documentation navigation">
+  <div class="ps-sidebar__brand">
+    <a href="{{ '/' | relative_url }}" class="ps-sidebar__home">
+      <img src="{{ '/assets/logo.svg' | relative_url }}" alt="" width="28" height="28" />
+      <span>promptsheon</span>
+    </a>
+  </div>
+  <nav class="ps-sidebar__nav">
+    <ul>
+      {%- for item in site.nav_pages -%}
+        {%- assign active = false -%}
+        {%- if page.url == item.url -%}
+          {%- assign active = true -%}
+        {%- elsif item.url != '/' and page.url contains item.url -%}
+          {%- assign active = true -%}
+        {%- endif -%}
+        <li>
+          <a href="{{ item.url | relative_url }}" class="{% if active %}ps-sidebar__link--active{% endif %}">
+            {{ item.title }}
+          </a>
+        </li>
+      {%- endfor -%}
+    </ul>
+  </nav>
+  <div class="ps-sidebar__foot">
+    <a href="https://github.com/sachncs/promptsheon" rel="noopener">View on GitHub</a>
+  </div>
+</aside>
