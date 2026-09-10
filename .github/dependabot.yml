@@ -1,14 +1,13 @@
-# OPS-7: Dependabot keeps the GitHub Actions runner, Go
-# modules, npm (TS SDK), and pip (Py SDK) up to date. Renovate
-# is preferred for Go and npm because it batches updates; this
-# file covers the runners and ecosystems that Dependabot handles
-# better (e.g. the Docker base image).
+# Dependabot keeps the GitHub Actions runner and the pnpm
+# workspace packages up to date. The repo does not have a
+# Python SDK, a Go module tree, or a Dockerfile (see #56,
+# #63); this file intentionally covers only ecosystems that
+# actually exist in the repo.
 #
 # Schedule: weekly. Grouping is left to Dependabot's defaults
 # so reviewers see one PR per ecosystem per week instead of
 # daily noise. Production tenants with stricter SLAs can
-# shorten the interval; OPS-10 adds Renovate for finer
-# batching control.
+# shorten the interval.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
@@ -19,18 +18,72 @@ updates:
       prefix: "ci"
     labels:
       - "dependencies"
-      - "ops"
 
-  # gomod handled by Renovate (better batching + auto-merge)
-
-  - package-ecosystem: "docker"
-    directory: "/"
+  - package-ecosystem: "npm"
+    directory: "/packages/shared"
     schedule:
       interval: "weekly"
     commit-message:
-      prefix: "docker"
+      prefix: "chore(deps)"
     labels:
       - "dependencies"
-      - "docker"
-    # The Dockerfile FROM line references the golang image;
-    # Dependabot opens a PR when a new patch/minor lands.
+    ignore:
+      # Bump these by hand so the change is reviewed against
+      # the route layer that depends on them.
+      - dependency-name: "@strands-agents/sdk"
+      - dependency-name: "fastify"
+      - dependency-name: "better-sqlite3"
+
+  - package-ecosystem: "npm"
+    directory: "/packages/server"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+    ignore:
+      - dependency-name: "@strands-agents/sdk"
+      - dependency-name: "fastify"
+      - dependency-name: "better-sqlite3"
+      - dependency-name: "@cedar-policy/cedar-wasm"
+
+  - package-ecosystem: "npm"
+    directory: "/packages/cli"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "npm"
+    directory: "/packages/sdk"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "npm"
+    directory: "/extensions/promptsheon"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+    ignore:
+      - dependency-name: "next"
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
