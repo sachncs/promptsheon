@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as cedar from '@cedar-policy/cedar-wasm';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const DEFAULT_POLICY_PATH = resolve(HERE, '..', '..', 'policies', 'promptsheon.cedar');
 
 export type CedarDecision = 'allow' | 'deny';
 
@@ -51,8 +55,7 @@ export class CedarAuthorizer {
   private readonly dryRun: boolean;
 
   constructor(opts: { policyPath?: string; dryRun?: boolean } = {}) {
-    this.policyPath =
-      opts.policyPath ?? resolve('packages/server/policies/promptsheon.cedar');
+    this.policyPath = opts.policyPath ?? DEFAULT_POLICY_PATH;
     this.dryRun = opts.dryRun ?? false;
   }
 
