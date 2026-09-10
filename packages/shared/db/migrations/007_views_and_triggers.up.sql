@@ -1,0 +1,11 @@
+-- 008: Reserved for views and triggers.
+--
+-- Phase 2 will add:
+--   - JSON validity CHECK on all 17 TEXT/JSON columns
+--   - immutability triggers on audit_chain_state
+--   - reporting views: vw_recent_audit, vw_active_alerts,
+--     vw_capability_daily_cost
+--
+-- For v0.1.x this file is intentionally a no-op so the migration
+-- numbering has a slot to grow into without renumbering.
+SELECT 1;

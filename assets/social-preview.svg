@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" role="img" aria-label="Promptsheon — Git-native version control for AI agents">
+  <title>Promptsheon</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F1117"/>
+      <stop offset="50%" stop-color="#0B0D14"/>
+      <stop offset="100%" stop-color="#05060A"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.32" cy="0.4" r="0.6">
+      <stop offset="0%" stop-color="#A4B5D6" stop-opacity="0.18"/>
+      <stop offset="60%" stop-color="#6C7591" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="mark-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#191B26"/>
+      <stop offset="100%" stop-color="#0B0D14"/>
+    </linearGradient>
+    <linearGradient id="mark-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#A4B5D6"/>
+      <stop offset="60%" stop-color="#6C7591"/>
+      <stop offset="100%" stop-color="#1E2233"/>
+    </linearGradient>
+    <linearGradient id="mark-sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="wordmark" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#C7CFE3"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <rect width="1280" height="640" fill="url(#glow)"/>
+
+  <!-- Brand mark, scaled up for the social card -->
+  <g transform="translate(160, 200) scale(3.6)">
+    <rect width="64" height="64" rx="20" fill="url(#mark-bg)"/>
+    <rect width="64" height="64" rx="20" fill="url(#mark-sheen)"/>
+    <path
+      d="M19 14 H38 a13 13 0 0 1 0 26 H28 V50 H19 Z M28 22 V32 H38 a5 5 0 0 0 0 -10 Z"
+      fill="url(#mark-fill)"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="430" y="345"
+        font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        font-size="108" font-weight="700"
+        fill="url(#wordmark)" letter-spacing="-3.5">promptsheon</text>
+
+  <!-- Tagline -->
+  <text x="430" y="420"
+        font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        font-size="32" font-weight="500"
+        fill="#9DA6BD" letter-spacing="0.3">Git-native version control for AI agents</text>
+
+  <!-- Sub-tagline -->
+  <text x="430" y="470"
+        font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        font-size="22" font-weight="400"
+        fill="#6C7591" letter-spacing="0.2">DAG editor · Maker-checker approvals · Eval suites · Self-evolution</text>
+
+  <!-- Footer domain -->
+  <text x="430" y="560"
+        font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+        font-size="22" font-weight="500"
+        fill="#6C7591" letter-spacing="0.4">github.com/sachncs/promptsheon</text>
+</svg>

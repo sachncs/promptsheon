@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Promptsheon">
+  <title>Promptsheon</title>
+  <defs>
+    <linearGradient id="psMark-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#A4B5D6"/>
+      <stop offset="60%" stop-color="#6C7591"/>
+      <stop offset="100%" stop-color="#1E2233"/>
+    </linearGradient>
+    <linearGradient id="psMark-sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="psMark-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#191B26"/>
+      <stop offset="100%" stop-color="#0B0D14"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="20" fill="url(#psMark-bg)"/>
+  <rect width="64" height="64" rx="20" fill="url(#psMark-sheen)"/>
+  <path
+    d="M19 14 H38 a13 13 0 0 1 0 26 H28 V50 H19 Z M28 22 V32 H38 a5 5 0 0 0 0 -10 Z"
+    fill="url(#psMark-fill)"/>
+</svg>

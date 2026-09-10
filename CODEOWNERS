@@ -1,0 +1,40 @@
+# CODEOWNERS
+#
+# Every PR that touches a line under a path listed here must be
+# reviewed by the matching owner before merge. GitHub auto-loads
+# this file from the repository root and surfaces the reviewer in
+# the PR UI.
+
+# Default fallback: catch-all owner for any path not listed.
+*       @sachncs
+
+# Security-sensitive areas: auth, audit, CAS, settings.
+# These encode the threat model and should never merge without
+# an explicit maintainer review.
+packages/server/src/middleware/auth.ts     @sachncs
+packages/server/src/audit/                 @sachncs
+packages/server/src/settings/              @sachncs
+packages/shared/src/cas/                   @sachncs
+
+# Public API surface: breaking changes here ripple to every consumer.
+packages/server/src/routes/                @sachncs
+packages/server/src/index.ts               @sachncs
+packages/server/API.md                     @sachncs
+
+# AI agents: Strands SDK integration is the most
+# blast-radius-heavy code in the TS port.
+/packages/server/src/agents/                @sachncs
+
+# Database layer: migrations are forward-only.
+/packages/shared/db/migrations/            @sachncs
+
+# Tests.
+/packages/server/test/                     @sachncs
+
+# CI, build, release. /.github/workflows/ is covered by
+# the directory glob above.
+/Dockerfile                                @sachncs
+/.dockerignore                             @sachncs
+/SECURITY.md                               @sachncs
+/CONTRIBUTING.md                           @sachncs
+/CODE_OF_CONDUCT.md                        @sachncs

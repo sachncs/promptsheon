@@ -1,0 +1,10 @@
+-- 006: Webhook secret ciphertext.
+--
+-- The ciphertext column is declared in 001_core_schema so this
+-- migration is now a no-op on fresh installs. The file remains
+-- because production deployments that upgrade from
+-- pre-consolidation will have webhook_endpoints without the
+-- ciphertext column; ALTER adds it idempotently there.
+--
+-- Application code encrypts via the vault at handler time
+-- (handlers_webhooks.go + SaveWebhookEndpoint).

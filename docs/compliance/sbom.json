@@ -1,0 +1,337 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "promptsheon",
+  "documentNamespace": "https://github.com/sachncs/promptsheon",
+  "creationInfo": {
+    "created": "2026-08-25T04:44:01.407Z",
+    "creators": [
+      "Tool: scripts/build-sbom.sh"
+    ]
+  },
+  "packages": {},
+  "directDependencies": [
+    {
+      "component": "frontend/package.json",
+      "dependencies": [
+        {
+          "name": "@hookform/resolvers",
+          "version": "^5.9.1"
+        },
+        {
+          "name": "@promptsheon/shared",
+          "version": "link:../packages/shared"
+        },
+        {
+          "name": "@radix-ui/react-avatar",
+          "version": "^1.1.10"
+        },
+        {
+          "name": "@radix-ui/react-dialog",
+          "version": "^1.1.14"
+        },
+        {
+          "name": "@radix-ui/react-dropdown-menu",
+          "version": "^2.1.15"
+        },
+        {
+          "name": "@radix-ui/react-label",
+          "version": "^2.1.7"
+        },
+        {
+          "name": "@radix-ui/react-progress",
+          "version": "^1.1.7"
+        },
+        {
+          "name": "@radix-ui/react-select",
+          "version": "^2.2.5"
+        },
+        {
+          "name": "@radix-ui/react-separator",
+          "version": "^1.1.7"
+        },
+        {
+          "name": "@radix-ui/react-slot",
+          "version": "^1.2.3"
+        },
+        {
+          "name": "@radix-ui/react-switch",
+          "version": "^1.2.5"
+        },
+        {
+          "name": "@radix-ui/react-tabs",
+          "version": "^1.1.12"
+        },
+        {
+          "name": "@radix-ui/react-toast",
+          "version": "^1.2.14"
+        },
+        {
+          "name": "@radix-ui/react-tooltip",
+          "version": "^1.2.7"
+        },
+        {
+          "name": "@tanstack/react-query",
+          "version": "^5.80.0"
+        },
+        {
+          "name": "@xyflow/react",
+          "version": "^12.11.3"
+        },
+        {
+          "name": "axios",
+          "version": "^1.10.0"
+        },
+        {
+          "name": "class-variance-authority",
+          "version": "^0.7.1"
+        },
+        {
+          "name": "clsx",
+          "version": "^2.1.1"
+        },
+        {
+          "name": "lucide-react",
+          "version": "^0.525.0"
+        },
+        {
+          "name": "next",
+          "version": "^16.0.0"
+        },
+        {
+          "name": "react",
+          "version": "^19.1.0"
+        },
+        {
+          "name": "react-dom",
+          "version": "^19.1.0"
+        },
+        {
+          "name": "react-hook-form",
+          "version": "^7.86.0"
+        },
+        {
+          "name": "tailwind-merge",
+          "version": "^3.3.0"
+        },
+        {
+          "name": "tw-animate-css",
+          "version": "^1.4.0"
+        },
+        {
+          "name": "zod",
+          "version": "^4.4.3"
+        }
+      ],
+      "devDependencies": [
+        {
+          "name": "@playwright/test",
+          "version": "^1.62.1"
+        },
+        {
+          "name": "@tailwindcss/postcss",
+          "version": "^4.1.0"
+        },
+        {
+          "name": "@types/node",
+          "version": "^22.0.0"
+        },
+        {
+          "name": "@types/react",
+          "version": "^19.1.0"
+        },
+        {
+          "name": "@types/react-dom",
+          "version": "^19.1.0"
+        },
+        {
+          "name": "@typescript-eslint/eslint-plugin",
+          "version": "^8.67.0"
+        },
+        {
+          "name": "@typescript-eslint/parser",
+          "version": "^8.67.0"
+        },
+        {
+          "name": "eslint",
+          "version": "^9.39.5"
+        },
+        {
+          "name": "eslint-config-next",
+          "version": "^16.3.2"
+        },
+        {
+          "name": "tailwindcss",
+          "version": "^4.1.0"
+        },
+        {
+          "name": "typescript",
+          "version": "^5.8.0"
+        }
+      ]
+    },
+    {
+      "component": "packages/server/package.json",
+      "dependencies": [
+        {
+          "name": "@fastify/cors",
+          "version": "^11.3.0"
+        },
+        {
+          "name": "@fastify/rate-limit",
+          "version": "^11.2.0"
+        },
+        {
+          "name": "@opentelemetry/exporter-metrics-otlp-http",
+          "version": "^0.221.0"
+        },
+        {
+          "name": "@opentelemetry/exporter-trace-otlp-http",
+          "version": "^0.221.0"
+        },
+        {
+          "name": "@opentelemetry/resources",
+          "version": "^2.10.0"
+        },
+        {
+          "name": "@opentelemetry/sdk-metrics",
+          "version": "^2.10.0"
+        },
+        {
+          "name": "@opentelemetry/sdk-trace-base",
+          "version": "^2.10.0"
+        },
+        {
+          "name": "@promptsheon/shared",
+          "version": "workspace:*"
+        },
+        {
+          "name": "@strands-agents/sdk",
+          "version": "^1.13.0"
+        },
+        {
+          "name": "@types/pino",
+          "version": "^7.0.5"
+        },
+        {
+          "name": "better-sqlite3",
+          "version": "^12.11.1"
+        },
+        {
+          "name": "fastify",
+          "version": "^5.2.0"
+        },
+        {
+          "name": "pino",
+          "version": "^10.3.1"
+        },
+        {
+          "name": "zod",
+          "version": "^4.4.3"
+        }
+      ],
+      "devDependencies": [
+        {
+          "name": "@types/better-sqlite3",
+          "version": "^7.6.0"
+        },
+        {
+          "name": "@types/node",
+          "version": "^22.0.0"
+        },
+        {
+          "name": "tsx",
+          "version": "^4.19.0"
+        },
+        {
+          "name": "typescript",
+          "version": "^5.7.0"
+        },
+        {
+          "name": "vitest",
+          "version": "^4.1.10"
+        }
+      ]
+    },
+    {
+      "component": "packages/shared/package.json",
+      "dependencies": [
+        {
+          "name": "@types/better-sqlite3",
+          "version": "^7.6.13"
+        },
+        {
+          "name": "better-sqlite3",
+          "version": "^12.11.1"
+        },
+        {
+          "name": "zod",
+          "version": "^4.4.3"
+        }
+      ],
+      "devDependencies": [
+        {
+          "name": "@types/node",
+          "version": "^26.2.0"
+        },
+        {
+          "name": "typescript",
+          "version": "^5.7.0"
+        },
+        {
+          "name": "vitest",
+          "version": "^4.1.10"
+        }
+      ]
+    },
+    {
+      "component": "packages/cli/package.json",
+      "dependencies": [
+        {
+          "name": "@promptsheon/shared",
+          "version": "workspace:*"
+        }
+      ],
+      "devDependencies": [
+        {
+          "name": "@types/node",
+          "version": "^22.0.0"
+        },
+        {
+          "name": "typescript",
+          "version": "^5.7.0"
+        }
+      ]
+    },
+    {
+      "component": "packages/sdk/package.json",
+      "dependencies": [
+        {
+          "name": "@promptsheon/shared",
+          "version": "workspace:*"
+        }
+      ],
+      "devDependencies": [
+        {
+          "name": "@types/node",
+          "version": "^22.0.0"
+        },
+        {
+          "name": "typescript",
+          "version": "^5.7.0"
+        }
+      ]
+    }
+  ],
+  "lockfiles": [
+    {
+      "rel": "pnpm-lock.yaml",
+      "packages": 0
+    },
+    {
+      "rel": "frontend/pnpm-lock.yaml",
+      "packages": 0
+    }
+  ]
+}

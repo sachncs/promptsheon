@@ -1,0 +1,1 @@
+ALTER TABLE eval_runs ADD COLUMN scorer_results TEXT NOT NULL DEFAULT '{}';

@@ -1,0 +1,33 @@
+{
+  "name": "@promptsheon/shared",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^12.11.1",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

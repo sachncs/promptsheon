@@ -1,0 +1,9 @@
+# Promptsheon funding configuration.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+
+github: sachncs
+open_collective: promptsheon
+ko_fi: promptsheon
+tidelift: platform/promptsheon
+custom:
+  - https://github.com/sponsors/sachncs
