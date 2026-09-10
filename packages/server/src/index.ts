@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import { loadConfig } from './config/env.js';
+import { validateConfig } from './config/validate.js';
 import { createConnection, runMigrations } from './db/index.js';
 import { registerRoutes } from './routes/index.js';
 import { authMiddleware } from './middleware/index.js';
@@ -78,15 +79,15 @@ import type { Agent } from '@strands-agents/sdk';
  * load it is a fatal error.
  */
 async function setupPolicy(): Promise<void> {
-  const policyPath = process.env['PROMPTSHEON_POLICY_FILE']
-    ?? `${process.cwd()}/packages/server/policies/promptsheon.cedar`;
-  const authorizer = new CedarAuthorizer({ policyPath });
+  const policyPath = process.env['PROMPTSHEON_POLICY_FILE'];
+  const authorizer = new CedarAuthorizer({ ...(policyPath ? { policyPath } : {}) });
   authorizer.load();
   installDefaultAuthorizer(authorizer);
 }
 
 async function main() {
   const config = loadConfig();
+  validateConfig(config);
   const db = createConnection(config);
   await runMigrations(db);
   const auditChain = new AuditChain(db, config.server.fipsMode);
