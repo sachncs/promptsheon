@@ -25,7 +25,7 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
     "@opentelemetry/resources": "^2.10.0",
     "@opentelemetry/sdk-metrics": "^2.10.0",
-    "@opentelemetry/sdk-trace-base": "^2.10.0",
+    "@opentelemetry/sdk-trace-base": "^2.11.0",
     "@promptsheon/shared": "workspace:*",
     "@strands-agents/sdk": "^1.14.0",
     "@types/pino": "^7.0.5",
