@@ -404,7 +404,17 @@ Code is considered complete only when it satisfies every requirement above.
 
 ## Frontend
 
-- React 19 + Vite + shadcn/ui
-- TanStack Query for all data fetching
-- React Router v7 (HashRouter)
-- 15 UI components, 11 modals, 25 views
+- Next.js 16 (App Router, Turbopack)
+- React 19 + `@tanstack/react-query` 5 + `axios`
+- shadcn/ui primitives on Tailwind v4 + Radix UI
+- `@xyflow/react` 12 for the DAG editor
+- `@hookform/resolvers` + `react-hook-form` + Zod for typed forms
+- All data fetching goes through TanStack Query; raw `fetch` is banned in
+  views except where TanStack is unsuitable (SSE stream consume + manual
+  cancel)
+- Browser-side secret reads (`process.env.PROMPTSHEON_API_KEY`) are banned;
+  the SDK reads keys via `getCookie`/`getSession` only
+- Route handlers live under `frontend/src/app/`; shared primitives under
+  `frontend/src/components/`; brand assets under `frontend/src/brand/`
+- Playwright `test:e2e` is the frontend tier suite; CI gates on it
+  alongside the server vitest run
