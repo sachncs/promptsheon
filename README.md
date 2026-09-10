@@ -246,6 +246,9 @@ All configuration is via environment variables prefixed with
 | `PROMPTSHEON_SELF_EVOLVE_COOLDOWN_SEC` | Min seconds between re-evolves | `900`                          |
 | `PROMPTSHEON_SELF_EVOLVE_MAX_CONCURRENT` | Cap concurrent evolutions per worker | `3`                       |
 | `PROMPTSHEON_OTEL_ENDPOINT`    | OpenTelemetry OTLP collector URL       | `""`                           |
+| `PROMPTSHEON_FIPS_MODE`        | Enforce FIPS-validated crypto for the audit chain (requires a FIPS Node build) | `false` |
+| `PROMPTSHEON_REPLICA_INTERVAL_MS` | Audit-chain replicator poll interval | `5000`                        |
+| `PROMPTSHEON_REPLICA_ONESHOT` | Replicator exits after a single batch   | `false`                        |
 
 > 💡 For a **Custom** OpenAI/Anthropic-compatible endpoint, set
 > `PROMPTSHEON_LLM_PROVIDER=custom` and supply the credentials

@@ -48,8 +48,8 @@ export function loadConfig(): AppConfig {
       host: envString('PROMPTSHEON_HOST', '127.0.0.1'),
       dbPath: envString('PROMPTSHEON_DB_PATH', 'promptsheon.db'),
       casPath: envString('PROMPTSHEON_CAS_PATH', '.promptsheon'),
-      frontendPath: envString('PROMPTSHEON_FRONTEND_PATH', './frontend/dist'),
-      corsOrigin: envString('PROMPTSHEON_CORS_ORIGIN', ''),
+      frontendPath: envString('PROMPTSHEON_FRONTEND_PATH', './frontend/.next'),
+      corsOrigin: envString('PROMPTSHEON_CORS_ORIGIN', 'http://localhost:3000'),
       logLevel: envString('PROMPTSHEON_LOG_LEVEL', 'info'),
       nodeEnv: envString('PROMPTSHEON_NODE_ENV', envString('NODE_ENV', 'development')),
       fipsMode: envBool('PROMPTSHEON_FIPS_MODE', false),
@@ -63,7 +63,7 @@ export function loadConfig(): AppConfig {
       baseUrl: process.env['LLM_BASE_URL'] || process.env['ANTHROPIC_BASE_URL'] || process.env['OPENAI_BASE_URL'] || undefined,
     },
     auth: {
-      enabled: envBool('PROMPTSHEON_AUTH', true),
+      enabled: envBool('PROMPTSHEON_AUTH', false),
       jwtSecret: envString('PROMPTSHEON_JWT_SECRET', ''),
     },
     selfEvolve: {

@@ -98,10 +98,8 @@ async function main() {
     app.log.warn('PROMPTSHEON_FIPS_MODE=true — audit chain requires a FIPS-validated Node build');
   }
 
-  const corsOrigin = config.server.corsOrigin || 'http://localhost:5173';
-  if (!config.server.corsOrigin) {
-    app.log.warn(`CORS origin not set, defaulting to ${corsOrigin}`);
-  }
+  const corsOrigin = config.server.corsOrigin;
+  app.log.info({ corsOrigin }, 'CORS configuration');
 
   await app.register(cors, {
     origin: corsOrigin,
