@@ -17,9 +17,9 @@ const UNIQUE = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
  *   4. Finish → /app
  *
  * The probe is a live call to whatever URL the caller provided.
- * Caller is expected to pass a key that the URL accepts. The
- * MINIMAX_API_KEY env var is the production target; tests can
- * pass any working endpoint.
+ * Caller is expected to pass a key that the URL accepts. Tests
+ * should use any working endpoint — the production secrets are
+ * never read from the test environment.
  */
 export async function walkOnboarding(
   page: Page,

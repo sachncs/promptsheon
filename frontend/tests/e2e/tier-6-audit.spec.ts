@@ -1,13 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { walkOnboarding } from './helpers/walk-onboarding';
 
-const LLM_KEY = process.env['E2E_LLM_KEY'] ?? process.env['MINIMAX_API_KEY'] ?? '';
+const LLM_KEY = process.env['E2E_LLM_KEY'] ?? '';
 const LLM_BASE = process.env['E2E_LLM_BASE_URL'] ?? 'https://api.minimax.io/anthropic';
 const LLM_MODEL = process.env['E2E_LLM_MODEL'] ?? 'MiniMax-M3';
 
 test.describe('tier 6: audit + releases', () => {
   test.beforeAll(() => {
-    if (!LLM_KEY) throw new Error('E2E_LLM_KEY (or MINIMAX_API_KEY) must be set');
+    if (!LLM_KEY) throw new Error('E2E_LLM_KEY must be set');
   });
 
   test('audit: clicking a row opens the drawer with the hash chip', async ({ page, baseURL }) => {

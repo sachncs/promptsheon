@@ -1,13 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { walkOnboarding } from './helpers/walk-onboarding';
 
-const LLM_KEY = process.env['E2E_LLM_KEY'] ?? process.env['MINIMAX_API_KEY'] ?? '';
+const LLM_KEY = process.env['E2E_LLM_KEY'] ?? '';
 const LLM_BASE = process.env['E2E_LLM_BASE_URL'] ?? 'https://api.minimax.io/anthropic';
 const LLM_MODEL = process.env['E2E_LLM_MODEL'] ?? 'MiniMax-M3';
 
 test.describe('tier 5: editor', () => {
   test.beforeAll(() => {
-    if (!LLM_KEY) throw new Error('E2E_LLM_KEY (or MINIMAX_API_KEY) must be set');
+    if (!LLM_KEY) throw new Error('E2E_LLM_KEY must be set');
   });
 
   test('pick "Customer support triage" template seeds 4 nodes in the canvas', async ({ page, baseURL }) => {

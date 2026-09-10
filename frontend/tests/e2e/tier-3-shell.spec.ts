@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { walkOnboarding, clearClientState } from './helpers/walk-onboarding';
 
-const LLM_KEY = process.env['E2E_LLM_KEY'] ?? process.env['MINIMAX_API_KEY'] ?? '';
+const LLM_KEY = process.env['E2E_LLM_KEY'] ?? '';
 const LLM_BASE = process.env['E2E_LLM_BASE_URL'] ?? 'https://api.minimax.io/anthropic';
 const LLM_MODEL = process.env['E2E_LLM_MODEL'] ?? 'MiniMax-M3';
 
@@ -9,7 +9,7 @@ test.describe('tier 3: app shell after onboarding', () => {
   test.beforeAll(() => {
     if (!LLM_KEY) {
       throw new Error(
-        'E2E_LLM_KEY (or MINIMAX_API_KEY) must be set; the smoke test makes a real LLM probe call during onboarding.',
+        'E2E_LLM_KEY must be set; the smoke test makes a real LLM probe call during onboarding.',
       );
     }
   });
