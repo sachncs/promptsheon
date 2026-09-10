@@ -75,6 +75,6 @@ frontend/.turbo/
 # OpenCode session artefacts
 .opencode/
 
-# Root-level empty pnpm-lock.yaml — workspace lockfiles under
-# packages/ and frontend/ are intentionally committed.
-/pnpm-lock.yaml
+# Root pnpm-lock.yaml is committed (single workspace lockfile
+# after #51). The old packages/pnpm-lock.yaml has been
+# removed; do not re-introduce a nested lockfile per package.
