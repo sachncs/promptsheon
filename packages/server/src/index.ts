@@ -5,8 +5,10 @@ import rateLimit from '@fastify/rate-limit';
 import { loadConfig } from './config/env.js';
 import { validateConfig } from './config/validate.js';
 import { createConnection, runMigrations } from './db/index.js';
+import { buildRepos, type Repos } from './repos/factory.js';
 import { registerRoutes } from './routes/index.js';
 import { authMiddleware } from './middleware/index.js';
+import { orgContextMiddleware } from './middleware/org-context.js';
 import { SseHub } from './sse/hub.js';
 import { SettingsResolver } from './settings/resolver.js';
 import { AuditChain } from './audit/chain.js';
@@ -16,67 +18,28 @@ import { EvaluationAgent } from './agents/evaluation/evaluation.js';
 import { EvolutionAgent } from './agents/evolution/evolution.js';
 import { GoalBasedEvolutionAgent } from './agents/evolution/goal-evolver.js';
 import { ReasoningCompiler } from './agents/compiler/compiler.js';
-import { CasStore } from '@promptsheon/shared';
-import { WorkspaceRepo } from './repos/workspace.js';
-import { ProjectRepo } from './repos/project.js';
-import { RepoRepo } from './repos/repo.js';
-import { BranchRepo } from './repos/branch.js';
-import { TagRepo } from './repos/tag.js';
-import { RepoStore } from './repos/repo-store.js';
-import { CommitRepo } from './repos/commit.js';
-import { MergeRequestRepo } from './repos/mr.js';
-import { SigningKeyRepo } from './repos/signing-key.js';
-import { EvalSuiteRepo, HumanReviewRepo } from './repos/eval-suite.js';
-import { VaultRepo } from './repos/vault.js';
-import { TraceRepo } from './repos/trace.js';
-import { TraceScoreRepo } from './repos/trace-score.js';
-import { AutoEval } from './observability/auto-eval.js';
-import { UserAnalyticsRepo } from './repos/user-analytics.js';
-import { TeamRepo, SsoConfigRepo } from './repos/team.js';
-import { PromptScanRepo } from './repos/prompt-scan.js';
-import { OrgExportService, CostRollupRepo } from './repos/vault-extras.js';
-import { CostBudgetRepo } from './repos/budget.js';
-import { CostForecastService } from './analysis/forecast.js';
-import { RedteamRepo } from './repos/redteam.js';
-import { ExperimentRepo } from './repos/experiment.js';
-import { IncidentRepo } from './repos/incident.js';
-import { OrgSettingsRepo } from './repos/org-settings.js';
-import { FeatureFlagRepo } from './repos/feature-flag.js';
-import { CapabilityRepo } from './repos/capability.js';
-import { VersionRepo } from './repos/version.js';
-import { ReleaseRepo } from './repos/release.js';
-import { ExecutionRepo } from './repos/execution.js';
-import { DatasetRepo } from './repos/dataset.js';
-import { EvalRepo } from './repos/eval.js';
-import { PreconditionRepo } from './repos/precondition.js';
-import { AlertRepo } from './repos/alert.js';
-import { ScheduleRepo } from './repos/schedule.js';
-import { ApprovalRepo } from './repos/approval.js';
-import { ApiKeyRepo } from './repos/api-key.js';
-import { UserRepo } from './repos/user.js';
-import { SystemConfigRepo } from './repos/system-config.js';
-import { ManifestRepo } from './repos/manifest.js';
-import { MembershipRepo } from './repos/org.js';
 import { IdeaPlannerAgent } from './agents/planner/index.js';
 import { ManifestGraphExecutor } from './agents/executor/index.js';
+import { AutoEval } from './observability/auto-eval.js';
+import { CostForecastService } from './analysis/forecast.js';
+import { CasStore } from '@promptsheon/shared';
 import { setupObservability } from './observability/setup.js';
 import type { GoalSummary } from './routes/goals.js';
 import { SessionStore } from './sessions/store.js';
 import { SnapshotStore } from './snapshots/store.js';
-import { orgContextMiddleware } from './middleware/org-context.js';
 import { CedarAuthorizer, installDefaultAuthorizer } from './policy/gate.js';
 import { WebhookReceiver } from './webhooks/receiver.js';
 import { ChaosConfig } from './hardening/chaos.js';
-import { registerChaosRoutes } from './routes/chaos.js';
 import { LlmRouter } from './llm/router.js';
 import { Gateway, ResponseCache, FallbackChain, RateLimiter } from './llm/gateway.js';
 import type { Agent } from '@strands-agents/sdk';
+import type Database from 'better-sqlite3';
 
 /**
  * Load the Cedar policy file at boot and install the singleton
  * authorizer. The policy file is the single source of truth for
- * every authorization decision in the platform; failing to
- * load it is a fatal error.
+ * every authorization decision in the platform; failing to load
+ * it is a fatal error.
  */
 async function setupPolicy(): Promise<void> {
   const policyPath = process.env['PROMPTSHEON_POLICY_FILE'];
@@ -85,24 +48,65 @@ async function setupPolicy(): Promise<void> {
   installDefaultAuthorizer(authorizer);
 }
 
+/**
+ * Resolve the webhook secret. Refuses to boot in production
+ * with the dev fallback.
+ */
+function resolveWebhookSecret(nodeEnv: string): string {
+  const fromEnv = process.env['PROMPTSHEON_WEBHOOK_SECRET'];
+  if (fromEnv && fromEnv.length > 0) return fromEnv;
+  if (nodeEnv !== 'production') return 'dev-secret';
+  throw new Error(
+    'PROMPTSHEON_WEBHOOK_SECRET is required in production. Refusing to boot with the dev fallback.',
+  );
+}
+
+/**
+ * Build the cost forecast service from the repo bundle. Pulled
+ * out of main() so the budget handler can stay terse.
+ */
+function buildForecastService(db: Database.Database, repos: Repos): CostForecastService {
+  return new CostForecastService(db, {
+    rollups: repos.costRollup,
+    persistSnapshot: (snap) => repos.budget.insertForecastSnapshot(snap),
+    listBudgets: (orgId) => repos.budget.listForOrg(orgId),
+    updateLastAlerted: (id, ts) => repos.budget.updateLastAlerted(id, ts),
+  });
+}
+
+/**
+ * Helper used in every admin-only router dep. Reads the
+ * resolved org-context role off the Fastify request and
+ * returns true iff the caller is an admin.
+ */
+function adminOnly(request: unknown): boolean {
+  const ctx = request as { orgContext?: { role?: string } } | undefined;
+  return ctx?.orgContext?.role === 'admin';
+}
+
 async function main() {
   const config = loadConfig();
   validateConfig(config);
+
   const db = createConnection(config);
   await runMigrations(db);
-  const auditChain = new AuditChain(db, config.server.fipsMode);
 
+  // Build every repo from the single Database handle. The
+  // factory lives in src/repos/factory.ts and replaces the 41
+  // manual `new XRepo(db)` calls this function used to carry.
+  const repos = buildRepos(db);
+
+  const auditChain = new AuditChain(db, config.server.fipsMode);
   const app = Fastify({ logger: true, bodyLimit: 2_097_152 });
 
   if (config.server.fipsMode) {
     app.log.warn('PROMPTSHEON_FIPS_MODE=true — audit chain requires a FIPS-validated Node build');
   }
 
-  const corsOrigin = config.server.corsOrigin;
-  app.log.info({ corsOrigin }, 'CORS configuration');
+  app.log.info({ corsOrigin: config.server.corsOrigin }, 'CORS configuration');
 
   await app.register(cors, {
-    origin: corsOrigin,
+    origin: config.server.corsOrigin,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key'],
     credentials: true,
@@ -138,70 +142,20 @@ async function main() {
     },
   });
 
-  const workspaceRepo = new WorkspaceRepo(db);
-  const projectRepo = new ProjectRepo(db);
-  const repoRepo = new RepoRepo(db);
-  const branchRepo = new BranchRepo(db);
-  const tagRepo = new TagRepo(db);
-  const repoStore = new RepoStore(db);
-  const commitRepo = new CommitRepo(db);
-  const mrRepo = new MergeRequestRepo(db);
-  const signingKeyRepo = new SigningKeyRepo(db);
-  const evalSuiteRepo = new EvalSuiteRepo(db);
-  const humanReviewRepo = new HumanReviewRepo(db);
-  const vaultRepo = new VaultRepo(
-  db,
-  new (await import('./repos/vault.js')).LocalKms(db),
-);
-  const orgExportService = new OrgExportService(db, vaultRepo);
-  const costRollupRepo = new CostRollupRepo(db);
-  const budgetRepo = new CostBudgetRepo(db);
-  const forecastService = new CostForecastService(db, {
-    rollups: costRollupRepo,
-    persistSnapshot: (snap) => budgetRepo.insertForecastSnapshot(snap),
-    listBudgets: (orgId) => budgetRepo.listForOrg(orgId),
-    updateLastAlerted: (id, ts) => budgetRepo.updateLastAlerted(id, ts),
-  });
-  const traceRepo = new TraceRepo(db);
-  const traceScoreRepo = new TraceScoreRepo(db);
-  const userAnalyticsRepo = new UserAnalyticsRepo(db);
-  const teamRepo = new TeamRepo(db);
-  const ssoConfigRepo = new SsoConfigRepo(db);
-  const promptScanRepo = new PromptScanRepo(db);
-  const redteamRepo = new RedteamRepo(db);
-  const experimentRepo = new ExperimentRepo(db);
-  const incidentRepo = new IncidentRepo(db);
-  const orgSettingsRepo = new OrgSettingsRepo(db);
-  const featureFlagRepo = new FeatureFlagRepo(db);
-  const capabilityRepo = new CapabilityRepo(db);
-  const versionRepo = new VersionRepo(db);
-  const releaseRepo = new ReleaseRepo(db);
-  const executionRepo = new ExecutionRepo(db);
-  const datasetRepo = new DatasetRepo(db);
-  const evalRepo = new EvalRepo(db);
-  const preconditionRepo = new PreconditionRepo(db);
-  const alertRepo = new AlertRepo(db);
-  const scheduleRepo = new ScheduleRepo(db);
-  const approvalRepo = new ApprovalRepo(db);
-  const apiKeyRepo = new ApiKeyRepo(db);
-  const membershipRepo = new MembershipRepo(db);
-  const systemConfigRepo = new SystemConfigRepo(db);
-
   const sseHub = new SseHub();
   const settingsResolver = new SettingsResolver(
     {},
     process.env as Record<string, string>,
-    systemConfigRepo,
+    repos.systemConfig,
   );
 
   const casStore = new CasStore(config.server.casPath);
   await casStore.init();
 
-  const manifestRepo = new ManifestRepo(db);
-
   setupObservability(config);
   await setupPolicy();
-  const cutoverReport = manifestRepo.ensureCutover({ createdBy: 'system-cutover' });
+
+  const cutoverReport = repos.manifest.ensureCutover({ createdBy: 'system-cutover' });
   app.log.info(
     {
       scanned: cutoverReport.scanned,
@@ -217,9 +171,9 @@ async function main() {
   const evolutionAgent = new EvolutionAgent(config, { cas: casStore });
   const compiler = new ReasoningCompiler(config);
   const planner = new IdeaPlannerAgent(config);
-  const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo });
+  const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo: repos.manifest });
   const llmRouter = new LlmRouter();
-  const autoEval = new AutoEval({ traceRepo, scoreRepo: traceScoreRepo, router: llmRouter });
+  const autoEval = new AutoEval({ traceRepo: repos.trace, scoreRepo: repos.traceScore, router: llmRouter });
   const gateway = new Gateway({
     cache: new ResponseCache(2048),
     fallback: new FallbackChain(['custom', 'anthropic', 'openai']),
@@ -227,7 +181,12 @@ async function main() {
     router: llmRouter,
   });
   const chaosConfig = new ChaosConfig();
-  const goalEvolver = new GoalBasedEvolutionAgent({ config, hub: sseHub, executor, cas: casStore });
+  const goalEvolver = new GoalBasedEvolutionAgent({
+    config,
+    hub: sseHub,
+    executor,
+    cas: casStore,
+  });
   const activeGoals = new Map<string, GoalSummary>();
   setInterval(() => {
     for (const [hash, state] of (goalEvolver as unknown as { state: Map<string, unknown> }).state ?? new Map()) {
@@ -260,14 +219,7 @@ async function main() {
         url: 'https://example.com/github',
         events: ['push', 'pull_request'],
         active: true,
-        secret: (() => {
-          const v = process.env['PROMPTSHEON_WEBHOOK_SECRET'];
-          if (v && v.length > 0) return v;
-          if (config.server.nodeEnv !== 'production') return 'dev-secret';
-          throw new Error(
-            'PROMPTSHEON_WEBHOOK_SECRET is required in production. Refusing to boot with the dev fallback.',
-          );
-        })(),
+        secret: resolveWebhookSecret(config.server.nodeEnv),
       },
     ],
     [
@@ -280,8 +232,8 @@ async function main() {
     ],
   );
 
-  app.addHook('preHandler', authMiddleware(config, apiKeyRepo));
-  app.addHook('preHandler', orgContextMiddleware({ membershipRepo }));
+  app.addHook('preHandler', authMiddleware(config, repos.apiKey));
+  app.addHook('preHandler', orgContextMiddleware({ membershipRepo: repos.membership }));
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
     if (error.name === 'NotFoundError') {
@@ -297,8 +249,7 @@ async function main() {
     return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
   });
 
-  const RetentionSweeperModule = await import('./scheduler/retention-sweeper.js');
-  const RetentionSweeper = RetentionSweeperModule.RetentionSweeper;
+  const { RetentionSweeper } = await import('./scheduler/retention-sweeper.js');
   const retention = new RetentionSweeper(
     db,
     {
@@ -319,18 +270,18 @@ async function main() {
 
   await registerRoutes(app, {
     db,
-    workspaceRepo,
-    projectRepo,
-    capabilityRepo,
-    versionRepo,
-    releaseRepo,
-    executionRepo,
-    datasetRepo,
-    evalRepo,
-    preconditionRepo,
-    alertRepo,
-    scheduleRepo,
-    approvalRepo,
+    workspaceRepo: repos.workspace,
+    projectRepo: repos.project,
+    capabilityRepo: repos.capability,
+    versionRepo: repos.version,
+    releaseRepo: repos.release,
+    executionRepo: repos.execution,
+    datasetRepo: repos.dataset,
+    evalRepo: repos.eval,
+    preconditionRepo: repos.precondition,
+    alertRepo: repos.alert,
+    scheduleRepo: repos.schedule,
+    approvalRepo: repos.approval,
     sseHub,
     settingsResolver,
     invocationAgent,
@@ -340,7 +291,7 @@ async function main() {
     compiler,
     planner,
     executor,
-    manifestRepo,
+    manifestRepo: repos.manifest,
     getActiveGoals: () => Array.from(activeGoals.values()),
     sessionStore,
     snapshotStore,
@@ -351,93 +302,75 @@ async function main() {
       }
       return agentRegistry.get(id) ?? null;
     },
-    membershipRepo,
+    membershipRepo: repos.membership,
     webhookReceiver,
     chaosConfig,
     auditChain,
-    apiKeyRepo,
-    userRepo: new UserRepo(db),
+    apiKeyRepo: repos.apiKey,
+    userRepo: repos.user,
     llmRouter,
     repoDeps: {
-    repoRepo,
-    branchRepo,
-    tagRepo,
+      repoRepo: repos.repo,
+      branchRepo: repos.branch,
+      tagRepo: repos.tag,
     },
     contentsDeps: {
-      repoRepo,
-      branchRepo,
-      repoStore,
+      repoRepo: repos.repo,
+      branchRepo: repos.branch,
+      repoStore: repos.repoStore,
     },
     commitDeps: {
-      repoRepo,
-      branchRepo,
-      repoStore,
-      commitRepo,
+      repoRepo: repos.repo,
+      branchRepo: repos.branch,
+      repoStore: repos.repoStore,
+      commitRepo: repos.commit,
     },
     mrDeps: {
-      repoRepo,
-      branchRepo,
-      mrRepo,
+      repoRepo: repos.repo,
+      branchRepo: repos.branch,
+      mrRepo: repos.mergeRequest,
     },
     signingDeps: {
-      repoRepo,
-      commitRepo,
-      signingKeyRepo,
+      repoRepo: repos.repo,
+      commitRepo: repos.commit,
+      signingKeyRepo: repos.signingKey,
     },
     evalSuiteDeps: {
-      suiteRepo: evalSuiteRepo,
-      humanReviewRepo,
+      suiteRepo: repos.evalSuite,
+      humanReviewRepo: repos.humanReview,
     },
     vaultDeps: {
-      vaultRepo,
-      orgExportService,
-      costRollupRepo,
-      kms: vaultRepo.kms,
-      adminOnly: (request: unknown) => {
-        const ctx = request as { orgContext?: { role?: string } } | undefined;
-        return ctx?.orgContext?.role === 'admin';
-      },
+      vaultRepo: repos.vault,
+      orgExportService: repos.orgExport,
+      costRollupRepo: repos.costRollup,
+      kms: repos.vault.kms,
+      adminOnly,
     },
-    retentionDeps: (() => {
-      const adminOnly = (request: unknown): boolean => {
-        const ctx = request as { orgContext?: { role?: string } } | undefined;
-        return ctx?.orgContext?.role === 'admin';
-      };
-      return { sweeper: retention, adminOnly };
-    })(),
-    redteamDeps: {
-      redteamRepo,
-      adminOnly: (request: unknown) => {
-        const ctx = request as { orgContext?: { role?: string } } | undefined;
-        return ctx?.orgContext?.role === 'admin';
-      },
-    },
-    experimentDeps: { experimentRepo },
-    incidentDeps: { incidentRepo, actorId: () => 'system' },
-    featureFlagRepo,
-    traceRepo,
-    traceScoreRepo,
+    retentionDeps: { sweeper: retention, adminOnly },
+    redteamDeps: { redteamRepo: repos.redteam, adminOnly },
+    experimentDeps: { experimentRepo: repos.experiment },
+    incidentDeps: { incidentRepo: repos.incident, actorId: () => 'system' },
+    featureFlagRepo: repos.featureFlag,
+    traceRepo: repos.trace,
+    traceScoreRepo: repos.traceScore,
     autoEval,
-    userAnalyticsRepo,
-    teamRepo,
-    ssoConfigRepo,
-    promptScanRepo,
+    userAnalyticsRepo: repos.userAnalytics,
+    teamRepo: repos.team,
+    ssoConfigRepo: repos.ssoConfig,
+    promptScanRepo: repos.promptScan,
     gateway,
     budgetDeps: {
-      budgetRepo,
-      forecastService,
+      budgetRepo: repos.budget,
+      forecastService: buildForecastService(db, repos),
     },
     orgSettingsDeps: {
-      orgSettingsRepo,
-      vaultRepo,
-      adminOnly: (request: unknown) => {
-        const ctx = request as { orgContext?: { role?: string } } | undefined;
-        return ctx?.orgContext?.role === 'admin';
-      },
+      orgSettingsRepo: repos.orgSettings,
+      vaultRepo: repos.vault,
+      adminOnly,
     },
   });
 
-  const scheduler = new Scheduler(scheduleRepo, sseHub);
+  const scheduler = new Scheduler(repos.schedule, sseHub);
   scheduler.start();
 
   const port = config.server.port;
