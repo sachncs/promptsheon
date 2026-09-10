@@ -1,43 +1,51 @@
-# OPS-CI-1: pre-commit hooks. We keep the surface tight:
-# the hooks that match every commit land in pre-commit; the
-# periodic checks (markdownlint, vale, Dependabot) live in CI
-# so the local hook time stays under a second. Operators can
-# install with `pip install pre-commit && pre-commit install`.
+# OPS-CI-1: pre-commit hooks. The hooks that match every commit
+# land here; the slower checks (full vitest, Playwright, markdownlint)
+# live in CI so the local hook time stays under a second.
 #
-# Note: the `gofmt` and `goimports` hooks need a working Go
-# toolchain. Production CI has it; this config is a no-op on
-# dev machines that don't.
+# Operators install with `pip install pre-commit && pre-commit install`.
+# Every hook is `language: system` so the operator's locally-installed
+# pnpm + eslint + tsc drive the checks — there is no extra Python-side
+# dependency for a Node project.
 
 repos:
   - repo: local
     hooks:
-      - id: gofmt
-        name: gofmt
-        description: Format Go source files (gofmt -s -w .).
+      - id: shared-typecheck
+        name: shared tsc --noEmit
+        description: Type-check the shared package (fastest package to typecheck).
         language: system
-        entry: gofmt -s -w
-        args: []
-        files: \.go$
-        pass_filenames: true
+        entry: bash -c 'cd packages/shared && pnpm typecheck'
+        files: ^packages/shared/src/.*\.ts$
+        pass_filenames: false
 
-      - id: goimports
-        name: goimports
-        description: Tidy Go imports.
+      - id: server-typecheck
+        name: server tsc --noEmit
+        description: Type-check the server package.
         language: system
-        entry: goimports -w
-        args: []
-        files: \.go$
-        pass_filenames: true
+        entry: bash -c 'cd packages/server && pnpm typecheck'
+        files: ^packages/server/src/.*\.ts$
+        pass_filenames: false
 
-      - id: golangci-fix
-        # OPS-CI-1: golangci-lint --fix on the touched files
-        # only (the full lint run is in CI; this is the cheap
-        # local autofix loop). Operators who don't have
-        # golangci-lint installed can `go install` it; the
-        # hook is a no-op in that case.
-        name: golangci-lint --fix
-        description: Auto-fix linter issues on the changed files.
+      - id: frontend-eslint
+        name: frontend eslint
+        description: Lint the frontend with eslint-config-next + AGENTS.md rules.
         language: system
-        entry: bash -c 'changed=$(git diff --cached --name-only --diff-filter=ACM | grep -E "\.go$" || true); if [ -n "$changed" ]; then golangci-lint run --fix $changed || true; fi'
-        files: \.go$
+        entry: bash -c 'cd frontend && pnpm exec eslint --fix $(git diff --cached --name-only --diff-filter=ACM | grep -E "\.(ts|tsx)$" | sed "s|^|frontend/|" || true)'
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false
+
+      - id: prettier-shared-server
+        name: prettier (shared + server)
+        description: Format the touched shared + server files with Prettier.
+        language: system
+        entry: bash -c 'changed=$(git diff --cached --name-only --diff-filter=ACM | grep -E "^(packages/(shared|server)/src/.*\.ts$|packages/(shared|server)/test/.*\.ts$)" || true); if [ -n "$changed" ]; then pnpm exec prettier --write $changed || true; fi'
+        files: ^packages/(shared|server)/.*\.ts$
+        pass_filenames: false
+
+      - id: changelog-footer
+        name: changelog keep-a-changelog footer
+        description: Fail if CHANGELOG.md does not end with the Keep-a-Changelog footer.
+        language: system
+        entry: bash -c 'tail -n 5 CHANGELOG.md | grep -q "Keep a Changelog" || (echo "CHANGELOG.md is missing the Keep-a-Changelog footer"; exit 1)'
+        files: ^CHANGELOG\.md$
         pass_filenames: false
