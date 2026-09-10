@@ -28,8 +28,9 @@ A clear and concise description of what actually happened.
 ## Environment
 
 - OS: [e.g., macOS 14.0, Ubuntu 22.04]
-- Go version: [e.g., 1.23.0]
-- Promptsheon version: [e.g., v1.0.0]
+- Node.js version: [e.g., 26.0.0]
+- pnpm version: [e.g., 11.23.0]
+- Promptsheon version: [e.g., v0.4.2]
 - Database: [e.g., SQLite]
 
 ## Logs
