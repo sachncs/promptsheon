@@ -307,10 +307,13 @@ For operators / maintainers:
 ```bash
 pnpm install                # install all workspace deps
 pnpm typecheck              # tsc across shared + server + frontend
-pnpm --dir packages/server test   # vitest, 59 files / 377 cases
-pnpm --dir packages/shared test   # vitest, 3 files / 29 cases
+pnpm --dir packages/server test   # vitest, 86 files / 619 cases
+pnpm --dir packages/shared test   # vitest, 4 files / 36 cases
+pnpm --dir frontend test:e2e      # Playwright tier suite, 10 specs
 pnpm --dir frontend build          # next build
 ```
+
+To regenerate the architecture counts above, run `bash scripts/stats.sh`.
 
 ### Per-package workflow
 
