@@ -30,7 +30,7 @@ multi-provider LLM, an audit chain, webhooks, eval scorers, and a
 live DAG editor.
 
 Built on the
-[`@strands-agents/sdk`](https://github.com/strands-agents/sdk) for
+[`@strands-agents/sdk`](https://github.com/strands-agents/harness-sdk) for
 every AI call: planning is a 5-agent `Swarm`, execution is a `Graph`
 of per-node `Agent`s, and standalone `Agent`s handle compilation,
 scoring, and self-evolution.
@@ -289,7 +289,7 @@ For operators / maintainers:
 | HTTP           | [Fastify 5](https://fastify.dev)                 |
 | Validation     | [Zod 4](https://zod.dev)                         |
 | Database       | SQLite via [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) |
-| AI             | [`@strands-agents/sdk`](https://github.com/strands-agents/sdk) — `Agent`, `Swarm`, `Graph` |
+| AI             | [`@strands-agents/sdk`](https://github.com/strands-agents/harness-sdk) — `Agent`, `Swarm`, `Graph` |
 | LLM providers  | OpenAI, Anthropic, AWS Bedrock, custom OpenAI/Anthropic-compatible |
 | Frontend       | [Next.js 16](https://nextjs.org) (App Router, Turbopack) |
 | UI             | [React 19](https://react.dev), [shadcn/ui](https://ui.shadcn.com), [Tailwind v4](https://tailwindcss.com) |
