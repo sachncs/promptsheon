@@ -1,0 +1,27 @@
+---
+import LogoMark from './LogoMark.astro';
+
+export interface Props {
+  size?: 'sm' | 'md' | 'lg';
+  showWordmark?: boolean;
+  className?: string;
+}
+
+const { size = 'sm', showWordmark = true, className = '' } = Astro.props;
+const cfg = {
+  sm: { mark: 24, text: 'text-[15px]', gap: 'gap-2.5' },
+  md: { mark: 32, text: 'text-lg',     gap: 'gap-3'   },
+  lg: { mark: 44, text: 'text-2xl',    gap: 'gap-3.5' },
+}[size];
+---
+
+<a href="/" class={`inline-flex items-center ${cfg.gap} select-none group ${className}`} aria-label="Promptsheon home">
+  <LogoMark size={cfg.mark} />
+  {showWordmark && (
+    <span
+      class={`font-semibold tracking-[-0.025em] text-[var(--ink-strong)] ${cfg.text} transition-opacity`}
+    >
+      promptsheon
+    </span>
+  )}
+</a>

@@ -1,0 +1,342 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================================
+   Promptsheon — product site
+   Design system grounded in restraint: monochrome ink, a single accent,
+   generous whitespace, and a near-imperceptible surface tint that lets
+   the typography do the work. Inspired by Apple's clarity and the dark
+   elegance of Linear / Vercel product pages.
+   ========================================================================= */
+
+@layer base {
+  :root {
+    /* Light-mode surface scale — soft, near-white, very subtle warmth. */
+    --bg:           #FBFBFD;
+    --bg-elevated:  #FFFFFF;
+    --bg-subtle:    #F4F5F8;
+    --bg-overlay:   rgba(255, 255, 255, 0.72);
+    --bg-code:      #0E1322;
+    --bg-code-soft: #11141E;
+    --ink:          #0B0D14;
+    --ink-strong:   #05060A;
+    --ink-muted:    #4B5471;
+    --ink-subtle:   #6E7693;
+    --line:         rgba(15, 17, 23, 0.08);
+    --line-strong:  rgba(15, 17, 23, 0.14);
+    --accent:       #4F46E5;
+    --accent-soft:  rgba(79, 70, 229, 0.08);
+    --accent-ring:  rgba(79, 70, 229, 0.22);
+    --success:      #10B981;
+    --warn:         #F59E0B;
+    --danger:       #EF4444;
+    --noise-opacity: 0.035;
+    --shadow-color: 220 30% 5%;
+  }
+
+  .dark {
+    /* Dark-mode surface scale — cinematic, deep navy-black, never pure #000. */
+    --bg:           #07080D;
+    --bg-elevated:  #0C0E16;
+    --bg-subtle:    #11141E;
+    --bg-overlay:   rgba(7, 8, 13, 0.7);
+    --bg-code:      #0B0D14;
+    --bg-code-soft: #11141E;
+    --ink:          #E8ECF5;
+    --ink-strong:   #FFFFFF;
+    --ink-muted:    #9DA6BD;
+    --ink-subtle:   #6C7591;
+    --line:         rgba(232, 236, 245, 0.08);
+    --line-strong:  rgba(232, 236, 245, 0.14);
+    --accent:       #818CF8;
+    --accent-soft:  rgba(129, 140, 248, 0.12);
+    --accent-ring:  rgba(129, 140, 248, 0.32);
+    --noise-opacity: 0.06;
+    --shadow-color: 220 30% 2%;
+  }
+
+  * {
+    border-color: var(--line);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+    color-scheme: light;
+    background: var(--bg);
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: theme('fontFamily.sans');
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background-color: var(--accent);
+    color: white;
+  }
+
+  /* Respect users who prefer reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Focus visibility — visible only on keyboard nav, soft on pointer */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  /* Container used across the site; sized to feel tight on large screens. */
+  .ps-container {
+    @apply mx-auto w-full max-w-[1200px] px-6 sm:px-8 lg:px-10;
+  }
+  .ps-container-narrow {
+    @apply mx-auto w-full max-w-[820px] px-6 sm:px-8;
+  }
+
+  /* Section frame — generous vertical rhythm with subtle dividers. */
+  .ps-section {
+    @apply relative py-24 sm:py-32 lg:py-40;
+  }
+  .ps-section-tight {
+    @apply relative py-16 sm:py-20 lg:py-28;
+  }
+
+  /* Section eyebrow — small uppercase label that anchors a section */
+  .ps-eyebrow {
+    @apply inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-subtle)];
+  }
+
+  /* Display headlines — optical kerning, tight leading */
+  .ps-display {
+    font-family: theme('fontFamily.display');
+    font-weight: 600;
+    color: var(--ink-strong);
+    letter-spacing: -0.035em;
+    line-height: 1.04;
+    text-wrap: balance;
+  }
+
+  /* Subheadline — restrained companion text */
+  .ps-lead {
+    @apply text-lg sm:text-xl leading-relaxed;
+    color: var(--ink-muted);
+    text-wrap: pretty;
+  }
+
+  /* Premium card with hairline border and tiny inner highlight */
+  .ps-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 1.25rem;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.6) inset,
+      0 1px 2px hsl(var(--shadow-color) / 0.04),
+      0 12px 32px -12px hsl(var(--shadow-color) / 0.10);
+    transition: border-color 280ms cubic-bezier(0.22, 1, 0.36, 1),
+                transform   280ms cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow  280ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .dark .ps-card {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.04) inset,
+      0 1px 2px hsl(var(--shadow-color) / 0.4),
+      0 16px 40px -12px hsl(var(--shadow-color) / 0.6);
+  }
+
+  .ps-card:hover {
+    border-color: var(--line-strong);
+    transform: translateY(-2px);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.6) inset,
+      0 4px 8px hsl(var(--shadow-color) / 0.04),
+      0 24px 60px -16px hsl(var(--shadow-color) / 0.18);
+  }
+
+  /* Premium button — subtle hairline + tiny sheen on hover */
+  .ps-btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full text-sm font-medium select-none;
+    height: 40px;
+    padding: 0 18px;
+    transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+                background-color 200ms ease,
+                color 200ms ease,
+                box-shadow 200ms ease,
+                border-color 200ms ease;
+    will-change: transform;
+  }
+  .ps-btn:active { transform: translateY(1px); }
+
+  .ps-btn-primary {
+    background: var(--ink-strong);
+    color: white;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      0 1px 2px rgba(0, 0, 0, 0.08),
+      0 6px 18px -6px rgba(0, 0, 0, 0.24);
+  }
+  .dark .ps-btn-primary {
+    background: white;
+    color: #05060A;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      0 1px 2px rgba(0, 0, 0, 0.5),
+      0 6px 18px -6px rgba(255, 255, 255, 0.18);
+  }
+  .ps-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      0 2px 4px rgba(0, 0, 0, 0.08),
+      0 12px 28px -10px rgba(0, 0, 0, 0.36);
+  }
+
+  .ps-btn-secondary {
+    background: var(--bg-elevated);
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  .ps-btn-secondary:hover {
+    background: var(--bg-subtle);
+    border-color: var(--line-strong);
+  }
+
+  .ps-btn-ghost {
+    background: transparent;
+    color: var(--ink);
+  }
+  .ps-btn-ghost:hover {
+    background: var(--bg-subtle);
+  }
+
+  .ps-btn-lg {
+    height: 48px;
+    padding: 0 24px;
+    font-size: 0.95rem;
+  }
+
+  /* Pill — for status, tags, and small inline marks */
+  .ps-pill {
+    @apply inline-flex items-center gap-1.5 rounded-full text-[11px] font-medium tracking-tight;
+    height: 24px;
+    padding: 0 10px;
+    background: var(--bg-subtle);
+    color: var(--ink-muted);
+    border: 1px solid var(--line);
+  }
+
+  /* Hash chip — content-addressed badge (signature Promptsheon motif) */
+  .ps-hash {
+    @apply inline-flex items-center gap-1.5 rounded-md font-mono text-[11px];
+    padding: 2px 8px;
+    background: var(--bg-subtle);
+    color: var(--ink-subtle);
+    border: 1px solid var(--line);
+  }
+
+  /* Code block — terminal feel */
+  .ps-code {
+    @apply font-mono text-[12.5px] leading-relaxed;
+    background: var(--bg-code);
+    color: #E8ECF5;
+    border-radius: 1rem;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 30px 60px -20px rgba(0, 0, 0, 0.4);
+    overflow-x: auto;
+  }
+
+  /* Reveal-on-scroll hook */
+  .ps-reveal {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+    will-change: opacity, transform;
+  }
+  .ps-reveal.is-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  /* Background grid — subtle, anchored to top */
+  .ps-grid-bg {
+    background-image:
+      linear-gradient(to right, var(--line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+    background-size: 56px 56px;
+    background-position: -1px -1px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 75%);
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 75%);
+  }
+
+  /* Cinematic vignette — used in the hero for depth */
+  .ps-vignette::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 60% 40% at 50% 0%, var(--accent-soft) 0%, transparent 70%),
+      radial-gradient(ellipse 80% 50% at 50% 100%, transparent 0%, var(--bg) 80%);
+    z-index: 0;
+  }
+
+  /* Animated noise texture for depth */
+  .ps-noise::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: var(--noise-opacity);
+    mix-blend-mode: overlay;
+    background-image: theme('backgroundImage.noise');
+    background-size: 160px 160px;
+    z-index: 0;
+  }
+
+  /* Hairline divider used between sections */
+  .ps-hr {
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--line-strong), transparent);
+  }
+}
+
+@layer utilities {
+  .text-balance   { text-wrap: balance; }
+  .text-pretty    { text-wrap: pretty; }
+  .text-ink       { color: var(--ink); }
+  .text-ink-strong{ color: var(--ink-strong); }
+  .text-ink-muted { color: var(--ink-muted); }
+  .text-ink-subtle{ color: var(--ink-subtle); }
+  .text-accent    { color: var(--accent); }
+  .bg-surface     { background: var(--bg); }
+  .bg-elevated    { background: var(--bg-elevated); }
+  .bg-subtle      { background: var(--bg-subtle); }
+  .border-hairline{ border-color: var(--line); }
+}

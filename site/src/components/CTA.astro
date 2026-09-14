@@ -1,0 +1,68 @@
+---
+import LogoMark from './LogoMark.astro';
+---
+
+<section id="install" class="ps-section relative overflow-hidden border-t border-[var(--line)]">
+  <!-- Cinematic glow -->
+  <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10">
+    <div class="absolute left-1/2 top-0 h-[480px] w-[680px] -translate-x-1/2 rounded-full bg-[var(--accent)] opacity-[0.08] blur-[120px]"></div>
+  </div>
+
+  <div class="ps-container">
+    <div class="mx-auto max-w-4xl text-center">
+      <div class="ps-reveal mx-auto flex justify-center">
+        <LogoMark size={48} />
+      </div>
+      <h2 class="ps-reveal ps-display mt-8 text-display-lg" style="--reveal-delay: 80ms">
+        Ship AI capabilities, not prompts.
+      </h2>
+      <p class="ps-reveal mx-auto mt-5 max-w-xl text-[17px] leading-relaxed text-[var(--ink-muted)] text-pretty" style="--reveal-delay: 160ms">
+        Set up Promptsheon on your own infrastructure. Configure your provider,
+        create your first capability, route a release. Ten minutes from
+        <code class="rounded bg-[var(--bg-subtle)] px-1.5 py-0.5 font-mono text-[13.5px] text-[var(--ink)]">git clone</code> to first canary.
+      </p>
+
+      <div class="ps-reveal mx-auto mt-10 max-w-2xl overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--bg-code)] text-left shadow-lift" style="--reveal-delay: 220ms">
+        <div class="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-2.5">
+          <div class="flex items-center gap-1.5">
+            <span class="h-2.5 w-2.5 rounded-full bg-[#FF5F57]"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-[#28C840]"></span>
+          </div>
+          <span class="font-mono text-[11px] text-white/40">terminal</span>
+          <span class="font-mono text-[11px] text-white/40">~</span>
+        </div>
+        <pre class="overflow-x-auto p-5 font-mono text-[13px] leading-[1.85] text-[#E8ECF5]"><code><span class="text-[#6C7591]">$</span> git clone https://github.com/sachncs/promptsheon.git
+<span class="text-[#6C7591]">$</span> cd promptsheon
+<span class="text-[#6C7591]">$</span> pnpm install
+<span class="text-[#6C7591]">$</span> cp .env.example .env
+<span class="text-[#6C7591]">$</span> pnpm dev
+<span class="text-[#34D399]">▸ backend</span>  listening on http://localhost:8080
+<span class="text-[#34D399]">▸ frontend</span> ready at   http://localhost:3000
+<span class="text-[#A5B4FC]">✓</span> capability <span class="text-[#FBBF24]">refund-triage@v3</span> deployed · sha256:9c4f…a02b</code></pre>
+      </div>
+
+      <div class="ps-reveal mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row" style="--reveal-delay: 280ms">
+        <a
+          href="https://github.com/sachncs/promptsheon"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="ps-btn ps-btn-primary ps-btn-lg"
+        >
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55v-2.16c-3.2.7-3.87-1.36-3.87-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.34.95.1-.74.4-1.24.73-1.53-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.21-1.49 3.18-1.18 3.18-1.18.62 1.59.23 2.76.11 3.05.73.81 1.18 1.84 1.18 3.1 0 4.43-2.7 5.4-5.26 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/>
+          </svg>
+          Star on GitHub
+        </a>
+        <a
+          href="https://github.com/sachncs/promptsheon/blob/master/getting-started.md"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="ps-btn ps-btn-secondary ps-btn-lg"
+        >
+          Read the guide
+        </a>
+      </div>
+    </div>
+  </div>
+</section>

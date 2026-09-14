@@ -1,0 +1,28 @@
+---
+const metrics = [
+  { value: 76,   suffix: '',  label: 'REST endpoints' },
+  { value: 5,    suffix: '',  label: 'specialised agents' },
+  { value: 12,   suffix: '+', label: 'integrations' },
+  { value: 100,  suffix: '%', label: 'self-hosted' },
+];
+---
+
+<section class="ps-section-tight border-y border-[var(--line)] bg-[var(--bg-subtle)]">
+  <div class="ps-container">
+    <div class="grid grid-cols-2 gap-y-10 lg:grid-cols-4">
+      {metrics.map((m, idx) => (
+        <div
+          class={`ps-reveal px-6 text-center sm:px-8 lg:text-left ${idx > 0 ? 'lg:border-l lg:border-[var(--line)]' : ''}`}
+          style={`--reveal-delay: ${idx * 80}ms`}
+        >
+          <div class="font-mono text-[44px] font-semibold leading-none tracking-tight text-[var(--ink-strong)] sm:text-[52px]">
+            <span data-counter data-target={m.value} data-suffix={m.suffix}>{m.value.toLocaleString()}{m.suffix}</span>
+          </div>
+          <div class="mt-3 text-[12.5px] font-medium uppercase tracking-[0.14em] text-[var(--ink-subtle)]">
+            {m.label}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

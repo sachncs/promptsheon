@@ -1,0 +1,49 @@
+---
+export interface Props {
+  title: string;
+  description?: string;
+  ogImage?: string;
+}
+
+const { title, description, ogImage } = Astro.props;
+const SITE_URL = 'https://sachncs.github.io/promptsheon';
+const canonical = new URL(Astro.url.pathname, SITE_URL).toString();
+const ogUrl = ogImage?.startsWith('http') ? ogImage : `${SITE_URL}${ogImage ?? '/og.png'}`;
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#0E1322" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#FBFBFD" media="(prefers-color-scheme: light)" />
+
+<title>{title}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="apple-touch-icon" href="/logo.svg" />
+
+<!-- Open Graph -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:image" content={ogUrl} />
+<meta property="og:url" content={canonical} />
+<meta property="og:site_name" content="Promptsheon" />
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={ogUrl} />
+
+<!-- Performance: preconnect to Google Fonts for the Inter / JetBrains families -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+/>
+
+<meta name="generator" content={Astro.generator} />

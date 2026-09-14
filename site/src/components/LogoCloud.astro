@@ -1,0 +1,20 @@
+---
+const logos = [
+  'northwind', 'orbital', 'octant', 'lyra', 'helix',
+];
+---
+
+<section class="ps-section-tight border-t border-[var(--line)]">
+  <div class="ps-container">
+    <div class="ps-reveal text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-subtle)]">
+      Self-hosted by teams running agents in production
+    </div>
+    <div class="ps-reveal mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" style="--reveal-delay: 100ms">
+      {logos.map((name) => (
+        <div class="flex h-12 items-center justify-center rounded-lg border border-[var(--line)] bg-[var(--bg-elevated)] font-mono text-[12px] text-[var(--ink-subtle)] transition-colors hover:border-[var(--line-strong)] hover:text-[var(--ink-muted)]">
+          :: / /{name}
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

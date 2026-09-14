@@ -55,6 +55,11 @@ frontend/out/
 frontend/build/
 frontend/.turbo/
 
+# Site (Astro) — build artefacts only; site/.gitignore covers the rest
+# (node_modules, dist, .astro, .env*, etc).
+site/dist/
+site/.astro/
+
 # Secret material — never commit
 *.pem
 *.key

@@ -1,0 +1,26 @@
+---
+import BaseLayout from '@layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Promptsheon — Not found" description="Page not found">
+  <section class="ps-section">
+    <div class="ps-container text-center">
+      <div class="ps-eyebrow">404</div>
+      <h1 class="ps-display mt-4 text-display-xl">Page not found.</h1>
+      <p class="ps-lead mx-auto mt-5 max-w-md">
+        The link you followed may be broken, or the page may have been moved.
+      </p>
+      <div class="mt-10 flex items-center justify-center gap-3">
+        <a href="/" class="ps-btn ps-btn-primary ps-btn-lg">Back to home</a>
+        <a
+          href="https://github.com/sachncs/promptsheon"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="ps-btn ps-btn-secondary ps-btn-lg"
+        >
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

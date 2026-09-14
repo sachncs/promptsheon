@@ -1,0 +1,129 @@
+---
+const tiers = [
+  {
+    name: 'Self-host',
+    badge: null,
+    price: 'Free',
+    period: 'forever',
+    blurb: 'Apache-2.0. Run anywhere you can run Node.',
+    cta: 'Get started',
+    href: '#install',
+    features: [
+      'All 76 REST endpoints',
+      'DAG editor, eval engine, audit chain',
+      'Multi-provider LLM',
+      'No telemetry',
+      'GitHub releases + signed tags',
+    ],
+    highlight: true,
+  },
+  {
+    name: 'Cloud (soon)',
+    badge: 'Waitlist',
+    price: 'TBD',
+    period: 'when ready',
+    blurb: 'Hosted Promptsheon with managed upgrades.',
+    cta: 'Join waitlist',
+    href: 'mailto:sachncs@gmail.com?subject=Promptsheon%20Cloud%20waitlist',
+    features: [
+      'Same Apache-2.0 codebase',
+      'Zero-ops upgrade path',
+      'Backups + observability included',
+      'Region-pinned deployments',
+    ],
+    disabled: true,
+  },
+  {
+    name: 'Enterprise',
+    badge: null,
+    price: 'Talk to us',
+    period: 'tailored',
+    blurb: 'Air-gapped installs, SSO, custom integrations.',
+    cta: 'Email us',
+    href: 'mailto:sachncs@gmail.com?subject=Promptsheon%20Enterprise',
+    features: [
+      'On-prem deployment playbook',
+      'SSO via your IdP',
+      'Custom audit retention',
+      'Named engineering contact',
+    ],
+  },
+];
+---
+
+<section id="pricing" class="ps-section border-t border-[var(--line)] bg-[var(--bg-subtle)]">
+  <div class="ps-container">
+    <div class="mx-auto max-w-3xl text-center">
+      <div class="ps-reveal ps-eyebrow">Pricing</div>
+      <h2 class="ps-reveal ps-display mt-4 text-display-lg" style="--reveal-delay: 80ms">
+        One tier. Self-hosted. Apache-2.0.
+      </h2>
+      <p class="ps-reveal mx-auto mt-5 max-w-2xl text-[17px] leading-relaxed text-[var(--ink-muted)] text-pretty" style="--reveal-delay: 160ms">
+        No per-seat pricing. No cloud bill. Run it on your own metal, behind your
+        own firewall. Pay only for the LLM tokens you actually use.
+      </p>
+    </div>
+
+    <div class="mt-14 grid gap-5 md:grid-cols-3">
+      {tiers.map((tier, i) => (
+        <article
+          class={`ps-reveal relative rounded-2xl p-7 transition-all ${
+            tier.highlight
+              ? 'border-2 border-[var(--ink-strong)] bg-[var(--bg-elevated)] shadow-glow'
+              : 'border border-[var(--line)] bg-[var(--bg-elevated)]'
+          }`}
+          style={`--reveal-delay: ${i * 80}ms`}
+        >
+          {tier.highlight && (
+            <div class="absolute -top-3 left-7 rounded-full bg-[var(--ink-strong)] px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-white dark:bg-white dark:text-[#05060A]">
+              Recommended
+            </div>
+          )}
+
+          <div class="flex items-center justify-between">
+            <div class="text-[15px] font-semibold text-[var(--ink-strong)]">{tier.name}</div>
+            {tier.badge && (
+              <span class="rounded-full border border-[var(--line)] bg-[var(--bg-subtle)] px-2.5 py-0.5 text-[10.5px] font-medium uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                {tier.badge}
+              </span>
+            )}
+          </div>
+
+          <div class="mt-5 flex items-baseline gap-1.5">
+            <span class="font-semibold text-[40px] tracking-tight text-[var(--ink-strong)]">
+              {tier.price}
+            </span>
+            <span class="text-[13px] text-[var(--ink-subtle)]">{tier.period}</span>
+          </div>
+
+          <p class="mt-1.5 text-[14px] text-[var(--ink-muted)]">{tier.blurb}</p>
+
+          <ul class="mt-6 space-y-3 border-t border-[var(--line)] pt-6 text-[13.5px]">
+            {tier.features.map((f) => (
+              <li class="flex items-start gap-2.5">
+                <svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                <span class="text-[var(--ink)]">{f}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div class="mt-8">
+            <a
+              href={tier.href}
+              class={`ps-btn w-full ${tier.highlight ? 'ps-btn-primary' : 'ps-btn-secondary'} ${tier.disabled ? 'pointer-events-none opacity-50' : ''}`}
+            >
+              {tier.cta}
+              {!tier.disabled && (
+                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M5 12h14M13 5l7 7-7 7" />
+                </svg>
+              )}
+            </a>
+          </div>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>

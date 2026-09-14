@@ -6,8 +6,10 @@
     "dev": "concurrently -n server,frontend -c blue,green \"pnpm --dir server dev\" \"sh -c 'cd ../frontend && pnpm dev'\"",
     "dev:server": "pnpm --dir server dev",
     "dev:frontend": "sh -c 'cd ../frontend && pnpm dev'",
-    "build": "pnpm --dir shared build && pnpm --dir server build && sh -c 'cd ../frontend && pnpm build'",
-    "typecheck": "pnpm --dir shared typecheck && pnpm --dir server typecheck && sh -c 'cd ../frontend && pnpm typecheck' && pnpm --dir cli typecheck && pnpm --dir sdk typecheck",
+    "dev:site": "sh -c 'cd ../site && pnpm dev'",
+    "build": "pnpm --dir shared build && pnpm --dir server build && sh -c 'cd ../frontend && pnpm build' && sh -c 'cd ../site && pnpm build'",
+    "build:site": "sh -c 'cd ../site && pnpm build'",
+    "typecheck": "pnpm --dir shared typecheck && pnpm --dir server typecheck && sh -c 'cd ../frontend && pnpm typecheck' && pnpm --dir cli typecheck && pnpm --dir sdk typecheck && sh -c 'cd ../site && pnpm exec astro check'",
     "test": "pnpm --dir server test"
   },
   "devDependencies": {

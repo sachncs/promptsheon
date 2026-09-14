@@ -1,0 +1,120 @@
+---
+import Logo from './Logo.astro';
+
+interface NavItem {
+  label: string;
+  href: string;
+  external?: boolean;
+}
+
+const sections: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'Product',
+    items: [
+      { label: 'Overview',     href: '#overview' },
+      { label: 'Capabilities', href: '#capabilities' },
+      { label: 'Workflow',     href: '#workflow' },
+      { label: 'Trust',        href: '#trust' },
+    ],
+  },
+  {
+    label: 'Resources',
+    items: [
+      { label: 'Documentation', href: 'https://github.com/sachncs/promptsheon#readme', external: true },
+      { label: 'Getting started', href: 'https://github.com/sachncs/promptsheon/blob/master/getting-started.md', external: true },
+      { label: 'Architecture',  href: 'https://github.com/sachncs/promptsheon/blob/master/architecture.md', external: true },
+      { label: 'API reference', href: 'https://github.com/sachncs/promptsheon/blob/master/api-reference.md', external: true },
+    ],
+  },
+  {
+    label: 'Project',
+    items: [
+      { label: 'GitHub',     href: 'https://github.com/sachncs/promptsheon', external: true },
+      { label: 'Releases',   href: 'https://github.com/sachncs/promptsheon/releases', external: true },
+      { label: 'Issues',     href: 'https://github.com/sachncs/promptsheon/issues', external: true },
+      { label: 'Security',   href: 'https://github.com/sachncs/promptsheon/security', external: true },
+    ],
+  },
+  {
+    label: 'Community',
+    items: [
+      { label: 'Contributing', href: 'https://github.com/sachncs/promptsheon/blob/master/CONTRIBUTING.md', external: true },
+      { label: 'Code of conduct', href: 'https://github.com/sachncs/promptsheon/blob/master/CODE_OF_CONDUCT.md', external: true },
+      { label: 'Changelog',   href: 'https://github.com/sachncs/promptsheon/blob/master/CHANGELOG.md', external: true },
+      { label: 'License',     href: 'https://github.com/sachncs/promptsheon/blob/master/LICENSE', external: true },
+    ],
+  },
+];
+---
+
+<footer class="relative border-t border-[var(--line)] bg-[var(--bg)]">
+  <div class="ps-container py-20">
+    <div class="grid gap-16 lg:grid-cols-12">
+      <div class="lg:col-span-4">
+        <Logo size="md" />
+        <p class="mt-5 max-w-sm text-[15px] leading-relaxed text-[var(--ink-muted)] text-pretty">
+          The control plane for AI capabilities. Author multi-agent prompts, ship them safely,
+          prove they don&rsquo;t regress, and roll back when they do.
+        </p>
+        <div class="mt-6 flex items-center gap-2">
+          <span class="ps-pill">Apache&nbsp;2.0</span>
+          <span class="ps-pill">Self-hosted</span>
+          <span class="ps-pill">No telemetry</span>
+        </div>
+        <div class="mt-8 flex items-center gap-3">
+          <a
+            href="https://github.com/sachncs/promptsheon"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--bg-elevated)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] hover:border-[var(--line-strong)]"
+            aria-label="GitHub"
+          >
+            <svg viewBox="0 0 24 24" class="h-[18px] w-[18px]" fill="currentColor" aria-hidden="true">
+              <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55v-2.16c-3.2.7-3.87-1.36-3.87-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.34.95.1-.74.4-1.24.73-1.53-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.21-1.49 3.18-1.18 3.18-1.18.62 1.59.23 2.76.11 3.05.73.81 1.18 1.84 1.18 3.1 0 4.43-2.7 5.4-5.26 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/>
+            </svg>
+          </a>
+          <a
+            href="https://github.com/sachncs/promptsheon/releases"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex h-10 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--bg-elevated)] px-4 text-[13px] font-medium text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] hover:border-[var(--line-strong)]"
+          >
+            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse-soft"></span>
+            v0.1
+          </a>
+        </div>
+      </div>
+
+      <nav class="lg:col-span-8 grid grid-cols-2 gap-10 sm:grid-cols-4">
+        {sections.map((section) => (
+          <div>
+            <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-subtle)]">
+              {section.label}
+            </div>
+            <ul class="mt-5 space-y-3">
+              {section.items.map((item) => (
+                <li>
+                  <a
+                    href={item.href}
+                    target={item.external ? '_blank' : undefined}
+                    rel={item.external ? 'noopener noreferrer' : undefined}
+                    class="text-[14px] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </nav>
+    </div>
+
+    <div class="mt-20 flex flex-col gap-3 border-t border-[var(--line)] pt-8 text-[12.5px] text-[var(--ink-subtle)] sm:flex-row sm:items-center sm:justify-between">
+      <span>© 2026 Promptsheon contributors. Apache License 2.0.</span>
+      <span class="max-w-md text-pretty">
+        Promptsheon is self-hosted infrastructure. By using the software you accept responsibility for the content your capabilities produce.
+      </span>
+    </div>
+  </div>
+</footer>

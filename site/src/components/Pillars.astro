@@ -1,0 +1,73 @@
+---
+const pillars = [
+  {
+    name: 'Content-addressed registry',
+    detail: 'manifest CAS',
+    icon: 'cube',
+    body: 'Every manifest, prompt block, tool spec, and policy snapshot is hashed and stored by content. Same input, same hash, every time. Identities are immutable.',
+  },
+  {
+    name: 'Evaluation engine',
+    detail: 'eval passes',
+    icon: 'flask',
+    body: 'Run datasets, score with deterministic or LLM-judge scorers, gate releases on thresholds, detect regressions, compare models in parallel.',
+  },
+  {
+    name: 'Governed releases',
+    detail: 'release path',
+    icon: 'branch',
+    body: 'Draft → review → approved → canary → active → rolled back. Every transition is signed, audited, and reversible in one click.',
+  },
+];
+
+const icons: Record<string, string> = {
+  cube:   'M12 2L3 7v10l9 5 9-5V7l-9-5zM3 7l9 5 9-5M12 12v10',
+  flask:  'M9 3h6M10 3v6.5L4.5 19a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 9.5V3',
+  branch: 'M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9',
+};
+---
+
+<section id="overview" class="ps-section">
+  <div class="ps-container">
+    <div class="mx-auto max-w-3xl text-center">
+      <div class="ps-reveal ps-eyebrow">Three pillars</div>
+      <h2 class="ps-reveal ps-display mt-4 text-display-lg" style="--reveal-delay: 80ms">
+        Treat AI capabilities like software.
+      </h2>
+      <p class="ps-reveal mx-auto mt-5 max-w-2xl text-[17px] leading-relaxed text-[var(--ink-muted)] text-pretty" style="--reveal-delay: 160ms">
+        The same practices you expect from infrastructure: addressable artifacts,
+        reproducible builds, gated releases, and an audit chain that survives a regulator.
+      </p>
+    </div>
+
+    <div class="mt-16 grid gap-5 md:grid-cols-3">
+      {pillars.map((p, i) => (
+        <article
+          class="ps-card ps-reveal group relative overflow-hidden p-7"
+          style={`--reveal-delay: ${i * 80}ms`}
+        >
+          <!-- Corner glow -->
+          <div aria-hidden="true" class="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-[var(--accent)] opacity-0 blur-3xl transition-opacity duration-700 group-hover:opacity-15"></div>
+
+          <div class="flex items-start justify-between">
+            <div class="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--bg-subtle)] text-[var(--accent)] transition-colors group-hover:bg-[var(--accent-soft)]">
+              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d={icons[p.icon]} />
+              </svg>
+            </div>
+            <span class="rounded-full border border-[var(--line)] bg-[var(--bg-subtle)] px-2.5 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[var(--ink-subtle)]">
+              {p.detail}
+            </span>
+          </div>
+
+          <h3 class="mt-6 font-semibold text-[19px] tracking-tight text-[var(--ink-strong)]">
+            {p.name}
+          </h3>
+          <p class="mt-3 text-[14.5px] leading-relaxed text-[var(--ink-muted)] text-pretty">
+            {p.body}
+          </p>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>

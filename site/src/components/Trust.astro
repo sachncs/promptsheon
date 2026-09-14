@@ -1,0 +1,96 @@
+---
+const trust = [
+  { icon: 'lock',     title: 'Content-addressed',  text: 'Same input, same artifact hash, same provenance.' },
+  { icon: 'shield',   title: 'Maker-checker',      text: 'Approval workflow; creators cannot self-approve.' },
+  { icon: 'scroll',   title: 'Hash-linked audit',  text: 'Append-only chain. Public verification endpoint.' },
+  { icon: 'layers',   title: 'Rollback',           text: 'Revert any release in one click. State is preserved.' },
+  { icon: 'key',      title: 'Cedar policies',     text: 'Declarative, testable authorisation for every API call.' },
+  { icon: 'globe',    title: 'Air-gap ready',      text: 'Runs offline. No telemetry. No outbound network calls.' },
+];
+
+const icons: Record<string, string> = {
+  lock:   'M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zM7 11V7a5 5 0 0 1 10 0v4',
+  shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+  scroll: 'M19 21H8a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h11v15a3 3 0 0 1 0 6zM8 6h8M8 10h6M8 14h6',
+  layers: 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
+  key:    'M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4',
+  globe:  'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z',
+};
+---
+
+<section id="trust" class="ps-section border-t border-[var(--line)] bg-[var(--bg-subtle)]">
+  <div class="ps-container">
+    <div class="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-16">
+      <div class="lg:col-span-5">
+        <div class="ps-reveal ps-eyebrow">Trust & governance</div>
+        <h2 class="ps-reveal ps-display mt-4 text-display-lg" style="--reveal-delay: 80ms">
+          Built for procurement, security, and risk.
+        </h2>
+        <p class="ps-reveal mt-5 text-[16.5px] leading-relaxed text-[var(--ink-muted)] text-pretty" style="--reveal-delay: 160ms">
+          Every capability has a reproducible history. Every release has an
+          approver. Every audit row is hash-linked and publicly verifiable.
+        </p>
+
+        <div class="ps-reveal mt-10 space-y-3" style="--reveal-delay: 220ms">
+          <div class="flex items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)] p-4 shadow-soft">
+            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="M9 12l2 2 4-4" />
+              </svg>
+            </div>
+            <div>
+              <div class="text-[13.5px] font-medium text-[var(--ink-strong)]">SOC&nbsp;2 controls mapped</div>
+              <div class="text-[12.5px] text-[var(--ink-subtle)]">Access, change management, logging, monitoring.</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)] p-4 shadow-soft">
+            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+              </svg>
+            </div>
+            <div>
+              <div class="text-[13.5px] font-medium text-[var(--ink-strong)]">SBOM published per release</div>
+              <div class="text-[12.5px] text-[var(--ink-subtle)]">CycloneDX 1.5 with hash, license, and provenance.</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)] p-4 shadow-soft">
+            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.83 21h16.34a2 2 0 0 0 1.72-2.96l-8.18-14.18a2 2 0 0 0-3.42 0z" />
+              </svg>
+            </div>
+            <div>
+              <div class="text-[13.5px] font-medium text-[var(--ink-strong)]">Incident response playbook</div>
+              <div class="text-[12.5px] text-[var(--ink-subtle)]">Documented rollback, evidence collection, disclosure.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-7">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {trust.map((t, i) => (
+            <article
+              class="ps-card ps-reveal flex items-start gap-4 p-5"
+              style={`--reveal-delay: ${i * 50}ms`}
+            >
+              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-subtle)] text-[var(--accent)]">
+                <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d={icons[t.icon]} />
+                </svg>
+              </div>
+              <div>
+                <div class="text-[14px] font-semibold text-[var(--ink-strong)]">{t.title}</div>
+                <div class="mt-0.5 text-[12.5px] leading-relaxed text-[var(--ink-muted)] text-pretty">
+                  {t.text}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

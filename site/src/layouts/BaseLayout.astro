@@ -1,0 +1,113 @@
+---
+import '../styles/global.css';
+import SiteHead from '@components/SiteHead.astro';
+import SiteNav from '@components/SiteNav.astro';
+import SiteFooter from '@components/SiteFooter.astro';
+
+export interface Props {
+  title?: string;
+  description?: string;
+  ogImage?: string;
+}
+
+const {
+  title = 'Promptsheon — The control plane for AI capabilities',
+  description = 'Promptsheon manages prompts, agents, policies, tools, MCP servers, guardrails, and evaluation suites as content-addressed, governed, version-controlled release artifacts. Not chat. Not notebooks. Production infrastructure.',
+  ogImage = '/og.png',
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <SiteHead title={title} description={description} ogImage={ogImage} />
+  </head>
+  <body class="bg-surface text-ink antialiased">
+    <a href="#main" class="sr-only focus:not-sr-only fixed left-4 top-4 z-50 rounded-md bg-white px-3 py-2 text-sm font-medium text-ink-strong shadow-lg ring-1 ring-[var(--line)]">
+      Skip to content
+    </a>
+
+    <SiteNav />
+
+    <main id="main" class="relative">
+      <slot />
+    </main>
+
+    <SiteFooter />
+
+    <script is:inline>
+      // Theme bootstrap — applied before paint to avoid a flash.
+      (() => {
+        const stored = localStorage.getItem('promptsheon-theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = stored ?? (prefersDark ? 'dark' : 'light');
+        if (theme === 'dark') document.documentElement.classList.add('dark');
+      })();
+    </script>
+
+<script>
+      // Reveal-on-scroll observer — minimal and dependency-free.
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('is-visible');
+              observer.unobserve(entry.target);
+            }
+          }
+        },
+        { threshold: 0.12, rootMargin: '0px 0px -8% 0px' },
+      );
+
+      function bindReveal() {
+        document.querySelectorAll('.ps-reveal:not(.is-visible)').forEach((el) => observer.observe(el));
+      }
+      bindReveal();
+      document.addEventListener('astro:page-load', bindReveal);
+
+      // Animated counters in the metrics strip — only animates once per element.
+      // Skips if the rendered value already matches the target (e.g. noscript).
+      function animateCounter(el: HTMLElement) {
+        const target = Number(el.dataset.target ?? '0');
+        const suffix = el.dataset.suffix ?? '';
+        const current = Number((el.textContent ?? '').replace(/[^0-9.-]/g, '')) || 0;
+        if (current >= target) return;
+        const duration = 1400;
+        const start = performance.now();
+        const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+        function frame(now: number) {
+          const t = Math.min(1, (now - start) / duration);
+          el.textContent = Math.round(target * ease(t)).toLocaleString() + suffix;
+          if (t < 1) requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+      }
+      const counterObserver = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              animateCounter(entry.target as HTMLElement);
+              counterObserver.unobserve(entry.target);
+            }
+          }
+        },
+        { threshold: 0.5 },
+      );
+      document.querySelectorAll('[data-counter]').forEach((el) => counterObserver.observe(el));
+
+      // Smooth-scroll anchor links (with header offset)
+      document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+        anchor.addEventListener('click', (e) => {
+          const href = anchor.getAttribute('href');
+          if (!href || href === '#') return;
+          const target = document.querySelector(href);
+          if (!target) return;
+          e.preventDefault();
+          const headerOffset = 64;
+          const top = target.getBoundingClientRect().top + window.scrollY - headerOffset;
+          window.scrollTo({ top, behavior: 'smooth' });
+        });
+      });
+    </script>
+  </body>
+</html>

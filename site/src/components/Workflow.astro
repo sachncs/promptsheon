@@ -1,0 +1,103 @@
+---
+const steps = [
+  {
+    step: '01',
+    title: 'Author',
+    body: 'Describe the capability. The planner decomposes it into a DAG of agents, policies, and tools.',
+    tone: 'indigo',
+  },
+  {
+    step: '02',
+    title: 'Compile',
+    body: 'The compiler produces an immutable manifest. Its content hash is its identity — same input, same artifact, forever.',
+    tone: 'emerald',
+  },
+  {
+    step: '03',
+    title: 'Evaluate',
+    body: 'Run suites. Gate on threshold. Block merges on regressions. Parallel scorers in one pass.',
+    tone: 'amber',
+  },
+  {
+    step: '04',
+    title: 'Approve',
+    body: 'A second pair of eyes signs off. The creator cannot approve their own release. Reason is logged.',
+    tone: 'rose',
+  },
+  {
+    step: '05',
+    title: 'Canary → Active',
+    body: 'Weighted rollout. Live eval scores watch for drift. One-click rollback when the world changes.',
+    tone: 'sky',
+  },
+];
+
+const tones: Record<string, { dot: string; text: string; bg: string }> = {
+  indigo:  { dot: 'bg-indigo-500',  text: 'text-indigo-500',  bg: 'bg-indigo-500/10'  },
+  emerald: { dot: 'bg-emerald-500', text: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+  amber:   { dot: 'bg-amber-500',   text: 'text-amber-500',   bg: 'bg-amber-500/10'   },
+  rose:    { dot: 'bg-rose-500',    text: 'text-rose-500',    bg: 'bg-rose-500/10'    },
+  sky:     { dot: 'bg-sky-500',     text: 'text-sky-500',     bg: 'bg-sky-500/10'     },
+};
+---
+
+<section id="workflow" class="ps-section border-t border-[var(--line)]">
+  <div class="ps-container">
+    <div class="grid grid-cols-1 gap-16 lg:grid-cols-12">
+      <div class="lg:col-span-4 lg:sticky lg:top-28 lg:self-start">
+        <div class="ps-reveal ps-eyebrow">Workflow</div>
+        <h2 class="ps-reveal ps-display mt-4 text-display-lg" style="--reveal-delay: 80ms">
+          From intent to release.
+        </h2>
+        <p class="ps-reveal mt-5 text-[16.5px] leading-relaxed text-[var(--ink-muted)] text-pretty" style="--reveal-delay: 160ms">
+          Capabilities move through a deterministic state machine. Every transition
+          records who acted and on what evidence. Nothing ships without a hash.
+        </p>
+
+        <div class="ps-reveal mt-8 hidden lg:block" style="--reveal-delay: 220ms">
+          <div class="rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)] p-5 shadow-soft">
+            <div class="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-subtle)]">State machine</div>
+            <div class="mt-4 flex flex-wrap items-center gap-1.5 text-[11px] font-medium">
+              {['draft', 'review', 'approved', 'canary', 'active'].map((state, idx) => (
+                <>
+                  <span class="rounded-md bg-[var(--bg-subtle)] px-2 py-1 font-mono text-[var(--ink)]">{state}</span>
+                  {idx < 4 && <span class="text-[var(--ink-subtle)]">→</span>}
+                </>
+              ))}
+            </div>
+            <div class="mt-4 flex items-center gap-2 text-[11px] text-[var(--ink-muted)]">
+              <span class="ps-hash">v3</span>
+              <span>11.2k LOC manifest · sha256:9c4f…a02b</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ol class="lg:col-span-8 space-y-4">
+        {steps.map((s, idx) => (
+          <li
+            class="ps-card ps-reveal relative flex gap-5 p-5 sm:p-6"
+            style={`--reveal-delay: ${idx * 70}ms`}
+          >
+            <div class="shrink-0">
+              <div class={`grid h-10 w-10 place-items-center rounded-lg ${tones[s.tone].bg} font-mono text-[11px] font-semibold ${tones[s.tone].text}`}>
+                {s.step}
+              </div>
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <h3 class="font-semibold text-[16.5px] tracking-tight text-[var(--ink-strong)]">
+                  {s.title}
+                </h3>
+                <span class={`ml-1 inline-block h-1.5 w-1.5 rounded-full ${tones[s.tone].dot}`}></span>
+              </div>
+              <p class="mt-1.5 text-[14.5px] leading-relaxed text-[var(--ink-muted)] text-pretty">
+                {s.body}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </div>
+</section>
