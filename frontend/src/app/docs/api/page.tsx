@@ -15,6 +15,7 @@ export default function ApiDoc() {
 
       <h2>Public endpoints</h2>
       <DocCurl cmd="GET    /api/health" />
+      <DocCurl cmd="GET    /api/ready" />
       <DocCurl cmd="GET    /api/openapi.json" />
       <DocCurl cmd="GET    /api/bootstrap/status" />
       <DocCurl cmd="POST   /api/bootstrap/admin" />

@@ -37,6 +37,12 @@ describe('Fastify routes', () => {
     expect(typeof body.timestamp).toBe('string');
   });
 
+  it('GET /api/ready verifies database readiness', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/ready' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ status: string; db: string }>()).toMatchObject({ status: 'ready', db: 'ok' });
+  });
+
   it('POST /api/workspaces then GET /api/workspaces/:id returns 200', async () => {
     const createRes = await app.inject({
       method: 'POST',

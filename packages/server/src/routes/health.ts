@@ -20,4 +20,25 @@ export function registerHealthRoutes(app: FastifyInstance, db: Database.Database
       });
     }
   });
+
+  app.get('/api/ready', async (_request, reply) => {
+    try {
+      const row = db.prepare('PRAGMA quick_check').get() as { quick_check?: string } | undefined;
+      if (row?.quick_check !== 'ok') {
+        return reply.code(503).send({
+          status: 'not_ready',
+          db: 'error',
+          timestamp: new Date().toISOString(),
+        });
+      }
+      return reply.send({ status: 'ready', db: 'ok', timestamp: new Date().toISOString() });
+    } catch (err) {
+      app.log.error({ err }, 'readiness database probe failed');
+      return reply.code(503).send({
+        status: 'not_ready',
+        db: 'error',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
 }

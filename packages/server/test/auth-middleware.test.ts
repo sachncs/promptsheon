@@ -173,7 +173,7 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
 
   it('tags the request as public on the documented public paths', async () => {
     const mw = authMiddleware(baseConfig, makeApiKeyRepo({}));
-    for (const path of ['/api/health', '/api/openapi.json', '/api/audit/verify', '/api/audit/state']) {
+    for (const path of ['/api/health', '/api/ready', '/api/openapi.json', '/api/audit/verify', '/api/audit/state']) {
       const req = makeReq({}, path);
       const mock = makeReply();
       await mw(req, mock.reply);

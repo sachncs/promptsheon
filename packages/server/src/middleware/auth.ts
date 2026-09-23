@@ -19,6 +19,7 @@ const BOOTSTRAP_PREFIX = '/api/bootstrap/';
 const PUBLIC_PATHS = new Set([
   '/api/openapi.json',
   '/api/health',
+  '/api/ready',
   '/api/audit/verify',
   '/api/audit/state',
 ]);
@@ -43,7 +44,7 @@ const PUBLIC_PATHS = new Set([
  * depends on the request's identity. When auth is disabled (dev /
  * test), X-User-Id is honoured so curl-based smoke checks work.
  *
- * Public paths (`/api/openapi.json`, `/api/health`,
+ * Public paths (`/api/openapi.json`, `/api/health`, `/api/ready`,
  * `/api/audit/verify`, `/api/audit/state`, `/api/bootstrap/...`)
  * bypass the auth check and tag the request as `bootstrap` or
  * `public`. The SVID route (`/api/identity/...`) is registered
