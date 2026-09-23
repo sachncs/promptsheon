@@ -65,7 +65,7 @@ describe('PUT /api/releases/:id/activate (approval gate)', () => {
     db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
     applyMigrations(db, loadAllMigrations());
-    db.prepare(`INSERT INTO workspaces (id, name, organization, created_at, updated_at) VALUES ('ws1', 'ws', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
+    db.prepare(`INSERT INTO workspaces (id, name, organization, org_id, created_at, updated_at) VALUES ('ws1', 'ws', '', 'legacy', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
     db.prepare(`INSERT INTO projects (id, workspace_id, name, description, created_at, updated_at) VALUES ('proj1', 'ws1', 'p', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
     db.prepare(`INSERT INTO capabilities (id, project_id, name, description, created_at, updated_at) VALUES ('cap1', 'proj1', 'c', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
     db.prepare(`INSERT INTO users (id, email, name, role, created_at, updated_at) VALUES ('system', 'system@local', 'System', 'admin', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
@@ -76,6 +76,9 @@ describe('PUT /api/releases/:id/activate (approval gate)', () => {
     manifestRepo = new ManifestRepo(db);
 
     app = Fastify({ logger: false });
+    app.addHook('onRequest', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = 'legacy';
+    });
     app.setErrorHandler((error, _request, reply) => {
       if (error.statusCode) return reply.code(error.statusCode).send({ error: { code: 'APP_ERROR', message: error.message } });
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });

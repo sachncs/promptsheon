@@ -51,11 +51,25 @@ const MIN_APPROVERS = 2;
 
 interface RequestUserContext {
   userId?: string;
+  agentOrgId?: string;
+  orgContext?: { orgId?: string; organizationId?: string };
 }
 
 function actorOf(request: unknown): string {
   const ctx = (request as RequestUserContext | undefined) ?? {};
   return ctx.userId ?? 'system';
+}
+
+function organizationOf(request: unknown): string | null {
+  const ctx = (request as RequestUserContext | undefined) ?? {};
+  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
+}
+
+function requireOrganization(request: unknown, reply: { code: (status: number) => { send: (body: unknown) => unknown } }): string | null {
+  const organizationId = organizationOf(request);
+  if (organizationId) return organizationId;
+  void reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+  return null;
 }
 
 /**
@@ -106,40 +120,45 @@ export function registerReleaseRoutes(
   deps: { manifestRepo: ManifestRepo; auditChain: AuditChain; overlayRepo: ReleaseOverlayRepo },
 ) {
   app.get('/api/releases', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const parsed = parseQuery(reply, ListQuerySchema, request.query);
     if (!parsed.ok) return;
     const { capabilityId, status, page, pageSize } = parsed.data;
-    if (capabilityId) return reply.send(repo.findByCapabilityId(capabilityId));
-    if (status) {
-      const all = repo.findMany({ page, pageSize });
-      return reply.send({ ...all, items: all.items.filter((r) => r.status === status) });
-    }
-    return reply.send(repo.findMany({ page, pageSize }));
+    if (capabilityId) return reply.send(repo.findByCapabilityIdInOrg(capabilityId, organizationId));
+    return reply.send(repo.findManyInOrg(organizationId, { page, pageSize, status }));
   });
 
   app.get('/api/releases/:id', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const { id } = request.params as { id: string };
-    const item = repo.findById(id);
+    const item = repo.findByIdInOrg(id, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
     return reply.send(item);
   });
 
   app.get('/api/releases/:id/transitions', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const { id } = request.params as { id: string };
-    if (!repo.findById(id)) {
+    if (!repo.findByIdInOrg(id, organizationId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
     }
     return reply.send(repo.listTransitions(id));
   });
 
   app.get('/api/releases/:id/notes', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const { id } = request.params as { id: string };
-    const item = repo.findById(id);
+    const item = repo.findByIdInOrg(id, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
-    const previous = repo.findPreviousActive(
+    const previous = repo.findPreviousActiveInOrg(
       item.capabilityId,
       item.environment,
       item.capabilityVersion,
+      organizationId,
     );
     return reply.send({
       releaseId: id,
@@ -160,9 +179,12 @@ export function registerReleaseRoutes(
   });
 
   app.post('/api/releases', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const parsed = parseBody(reply, CreateBodySchema, request.body);
     if (!parsed.ok) return;
-    const item = repo.create(parsed.data);
+    const item = repo.createInOrg(parsed.data, organizationId);
+    if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'capability not found' } });
 
     // BUG-1 follow-on: a release has its own manifest distinct from
     // any version's. Register it in manifest_dag so the maker-checker
@@ -202,10 +224,12 @@ export function registerReleaseRoutes(
   });
 
   app.post('/api/releases/:id/transition', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, TransitionSchema, request.body);
     if (!parsed.ok) return;
-    const existing = repo.findById(id);
+    const existing = repo.findByIdInOrg(id, organizationId);
     if (!existing) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
     const from = existing.status as ReleaseStatus;
     const to = parsed.data.to;
@@ -223,7 +247,7 @@ export function registerReleaseRoutes(
         return reply.code(409).send({ error: { code: 'APPROVAL_REQUIRED', message: gateFailure } });
       }
     }
-    const item = repo.updateStatus(id, to);
+    const item = repo.updateStatusInOrg(id, organizationId, to);
     if (item) {
       repo.appendTransition({
         id: randomUUID(),
@@ -247,10 +271,12 @@ export function registerReleaseRoutes(
   });
 
   app.put('/api/releases/:id/overlay', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, OverlaySchema, request.body);
     if (!parsed.ok) return;
-    if (!repo.findById(id)) {
+    if (!repo.findByIdInOrg(id, organizationId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
     }
     const env = (request.query as { environment?: string }).environment ?? 'prod';
@@ -259,8 +285,10 @@ export function registerReleaseRoutes(
   });
 
   app.get('/api/releases/:id/overlay', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const { id } = request.params as { id: string };
-    if (!repo.findById(id)) {
+    if (!repo.findByIdInOrg(id, organizationId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
     }
     const env = (request.query as { environment?: string }).environment ?? 'prod';
@@ -268,13 +296,15 @@ export function registerReleaseRoutes(
   });
 
   app.put('/api/releases/:id/canary-rule', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, CanaryRuleSchema, request.body);
     if (!parsed.ok) return;
-    if (!repo.findById(id)) {
+    if (!repo.findByIdInOrg(id, organizationId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
     }
-    const updated = repo.updateCanaryPercent(id, parsed.data.percent);
+    const updated = repo.updateCanaryPercentInOrg(id, organizationId, parsed.data.percent);
     if (updated) {
       deps.auditChain.append({
         userId: actorOf(request),
@@ -289,8 +319,10 @@ export function registerReleaseRoutes(
   });
 
   app.put('/api/releases/:id/activate', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const { id } = request.params as { id: string };
-    const existing = repo.findById(id);
+    const existing = repo.findByIdInOrg(id, organizationId);
     if (!existing) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Release not found' } });
     const from = existing.status as ReleaseStatus;
     // /activate is a legacy shortcut. The 6-state machine is the
@@ -306,7 +338,7 @@ export function registerReleaseRoutes(
     if (gateFailure) {
       return reply.code(409).send({ error: { code: 'APPROVAL_REQUIRED', message: gateFailure } });
     }
-    const item = repo.updateStatus(id, 'active');
+    const item = repo.updateStatusInOrg(id, organizationId, 'active');
     if (item) {
       repo.appendTransition({
         id: randomUUID(),
@@ -330,8 +362,11 @@ export function registerReleaseRoutes(
   });
 
   app.put('/api/releases/:id/supersede', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const { id } = request.params as { id: string };
-    const item = repo.updateStatus(id, 'rolled_back');
+    const item = repo.updateStatusInOrg(id, organizationId, 'rolled_back');
+    if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Release not found' } });
     if (item) {
       deps.auditChain.append({
         userId: actorOf(request),
@@ -346,12 +381,14 @@ export function registerReleaseRoutes(
   });
 
   app.put('/api/releases/:id/canary', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, CanaryBodySchema, request.body);
     if (!parsed.ok) return;
-    const item = repo.findById(id);
+    const item = repo.findByIdInOrg(id, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
-    const updated = repo.updateCanaryPercent(id, parsed.data.percent);
+    const updated = repo.updateCanaryPercentInOrg(id, organizationId, parsed.data.percent);
     if (updated) {
       deps.auditChain.append({
         userId: actorOf(request),
@@ -366,15 +403,17 @@ export function registerReleaseRoutes(
   });
 
   app.post('/api/releases/:id/rollback', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const { id } = request.params as { id: string };
-    const current = repo.findById(id);
+    const current = repo.findByIdInOrg(id, organizationId);
     if (!current) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
 
     const parsed = parseBody(reply, RollbackBodySchema, request.body ?? {});
     if (!parsed.ok) return;
     const target = parsed.data.toReleaseId
-      ? repo.findById(parsed.data.toReleaseId)
-      : repo.findPreviousActive(current.capabilityId, current.environment, current.capabilityVersion);
+      ? repo.findByIdInOrg(parsed.data.toReleaseId, organizationId)
+      : repo.findPreviousActiveInOrg(current.capabilityId, current.environment, current.capabilityVersion, organizationId);
 
     if (!target) {
       return reply.code(404).send({ error: { code: 'NO_PREVIOUS_RELEASE', message: 'No previous active release found for rollback' } });
@@ -383,7 +422,7 @@ export function registerReleaseRoutes(
       return reply.code(400).send({ error: { code: 'INVALID_ROLLBACK', message: 'Cannot rollback to the current release' } });
     }
 
-    const result = repo.rollbackAtomically(current.id, target.id);
+    const result = repo.rollbackAtomicallyInOrg(current.id, target.id, organizationId);
     if (!result) {
       return reply.code(500).send({ error: { code: 'ROLLBACK_FAILED', message: 'Atomic rollback failed' } });
     }
