@@ -43,6 +43,7 @@ function buildApp(): { app: FastifyInstance; db: Database.Database } {
     `INSERT INTO users (id, email, name, role, created_at, updated_at)
      VALUES ('u-bob','bob@e.test','Bob','admin',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
   ).run();
+  db.prepare(`UPDATE users SET org_id = 'org-1' WHERE id IN ('u-alice', 'u-bob')`).run();
   const audit = new AuditChain(db);
   audit.append({
     userId: 'u-alice',
@@ -93,6 +94,31 @@ describe('GET /api/audit/report', () => {
     expect(body.chainHead).toMatch(/^[0-9a-f]{64}$/);
     expect(body.entries.map((e) => e.actor)).toEqual(['u-alice', 'u-bob']);
     expect(body.signature.value).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('excludes audit entries from another organization', async () => {
+    const { app, db } = buildApp();
+    db.prepare(`INSERT INTO orgs (id,name,slug,created_at,updated_at) VALUES ('org-2','O2','o2',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).run();
+    db.prepare(`INSERT INTO users (id, org_id, email, name, role, created_at, updated_at) VALUES ('u-other','org-2','other@e.test','Other','admin',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).run();
+    const audit = new AuditChain(db);
+    audit.append({
+      userId: 'u-other',
+      action: 'secret.read',
+      resource: 'vault',
+      details: '{}',
+      resourceKind: 'vault',
+      resourceId: 'other-secret',
+    });
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/audit/report',
+      headers: { 'x-user-id': 'u-test', 'x-org-id': 'org-1' },
+    });
+    const body = response.json() as { entries: Array<{ actor: string }> };
+    expect(response.statusCode).toBe(200);
+    expect(body.entries).toHaveLength(2);
+    expect(body.entries.some((entry) => entry.actor === 'u-other')).toBe(false);
+    await app.close();
   });
 
   it('rejects requests without an org context', async () => {

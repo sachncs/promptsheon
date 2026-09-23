@@ -89,29 +89,7 @@ export function registerAuditReportRoutes(
     const limit = data.limit;
 
     const verification = deps.auditChain.verify();
-    // Fetch the chain ourselves (verify() doesn't return entries) so
-    // we can re-use the same ordering as the chain head computation.
-    const chainRows = (deps.auditChain as unknown as { db: import('better-sqlite3').Database }).db
-      .prepare(
-        `SELECT id, user_id AS userId, action, resource, details, timestamp,
-                previous_hash AS previousHash, entry_hash AS entryHash,
-                timestamp_str AS timestampStr, resource_kind AS resourceKind,
-                resource_id AS resourceId
-         FROM audit_entries ORDER BY rowid ASC`,
-      )
-      .all() as Array<{
-        id: string;
-        userId: string;
-        action: string;
-        resource: string;
-        details: string;
-        timestamp: string;
-        previousHash: string;
-        entryHash: string;
-        timestampStr: string;
-        resourceKind: string;
-        resourceId: string;
-      }>;
+    const chainRows = deps.auditChain.entriesForOrganization(orgId);
     const chainHead = chainRows.length > 0 ? chainRows[chainRows.length - 1]?.entryHash ?? '' : '';
 
     // Apply filters

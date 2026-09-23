@@ -144,6 +144,29 @@ export class AuditChain {
     return { valid: true };
   }
 
+  /** Return audit entries authored by users belonging to one organization. */
+  entriesForOrganization(organizationId: string): AuditEntry[] {
+    return this.db
+      .prepare(
+        `SELECT ae.id,
+                ae.user_id AS userId,
+                ae.action,
+                ae.resource,
+                ae.details,
+                ae.timestamp,
+                ae.previous_hash AS previousHash,
+                ae.entry_hash AS entryHash,
+                ae.timestamp_str AS timestampStr,
+                ae.resource_kind AS resourceKind,
+                ae.resource_id AS resourceId
+         FROM audit_entries ae
+         JOIN users u ON u.id = ae.user_id
+         WHERE u.org_id = ?
+         ORDER BY ae.rowid ASC`,
+      )
+      .all(organizationId) as AuditEntry[];
+  }
+
   getChainState(): { lastHash: string; lastRowid: number } {
     return this.db.prepare(
       'SELECT last_hash as lastHash, last_rowid as lastRowid FROM audit_chain_state WHERE id = 0'
