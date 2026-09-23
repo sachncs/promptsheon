@@ -18,6 +18,10 @@ function actorOf(request: unknown): string {
   return ctx.userId ?? 'system';
 }
 
+function organizationIdOf(request: { orgContext?: { orgId?: string }; agentOrgId?: string }): string | undefined {
+  return request.orgContext?.orgId ?? request.agentOrgId;
+}
+
 const CreateSuiteSchema = z.object({
   capabilityId: z.string(),
   repositoryId: z.string().nullable().optional(),
@@ -109,7 +113,8 @@ export function registerEvalSuiteRoutes(
 ): void {
   app.get('/api/eval-suites', async (request, reply) => {
     const { capabilityId } = request.query as { capabilityId?: string };
-    return reply.send(deps.suiteRepo.list(capabilityId));
+    const organizationId = organizationIdOf(request);
+    return reply.send(organizationId ? deps.suiteRepo.listInOrg(organizationId, capabilityId) : deps.suiteRepo.list(capabilityId));
   });
   registerRouteDoc({
     method: 'get',
@@ -130,7 +135,7 @@ export function registerEvalSuiteRoutes(
       // the boundary. The runner validates `kind` again at run time.
       config: g.config as never,
     }));
-    const out = deps.suiteRepo.create({
+    const input = {
       capabilityId: parsed.data.capabilityId,
       repositoryId: parsed.data.repositoryId ?? null,
       name: parsed.data.name,
@@ -140,7 +145,10 @@ export function registerEvalSuiteRoutes(
       createdBy: actorOf(request),
       initialGraders: initial,
       notes: parsed.data.notes ?? null,
-    });
+    };
+    const organizationId = organizationIdOf(request);
+    const out = organizationId ? deps.suiteRepo.createInOrg(input, organizationId) : deps.suiteRepo.create(input);
+    if (!out) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'capability not found' } });
     return reply.code(201).send(out);
   });
   registerRouteDoc({
@@ -153,7 +161,8 @@ export function registerEvalSuiteRoutes(
 
   app.get('/api/eval-suites/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const suite = deps.suiteRepo.findById(id);
+    const organizationId = organizationIdOf(request);
+    const suite = organizationId ? deps.suiteRepo.findByIdInOrg(id, organizationId) : deps.suiteRepo.findById(id);
     if (!suite) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'suite not found' } });
     return reply.send({ suite, versions: deps.suiteRepo.listVersions(id) });
   });
@@ -168,11 +177,16 @@ export function registerEvalSuiteRoutes(
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, RunSuiteSchema, request.body ?? {});
     if (!parsed.ok) return;
-    const suite = deps.suiteRepo.findById(id);
+    const organizationId = organizationIdOf(request);
+    const suite = organizationId ? deps.suiteRepo.findByIdInOrg(id, organizationId) : deps.suiteRepo.findById(id);
     if (!suite) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'suite not found' } });
     const version = parsed.data.suiteVersionId
-      ? deps.suiteRepo.findVersionById(parsed.data.suiteVersionId)
-      : deps.suiteRepo.findVersion(id, suite.currentVersion);
+      ? organizationId
+        ? deps.suiteRepo.findVersionByIdInOrg(parsed.data.suiteVersionId, organizationId)
+        : deps.suiteRepo.findVersionById(parsed.data.suiteVersionId)
+      : organizationId
+        ? deps.suiteRepo.findVersionInOrg(id, suite.currentVersion, organizationId)
+        : deps.suiteRepo.findVersion(id, suite.currentVersion);
     if (!version) return reply.code(404).send({ error: { code: 'NOT_VERSION', message: 'suite has no versioned graders' } });
     const trials = parsed.data.trials ?? [
       { caseId: 'sample-1', output: 'hello', finalState: {} },
@@ -228,7 +242,10 @@ export function registerEvalSuiteRoutes(
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, GateSchema, request.body);
     if (!parsed.ok) return;
-    const suites = deps.suiteRepo.list();
+    const organizationId = organizationIdOf(request);
+    const suites = organizationId
+      ? deps.suiteRepo.listForRepositoryInOrg(id, organizationId)
+      : deps.suiteRepo.list();
     if (suites.length === 0) {
       return reply.send({
         ok: true,
@@ -247,7 +264,9 @@ export function registerEvalSuiteRoutes(
       threshold: number;
     }> = [];
     for (const suite of suites) {
-      const version = deps.suiteRepo.findVersion(suite.id, suite.currentVersion);
+      const version = organizationId
+        ? deps.suiteRepo.findVersionInOrg(suite.id, suite.currentVersion, organizationId)
+        : deps.suiteRepo.findVersion(suite.id, suite.currentVersion);
       if (!version) continue;
       const runner = new GraderRunner(version.graderConfig);
       const graded = parsed.data.trials.map((t) =>
@@ -275,14 +294,18 @@ export function registerEvalSuiteRoutes(
   });
 
   app.get('/api/human-review', async (request, reply) => {
-    return reply.send(deps.humanReviewRepo.listOpen());
+    const organizationId = organizationIdOf(request);
+    return reply.send(organizationId ? deps.humanReviewRepo.listOpenInOrg(organizationId) : deps.humanReviewRepo.listOpen());
   });
 
   app.post('/api/human-review/:id/decide', async (request, reply) => {
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, ReviewDecisionSchema, request.body);
     if (!parsed.ok) return;
-    const review = deps.humanReviewRepo.decide(id, actorOf(request), parsed.data.decision, parsed.data.notes ?? null);
+    const organizationId = organizationIdOf(request);
+    const review = organizationId
+      ? deps.humanReviewRepo.decideInOrg(id, organizationId, actorOf(request), parsed.data.decision, parsed.data.notes ?? null)
+      : deps.humanReviewRepo.decide(id, actorOf(request), parsed.data.decision, parsed.data.notes ?? null);
     if (!review) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'review not found' } });
     return reply.send(review);
   });
