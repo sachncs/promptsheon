@@ -9,6 +9,7 @@ class StubRepo {
   private readonly items = new Map<string, Capability>();
   put(c: Capability) { this.items.set(c.id, c); }
   findById(id: string): Capability | null { return this.items.get(id) ?? null; }
+  findByIdInOrg(id: string): Capability | null { return this.findById(id); }
 }
 
 class StubEvalRepo {}
@@ -52,6 +53,9 @@ describe('self-evolve path reconciliation', () => {
     evolutionAgent = new StubEvolutionAgent();
     evolutionAgent.setState(CAP_ID, { status: 'idle', cycleCount: 0 });
     app = Fastify({ logger: false });
+    app.addHook('onRequest', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = 'org-test';
+    });
     registerSelfEvolveRoutes(
       app,
       evolutionAgent as unknown as Parameters<typeof registerSelfEvolveRoutes>[1],
@@ -81,10 +85,7 @@ describe('self-evolve path reconciliation', () => {
       method: 'GET',
       url: '/api/capabilities/00000000-0000-4000-8000-deadbeef/self-evolve',
     });
-    expect(r.statusCode).toBe(200);
-    const body = r.json() as { status: string; cycleCount: number };
-    expect(body.status).toBe('idle');
-    expect(body.cycleCount).toBe(0);
+    expect(r.statusCode).toBe(404);
   });
 
   it('POST /api/self-evolve/run with body runs a cycle', async () => {
