@@ -83,8 +83,8 @@ function buildLeafManifest(id = 'm1'): Manifest {
 
 function insertTestData(db: ReturnType<typeof Database>): void {
   db.prepare(
-    `INSERT INTO workspaces (id, name, organization, created_at, updated_at)
-     VALUES ('ws1', 'Test WS', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`,
+    `INSERT INTO workspaces (id, org_id, name, organization, created_at, updated_at)
+     VALUES ('ws1', 'unscoped', 'Test WS', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`,
   ).run();
   db.prepare(
     `INSERT INTO projects (id, workspace_id, name, description, created_at, updated_at)
@@ -121,6 +121,10 @@ async function setupHarness(): Promise<TestHarness> {
   const hub = new SseHub();
   const executor = new ManifestGraphExecutor({ config: buildConfig(), hub });
   const app = Fastify();
+  app.addHook('preHandler', (request, _reply, done) => {
+    (request as Record<string, unknown>)['orgContext'] = { orgId: 'unscoped' };
+    done();
+  });
   app.setErrorHandler((error, _request, reply) => {
     if (error.name === 'NotFoundError') {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: error.message } });

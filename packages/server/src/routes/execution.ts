@@ -44,8 +44,18 @@ function hashInputs(inputs: Record<string, unknown>): string {
   return createHash('sha256').update(JSON.stringify(inputs)).digest('hex');
 }
 
-function organizationIdOf(request: { orgContext?: { orgId?: string }; agentOrgId?: string }): string {
-  return request.orgContext?.orgId ?? request.agentOrgId ?? 'unscoped';
+function organizationIdOf(request: { orgContext?: { orgId?: string }; agentOrgId?: string }): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
+}
+
+function requireOrganization(
+  request: { orgContext?: { orgId?: string }; agentOrgId?: string },
+  reply: { code: (status: number) => { send: (body: unknown) => unknown } },
+): string | null {
+  const organizationId = organizationIdOf(request);
+  if (organizationId) return organizationId;
+  void reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+  return null;
 }
 
 export function registerExecutionRoutes(
@@ -61,16 +71,20 @@ export function registerExecutionRoutes(
   },
 ) {
   app.get('/api/executions', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const parsed = parseQuery(reply, ListExecutionsQuerySchema, request.query);
     if (!parsed.ok) return;
     const { capabilityVersionId, page, pageSize } = parsed.data;
-    if (capabilityVersionId) return reply.send(deps.executionRepo.findByVersionId(capabilityVersionId, { page, pageSize }));
-    return reply.send(deps.executionRepo.findMany({ page, pageSize }));
+    if (capabilityVersionId) return reply.send(deps.executionRepo.findByVersionIdInOrg(capabilityVersionId, organizationId, { page, pageSize }));
+    return reply.send(deps.executionRepo.findManyInOrg(organizationId, { page, pageSize }));
   });
 
   app.get('/api/executions/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const item = deps.executionRepo.findById(id);
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
+    const item = deps.executionRepo.findByIdInOrg(id, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
     return reply.send(item);
   });
@@ -79,7 +93,9 @@ export function registerExecutionRoutes(
     const parsed = parseBody(reply, ExecuteManifestSchema, request.body);
     if (!parsed.ok) return;
     const { manifestHash, inputs, environment, traceId } = parsed.data;
-    const manifest = deps.manifestRepo.findByHash(manifestHash);
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
+    const manifest = deps.manifestRepo.findByHashInOrg(manifestHash, organizationId);
     if (!manifest) {
       throw new NotFoundError('manifest', manifestHash);
     }
@@ -87,7 +103,8 @@ export function registerExecutionRoutes(
     // Canary routing: when multiple active releases exist for this
     // manifest, distribute traffic by canaryPercent. With 0 or 1
     // active release, no routing is needed.
-    const activeReleases = deps.releaseRepo.findActiveByManifestHash(manifestHash);
+    const activeReleases = deps.releaseRepo.findActiveByManifestHash(manifestHash)
+      .filter((release) => deps.releaseRepo.findByIdInOrg(release.id, organizationId));
     const pickedReleaseId = selectByCanary(
       activeReleases.map((r) => ({ id: r.id, canaryPercent: r.canaryPercent })),
     );
@@ -113,7 +130,7 @@ export function registerExecutionRoutes(
     }
 
     const traceRun = deps.traceRepo.startRun({
-      organizationId: organizationIdOf(request),
+      organizationId,
       executionId,
       environment,
       name: `manifest:${manifestHash.slice(0, 12)}`,
@@ -184,6 +201,8 @@ export function registerExecutionRoutes(
     const parsed = parseBody(reply, InvokeSchema, request.body);
     if (!parsed.ok) return;
     const { capabilityVersionId, inputs, environment, traceId } = parsed.data;
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const version = deps.versionRepo.findById(capabilityVersionId);
     if (!version) {
       return reply.code(404).send({
@@ -200,11 +219,12 @@ export function registerExecutionRoutes(
     // the canonical POST /api/executions handler by inlining its
     // body. We avoid a self-fetch (which would re-introduce auth
     // + a round-trip) by reusing the same controller below.
-    const manifest = deps.manifestRepo.findByHash(manifestHash);
+    const manifest = deps.manifestRepo.findByHashInOrg(manifestHash, organizationId);
     if (!manifest) {
       throw new NotFoundError('manifest', manifestHash);
     }
-    const activeReleases = deps.releaseRepo.findActiveByManifestHash(manifestHash);
+    const activeReleases = deps.releaseRepo.findActiveByManifestHash(manifestHash)
+      .filter((release) => deps.releaseRepo.findByIdInOrg(release.id, organizationId));
     if (activeReleases.length === 0) {
       return reply
         .code(404)
@@ -215,7 +235,7 @@ export function registerExecutionRoutes(
     );
     const executionId = crypto.randomUUID();
     const traceRun = deps.traceRepo.startRun({
-      organizationId: 'unscoped',
+      organizationId,
       executionId,
       environment,
       name: `manifest:${manifestHash.slice(0, 12)}`,
@@ -271,6 +291,11 @@ export function registerExecutionRoutes(
    */
   app.post('/api/executions/:id/replay', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
+    if (!deps.executionRepo.findByIdInOrg(id, organizationId)) {
+      return reply.code(404).send({ error: { code: 'EXECUTION_NOT_FOUND', message: `execution ${id} not found` } });
+    }
     const replayService = new ExecutionReplayService(
       deps.executionRepo,
       deps.manifestRepo,
@@ -320,7 +345,9 @@ export function registerExecutionRoutes(
    */
   app.get('/api/executions/:id/replays', async (request, reply) => {
     const { id } = request.params as { id: string };
-    if (!deps.executionRepo.findById(id)) {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
+    if (!deps.executionRepo.findByIdInOrg(id, organizationId)) {
       return reply.code(404).send({
         error: { code: 'EXECUTION_NOT_FOUND', message: `execution ${id} not found` },
       });

@@ -20,6 +20,46 @@ export class ExecutionRepo extends BaseRepo<Execution> {
     return { items, total };
   }
 
+  findByVersionIdInOrg(versionId: string, organizationId: string, opts: { page: number; pageSize: number }): { items: Execution[]; total: number } {
+    const scope = `FROM executions e
+      JOIN capability_versions v ON v.id = e.capability_version_id
+      JOIN capabilities c ON c.id = v.capability_id
+      JOIN projects p ON p.id = c.project_id
+      JOIN workspaces w ON w.id = p.workspace_id
+      WHERE v.id = ? AND w.org_id = ?`;
+    const total = (this.db.prepare(`SELECT COUNT(*) AS count ${scope}`).get(versionId, organizationId) as { count: number }).count;
+    const items = this.db.prepare(`SELECT e.* ${scope} ORDER BY e.timestamp DESC LIMIT ? OFFSET ?`)
+      .all(versionId, organizationId, opts.pageSize, (opts.page - 1) * opts.pageSize)
+      .map((row) => toExecution(row as Record<string, unknown>));
+    return { items, total };
+  }
+
+  findByIdInOrg(id: string, organizationId: string): Execution | null {
+    const row = this.db.prepare(
+      `SELECT e.* FROM executions e
+       JOIN capability_versions v ON v.id = e.capability_version_id
+       JOIN capabilities c ON c.id = v.capability_id
+       JOIN projects p ON p.id = c.project_id
+       JOIN workspaces w ON w.id = p.workspace_id
+       WHERE e.id = ? AND w.org_id = ?`,
+    ).get(id, organizationId) as Record<string, unknown> | undefined;
+    return row ? toExecution(row) : null;
+  }
+
+  findManyInOrg(organizationId: string, opts: { page: number; pageSize: number }): { items: Execution[]; total: number } {
+    const scope = `FROM executions e
+      JOIN capability_versions v ON v.id = e.capability_version_id
+      JOIN capabilities c ON c.id = v.capability_id
+      JOIN projects p ON p.id = c.project_id
+      JOIN workspaces w ON w.id = p.workspace_id
+      WHERE w.org_id = ?`;
+    const total = (this.db.prepare(`SELECT COUNT(*) AS count ${scope}`).get(organizationId) as { count: number }).count;
+    const items = this.db.prepare(`SELECT e.* ${scope} ORDER BY e.timestamp DESC LIMIT ? OFFSET ?`)
+      .all(organizationId, opts.pageSize, (opts.page - 1) * opts.pageSize)
+      .map((row) => toExecution(row as Record<string, unknown>));
+    return { items, total };
+  }
+
   findRecent(capabilityId: string, limit = 100): Execution[] {
     return this.db.prepare(`SELECT e.* FROM executions e JOIN capability_versions v ON e.capability_version_id = v.id WHERE v.capability_id = ? ORDER BY e.timestamp DESC LIMIT ?`)
       .all(capabilityId, limit)
