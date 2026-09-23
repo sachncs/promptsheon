@@ -164,8 +164,15 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
 
   // Cost / analytics
   app.post('/api/analytics/rollups', async (request, reply) => {
+    const organizationId = activeOrg(request);
+    if (!organizationId) {
+      return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    }
     const parsed = parseBody(reply, RollupIngestSchema, request.body);
     if (!parsed.ok) return;
+    if (!deps.costRollupRepo.capabilityBelongsToOrg(parsed.data.capabilityId, organizationId)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'capability not found' } });
+    }
     const today = new Date().toISOString().slice(0, 10);
     deps.costRollupRepo.record(
       parsed.data.capabilityId,
