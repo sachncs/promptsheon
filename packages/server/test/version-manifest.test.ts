@@ -38,7 +38,7 @@ describe('GET /api/capability-versions/:versionId/manifest', () => {
       `INSERT INTO orgs (id,name,slug,created_at,updated_at) VALUES ('o1','O','o',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
     ).run();
     db.prepare(
-      `INSERT INTO workspaces (id,name,organization,created_at,updated_at) VALUES ('w1','W','O',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+      `INSERT INTO workspaces (id,name,organization,org_id,created_at,updated_at) VALUES ('w1','W','O','o1',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
     ).run();
     db.prepare(
       `INSERT INTO projects (id,workspace_id,name,description,created_at,updated_at) VALUES ('p1','w1','P','',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
@@ -58,6 +58,9 @@ describe('GET /api/capability-versions/:versionId/manifest', () => {
     });
     const manifestRepo = new ManifestRepo(db);
     const app = Fastify({ logger: false });
+    app.addHook('onRequest', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = 'o1';
+    });
     registerVersionRoutes(app, repo, manifestRepo, db);
     await app.ready();
     const r = await app.inject({ method: 'GET', url: `/api/capability-versions/${created.id}/manifest` });
@@ -71,6 +74,9 @@ describe('GET /api/capability-versions/:versionId/manifest', () => {
     const db = openDb();
     const manifestRepo = new ManifestRepo(db);
     const app = Fastify({ logger: false });
+    app.addHook('onRequest', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = 'legacy';
+    });
     registerVersionRoutes(app, new VersionRepo(db), manifestRepo, db);
     await app.ready();
     const r = await app.inject({ method: 'GET', url: '/api/capability-versions/missing/manifest' });

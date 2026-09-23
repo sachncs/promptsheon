@@ -19,6 +19,19 @@ const CreateVersionSchema = z.object({
   goal: z.string().optional(),
 });
 
+interface RequestOrganizationContext {
+  agentOrgId?: string;
+  orgContext?: { orgId?: string; organizationId?: string };
+}
+
+function requireOrganization(request: unknown, reply: { code: (status: number) => { send: (body: unknown) => unknown } }): string | null {
+  const context = (request as RequestOrganizationContext | undefined) ?? {};
+  const organizationId = context.orgContext?.orgId ?? context.orgContext?.organizationId ?? context.agentOrgId;
+  if (organizationId) return organizationId;
+  void reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+  return null;
+}
+
 export function registerVersionRoutes(
   app: FastifyInstance,
   repo: VersionRepo,
@@ -26,44 +39,29 @@ export function registerVersionRoutes(
   db?: import('better-sqlite3').Database,
 ) {
   app.get('/api/capability-versions', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const parsed = parseQuery(reply, ListQuerySchema, request.query);
     if (!parsed.ok) return;
     const { capabilityId, page, pageSize } = parsed.data;
-    if (capabilityId) return reply.send(repo.findByCapabilityId(capabilityId));
-    return reply.send(repo.findMany({ page, pageSize }));
+    if (capabilityId) return reply.send(repo.findByCapabilityIdInOrg(capabilityId, organizationId));
+    return reply.send(repo.findManyInOrg(organizationId, { page, pageSize }));
   });
 
   app.get('/api/capability-versions/:id', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const { id } = request.params as { id: string };
-    const item = repo.findById(id);
+    const item = repo.findByIdInOrg(id, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
     return reply.send(item);
   });
 
   app.get('/api/capability-versions/:versionId/manifest', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const { versionId } = request.params as { versionId: string };
-    const sqlite = (db ?? (app as unknown as { db?: import('better-sqlite3').Database }).db) as
-      | import('better-sqlite3').Database
-      | undefined;
-    if (!sqlite) {
-      return reply.code(500).send({ error: { code: 'INTERNAL', message: 'db not configured' } });
-    }
-    const row = sqlite
-      .prepare(
-        `SELECT id, capability_id, version, manifest, manifest_hash, created_by, created_at
-         FROM capability_versions WHERE id = ?`,
-      )
-      .get(versionId) as
-      | {
-          id: string;
-          capability_id: string;
-          version: number;
-          manifest: string;
-          manifest_hash: string;
-          created_by: string;
-          created_at: string;
-        }
-      | undefined;
+    const row = repo.findByIdInOrg(versionId, organizationId);
     if (!row) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'version not found' } });
     let parsed: unknown;
     try {
@@ -73,21 +71,24 @@ export function registerVersionRoutes(
     }
     return reply.send({
       id: row.id,
-      hash: row.manifest_hash,
+      hash: row.manifestHash,
       manifest: parsed,
-      capabilityId: row.capability_id,
+      capabilityId: row.capabilityId,
       capabilityVersion: row.version,
-      createdAt: row.created_at,
-      createdBy: row.created_by,
+      createdAt: row.createdAt,
+      createdBy: row.createdBy,
       size: row.manifest.length,
       approvals: [],
     });
   });
 
   app.post('/api/capability-versions', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const parsed = parseBody(reply, CreateVersionSchema, request.body);
     if (!parsed.ok) return;
-    const item = repo.create(parsed.data);
+    const item = repo.createInOrg(parsed.data, organizationId);
+    if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'capability not found' } });
 
     // BUG-1 fix: also register the manifest in manifest_dag so the
     // maker-checker / approval flow can look it up by hash. Without
@@ -114,8 +115,10 @@ export function registerVersionRoutes(
   });
 
   app.delete('/api/capability-versions/:id', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
     const { id } = request.params as { id: string };
-    repo.delete(id);
+    repo.deleteInOrg(id, organizationId);
     return reply.code(204).send();
   });
 }
