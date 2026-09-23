@@ -99,9 +99,9 @@ export function subscribeSSE(channel: string, onEvent: (event: unknown) => void)
 }
 
 export const workspaceApi = {
-  list: async (page = 1): Promise<{ data: WorkspaceRow[] }> => {
+  list: async (page = 1, pageSize = 100): Promise<{ data: WorkspaceRow[] }> => {
     const r = await client.get<{ items?: WorkspaceRow[]; total?: number }>('/workspaces', {
-      params: { page },
+      params: { page, pageSize },
     });
     return { data: unwrapList<WorkspaceRow>(r.data) };
   },
@@ -139,6 +139,7 @@ export const versionApi = {
 
 export const releaseApi = {
   list: (capabilityId: string) => client.get('/releases', { params: { capabilityId } }),
+  listAll: (page = 1, pageSize = 100) => client.get('/releases', { params: { page, pageSize } }),
   get: (id: string) => client.get(`/releases/${id}`),
   create: (data: { capabilityId: string; capabilityVersion: number; capabilityVersionId: string | null; manifest: string; environment: string }) =>
     client.post('/releases', data),

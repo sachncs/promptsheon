@@ -61,11 +61,12 @@ function useDashboardData() {
   const releases = useQuery({
     queryKey: ['releases', 'all'],
     queryFn: async () => {
-      const byCapability = await Promise.all(capabilityList.map(async (c) => {
-        const data = await releaseApi.list(c.id).then((res) => res.data);
-        return unwrapList<Record<string, unknown>>(data).map((rel) => ({ ...rel, capabilityName: c.name, capabilityId: c.id }));
+      const data = await releaseApi.listAll(1, 100).then((res) => res.data);
+      const names = new Map(capabilityList.map((capability) => [capability.id, capability.name]));
+      return unwrapList<Record<string, unknown>>(data).map((release) => ({
+        ...release,
+        capabilityName: names.get(String(release['capabilityId'])) ?? 'Unknown capability',
       }));
-      return byCapability.flat();
     },
     enabled: capabilityList.length > 0,
   });
@@ -124,7 +125,7 @@ function Dashboard() {
   }
 
   const trustScore = computeTrust(evalList, approvalList, releaseList);
-  const openReleases = releaseList.filter((r) => r['state'] === 'active' || r['state'] === 'canary').length;
+  const openReleases = releaseList.filter((r) => r['status'] === 'active' || r['status'] === 'canary').length;
 
   const wsFirst = d.workspaceList[0];
   const wsName = wsFirst?.name ?? 'your workspace';
@@ -226,7 +227,7 @@ function Dashboard() {
               columns={[
                 { key: 'cap', header: 'Capability', render: (r) => String(r['capabilityName'] ?? '—') },
                 { key: 'ver', header: 'Version', render: (r) => `v${r['capabilityVersion'] ?? '?'}` },
-                { key: 'state', header: 'State', render: (r) => <StatusPill kind={(r['state'] as never) ?? 'neutral'} /> },
+                { key: 'state', header: 'State', render: (r) => <StatusPill kind={(r['status'] as never) ?? 'neutral'} /> },
                 { key: 'hash', header: 'Content', render: (r) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} /> },
                 { key: 'env', header: 'Env', render: (r) => <span className="font-mono text-xs text-text-muted">{String(r['environment'] ?? 'production')}</span> },
               ]}
