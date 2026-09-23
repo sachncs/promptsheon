@@ -18,7 +18,7 @@ import { DataTable } from '@/components/brand/data-table';
 import { AnimatedNumber } from '@/components/brand/animated-number';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
 import { Button } from '@/components/ui/button';
-import { workspaceApi, projectApi, capabilityApi, releaseApi, evalApi, auditApi, approvalApi } from '@/lib/api';
+import { workspaceApi, projectApi, capabilityApi, releaseApi, evalApi, auditApi, approvalApi, unwrapList, type WorkspaceRow } from '@/lib/api';
 import { QueryError } from '@/components/brand/query-error';
 
 export default function ControlPlanePage() {
@@ -31,31 +31,39 @@ function useDashboardData() {
     queryKey: ['workspaces'],
     queryFn: () => workspaceApi.list(1).then((r) => r.data),
   });
-  const first = unwrapFirst(workspaces.data);
-  const workspaceId = first?.id as string | undefined;
+  const workspaceList = unwrapList<WorkspaceRow>(workspaces.data);
+  const workspaceIds = workspaceList.map((workspace) => workspace.id);
 
   const projects = useQuery({
-    queryKey: ['projects', workspaceId],
-    queryFn: () => projectApi.list(workspaceId!).then((r) => r.data),
-    enabled: Boolean(workspaceId),
+    queryKey: ['projects', 'all', workspaceIds],
+    queryFn: async () => {
+      const responses = await Promise.all(workspaceIds.map((workspaceId) => projectApi.list(workspaceId)));
+      return responses.flatMap((response) => unwrapList<Record<string, unknown>>(response.data));
+    },
+    enabled: workspaceIds.length > 0,
   });
-  const projectFirst = unwrapFirst(projects.data);
-  const projectId = projectFirst?.id as string | undefined;
+  const projectList = unwrapList<Record<string, unknown>>(projects.data);
+  const projectIds = projectList.flatMap((project) => {
+    const id = project['id'];
+    return typeof id === 'string' ? [id] : [];
+  });
 
   const capabilities = useQuery({
-    queryKey: ['capabilities', projectId],
-    queryFn: () => capabilityApi.list(projectId!).then((r) => r.data),
-    enabled: Boolean(projectId),
+    queryKey: ['capabilities', 'all', projectIds],
+    queryFn: async () => {
+      const responses = await Promise.all(projectIds.map((projectId) => capabilityApi.list(projectId)));
+      return responses.flatMap((response) => unwrapList<Record<string, unknown>>(response.data));
+    },
+    enabled: projectIds.length > 0,
   });
-  const capabilityList = (Array.isArray(capabilities.data) ? capabilities.data : []) as Array<{ id: string; name: string }>;
+  const capabilityList = unwrapList<{ id: string; name: string }>(capabilities.data);
 
   const releases = useQuery({
     queryKey: ['releases', 'all'],
     queryFn: async () => {
       const byCapability = await Promise.all(capabilityList.map(async (c) => {
         const data = await releaseApi.list(c.id).then((res) => res.data);
-        if (!Array.isArray(data)) throw new Error(`Invalid releases response for ${c.name}`);
-        return data.map((rel: Record<string, unknown>) => ({ ...rel, capabilityName: c.name, capabilityId: c.id }));
+        return unwrapList<Record<string, unknown>>(data).map((rel) => ({ ...rel, capabilityName: c.name, capabilityId: c.id }));
       }));
       return byCapability.flat();
     },
@@ -69,7 +77,7 @@ function useDashboardData() {
     queryFn: () => approvalApi.listPending().then((r) => r.data),
   });
 
-  return { workspaces, projects, capabilities, releases, evals, audits, approvals, workspaceId, projectId, capabilityList };
+  return { workspaces, projects, capabilities, releases, evals, audits, approvals, workspaceList, capabilityList };
 }
 
 function Dashboard() {
@@ -85,13 +93,13 @@ function Dashboard() {
     .some((query) => query.isPending);
   if (loadingQuery) return <DashboardLoading />;
 
-  const capabilityCount = unwrapArray(d.capabilities.data).length;
-  const releaseList = unwrapArray<Record<string, unknown>>(d.releases.data);
-  const evalList = unwrapArray<Record<string, unknown>>(d.evals.data);
-  const auditList = unwrapArray<Record<string, unknown>>(d.audits.data);
-  const approvalList = unwrapArray<Record<string, unknown>>(d.approvals.data);
+  const capabilityCount = d.capabilityList.length;
+  const releaseList = unwrapList<Record<string, unknown>>(d.releases.data);
+  const evalList = unwrapList<Record<string, unknown>>(d.evals.data);
+  const auditList = unwrapList<Record<string, unknown>>(d.audits.data);
+  const approvalList = unwrapList<Record<string, unknown>>(d.approvals.data);
 
-  const noWorkspace = !d.workspaces.data || unwrapArray(d.workspaces.data).length === 0;
+  const noWorkspace = d.workspaceList.length === 0;
 
   if (noWorkspace) {
     return (
@@ -118,8 +126,8 @@ function Dashboard() {
   const trustScore = computeTrust(evalList, approvalList, releaseList);
   const openReleases = releaseList.filter((r) => r['state'] === 'active' || r['state'] === 'canary').length;
 
-  const wsFirst = unwrapFirst(d.workspaces.data);
-  const wsName = wsFirst ? (wsFirst as { name?: string }).name : 'your workspace';
+  const wsFirst = d.workspaceList[0];
+  const wsName = wsFirst?.name ?? 'your workspace';
   const noCapability = capabilityCount === 0;
   const noRelease = releaseList.length === 0;
   const onboard = noCapability || noRelease;
@@ -350,20 +358,6 @@ function PageHeader({ eyebrow, title, subtitle, actions }: { eyebrow: string; ti
       {actions}
     </div>
   );
-}
-
-function unwrapArray<T = Record<string, unknown>>(data: unknown): T[] {
-  if (Array.isArray(data)) return data as T[];
-  if (data && typeof data === 'object' && 'items' in data) {
-    const items = (data as { items?: unknown }).items;
-    if (Array.isArray(items)) return items as T[];
-  }
-  return [];
-}
-
-function unwrapFirst<T = Record<string, unknown>>(data: unknown): T | undefined {
-  const arr = unwrapArray<T>(data);
-  return arr[0];
 }
 
 function passRate(evalList: Array<Record<string, unknown>>): number {
