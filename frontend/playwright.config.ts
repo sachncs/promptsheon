@@ -21,7 +21,7 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: {
-    command: `PROMPTSHEON_PORT=${BACKEND_PORT} PROMPTSHEON_DB_PATH=promptsheon-test.db pnpm dev`,
+    command: `cd .. && PROMPTSHEON_PORT=${BACKEND_PORT} PROMPTSHEON_DB_PATH=promptsheon-test.db PROMPTSHEON_RATE_LIMIT_MAX=10000 pnpm --dir packages dev`,
     url: BASE_URL,
     reuseExistingServer: !process.env['CI'],
     timeout: 120_000,

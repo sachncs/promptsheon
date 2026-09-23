@@ -18,18 +18,14 @@ jobs:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
-          version: 9
+          version: 11
       - uses: actions/setup-node@v7
         with:
-          node-version: '26'
+          node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - name: shared typecheck
-        run: cd packages/shared && pnpm typecheck
-      - name: server typecheck
-        run: cd packages/server && pnpm typecheck
-      - name: frontend typecheck
-        run: cd frontend && pnpm typecheck
+      - name: workspace typecheck
+        run: pnpm typecheck
 
   test:
     name: Server Tests
@@ -39,15 +35,13 @@ jobs:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
-          version: 9
+          version: 11
       - uses: actions/setup-node@v7
         with:
-          node-version: '26'
+          node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - name: approve native builds
-        run: pnpm approve-builds
-      - run: cd packages/server && pnpm test
+      - run: pnpm test
 
   build:
     name: Build
@@ -57,14 +51,34 @@ jobs:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
-          version: 9
+          version: 11
       - uses: actions/setup-node@v7
         with:
-          node-version: '26'
+          node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @promptsheon/server build
-      - run: pnpm --filter @promptsheon/frontend build
+      - run: pnpm build
+
+  e2e:
+    name: Browser Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [typecheck, test, build]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: install Chromium
+        run: pnpm --dir frontend exec playwright install --with-deps chromium
+      - name: run non-LLM browser gates
+        run: >-
+          pnpm --dir frontend exec playwright test
+          --grep "tier 1:|tier 2:|tier 4:|tier 7:|tier 8:|tier 9:"
 
   docker:
     name: Docker Build
