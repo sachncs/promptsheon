@@ -318,49 +318,6 @@ export function registerReleaseRoutes(
     return reply.send(updated);
   });
 
-  app.put('/api/releases/:id/activate', async (request, reply) => {
-    const organizationId = requireOrganization(request, reply);
-    if (!organizationId) return;
-    const { id } = request.params as { id: string };
-    const existing = repo.findByIdInOrg(id, organizationId);
-    if (!existing) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Release not found' } });
-    const from = existing.status as ReleaseStatus;
-    // /activate is a legacy shortcut. The 6-state machine is the
-    // canonical path via POST /transition; this route accepts any
-    // non-terminal state to keep the pre-v0.4 test contract green.
-    if (from === 'rolled_back') {
-      return reply.code(422).send({ error: { code: 'INVALID_TRANSITION', message: `cannot transition from ${from} to active` } });
-    }
-    const gateFailure = approvalGate({
-      createdBy: existing.createdBy,
-      manifest: existing.manifest,
-    }, deps.manifestRepo);
-    if (gateFailure) {
-      return reply.code(409).send({ error: { code: 'APPROVAL_REQUIRED', message: gateFailure } });
-    }
-    const item = repo.updateStatusInOrg(id, organizationId, 'active');
-    if (item) {
-      repo.appendTransition({
-        id: randomUUID(),
-        releaseId: id,
-        fromStatus: from,
-        toStatus: 'active',
-        actorId: actorOf(request),
-        reason: 'promoted (legacy /activate)',
-        createdAt: new Date().toISOString(),
-      });
-      deps.auditChain.append({
-        userId: actorOf(request),
-        action: 'release.activate',
-        resource: 'release',
-        details: JSON.stringify({ releaseId: id, environment: item.environment }),
-        resourceKind: 'release',
-        resourceId: id,
-      });
-    }
-    return reply.send(item);
-  });
-
   app.put('/api/releases/:id/supersede', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;

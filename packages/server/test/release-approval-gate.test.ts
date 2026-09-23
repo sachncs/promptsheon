@@ -54,7 +54,7 @@ describe('approvalGate (pure logic)', () => {
   });
 });
 
-describe('PUT /api/releases/:id/activate (approval gate)', () => {
+describe('POST /api/releases/:id/transition (approval gate)', () => {
   let app: FastifyInstance;
   let db: ReturnType<typeof import('better-sqlite3')>;
   let releaseRepo: ReleaseRepo;
@@ -122,37 +122,38 @@ describe('PUT /api/releases/:id/activate (approval gate)', () => {
       capabilityId: 'cap1', capabilityVersion: 1, capabilityVersionId: null,
       manifest: JSON.stringify(manifest), environment: 'prod', createdBy: creator, canaryPercent: 0,
     });
+    releaseRepo.updateStatus(release.id, 'canary');
     return release.id;
   }
 
   it('returns 409 when no approvers', async () => {
     const id = seedApprovedRelease('alice', []);
-    const response = await app.inject({ method: 'PUT', url: `/api/releases/${id}/activate` });
+    const response = await app.inject({ method: 'POST', url: `/api/releases/${id}/transition`, payload: { to: 'active' } });
     expect(response.statusCode).toBe(409);
   });
 
   it('returns 409 when creator is approver (maker-checker)', async () => {
     const id = seedApprovedRelease('alice', ['alice', 'bob']);
-    const response = await app.inject({ method: 'PUT', url: `/api/releases/${id}/activate` });
+    const response = await app.inject({ method: 'POST', url: `/api/releases/${id}/transition`, payload: { to: 'active' } });
     expect(response.statusCode).toBe(409);
   });
 
   it('returns 409 when only 1 approver', async () => {
     const id = seedApprovedRelease('alice', ['bob']);
-    const response = await app.inject({ method: 'PUT', url: `/api/releases/${id}/activate` });
+    const response = await app.inject({ method: 'POST', url: `/api/releases/${id}/transition`, payload: { to: 'active' } });
     expect(response.statusCode).toBe(409);
   });
 
   it('returns 200 when 2+ distinct approvers (different from creator)', async () => {
     const id = seedApprovedRelease('alice', ['bob', 'carol']);
-    const response = await app.inject({ method: 'PUT', url: `/api/releases/${id}/activate` });
+    const response = await app.inject({ method: 'POST', url: `/api/releases/${id}/transition`, payload: { to: 'active' } });
     expect(response.statusCode).toBe(200);
     const body = response.json() as { status: string };
     expect(body.status).toBe('active');
   });
 
   it('returns 404 for unknown release', async () => {
-    const response = await app.inject({ method: 'PUT', url: '/api/releases/nonexistent/activate' });
+    const response = await app.inject({ method: 'POST', url: '/api/releases/nonexistent/transition', payload: { to: 'active' } });
     expect(response.statusCode).toBe(404);
   });
 });

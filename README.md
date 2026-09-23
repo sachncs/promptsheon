@@ -215,7 +215,7 @@ import { workspaceApi, capabilityApi, releaseApi } from '@/lib/api';
 
 const ws = await workspaceApi.create({ name: 'refund-triage' });
 const cap = await capabilityApi.list(projectId);
-const release = await releaseApi.activate(releaseId);
+const release = await releaseApi.transition(releaseId, 'active');
 // → 409 APPROVAL_REQUIRED until 2 distinct non-creator approvals
 //    are on the manifest hash. The gate fires correctly now that
 //    BaseRepo.findById returns camelCase rows.

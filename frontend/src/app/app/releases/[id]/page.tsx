@@ -72,7 +72,7 @@ export default function ReleaseDetailPage() {
 
   const handleActivate = async () => {
     try {
-      await releaseApi.activate(id);
+      await releaseApi.transition(id, 'active');
       refreshRelease();
       toast({ title: 'Release activated', variant: 'success', description: 'Now receiving 100% of production traffic.' });
     } catch (err) {

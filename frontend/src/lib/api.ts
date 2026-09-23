@@ -169,7 +169,8 @@ export const releaseApi = {
   get: (id: string) => client.get(`/releases/${id}`),
   create: (data: { capabilityId: string; capabilityVersion: number; capabilityVersionId: string | null; manifest: string; environment: string }) =>
     client.post('/releases', data),
-  activate: (id: string) => client.put(`/releases/${id}/activate`),
+  transition: (id: string, to: 'draft' | 'review' | 'approved' | 'canary' | 'active' | 'rolled_back', reason?: string) =>
+    client.post(`/releases/${id}/transition`, { to, ...(reason ? { reason } : {}) }),
   canary: (id: string, percent: number) => client.put(`/releases/${id}/canary`, { percent }),
   supersede: (id: string) => client.put(`/releases/${id}/supersede`),
   rollback: (id: string, toReleaseId?: string) => {

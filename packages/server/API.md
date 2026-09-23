@@ -76,7 +76,7 @@ All endpoints live under `/api/`. Endpoints with `:id` style parameters expect a
 | `GET` | `/api/releases` | List releases (paginated, optionally filtered by `capabilityId`) | — | `200 Release[]` |
 | `GET` | `/api/releases/:id` | Fetch one release | — | `200 Release` / `404` |
 | `POST` | `/api/releases` | Create a release (adds `capabilityVersionId`, `manifest`, `createdBy?` to `CreateReleaseSchema`) | `CreateBodySchema` (`CreateReleaseSchema` + `capabilityVersionId`, `manifest`, `createdBy?`) | `201 Release` |
-| `PUT` | `/api/releases/:id/activate` | Transition a release to `active` | — | `200 Release` |
+| `POST` | `/api/releases/:id/transition` | Apply a validated release state transition | `{ to, reason? }` | `200 Release` / `409` / `422` |
 | `PUT` | `/api/releases/:id/supersede` | Transition a release to `superseded` | — | `200 Release` |
 
 ---
