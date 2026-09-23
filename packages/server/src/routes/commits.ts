@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { RepoRepo } from '../repos/repo.js';
 import type { RepoStore } from '../repos/repo-store.js';
@@ -20,12 +21,17 @@ export interface CommitDeps {
   commitRepo: CommitRepo;
 }
 
+function repositoryForRequest(repoRepo: RepoRepo, request: FastifyRequest, id: string) {
+  const organizationId = request.orgContext?.orgId;
+  return organizationId ? repoRepo.findByIdInOrg(id, organizationId) : repoRepo.findById(id);
+}
+
 export function registerCommitRoutes(app: FastifyInstance, deps: CommitDeps): void {
   app.post('/api/repos/:id/commits', async (request, reply) => {
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, CreateCommitSchema, request.body);
     if (!parsed.ok) return;
-    const repo = deps.repoRepo.findById(id);
+    const repo = repositoryForRequest(deps.repoRepo, request, id);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
 
     const branch = deps.branchRepo.findByName(id, parsed.data.ref);
@@ -69,6 +75,9 @@ export function registerCommitRoutes(app: FastifyInstance, deps: CommitDeps): vo
     const { oid } = request.params as { oid: string };
     const commit = deps.commitRepo.findByOid(oid);
     if (!commit) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'commit not found' } });
+    if (!repositoryForRequest(deps.repoRepo, request, commit.repositoryId)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'commit not found' } });
+    }
     return reply.send(commit);
   });
   registerRouteDoc({
@@ -84,7 +93,7 @@ export function registerCommitRoutes(app: FastifyInstance, deps: CommitDeps): vo
     if (!ref) {
       return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'ref required' } });
     }
-    if (!deps.repoRepo.findById(id)) {
+    if (!repositoryForRequest(deps.repoRepo, request, id)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     }
     return reply.send(deps.commitRepo.listForRef(id, ref));

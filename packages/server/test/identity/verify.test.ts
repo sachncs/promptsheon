@@ -29,6 +29,23 @@ describe('verifyPrincipal', () => {
     expect(result).toBeNull();
   });
 
+  it('does not downgrade an invalid Bearer token to spoofed headers', () => {
+    const stored = mintApiKey({ agentId: 'a-1', orgId: 'o-1' });
+    const result = verifyPrincipal({
+      authorization: 'Bearer invalid-token',
+      headers: { 'x-user-id': 'admin', 'x-org-id': 'o-1' },
+      apikey: {
+        hash: stored.hash,
+        agentId: stored.agentId,
+        orgId: stored.orgId,
+        scope: stored.scope,
+        expiresAt: stored.expiresAt,
+        revokedAt: null,
+      },
+    });
+    expect(result).toBeNull();
+  });
+
   it('returns a User principal on a matching Bearer apikey', () => {
     const m = mintApiKey({ agentId: 'a-1', orgId: 'o-1' });
     const stored = {

@@ -63,7 +63,7 @@ function buildApp(): { app: FastifyInstance; db: Database.Database } {
   const app = Fastify({ logger: false });
   app.addHook('preHandler', (request, _reply, done) => {
     (request as Record<string, unknown>)['userId'] = 'u-test';
-    (request as Record<string, unknown>)['orgContext'] = { organizationId: 'org-1' };
+    (request as Record<string, unknown>)['orgContext'] = { orgId: 'org-1' };
     done();
   });
   registerAuditReportRoutes(app, { auditChain: audit });

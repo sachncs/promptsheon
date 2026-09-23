@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validateConfig } from '../src/config/validate.js';
+import { resolveScimBearerToken } from '../src/routes/index.js';
 import type { AppConfig } from '@promptsheon/shared';
 
 const baseConfig: AppConfig = {
@@ -60,5 +61,38 @@ describe('validateConfig (issue #47 — boot-time validation gate)', () => {
       server: { ...baseConfig.server, port: 70000 },
     };
     expect(() => validateConfig(config)).toThrow(/PROMPTSHEON_PORT/);
+  });
+
+  it('refuses to boot production with authentication disabled', () => {
+    const config: AppConfig = {
+      ...baseConfig,
+      server: { ...baseConfig.server, nodeEnv: 'production' },
+    };
+    expect(() => validateConfig(config)).toThrow(/PROMPTSHEON_AUTH/);
+  });
+
+  it('rejects invalid LLM retry and timeout settings', () => {
+    expect(() => validateConfig({
+      ...baseConfig,
+      llm: { ...baseConfig.llm, maxRetries: -1 },
+    })).toThrow(/PROMPTSHEON_LLM_MAX_RETRIES/);
+    expect(() => validateConfig({
+      ...baseConfig,
+      llm: { ...baseConfig.llm, timeoutMs: 0 },
+    })).toThrow(/PROMPTSHEON_LLM_TIMEOUT_MS/);
+  });
+});
+
+describe('resolveScimBearerToken', () => {
+  it('uses an explicitly configured token', () => {
+    expect(resolveScimBearerToken('production', 'configured-token')).toBe('configured-token');
+  });
+
+  it('keeps a local development fallback', () => {
+    expect(resolveScimBearerToken('development', undefined)).toBe('dev-scim-token');
+  });
+
+  it('fails closed in production when the token is missing', () => {
+    expect(() => resolveScimBearerToken('production', undefined)).toThrow('PROMPTSHEON_SCIM_TOKEN is required in production');
   });
 });

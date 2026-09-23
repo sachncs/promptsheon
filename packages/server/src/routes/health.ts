@@ -11,10 +11,11 @@ export function registerHealthRoutes(app: FastifyInstance, db: Database.Database
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
+      app.log.error({ err }, 'health check database probe failed');
       return reply.code(503).send({
         status: 'error',
         db: 'error',
-        error: String(err),
+        error: 'database unavailable',
         timestamp: new Date().toISOString(),
       });
     }

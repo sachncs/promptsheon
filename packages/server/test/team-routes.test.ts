@@ -7,6 +7,8 @@ import { applyMigrations } from '@promptsheon/shared';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerTeamRoutes } from '../src/routes/team.js';
 import { TeamRepo, SsoConfigRepo } from '../src/repos/team.js';
+import { UserRepo } from '../src/repos/user.js';
+import { MembershipRepo } from '../src/repos/org.js';
 import { AuditChain } from '../src/audit/chain.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -35,6 +37,8 @@ function buildApp(role: 'admin' | 'reader'): { app: FastifyInstance; db: Databas
   const db = openDb();
   const teamRepo = new TeamRepo(db);
   const ssoRepo = new SsoConfigRepo(db);
+  const userRepo = new UserRepo(db);
+  const membershipRepo = new MembershipRepo(db);
   const audit = new AuditChain(db);
   db.prepare(
     `INSERT OR IGNORE INTO orgs (id, name, slug, created_at, updated_at)
@@ -44,7 +48,7 @@ function buildApp(role: 'admin' | 'reader'): { app: FastifyInstance; db: Databas
   app.addHook('preHandler', (request, _reply, done) => {
     (request as Record<string, unknown>)['userId'] = 'u-test';
     (request as Record<string, unknown>)['orgContext'] = {
-      organizationId: '00000000-0000-4000-8000-000000000001',
+      orgId: '00000000-0000-4000-8000-000000000001',
       role,
     };
     done();
@@ -54,11 +58,19 @@ function buildApp(role: 'admin' | 'reader'): { app: FastifyInstance; db: Databas
     ssoConfigRepo: ssoRepo,
     auditChain: audit,
     scimBearerToken: 'test-scim-token',
+    userRepo,
+    membershipRepo,
   });
   return { app, db };
 }
 
 describe('Team + SCIM routes', () => {
+  it('does not allow an active org member to address another org by id', async () => {
+    const { app } = buildApp('admin');
+    const response = await app.inject({ method: 'GET', url: '/api/orgs/org-other/teams' });
+    expect(response.statusCode).toBe(404);
+  });
+
   describe('teams CRUD', () => {
     it('admin can create + list teams', async () => {
       const { app, db } = buildApp('admin');
@@ -210,7 +222,7 @@ describe('Team + SCIM routes', () => {
       });
       expect(r.statusCode).toBe(201);
       const body = r.json() as { id: string; schemas: string[] };
-      expect(body.id).toMatch(/^scim-/);
+      expect(body.id).toMatch(/^[0-9a-f-]{36}$/);
       expect(body.schemas).toContain('urn:ietf:params:scim:schemas:core:2.0:User');
     });
 
@@ -234,6 +246,31 @@ describe('Team + SCIM routes', () => {
       });
       // Zod rejects the missing emails array with 422.
       expect([400, 422]).toContain(r.statusCode);
+    });
+
+    it('persists users, supports pagination, and deactivates an org membership', async () => {
+      const { app, db } = buildApp('admin');
+      const headers = { authorization: 'Bearer test-scim-token' };
+      const created = await app.inject({
+        method: 'POST',
+        url: '/api/scim/v2/Users',
+        headers,
+        payload: { userName: 'carol', emails: [{ value: 'carol@corp.test', primary: true }] },
+      });
+      const userId = (created.json() as { id: string }).id;
+      const listed = await app.inject({ method: 'GET', url: '/api/scim/v2/Users?startIndex=1&count=1', headers });
+      expect(listed.statusCode).toBe(200);
+      expect((listed.json() as { totalResults: number; Resources: Array<{ id: string }> }).totalResults).toBe(1);
+
+      const patched = await app.inject({
+        method: 'PATCH',
+        url: `/api/scim/v2/Users/${userId}`,
+        headers,
+        payload: { Operations: [{ op: 'replace', path: 'active', value: false }] },
+      });
+      expect(patched.statusCode).toBe(200);
+      expect((patched.json() as { active: boolean }).active).toBe(false);
+      expect(db.prepare('SELECT COUNT(*) AS c FROM org_members WHERE user_id = ?').get(userId)).toEqual({ c: 0 });
     });
   });
 

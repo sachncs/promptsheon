@@ -4,6 +4,7 @@ import type { UserRepo } from '../repos/user.js';
 import { parseBody } from './validate.js';
 import { AuditChain } from '../audit/chain.js';
 import { requireAdmin } from '../middleware/admin.js';
+import type { MembershipRepo } from '../repos/org.js';
 
 const CreateUserSchema = z.object({
   email: z.string().email().max(255),
@@ -26,10 +27,14 @@ function actorOf(request: unknown): string {
 
 export function registerUserRoutes(
   app: FastifyInstance,
-  deps: { userRepo: UserRepo; auditChain: AuditChain },
+  deps: { userRepo: UserRepo; auditChain: AuditChain; membershipRepo?: MembershipRepo },
 ) {
-  app.get('/api/users', { preHandler: requireAdmin() }, async (_request, reply) => {
-    return reply.send({ users: deps.userRepo.list() });
+  app.get('/api/users', { preHandler: requireAdmin() }, async (request, reply) => {
+    const orgId = request.orgContext?.orgId;
+    const users = orgId
+      ? deps.userRepo.listForOrg(orgId)
+      : deps.userRepo.list();
+    return reply.send({ users });
   });
 
   app.get('/api/users/me', async (request, reply) => {
@@ -43,7 +48,10 @@ export function registerUserRoutes(
 
   app.get('/api/users/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const user = deps.userRepo.findById(id);
+    const orgId = request.orgContext?.orgId;
+    const user = orgId
+      ? deps.userRepo.findByIdInOrg(id, orgId)
+      : deps.userRepo.findById(id);
     if (!user) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'User not found' } });
     }
@@ -54,6 +62,15 @@ export function registerUserRoutes(
     const parsed = parseBody(reply, CreateUserSchema, request.body);
     if (!parsed.ok) return;
     const user = deps.userRepo.create(parsed.data);
+    const context = request.orgContext;
+    if (context?.orgId && deps.membershipRepo) {
+      const role = parsed.data.role === 'admin'
+        ? 'admin'
+        : parsed.data.role === 'editor'
+          ? 'editor'
+          : 'viewer';
+      deps.membershipRepo.addOrgMember(context.orgId, user.id, role);
+    }
     deps.auditChain.append({
       userId: actorOf(request),
       action: 'user.create',
@@ -69,6 +86,13 @@ export function registerUserRoutes(
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, UpdateRoleSchema, request.body);
     if (!parsed.ok) return;
+    const orgId = request.orgContext?.orgId;
+    const existing = orgId
+      ? deps.userRepo.findByIdInOrg(id, orgId)
+      : deps.userRepo.findById(id);
+    if (!existing) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'User not found' } });
+    }
     const user = deps.userRepo.updateRole(id, parsed.data.role);
     if (!user) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'User not found' } });

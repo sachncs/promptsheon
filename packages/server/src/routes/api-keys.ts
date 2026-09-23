@@ -31,7 +31,12 @@ export function registerApiKeyRoutes(
   deps: { apiKeyRepo: ApiKeyRepo; auditChain: AuditChain },
 ) {
   app.get('/api/api-keys', { preHandler: requireAdmin() }, async (_request, reply) => {
-    return reply.send({ keys: deps.apiKeyRepo.findMany({ page: 1, pageSize: 100 }).items });
+    const request = _request;
+    const orgId = request.orgContext?.orgId;
+    const keys = orgId
+      ? deps.apiKeyRepo.listForOrg(orgId)
+      : deps.apiKeyRepo.findMany({ page: 1, pageSize: 100 }).items;
+    return reply.send({ keys });
   });
 
   app.post('/api/api-keys', { preHandler: requireAdmin() }, async (request, reply) => {
@@ -39,6 +44,9 @@ export function registerApiKeyRoutes(
     if (!parsed.ok) return;
     const { name, userId, role } = parsed.data;
     const ctx = getOrgContext(request);
+    if (ctx.orgId && !deps.apiKeyRepo.userBelongsToOrg(userId, ctx.orgId)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'User not found in organization' } });
+    }
     const targetRole = ctx.role === 'admin' ? role : (role === 'admin' ? 'reader' : role);
     const raw = `pk_${randomBytes(24).toString('hex')}`;
     const keyHash = createHash('sha256').update(raw).digest('hex');
@@ -57,7 +65,10 @@ export function registerApiKeyRoutes(
 
   app.delete('/api/api-keys/:id', { preHandler: requireAdmin() }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const ok = deps.apiKeyRepo.revoke(id);
+    const orgId = request.orgContext?.orgId;
+    const ok = orgId
+      ? deps.apiKeyRepo.revokeInOrg(id, orgId)
+      : deps.apiKeyRepo.revoke(id);
     if (!ok) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'API key not found' } });
     }

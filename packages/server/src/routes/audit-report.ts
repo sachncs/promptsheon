@@ -15,12 +15,13 @@ const ReportQuerySchema = z.object({
 
 interface RequestUserContext {
   userId?: string;
-  orgContext?: { organizationId?: string; role?: string };
+  agentOrgId?: string;
+  orgContext?: { organizationId?: string; orgId?: string; role?: string };
 }
 
 function orgOf(request: unknown): string | null {
   const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.organizationId ?? null;
+  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
 }
 
 interface AuditReportEntry {

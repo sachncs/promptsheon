@@ -12,12 +12,14 @@ const ScanTextSchema = z.object({
 
 interface RequestUserContext {
   userId?: string;
-  orgContext?: { organizationId?: string };
+  agentOrgId?: string;
+  orgContext?: { organizationId?: string; orgId?: string };
 }
 
 interface RequestLike {
   userId?: string;
-  orgContext?: { organizationId?: string };
+  agentOrgId?: string;
+  orgContext?: { organizationId?: string; orgId?: string };
   headers: Record<string, string | string[] | undefined>;
 }
 
@@ -25,6 +27,11 @@ function orgOf(request: unknown): string | null {
   const req = request as RequestLike | undefined;
   if (!req) return null;
   if (req.orgContext?.organizationId) return req.orgContext.organizationId;
+  if (req.orgContext?.orgId) return req.orgContext.orgId;
+  if (req.agentOrgId) return req.agentOrgId;
+  // Headers remain a compatibility fallback for direct, auth-disabled
+  // route tests. Never let them override an authenticated principal.
+  if (req.userId) return null;
   const raw = req.headers['x-org-id'];
   if (typeof raw === 'string') return raw;
   if (Array.isArray(raw) && typeof raw[0] === 'string') return raw[0];
@@ -35,6 +42,8 @@ function actorOf(request: unknown): string | null {
   const req = request as RequestLike | undefined;
   if (!req) return null;
   if (req.userId) return req.userId;
+  // Headers remain a compatibility fallback only when no authenticated
+  // identity was established by the auth middleware.
   const raw = req.headers['x-user-id'];
   if (typeof raw === 'string') return raw;
   if (Array.isArray(raw) && typeof raw[0] === 'string') return raw[0];

@@ -1,19 +1,22 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { NotFoundError } from '@promptsheon/shared';
 import type { TeamRepo, SsoConfigRepo } from '../repos/team.js';
 import type { AuditChain } from '../audit/chain.js';
+import type { UserRepo } from '../repos/user.js';
+import type { MembershipRepo } from '../repos/org.js';
 import { parseBody, parseQuery } from './validate.js';
 
 interface RequestUserContext {
   userId?: string;
-  orgContext?: { organizationId?: string; role?: string };
+  agentOrgId?: string;
+  orgContext?: { organizationId?: string; orgId?: string; role?: string };
 }
 
 function orgOf(request: unknown): string | null {
   const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.organizationId ?? null;
+  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
 }
 
 function actorRole(request: unknown): string {
@@ -40,6 +43,19 @@ const ScimUserSchema = z.object({
   roles: z.array(z.string()).optional().default([]),
 });
 
+const ScimListQuerySchema = z.object({
+  startIndex: z.coerce.number().int().min(1).default(1),
+  count: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+const ScimPatchSchema = z.object({
+  Operations: z.array(z.object({
+    op: z.enum(['add', 'replace', 'remove']),
+    path: z.string().optional(),
+    value: z.unknown().optional(),
+  })).min(1),
+});
+
 /**
  * SCIM 2.0 / SSO routes.
  *
@@ -61,7 +77,14 @@ const ScimUserSchema = z.object({
  */
 export function registerTeamRoutes(
   app: FastifyInstance,
-  deps: { teamRepo: TeamRepo; ssoConfigRepo: SsoConfigRepo; auditChain: AuditChain; scimBearerToken: string },
+  deps: {
+    teamRepo: TeamRepo;
+    ssoConfigRepo: SsoConfigRepo;
+    auditChain: AuditChain;
+    scimBearerToken: string;
+    userRepo?: UserRepo;
+    membershipRepo?: MembershipRepo;
+  },
 ) {
   // ===== Teams =====
   app.get('/api/teams', async (request, reply) => {
@@ -199,9 +222,9 @@ export function registerTeamRoutes(
       return false;
     }
     const presented = token.slice('Bearer '.length).trim();
-    const expected = createHash('sha256').update(deps.scimBearerToken).digest('hex');
-    const actual = createHash('sha256').update(presented).digest('hex');
-    if (expected !== actual) {
+    const expected = createHash('sha256').update(deps.scimBearerToken).digest();
+    const actual = createHash('sha256').update(presented).digest();
+    if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
       reply.code(401).send({ error: { code: 'UNAUTHORIZED' } });
       return false;
     }
@@ -211,54 +234,83 @@ export function registerTeamRoutes(
   app.get('/api/scim/v2/Users', async (request, reply) => {
     if (!(await scimAuth(request, reply))) return;
     const orgId = orgOf(request);
-    const startIndex = Number((request.query as Record<string, string>).startIndex ?? '1');
-    const count = Math.min(Number((request.query as Record<string, string>).count ?? '50'), 200);
-    const rows = (deps.teamRepo as unknown as { db: unknown }).db
-      ? []
-      : [];
-    void orgId;
-    void startIndex;
-    void count;
+    if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT' } });
+    if (!deps.userRepo || !deps.membershipRepo) {
+      return reply.code(503).send({ error: { code: 'SCIM_NOT_CONFIGURED', message: 'SCIM persistence is not configured' } });
+    }
+    const parsed = parseQuery(reply, ScimListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const allUsers = deps.userRepo.listForOrg(orgId);
+    const rows = allUsers.slice(parsed.data.startIndex - 1, parsed.data.startIndex - 1 + parsed.data.count);
     return reply.send({
       schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
-      totalResults: rows.length,
-      Resources: rows,
+      totalResults: allUsers.length,
+      startIndex: parsed.data.startIndex,
+      itemsPerPage: rows.length,
+      Resources: rows.map((user) => toScimUser(user)),
     });
   });
 
   app.post('/api/scim/v2/Users', async (request, reply) => {
     if (!(await scimAuth(request, reply))) return;
+    const orgId = orgOf(request);
+    if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT' } });
     const parsed = parseBody(reply, ScimUserSchema, request.body);
     if (!parsed.ok) return;
-    const orgId = orgOf(request) ?? 'unscoped';
+    if (!deps.userRepo || !deps.membershipRepo) {
+      return reply.code(503).send({ error: { code: 'SCIM_NOT_CONFIGURED', message: 'SCIM persistence is not configured' } });
+    }
     const email = parsed.data.emails.find((e) => e.primary)?.value ?? parsed.data.emails[0]?.value;
     if (!email) {
       return reply.code(400).send({ error: { code: 'MISSING_EMAIL', message: 'at least one email required' } });
     }
-    const userId = `scim-${randomUUID()}`;
+    const existing = deps.userRepo.findByEmail(email);
+    const user = existing ?? deps.userRepo.create({ email, name: parsed.data.displayName ?? parsed.data.userName, role: 'reader' });
+    const memberRole = parsed.data.roles.some((role) => role.toLowerCase() === 'admin') ? 'admin' : 'viewer';
+    deps.membershipRepo.addOrgMember(orgId, user.id, memberRole);
     deps.auditChain.append({
-      userId,
+      userId: user.id,
       action: 'scim.user_create',
       resource: 'user',
       details: JSON.stringify({ userName: parsed.data.userName, email }),
       resourceKind: 'user',
-      resourceId: userId,
+      resourceId: user.id,
     });
-    return reply.code(201).send({
-      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-      id: userId,
-      userName: parsed.data.userName,
-      displayName: parsed.data.displayName ?? parsed.data.userName,
-      emails: parsed.data.emails,
-      active: parsed.data.active ?? true,
-      meta: { resourceType: 'User' },
-      organizationId: orgId,
-    });
+    return reply.code(existing ? 200 : 201).send(toScimUser(user));
+  });
+
+  app.patch('/api/scim/v2/Users/:id', async (request, reply) => {
+    if (!(await scimAuth(request, reply))) return;
+    const orgId = orgOf(request);
+    if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT' } });
+    if (!deps.userRepo || !deps.membershipRepo) {
+      return reply.code(503).send({ error: { code: 'SCIM_NOT_CONFIGURED', message: 'SCIM persistence is not configured' } });
+    }
+    const parsed = parseBody(reply, ScimPatchSchema, request.body);
+    if (!parsed.ok) return;
+    const { id } = request.params as { id: string };
+    const user = deps.userRepo.findByIdInOrg(id, orgId);
+    if (!user) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'SCIM user not found' } });
+    for (const operation of parsed.data.Operations) {
+      if ((operation.path ?? '').toLowerCase() !== 'active') continue;
+      const value = typeof operation.value === 'boolean' ? operation.value : undefined;
+      if (value === false || operation.op === 'remove') deps.membershipRepo.removeOrgMember(orgId, id);
+      if (value === true) deps.membershipRepo.addOrgMember(orgId, id, 'viewer');
+    }
+    return reply.send(toScimUser(user, deps.membershipRepo.findOrgMembers(orgId).some((member) => member.userId === id)));
   });
 
   app.delete('/api/scim/v2/Users/:id', async (request, reply) => {
     if (!(await scimAuth(request, reply))) return;
+    const orgId = orgOf(request);
+    if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT' } });
+    if (!deps.membershipRepo) {
+      return reply.code(503).send({ error: { code: 'SCIM_NOT_CONFIGURED', message: 'SCIM persistence is not configured' } });
+    }
     const { id } = request.params as { id: string };
+    if (!deps.membershipRepo.removeOrgMember(orgId, id)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'SCIM user not found' } });
+    }
     deps.auditChain.append({
       userId: id,
       action: 'scim.user_deactivate',
@@ -269,4 +321,16 @@ export function registerTeamRoutes(
     });
     return reply.code(204).send();
   });
+}
+
+function toScimUser(user: { id: string; email: string; name: string; createdAt: string }, active = true): Record<string, unknown> {
+  return {
+    schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+    id: user.id,
+    userName: user.email,
+    displayName: user.name,
+    emails: [{ value: user.email, primary: true }],
+    active,
+    meta: { resourceType: 'User', created: user.createdAt },
+  };
 }

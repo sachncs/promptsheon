@@ -21,12 +21,13 @@ const RollupQuerySchema = z.object({
 
 interface RequestUserContext {
   userId?: string;
-  orgContext?: { organizationId?: string };
+  agentOrgId?: string;
+  orgContext?: { organizationId?: string; orgId?: string };
 }
 
 function orgOf(request: unknown): string | null {
   const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.organizationId ?? null;
+  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
 }
 
 /**
@@ -82,7 +83,11 @@ export function registerTraceRoutes(
     { preHandler: deps.requireAdmin() },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      const run = deps.traceRepo.findById(id);
+      const orgId = orgOf(request);
+      if (!orgId) {
+        return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+      }
+      const run = deps.traceRepo.findByIdInOrg(id, orgId);
       if (!run) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'trace run not found' } });
       const spans = deps.traceRepo.findSpansByRun(id);
       return reply.send({ run, spans });

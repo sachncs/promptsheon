@@ -72,6 +72,25 @@ describe('orgContextMiddleware', () => {
     expect(response.statusCode).toBe(403);
   });
 
+  it('does not allow X-User-Id to override an authenticated request identity', async () => {
+    const isolated = Fastify();
+    isolated.addHook('preHandler', async (request) => {
+      request.userId = 'u1';
+    });
+    isolated.addHook('preHandler', orgContextMiddleware({ membershipRepo }));
+    isolated.get('/api/whoami', async (request) => getOrgContext(request));
+    await isolated.ready();
+
+    const response = await isolated.inject({
+      method: 'GET',
+      url: '/api/whoami',
+      headers: { 'x-user-id': 'nonexistent', 'x-org-id': 'o1' },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ userId: 'u1', role: 'admin' });
+    await isolated.close();
+  });
+
   it('attaches org context when user is a member (direct repo call)', () => {
     const members = membershipRepo.findOrgMembers('o1');
     expect(members.length).toBeGreaterThan(0);

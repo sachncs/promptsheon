@@ -5,6 +5,7 @@ import type { OrgRole } from '@promptsheon/shared';
 declare module 'fastify' {
   interface FastifyRequest {
     orgContextBypass?: boolean;
+    orgContext?: OrgContext;
   }
 }
 
@@ -53,13 +54,17 @@ export function orgContextMiddleware(
 
     const userIdRaw = request.headers['x-user-id'];
     const orgIdRaw = request.headers['x-org-id'];
-    const userId = Array.isArray(userIdRaw) ? userIdRaw[0] : userIdRaw;
+    const headerUserId = Array.isArray(userIdRaw) ? userIdRaw[0] : userIdRaw;
+    // Auth middleware establishes the principal. The header is only a
+    // compatibility fallback for auth-disabled/direct middleware usage;
+    // never let it override a verified Bearer/SVID identity.
+    const userId = request.userId ?? headerUserId;
     const orgId = Array.isArray(orgIdRaw) ? orgIdRaw[0] : orgIdRaw;
 
     // System actor — only honored if explicitly enabled.
     if (userId === 'api' && !orgId) {
       if (allowSystemActor) {
-        (request as unknown as { orgContext: OrgContext }).orgContext = {
+        request.orgContext = {
           userId: 'api',
           orgId: 'system',
           role: 'admin',
@@ -84,7 +89,7 @@ export function orgContextMiddleware(
       return reply.code(403).send({ error: { code: 'NOT_ORG_MEMBER', message: 'User is not a member of the org' } });
     }
 
-    (request as unknown as { orgContext: OrgContext }).orgContext = {
+    request.orgContext = {
       userId,
       orgId,
       role: member.role,
@@ -98,7 +103,7 @@ export function orgContextMiddleware(
  */
 export function requireRole(allowedRoles: OrgRole[]) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
-    const ctx = (request as unknown as { orgContext?: OrgContext }).orgContext;
+    const ctx = request.orgContext;
     if (!ctx) {
       return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'orgContextMiddleware must run first' } });
     }
@@ -109,7 +114,25 @@ export function requireRole(allowedRoles: OrgRole[]) {
 }
 
 export function getOrgContext(request: FastifyRequest): OrgContext {
-  const ctx = (request as unknown as { orgContext?: OrgContext }).orgContext;
+  const ctx = request.orgContext;
   if (!ctx) throw new Error('orgContext not set on request');
   return ctx;
+}
+
+/**
+ * Bind a route's organization identifier to the authenticated context.
+ * Requests without context remain compatible with isolated route tests and
+ * auth-disabled development wiring; production auth always establishes one.
+ */
+export function assertOrgScope(
+  request: FastifyRequest,
+  requestedOrgId: string,
+  reply: FastifyReply,
+): boolean {
+  const activeOrgId = request.orgContext?.orgId ?? request.agentOrgId;
+  if (activeOrgId && activeOrgId !== requestedOrgId) {
+    void reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
+    return false;
+  }
+  return true;
 }

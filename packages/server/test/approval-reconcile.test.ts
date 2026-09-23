@@ -143,6 +143,13 @@ describe('approval route reconciliation', () => {
     expect(r.statusCode).toBe(400);
   });
 
+  it('GET /api/approvals/pending lists persisted approval rows', async () => {
+    await approvalRepo.upsert(releaseId, 'approve');
+    const r = await app.inject({ method: 'GET', url: '/api/approvals/pending' });
+    expect(r.statusCode).toBe(200);
+    expect((r.json() as { approvals: Array<{ releaseId: string }> }).approvals[0]?.releaseId).toBe(releaseId);
+  });
+
   it('POST /api/releases/:releaseId/approvals records a vote', async () => {
     const r = await app.inject({
       method: 'POST',

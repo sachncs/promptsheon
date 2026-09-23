@@ -1,11 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type Database from 'better-sqlite3';
 import { parseBody } from './validate.js';
 import type { SettingsResolver } from '../settings/resolver.js';
 import type { UserRepo } from '../repos/user.js';
-import { OrgRepo, MembershipRepo } from '../repos/org.js';
+import type { OrgRepo, MembershipRepo } from '../repos/org.js';
 import type { LlmRouter } from '../llm/router.js';
 
 const CreateAdminSchema = z.object({
@@ -52,15 +51,13 @@ const SaveLlmSchema = z.object({
 export function registerBootstrapRoutes(
   app: FastifyInstance,
   deps: {
-    db: Database.Database;
     userRepo: UserRepo;
+    orgRepo: OrgRepo;
+    membershipRepo: MembershipRepo;
     settingsResolver: SettingsResolver;
     llmRouter: LlmRouter;
   },
 ): void {
-  const orgRepo = new OrgRepo(deps.db);
-  const membershipRepo = new MembershipRepo(deps.db);
-
   app.get('/api/bootstrap/status', async (_request, reply) => {
     const users = deps.userRepo.list();
     const adminExists = users.some((u) => u.role === 'admin');
@@ -84,12 +81,12 @@ export function registerBootstrapRoutes(
     if (!admin) {
       return reply.code(404).send({ error: { code: 'NO_ADMIN', message: 'No admin exists yet.' } });
     }
-    const orgIds = membershipRepo.findOrgsForUser(admin.id);
+    const orgIds = deps.membershipRepo.findOrgsForUser(admin.id);
     const firstOrgId = orgIds[0];
     if (!firstOrgId) {
       return reply.code(404).send({ error: { code: 'NO_ORG', message: 'Admin has no organisation.' } });
     }
-    const org = orgRepo.findById(firstOrgId);
+    const org = deps.orgRepo.findById(firstOrgId);
     if (!org) {
       return reply.code(404).send({ error: { code: 'NO_ORG', message: 'Organisation not found.' } });
     }
@@ -113,13 +110,13 @@ export function registerBootstrapRoutes(
     }
 
     const slug = parsed.data.orgSlug ?? slugify(parsed.data.orgName) + '-' + randomBytes(2).toString('hex');
-    const org = orgRepo.create({ name: parsed.data.orgName, slug });
+    const org = deps.orgRepo.create({ name: parsed.data.orgName, slug });
     const user = deps.userRepo.create({
       email: parsed.data.adminEmail,
       name: parsed.data.adminName,
       role: 'admin',
     });
-    membershipRepo.addOrgMember(org.id, user.id, 'admin');
+    deps.membershipRepo.addOrgMember(org.id, user.id, 'admin');
 
     return reply.code(201).send({
       user: { id: user.id, email: user.email, name: user.name, role: user.role },

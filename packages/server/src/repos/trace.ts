@@ -274,6 +274,14 @@ export class TraceRepo extends BaseRepo<TraceRun> {
     return row ? rowToRun(row) : null;
   }
 
+  /** Return a trace run only when it belongs to the requested organization. */
+  findByIdInOrg(id: string, organizationId: string): TraceRun | null {
+    const row = this.db
+      .prepare('SELECT * FROM trace_runs WHERE id = ? AND organization_id = ?')
+      .get(id, organizationId) as TraceRunRow | undefined;
+    return row ? rowToRun(row) : null;
+  }
+
   /**
    * Paginated list of trace runs for an organization, newest first.
    * Supports filtering by environment, status, and a free-text

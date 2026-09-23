@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { applyMigrations } from '@promptsheon/shared';
 import { RepoRepo } from '../src/repos/repo.js';
 import { BranchRepo } from '../src/repos/branch.js';
@@ -9,12 +11,20 @@ import { MergeRequestRepo } from '../src/repos/mr.js';
 import { registerMergeRequestRoutes } from '../src/routes/mr.js';
 
 function loadMigrations() {
-  return fs.readdirSync('/Users/sachin/repo/promptsheon/packages/shared/db/migrations')
+  const migrationsDir = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '..',
+    '..',
+    'shared',
+    'db',
+    'migrations',
+  );
+  return fs.readdirSync(migrationsDir)
     .filter((f) => f.endsWith('.up.sql'))
     .map((f) => ({
       version: parseInt(f.split('_')[0], 10),
       name: f,
-      up: fs.readFileSync(`/Users/sachin/repo/promptsheon/packages/shared/db/migrations/${f}`, 'utf-8'),
+      up: fs.readFileSync(path.join(migrationsDir, f), 'utf-8'),
     }))
     .filter((m) => m.version !== 0)
     .sort((a, b) => a.version - b.version);

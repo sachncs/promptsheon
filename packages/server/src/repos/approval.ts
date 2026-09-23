@@ -8,6 +8,13 @@ export class ApprovalRepo {
     return this.db.prepare('SELECT * FROM approvals WHERE release_id = ?').get(releaseId) as Approval | null;
   }
 
+  listAll(): Approval[] {
+    const rows = this.db
+      .prepare('SELECT release_id, votes, updated_at FROM approvals ORDER BY updated_at DESC')
+      .all() as Array<{ release_id: string; votes: string; updated_at: string }>;
+    return rows.map((row) => ({ releaseId: row.release_id, votes: row.votes, updatedAt: row.updated_at }));
+  }
+
   upsert(releaseId: string, votes: string): boolean {
     const existing = this.getByReleaseId(releaseId);
     const now = new Date().toISOString();

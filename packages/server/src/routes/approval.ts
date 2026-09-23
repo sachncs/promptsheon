@@ -45,6 +45,10 @@ export function registerApprovalRoutes(
   repo: ApprovalRepo,
   deps: { releaseRepo: ReleaseRepo; manifestRepo: ManifestRepo },
 ) {
+  app.get('/api/approvals/pending', async (_request, reply) => {
+    return reply.send({ approvals: repo.listAll() });
+  });
+
   app.get('/api/approvals/:releaseId', async (request, reply) => {
     const { releaseId } = request.params as { releaseId: string };
     const item = repo.getByReleaseId(releaseId);

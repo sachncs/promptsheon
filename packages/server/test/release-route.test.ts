@@ -4,6 +4,7 @@ import { registerReleaseRoutes } from '../src/routes/release.js';
 import { ManifestRepo } from '../src/repos/manifest.js';
 import { ReleaseRepo } from '../src/repos/release.js';
 import { AuditChain } from '../src/audit/chain.js';
+import { ReleaseOverlayRepo } from '../src/repos/release-overlay.js';
 import { applyMigrations } from '@promptsheon/shared';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -74,7 +75,11 @@ describe('POST /api/releases/:id/rollback', () => {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     });
     await app.register(async (instance) => {
-      await registerReleaseRoutes(instance, repo, { manifestRepo: new ManifestRepo(db), auditChain: new AuditChain(db) });
+      await registerReleaseRoutes(instance, repo, {
+        manifestRepo: new ManifestRepo(db),
+        auditChain: new AuditChain(db),
+        overlayRepo: new ReleaseOverlayRepo(db),
+      });
     });
     await app.ready();
   });
@@ -149,5 +154,29 @@ describe('POST /api/releases/:id/rollback', () => {
     expect(response.statusCode).toBe(200);
     const body = response.json() as { canaryPercent: number };
     expect(body.canaryPercent).toBe(30);
+  });
+
+  it('persists environment overlays and replaces them atomically', async () => {
+    const releaseId = makeRelease(repo, 'cap1', 'prod', 1, 'alice');
+    const first = await app.inject({
+      method: 'PUT',
+      url: `/api/releases/${releaseId}/overlay?environment=staging`,
+      payload: { patch: { timeoutMs: 1000, model: 'fast' } },
+    });
+    expect(first.statusCode).toBe(200);
+
+    const second = await app.inject({
+      method: 'PUT',
+      url: `/api/releases/${releaseId}/overlay?environment=staging`,
+      payload: { patch: { timeoutMs: 2000 } },
+    });
+    expect(second.statusCode).toBe(200);
+
+    const read = await app.inject({
+      method: 'GET',
+      url: `/api/releases/${releaseId}/overlay?environment=staging`,
+    });
+    expect(read.statusCode).toBe(200);
+    expect(read.json()).toMatchObject({ id: releaseId, environment: 'staging', patch: { timeoutMs: 2000 } });
   });
 });

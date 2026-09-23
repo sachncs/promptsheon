@@ -93,10 +93,20 @@ function parseSvid(token: string): { payload: Buffer; signature: Buffer } | null
   const payloadB64 = stripped.slice(0, dot);
   const sigB64 = stripped.slice(dot + 1);
   if (payloadB64.length === 0 || sigB64.length === 0) return null;
+  if (!/^[A-Za-z0-9_-]+$/.test(payloadB64) || !/^[A-Za-z0-9_-]+$/.test(sigB64)) return null;
   try {
+    const payload = Buffer.from(payloadB64, 'base64url');
+    const signature = Buffer.from(sigB64, 'base64url');
+    // Reject alternate encodings and malformed Ed25519 signatures. Without
+    // canonical checks, changing ignored base64 padding bits can decode to the
+    // original bytes and appear to be a successful tamper.
+    if (payload.toString('base64url') !== payloadB64 || signature.toString('base64url') !== sigB64) {
+      return null;
+    }
+    if (signature.length !== 64) return null;
     return {
-      payload: Buffer.from(payloadB64, 'base64url'),
-      signature: Buffer.from(sigB64, 'base64url'),
+      payload,
+      signature,
     };
   } catch {
     return null;

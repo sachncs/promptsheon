@@ -16,6 +16,33 @@ export class ApiKeyRepo extends BaseRepo<ApiKey> {
       .all(userId) as ApiKey[];
   }
 
+  listForOrg(organizationId: string): ApiKey[] {
+    return this.db
+      .prepare(
+        `SELECT k.* FROM api_keys k
+         JOIN org_members m ON m.user_id = k.user_id
+         WHERE m.org_id = ? ORDER BY k.created_at ASC`,
+      )
+      .all(organizationId) as ApiKey[];
+  }
+
+  userBelongsToOrg(userId: string, organizationId: string): boolean {
+    const row = this.db
+      .prepare('SELECT 1 AS present FROM org_members WHERE user_id = ? AND org_id = ?')
+      .get(userId, organizationId) as { present: number } | undefined;
+    return row !== undefined;
+  }
+
+  revokeInOrg(id: string, organizationId: string): boolean {
+    const result = this.db
+      .prepare(
+        `UPDATE api_keys SET revoked = 1
+         WHERE id = ? AND user_id IN (SELECT user_id FROM org_members WHERE org_id = ?)`,
+      )
+      .run(id, organizationId);
+    return result.changes > 0;
+  }
+
   create(data: { userId: string; name: string; keyHash: string; keyPrefix: string; role: string; expiresAt?: string }): ApiKey {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();

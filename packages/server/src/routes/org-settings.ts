@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { parseBody } from './validate.js';
 import type { OrgSettingsRepo } from '../repos/org-settings.js';
 import type { VaultRepo } from '../repos/vault.js';
+import { assertOrgScope } from '../middleware/org-context.js';
 
 const SettingsSchema = z.object({
   residency: z.enum(['local', 'us', 'eu', 'ap', 'sa', 'me', 'af']).optional(),
@@ -22,6 +23,7 @@ export function registerOrgSettingsRoutes(
 ): void {
   app.get('/api/orgs/:id/settings', async (request, reply) => {
     const { id } = request.params as { id: string };
+    if (!assertOrgScope(request, id, reply)) return;
     const settings = deps.orgSettingsRepo.get(id);
     if (!settings) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'org not found' } });
     return reply.send(settings);
@@ -29,6 +31,7 @@ export function registerOrgSettingsRoutes(
 
   app.patch('/api/orgs/:id/settings', async (request, reply) => {
     const { id } = request.params as { id: string };
+    if (!assertOrgScope(request, id, reply)) return;
     if (!deps.adminOnly(request)) {
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
     }

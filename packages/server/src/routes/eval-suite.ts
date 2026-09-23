@@ -103,24 +103,6 @@ export interface EvalSuiteRouteDeps {
   humanReviewRepo: HumanReviewRepo;
 }
 
-interface RunSummary {
-  runId: string;
-  suiteId: string;
-  suiteVersionId: string;
-  passThreshold: number;
-  passAtK: number;
-  rawScore: number;
-  passed: boolean;
-  borderlineCount: number;
-  gradedAt: string;
-}
-
-/**
- * Per-process cache for in-flight runs so the gate endpoint can
- * reuse the latest score without a database roundtrip.
- */
-const runCache = new Map<string, RunSummary>();
-
 export function registerEvalSuiteRoutes(
   app: FastifyInstance,
   deps: EvalSuiteRouteDeps,
@@ -224,7 +206,7 @@ export function registerEvalSuiteRoutes(
     }
 
     const runId = `run-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const summary: RunSummary = {
+    const summary = {
       runId,
       suiteId: suite.id,
       suiteVersionId: version.id,
@@ -235,7 +217,6 @@ export function registerEvalSuiteRoutes(
       borderlineCount: borderlineBand,
       gradedAt: new Date().toISOString(),
     };
-    runCache.set(runId, summary);
     return reply.code(201).send({ ...summary, results: graded });
   });
 

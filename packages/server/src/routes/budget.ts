@@ -32,6 +32,23 @@ export interface BudgetDeps {
   forecastService: CostForecastService;
 }
 
+function activeOrg(request: { orgContext?: { orgId?: string }; agentOrgId?: string }): string | undefined {
+  return request.orgContext?.orgId ?? request.agentOrgId;
+}
+
+function assertOrgScope(
+  request: { orgContext?: { orgId?: string }; agentOrgId?: string },
+  requestedOrgId: string,
+  reply: { code: (status: number) => { send: (body: unknown) => unknown } },
+): boolean {
+  const current = activeOrg(request);
+  if (current && current !== requestedOrgId) {
+    void reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
+    return false;
+  }
+  return true;
+}
+
 export function registerBudgetRoutes(app: FastifyInstance, deps: BudgetDeps): void {
   /**
    * List the org's budgets.
@@ -41,12 +58,14 @@ export function registerBudgetRoutes(app: FastifyInstance, deps: BudgetDeps): vo
     if (!orgId) {
       return reply.code(400).send({ error: { code: 'MISSING_ORG', message: 'organizationId required' } });
     }
+    if (!assertOrgScope(request, orgId, reply)) return;
     return reply.send({ items: deps.budgetRepo.listForOrg(orgId) });
   });
 
   app.post('/api/admin/budgets', async (request, reply) => {
     const parsed = parseBody(reply, CreateBudgetSchema, request.body);
     if (!parsed.ok) return;
+    if (!assertOrgScope(request, parsed.data.organizationId, reply)) return;
     try {
       const created = deps.budgetRepo.create(parsed.data);
       return reply.code(201).send(created);
@@ -70,6 +89,9 @@ export function registerBudgetRoutes(app: FastifyInstance, deps: BudgetDeps): vo
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, UpdateBudgetSchema, request.body);
     if (!parsed.ok) return;
+    const existing = deps.budgetRepo.findById(id);
+    if (!existing) throw new NotFoundError('budget', id);
+    if (!assertOrgScope(request, existing.organizationId, reply)) return;
     const updated = deps.budgetRepo.update(id, parsed.data);
     if (!updated) {
       throw new NotFoundError('budget', id);
@@ -79,6 +101,9 @@ export function registerBudgetRoutes(app: FastifyInstance, deps: BudgetDeps): vo
 
   app.delete('/api/admin/budgets/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const existing = deps.budgetRepo.findById(id);
+    if (!existing) throw new NotFoundError('budget', id);
+    if (!assertOrgScope(request, existing.organizationId, reply)) return;
     if (!deps.budgetRepo.delete(id)) {
       throw new NotFoundError('budget', id);
     }
@@ -93,6 +118,7 @@ export function registerBudgetRoutes(app: FastifyInstance, deps: BudgetDeps): vo
   app.get('/api/admin/cost-forecast', async (request, reply) => {
     const parsed = parseQuery(reply, ForecastQuerySchema, request.query);
     if (!parsed.ok) return;
+    if (!assertOrgScope(request, parsed.data.organizationId, reply)) return;
     const result = deps.forecastService.compute(parsed.data.organizationId, {
       windowDays: parsed.data.windowDays,
     });

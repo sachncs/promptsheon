@@ -80,9 +80,24 @@ function principalType(p: Principal): string {
 }
 
 function extractPrincipal(request: FastifyRequest): Principal | null {
+  if (request.principal) return request.principal;
+  if (request.userId) {
+    const orgId = request.agentOrgId ?? request.orgContext?.orgId ?? headerValue(request, 'x-org-id') ?? 'unscoped';
+    return {
+      type: 'User',
+      id: request.userId,
+      orgId,
+      role: request.orgContext?.role ?? request.userRole ?? 'viewer',
+    };
+  }
   const headers = request.headers as Record<string, string | undefined>;
   const principal = principalFromRequest(headers);
   return applySystemActorOverride(principal);
+}
+
+function headerValue(request: FastifyRequest, name: string): string | undefined {
+  const value = request.headers[name];
+  return Array.isArray(value) ? value[0] : value;
 }
 
 let defaultAuthorizer: CedarAuthorizer | null = null;
@@ -115,6 +130,6 @@ export function installDefaultAuthorizer(authorizer: CedarAuthorizer): void {
  * line; the Cedar policy does the actual authz.
  */
 export function cedarContextFromRequest(request: FastifyRequest): CedarContext | null {
-  const ctx = (request as unknown as { orgContext?: CedarContext }).orgContext;
+  const ctx = request.orgContext;
   return ctx ?? null;
 }

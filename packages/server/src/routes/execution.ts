@@ -44,6 +44,10 @@ function hashInputs(inputs: Record<string, unknown>): string {
   return createHash('sha256').update(JSON.stringify(inputs)).digest('hex');
 }
 
+function organizationIdOf(request: { orgContext?: { orgId?: string }; agentOrgId?: string }): string {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? 'unscoped';
+}
+
 export function registerExecutionRoutes(
   app: FastifyInstance,
   deps: {
@@ -109,7 +113,7 @@ export function registerExecutionRoutes(
     }
 
     const traceRun = deps.traceRepo.startRun({
-      organizationId: 'unscoped',
+      organizationId: organizationIdOf(request),
       executionId,
       environment,
       name: `manifest:${manifestHash.slice(0, 12)}`,

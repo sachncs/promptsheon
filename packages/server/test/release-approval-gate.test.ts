@@ -4,6 +4,7 @@ import { registerReleaseRoutes, approvalGate } from '../src/routes/release.js';
 import { ReleaseRepo } from '../src/repos/release.js';
 import { ManifestRepo } from '../src/repos/manifest.js';
 import { AuditChain } from '../src/audit/chain.js';
+import { ReleaseOverlayRepo } from '../src/repos/release-overlay.js';
 import { applyMigrations } from '@promptsheon/shared';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -80,7 +81,11 @@ describe('PUT /api/releases/:id/activate (approval gate)', () => {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     });
     await app.register(async (instance) => {
-      await registerReleaseRoutes(instance, releaseRepo, { manifestRepo, auditChain: new AuditChain(db) });
+      await registerReleaseRoutes(instance, releaseRepo, {
+        manifestRepo,
+        auditChain: new AuditChain(db),
+        overlayRepo: new ReleaseOverlayRepo(db),
+      });
     });
     await app.ready();
   });

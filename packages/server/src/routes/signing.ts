@@ -27,6 +27,10 @@ export interface SigningDeps {
   signingKeyRepo: SigningKeyRepo;
 }
 
+function organizationIdOf(request: { orgContext?: { orgId?: string }; agentOrgId?: string }): string | undefined {
+  return request.orgContext?.orgId ?? request.agentOrgId;
+}
+
 /** Canonical payload the operator signs for a commit. */
 export function signPayload(input: {
   commitOid: string;
@@ -70,6 +74,10 @@ function loadPublicKey(pem: string): KeyObject {
 export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): void {
   app.get('/api/orgs/:id/signing-keys', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const organizationId = organizationIdOf(request);
+    if (organizationId && organizationId !== id) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
+    }
     return reply.send(deps.signingKeyRepo.list(id));
   });
   registerRouteDoc({
@@ -81,6 +89,10 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
 
   app.post('/api/orgs/:id/signing-keys', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const organizationId = organizationIdOf(request);
+    if (organizationId && organizationId !== id) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
+    }
     const parsed = parseBody(reply, UploadKeySchema, request.body);
     if (!parsed.ok) return;
     if (parsed.data.organizationId !== id) {
@@ -109,8 +121,14 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
   });
 
   app.delete('/api/orgs/:id/signing-keys/:keyId', async (request, reply) => {
-    const { keyId } = request.params as { keyId: string };
-    const updated = deps.signingKeyRepo.deactivate(keyId);
+    const { id, keyId } = request.params as { id: string; keyId: string };
+    const organizationId = organizationIdOf(request);
+    if (organizationId && organizationId !== id) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
+    }
+    const updated = organizationId
+      ? deps.signingKeyRepo.deactivateInOrg(keyId, organizationId)
+      : deps.signingKeyRepo.deactivate(keyId);
     if (!updated) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'signing key not found' } });
     return reply.send(updated);
   });
@@ -130,6 +148,13 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
     const key = deps.signingKeyRepo.findById(parsed.data.keyId);
     if (!key || key.deactivatedAt) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'signing key not found' } });
+    }
+    const organizationId = organizationIdOf(request);
+    if (organizationId && key.organizationId !== organizationId) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'signing key not found' } });
+    }
+    if (!deps.repoRepo.findByIdInOrg(commit.repositoryId, key.organizationId)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'commit not found' } });
     }
     const userId = (request as unknown as { userId?: string }).userId ?? 'system';
     const timestamp = new Date().toISOString();
@@ -171,6 +196,9 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
     const key = deps.signingKeyRepo.findById(commit.signedKeyId);
     if (!key || key.deactivatedAt) {
       return reply.send({ valid: false, reason: 'key_deactivated' });
+    }
+    if (!deps.repoRepo.findByIdInOrg(commit.repositoryId, key.organizationId)) {
+      return reply.send({ valid: false, reason: 'key_scope_mismatch' });
     }
     const msg = signedMessage({
       commitOid: oid,

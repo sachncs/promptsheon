@@ -63,9 +63,9 @@ export function verifyPrincipal(input: VerifyPrincipalInput): IdentityResolution
       };
       return { kind: 'apikey', principal, scope: input.apikey.scope };
     }
-    // Bearer token didn't match the stored apikey — fall through
-    // to header-based extraction (legacy X-User-Id path).
-    return resolveFromHeaders(input);
+    // An explicitly supplied credential must not downgrade to an
+    // unauthenticated header identity when verification fails.
+    return null;
   }
   if (auth.startsWith('SVID ')) {
     const token = auth.slice('SVID '.length);
@@ -83,7 +83,7 @@ export function verifyPrincipal(input: VerifyPrincipalInput): IdentityResolution
     }
     return null;
   }
-  return resolveFromHeaders(input);
+  return null;
 }
 
 function resolveFromHeaders(input: VerifyPrincipalInput): IdentityResolution | null {

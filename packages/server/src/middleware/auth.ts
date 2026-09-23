@@ -3,6 +3,17 @@ import { createHash } from 'node:crypto';
 import type { AppConfig } from '@promptsheon/shared';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 import { verifySVID } from '../identity/svid.js';
+import type { Principal } from '../policy/principal.js';
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    userId?: string;
+    userRole?: string;
+    agentOrgId?: string;
+    agentClassification?: string;
+    principal?: Principal;
+  }
+}
 
 const BOOTSTRAP_PREFIX = '/api/bootstrap/';
 const PUBLIC_PATHS = new Set([
@@ -47,22 +58,22 @@ export function authMiddleware(
   const svidPublicKeyPem = opts.svidPublicKeyPem ?? process.env['PROMPTSHEON_SVID_PUBLIC_KEY_PEM'];
   return async (request: FastifyRequest, reply: FastifyReply) => {
     if (request.url.startsWith(BOOTSTRAP_PREFIX)) {
-      (request as unknown as Record<string, string>).userId = 'bootstrap';
-      (request as unknown as { orgContextBypass?: boolean }).orgContextBypass = true;
+      request.userId = 'bootstrap';
+      request.orgContextBypass = true;
       return;
     }
     if (PUBLIC_PATHS.has(request.url.split('?')[0] ?? '')) {
-      (request as unknown as Record<string, string>).userId = 'public';
-      (request as unknown as { orgContextBypass?: boolean }).orgContextBypass = true;
+      request.userId = 'public';
+      request.orgContextBypass = true;
       return;
     }
 
     if (!config.auth.enabled) {
       const headerUser = request.headers['x-user-id'];
       if (typeof headerUser === 'string' && headerUser.length > 0) {
-        (request as unknown as Record<string, string>).userId = headerUser;
+        request.userId = headerUser;
       } else {
-        (request as unknown as Record<string, string>).userId = 'api';
+        request.userId = 'api';
       }
       return;
     }
@@ -82,8 +93,8 @@ export function authMiddleware(
           return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'API key expired' } });
         }
 
-        (request as unknown as Record<string, string>).userId = apiKey.userId;
-        (request as unknown as Record<string, string>).userRole = apiKey.role;
+        request.userId = apiKey.userId;
+        request.userRole = apiKey.role;
         void apiKeyRepo.updateLastUsed(apiKey.id);
         return;
       }
@@ -104,11 +115,11 @@ export function authMiddleware(
             error: { code: 'INVALID_SVID', message: 'SVID failed signature or freshness check' },
           });
         }
-        (request as unknown as Record<string, string>).userId = v.payload.sub;
-        (request as unknown as Record<string, string>).agentOrgId = v.payload.org;
-        (request as unknown as Record<string, string>).agentClassification = v.payload.cls;
-        (request as unknown as { orgContextBypass?: boolean }).orgContextBypass = true;
-        (request as unknown as { principal?: unknown }).principal = {
+        request.userId = v.payload.sub;
+        request.agentOrgId = v.payload.org;
+        request.agentClassification = v.payload.cls;
+        request.orgContextBypass = true;
+        request.principal = {
           type: 'Agent',
           id: v.payload.sub,
           orgId: v.payload.org,

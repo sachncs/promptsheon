@@ -4,25 +4,17 @@ import { randomUUID } from 'node:crypto';
 import { parseBody } from './validate.js';
 import type { AuditChain } from '../audit/chain.js';
 import { requireAdmin } from '../middleware/admin.js';
+import { OutgoingWebhookRepo, type OutgoingWebhookRecord } from '../repos/outgoing-webhook.js';
 
 /**
  * Outgoing-webhook subscription store. The frontend `/app/webhooks` page
  * exposes a CRUD UI; today every request 404s because the backend only
  * registers /api/webhooks/incoming/:id for receiver-side signature
  * verification. This file closes that gap with a small in-memory
- * registry; production v2 would back this with a `webhooks` table.
+ * registry used only by isolated route tests. Production wiring uses the
+ * SQLite-backed OutgoingWebhookRepo.
  */
-export interface OutgoingWebhook {
-  id: string;
-  organizationId: string;
-  label: string;
-  url: string;
-  events: string[];
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-}
+export type OutgoingWebhook = OutgoingWebhookRecord;
 
 const HttpUrl = z
   .string()
@@ -50,8 +42,9 @@ export class WebhookCrudStore {
     return Array.from(this.items.values()).filter((w) => w.organizationId === orgId);
   }
 
-  get(id: string): OutgoingWebhook | null {
-    return this.items.get(id) ?? null;
+  get(id: string, organizationId?: string): OutgoingWebhook | null {
+    const item = this.items.get(id);
+    return item && (!organizationId || item.organizationId === organizationId) ? item : null;
   }
 
   create(data: Omit<OutgoingWebhook, 'id' | 'createdAt' | 'updatedAt'>): OutgoingWebhook {
@@ -66,8 +59,8 @@ export class WebhookCrudStore {
     return item;
   }
 
-  update(id: string, data: Partial<Pick<OutgoingWebhook, 'url' | 'events' | 'active'>>): OutgoingWebhook | null {
-    const existing = this.items.get(id);
+  update(id: string, organizationId: string, data: Partial<Pick<OutgoingWebhook, 'url' | 'events' | 'active'>>): OutgoingWebhook | null {
+    const existing = this.get(id, organizationId);
     if (!existing) return null;
     const updated: OutgoingWebhook = {
       ...existing,
@@ -78,14 +71,18 @@ export class WebhookCrudStore {
     return updated;
   }
 
-  delete(id: string): boolean {
-    return this.items.delete(id);
+  delete(id: string, organizationId: string): boolean {
+    const existing = this.get(id, organizationId);
+    return existing ? this.items.delete(id) : false;
   }
 }
 
+type WebhookStore = Pick<OutgoingWebhookRepo, 'listByOrg' | 'create' | 'update' | 'delete'>;
+
 interface RequestUserContext {
   userId?: string;
-  orgContext?: { organizationId?: string; role?: string };
+  agentOrgId?: string;
+  orgContext?: { organizationId?: string; orgId?: string; role?: string };
 }
 
 function actorOf(request: unknown): string {
@@ -95,14 +92,14 @@ function actorOf(request: unknown): string {
 
 function orgOf(request: unknown): string | null {
   const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.organizationId ?? null;
+  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
 }
 
 export function registerWebhookCrudRoutes(
   app: FastifyInstance,
-  deps: { auditChain: AuditChain; store?: WebhookCrudStore },
-): { store: WebhookCrudStore } {
-  const store = deps.store ?? new WebhookCrudStore();
+  deps: { auditChain: AuditChain; repo?: OutgoingWebhookRepo; store?: WebhookCrudStore },
+): { store: WebhookStore } {
+  const store: WebhookStore = deps.repo ?? deps.store ?? new WebhookCrudStore();
 
   app.get('/api/webhooks', { preHandler: requireAdmin() }, async (request, reply) => {
     const orgId = orgOf(request);
@@ -117,6 +114,13 @@ export function registerWebhookCrudRoutes(
   app.post('/api/webhooks', { preHandler: requireAdmin() }, async (request, reply) => {
     const parsed = parseBody(reply, CreateWebhookSchema, request.body);
     if (!parsed.ok) return;
+    const orgId = orgOf(request);
+    if (!orgId) {
+      return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    }
+    if (parsed.data.organizationId !== orgId) {
+      return reply.code(403).send({ error: { code: 'ORG_MISMATCH', message: 'organization does not match request context' } });
+    }
     const item = store.create({ ...parsed.data, active: true, createdBy: actorOf(request) });
     deps.auditChain.append({
       userId: actorOf(request),
@@ -130,10 +134,12 @@ export function registerWebhookCrudRoutes(
   });
 
   app.put('/api/webhooks/:id', { preHandler: requireAdmin() }, async (request, reply) => {
+    const orgId = orgOf(request);
+    if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, UpdateWebhookSchema, request.body);
     if (!parsed.ok) return;
-    const updated = store.update(id, parsed.data);
+    const updated = store.update(id, orgId, parsed.data);
     if (!updated) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'webhook not found' } });
     }
@@ -149,8 +155,10 @@ export function registerWebhookCrudRoutes(
   });
 
   app.delete('/api/webhooks/:id', { preHandler: requireAdmin() }, async (request, reply) => {
+    const orgId = orgOf(request);
+    if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     const { id } = request.params as { id: string };
-    const removed = store.delete(id);
+    const removed = store.delete(id, orgId);
     if (!removed) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'webhook not found' } });
     }

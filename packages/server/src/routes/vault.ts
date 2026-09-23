@@ -45,6 +45,23 @@ export interface VaultRouteDeps {
   adminOnly: (request: unknown) => boolean;
 }
 
+function activeOrg(request: { orgContext?: { orgId?: string }; agentOrgId?: string }): string | undefined {
+  return request.orgContext?.orgId ?? request.agentOrgId;
+}
+
+function assertOrgScope(
+  request: { orgContext?: { orgId?: string }; agentOrgId?: string },
+  requestedOrgId: string,
+  reply: { code: (status: number) => { send: (body: unknown) => unknown } },
+): boolean {
+  const current = activeOrg(request);
+  if (current && current !== requestedOrgId) {
+    void reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
+    return false;
+  }
+  return true;
+}
+
 function actorOf(request: unknown): string {
   const ctx = (request as { userId?: string } | undefined) ?? {};
   return ctx.userId ?? 'system';
@@ -77,6 +94,7 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
     if (!organizationId) {
       return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'organizationId required' } });
     }
+    if (!assertOrgScope(request, organizationId, reply)) return;
     return reply.send(deps.vaultRepo.list(organizationId));
   });
 
@@ -86,6 +104,7 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
     }
     const parsed = parseBody(reply, VaultSetSchema, request.body);
     if (!parsed.ok) return;
+    if (!assertOrgScope(request, parsed.data.organizationId, reply)) return;
     const created = deps.vaultRepo.set(
       parsed.data.organizationId,
       parsed.data.name,
@@ -127,6 +146,7 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
     }
     const { id } = request.params as { id: string };
+    if (!assertOrgScope(request, id, reply)) return;
     const exp = await deps.orgExportService.exportAll(id, actorOf(request));
     deps.orgExportService.recordExport(exp);
     return reply.code(202).send(exp);
@@ -137,6 +157,7 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
     }
     const { id } = request.params as { id: string };
+    if (!assertOrgScope(request, id, reply)) return;
     const result = deps.orgExportService.schedulePurge(id, actorOf(request));
     return reply.send(result);
   });
@@ -160,6 +181,7 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
   app.get('/api/analytics/cost', async (request, reply) => {
     const parsed = parseQuerySchema(reply, request.query);
     if (!parsed.ok) return;
+    if (!assertOrgScope(request, parsed.data.organizationId, reply)) return;
     return reply.send(deps.costRollupRepo.rollupsForOrg(parsed.data.organizationId, parsed.data.days ?? 30));
   });
 

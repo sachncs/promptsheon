@@ -56,6 +56,27 @@ export class RepoRepo extends BaseRepo<Repository> {
     return row ? toRepository(row) : null;
   }
 
+  /** Return a repository only when its workspace belongs to the organization. */
+  findByIdInOrg(id: string, organizationId: string): Repository | null {
+    const row = this.db
+      .prepare(
+        `SELECT r.*
+           FROM repositories r
+           JOIN workspaces w ON w.id = r.workspace_id
+          WHERE r.id = ? AND w.org_id = ?`,
+      )
+      .get(id, organizationId) as RepositoryRow | undefined;
+    return row ? toRepository(row) : null;
+  }
+
+  /** Return whether a workspace belongs to the organization. */
+  workspaceBelongsToOrg(workspaceId: string, organizationId: string): boolean {
+    const row = this.db
+      .prepare('SELECT 1 AS present FROM workspaces WHERE id = ? AND org_id = ?')
+      .get(workspaceId, organizationId) as { present: number } | undefined;
+    return row !== undefined;
+  }
+
   create(input: RepositoryCreateInput): Repository {
     const id = randomUUID();
     const now = new Date().toISOString();

@@ -11,6 +11,7 @@ import {
   type OutgoingWebhook,
 } from '../src/routes/webhooks-crud.js';
 import { AuditChain } from '../src/audit/chain.js';
+import { OutgoingWebhookRepo } from '../src/repos/outgoing-webhook.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(__dirname, '..', '..', 'shared', 'db', 'migrations');
@@ -77,6 +78,20 @@ describe('POST /api/webhooks', () => {
       payload: { organizationId: ORG_A, label: 'gh', url: 'ftp://x', events: ['push'] },
     });
     expect(res.statusCode).toBe(422);
+  });
+
+  it('rejects a webhook created for a different organization', async () => {
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/webhooks',
+      payload: {
+        organizationId: ORG_B,
+        label: 'cross-tenant',
+        url: 'https://example.com/hook',
+        events: ['push'],
+      },
+    });
+    expect(res.statusCode).toBe(403);
   });
 
   it('creates with defaults active=true and an id, then lists', async () => {
@@ -201,4 +216,45 @@ describe('org scoping', () => {
     const body = listB.json() as { webhooks: unknown[] };
     expect(body.webhooks).toHaveLength(0);
   });
+});
+
+it('persists subscriptions through the repository across route registrations', async () => {
+  const db = openDb();
+  const auditChain = new AuditChain(db);
+  const repo = new OutgoingWebhookRepo(db);
+  const appA = Fastify();
+  appA.addHook('preHandler', (req, _reply, done) => {
+    (req as Record<string, unknown>)['userId'] = 'u-test';
+    (req as Record<string, unknown>)['orgContext'] = { organizationId: ORG_A, role: 'admin' };
+    done();
+  });
+  registerWebhookCrudRoutes(appA, { auditChain, repo });
+  await appA.ready();
+
+  const created = await appA.inject({
+    method: 'POST',
+    url: '/api/webhooks',
+    payload: {
+      organizationId: ORG_A,
+      label: 'durable',
+      url: 'https://example.com/durable',
+      events: ['release.activated'],
+    },
+  });
+  expect(created.statusCode).toBe(201);
+  await appA.close();
+
+  const appB = Fastify();
+  appB.addHook('preHandler', (req, _reply, done) => {
+    (req as Record<string, unknown>)['userId'] = 'u-test';
+    (req as Record<string, unknown>)['orgContext'] = { organizationId: ORG_A, role: 'admin' };
+    done();
+  });
+  registerWebhookCrudRoutes(appB, { auditChain, repo });
+  await appB.ready();
+  const listed = await appB.inject({ method: 'GET', url: '/api/webhooks' });
+  expect(listed.statusCode).toBe(200);
+  expect((listed.json() as { webhooks: OutgoingWebhook[] }).webhooks[0]?.label).toBe('durable');
+  await appB.close();
+  db.close();
 });

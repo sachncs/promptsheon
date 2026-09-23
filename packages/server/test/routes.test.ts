@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import Database from 'better-sqlite3';
 import { runMigrations } from '../src/db/index.js';
 import { WorkspaceRepo } from '../src/repos/workspace.js';
+import { WorkspaceService } from '../src/application/workspace-service.js';
 import { registerWorkspaceRoutes } from '../src/routes/workspace.js';
 import { registerHealthRoutes } from '../src/routes/health.js';
 
@@ -17,7 +18,7 @@ describe('Fastify routes', () => {
 
     app = Fastify({ logger: false });
     const workspaceRepo = new WorkspaceRepo(db);
-    registerWorkspaceRoutes(app, workspaceRepo);
+    registerWorkspaceRoutes(app, new WorkspaceService(workspaceRepo));
     registerHealthRoutes(app, db);
     await app.ready();
   });
@@ -73,5 +74,20 @@ describe('Fastify routes', () => {
       url: '/api/workspaces/00000000-0000-0000-0000-000000000000',
     });
     expect(res.statusCode).toBe(404);
+  });
+
+  it('rejects malformed workspace ids before querying the repository', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/workspaces/not-a-uuid' });
+    expect(res.statusCode).toBe(422);
+    expect(res.json<{ error: { code: string } }>().error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 404 when deleting a workspace that does not exist', async () => {
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/api/workspaces/00000000-0000-0000-0000-000000000000',
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json<{ error: { code: string } }>().error.code).toBe('NOT_FOUND');
   });
 });

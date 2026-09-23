@@ -25,10 +25,39 @@ export class UserRepo {
     return rows.map(this.toUser);
   }
 
+  listForOrg(organizationId: string): User[] {
+    const rows = this.db
+      .prepare(
+        `SELECT u.* FROM users u
+         JOIN org_members m ON m.user_id = u.id
+         WHERE m.org_id = ? ORDER BY u.created_at ASC`,
+      )
+      .all(organizationId) as UserRow[];
+    return rows.map(this.toUser);
+  }
+
   findById(id: string): User | null {
     const row = this.db
       .prepare('SELECT * FROM users WHERE id = ?')
       .get(id) as UserRow | undefined;
+    return row ? this.toUser(row) : null;
+  }
+
+  findByEmail(email: string): User | null {
+    const row = this.db
+      .prepare('SELECT * FROM users WHERE lower(email) = lower(?)')
+      .get(email) as UserRow | undefined;
+    return row ? this.toUser(row) : null;
+  }
+
+  findByIdInOrg(id: string, organizationId: string): User | null {
+    const row = this.db
+      .prepare(
+        `SELECT u.* FROM users u
+         JOIN org_members m ON m.user_id = u.id
+         WHERE u.id = ? AND m.org_id = ?`,
+      )
+      .get(id, organizationId) as UserRow | undefined;
     return row ? this.toUser(row) : null;
   }
 

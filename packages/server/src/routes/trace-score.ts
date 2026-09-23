@@ -15,14 +15,20 @@ const ListScoresQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+const SummaryQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(90).default(7),
+  evaluator: z.string().min(1).max(120).optional(),
+});
+
 interface RequestUserContext {
   userId?: string;
-  orgContext?: { organizationId?: string };
+  agentOrgId?: string;
+  orgContext?: { organizationId?: string; orgId?: string };
 }
 
 function orgOf(request: unknown): string | null {
   const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.organizationId ?? null;
+  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
 }
 
 /**
@@ -42,7 +48,11 @@ export function registerTraceScoreRoutes(
 ) {
   app.get('/api/traces/:id/scores', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const run = deps.traceRepo.findById(id);
+    const orgId = orgOf(request);
+    if (!orgId) {
+      return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    }
+    const run = deps.traceRepo.findByIdInOrg(id, orgId);
     if (!run) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'trace_run not found' } });
     const parsed = parseQuery(reply, ListScoresQuerySchema, request.query);
     if (!parsed.ok) return;
@@ -52,6 +62,13 @@ export function registerTraceScoreRoutes(
 
   app.post('/api/traces/:id/auto-eval', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const orgId = orgOf(request);
+    if (!orgId) {
+      return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    }
+    if (!deps.traceRepo.findByIdInOrg(id, orgId)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'trace_run not found' } });
+    }
     const parsed = parseBody(reply, RunAutoEvalSchema, request.body ?? {});
     if (!parsed.ok) return;
     try {
@@ -71,10 +88,11 @@ export function registerTraceScoreRoutes(
         .code(401)
         .send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     }
-    const days = Number((request.query as { days?: string }).days ?? '7');
-    const evaluator = (request.query as { evaluator?: string }).evaluator;
+    const parsed = parseQuery(reply, SummaryQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { days, evaluator } = parsed.data;
     const out = deps.scoreRepo.summaryByOrg(orgId, {
-      days: Math.min(Math.max(days, 1), 90),
+      days,
       ...(evaluator ? { evaluator } : {}),
     });
     return reply.send({ orgId, days, ...out });

@@ -7,6 +7,7 @@ import {
   type ReleaseStatus,
 } from '@promptsheon/shared';
 import type { ReleaseRepo } from '../repos/release.js';
+import type { ReleaseOverlayRepo } from '../repos/release-overlay.js';
 import { ManifestRepo } from '../repos/manifest.js';
 import { parseBody, parseQuery } from './validate.js';
 import { AuditChain } from '../audit/chain.js';
@@ -102,7 +103,7 @@ export function selectByCanary(
 export function registerReleaseRoutes(
   app: FastifyInstance,
   repo: ReleaseRepo,
-  deps: { manifestRepo: ManifestRepo; auditChain: AuditChain },
+  deps: { manifestRepo: ManifestRepo; auditChain: AuditChain; overlayRepo: ReleaseOverlayRepo },
 ) {
   app.get('/api/releases', async (request, reply) => {
     const parsed = parseQuery(reply, ListQuerySchema, request.query);
@@ -245,11 +246,6 @@ export function registerReleaseRoutes(
     return reply.send(item);
   });
 
-  // Overlay: per-environment patch applied at the evaluation /
-  // execution boundary. Persistence is in-memory keyed off releaseId
-  // + environment so the value survives restart.
-  const overlayStore = new Map<string, Record<string, unknown>>();
-
   app.put('/api/releases/:id/overlay', async (request, reply) => {
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, OverlaySchema, request.body);
@@ -258,8 +254,8 @@ export function registerReleaseRoutes(
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
     }
     const env = (request.query as { environment?: string }).environment ?? 'prod';
-    overlayStore.set(`${id}:${env}`, parsed.data.patch);
-    return reply.send({ id, environment: env, patch: parsed.data.patch });
+    const overlay = deps.overlayRepo.upsert(id, env, parsed.data.patch);
+    return reply.send({ id: overlay.releaseId, environment: overlay.environment, patch: overlay.patch });
   });
 
   app.get('/api/releases/:id/overlay', async (request, reply) => {
@@ -268,7 +264,7 @@ export function registerReleaseRoutes(
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
     }
     const env = (request.query as { environment?: string }).environment ?? 'prod';
-    return reply.send({ id, environment: env, patch: overlayStore.get(`${id}:${env}`) ?? {} });
+    return reply.send({ id, environment: env, patch: deps.overlayRepo.get(id, env)?.patch ?? {} });
   });
 
   app.put('/api/releases/:id/canary-rule', async (request, reply) => {
