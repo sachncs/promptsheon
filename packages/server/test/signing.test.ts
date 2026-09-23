@@ -7,7 +7,8 @@ import {
   sign,
   verify,
 } from 'node:crypto';
-import { fingerprintSpki, generateEd25519KeyPair } from '../src/repos/signing-key.js';
+import Database from 'better-sqlite3';
+import { SigningKeyRepo, fingerprintSpki, generateEd25519KeyPair } from '../src/repos/signing-key.js';
 import { signPayload, signedMessage } from '../src/routes/signing.js';
 
 function signEd(privateKeyPem: string, msg: Buffer): Buffer {
@@ -114,5 +115,43 @@ describe('operator-managed signing keys', () => {
     expect(f1).toBe(f2);
     // SHA-256 hex digest is 64 characters.
     expect(f1.length).toBe(64);
+  });
+
+  it('only resolves signing keys inside the requested organization', () => {
+    const db = new Database(':memory:');
+    db.exec(`
+      CREATE TABLE signing_keys (
+        id TEXT PRIMARY KEY,
+        organization_id TEXT NOT NULL,
+        label TEXT NOT NULL,
+        fingerprint TEXT NOT NULL,
+        public_key_pem TEXT NOT NULL,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        deactivated_at TEXT
+      )
+    `);
+
+    const repo = new SigningKeyRepo(db);
+    const first = generateEd25519KeyPair();
+    const second = generateEd25519KeyPair();
+    const key = repo.create({
+      organizationId: 'org-a',
+      label: 'a',
+      publicKeyPem: first.publicKeyPem,
+      createdBy: 'user-a',
+    });
+    repo.create({
+      organizationId: 'org-b',
+      label: 'b',
+      publicKeyPem: second.publicKeyPem,
+      createdBy: 'user-b',
+    });
+
+    expect(repo.findByIdInOrg(key.id, 'org-a')?.organizationId).toBe('org-a');
+    expect(repo.findByIdInOrg(key.id, 'org-b')).toBeNull();
+    expect(repo.list('org-a')).toHaveLength(1);
+    expect(repo.list('org-b')).toHaveLength(1);
+    db.close();
   });
 });

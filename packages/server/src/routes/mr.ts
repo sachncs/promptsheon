@@ -165,7 +165,9 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
     }
     const approvals = deps.mrRepo.listApprovals(id).filter((a) => a.decision === 'approve');
-    const repo = deps.repoRepo.findById(mr.repositoryId);
+    const repo = request.orgContext?.orgId
+      ? deps.repoRepo.findByIdInOrg(mr.repositoryId, request.orgContext.orgId)
+      : deps.repoRepo.findById(mr.repositoryId);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     if (approvals.length < repo.minApprovers) {
       return reply.code(422).send({
