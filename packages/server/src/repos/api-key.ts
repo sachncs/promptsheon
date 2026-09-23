@@ -2,18 +2,44 @@ import type { ApiKey } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
 import { BaseRepo } from './base.js';
 
+function toApiKey(row: Record<string, unknown>): ApiKey {
+  const requiredString = (key: string): string => {
+    const value = row[key];
+    if (typeof value !== 'string') throw new Error(`api key row is missing ${key}`);
+    return value;
+  };
+  const nullableString = (key: string): string | null => {
+    const value = row[key];
+    return typeof value === 'string' ? value : null;
+  };
+  return {
+    id: requiredString('id'),
+    userId: requiredString('user_id'),
+    name: requiredString('name'),
+    keyHash: requiredString('key_hash'),
+    keyPrefix: requiredString('key_prefix'),
+    role: requiredString('role') as ApiKey['role'],
+    expiresAt: nullableString('expires_at'),
+    lastUsed: nullableString('last_used'),
+    createdAt: requiredString('created_at'),
+    revoked: Boolean(row.revoked),
+  };
+}
+
 export class ApiKeyRepo extends BaseRepo<ApiKey> {
   constructor(db: Database.Database) {
     super(db, 'api_keys');
   }
 
   findByKeyHash(keyHash: string): ApiKey | null {
-    return this.db.prepare('SELECT * FROM api_keys WHERE key_hash = ?').get(keyHash) as ApiKey | null;
+    const row = this.db.prepare('SELECT * FROM api_keys WHERE key_hash = ?').get(keyHash) as Record<string, unknown> | undefined;
+    return row ? toApiKey(row) : null;
   }
 
   findByUserId(userId: string): ApiKey[] {
     return this.db.prepare('SELECT * FROM api_keys WHERE user_id = ? ORDER BY created_at DESC')
-      .all(userId) as ApiKey[];
+      .all(userId)
+      .map((row) => toApiKey(row as Record<string, unknown>));
   }
 
   listForOrg(organizationId: string): ApiKey[] {
@@ -23,7 +49,8 @@ export class ApiKeyRepo extends BaseRepo<ApiKey> {
          JOIN org_members m ON m.user_id = k.user_id
          WHERE m.org_id = ? ORDER BY k.created_at ASC`,
       )
-      .all(organizationId) as ApiKey[];
+      .all(organizationId)
+      .map((row) => toApiKey(row as Record<string, unknown>));
   }
 
   userBelongsToOrg(userId: string, organizationId: string): boolean {

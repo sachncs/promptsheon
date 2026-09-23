@@ -45,8 +45,12 @@ describe('bootstrap routes', () => {
     const stored = apiKeyRepo.findByUserId(body.user.id);
     expect(stored).toHaveLength(1);
     expect(stored[0]?.keyHash).not.toBe(body.apiKey);
+    expect(stored[0]?.revoked).toBe(false);
+    expect(stored[0]?.userId).toBe(body.user.id);
     const keyHash = createHash('sha256').update(body.apiKey).digest('hex');
-    expect(apiKeyRepo.findByKeyHash(keyHash)).not.toBeNull();
+    const loaded = apiKeyRepo.findByKeyHash(keyHash);
+    expect(loaded?.userId).toBe(body.user.id);
+    expect(loaded?.revoked).toBe(false);
 
     await app.close();
     db.close();
