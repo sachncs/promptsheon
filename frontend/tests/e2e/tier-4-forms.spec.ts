@@ -12,7 +12,7 @@ import { test, expect, request } from '@playwright/test';
  * optimistic update path.
  */
 
-const BASE = process.env['PROMPTSHEON_E2E_BASE_URL'] ?? 'http://127.0.0.1:8080';
+const BASE = process.env['PROMPTSHEON_E2E_BASE_URL'] ?? 'http://127.0.0.1:8081';
 
 async function bootstrap() {
   const ctx = await request.newContext({ baseURL: BASE });
@@ -51,6 +51,7 @@ test.describe('tier 4: forms submit and rows appear', () => {
             completedAt: new Date().toISOString(),
           }),
         );
+        window.dispatchEvent(new Event('promptsheon:session-changed'));
       },
       [userId, orgId],
     );
@@ -87,7 +88,7 @@ test.describe('tier 4: forms submit and rows appear', () => {
     );
     await page.goto('/app/api-keys');
     await page.getByLabel(/name/i).first().fill(`e2e-key-${Date.now()}`);
-    await page.getByRole('button', { name: /create/i }).first().click();
+    await page.getByRole('button', { name: /issue/i }).click();
     await expect(page.getByText(/^e2e-key-/).first()).toBeVisible({ timeout: 10_000 });
   });
 
@@ -111,14 +112,14 @@ test.describe('tier 4: forms submit and rows appear', () => {
             completedAt: new Date().toISOString(),
           }),
         );
+        window.dispatchEvent(new Event('promptsheon:session-changed'));
       },
       [userId, orgId],
     );
     await page.goto('/app/webhooks');
-    await page.getByLabel(/label/i).first().fill(`hook-${Date.now()}`);
     await page.getByLabel(/url/i).first().fill('https://example.com/h');
-    await page.getByRole('button', { name: /create/i }).first().click();
-    await expect(page.getByText(/^hook-/).first()).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: /add webhook/i }).click();
+    await expect(page.getByText('https://example.com/h').first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('feature-flags: create and list', async ({ page, baseURL }) => {
@@ -145,7 +146,7 @@ test.describe('tier 4: forms submit and rows appear', () => {
       [userId, orgId],
     );
     await page.goto('/app/feature-flags');
-    await page.getByLabel(/name/i).first().fill(`flag_${Date.now()}`);
+    await page.getByLabel(/key/i).first().fill(`flag_${Date.now()}`);
     await page.getByRole('button', { name: /create|save/i }).first().click();
     // Page lists seeded + created flags; we just verify the form path completes.
     await expect(page).toHaveURL(/\/app\/feature-flags/);
@@ -176,7 +177,7 @@ test.describe('tier 4: forms submit and rows appear', () => {
     );
     await page.goto('/app/schedules');
     // The page has disabled Create button until releaseId + cron are picked.
-    const createBtn = page.getByRole('button', { name: /create/i }).first();
+    const createBtn = page.getByRole('button', { name: /schedule/i }).first();
     await expect(createBtn).toBeDisabled();
   });
 });
