@@ -27,31 +27,51 @@ const ScoreInputSchema = z.object({
   evaluator: z.string().optional(),
 });
 
+interface RequestOrgContext {
+  agentOrgId?: string;
+  orgContext?: { orgId?: string; organizationId?: string };
+}
+
+function orgOf(request: unknown): string | null {
+  const ctx = (request as RequestOrgContext | undefined) ?? {};
+  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
+}
+
 export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAgent: EvaluationAgent) {
   app.get('/api/eval-runs', async (request, reply) => {
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     const parsed = parseQuery(reply, ListQuerySchema, request.query);
     if (!parsed.ok) return;
     const { releaseId, page, pageSize } = parsed.data;
-    if (releaseId) return reply.send(repo.findRunsByReleaseId(releaseId));
-    return reply.send(repo.findMany({ page, pageSize }));
+    if (releaseId) return reply.send(repo.findRunsByReleaseIdInOrg(releaseId, organizationId));
+    return reply.send(repo.findManyInOrg(organizationId, { page, pageSize }));
   });
 
   app.get('/api/eval-runs/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const item = repo.findRunById(id);
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    const item = repo.findRunByIdInOrg(id, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
     return reply.send(item);
   });
 
   app.post('/api/eval-runs', async (request, reply) => {
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     const parsed = parseBody(reply, CreateEvalRunSchema, request.body);
     if (!parsed.ok) return;
-    const item = repo.createRun(parsed.data);
+    const item = repo.createRun(parsed.data, organizationId);
+    if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release or dataset not found' } });
     return reply.code(201).send(item);
   });
 
   app.get('/api/eval-runs/:id/results', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    if (!repo.findRunByIdInOrg(id, organizationId)) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Eval run not found' } });
     return reply.send(repo.findResultsByRunId(id));
   });
 
@@ -59,6 +79,8 @@ export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAge
     const parsed = parseBody(reply, RunEvalSchema, request.body);
     if (!parsed.ok) return;
     const { evalRunId, getActualUrl } = parsed.data;
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     const outbound = validateOutboundUrl(getActualUrl, {
       allowedHosts: (process.env['PROMPTSHEON_EVAL_ALLOWED_HOSTS'] ?? '').split(',').map((host) => host.trim()),
       allowPrivateNetworks: (process.env['PROMPTSHEON_NODE_ENV'] ?? process.env['NODE_ENV'] ?? 'development') !== 'production',
@@ -66,7 +88,7 @@ export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAge
     if (!outbound.ok) {
       return reply.code(422).send({ error: { code: 'UNSAFE_OUTBOUND_URL', message: outbound.reason } });
     }
-    const evalRun = repo.findRunById(evalRunId);
+    const evalRun = repo.findRunByIdInOrg(evalRunId, organizationId);
     if (!evalRun) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Eval run not found' } });
 
     const getActual = async (inputs: Record<string, unknown>): Promise<string> => {
