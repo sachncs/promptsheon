@@ -67,7 +67,7 @@ ten minutes.
   execution preview.
 - **Releases with canary rollout** — versioned releases,
   per-environment activation, weighted traffic split, and
-  one-click rollback / supersede.
+  one-click rollback.
 - **Maker-checker approvals** — release creator cannot approve their
   own release; approvals are persisted with reason and voter.
 - **Strands-powered planning** — a `Swarm` of 5 specialised agents

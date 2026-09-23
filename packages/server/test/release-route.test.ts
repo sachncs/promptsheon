@@ -92,7 +92,7 @@ describe('POST /api/releases/:id/rollback', () => {
     db.close();
   });
 
-  it('rollback to most recent superseded release', async () => {
+  it('rollback to most recent rolled-back release', async () => {
     const v1 = makeRelease(repo, 'cap1', 'prod', 1, 'alice');
     const v2 = makeRelease(repo, 'cap1', 'prod', 2, 'alice');
     const v3 = makeRelease(repo, 'cap1', 'prod', 3, 'alice');
@@ -105,11 +105,11 @@ describe('POST /api/releases/:id/rollback', () => {
 
     const response = await app.inject({ method: 'POST', url: `/api/releases/${v3}/rollback`, payload: {} });
     expect(response.statusCode).toBe(200);
-    const body = response.json() as { reactivated: { id: string; status: string }; superseded: { id: string; status: string } };
+    const body = response.json() as { reactivated: { id: string; status: string }; rolledBack: { id: string; status: string } };
     expect(body.reactivated.id).toBe(v2);
     expect(body.reactivated.status).toBe('active');
-    expect(body.superseded.id).toBe(v3);
-    expect(body.superseded.status).toBe('rolled_back');
+    expect(body.rolledBack.id).toBe(v3);
+    expect(body.rolledBack.status).toBe('rolled_back');
   });
 
   it('rollback to specific release by toReleaseId', async () => {
@@ -117,9 +117,9 @@ describe('POST /api/releases/:id/rollback', () => {
     const v2 = makeRelease(repo, 'cap1', 'prod', 2, 'alice');
     const v3 = makeRelease(repo, 'cap1', 'prod', 3, 'alice');
     repo.updateStatus(v1, 'active');
-    repo.updateStatus(v1, 'superseded');
+    repo.updateStatus(v1, 'rolled_back');
     repo.updateStatus(v2, 'active');
-    repo.updateStatus(v2, 'superseded');
+    repo.updateStatus(v2, 'rolled_back');
     repo.updateStatus(v3, 'active');
     void v2;
 

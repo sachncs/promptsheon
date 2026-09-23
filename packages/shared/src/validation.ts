@@ -245,27 +245,6 @@ export const CreateReleaseSchema = z.object({
   environment: z.enum(['dev', 'staging', 'prod']),
   canaryPercent: z.number().int().min(0).max(100).optional().default(0),
 });
-export const ActivateReleaseSchema = z.object({
-  releaseId: z.string().uuid(),
-});
-export const SupersedeReleaseSchema = z.object({
-  releaseId: z.string().uuid(),
-  supersededBy: z.string().uuid(),
-});
-
-export const VoteApprovalSchema = z.object({
-  releaseId: z.string().uuid(),
-  voter: z.string().min(1),
-  approved: z.boolean(),
-  comment: z.string().max(1000).optional().default(''),
-});
-
-export const InvokeExecutionSchema = z.object({
-  capabilityVersionId: z.string().uuid(),
-  inputs: z.record(z.string(), z.unknown()),
-  environment: z.string().optional().default(''),
-  traceId: z.string().optional().default(''),
-});
 
 export const CreateDatasetSchema = z.object({
   capabilityId: z.string().uuid(),

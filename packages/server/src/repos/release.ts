@@ -108,7 +108,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
       capabilityVersionId: data.capabilityVersionId, manifest: data.manifest,
       environment: data.environment as Release['environment'], status: 'draft', createdBy: data.createdBy ?? '',
       approvedBy: '', canaryPercent: data.canaryPercent ?? 0, createdAt: now,
-      replacesReleaseId: null, activatedAt: null, supersededAt: null, supersededBy: null,
+      replacesReleaseId: null, activatedAt: null,
     };
   }
 
@@ -235,17 +235,10 @@ export class ReleaseRepo extends BaseRepo<Release> {
       });
   }
 
-  /**
-   * Find the most recent rolled-back release for a (capability, env) pair
-   * with capability_version < currentVersion. Used by rollback to find
-   * the previous known-good release.
-   */
+  /** Find the most recent rolled-back release for a capability and environment. */
   findPreviousActive(capabilityId: string, environment: string, currentVersion: number): Release | null {
-    // Pre-v0.4 releases use 'superseded'; the 6-state machine uses
-    // 'rolled_back'. Both are terminal states; either should be a
-    // valid rollback target.
     const row = this.db.prepare(
-      "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status IN ('rolled_back', 'superseded') AND capability_version < ? ORDER BY capability_version DESC LIMIT 1",
+      "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'rolled_back' AND capability_version < ? ORDER BY capability_version DESC LIMIT 1",
     ).get(capabilityId, environment, currentVersion) as Record<string, unknown> | undefined;
     return row ? toRelease(row) : null;
   }
@@ -257,7 +250,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
        JOIN projects p ON p.id = c.project_id
        JOIN workspaces w ON w.id = p.workspace_id
        WHERE r.capability_id = ? AND r.environment = ?
-         AND r.status IN ('rolled_back', 'superseded')
+         AND r.status = 'rolled_back'
          AND r.capability_version < ? AND w.org_id = ?
        ORDER BY r.capability_version DESC LIMIT 1`,
     ).get(capabilityId, environment, currentVersion, organizationId) as Record<string, unknown> | undefined;

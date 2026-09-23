@@ -318,25 +318,6 @@ export function registerReleaseRoutes(
     return reply.send(updated);
   });
 
-  app.put('/api/releases/:id/supersede', async (request, reply) => {
-    const organizationId = requireOrganization(request, reply);
-    if (!organizationId) return;
-    const { id } = request.params as { id: string };
-    const item = repo.updateStatusInOrg(id, organizationId, 'rolled_back');
-    if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Release not found' } });
-    if (item) {
-      deps.auditChain.append({
-        userId: actorOf(request),
-        action: 'release.supersede',
-        resource: 'release',
-        details: JSON.stringify({ releaseId: id, environment: item.environment }),
-        resourceKind: 'release',
-        resourceId: id,
-      });
-    }
-    return reply.send(item);
-  });
-
   app.put('/api/releases/:id/canary', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
@@ -391,13 +372,6 @@ export function registerReleaseRoutes(
       resourceKind: 'release',
       resourceId: current.id,
     });
-    // Map the repo return shape (rolledBack, reactivated) to the
-    // public API shape (superseded, reactivated) so legacy callers
-    // see the v0.4 vocabulary.
-    const body = {
-      superseded: result.rolledBack,
-      reactivated: result.reactivated,
-    };
-    return reply.send(body);
+    return reply.send(result);
   });
 }

@@ -172,7 +172,6 @@ export const releaseApi = {
   transition: (id: string, to: 'draft' | 'review' | 'approved' | 'canary' | 'active' | 'rolled_back', reason?: string) =>
     client.post(`/releases/${id}/transition`, { to, ...(reason ? { reason } : {}) }),
   canary: (id: string, percent: number) => client.put(`/releases/${id}/canary`, { percent }),
-  supersede: (id: string) => client.put(`/releases/${id}/supersede`),
   rollback: (id: string, toReleaseId?: string) => {
     const body: { toReleaseId?: string } = {};
     if (toReleaseId !== undefined) body.toReleaseId = toReleaseId;

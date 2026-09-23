@@ -6,10 +6,6 @@ export type ReleaseStatus =
   | 'active'
   | 'rolled_back';
 
-export type LegacyReleaseStatus = 'superseded' | 'rejected';
-
-export type AnyReleaseStatus = ReleaseStatus | LegacyReleaseStatus;
-
 export type Environment = 'dev' | 'staging' | 'prod';
 
 export const RELEASE_TRANSITIONS: Record<ReleaseStatus, ReleaseStatus[]> = {
@@ -28,14 +24,12 @@ export interface Release {
   capabilityVersionId: string | null;
   manifest: string;
   environment: Environment;
-  status: AnyReleaseStatus;
+  status: ReleaseStatus;
   approvedBy: string;
-  supersededBy: string | null;
   replacesReleaseId: string | null;
   createdAt: string;
   createdBy: string;
   activatedAt: string | null;
-  supersededAt: string | null;
   canaryPercent: number;
 }
 

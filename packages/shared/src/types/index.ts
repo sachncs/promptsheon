@@ -50,8 +50,6 @@ export type {
   ReleaseTransition,
   ReleaseTransition as ReleaseLifecycleEvent,
   Environment,
-  LegacyReleaseStatus,
-  AnyReleaseStatus,
   RELEASE_TRANSITIONS,
   RELEASE_NEW_STATES,
 } from './release.js';
