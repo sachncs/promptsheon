@@ -355,6 +355,7 @@ async function main() {
     teamRepo: repos.team,
     orgTeamRepo: repos.orgTeam,
     ssoConfigRepo: repos.ssoConfig,
+    vaultRepo: repos.vault,
     promptScanRepo: repos.promptScan,
     gateway,
     budgetDeps: {

@@ -10,6 +10,7 @@ import { TeamRepo, SsoConfigRepo } from '../src/repos/team.js';
 import { UserRepo } from '../src/repos/user.js';
 import { MembershipRepo } from '../src/repos/org.js';
 import { AuditChain } from '../src/audit/chain.js';
+import { LocalKms, VaultRepo } from '../src/repos/vault.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(__dirname, '..', '..', 'shared', 'db', 'migrations');
@@ -33,16 +34,21 @@ function openDb(): Database.Database {
   return db;
 }
 
-function buildApp(role: 'admin' | 'reader'): { app: FastifyInstance; db: Database.Database } {
+function buildApp(role: 'admin' | 'reader'): { app: FastifyInstance; db: Database.Database; vaultRepo: VaultRepo } {
   const db = openDb();
   const teamRepo = new TeamRepo(db);
   const ssoRepo = new SsoConfigRepo(db);
   const userRepo = new UserRepo(db);
   const membershipRepo = new MembershipRepo(db);
   const audit = new AuditChain(db);
+  const vaultRepo = new VaultRepo(db, new LocalKms(db));
   db.prepare(
     `INSERT OR IGNORE INTO orgs (id, name, slug, created_at, updated_at)
      VALUES ('00000000-0000-4000-8000-000000000001', 'Test Org', 'test-org', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+  ).run();
+  db.prepare(
+    `INSERT OR IGNORE INTO users (id, email, name, role, created_at, updated_at)
+     VALUES ('u-test', 'test@example.com', 'Test User', 'admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
   ).run();
   const app = Fastify({ logger: false });
   app.addHook('preHandler', (request, _reply, done) => {
@@ -60,8 +66,9 @@ function buildApp(role: 'admin' | 'reader'): { app: FastifyInstance; db: Databas
     scimBearerToken: 'test-scim-token',
     userRepo,
     membershipRepo,
+    vaultRepo,
   });
-  return { app, db };
+  return { app, db, vaultRepo };
 }
 
 describe('Team + SCIM routes', () => {
@@ -276,7 +283,7 @@ describe('Team + SCIM routes', () => {
 
   describe('SSO config', () => {
     it('admin can set the OIDC config; secret is not echoed back', async () => {
-      const { app, db } = buildApp('admin');
+      const { app, db, vaultRepo } = buildApp('admin');
       const r = await app.inject({
         method: 'POST',
         url: '/api/auth/oidc/config',
@@ -294,6 +301,10 @@ describe('Team + SCIM routes', () => {
         )
         .get('00000000-0000-4000-8000-000000000001') as { client_secret_encrypted: string };
       expect(stored.client_secret_encrypted).not.toBe('super-secret');
+      expect(stored.client_secret_encrypted).toBe(
+        'vault://00000000-0000-4000-8000-000000000001/oidc-client-secret',
+      );
+      expect(vaultRepo.resolve('00000000-0000-4000-8000-000000000001', 'oidc-client-secret')).toBe('super-secret');
       const get = await app.inject({ method: 'GET', url: '/api/auth/oidc/config' });
       expect(get.statusCode).toBe(200);
       const config = get.json() as { configured: boolean; clientSecretEncrypted?: string; clientSecret?: string };

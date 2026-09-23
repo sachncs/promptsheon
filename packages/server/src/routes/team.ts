@@ -6,6 +6,7 @@ import type { TeamRepo, SsoConfigRepo } from '../repos/team.js';
 import type { AuditChain } from '../audit/chain.js';
 import type { UserRepo } from '../repos/user.js';
 import type { MembershipRepo } from '../repos/org.js';
+import type { VaultRepo } from '../repos/vault.js';
 import { parseBody, parseQuery } from './validate.js';
 
 interface RequestUserContext {
@@ -84,6 +85,7 @@ export function registerTeamRoutes(
     scimBearerToken: string;
     userRepo?: UserRepo;
     membershipRepo?: MembershipRepo;
+    vaultRepo?: VaultRepo;
   },
 ) {
   // ===== Teams =====
@@ -163,17 +165,23 @@ export function registerTeamRoutes(
     });
     const parsed = parseBody(reply, schema, request.body);
     if (!parsed.ok) return;
-    // clientSecret is encrypted via the vault before storage.
-    // Real implementation would call deps.vault.encrypt.
-    const placeholderCiphertext = createHash('sha256')
-      .update(parsed.data.clientSecret)
-      .digest('hex');
+    if (!deps.vaultRepo) {
+      return reply.code(503).send({
+        error: { code: 'OIDC_NOT_CONFIGURED', message: 'OIDC secret storage is not configured' },
+      });
+    }
+    deps.vaultRepo.set(
+      orgId,
+      'oidc-client-secret',
+      parsed.data.clientSecret,
+      (request as RequestUserContext).userId ?? 'system',
+    );
     deps.ssoConfigRepo.upsert({
       organizationId: orgId,
       provider: parsed.data.provider,
       issuer: parsed.data.issuer,
       clientId: parsed.data.clientId,
-      clientSecretEncrypted: placeholderCiphertext,
+      clientSecretEncrypted: `vault://${orgId}/oidc-client-secret`,
       scopes: parsed.data.scopes,
       audience: parsed.data.audience,
       groupsClaim: parsed.data.groupsClaim,

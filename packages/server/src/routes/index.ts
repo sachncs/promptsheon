@@ -66,6 +66,7 @@ import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 import type { OutgoingWebhookRepo } from '../repos/outgoing-webhook.js';
 import type { ReleaseOverlayRepo } from '../repos/release-overlay.js';
+import type { VaultRepo } from '../repos/vault.js';
 
 import type { WorkspaceRepo } from '../repos/workspace.js';
 import type { ProjectRepo } from '../repos/project.js';
@@ -153,6 +154,7 @@ export interface AppDeps {
   teamRepo: import('../repos/team.js').TeamRepo;
   orgTeamRepo: import('../repos/org.js').TeamRepo;
   ssoConfigRepo: import('../repos/team.js').SsoConfigRepo;
+  vaultRepo: VaultRepo;
   promptScanRepo: import('../repos/prompt-scan.js').PromptScanRepo;
 }
 
@@ -273,6 +275,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerTeamRoutes(app, {
     teamRepo: deps.teamRepo,
     ssoConfigRepo: deps.ssoConfigRepo,
+    vaultRepo: deps.vaultRepo,
     auditChain: deps.auditChain,
     userRepo: deps.userRepo,
     membershipRepo: deps.membershipRepo,
