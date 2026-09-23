@@ -46,9 +46,9 @@ function seedRepoRelease(db: Database.Database, releaseRepo: ReleaseRepo, manife
     `INSERT INTO orgs (id, name, slug, created_at, updated_at) VALUES (?, 'O', 'o', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
   ).run(ORG_ID);
   db.prepare(
-    `INSERT INTO workspaces (id, name, organization, created_at, updated_at)
-     VALUES (?, 'W', 'O', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-  ).run(workspaceId);
+    `INSERT INTO workspaces (id, org_id, name, organization, created_at, updated_at)
+     VALUES (?, ?, 'W', 'O', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+  ).run(workspaceId, ORG_ID);
   db.prepare(
     `INSERT INTO projects (id, workspace_id, name, description, created_at, updated_at)
      VALUES (?, ?, 'P', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
@@ -107,6 +107,7 @@ describe('approval route reconciliation', () => {
     });
     app.addHook('preHandler', (request, _reply, done) => {
       (request as Record<string, unknown>)['userId'] = VOTER;
+      (request as Record<string, unknown>)['orgContext'] = { orgId: ORG_ID };
       done();
     });
     registerApprovalRoutes(app, approvalRepo, { releaseRepo, manifestRepo });

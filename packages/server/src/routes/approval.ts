@@ -18,11 +18,18 @@ const ReleaseVoteSchema = z.object({
 
 interface RequestUserContext {
   userId?: string;
+  agentOrgId?: string;
+  orgContext?: { orgId?: string; organizationId?: string };
 }
 
 function actorOf(request: unknown): string {
   const ctx = (request as RequestUserContext | undefined) ?? {};
   return ctx.userId ?? 'system';
+}
+
+function orgOf(request: unknown): string | null {
+  const ctx = (request as RequestUserContext | undefined) ?? {};
+  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
 }
 
 /**
@@ -45,13 +52,17 @@ export function registerApprovalRoutes(
   repo: ApprovalRepo,
   deps: { releaseRepo: ReleaseRepo; manifestRepo: ManifestRepo },
 ) {
-  app.get('/api/approvals/pending', async (_request, reply) => {
-    return reply.send({ approvals: repo.listAll() });
+  app.get('/api/approvals/pending', async (request, reply) => {
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    return reply.send({ approvals: repo.listAllForOrg(organizationId) });
   });
 
   app.get('/api/approvals/:releaseId', async (request, reply) => {
     const { releaseId } = request.params as { releaseId: string };
-    const item = repo.getByReleaseId(releaseId);
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    const item = repo.getByReleaseIdInOrg(releaseId, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
     return reply.send(item);
   });
@@ -60,6 +71,11 @@ export function registerApprovalRoutes(
     const parsed = parseBody(reply, UpsertApprovalSchema, request.body);
     if (!parsed.ok) return;
     const { releaseId, votes } = parsed.data;
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    if (!deps.releaseRepo.findByIdInOrg(releaseId, organizationId)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
+    }
     repo.upsert(releaseId, votes);
     return reply.code(201).send({ releaseId, votes });
   });
@@ -69,17 +85,24 @@ export function registerApprovalRoutes(
     if (!releaseId) {
       return reply.code(400).send({ error: { code: 'MISSING_RELEASE_ID', message: 'releaseId required' } });
     }
-    const item = repo.getByReleaseId(releaseId);
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    if (!deps.releaseRepo.findByIdInOrg(releaseId, organizationId)) {
+      return reply.send({ releaseId, votes: '', distinctApprovers: 0, approvals: [] });
+    }
+    const item = repo.getByReleaseIdInOrg(releaseId, organizationId);
     if (!item) return reply.send({ releaseId, votes: '', distinctApprovers: 0, approvals: [] });
     return reply.send(item);
   });
 
   app.post('/api/releases/:releaseId/approvals', async (request, reply) => {
     const { releaseId } = request.params as { releaseId: string };
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     const parsed = parseBody(reply, ReleaseVoteSchema, request.body);
     if (!parsed.ok) return;
 
-    const release = deps.releaseRepo.findById(releaseId);
+    const release = deps.releaseRepo.findByIdInOrg(releaseId, organizationId);
     if (!release) throw new NotFoundError('release', releaseId);
 
     const manifestHash = deps.releaseRepo.computeManifestHash(release.manifest);
