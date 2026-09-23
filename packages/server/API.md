@@ -176,8 +176,9 @@ All endpoints live under `/api/`. Endpoints with `:id` style parameters expect a
 
 | Method | Path | Purpose | Body | Response |
 |--------|------|---------|------|----------|
-| `GET` | `/api/approvals/:releaseId` | Fetch the approval record for a release | — | `200 Approval` / `404` |
-| `POST` | `/api/approvals` | Upsert the approval votes for a release | `UpsertApprovalSchema` (`releaseId`, `votes`) | `201 { releaseId, votes }` |
+| `GET` | `/api/approvals/pending` | List releases in review with canonical manifest approvals | — | `200 { approvals: [...] }` |
+| `GET` | `/api/approvals?releaseId=...` | Fetch manifest approval decisions for a release | — | `200 Approval summary` |
+| `POST` | `/api/releases/:releaseId/approvals` | Record the authenticated user's release decision | `{ decision, comment? }` | `201 Approval summary` |
 
 ---
 

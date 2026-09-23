@@ -31,7 +31,6 @@ import { EvalRepo } from './eval.js';
 import { PreconditionRepo } from './precondition.js';
 import { AlertRepo } from './alert.js';
 import { ScheduleRepo } from './schedule.js';
-import { ApprovalRepo } from './approval.js';
 import { ApiKeyRepo } from './api-key.js';
 import { UserRepo } from './user.js';
 import { SystemConfigRepo } from './system-config.js';
@@ -85,7 +84,6 @@ export interface Repos {
   precondition: PreconditionRepo;
   alert: AlertRepo;
   schedule: ScheduleRepo;
-  approval: ApprovalRepo;
   apiKey: ApiKeyRepo;
   user: UserRepo;
   systemConfig: SystemConfigRepo;
@@ -146,7 +144,6 @@ export function buildRepos(db: Database.Database): Repos {
     precondition: new PreconditionRepo(db),
     alert: new AlertRepo(db),
     schedule: new ScheduleRepo(db),
-    approval: new ApprovalRepo(db),
     apiKey: new ApiKeyRepo(db),
     user: new UserRepo(db),
     systemConfig: new SystemConfigRepo(db),
@@ -177,7 +174,6 @@ export { ScheduleRepo } from './schedule.js';
 export { ApiKeyRepo } from './api-key.js';
 export { WebhookRepo } from './webhook.js';
 export { FeatureFlagRepo } from './feature-flag.js';
-export { ApprovalRepo } from './approval.js';
 export { SystemConfigRepo } from './system-config.js';
 export { IdempotencyRepo } from './idempotency.js';
 export { ManifestRepo, computeManifestHash } from './manifest.js';

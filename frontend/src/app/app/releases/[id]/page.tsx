@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
-import { releaseApi, approvalApi, auditApi } from '@/lib/api';
+import { releaseApi, approvalApi, auditApi, unwrapList } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatusPill, type StatusKind } from '@/components/brand/status-pill';
@@ -51,7 +51,7 @@ export default function ReleaseDetailPage() {
 
   const approvals = useQuery({
     queryKey: ['approvals', id],
-    queryFn: () => approvalApi.list(id).then((r) => r.data).catch(() => []),
+    queryFn: () => approvalApi.list(id).then((r) => unwrapList<{ userId?: string; vote?: string; comment?: string; createdAt?: string }>(r.data)),
     enabled: Boolean(id),
   });
 
@@ -215,12 +215,12 @@ export default function ReleaseDetailPage() {
             <SurfaceHeader title="Approvals" description="Maker-checker coverage on this release." />
             {(approvals.data as unknown[] | undefined)?.length ? (
               <ul className="space-y-3">
-                {((approvals.data as Array<{ id: string; actor?: string; decision?: string; createdAt?: string }>) ?? []).map((a) => (
-                  <li key={a.id} className="flex items-center gap-3">
-                    <ShieldCheck className={`h-4 w-4 ${a.decision === 'approve' ? 'text-success' : a.decision === 'reject' ? 'text-destructive' : 'text-info'}`} />
+                {((approvals.data as Array<{ userId?: string; vote?: string; comment?: string; createdAt?: string }>) ?? []).map((a) => (
+                  <li key={`${a.userId ?? 'reviewer'}-${a.createdAt ?? 'unknown'}`} className="flex items-center gap-3">
+                    <ShieldCheck className={`h-4 w-4 ${a.vote === 'approve' ? 'text-success' : a.vote === 'reject' ? 'text-destructive' : 'text-info'}`} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm text-text-strong">{a.actor ?? a.id}</div>
-                      <div className="text-xs text-text-muted">{a.decision === 'approve' ? 'approved' : a.decision === 'reject' ? 'rejected' : 'pending'} · {new Date(a.createdAt ?? Date.now()).toLocaleString()}</div>
+                      <div className="text-sm text-text-strong">{a.userId ?? 'Reviewer'}</div>
+                      <div className="text-xs text-text-muted">{a.vote === 'approve' ? 'approved' : a.vote === 'reject' ? 'rejected' : 'pending'} · {new Date(a.createdAt ?? Date.now()).toLocaleString()}</div>
                     </div>
                   </li>
                 ))}

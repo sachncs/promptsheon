@@ -6,7 +6,6 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyMigrations } from '@promptsheon/shared';
 import { registerApprovalRoutes } from '../src/routes/approval.js';
-import { ApprovalRepo } from '../src/repos/approval.js';
 import { ReleaseRepo } from '../src/repos/release.js';
 import { ManifestRepo } from '../src/repos/manifest.js';
 import { AuditChain } from '../src/audit/chain.js';
@@ -86,7 +85,6 @@ function seedRepoRelease(db: Database.Database, releaseRepo: ReleaseRepo, manife
 
 describe('approval route reconciliation', () => {
   let app: FastifyInstance;
-  let approvalRepo: ApprovalRepo;
   let releaseRepo: ReleaseRepo;
   let manifestRepo: ManifestRepo;
   let db: Database.Database;
@@ -94,7 +92,6 @@ describe('approval route reconciliation', () => {
 
   beforeEach(async () => {
     db = openDb();
-    approvalRepo = new ApprovalRepo(db);
     releaseRepo = new ReleaseRepo(db);
     manifestRepo = new ManifestRepo(db);
     releaseId = seedRepoRelease(db, releaseRepo, manifestRepo);
@@ -110,13 +107,8 @@ describe('approval route reconciliation', () => {
       (request as Record<string, unknown>)['orgContext'] = { orgId: ORG_ID };
       done();
     });
-    registerApprovalRoutes(app, approvalRepo, { releaseRepo, manifestRepo });
+    registerApprovalRoutes(app, { releaseRepo, manifestRepo });
     await app.ready();
-  });
-
-  it('GET /api/approvals/:releaseId returns 404 when no row exists yet', async () => {
-    const r = await app.inject({ method: 'GET', url: `/api/approvals/${releaseId}` });
-    expect(r.statusCode).toBe(404);
   });
 
   it('GET /api/approvals?releaseId returns the row after a vote', async () => {
@@ -144,8 +136,13 @@ describe('approval route reconciliation', () => {
     expect(r.statusCode).toBe(400);
   });
 
-  it('GET /api/approvals/pending lists persisted approval rows', async () => {
-    await approvalRepo.upsert(releaseId, 'approve');
+  it('GET /api/approvals/pending lists review releases with canonical approvals', async () => {
+    db.prepare("UPDATE releases SET status = 'review' WHERE id = ?").run(releaseId);
+    await app.inject({
+      method: 'POST',
+      url: `/api/releases/${releaseId}/approvals`,
+      payload: { decision: 'approve' },
+    });
     const r = await app.inject({ method: 'GET', url: '/api/approvals/pending' });
     expect(r.statusCode).toBe(200);
     expect((r.json() as { approvals: Array<{ releaseId: string }> }).approvals[0]?.releaseId).toBe(releaseId);
@@ -181,14 +178,4 @@ describe('approval route reconciliation', () => {
     expect(r.statusCode).toBe(422);
   });
 
-  it('legacy POST /api/approvals still upserts the votes blob', async () => {
-    const r = await app.inject({
-      method: 'POST',
-      url: '/api/approvals',
-      payload: { releaseId, votes: 'legacy-blob' },
-    });
-    expect(r.statusCode).toBe(201);
-    const gotten = approvalRepo.getByReleaseId(releaseId);
-    expect(gotten?.votes).toBe('legacy-blob');
-  });
 });

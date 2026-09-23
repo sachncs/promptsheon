@@ -278,7 +278,6 @@ async function main() {
     preconditionRepo: repos.precondition,
     alertRepo: repos.alert,
     scheduleRepo: repos.schedule,
-    approvalRepo: repos.approval,
     sseHub,
     settingsResolver,
     llmSettings,

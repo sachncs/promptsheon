@@ -80,7 +80,6 @@ import type { EvalRepo } from '../repos/eval.js';
 import type { PreconditionRepo } from '../repos/precondition.js';
 import type { AlertRepo } from '../repos/alert.js';
 import type { ScheduleRepo } from '../repos/schedule.js';
-import type { ApprovalRepo } from '../repos/approval.js';
 import type { SseHub } from '../sse/hub.js';
 import type { SettingsResolver } from '../settings/resolver.js';
 import type { InvocationAgent } from '../agents/invocation.js';
@@ -108,7 +107,6 @@ export interface AppDeps {
   preconditionRepo: PreconditionRepo;
   alertRepo: AlertRepo;
   scheduleRepo: ScheduleRepo;
-  approvalRepo: ApprovalRepo;
   sseHub: SseHub;
   settingsResolver: SettingsResolver;
   llmSettings: LlmSettingsService;
@@ -199,7 +197,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerSettingsRoutes(app, deps.settingsResolver);
   registerSseRoutes(app, deps.sseHub);
   registerSelfEvolveRoutes(app, deps.evolutionAgent, deps.capabilityRepo, deps.evalRepo);
-  registerApprovalRoutes(app, deps.approvalRepo, { releaseRepo: deps.releaseRepo, manifestRepo: deps.manifestRepo });
+  registerApprovalRoutes(app, { releaseRepo: deps.releaseRepo, manifestRepo: deps.manifestRepo });
   registerCompilerRoutes(app, deps.compiler);
   registerHealthRoutes(app, deps.db);
   registerIdeaRoutes(app, { planner: deps.planner });
