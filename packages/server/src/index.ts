@@ -31,6 +31,7 @@ import { WebhookReceiver } from './webhooks/receiver.js';
 import { ChaosConfig } from './hardening/chaos.js';
 import { LlmRouter } from './llm/router.js';
 import { Gateway, ResponseCache, FallbackChain, RateLimiter } from './llm/gateway.js';
+import { LlmSettingsService } from './application/llm-settings-service.js';
 import type { Agent } from '@strands-agents/sdk';
 import type Database from 'better-sqlite3';
 
@@ -154,6 +155,8 @@ async function main() {
     process.env as Record<string, string>,
     repos.systemConfig,
   );
+  const llmSettings = new LlmSettingsService(settingsResolver, repos.vault, repos.user, repos.membership);
+  await llmSettings.hydrateConfig(config);
 
   const casStore = new CasStore(config.server.casPath);
   await casStore.init();
@@ -278,6 +281,7 @@ async function main() {
     approvalRepo: repos.approval,
     sseHub,
     settingsResolver,
+    llmSettings,
     invocationAgent,
     evalAgent,
     evolutionAgent,

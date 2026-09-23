@@ -10,6 +10,9 @@ import { SystemConfigRepo } from '../src/repos/system-config.js';
 import { SettingsResolver } from '../src/settings/resolver.js';
 import { LlmRouter } from '../src/llm/router.js';
 import { registerBootstrapRoutes } from '../src/routes/bootstrap.js';
+import { VaultRepo, LocalKms } from '../src/repos/vault.js';
+import { LlmSettingsService } from '../src/application/llm-settings-service.js';
+import type { AppConfig } from '@promptsheon/shared';
 
 describe('bootstrap routes', () => {
   it('issues a one-time admin API key for the browser session', async () => {
@@ -17,15 +20,20 @@ describe('bootstrap routes', () => {
     db.pragma('foreign_keys = ON');
     await runMigrations(db);
     const apiKeyRepo = new ApiKeyRepo(db);
+    const userRepo = new UserRepo(db);
+    const membershipRepo = new MembershipRepo(db);
+    const settingsResolver = new SettingsResolver({}, {}, new SystemConfigRepo(db));
+    const llmSettings = new LlmSettingsService(settingsResolver, new VaultRepo(db, new LocalKms(db)), userRepo, membershipRepo);
     const app = Fastify({ logger: false });
 
     registerBootstrapRoutes(app, {
-      userRepo: new UserRepo(db),
+      userRepo,
       orgRepo: new OrgRepo(db),
-      membershipRepo: new MembershipRepo(db),
-      settingsResolver: new SettingsResolver({}, {}, new SystemConfigRepo(db)),
+      membershipRepo,
+      settingsResolver,
       llmRouter: new LlmRouter(),
       apiKeyRepo,
+      llmSettings,
     });
 
     const response = await app.inject({
@@ -53,6 +61,52 @@ describe('bootstrap routes', () => {
     expect(loaded?.revoked).toBe(false);
 
     await app.close();
+    db.close();
+  });
+
+  it('stores provider credentials as vault references and hydrates runtime config', async () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    await runMigrations(db);
+    const users = new UserRepo(db);
+    const orgs = new OrgRepo(db);
+    const memberships = new MembershipRepo(db);
+    const org = orgs.create({ name: 'Test Org', slug: 'test-org' });
+    const user = users.create({ email: 'admin@example.com', name: 'Admin', role: 'admin' });
+    memberships.addOrgMember(org.id, user.id, 'admin');
+    const settings = new SettingsResolver({}, {}, new SystemConfigRepo(db));
+    const vault = new VaultRepo(db, new LocalKms(db));
+    const service = new LlmSettingsService(settings, vault, users, memberships);
+    const previousKey = process.env['OPENAI_API_KEY'];
+    const previousAnthropicKey = process.env['ANTHROPIC_API_KEY'];
+
+    await service.save({ provider: 'openai', model: 'gpt-4o-mini', apiKey: 'sk-test-secret' });
+
+    const stored = db.prepare('SELECT value FROM system_config WHERE key = ?').get('llm.openaiApiKey') as { value: string };
+    expect(stored.value).toBe(`"vault://${org.id}/llm-openai-api-key"`);
+    expect(vault.resolve(org.id, 'llm-openai-api-key')).toBe('sk-test-secret');
+    expect(await service.hasCredentials('openai')).toBe(true);
+
+    const config: AppConfig = {
+      server: { port: 8080, host: '127.0.0.1', dbPath: ':memory:', casPath: '.cas', frontendPath: './frontend/.next', corsOrigin: '', logLevel: 'info', nodeEnv: 'test', fipsMode: false },
+      llm: { defaultProvider: 'openai', defaultModel: 'old-model', apiKeyEnvVar: 'OPENAI_API_KEY', maxRetries: 1, timeoutMs: 1000 },
+      auth: { enabled: false, jwtSecret: '' },
+      selfEvolve: { enabled: false, defaultCooldownSec: 900, maxConcurrent: 1 },
+    };
+    await service.hydrateConfig(config);
+    expect(config.llm.defaultModel).toBe('gpt-4o-mini');
+    expect(process.env['OPENAI_API_KEY']).toBe('sk-test-secret');
+
+    await settings.set('llm.anthropicApiKey', 'legacy-secret', user.id);
+    expect(await service.hasCredentials('anthropic')).toBe(true);
+    const migrated = db.prepare('SELECT value FROM system_config WHERE key = ?').get('llm.anthropicApiKey') as { value: string };
+    expect(migrated.value).toBe(`"vault://${org.id}/llm-anthropic-api-key"`);
+    expect(vault.resolve(org.id, 'llm-anthropic-api-key')).toBe('legacy-secret');
+
+    if (previousKey === undefined) delete process.env['OPENAI_API_KEY'];
+    else process.env['OPENAI_API_KEY'] = previousKey;
+    if (previousAnthropicKey === undefined) delete process.env['ANTHROPIC_API_KEY'];
+    else process.env['ANTHROPIC_API_KEY'] = previousAnthropicKey;
     db.close();
   });
 });

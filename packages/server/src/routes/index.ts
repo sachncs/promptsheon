@@ -62,6 +62,7 @@ import { registerIdentityRoutes } from './identity.js';
 import { WorkspaceService } from '../application/workspace-service.js';
 import { ProjectService } from '../application/project-service.js';
 import { CapabilityService } from '../application/capability-service.js';
+import type { LlmSettingsService } from '../application/llm-settings-service.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 import type { OutgoingWebhookRepo } from '../repos/outgoing-webhook.js';
@@ -110,6 +111,7 @@ export interface AppDeps {
   approvalRepo: ApprovalRepo;
   sseHub: SseHub;
   settingsResolver: SettingsResolver;
+  llmSettings: LlmSettingsService;
   invocationAgent: InvocationAgent;
   evalAgent: EvaluationAgent;
   evolutionAgent: EvolutionAgent;
@@ -231,6 +233,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     orgRepo: deps.orgRepo,
     membershipRepo: deps.membershipRepo,
     settingsResolver: deps.settingsResolver,
+    llmSettings: deps.llmSettings,
     llmRouter: deps.llmRouter,
     apiKeyRepo: deps.apiKeyRepo,
   });
