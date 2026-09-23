@@ -25,6 +25,7 @@ export class Scheduler {
 
   stop(): void {
     if (this.interval) clearInterval(this.interval);
+    this.interval = null;
   }
 
   async poll(): Promise<void> {

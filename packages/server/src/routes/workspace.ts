@@ -1,44 +1,51 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import {
   CreateWorkspaceSchema,
   UpdateWorkspaceSchema,
   PaginationSchema,
 } from '@promptsheon/shared';
-import type { WorkspaceRepo } from '../repos/workspace.js';
-import { parseBody, parseQuery } from './validate.js';
+import type { WorkspaceService } from '../application/workspace-service.js';
+import { parseBody, parseParams, parseQuery, sendNotFound } from './validate.js';
 
-export function registerWorkspaceRoutes(app: FastifyInstance, repo: WorkspaceRepo) {
+const IdParamsSchema = z.object({ id: z.string().uuid() });
+
+export function registerWorkspaceRoutes(app: FastifyInstance, service: WorkspaceService) {
   app.get('/api/workspaces', async (request, reply) => {
     const parsed = parseQuery(reply, PaginationSchema, request.query);
     if (!parsed.ok) return;
-    return reply.send(repo.findMany(parsed.data));
+    return reply.send(service.list(parsed.data));
   });
 
   app.get('/api/workspaces/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const item = repo.findById(id);
-    if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
+    const parsed = parseParams(reply, IdParamsSchema, request.params);
+    if (!parsed.ok) return;
+    const item = service.get(parsed.data.id);
+    if (!item) return sendNotFound(reply, 'Workspace', parsed.data.id);
     return reply.send(item);
   });
 
   app.post('/api/workspaces', async (request, reply) => {
     const parsed = parseBody(reply, CreateWorkspaceSchema, request.body);
     if (!parsed.ok) return;
-    const item = repo.create(parsed.data);
+    const item = service.create(parsed.data);
     return reply.code(201).send(item);
   });
 
   app.put('/api/workspaces/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, IdParamsSchema, request.params);
+    if (!parsedParams.ok) return;
     const parsed = parseBody(reply, UpdateWorkspaceSchema, request.body);
     if (!parsed.ok) return;
-    const item = repo.update(id, parsed.data);
+    const item = service.update(parsedParams.data.id, parsed.data);
+    if (!item) return sendNotFound(reply, 'Workspace', parsedParams.data.id);
     return reply.send(item);
   });
 
   app.delete('/api/workspaces/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    repo.delete(id);
+    const parsed = parseParams(reply, IdParamsSchema, request.params);
+    if (!parsed.ok) return;
+    if (!service.remove(parsed.data.id)) return sendNotFound(reply, 'Workspace', parsed.data.id);
     return reply.code(204).send();
   });
 }

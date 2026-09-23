@@ -11,6 +11,8 @@ export { AlertRepo } from './alert.js';
 export { ScheduleRepo } from './schedule.js';
 export { ApiKeyRepo } from './api-key.js';
 export { WebhookRepo } from './webhook.js';
+export { OutgoingWebhookRepo } from './outgoing-webhook.js';
+export { ReleaseOverlayRepo } from './release-overlay.js';
 export { FeatureFlagRepo } from './feature-flag.js';
 export { ApprovalRepo } from './approval.js';
 export { SystemConfigRepo } from './system-config.js';

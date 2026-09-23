@@ -36,9 +36,11 @@ import { ApiKeyRepo } from './api-key.js';
 import { UserRepo } from './user.js';
 import { SystemConfigRepo } from './system-config.js';
 import { ManifestRepo } from './manifest.js';
-import { MembershipRepo } from './org.js';
+import { OrgRepo, TeamRepo as OrgTeamRepo, MembershipRepo } from './org.js';
 import { WebhookRepo } from './webhook.js';
+import { OutgoingWebhookRepo } from './outgoing-webhook.js';
 import { IdempotencyRepo } from './idempotency.js';
+import { ReleaseOverlayRepo } from './release-overlay.js';
 
 /**
  * Bundle of every repo in the server. Built once from a
@@ -65,6 +67,7 @@ export interface Repos {
   traceScore: TraceScoreRepo;
   userAnalytics: UserAnalyticsRepo;
   team: TeamRepo;
+  orgTeam: OrgTeamRepo;
   ssoConfig: SsoConfigRepo;
   promptScan: PromptScanRepo;
   redteam: RedteamRepo;
@@ -87,7 +90,10 @@ export interface Repos {
   systemConfig: SystemConfigRepo;
   manifest: ManifestRepo;
   membership: MembershipRepo;
+  org: OrgRepo;
   webhook: WebhookRepo;
+  outgoingWebhook: OutgoingWebhookRepo;
+  releaseOverlay: ReleaseOverlayRepo;
   idempotency: IdempotencyRepo;
 }
 
@@ -121,6 +127,7 @@ export function buildRepos(db: Database.Database): Repos {
     traceScore: new TraceScoreRepo(db),
     userAnalytics: new UserAnalyticsRepo(db),
     team: new TeamRepo(db),
+    orgTeam: new OrgTeamRepo(db),
     ssoConfig: new SsoConfigRepo(db),
     promptScan: new PromptScanRepo(db),
     redteam: new RedteamRepo(db),
@@ -143,7 +150,10 @@ export function buildRepos(db: Database.Database): Repos {
     systemConfig: new SystemConfigRepo(db),
     manifest: new ManifestRepo(db),
     membership: new MembershipRepo(db),
+    org: new OrgRepo(db),
     webhook: new WebhookRepo(db),
+    outgoingWebhook: new OutgoingWebhookRepo(db),
+    releaseOverlay: new ReleaseOverlayRepo(db),
     idempotency: new IdempotencyRepo(db),
   };
 }

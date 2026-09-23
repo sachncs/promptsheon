@@ -28,7 +28,6 @@ import { registerOrgTeamRoutes } from './org-team.js';
 import { registerWebhookRoutes } from './webhooks-incoming.js';
 import { registerWebhookCrudRoutes } from './webhooks-crud.js';
 import { registerFeatureFlagRoutes } from './feature-flag.js';
-import { OrgRepo, TeamRepo } from '../repos/org.js';
 import { WebhookReceiver } from '../webhooks/receiver.js';
 import { registerChaosRoutes } from './chaos.js';
 import { AuditChain } from '../audit/chain.js';
@@ -38,6 +37,7 @@ import { registerApiKeyRoutes } from './api-keys.js';
 import { registerBootstrapRoutes } from './bootstrap.js';
 import type { LlmRouter } from '../llm/router.js';
 import { registerRepoRoutes, type RepoDeps } from './repo.js';
+import { RepositoryService } from '../application/repository-service.js';
 import { registerContentsRoutes, type ContentsDeps } from './contents.js';
 import { registerCommitRoutes, type CommitDeps } from './commits.js';
 import { registerMergeRequestRoutes, type MRDeps } from './mr.js';
@@ -59,8 +59,13 @@ import { registerSecurityRoutes } from './security.js';
 import { registerAuditReportRoutes } from './audit-report.js';
 import { registerBudgetRoutes } from './budget.js';
 import { registerIdentityRoutes } from './identity.js';
+import { WorkspaceService } from '../application/workspace-service.js';
+import { ProjectService } from '../application/project-service.js';
+import { CapabilityService } from '../application/capability-service.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
+import type { OutgoingWebhookRepo } from '../repos/outgoing-webhook.js';
+import type { ReleaseOverlayRepo } from '../repos/release-overlay.js';
 
 import type { WorkspaceRepo } from '../repos/workspace.js';
 import type { ProjectRepo } from '../repos/project.js';
@@ -122,7 +127,10 @@ export interface AppDeps {
   budgetDeps?: BudgetDeps;
   auditChain: AuditChain;
   apiKeyRepo: ApiKeyRepo;
+  outgoingWebhookRepo: OutgoingWebhookRepo;
+  releaseOverlayRepo: ReleaseOverlayRepo;
   userRepo: UserRepo;
+  orgRepo: import('../repos/org.js').OrgRepo;
   llmRouter: LlmRouter;
   gateway: import('../llm/gateway.js').Gateway;
   repoDeps: RepoDeps;
@@ -143,16 +151,34 @@ export interface AppDeps {
   autoEval: import('../observability/auto-eval.js').AutoEval;
   userAnalyticsRepo: import('../repos/user-analytics.js').UserAnalyticsRepo;
   teamRepo: import('../repos/team.js').TeamRepo;
+  orgTeamRepo: import('../repos/org.js').TeamRepo;
   ssoConfigRepo: import('../repos/team.js').SsoConfigRepo;
   promptScanRepo: import('../repos/prompt-scan.js').PromptScanRepo;
 }
 
+/**
+ * Resolve the SCIM bearer secret at the composition root. A known fallback is
+ * acceptable for local development, but production must never boot with a
+ * credential that an attacker can guess from the source tree.
+ */
+export function resolveScimBearerToken(environment: string, configuredToken = process.env['PROMPTSHEON_SCIM_TOKEN']): string {
+  if (configuredToken) return configuredToken;
+  if (environment === 'production') {
+    throw new Error('PROMPTSHEON_SCIM_TOKEN is required in production');
+  }
+  return 'dev-scim-token';
+}
+
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
-  registerWorkspaceRoutes(app, deps.workspaceRepo);
-  registerProjectRoutes(app, deps.projectRepo);
-  registerCapabilityRoutes(app, deps.capabilityRepo);
+  registerWorkspaceRoutes(app, new WorkspaceService(deps.workspaceRepo));
+  registerProjectRoutes(app, new ProjectService(deps.projectRepo));
+  registerCapabilityRoutes(app, new CapabilityService(deps.capabilityRepo));
   registerVersionRoutes(app, deps.versionRepo, deps.manifestRepo, deps.db);
-  registerReleaseRoutes(app, deps.releaseRepo, { manifestRepo: deps.manifestRepo, auditChain: deps.auditChain });
+  registerReleaseRoutes(app, deps.releaseRepo, {
+    manifestRepo: deps.manifestRepo,
+    auditChain: deps.auditChain,
+    overlayRepo: deps.releaseOverlayRepo,
+  });
   registerExecutionRoutes(app, {
     executionRepo: deps.executionRepo,
     releaseRepo: deps.releaseRepo,
@@ -184,24 +210,32 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerSnapshotRoutes(app, { store: deps.snapshotStore, getAgent: deps.getAgent });
   registerManifestHashRoutes(app, { manifestRepo: deps.manifestRepo });
   registerOrgTeamRoutes(app, {
-    orgRepo: new OrgRepo(deps.db),
-    teamRepo: new TeamRepo(deps.db),
+    orgRepo: deps.orgRepo,
+    teamRepo: deps.orgTeamRepo,
     membershipRepo: deps.membershipRepo,
   });
   registerWebhookRoutes(app, { receiver: deps.webhookReceiver, executor: deps.executor, manifestRepo: deps.manifestRepo });
-  registerWebhookCrudRoutes(app, { auditChain: deps.auditChain });
+  registerWebhookCrudRoutes(app, { auditChain: deps.auditChain, repo: deps.outgoingWebhookRepo });
   registerFeatureFlagRoutes(app, { repo: deps.featureFlagRepo, auditChain: deps.auditChain });
   registerAuditRoutes(app, { auditChain: deps.auditChain, db: deps.db });
-  registerUserRoutes(app, { userRepo: deps.userRepo, auditChain: deps.auditChain });
+  registerUserRoutes(app, {
+    userRepo: deps.userRepo,
+    auditChain: deps.auditChain,
+    membershipRepo: deps.membershipRepo,
+  });
   registerApiKeyRoutes(app, { apiKeyRepo: deps.apiKeyRepo, auditChain: deps.auditChain });
   registerBootstrapRoutes(app, {
-    db: deps.db,
     userRepo: deps.userRepo,
+    orgRepo: deps.orgRepo,
+    membershipRepo: deps.membershipRepo,
     settingsResolver: deps.settingsResolver,
     llmRouter: deps.llmRouter,
   });
 
-  registerRepoRoutes(app, deps.repoDeps);
+  registerRepoRoutes(app, {
+    ...deps.repoDeps,
+    repositoryService: new RepositoryService(deps.repoDeps.repoRepo),
+  });
   registerContentsRoutes(app, deps.contentsDeps);
   registerCommitRoutes(app, deps.commitDeps);
   registerMergeRequestRoutes(app, deps.mrDeps);
@@ -240,7 +274,9 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     teamRepo: deps.teamRepo,
     ssoConfigRepo: deps.ssoConfigRepo,
     auditChain: deps.auditChain,
-    scimBearerToken: process.env['PROMPTSHEON_SCIM_TOKEN'] ?? 'dev-scim-token',
+    userRepo: deps.userRepo,
+    membershipRepo: deps.membershipRepo,
+    scimBearerToken: resolveScimBearerToken(process.env['PROMPTSHEON_NODE_ENV'] ?? process.env['NODE_ENV'] ?? 'development'),
   });
   registerSecurityRoutes(app, { scanRepo: deps.promptScanRepo });
   registerAuditReportRoutes(app, { auditChain: deps.auditChain });

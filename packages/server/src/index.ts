@@ -24,7 +24,6 @@ import { AutoEval } from './observability/auto-eval.js';
 import { CostForecastService } from './analysis/forecast.js';
 import { CasStore } from '@promptsheon/shared';
 import { setupObservability } from './observability/setup.js';
-import type { GoalSummary } from './routes/goals.js';
 import { SessionStore } from './sessions/store.js';
 import { SnapshotStore } from './snapshots/store.js';
 import { CedarAuthorizer, installDefaultAuthorizer } from './policy/gate.js';
@@ -108,7 +107,14 @@ async function main() {
   await app.register(cors, {
     origin: config.server.corsOrigin,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Request-Id',
+      'Idempotency-Key',
+      'X-User-Id',
+      'X-Org-Id',
+    ],
     credentials: true,
   });
 
@@ -135,7 +141,7 @@ async function main() {
   });
 
   await app.register(rateLimit, {
-    max: 100,
+    max: Number.parseInt(process.env['PROMPTSHEON_RATE_LIMIT_MAX'] ?? '100', 10),
     timeWindow: '1 minute',
     keyGenerator: (req) => {
       return (req as unknown as Record<string, string>).userId ?? req.ip ?? 'unknown';
@@ -187,18 +193,6 @@ async function main() {
     executor,
     cas: casStore,
   });
-  const activeGoals = new Map<string, GoalSummary>();
-  setInterval(() => {
-    for (const [hash, state] of (goalEvolver as unknown as { state: Map<string, unknown> }).state ?? new Map()) {
-      const s = state as { currentHash: string; bestHash: string; bestScore: number; iteration: number };
-      activeGoals.set(hash, {
-        manifestHash: hash,
-        bestScore: s.bestScore,
-        iterations: s.iteration,
-        lastUpdated: new Date().toISOString(),
-      });
-    }
-  }, 1000).unref();
   const sessionStore = new SessionStore({
     storageDir: `${config.server.casPath}/sessions`,
     persist: true,
@@ -292,7 +286,7 @@ async function main() {
     planner,
     executor,
     manifestRepo: repos.manifest,
-    getActiveGoals: () => Array.from(activeGoals.values()),
+    getActiveGoals: () => goalEvolver.listSummaries(),
     sessionStore,
     snapshotStore,
     getAgent: (id: string) => {
@@ -303,10 +297,13 @@ async function main() {
       return agentRegistry.get(id) ?? null;
     },
     membershipRepo: repos.membership,
+    orgRepo: repos.org,
     webhookReceiver,
     chaosConfig,
     auditChain,
     apiKeyRepo: repos.apiKey,
+    outgoingWebhookRepo: repos.outgoingWebhook,
+    releaseOverlayRepo: repos.releaseOverlay,
     userRepo: repos.user,
     llmRouter,
     repoDeps: {
@@ -356,6 +353,7 @@ async function main() {
     autoEval,
     userAnalyticsRepo: repos.userAnalytics,
     teamRepo: repos.team,
+    orgTeamRepo: repos.orgTeam,
     ssoConfigRepo: repos.ssoConfig,
     promptScanRepo: repos.promptScan,
     gateway,
@@ -381,6 +379,8 @@ async function main() {
   const shutdown = async (signal: string) => {
     app.log.info(`Received ${signal}, shutting down gracefully`);
     scheduler.stop();
+    retention.stop();
+    sseHub.destroy();
     await app.close();
     db.close();
     process.exit(0);
