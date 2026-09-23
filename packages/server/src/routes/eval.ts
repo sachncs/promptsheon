@@ -8,6 +8,7 @@ import type { EvalRepo } from '../repos/eval.js';
 import type { EvaluationAgent } from '../agents/evaluation/evaluation.js';
 import { buildEvaluatorRegistry, listEvaluators } from '../evaluation/evaluators.js';
 import { parseBody, parseQuery } from './validate.js';
+import { validateOutboundUrl } from '../security/outbound-url.js';
 
 const ListQuerySchema = PaginationSchema.extend({
   releaseId: z.string().uuid().optional(),
@@ -58,19 +59,42 @@ export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAge
     const parsed = parseBody(reply, RunEvalSchema, request.body);
     if (!parsed.ok) return;
     const { evalRunId, getActualUrl } = parsed.data;
+    const outbound = validateOutboundUrl(getActualUrl, {
+      allowedHosts: (process.env['PROMPTSHEON_EVAL_ALLOWED_HOSTS'] ?? '').split(',').map((host) => host.trim()),
+      allowPrivateNetworks: (process.env['PROMPTSHEON_NODE_ENV'] ?? process.env['NODE_ENV'] ?? 'development') !== 'production',
+    });
+    if (!outbound.ok) {
+      return reply.code(422).send({ error: { code: 'UNSAFE_OUTBOUND_URL', message: outbound.reason } });
+    }
     const evalRun = repo.findRunById(evalRunId);
     if (!evalRun) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Eval run not found' } });
 
     const getActual = async (inputs: Record<string, unknown>): Promise<string> => {
-      const res = await fetch(getActualUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(inputs),
-      });
-      return res.text();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15_000);
+      let res: Response;
+      try {
+        res = await fetch(outbound.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(inputs),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (!res.ok) throw new Error(`actual endpoint returned ${res.status}`);
+      const body = await res.arrayBuffer();
+      if (body.byteLength > 2 * 1024 * 1024) throw new Error('actual endpoint response exceeds 2 MiB');
+      return new TextDecoder().decode(body);
     };
 
-    const result = await evalAgent.runEval(evalRun, [], getActual);
+    let result;
+    try {
+      result = await evalAgent.runEval(evalRun, [], getActual);
+    } catch {
+      return reply.code(502).send({ error: { code: 'EVAL_ENDPOINT_FAILED', message: 'evaluation endpoint failed' } });
+    }
     repo.updateRun(evalRunId, result);
     return reply.send(result);
   });
