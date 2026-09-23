@@ -42,7 +42,7 @@ export class UserAnalyticsRepo extends BaseRepo<never> {
   /**
    * Per-day usage for a single user across the last N days.
    */
-  perDay(actorId: string, days = 30): UserDailyUsage[] {
+  perDay(actorId: string, organizationId: string, days = 30): UserDailyUsage[] {
     const since = new Date(Date.now() - days * 86_400_000).toISOString();
     return this.db
       .prepare(
@@ -51,11 +51,11 @@ export class UserAnalyticsRepo extends BaseRepo<never> {
                 SUM(total_tokens) AS tokens,
                 SUM(total_cost_usd) AS cost
          FROM trace_runs
-         WHERE actor_id = ? AND start_time >= ?
+         WHERE organization_id = ? AND actor_id = ? AND start_time >= ?
          GROUP BY day
          ORDER BY day DESC`,
       )
-      .all(actorId, since)
+      .all(organizationId, actorId, since)
       .map((r: unknown) => {
         const row = r as { day: string; runs: number; tokens: number; cost: number };
         return {

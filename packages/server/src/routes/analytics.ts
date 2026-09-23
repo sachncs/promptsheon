@@ -36,11 +36,15 @@ export function registerAnalyticsRoutes(
   deps: { repo: UserAnalyticsRepo },
 ) {
   app.get('/api/analytics/users/:userId', async (request, reply) => {
+    const organizationId = orgOf(request);
+    if (!organizationId) {
+      return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    }
     const { userId } = request.params as { userId: string };
     const parsed = parseQuery(reply, UserAnalyticsQuerySchema, { ...(request.query as Record<string, unknown>), userId });
     if (!parsed.ok) return;
     const days = parsed.data.days;
-    const perDay = deps.repo.perDay(userId, days);
+    const perDay = deps.repo.perDay(userId, organizationId, days);
     return reply.send({ userId, days, perDay });
   });
 
