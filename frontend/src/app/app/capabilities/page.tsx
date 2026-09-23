@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { Boxes, Workflow, Plus } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
-import { workspaceApi, projectApi, capabilityApi, releaseApi } from '@/lib/api';
+import { workspaceApi, projectApi, capabilityApi, unwrapList } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
@@ -14,11 +14,12 @@ import { StatusPill } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function CapabilitiesRegistryPage() {
   const session = useRequireSession();
   const router = useRouter();
-  const workspaces = useQuery({ queryKey: ['workspaces'], queryFn: () => workspaceApi.list(1).then((r) => r.data) });
+  const workspaces = useQuery({ queryKey: ['workspaces'], queryFn: () => workspaceApi.list(1, 100).then((r) => r.data) });
   const wsFirst = unwrapFirst<{ id: string; name: string }>(workspaces.data);
   const projects = useQuery({
     queryKey: ['projects', wsFirst?.id],
@@ -31,11 +32,13 @@ export default function CapabilitiesRegistryPage() {
   const capabilities = useQuery({
     queryKey: ['capabilities', 'all', allProjects.map((p) => p.id)],
     queryFn: async () => {
+      const responses = await Promise.all(allProjects.map((p) => capabilityApi.list(p.id)));
       const out: Array<Record<string, unknown> & { projectName: string }> = [];
-      for (const p of allProjects) {
-        const list = await capabilityApi.list(p.id).then((r) => r.data).catch(() => []);
-        if (Array.isArray(list)) out.push(...list.map((c: Record<string, unknown>) => ({ ...c, projectName: p.name })));
-      }
+      responses.forEach((response, index) => {
+        const project = allProjects[index];
+        if (!project) return;
+        out.push(...unwrapList<Record<string, unknown>>(response.data).map((capability) => ({ ...capability, projectName: project.name })));
+      });
       return out;
     },
     enabled: allProjects.length > 0,
@@ -47,6 +50,12 @@ export default function CapabilitiesRegistryPage() {
   }, [capabilities.data]);
 
   if (!session) return null;
+
+  const failedQuery = [workspaces, projects, capabilities].find((query) => query.isError);
+  if (failedQuery) return <QueryError message={(failedQuery.error as Error).message} onRetry={() => void failedQuery.refetch()} />;
+  if (workspaces.isPending || projects.isPending || capabilities.isPending) {
+    return <div className="space-y-6" aria-busy="true"><PageHeader eyebrow="Capabilities" title="Registry" /><Surface className="h-72 animate-pulse bg-surface-2/40"><span className="sr-only">Loading capabilities</span></Surface></div>;
+  }
 
   const empty = rows.length === 0 && !capabilities.isLoading;
 
@@ -116,7 +125,7 @@ export default function CapabilitiesRegistryPage() {
                 header: 'Content',
                 render: (r) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} />,
               },
-              { key: 'state', header: 'State', render: (r) => <StatusPill kind={(r['state'] as never) ?? 'neutral'} /> },
+              { key: 'state', header: 'State', render: (r) => <StatusPill kind={(r['status'] as never) ?? 'neutral'} /> },
             ]}
           />
         </Surface>

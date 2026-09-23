@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { QueryError } from '@/components/brand/query-error';
 
 interface ProjectItem {
   id: string;
@@ -32,7 +33,7 @@ export default function ProjectsPage() {
 
   const workspaces = useQuery({
     queryKey: ['workspaces'],
-    queryFn: () => workspaceApi.list(1).then((r) => r.data),
+    queryFn: () => workspaceApi.list(1, 100).then((r) => r.data),
   });
   const wsFirst = Array.isArray(workspaces.data) ? workspaces.data[0] as { id?: string } : undefined;
   const wsId = wsFirst?.id;
@@ -67,6 +68,11 @@ export default function ProjectsPage() {
   });
 
   if (!session) return null;
+  const failedQuery = [workspaces, projects].find((query) => query.isError);
+  if (failedQuery) return <QueryError message={(failedQuery.error as Error).message} onRetry={() => void failedQuery.refetch()} />;
+  if (workspaces.isPending || (Boolean(wsId) && projects.isPending)) {
+    return <div className="space-y-6" aria-busy="true"><PageHeader eyebrow="Admin" title="Projects" /><Surface className="h-72 animate-pulse bg-surface-2/40"><span className="sr-only">Loading projects</span></Surface></div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -157,7 +163,7 @@ export default function ProjectsPage() {
                 key: 'actions',
                 header: '',
                 render: (r) => (
-                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); remove.mutate(String(r['id'])); }}>
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); if (window.confirm('Delete this project? Capabilities inside it may also be removed.')) remove.mutate(String(r['id'])); }}>
                     <Trash2 className="mr-1 size-3" />
                     Delete
                   </Button>
