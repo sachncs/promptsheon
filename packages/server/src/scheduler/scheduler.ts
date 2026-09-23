@@ -19,6 +19,7 @@ export class Scheduler {
   }
 
   start(pollIntervalMs = 10_000): void {
+    if (this.interval) return;
     this.interval = setInterval(() => { this.poll().catch(console.error); }, pollIntervalMs);
     this.poll().catch(console.error);
   }

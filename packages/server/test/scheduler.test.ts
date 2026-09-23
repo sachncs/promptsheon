@@ -24,6 +24,22 @@ describe('Scheduler lifecycle', () => {
     expect(findDueSchedules).toHaveBeenCalledTimes(callsBeforeStop);
   });
 
+  it('does not create duplicate polling intervals when started twice', async () => {
+    vi.useFakeTimers();
+    const findDueSchedules = vi.fn().mockResolvedValue([]);
+    const scheduler = new Scheduler(
+      { findDueSchedules } as never,
+      { broadcast: vi.fn() } as never,
+    );
+
+    scheduler.start(1000);
+    scheduler.start(1000);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(findDueSchedules).toHaveBeenCalledTimes(2);
+    scheduler.stop();
+  });
+
   it('advances a successful schedule instead of leaving it due immediately', async () => {
     const schedule = {
       id: 'schedule-1',

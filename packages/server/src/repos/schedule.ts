@@ -1,21 +1,38 @@
 import type { Schedule } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
-import { BaseRepo } from './base.js';
+import { BaseRepo, camelize, type Paginated } from './base.js';
 import { nextCronFire } from '../scheduler/cron.js';
+
+function toSchedule(row: Record<string, unknown>): Schedule {
+  const value = camelize(row);
+  return { ...value, enabled: Boolean(value['enabled']) } as unknown as Schedule;
+}
 
 export class ScheduleRepo extends BaseRepo<Schedule> {
   constructor(db: Database.Database) {
     super(db, 'schedules');
   }
 
+  override findById(id: string): Schedule | null {
+    const schedule = super.findById(id);
+    return schedule ? toSchedule(schedule as unknown as Record<string, unknown>) : null;
+  }
+
+  override findMany(opts: { page: number; pageSize: number }): Paginated<Schedule> {
+    const result = super.findMany(opts);
+    return { ...result, items: result.items.map((schedule) => toSchedule(schedule as unknown as Record<string, unknown>)) };
+  }
+
   findDueSchedules(now: Date): Schedule[] {
-    return this.db.prepare("SELECT * FROM schedules WHERE enabled = 1 AND next_fire_at <= ?")
-      .all(now.toISOString()) as Schedule[];
+    const rows = this.db.prepare("SELECT * FROM schedules WHERE enabled = 1 AND next_fire_at <= ?")
+      .all(now.toISOString()) as Array<Record<string, unknown>>;
+    return rows.map(toSchedule);
   }
 
   findByReleaseId(releaseId: string): Schedule[] {
-    return this.db.prepare('SELECT * FROM schedules WHERE release_id = ?')
-      .all(releaseId) as Schedule[];
+    const rows = this.db.prepare('SELECT * FROM schedules WHERE release_id = ?')
+      .all(releaseId) as Array<Record<string, unknown>>;
+    return rows.map(toSchedule);
   }
 
   create(data: { workspaceId: string; releaseId: string; kind: string; cron: string; enabled?: boolean }): Schedule {
