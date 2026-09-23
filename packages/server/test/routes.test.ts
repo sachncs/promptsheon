@@ -17,6 +17,9 @@ describe('Fastify routes', () => {
     await runMigrations(db);
 
     app = Fastify({ logger: false });
+    app.addHook('onRequest', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = 'legacy';
+    });
     const workspaceRepo = new WorkspaceRepo(db);
     registerWorkspaceRoutes(app, new WorkspaceService(workspaceRepo));
     registerHealthRoutes(app, db);

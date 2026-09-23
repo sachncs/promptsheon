@@ -8,29 +8,34 @@ export interface WorkspaceStore {
   create(input: { name: string; organization?: string }): Workspace;
   update(id: string, input: Partial<Pick<Workspace, 'name' | 'organization'>>): Workspace | null;
   delete(id: string): boolean;
+  findByIdInOrg(id: string, organizationId: string): Workspace | null;
+  findManyInOrg(organizationId: string, options: { page: number; pageSize: number }): Paginated<Workspace>;
+  createInOrg(input: { name: string; organization?: string }, organizationId: string): Workspace | null;
+  updateInOrg(id: string, organizationId: string, input: Partial<Pick<Workspace, 'name' | 'organization'>>): Workspace | null;
+  deleteInOrg(id: string, organizationId: string): boolean;
 }
 
 /** Application service for workspace lifecycle operations. */
 export class WorkspaceService {
   constructor(private readonly store: WorkspaceStore) {}
 
-  list(options: { page: number; pageSize: number }): Paginated<Workspace> {
-    return this.store.findMany(options);
+  list(organizationId: string, options: { page: number; pageSize: number }): Paginated<Workspace> {
+    return this.store.findManyInOrg(organizationId, options);
   }
 
-  get(id: string): Workspace | null {
-    return this.store.findById(id);
+  get(id: string, organizationId: string): Workspace | null {
+    return this.store.findByIdInOrg(id, organizationId);
   }
 
-  create(input: { name: string; organization?: string }): Workspace {
-    return this.store.create(input);
+  create(input: { name: string; organization?: string }, organizationId: string): Workspace | null {
+    return this.store.createInOrg(input, organizationId);
   }
 
-  update(id: string, input: Partial<Pick<Workspace, 'name' | 'organization'>>): Workspace | null {
-    return this.store.update(id, input);
+  update(id: string, organizationId: string, input: Partial<Pick<Workspace, 'name' | 'organization'>>): Workspace | null {
+    return this.store.updateInOrg(id, organizationId, input);
   }
 
-  remove(id: string): boolean {
-    return this.store.delete(id);
+  remove(id: string, organizationId: string): boolean {
+    return this.store.deleteInOrg(id, organizationId);
   }
 }
