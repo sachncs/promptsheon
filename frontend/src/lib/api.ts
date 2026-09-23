@@ -13,6 +13,10 @@ export class ApiError extends Error {
   }
 }
 
+export function getErrorMessage(error: unknown, fallback = 'Something went wrong.'): string {
+  return error instanceof Error && error.message.trim() !== '' ? error.message : fallback;
+}
+
 const client = axios.create({
   baseURL: '/api',
   timeout: 15_000,

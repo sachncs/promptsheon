@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, Plus, Trash2 } from 'lucide-react';
-import { scheduleApi, workspaceApi, releaseApi, projectApi, unwrapList } from '@/lib/api';
+import { getErrorMessage, scheduleApi, workspaceApi, releaseApi, projectApi, unwrapList } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -28,6 +28,11 @@ interface ScheduleItem {
   nextRunAt?: string | null;
 }
 
+interface ProjectItem {
+  id: string;
+  name?: string;
+}
+
 interface ReleaseLite {
   id: string;
   capabilityName?: string;
@@ -41,6 +46,20 @@ const KIND_OPTIONS = [
   { value: 'release-rotation', label: 'Release rotation' },
 ] as const;
 
+type ScheduleKind = typeof KIND_OPTIONS[number]['value'];
+
+function isScheduleKind(value: string): value is ScheduleKind {
+  return KIND_OPTIONS.some((option) => option.value === value);
+}
+
+function stringField(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function numberField(value: unknown): number | undefined {
+  return typeof value === 'number' ? value : undefined;
+}
+
 export default function SchedulesPage() {
   const session = useRequireSession();
   const qc = useQueryClient();
@@ -49,7 +68,7 @@ export default function SchedulesPage() {
     queryKey: ['workspaces'],
     queryFn: () => workspaceApi.list(1).then((r) => r.data),
   });
-  const wsFirst = Array.isArray(workspaces.data) ? workspaces.data[0] as { id?: string } : undefined;
+  const wsFirst = workspaces.data?.[0];
   const wsId = wsFirst?.id;
 
   const projects = useQuery({
@@ -57,20 +76,20 @@ export default function SchedulesPage() {
     queryFn: () => (wsId ? projectApi.list(wsId).then((r) => r.data) : Promise.resolve([])),
     enabled: Boolean(wsId),
   });
-  const projectList = Array.isArray(projects.data) ? projects.data as Array<{ id: string; name?: string }> : [];
+  const projectList = unwrapList<ProjectItem>(projects.data);
 
   const allReleases = useQuery({
     queryKey: ['releases-for-schedules', projectList.map((p) => p.id)],
     queryFn: async (): Promise<ReleaseLite[]> => {
       const byProject = await Promise.all(projectList.map(async (p) => {
         const data = await releaseApi.list(p.id).then((res) => res.data);
-        if (!Array.isArray(data)) throw new Error(`Invalid releases response for ${p.name ?? p.id}`);
-        return data.map((rel) => {
-          const lite: ReleaseLite = { id: String((rel as { id?: unknown }).id ?? '') };
+        const releaseRows = unwrapList<Record<string, unknown>>(data);
+        return releaseRows.map((rel) => {
+          const lite: ReleaseLite = { id: stringField(rel['id']) ?? '' };
           if (p.name !== undefined) lite.capabilityName = p.name;
-          const cv = Number((rel as { capabilityVersion?: unknown }).capabilityVersion ?? 0);
-          if (cv) lite.capabilityVersion = cv;
-          const env = (rel as { environment?: unknown }).environment as string | undefined;
+          const cv = numberField(rel['capabilityVersion']);
+          if (cv !== undefined) lite.capabilityVersion = cv;
+          const env = stringField(rel['environment']);
           if (env !== undefined) lite.environment = env;
           return lite;
         });
@@ -87,7 +106,7 @@ export default function SchedulesPage() {
   const rows = schedules.data ?? [];
 
   const [releaseId, setReleaseId] = useState('');
-  const [kind, setKind] = useState<typeof KIND_OPTIONS[number]['value']>('eval');
+  const [kind, setKind] = useState<ScheduleKind>('eval');
   const [cron, setCron] = useState('0 */6 * * *');
 
   const create = useMutation({
@@ -107,12 +126,20 @@ export default function SchedulesPage() {
   });
 
   if (!session) return null;
-  if (workspaces.isError) return <QueryError message={(workspaces.error as Error).message} onRetry={() => void workspaces.refetch()} />;
-  if (projects.isError) return <QueryError message={(projects.error as Error).message} onRetry={() => void projects.refetch()} />;
-  if (allReleases.isError) return <QueryError message={(allReleases.error as Error).message} onRetry={() => void allReleases.refetch()} />;
-  if (schedules.isError) return <QueryError message={(schedules.error as Error).message} onRetry={() => void schedules.refetch()} />;
+  if (workspaces.isError) return <QueryError message={getErrorMessage(workspaces.error)} onRetry={() => void workspaces.refetch()} />;
+  if (projects.isError) return <QueryError message={getErrorMessage(projects.error)} onRetry={() => void projects.refetch()} />;
+  if (allReleases.isError) return <QueryError message={getErrorMessage(allReleases.error)} onRetry={() => void allReleases.refetch()} />;
+  if (schedules.isError) return <QueryError message={getErrorMessage(schedules.error)} onRetry={() => void schedules.refetch()} />;
+  if (workspaces.isPending || projects.isPending || (projectList.length > 0 && allReleases.isPending) || schedules.isPending) {
+    return (
+      <div className="space-y-6" aria-busy="true">
+        <PageHeader eyebrow="Release" title="Schedules" subtitle="Cron-based schedules for eval runs, release rotations, and self-evolve cycles." />
+        <Surface className="h-72 animate-pulse bg-surface-2/40"><span className="sr-only">Loading schedules</span></Surface>
+      </div>
+    );
+  }
 
-  const releases = (allReleases.data ?? []) as ReleaseLite[];
+  const releases = allReleases.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -125,7 +152,7 @@ export default function SchedulesPage() {
       <Surface>
         <SurfaceHeader
           title="New schedule"
-          description={wsId ? `In workspace ${wsFirst?.id?.slice(0, 8) ?? ''}` : 'No workspace available'}
+          description={wsId ? `In workspace ${wsFirst?.name ?? wsId.slice(0, 8)}` : 'Create a workspace before scheduling a release.'}
         />
         <div className="grid gap-3 sm:grid-cols-4">
           <div>
@@ -149,7 +176,7 @@ export default function SchedulesPage() {
             <div className="mt-2">
               <ThemedSelect
                 value={kind}
-                onValueChange={(v) => setKind(v as typeof KIND_OPTIONS[number]['value'])}
+                onValueChange={(v) => { if (isScheduleKind(v)) setKind(v); }}
                 options={KIND_OPTIONS.map((k) => ({ value: k.value, label: k.label }))}
                 ariaLabel="Schedule kind"
                 triggerClassName="w-full"
@@ -169,7 +196,7 @@ export default function SchedulesPage() {
           <div className="flex items-end">
             <Button
               onClick={() => create.mutate()}
-              disabled={!releaseId || !cron || create.isPending}
+              disabled={!wsId || !releaseId || !cron.trim() || create.isPending}
               className="w-full"
             >
               <Plus className="mr-1.5 size-3.5" />
@@ -177,8 +204,9 @@ export default function SchedulesPage() {
             </Button>
           </div>
         </div>
-        {create.isError && (
-          <div className="mt-3 text-xs text-destructive">{(create.error as Error).message}</div>
+        {create.isError && <div role="alert" className="mt-3 text-xs text-destructive">{getErrorMessage(create.error, 'The schedule could not be created.')}</div>}
+        {!allReleases.isPending && releases.length === 0 && wsId && (
+          <p className="mt-3 text-xs text-text-muted">Publish a release first; schedules can only target published releases.</p>
         )}
       </Surface>
 
@@ -198,35 +226,35 @@ export default function SchedulesPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
+            rows={rows}
+            rowKey={(r) => r.id}
             columns={[
               {
                 key: 'kind',
                 header: 'Kind',
-                render: (r) => <Badge>{String(r['kind'] ?? 'eval')}</Badge>,
+                render: (r) => <Badge>{r.kind ?? 'eval'}</Badge>,
               },
               {
                 key: 'release',
                 header: 'Release',
                 render: (r) => (
-                  <span className="font-mono text-xs text-text-muted">{String(r['releaseId'] ?? '—').slice(0, 16)}…</span>
+                  <span className="font-mono text-xs text-text-muted">{r.releaseId ? `${r.releaseId.slice(0, 16)}…` : '—'}</span>
                 ),
               },
               {
                 key: 'cron',
                 header: 'Cron',
-                render: (r) => <code className="font-mono text-xs">{String(r['cron'] ?? '—')}</code>,
+                render: (r) => <code className="font-mono text-xs">{r.cron ?? '—'}</code>,
               },
               {
                 key: 'last',
                 header: 'Last run',
-                render: (r) => r['lastRunAt'] ? new Date(String(r['lastRunAt'])).toLocaleString() : '—',
+                render: (r) => r.lastRunAt ? new Date(r.lastRunAt).toLocaleString() : '—',
               },
               {
                 key: 'next',
                 header: 'Next run',
-                render: (r) => r['nextRunAt'] ? new Date(String(r['nextRunAt'])).toLocaleString() : '—',
+                render: (r) => r.nextRunAt ? new Date(r.nextRunAt).toLocaleString() : '—',
               },
               {
                 key: 'actions',
@@ -235,10 +263,13 @@ export default function SchedulesPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => remove.mutate(String(r['id']))}
+                    onClick={() => {
+                      if (window.confirm('Delete this schedule? This cannot be undone.')) remove.mutate(r.id);
+                    }}
+                    disabled={remove.isPending}
                   >
                     <Trash2 className="mr-1 size-3" />
-                    Delete
+                    {remove.isPending ? 'Deleting…' : 'Delete'}
                   </Button>
                 ),
               },
