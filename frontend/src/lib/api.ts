@@ -1,5 +1,17 @@
 import axios from 'axios';
-import { getSession } from './session';
+import { clearSession, getSession } from './session';
+
+export class ApiError extends Error {
+  readonly status: number | undefined;
+  readonly code: string | undefined;
+
+  constructor(message: string, options: { status?: number | undefined; code?: string | undefined } = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = options.status;
+    this.code = options.code;
+  }
+}
 
 const client = axios.create({
   baseURL: '/api',
@@ -24,8 +36,18 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (res) => res,
   (err) => {
-    const message = err.response?.data?.error?.message ?? err.message;
-    return Promise.reject(new Error(message));
+    const status = typeof err.response?.status === 'number' ? err.response.status : undefined;
+    const payload = err.response?.data?.error;
+    const message = typeof payload?.message === 'string'
+      ? payload.message
+      : err.code === 'ECONNABORTED'
+        ? 'The request timed out. Please try again.'
+        : err.message || 'The request failed.';
+    if (status === 401) clearSession();
+    return Promise.reject(new ApiError(message, {
+      status,
+      code: typeof payload?.code === 'string' ? payload.code : undefined,
+    }));
   },
 );
 
