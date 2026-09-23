@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Cog, Save } from 'lucide-react';
-import { settingsApi } from '@/lib/api';
+import { settingsApi, unwrapList } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { QueryError } from '@/components/brand/query-error';
 
 interface SettingItem {
   key: string;
@@ -37,10 +38,10 @@ export default function SettingsPage() {
 
   const settings = useQuery({
     queryKey: ['settings'],
-    queryFn: () => settingsApi.list().then((r) => r.data).catch(() => ({ settings: [] as SettingItem[] })),
+    queryFn: () => settingsApi.list().then((r) => r.data),
   });
 
-  const list = ((settings.data as { settings?: SettingItem[] } | undefined)?.settings ?? []) as SettingItem[];
+  const list = unwrapList<SettingItem>(settings.data);
   const known = KNOWN_KEYS.map((k) => {
     const found = list.find((s) => s.key === k.key);
     return { ...k, current: found?.value, updatedAt: found?.updatedAt };
@@ -64,6 +65,9 @@ export default function SettingsPage() {
   });
 
   if (!session) return null;
+  if (settings.isError) {
+    return <QueryError message={settings.error instanceof Error ? settings.error.message : 'You do not have permission to view settings.'} onRetry={() => void settings.refetch()} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -83,12 +87,12 @@ export default function SettingsPage() {
           {known.map((k) => {
             const dirty = (draft[k.key] ?? '') !== (k.current !== undefined && k.current !== null ? String(k.current) : '');
             return (
-              <div key={k.key} className="grid grid-cols-12 items-center gap-4 px-5 py-4">
-                <div className="col-span-4">
+              <div key={k.key} className="grid grid-cols-1 items-start gap-3 px-5 py-4 md:grid-cols-12 md:items-center md:gap-4">
+                <div className="md:col-span-4">
                   <div className="text-sm font-medium text-text-strong">{k.label}</div>
                   <code className="font-mono text-xs text-text-subtle">{k.key}</code>
                 </div>
-                <div className="col-span-5">
+                <div className="md:col-span-5">
                   <Input
                     value={draft[k.key] ?? ''}
                     onChange={(e) => setDraft((prev) => ({ ...prev, [k.key]: e.target.value }))}
@@ -97,14 +101,15 @@ export default function SettingsPage() {
                   />
                   <p className="mt-1 text-xs text-text-muted">{k.description}</p>
                 </div>
-                <div className="col-span-2 text-xs text-text-subtle">
+                <div className="text-xs text-text-subtle md:col-span-2">
                   {k.updatedAt ? new Date(k.updatedAt).toLocaleDateString() : '—'}
                 </div>
-                <div className="col-span-1 flex justify-end">
+                <div className="flex justify-start md:col-span-1 md:justify-end">
                   <Button
                     size="sm"
                     variant={dirty ? 'default' : 'outline'}
                     disabled={!dirty || save.isPending}
+                    aria-label={`Save ${k.label}`}
                     onClick={() => {
                       const raw = draft[k.key] ?? '';
                       let parsed: unknown = raw;
@@ -123,6 +128,14 @@ export default function SettingsPage() {
           })}
         </div>
       </Surface>
+
+      {save.isError && (
+        <Surface className="border-destructive/30 bg-destructive/5">
+          <p className="text-sm text-destructive">
+            {save.error instanceof Error ? save.error.message : 'The setting could not be saved. Try again.'}
+          </p>
+        </Surface>
+      )}
 
       {extras.length > 0 && (
         <Surface padded={false}>
