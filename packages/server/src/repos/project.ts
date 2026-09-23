@@ -1,6 +1,6 @@
 import type { Project } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
-import { BaseRepo } from './base.js';
+import { BaseRepo, camelize } from './base.js';
 
 export class ProjectRepo extends BaseRepo<Project> {
   constructor(db: Database.Database) {
@@ -9,7 +9,8 @@ export class ProjectRepo extends BaseRepo<Project> {
 
   findByWorkspaceId(workspaceId: string): Project[] {
     return this.db.prepare('SELECT * FROM projects WHERE workspace_id = ?')
-      .all(workspaceId) as Project[];
+      .all(workspaceId)
+      .map((row) => camelize(row as Record<string, unknown>) as unknown as Project);
   }
 
   create(data: { workspaceId: string; name: string; description?: string }): Project {

@@ -50,6 +50,7 @@ describe('capability routes', () => {
     const items = listed.json<Array<{ name: string }>>();
     expect(items).toHaveLength(1);
     expect(items[0]?.name).toBe('refund-triage');
+    expect((items[0] as { selfEvolveEnabled: unknown }).selfEvolveEnabled).toBe(false);
   });
 
   it('validates ids and returns not found for missing capabilities', async () => {

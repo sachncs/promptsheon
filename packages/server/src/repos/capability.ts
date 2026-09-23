@@ -1,15 +1,26 @@
 import type { Capability } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
-import { BaseRepo } from './base.js';
+import { BaseRepo, camelize } from './base.js';
+
+function toCapability(row: Record<string, unknown>): Capability {
+  const value = camelize(row) as unknown as Capability;
+  return { ...value, selfEvolveEnabled: Boolean(row.self_evolve_enabled) };
+}
 
 export class CapabilityRepo extends BaseRepo<Capability> {
   constructor(db: Database.Database) {
     super(db, 'capabilities');
   }
 
+  override findById(id: string): Capability | null {
+    const row = this.db.prepare('SELECT * FROM capabilities WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    return row ? toCapability(row) : null;
+  }
+
   findByProjectId(projectId: string): Capability[] {
     return this.db.prepare('SELECT * FROM capabilities WHERE project_id = ?')
-      .all(projectId) as Capability[];
+      .all(projectId)
+      .map((row) => toCapability(row as Record<string, unknown>));
   }
 
   create(data: { projectId: string; name: string; description?: string }): Capability {
