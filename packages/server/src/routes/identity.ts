@@ -62,6 +62,18 @@ export interface IdentityDeps {
   db: Database.Database;
 }
 
+function requireOrganization(
+  request: { orgContext?: { orgId?: string }; agentOrgId?: string },
+  reply: { code: (status: number) => { send: (body: unknown) => unknown } },
+): string | null {
+  const organizationId = request.orgContext?.orgId ?? request.agentOrgId;
+  if (!organizationId) {
+    void reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'organization context is required' } });
+    return null;
+  }
+  return organizationId;
+}
+
 /**
  * Register the agent-identity routes. Three endpoints:
  *
@@ -100,6 +112,11 @@ export function registerIdentityRoutes(app: FastifyInstance, deps: IdentityDeps)
             issues: parsed.error.issues,
           },
         });
+      }
+      const organizationId = requireOrganization(request, reply);
+      if (!organizationId) return;
+      if (parsed.data.organizationId !== organizationId) {
+        return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
       }
       const material = mintApiKey({
         agentId: parsed.data.agentId,
@@ -149,6 +166,11 @@ export function registerIdentityRoutes(app: FastifyInstance, deps: IdentityDeps)
           },
         });
       }
+      const organizationId = requireOrganization(request, reply);
+      if (!organizationId) return;
+      if (parsed.data.organizationId !== organizationId) {
+        return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
+      }
       let token: string;
       try {
         token = mintSVID({
@@ -197,9 +219,11 @@ export function registerIdentityRoutes(app: FastifyInstance, deps: IdentityDeps)
     { preHandler: adminOrApproverRevoke },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      const organizationId = requireOrganization(request, reply);
+      if (!organizationId) return;
       const row = deps.db
-        .prepare('SELECT * FROM agent_identities WHERE id = ?')
-        .get(id) as AgentIdentityRow | undefined;
+        .prepare('SELECT * FROM agent_identities WHERE id = ? AND organization_id = ?')
+        .get(id, organizationId) as AgentIdentityRow | undefined;
       if (!row) {
         return reply.code(404).send({
           error: { code: 'IDENTITY_NOT_FOUND', message: `identity ${id} not found` },
@@ -219,8 +243,8 @@ export function registerIdentityRoutes(app: FastifyInstance, deps: IdentityDeps)
         // Apikeys are long-lived; mark revoked_at so the verifier
         // rejects them.
         deps.db
-          .prepare('UPDATE agent_identities SET revoked_at = ? WHERE id = ?')
-          .run(new Date().toISOString(), id);
+          .prepare('UPDATE agent_identities SET revoked_at = ? WHERE id = ? AND organization_id = ?')
+          .run(new Date().toISOString(), id, organizationId);
       }
       return reply.code(204).send();
     },
