@@ -133,7 +133,7 @@ describe('Team + SCIM routes', () => {
       void t;
       teamId = db
         .prepare(
-          `INSERT INTO teams (id, org_id, organisation_id, name, slug, description, created_at, updated_at) VALUES ('t1','org-1','org-1','Core','core','',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+          `INSERT INTO teams (id, org_id, organisation_id, name, slug, description, created_at, updated_at) VALUES ('t1','00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','Core','core','',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
         )
         .run().lastInsertRowid as string;
       const r = await app.inject({
@@ -142,6 +142,18 @@ describe('Team + SCIM routes', () => {
         payload: { userId: 'u1', role: 'member' },
       });
       void r;
+    });
+
+    it('rejects membership changes for a team in another organization', async () => {
+      const { app, db } = buildApp('admin');
+      db.prepare(`INSERT INTO orgs (id,name,slug,created_at,updated_at) VALUES ('org-other','Other','other',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).run();
+      db.prepare(`INSERT INTO teams (id,org_id,organisation_id,name,slug,description,created_at,updated_at) VALUES ('foreign-team','org-other','org-other','Foreign','foreign','',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).run();
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/teams/foreign-team/members',
+        payload: { userId: 'u1', role: 'member' },
+      });
+      expect(response.statusCode).toBe(404);
     });
 
     it('admin can add and remove members', async () => {
@@ -153,7 +165,7 @@ describe('Team + SCIM routes', () => {
         `INSERT INTO users (id, email, name, role, created_at, updated_at) VALUES ('u1', 'a@b.test', 'A', 'member', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
       ).run();
       await db.prepare(
-        `INSERT INTO teams (id, org_id, organisation_id, name, slug, description, created_at, updated_at) VALUES ('t1','org-1','org-1','Core','core','',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+        `INSERT INTO teams (id, org_id, organisation_id, name, slug, description, created_at, updated_at) VALUES ('t1','00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','Core','core','',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
       ).run();
       const add = await app.inject({
         method: 'POST',

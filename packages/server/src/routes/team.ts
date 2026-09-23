@@ -116,10 +116,13 @@ export function registerTeamRoutes(
 
   app.post('/api/teams/:id/members', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const orgId = orgOf(request);
+    if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT' } });
     const parsed = parseBody(reply, AddMemberSchema, request.body);
     if (!parsed.ok) return;
     if (actorRole(request) !== 'admin') return reply.code(403).send({ error: { code: 'INSUFFICIENT_ROLE' } });
-    const member = deps.teamRepo.addMember(id, parsed.data.userId, parsed.data.role);
+    const member = deps.teamRepo.addMemberInOrg(id, orgId, parsed.data.userId, parsed.data.role);
+    if (!member) return reply.code(404).send({ error: { code: 'NOT_FOUND' } });
     deps.auditChain.append({
       userId: (request as RequestUserContext).userId ?? 'system',
       action: 'team.add_member',
@@ -133,8 +136,10 @@ export function registerTeamRoutes(
 
   app.delete('/api/teams/:teamId/members/:userId', async (request, reply) => {
     const { teamId, userId } = request.params as { teamId: string; userId: string };
+    const orgId = orgOf(request);
+    if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT' } });
     if (actorRole(request) !== 'admin') return reply.code(403).send({ error: { code: 'INSUFFICIENT_ROLE' } });
-    const ok = deps.teamRepo.removeMember(teamId, userId);
+    const ok = deps.teamRepo.removeMemberInOrg(teamId, orgId, userId);
     if (!ok) return reply.code(404).send({ error: { code: 'NOT_FOUND' } });
     deps.auditChain.append({
       userId: (request as RequestUserContext).userId ?? 'system',

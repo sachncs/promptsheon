@@ -18,6 +18,16 @@ const UpdateRoleSchema = z.object({
 
 interface RequestUserContext {
   userId?: string;
+  agentOrgId?: string;
+  orgContext?: { orgId?: string; organizationId?: string };
+}
+
+function requireOrganization(request: unknown, reply: { code: (status: number) => { send: (body: unknown) => unknown } }): string | null {
+  const context = (request as RequestUserContext | undefined) ?? {};
+  const organizationId = context.orgContext?.orgId ?? context.orgContext?.organizationId ?? context.agentOrgId;
+  if (organizationId) return organizationId;
+  void reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+  return null;
 }
 
 function actorOf(request: unknown): string {
@@ -30,16 +40,17 @@ export function registerUserRoutes(
   deps: { userRepo: UserRepo; auditChain: AuditChain; membershipRepo?: MembershipRepo },
 ) {
   app.get('/api/users', { preHandler: requireAdmin() }, async (request, reply) => {
-    const orgId = request.orgContext?.orgId;
-    const users = orgId
-      ? deps.userRepo.listForOrg(orgId)
-      : deps.userRepo.list();
+    const orgId = requireOrganization(request, reply);
+    if (!orgId) return;
+    const users = deps.userRepo.listForOrg(orgId);
     return reply.send({ users });
   });
 
   app.get('/api/users/me', async (request, reply) => {
+    const orgId = requireOrganization(request, reply);
+    if (!orgId) return;
     const userId = actorOf(request);
-    const user = deps.userRepo.findById(userId);
+    const user = deps.userRepo.findByIdInOrg(userId, orgId);
     if (!user) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Current user not found' } });
     }
@@ -47,11 +58,10 @@ export function registerUserRoutes(
   });
 
   app.get('/api/users/:id', async (request, reply) => {
+    const orgId = requireOrganization(request, reply);
+    if (!orgId) return;
     const { id } = request.params as { id: string };
-    const orgId = request.orgContext?.orgId;
-    const user = orgId
-      ? deps.userRepo.findByIdInOrg(id, orgId)
-      : deps.userRepo.findById(id);
+    const user = deps.userRepo.findByIdInOrg(id, orgId);
     if (!user) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'User not found' } });
     }
@@ -59,17 +69,18 @@ export function registerUserRoutes(
   });
 
   app.post('/api/users', { preHandler: requireAdmin() }, async (request, reply) => {
+    const orgId = requireOrganization(request, reply);
+    if (!orgId) return;
     const parsed = parseBody(reply, CreateUserSchema, request.body);
     if (!parsed.ok) return;
-    const user = deps.userRepo.create(parsed.data);
-    const context = request.orgContext;
-    if (context?.orgId && deps.membershipRepo) {
+    const user = deps.userRepo.createInOrg(parsed.data, orgId);
+    if (deps.membershipRepo) {
       const role = parsed.data.role === 'admin'
         ? 'admin'
         : parsed.data.role === 'editor'
           ? 'editor'
           : 'viewer';
-      deps.membershipRepo.addOrgMember(context.orgId, user.id, role);
+      deps.membershipRepo.addOrgMember(orgId, user.id, role);
     }
     deps.auditChain.append({
       userId: actorOf(request),
@@ -83,17 +94,16 @@ export function registerUserRoutes(
   });
 
   app.put('/api/users/:id/role', { preHandler: requireAdmin() }, async (request, reply) => {
+    const orgId = requireOrganization(request, reply);
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, UpdateRoleSchema, request.body);
     if (!parsed.ok) return;
-    const orgId = request.orgContext?.orgId;
-    const existing = orgId
-      ? deps.userRepo.findByIdInOrg(id, orgId)
-      : deps.userRepo.findById(id);
+    if (!orgId) return;
+    const existing = deps.userRepo.findByIdInOrg(id, orgId);
     if (!existing) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'User not found' } });
     }
-    const user = deps.userRepo.updateRole(id, parsed.data.role);
+    const user = deps.userRepo.updateRoleInOrg(id, orgId, parsed.data.role);
     if (!user) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'User not found' } });
     }
