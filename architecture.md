@@ -8,6 +8,10 @@ subtitle: How the backend, the agents, and the audit chain fit together.
 
 Promptsheon is a TypeScript monorepo. This page describes the on-disk architecture, the runtime architecture, and the cross-cutting concerns (auth, audit, observability).
 
+The detailed engineering guide is [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+It defines the clean-architecture dependency direction, module extension
+workflow, testing matrix, and production operating rules.
+
 ## Repository layout
 
 ```
@@ -95,7 +99,7 @@ When `PROMPTSHEON_AUTH=true` and no Bearer or SVID header is present, the middle
 
 ### Authorization
 
-Cedar policies under `packages/server/policies/promptsheon.cedar` are the single source of truth for every authorization decision. The `CedarAuthorizer` is loaded at boot and invoked by the gate middleware. The smoke-test route is `/api/orgs/:orgId/teams` (see `routes/org-team.ts`). Callers that haven't migrated to the gate yet can still use the legacy `requireRole()` helper in `middleware/org-context.ts`.
+Cedar policies under `packages/server/policies/promptsheon.cedar` are the single source of truth for every authorization decision. The `CedarAuthorizer` is loaded at boot and invoked by the gate middleware. The smoke-test route is `/api/orgs/:orgId/teams` (see `routes/org-team.ts`). Organization-scoped routes require the verified context from `orgContextMiddleware`; new code must not introduce global-query or role-fallback paths.
 
 ### Audit chain
 

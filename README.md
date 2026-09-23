@@ -29,6 +29,11 @@ and you have a fully working prompt-management platform with
 multi-provider LLM, an audit chain, webhooks, eval scorers, and a
 live DAG editor.
 
+For development and contribution work, start with the
+[engineering guide](docs/DEVELOPMENT.md). It documents the clean-architecture
+boundaries, environment setup, testing strategy, production operation, and
+the explicit breaking-change policy.
+
 Built on the
 [`@strands-agents/sdk`](https://github.com/strands-agents/harness-sdk) for
 every AI call: planning is a 5-agent `Swarm`, execution is a `Graph`
