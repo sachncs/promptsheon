@@ -344,6 +344,7 @@ async function main() {
       vaultRepo: repos.vault,
       orgExportService: repos.orgExport,
       costRollupRepo: repos.costRollup,
+      searchRepo: repos.search,
       kms: repos.vault.kms,
       adminOnly,
     },

@@ -41,6 +41,7 @@ import { WebhookRepo } from './webhook.js';
 import { OutgoingWebhookRepo } from './outgoing-webhook.js';
 import { IdempotencyRepo } from './idempotency.js';
 import { ReleaseOverlayRepo } from './release-overlay.js';
+import { SearchRepo } from './search.js';
 
 /**
  * Bundle of every repo in the server. Built once from a
@@ -95,6 +96,7 @@ export interface Repos {
   outgoingWebhook: OutgoingWebhookRepo;
   releaseOverlay: ReleaseOverlayRepo;
   idempotency: IdempotencyRepo;
+  search: SearchRepo;
 }
 
 /**
@@ -155,6 +157,7 @@ export function buildRepos(db: Database.Database): Repos {
     outgoingWebhook: new OutgoingWebhookRepo(db),
     releaseOverlay: new ReleaseOverlayRepo(db),
     idempotency: new IdempotencyRepo(db),
+    search: new SearchRepo(db),
   };
 }
 

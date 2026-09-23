@@ -4,6 +4,7 @@ import { parseBody } from './validate.js';
 import type { VaultRepo, Kms } from '../repos/vault.js';
 import type { OrgExportService } from '../repos/vault-extras.js';
 import type { CostRollupRepo } from '../repos/vault-extras.js';
+import type { SearchRepo } from '../repos/search.js';
 
 const VaultSetSchema = z.object({
   organizationId: z.string(),
@@ -41,6 +42,7 @@ export interface VaultRouteDeps {
   vaultRepo: VaultRepo;
   orgExportService: OrgExportService;
   costRollupRepo: CostRollupRepo;
+  searchRepo: SearchRepo;
   kms: Kms;
   adminOnly: (request: unknown) => boolean;
 }
@@ -196,13 +198,6 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
   app.get('/api/search', async (request, reply) => {
     const { q, type } = request.query as { q?: string; type?: string };
     if (!q || q.length < 2) return reply.send([]);
-    const where = type ? 'AND kind = ?' : '';
-    const params: unknown[] = [escapeFts(q)];
-    if (type) params.push(type);
-    const db = (deps.costRollupRepo as unknown as { db: { prepare: (s: string) => { all: (...p: unknown[]) => Array<{ kind: string; resource_id: string; title: string; body: string }> } } }).db;
-    const rows = db
-      .prepare(`SELECT kind, resource_id, title, body FROM search_index WHERE search_index MATCH ? ${where} ORDER BY rank LIMIT 50`)
-      .all(...params);
-    return reply.send(rows);
+    return reply.send(deps.searchRepo.search(escapeFts(q), type));
   });
 }
