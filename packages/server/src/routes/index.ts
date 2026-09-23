@@ -187,7 +187,6 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     executionRepo: deps.executionRepo,
     releaseRepo: deps.releaseRepo,
     manifestRepo: deps.manifestRepo,
-    versionRepo: deps.versionRepo,
     traceRepo: deps.traceRepo,
     executor: deps.executor,
     sseHub: deps.sseHub,

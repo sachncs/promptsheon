@@ -139,7 +139,6 @@ async function setupHarness(): Promise<TestHarness> {
       executionRepo,
       releaseRepo: { findActiveByManifestHashInOrg: () => [] } as never,
       manifestRepo,
-      versionRepo: { findById: () => null } as never,
       traceRepo,
       executor,
     });

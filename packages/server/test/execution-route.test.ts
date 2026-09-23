@@ -109,7 +109,6 @@ describe('POST /api/executions', () => {
         executor,
         sseHub: hub,
         releaseRepo: { findActiveByManifestHashInOrg: () => [{ id: 'rel-sse', canaryPercent: 0 }] } as never,
-        versionRepo: { findById: () => null } as never,
         traceRepo: { startRun: () => ({ id: 'stub-trace' }), finalize: () => undefined } as never,
       });
     });

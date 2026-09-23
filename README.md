@@ -373,7 +373,7 @@ chore: bump @strands-agents/sdk to 1.14
   webhooks + replay protection, chaos hooks, OpenTelemetry.
 - **v0.4.2** (current) — admin gates on 14 management routes,
   maker-checker gate now fires correctly for self-approvals,
-  `/api/invoke` SDK alias, `/api/goals/:hash` drilldown, DAG
+  `/api/executions` workflow, `/api/goals/:hash` drilldown, DAG
   editor drafts persist, `BaseRepo` camelCase mapper,
   Playwright tier suite rewritten against the new contracts
   (619 server tests + 41-route smoke + 5 new auth/forms/audit/

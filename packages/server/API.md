@@ -87,7 +87,7 @@ All endpoints live under `/api/`. Endpoints with `:id` style parameters expect a
 |--------|------|---------|------|----------|
 | `GET` | `/api/executions` | List executions (paginated, optionally filtered by `capabilityVersionId`) | — | `200 Execution[]` |
 | `GET` | `/api/executions/:id` | Fetch one execution | — | `200 Execution` / `404` |
-| `POST` | `/api/invoke` | Invoke a capability version via the Strands `InvocationAgent`; persists the execution | `InvokeExecutionSchema` (`capabilityVersionId`, `inputs`, `environment?`, `traceId?`) | `200 Execution` |
+| `POST` | `/api/executions` | Execute the manifest selected by an active release; persists the execution | `ExecuteManifestSchema` (`manifestHash`, `inputs`, `environment?`, `traceId?`) | `200 Execution` |
 
 ---
 
