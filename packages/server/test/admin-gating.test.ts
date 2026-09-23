@@ -93,6 +93,11 @@ describe('admin gating', () => {
       });
       expect(r.statusCode).toBe(200);
     });
+
+    it('200 on GET /api/settings', async () => {
+      const r = await ctx.app.inject({ method: 'GET', url: '/api/settings' });
+      expect(r.statusCode).toBe(200);
+    });
   });
 
   describe('reader role', () => {
@@ -122,6 +127,16 @@ describe('admin gating', () => {
         url: '/api/settings/foo',
         payload: { value: 'bar' },
       });
+      expect(r.statusCode).toBe(403);
+    });
+
+    it('403 on GET /api/settings', async () => {
+      const r = await ctx.app.inject({ method: 'GET', url: '/api/settings' });
+      expect(r.statusCode).toBe(403);
+    });
+
+    it('403 on GET /api/settings/foo', async () => {
+      const r = await ctx.app.inject({ method: 'GET', url: '/api/settings/foo' });
       expect(r.statusCode).toBe(403);
     });
 
