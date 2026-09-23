@@ -217,6 +217,24 @@ export class ReleaseRepo extends BaseRepo<Release> {
     });
   }
 
+  findActiveByManifestHashInOrg(manifestHash: string, organizationId: string): Release[] {
+    return this.db.prepare(
+      `SELECT r.* FROM releases r
+       JOIN capabilities c ON c.id = r.capability_id
+       JOIN projects p ON p.id = c.project_id
+       JOIN workspaces w ON w.id = p.workspace_id
+       WHERE r.status = 'active' AND w.org_id = ?`,
+    ).all(organizationId)
+      .map((row) => toRelease(row as Record<string, unknown>))
+      .filter((release) => {
+        try {
+          const manifest = JSON.parse(release.manifest) as Record<string, unknown>;
+          if (manifest['manifestHash'] === manifestHash) return true;
+        } catch { /* fall through to raw blob hash */ }
+        return createHash('sha256').update(release.manifest).digest('hex') === manifestHash;
+      });
+  }
+
   /**
    * Find the most recent rolled-back release for a (capability, env) pair
    * with capability_version < currentVersion. Used by rollback to find

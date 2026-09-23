@@ -17,6 +17,17 @@ export class VersionRepo extends BaseRepo<CapabilityVersion> {
       .map((row) => toVersion(row as Record<string, unknown>));
   }
 
+  findByIdInOrg(id: string, organizationId: string): CapabilityVersion | null {
+    const row = this.db.prepare(
+      `SELECT v.* FROM capability_versions v
+       JOIN capabilities c ON c.id = v.capability_id
+       JOIN projects p ON p.id = c.project_id
+       JOIN workspaces w ON w.id = p.workspace_id
+       WHERE v.id = ? AND w.org_id = ?`,
+    ).get(id, organizationId) as Record<string, unknown> | undefined;
+    return row ? toVersion(row) : null;
+  }
+
   findByCapabilityAndVersion(capabilityId: string, version: number): CapabilityVersion | null {
     const row = this.db.prepare('SELECT * FROM capability_versions WHERE capability_id = ? AND version = ?')
       .get(capabilityId, version) as Record<string, unknown> | undefined;

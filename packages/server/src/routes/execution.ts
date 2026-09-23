@@ -103,8 +103,7 @@ export function registerExecutionRoutes(
     // Canary routing: when multiple active releases exist for this
     // manifest, distribute traffic by canaryPercent. With 0 or 1
     // active release, no routing is needed.
-    const activeReleases = deps.releaseRepo.findActiveByManifestHash(manifestHash)
-      .filter((release) => deps.releaseRepo.findByIdInOrg(release.id, organizationId));
+    const activeReleases = deps.releaseRepo.findActiveByManifestHashInOrg(manifestHash, organizationId);
     const pickedReleaseId = selectByCanary(
       activeReleases.map((r) => ({ id: r.id, canaryPercent: r.canaryPercent })),
     );
@@ -203,7 +202,7 @@ export function registerExecutionRoutes(
     const { capabilityVersionId, inputs, environment, traceId } = parsed.data;
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const version = deps.versionRepo.findById(capabilityVersionId);
+    const version = deps.versionRepo.findByIdInOrg(capabilityVersionId, organizationId);
     if (!version) {
       return reply.code(404).send({
         error: { code: 'VERSION_NOT_FOUND', message: 'capabilityVersionId not found' },
@@ -223,8 +222,7 @@ export function registerExecutionRoutes(
     if (!manifest) {
       throw new NotFoundError('manifest', manifestHash);
     }
-    const activeReleases = deps.releaseRepo.findActiveByManifestHash(manifestHash)
-      .filter((release) => deps.releaseRepo.findByIdInOrg(release.id, organizationId));
+    const activeReleases = deps.releaseRepo.findActiveByManifestHashInOrg(manifestHash, organizationId);
     if (activeReleases.length === 0) {
       return reply
         .code(404)

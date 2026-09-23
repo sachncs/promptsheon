@@ -137,7 +137,7 @@ async function setupHarness(): Promise<TestHarness> {
   await app.register(async (instance) => {
     await registerExecutionRoutes(instance, {
       executionRepo,
-      releaseRepo: { findActiveByManifestHash: () => [] } as never,
+      releaseRepo: { findActiveByManifestHashInOrg: () => [] } as never,
       manifestRepo,
       versionRepo: { findById: () => null } as never,
       traceRepo,
