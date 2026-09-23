@@ -9,6 +9,9 @@ const client = axios.create({
 
 client.interceptors.request.use((config) => {
   const session = getSession();
+  if (session?.apiKey) {
+    config.headers.set('Authorization', `Bearer ${session.apiKey}`);
+  }
   if (session?.userId) {
     config.headers.set('X-User-Id', session.userId);
   }
@@ -167,12 +170,17 @@ export const executionApi = {
     const controller = new AbortController();
     const base = baseURL();
     const url = `${base}/api/executions`;
+    const session = getSession();
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+      accept: 'text/event-stream',
+    };
+    if (session?.apiKey) headers.Authorization = `Bearer ${session.apiKey}`;
+    if (session?.userId) headers['X-User-Id'] = session.userId;
+    if (session?.orgId) headers['X-Org-Id'] = session.orgId;
     void fetch(url, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        accept: 'text/event-stream',
-      },
+      headers,
       body: JSON.stringify(data),
       signal: controller.signal,
     }).then(async (res) => {

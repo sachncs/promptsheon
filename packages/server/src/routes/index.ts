@@ -232,6 +232,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     membershipRepo: deps.membershipRepo,
     settingsResolver: deps.settingsResolver,
     llmRouter: deps.llmRouter,
+    apiKeyRepo: deps.apiKeyRepo,
   });
 
   registerRepoRoutes(app, {

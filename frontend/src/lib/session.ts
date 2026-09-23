@@ -5,6 +5,8 @@ export interface Session {
   orgId: string;
   orgName: string;
   provider?: string | null;
+  /** One-time bootstrap credential used for authenticated API requests. */
+  apiKey?: string;
   completedAt?: string;
 }
 

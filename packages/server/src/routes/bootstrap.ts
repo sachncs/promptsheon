@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { parseBody } from './validate.js';
@@ -6,6 +6,7 @@ import type { SettingsResolver } from '../settings/resolver.js';
 import type { UserRepo } from '../repos/user.js';
 import type { OrgRepo, MembershipRepo } from '../repos/org.js';
 import type { LlmRouter } from '../llm/router.js';
+import type { ApiKeyRepo } from '../repos/api-key.js';
 
 const CreateAdminSchema = z.object({
   adminName: z.string().min(1).max(120),
@@ -56,6 +57,7 @@ export function registerBootstrapRoutes(
     membershipRepo: MembershipRepo;
     settingsResolver: SettingsResolver;
     llmRouter: LlmRouter;
+    apiKeyRepo?: ApiKeyRepo;
   },
 ): void {
   app.get('/api/bootstrap/status', async (_request, reply) => {
@@ -118,9 +120,23 @@ export function registerBootstrapRoutes(
     });
     deps.membershipRepo.addOrgMember(org.id, user.id, 'admin');
 
+    const browserApiKey = deps.apiKeyRepo
+      ? `pk_${randomBytes(24).toString('hex')}`
+      : undefined;
+    if (browserApiKey && deps.apiKeyRepo) {
+      deps.apiKeyRepo.create({
+        userId: user.id,
+        name: 'browser-session',
+        keyHash: createHash('sha256').update(browserApiKey).digest('hex'),
+        keyPrefix: browserApiKey.slice(0, 12),
+        role: 'admin',
+      });
+    }
+
     return reply.code(201).send({
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
       org: { id: org.id, name: org.name, slug: org.slug },
+      ...(browserApiKey ? { apiKey: browserApiKey } : {}),
     });
   });
 
