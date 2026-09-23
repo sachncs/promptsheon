@@ -1,7 +1,11 @@
 import type { Release } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
-import { BaseRepo } from './base.js';
+import { BaseRepo, camelize } from './base.js';
+
+function toRelease(row: Record<string, unknown>): Release {
+  return camelize(row) as unknown as Release;
+}
 
 export class ReleaseRepo extends BaseRepo<Release> {
   constructor(db: Database.Database) {
@@ -10,17 +14,20 @@ export class ReleaseRepo extends BaseRepo<Release> {
 
   findByCapabilityId(capabilityId: string): Release[] {
     return this.db.prepare('SELECT * FROM releases WHERE capability_id = ?')
-      .all(capabilityId) as Release[];
+      .all(capabilityId)
+      .map((row) => toRelease(row as Record<string, unknown>));
   }
 
   findActive(capabilityId: string, environment: string): Release | null {
-    return this.db.prepare("SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'active'")
-      .get(capabilityId, environment) as Release | null;
+    const row = this.db.prepare("SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'active'")
+      .get(capabilityId, environment) as Record<string, unknown> | undefined;
+    return row ? toRelease(row) : null;
   }
 
   findByCapabilityAndEnv(capabilityId: string, environment: string): Release[] {
     return this.db.prepare('SELECT * FROM releases WHERE capability_id = ? AND environment = ?')
-      .all(capabilityId, environment) as Release[];
+      .all(capabilityId, environment)
+      .map((row) => toRelease(row as Record<string, unknown>));
   }
 
   create(data: { capabilityId: string; capabilityVersion: number; capabilityVersionId: string | null; manifest: string; environment: string; createdBy?: string; canaryPercent?: number }): Release {
@@ -89,13 +96,13 @@ export class ReleaseRepo extends BaseRepo<Release> {
   findActiveByCapabilityAndEnv(capabilityId: string, environment: string): Release[] {
     return this.db.prepare(
       "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'active'",
-    ).all(capabilityId, environment) as Release[];
+    ).all(capabilityId, environment).map((row) => toRelease(row as Record<string, unknown>));
   }
 
   findActiveByManifestHash(manifestHash: string): Release[] {
     const all = this.db.prepare(
       "SELECT * FROM releases WHERE status = 'active'",
-    ).all() as Release[];
+    ).all().map((row) => toRelease(row as Record<string, unknown>));
     return all.filter((r) => {
       try {
         const obj = JSON.parse(r.manifest) as Record<string, unknown>;
@@ -116,9 +123,10 @@ export class ReleaseRepo extends BaseRepo<Release> {
     // Pre-v0.4 releases use 'superseded'; the 6-state machine uses
     // 'rolled_back'. Both are terminal states; either should be a
     // valid rollback target.
-    return this.db.prepare(
+    const row = this.db.prepare(
       "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status IN ('rolled_back', 'superseded') AND capability_version < ? ORDER BY capability_version DESC LIMIT 1",
-    ).get(capabilityId, environment, currentVersion) as Release | null;
+    ).get(capabilityId, environment, currentVersion) as Record<string, unknown> | undefined;
+    return row ? toRelease(row) : null;
   }
 
   updateCanaryPercent(id: string, percent: number): Release | null {

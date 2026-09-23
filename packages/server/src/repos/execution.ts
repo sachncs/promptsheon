@@ -1,7 +1,11 @@
 import type { Execution, ExecutionReplay } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
-import { BaseRepo } from './base.js';
+import { BaseRepo, camelize } from './base.js';
+
+function toExecution(row: Record<string, unknown>): Execution {
+  return camelize(row) as unknown as Execution;
+}
 
 export class ExecutionRepo extends BaseRepo<Execution> {
   constructor(db: Database.Database) {
@@ -11,13 +15,15 @@ export class ExecutionRepo extends BaseRepo<Execution> {
   findByVersionId(versionId: string, opts: { page: number; pageSize: number }): { items: Execution[]; total: number } {
     const total = (this.db.prepare('SELECT COUNT(*) as count FROM executions WHERE capability_version_id = ?').get(versionId) as { count: number }).count;
     const items = this.db.prepare('SELECT * FROM executions WHERE capability_version_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?')
-      .all(versionId, opts.pageSize, (opts.page - 1) * opts.pageSize) as Execution[];
+      .all(versionId, opts.pageSize, (opts.page - 1) * opts.pageSize)
+      .map((row) => toExecution(row as Record<string, unknown>));
     return { items, total };
   }
 
   findRecent(capabilityId: string, limit = 100): Execution[] {
     return this.db.prepare(`SELECT e.* FROM executions e JOIN capability_versions v ON e.capability_version_id = v.id WHERE v.capability_id = ? ORDER BY e.timestamp DESC LIMIT ?`)
-      .all(capabilityId, limit) as Execution[];
+      .all(capabilityId, limit)
+      .map((row) => toExecution(row as Record<string, unknown>));
   }
 
   create(data: {

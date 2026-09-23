@@ -1,6 +1,10 @@
 import type { CapabilityVersion } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
-import { BaseRepo } from './base.js';
+import { BaseRepo, camelize } from './base.js';
+
+function toVersion(row: Record<string, unknown>): CapabilityVersion {
+  return camelize(row) as unknown as CapabilityVersion;
+}
 
 export class VersionRepo extends BaseRepo<CapabilityVersion> {
   constructor(db: Database.Database) {
@@ -9,12 +13,14 @@ export class VersionRepo extends BaseRepo<CapabilityVersion> {
 
   findByCapabilityId(capabilityId: string): CapabilityVersion[] {
     return this.db.prepare('SELECT * FROM capability_versions WHERE capability_id = ? ORDER BY version DESC')
-      .all(capabilityId) as CapabilityVersion[];
+      .all(capabilityId)
+      .map((row) => toVersion(row as Record<string, unknown>));
   }
 
   findByCapabilityAndVersion(capabilityId: string, version: number): CapabilityVersion | null {
-    return this.db.prepare('SELECT * FROM capability_versions WHERE capability_id = ? AND version = ?')
-      .get(capabilityId, version) as CapabilityVersion | null;
+    const row = this.db.prepare('SELECT * FROM capability_versions WHERE capability_id = ? AND version = ?')
+      .get(capabilityId, version) as Record<string, unknown> | undefined;
+    return row ? toVersion(row) : null;
   }
 
   create(data: { capabilityId: string; version: number; manifest: string; manifestHash: string; createdBy?: string }): CapabilityVersion {
