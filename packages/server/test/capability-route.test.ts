@@ -19,12 +19,15 @@ describe('capability routes', () => {
 
     const workspaceId = crypto.randomUUID();
     db.prepare(
-      `INSERT INTO workspaces (id, name, organization, created_at, updated_at)
-       VALUES (?, 'test', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+      `INSERT INTO workspaces (id, name, organization, org_id, created_at, updated_at)
+       VALUES (?, 'test', '', 'legacy', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
     ).run(workspaceId);
     projectId = new ProjectRepo(db).create({ workspaceId, name: 'test-project' }).id;
 
     app = Fastify({ logger: false });
+    app.addHook('onRequest', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = 'legacy';
+    });
     registerCapabilityRoutes(app, new CapabilityService(new CapabilityRepo(db)));
     await app.ready();
   });
