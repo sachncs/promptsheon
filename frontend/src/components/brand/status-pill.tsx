@@ -34,7 +34,7 @@ export function StatusPill({
   label?: string | undefined;
   className?: string | undefined;
 }) {
-  const s = styles[kind];
+  const s = styles[kind] ?? styles.neutral;
   return (
     <span
       className={cn(

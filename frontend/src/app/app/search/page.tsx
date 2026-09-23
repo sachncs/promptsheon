@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, useDeferredValue } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Search as SearchIcon } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
@@ -10,18 +11,29 @@ import { Surface } from '@/components/brand/surface';
 import { EmptyState } from '@/components/brand/empty-state';
 import { HashChip } from '@/components/brand/hash-chip';
 import { Input } from '@/components/ui/input';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function SearchPage() {
   const session = useRequireSession();
-  const [q, setQ] = useState('');
+  const searchParams = useSearchParams();
+  const [q, setQ] = useState(() => searchParams.get('q') ?? '');
+  const deferredQuery = useDeferredValue(q.trim());
+
+  useEffect(() => {
+    const next = searchParams.get('q') ?? '';
+    if (next !== q) setQ(next);
+  }, [q, searchParams]);
 
   const results = useQuery({
-    queryKey: ['search', q],
-    queryFn: () => (q.length >= 2 ? searchApi.q(q) : Promise.resolve([])),
-    enabled: q.length >= 2,
+    queryKey: ['search', deferredQuery],
+    queryFn: () => searchApi.q(deferredQuery),
+    enabled: deferredQuery.length >= 2,
   });
 
   const rows = (results.data ?? []) as Array<Record<string, unknown>>;
+
+  if (!session) return null;
+  if (results.isError) return <QueryError message={(results.error as Error).message} onRetry={() => void results.refetch()} />;
 
   return (
     <div className="space-y-6">
@@ -38,7 +50,7 @@ export default function SearchPage() {
           />
         </div>
         <div className="mt-5">
-          {q.length < 2 ? (
+          {deferredQuery.length < 2 ? (
             <p className="text-text-muted text-sm">Type at least two characters.</p>
           ) : rows.length === 0 ? (
             <EmptyState

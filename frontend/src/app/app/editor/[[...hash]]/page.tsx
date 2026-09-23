@@ -26,7 +26,7 @@ import type { Edge } from '@xyflow/react';
 const blankManifest: Manifest = {
   id: '',
   version: 1,
-  prompt: { systemPrompt: '', userTemplate: '{{input}}' },
+  prompt: { systemPrompt: 'You are a helpful assistant.', userTemplate: '{{input}}' },
   model: { provider: 'openai', modelId: 'gpt-4', temperature: 0.7, maxTokens: 4096 },
   runtime: { timeoutMs: 30000, nodeTimeoutMs: 10000, totalTimeoutMs: 300000, maxRetries: 3, canaryPercent: 0, concurrencyLimit: 10 },
   context: { inputsSchema: {}, outputsSchema: {}, requiredContextVars: [] },

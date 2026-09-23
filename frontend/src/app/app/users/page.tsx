@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Users } from 'lucide-react';
-import { userApi } from '@/lib/api';
+import { unwrapList, userApi } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { ThemedSelect } from '@/components/brand/themed-select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { QueryError } from '@/components/brand/query-error';
 
 interface UserItem {
   id: string;
@@ -29,7 +30,7 @@ export default function UsersPage() {
 
   const users = useQuery({
     queryKey: ['users'],
-    queryFn: () => userApi.list().then((r) => r.data).catch(() => [] as UserItem[]),
+    queryFn: () => userApi.list().then((r) => unwrapList<UserItem>(r.data, 'users')),
   });
   const me = useQuery({
     queryKey: ['me'],
@@ -42,6 +43,7 @@ export default function UsersPage() {
   });
 
   if (!session) return null;
+  if (users.isError) return <QueryError message={(users.error as Error).message} onRetry={() => void users.refetch()} />;
 
   const rows = (users.data ?? []) as UserItem[];
   const meId = (me.data as { user?: { id?: string } } | null)?.user?.id;

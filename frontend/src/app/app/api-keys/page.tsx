@@ -39,7 +39,7 @@ export default function ApiKeysPage() {
     queryKey: ['me'],
     queryFn: async () => {
       const r = await userApi.me();
-      return r.data as unknown as { user: { id: string; email: string; name: string; role: string } };
+      return r.data as { id: string; email: string; name: string; role: string };
     },
   });
   const [name, setName] = useState('');
@@ -47,7 +47,10 @@ export default function ApiKeysPage() {
   const [issued, setIssued] = useState<{ key: string; id: string; name: string } | null>(null);
 
   const create = useMutation({
-    mutationFn: () => apiKeyApi.create({ name: name || 'untitled', role }),
+    mutationFn: () => {
+      if (!session) throw new Error('A session is required to issue an API key');
+      return apiKeyApi.create({ name: name || 'untitled', role, userId: session.userId });
+    },
     onSuccess: async (resp) => {
       const o = resp.data as unknown as { key: string; id: string; name: string };
       setIssued(o);
@@ -75,12 +78,13 @@ export default function ApiKeysPage() {
       <Surface>
         <SurfaceHeader
           title="Issue a key"
-          description={me.data ? `as ${me.data.user.email}` : 'as the current actor'}
+          description={me.data ? `as ${me.data.email}` : 'as the current actor'}
         />
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Name</label>
+            <label htmlFor="api-key-name" className="text-xs uppercase tracking-wider text-text-subtle">Name</label>
             <Input
+              id="api-key-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="mt-2"

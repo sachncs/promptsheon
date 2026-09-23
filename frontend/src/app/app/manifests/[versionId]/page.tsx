@@ -28,12 +28,12 @@ interface ManifestDetail {
 export default function ManifestDetailPage() {
   const session = useRequireSession();
   const params = useParams<{ versionId: string }>();
-  const versionId = params.versionId ?? '';
+  const hash = params.versionId ?? '';
 
   const detail = useQuery({
-    queryKey: ['manifest', versionId],
-    queryFn: () => manifestApi.get(versionId).then((r) => r.data as ManifestDetail),
-    enabled: Boolean(versionId),
+    queryKey: ['manifest', hash],
+    queryFn: () => manifestApi.getByHash(hash).then((r) => r.data as ManifestDetail),
+    enabled: Boolean(hash),
     retry: false,
   });
 
@@ -48,7 +48,7 @@ export default function ManifestDetailPage() {
     if (data === undefined) return '';
     if (typeof data.manifest === 'string') return data.manifest;
     try {
-      return JSON.stringify(data.manifest, null, 2);
+      return JSON.stringify(data.manifest ?? data, null, 2);
     } catch {
       return '';
     }
@@ -80,7 +80,7 @@ export default function ManifestDetailPage() {
         <EmptyState
           icon={ScrollText}
           title="Manifest not found"
-          description={`No manifest matches versionId ${versionId.slice(0, 16)}. Open a capability to inspect its compiled manifests.`}
+          description={`No manifest matches hash ${hash.slice(0, 16)}. Open a capability to inspect its compiled manifests.`}
           action={
             <Link href="/app/capabilities">
               <Button>Open registry</Button>

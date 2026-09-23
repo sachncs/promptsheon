@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2, ScrollText, ShieldCheck, AlertCircle } from 'lucide-react';
-import { auditApi } from '@/lib/api';
+import { auditApi, unwrapList } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Drawer, DrawerContent } from '@/components/brand/drawer';
 import { ThemedSelect } from '@/components/brand/themed-select';
+import { QueryError } from '@/components/brand/query-error';
 
 interface AuditEntry {
   id: string;
@@ -52,10 +53,10 @@ export default function AuditPage() {
 
   const audit = useQuery({
     queryKey: ['audit', 'all'],
-    queryFn: () => auditApi.list().then((r) => r.data).catch(() => []),
+    queryFn: () => auditApi.list().then((r) => unwrapList<AuditEntry>(r.data)),
     enabled: Boolean(session),
   });
-  const allRows = ((audit.data ?? []) as AuditEntry[]);
+  const allRows = audit.data ?? [];
 
   const resourceOptions = useMemo(() => {
     const set = new Set<string>();
@@ -86,6 +87,9 @@ export default function AuditPage() {
   }, [allRows, range, resource, action, actorFilter]);
 
   const open = openId ? filtered.find((r) => r.id === openId) : null;
+
+  if (!session) return null;
+  if (audit.isError) return <QueryError message={(audit.error as Error).message} onRetry={() => void audit.refetch()} />;
 
   return (
     <div className="space-y-6">

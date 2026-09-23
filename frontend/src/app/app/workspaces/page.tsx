@@ -78,8 +78,9 @@ export default function WorkspacesPage() {
         />
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="sm:col-span-2">
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Name</label>
+            <label htmlFor="workspace-name" className="text-xs uppercase tracking-wider text-text-subtle">Name</label>
             <Input
+              id="workspace-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="refund-triage"
@@ -87,8 +88,9 @@ export default function WorkspacesPage() {
             />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Organisation label</label>
+            <label htmlFor="workspace-organization" className="text-xs uppercase tracking-wider text-text-subtle">Organisation label</label>
             <Input
+              id="workspace-organization"
               value={organization}
               onChange={(e) => setOrganization(e.target.value)}
               placeholder="Acme AI"

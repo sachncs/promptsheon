@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Flag, Plus, Save, Trash2 } from 'lucide-react';
 import { featureFlagApi } from '@/lib/api';
+import { unwrapList } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -12,6 +13,7 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { QueryError } from '@/components/brand/query-error';
 
 interface FlagItem {
   key: string;
@@ -28,9 +30,9 @@ export default function FeatureFlagsPage() {
 
   const flags = useQuery({
     queryKey: ['feature-flags'],
-    queryFn: () => featureFlagApi.list().then((r) => r.data).catch(() => [] as FlagItem[]),
+    queryFn: () => featureFlagApi.list().then((r) => unwrapList<FlagItem>(r.data, 'flags')),
   });
-  const rows = (flags.data ?? []) as FlagItem[];
+  const rows = (flags.data ?? []).map((flag) => ({ ...flag, key: flag.key ?? (flag as FlagItem & { name?: string }).name ?? '' }));
 
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('true');
@@ -60,6 +62,7 @@ export default function FeatureFlagsPage() {
   });
 
   if (!session) return null;
+  if (flags.isError) return <QueryError message={(flags.error as Error).message} onRetry={() => void flags.refetch()} />;
 
   return (
     <div className="space-y-6">
@@ -73,8 +76,9 @@ export default function FeatureFlagsPage() {
         <SurfaceHeader title="New flag" description="Boolean or JSON values. Update PUT /api/feature-flags/:key with the new value to flip rollout state." />
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Key</label>
+            <label htmlFor="feature-flag-key" className="text-xs uppercase tracking-wider text-text-subtle">Key</label>
             <Input
+              id="feature-flag-key"
               value={newKey}
               onChange={(e) => setNewKey(e.target.value)}
               placeholder="enable-refund-fast-path"
@@ -82,8 +86,9 @@ export default function FeatureFlagsPage() {
             />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Value (JSON or bool)</label>
+            <label htmlFor="feature-flag-value" className="text-xs uppercase tracking-wider text-text-subtle">Value (JSON or bool)</label>
             <Input
+              id="feature-flag-value"
               value={newValue}
               onChange={(e) => setNewValue(e.target.value)}
               placeholder='true | false | {"percent": 25}'

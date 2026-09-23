@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ShieldCheck, ShieldAlert } from 'lucide-react';
-import { approvalApi, releaseApi } from '@/lib/api';
+import { approvalApi, releaseApi, unwrapList } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -44,7 +44,7 @@ export default function ReleaseApprovalPage() {
   });
   const approvals = useQuery({
     queryKey: ['approvals', releaseId],
-    queryFn: () => approvalApi.list(releaseId).then((r) => r.data).catch(() => [] as Array<{ id: string; voter: string; decision: 'approve' | 'reject'; comment?: string; at: string }>),
+    queryFn: () => approvalApi.list(releaseId).then((r) => unwrapList<NonNullable<ReleaseDetail['approvals']>[number]>(r.data)).catch(() => []),
     enabled: Boolean(releaseId),
   });
 
@@ -68,7 +68,7 @@ export default function ReleaseApprovalPage() {
   if (!session) return null;
 
   const data = release.data;
-  const approvalRows = ((approvals.data ?? []) as NonNullable<ReleaseDetail['approvals']>).concat(data?.approvals ?? []);
+  const approvalRows = (approvals.data ?? []).concat(data?.approvals ?? []);
   const seen = new Set<string>();
   const dedup = approvalRows.filter((a) => {
     const key = `${a.voter}:${a.decision}:${a.at}`;

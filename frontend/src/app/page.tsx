@@ -55,7 +55,7 @@ export default function LandingPage() {
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link href="/onboarding">
                   <Button size="lg">
-                    Open dashboard
+                    Start building
                     <ArrowRight className="ml-1.5 h-4 w-4" />
                   </Button>
                 </Link>

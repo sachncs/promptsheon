@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { StatusPill } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 interface Release {
   id: string;
@@ -48,26 +49,27 @@ export default function ApprovalsPage() {
   const allReleases = useQuery({
     queryKey: ['approvals', 'releases', projectList.map((p) => p.id)],
     queryFn: async (): Promise<Release[]> => {
-      const out: Release[] = [];
-      for (const p of projectList) {
-        try {
-          const r = await releaseApi.list(p.id).then((res) => res.data);
-          if (Array.isArray(r)) {
-            for (const rel of r) {
-              const base = rel as Release;
-              const merged: Release = { ...base, capabilityId: base.capabilityId ?? p.id };
-              if (p.name !== undefined) merged.capabilityName = p.name;
-              out.push(merged);
-            }
-          }
-        } catch { /* skip */ }
-      }
-      return out;
+      const releasesByProject = await Promise.all(
+        projectList.map(async (p) => {
+          const data = await releaseApi.list(p.id).then((res) => res.data);
+          if (!Array.isArray(data)) throw new Error(`Invalid releases response for ${p.name ?? p.id}`);
+          return data.map((rel) => {
+            const base = rel as Release;
+            const merged: Release = { ...base, capabilityId: base.capabilityId ?? p.id };
+            if (p.name !== undefined) merged.capabilityName = p.name;
+            return merged;
+          });
+        }),
+      );
+      return releasesByProject.flat();
     },
     enabled: projectList.length > 0,
   });
 
   if (!session) return null;
+  if (workspaces.isError) return <QueryError message={(workspaces.error as Error).message} onRetry={() => void workspaces.refetch()} />;
+  if (projects.isError) return <QueryError message={(projects.error as Error).message} onRetry={() => void projects.refetch()} />;
+  if (allReleases.isError) return <QueryError message={(allReleases.error as Error).message} onRetry={() => void allReleases.refetch()} />;
 
   const rows = ((allReleases.data ?? []) as Release[]).filter(
     (r) => r.state === 'review' || r.state === 'draft',

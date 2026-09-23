@@ -3,6 +3,7 @@ import { getSession } from './session';
 
 const client = axios.create({
   baseURL: '/api',
+  timeout: 15_000,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -276,6 +277,7 @@ export const preconditionApi = {
 
 export const approvalApi = {
   list: (releaseId: string) => client.get('/approvals', { params: { releaseId } }),
+  listPending: () => client.get('/approvals/pending'),
   vote: (releaseId: string, data: { decision: 'approve' | 'reject'; comment?: string }) =>
     client.post(`/releases/${releaseId}/approvals`, data),
 };
@@ -336,14 +338,14 @@ export function validateDagClient(manifest: { nodes: Array<{ id: string }>; edge
 
 export const webhookApi = {
   list: () => client.get('/webhooks'),
-  create: (data: { url: string; events: string[] }) => client.post('/webhooks', data),
+  create: (data: { organizationId: string; label: string; url: string; events: string[] }) => client.post('/webhooks', data),
   update: (id: string, data: { url?: string; events?: string[]; active?: boolean }) => client.put(`/webhooks/${id}`, data),
   delete: (id: string) => client.delete(`/webhooks/${id}`),
 };
 
 export const apiKeyApi = {
   list: () => client.get('/api-keys'),
-  create: (data: { name: string; role: string }) => client.post('/api-keys', data),
+  create: (data: { name: string; role: string; userId: string }) => client.post('/api-keys', data),
   revoke: (id: string) => client.delete(`/api-keys/${id}`),
 };
 

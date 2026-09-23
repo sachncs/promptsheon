@@ -17,7 +17,8 @@ import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { workspaceApi } from '@/lib/api';
-import { clearSession, getSession } from '@/lib/session';
+import { clearSession } from '@/lib/session';
+import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/components/theme/theme-provider';
 import { cn } from '@/lib/utils';
 
@@ -97,7 +98,15 @@ const groups: NavGroup[] = [
   },
 ];
 
-function NavGroupSection({ group, last }: { group: NavGroup; last?: boolean }) {
+function NavGroupSection({
+  group,
+  last,
+  onNavigate,
+}: {
+  group: NavGroup;
+  last?: boolean;
+  onNavigate?: (() => void) | undefined;
+}) {
   const pathname = usePathname();
   const hasActive = group.items.some(
     (item) => pathname === item.href || pathname.startsWith(item.href + '/'),
@@ -122,6 +131,7 @@ function NavGroupSection({ group, last }: { group: NavGroup; last?: boolean }) {
               <Link
                 key={item.href}
                 href={item.href}
+                {...(onNavigate ? { onClick: onNavigate } : {})}
                 className={cn(
                   'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors',
                   isActive
@@ -140,8 +150,14 @@ function NavGroupSection({ group, last }: { group: NavGroup; last?: boolean }) {
   );
 }
 
-export function AppSidebar() {
-  const session = getSession();
+export function AppSidebar({
+  mobileOpen = false,
+  onMobileClose,
+}: {
+  mobileOpen?: boolean;
+  onMobileClose?: (() => void) | undefined;
+}) {
+  const session = useSession();
   const router = useRouter();
   const [userOpen, setUserOpen] = React.useState(false);
   const { theme, setTheme } = useTheme();
@@ -166,7 +182,19 @@ export function AppSidebar() {
   }, []);
 
   return (
-    <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border-subtle bg-surface-1">
+    <>
+      {mobileOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] md:hidden"
+          onClick={onMobileClose}
+          aria-label="Close navigation"
+        />
+      )}
+      <aside className={cn(
+        'w-64 shrink-0 flex-col border-r border-border-subtle bg-surface-1',
+        mobileOpen ? 'fixed inset-y-0 left-0 z-50 flex shadow-3 md:static md:z-auto md:shadow-none' : 'hidden md:flex',
+      )}>
       <div className="flex h-14 items-center border-b border-border-subtle px-4">
         <Link href="/app" aria-label="Promptsheon home">
           <Logo size="sm" />
@@ -198,7 +226,12 @@ export function AppSidebar() {
 
       <div className="flex-1 overflow-y-auto">
         {groups.map((group, i) => (
-          <NavGroupSection key={group.label} group={group} last={i === groups.length - 1} />
+          <NavGroupSection
+            key={group.label}
+            group={group}
+            last={i === groups.length - 1}
+            onNavigate={onMobileClose}
+          />
         ))}
       </div>
 
@@ -270,6 +303,7 @@ export function AppSidebar() {
           </div>
         )}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Activity, AlertTriangle, GitMerge, ShieldAlert } from 'lucide-react';
-import { releaseApi, workspaceApi, projectApi, evalApi, alertApi } from '@/lib/api';
+import { releaseApi, workspaceApi, projectApi, evalApi, alertApi, unwrapList } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -13,6 +13,7 @@ import { DataTable } from '@/components/brand/data-table';
 import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { HashChip } from '@/components/brand/hash-chip';
+import { QueryError } from '@/components/brand/query-error';
 
 interface Release {
   id: string;
@@ -66,41 +67,37 @@ export default function OperationsPage() {
   const allReleases = useQuery({
     queryKey: ['operations', 'releases', projectList.map((p) => p.id)],
     queryFn: async () => {
-      const out: Release[] = [];
-      for (const p of projectList) {
-        try {
-          const r = await releaseApi.list(p.id).then((res) => res.data);
-          if (Array.isArray(r)) {
-            for (const rel of r) {
-              const base = rel as Release;
-              const merged: Release = {
-                ...base,
-                capabilityId: base.capabilityId ?? p.id,
-              };
-              if (p.name !== undefined) merged.capabilityName = p.name;
-              out.push(merged);
-            }
-          }
-        } catch {
-          /* skip */
-        }
-      }
-      return out;
+      const byProject = await Promise.all(projectList.map(async (p) => {
+        const data = await releaseApi.list(p.id).then((res) => res.data);
+        if (!Array.isArray(data)) throw new Error(`Invalid releases response for ${p.name ?? p.id}`);
+        return data.map((rel) => {
+          const base = rel as Release;
+          const merged: Release = { ...base, capabilityId: base.capabilityId ?? p.id };
+          if (p.name !== undefined) merged.capabilityName = p.name;
+          return merged;
+        });
+      }));
+      return byProject.flat();
     },
     enabled: projectList.length > 0,
   });
 
   const recentEvals = useQuery({
     queryKey: ['eval-runs', 'recent'],
-    queryFn: () => evalApi.list().then((r) => r.data as EvalRun[]),
+    queryFn: () => evalApi.list().then((r) => unwrapList<EvalRun>(r.data)),
   });
 
   const alerts = useQuery({
     queryKey: ['alerts'],
-    queryFn: () => alertApi.listAlerts().then((r) => r.data).catch(() => [] as AlertItem[]),
+    queryFn: () => alertApi.listAlerts().then((r) => r.data as AlertItem[]),
   });
 
   if (!session) return null;
+  if (workspaces.isError) return <QueryError message={(workspaces.error as Error).message} onRetry={() => void workspaces.refetch()} />;
+  if (projects.isError) return <QueryError message={(projects.error as Error).message} onRetry={() => void projects.refetch()} />;
+  if (allReleases.isError) return <QueryError message={(allReleases.error as Error).message} onRetry={() => void allReleases.refetch()} />;
+  if (recentEvals.isError) return <QueryError message={(recentEvals.error as Error).message} onRetry={() => void recentEvals.refetch()} />;
+  if (alerts.isError) return <QueryError message={(alerts.error as Error).message} onRetry={() => void alerts.refetch()} />;
 
   const releases = (allReleases.data ?? []) as Release[];
   const activeReleases = releases.filter((r) => r.state === 'active');

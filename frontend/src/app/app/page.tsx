@@ -19,6 +19,7 @@ import { AnimatedNumber } from '@/components/brand/animated-number';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
 import { Button } from '@/components/ui/button';
 import { workspaceApi, projectApi, capabilityApi, releaseApi, evalApi, auditApi, approvalApi } from '@/lib/api';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function ControlPlanePage() {
   const session = useRequireSession();
@@ -51,23 +52,21 @@ function useDashboardData() {
   const releases = useQuery({
     queryKey: ['releases', 'all'],
     queryFn: async () => {
-      const out: Array<Record<string, unknown>> = [];
-      for (const c of capabilityList) {
-        try {
-          const r = await releaseApi.list(c.id).then((res) => res.data);
-          if (Array.isArray(r)) out.push(...r.map((rel: Record<string, unknown>) => ({ ...rel, capabilityName: c.name, capabilityId: c.id })));
-        } catch { /* skip */ }
-      }
-      return out;
+      const byCapability = await Promise.all(capabilityList.map(async (c) => {
+        const data = await releaseApi.list(c.id).then((res) => res.data);
+        if (!Array.isArray(data)) throw new Error(`Invalid releases response for ${c.name}`);
+        return data.map((rel: Record<string, unknown>) => ({ ...rel, capabilityName: c.name, capabilityId: c.id }));
+      }));
+      return byCapability.flat();
     },
     enabled: capabilityList.length > 0,
   });
 
-  const evals = useQuery({ queryKey: ['eval-runs'], queryFn: () => evalApi.list().then((r) => r.data).catch(() => []) });
-  const audits = useQuery({ queryKey: ['audit', 'recent'], queryFn: () => auditApi.list().then((r) => r.data).catch(() => []) });
+  const evals = useQuery({ queryKey: ['eval-runs'], queryFn: () => evalApi.list().then((r) => r.data) });
+  const audits = useQuery({ queryKey: ['audit', 'recent'], queryFn: () => auditApi.list().then((r) => r.data) });
   const approvals = useQuery({
     queryKey: ['approvals', 'all'],
-    queryFn: () => approvalApi.list('').then((r) => r.data).catch(() => []),
+    queryFn: () => approvalApi.listPending().then((r) => r.data),
   });
 
   return { workspaces, projects, capabilities, releases, evals, audits, approvals, workspaceId, projectId, capabilityList };
@@ -75,6 +74,16 @@ function useDashboardData() {
 
 function Dashboard() {
   const d = useDashboardData();
+
+  const failedQuery = [d.workspaces, d.projects, d.capabilities, d.releases, d.evals, d.audits, d.approvals]
+    .find((query) => query.isError);
+  if (failedQuery) {
+    return <QueryError message={(failedQuery.error as Error).message} onRetry={() => void failedQuery.refetch()} />;
+  }
+
+  const loadingQuery = [d.workspaces, d.projects, d.capabilities, d.releases, d.evals, d.audits, d.approvals]
+    .some((query) => query.isPending);
+  if (loadingQuery) return <DashboardLoading />;
 
   const capabilityCount = unwrapArray(d.capabilities.data).length;
   const releaseList = unwrapArray<Record<string, unknown>>(d.releases.data);
@@ -307,6 +316,25 @@ function Dashboard() {
           </Surface>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function DashboardLoading() {
+  return (
+    <div className="space-y-6" aria-busy="true">
+      <div className="space-y-2">
+        <div className="h-3 w-28 animate-pulse rounded bg-surface-2" />
+        <div className="h-8 w-64 animate-pulse rounded bg-surface-2" />
+        <div className="h-4 w-full max-w-2xl animate-pulse rounded bg-surface-2" />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }, (_, i) => <div key={i} className="h-28 animate-pulse rounded-xl border border-border-subtle bg-surface-1" />)}
+      </div>
+      <div className="grid gap-5 lg:grid-cols-3">
+        <div className="h-80 animate-pulse rounded-xl border border-border-subtle bg-surface-1 lg:col-span-2" />
+        <div className="h-80 animate-pulse rounded-xl border border-border-subtle bg-surface-1" />
+      </div>
     </div>
   );
 }

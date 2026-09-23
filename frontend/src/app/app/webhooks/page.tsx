@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Webhook, Power, Trash2 } from 'lucide-react';
 import { webhookApi } from '@/lib/api';
+import { unwrapList } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { QueryError } from '@/components/brand/query-error';
 
 interface WebhookItem {
   id: string;
@@ -42,7 +44,8 @@ export default function WebhooksPage() {
 
   const hooks = useQuery({
     queryKey: ['webhooks'],
-    queryFn: () => webhookApi.list().then((r) => r.data).catch(() => [] as WebhookItem[]),
+    queryFn: () => webhookApi.list().then((r) => unwrapList<WebhookItem>(r.data, 'webhooks')),
+    enabled: Boolean(session),
   });
   const rows = (hooks.data ?? []) as WebhookItem[];
 
@@ -50,7 +53,10 @@ export default function WebhooksPage() {
   const [events, setEvents] = useState<string[]>(['release.activated', 'approval.requested']);
 
   const create = useMutation({
-    mutationFn: () => webhookApi.create({ url, events }),
+    mutationFn: () => {
+      if (!session) throw new Error('A session is required to add a webhook');
+      return webhookApi.create({ organizationId: session.orgId, label: url, url, events });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['webhooks'] });
       setUrl('');
@@ -68,6 +74,7 @@ export default function WebhooksPage() {
   });
 
   if (!session) return null;
+  if (hooks.isError) return <QueryError message={(hooks.error as Error).message} onRetry={() => void hooks.refetch()} />;
 
   const toggleEvent = (ev: string) => {
     setEvents((prev) => prev.includes(ev) ? prev.filter((e) => e !== ev) : [...prev, ev]);
@@ -85,8 +92,9 @@ export default function WebhooksPage() {
         <SurfaceHeader title="Add a webhook" description="Receives signed POSTs at the URL you specify." />
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">URL</label>
+            <label htmlFor="webhook-url" className="text-xs uppercase tracking-wider text-text-subtle">URL</label>
             <Input
+              id="webhook-url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://example.com/webhooks/promptsheon"

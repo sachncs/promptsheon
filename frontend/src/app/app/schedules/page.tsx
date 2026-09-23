@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, Plus, Trash2 } from 'lucide-react';
-import { scheduleApi, workspaceApi, releaseApi, projectApi } from '@/lib/api';
+import { scheduleApi, workspaceApi, releaseApi, projectApi, unwrapList } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -13,6 +13,7 @@ import { ThemedSelect } from '@/components/brand/themed-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { QueryError } from '@/components/brand/query-error';
 
 interface ScheduleItem {
   id: string;
@@ -61,33 +62,29 @@ export default function SchedulesPage() {
   const allReleases = useQuery({
     queryKey: ['releases-for-schedules', projectList.map((p) => p.id)],
     queryFn: async (): Promise<ReleaseLite[]> => {
-      const out: ReleaseLite[] = [];
-      for (const p of projectList) {
-        try {
-          const r = await releaseApi.list(p.id).then((res) => res.data);
-          if (Array.isArray(r)) {
-            for (const rel of r) {
-              const lite: ReleaseLite = { id: String((rel as { id?: unknown }).id ?? '') };
-              if (p.name !== undefined) lite.capabilityName = p.name;
-              const cv = Number((rel as { capabilityVersion?: unknown }).capabilityVersion ?? 0);
-              if (cv) lite.capabilityVersion = cv;
-              const env = (rel as { environment?: unknown }).environment as string | undefined;
-              if (env !== undefined) lite.environment = env;
-              out.push(lite);
-            }
-          }
-        } catch { /* skip */ }
-      }
-      return out.filter((r) => r.id);
+      const byProject = await Promise.all(projectList.map(async (p) => {
+        const data = await releaseApi.list(p.id).then((res) => res.data);
+        if (!Array.isArray(data)) throw new Error(`Invalid releases response for ${p.name ?? p.id}`);
+        return data.map((rel) => {
+          const lite: ReleaseLite = { id: String((rel as { id?: unknown }).id ?? '') };
+          if (p.name !== undefined) lite.capabilityName = p.name;
+          const cv = Number((rel as { capabilityVersion?: unknown }).capabilityVersion ?? 0);
+          if (cv) lite.capabilityVersion = cv;
+          const env = (rel as { environment?: unknown }).environment as string | undefined;
+          if (env !== undefined) lite.environment = env;
+          return lite;
+        });
+      }));
+      return byProject.flat().filter((r) => r.id);
     },
     enabled: projectList.length > 0,
   });
 
   const schedules = useQuery({
     queryKey: ['schedules'],
-    queryFn: () => scheduleApi.list().then((r) => r.data).catch(() => [] as ScheduleItem[]),
+    queryFn: () => scheduleApi.list().then((r) => unwrapList<ScheduleItem>(r.data)),
   });
-  const rows = (schedules.data ?? []) as ScheduleItem[];
+  const rows = schedules.data ?? [];
 
   const [releaseId, setReleaseId] = useState('');
   const [kind, setKind] = useState<typeof KIND_OPTIONS[number]['value']>('eval');
@@ -110,6 +107,10 @@ export default function SchedulesPage() {
   });
 
   if (!session) return null;
+  if (workspaces.isError) return <QueryError message={(workspaces.error as Error).message} onRetry={() => void workspaces.refetch()} />;
+  if (projects.isError) return <QueryError message={(projects.error as Error).message} onRetry={() => void projects.refetch()} />;
+  if (allReleases.isError) return <QueryError message={(allReleases.error as Error).message} onRetry={() => void allReleases.refetch()} />;
+  if (schedules.isError) return <QueryError message={(schedules.error as Error).message} onRetry={() => void schedules.refetch()} />;
 
   const releases = (allReleases.data ?? []) as ReleaseLite[];
 
@@ -156,8 +157,9 @@ export default function SchedulesPage() {
             </div>
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Cron</label>
+            <label htmlFor="schedule-cron" className="text-xs uppercase tracking-wider text-text-subtle">Cron</label>
             <Input
+              id="schedule-cron"
               value={cron}
               onChange={(e) => setCron(e.target.value)}
               placeholder="0 */6 * * *"

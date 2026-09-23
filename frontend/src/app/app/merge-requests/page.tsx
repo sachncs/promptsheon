@@ -12,6 +12,7 @@ import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 interface MergeRequestRow {
   id: string;
@@ -46,11 +47,9 @@ export default function MergeRequestsIndex() {
   const allMrs = useQuery({
     queryKey: ['merge-requests-all', (repos.data ?? []).map((r: { id: string }) => r.id).join(',')],
     queryFn: async (): Promise<MergeRequestRow[]> => {
-      const out: MergeRequestRow[] = [];
-      for (const r of repos.data ?? []) {
-        try {
+      const byRepository = await Promise.all((repos.data ?? []).map(async (r: { id: string; name: string }) => {
           const mrs = await repoApi.listMRs(r.id);
-          for (const m of mrs as Array<Record<string, unknown>>) {
+          return (mrs as Array<Record<string, unknown>>).map((m): MergeRequestRow => {
             const row: MergeRequestRow = {
               id: String(m['id'] ?? ''),
               repoId: r.id,
@@ -70,16 +69,18 @@ export default function MergeRequestsIndex() {
             if (typeof createdAt === 'string') row.createdAt = createdAt;
             const updatedAt = m['updatedAt'];
             if (typeof updatedAt === 'string') row.updatedAt = updatedAt;
-            out.push(row);
-          }
-        } catch { /* skip */ }
-      }
-      return out;
+            return row;
+          });
+        }));
+      return byRepository.flat();
     },
     enabled: (repos.data ?? []).length > 0,
   });
 
   if (!session) return null;
+  if (workspaces.isError) return <QueryError message={(workspaces.error as Error).message} onRetry={() => void workspaces.refetch()} />;
+  if (repos.isError) return <QueryError message={(repos.error as Error).message} onRetry={() => void repos.refetch()} />;
+  if (allMrs.isError) return <QueryError message={(allMrs.error as Error).message} onRetry={() => void allMrs.refetch()} />;
 
   const rows = allMrs.data ?? [];
 

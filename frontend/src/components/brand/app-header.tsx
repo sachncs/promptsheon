@@ -1,38 +1,66 @@
 'use client';
 
-import * as React from 'react';
 import Link from 'next/link';
-import { Command, LogOut, Plus, Search } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Command, LogOut, Menu, Plus, Search } from 'lucide-react';
 import { Logo } from '@/brand/logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ThemeToggle } from '@/components/theme/theme-toggle';
-import { getSession, clearSession } from '@/lib/session';
+import { clearSession } from '@/lib/session';
+import { useSession } from '@/hooks/use-session';
 
-export function AppHeader() {
-  const [session, setSessionState] = React.useState(() => getSession());
+export function AppHeader({ onMenu }: { onMenu?: (() => void) | undefined }) {
+  const session = useSession();
+  const router = useRouter();
+  const [query, setQuery] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
 
-  React.useEffect(() => {
-    function onStorage() { setSessionState(getSession()); }
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
+
+  const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const value = query.trim();
+    if (value.length >= 2) router.push(`/app/search?q=${encodeURIComponent(value)}`);
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border-subtle bg-surface-0/85 px-4 backdrop-blur">
+      <button
+        type="button"
+        onClick={onMenu}
+        className="grid size-9 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text-default md:hidden"
+        aria-label="Open navigation"
+      >
+        <Menu className="size-4" />
+      </button>
       <Link href="/app" className="md:hidden">
         <Logo size="xs" />
       </Link>
-      <div className="relative flex-1 max-w-xl">
+      <form className="relative flex-1 max-w-xl" onSubmit={submitSearch} role="search">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-subtle" />
         <Input
+          ref={searchRef}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
           placeholder="Search capabilities, releases, hashes…"
+          aria-label="Search capabilities, releases, and hashes"
           className="pl-9 pr-12 h-9 bg-surface-1 border-border-subtle focus-visible:ring-brand"
         />
         <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-border-subtle bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-text-subtle">
           <Command className="inline h-2.5 w-2.5 mr-0.5" />K
         </kbd>
-      </div>
+      </form>
       <div className="flex items-center gap-2 ml-auto">
         <ThemeToggle className="text-text-muted hover:text-text-default" />
         <Link href="/app/capabilities">
