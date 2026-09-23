@@ -47,9 +47,6 @@ class ReplayCache {
   }
 }
 
-const replayCache = new ReplayCache();
-setInterval(() => replayCache.prune(), 60_000).unref();
-
 function mapPayloadToInputs(mapping: Record<string, string>, payload: unknown): Record<string, unknown> {
   const inputs: Record<string, unknown> = {};
   const obj = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>;
@@ -73,6 +70,14 @@ export function registerWebhookRoutes(
     manifestRepo?: ManifestRepo;
   },
 ) {
+  const replayCache = new ReplayCache();
+  const replayPruneTimer = setInterval(() => replayCache.prune(), 60_000);
+  replayPruneTimer.unref();
+  app.addHook('onClose', (_instance, done) => {
+    clearInterval(replayPruneTimer);
+    done();
+  });
+
   app.removeContentTypeParser(['application/json']);
   app.addContentTypeParser(
     'application/json',
