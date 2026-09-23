@@ -44,8 +44,8 @@ function seed(db: Database.Database) {
     `INSERT INTO orgs (id,name,slug,created_at,updated_at) VALUES (?, 'O','o',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
   ).run(ORG);
   db.prepare(
-    `INSERT INTO workspaces (id,name,organization,created_at,updated_at) VALUES (?, 'W','O',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
-  ).run(WS);
+    `INSERT INTO workspaces (id,org_id,name,organization,created_at,updated_at) VALUES (?, ?, 'W','O',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+  ).run(WS, ORG);
   db.prepare(
     `INSERT INTO projects (id,workspace_id,name,description,created_at,updated_at) VALUES (?, ?, 'P','',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
   ).run(PROJECT, WS);
@@ -71,6 +71,10 @@ describe('/api/invoke alias', () => {
     const db = openDb();
     seed(db);
     const app = Fastify({ logger: false });
+    app.addHook('preHandler', (request, _reply, done) => {
+      (request as Record<string, unknown>)['orgContext'] = { orgId: ORG };
+      done();
+    });
     registerExecutionRoutes(app, {
       executionRepo: new ExecutionRepo(db),
       releaseRepo: new ReleaseRepo(db),
@@ -96,6 +100,10 @@ describe('/api/invoke alias', () => {
        VALUES ('v1', ?, 1, '{}', '', CURRENT_TIMESTAMP, 'u1')`,
     ).run(CAP);
     const app = Fastify({ logger: false });
+    app.addHook('preHandler', (request, _reply, done) => {
+      (request as Record<string, unknown>)['orgContext'] = { orgId: ORG };
+      done();
+    });
     registerExecutionRoutes(app, {
       executionRepo: new ExecutionRepo(db),
       releaseRepo: new ReleaseRepo(db),
