@@ -42,7 +42,7 @@ export class Scheduler {
 
         try {
           await handler(schedule);
-          await this.scheduleRepo.update(schedule.id, { nextFireAt: new Date().toISOString() });
+          await this.scheduleRepo.advance(schedule.id, new Date());
           this.sseHub.broadcast({
             type: 'status',
             data: { scheduleId: schedule.id, status: 'fired' },

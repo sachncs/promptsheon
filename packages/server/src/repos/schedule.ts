@@ -1,6 +1,7 @@
 import type { Schedule } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
 import { BaseRepo } from './base.js';
+import { nextCronFire } from '../scheduler/cron.js';
 
 export class ScheduleRepo extends BaseRepo<Schedule> {
   constructor(db: Database.Database) {
@@ -19,13 +20,15 @@ export class ScheduleRepo extends BaseRepo<Schedule> {
 
   create(data: { workspaceId: string; releaseId: string; kind: string; cron: string; enabled?: boolean }): Schedule {
     const id = crypto.randomUUID();
-    const now = new Date().toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const nextFireAt = nextCronFire(data.cron, now).toISOString();
     this.db.prepare(`INSERT INTO schedules (id, workspace_id, release_id, kind, cron, enabled, created_at, updated_at, next_fire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(id, data.workspaceId, data.releaseId, data.kind, data.cron, data.enabled ? 1 : 0, now, now, now);
+      .run(id, data.workspaceId, data.releaseId, data.kind, data.cron, data.enabled ? 1 : 0, nowIso, nowIso, nextFireAt);
     return {
       id, workspaceId: data.workspaceId, releaseId: data.releaseId, kind: data.kind, cron: data.cron,
-      webhookPath: '', nextFireAt: now, lastFireAt: null, firedCount: 0,
-      enabled: data.enabled ?? true, createdAt: now, createdBy: '',
+      webhookPath: '', nextFireAt, lastFireAt: null, firedCount: 0,
+      enabled: data.enabled ?? true, createdAt: nowIso, createdBy: '',
     };
   }
 
@@ -34,9 +37,23 @@ export class ScheduleRepo extends BaseRepo<Schedule> {
     if (!existing) return null;
     const cron = data.cron ?? existing.cron;
     const enabled = data.enabled ?? existing.enabled;
-    const nextFireAt = data.nextFireAt ?? existing.nextFireAt;
+    const nextFireAt = data.nextFireAt ?? (data.cron ? nextCronFire(cron, new Date()).toISOString() : existing.nextFireAt);
     this.db.prepare(`UPDATE schedules SET cron = ?, enabled = ?, next_fire_at = ?, updated_at = ? WHERE id = ?`)
       .run(cron, enabled ? 1 : 0, nextFireAt, new Date().toISOString(), id);
     return { ...existing, cron, enabled, nextFireAt };
+  }
+
+  advance(id: string, firedAt: Date): Schedule | null {
+    const existing = this.findById(id);
+    if (!existing) return null;
+    const nextFireAt = nextCronFire(existing.cron, firedAt).toISOString();
+    const lastFireAt = firedAt.toISOString();
+    const firedCount = existing.firedCount + 1;
+    this.db.prepare(
+      `UPDATE schedules
+       SET last_fire_at = ?, fired_count = ?, next_fire_at = ?, updated_at = ?
+       WHERE id = ?`,
+    ).run(lastFireAt, firedCount, nextFireAt, lastFireAt, id);
+    return { ...existing, lastFireAt, firedCount, nextFireAt };
   }
 }

@@ -23,4 +23,36 @@ describe('Scheduler lifecycle', () => {
     await vi.advanceTimersByTimeAsync(5000);
     expect(findDueSchedules).toHaveBeenCalledTimes(callsBeforeStop);
   });
+
+  it('advances a successful schedule instead of leaving it due immediately', async () => {
+    const schedule = {
+      id: 'schedule-1',
+      workspaceId: 'workspace-1',
+      releaseId: 'release-1',
+      kind: 'test',
+      cron: '* * * * *',
+      webhookPath: '',
+      nextFireAt: new Date(0).toISOString(),
+      lastFireAt: null,
+      firedCount: 0,
+      enabled: true,
+      createdAt: new Date(0).toISOString(),
+      createdBy: 'test',
+    };
+    const handler = vi.fn().mockResolvedValue(undefined);
+    const advance = vi.fn().mockResolvedValue(schedule);
+    const scheduler = new Scheduler(
+      {
+        findDueSchedules: vi.fn().mockResolvedValue([schedule]),
+        advance,
+      } as never,
+      { broadcast: vi.fn() } as never,
+    );
+    scheduler.registerHandler('test', handler);
+
+    await scheduler.poll();
+
+    expect(handler).toHaveBeenCalledWith(schedule);
+    expect(advance).toHaveBeenCalledWith(schedule.id, expect.any(Date));
+  });
 });

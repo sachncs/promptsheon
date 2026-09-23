@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { CreateScheduleSchema, PaginationSchema } from '@promptsheon/shared';
 import type { ScheduleRepo } from '../repos/schedule.js';
 import { parseBody, parseQuery } from './validate.js';
+import { nextCronFire } from '../scheduler/cron.js';
 
 const UpdateScheduleSchema = z.object({
   cron: z.string().min(1).optional(),
@@ -27,6 +28,11 @@ export function registerScheduleRoutes(app: FastifyInstance, repo: ScheduleRepo)
   app.post('/api/schedules', async (request, reply) => {
     const parsed = parseBody(reply, CreateScheduleSchema, request.body);
     if (!parsed.ok) return;
+    try {
+      nextCronFire(parsed.data.cron, new Date());
+    } catch (error) {
+      return reply.code(422).send({ error: { code: 'INVALID_CRON', message: error instanceof Error ? error.message : 'Invalid cron expression' } });
+    }
     const item = repo.create(parsed.data);
     return reply.code(201).send(item);
   });
@@ -35,6 +41,13 @@ export function registerScheduleRoutes(app: FastifyInstance, repo: ScheduleRepo)
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, UpdateScheduleSchema, request.body);
     if (!parsed.ok) return;
+    if (parsed.data.cron) {
+      try {
+        nextCronFire(parsed.data.cron, new Date());
+      } catch (error) {
+        return reply.code(422).send({ error: { code: 'INVALID_CRON', message: error instanceof Error ? error.message : 'Invalid cron expression' } });
+      }
+    }
     const item = repo.update(id, parsed.data);
     return reply.send(item);
   });
