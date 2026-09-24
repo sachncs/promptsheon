@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 import type { ReleaseRepo } from '../repos/release.js';
@@ -15,20 +15,12 @@ const ApprovalQuerySchema = z.object({
 });
 const ReleaseApprovalParamsSchema = z.object({ releaseId: z.string().trim().min(1).max(255) });
 
-interface RequestUserContext {
-  userId?: string;
-  agentOrgId?: string;
-  orgContext?: { orgId?: string; organizationId?: string };
+function actorOf(request: FastifyRequest): string {
+  return request.userId ?? 'system';
 }
 
-function actorOf(request: unknown): string {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.userId ?? 'system';
-}
-
-function orgOf(request: unknown): string | null {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
+function orgOf(request: FastifyRequest): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { AuditChain } from '../audit/chain.js';
@@ -13,15 +13,8 @@ const ReportQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(10000).default(1000),
 });
 
-interface RequestUserContext {
-  userId?: string;
-  agentOrgId?: string;
-  orgContext?: { organizationId?: string; orgId?: string; role?: string };
-}
-
-function orgOf(request: unknown): string | null {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
+function orgOf(request: FastifyRequest): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
 interface AuditReportEntry {
@@ -104,7 +97,7 @@ export function registerAuditReportRoutes(
     const report: Omit<AuditReport, 'signature'> = {
       id: `report-${Date.now()}-${randomShort()}`,
       generatedAt: new Date().toISOString(),
-      generatedBy: (request as RequestUserContext).userId ?? null,
+      generatedBy: request.userId ?? null,
       organizationId: orgId,
       range: { from, to },
       filters: {

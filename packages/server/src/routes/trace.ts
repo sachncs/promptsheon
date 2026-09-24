@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { TraceService } from '../application/trace-service.js';
 import { parseParams, parseQuery } from './validate.js';
@@ -21,15 +21,8 @@ const RollupQuerySchema = z.object({
 
 const TraceParamsSchema = z.object({ id: z.string().uuid() });
 
-interface RequestUserContext {
-  userId?: string;
-  agentOrgId?: string;
-  orgContext?: { organizationId?: string; orgId?: string };
-}
-
-function orgOf(request: unknown): string | null {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
+function orgOf(request: FastifyRequest): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
 /**
