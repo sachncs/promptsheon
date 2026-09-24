@@ -11,7 +11,7 @@ import {
   type HumanReviewRepo,
 } from '../repos/eval-suite.js';
 import type { EvalSuiteService } from '../application/eval-suite-service.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
 function actorOf(request: unknown): string {
@@ -120,6 +120,10 @@ const CalibrationSchema = z.object({
   }
 });
 
+const SuiteIdParamsSchema = z.object({
+  id: z.string().min(1).max(200),
+});
+
 export interface EvalSuiteRouteDeps {
   suiteRepo: EvalSuiteRepo;
   humanReviewRepo: HumanReviewRepo;
@@ -181,7 +185,9 @@ export function registerEvalSuiteRoutes(
   });
 
   app.get('/api/eval-suites/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsed = parseParams(reply, SuiteIdParamsSchema, request.params);
+    if (!parsed.ok) return;
+    const { id } = parsed.data;
     const organizationId = organizationIdOf(request);
     const suite = organizationId ? deps.suiteRepo.findByIdInOrg(id, organizationId) : deps.suiteRepo.findById(id);
     if (!suite) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'suite not found' } });
@@ -195,7 +201,9 @@ export function registerEvalSuiteRoutes(
   });
 
   app.post('/api/eval-suites/:id/run', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, SuiteIdParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, RunSuiteSchema, request.body ?? {});
     if (!parsed.ok) return;
     const organizationId = organizationIdOf(request);
@@ -214,7 +222,9 @@ export function registerEvalSuiteRoutes(
    * Accepts a list of graded trials and returns pass/fail.
    */
   app.post('/api/repos/:id/eval-gate', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, SuiteIdParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, GateSchema, request.body);
     if (!parsed.ok) return;
     const organizationId = organizationIdOf(request);
@@ -237,7 +247,9 @@ export function registerEvalSuiteRoutes(
   });
 
   app.post('/api/human-review/:id/decide', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, SuiteIdParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, ReviewDecisionSchema, request.body);
     if (!parsed.ok) return;
     const organizationId = organizationIdOf(request);
