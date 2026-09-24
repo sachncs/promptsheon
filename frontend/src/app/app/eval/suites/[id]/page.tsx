@@ -10,6 +10,7 @@ import { evalSuiteApi } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function EvalSuiteDetailPage() {
   const session = useRequireSession();
@@ -27,6 +28,9 @@ export default function EvalSuiteDetailPage() {
   });
 
   if (!session) return null;
+  if (suite.isError) {
+    return <QueryError message={(suite.error as Error).message} onRetry={() => void suite.refetch()} />;
+  }
   if (suite.isLoading) return <div className="text-text-muted text-sm">Loading…</div>;
   if (!suite.data) return <div className="text-text-muted text-sm">Suite not found.</div>;
 

@@ -3,14 +3,14 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Target, History } from 'lucide-react';
+import { ArrowLeft, History } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
 import { client } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatusPill } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
-import { EmptyState } from '@/components/brand/empty-state';
+import { QueryError } from '@/components/brand/query-error';
 
 interface GoalHistoryEntry {
   iteration: number;
@@ -74,16 +74,7 @@ export default function GoalDetailPage() {
       />
 
       {goal.isError ? (
-        <EmptyState
-          icon={Target}
-          title="Goal state not available"
-          description={`No in-memory state for goal hash ${hash.slice(0, 16)}. Active goals are kept in memory only — restart cycles are not preserved.`}
-          action={
-            <Link href="/app/goals">
-              <span className="text-sm text-brand-highlight hover:underline">Back to active goals</span>
-            </Link>
-          }
-        />
+        <QueryError message={(goal.error as Error).message} onRetry={() => void goal.refetch()} />
       ) : !data ? (
         <Surface>
           <div className="text-sm text-text-muted">

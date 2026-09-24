@@ -13,6 +13,7 @@ import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
 import { ThemedSelect } from '@/components/brand/themed-select';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function EvalSuitesPage() {
   const session = useRequireSession();
@@ -20,6 +21,7 @@ export default function EvalSuitesPage() {
   const suites = useQuery({
     queryKey: ['eval-suites'],
     queryFn: () => evalSuiteApi.list(),
+    enabled: Boolean(session),
   });
   const [capabilityId, setCapabilityId] = useState('');
   const [name, setName] = useState('');
@@ -50,6 +52,9 @@ export default function EvalSuitesPage() {
   });
 
   if (!session) return null;
+  if (suites.isError) {
+    return <QueryError message={(suites.error as Error).message} onRetry={() => void suites.refetch()} />;
+  }
   const rows = Array.isArray(suites.data) ? (suites.data as Array<Record<string, unknown>>) : [];
 
   return (

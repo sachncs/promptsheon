@@ -13,6 +13,7 @@ import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { QueryError } from '@/components/brand/query-error';
 
 interface SelfEvolveState {
   capabilityId?: string;
@@ -35,7 +36,7 @@ export default function SelfEvolvePage() {
   const state = useQuery({
     queryKey: ['self-evolve', capabilityId],
     queryFn: () => selfEvolveApi.getState(capabilityId).then((r) => r.data as SelfEvolveState),
-    enabled: Boolean(capabilityId),
+    enabled: Boolean(capabilityId) && Boolean(session),
     refetchInterval: 5000,
   });
 
@@ -52,7 +53,6 @@ export default function SelfEvolvePage() {
 
   const s = state.data;
   const isLoading = state.isLoading;
-  const isError = state.isError && !s;
 
   return (
     <div className="space-y-6">
@@ -71,7 +71,9 @@ export default function SelfEvolvePage() {
         }
       />
 
-      {isError ? (
+      {state.isError ? (
+        <QueryError message={(state.error as Error).message} onRetry={() => void state.refetch()} />
+      ) : !s && !isLoading ? (
         <EmptyState
           icon={Activity}
           title="Capability not found"
