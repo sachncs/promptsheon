@@ -20,6 +20,41 @@ import DocsLayout from '@components/DocsLayout.astro';
   -H 'Authorization: Bearer pk_your_key_here' \
   -H 'Accept: application/json'</code></pre>
 
+  <h2>Use the TypeScript SDK</h2>
+  <p>The workspace SDK is a small typed client over the same HTTP contract. It uses the platform's native <code>fetch</code>, so it works in Node 18+, server runtimes, and worker environments. Keep the API key on the server. The package is currently workspace-private, so build it from a checkout:</p>
+  <pre><code>pnpm --filter @promptsheon/sdk build</code></pre>
+  <pre><code>import &#123; PromptsheonClient &#125; from '@promptsheon/sdk';
+
+const client = new PromptsheonClient(&#123;
+  baseUrl: process.env.PROMPTSHEON_API_URL ?? 'http://127.0.0.1:8080',
+  apiKey: process.env.PROMPTSHEON_API_KEY,
+&#125;);
+
+const repositories = await client.listRepos(process.env.PROMPTSHEON_WORKSPACE_ID!);
+const suite = await client.createSuite(&#123;
+  capabilityId: process.env.PROMPTSHEON_CAPABILITY_ID!,
+  name: 'refund-regression',
+  passThreshold: 0.92,
+  initialGraders: [&#123; name: 'exact-match', kind: 'exact', weight: 1, config: &#123;&#125; &#125;],
+&#125;);
+
+console.log(&#123; repositories, suiteId: suite.suite.id &#125;);</code></pre>
+  <p>SDK methods throw an <code>Error</code> containing the HTTP method, path, status, and response body for non-success responses. Catch it at your job boundary and preserve the request ID from the raw response in production integrations.</p>
+
+  <h2>Use the CLI in CI</h2>
+  <p>The CLI reads its endpoint and bearer key from environment variables. Add <code>--json</code> when another pipeline step consumes the result, and use <code>--dry-run</code> before allowing a mutating command to run in a new environment.</p>
+  <pre><code>export PROMPTSHEON_API_URL=http://127.0.0.1:8080
+export PROMPTSHEON_API_KEY=pk_your_key_here
+export PROMPTSHEON_WORKSPACE_ID=workspace-uuid
+
+promptsheon login
+promptsheon repos list --json
+promptsheon eval gate "$REPO_ID" --json
+promptsheon release get "$RELEASE_ID" --json
+promptsheon release approve "$RELEASE_ID" --dry-run --json
+promptsheon manifest scan "$MANIFEST_HASH" --json</code></pre>
+  <p>For a checkout of this repository, build the workspace CLI with <code>pnpm --filter @promptsheon/cli build</code> and invoke <code>node packages/cli/dist/index.js</code> until the package is published.</p>
+
   <h2>HTTP conventions</h2>
   <ul>
     <li>Request bodies and query strings are validated at the route boundary.</li>
@@ -35,9 +70,9 @@ pnpm test
 pnpm typecheck
 pnpm --dir frontend test:e2e
 
-# publish through your chosen API/CLI workflow
-promptsheon release validate ./capability.yaml
-promptsheon release promote &lt;release-id&gt; --environment production</code></pre>
+# inspect the candidate and approval state
+promptsheon release get &lt;release-id&gt; --json
+promptsheon release approve &lt;release-id&gt; --dry-run --json</code></pre>
   <p>Keep evaluation output, release identifiers, and audit references as build artifacts. A deployment should be reproducible from the content hash, not from an untracked local file.</p>
 
   <h2>More reference detail</h2>
