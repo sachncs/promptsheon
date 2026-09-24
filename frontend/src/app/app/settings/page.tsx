@@ -142,12 +142,12 @@ export default function SettingsPage() {
           <SurfaceHeader className="px-5 pt-5" title="Other settings" description={`${extras.length} not surfaced in this UI.`} />
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={extras as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['key'])}
+            rows={extras}
+            rowKey={(r) => r.key}
             columns={[
-              { key: 'key', header: 'Key', render: (r) => <code className="font-mono text-xs">{String(r['key'])}</code> },
-              { key: 'value', header: 'Value', render: (r) => <code className="font-mono text-xs">{String(JSON.stringify(r['value']))}</code> },
-              { key: 'when', header: 'Updated', render: (r) => r['updatedAt'] ? new Date(String(r['updatedAt'])).toLocaleString() : '—' },
+              { key: 'key', header: 'Key', render: (r) => <code className="font-mono text-xs">{r.key}</code> },
+              { key: 'value', header: 'Value', render: (r) => <code className="font-mono text-xs">{JSON.stringify(r.value)}</code> },
+              { key: 'when', header: 'Updated', render: (r) => r.updatedAt ? new Date(r.updatedAt).toLocaleString() : '—' },
             ]}
           />
         </Surface>
