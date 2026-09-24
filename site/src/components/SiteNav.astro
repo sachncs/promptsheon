@@ -112,6 +112,23 @@ const links: NavLink[] = [
           </a>
         ))}
       </nav>
+      <div class="mt-2 border-t border-[var(--line)] pt-2">
+        <button
+          id="mobile-theme-toggle"
+          type="button"
+          aria-label="Toggle theme"
+          class="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--ink-strong)]"
+        >
+          <svg class="theme-sun h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+          </svg>
+          <svg class="theme-moon h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+          <span>Toggle theme</span>
+        </button>
+      </div>
     </div>
   </div>
 </header>
@@ -128,13 +145,13 @@ const links: NavLink[] = [
   onScroll();
   window.addEventListener('scroll', onScroll, { passive: true });
 
-  const toggle = document.getElementById('theme-toggle');
-  if (toggle) {
+  const themeToggles = document.querySelectorAll('#theme-toggle, #mobile-theme-toggle');
+  themeToggles.forEach((toggle) => {
     toggle.addEventListener('click', () => {
       const isDark = document.documentElement.classList.toggle('dark');
       localStorage.setItem('promptsheon-theme', isDark ? 'dark' : 'light');
     });
-  }
+  });
 
   const mobileToggle = document.getElementById('mobile-nav-toggle');
   const mobilePanel = document.getElementById('mobile-nav-panel');
