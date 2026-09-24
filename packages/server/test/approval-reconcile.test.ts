@@ -131,9 +131,9 @@ describe('approval route reconciliation', () => {
     expect(body.approvals).toEqual([]);
   });
 
-  it('GET /api/approvals without releaseId returns 400', async () => {
+  it('GET /api/approvals without releaseId returns a validation error', async () => {
     const r = await app.inject({ method: 'GET', url: '/api/approvals' });
-    expect(r.statusCode).toBe(400);
+    expect(r.statusCode).toBe(422);
   });
 
   it('GET /api/approvals/pending lists review releases with canonical approvals', async () => {

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { parseBody } from './validate.js';
+import { parseBody, parseQuery } from './validate.js';
 import type { ReleaseRepo } from '../repos/release.js';
 import type { ManifestRepo } from '../repos/manifest.js';
 import { NotFoundError } from '@promptsheon/shared';
@@ -8,6 +8,10 @@ import { NotFoundError } from '@promptsheon/shared';
 const ReleaseVoteSchema = z.object({
   decision: z.enum(['approve', 'reject']),
   comment: z.string().max(1000).optional().default(''),
+});
+
+const ApprovalQuerySchema = z.object({
+  releaseId: z.string().min(1).max(200),
 });
 
 interface RequestUserContext {
@@ -58,10 +62,9 @@ export function registerApprovalRoutes(
   });
 
   app.get('/api/approvals', async (request, reply) => {
-    const releaseId = (request.query as { releaseId?: string }).releaseId;
-    if (!releaseId) {
-      return reply.code(400).send({ error: { code: 'MISSING_RELEASE_ID', message: 'releaseId required' } });
-    }
+    const parsed = parseQuery(reply, ApprovalQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { releaseId } = parsed.data;
     const organizationId = orgOf(request);
     if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     if (!deps.releaseRepo.findByIdInOrg(releaseId, organizationId)) {

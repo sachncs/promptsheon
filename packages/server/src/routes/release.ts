@@ -41,6 +41,10 @@ const OverlaySchema = z.object({
   patch: z.record(z.string(), z.unknown()),
 });
 
+const EnvironmentQuerySchema = z.object({
+  environment: z.string().min(1).max(60).default('prod'),
+});
+
 const CanaryRuleSchema = z.object({
   percent: z.number().int().min(0).max(100),
   segmentExpr: z.string().optional(),
@@ -279,7 +283,9 @@ export function registerReleaseRoutes(
     if (!repo.findByIdInOrg(id, organizationId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
     }
-    const env = (request.query as { environment?: string }).environment ?? 'prod';
+    const parsedQuery = parseQuery(reply, EnvironmentQuerySchema, request.query);
+    if (!parsedQuery.ok) return;
+    const { environment: env } = parsedQuery.data;
     const overlay = deps.overlayRepo.upsert(id, env, parsed.data.patch);
     return reply.send({ id: overlay.releaseId, environment: overlay.environment, patch: overlay.patch });
   });
@@ -291,7 +297,9 @@ export function registerReleaseRoutes(
     if (!repo.findByIdInOrg(id, organizationId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
     }
-    const env = (request.query as { environment?: string }).environment ?? 'prod';
+    const parsedQuery = parseQuery(reply, EnvironmentQuerySchema, request.query);
+    if (!parsedQuery.ok) return;
+    const { environment: env } = parsedQuery.data;
     return reply.send({ id, environment: env, patch: deps.overlayRepo.get(id, env)?.patch ?? {} });
   });
 
