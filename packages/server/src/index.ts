@@ -328,7 +328,6 @@ async function main() {
     userRepo: repos.user,
     llmRouter,
     repoDeps: {
-      repoRepo: repos.repo,
       repositoryService,
       branchRepo: repos.branch,
       tagRepo: repos.tag,

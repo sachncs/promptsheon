@@ -5,7 +5,7 @@ import type {
   RepositoryCreateInput,
   RepositoryUpdateInput,
 } from '@promptsheon/shared';
-import { RepoRepo, RepositoryExistsError } from '../repos/repo.js';
+import { RepositoryExistsError } from '../repos/repo.js';
 import type { BranchRepo } from '../repos/branch.js';
 import type { TagRepo } from '../repos/tag.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
@@ -64,7 +64,6 @@ const RepositoryTagParamsSchema = z.object({
 });
 
 export interface RepoDeps {
-  repoRepo: RepoRepo;
   repositoryService: RepositoryService;
   branchRepo: BranchRepo;
   tagRepo: TagRepo;
