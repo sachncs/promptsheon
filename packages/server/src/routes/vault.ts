@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import type { VaultRepo, Kms } from '../repos/vault.js';
 import type { OrgExportService } from '../repos/vault-extras.js';
 import type { CostRollupRepo } from '../repos/vault-extras.js';
@@ -45,6 +45,10 @@ const RollupIngestSchema = z.object({
 const RotateKeySchema = z.object({
   label: z.string().min(1).max(120),
   reencrypt: z.boolean().optional(),
+});
+
+const OrganizationParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
 });
 
 export interface VaultRouteDeps {
@@ -139,7 +143,9 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
     if (!deps.adminOnly(request)) {
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
     }
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     if (!assertOrgScope(request, id, reply)) return;
     const exp = await deps.orgExportService.exportAll(id, actorOf(request));
     deps.orgExportService.recordExport(exp);
@@ -150,7 +156,9 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
     if (!deps.adminOnly(request)) {
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
     }
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     if (!assertOrgScope(request, id, reply)) return;
     const result = deps.orgExportService.schedulePurge(id, actorOf(request));
     return reply.send(result);

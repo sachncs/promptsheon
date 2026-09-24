@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { cedarGate } from '../policy/gate.js';
 import { NotFoundError } from '@promptsheon/shared';
 import type { IdentityService } from '../application/identity-service.js';
+import { parseParams } from './validate.js';
 
 const MintKeySchema = z.object({
   agentId: z.string().min(1).max(128),
@@ -18,6 +19,10 @@ const MintSvidSchema = z.object({
   ttlSeconds: z.number().int().min(60).max(86_400).optional().default(900),
   scope: z.array(z.string()).optional(),
   classification: z.string().min(1).max(64).optional(),
+});
+
+const IdentityParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
 });
 
 export interface IdentityDeps {
@@ -136,7 +141,9 @@ export function registerIdentityRoutes(app: FastifyInstance, deps: IdentityDeps)
     '/api/identity/:id',
     { preHandler: adminOrApproverRevoke },
     async (request, reply) => {
-      const { id } = request.params as { id: string };
+      const parsedParams = parseParams(reply, IdentityParamsSchema, request.params);
+      if (!parsedParams.ok) return;
+      const { id } = parsedParams.data;
       const organizationId = requireOrganization(request, reply);
       if (!organizationId) return;
       if (!deps.service.revoke(id, organizationId)) {

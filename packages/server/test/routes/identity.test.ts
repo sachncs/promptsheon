@@ -175,5 +175,14 @@ describe('identity routes', () => {
       });
       expect(response.statusCode).toBe(404);
     });
+
+    it('rejects a blank route id', async () => {
+      const response = await app.inject({
+        method: 'DELETE',
+        url: '/api/identity/%20',
+      });
+      expect(response.statusCode).toBe(422);
+      expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+    });
   });
 });
