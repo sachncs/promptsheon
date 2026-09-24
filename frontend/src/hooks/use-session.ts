@@ -23,9 +23,14 @@ export function useSession() {
 export function useRequireSession() {
   const router = useRouter();
   const session = useSession();
+  const hydrated = React.useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
 
   React.useEffect(() => {
-    if (!session) router.replace('/onboarding');
-  }, [session, router]);
-  return session;
+    if (hydrated && !session) router.replace('/onboarding');
+  }, [hydrated, session, router]);
+  return hydrated ? session : null;
 }

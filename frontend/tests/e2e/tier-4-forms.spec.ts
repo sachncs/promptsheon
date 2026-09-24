@@ -15,7 +15,10 @@ import { test, expect, request } from '@playwright/test';
 const BACKEND_PORT = process.env['PROMPTSHEON_E2E_BACKEND_PORT'] ?? '8081';
 const BASE = process.env['PROMPTSHEON_E2E_BASE_URL'] ?? `http://127.0.0.1:${BACKEND_PORT}`;
 
+let cachedBootstrap: { userId: string; orgId: string; apiKey: string } | null = null;
+
 async function bootstrap() {
+  if (cachedBootstrap) return cachedBootstrap;
   const ctx = await request.newContext({ baseURL: BASE });
   const slug = `t4-${Date.now()}`;
   let resp = await ctx.post('/api/bootstrap/admin', {
@@ -27,20 +30,24 @@ async function bootstrap() {
     },
   });
   if (resp.status() === 409) resp = await ctx.get('/api/bootstrap/admin');
-  const body = (await resp.json()) as { user: { id: string }; org: { id: string } };
-  return { ctx, userId: body.user.id, orgId: body.org.id };
+  const body = (await resp.json()) as { user: { id: string }; org: { id: string }; apiKey?: string };
+  await ctx.dispose();
+  if (!body.apiKey) {
+    throw new Error('bootstrap admin did not return an API key; run E2E against a fresh test database');
+  }
+  cachedBootstrap = { userId: body.user.id, orgId: body.org.id, apiKey: body.apiKey };
+  return cachedBootstrap;
 }
 
 test.describe('tier 4: forms submit and rows appear', () => {
   test('workspaces: create workspace', async ({ page, baseURL }) => {
     if (!baseURL) throw new Error('baseURL not provided');
 
-    const { ctx, userId, orgId } = await bootstrap();
-    await ctx.dispose();
+    const { userId, orgId, apiKey } = await bootstrap();
 
     await page.goto('/');
     await page.evaluate(
-      ([u, o]) => {
+      ([u, o, key]) => {
         window.localStorage.setItem(
           'promptsheon:session:v1',
           JSON.stringify({
@@ -49,13 +56,15 @@ test.describe('tier 4: forms submit and rows appear', () => {
             userEmail: 't4@promptsheon.test',
             orgId: o,
             orgName: 'T4 Org',
+            apiKey: key,
             completedAt: new Date().toISOString(),
           }),
         );
         window.dispatchEvent(new Event('promptsheon:session-changed'));
       },
-      [userId, orgId],
+      [userId, orgId, apiKey],
     );
+    await page.reload();
     await page.goto('/app/workspaces');
     await page.getByLabel(/name/i).first().fill(`ws-${Date.now()}`);
     await page.getByRole('button', { name: /create workspace/i }).click();
@@ -67,12 +76,11 @@ test.describe('tier 4: forms submit and rows appear', () => {
   test('api-keys: create key and list', async ({ page, baseURL }) => {
     if (!baseURL) throw new Error('baseURL not provided');
 
-    const { ctx, userId, orgId } = await bootstrap();
-    await ctx.dispose();
+    const { userId, orgId, apiKey } = await bootstrap();
 
     await page.goto('/');
     await page.evaluate(
-      ([u, o]) => {
+      ([u, o, key]) => {
         window.localStorage.setItem(
           'promptsheon:session:v1',
           JSON.stringify({
@@ -81,12 +89,14 @@ test.describe('tier 4: forms submit and rows appear', () => {
             userEmail: 't4@promptsheon.test',
             orgId: o,
             orgName: 'T4 Org',
+            apiKey: key,
             completedAt: new Date().toISOString(),
           }),
         );
       },
-      [userId, orgId],
+      [userId, orgId, apiKey],
     );
+    await page.reload();
     await page.goto('/app/api-keys');
     await page.getByLabel(/name/i).first().fill(`e2e-key-${Date.now()}`);
     await page.getByRole('button', { name: /issue/i }).click();
@@ -96,12 +106,11 @@ test.describe('tier 4: forms submit and rows appear', () => {
   test('webhooks: create and list', async ({ page, baseURL }) => {
     if (!baseURL) throw new Error('baseURL not provided');
 
-    const { ctx, userId, orgId } = await bootstrap();
-    await ctx.dispose();
+    const { userId, orgId, apiKey } = await bootstrap();
 
     await page.goto('/');
     await page.evaluate(
-      ([u, o]) => {
+      ([u, o, key]) => {
         window.localStorage.setItem(
           'promptsheon:session:v1',
           JSON.stringify({
@@ -110,13 +119,15 @@ test.describe('tier 4: forms submit and rows appear', () => {
             userEmail: 't4@promptsheon.test',
             orgId: o,
             orgName: 'T4 Org',
+            apiKey: key,
             completedAt: new Date().toISOString(),
           }),
         );
         window.dispatchEvent(new Event('promptsheon:session-changed'));
       },
-      [userId, orgId],
+      [userId, orgId, apiKey],
     );
+    await page.reload();
     await page.goto('/app/webhooks');
     await page.getByLabel(/url/i).first().fill('https://example.com/h');
     await page.getByRole('button', { name: /add webhook/i }).click();
@@ -126,12 +137,11 @@ test.describe('tier 4: forms submit and rows appear', () => {
   test('feature-flags: create and list', async ({ page, baseURL }) => {
     if (!baseURL) throw new Error('baseURL not provided');
 
-    const { ctx, userId, orgId } = await bootstrap();
-    await ctx.dispose();
+    const { userId, orgId, apiKey } = await bootstrap();
 
     await page.goto('/');
     await page.evaluate(
-      ([u, o]) => {
+      ([u, o, key]) => {
         window.localStorage.setItem(
           'promptsheon:session:v1',
           JSON.stringify({
@@ -140,12 +150,14 @@ test.describe('tier 4: forms submit and rows appear', () => {
             userEmail: 't4@promptsheon.test',
             orgId: o,
             orgName: 'T4 Org',
+            apiKey: key,
             completedAt: new Date().toISOString(),
           }),
         );
       },
-      [userId, orgId],
+      [userId, orgId, apiKey],
     );
+    await page.reload();
     await page.goto('/app/feature-flags');
     await page.getByLabel(/key/i).first().fill(`flag_${Date.now()}`);
     await page.getByRole('button', { name: /create|save/i }).first().click();
@@ -156,12 +168,11 @@ test.describe('tier 4: forms submit and rows appear', () => {
   test('schedules: button is disabled until inputs filled', async ({ page, baseURL }) => {
     if (!baseURL) throw new Error('baseURL not provided');
 
-    const { ctx, userId, orgId } = await bootstrap();
-    await ctx.dispose();
+    const { userId, orgId, apiKey } = await bootstrap();
 
     await page.goto('/');
     await page.evaluate(
-      ([u, o]) => {
+      ([u, o, key]) => {
         window.localStorage.setItem(
           'promptsheon:session:v1',
           JSON.stringify({
@@ -170,12 +181,14 @@ test.describe('tier 4: forms submit and rows appear', () => {
             userEmail: 't4@promptsheon.test',
             orgId: o,
             orgName: 'T4 Org',
+            apiKey: key,
             completedAt: new Date().toISOString(),
           }),
         );
       },
-      [userId, orgId],
+      [userId, orgId, apiKey],
     );
+    await page.reload();
     await page.goto('/app/schedules');
     // The page has disabled Create button until releaseId + cron are picked.
     const createBtn = page.getByRole('button', { name: /schedule/i }).first();

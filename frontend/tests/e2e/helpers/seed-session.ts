@@ -16,6 +16,7 @@ export interface SessionInfo {
   userEmail: string;
   orgId: string;
   orgName: string;
+  apiKey: string;
   completedAt: string;
 }
 
@@ -48,13 +49,21 @@ export async function bootstrapAdminViaApi(baseUrl: string, opts: SeedOptions): 
   if (!resp.ok()) {
     throw new Error(`bootstrap admin failed: ${resp.status()} ${await resp.text()}`);
   }
-  const body = (await resp.json()) as { user: { id: string; name: string; email: string }; org: { id: string; name: string } };
+  const body = (await resp.json()) as {
+    user: { id: string; name: string; email: string };
+    org: { id: string; name: string };
+    apiKey?: string;
+  };
+  if (!body.apiKey) {
+    throw new Error('bootstrap admin did not return an API key; run E2E against a fresh test database');
+  }
   return {
     userId: body.user.id,
     userName: body.user.name,
     userEmail: body.user.email,
     orgId: body.org.id,
     orgName: body.org.name,
+    apiKey: body.apiKey,
     completedAt: new Date().toISOString(),
   };
 }
