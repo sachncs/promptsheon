@@ -103,6 +103,33 @@ export interface EvalSuite {
   updatedAt: string;
 }
 
+export type EvalRunStatus = 'running' | 'passed' | 'failed' | 'error';
+
+export interface EvalRun {
+  id: string;
+  releaseId: string;
+  datasetId: string;
+  scorer: string;
+  score: number;
+  passed: number;
+  failed: number;
+  total: number;
+  status: EvalRunStatus;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+export interface EvalResult {
+  id: string;
+  runId: string;
+  caseId: string | null;
+  seq: number;
+  passed: boolean;
+  actual: string;
+  error: string;
+  latencyMs: number;
+}
+
 const CostRollupSchema = z.object({
   capabilityId: z.string(),
   day: z.string(),
@@ -122,6 +149,31 @@ const EvalSuiteSchema = z.object({
   createdBy: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+const EvalRunSchema = z.object({
+  id: z.string(),
+  releaseId: z.string(),
+  datasetId: z.string(),
+  scorer: z.string(),
+  score: z.number().min(0).max(1),
+  passed: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  status: z.enum(['running', 'passed', 'failed', 'error']),
+  startedAt: z.string(),
+  finishedAt: z.string().nullable(),
+});
+
+const EvalResultSchema = z.object({
+  id: z.string(),
+  runId: z.string(),
+  caseId: z.string().nullable(),
+  seq: z.number().int().nonnegative(),
+  passed: z.boolean(),
+  actual: z.string(),
+  error: z.string(),
+  latencyMs: z.number().nonnegative(),
 });
 
 function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
@@ -149,6 +201,24 @@ function parseEvalSuites(raw: unknown): EvalSuite[] {
     const parsed = EvalSuiteSchema.safeParse(entry);
     if (!parsed.success) {
       throw new ApiError('The server returned invalid eval suite data.', { code: 'INVALID_RESPONSE' });
+    }
+    return parsed.data;
+  });
+}
+
+function parseEvalRun(raw: unknown): EvalRun {
+  const parsed = EvalRunSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ApiError('The server returned invalid eval run data.', { code: 'INVALID_RESPONSE' });
+  }
+  return parsed.data;
+}
+
+function parseEvalResults(raw: unknown): EvalResult[] {
+  return unwrapList<unknown>(raw).map((entry) => {
+    const parsed = EvalResultSchema.safeParse(entry);
+    if (!parsed.success) {
+      throw new ApiError('The server returned invalid eval result data.', { code: 'INVALID_RESPONSE' });
     }
     return parsed.data;
   });
@@ -392,9 +462,15 @@ export const datasetApi = {
 
 export const evalApi = {
   list: (releaseId?: string) => client.get('/eval-runs', { params: { releaseId } }),
-  get: (id: string) => client.get(`/eval-runs/${id}`),
+  get: async (id: string): Promise<{ data: EvalRun }> => {
+    const r = await client.get<unknown>(`/eval-runs/${id}`);
+    return { data: parseEvalRun(r.data) };
+  },
   create: (data: { releaseId: string; datasetId: string; scorer: string }) => client.post('/eval-runs', data),
-  getResults: (id: string) => client.get(`/eval-runs/${id}/results`),
+  getResults: async (id: string): Promise<{ data: EvalResult[] }> => {
+    const r = await client.get<unknown>(`/eval-runs/${id}/results`);
+    return { data: parseEvalResults(r.data) };
+  },
 };
 
 export const alertApi = {
