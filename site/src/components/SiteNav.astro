@@ -81,7 +81,7 @@ const links: NavLink[] = [
         <button
           id="mobile-nav-toggle"
           type="button"
-          aria-label="Toggle menu"
+          aria-label="Open navigation"
           aria-expanded="false"
           aria-controls="mobile-nav-panel"
           class="grid h-9 w-9 place-items-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--ink-strong)] lg:hidden"
@@ -177,31 +177,50 @@ const links: NavLink[] = [
   const mobilePanel = document.getElementById('mobile-nav-panel');
   const iconMenu = mobileToggle?.querySelector('.icon-menu') as HTMLElement | null;
   const iconClose = mobileToggle?.querySelector('.icon-close') as HTMLElement | null;
+  let previousBodyOverflow = '';
 
-  if (mobileToggle && mobilePanel) {
-    mobileToggle.addEventListener('click', () => {
-      const open = !mobilePanel.classList.contains('hidden');
+  if (mobileToggle instanceof HTMLButtonElement && mobilePanel instanceof HTMLElement) {
+    const toggle = mobileToggle;
+    const panel = mobilePanel;
+
+    function setMobileNav(open: boolean, restoreFocus = false) {
       if (open) {
-        mobilePanel.classList.add('hidden');
-        mobileToggle.setAttribute('aria-expanded', 'false');
-        iconMenu?.classList.remove('hidden');
-        iconClose?.classList.add('hidden');
+        previousBodyOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
       } else {
-        mobilePanel.classList.remove('hidden');
-        mobileToggle.setAttribute('aria-expanded', 'true');
-        iconMenu?.classList.add('hidden');
-        iconClose?.classList.remove('hidden');
+        panel.classList.add('hidden');
+        document.body.style.overflow = previousBodyOverflow;
       }
+
+      if (open) panel.classList.remove('hidden');
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+      iconMenu?.classList.toggle('hidden', open);
+      iconClose?.classList.toggle('hidden', !open);
+
+      if (restoreFocus) toggle.focus();
+    }
+
+    toggle.addEventListener('click', () => {
+      const open = !panel.classList.contains('hidden');
+      setMobileNav(!open);
     });
 
     // Close on link click
-    mobilePanel.querySelectorAll('a').forEach((a) => {
-      a.addEventListener('click', () => {
-        mobilePanel.classList.add('hidden');
-        mobileToggle.setAttribute('aria-expanded', 'false');
-        iconMenu?.classList.remove('hidden');
-        iconClose?.classList.add('hidden');
-      });
+    panel.querySelectorAll('a').forEach((a) => {
+      a.addEventListener('click', () => setMobileNav(false));
     });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !panel.classList.contains('hidden')) {
+        setMobileNav(false, true);
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth >= 1024 && !panel.classList.contains('hidden')) {
+        setMobileNav(false);
+      }
+    }, { passive: true });
   }
 </script>
