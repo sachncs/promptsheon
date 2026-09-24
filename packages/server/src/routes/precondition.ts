@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { CreatePreconditionSchema } from '@promptsheon/shared';
 import type { PreconditionRepo } from '../repos/precondition.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 
 const ListPreconditionsQuerySchema = z.object({
   capabilityId: z.string().min(1).optional(),
@@ -14,6 +14,8 @@ const UpdatePreconditionSchema = z.object({
   timeoutSec: z.number().int().min(1).max(3600).optional(),
   enabled: z.boolean().optional(),
 });
+
+const PreconditionParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
 
 interface RequestOrganizationContext {
   agentOrgId?: string;
@@ -42,7 +44,9 @@ export function registerPreconditionRoutes(app: FastifyInstance, repo: Precondit
   app.get('/api/preconditions/:id', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, PreconditionParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const item = repo.findByIdInOrg(id, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
     return reply.send(item);
@@ -61,7 +65,9 @@ export function registerPreconditionRoutes(app: FastifyInstance, repo: Precondit
   app.put('/api/preconditions/:id', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, PreconditionParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, UpdatePreconditionSchema, request.body);
     if (!parsed.ok) return;
     const updated = repo.updateInOrg(id, organizationId, parsed.data);
@@ -72,7 +78,9 @@ export function registerPreconditionRoutes(app: FastifyInstance, repo: Precondit
   app.delete('/api/preconditions/:id', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, PreconditionParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     repo.deleteInOrg(id, organizationId);
     return reply.code(204).send();
   });
