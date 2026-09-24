@@ -98,6 +98,11 @@ const groups: NavGroup[] = [
   },
 ];
 
+function isNavItemActive(pathname: string, href: string): boolean {
+  if (href === '/app') return pathname === href;
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 function NavGroupSection({
   group,
   last,
@@ -108,11 +113,13 @@ function NavGroupSection({
   onNavigate?: (() => void) | undefined;
 }) {
   const pathname = usePathname();
-  const hasActive = group.items.some(
-    (item) => pathname === item.href || pathname.startsWith(item.href + '/'),
-  );
+  const hasActive = group.items.some((item) => isNavItemActive(pathname, item.href));
   const [open, setOpen] = React.useState(hasActive);
   const groupId = `navigation-${group.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+
+  React.useEffect(() => {
+    if (hasActive) setOpen(true);
+  }, [hasActive]);
 
   return (
     <div className={cn('py-2', !last && 'border-b border-border-subtle')}>
@@ -130,12 +137,13 @@ function NavGroupSection({
         <nav id={groupId} aria-label={`${group.label} navigation`} className="space-y-0.5 px-2">
           {group.items.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+            const isActive = isNavItemActive(pathname, item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 {...(onNavigate ? { onClick: onNavigate } : {})}
+                aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors',
                   isActive
