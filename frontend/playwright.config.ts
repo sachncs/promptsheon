@@ -23,7 +23,10 @@ export default defineConfig({
   webServer: {
     command: `cd .. && PROMPTSHEON_PORT=${BACKEND_PORT} PROMPTSHEON_FRONTEND_PORT=${PORT} PROMPTSHEON_DB_PATH=promptsheon-test.db PROMPTSHEON_RATE_LIMIT_MAX=10000 pnpm --dir packages dev`,
     url: BASE_URL,
-    reuseExistingServer: !process.env['CI'],
+    // Never attach to an unrelated process that happens to own the port.
+    // The dev command starts both the frontend and the API; reusing only the
+    // frontend leaves the API unavailable and can produce misleading failures.
+    reuseExistingServer: false,
     timeout: 120_000,
     stdout: 'pipe',
     stderr: 'pipe',
