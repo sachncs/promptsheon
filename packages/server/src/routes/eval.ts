@@ -7,7 +7,7 @@ import {
 import type { EvalRepo } from '../repos/eval.js';
 import type { EvaluationAgent } from '../agents/evaluation/evaluation.js';
 import { buildEvaluatorRegistry, listEvaluators } from '../evaluation/evaluators.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import { validateOutboundUrl } from '../security/outbound-url.js';
 
 const ListQuerySchema = PaginationSchema.extend({
@@ -26,6 +26,8 @@ const ScoreInputSchema = z.object({
   context: z.record(z.string(), z.unknown()).optional(),
   evaluator: z.string().optional(),
 });
+
+const EvalRunParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
 
 interface RequestOrgContext {
   agentOrgId?: string;
@@ -49,7 +51,9 @@ export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAge
   });
 
   app.get('/api/eval-runs/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, EvalRunParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const organizationId = orgOf(request);
     if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     const item = repo.findRunByIdInOrg(id, organizationId);
@@ -68,7 +72,9 @@ export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAge
   });
 
   app.get('/api/eval-runs/:id/results', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, EvalRunParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const organizationId = orgOf(request);
     if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     if (!repo.findRunByIdInOrg(id, organizationId)) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Eval run not found' } });
