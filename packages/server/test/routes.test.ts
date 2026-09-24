@@ -48,6 +48,43 @@ describe('Fastify routes', () => {
     expect(res.json<{ status: string; db: string }>()).toMatchObject({ status: 'ready', db: 'ok' });
   });
 
+  it('GET /api/health fails closed when the database is unhealthy', async () => {
+    const unhealthyApp = Fastify({ logger: false });
+    registerHealthRoutes(
+      unhealthyApp,
+      new HealthService({ ping: () => false, quickCheck: () => false }),
+    );
+    await unhealthyApp.ready();
+
+    const res = await unhealthyApp.inject({ method: 'GET', url: '/api/health' });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json<{ status: string; db: string; error: string }>()).toMatchObject({
+      status: 'error',
+      db: 'error',
+      error: 'database unavailable',
+    });
+    await unhealthyApp.close();
+  });
+
+  it('GET /api/ready fails closed when the database is not ready', async () => {
+    const notReadyApp = Fastify({ logger: false });
+    registerHealthRoutes(
+      notReadyApp,
+      new HealthService({ ping: () => true, quickCheck: () => false }),
+    );
+    await notReadyApp.ready();
+
+    const res = await notReadyApp.inject({ method: 'GET', url: '/api/ready' });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json<{ status: string; db: string }>()).toMatchObject({
+      status: 'not_ready',
+      db: 'error',
+    });
+    await notReadyApp.close();
+  });
+
   it('POST /api/workspaces then GET /api/workspaces/:id returns 200', async () => {
     const createRes = await app.inject({
       method: 'POST',

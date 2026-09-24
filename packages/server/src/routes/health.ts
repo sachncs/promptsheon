@@ -4,11 +4,17 @@ import type { HealthService } from '../application/health-service.js';
 export function registerHealthRoutes(app: FastifyInstance, service: HealthService) {
   app.get('/api/health', async (_request, reply) => {
     try {
-      return reply.send({
-        status: 'ok',
-        db: service.isHealthy() ? 'ok' : 'error',
-        timestamp: new Date().toISOString(),
-      });
+      const healthy = service.isHealthy();
+      const timestamp = new Date().toISOString();
+      if (!healthy) {
+        return reply.code(503).send({
+          status: 'error',
+          db: 'error',
+          error: 'database unavailable',
+          timestamp,
+        });
+      }
+      return reply.send({ status: 'ok', db: 'ok', timestamp });
     } catch (err) {
       app.log.error({ err }, 'health check database probe failed');
       return reply.code(503).send({
