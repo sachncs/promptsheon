@@ -12,6 +12,7 @@ import { StepIndicator } from '@/components/brand/step-indicator';
 import { bootstrapApi, toSession } from '@/lib/bootstrap';
 import { getSession, setSession } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { QueryError } from '@/components/brand/query-error';
 
 const steps = [
   { id: 'welcome', label: 'Welcome', icon: Bot },
@@ -40,6 +41,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const status = useQuery({ queryKey: ['bootstrap', 'status'], queryFn: () => bootstrapApi.status() });
   const [index, setIndex] = React.useState(0);
+  const [restoreError, setRestoreError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!status.data) return;
@@ -56,12 +58,12 @@ export default function OnboardingPage() {
       }
       bootstrapApi.admin()
         .then((data) => {
+          setRestoreError(null);
           setSession(toSession(data, status.data?.provider ?? null));
           router.replace('/app');
         })
-        .catch(() => {
-          // No admin or no org — leave the user on the onboarding UI so
-          // they can run the steps. (If we got here, status must be stale.)
+        .catch((error: unknown) => {
+          setRestoreError(error instanceof Error ? error.message : 'We could not restore the administrator session.');
         });
     }
   }, [status.data, router]);
@@ -74,9 +76,17 @@ export default function OnboardingPage() {
       </div>
     );
   }
+  if (status.isError) {
+    return <QueryError message={(status.error as Error).message} onRetry={() => void status.refetch()} />;
+  }
 
   return (
     <div className="relative">
+      {restoreError ? (
+        <div role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          {restoreError} Please retry or complete the administrator step again.
+        </div>
+      ) : null}
       <div className="ps-aurora-bg pointer-events-none absolute -inset-x-12 -top-12 -bottom-12 -z-10 rounded-[3rem]" aria-hidden />
       <div className="rounded-2xl border border-border-subtle bg-surface-1 p-8 shadow-2 sm:p-10">
         <StepIndicator steps={steps} currentIndex={index} />
