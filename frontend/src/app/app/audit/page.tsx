@@ -154,43 +154,43 @@ export default function AuditPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={filtered as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => setOpenId(String(r['id']))}
+            rows={filtered}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => setOpenId(r.id)}
             columns={[
               {
                 key: 'when',
                 header: 'When',
                 render: (r) => (
                   <span className="font-mono text-xs text-text-muted">
-                    {r['createdAt'] ? new Date(String(r['createdAt'])).toLocaleString() : '—'}
+                    {r.createdAt ? new Date(r.createdAt).toLocaleString() : '—'}
                   </span>
                 ),
               },
               {
                 key: 'action',
                 header: 'Action',
-                render: (r) => <code className="font-mono text-xs">{String(r['action'] ?? '—')}</code>,
+                render: (r) => <code className="font-mono text-xs">{r.action ?? '—'}</code>,
               },
               {
                 key: 'resource',
                 header: 'Resource',
                 render: (r) => (
                   <span className="font-mono text-xs">
-                    {String(r['resourceKind'] ?? '—')}
-                    {r['resourceId'] ? <span className="text-text-subtle">/{String(r['resourceId']).slice(0, 12)}…</span> : null}
+                    {r.resourceKind ?? '—'}
+                    {r.resourceId ? <span className="text-text-subtle">/{r.resourceId.slice(0, 12)}…</span> : null}
                   </span>
                 ),
               },
               {
                 key: 'actor',
                 header: 'Actor',
-                render: (r) => r['actor'] ? <span className="font-mono text-xs">{String(r['actor'])}</span> : '—',
+                render: (r) => r.actor ? <span className="font-mono text-xs">{r.actor}</span> : '—',
               },
               {
                 key: 'hash',
                 header: 'Hash',
-                render: (r) => r['hash'] ? <HashChip hash={String(r['hash'])} /> : <span className="text-text-subtle">—</span>,
+                render: (r) => r.hash ? <HashChip hash={r.hash} /> : <span className="text-text-subtle">—</span>,
               },
               {
                 key: 'verify',
