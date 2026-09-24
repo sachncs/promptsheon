@@ -24,7 +24,8 @@ const rows = [
     </div>
 
     <div class="ps-reveal mt-12 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)] shadow-soft" style="--reveal-delay: 220ms">
-      <table class="w-full text-left">
+      <div class="overflow-x-auto" tabindex="0" aria-label="Comparison table; scroll horizontally to see all columns">
+        <table class="w-full min-w-[620px] text-left">
         <thead>
           <tr class="border-b border-[var(--line)] bg-[var(--bg-subtle)] text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-subtle)]">
             <th class="px-5 py-4"></th>
@@ -45,7 +46,8 @@ const rows = [
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   </div>
 </section>
