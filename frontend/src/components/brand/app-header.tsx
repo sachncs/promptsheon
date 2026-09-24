@@ -63,7 +63,13 @@ export function AppHeader({ onMenu }: { onMenu?: (() => void) | undefined }) {
       </form>
       <div className="flex items-center gap-2 ml-auto">
         <ThemeToggle className="text-text-muted hover:text-text-default" />
-        <Link href="/app/capabilities">
+        <Link href="/app/capabilities" className="sm:hidden" aria-label="New capability">
+          <Button size="icon" variant="default">
+            <Plus className="h-4 w-4" />
+            <span className="sr-only">New capability</span>
+          </Button>
+        </Link>
+        <Link href="/app/capabilities" className="hidden sm:inline-flex">
           <Button size="sm" variant="default">
             <Plus className="h-3.5 w-3.5 mr-1.5" />New capability
           </Button>
