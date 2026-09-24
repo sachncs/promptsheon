@@ -123,10 +123,10 @@
 
   /* Section frame — generous vertical rhythm with subtle dividers. */
   .ps-section {
-    @apply relative py-24 sm:py-32 lg:py-40;
+    @apply relative py-20 sm:py-24 lg:py-28;
   }
   .ps-section-tight {
-    @apply relative py-16 sm:py-20 lg:py-28;
+    @apply relative py-12 sm:py-16 lg:py-20;
   }
 
   /* Section eyebrow — small uppercase label that anchors a section */
@@ -292,6 +292,11 @@
     opacity: 1;
     transform: translate3d(0, 0, 0);
   }
+
+  /* The theme control lives in the shared navigation, so its state styles
+     must be global rather than scoped to the homepage hero. */
+  html:not(.dark) .theme-moon { display: none; }
+  html.dark .theme-sun { display: none; }
 
   /* Background grid — subtle, anchored to top */
   .ps-grid-bg {

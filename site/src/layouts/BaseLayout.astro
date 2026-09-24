@@ -36,16 +36,6 @@ const {
 
     <SiteFooter />
 
-    <script is:inline>
-      // Theme bootstrap — applied before paint to avoid a flash.
-      (() => {
-        const stored = localStorage.getItem('promptsheon-theme');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const theme = stored ?? (prefersDark ? 'dark' : 'light');
-        if (theme === 'dark') document.documentElement.classList.add('dark');
-      })();
-    </script>
-
 <script>
       // Reveal-on-scroll observer — minimal and dependency-free.
       const observer = new IntersectionObserver(

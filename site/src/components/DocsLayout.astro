@@ -80,12 +80,5 @@ const links = [
       </div>
     </main>
     <SiteFooter />
-    <script is:inline>
-      (() => {
-        const stored = localStorage.getItem('promptsheon-theme');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if ((stored ?? (prefersDark ? 'dark' : 'light')) === 'dark') document.documentElement.classList.add('dark');
-      })();
-    </script>
   </body>
 </html>
