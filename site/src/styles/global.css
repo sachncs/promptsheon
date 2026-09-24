@@ -277,6 +277,10 @@
 
   /* Reveal-on-scroll hook */
   .ps-reveal {
+    opacity: 1;
+    transform: none;
+  }
+  html.js .ps-reveal {
     opacity: 0;
     transform: translate3d(0, 18px, 0);
     transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
@@ -284,7 +288,7 @@
     transition-delay: var(--reveal-delay, 0ms);
     will-change: opacity, transform;
   }
-  .ps-reveal.is-visible {
+  html.js .ps-reveal.is-visible {
     opacity: 1;
     transform: translate3d(0, 0, 0);
   }
