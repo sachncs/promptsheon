@@ -87,7 +87,7 @@ function Dashboard() {
   const failedQuery = [d.workspaces, d.projects, d.capabilities, d.releases, d.evals, d.audits, d.approvals]
     .find((query) => query.isError);
   if (failedQuery) {
-    return <QueryError message={(failedQuery.error as Error).message} onRetry={() => void failedQuery.refetch()} />;
+    return <QueryError message={failedQuery.error} onRetry={() => void failedQuery.refetch()} />;
   }
 
   const loadingQuery = [d.workspaces, d.projects, d.capabilities, d.releases, d.evals, d.audits, d.approvals]

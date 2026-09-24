@@ -69,7 +69,7 @@ export default function ProjectsPage() {
 
   if (!session) return null;
   const failedQuery = [workspaces, projects].find((query) => query.isError);
-  if (failedQuery) return <QueryError message={(failedQuery.error as Error).message} onRetry={() => void failedQuery.refetch()} />;
+  if (failedQuery) return <QueryError message={failedQuery.error} onRetry={() => void failedQuery.refetch()} />;
   if (workspaces.isPending || (Boolean(wsId) && projects.isPending)) {
     return <div className="space-y-6" aria-busy="true"><PageHeader eyebrow="Admin" title="Projects" /><Surface className="h-72 animate-pulse bg-surface-2/40"><span className="sr-only">Loading projects</span></Surface></div>;
   }

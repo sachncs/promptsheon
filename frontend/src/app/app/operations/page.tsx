@@ -93,11 +93,11 @@ export default function OperationsPage() {
   });
 
   if (!session) return null;
-  if (workspaces.isError) return <QueryError message={(workspaces.error as Error).message} onRetry={() => void workspaces.refetch()} />;
-  if (projects.isError) return <QueryError message={(projects.error as Error).message} onRetry={() => void projects.refetch()} />;
-  if (allReleases.isError) return <QueryError message={(allReleases.error as Error).message} onRetry={() => void allReleases.refetch()} />;
-  if (recentEvals.isError) return <QueryError message={(recentEvals.error as Error).message} onRetry={() => void recentEvals.refetch()} />;
-  if (alerts.isError) return <QueryError message={(alerts.error as Error).message} onRetry={() => void alerts.refetch()} />;
+  if (workspaces.isError) return <QueryError message={workspaces.error} onRetry={() => void workspaces.refetch()} />;
+  if (projects.isError) return <QueryError message={projects.error} onRetry={() => void projects.refetch()} />;
+  if (allReleases.isError) return <QueryError message={allReleases.error} onRetry={() => void allReleases.refetch()} />;
+  if (recentEvals.isError) return <QueryError message={recentEvals.error} onRetry={() => void recentEvals.refetch()} />;
+  if (alerts.isError) return <QueryError message={alerts.error} onRetry={() => void alerts.refetch()} />;
 
   const releases = (allReleases.data ?? []) as Release[];
   const activeReleases = releases.filter((r) => r.state === 'active');

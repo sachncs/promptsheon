@@ -83,10 +83,10 @@ export default function ReleasesPage() {
   }, [releases.data, filter, search]);
 
   if (!session) return null;
-  if (workspaces.isError) return <QueryError message={workspaces.error.message} onRetry={() => void workspaces.refetch()} />;
-  if (projects.isError) return <QueryError message={projects.error.message} onRetry={() => void projects.refetch()} />;
-  if (capabilities.isError) return <QueryError message={capabilities.error.message} onRetry={() => void capabilities.refetch()} />;
-  if (releases.isError) return <QueryError message={releases.error.message} onRetry={() => void releases.refetch()} />;
+  if (workspaces.isError) return <QueryError message={workspaces.error} onRetry={() => void workspaces.refetch()} />;
+  if (projects.isError) return <QueryError message={projects.error} onRetry={() => void projects.refetch()} />;
+  if (capabilities.isError) return <QueryError message={capabilities.error} onRetry={() => void capabilities.refetch()} />;
+  if (releases.isError) return <QueryError message={releases.error} onRetry={() => void releases.refetch()} />;
 
   const total = Array.isArray(releases.data) ? releases.data.length : 0;
 
