@@ -28,5 +28,12 @@ export default defineConfig([
       ],
     },
   },
-  globalIgnores(['.next/**', 'out/**', 'node_modules/**', 'dist/**']),
+  globalIgnores([
+    '.next/**',
+    'out/**',
+    'node_modules/**',
+    'dist/**',
+    'playwright-report/**',
+    'test-results/**',
+  ]),
 ]);

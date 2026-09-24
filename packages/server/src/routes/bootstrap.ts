@@ -57,6 +57,20 @@ const SaveLlmSchema = z.object({
   { message: 'Custom provider needs baseUrl + apiKey; Bedrock needs bedrock object; others need apiKey' },
 );
 
+function issueE2eSessionKey(apiKeyRepo: ApiKeyRepo | undefined, userId: string, organizationId: string): string | undefined {
+  if (process.env['PROMPTSHEON_E2E'] !== 'true' || !apiKeyRepo) return undefined;
+  const apiKey = `pk_${randomBytes(24).toString('hex')}`;
+  apiKeyRepo.create({
+    userId,
+    organizationId,
+    name: 'e2e-browser-session',
+    keyHash: createHash('sha256').update(apiKey).digest('hex'),
+    keyPrefix: apiKey.slice(0, 12),
+    role: 'admin',
+  });
+  return apiKey;
+}
+
 export function registerBootstrapRoutes(
   app: FastifyInstance,
   deps: {
@@ -83,10 +97,9 @@ export function registerBootstrapRoutes(
     });
   });
 
-  // Re-establish a session after bootstrap. Safe to expose without auth
-  // because bootstrap is the only pre-auth state in a self-hosted install —
-  // there is no other user to authenticate as, and the endpoint returns
-  // no secrets (only the admin id/email/name and the org id/slug).
+  // Re-establish the non-secret identity metadata after bootstrap. In the
+  // dedicated E2E harness only, also issue a short-lived test session key so
+  // separate Playwright tiers can authenticate against one shared database.
   app.get('/api/bootstrap/admin', async (_request, reply) => {
     const admin = deps.userRepo.list().find((u) => u.role === 'admin');
     if (!admin) {
@@ -102,10 +115,12 @@ export function registerBootstrapRoutes(
       return reply.code(404).send({ error: { code: 'NO_ORG', message: 'Organisation not found.' } });
     }
     const provider = await deps.settingsResolver.get<string>('llm.provider').catch(() => undefined);
+    const apiKey = issueE2eSessionKey(deps.apiKeyRepo, admin.id, org.id);
     return reply.send({
       user: { id: admin.id, email: admin.email, name: admin.name, role: admin.role },
       org: { id: org.id, name: org.name, slug: org.slug },
       provider: provider ?? null,
+      ...(apiKey ? { apiKey } : {}),
     });
   });
 
