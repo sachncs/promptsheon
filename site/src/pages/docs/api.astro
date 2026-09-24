@@ -1,0 +1,45 @@
+---
+import DocsLayout from '@components/DocsLayout.astro';
+---
+
+<DocsLayout title="API & SDK" description="Integrate Promptsheon with automation, CI, the command line, or a custom control plane without coupling to the web console.">
+  <h2>Choose your integration surface</h2>
+  <div class="not-prose grid gap-3 sm:grid-cols-3">
+    {[
+      ['HTTP API', 'Use the authenticated Fastify API for releases, evaluations, audit, workspaces, and operations.'],
+      ['CLI', 'Use repository-local commands when humans or CI need a scriptable workflow.'],
+      ['SDK', 'Embed capability publishing and tracing in a service without hand-building HTTP requests.'],
+    ].map(([name, text]) => (
+      <div class="rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)] p-5"><h3 class="text-[15px] font-semibold text-[var(--ink-strong)]">{name}</h3><p class="mt-2 text-[13px] leading-relaxed text-[var(--ink-muted)]">{text}</p></div>
+    ))}
+  </div>
+
+  <h2>Authentication</h2>
+  <p>Send a bearer API key with every protected request. Keys are hashed at rest, scoped to an organization, and assigned a role. Do not put keys in browser bundles, source control, URLs, or logs.</p>
+  <pre><code>curl http://localhost:8080/api/releases \
+  -H 'Authorization: Bearer pk_your_key_here' \
+  -H 'Accept: application/json'</code></pre>
+
+  <h2>HTTP conventions</h2>
+  <ul>
+    <li>Request bodies and query strings are validated at the route boundary.</li>
+    <li>Errors use <code>{'{ error: { code, message } }'}</code>; validation errors may include issues.</li>
+    <li>Use <code>X-Request-Id</code> to correlate client logs with server logs.</li>
+    <li>Use <code>Idempotency-Key</code> for retried mutating operations that support it.</li>
+    <li>Health and readiness endpoints are available at <code>/api/health</code> and <code>/api/ready</code>.</li>
+  </ul>
+
+  <h2>CI release shape</h2>
+  <pre><code># validate and evaluate the candidate
+pnpm test
+pnpm typecheck
+pnpm --dir frontend test:e2e
+
+# publish through your chosen API/CLI workflow
+promptsheon release validate ./capability.yaml
+promptsheon release promote &lt;release-id&gt; --environment production</code></pre>
+  <p>Keep evaluation output, release identifiers, and audit references as build artifacts. A deployment should be reproducible from the content hash, not from an untracked local file.</p>
+
+  <h2>More reference detail</h2>
+  <p>The generated OpenAPI surface is available from a running instance at <code>/api/openapi.json</code>. Use it to generate a client for your language or to inspect the exact request and response contracts for the version you operate.</p>
+</DocsLayout>

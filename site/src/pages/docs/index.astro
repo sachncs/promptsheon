@@ -1,0 +1,40 @@
+---
+import DocsLayout from '@components/DocsLayout.astro';
+
+const guides = [
+  { title: 'Quickstart', text: 'Run the platform locally, connect a provider, and ship a first capability.', href: '/docs/quickstart/', tag: '10 minutes' },
+  { title: 'Architecture', text: 'Understand manifests, content addressing, application boundaries, policy, and release state.', href: '/docs/architecture/', tag: 'Foundations' },
+  { title: 'API & SDK', text: 'Integrate the control plane from automation, CI, the CLI, or your own service.', href: '/docs/api/', tag: 'Integration' },
+  { title: 'Operations', text: 'Deploy safely, configure production, monitor readiness, back up data, and troubleshoot failures.', href: '/docs/operations/', tag: 'Production' },
+  { title: 'Contributing', text: 'Make changes that fit the architecture, pass the quality bar, and remain easy to review.', href: '/docs/contributing/', tag: 'Open source' },
+];
+---
+
+<DocsLayout title="Build with Promptsheon" description="A practical path from first install to a governed AI capability in production. These guides explain the product, the system boundaries, and the decisions behind them.">
+  <div class="grid gap-4 sm:grid-cols-2">
+    {guides.map((guide, index) => (
+      <a href={guide.href} class={`group rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)] p-6 transition-all hover:-translate-y-0.5 hover:border-[var(--line-strong)] hover:shadow-soft ${index === 0 ? 'sm:col-span-2' : ''}`}>
+        <div class="flex items-center justify-between gap-3">
+          <span class="ps-eyebrow">{guide.tag}</span>
+          <span class="text-[var(--accent)] transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
+        </div>
+        <h2 class="mt-4 text-[21px] font-semibold tracking-tight text-[var(--ink-strong)]">{guide.title}</h2>
+        <p class="mt-2 max-w-xl text-[14px] leading-relaxed text-[var(--ink-muted)]">{guide.text}</p>
+      </a>
+    ))}
+  </div>
+
+  <section class="mt-14 rounded-2xl border border-[var(--line)] bg-[var(--bg-code)] p-6 text-[#E8ECF5] sm:p-8">
+    <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#A5B4FC]">The mental model</div>
+    <h2 class="mt-3 text-[25px] font-semibold tracking-tight">Promptsheon is a release system for AI behaviour.</h2>
+    <p class="mt-3 max-w-2xl text-[14px] leading-relaxed text-white/65">You define a capability as a versioned manifest. The platform evaluates it, applies policy, records the decision, and moves an approved version through canary to production. The interface is the control plane; your runtime remains yours.</p>
+    <div class="mt-7 grid gap-3 text-[12px] sm:grid-cols-4">
+      {['Author', 'Evaluate', 'Approve', 'Release'].map((step, index) => (
+        <div class="rounded-lg border border-white/10 bg-white/[0.04] p-3">
+          <div class="font-mono text-white/40">0{index + 1}</div>
+          <div class="mt-2 font-medium text-white">{step}</div>
+        </div>
+      ))}
+    </div>
+  </section>
+</DocsLayout>

@@ -1,0 +1,42 @@
+---
+import DocsLayout from '@components/DocsLayout.astro';
+---
+
+<DocsLayout title="Quickstart" description="Get a local control plane running, configure an LLM provider, and understand the first release path.">
+  <h2>What you will have at the end</h2>
+  <p>A local Promptsheon instance with the Fastify API, Next.js console, SQLite persistence, and a first capability ready to evaluate. The default setup is intentionally local and self-hosted so you can inspect every boundary.</p>
+
+  <h2>1. Install and start</h2>
+  <pre><code>git clone https://github.com/sachncs/promptsheon.git
+cd promptsheon
+pnpm install
+cp .env.example .env
+pnpm dev</code></pre>
+  <p>Open <code>http://localhost:3000</code>. The API runs on <code>http://localhost:8080</code>. Onboarding creates the first administrator, organization, and provider configuration.</p>
+
+  <h2>2. Configure a provider</h2>
+  <p>Choose OpenAI, Anthropic, Bedrock, or an OpenAI/Anthropic-compatible custom endpoint. Credentials are stored through the vault boundary and are never written to <code>system_config</code> in plain text. For an unattended environment, provide the provider credentials through the deployment secret manager before boot.</p>
+  <div class="not-prose my-6 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-[13px] leading-relaxed text-[var(--ink)]"><strong>Production note:</strong> local defaults are for development only. Production requires authentication, explicit CORS, webhook and SCIM secrets, and a persistent database/CAS path.</div>
+
+  <h2>3. Create a capability</h2>
+  <p>A capability is a manifest: prompts, nodes, tools, policies, runtime limits, and evaluation intent. Start small. A useful first capability has one classification step, one tool or retrieval step, and one response step with a guardrail.</p>
+  <pre><code>name: refund-triage
+version: 1
+graph:
+  - classify: &#123; model: claude-3-5 &#125;
+  - retrieve: &#123; tool: orders &#125;
+  - respond: &#123; guardrail: pii-redact &#125;</code></pre>
+
+  <h2>4. Evaluate before release</h2>
+  <p>Attach a dataset and run deterministic or LLM-judge scorers. A release should have a threshold that describes acceptable behaviour, not just a green deployment. Review the diff, score movement, audit entry, and policy decision together.</p>
+
+  <h2>5. Promote with confidence</h2>
+  <p>Move the approved version through canary traffic before activating it. If the score, latency, cost, or trace quality regresses, roll back to the last known-good content hash. Every transition is recorded so the team can answer who changed what and why.</p>
+
+  <h2>Where to go next</h2>
+  <ul>
+    <li><a href="/docs/architecture/">Read the architecture guide</a> to understand package and dependency boundaries.</li>
+    <li><a href="/docs/api/">Integrate the API and SDK</a> into CI or your own runtime.</li>
+    <li><a href="/docs/operations/">Prepare a production deployment</a> with health checks and backups.</li>
+  </ul>
+</DocsLayout>
