@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
   passAtK,
+  cohensKappa,
+  krippendorffAlpha,
   type EvalSuite,
   type GraderSpec,
 } from '@promptsheon/shared';
@@ -10,7 +12,7 @@ import {
   type HumanReviewRepo,
 } from '../repos/eval-suite.js';
 import { GraderRunner } from '../agents/evaluation/grader-runner.js';
-import { parseBody } from './validate.js';
+import { parseBody, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
 function actorOf(request: unknown): string {
@@ -102,6 +104,23 @@ const ReviewDecisionSchema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
+const ListSuiteQuerySchema = z.object({
+  capabilityId: z.string().min(1).max(200).optional(),
+});
+
+const CalibrationSchema = z.object({
+  a: z.array(z.string().max(100_000)).min(1).max(10_000),
+  b: z.array(z.string().max(100_000)).min(1).max(10_000),
+}).superRefine((value, context) => {
+  if (value.a.length !== value.b.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'equal non-empty arrays required',
+      path: ['b'],
+    });
+  }
+});
+
 export interface EvalSuiteRouteDeps {
   suiteRepo: EvalSuiteRepo;
   humanReviewRepo: HumanReviewRepo;
@@ -112,7 +131,9 @@ export function registerEvalSuiteRoutes(
   deps: EvalSuiteRouteDeps,
 ): void {
   app.get('/api/eval-suites', async (request, reply) => {
-    const { capabilityId } = request.query as { capabilityId?: string };
+    const parsed = parseQuery(reply, ListSuiteQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { capabilityId } = parsed.data;
     const organizationId = organizationIdOf(request);
     return reply.send(organizationId ? deps.suiteRepo.listInOrg(organizationId, capabilityId) : deps.suiteRepo.list(capabilityId));
   });
@@ -314,13 +335,9 @@ export function registerEvalSuiteRoutes(
   // equal length, returns Cohen's kappa and Krippendorff's alpha
   // (nominal). Used by /app/eval/calibrations UI.
   app.post('/api/eval/calibrate', async (request, reply) => {
-    const body = request.body as { a?: string[]; b?: string[] };
-    const a = body.a ?? [];
-    const b = body.b ?? [];
-    if (a.length !== b.length || a.length === 0) {
-      return reply.code(422).send({ error: { code: 'BAD_INPUT', message: 'equal non-empty arrays required' } });
-    }
-    const { cohensKappa, krippendorffAlpha } = await import('@promptsheon/shared');
+    const parsed = parseBody(reply, CalibrationSchema, request.body);
+    if (!parsed.ok) return;
+    const { a, b } = parsed.data;
     return reply.send({
       n: a.length,
       cohensKappa: cohensKappa(a, b),
