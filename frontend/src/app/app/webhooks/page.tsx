@@ -50,7 +50,7 @@ export default function WebhooksPage() {
     queryFn: () => webhookApi.list().then((r) => unwrapList<WebhookItem>(r.data, 'webhooks')),
     enabled: Boolean(session),
   });
-  const rows = (hooks.data ?? []) as WebhookItem[];
+  const rows = hooks.data ?? [];
 
   const [url, setUrl] = useState('');
   const [events, setEvents] = useState<string[]>(['release.activated', 'approval.requested']);
@@ -122,10 +122,10 @@ export default function WebhooksPage() {
                 return (
                   <button
                     key={ev}
-                  type="button"
-                  onClick={() => toggleEvent(ev)}
-                  aria-pressed={active}
-                  aria-label={`${active ? 'Remove' : 'Add'} ${ev} event`}
+                    type="button"
+                    onClick={() => toggleEvent(ev)}
+                    aria-pressed={active}
+                    aria-label={`${active ? 'Remove' : 'Add'} ${ev} event`}
                     className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
                       active
                         ? 'border-brand bg-brand text-brand-foreground'
@@ -162,19 +162,19 @@ export default function WebhooksPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
+            rows={rows}
+            rowKey={(r) => r.id}
             columns={[
               {
                 key: 'url',
                 header: 'URL',
-                render: (r) => <code className="font-mono text-xs">{String(r['url'] ?? '—')}</code>,
+                render: (r) => <code className="font-mono text-xs">{r.url ?? '—'}</code>,
               },
               {
                 key: 'events',
                 header: 'Events',
                 render: (r) => {
-                  const evs = (r['events'] as string[] | undefined) ?? [];
+                  const evs = r.events ?? [];
                   return (
                     <div className="flex flex-wrap gap-1">
                       {evs.slice(0, 3).map((ev) => <Badge key={ev}>{ev}</Badge>)}
@@ -187,9 +187,9 @@ export default function WebhooksPage() {
                 key: 'delivery',
                 header: 'Delivery',
                 render: (r) => {
-                  const total = Number(r['deliveryCount'] ?? 0);
-                  const fail = Number(r['failureCount'] ?? 0);
-                  const last = r['lastDeliveredAt'] ? new Date(String(r['lastDeliveredAt'])).toLocaleString() : 'never';
+                  const total = r.deliveryCount ?? 0;
+                  const fail = r.failureCount ?? 0;
+                  const last = r.lastDeliveredAt ? new Date(r.lastDeliveredAt).toLocaleString() : 'never';
                   return (
                     <div className="text-xs">
                       <div className="text-text-default">{total} sent · {fail} failed</div>
@@ -203,8 +203,8 @@ export default function WebhooksPage() {
                 header: 'Active',
                 render: (r) => (
                   <Switch
-                    checked={Boolean(r['active'])}
-                    onCheckedChange={() => toggle.mutate(r as unknown as WebhookItem)}
+                    checked={Boolean(r.active)}
+                    onCheckedChange={() => toggle.mutate(r)}
                   />
                 ),
               },
@@ -212,7 +212,7 @@ export default function WebhooksPage() {
                 key: 'actions',
                 header: '',
                 render: (r) => (
-                  <Button size="sm" variant="outline" onClick={() => remove.mutate(String(r['id']))}>
+                  <Button size="sm" variant="outline" onClick={() => remove.mutate(r.id)}>
                     <Trash2 className="mr-1 size-3" />
                     Delete
                   </Button>
