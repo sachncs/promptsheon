@@ -13,6 +13,7 @@ import { StatusPill } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function MergeRequestDetail() {
   const session = useRequireSession();
@@ -27,6 +28,7 @@ export default function MergeRequestDetail() {
   });
 
   if (!session) return null;
+  if (mr.isError) return <QueryError message={(mr.error as Error).message} onRetry={() => void mr.refetch()} />;
   if (mr.isLoading) return <div className="text-text-muted text-sm">Loading…</div>;
   if (!mr.data) return <div className="text-text-muted text-sm">Merge request not found.</div>;
 

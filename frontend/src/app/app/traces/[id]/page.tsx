@@ -11,6 +11,7 @@ import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { HashChip } from '@/components/brand/hash-chip';
 import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function TraceDetailPage() {
   const session = useRequireSession();
@@ -36,7 +37,11 @@ export default function TraceDetailPage() {
   if (!session) return null;
   const data = trace.data;
 
-  if (trace.isError || !data) {
+  if (trace.isError) {
+    return <QueryError message={(trace.error as Error).message} onRetry={() => void trace.refetch()} />;
+  }
+
+  if (!data) {
     return (
       <div className="space-y-6">
         <BackLink />
@@ -129,7 +134,9 @@ export default function TraceDetailPage() {
             </Button>
           }
         />
-        {scores.data && scores.data.items.length > 0 ? (
+        {scores.isError ? (
+          <QueryError message={(scores.error as Error).message} onRetry={() => void scores.refetch()} />
+        ) : scores.data && scores.data.items.length > 0 ? (
           <ul className="divide-y divide-border-subtle">
             {scores.data.items.map((s) => (
               <ScoreRow key={s.id} score={s} />

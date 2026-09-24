@@ -13,6 +13,7 @@ import { HashChip } from '@/components/brand/hash-chip';
 import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 interface ExecutionDetail {
   id: string;
@@ -100,6 +101,12 @@ export default function ExecutionDetailPage() {
       />
 
       {isError ? (
+        <QueryError message={(detail.error as Error).message} onRetry={() => void detail.refetch()} />
+      ) : detail.isLoading ? (
+        <Surface>
+          <div className="text-sm text-text-muted">Loading execution…</div>
+        </Surface>
+      ) : !data ? (
         <EmptyState
           icon={Play}
           title="Execution not found"
@@ -110,10 +117,6 @@ export default function ExecutionDetailPage() {
             </Link>
           }
         />
-      ) : !data ? (
-        <Surface>
-          <div className="text-sm text-text-muted">{detail.isLoading ? 'Loading execution…' : 'No execution data.'}</div>
-        </Surface>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-4">
