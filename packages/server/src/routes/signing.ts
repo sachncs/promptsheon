@@ -5,7 +5,7 @@ import type { RepoRepo } from '../repos/repo.js';
 import { CommitRepo, deriveCommitOid } from '../repos/commit.js';
 import { SigningKeyRepo, fingerprintSpki } from '../repos/signing-key.js';
 import { commitInputPayload } from '@promptsheon/shared';
-import { parseBody } from './validate.js';
+import { parseBody, parseParams } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
 const UploadKeySchema = z.object({
@@ -27,6 +27,13 @@ const SignHelperSchema = z.object({
   approverId: z.string().min(1).max(200),
   timestamp: z.string().datetime({ offset: true }),
 });
+
+const OrganizationParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
+const SigningKeyParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
+  keyId: z.string().trim().min(1).max(255),
+});
+const CommitOidParamsSchema = z.object({ oid: z.string().trim().min(1).max(200) });
 
 export interface SigningDeps {
   repoRepo: RepoRepo;
@@ -80,7 +87,9 @@ function loadPublicKey(pem: string): KeyObject {
 
 export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): void {
   app.get('/api/orgs/:id/signing-keys', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const organizationId = organizationIdOf(request);
     if (organizationId && organizationId !== id) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
@@ -95,7 +104,9 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
   });
 
   app.post('/api/orgs/:id/signing-keys', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const organizationId = organizationIdOf(request);
     if (organizationId && organizationId !== id) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
@@ -128,7 +139,9 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
   });
 
   app.delete('/api/orgs/:id/signing-keys/:keyId', async (request, reply) => {
-    const { id, keyId } = request.params as { id: string; keyId: string };
+    const parsedParams = parseParams(reply, SigningKeyParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id, keyId } = parsedParams.data;
     const organizationId = organizationIdOf(request);
     if (organizationId && organizationId !== id) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
@@ -147,7 +160,9 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
   });
 
   app.post('/api/commits/:oid/sign', async (request, reply) => {
-    const { oid } = request.params as { oid: string };
+    const parsedParams = parseParams(reply, CommitOidParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { oid } = parsedParams.data;
     const parsed = parseBody(reply, SignCommitSchema, request.body);
     if (!parsed.ok) return;
     const commit = deps.commitRepo.findByOid(oid);
@@ -193,7 +208,9 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
   });
 
   app.get('/api/commits/:oid/verify', async (request, reply) => {
-    const { oid } = request.params as { oid: string };
+    const parsedParams = parseParams(reply, CommitOidParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { oid } = parsedParams.data;
     const commit = deps.commitRepo.findByOid(oid);
     if (!commit) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'commit not found' } });
     if (!commit.signature || !commit.signedKeyId || !commit.signedAt) {
