@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { DagCanvas } from '@/components/dag/DagCanvas';
 import { NodeConfigPanel } from '@/components/dag/NodeConfigPanel';
+import { QueryError } from '@/components/brand/query-error';
 import type { Manifest, SubCapabilityManifest } from '@promptsheon/shared';
 import type { Edge } from '@xyflow/react';
 
@@ -71,10 +72,10 @@ export default function ManifestEditorPage() {
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
   const [validationErrors, setValidationErrors] = React.useState<string[]>([]);
 
-  const { data: loaded } = useQuery({
+  const { data: loaded, isError: loadError, error: loadErrorDetail, refetch: refetchManifest } = useQuery({
     queryKey: ['manifest', hash],
     queryFn: () => manifestApi.getByHash(hash!).then((r) => r.data as Manifest),
-    enabled: !!hash,
+    enabled: Boolean(session && hash),
   });
 
   React.useEffect(() => {
@@ -176,6 +177,11 @@ export default function ManifestEditorPage() {
   const isValid = validationErrors.length === 0;
   const [fullscreen, setFullscreen] = React.useState(false);
   const { toast } = useToast();
+
+  if (!session) return null;
+  if (loadError) {
+    return <QueryError message={(loadErrorDetail as Error).message} onRetry={() => void refetchManifest()} />;
+  }
 
   const TEMPLATES: Array<{ id: string; label: string; description: string; build: () => Manifest }> = [
     {

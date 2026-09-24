@@ -24,6 +24,7 @@ const ROUTES = [
   '/app/alerts/rules',
   '/app/projects',
   '/app/audit',
+  '/app/audit/reports',
   '/app/capabilities/test-id/self-evolve',
   '/app/capabilities/test-id/datasets',
   '/app/capabilities/test-id/preconditions',

@@ -4,15 +4,14 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ScrollText, ArrowLeft, ClipboardCopy } from 'lucide-react';
+import { ArrowLeft, ClipboardCopy } from 'lucide-react';
 import { manifestApi } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { HashChip } from '@/components/brand/hash-chip';
-import { EmptyState } from '@/components/brand/empty-state';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
+import { QueryError } from '@/components/brand/query-error';
 
 interface ManifestDetail {
   hash: string;
@@ -77,16 +76,7 @@ export default function ManifestDetailPage() {
       />
 
       {isError ? (
-        <EmptyState
-          icon={ScrollText}
-          title="Manifest not found"
-          description={`No manifest matches hash ${hash.slice(0, 16)}. Open a capability to inspect its compiled manifests.`}
-          action={
-            <Link href="/app/capabilities">
-              <Button>Open registry</Button>
-            </Link>
-          }
-        />
+        <QueryError message={(detail.error as Error).message} onRetry={() => void detail.refetch()} />
       ) : !data ? (
         <Surface>
           <div className="text-sm text-text-muted">
