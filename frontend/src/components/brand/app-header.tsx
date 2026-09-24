@@ -11,7 +11,13 @@ import { ThemeToggle } from '@/components/theme/theme-toggle';
 import { clearSession } from '@/lib/session';
 import { useSession } from '@/hooks/use-session';
 
-export function AppHeader({ onMenu }: { onMenu?: (() => void) | undefined }) {
+export function AppHeader({
+  onMenu,
+  mobileMenuOpen = false,
+}: {
+  onMenu?: (() => void) | undefined;
+  mobileMenuOpen?: boolean;
+}) {
   const session = useSession();
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -40,7 +46,9 @@ export function AppHeader({ onMenu }: { onMenu?: (() => void) | undefined }) {
         type="button"
         onClick={onMenu}
         className="grid size-9 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text-default md:hidden"
-        aria-label="Open navigation"
+        aria-label={mobileMenuOpen ? 'Close navigation' : 'Open navigation'}
+        aria-expanded={mobileMenuOpen}
+        aria-controls="app-mobile-navigation"
       >
         <Menu className="size-4" />
       </button>

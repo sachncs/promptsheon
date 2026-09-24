@@ -22,7 +22,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen w-full bg-surface-0 text-foreground">
       <AppSidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <AppHeader onMenu={() => setMobileNavOpen(true)} />
+        <AppHeader
+          mobileMenuOpen={mobileNavOpen}
+          onMenu={() => setMobileNavOpen((open) => !open)}
+        />
         <a
           href="#main-content"
           className="sr-only z-50 rounded-md bg-surface-1 px-3 py-2 text-sm text-text-strong focus:not-sr-only focus:absolute focus:left-4 focus:top-16 focus:ring-2 focus:ring-brand"
