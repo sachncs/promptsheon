@@ -17,6 +17,7 @@ import { ThemedSelect } from '@/components/brand/themed-select';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/brand/empty-state';
 import { cn } from '@/lib/utils';
+import { QueryError } from '@/components/brand/query-error';
 
 type Mode = 'unified' | 'split';
 
@@ -30,7 +31,7 @@ function DiffPageInner() {
 
   const fromVer = useQuery({
     queryKey: ['versions', capabilityParam],
-    queryFn: () => capabilityParam ? versionApi.list(capabilityParam).then((r) => r.data).catch(() => []) : Promise.resolve([]),
+    queryFn: () => capabilityParam ? versionApi.list(capabilityParam).then((r) => r.data) : Promise.resolve([]),
     enabled: Boolean(capabilityParam) && Boolean(session),
   });
 
@@ -41,12 +42,12 @@ function DiffPageInner() {
 
   const fromData = useQuery({
     queryKey: ['manifest', fromId],
-    queryFn: () => fromId ? releaseApi.get(fromId).then((r) => r.data).catch(() => null) : Promise.resolve(null),
+    queryFn: () => fromId ? releaseApi.get(fromId).then((r) => r.data) : Promise.resolve(null),
     enabled: Boolean(fromId) && Boolean(session),
   });
   const toData = useQuery({
     queryKey: ['manifest', toId],
-    queryFn: () => toId ? releaseApi.get(toId).then((r) => r.data).catch(() => null) : Promise.resolve(null),
+    queryFn: () => toId ? releaseApi.get(toId).then((r) => r.data) : Promise.resolve(null),
     enabled: Boolean(toId) && Boolean(session),
   });
 
@@ -57,6 +58,10 @@ function DiffPageInner() {
 
   const fromHash = (fromData.data as { manifestHash?: string } | null | undefined)?.manifestHash ?? '';
   const toHash = (toData.data as { manifestHash?: string } | null | undefined)?.manifestHash ?? '';
+
+  if (fromVer.isError) return <QueryError message={(fromVer.error as Error).message} onRetry={() => void fromVer.refetch()} />;
+  if (fromData.isError) return <QueryError message={(fromData.error as Error).message} onRetry={() => void fromData.refetch()} />;
+  if (toData.isError) return <QueryError message={(toData.error as Error).message} onRetry={() => void toData.refetch()} />;
 
   return (
     <div className="space-y-6">

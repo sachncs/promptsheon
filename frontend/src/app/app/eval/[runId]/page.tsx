@@ -12,6 +12,7 @@ import { DataTable } from '@/components/brand/data-table';
 import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function EvalRunPage() {
   const session = useRequireSession();
@@ -20,17 +21,18 @@ export default function EvalRunPage() {
 
   const run = useQuery({
     queryKey: ['eval-run', id],
-    queryFn: () => evalApi.get(id).then((r) => r.data).catch(() => null),
+    queryFn: () => evalApi.get(id).then((r) => r.data),
     enabled: Boolean(id) && Boolean(session),
   });
 
   const results = useQuery({
     queryKey: ['eval-run', id, 'results'],
-    queryFn: () => evalApi.getResults(id).then((r) => r.data).catch(() => []),
+    queryFn: () => evalApi.getResults(id).then((r) => r.data),
     enabled: Boolean(id) && Boolean(session),
   });
 
   if (run.isLoading) return <div className="text-text-muted text-sm">Loading run…</div>;
+  if (run.isError) return <QueryError message={(run.error as Error).message} onRetry={() => void run.refetch()} />;
   if (!run.data) {
     return (
       <EmptyState
@@ -45,6 +47,7 @@ export default function EvalRunPage() {
       />
     );
   }
+  if (results.isError) return <QueryError message={(results.error as Error).message} onRetry={() => void results.refetch()} />;
 
   const r = run.data as Record<string, unknown>;
   const rows = (Array.isArray(results.data) ? results.data : []) as Array<Record<string, unknown>>;

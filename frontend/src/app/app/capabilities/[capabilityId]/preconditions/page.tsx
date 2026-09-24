@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QueryError } from '@/components/brand/query-error';
 
 interface PreconditionRow {
   id: string;
@@ -44,7 +45,7 @@ export default function PreconditionsPage() {
 
   const versions = useQuery({
     queryKey: ['versions', capabilityId],
-    queryFn: () => versionApi.list(capabilityId!).then((r) => r.data).catch(() => [] as VersionRow[]),
+    queryFn: () => versionApi.list(capabilityId!).then((r) => r.data),
     enabled: Boolean(capabilityId) && Boolean(session),
   });
   const latestVersionId = useMemo(() => {
@@ -53,6 +54,9 @@ export default function PreconditionsPage() {
   }, [versions.data]);
 
   const rows = (Array.isArray(data.data) ? data.data : []) as PreconditionRow[];
+
+  if (data.isError) return <QueryError message={(data.error as Error).message} onRetry={() => void data.refetch()} />;
+  if (versions.isError) return <QueryError message={(versions.error as Error).message} onRetry={() => void versions.refetch()} />;
 
   const [name, setName] = useState('');
   const [command, setCommand] = useState('');
