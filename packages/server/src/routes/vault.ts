@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { parseBody } from './validate.js';
+import { parseBody, parseQuery } from './validate.js';
 import type { VaultRepo, Kms } from '../repos/vault.js';
 import type { OrgExportService } from '../repos/vault-extras.js';
 import type { CostRollupRepo } from '../repos/vault-extras.js';
@@ -23,6 +23,15 @@ const PurgeRequestSchema = z.object({
 const CostQuerySchema = z.object({
   organizationId: z.string(),
   days: z.coerce.number().int().min(1).max(365).optional(),
+});
+
+const SecretsQuerySchema = z.object({
+  organizationId: z.string().min(1).max(200),
+});
+
+const SearchQuerySchema = z.object({
+  q: z.string().max(500).optional(),
+  type: z.string().min(1).max(80).optional(),
 });
 
 const RollupIngestSchema = z.object({
@@ -69,22 +78,6 @@ function actorOf(request: unknown): string {
   return ctx.userId ?? 'system';
 }
 
-function parseQuerySchema(
-  reply: { code: (n: number) => { send: (p: unknown) => void } },
-  query: unknown,
-): { ok: true; data: { organizationId: string; days?: number } } | { ok: false } {
-  const schema = z.object({
-    organizationId: z.string(),
-    days: z.coerce.number().int().min(1).max(365).optional(),
-  });
-  const result = schema.safeParse(query);
-  if (result.success) return { ok: true, data: result.data };
-  reply.code(422).send({
-    error: { code: 'VALIDATION_ERROR', message: 'Query validation failed' },
-  });
-  return { ok: false };
-}
-
 function escapeFts(s: string): string {
   return s.replace(/[\u0000-\u001f]/g, ' ').split(/\s+/).filter(Boolean).map((w) => `${w}*`).join(' ');
 }
@@ -92,10 +85,9 @@ function escapeFts(s: string): string {
 export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps): void {
   // Vault
   app.get('/api/vault/secrets', async (request, reply) => {
-    const { organizationId } = request.query as { organizationId?: string };
-    if (!organizationId) {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'organizationId required' } });
-    }
+    const parsed = parseQuery(reply, SecretsQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { organizationId } = parsed.data;
     if (!assertOrgScope(request, organizationId, reply)) return;
     return reply.send(deps.vaultRepo.list(organizationId));
   });
@@ -188,7 +180,7 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
   });
 
   app.get('/api/analytics/cost', async (request, reply) => {
-    const parsed = parseQuerySchema(reply, request.query);
+    const parsed = parseQuery(reply, CostQuerySchema, request.query);
     if (!parsed.ok) return;
     if (!assertOrgScope(request, parsed.data.organizationId, reply)) return;
     return reply.send(deps.costRollupRepo.rollupsForOrg(parsed.data.organizationId, parsed.data.days ?? 30));
@@ -196,7 +188,9 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
 
   // Search (FTS5)
   app.get('/api/search', async (request, reply) => {
-    const { q, type } = request.query as { q?: string; type?: string };
+    const parsed = parseQuery(reply, SearchQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { q, type } = parsed.data;
     if (!q || q.length < 2) return reply.send([]);
     return reply.send(deps.searchRepo.search(escapeFts(q), type));
   });
