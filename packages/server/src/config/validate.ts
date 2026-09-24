@@ -1,5 +1,30 @@
 import type { AppConfig } from '@promptsheon/shared';
 
+const LOG_LEVELS = new Set(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']);
+const NODE_ENVIRONMENTS = new Set(['development', 'test', 'production']);
+
+function validateOrigin(value: string): void {
+  if (!value.trim()) return;
+
+  let origin: URL;
+  try {
+    origin = new URL(value);
+  } catch {
+    throw new Error('PROMPTSHEON_CORS_ORIGIN must be a valid HTTP(S) origin');
+  }
+
+  if (
+    !['http:', 'https:'].includes(origin.protocol)
+    || origin.username
+    || origin.password
+    || origin.pathname !== '/'
+    || origin.search
+    || origin.hash
+  ) {
+    throw new Error('PROMPTSHEON_CORS_ORIGIN must be a valid HTTP(S) origin');
+  }
+}
+
 export function validateConfig(config: AppConfig): void {
   const isProduction = config.server.nodeEnv === 'production';
 
@@ -23,6 +48,21 @@ export function validateConfig(config: AppConfig): void {
   }
   if (isProduction && (!config.server.corsOrigin.trim() || config.server.corsOrigin.trim() === '*')) {
     throw new Error('PROMPTSHEON_CORS_ORIGIN must be an explicit origin in production');
+  }
+  if (!NODE_ENVIRONMENTS.has(config.server.nodeEnv)) {
+    throw new Error('PROMPTSHEON_NODE_ENV must be one of development, test, or production');
+  }
+  if (!LOG_LEVELS.has(config.server.logLevel)) {
+    throw new Error('PROMPTSHEON_LOG_LEVEL must be a valid structured log level');
+  }
+  validateOrigin(config.server.corsOrigin);
+  if (config.llm.baseUrl !== undefined) {
+    try {
+      const baseUrl = new URL(config.llm.baseUrl);
+      if (!['http:', 'https:'].includes(baseUrl.protocol)) throw new Error('invalid protocol');
+    } catch {
+      throw new Error('LLM_BASE_URL must be a valid HTTP(S) URL');
+    }
   }
   if (config.server.port < 1 || config.server.port > 65535) {
     throw new Error('PROMPTSHEON_PORT must be between 1 and 65535');

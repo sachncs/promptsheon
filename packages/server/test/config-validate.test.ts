@@ -87,6 +87,28 @@ describe('validateConfig (issue #47 — boot-time validation gate)', () => {
     })).toThrow(/PROMPTSHEON_CORS_ORIGIN/);
   });
 
+  it('rejects invalid runtime environment and log level values', () => {
+    expect(() => validateConfig({
+      ...baseConfig,
+      server: { ...baseConfig.server, nodeEnv: 'staging' },
+    })).toThrow(/PROMPTSHEON_NODE_ENV/);
+    expect(() => validateConfig({
+      ...baseConfig,
+      server: { ...baseConfig.server, logLevel: 'verbose' },
+    })).toThrow(/PROMPTSHEON_LOG_LEVEL/);
+  });
+
+  it('rejects malformed CORS origins and LLM base URLs', () => {
+    expect(() => validateConfig({
+      ...baseConfig,
+      server: { ...baseConfig.server, corsOrigin: 'not-an-origin' },
+    })).toThrow(/PROMPTSHEON_CORS_ORIGIN/);
+    expect(() => validateConfig({
+      ...baseConfig,
+      llm: { ...baseConfig.llm, baseUrl: 'ftp://llm.internal' },
+    })).toThrow(/LLM_BASE_URL/);
+  });
+
   it('rejects invalid LLM retry and timeout settings', () => {
     expect(() => validateConfig({
       ...baseConfig,
