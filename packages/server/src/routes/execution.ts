@@ -58,6 +58,7 @@ export function registerExecutionRoutes(
     manifestRepo: ManifestRepo;
     traceRepo: TraceRepo;
     executor: ManifestGraphExecutor;
+    replayService: ExecutionReplayService;
     sseHub?: SseHub;
   },
 ) {
@@ -202,14 +203,8 @@ export function registerExecutionRoutes(
     if (!deps.executionRepo.findByIdInOrg(id, organizationId)) {
       return reply.code(404).send({ error: { code: 'EXECUTION_NOT_FOUND', message: `execution ${id} not found` } });
     }
-    const replayService = new ExecutionReplayService(
-      deps.executionRepo,
-      deps.manifestRepo,
-      deps.traceRepo,
-      deps.executor,
-    );
     try {
-      const result = await replayService.replay(id);
+      const result = await deps.replayService.replay(id, { organizationId });
       return reply.code(201).send({
         replayExecutionId: result.replayed.id,
         replayOf: result.original.id,

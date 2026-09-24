@@ -71,6 +71,7 @@ import { AgentIdentityRepo } from '../repos/agent-identity.js';
 import { createTraceService } from '../application/trace-service.js';
 import { EvalSuiteService } from '../application/eval-suite-service.js';
 import { GraderRunner } from '../agents/evaluation/grader-runner.js';
+import { ExecutionReplayService } from '../agents/replay.js';
 import type { LlmSettingsService } from '../application/llm-settings-service.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
@@ -196,6 +197,12 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     manifestRepo: deps.manifestRepo,
     traceRepo: deps.traceRepo,
     executor: deps.executor,
+    replayService: new ExecutionReplayService(
+      deps.executionRepo,
+      deps.manifestRepo,
+      deps.traceRepo,
+      deps.executor,
+    ),
     sseHub: deps.sseHub,
   });
   registerDatasetRoutes(app, deps.datasetRepo);
