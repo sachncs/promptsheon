@@ -87,8 +87,8 @@ export default function PreconditionsPage() {
   });
 
   if (!session) return null;
-  if (data.isError) return <QueryError message={(data.error as Error).message} onRetry={() => void data.refetch()} />;
-  if (versions.isError) return <QueryError message={(versions.error as Error).message} onRetry={() => void versions.refetch()} />;
+  if (data.isError) return <QueryError message={data.error} onRetry={() => void data.refetch()} />;
+  if (versions.isError) return <QueryError message={versions.error} onRetry={() => void versions.refetch()} />;
 
   return (
     <div className="space-y-6">

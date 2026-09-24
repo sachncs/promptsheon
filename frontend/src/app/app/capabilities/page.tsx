@@ -52,7 +52,7 @@ export default function CapabilitiesRegistryPage() {
   if (!session) return null;
 
   const failedQuery = [workspaces, projects, capabilities].find((query) => query.isError);
-  if (failedQuery) return <QueryError message={(failedQuery.error as Error).message} onRetry={() => void failedQuery.refetch()} />;
+  if (failedQuery) return <QueryError message={failedQuery.error} onRetry={() => void failedQuery.refetch()} />;
   if (workspaces.isPending || projects.isPending || capabilities.isPending) {
     return <div className="space-y-6" aria-busy="true"><PageHeader eyebrow="Capabilities" title="Registry" /><Surface className="h-72 animate-pulse bg-surface-2/40"><span className="sr-only">Loading capabilities</span></Surface></div>;
   }

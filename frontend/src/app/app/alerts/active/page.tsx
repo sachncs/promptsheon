@@ -19,7 +19,7 @@ export default function AlertsActivePage() {
   });
   const rows = Array.isArray(alerts.data) ? alerts.data : [];
 
-  if (alerts.isError) return <QueryError message={(alerts.error as Error).message} onRetry={() => void alerts.refetch()} />;
+  if (alerts.isError) return <QueryError message={alerts.error} onRetry={() => void alerts.refetch()} />;
 
   return (
     <div className="space-y-6">

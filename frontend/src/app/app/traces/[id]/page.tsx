@@ -38,7 +38,7 @@ export default function TraceDetailPage() {
   const data = trace.data;
 
   if (trace.isError) {
-    return <QueryError message={(trace.error as Error).message} onRetry={() => void trace.refetch()} />;
+    return <QueryError message={trace.error} onRetry={() => void trace.refetch()} />;
   }
 
   if (!data) {
@@ -135,7 +135,7 @@ export default function TraceDetailPage() {
           }
         />
         {scores.isError ? (
-          <QueryError message={(scores.error as Error).message} onRetry={() => void scores.refetch()} />
+          <QueryError message={scores.error} onRetry={() => void scores.refetch()} />
         ) : scores.data && scores.data.items.length > 0 ? (
           <ul className="divide-y divide-border-subtle">
             {scores.data.items.map((s) => (

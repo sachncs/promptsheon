@@ -43,9 +43,9 @@ export default function UsersPage() {
   });
 
   if (!session) return null;
-  if (users.isError) return <QueryError message={(users.error as Error).message} onRetry={() => void users.refetch()} />;
+  if (users.isError) return <QueryError message={users.error} onRetry={() => void users.refetch()} />;
   if (me.isLoading) return <div className="text-sm text-text-muted">Loading member permissions…</div>;
-  if (me.isError) return <QueryError message={(me.error as Error).message} onRetry={() => void me.refetch()} />;
+  if (me.isError) return <QueryError message={me.error} onRetry={() => void me.refetch()} />;
 
   const rows = (users.data ?? []) as UserItem[];
   const meId = (me.data as { user?: { id?: string } }).user?.id;

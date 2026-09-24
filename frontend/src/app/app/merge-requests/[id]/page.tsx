@@ -28,7 +28,7 @@ export default function MergeRequestDetail() {
   });
 
   if (!session) return null;
-  if (mr.isError) return <QueryError message={(mr.error as Error).message} onRetry={() => void mr.refetch()} />;
+  if (mr.isError) return <QueryError message={mr.error} onRetry={() => void mr.refetch()} />;
   if (mr.isLoading) return <div className="text-text-muted text-sm">Loading…</div>;
   if (!mr.data) return <div className="text-text-muted text-sm">Merge request not found.</div>;
 

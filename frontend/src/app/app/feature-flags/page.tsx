@@ -70,7 +70,7 @@ export default function FeatureFlagsPage() {
   });
 
   if (!session) return null;
-  if (flags.isError) return <QueryError message={(flags.error as Error).message} onRetry={() => void flags.refetch()} />;
+  if (flags.isError) return <QueryError message={flags.error} onRetry={() => void flags.refetch()} />;
 
   return (
     <div className="space-y-6">

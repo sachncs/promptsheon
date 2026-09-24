@@ -78,9 +78,9 @@ export default function MergeRequestsIndex() {
   });
 
   if (!session) return null;
-  if (workspaces.isError) return <QueryError message={(workspaces.error as Error).message} onRetry={() => void workspaces.refetch()} />;
-  if (repos.isError) return <QueryError message={(repos.error as Error).message} onRetry={() => void repos.refetch()} />;
-  if (allMrs.isError) return <QueryError message={(allMrs.error as Error).message} onRetry={() => void allMrs.refetch()} />;
+  if (workspaces.isError) return <QueryError message={workspaces.error} onRetry={() => void workspaces.refetch()} />;
+  if (repos.isError) return <QueryError message={repos.error} onRetry={() => void repos.refetch()} />;
+  if (allMrs.isError) return <QueryError message={allMrs.error} onRetry={() => void allMrs.refetch()} />;
 
   const rows = allMrs.data ?? [];
 

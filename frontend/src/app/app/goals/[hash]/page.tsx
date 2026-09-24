@@ -74,7 +74,7 @@ export default function GoalDetailPage() {
       />
 
       {goal.isError ? (
-        <QueryError message={(goal.error as Error).message} onRetry={() => void goal.refetch()} />
+        <QueryError message={goal.error} onRetry={() => void goal.refetch()} />
       ) : !data ? (
         <Surface>
           <div className="text-sm text-text-muted">

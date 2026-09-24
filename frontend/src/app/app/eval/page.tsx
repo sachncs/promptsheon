@@ -24,7 +24,7 @@ export default function EvalListPage() {
   });
   const rows = Array.isArray(evals.data) ? evals.data : [];
 
-  if (evals.isError) return <QueryError message={(evals.error as Error).message} onRetry={() => void evals.refetch()} />;
+  if (evals.isError) return <QueryError message={evals.error} onRetry={() => void evals.refetch()} />;
 
   return (
     <div className="space-y-6">

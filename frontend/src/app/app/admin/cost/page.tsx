@@ -63,8 +63,8 @@ export default function CostPage() {
   }, [rows]);
 
   if (!session) return null;
-  if (workspaces.isError) return <QueryError message={(workspaces.error as Error).message} onRetry={() => void workspaces.refetch()} />;
-  if (costs.isError) return <QueryError message={(costs.error as Error).message} onRetry={() => void costs.refetch()} />;
+  if (workspaces.isError) return <QueryError message={workspaces.error} onRetry={() => void workspaces.refetch()} />;
+  if (costs.isError) return <QueryError message={costs.error} onRetry={() => void costs.refetch()} />;
 
   return (
     <div className="space-y-6">

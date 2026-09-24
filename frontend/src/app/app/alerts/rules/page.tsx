@@ -79,7 +79,7 @@ export default function AlertRulesPage() {
   });
 
   if (!session) return null;
-  if (rules.isError) return <QueryError message={(rules.error as Error).message} onRetry={() => void rules.refetch()} />;
+  if (rules.isError) return <QueryError message={rules.error} onRetry={() => void rules.refetch()} />;
 
   return (
     <div className="space-y-6">

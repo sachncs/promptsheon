@@ -77,7 +77,7 @@ export default function OnboardingPage() {
     );
   }
   if (status.isError) {
-    return <QueryError message={(status.error as Error).message} onRetry={() => void status.refetch()} />;
+    return <QueryError message={status.error} onRetry={() => void status.refetch()} />;
   }
 
   return (

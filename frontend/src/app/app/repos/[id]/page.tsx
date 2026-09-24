@@ -75,7 +75,7 @@ export default function RepositoryDetail() {
   if (!session) return null;
 
   if (repo.isError) {
-    return <QueryError message={(repo.error as Error).message} onRetry={() => void repo.refetch()} />;
+    return <QueryError message={repo.error} onRetry={() => void repo.refetch()} />;
   }
   if (repo.isLoading) return <div className="text-text-muted text-sm">Loading…</div>;
   if (!repo.data) return (
@@ -127,7 +127,7 @@ export default function RepositoryDetail() {
             <Surface>
               <SurfaceHeader title={`Tree at ${ref}`} description={`${(contents.data ?? []).length} entries staged on this ref`} />
               {contents.isError ? (
-                <QueryError message={(contents.error as Error).message} onRetry={() => void contents.refetch()} />
+                <QueryError message={contents.error} onRetry={() => void contents.refetch()} />
               ) : (contents.data ?? []).length === 0 ? (
                 <div className="text-text-muted text-sm">No staged files.</div>
               ) : (
@@ -223,7 +223,7 @@ export default function RepositoryDetail() {
           <Surface padded={false}>
             <SurfaceHeader className="px-5 pt-5" title="Branches" description="Movable refs with optional protection." />
             {branches.isError ? (
-              <QueryError message={(branches.error as Error).message} onRetry={() => void branches.refetch()} />
+              <QueryError message={branches.error} onRetry={() => void branches.refetch()} />
             ) : <DataTable
               className="rounded-none border-0 border-t border-border-subtle"
               rows={(branches.data ?? []) as Array<Record<string, unknown>>}
@@ -251,7 +251,7 @@ export default function RepositoryDetail() {
           <Surface padded={false}>
             <SurfaceHeader className="px-5 pt-5" title={`Commits on ${ref}`} />
             {commits.isError ? (
-              <QueryError message={(commits.error as Error).message} onRetry={() => void commits.refetch()} />
+              <QueryError message={commits.error} onRetry={() => void commits.refetch()} />
             ) : (commits.data ?? []).length === 0 ? (
               <div className="px-5 pb-5 text-text-muted text-sm">No commits yet.</div>
             ) : (
@@ -285,7 +285,7 @@ export default function RepositoryDetail() {
               }
             />
             {mrs.isError ? (
-              <QueryError message={(mrs.error as Error).message} onRetry={() => void mrs.refetch()} />
+              <QueryError message={mrs.error} onRetry={() => void mrs.refetch()} />
             ) : (mrs.data ?? []).length === 0 ? (
               <div className="px-5 pb-5 text-text-muted text-sm">No open merge requests.</div>
             ) : (

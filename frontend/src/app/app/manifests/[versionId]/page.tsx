@@ -76,7 +76,7 @@ export default function ManifestDetailPage() {
       />
 
       {isError ? (
-        <QueryError message={(detail.error as Error).message} onRetry={() => void detail.refetch()} />
+        <QueryError message={detail.error} onRetry={() => void detail.refetch()} />
       ) : !data ? (
         <Surface>
           <div className="text-sm text-text-muted">

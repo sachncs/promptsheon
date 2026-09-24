@@ -67,9 +67,9 @@ export default function ApprovalsPage() {
   });
 
   if (!session) return null;
-  if (workspaces.isError) return <QueryError message={(workspaces.error as Error).message} onRetry={() => void workspaces.refetch()} />;
-  if (projects.isError) return <QueryError message={(projects.error as Error).message} onRetry={() => void projects.refetch()} />;
-  if (allReleases.isError) return <QueryError message={(allReleases.error as Error).message} onRetry={() => void allReleases.refetch()} />;
+  if (workspaces.isError) return <QueryError message={workspaces.error} onRetry={() => void workspaces.refetch()} />;
+  if (projects.isError) return <QueryError message={projects.error} onRetry={() => void projects.refetch()} />;
+  if (allReleases.isError) return <QueryError message={allReleases.error} onRetry={() => void allReleases.refetch()} />;
 
   const rows = ((allReleases.data ?? []) as Release[]).filter(
     (r) => r.state === 'review' || r.state === 'draft',

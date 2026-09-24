@@ -59,9 +59,9 @@ function DiffPageInner() {
   const fromHash = (fromData.data as { manifestHash?: string } | null | undefined)?.manifestHash ?? '';
   const toHash = (toData.data as { manifestHash?: string } | null | undefined)?.manifestHash ?? '';
 
-  if (fromVer.isError) return <QueryError message={(fromVer.error as Error).message} onRetry={() => void fromVer.refetch()} />;
-  if (fromData.isError) return <QueryError message={(fromData.error as Error).message} onRetry={() => void fromData.refetch()} />;
-  if (toData.isError) return <QueryError message={(toData.error as Error).message} onRetry={() => void toData.refetch()} />;
+  if (fromVer.isError) return <QueryError message={fromVer.error} onRetry={() => void fromVer.refetch()} />;
+  if (fromData.isError) return <QueryError message={fromData.error} onRetry={() => void fromData.refetch()} />;
+  if (toData.isError) return <QueryError message={toData.error} onRetry={() => void toData.refetch()} />;
 
   return (
     <div className="space-y-6">

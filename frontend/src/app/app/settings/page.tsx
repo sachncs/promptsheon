@@ -66,7 +66,7 @@ export default function SettingsPage() {
 
   if (!session) return null;
   if (settings.isError) {
-    return <QueryError message={settings.error instanceof Error ? settings.error.message : 'You do not have permission to view settings.'} onRetry={() => void settings.refetch()} />;
+    return <QueryError message={settings.error instanceof Error ? settings.error : 'You do not have permission to view settings.'} onRetry={() => void settings.refetch()} />;
   }
 
   return (

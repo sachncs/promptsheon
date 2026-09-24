@@ -89,7 +89,7 @@ export default function AuditPage() {
   const open = openId ? filtered.find((r) => r.id === openId) : null;
 
   if (!session) return null;
-  if (audit.isError) return <QueryError message={(audit.error as Error).message} onRetry={() => void audit.refetch()} />;
+  if (audit.isError) return <QueryError message={audit.error} onRetry={() => void audit.refetch()} />;
 
   return (
     <div className="space-y-6">

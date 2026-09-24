@@ -57,7 +57,7 @@ export default function SecurityPage() {
   });
 
   if (!session) return null;
-  if (summary.isError) return <QueryError message={(summary.error as Error).message} onRetry={() => void summary.refetch()} />;
+  if (summary.isError) return <QueryError message={summary.error} onRetry={() => void summary.refetch()} />;
 
   return (
     <div className="space-y-6">

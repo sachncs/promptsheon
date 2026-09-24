@@ -86,7 +86,7 @@ export default function WebhooksPage() {
   });
 
   if (!session) return null;
-  if (hooks.isError) return <QueryError message={(hooks.error as Error).message} onRetry={() => void hooks.refetch()} />;
+  if (hooks.isError) return <QueryError message={hooks.error} onRetry={() => void hooks.refetch()} />;
 
   const toggleEvent = (ev: string) => {
     setEvents((prev) => prev.includes(ev) ? prev.filter((e) => e !== ev) : [...prev, ev]);

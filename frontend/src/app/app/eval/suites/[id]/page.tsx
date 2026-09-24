@@ -29,7 +29,7 @@ export default function EvalSuiteDetailPage() {
 
   if (!session) return null;
   if (suite.isError) {
-    return <QueryError message={(suite.error as Error).message} onRetry={() => void suite.refetch()} />;
+    return <QueryError message={suite.error} onRetry={() => void suite.refetch()} />;
   }
   if (suite.isLoading) return <div className="text-text-muted text-sm">Loading…</div>;
   if (!suite.data) return <div className="text-text-muted text-sm">Suite not found.</div>;

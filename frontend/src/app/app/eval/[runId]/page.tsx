@@ -32,7 +32,7 @@ export default function EvalRunPage() {
   });
 
   if (run.isLoading) return <div className="text-text-muted text-sm">Loading run…</div>;
-  if (run.isError) return <QueryError message={(run.error as Error).message} onRetry={() => void run.refetch()} />;
+  if (run.isError) return <QueryError message={run.error} onRetry={() => void run.refetch()} />;
   if (!run.data) {
     return (
       <EmptyState
@@ -47,7 +47,7 @@ export default function EvalRunPage() {
       />
     );
   }
-  if (results.isError) return <QueryError message={(results.error as Error).message} onRetry={() => void results.refetch()} />;
+  if (results.isError) return <QueryError message={results.error} onRetry={() => void results.refetch()} />;
 
   const r = run.data as Record<string, unknown>;
   const rows = (Array.isArray(results.data) ? results.data : []) as Array<Record<string, unknown>>;

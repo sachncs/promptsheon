@@ -35,7 +35,7 @@ export default function EvalRunsPage() {
   if (!session) return null;
 
   if (isError) {
-    return <QueryError message={(error as Error).message} onRetry={() => void refetch()} />;
+    return <QueryError message={error} onRetry={() => void refetch()} />;
   }
 
   return (

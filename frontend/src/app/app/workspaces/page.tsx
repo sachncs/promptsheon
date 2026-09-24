@@ -63,7 +63,7 @@ export default function WorkspacesPage() {
   });
 
   if (!session) return null;
-  if (ws.isError) return <QueryError message={ws.error.message} onRetry={() => void ws.refetch()} />;
+  if (ws.isError) return <QueryError message={ws.error} onRetry={() => void ws.refetch()} />;
 
   return (
     <div className="space-y-6">

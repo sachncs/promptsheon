@@ -70,7 +70,7 @@ export default function WorkspaceProjectsPage() {
 
   const rows = (Array.isArray(projects.data) ? projects.data : []) as ProjectRow[];
 
-  if (projects.isError) return <QueryError message={(projects.error as Error).message} onRetry={() => void projects.refetch()} />;
+  if (projects.isError) return <QueryError message={projects.error} onRetry={() => void projects.refetch()} />;
 
   return (
     <div className="space-y-6">

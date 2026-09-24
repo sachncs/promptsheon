@@ -72,7 +72,7 @@ export default function SelfEvolvePage() {
       />
 
       {state.isError ? (
-        <QueryError message={(state.error as Error).message} onRetry={() => void state.refetch()} />
+        <QueryError message={state.error} onRetry={() => void state.refetch()} />
       ) : !s && !isLoading ? (
         <EmptyState
           icon={Activity}

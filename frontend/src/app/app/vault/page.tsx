@@ -49,7 +49,7 @@ export default function VaultPage() {
   if (!session) return null;
 
   if (keys.isError) {
-    return <QueryError message={(keys.error as Error).message} onRetry={() => void keys.refetch()} />;
+    return <QueryError message={keys.error} onRetry={() => void keys.refetch()} />;
   }
 
   return (

@@ -129,7 +129,7 @@ export default function AuditReportsPage() {
       </Surface>
 
       {report.isError && submitted ? (
-        <QueryError message={(report.error as Error).message} onRetry={() => void report.refetch()} />
+        <QueryError message={report.error} onRetry={() => void report.refetch()} />
       ) : report.data ? (
         <Surface padded={false}>
           <SurfaceHeader

@@ -180,7 +180,7 @@ export default function ManifestEditorPage() {
 
   if (!session) return null;
   if (loadError) {
-    return <QueryError message={(loadErrorDetail as Error).message} onRetry={() => void refetchManifest()} />;
+    return <QueryError message={loadErrorDetail} onRetry={() => void refetchManifest()} />;
   }
 
   const TEMPLATES: Array<{ id: string; label: string; description: string; build: () => Manifest }> = [

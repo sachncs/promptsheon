@@ -71,11 +71,11 @@ export default function RepositoriesPage() {
   if (!session) return null;
 
   if (workspaces.isError) {
-    return <QueryError message={(workspaces.error as Error).message} onRetry={() => void workspaces.refetch()} />;
+    return <QueryError message={workspaces.error} onRetry={() => void workspaces.refetch()} />;
   }
 
   if (repos.isError) {
-    return <QueryError message={(repos.error as Error).message} onRetry={() => void repos.refetch()} />;
+    return <QueryError message={repos.error} onRetry={() => void repos.refetch()} />;
   }
 
   if (!wsFirst && workspaces.isFetched) {

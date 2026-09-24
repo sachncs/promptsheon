@@ -43,11 +43,11 @@ export default function TracesPage() {
   if (!session) return null;
 
   if (traces.isError) {
-    return <QueryError message={(traces.error as Error).message} onRetry={() => void traces.refetch()} />;
+    return <QueryError message={traces.error} onRetry={() => void traces.refetch()} />;
   }
 
   if (rollup.isError) {
-    return <QueryError message={(rollup.error as Error).message} onRetry={() => void rollup.refetch()} />;
+    return <QueryError message={rollup.error} onRetry={() => void rollup.refetch()} />;
   }
 
   const runList = traces.data?.items ?? [];

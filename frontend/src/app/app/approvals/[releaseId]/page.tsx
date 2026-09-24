@@ -100,7 +100,7 @@ export default function ReleaseApprovalPage() {
 
       {release.isError ? (
         <Surface>
-          <QueryError message={release.error.message} onRetry={() => void release.refetch()} />
+          <QueryError message={release.error} onRetry={() => void release.refetch()} />
         </Surface>
       ) : !data ? (
         <Surface>
@@ -160,7 +160,7 @@ export default function ReleaseApprovalPage() {
           <Surface padded={false}>
             <SurfaceHeader className="px-5 pt-5" title="Vote history" description={`${dedup.length} vote(s)`} />
             {approvals.isError ? (
-              <QueryError message={approvals.error.message} onRetry={() => void approvals.refetch()} />
+              <QueryError message={approvals.error} onRetry={() => void approvals.refetch()} />
             ) : dedup.length === 0 ? (
               <div className="px-5 pb-5 text-sm text-text-muted">No votes yet.</div>
             ) : (

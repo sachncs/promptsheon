@@ -34,7 +34,7 @@ export default function GoalsPage() {
   if (!session) return null;
 
   if (goals.isError) {
-    return <QueryError message={(goals.error as Error).message} onRetry={() => void goals.refetch()} />;
+    return <QueryError message={goals.error} onRetry={() => void goals.refetch()} />;
   }
 
   return (

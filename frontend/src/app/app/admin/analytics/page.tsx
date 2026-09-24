@@ -30,8 +30,8 @@ export default function AnalyticsPage() {
   });
 
   if (!session) return null;
-  if (totals.isError) return <QueryError message={(totals.error as Error).message} onRetry={() => void totals.refetch()} />;
-  if (leaderboard.isError) return <QueryError message={(leaderboard.error as Error).message} onRetry={() => void leaderboard.refetch()} />;
+  if (totals.isError) return <QueryError message={totals.error} onRetry={() => void totals.refetch()} />;
+  if (leaderboard.isError) return <QueryError message={leaderboard.error} onRetry={() => void leaderboard.refetch()} />;
 
   return (
     <div className="space-y-6">

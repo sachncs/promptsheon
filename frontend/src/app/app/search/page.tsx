@@ -33,7 +33,7 @@ export default function SearchPage() {
   const rows = (results.data ?? []) as Array<Record<string, unknown>>;
 
   if (!session) return null;
-  if (results.isError) return <QueryError message={(results.error as Error).message} onRetry={() => void results.refetch()} />;
+  if (results.isError) return <QueryError message={results.error} onRetry={() => void results.refetch()} />;
 
   return (
     <div className="space-y-6">

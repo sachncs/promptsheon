@@ -74,7 +74,7 @@ export default function ApiKeysPage() {
   });
 
   if (!session) return null;
-  if (keys.isError) return <QueryError message={(keys.error as Error).message} onRetry={() => void keys.refetch()} />;
+  if (keys.isError) return <QueryError message={keys.error} onRetry={() => void keys.refetch()} />;
   const rows = keys.data?.keys ?? [];
 
   return (

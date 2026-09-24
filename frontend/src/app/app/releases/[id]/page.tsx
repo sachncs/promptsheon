@@ -110,7 +110,7 @@ export default function ReleaseDetailPage() {
 
   if (!session) return null;
   if (release.isLoading) return <div className="text-text-muted text-sm">Loading release…</div>;
-  if (release.isError) return <QueryError message={release.error.message} onRetry={() => void release.refetch()} />;
+  if (release.isError) return <QueryError message={release.error} onRetry={() => void release.refetch()} />;
   if (!release.data) {
     return (
       <EmptyState
@@ -216,7 +216,7 @@ export default function ReleaseDetailPage() {
           <Surface>
             <SurfaceHeader title="Approvals" description="Maker-checker coverage on this release." />
             {approvals.isError ? (
-              <QueryError message={approvals.error.message} onRetry={() => void approvals.refetch()} />
+              <QueryError message={approvals.error} onRetry={() => void approvals.refetch()} />
             ) : (approvals.data as unknown[] | undefined)?.length ? (
               <ul className="space-y-3">
                 {((approvals.data as Array<{ userId?: string; vote?: string; comment?: string; createdAt?: string }>) ?? []).map((a) => (
@@ -268,7 +268,7 @@ export default function ReleaseDetailPage() {
           <Surface>
             <SurfaceHeader title="Lifecycle" description="Append-only audit events for this release." />
             {audit.isError ? (
-              <QueryError message={audit.error.message} onRetry={() => void audit.refetch()} />
+              <QueryError message={audit.error} onRetry={() => void audit.refetch()} />
             ) : (audit.data as unknown[] | undefined)?.length ? (
               <Timeline
                 entries={((audit.data as Array<{ id: string; action?: string; actor?: string; createdAt?: string }>) ?? []).map((a) => ({

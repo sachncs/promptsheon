@@ -53,7 +53,7 @@ export default function EvalSuitesPage() {
 
   if (!session) return null;
   if (suites.isError) {
-    return <QueryError message={(suites.error as Error).message} onRetry={() => void suites.refetch()} />;
+    return <QueryError message={suites.error} onRetry={() => void suites.refetch()} />;
   }
   const rows = Array.isArray(suites.data) ? (suites.data as Array<Record<string, unknown>>) : [];
 

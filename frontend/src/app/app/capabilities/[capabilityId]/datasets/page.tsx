@@ -91,7 +91,7 @@ export default function DatasetsPage() {
   if (!session) return null;
 
   if (datasets.isError) {
-    return <QueryError message={(datasets.error as Error).message} onRetry={() => void datasets.refetch()} />;
+    return <QueryError message={datasets.error} onRetry={() => void datasets.refetch()} />;
   }
 
   return (

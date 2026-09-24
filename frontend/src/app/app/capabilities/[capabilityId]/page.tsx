@@ -62,10 +62,10 @@ export default function CapabilityDetailPage() {
     return <div className="text-text-muted text-sm">Loading…</div>;
   }
 
-  if (cap.isError) return <QueryError message={cap.error.message} onRetry={() => void cap.refetch()} />;
-  if (versions.isError) return <QueryError message={versions.error.message} onRetry={() => void versions.refetch()} />;
-  if (manifest.isError) return <QueryError message={manifest.error.message} onRetry={() => void manifest.refetch()} />;
-  if (releases.isError) return <QueryError message={releases.error.message} onRetry={() => void releases.refetch()} />;
+  if (cap.isError) return <QueryError message={cap.error} onRetry={() => void cap.refetch()} />;
+  if (versions.isError) return <QueryError message={versions.error} onRetry={() => void versions.refetch()} />;
+  if (manifest.isError) return <QueryError message={manifest.error} onRetry={() => void manifest.refetch()} />;
+  if (releases.isError) return <QueryError message={releases.error} onRetry={() => void releases.refetch()} />;
 
   if (!cap.data) {
     return (

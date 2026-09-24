@@ -73,8 +73,8 @@ export default function TeamsPage() {
   const [ssoSecret, setSsoSecret] = useState('');
 
   if (!session) return null;
-  if (teams.isError) return <QueryError message={(teams.error as Error).message} onRetry={() => void teams.refetch()} />;
-  if (sso.isError) return <QueryError message={(sso.error as Error).message} onRetry={() => void sso.refetch()} />;
+  if (teams.isError) return <QueryError message={teams.error} onRetry={() => void teams.refetch()} />;
+  if (sso.isError) return <QueryError message={sso.error} onRetry={() => void sso.refetch()} />;
   const items = teams.data?.items ?? [];
 
   return (

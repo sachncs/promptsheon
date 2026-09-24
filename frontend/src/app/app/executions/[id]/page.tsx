@@ -101,7 +101,7 @@ export default function ExecutionDetailPage() {
       />
 
       {isError ? (
-        <QueryError message={(detail.error as Error).message} onRetry={() => void detail.refetch()} />
+        <QueryError message={detail.error} onRetry={() => void detail.refetch()} />
       ) : detail.isLoading ? (
         <Surface>
           <div className="text-sm text-text-muted">Loading execution…</div>

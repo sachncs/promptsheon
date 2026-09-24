@@ -27,7 +27,7 @@ export default function ProjectCapabilitiesPage() {
 
   const rows = (Array.isArray(capabilities.data) ? capabilities.data : []) as Array<{ id: string; name: string; description?: string }>;
 
-  if (capabilities.isError) return <QueryError message={(capabilities.error as Error).message} onRetry={() => void capabilities.refetch()} />;
+  if (capabilities.isError) return <QueryError message={capabilities.error} onRetry={() => void capabilities.refetch()} />;
 
   return (
     <div className="space-y-6">
