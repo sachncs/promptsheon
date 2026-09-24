@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { CreatePreconditionSchema } from '@promptsheon/shared';
 import type { PreconditionRepo } from '../repos/precondition.js';
@@ -17,14 +17,8 @@ const UpdatePreconditionSchema = z.object({
 
 const PreconditionParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
 
-interface RequestOrganizationContext {
-  agentOrgId?: string;
-  orgContext?: { orgId?: string; organizationId?: string };
-}
-
-function requireOrganization(request: unknown, reply: { code: (status: number) => { send: (body: unknown) => unknown } }): string | null {
-  const context = (request as RequestOrganizationContext | undefined) ?? {};
-  const organizationId = context.orgContext?.orgId ?? context.orgContext?.organizationId ?? context.agentOrgId;
+function requireOrganization(request: FastifyRequest, reply: FastifyReply): string | null {
+  const organizationId = request.orgContext?.orgId ?? request.agentOrgId;
   if (organizationId) return organizationId;
   void reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
   return null;

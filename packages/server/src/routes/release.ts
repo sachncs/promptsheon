@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
   CreateReleaseSchema,
@@ -56,23 +56,15 @@ const ReleaseParamsSchema = z.object({ id: z.string().uuid() });
 
 const MIN_APPROVERS = 2;
 
-interface RequestUserContext {
-  userId?: string;
-  agentOrgId?: string;
-  orgContext?: { orgId?: string; organizationId?: string };
+function actorOf(request: FastifyRequest): string {
+  return request.userId ?? 'system';
 }
 
-function actorOf(request: unknown): string {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.userId ?? 'system';
+function organizationOf(request: FastifyRequest): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
-function organizationOf(request: unknown): string | null {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
-}
-
-function requireOrganization(request: unknown, reply: { code: (status: number) => { send: (body: unknown) => unknown } }): string | null {
+function requireOrganization(request: FastifyRequest, reply: FastifyReply): string | null {
   const organizationId = organizationOf(request);
   if (organizationId) return organizationId;
   void reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
