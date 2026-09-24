@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Activity } from 'lucide-react';
 import { useMemo } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
-import { workspaceApi, costApi } from '@/lib/api';
+import { workspaceApi, costApi, type CostRollup } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatCard } from '@/components/brand/stat-card';
@@ -12,13 +12,6 @@ import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
 import { BarChart } from '@/components/brand/bar-chart';
 import { QueryError } from '@/components/brand/query-error';
-
-interface Rollup {
-  capabilityId: string;
-  day: string;
-  costMicros: number;
-  executions: number;
-}
 
 export default function CostPage() {
   const session = useRequireSession();
@@ -32,11 +25,11 @@ export default function CostPage() {
 
   const costs = useQuery({
     queryKey: ['cost', wsId],
-    queryFn: () => (wsId ? costApi.forOrg(wsId, 30) : Promise.resolve([] as Rollup[])),
+    queryFn: () => (wsId ? costApi.forOrg(wsId, 30).then((r) => r.data) : Promise.resolve([] as CostRollup[])),
     enabled: Boolean(wsId),
   });
 
-  const rows = (costs.data ?? []) as Rollup[];
+  const rows = costs.data ?? [];
   const totalMicros = rows.reduce((acc, r) => acc + r.costMicros, 0);
   const totalExec = rows.reduce((acc, r) => acc + r.executions, 0);
   const capabilityIds = new Set(rows.map((r) => r.capabilityId));

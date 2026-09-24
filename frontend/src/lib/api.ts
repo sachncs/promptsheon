@@ -64,6 +64,58 @@ export interface WorkspaceRow {
   updatedAt: string;
 }
 
+export interface VaultKeyringEntry {
+  id: number;
+  label: string;
+  fingerprint: string;
+  active: boolean;
+  createdAt: string;
+  rotatedAt: string | null;
+}
+
+const VaultKeyringEntrySchema = z.object({
+  id: z.number().int(),
+  label: z.string(),
+  fingerprint: z.string(),
+  active: z.boolean(),
+  createdAt: z.string(),
+  rotatedAt: z.string().nullable(),
+});
+
+export interface CostRollup {
+  capabilityId: string;
+  day: string;
+  costMicros: number;
+  executions: number;
+}
+
+const CostRollupSchema = z.object({
+  capabilityId: z.string(),
+  day: z.string(),
+  costMicros: z.number().int().nonnegative(),
+  executions: z.number().int().nonnegative(),
+});
+
+function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
+  return unwrapList<unknown>(raw).map((entry) => {
+    const parsed = VaultKeyringEntrySchema.safeParse(entry);
+    if (!parsed.success) {
+      throw new ApiError('The server returned an invalid vault keyring.', { code: 'INVALID_RESPONSE' });
+    }
+    return parsed.data;
+  });
+}
+
+function parseCostRollups(raw: unknown): CostRollup[] {
+  return unwrapList<unknown>(raw).map((entry) => {
+    const parsed = CostRollupSchema.safeParse(entry);
+    if (!parsed.success) {
+      throw new ApiError('The server returned invalid cost rollup data.', { code: 'INVALID_RESPONSE' });
+    }
+    return parsed.data;
+  });
+}
+
 const WorkspaceRowSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
@@ -567,7 +619,10 @@ export const evalSuiteApi = {
 export const vaultApi = {
   listSecrets: (organizationId: string) =>
     client.get(`/vault/secrets?organizationId=${encodeURIComponent(organizationId)}`).then((r) => r.data),
-  listKeys: () => client.get('/vault/keys').then((r) => r.data),
+  listKeys: async (): Promise<VaultKeyringEntry[]> => {
+    const r = await client.get<unknown>('/vault/keys');
+    return parseVaultKeyring(r.data);
+  },
   rotateKey: (label: string, reencrypt = true) =>
     client.post('/vault/keys/rotate', { label, reencrypt }).then((r) => r.data),
   writeSecret: (organizationId: string, name: string, value: string) =>
@@ -584,8 +639,10 @@ export const retentionApi = {
 };
 
 export const costApi = {
-  forOrg: (organizationId: string, days = 30) =>
-    client.get(`/analytics/cost?organizationId=${encodeURIComponent(organizationId)}&days=${days}`).then((r) => r.data),
+  forOrg: async (organizationId: string, days = 30): Promise<{ data: CostRollup[] }> => {
+    const r = await client.get<unknown>(`/analytics/cost?organizationId=${encodeURIComponent(organizationId)}&days=${days}`);
+    return { data: parseCostRollups(r.data) };
+  },
   ingest: (row: { capabilityId: string; input?: number; output?: number; costMicros?: number; executions?: number }) =>
     client.post('/analytics/rollups', row),
 };

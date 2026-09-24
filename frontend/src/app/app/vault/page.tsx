@@ -25,6 +25,7 @@ export default function VaultPage() {
     queryFn: () => vaultApi.listKeys(),
     enabled: Boolean(session),
   });
+  const rows = keys.data ?? [];
   const rotate = useMutation({
     mutationFn: () => vaultApi.rotateKey(`key-${Date.now()}`, true),
     onSuccess: () => {
@@ -69,30 +70,30 @@ export default function VaultPage() {
             {rotate.isPending ? 'Rotating…' : 'Rotate key'}
           </Button>
         </div>
-        {Array.isArray(keys.data) && keys.data.length > 0 ? (
+        {rows.length > 0 ? (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={(keys.data as Array<Record<string, unknown>>)}
-            rowKey={(r) => String(r['id'])}
+            rows={rows}
+            rowKey={(r) => String(r.id)}
             columns={[
-              { key: 'label', header: 'Label', render: (r) => String(r['label']) },
-              { key: 'fingerprint', header: 'Fingerprint', render: (r) => <span className="font-mono text-xs">{String(r['fingerprint']).slice(0, 24)}…</span> },
+              { key: 'label', header: 'Label', render: (r) => r.label },
+              { key: 'fingerprint', header: 'Fingerprint', render: (r) => <span className="font-mono text-xs">{r.fingerprint.slice(0, 24)}…</span> },
               {
                 key: 'active',
                 header: 'Active',
-                render: (r) => (r['active']
+                render: (r) => (r.active
                   ? <Badge className="bg-success/15 text-success">active</Badge>
                   : <span className="text-text-subtle text-xs">—</span>),
               },
               {
                 key: 'created',
                 header: 'Created',
-                render: (r) => new Date(String(r['createdAt'])).toLocaleString(),
+                render: (r) => new Date(r.createdAt).toLocaleString(),
               },
               {
                 key: 'rotated',
                 header: 'Rotated',
-                render: (r) => r['rotatedAt'] ? new Date(String(r['rotatedAt'])).toLocaleString() : '—',
+                render: (r) => r.rotatedAt ? new Date(r.rotatedAt).toLocaleString() : '—',
               },
             ]}
             empty={

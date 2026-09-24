@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { parseBody, parseParams, parseQuery } from './validate.js';
-import type { VaultRepo, Kms } from '../repos/vault.js';
+import type { VaultKeyringEntry, VaultRepo, Kms } from '../repos/vault.js';
 import type { OrgExportService } from '../repos/vault-extras.js';
 import type { CostRollupRepo } from '../repos/vault-extras.js';
 import type { SearchRepo } from '../repos/search.js';
@@ -81,6 +81,11 @@ function actorOf(request: FastifyRequest): string {
   return request.userId ?? 'system';
 }
 
+function publicKeyringEntry(entry: VaultKeyringEntry): Omit<VaultKeyringEntry, 'ciphertext'> {
+  const { ciphertext: _ciphertext, ...metadata } = entry;
+  return metadata;
+}
+
 function escapeFts(s: string): string {
   return s.replace(/[\u0000-\u001f]/g, ' ').split(/\s+/).filter(Boolean).map((w) => `${w}*`).join(' ');
 }
@@ -116,7 +121,7 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
     if (!deps.adminOnly(request)) {
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
     }
-    return reply.send(deps.vaultRepo.listKeyring());
+    return reply.send(deps.vaultRepo.listKeyring().map(publicKeyringEntry));
   });
 
   app.post('/api/vault/keys/rotate', async (request, reply) => {
@@ -134,7 +139,7 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
     if (parsed.data.reencrypt !== false) {
       re = deps.vaultRepo.reencryptAllFromKey(current.fingerprint, next.fingerprint);
     }
-    return reply.send({ key: next, reencrypted: re });
+    return reply.send({ key: publicKeyringEntry(next), reencrypted: re });
   });
 
   // Export + purge
