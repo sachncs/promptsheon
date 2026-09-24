@@ -5,11 +5,12 @@ import {
   UpdateAlertRuleSchema,
 } from '@promptsheon/shared';
 import type { AlertRepo } from '../repos/alert.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 
 const ListAlertsQuerySchema = z.object({
   status: z.string().optional(),
 });
+const AlertParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
 
 export function registerAlertRoutes(app: FastifyInstance, repo: AlertRepo) {
   app.get('/api/alert-rules', async (_request, reply) => {
@@ -17,7 +18,9 @@ export function registerAlertRoutes(app: FastifyInstance, repo: AlertRepo) {
   });
 
   app.get('/api/alert-rules/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, AlertParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const item = repo.findRuleById(id);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
     return reply.send(item);
@@ -32,7 +35,9 @@ export function registerAlertRoutes(app: FastifyInstance, repo: AlertRepo) {
   });
 
   app.put('/api/alert-rules/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, AlertParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, UpdateAlertRuleSchema, request.body);
     if (!parsed.ok) return;
     const { config, ...rest } = parsed.data;
@@ -41,7 +46,9 @@ export function registerAlertRoutes(app: FastifyInstance, repo: AlertRepo) {
   });
 
   app.delete('/api/alert-rules/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, AlertParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     repo.deleteRule(id);
     return reply.code(204).send();
   });
@@ -53,7 +60,9 @@ export function registerAlertRoutes(app: FastifyInstance, repo: AlertRepo) {
   });
 
   app.put('/api/alerts/:id/acknowledge', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, AlertParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const item = repo.updateAlert(id, { acknowledgedAt: new Date().toISOString() });
     return reply.send(item);
   });

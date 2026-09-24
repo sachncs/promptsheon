@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { CreateScheduleSchema, PaginationSchema } from '@promptsheon/shared';
 import type { ScheduleRepo } from '../repos/schedule.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import { nextCronFire } from '../scheduler/cron.js';
 
 const UpdateScheduleSchema = z.object({
@@ -10,6 +10,7 @@ const UpdateScheduleSchema = z.object({
   enabled: z.boolean().optional(),
   nextFireAt: z.string().optional(),
 });
+const ScheduleParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
 
 export function registerScheduleRoutes(app: FastifyInstance, repo: ScheduleRepo) {
   app.get('/api/schedules', async (request, reply) => {
@@ -19,7 +20,9 @@ export function registerScheduleRoutes(app: FastifyInstance, repo: ScheduleRepo)
   });
 
   app.get('/api/schedules/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ScheduleParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const item = repo.findById(id);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
     return reply.send(item);
@@ -38,7 +41,9 @@ export function registerScheduleRoutes(app: FastifyInstance, repo: ScheduleRepo)
   });
 
   app.put('/api/schedules/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ScheduleParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, UpdateScheduleSchema, request.body);
     if (!parsed.ok) return;
     if (parsed.data.cron) {
@@ -53,7 +58,9 @@ export function registerScheduleRoutes(app: FastifyInstance, repo: ScheduleRepo)
   });
 
   app.delete('/api/schedules/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ScheduleParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     repo.delete(id);
     return reply.code(204).send();
   });
