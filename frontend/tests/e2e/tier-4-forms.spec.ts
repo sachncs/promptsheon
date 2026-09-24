@@ -12,7 +12,8 @@ import { test, expect, request } from '@playwright/test';
  * optimistic update path.
  */
 
-const BASE = process.env['PROMPTSHEON_E2E_BASE_URL'] ?? 'http://127.0.0.1:8081';
+const BACKEND_PORT = process.env['PROMPTSHEON_E2E_BACKEND_PORT'] ?? '8081';
+const BASE = process.env['PROMPTSHEON_E2E_BASE_URL'] ?? `http://127.0.0.1:${BACKEND_PORT}`;
 
 async function bootstrap() {
   const ctx = await request.newContext({ baseURL: BASE });

@@ -15,7 +15,8 @@ import { test, expect, request } from '@playwright/test';
  * response shape matches what the page renders.
  */
 
-const BASE = process.env['PROMPTSHEON_E2E_BASE_URL'] ?? 'http://127.0.0.1:8081';
+const BACKEND_PORT = process.env['PROMPTSHEON_E2E_BACKEND_PORT'] ?? '8081';
+const BASE = process.env['PROMPTSHEON_E2E_BASE_URL'] ?? `http://127.0.0.1:${BACKEND_PORT}`;
 
 test.describe('tier 8: approvals flow', () => {
   test('POST /api/releases/:id/approvals accepts a vote', async () => {
