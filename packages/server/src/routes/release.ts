@@ -3,8 +3,6 @@ import { z } from 'zod';
 import {
   CreateReleaseSchema,
   PaginationSchema,
-  canTransition,
-  type ReleaseStatus,
 } from '@promptsheon/shared';
 import type { ReleaseRepo } from '../repos/release.js';
 import type { ReleaseOverlayRepo } from '../repos/release-overlay.js';
@@ -13,6 +11,15 @@ import { parseBody, parseParams, parseQuery } from './validate.js';
 import { AuditChain } from '../audit/chain.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { selectByCanary } from '../application/canary-routing.js';
+import {
+  approvalGate,
+  InvalidReleaseTransitionError,
+  ReleaseApprovalRequiredError,
+  ReleaseNotFoundError,
+  ReleaseService,
+} from '../application/release-service.js';
+
+export { approvalGate } from '../application/release-service.js';
 
 const ListQuerySchema = PaginationSchema.extend({
   capabilityId: z.string().uuid().optional(),
@@ -54,8 +61,6 @@ const CanaryRuleSchema = z.object({
 
 const ReleaseParamsSchema = z.object({ id: z.string().uuid() });
 
-const MIN_APPROVERS = 2;
-
 function actorOf(request: FastifyRequest): string {
   return request.userId ?? 'system';
 }
@@ -72,26 +77,6 @@ function requireOrganization(request: FastifyRequest, reply: FastifyReply): stri
 }
 
 /**
- * Activation gate: requires 2+ distinct approvers, all different from
- * the release creator. Returns null if approved, otherwise reason.
- */
-export function approvalGate(
-  release: { createdBy: string; manifest: string },
-  manifestRepo: ManifestRepo,
-): string | null {
-  const manifestHash = manifestRepo.computeManifestHash(release.manifest);
-  const approvers = manifestRepo.findApprovals(manifestHash);
-  const distinct = new Set(approvers.map((a) => a.userId));
-  if (distinct.has(release.createdBy)) {
-    return 'creator cannot approve their own release (maker-checker)';
-  }
-  if (distinct.size < MIN_APPROVERS) {
-    return `insufficient approvers (${distinct.size}/${MIN_APPROVERS})`;
-  }
-  return null;
-}
-
-/**
  * Select a release for an invocation using per-request random canary split.
  * Each active release in the (capability, env) pool gets weight = canaryPercent.
  * Falls back to the only active release if there's only one.
@@ -101,6 +86,8 @@ export function registerReleaseRoutes(
   repo: ReleaseRepo,
   deps: { manifestRepo: ManifestRepo; auditChain: AuditChain; overlayRepo: ReleaseOverlayRepo },
 ) {
+  const releaseService = new ReleaseService(repo, deps.manifestRepo, deps.auditChain);
+
   app.get('/api/releases', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
@@ -221,43 +208,27 @@ export function registerReleaseRoutes(
     if (!parsed.ok) return;
     const existing = repo.findByIdInOrg(id, organizationId);
     if (!existing) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
-    const from = existing.status as ReleaseStatus;
-    const to = parsed.data.to;
-    if (!canTransition(from, to)) {
-      return reply.code(422).send({
-        error: { code: 'INVALID_TRANSITION', message: `cannot transition from ${from} to ${to}` },
-      });
-    }
-    if (to === 'approved' || to === 'canary' || to === 'active') {
-      const gateFailure = approvalGate(
-        { createdBy: existing.createdBy, manifest: existing.manifest },
-        deps.manifestRepo,
-      );
-      if (gateFailure) {
-        return reply.code(409).send({ error: { code: 'APPROVAL_REQUIRED', message: gateFailure } });
-      }
-    }
-    const item = repo.updateStatusInOrg(id, organizationId, to);
-    if (item) {
-      repo.appendTransition({
-        id: randomUUID(),
+    try {
+      const item = releaseService.transition({
         releaseId: id,
-        fromStatus: from,
-        toStatus: to,
+        organizationId,
         actorId: actorOf(request),
-        reason: parsed.data.reason ?? null,
-        createdAt: new Date().toISOString(),
+        to: parsed.data.to,
+        reason: parsed.data.reason,
       });
-      deps.auditChain.append({
-        userId: actorOf(request),
-        action: `release.${to}`,
-        resource: 'release',
-        details: JSON.stringify({ releaseId: id, from, to, reason: parsed.data.reason }),
-        resourceKind: 'release',
-        resourceId: id,
-      });
+      return reply.send(item);
+    } catch (error) {
+      if (error instanceof ReleaseNotFoundError) {
+        return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
+      }
+      if (error instanceof InvalidReleaseTransitionError) {
+        return reply.code(422).send({ error: { code: 'INVALID_TRANSITION', message: error.message } });
+      }
+      if (error instanceof ReleaseApprovalRequiredError) {
+        return reply.code(409).send({ error: { code: 'APPROVAL_REQUIRED', message: error.message } });
+      }
+      throw error;
     }
-    return reply.send(item);
   });
 
   app.put('/api/releases/:id/overlay', async (request, reply) => {
