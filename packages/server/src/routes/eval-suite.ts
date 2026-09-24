@@ -43,9 +43,56 @@ const CreateSuiteSchema = z.object({
           'llm_rubric',
         ]),
         weight: z.number().min(0).max(1),
-        config: z.record(z.string(), z.unknown()),
+        config: z.discriminatedUnion('kind', [
+          z.object({
+            kind: z.literal('regex_match'),
+            pattern: z.string(),
+            flags: z.string().optional(),
+            field: z.enum(['output', 'transcript', 'metadata']),
+          }),
+          z.object({
+            kind: z.literal('schema_state_check'),
+            schema: z.record(z.string(), z.unknown()),
+            jqExpr: z.string().optional(),
+            field: z.enum(['output', 'finalState']),
+          }),
+          z.object({
+            kind: z.literal('tool_call_assertion'),
+            calls: z.array(z.object({
+              tool: z.string().min(1),
+              argsMatcher: z.record(z.string(), z.unknown()),
+              resultMatcher: z.record(z.string(), z.unknown()).optional(),
+            })),
+          }),
+          z.object({
+            kind: z.literal('transcript_diff'),
+            referenceTranscript: z.string(),
+            ignoreTimestamps: z.boolean().optional(),
+          }),
+          z.object({
+            kind: z.literal('llm_rubric'),
+            rubric: z.string().min(1),
+            model: z.string().min(1),
+            anchors: z.array(z.object({
+              score: z.number(),
+              label: z.string(),
+              description: z.string(),
+            })),
+          }),
+        ]),
       }),
     )
+    .superRefine((graders, context) => {
+      graders.forEach((grader, index) => {
+        if (grader.config.kind !== grader.kind) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'grader kind must match config.kind',
+            path: [index, 'config', 'kind'],
+          });
+        }
+      });
+    })
     .optional(),
 });
 
@@ -155,10 +202,7 @@ export function registerEvalSuiteRoutes(
       name: g.name,
       kind: g.kind,
       weight: g.weight,
-      // The Zod record coerce widens the config to `Record<string, unknown>`
-      // but our grader spec expects a discriminator-bearing union; cast at
-      // the boundary. The runner validates `kind` again at run time.
-      config: g.config as never,
+      config: g.config,
     }));
     const input = {
       capabilityId: parsed.data.capabilityId,
