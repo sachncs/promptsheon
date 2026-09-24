@@ -1,4 +1,6 @@
 ---
+const base = import.meta.env.BASE_URL;
+
 const steps = [
   {
     step: '01',
@@ -135,7 +137,7 @@ const evidence = [
           <div class="ps-eyebrow">Evidence trail</div>
           <h3 class="ps-display mt-3 text-display-sm">The release carries its evidence.</h3>
         </div>
-        <a class="ps-link text-[13px]" href="/docs/architecture/">See the architecture <span aria-hidden="true">→</span></a>
+        <a class="ps-link text-[13px]" href={`${base}docs/architecture/`}>See the architecture <span aria-hidden="true">→</span></a>
       </div>
 
       <div class="mt-7 grid gap-4 md:grid-cols-3">

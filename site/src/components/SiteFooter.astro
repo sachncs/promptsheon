@@ -1,6 +1,8 @@
 ---
 import Logo from './Logo.astro';
 
+const base = import.meta.env.BASE_URL;
+
 interface NavItem {
   label: string;
   href: string;
@@ -11,19 +13,19 @@ const sections: { label: string; items: NavItem[] }[] = [
   {
     label: 'Product',
     items: [
-      { label: 'Overview',     href: '#overview' },
-      { label: 'Capabilities', href: '#capabilities' },
-      { label: 'Workflow',     href: '#workflow' },
-      { label: 'Trust',        href: '#trust' },
+      { label: 'Overview',     href: `${base}#overview` },
+      { label: 'Capabilities', href: `${base}#capabilities` },
+      { label: 'Workflow',     href: `${base}#workflow` },
+      { label: 'Trust',        href: `${base}#trust` },
     ],
   },
   {
     label: 'Resources',
     items: [
-      { label: 'Documentation', href: '/docs/' },
-      { label: 'Getting started', href: '/docs/quickstart/' },
-      { label: 'Architecture',  href: '/docs/architecture/' },
-      { label: 'API reference', href: '/docs/api/' },
+      { label: 'Documentation', href: `${base}docs/` },
+      { label: 'Getting started', href: `${base}docs/quickstart/` },
+      { label: 'Architecture',  href: `${base}docs/architecture/` },
+      { label: 'API reference', href: `${base}docs/api/` },
     ],
   },
   {
@@ -38,8 +40,8 @@ const sections: { label: string; items: NavItem[] }[] = [
   {
     label: 'Community',
     items: [
-      { label: 'Contributing', href: '/docs/contributing/' },
-      { label: 'Operations', href: '/docs/operations/' },
+      { label: 'Contributing', href: `${base}docs/contributing/` },
+      { label: 'Operations', href: `${base}docs/operations/` },
       { label: 'Code of conduct', href: 'https://github.com/sachncs/promptsheon/blob/master/CODE_OF_CONDUCT.md', external: true },
       { label: 'License',     href: 'https://github.com/sachncs/promptsheon/blob/master/LICENSE', external: true },
     ],

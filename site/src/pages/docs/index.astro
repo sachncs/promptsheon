@@ -1,12 +1,18 @@
 ---
 import DocsLayout from '@components/DocsLayout.astro';
 
+const base = import.meta.env.BASE_URL;
+
 const guides = [
-  { title: 'Quickstart', text: 'Run the platform locally, connect a provider, and ship a first capability.', href: '/docs/quickstart/', tag: '10 minutes' },
-  { title: 'Architecture', text: 'Understand manifests, content addressing, application boundaries, policy, and release state.', href: '/docs/architecture/', tag: 'Foundations' },
-  { title: 'API & SDK', text: 'Integrate the control plane from automation, CI, the CLI, or your own service.', href: '/docs/api/', tag: 'Integration' },
-  { title: 'Operations', text: 'Deploy safely, configure production, monitor readiness, back up data, and troubleshoot failures.', href: '/docs/operations/', tag: 'Production' },
-  { title: 'Contributing', text: 'Make changes that fit the architecture, pass the quality bar, and remain easy to review.', href: '/docs/contributing/', tag: 'Open source' },
+  { title: 'Quickstart', text: 'Run the platform locally, connect a provider, and ship a first capability.', href: `${base}docs/quickstart/`, tag: '10 minutes' },
+  { title: 'Local development', text: 'Understand the workspace, run each surface independently, and debug the request path.', href: `${base}docs/local-development/`, tag: 'Build locally' },
+  { title: 'Testing', text: 'Choose the right test tier for domain rules, APIs, browser flows, and release confidence.', href: `${base}docs/testing/`, tag: 'Quality gates' },
+  { title: 'Architecture', text: 'Understand manifests, content addressing, application boundaries, policy, and release state.', href: `${base}docs/architecture/`, tag: 'Foundations' },
+  { title: 'API & SDK', text: 'Integrate the control plane from automation, CI, the CLI, or your own service.', href: `${base}docs/api/`, tag: 'Integration' },
+  { title: 'Deployment', text: 'Promote a known build into a production-shaped environment with safe configuration and rollback.', href: `${base}docs/deployment/`, tag: 'Ship safely' },
+  { title: 'Operations', text: 'Deploy safely, configure production, monitor readiness, back up data, and troubleshoot failures.', href: `${base}docs/operations/`, tag: 'Production' },
+  { title: 'Troubleshooting', text: 'Follow evidence-first checks for startup, authentication, provider, release, and UI failures.', href: `${base}docs/troubleshooting/`, tag: 'Recovery' },
+  { title: 'Contributing', text: 'Make changes that fit the architecture, pass the quality bar, and remain easy to review.', href: `${base}docs/contributing/`, tag: 'Open source' },
 ];
 ---
 

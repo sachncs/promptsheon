@@ -4,10 +4,11 @@ export interface Props {
   className?: string;
 }
 const { size = 28, className = '' } = Astro.props;
+const base = import.meta.env.BASE_URL;
 ---
 
 <img
-  src="/promptsheon-mark-hd.png"
+  src={`${base}promptsheon-mark-hd.png`}
   width={size}
   height={size}
   role="img"

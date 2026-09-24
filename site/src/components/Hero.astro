@@ -1,4 +1,5 @@
 ---
+const base = import.meta.env.BASE_URL;
 ---
 
 <section class="relative overflow-hidden ps-vignette ps-noise">
@@ -45,7 +46,7 @@
         class="ps-reveal mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-3"
         style="--reveal-delay: 240ms"
       >
-        <a href="/docs/quickstart/" class="ps-btn ps-btn-primary ps-btn-lg group">
+        <a href={`${base}docs/quickstart/`} class="ps-btn ps-btn-primary ps-btn-lg group">
           <span>Read the quickstart</span>
           <span class="arrow-nudge">
             <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

@@ -1,4 +1,6 @@
 ---
+const base = import.meta.env.BASE_URL;
+
 const audiences = [
   {
     role: 'Platform & AI engineering',
@@ -34,7 +36,7 @@ const audiences = [
           intent, evidence, approval, and change. It is the layer that makes the
           work legible to everyone else who has to operate it.
         </p>
-        <a href="/docs/architecture/" class="ps-reveal mt-7 inline-flex items-center gap-2 text-[13.5px] font-medium text-[var(--accent)] hover:underline" style="--reveal-delay: 220ms">
+        <a href={`${base}docs/architecture/`} class="ps-reveal mt-7 inline-flex items-center gap-2 text-[13.5px] font-medium text-[var(--accent)] hover:underline" style="--reveal-delay: 220ms">
           See the architecture <span aria-hidden="true">→</span>
         </a>
       </div>

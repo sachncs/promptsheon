@@ -1,0 +1,43 @@
+---
+import DocsLayout from '@components/DocsLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<DocsLayout title="Local development" description="Run the backend, frontend, and website as separate surfaces while keeping the request path and package boundaries visible.">
+  <h2>Workspace map</h2>
+  <p>The repository is a pnpm workspace. Shared contracts live in <code>packages/shared</code>; the Fastify backend, CLI, SDK, Next.js console, and Astro website remain separate consumers. Start with the smallest surface that exercises your change.</p>
+
+  <h2>Run the platform</h2>
+  <pre><code>pnpm install
+pnpm dev</code></pre>
+  <p>The root development command starts the package workspace. To work on one surface in isolation:</p>
+  <pre><code>pnpm dev:server
+pnpm dev:frontend
+pnpm dev:site</code></pre>
+  <p>The API defaults to <code>http://localhost:8080</code>, the console to <code>http://localhost:3000</code>, and the public site uses Astro's local development port.</p>
+
+  <h2>Follow one request</h2>
+  <ol>
+    <li>Validate external input at the Fastify route with the shared Zod schema.</li>
+    <li>Translate the request into an application service call.</li>
+    <li>Let the service enforce domain rules and use injected ports for persistence or providers.</li>
+    <li>Return the stable HTTP error or response contract to the caller.</li>
+    <li>Use the frontend query layer or SDK rather than duplicating request logic in a view.</li>
+  </ol>
+
+  <h2>Common local changes</h2>
+  <div class="not-prose grid gap-3 sm:grid-cols-3">
+    {[
+      ['Backend', 'Change routes, services, repositories, agents, or configuration. Run server tests and typecheck.'],
+      ['Frontend', 'Change the console, query hooks, forms, or browser flows. Run lint, typecheck, and Playwright.'],
+      ['Website', 'Change public positioning or docs. Run the Astro build and inspect generated routes.'],
+    ].map(([title, text]) => (
+      <article class="rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)] p-5"><h3 class="text-[15px] font-semibold text-[var(--ink-strong)]">{title}</h3><p class="mt-2 text-[13px] leading-relaxed text-[var(--ink-muted)]">{text}</p></article>
+    ))}
+  </div>
+
+  <h2>Configuration discipline</h2>
+  <p>Copy <code>.env.example</code> for local work, keep credentials out of browser code and logs, and use the injected configuration boundary. If a test needs a provider, use the repository's fake or test adapter rather than a live secret.</p>
+
+  <p><a href={`${base}docs/architecture/`}>Read the architecture guide →</a></p>
+</DocsLayout>
