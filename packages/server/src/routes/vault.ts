@@ -57,7 +57,7 @@ export interface VaultRouteDeps {
   costRollupRepo: CostRollupRepo;
   searchRepo: SearchRepo;
   kms: Kms;
-  adminOnly: (request: unknown) => boolean;
+  adminOnly: (request: FastifyRequest) => boolean;
 }
 
 function activeOrg(request: FastifyRequest): string | undefined {

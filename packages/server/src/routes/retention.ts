@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { parseBody, parseParams } from './validate.js';
 import type { RetentionSweeper } from '../scheduler/retention-sweeper.js';
@@ -12,7 +12,7 @@ const OrganizationParamsSchema = z.object({ id: z.string().trim().min(1).max(255
 
 export interface RetentionRouteDeps {
   sweeper: RetentionSweeper;
-  adminOnly: (request: unknown) => boolean;
+  adminOnly: (request: FastifyRequest) => boolean;
 }
 
 export function registerRetentionRoutes(app: FastifyInstance, deps: RetentionRouteDeps): void {

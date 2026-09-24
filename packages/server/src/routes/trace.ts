@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { TraceService } from '../application/trace-service.js';
 import { parseParams, parseQuery } from './validate.js';
@@ -36,7 +36,7 @@ function orgOf(request: FastifyRequest): string | null {
  */
 export function registerTraceRoutes(
   app: FastifyInstance,
-  deps: { service: TraceService; requireAdmin: () => (request: unknown, reply: unknown) => Promise<void> },
+  deps: { service: TraceService; requireAdmin: () => (request: FastifyRequest, reply: FastifyReply) => Promise<void> },
 ) {
   app.get(
     '/api/traces/rollup',

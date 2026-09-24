@@ -1,4 +1,4 @@
-import Fastify, { type FastifyError } from 'fastify';
+import Fastify, { type FastifyError, type FastifyRequest } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
@@ -79,9 +79,8 @@ function buildForecastService(db: Database.Database, repos: Repos): CostForecast
  * resolved org-context role off the Fastify request and
  * returns true iff the caller is an admin.
  */
-function adminOnly(request: unknown): boolean {
-  const ctx = request as { orgContext?: { role?: string } } | undefined;
-  return ctx?.orgContext?.role === 'admin';
+function adminOnly(request: FastifyRequest): boolean {
+  return request.orgContext?.role === 'admin';
 }
 
 async function main() {

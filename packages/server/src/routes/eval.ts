@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
   CreateEvalRunSchema,
@@ -29,14 +29,8 @@ const ScoreInputSchema = z.object({
 
 const EvalRunParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
 
-interface RequestOrgContext {
-  agentOrgId?: string;
-  orgContext?: { orgId?: string; organizationId?: string };
-}
-
-function orgOf(request: unknown): string | null {
-  const ctx = (request as RequestOrgContext | undefined) ?? {};
-  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
+function orgOf(request: FastifyRequest): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
 export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAgent: EvaluationAgent) {

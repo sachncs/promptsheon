@@ -308,7 +308,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   });
   registerTraceRoutes(app, {
     service: traceService,
-    requireAdmin: () => requireAdmin() as unknown as (request: unknown, reply: unknown) => Promise<void>,
+    requireAdmin,
   });
   registerTraceScoreRoutes(app, {
     service: traceService,

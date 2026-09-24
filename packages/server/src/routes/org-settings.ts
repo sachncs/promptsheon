@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { parseBody, parseParams } from './validate.js';
 import type { OrgSettingsRepo } from '../repos/org-settings.js';
@@ -18,7 +18,7 @@ const OrganizationParamsSchema = z.object({
 export interface OrgSettingsRouteDeps {
   orgSettingsRepo: OrgSettingsRepo;
   vaultRepo: VaultRepo;
-  adminOnly: (request: unknown) => boolean;
+  adminOnly: (request: FastifyRequest) => boolean;
 }
 
 export function registerOrgSettingsRoutes(

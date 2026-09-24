@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { SEEDS } from '@promptsheon/shared';
 import { parseBody, parseParams } from './validate.js';
@@ -20,7 +20,7 @@ const RedteamPackParamsSchema = z.object({
 
 export interface RedteamDeps {
   redteamRepo: RedteamRepo;
-  adminOnly: (request: unknown) => boolean;
+  adminOnly: (request: FastifyRequest) => boolean;
 }
 
 export function registerRedteamRoutes(app: FastifyInstance, deps: RedteamDeps): void {
