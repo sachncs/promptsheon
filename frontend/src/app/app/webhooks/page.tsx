@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { QueryError } from '@/components/brand/query-error';
+import { useToast } from '@/components/brand/toast';
 
 interface WebhookItem {
   id: string;
@@ -41,6 +42,7 @@ const EVENT_PRESETS = [
 export default function WebhooksPage() {
   const session = useRequireSession();
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   const hooks = useQuery({
     queryKey: ['webhooks'],
@@ -60,17 +62,27 @@ export default function WebhooksPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['webhooks'] });
       setUrl('');
+      toast({ title: 'Webhook added', variant: 'success' });
     },
+    onError: (error) => toast({ title: 'Could not add webhook', description: (error as Error).message, variant: 'destructive' }),
   });
 
   const toggle = useMutation({
     mutationFn: (item: WebhookItem) => webhookApi.update(item.id, { active: !(item.active ?? false) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['webhooks'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['webhooks'] });
+      toast({ title: 'Webhook updated', variant: 'success' });
+    },
+    onError: (error) => toast({ title: 'Could not update webhook', description: (error as Error).message, variant: 'destructive' }),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => webhookApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['webhooks'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['webhooks'] });
+      toast({ title: 'Webhook deleted', variant: 'success' });
+    },
+    onError: (error) => toast({ title: 'Could not delete webhook', description: (error as Error).message, variant: 'destructive' }),
   });
 
   if (!session) return null;
@@ -109,8 +121,10 @@ export default function WebhooksPage() {
                 return (
                   <button
                     key={ev}
-                    type="button"
-                    onClick={() => toggleEvent(ev)}
+                  type="button"
+                  onClick={() => toggleEvent(ev)}
+                  aria-pressed={active}
+                  aria-label={`${active ? 'Remove' : 'Add'} ${ev} event`}
                     className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
                       active
                         ? 'border-brand bg-brand text-brand-foreground'

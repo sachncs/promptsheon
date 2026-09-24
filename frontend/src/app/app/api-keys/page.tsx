@@ -12,6 +12,8 @@ import { ThemedSelect } from '@/components/brand/themed-select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QueryError } from '@/components/brand/query-error';
+import { useToast } from '@/components/brand/toast';
 
 interface ApiKey {
   id: string;
@@ -28,6 +30,7 @@ interface ApiKey {
 export default function ApiKeysPage() {
   const session = useRequireSession();
   const qc = useQueryClient();
+  const { toast } = useToast();
   const keys = useQuery({
     queryKey: ['api-keys'],
     queryFn: async () => {
@@ -56,15 +59,22 @@ export default function ApiKeysPage() {
       setIssued(o);
       setName('');
       void qc.invalidateQueries({ queryKey: ['api-keys'] });
+      toast({ title: 'API key issued', description: 'Copy it now; it will not be shown again.', variant: 'success' });
     },
+    onError: (error) => toast({ title: 'Could not issue API key', description: (error as Error).message, variant: 'destructive' }),
   });
 
   const revoke = useMutation({
     mutationFn: (id: string) => apiKeyApi.revoke(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['api-keys'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['api-keys'] });
+      toast({ title: 'API key revoked', variant: 'success' });
+    },
+    onError: (error) => toast({ title: 'Could not revoke API key', description: (error as Error).message, variant: 'destructive' }),
   });
 
   if (!session) return null;
+  if (keys.isError) return <QueryError message={(keys.error as Error).message} onRetry={() => void keys.refetch()} />;
   const rows = keys.data?.keys ?? [];
 
   return (
@@ -122,6 +132,19 @@ export default function ApiKeysPage() {
             <pre className="mt-2 overflow-x-auto rounded-md bg-surface-0 p-3 font-mono text-xs text-text-default">
 {issued.key}
             </pre>
+            <Button
+              className="mt-3"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                void navigator.clipboard.writeText(issued.key).then(
+                  () => toast({ title: 'API key copied', variant: 'success' }),
+                  () => toast({ title: 'Copy failed', description: 'Select and copy the key manually.', variant: 'destructive' }),
+                );
+              }}
+            >
+              Copy key
+            </Button>
             <div className="mt-2 text-xs text-text-muted">
               Use as <code className="rounded bg-surface-2 px-1 py-0.5">Authorization: Bearer {issued.key}</code>
             </div>
