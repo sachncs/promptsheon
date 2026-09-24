@@ -31,7 +31,7 @@ export default function WorkspacesPage() {
     queryFn: () => workspaceApi.list(1).then((r) => r.data),
     enabled: Boolean(session),
   });
-  const rows = (ws.data ?? []) as unknown as Array<Record<string, unknown>>;
+  const rows = ws.data ?? [];
 
   const create = useMutation({
     mutationFn: () => {
@@ -43,7 +43,7 @@ export default function WorkspacesPage() {
       qc.invalidateQueries({ queryKey: ['workspaces'] });
       setName('');
       setOrganization('');
-      const created = data?.data as { id?: string } | undefined;
+      const created = data.data;
       if (created?.id) {
         toast({ title: 'Workspace created', variant: 'success', description: 'Open it to start adding projects.' });
         router.push(`/app/workspaces/${created.id}/projects`);
@@ -125,15 +125,15 @@ export default function WorkspacesPage() {
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
             rows={rows}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => router.push(`/app/workspaces/${String(r['id'])}/projects`)}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => router.push(`/app/workspaces/${r.id}/projects`)}
             columns={[
               {
                 key: 'name',
                 header: 'Name',
                 render: (r) => (
-                  <Link href={`/app/workspaces/${String(r['id'])}/projects`} className="font-medium text-text-strong hover:underline">
-                    {String(r['name'] ?? '—')}
+                  <Link href={`/app/workspaces/${r.id}/projects`} className="font-medium text-text-strong hover:underline">
+                    {r.name || '—'}
                   </Link>
                 ),
               },
@@ -141,14 +141,14 @@ export default function WorkspacesPage() {
                 key: 'org',
                 header: 'Organisation',
                 render: (r) => {
-                  const org = (r['organization'] as string | undefined) ?? '';
+                  const org = r.organization;
                   return org ? <span className="text-text-muted">{org}</span> : <span className="text-text-subtle">—</span>;
                 },
               },
               {
                 key: 'id',
                 header: 'Identifier',
-                render: (r) => <HashChip hash={String(r['id'])} />,
+                render: (r) => <HashChip hash={r.id} />,
               },
               {
                 key: 'actions',
@@ -159,7 +159,7 @@ export default function WorkspacesPage() {
                     variant="outline"
                     onClick={(e) => {
                       e.stopPropagation();
-                      remove.mutate(String(r['id']));
+                      remove.mutate(r.id);
                     }}
                   >
                     <Trash2 className="mr-1 size-3" />

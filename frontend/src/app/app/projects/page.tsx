@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Boxes, Plus, Trash2 } from 'lucide-react';
-import { projectApi, workspaceApi } from '@/lib/api';
+import { projectApi, workspaceApi, type WorkspaceRow } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -36,7 +36,7 @@ export default function ProjectsPage() {
     queryKey: ['workspaces'],
     queryFn: () => workspaceApi.list(1, 100).then((r) => r.data),
   });
-  const wsFirst = Array.isArray(workspaces.data) ? workspaces.data[0] as { id?: string } : undefined;
+  const wsFirst: WorkspaceRow | undefined = workspaces.data?.[0];
   const wsId = wsFirst?.id;
 
   const projects = useQuery({

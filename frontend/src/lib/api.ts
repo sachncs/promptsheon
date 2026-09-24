@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { z } from 'zod';
 import { clearSession, getSession } from './session';
 
 export class ApiError extends Error {
@@ -61,6 +62,26 @@ export interface WorkspaceRow {
   organization: string;
   createdAt: string;
   updatedAt: string;
+}
+
+const WorkspaceRowSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  organization: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+function parseWorkspace(raw: unknown): WorkspaceRow {
+  const parsed = WorkspaceRowSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ApiError('The server returned an invalid workspace.', { code: 'INVALID_RESPONSE' });
+  }
+  return parsed.data;
+}
+
+function parseWorkspaceList(raw: unknown): WorkspaceRow[] {
+  return unwrapList<unknown>(raw).map(parseWorkspace);
 }
 
 /**
@@ -134,17 +155,17 @@ export function subscribeSSE(channel: string, onEvent: (event: unknown) => void)
 
 export const workspaceApi = {
   list: async (page = 1, pageSize = 100): Promise<{ data: WorkspaceRow[] }> => {
-    const r = await client.get<{ items?: WorkspaceRow[]; total?: number }>('/workspaces', {
+    const r = await client.get<unknown>('/workspaces', {
       params: { page, pageSize },
     });
-    return { data: unwrapList<WorkspaceRow>(r.data) };
+    return { data: parseWorkspaceList(r.data) };
   },
   get: (id: string): Promise<{ data: WorkspaceRow }> =>
-    client.get(`/workspaces/${id}`).then((r) => ({ data: r.data as WorkspaceRow })),
+    client.get<unknown>(`/workspaces/${id}`).then((r) => ({ data: parseWorkspace(r.data) })),
   create: (data: { name: string; organization?: string }): Promise<{ data: WorkspaceRow }> =>
-    client.post('/workspaces', data).then((r) => ({ data: r.data as WorkspaceRow })),
+    client.post<unknown>('/workspaces', data).then((r) => ({ data: parseWorkspace(r.data) })),
   update: (id: string, data: { name?: string; organization?: string }): Promise<{ data: WorkspaceRow }> =>
-    client.put(`/workspaces/${id}`, data).then((r) => ({ data: r.data as WorkspaceRow })),
+    client.put<unknown>(`/workspaces/${id}`, data).then((r) => ({ data: parseWorkspace(r.data) })),
   delete: (id: string) => client.delete(`/workspaces/${id}`),
 };
 
