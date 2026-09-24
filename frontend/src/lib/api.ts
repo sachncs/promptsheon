@@ -242,6 +242,15 @@ export interface Capability {
   selfEvolveDatasetId: string;
 }
 
+export interface Project {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ReleaseStatus = 'draft' | 'review' | 'approved' | 'canary' | 'active' | 'rolled_back';
 export type ReleaseEnvironment = 'dev' | 'staging' | 'prod';
 
@@ -414,6 +423,15 @@ const CapabilitySchema = z.object({
   selfEvolveDatasetId: z.string(),
 });
 
+const ProjectSchema = z.object({
+  id: z.string(),
+  workspaceId: z.string(),
+  name: z.string(),
+  description: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 const ReleaseSchema = z.object({
   id: z.string(),
   capabilityId: z.string(),
@@ -565,6 +583,12 @@ function parseCapabilities(raw: unknown): Capability[] {
   return parsed.data;
 }
 
+function parseProjects(raw: unknown): Project[] {
+  const parsed = z.array(ProjectSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid project data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
 function parseReleases(raw: unknown): Release[] {
   const parsed = z.array(ReleaseSchema).safeParse(unwrapList<unknown>(raw));
   if (!parsed.success) throw new ApiError('The server returned invalid release data.', { code: 'INVALID_RESPONSE' });
@@ -683,8 +707,16 @@ export const workspaceApi = {
 };
 
 export const projectApi = {
-  list: (workspaceId: string) => client.get('/projects', { params: { workspaceId } }),
-  get: (id: string) => client.get(`/projects/${id}`),
+  list: async (workspaceId: string): Promise<{ data: Project[] }> => {
+    const r = await client.get<unknown>('/projects', { params: { workspaceId } });
+    return { data: parseProjects(r.data) };
+  },
+  get: async (id: string): Promise<{ data: Project }> => {
+    const r = await client.get<unknown>(`/projects/${id}`);
+    const parsed = ProjectSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid project data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
   create: (data: { workspaceId: string; name: string; description?: string }) => client.post('/projects', data),
   update: (id: string, data: { name?: string; description?: string }) => client.put(`/projects/${id}`, data),
   delete: (id: string) => client.delete(`/projects/${id}`),
