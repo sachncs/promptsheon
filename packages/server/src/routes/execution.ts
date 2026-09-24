@@ -9,7 +9,7 @@ import {
   ExecutionReplayService,
   ReplayManifestMissingError,
   ReplayNotFoundError,
-} from '../agents/replay.js';
+} from '../application/execution-replay-service.js';
 import { ReplayInputsUnavailableError } from '../repos/execution.js';
 import { selectByCanary } from './release.js';
 import { parseBody, parseQuery } from './validate.js';

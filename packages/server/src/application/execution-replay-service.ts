@@ -3,7 +3,7 @@ import type { Execution, Manifest, ReplayDiffSummary } from '@promptsheon/shared
 import { ExecutionRepo } from '../repos/execution.js';
 import { ManifestRepo } from '../repos/manifest.js';
 import { TraceRepo } from '../repos/trace.js';
-import type { ExecutionTrace, ManifestGraphExecutor, ExecuteOptions } from './executor/index.js';
+import type { ExecutionTrace, ManifestGraphExecutor, ExecuteOptions } from '../agents/executor/index.js';
 
 export interface ReplayExecutor {
   execute(

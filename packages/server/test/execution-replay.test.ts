@@ -10,7 +10,7 @@ import { ManifestRepo } from '../src/repos/manifest.js';
 import { TraceRepo } from '../src/repos/trace.js';
 import { registerExecutionRoutes } from '../src/routes/execution.js';
 import { ManifestGraphExecutor } from '../src/agents/executor/executor.js';
-import { ExecutionReplayService } from '../src/agents/replay.js';
+import { ExecutionReplayService } from '../src/application/execution-replay-service.js';
 import { SseHub } from '../src/sse/hub.js';
 import type { ExecutionTrace } from '../src/agents/executor/index.js';
 

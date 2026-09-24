@@ -71,7 +71,7 @@ import { AgentIdentityRepo } from '../repos/agent-identity.js';
 import { createTraceService } from '../application/trace-service.js';
 import { EvalSuiteService } from '../application/eval-suite-service.js';
 import { GraderRunner } from '../agents/evaluation/grader-runner.js';
-import { ExecutionReplayService } from '../agents/replay.js';
+import { ExecutionReplayService } from '../application/execution-replay-service.js';
 import type { LlmSettingsService } from '../application/llm-settings-service.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
