@@ -50,8 +50,7 @@ declare module 'fastify' {
  * every authorization decision in the platform; failing to load
  * it is a fatal error.
  */
-async function setupPolicy(): Promise<void> {
-  const policyPath = process.env['PROMPTSHEON_POLICY_FILE'];
+async function setupPolicy(policyPath?: string): Promise<void> {
   const authorizer = new CedarAuthorizer({ ...(policyPath ? { policyPath } : {}) });
   authorizer.load();
   installDefaultAuthorizer(authorizer);
@@ -61,8 +60,8 @@ async function setupPolicy(): Promise<void> {
  * Resolve the webhook secret. Refuses to boot in production
  * with the dev fallback.
  */
-function resolveWebhookSecret(nodeEnv: string): string {
-  const fromEnv = process.env['PROMPTSHEON_WEBHOOK_SECRET'];
+function resolveWebhookSecret(nodeEnv: string, configuredSecret?: string): string {
+  const fromEnv = configuredSecret;
   if (fromEnv && fromEnv.length > 0) return fromEnv;
   if (nodeEnv !== 'production') return 'dev-secret';
   throw new Error(
@@ -147,7 +146,7 @@ async function main() {
   });
 
   await app.register(rateLimit, {
-    max: Number.parseInt(process.env['PROMPTSHEON_RATE_LIMIT_MAX'] ?? '100', 10),
+    max: config.server.rateLimitMax ?? 100,
     timeWindow: '1 minute',
     keyGenerator: (req) => {
       return req.userId ?? req.ip ?? 'unknown';
@@ -167,7 +166,7 @@ async function main() {
   await casStore.init();
 
   setupObservability(config);
-  await setupPolicy();
+  await setupPolicy(config.server.policyFile);
 
   const cutoverReport = repos.manifest.ensureCutover({ createdBy: 'system-cutover' });
   app.log.info(
@@ -221,7 +220,7 @@ async function main() {
         url: 'https://example.com/github',
         events: ['push', 'pull_request'],
         active: true,
-        secret: resolveWebhookSecret(config.server.nodeEnv),
+        secret: resolveWebhookSecret(config.server.nodeEnv, config.server.webhookSecret),
       },
     ],
     [

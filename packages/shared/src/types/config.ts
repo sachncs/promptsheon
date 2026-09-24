@@ -26,6 +26,14 @@ export interface AppConfig {
     allowPrivateNetworks?: boolean;
     /** Enable the dedicated end-to-end browser session helper. */
     e2eSessionEnabled?: boolean;
+    /** Optional Cedar policy file loaded during startup. */
+    policyFile?: string;
+    /** Webhook signing secret resolved during startup. */
+    webhookSecret?: string;
+    /** Maximum requests per minute per rate-limit key. */
+    rateLimitMax?: number;
+    /** Optional OpenTelemetry exporter endpoint. */
+    otelEndpoint?: string;
   };
   llm: {
     defaultProvider: string;

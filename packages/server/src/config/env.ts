@@ -75,6 +75,10 @@ export function loadConfig(): AppConfig {
         .filter((host) => host.length > 0),
       allowPrivateNetworks: envString('PROMPTSHEON_NODE_ENV', envString('NODE_ENV', 'development')) !== 'production',
       e2eSessionEnabled: envBool('PROMPTSHEON_E2E', false),
+      policyFile: process.env['PROMPTSHEON_POLICY_FILE'] || undefined,
+      webhookSecret: process.env['PROMPTSHEON_WEBHOOK_SECRET'] || undefined,
+      rateLimitMax: envInt('PROMPTSHEON_RATE_LIMIT_MAX', 100),
+      otelEndpoint: process.env['PROMPTSHEON_OTEL_ENDPOINT'] || undefined,
     },
     llm: {
       defaultProvider: envString('PROMPTSHEON_LLM_PROVIDER', 'openai'),
