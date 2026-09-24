@@ -15,9 +15,50 @@ const guides = [
   { title: 'Troubleshooting', text: 'Follow evidence-first checks for startup, authentication, provider, release, and UI failures.', href: `${base}docs/troubleshooting/`, tag: 'Recovery' },
   { title: 'Contributing', text: 'Make changes that fit the architecture, pass the quality bar, and remain easy to review.', href: `${base}docs/contributing/`, tag: 'Open source' },
 ];
+
+const paths = [
+  {
+    number: '01',
+    title: 'Build a capability',
+    text: 'Run locally, define an AgentSpec, evaluate it, and promote your first evidence-backed candidate.',
+    href: `${base}docs/quickstart/`,
+    action: 'Start with the quickstart',
+  },
+  {
+    number: '02',
+    title: 'Integrate the control plane',
+    text: 'Connect CI, the CLI, or your own service to releases, evaluations, audit, and operations.',
+    href: `${base}docs/api/`,
+    action: 'Explore API & SDK',
+  },
+  {
+    number: '03',
+    title: 'Run it responsibly',
+    text: 'Shape production configuration, readiness gates, observability, backups, and rollback before launch.',
+    href: `${base}docs/operations/`,
+    action: 'Read operations',
+  },
+];
 ---
 
 <DocsLayout title="Build with Promptsheon" description="A practical path from first install to a governed AI capability in production. These guides explain the product, the system boundaries, and the decisions behind them.">
+  <section class="not-prose mb-14">
+    <div class="ps-eyebrow">Choose your path</div>
+    <h2 class="mt-3 text-[25px] font-semibold tracking-tight text-[var(--ink-strong)]">A clear route from first run to production.</h2>
+    <p class="mt-3 max-w-2xl text-[14px] leading-relaxed text-[var(--ink-muted)]">Start with the outcome you need. Each path points to the next decision instead of sending you back to the repository for context.</p>
+    <div class="mt-6 grid gap-3 sm:grid-cols-3">
+      {paths.map((path) => (
+        <a href={path.href} class="group rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)] p-5 transition-all hover:-translate-y-0.5 hover:border-[var(--line-strong)] hover:shadow-soft">
+          <div class="font-mono text-[11px] text-[var(--ink-subtle)]">{path.number}</div>
+          <h3 class="mt-4 text-[16px] font-semibold tracking-tight text-[var(--ink-strong)]">{path.title}</h3>
+          <p class="mt-2 text-[13px] leading-relaxed text-[var(--ink-muted)]">{path.text}</p>
+          <span class="mt-5 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--accent)] group-hover:underline">{path.action} <span aria-hidden="true">→</span></span>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <h2>Reference guides</h2>
   <div class="grid gap-4 sm:grid-cols-2">
     {guides.map((guide, index) => (
       <a href={guide.href} class={`group rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)] p-6 transition-all hover:-translate-y-0.5 hover:border-[var(--line-strong)] hover:shadow-soft ${index === 0 ? 'sm:col-span-2' : ''}`}>
