@@ -28,6 +28,7 @@ const ROUTES = [
   '/app/capabilities/test-id/datasets',
   '/app/capabilities/test-id/preconditions',
   '/app/repos',
+  '/app/repos/test-id',
   '/app/merge-requests',
   '/app/search',
   '/app/workspaces',

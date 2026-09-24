@@ -17,6 +17,7 @@ import { ThemedSelect } from '@/components/brand/themed-select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QueryError } from '@/components/brand/query-error';
 
 type Tab = 'tree' | 'branches' | 'merge-requests' | 'commits';
 
@@ -31,29 +32,29 @@ export default function RepositoryDetail() {
   const repo = useQuery({
     queryKey: ['repo', id],
     queryFn: () => repoApi.get(id),
-    enabled: Boolean(id),
+    enabled: Boolean(session && id),
   });
 
   const [ref, setRef] = useState<string>('main');
   const branches = useQuery({
     queryKey: ['branches', id],
     queryFn: () => repoApi.listBranches(id),
-    enabled: Boolean(id),
+    enabled: Boolean(session && id),
   });
   const contents = useQuery({
     queryKey: ['contents', id, ref],
     queryFn: () => repoApi.listContents(id, ref),
-    enabled: Boolean(id),
+    enabled: Boolean(session && id),
   });
   const commits = useQuery({
     queryKey: ['commits', id, ref],
     queryFn: () => repoApi.listCommits(id, ref),
-    enabled: Boolean(id),
+    enabled: Boolean(session && id),
   });
   const mrs = useQuery({
     queryKey: ['mr', id],
     queryFn: () => repoApi.listMRs(id, 'open'),
-    enabled: Boolean(id),
+    enabled: Boolean(session && id),
   });
 
   const [newPath, setNewPath] = useState('prompts/main.md');
@@ -73,6 +74,9 @@ export default function RepositoryDetail() {
 
   if (!session) return null;
 
+  if (repo.isError) {
+    return <QueryError message={(repo.error as Error).message} onRetry={() => void repo.refetch()} />;
+  }
   if (repo.isLoading) return <div className="text-text-muted text-sm">Loading…</div>;
   if (!repo.data) return (
     <div className="text-text-muted text-sm">Repository not found.</div>
@@ -122,7 +126,9 @@ export default function RepositoryDetail() {
           <div className="space-y-5">
             <Surface>
               <SurfaceHeader title={`Tree at ${ref}`} description={`${(contents.data ?? []).length} entries staged on this ref`} />
-              {(contents.data ?? []).length === 0 ? (
+              {contents.isError ? (
+                <QueryError message={(contents.error as Error).message} onRetry={() => void contents.refetch()} />
+              ) : (contents.data ?? []).length === 0 ? (
                 <div className="text-text-muted text-sm">No staged files.</div>
               ) : (
                 <DataTable
@@ -216,7 +222,9 @@ export default function RepositoryDetail() {
         <TabsContent value="branches">
           <Surface padded={false}>
             <SurfaceHeader className="px-5 pt-5" title="Branches" description="Movable refs with optional protection." />
-            <DataTable
+            {branches.isError ? (
+              <QueryError message={(branches.error as Error).message} onRetry={() => void branches.refetch()} />
+            ) : <DataTable
               className="rounded-none border-0 border-t border-border-subtle"
               rows={(branches.data ?? []) as Array<Record<string, unknown>>}
               rowKey={(r) => String(r['id'])}
@@ -235,14 +243,16 @@ export default function RepositoryDetail() {
                   render: (r) => (r['isProtected'] ? <StatusPill kind="approved" /> : <StatusPill kind="neutral" label="—" />),
                 },
               ]}
-            />
+            />}
           </Surface>
         </TabsContent>
 
         <TabsContent value="commits">
           <Surface padded={false}>
             <SurfaceHeader className="px-5 pt-5" title={`Commits on ${ref}`} />
-            {(commits.data ?? []).length === 0 ? (
+            {commits.isError ? (
+              <QueryError message={(commits.error as Error).message} onRetry={() => void commits.refetch()} />
+            ) : (commits.data ?? []).length === 0 ? (
               <div className="px-5 pb-5 text-text-muted text-sm">No commits yet.</div>
             ) : (
               <ul className="divide-y divide-border-subtle">
@@ -274,7 +284,9 @@ export default function RepositoryDetail() {
                 </Link>
               }
             />
-            {(mrs.data ?? []).length === 0 ? (
+            {mrs.isError ? (
+              <QueryError message={(mrs.error as Error).message} onRetry={() => void mrs.refetch()} />
+            ) : (mrs.data ?? []).length === 0 ? (
               <div className="px-5 pb-5 text-text-muted text-sm">No open merge requests.</div>
             ) : (
               <DataTable
