@@ -1,39 +1,75 @@
 import type { Project } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
-import { BaseRepo, camelize, type Paginated } from './base.js';
+import { z } from 'zod';
+import { BaseRepo, type Paginated } from './base.js';
+
+const ProjectRowSchema = z.object({
+  id: z.string(),
+  workspace_id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+const CountSchema = z.object({ count: z.number().int().nonnegative() });
+
+function toProject(row: unknown): Project {
+  const value = ProjectRowSchema.parse(row);
+  return {
+    id: value.id,
+    workspaceId: value.workspace_id,
+    name: value.name,
+    description: value.description,
+    createdAt: value.created_at,
+    updatedAt: value.updated_at,
+  };
+}
 
 export class ProjectRepo extends BaseRepo<Project> {
   constructor(db: Database.Database) {
     super(db, 'projects');
   }
 
+  override findById(id: string): Project | null {
+    const row = this.db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+    return row ? toProject(row) : null;
+  }
+
+  override findMany(opts: { page: number; pageSize: number }): Paginated<Project> {
+    const total = CountSchema.parse(this.db.prepare('SELECT COUNT(*) AS count FROM projects').get()).count;
+    const rows = this.db.prepare('SELECT * FROM projects LIMIT ? OFFSET ?')
+      .all(opts.pageSize, (opts.page - 1) * opts.pageSize);
+    return { items: rows.map(toProject), total };
+  }
+
   findByWorkspaceId(workspaceId: string): Project[] {
     return this.db.prepare('SELECT * FROM projects WHERE workspace_id = ?')
       .all(workspaceId)
-      .map((row) => camelize(row as Record<string, unknown>) as unknown as Project);
+      .map(toProject);
   }
 
   findByWorkspaceIdInOrg(workspaceId: string, organizationId: string): Project[] {
     return this.db.prepare(
       `SELECT p.* FROM projects p JOIN workspaces w ON w.id = p.workspace_id
        WHERE p.workspace_id = ? AND w.org_id = ? ORDER BY p.created_at DESC`,
-    ).all(workspaceId, organizationId).map((row) => camelize(row as Record<string, unknown>) as unknown as Project);
+    ).all(workspaceId, organizationId).map(toProject);
   }
 
   findByIdInOrg(id: string, organizationId: string): Project | null {
     const row = this.db.prepare(
       `SELECT p.* FROM projects p JOIN workspaces w ON w.id = p.workspace_id
        WHERE p.id = ? AND w.org_id = ?`,
-    ).get(id, organizationId) as Record<string, unknown> | undefined;
-    return row ? camelize(row) as unknown as Project : null;
+    ).get(id, organizationId);
+    return row ? toProject(row) : null;
   }
 
   findManyInOrg(organizationId: string, opts: { page: number; pageSize: number }): Paginated<Project> {
     const joins = ' FROM projects p JOIN workspaces w ON w.id = p.workspace_id WHERE w.org_id = ?';
-    const total = (this.db.prepare(`SELECT COUNT(*) AS count${joins}`).get(organizationId) as { count: number }).count;
+    const total = CountSchema.parse(this.db.prepare(`SELECT COUNT(*) AS count${joins}`).get(organizationId)).count;
     const rows = this.db.prepare(`SELECT p.*${joins} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`)
-      .all(organizationId, opts.pageSize, (opts.page - 1) * opts.pageSize) as Array<Record<string, unknown>>;
-    return { items: rows.map((row) => camelize(row) as unknown as Project), total };
+      .all(organizationId, opts.pageSize, (opts.page - 1) * opts.pageSize);
+    return { items: rows.map(toProject), total };
   }
 
   createInOrg(data: { workspaceId: string; name: string; description?: string }, organizationId: string): Project | null {
