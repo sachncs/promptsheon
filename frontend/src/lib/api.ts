@@ -270,6 +270,29 @@ export interface Release {
   canaryPercent: number;
 }
 
+export type ApprovalVote = 'approve' | 'reject';
+
+export interface ApprovalEntry {
+  userId: string;
+  vote: ApprovalVote;
+  comment: string;
+  createdAt: string;
+}
+
+export interface ApprovalSummary {
+  releaseId: string;
+  manifestHash?: string | undefined;
+  distinctApprovers: number;
+  approvals: ApprovalEntry[];
+}
+
+export interface PendingApprovalSummary {
+  releaseId: string;
+  manifestHash: string;
+  approvals: ApprovalEntry[];
+  updatedAt: string;
+}
+
 const CostRollupSchema = z.object({
   capabilityId: z.string(),
   day: z.string(),
@@ -446,6 +469,27 @@ const ReleaseSchema = z.object({
   createdBy: z.string(),
   activatedAt: z.string().nullable(),
   canaryPercent: z.number().int().min(0).max(100),
+});
+
+const ApprovalEntrySchema = z.object({
+  userId: z.string(),
+  vote: z.enum(['approve', 'reject']),
+  comment: z.string(),
+  createdAt: z.string(),
+});
+
+const ApprovalSummarySchema = z.object({
+  releaseId: z.string(),
+  manifestHash: z.string().optional(),
+  distinctApprovers: z.number().int().nonnegative(),
+  approvals: z.array(ApprovalEntrySchema),
+});
+
+const PendingApprovalSummarySchema = z.object({
+  releaseId: z.string(),
+  manifestHash: z.string(),
+  approvals: z.array(ApprovalEntrySchema),
+  updatedAt: z.string(),
 });
 
 function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
@@ -930,8 +974,19 @@ export const preconditionApi = {
 };
 
 export const approvalApi = {
-  list: (releaseId: string) => client.get('/approvals', { params: { releaseId } }),
-  listPending: () => client.get('/approvals/pending'),
+  list: async (releaseId: string): Promise<{ data: ApprovalSummary }> => {
+    const r = await client.get<unknown>('/approvals', { params: { releaseId } });
+    const parsed = ApprovalSummarySchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid approval data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  listPending: async (): Promise<{ data: { approvals: PendingApprovalSummary[] } }> => {
+    const r = await client.get<unknown>('/approvals/pending');
+    if (!r.data || typeof r.data !== 'object') throw new ApiError('The server returned invalid pending approvals.', { code: 'INVALID_RESPONSE' });
+    const parsed = z.object({ approvals: z.array(PendingApprovalSummarySchema) }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid pending approvals.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
   vote: (releaseId: string, data: { decision: 'approve' | 'reject'; comment?: string }) =>
     client.post(`/releases/${releaseId}/approvals`, data),
 };

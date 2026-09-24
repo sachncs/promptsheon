@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ShieldCheck, ShieldAlert } from 'lucide-react';
-import { approvalApi, releaseApi, unwrapList } from '@/lib/api';
+import { approvalApi, releaseApi, type ApprovalEntry, type Release } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -16,21 +16,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { QueryError } from '@/components/brand/query-error';
 
-interface ReleaseDetail {
-  id: string;
-  capabilityId?: string;
-  capabilityName?: string;
-  capabilityVersion?: number;
-  environment?: string;
-  state?: string;
-  manifestHash?: string;
-  canaryPercent?: number;
-  approvals?: Array<{ userId: string; vote: 'approve' | 'reject'; comment?: string; createdAt: string }>;
-  createdBy?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
 export default function ReleaseApprovalPage() {
   const session = useRequireSession();
   const params = useParams<{ releaseId: string }>();
@@ -39,13 +24,13 @@ export default function ReleaseApprovalPage() {
 
   const release = useQuery({
     queryKey: ['release', releaseId],
-    queryFn: () => releaseApi.get(releaseId).then((r) => r.data as ReleaseDetail),
+    queryFn: () => releaseApi.get(releaseId).then((r) => r.data),
     enabled: Boolean(releaseId),
     retry: false,
   });
   const approvals = useQuery({
     queryKey: ['approvals', releaseId],
-    queryFn: () => approvalApi.list(releaseId).then((r) => unwrapList<NonNullable<ReleaseDetail['approvals']>[number]>(r.data)),
+    queryFn: () => approvalApi.list(releaseId).then((r) => r.data.approvals),
     enabled: Boolean(releaseId),
   });
 
@@ -68,8 +53,8 @@ export default function ReleaseApprovalPage() {
 
   if (!session) return null;
 
-  const data = release.data;
-  const approvalRows = approvals.data ?? [];
+  const data: Release | undefined = release.data;
+  const approvalRows: ApprovalEntry[] = approvals.data ?? [];
   const seen = new Set<string>();
   const dedup = approvalRows.filter((a) => {
     const key = `${a.userId}:${a.vote}:${a.createdAt}`;
@@ -88,12 +73,12 @@ export default function ReleaseApprovalPage() {
 
       <PageHeader
         eyebrow="Approval"
-        title={data?.capabilityName ? `${data.capabilityName} v${data.capabilityVersion ?? '?'}` : 'Release approval'}
-        subtitle={data?.environment ? `${data.environment} · ${data.state ?? '—'}` : 'Approve or reject this release.'}
+        title={data ? `Release v${data.capabilityVersion}` : 'Release approval'}
+        subtitle={data ? `${data.environment} · ${data.status}` : 'Approve or reject this release.'}
         actions={
           <div className="flex items-center gap-2">
-            {data?.state ? <StatusPill kind={statusKindOf(data.state)} /> : null}
-            {data?.manifestHash ? <HashChip hash={data.manifestHash} /> : null}
+            {data?.status ? <StatusPill kind={statusKindOf(data.status)} /> : null}
+            {data ? <HashChip hash={data.id} /> : null}
           </div>
         }
       />
