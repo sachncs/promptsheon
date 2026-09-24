@@ -61,7 +61,7 @@ describe('GET /api/capability-versions/:versionId/manifest', () => {
     app.addHook('onRequest', async (request) => {
       (request as unknown as { agentOrgId: string }).agentOrgId = 'o1';
     });
-    registerVersionRoutes(app, repo, manifestRepo, db);
+    registerVersionRoutes(app, repo, manifestRepo);
     await app.ready();
     const r = await app.inject({ method: 'GET', url: `/api/capability-versions/${created.id}/manifest` });
     expect(r.statusCode).toBe(200);
@@ -77,7 +77,7 @@ describe('GET /api/capability-versions/:versionId/manifest', () => {
     app.addHook('onRequest', async (request) => {
       (request as unknown as { agentOrgId: string }).agentOrgId = 'legacy';
     });
-    registerVersionRoutes(app, new VersionRepo(db), manifestRepo, db);
+    registerVersionRoutes(app, new VersionRepo(db), manifestRepo);
     await app.ready();
     const r = await app.inject({ method: 'GET', url: '/api/capability-versions/missing/manifest' });
     expect(r.statusCode).toBe(404);

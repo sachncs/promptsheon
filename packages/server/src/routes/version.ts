@@ -36,7 +36,6 @@ export function registerVersionRoutes(
   app: FastifyInstance,
   repo: VersionRepo,
   manifestRepo: ManifestRepo,
-  db?: import('better-sqlite3').Database,
 ) {
   app.get('/api/capability-versions', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);

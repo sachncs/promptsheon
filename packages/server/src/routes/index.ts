@@ -181,7 +181,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerWorkspaceRoutes(app, new WorkspaceService(deps.workspaceRepo));
   registerProjectRoutes(app, new ProjectService(deps.projectRepo));
   registerCapabilityRoutes(app, new CapabilityService(deps.capabilityRepo));
-  registerVersionRoutes(app, deps.versionRepo, deps.manifestRepo, deps.db);
+  registerVersionRoutes(app, deps.versionRepo, deps.manifestRepo);
   registerReleaseRoutes(app, deps.releaseRepo, {
     manifestRepo: deps.manifestRepo,
     auditChain: deps.auditChain,
