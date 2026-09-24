@@ -77,9 +77,6 @@ describe('bootstrap routes', () => {
     const settings = new SettingsResolver({}, {}, new SystemConfigRepo(db));
     const vault = new VaultRepo(db, new LocalKms(db));
     const service = new LlmSettingsService(settings, vault, users, memberships);
-    const previousKey = process.env['OPENAI_API_KEY'];
-    const previousAnthropicKey = process.env['ANTHROPIC_API_KEY'];
-
     await service.save({ provider: 'openai', model: 'gpt-4o-mini', apiKey: 'sk-test-secret' });
 
     const stored = db.prepare('SELECT value FROM system_config WHERE key = ?').get('llm.openaiApiKey') as { value: string };
@@ -95,7 +92,7 @@ describe('bootstrap routes', () => {
     };
     await service.hydrateConfig(config);
     expect(config.llm.defaultModel).toBe('gpt-4o-mini');
-    expect(process.env['OPENAI_API_KEY']).toBe('sk-test-secret');
+    expect(config.llm.credentials?.openaiApiKey).toBe('sk-test-secret');
 
     await settings.set('llm.anthropicApiKey', 'legacy-secret', user.id);
     expect(await service.hasCredentials('anthropic')).toBe(true);
@@ -103,10 +100,6 @@ describe('bootstrap routes', () => {
     expect(migrated.value).toBe(`"vault://${org.id}/llm-anthropic-api-key"`);
     expect(vault.resolve(org.id, 'llm-anthropic-api-key')).toBe('legacy-secret');
 
-    if (previousKey === undefined) delete process.env['OPENAI_API_KEY'];
-    else process.env['OPENAI_API_KEY'] = previousKey;
-    if (previousAnthropicKey === undefined) delete process.env['ANTHROPIC_API_KEY'];
-    else process.env['ANTHROPIC_API_KEY'] = previousAnthropicKey;
     db.close();
   });
 });

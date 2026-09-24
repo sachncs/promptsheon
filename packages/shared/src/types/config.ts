@@ -1,3 +1,14 @@
+export interface LlmCredentials {
+  openaiApiKey?: string;
+  anthropicApiKey?: string;
+  customApiKey?: string;
+  bedrock?: {
+    region: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+  };
+}
+
 export interface AppConfig {
   server: {
     port: number;
@@ -17,6 +28,7 @@ export interface AppConfig {
     maxRetries: number;
     timeoutMs: number;
     baseUrl?: string;
+    credentials?: LlmCredentials;
   };
   auth: {
     enabled: boolean;

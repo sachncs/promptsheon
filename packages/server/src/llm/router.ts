@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { LlmCredentials } from '@promptsheon/shared';
 
 export const LlmProbeRequestSchema = z.object({
   provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom']),
@@ -44,6 +45,8 @@ export interface LlmCompleteResult {
 }
 
 export class LlmRouter {
+  constructor(private readonly credentials?: LlmCredentials) {}
+
   async probe(req: LlmProbeRequest): Promise<LlmProbeResult> {
     const started = Date.now();
     switch (req.provider) {
@@ -98,7 +101,7 @@ export class LlmRouter {
 
   private async completeOpenai(req: LlmCompleteRequest, promptTokens: number): Promise<string> {
     const base = (req.baseUrl ?? process.env['OPENAI_BASE_URL'] ?? 'https://api.openai.com').replace(/\/$/, '');
-    const apiKey = req.apiKey ?? process.env['OPENAI_API_KEY'] ?? '';
+    const apiKey = req.apiKey ?? this.credentials?.openaiApiKey ?? process.env['OPENAI_API_KEY'] ?? '';
     if (!apiKey) throw new Error('OpenAI API key missing');
     const res = await fetch(`${base}/v1/chat/completions`, {
       method: 'POST',
@@ -136,7 +139,7 @@ export class LlmRouter {
 
   private async completeAnthropic(req: LlmCompleteRequest, promptTokens: number): Promise<string> {
     const base = (req.baseUrl ?? process.env['ANTHROPIC_BASE_URL'] ?? 'https://api.anthropic.com').replace(/\/$/, '');
-    const apiKey = req.apiKey ?? process.env['ANTHROPIC_API_KEY'] ?? '';
+    const apiKey = req.apiKey ?? this.credentials?.anthropicApiKey ?? process.env['ANTHROPIC_API_KEY'] ?? '';
     if (!apiKey) throw new Error('Anthropic API key missing');
     const res = await fetch(`${base}/v1/messages`, {
       method: 'POST',

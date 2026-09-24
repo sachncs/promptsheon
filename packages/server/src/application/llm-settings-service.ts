@@ -1,4 +1,4 @@
-import type { AppConfig } from '@promptsheon/shared';
+import type { AppConfig, LlmCredentials } from '@promptsheon/shared';
 import type { MembershipRepo } from '../repos/org.js';
 import type { UserRepo } from '../repos/user.js';
 import type { VaultRepo } from '../repos/vault.js';
@@ -17,15 +17,14 @@ export interface LlmSettingsInput {
 interface SecretDefinition {
   settingKey: string;
   vaultName: string;
-  environmentKey: string;
 }
 
 const SECRET_DEFINITIONS: Record<string, SecretDefinition> = {
-  'llm.openaiApiKey': { settingKey: 'llm.openaiApiKey', vaultName: 'llm-openai-api-key', environmentKey: 'OPENAI_API_KEY' },
-  'llm.anthropicApiKey': { settingKey: 'llm.anthropicApiKey', vaultName: 'llm-anthropic-api-key', environmentKey: 'ANTHROPIC_API_KEY' },
-  'llm.customApiKey': { settingKey: 'llm.customApiKey', vaultName: 'llm-custom-api-key', environmentKey: 'LLM_CUSTOM_KEY' },
-  'llm.bedrockAccessKeyId': { settingKey: 'llm.bedrockAccessKeyId', vaultName: 'llm-bedrock-access-key-id', environmentKey: 'AWS_ACCESS_KEY_ID' },
-  'llm.bedrockSecretAccessKey': { settingKey: 'llm.bedrockSecretAccessKey', vaultName: 'llm-bedrock-secret-access-key', environmentKey: 'AWS_SECRET_ACCESS_KEY' },
+  'llm.openaiApiKey': { settingKey: 'llm.openaiApiKey', vaultName: 'llm-openai-api-key' },
+  'llm.anthropicApiKey': { settingKey: 'llm.anthropicApiKey', vaultName: 'llm-anthropic-api-key' },
+  'llm.customApiKey': { settingKey: 'llm.customApiKey', vaultName: 'llm-custom-api-key' },
+  'llm.bedrockAccessKeyId': { settingKey: 'llm.bedrockAccessKeyId', vaultName: 'llm-bedrock-access-key-id' },
+  'llm.bedrockSecretAccessKey': { settingKey: 'llm.bedrockSecretAccessKey', vaultName: 'llm-bedrock-secret-access-key' },
 };
 
 /** Owns durable provider configuration and keeps credentials out of system_config. */
@@ -36,6 +35,8 @@ export class LlmSettingsService {
     private readonly users: UserRepo,
     private readonly memberships: MembershipRepo,
   ) {}
+
+  private runtimeConfig: AppConfig | undefined;
 
   async save(input: LlmSettingsInput, updatedBy = 'bootstrap'): Promise<void> {
     const orgId = this.adminOrganizationId();
@@ -56,17 +57,18 @@ export class LlmSettingsService {
       await this.saveSecret('llm.bedrockSecretAccessKey', input.bedrock.secretAccessKey, orgId, actorId);
       await this.settings.set('llm.bedrockRegion', input.bedrock.region, actorId);
     }
-    await this.hydrateEnvironment();
+    if (this.runtimeConfig) await this.hydrateConfig(this.runtimeConfig);
   }
 
   async hydrateConfig(config: AppConfig): Promise<void> {
+    this.runtimeConfig = config;
     const provider = await this.settings.get<string>('llm.provider');
     const model = await this.settings.get<string>('llm.model');
     if (provider) config.llm.defaultProvider = provider;
     if (model) config.llm.defaultModel = model;
     const baseUrl = await this.settings.get<string>('llm.baseUrl');
     if (baseUrl) config.llm.baseUrl = baseUrl;
-    await this.hydrateEnvironment();
+    config.llm.credentials = await this.readCredentials();
   }
 
   async hasCredentials(provider: string | undefined): Promise<boolean> {
@@ -80,15 +82,23 @@ export class LlmSettingsService {
     return false;
   }
 
-  private async hydrateEnvironment(): Promise<void> {
-    for (const definition of Object.values(SECRET_DEFINITIONS)) {
-      const value = await this.readSecret(definition.settingKey);
-      if (value) process.env[definition.environmentKey] = value;
+  private async readCredentials(): Promise<LlmCredentials> {
+    const [openaiApiKey, anthropicApiKey, customApiKey, accessKeyId, secretAccessKey, region] = await Promise.all([
+      this.readSecret('llm.openaiApiKey'),
+      this.readSecret('llm.anthropicApiKey'),
+      this.readSecret('llm.customApiKey'),
+      this.readSecret('llm.bedrockAccessKeyId'),
+      this.readSecret('llm.bedrockSecretAccessKey'),
+      this.settings.get<string>('llm.bedrockRegion'),
+    ]);
+    const credentials: LlmCredentials = {};
+    if (openaiApiKey) credentials.openaiApiKey = openaiApiKey;
+    if (anthropicApiKey) credentials.anthropicApiKey = anthropicApiKey;
+    if (customApiKey) credentials.customApiKey = customApiKey;
+    if (accessKeyId && secretAccessKey && region) {
+      credentials.bedrock = { region, accessKeyId, secretAccessKey };
     }
-    const region = await this.settings.get<string>('llm.bedrockRegion');
-    if (region) process.env['AWS_DEFAULT_REGION'] = region;
-    const baseUrl = await this.settings.get<string>('llm.baseUrl');
-    if (baseUrl) process.env['LLM_BASE_URL'] = baseUrl;
+    return credentials;
   }
 
   private async saveSecret(settingKey: string, value: string, orgId: string, updatedBy: string): Promise<void> {

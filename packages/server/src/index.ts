@@ -186,7 +186,7 @@ async function main() {
   const compiler = new ReasoningCompiler(config);
   const planner = new IdeaPlannerAgent(config);
   const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo: repos.manifest });
-  const llmRouter = new LlmRouter();
+  const llmRouter = new LlmRouter(config.llm.credentials);
   const autoEval = new AutoEval({ traceRepo: repos.trace, scoreRepo: repos.traceScore, router: llmRouter });
   const gateway = new Gateway({
     cache: new ResponseCache(2048),
