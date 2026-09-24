@@ -168,6 +168,27 @@ export interface MergeRequestComment {
   createdAt: string;
 }
 
+export interface CapabilityVersion {
+  id: string;
+  capabilityId: string;
+  version: number;
+  manifest: string;
+  manifestHash: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface CapabilityManifestResponse {
+  id: string;
+  hash: string;
+  manifest: unknown;
+  capabilityId: string;
+  capabilityVersion: number;
+  createdAt: string;
+  createdBy: string;
+  size: number;
+}
+
 const CostRollupSchema = z.object({
   capabilityId: z.string(),
   day: z.string(),
@@ -248,6 +269,27 @@ const MergeRequestCommentSchema = z.object({
   path: z.string().nullable(),
   body: z.string(),
   createdAt: z.string(),
+});
+
+const CapabilityVersionSchema = z.object({
+  id: z.string(),
+  capabilityId: z.string(),
+  version: z.number().int().positive(),
+  manifest: z.string(),
+  manifestHash: z.string(),
+  createdAt: z.string(),
+  createdBy: z.string(),
+});
+
+const CapabilityManifestResponseSchema = z.object({
+  id: z.string(),
+  hash: z.string(),
+  manifest: z.unknown(),
+  capabilityId: z.string(),
+  capabilityVersion: z.number().int().positive(),
+  createdAt: z.string(),
+  createdBy: z.string(),
+  size: z.number().int().nonnegative(),
 });
 
 function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
@@ -334,6 +376,24 @@ function parseMergeRequestDetail(raw: unknown): {
     throw new ApiError('The server returned invalid merge request details.', { code: 'INVALID_RESPONSE' });
   }
   return { mr, approvals, comments };
+}
+
+function parseCapabilityVersions(raw: unknown): CapabilityVersion[] {
+  return unwrapList<unknown>(raw).map((entry) => {
+    const parsed = CapabilityVersionSchema.safeParse(entry);
+    if (!parsed.success) {
+      throw new ApiError('The server returned invalid capability version data.', { code: 'INVALID_RESPONSE' });
+    }
+    return parsed.data;
+  });
+}
+
+function parseCapabilityManifest(raw: unknown): CapabilityManifestResponse {
+  const parsed = CapabilityManifestResponseSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ApiError('The server returned invalid capability manifest data.', { code: 'INVALID_RESPONSE' });
+  }
+  return parsed.data;
 }
 
 const WorkspaceRowSchema = z.object({
@@ -458,8 +518,16 @@ export const capabilityApi = {
 };
 
 export const versionApi = {
-  list: (capabilityId: string) => client.get('/capability-versions', { params: { capabilityId } }),
-  get: (id: string) => client.get(`/capability-versions/${id}`),
+  list: async (capabilityId: string): Promise<{ data: CapabilityVersion[] }> => {
+    const r = await client.get<unknown>('/capability-versions', { params: { capabilityId } });
+    return { data: parseCapabilityVersions(r.data) };
+  },
+  get: async (id: string): Promise<{ data: CapabilityVersion }> => {
+    const r = await client.get<unknown>(`/capability-versions/${id}`);
+    const parsed = CapabilityVersionSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid capability version data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
   create: (data: { capabilityId: string; version: number; manifest: string; manifestHash: string; createdBy?: string }) =>
     client.post('/capability-versions', data),
 };
@@ -634,7 +702,10 @@ export const selfEvolveApi = {
 };
 
 export const manifestApi = {
-  get: (versionId: string) => client.get(`/capability-versions/${versionId}/manifest`),
+  get: async (versionId: string): Promise<{ data: CapabilityManifestResponse }> => {
+    const r = await client.get<unknown>(`/capability-versions/${versionId}/manifest`);
+    return { data: parseCapabilityManifest(r.data) };
+  },
   getByHash: (hash: string) => client.get(`/manifests/${hash}`),
   create: (data: unknown) => client.post('/manifests', data),
 };

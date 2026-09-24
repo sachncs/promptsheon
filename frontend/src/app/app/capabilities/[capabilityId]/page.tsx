@@ -132,11 +132,11 @@ export default function CapabilityDetailPage() {
                 <EmptyState icon={Box} title="No versions yet" description="Compile a draft to create the first version." />
               ) : (
                 <Timeline
-                  entries={versionList.slice(0, 6).map((v: Record<string, unknown>) => ({
-                    id: String(v['id']),
-                    title: `v${String(v['version'] ?? '?')}`,
-                    description: String(v['summary'] ?? 'Compiled'),
-                    timestamp: new Date(String(v['createdAt'] ?? Date.now())).toLocaleString(),
+                  entries={versionList.slice(0, 6).map((v) => ({
+                    id: v.id,
+                    title: `v${v.version}`,
+                    description: 'Compiled',
+                    timestamp: new Date(v.createdAt).toLocaleString(),
                     icon: GitBranch,
                     tone: 'info',
                   }))}
@@ -152,17 +152,17 @@ export default function CapabilityDetailPage() {
             <DataTable
               className="rounded-none border-0 border-t border-border-subtle"
               rows={versionList}
-              rowKey={(r: Record<string, unknown>) => String(r['id'])}
+              rowKey={(r) => r.id}
               columns={[
-                { key: 'v', header: 'Version', render: (r: Record<string, unknown>) => <span className="font-mono text-xs">v{String(r['version'] ?? '?')}</span> },
-                { key: 'hash', header: 'Hash', render: (r: Record<string, unknown>) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} /> },
-                { key: 'author', header: 'Author', render: (r: Record<string, unknown>) => String(r['createdBy'] ?? 'system') },
-                { key: 'created', header: 'Created', render: (r: Record<string, unknown>) => new Date(String(r['createdAt'] ?? Date.now())).toLocaleString() },
+                { key: 'v', header: 'Version', render: (r) => <span className="font-mono text-xs">v{r.version}</span> },
+                { key: 'hash', header: 'Hash', render: (r) => <HashChip hash={r.manifestHash || r.id} /> },
+                { key: 'author', header: 'Author', render: (r) => r.createdBy || 'system' },
+                { key: 'created', header: 'Created', render: (r) => new Date(r.createdAt).toLocaleString() },
                 {
                   key: 'actions',
                   header: '',
-                  render: (r: Record<string, unknown>) => (
-                    <Link href={`/app/diff?capability=${id}&version=${String(r['version'] ?? '')}`} className="text-xs text-brand-highlight hover:underline">
+                  render: (r) => (
+                    <Link href={`/app/diff?capability=${id}&version=${r.version}`} className="text-xs text-brand-highlight hover:underline">
                       Diff
                     </Link>
                   ),
@@ -176,8 +176,8 @@ export default function CapabilityDetailPage() {
           <Surface>
             <SurfaceHeader title="Multi-agent DAG" description="The structure of this capability: agents, tools, memory, policies, and the edges between them." />
             <DagMini
-              nodes={nodesForManifest(manifest.data as Record<string, unknown> | null)}
-              edges={edgesForManifest(manifest.data as Record<string, unknown> | null)}
+              nodes={nodesForManifest(recordOf(manifest.data?.manifest))}
+              edges={edgesForManifest(recordOf(manifest.data?.manifest))}
               className="mt-3 rounded-lg border border-border-subtle bg-surface-0"
             />
           </Surface>
@@ -213,6 +213,12 @@ function Detail({ label, value, mono }: { label: string; value: React.ReactNode;
       <dd className={mono ? 'font-mono text-xs text-text-default' : 'text-sm text-text-default'}>{value}</dd>
     </div>
   );
+}
+
+function recordOf(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
 }
 
 interface ManifestLike { nodes?: Array<{ id: string; label?: string }>; edges?: Array<{ from: string; to: string }> }
