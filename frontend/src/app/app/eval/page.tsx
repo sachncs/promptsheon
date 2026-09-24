@@ -54,15 +54,15 @@ export default function EvalListPage() {
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
             rows={rows}
-            rowKey={(r: Record<string, unknown>) => String(r['id'])}
-            onRowClick={(r) => { router.push(`/app/eval/${String(r['id'])}`); }}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => { router.push(`/app/eval/${r.id}`); }}
             columns={[
-              { key: 'release', header: 'Release', render: (r) => String(r['releaseId'] ?? '—') },
-              { key: 'dataset', header: 'Dataset', render: (r) => String(r['datasetId'] ?? '—') },
-              { key: 'scorer', header: 'Scorer', render: (r) => String(r['scorer'] ?? '—') },
-              { key: 'score', header: 'Score', render: (r) => r['score'] != null ? `${(Number(r['score']) * 100).toFixed(0)}%` : '—' },
-              { key: 'state', header: 'Status', render: (r) => <StatusPill kind={statusKindOf(r['status'], 'pending')} /> },
-              { key: 'started', header: 'Started', render: (r) => new Date(String(r['startedAt'] ?? r['createdAt'] ?? Date.now())).toLocaleString() },
+              { key: 'release', header: 'Release', render: (r) => r.releaseId },
+              { key: 'dataset', header: 'Dataset', render: (r) => r.datasetId },
+              { key: 'scorer', header: 'Scorer', render: (r) => r.scorer },
+              { key: 'score', header: 'Score', render: (r) => `${(r.score * 100).toFixed(0)}%` },
+              { key: 'state', header: 'Status', render: (r) => <StatusPill kind={statusKindOf(r.status, 'pending')} /> },
+              { key: 'started', header: 'Started', render: (r) => new Date(r.startedAt).toLocaleString() },
             ]}
           />
         </Surface>

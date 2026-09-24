@@ -499,6 +499,10 @@ function parseEvalRun(raw: unknown): EvalRun {
   return parsed.data;
 }
 
+function parseEvalRuns(raw: unknown): EvalRun[] {
+  return unwrapList<unknown>(raw).map(parseEvalRun);
+}
+
 function parseEvalResults(raw: unknown): EvalResult[] {
   return unwrapList<unknown>(raw).map((entry) => {
     const parsed = EvalResultSchema.safeParse(entry);
@@ -877,7 +881,10 @@ export const datasetApi = {
 };
 
 export const evalApi = {
-  list: (releaseId?: string) => client.get('/eval-runs', { params: { releaseId } }),
+  list: async (releaseId?: string): Promise<{ data: EvalRun[] }> => {
+    const r = await client.get<unknown>('/eval-runs', { params: { releaseId } });
+    return { data: parseEvalRuns(r.data) };
+  },
   get: async (id: string): Promise<{ data: EvalRun }> => {
     const r = await client.get<unknown>(`/eval-runs/${id}`);
     return { data: parseEvalRun(r.data) };
