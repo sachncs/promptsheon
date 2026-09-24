@@ -1,0 +1,56 @@
+---
+const audiences = [
+  {
+    role: 'Platform & AI engineering',
+    title: 'Turn agent behaviour into a release artifact.',
+    body: 'Keep prompts, tools, policies, models, and runtime limits together in a versioned manifest your team can review, reproduce, and promote.',
+    signal: 'Less tribal knowledge',
+  },
+  {
+    role: 'Product & application teams',
+    title: 'Ship useful behaviour without guessing.',
+    body: 'Compare candidate versions against real datasets, watch the metrics that matter, and move from a promising demo to a controlled canary.',
+    signal: 'Shorter feedback loops',
+  },
+  {
+    role: 'Security, risk & operations',
+    title: 'Know what changed when production changes.',
+    body: 'Use approvals, Cedar policies, hash-linked audit history, health checks, and rollback to make AI operations accountable and recoverable.',
+    signal: 'Evidence at every step',
+  },
+];
+---
+
+<section id="audience" class="ps-section border-t border-[var(--line)] bg-[var(--bg-subtle)]">
+  <div class="ps-container">
+    <div class="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
+      <div class="lg:sticky lg:top-28 lg:self-start">
+        <div class="ps-reveal ps-eyebrow">Who it is for</div>
+        <h2 class="ps-reveal ps-display mt-4 text-display-lg" style="--reveal-delay: 80ms">
+          The handoff from demo to dependable system.
+        </h2>
+        <p class="ps-reveal mt-5 max-w-md text-[16.5px] leading-relaxed text-[var(--ink-muted)] text-pretty" style="--reveal-delay: 160ms">
+          Promptsheon gives the people building AI systems a shared language for
+          intent, evidence, approval, and change. It is the layer that makes the
+          work legible to everyone else who has to operate it.
+        </p>
+        <a href="/docs/architecture/" class="ps-reveal mt-7 inline-flex items-center gap-2 text-[13.5px] font-medium text-[var(--accent)] hover:underline" style="--reveal-delay: 220ms">
+          See the architecture <span aria-hidden="true">→</span>
+        </a>
+      </div>
+
+      <div class="grid gap-4">
+        {audiences.map((audience, i) => (
+          <article class="ps-card ps-reveal group p-6 sm:p-7" style={`--reveal-delay: ${i * 80}ms`}>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <span class="ps-eyebrow">{audience.role}</span>
+              <span class="rounded-full border border-[var(--line)] bg-[var(--bg-subtle)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-subtle)]">{audience.signal}</span>
+            </div>
+            <h3 class="mt-5 max-w-xl text-[21px] font-semibold tracking-tight text-[var(--ink-strong)]">{audience.title}</h3>
+            <p class="mt-2 max-w-2xl text-[14.5px] leading-relaxed text-[var(--ink-muted)] text-pretty">{audience.body}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
