@@ -16,6 +16,7 @@ import { StatusPill } from '@/components/brand/status-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NewRepositoryDialog } from '@/components/brand/new-repository-dialog';
+import { QueryError } from '@/components/brand/query-error';
 
 interface WorkspaceRow {
   id: string;
@@ -41,6 +42,7 @@ export default function RepositoriesPage() {
       const r = await workspaceApi.list(1);
       return r.data as { workspaces?: WorkspaceRow[] };
     },
+    enabled: Boolean(session),
   });
   const wsList: WorkspaceRow[] = workspaces.data?.workspaces ?? [];
   const wsFirst = wsList[0];
@@ -67,6 +69,14 @@ export default function RepositoriesPage() {
   }, [repos.data, query]);
 
   if (!session) return null;
+
+  if (workspaces.isError) {
+    return <QueryError message={(workspaces.error as Error).message} onRetry={() => void workspaces.refetch()} />;
+  }
+
+  if (repos.isError) {
+    return <QueryError message={(repos.error as Error).message} onRetry={() => void repos.refetch()} />;
+  }
 
   if (!wsFirst && workspaces.isFetched) {
     return (

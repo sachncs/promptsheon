@@ -13,12 +13,17 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function VaultPage() {
   const session = useRequireSession();
   const qc = useQueryClient();
   const { toast } = useToast();
-  const keys = useQuery({ queryKey: ['vault', 'keys'], queryFn: () => vaultApi.listKeys() });
+  const keys = useQuery({
+    queryKey: ['vault', 'keys'],
+    queryFn: () => vaultApi.listKeys(),
+    enabled: Boolean(session),
+  });
   const rotate = useMutation({
     mutationFn: () => vaultApi.rotateKey(`key-${Date.now()}`, true),
     onSuccess: () => {
@@ -40,6 +45,12 @@ export default function VaultPage() {
     },
     onError: (err) => toast({ title: 'Write failed', variant: 'destructive', description: (err as Error).message }),
   });
+
+  if (!session) return null;
+
+  if (keys.isError) {
+    return <QueryError message={(keys.error as Error).message} onRetry={() => void keys.refetch()} />;
+  }
 
   return (
     <div className="space-y-6">

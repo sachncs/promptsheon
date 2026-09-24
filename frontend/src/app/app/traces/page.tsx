@@ -12,6 +12,7 @@ import { HashChip } from '@/components/brand/hash-chip';
 import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { ThemedSelect } from '@/components/brand/themed-select';
+import { QueryError } from '@/components/brand/query-error';
 import type { LucideIcon } from 'lucide-react';
 
 export default function TracesPage() {
@@ -40,6 +41,14 @@ export default function TracesPage() {
   });
 
   if (!session) return null;
+
+  if (traces.isError) {
+    return <QueryError message={(traces.error as Error).message} onRetry={() => void traces.refetch()} />;
+  }
+
+  if (rollup.isError) {
+    return <QueryError message={(rollup.error as Error).message} onRetry={() => void rollup.refetch()} />;
+  }
 
   const runList = traces.data?.items ?? [];
   const total = traces.data?.total ?? 0;
