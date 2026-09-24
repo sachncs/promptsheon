@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { z } from 'zod';
+import { ManifestSchema } from '@promptsheon/shared/validation';
+import type { Manifest } from '@promptsheon/shared';
 import { clearSession, getSession } from './session';
 
 export class ApiError extends Error {
@@ -503,6 +505,11 @@ const PendingApprovalSummarySchema = z.object({
   approvals: z.array(ApprovalEntrySchema),
   updatedAt: z.string(),
 });
+
+function assertManifest(value: unknown): asserts value is Manifest {
+  const parsed = ManifestSchema.safeParse(value);
+  if (!parsed.success) throw new ApiError('The server returned invalid manifest data.', { code: 'INVALID_RESPONSE' });
+}
 
 const AuditEntrySchema = z.object({
   id: z.string(),
@@ -1038,8 +1045,17 @@ export const manifestApi = {
     const r = await client.get<unknown>(`/capability-versions/${versionId}/manifest`);
     return { data: parseCapabilityManifest(r.data) };
   },
-  getByHash: (hash: string) => client.get(`/manifests/${hash}`),
-  create: (data: unknown) => client.post('/manifests', data),
+  getByHash: async (hash: string): Promise<{ data: Manifest }> => {
+    const r = await client.get<unknown>(`/manifests/${encodeURIComponent(hash)}`);
+    assertManifest(r.data);
+    return { data: r.data };
+  },
+  create: async (data: Manifest): Promise<{ data: { hash: string } }> => {
+    const r = await client.post<unknown>('/manifests', data);
+    const parsed = z.object({ hash: z.string().min(1) }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid manifest creation data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
 };
 
 /**

@@ -69,15 +69,17 @@ export default function ManifestEditorPage() {
   const queryClient = useQueryClient();
   const [manifest, setManifest] = React.useState<Manifest>(blankManifest);
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
-  const [validationErrors, setValidationErrors] = React.useState<string[]>([]);
 
   const { data: loaded, isError: loadError, error: loadErrorDetail, refetch: refetchManifest } = useQuery({
     queryKey: ['manifest', hash],
-    queryFn: () => manifestApi.getByHash(hash!).then((r) => r.data as Manifest),
+    queryFn: () => manifestApi.getByHash(hash!).then((r) => r.data),
     enabled: Boolean(session && hash),
   });
 
   React.useEffect(() => {
+    // The query is an external source of truth when opening an existing manifest.
+    // Local edits remain owned by the editor state after the initial hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (loaded) setManifest(loaded);
   }, [loaded]);
 
@@ -104,13 +106,7 @@ export default function ManifestEditorPage() {
     return { nodes: ns, edges: es };
   }, [manifest]);
 
-  const validate = React.useCallback(() => {
-    setValidationErrors(validateDagClient(manifest));
-  }, [manifest]);
-
-  React.useEffect(() => {
-    validate();
-  }, [manifest, validate]);
+  const validationErrors = React.useMemo(() => validateDagClient(manifest), [manifest]);
 
   const handleNodesChange = React.useCallback((updated: Array<{ id: string; data: { name: unknown; goal: unknown } }>) => {
     setManifest((prev) => {
@@ -150,7 +146,7 @@ export default function ManifestEditorPage() {
   }, [manifest.nodes.length]);
 
   const saveMutation = useMutation({
-    mutationFn: () => manifestApi.create(manifest).then((r) => r.data as { hash: string }),
+    mutationFn: () => manifestApi.create(manifest).then((r) => r.data),
     onSuccess: ({ hash: newHash }) => {
       void queryClient.invalidateQueries({ queryKey: ['manifests'] });
       void queryClient.invalidateQueries({ queryKey: ['manifest', newHash] });
