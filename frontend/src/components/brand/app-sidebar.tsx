@@ -212,15 +212,19 @@ export function AppSidebar({
           aria-label="Close navigation"
         />
       )}
-      <aside className={cn(
-        'w-64 shrink-0 flex-col border-r border-border-subtle bg-surface-1',
-        mobileOpen ? 'fixed inset-y-0 left-0 z-50 flex shadow-3 md:static md:z-auto md:shadow-none' : 'hidden md:flex',
-      )}>
-      <div className="flex h-14 items-center border-b border-border-subtle px-4">
-        <Link href="/app" aria-label="Promptsheon home">
-          <Logo size="sm" />
-        </Link>
-      </div>
+      <aside
+        id="app-mobile-navigation"
+        aria-label="Application navigation"
+        className={cn(
+          'w-64 shrink-0 flex-col border-r border-border-subtle bg-surface-1',
+          mobileOpen ? 'fixed inset-y-0 left-0 z-50 flex shadow-3 md:static md:z-auto md:shadow-none' : 'hidden md:flex',
+        )}
+      >
+        <div className="flex h-14 items-center border-b border-border-subtle px-4">
+          <Link href="/app" aria-label="Promptsheon home">
+            <Logo size="sm" />
+          </Link>
+        </div>
 
       {workspaces.isError ? (
         <div className="border-b border-border-subtle p-3">
