@@ -1,5 +1,5 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { NotFoundError } from '@promptsheon/shared';
 import type { TeamRepo, SsoConfigRepo } from '../repos/team.js';
@@ -9,20 +9,12 @@ import type { MembershipRepo } from '../repos/org.js';
 import type { VaultRepo } from '../repos/vault.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 
-interface RequestUserContext {
-  userId?: string;
-  agentOrgId?: string;
-  orgContext?: { organizationId?: string; orgId?: string; role?: string };
+function orgOf(request: FastifyRequest): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
-function orgOf(request: unknown): string | null {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
-}
-
-function actorRole(request: unknown): string {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.role ?? 'reader';
+function actorRole(request: FastifyRequest): string {
+  return request.orgContext?.role ?? 'reader';
 }
 
 const CreateTeamSchema = z.object({
@@ -113,7 +105,7 @@ export function registerTeamRoutes(
     if (!parsed.ok) return;
     const team = deps.teamRepo.create({ organizationId: orgId, ...parsed.data });
     deps.auditChain.append({
-      userId: (request as RequestUserContext).userId ?? 'system',
+      userId: request.userId ?? 'system',
       action: 'team.create',
       resource: 'team',
       details: JSON.stringify({ teamId: team.id, slug: team.slug }),
@@ -135,7 +127,7 @@ export function registerTeamRoutes(
     const member = deps.teamRepo.addMemberInOrg(id, orgId, parsed.data.userId, parsed.data.role);
     if (!member) return reply.code(404).send({ error: { code: 'NOT_FOUND' } });
     deps.auditChain.append({
-      userId: (request as RequestUserContext).userId ?? 'system',
+      userId: request.userId ?? 'system',
       action: 'team.add_member',
       resource: 'team_member',
       details: JSON.stringify({ teamId: id, userId: parsed.data.userId, role: parsed.data.role }),
@@ -155,7 +147,7 @@ export function registerTeamRoutes(
     const ok = deps.teamRepo.removeMemberInOrg(teamId, orgId, userId);
     if (!ok) return reply.code(404).send({ error: { code: 'NOT_FOUND' } });
     deps.auditChain.append({
-      userId: (request as RequestUserContext).userId ?? 'system',
+      userId: request.userId ?? 'system',
       action: 'team.remove_member',
       resource: 'team_member',
       details: JSON.stringify({ teamId, userId }),
@@ -192,7 +184,7 @@ export function registerTeamRoutes(
       orgId,
       'oidc-client-secret',
       parsed.data.clientSecret,
-      (request as RequestUserContext).userId ?? 'system',
+      request.userId ?? 'system',
     );
     deps.ssoConfigRepo.upsert({
       organizationId: orgId,
@@ -207,7 +199,7 @@ export function registerTeamRoutes(
       nameClaim: parsed.data.nameClaim,
     });
     deps.auditChain.append({
-      userId: (request as RequestUserContext).userId ?? 'system',
+      userId: request.userId ?? 'system',
       action: 'sso.config_update',
       resource: 'sso_config',
       details: JSON.stringify({ provider: parsed.data.provider, issuer: parsed.data.issuer }),

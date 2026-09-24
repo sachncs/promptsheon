@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 import type { VaultRepo, Kms } from '../repos/vault.js';
@@ -60,14 +60,14 @@ export interface VaultRouteDeps {
   adminOnly: (request: unknown) => boolean;
 }
 
-function activeOrg(request: { orgContext?: { orgId?: string }; agentOrgId?: string }): string | undefined {
+function activeOrg(request: FastifyRequest): string | undefined {
   return request.orgContext?.orgId ?? request.agentOrgId;
 }
 
 function assertOrgScope(
-  request: { orgContext?: { orgId?: string }; agentOrgId?: string },
+  request: FastifyRequest,
   requestedOrgId: string,
-  reply: { code: (status: number) => { send: (body: unknown) => unknown } },
+  reply: FastifyReply,
 ): boolean {
   const current = activeOrg(request);
   if (current && current !== requestedOrgId) {
@@ -77,9 +77,8 @@ function assertOrgScope(
   return true;
 }
 
-function actorOf(request: unknown): string {
-  const ctx = (request as { userId?: string } | undefined) ?? {};
-  return ctx.userId ?? 'system';
+function actorOf(request: FastifyRequest): string {
+  return request.userId ?? 'system';
 }
 
 function escapeFts(s: string): string {

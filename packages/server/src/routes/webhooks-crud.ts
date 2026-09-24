@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { parseBody, parseParams } from './validate.js';
@@ -83,20 +83,12 @@ export class WebhookCrudStore {
 
 type WebhookStore = Pick<OutgoingWebhookRepo, 'listByOrg' | 'create' | 'update' | 'delete'>;
 
-interface RequestUserContext {
-  userId?: string;
-  agentOrgId?: string;
-  orgContext?: { organizationId?: string; orgId?: string; role?: string };
+function actorOf(request: FastifyRequest): string {
+  return request.userId ?? 'system';
 }
 
-function actorOf(request: unknown): string {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.userId ?? 'system';
-}
-
-function orgOf(request: unknown): string | null {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.orgId ?? ctx.orgContext?.organizationId ?? ctx.agentOrgId ?? null;
+function orgOf(request: FastifyRequest): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
 export function registerWebhookCrudRoutes(

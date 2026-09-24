@@ -48,7 +48,7 @@ function buildApp(sharedStore?: WebhookCrudStore): {
   const auditChain = new AuditChain(db);
   app.addHook('preHandler', (request, _reply, done) => {
     (request as Record<string, unknown>)['userId'] = 'u-test';
-    (request as Record<string, unknown>)['orgContext'] = { organizationId: ORG_A, role: 'admin' };
+    (request as Record<string, unknown>)['orgContext'] = { orgId: ORG_A, role: 'admin' };
     done();
   });
   registerWebhookCrudRoutes(app, { auditChain, store: sharedStore });
@@ -195,7 +195,7 @@ describe('org scoping', () => {
     const appA = Fastify();
     appA.addHook('preHandler', (req, _r, d) => {
       (req as Record<string, unknown>)['userId'] = 'uA';
-      (req as Record<string, unknown>)['orgContext'] = { organizationId: ORG_A, role: 'admin' };
+      (req as Record<string, unknown>)['orgContext'] = { orgId: ORG_A, role: 'admin' };
       d();
     });
     registerWebhookCrudRoutes(appA, {
@@ -217,7 +217,7 @@ describe('org scoping', () => {
     const appB = Fastify();
     appB.addHook('preHandler', (req, _r, d) => {
       (req as Record<string, unknown>)['userId'] = 'uB';
-      (req as Record<string, unknown>)['orgContext'] = { organizationId: ORG_B, role: 'admin' };
+      (req as Record<string, unknown>)['orgContext'] = { orgId: ORG_B, role: 'admin' };
       d();
     });
     registerWebhookCrudRoutes(appB, {
@@ -239,7 +239,7 @@ it('persists subscriptions through the repository across route registrations', a
   const appA = Fastify();
   appA.addHook('preHandler', (req, _reply, done) => {
     (req as Record<string, unknown>)['userId'] = 'u-test';
-    (req as Record<string, unknown>)['orgContext'] = { organizationId: ORG_A, role: 'admin' };
+    (req as Record<string, unknown>)['orgContext'] = { orgId: ORG_A, role: 'admin' };
     done();
   });
   registerWebhookCrudRoutes(appA, { auditChain, repo });
@@ -261,7 +261,7 @@ it('persists subscriptions through the repository across route registrations', a
   const appB = Fastify();
   appB.addHook('preHandler', (req, _reply, done) => {
     (req as Record<string, unknown>)['userId'] = 'u-test';
-    (req as Record<string, unknown>)['orgContext'] = { organizationId: ORG_A, role: 'admin' };
+    (req as Record<string, unknown>)['orgContext'] = { orgId: ORG_A, role: 'admin' };
     done();
   });
   registerWebhookCrudRoutes(appB, { auditChain, repo });

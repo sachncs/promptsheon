@@ -49,7 +49,7 @@ function buildApp(role: 'admin' | 'editor' | 'reader'): { app: FastifyInstance; 
   app.addHook('preHandler', (request, _reply, done) => {
     (request as Record<string, unknown>)['userId'] = 'u-test';
     (request as Record<string, unknown>)['orgContext'] = {
-      organizationId: '00000000-0000-4000-8000-000000000001',
+      orgId: '00000000-0000-4000-8000-000000000001',
       role,
     };
     done();
