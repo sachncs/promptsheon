@@ -176,12 +176,30 @@ export function registerBootstrapRoutes(
     // a populated bedrock for the bedrock case, so narrow the union
     // here.
     const data = parsed.data;
-    const probeInput = data.provider === 'bedrock'
-      ? { provider: 'bedrock' as const, model: data.model, bedrock: data.bedrock!, apiKey: 'unused' }
-      : { provider: data.provider, model: data.model, apiKey: data.apiKey!, ...(data.baseUrl ? { baseUrl: data.baseUrl } : {}) };
+    let probeInput: Parameters<typeof deps.llmRouter.probe>[0];
+    if (data.provider === 'bedrock') {
+      if (!data.bedrock) {
+        return reply.code(422).send({
+          error: { code: 'VALIDATION_ERROR', message: 'Bedrock credentials are required' },
+        });
+      }
+      probeInput = { provider: 'bedrock', model: data.model, bedrock: data.bedrock, apiKey: 'unused' };
+    } else {
+      if (!data.apiKey) {
+        return reply.code(422).send({
+          error: { code: 'VALIDATION_ERROR', message: 'An API key is required for this provider' },
+        });
+      }
+      probeInput = {
+        provider: data.provider,
+        model: data.model,
+        apiKey: data.apiKey,
+        ...(data.baseUrl ? { baseUrl: data.baseUrl } : {}),
+      };
+    }
 
     try {
-      const probe = await deps.llmRouter.probe(probeInput as Parameters<typeof deps.llmRouter.probe>[0]);
+      const probe = await deps.llmRouter.probe(probeInput);
       return reply.send({ ok: true, latencyMs: probe.latencyMs, model: probe.model });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Validation failed';
