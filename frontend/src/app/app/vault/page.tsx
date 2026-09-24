@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 export default function VaultPage() {
   const session = useRequireSession();
@@ -30,7 +31,7 @@ export default function VaultPage() {
       qc.invalidateQueries({ queryKey: ['vault', 'keys'] });
       toast({ title: 'Key rotated', variant: 'success', description: 'Ciphertext re-encrypted with the new key version.' });
     },
-    onError: (err) => toast({ title: 'Rotate failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Rotate failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const [name, setName] = useState('OPENAI_API_KEY');
@@ -43,7 +44,7 @@ export default function VaultPage() {
       qc.invalidateQueries({ queryKey: ['vault', 'keys'] });
       toast({ title: 'Secret stored', variant: 'success', description: `${name} written to the vault.` });
     },
-    onError: (err) => toast({ title: 'Write failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Write failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   if (!session) return null;

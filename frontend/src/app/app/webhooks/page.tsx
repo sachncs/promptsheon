@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 import { useToast } from '@/components/brand/toast';
 
 interface WebhookItem {
@@ -64,7 +65,7 @@ export default function WebhooksPage() {
       setUrl('');
       toast({ title: 'Webhook added', variant: 'success' });
     },
-    onError: (error) => toast({ title: 'Could not add webhook', description: (error as Error).message, variant: 'destructive' }),
+    onError: (error) => toast({ title: 'Could not add webhook', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   const toggle = useMutation({
@@ -73,7 +74,7 @@ export default function WebhooksPage() {
       void qc.invalidateQueries({ queryKey: ['webhooks'] });
       toast({ title: 'Webhook updated', variant: 'success' });
     },
-    onError: (error) => toast({ title: 'Could not update webhook', description: (error as Error).message, variant: 'destructive' }),
+    onError: (error) => toast({ title: 'Could not update webhook', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   const remove = useMutation({
@@ -82,7 +83,7 @@ export default function WebhooksPage() {
       void qc.invalidateQueries({ queryKey: ['webhooks'] });
       toast({ title: 'Webhook deleted', variant: 'success' });
     },
-    onError: (error) => toast({ title: 'Could not delete webhook', description: (error as Error).message, variant: 'destructive' }),
+    onError: (error) => toast({ title: 'Could not delete webhook', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   if (!session) return null;
@@ -145,7 +146,7 @@ export default function WebhooksPage() {
           </Button>
         </div>
         {create.isError && (
-          <div className="mt-3 text-xs text-destructive">{(create.error as Error).message}</div>
+          <div className="mt-3 text-xs text-destructive">{getErrorMessage(create.error)}</div>
         )}
       </Surface>
 

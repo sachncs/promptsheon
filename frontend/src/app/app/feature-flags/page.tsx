@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 import { useToast } from '@/components/brand/toast';
 
 interface FlagItem {
@@ -53,7 +54,7 @@ export default function FeatureFlagsPage() {
       setEditing({});
       toast({ title: 'Feature flag saved', variant: 'success' });
     },
-    onError: (error) => toast({ title: 'Could not save feature flag', description: (error as Error).message, variant: 'destructive' }),
+    onError: (error) => toast({ title: 'Could not save feature flag', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   const toggle = useMutation({
@@ -66,7 +67,7 @@ export default function FeatureFlagsPage() {
       void qc.invalidateQueries({ queryKey: ['feature-flags'] });
       toast({ title: 'Feature flag updated', variant: 'success' });
     },
-    onError: (error) => toast({ title: 'Could not update feature flag', description: (error as Error).message, variant: 'destructive' }),
+    onError: (error) => toast({ title: 'Could not update feature flag', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   if (!session) return null;
@@ -125,7 +126,7 @@ export default function FeatureFlagsPage() {
           </div>
         </div>
         {upsert.isError && (
-          <div className="mt-3 text-xs text-destructive">{(upsert.error as Error).message}</div>
+          <div className="mt-3 text-xs text-destructive">{getErrorMessage(upsert.error)}</div>
         )}
       </Surface>
 

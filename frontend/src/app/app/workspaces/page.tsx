@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 export default function WorkspacesPage() {
   const session = useRequireSession();
@@ -50,7 +51,7 @@ export default function WorkspacesPage() {
         toast({ title: 'Workspace created', variant: 'success' });
       }
     },
-    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const remove = useMutation({
@@ -59,7 +60,7 @@ export default function WorkspacesPage() {
       qc.invalidateQueries({ queryKey: ['workspaces'] });
       toast({ title: 'Workspace deleted', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Delete failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Delete failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   if (!session) return null;
@@ -107,7 +108,7 @@ export default function WorkspacesPage() {
           </Button>
         </div>
         {create.isError && (
-          <div className="mt-3 text-xs text-destructive">{(create.error as Error).message}</div>
+          <div className="mt-3 text-xs text-destructive">{getErrorMessage(create.error)}</div>
         )}
       </Surface>
 

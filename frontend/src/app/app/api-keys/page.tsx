@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 import { useToast } from '@/components/brand/toast';
 
 interface ApiKey {
@@ -61,7 +62,7 @@ export default function ApiKeysPage() {
       void qc.invalidateQueries({ queryKey: ['api-keys'] });
       toast({ title: 'API key issued', description: 'Copy it now; it will not be shown again.', variant: 'success' });
     },
-    onError: (error) => toast({ title: 'Could not issue API key', description: (error as Error).message, variant: 'destructive' }),
+    onError: (error) => toast({ title: 'Could not issue API key', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   const revoke = useMutation({
@@ -70,7 +71,7 @@ export default function ApiKeysPage() {
       void qc.invalidateQueries({ queryKey: ['api-keys'] });
       toast({ title: 'API key revoked', variant: 'success' });
     },
-    onError: (error) => toast({ title: 'Could not revoke API key', description: (error as Error).message, variant: 'destructive' }),
+    onError: (error) => toast({ title: 'Could not revoke API key', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   if (!session) return null;

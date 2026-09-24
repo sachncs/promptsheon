@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 interface ProjectItem {
   id: string;
@@ -111,7 +112,7 @@ export default function ProjectsPage() {
           </Button>
         </div>
         {create.isError && (
-          <div className="mt-3 text-xs text-destructive">{(create.error as Error).message}</div>
+          <div className="mt-3 text-xs text-destructive">{getErrorMessage(create.error)}</div>
         )}
       </Surface>
 
