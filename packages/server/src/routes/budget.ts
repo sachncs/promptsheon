@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { CostBudgetRepo } from '../repos/budget.js';
 import type { CostForecastService } from '../analysis/forecast.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import { NotFoundError } from '@promptsheon/shared';
 
 const CreateBudgetSchema = z.object({
@@ -30,6 +30,7 @@ const ForecastQuerySchema = z.object({
 const BudgetListQuerySchema = z.object({
   organizationId: z.string().min(1).max(200),
 });
+const BudgetParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
 
 export interface BudgetDeps {
   budgetRepo: CostBudgetRepo;
@@ -89,7 +90,9 @@ export function registerBudgetRoutes(app: FastifyInstance, deps: BudgetDeps): vo
   });
 
   app.patch('/api/admin/budgets/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, BudgetParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, UpdateBudgetSchema, request.body);
     if (!parsed.ok) return;
     const existing = deps.budgetRepo.findById(id);
@@ -103,7 +106,9 @@ export function registerBudgetRoutes(app: FastifyInstance, deps: BudgetDeps): vo
   });
 
   app.delete('/api/admin/budgets/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, BudgetParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const existing = deps.budgetRepo.findById(id);
     if (!existing) throw new NotFoundError('budget', id);
     if (!assertOrgScope(request, existing.organizationId, reply)) return;
