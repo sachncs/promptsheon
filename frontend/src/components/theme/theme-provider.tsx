@@ -10,6 +10,7 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = React.createContext<ThemeContextValue | null>(null);
+const THEME_CHANGED_EVENT = 'promptsheon:theme-changed';
 
 function readStoredTheme(): Theme | null {
   if (typeof window === 'undefined') return null;
@@ -27,31 +28,50 @@ function systemTheme(): Theme {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
+function getThemeSnapshot(): Theme {
+  return readStoredTheme() ?? systemTheme();
+}
+
+function subscribeToTheme(onChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => undefined;
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+  window.addEventListener(THEME_CHANGED_EVENT, onChange);
+  media.addEventListener('change', onChange);
+  return () => {
+    window.removeEventListener(THEME_CHANGED_EVENT, onChange);
+    media.removeEventListener('change', onChange);
+  };
+}
+
+function applyTheme(theme: Theme): void {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  root.classList.toggle('dark', theme === 'dark');
+  root.style.colorScheme = theme;
+}
+
+function persistTheme(theme: Theme): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    /* ignore quota / private mode errors */
+  }
+  applyTheme(theme);
+  window.dispatchEvent(new Event(THEME_CHANGED_EVENT));
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = React.useState<Theme>('light');
-  const [mounted, setMounted] = React.useState(false);
+  const theme = React.useSyncExternalStore(subscribeToTheme, getThemeSnapshot, (): Theme => 'light');
 
   React.useEffect(() => {
-    setThemeState(readStoredTheme() ?? systemTheme());
-    setMounted(true);
-  }, []);
+    applyTheme(theme);
+  }, [theme]);
 
-  React.useEffect(() => {
-    if (!mounted) return;
-    const root = document.documentElement;
-    root.classList.toggle('dark', theme === 'dark');
-    root.style.colorScheme = theme;
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } catch {
-      /* ignore quota / private mode errors */
-    }
-  }, [theme, mounted]);
-
-  const setTheme = React.useCallback((next: Theme) => setThemeState(next), []);
+  const setTheme = React.useCallback((next: Theme) => persistTheme(next), []);
   const toggleTheme = React.useCallback(
-    () => setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark')),
-    [],
+    () => persistTheme(theme === 'dark' ? 'light' : 'dark'),
+    [theme],
   );
 
   const value = React.useMemo<ThemeContextValue>(
