@@ -9,6 +9,7 @@ declare module 'fastify' {
   interface FastifyRequest {
     userId?: string;
     userRole?: string;
+    authenticatedOrgId?: string;
     agentOrgId?: string;
     agentClassification?: string;
     principal?: Principal;
@@ -94,8 +95,18 @@ export function authMiddleware(
           return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'API key expired' } });
         }
 
+        if (!apiKey.organizationId) {
+          return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'API key has no organization scope' } });
+        }
         request.userId = apiKey.userId;
         request.userRole = apiKey.role;
+        request.authenticatedOrgId = apiKey.organizationId;
+        request.principal = {
+          type: 'User',
+          id: apiKey.userId,
+          orgId: apiKey.organizationId,
+          role: apiKey.role,
+        };
         void apiKeyRepo.updateLastUsed(apiKey.id);
         return;
       }

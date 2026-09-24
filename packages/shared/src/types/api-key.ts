@@ -3,6 +3,7 @@ import type { UserRole } from './user.js';
 export interface ApiKey {
   id: string;
   userId: string;
+  organizationId: string | null;
   name: string;
   keyHash: string;
   keyPrefix: string;

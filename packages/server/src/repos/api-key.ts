@@ -15,6 +15,7 @@ function toApiKey(row: Record<string, unknown>): ApiKey {
   return {
     id: requiredString('id'),
     userId: requiredString('user_id'),
+    organizationId: typeof row['organization_id'] === 'string' ? row['organization_id'] : null,
     name: requiredString('name'),
     keyHash: requiredString('key_hash'),
     keyPrefix: requiredString('key_prefix'),
@@ -45,9 +46,7 @@ export class ApiKeyRepo extends BaseRepo<ApiKey> {
   listForOrg(organizationId: string): ApiKey[] {
     return this.db
       .prepare(
-        `SELECT k.* FROM api_keys k
-         JOIN org_members m ON m.user_id = k.user_id
-         WHERE m.org_id = ? ORDER BY k.created_at ASC`,
+        'SELECT k.* FROM api_keys k WHERE k.organization_id = ? ORDER BY k.created_at ASC',
       )
       .all(organizationId)
       .map((row) => toApiKey(row as Record<string, unknown>));
@@ -70,13 +69,13 @@ export class ApiKeyRepo extends BaseRepo<ApiKey> {
     return result.changes > 0;
   }
 
-  create(data: { userId: string; name: string; keyHash: string; keyPrefix: string; role: string; expiresAt?: string }): ApiKey {
+  create(data: { userId: string; organizationId: string; name: string; keyHash: string; keyPrefix: string; role: string; expiresAt?: string }): ApiKey {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
-    this.db.prepare(`INSERT INTO api_keys (id, user_id, name, key_hash, key_prefix, role, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(id, data.userId, data.name, data.keyHash, data.keyPrefix, data.role, data.expiresAt ?? null, now);
+    this.db.prepare(`INSERT INTO api_keys (id, user_id, organization_id, name, key_hash, key_prefix, role, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, data.userId, data.organizationId, data.name, data.keyHash, data.keyPrefix, data.role, data.expiresAt ?? null, now);
     return {
-      id, userId: data.userId, name: data.name, keyHash: data.keyHash, keyPrefix: data.keyPrefix,
+      id, userId: data.userId, organizationId: data.organizationId, name: data.name, keyHash: data.keyHash, keyPrefix: data.keyPrefix,
       role: data.role as ApiKey['role'], expiresAt: data.expiresAt ?? null, lastUsed: null,
       createdAt: now, revoked: false,
     };

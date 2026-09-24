@@ -91,6 +91,25 @@ describe('orgContextMiddleware', () => {
     await isolated.close();
   });
 
+  it('rejects an organization header that conflicts with verified credential scope', async () => {
+    const isolated = Fastify();
+    isolated.addHook('preHandler', async (request) => {
+      request.userId = 'u1';
+      request.authenticatedOrgId = 'o1';
+    });
+    isolated.addHook('preHandler', orgContextMiddleware({ membershipRepo }));
+    isolated.get('/api/whoami', async (request) => getOrgContext(request));
+    await isolated.ready();
+
+    const response = await isolated.inject({
+      method: 'GET',
+      url: '/api/whoami',
+      headers: { 'x-org-id': 'o2' },
+    });
+    expect(response.statusCode).toBe(404);
+    await isolated.close();
+  });
+
   it('attaches org context when user is a member (direct repo call)', () => {
     const members = membershipRepo.findOrgMembers('o1');
     expect(members.length).toBeGreaterThan(0);

@@ -38,7 +38,7 @@ function makeReply(): MockReply {
 }
 
 function makeApiKeyRepo(opts: {
-  find?: (keyHash: string) => Promise<{ id: string; userId: string; role: string; revoked: boolean; expiresAt?: string } | null>;
+  find?: (keyHash: string) => Promise<{ id: string; userId: string; organizationId?: string; role: string; revoked: boolean; expiresAt?: string } | null>;
   updateLastUsed?: (id: string) => Promise<void>;
 }) {
   return {
@@ -102,11 +102,12 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
     expect(mock.code).toBe(401);
   });
 
-  it('accepts Bearer token and stamps userId + userRole on the request', async () => {
+  it('accepts Bearer token and stamps the verified identity on the request', async () => {
     const apiKeyRepo = makeApiKeyRepo({
       find: async () => ({
         id: 'k1',
         userId: 'u1',
+        organizationId: 'org-1',
         role: 'admin',
         revoked: false,
       }),
@@ -119,6 +120,7 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
     expect(mock.code).toBe(200);
     expect((req as unknown as Record<string, string>).userId).toBe('u1');
     expect((req as unknown as Record<string, string>).userRole).toBe('admin');
+    expect((req as unknown as Record<string, string>).authenticatedOrgId).toBe('org-1');
   });
 
   it('rejects revoked Bearer tokens with 401', async () => {

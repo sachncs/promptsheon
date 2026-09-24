@@ -205,5 +205,5 @@ All endpoints live under `/api/`. Endpoints with `:id` style parameters expect a
 - **Pagination** — query parameters `page` (default 1) and `pageSize` (default 20, max 100) via `PaginationSchema`.
 - **IDs** — UUIDs, validated as `z.string().uuid()` by the relevant schemas.
 - **Error envelope** — every error response is `{ error: { code: ErrorCode, message, issues? } }` (`routes/validate.ts:35`).
-- **Auth** — when `PROMPTSHEON_AUTH=true`, requests must carry an API key (`Authorization: Bearer <key>` or `X-API-Key`).
+- **Auth** — when `PROMPTSHEON_AUTH=true`, requests must carry an API key (`Authorization: Bearer <key>` or `X-API-Key`). API keys are bound to one organization at issuance; a conflicting `X-Org-Id` is rejected.
 - **Content-Type** — `application/json` for request and response bodies; `text/event-stream` for SSE.

@@ -135,6 +135,7 @@ export function registerBootstrapRoutes(
     if (browserApiKey && deps.apiKeyRepo) {
       deps.apiKeyRepo.create({
         userId: user.id,
+        organizationId: org.id,
         name: 'browser-session',
         keyHash: createHash('sha256').update(browserApiKey).digest('hex'),
         keyPrefix: browserApiKey.slice(0, 12),

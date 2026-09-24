@@ -51,7 +51,7 @@ export function registerApiKeyRoutes(
     const raw = `pk_${randomBytes(24).toString('hex')}`;
     const keyHash = createHash('sha256').update(raw).digest('hex');
     const keyPrefix = raw.slice(0, 12);
-    const created = deps.apiKeyRepo.create({ name, userId, keyHash, keyPrefix, role: targetRole });
+    const created = deps.apiKeyRepo.create({ name, userId, organizationId: ctx.orgId, keyHash, keyPrefix, role: targetRole });
     deps.auditChain.append({
       userId: actorOf(request),
       action: 'api-key.create',

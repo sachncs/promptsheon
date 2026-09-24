@@ -59,7 +59,12 @@ export function orgContextMiddleware(
     // compatibility fallback for auth-disabled/direct middleware usage;
     // never let it override a verified Bearer/SVID identity.
     const userId = request.userId ?? headerUserId;
-    const orgId = Array.isArray(orgIdRaw) ? orgIdRaw[0] : orgIdRaw;
+    const headerOrgId = Array.isArray(orgIdRaw) ? orgIdRaw[0] : orgIdRaw;
+    const verifiedOrgId = request.authenticatedOrgId ?? request.agentOrgId;
+    if (verifiedOrgId && headerOrgId && verifiedOrgId !== headerOrgId) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
+    }
+    const orgId = verifiedOrgId ?? headerOrgId;
 
     // System actor — only honored if explicitly enabled.
     if (userId === 'api' && !orgId) {
