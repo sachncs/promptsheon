@@ -3,21 +3,21 @@ const base = import.meta.env.BASE_URL;
 
 const audiences = [
   {
-    role: 'Architect',
-    title: 'Design agent systems as executable specifications.',
-    body: 'Compose prompts, tools, policies, context, models, budgets, and evaluations into immutable agent and organization graphs with inspectable lineage.',
-    signal: 'Design with intent',
+    role: 'AI & platform engineers',
+    title: 'Turn agent experiments into systems you can ship.',
+    body: 'Move from prompt notebooks to versioned specifications with explicit tools, policies, budgets, evaluations, and lineage.',
+    signal: 'From prototype to product',
   },
   {
-    role: 'Operator',
-    title: 'Execute the right work with the right resources.',
-    body: 'Schedule dependencies, route models, invoke tools, reuse safe results, and enforce limits while the runtime turns a specification into outcomes.',
+    role: 'Runtime & operations teams',
+    title: 'Operate the graph with measurable control.',
+    body: 'Route models, schedule dependencies, invoke tools, reuse safe results, and enforce resource limits while work is running.',
     signal: 'Reliable execution',
   },
   {
-    role: 'Evaluator + Governor',
-    title: 'Improve quality under real constraints.',
-    body: 'Measure outcomes, cost, latency, context, tools, and permissions, then enforce hard limits so better results do not depend on unlimited computation.',
+    role: 'Product, security & risk owners',
+    title: 'Promote improvements with evidence, not optimism.',
+    body: 'Compare outcomes, cost, latency, permissions, and drift, then keep approval history and a reversible path for every release.',
     signal: 'Evidence over intuition',
   },
 ];
@@ -29,12 +29,11 @@ const audiences = [
       <div class="lg:sticky lg:top-28 lg:self-start">
         <div class="ps-reveal ps-eyebrow">Who it is for</div>
         <h2 class="ps-reveal ps-display mt-4 text-display-lg" style="--reveal-delay: 80ms">
-          The system between a promising agent and a better one.
+          From promising agent to dependable product.
         </h2>
         <p class="ps-reveal mt-5 max-w-md text-[16.5px] leading-relaxed text-[var(--ink-muted)] text-pretty" style="--reveal-delay: 160ms">
-          Most agent platforms focus on running agents. Promptsheon focuses on
-          making agent systems improve: create, execute, observe, evaluate, compare,
-          learn, mutate, validate, and promote.
+          Promptsheon gives the people who build, run, and govern agent systems a
+          shared path from first experiment to a safer, measurable release.
         </p>
         <a href={`${base}docs/architecture/`} class="ps-reveal mt-7 inline-flex items-center gap-2 text-[13.5px] font-medium text-[var(--accent)] hover:underline" style="--reveal-delay: 220ms">
           See the architecture <span aria-hidden="true">→</span>
