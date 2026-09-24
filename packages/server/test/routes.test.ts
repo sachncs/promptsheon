@@ -6,6 +6,8 @@ import { WorkspaceRepo } from '../src/repos/workspace.js';
 import { WorkspaceService } from '../src/application/workspace-service.js';
 import { registerWorkspaceRoutes } from '../src/routes/workspace.js';
 import { registerHealthRoutes } from '../src/routes/health.js';
+import { HealthService } from '../src/application/health-service.js';
+import { SqliteHealthProbe } from '../src/infrastructure/sqlite-health-probe.js';
 
 describe('Fastify routes', () => {
   let db: Database.Database;
@@ -22,7 +24,7 @@ describe('Fastify routes', () => {
     });
     const workspaceRepo = new WorkspaceRepo(db);
     registerWorkspaceRoutes(app, new WorkspaceService(workspaceRepo));
-    registerHealthRoutes(app, db);
+    registerHealthRoutes(app, new HealthService(new SqliteHealthProbe(db)));
     await app.ready();
   });
 

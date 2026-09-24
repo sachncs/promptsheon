@@ -1,13 +1,12 @@
 import type { FastifyInstance } from 'fastify';
-import type Database from 'better-sqlite3';
+import type { HealthService } from '../application/health-service.js';
 
-export function registerHealthRoutes(app: FastifyInstance, db: Database.Database) {
+export function registerHealthRoutes(app: FastifyInstance, service: HealthService) {
   app.get('/api/health', async (_request, reply) => {
     try {
-      const result = db.prepare('SELECT 1 as ok').get() as { ok: number } | undefined;
       return reply.send({
         status: 'ok',
-        db: result?.ok === 1 ? 'ok' : 'error',
+        db: service.isHealthy() ? 'ok' : 'error',
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
@@ -23,8 +22,7 @@ export function registerHealthRoutes(app: FastifyInstance, db: Database.Database
 
   app.get('/api/ready', async (_request, reply) => {
     try {
-      const row = db.prepare('PRAGMA quick_check').get() as { quick_check?: string } | undefined;
-      if (row?.quick_check !== 'ok') {
+      if (!service.isReady()) {
         return reply.code(503).send({
           status: 'not_ready',
           db: 'error',

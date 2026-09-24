@@ -64,6 +64,8 @@ import { ProjectService } from '../application/project-service.js';
 import { CapabilityService } from '../application/capability-service.js';
 import { ManifestApprovalService } from '../application/manifest-approval-service.js';
 import { AuditReplicationService } from '../application/audit-replication-service.js';
+import { HealthService } from '../application/health-service.js';
+import { SqliteHealthProbe } from '../infrastructure/sqlite-health-probe.js';
 import type { LlmSettingsService } from '../application/llm-settings-service.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
@@ -201,7 +203,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerSelfEvolveRoutes(app, deps.evolutionAgent, deps.capabilityRepo, deps.evalRepo);
   registerApprovalRoutes(app, { releaseRepo: deps.releaseRepo, manifestRepo: deps.manifestRepo });
   registerCompilerRoutes(app, deps.compiler);
-  registerHealthRoutes(app, deps.db);
+  registerHealthRoutes(app, new HealthService(new SqliteHealthProbe(deps.db)));
   registerIdeaRoutes(app, { planner: deps.planner });
   registerGoalEvolveRoutes(app, { goalEvolver: deps.goalEvolver, manifestRepo: deps.manifestRepo });
   registerManifestApprovalRoutes(app, {
