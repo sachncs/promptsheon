@@ -105,21 +105,19 @@ function isNavItemActive(pathname: string, href: string): boolean {
 
 function NavGroupSection({
   group,
+  pathname,
+  hasActive,
   last,
   onNavigate,
 }: {
   group: NavGroup;
+  pathname: string;
+  hasActive: boolean;
   last?: boolean;
   onNavigate?: (() => void) | undefined;
 }) {
-  const pathname = usePathname();
-  const hasActive = group.items.some((item) => isNavItemActive(pathname, item.href));
   const [open, setOpen] = React.useState(hasActive);
   const groupId = `navigation-${group.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-
-  React.useEffect(() => {
-    if (hasActive) setOpen(true);
-  }, [hasActive]);
 
   return (
     <div className={cn('py-2', !last && 'border-b border-border-subtle')}>
@@ -169,6 +167,7 @@ export function AppSidebar({
   mobileOpen?: boolean;
   onMobileClose?: (() => void) | undefined;
 }) {
+  const pathname = usePathname();
   const session = useSession();
   const router = useRouter();
   const [userOpen, setUserOpen] = React.useState(false);
@@ -261,14 +260,19 @@ export function AppSidebar({
       )}
 
       <div className="flex-1 overflow-y-auto">
-        {groups.map((group, i) => (
-          <NavGroupSection
-            key={group.label}
-            group={group}
-            last={i === groups.length - 1}
-            onNavigate={onMobileClose}
-          />
-        ))}
+        {groups.map((group, i) => {
+          const hasActive = group.items.some((item) => isNavItemActive(pathname, item.href));
+          return (
+            <NavGroupSection
+              key={`${group.label}-${hasActive}`}
+              group={group}
+              pathname={pathname}
+              hasActive={hasActive}
+              last={i === groups.length - 1}
+              onNavigate={onMobileClose}
+            />
+          );
+        })}
       </div>
 
       <Separator />
