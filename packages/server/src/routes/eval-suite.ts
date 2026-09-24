@@ -1,7 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
-  passAtK,
   cohensKappa,
   krippendorffAlpha,
   type EvalSuite,
@@ -11,7 +10,7 @@ import {
   type EvalSuiteRepo,
   type HumanReviewRepo,
 } from '../repos/eval-suite.js';
-import { GraderRunner } from '../agents/evaluation/grader-runner.js';
+import type { EvalSuiteService } from '../application/eval-suite-service.js';
 import { parseBody, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
@@ -124,6 +123,7 @@ const CalibrationSchema = z.object({
 export interface EvalSuiteRouteDeps {
   suiteRepo: EvalSuiteRepo;
   humanReviewRepo: HumanReviewRepo;
+  suiteExecution?: EvalSuiteService;
 }
 
 export function registerEvalSuiteRoutes(
@@ -199,60 +199,14 @@ export function registerEvalSuiteRoutes(
     const parsed = parseBody(reply, RunSuiteSchema, request.body ?? {});
     if (!parsed.ok) return;
     const organizationId = organizationIdOf(request);
-    const suite = organizationId ? deps.suiteRepo.findByIdInOrg(id, organizationId) : deps.suiteRepo.findById(id);
-    if (!suite) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'suite not found' } });
-    const version = parsed.data.suiteVersionId
-      ? organizationId
-        ? deps.suiteRepo.findVersionByIdInOrg(parsed.data.suiteVersionId, organizationId)
-        : deps.suiteRepo.findVersionById(parsed.data.suiteVersionId)
-      : organizationId
-        ? deps.suiteRepo.findVersionInOrg(id, suite.currentVersion, organizationId)
-        : deps.suiteRepo.findVersion(id, suite.currentVersion);
-    if (!version) return reply.code(404).send({ error: { code: 'NOT_VERSION', message: 'suite has no versioned graders' } });
-    const trials = parsed.data.trials ?? [
-      { caseId: 'sample-1', output: 'hello', finalState: {} },
-    ];
-    const n = parsed.data.n ?? trials.length;
-    const k = parsed.data.k ?? 1;
-    const runner = new GraderRunner(version.graderConfig);
-    const graded = trials.map((t) => ({
-      trial: t,
-      result: runner.run({
-        output: t.output,
-        transcript: t.transcript ?? '',
-        finalState: t.finalState ?? {},
-        toolCalls: t.toolCalls ?? [],
-        referenceTranscript: t.referenceTranscript ?? '',
-      }),
-    }));
-    const successes = graded.filter((g) => g.result.passed).length;
-    const passAtKValue = passAtK(n, k, successes);
-    const rawScore =
-      graded.reduce((acc, g) => acc + g.result.weightedScore, 0) / Math.max(1, graded.length);
-    const passed = rawScore >= suite.passThreshold;
-    const borderlineBand = graded.filter(
-      (g) => Math.abs(g.result.weightedScore - suite.passThreshold) <= suite.borderlineBand && !g.result.passed,
-    ).length;
-
-    for (const g of graded) {
-      if (Math.abs(g.result.weightedScore - suite.passThreshold) <= suite.borderlineBand) {
-        deps.humanReviewRepo.enqueue(g.trial.caseId, suite.id, null);
-      }
+    const result = deps.suiteExecution?.run(id, organizationId, parsed.data);
+    if (!result || result.kind === 'suite-not-found') {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'suite not found' } });
     }
-
-    const runId = `run-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const summary = {
-      runId,
-      suiteId: suite.id,
-      suiteVersionId: version.id,
-      passThreshold: suite.passThreshold,
-      passAtK: passAtKValue,
-      rawScore,
-      passed,
-      borderlineCount: borderlineBand,
-      gradedAt: new Date().toISOString(),
-    };
-    return reply.code(201).send({ ...summary, results: graded });
+    if (result.kind === 'version-not-found') {
+      return reply.code(404).send({ error: { code: 'NOT_VERSION', message: 'suite has no versioned graders' } });
+    }
+    return reply.code(201).send(result.value);
   });
 
   /**
@@ -264,10 +218,8 @@ export function registerEvalSuiteRoutes(
     const parsed = parseBody(reply, GateSchema, request.body);
     if (!parsed.ok) return;
     const organizationId = organizationIdOf(request);
-    const suites = organizationId
-      ? deps.suiteRepo.listForRepositoryInOrg(id, organizationId)
-      : deps.suiteRepo.list();
-    if (suites.length === 0) {
+    const result = deps.suiteExecution?.gate(id, organizationId, parsed.data.trials);
+    if (!result || result.suites.length === 0) {
       return reply.send({
         ok: true,
         score: 1,
@@ -276,42 +228,7 @@ export function registerEvalSuiteRoutes(
         note: `repository ${id} has no suites; gate passes by default`,
       });
     }
-    // Use each suite's current version + the first graders we have.
-    const summaries: Array<{
-      suiteId: string;
-      suiteName: string;
-      ok: boolean;
-      rawScore: number;
-      threshold: number;
-    }> = [];
-    for (const suite of suites) {
-      const version = organizationId
-        ? deps.suiteRepo.findVersionInOrg(suite.id, suite.currentVersion, organizationId)
-        : deps.suiteRepo.findVersion(suite.id, suite.currentVersion);
-      if (!version) continue;
-      const runner = new GraderRunner(version.graderConfig);
-      const graded = parsed.data.trials.map((t) =>
-        runner.run({
-          output: t.output,
-          transcript: t.transcript ?? '',
-          finalState: t.finalState ?? {},
-          toolCalls: t.toolCalls ?? [],
-          referenceTranscript: '',
-        }),
-      );
-      const rawScore =
-        graded.reduce((acc, g) => acc + g.weightedScore, 0) / Math.max(1, graded.length);
-      const ok = rawScore >= suite.passThreshold;
-      summaries.push({
-        suiteId: suite.id,
-        suiteName: suite.name,
-        ok,
-        rawScore,
-        threshold: suite.passThreshold,
-      });
-    }
-    const ok = summaries.every((s) => s.ok);
-    return reply.send({ ok, score: summaries[0]?.rawScore ?? 1, regressions: summaries.filter((s) => !s.ok), suites: summaries });
+    return reply.send(result);
   });
 
   app.get('/api/human-review', async (request, reply) => {

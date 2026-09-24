@@ -69,6 +69,8 @@ import { SqliteHealthProbe } from '../infrastructure/sqlite-health-probe.js';
 import { IdentityService } from '../application/identity-service.js';
 import { AgentIdentityRepo } from '../repos/agent-identity.js';
 import { createTraceService } from '../application/trace-service.js';
+import { EvalSuiteService } from '../application/eval-suite-service.js';
+import { GraderRunner } from '../agents/evaluation/grader-runner.js';
 import type { LlmSettingsService } from '../application/llm-settings-service.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
@@ -255,7 +257,19 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerCommitRoutes(app, deps.commitDeps);
   registerMergeRequestRoutes(app, deps.mrDeps);
   registerSigningRoutes(app, deps.signingDeps);
-  registerEvalSuiteRoutes(app, deps.evalSuiteDeps);
+  const suiteExecution = deps.evalSuiteDeps.suiteExecution ?? new EvalSuiteService(
+    deps.evalSuiteDeps.suiteRepo,
+    {
+      create: (specs) => {
+        const runner = new GraderRunner(specs);
+        return {
+          run: (input) => runner.run(input),
+        };
+      },
+    },
+    deps.evalSuiteDeps.humanReviewRepo,
+  );
+  registerEvalSuiteRoutes(app, { ...deps.evalSuiteDeps, suiteExecution });
   registerVaultRoutes(app, deps.vaultDeps);
   registerOpenApiRoutes(app);
   registerRetentionRoutes(app, deps.retentionDeps);
