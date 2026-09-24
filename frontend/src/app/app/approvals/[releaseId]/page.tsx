@@ -14,6 +14,7 @@ import { StatusPill } from '@/components/brand/status-pill';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { QueryError } from '@/components/brand/query-error';
 
 interface ReleaseDetail {
   id: string;
@@ -24,7 +25,7 @@ interface ReleaseDetail {
   state?: string;
   manifestHash?: string;
   canaryPercent?: number;
-  approvals?: Array<{ id: string; voter: string; decision: 'approve' | 'reject'; comment?: string; at: string }>;
+  approvals?: Array<{ userId: string; vote: 'approve' | 'reject'; comment?: string; createdAt: string }>;
   createdBy?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -44,7 +45,7 @@ export default function ReleaseApprovalPage() {
   });
   const approvals = useQuery({
     queryKey: ['approvals', releaseId],
-    queryFn: () => approvalApi.list(releaseId).then((r) => unwrapList<NonNullable<ReleaseDetail['approvals']>[number]>(r.data)).catch(() => []),
+    queryFn: () => approvalApi.list(releaseId).then((r) => unwrapList<NonNullable<ReleaseDetail['approvals']>[number]>(r.data)),
     enabled: Boolean(releaseId),
   });
 
@@ -68,10 +69,10 @@ export default function ReleaseApprovalPage() {
   if (!session) return null;
 
   const data = release.data;
-  const approvalRows = (approvals.data ?? []).concat(data?.approvals ?? []);
+  const approvalRows = approvals.data ?? [];
   const seen = new Set<string>();
   const dedup = approvalRows.filter((a) => {
-    const key = `${a.voter}:${a.decision}:${a.at}`;
+    const key = `${a.userId}:${a.vote}:${a.createdAt}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -99,7 +100,7 @@ export default function ReleaseApprovalPage() {
 
       {release.isError ? (
         <Surface>
-          <div className="text-sm text-text-muted">Release not found.</div>
+          <QueryError message={release.error.message} onRetry={() => void release.refetch()} />
         </Surface>
       ) : !data ? (
         <Surface>
@@ -158,7 +159,9 @@ export default function ReleaseApprovalPage() {
 
           <Surface padded={false}>
             <SurfaceHeader className="px-5 pt-5" title="Vote history" description={`${dedup.length} vote(s)`} />
-            {dedup.length === 0 ? (
+            {approvals.isError ? (
+              <QueryError message={approvals.error.message} onRetry={() => void approvals.refetch()} />
+            ) : dedup.length === 0 ? (
               <div className="px-5 pb-5 text-sm text-text-muted">No votes yet.</div>
             ) : (
               <ul className="divide-y divide-border-subtle">
@@ -166,12 +169,12 @@ export default function ReleaseApprovalPage() {
                   <li key={i} className="px-5 py-3 text-sm">
                     <div className="flex items-baseline justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <Badge className={a.decision === 'approve' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}>
-                          {a.decision}
+                        <Badge className={a.vote === 'approve' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}>
+                          {a.vote}
                         </Badge>
-                        <span className="font-medium text-text-strong">{a.voter}</span>
+                        <span className="font-medium text-text-strong">{a.userId}</span>
                       </div>
-                      <span className="text-xs text-text-subtle">{new Date(a.at).toLocaleString()}</span>
+                      <span className="text-xs text-text-subtle">{new Date(a.createdAt).toLocaleString()}</span>
                     </div>
                     {a.comment && <p className="mt-1 text-text-muted">{a.comment}</p>}
                   </li>
