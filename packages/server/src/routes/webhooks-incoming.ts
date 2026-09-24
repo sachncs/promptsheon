@@ -1,11 +1,17 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { WebhookReceiver } from '../webhooks/receiver.js';
 import type { ManifestGraphExecutor } from '../agents/executor/index.js';
 import type { ManifestRepo } from '../repos/manifest.js';
+import { parseParams } from './validate.js';
 
 const MAX_BODY_SIZE = 1_048_576; // 1 MiB
 const REPLAY_CACHE_TTL_MS = 5 * 60 * 1000;
+
+const IncomingWebhookParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
+});
 
 interface ReplayEntry {
   id: string;
@@ -98,7 +104,9 @@ export function registerWebhookRoutes(
   );
 
   app.post('/api/webhooks/incoming/:id', async (request: FastifyRequest, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, IncomingWebhookParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const sigHeader = request.headers['x-webhook-signature'];
     if (typeof sigHeader !== 'string' || sigHeader === '') {
       return reply.code(401).send({ error: { code: 'MISSING_SIGNATURE', message: 'X-Webhook-Signature header required' } });
