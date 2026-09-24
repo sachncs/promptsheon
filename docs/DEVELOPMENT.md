@@ -72,6 +72,7 @@ packages/shared/       domain contracts, validation, migrations, pure logic
 packages/server/
   src/application/     use-case orchestration and ports
   src/repos/           SQLite persistence adapters
+  src/infrastructure/  concrete runtime adapters (SQLite probes, providers)
   src/routes/          HTTP adapters: parse, authorize, call application code
   src/agents/           LLM/agent adapters
   src/middleware/      request identity and organization context
@@ -100,6 +101,13 @@ Repositories own prepared SQL, row mapping, pagination, and organization
 scoping. Agents are infrastructure adapters and are injected into application
 services; domain code must not construct an SDK client or read environment
 variables directly.
+
+Application services own workflow decisions and depend on small ports. Concrete
+adapters are assembled once in the composition root (`routes/index.ts`); for
+example, `HealthService` depends on `HealthProbe`, while
+`SqliteHealthProbe` provides the SQLite implementation. This keeps transport
+tests and use-case tests independent of database drivers and makes replacement
+adapters explicit rather than implicit.
 
 The frontend follows the same separation: pages compose queries and states,
 the API module owns HTTP behavior, shared components own presentation, and
