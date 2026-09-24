@@ -1,4 +1,3 @@
-import type Database from 'better-sqlite3';
 import type { TraceRepo } from '../repos/trace.js';
 import type { TraceScoreRepo } from '../repos/trace-score.js';
 import type { LlmRouter, LlmCompleteRequest } from '../llm/router.js';
@@ -301,17 +300,4 @@ export class AutoEval {
     }
     return written;
   }
-}
-
-/**
- * Convenience constructor with sensible defaults.
- */
-export function makeAutoEval(db: Database.Database): AutoEval {
-  // Lazy import to avoid a circular dep at module load time.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { TraceScoreRepo } = require('../repos/trace-score.js') as typeof import('../repos/trace-score.js');
-  void db;
-  void TraceScoreRepo;
-  // The caller wires deps.traceRepo + deps.scoreRepo externally.
-  throw new Error('use new AutoEval({ traceRepo, scoreRepo, router? }) directly');
 }
