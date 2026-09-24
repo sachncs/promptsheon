@@ -142,19 +142,19 @@ export default function FeatureFlagsPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['key'])}
+            rows={rows}
+            rowKey={(r) => r.key}
             columns={[
               {
                 key: 'key',
                 header: 'Key',
-                render: (r) => <code className="font-mono text-xs">{String(r['key'])}</code>,
+                render: (r) => <code className="font-mono text-xs">{r.key}</code>,
               },
               {
                 key: 'value',
                 header: 'Value',
                 render: (r) => {
-                  const k = String(r['key']);
+                  const k = r.key;
                   const isEditing = k in editing;
                   const value = isEditing ? editing[k] : JSON.stringify(r['value']);
                   return (
@@ -187,10 +187,10 @@ export default function FeatureFlagsPage() {
                 header: 'Enabled',
                 render: (r) => (
                   <Switch
-                    checked={Boolean(r['enabled'])}
-                    onCheckedChange={() => toggle.mutate(String(r['key']))}
+                    checked={Boolean(r.enabled)}
+                    onCheckedChange={() => toggle.mutate(r.key)}
                     disabled={toggle.isPending}
-                    aria-label={`Toggle feature flag ${String(r['key'])}`}
+                    aria-label={`Toggle feature flag ${r.key}`}
                   />
                 ),
               },
@@ -198,8 +198,8 @@ export default function FeatureFlagsPage() {
                 key: 'updated',
                 header: 'Updated',
                 render: (r) => {
-                  const v = r['updatedAt'];
-                  return v ? new Date(String(v)).toLocaleString() : '—';
+                  const v = r.updatedAt;
+                  return v ? new Date(v).toLocaleString() : '—';
                 },
               },
             ]}
