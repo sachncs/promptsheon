@@ -449,8 +449,44 @@ export interface RepoEntry {
   size: number;
 }
 
+export interface RepositorySummary {
+  id: string;
+  workspaceId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  defaultBranch: string;
+  visibility: 'private' | 'internal' | 'public';
+  minApprovers: number;
+  requireSignedReleases: boolean;
+  updatedAt: string;
+}
+
+const RepositorySummarySchema = z.object({
+  id: z.string().min(1),
+  workspaceId: z.string().min(1),
+  name: z.string().min(1),
+  slug: z.string().min(1),
+  description: z.string().nullable(),
+  defaultBranch: z.string().min(1),
+  visibility: z.enum(['private', 'internal', 'public']),
+  minApprovers: z.number().int().nonnegative(),
+  requireSignedReleases: z.boolean(),
+  updatedAt: z.string(),
+});
+
+function parseRepositoryList(raw: unknown): RepositorySummary[] {
+  const items = unwrapList<unknown>(raw);
+  const parsed = z.array(RepositorySummarySchema).safeParse(items);
+  if (!parsed.success) {
+    throw new ApiError('The server returned invalid repository data.', { code: 'INVALID_RESPONSE' });
+  }
+  return parsed.data;
+}
+
 export const repoApi = {
-  list: (workspaceId: string) => client.get(`/repos?workspaceId=${encodeURIComponent(workspaceId)}`).then((r) => r.data),
+  list: (workspaceId: string): Promise<RepositorySummary[]> =>
+    client.get<unknown>(`/repos?workspaceId=${encodeURIComponent(workspaceId)}`).then((r) => parseRepositoryList(r.data)),
   get: (id: string) => client.get(`/repos/${id}`).then((r) => r.data),
   create: (input: {
     workspaceId: string;

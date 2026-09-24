@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { GitBranch, Search, Lock } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
-import { workspaceApi, repoApi } from '@/lib/api';
+import { workspaceApi, repoApi, type RepositorySummary, type WorkspaceRow } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
@@ -18,33 +18,20 @@ import { Input } from '@/components/ui/input';
 import { NewRepositoryDialog } from '@/components/brand/new-repository-dialog';
 import { QueryError } from '@/components/brand/query-error';
 
-interface WorkspaceRow {
-  id: string;
-  name: string;
-}
-interface RepoRow {
-  id: string;
-  name: string;
-  slug: string;
-  visibility: string;
-  minApprovers: number;
-  requireSignedReleases: boolean;
-  updatedAt: string;
-  defaultBranch: string;
-}
+type RepoRow = RepositorySummary;
 
 export default function RepositoriesPage() {
   const session = useRequireSession();
   const router = useRouter();
-  const workspaces = useQuery<{ workspaces?: WorkspaceRow[] }>({
+  const workspaces = useQuery<WorkspaceRow[]>({
     queryKey: ['workspaces'],
     queryFn: async () => {
       const r = await workspaceApi.list(1);
-      return r.data as { workspaces?: WorkspaceRow[] };
+      return r.data;
     },
     enabled: Boolean(session),
   });
-  const wsList: WorkspaceRow[] = workspaces.data?.workspaces ?? [];
+  const wsList = workspaces.data ?? [];
   const wsFirst = wsList[0];
 
   const [query, setQuery] = useState('');
@@ -54,7 +41,7 @@ export default function RepositoriesPage() {
     queryFn: async () => {
       if (!wsFirst) return [] as RepoRow[];
       const list = await repoApi.list(wsFirst.id);
-      return list as unknown as RepoRow[];
+      return list;
     },
     enabled: Boolean(wsFirst),
   });
