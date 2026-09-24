@@ -228,6 +228,25 @@ export interface Capability {
   selfEvolveDatasetId: string;
 }
 
+export type ReleaseStatus = 'draft' | 'review' | 'approved' | 'canary' | 'active' | 'rolled_back';
+export type ReleaseEnvironment = 'dev' | 'staging' | 'prod';
+
+export interface Release {
+  id: string;
+  capabilityId: string;
+  capabilityVersion: number;
+  capabilityVersionId: string | null;
+  manifest: string;
+  environment: ReleaseEnvironment;
+  status: ReleaseStatus;
+  approvedBy: string;
+  replacesReleaseId: string | null;
+  createdAt: string;
+  createdBy: string;
+  activatedAt: string | null;
+  canaryPercent: number;
+}
+
 const CostRollupSchema = z.object({
   capabilityId: z.string(),
   day: z.string(),
@@ -367,6 +386,22 @@ const CapabilitySchema = z.object({
   selfEvolveDatasetId: z.string(),
 });
 
+const ReleaseSchema = z.object({
+  id: z.string(),
+  capabilityId: z.string(),
+  capabilityVersion: z.number().int().positive(),
+  capabilityVersionId: z.string().nullable(),
+  manifest: z.string(),
+  environment: z.enum(['dev', 'staging', 'prod']),
+  status: z.enum(['draft', 'review', 'approved', 'canary', 'active', 'rolled_back']),
+  approvedBy: z.string(),
+  replacesReleaseId: z.string().nullable(),
+  createdAt: z.string(),
+  createdBy: z.string(),
+  activatedAt: z.string().nullable(),
+  canaryPercent: z.number().int().min(0).max(100),
+});
+
 function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
   return unwrapList<unknown>(raw).map((entry) => {
     const parsed = VaultKeyringEntrySchema.safeParse(entry);
@@ -486,6 +521,18 @@ function parseAlerts(raw: unknown): Alert[] {
 function parseCapabilities(raw: unknown): Capability[] {
   const parsed = z.array(CapabilitySchema).safeParse(unwrapList<unknown>(raw));
   if (!parsed.success) throw new ApiError('The server returned invalid capability data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseReleases(raw: unknown): Release[] {
+  const parsed = z.array(ReleaseSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid release data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseRelease(raw: unknown): Release {
+  const parsed = ReleaseSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid release data.', { code: 'INVALID_RESPONSE' });
   return parsed.data;
 }
 
@@ -634,9 +681,24 @@ export const versionApi = {
 };
 
 export const releaseApi = {
-  list: (capabilityId: string) => client.get('/releases', { params: { capabilityId } }),
-  listAll: (page = 1, pageSize = 100) => client.get('/releases', { params: { page, pageSize } }),
-  get: (id: string) => client.get(`/releases/${id}`),
+  list: async (capabilityId: string): Promise<{ data: Release[] }> => {
+    const r = await client.get<unknown>('/releases', { params: { capabilityId } });
+    return { data: parseReleases(r.data) };
+  },
+  listAll: async (page = 1, pageSize = 100): Promise<{ data: { items: Release[]; total: number } }> => {
+    const r = await client.get<unknown>('/releases', { params: { page, pageSize } });
+    if (!r.data || typeof r.data !== 'object') throw new ApiError('The server returned invalid release data.', { code: 'INVALID_RESPONSE' });
+    const value = r.data as Record<string, unknown>;
+    const items = parseReleases(value['items']);
+    if (typeof value['total'] !== 'number' || !Number.isInteger(value['total']) || value['total'] < 0) {
+      throw new ApiError('The server returned invalid release totals.', { code: 'INVALID_RESPONSE' });
+    }
+    return { data: { items, total: value['total'] } };
+  },
+  get: async (id: string): Promise<{ data: Release }> => {
+    const r = await client.get<unknown>(`/releases/${id}`);
+    return { data: parseRelease(r.data) };
+  },
   create: (data: { capabilityId: string; capabilityVersion: number; capabilityVersionId: string | null; manifest: string; environment: string }) =>
     client.post('/releases', data),
   transition: (id: string, to: 'draft' | 'review' | 'approved' | 'canary' | 'active' | 'rolled_back', reason?: string) =>

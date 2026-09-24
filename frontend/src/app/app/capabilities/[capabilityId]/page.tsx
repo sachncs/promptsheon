@@ -189,14 +189,14 @@ export default function CapabilityDetailPage() {
             <DataTable
               className="rounded-none border-0 border-t border-border-subtle"
               rows={releaseList}
-              rowKey={(r: Record<string, unknown>) => String(r['id'])}
-              onRowClick={(r) => { router.push(`/app/releases/${String(r['id'])}`); }}
+              rowKey={(r) => r.id}
+              onRowClick={(r) => { router.push(`/app/releases/${r.id}`); }}
               columns={[
-                { key: 'v', header: 'Version', render: (r: Record<string, unknown>) => `v${String(r['capabilityVersion'] ?? '?')}` },
-                { key: 'env', header: 'Environment', render: (r: Record<string, unknown>) => <span className="font-mono text-xs">{String(r['environment'] ?? 'production')}</span> },
-                { key: 'state', header: 'State', render: (r: Record<string, unknown>) => <StatusPill kind={statusKindOf(r['state'])} /> },
-                { key: 'hash', header: 'Content', render: (r: Record<string, unknown>) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} /> },
-                { key: 'canary', header: 'Canary', render: (r: Record<string, unknown>) => r['canaryPercent'] != null ? `${String(r['canaryPercent'])}%` : '—' },
+                { key: 'v', header: 'Version', render: (r) => `v${r.capabilityVersion}` },
+                { key: 'env', header: 'Environment', render: (r) => <span className="font-mono text-xs">{r.environment}</span> },
+                { key: 'state', header: 'State', render: (r) => <StatusPill kind={statusKindOf(r.status)} /> },
+                { key: 'hash', header: 'Identifier', render: (r) => <HashChip hash={r.id} /> },
+                { key: 'canary', header: 'Canary', render: (r) => `${r.canaryPercent}%` },
               ]}
             />
           </Surface>

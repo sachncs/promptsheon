@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { GitBranch, GitMerge, Plus, ArrowUpRight } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
-import { workspaceApi, projectApi, capabilityApi, releaseApi } from '@/lib/api';
+import { workspaceApi, projectApi, capabilityApi, releaseApi, type Release } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface } from '@/components/brand/surface';
 import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
@@ -19,6 +19,7 @@ import { NewReleaseDialog } from '@/components/brand/new-release-dialog';
 import { QueryError } from '@/components/brand/query-error';
 
 type FilterState = 'all' | 'draft' | 'review' | 'approved' | 'canary' | 'active' | 'rolled-back';
+type ReleaseRow = Release & { capabilityName: string };
 
 export default function ReleasesPage() {
   const session = useRequireSession();
@@ -52,19 +53,18 @@ export default function ReleasesPage() {
   const releases = useQuery({
     queryKey: ['releases', 'all', capabilities.data],
     queryFn: async () => {
-      const out: Array<Record<string, unknown>> = [];
+      const out: ReleaseRow[] = [];
       const caps = capabilities.data ?? [];
       for (const c of caps) {
         const list = await releaseApi.list(c.id).then((r) => r.data);
         if (Array.isArray(list)) {
-          out.push(...list.map((rel: Record<string, unknown>) => ({
+          out.push(...list.map((rel) => ({
             ...rel,
             capabilityName: c.name,
-            capabilityId: c.id,
           })));
         }
       }
-      return out.sort((a, b) => String(b['createdAt'] ?? '').localeCompare(String(a['createdAt'] ?? '')));
+      return out.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     },
     enabled: Array.isArray(capabilities.data) && capabilities.data.length > 0,
   });
@@ -72,11 +72,10 @@ export default function ReleasesPage() {
   const rows = useMemo(() => {
     const arr = Array.isArray(releases.data) ? releases.data : [];
     return arr.filter((r) => {
-      if (filter !== 'all' && String(r['state'] ?? '') !== filter) return false;
+      if (filter !== 'all' && r.status !== filter) return false;
       if (search) {
         const q = search.toLowerCase();
-        if (!String(r['capabilityName'] ?? '').toLowerCase().includes(q) &&
-            !String(r['manifestHash'] ?? '').toLowerCase().includes(q)) return false;
+        if (!r.capabilityName.toLowerCase().includes(q) && !r.id.toLowerCase().includes(q)) return false;
       }
       return true;
     });
@@ -137,14 +136,14 @@ export default function ReleasesPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {rows.map((r) => {
-            const id = String(r['id']);
-            const name = String(r['capabilityName'] ?? '—');
-            const version = String(r['capabilityVersion'] ?? '?');
-            const env = String(r['environment'] ?? 'production');
-            const state = String(r['state'] ?? 'neutral');
-            const canary = Number(r['canaryPercent'] ?? 0);
-            const hash = String(r['manifestHash'] ?? id);
-            const updated = new Date(String(r['updatedAt'] ?? r['createdAt'] ?? Date.now()));
+            const id = r.id;
+            const name = r.capabilityName;
+            const version = r.capabilityVersion;
+            const env = r.environment;
+            const state = r.status;
+            const canary = r.canaryPercent;
+            const hash = r.id;
+            const updated = new Date(r.createdAt);
             return (
               <button
                 key={id}
