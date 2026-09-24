@@ -123,23 +123,23 @@ export default function WorkspaceProjectsPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => router.push(`/app/projects/${String(r['id'])}/capabilities`)}
+            rows={rows}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => router.push(`/app/projects/${r.id}/capabilities`)}
             columns={[
               {
                 key: 'name',
                 header: 'Project',
                 render: (r) => (
-                  <Link href={`/app/projects/${String(r['id'])}/capabilities`} className="font-medium text-text-strong hover:underline">
-                    {String(r['name'])}
+                  <Link href={`/app/projects/${r.id}/capabilities`} className="font-medium text-text-strong hover:underline">
+                    {r.name}
                   </Link>
                 ),
               },
               {
                 key: 'description',
                 header: 'Description',
-                render: (r) => r['description'] ? <span className="text-text-muted">{String(r['description'])}</span> : <span className="text-text-subtle">—</span>,
+                render: (r) => r.description ? <span className="text-text-muted">{r.description}</span> : <span className="text-text-subtle">—</span>,
               },
               {
                 key: 'actions',
@@ -148,7 +148,7 @@ export default function WorkspaceProjectsPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={(e) => { e.stopPropagation(); remove.mutate(String(r['id'])); }}
+                    onClick={(e) => { e.stopPropagation(); remove.mutate(r.id); }}
                   >
                     <Trash2 className="mr-1 size-3" />
                     Delete
