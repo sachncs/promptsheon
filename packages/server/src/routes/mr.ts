@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { RepoRepo } from '../repos/repo.js';
 import type { BranchRepo } from '../repos/branch.js';
 import type { MergeRequestRepo } from '../repos/mr.js';
-import { parseBody } from './validate.js';
+import { parseBody, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
 const OpenMRSchema = z.object({
@@ -31,6 +31,10 @@ const MergeSchema = z.object({
   mergeCommitOid: z.string().regex(/^[a-f0-9]{64}$/),
 });
 
+const MergeRequestListQuerySchema = z.object({
+  status: z.enum(['open', 'closed', 'all']).default('open'),
+});
+
 export interface MRDeps {
   repoRepo: RepoRepo;
   branchRepo: BranchRepo;
@@ -48,7 +52,9 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
     if (!repositoryForRequest(deps.repoRepo, request, id)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     }
-    const { status } = request.query as { status?: string };
+    const parsed = parseQuery(reply, MergeRequestListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { status } = parsed.data;
     const list =
       status === 'closed'
         ? [...deps.mrRepo.listAll(id)].filter((mr) => mr.status !== 'open')
@@ -62,6 +68,7 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
     path: '/api/repos/:id/merge-requests',
     summary: 'List merge requests (filtered by ?status=open|closed|all)',
     tags: ['merge-requests'],
+    query: MergeRequestListQuerySchema,
   });
 
   app.get('/api/merge-requests/:id', async (request, reply) => {

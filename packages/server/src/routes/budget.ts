@@ -27,6 +27,10 @@ const ForecastQuerySchema = z.object({
   windowDays: z.coerce.number().int().min(7).max(180).optional().default(30),
 });
 
+const BudgetListQuerySchema = z.object({
+  organizationId: z.string().min(1).max(200),
+});
+
 export interface BudgetDeps {
   budgetRepo: CostBudgetRepo;
   forecastService: CostForecastService;
@@ -54,10 +58,9 @@ export function registerBudgetRoutes(app: FastifyInstance, deps: BudgetDeps): vo
    * List the org's budgets.
    */
   app.get('/api/admin/budgets', async (request, reply) => {
-    const orgId = (request.query as { organizationId?: string }).organizationId;
-    if (!orgId) {
-      return reply.code(400).send({ error: { code: 'MISSING_ORG', message: 'organizationId required' } });
-    }
+    const parsed = parseQuery(reply, BudgetListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { organizationId: orgId } = parsed.data;
     if (!assertOrgScope(request, orgId, reply)) return;
     return reply.send({ items: deps.budgetRepo.listForOrg(orgId) });
   });

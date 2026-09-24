@@ -77,9 +77,9 @@ describe('GET /api/admin/budgets + /api/admin/cost-forecast', () => {
     expect(res.json()).toEqual({ items: [] });
   });
 
-  it('GET /api/admin/budgets without organizationId returns 400', async () => {
+  it('GET /api/admin/budgets without organizationId returns a validation error', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/admin/budgets' });
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(422);
   });
 
   it('does not allow an active org to query another organization', async () => {
