@@ -71,7 +71,7 @@ export function AppHeader({ onMenu }: { onMenu?: (() => void) | undefined }) {
         {session && (
           <button
             type="button"
-            onClick={() => { clearSession(); window.location.href = '/'; }}
+            onClick={() => { clearSession(); router.push('/'); }}
             className="grid h-9 w-9 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text-default"
             aria-label="Sign out"
             title="Sign out"
