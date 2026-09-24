@@ -14,6 +14,8 @@ const PutFeatureFlagSchema = z.object({
   value: z.unknown().optional(),
 });
 
+const FeatureFlagInputSchema = PutFeatureFlagSchema.omit({ name: true });
+
 interface RequestUserContext {
   userId?: string;
 }
@@ -33,9 +35,12 @@ export function registerFeatureFlagRoutes(
 
   app.put('/api/feature-flags/:name', { preHandler: requireAdmin() }, async (request, reply) => {
     const { name } = request.params as { name: string };
-    const merged = { ...(request.body as Record<string, unknown> | undefined), name };
-    const parsed = parseBody(reply, PutFeatureFlagSchema, merged);
-    if (!parsed.ok) return;
+    const parsedInput = parseBody(reply, FeatureFlagInputSchema, request.body);
+    if (!parsedInput.ok) return;
+    const parsed = PutFeatureFlagSchema.safeParse({ ...parsedInput.data, name });
+    if (!parsed.success) {
+      return reply.code(422).send({ error: { code: 'VALIDATION_ERROR', message: 'Request body validation failed' } });
+    }
     const before = deps.repo.find(name);
     const flag = deps.repo.upsert(parsed.data);
     deps.auditChain.append({

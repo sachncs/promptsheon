@@ -2,10 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { AuditChain } from '../audit/chain.js';
 import type { AuditReplicationService } from '../application/audit-replication-service.js';
+import { parseQuery } from './validate.js';
 
 const ListQuerySchema = z.object({
-  resource: z.string().optional(),
-  action: z.string().optional(),
+  resource: z.string().max(120).optional(),
+  action: z.string().max(120).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional().default(100),
   offset: z.coerce.number().int().min(0).optional().default(0),
 });
@@ -45,11 +46,9 @@ export function registerAuditRoutes(
     if (!organizationId) {
       return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     }
-    const params = request.query as Record<string, string | undefined>;
-    const limit = Math.min(parseInt(params['limit'] ?? '100', 10) || 100, 500);
-    const offset = parseInt(params['offset'] ?? '0', 10) || 0;
-    const resource = params['resource'];
-    const action = params['action'];
+    const parsed = parseQuery(reply, ListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { limit, offset, resource, action } = parsed.data;
 
     const rows = deps.auditChain
       .entriesForOrganization(organizationId)

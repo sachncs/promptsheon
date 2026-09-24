@@ -3,14 +3,17 @@ import { z } from 'zod';
 import type { UserAnalyticsRepo } from '../repos/user-analytics.js';
 import { parseQuery } from './validate.js';
 
-const UserAnalyticsQuerySchema = z.object({
-  userId: z.string().min(1).max(120),
+const UserAnalyticsDaysQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(365).default(30),
 });
 
 const OrgAnalyticsQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(365).default(30),
   limit: z.coerce.number().int().min(1).max(200).default(25),
+});
+
+const UserAnalyticsPathSchema = z.object({
+  userId: z.string().min(1).max(120),
 });
 
 interface RequestUserContext {
@@ -40,10 +43,14 @@ export function registerAnalyticsRoutes(
     if (!organizationId) {
       return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     }
-    const { userId } = request.params as { userId: string };
-    const parsed = parseQuery(reply, UserAnalyticsQuerySchema, { ...(request.query as Record<string, unknown>), userId });
+    const parsedPath = UserAnalyticsPathSchema.safeParse(request.params);
+    if (!parsedPath.success) {
+      return reply.code(422).send({ error: { code: 'VALIDATION_ERROR', message: 'Path validation failed' } });
+    }
+    const parsed = parseQuery(reply, UserAnalyticsDaysQuerySchema, request.query);
     if (!parsed.ok) return;
-    const days = parsed.data.days;
+    const { userId } = parsedPath.data;
+    const { days } = parsed.data;
     const perDay = deps.repo.perDay(userId, organizationId, days);
     return reply.send({ userId, days, perDay });
   });

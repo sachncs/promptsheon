@@ -8,7 +8,7 @@ import type {
 import { RepoRepo, RepositoryExistsError } from '../repos/repo.js';
 import type { BranchRepo } from '../repos/branch.js';
 import type { TagRepo } from '../repos/tag.js';
-import { parseBody } from './validate.js';
+import { parseBody, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 import type { FastifyRequest } from 'fastify';
 import type { RepositoryService } from '../application/repository-service.js';
@@ -45,6 +45,10 @@ const CreateTagSchema = z.object({
   message: z.string().max(500).optional(),
 });
 
+const ListRepositoriesQuerySchema = z.object({
+  workspaceId: z.string().uuid(),
+});
+
 export interface RepoDeps {
   repoRepo: RepoRepo;
   repositoryService?: RepositoryService;
@@ -63,10 +67,9 @@ function repositoryForRequest(repoRepo: RepoRepo, request: FastifyRequest, id: s
 
 export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
   app.get('/api/repos', async (request, reply) => {
-    const { workspaceId } = request.query as { workspaceId?: string };
-    if (!workspaceId) {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'workspaceId required' } });
-    }
+    const parsed = parseQuery(reply, ListRepositoriesQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { workspaceId } = parsed.data;
     const organizationId = orgId(request);
     const repos = deps.repositoryService
       ? deps.repositoryService.listByWorkspace(workspaceId, organizationId)
@@ -81,7 +84,7 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     path: '/api/repos',
     summary: 'List repositories in a workspace',
     tags: ['repos'],
-    query: z.object({ workspaceId: z.string().uuid() }),
+    query: ListRepositoriesQuerySchema,
   });
 
   app.get('/api/repos/:id', async (request, reply) => {
