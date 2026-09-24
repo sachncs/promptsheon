@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { PaginationSchema } from '@promptsheon/shared';
 import type { VersionRepo } from '../repos/version.js';
 import type { ManifestRepo } from '../repos/manifest.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 
 const ListQuerySchema = PaginationSchema.extend({
   capabilityId: z.string().uuid().optional(),
@@ -18,6 +18,8 @@ const CreateVersionSchema = z.object({
   createdBy: z.string().optional(),
   goal: z.string().optional(),
 });
+const VersionParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
+const VersionManifestParamsSchema = z.object({ versionId: z.string().trim().min(1).max(255) });
 
 interface RequestOrganizationContext {
   agentOrgId?: string;
@@ -50,7 +52,9 @@ export function registerVersionRoutes(
   app.get('/api/capability-versions/:id', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, VersionParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const item = repo.findByIdInOrg(id, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
     return reply.send(item);
@@ -59,7 +63,9 @@ export function registerVersionRoutes(
   app.get('/api/capability-versions/:versionId/manifest', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { versionId } = request.params as { versionId: string };
+    const parsedParams = parseParams(reply, VersionManifestParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { versionId } = parsedParams.data;
     const row = repo.findByIdInOrg(versionId, organizationId);
     if (!row) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'version not found' } });
     let parsed: unknown;
@@ -116,7 +122,9 @@ export function registerVersionRoutes(
   app.delete('/api/capability-versions/:id', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, VersionParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     repo.deleteInOrg(id, organizationId);
     return reply.code(204).send();
   });

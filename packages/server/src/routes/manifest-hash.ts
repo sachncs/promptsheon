@@ -2,8 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { ManifestSchema, mergeDraftManifest } from '@promptsheon/shared';
 import type { ManifestRepo } from '../repos/manifest.js';
-import { parseBody } from './validate.js';
+import { parseBody, parseParams } from './validate.js';
 import { NotFoundError } from '@promptsheon/shared';
+
+const ManifestHashParamsSchema = z.object({ hash: z.string().trim().min(1).max(255) });
 
 export function registerManifestHashRoutes(app: FastifyInstance, deps: { manifestRepo: ManifestRepo }) {
   app.post('/api/manifests', async (request, reply) => {
@@ -32,7 +34,9 @@ export function registerManifestHashRoutes(app: FastifyInstance, deps: { manifes
   });
 
   app.get('/api/manifests/:hash', async (request, reply) => {
-    const { hash } = request.params as { hash: string };
+    const parsedParams = parseParams(reply, ManifestHashParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { hash } = parsedParams.data;
     const manifest = deps.manifestRepo.findByHash(hash);
     if (!manifest) throw new NotFoundError('manifest', hash);
     return reply.send(manifest);
