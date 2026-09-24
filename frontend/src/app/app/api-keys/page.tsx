@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { KeyRound, Plus, Shield } from 'lucide-react';
 import { apiKeyApi, userApi } from '@/lib/api';
@@ -28,6 +29,49 @@ interface ApiKey {
   revoked: boolean;
 }
 
+const ApiKeySchema = z.object({
+  id: z.string().min(1),
+  userId: z.string().min(1),
+  name: z.string(),
+  keyPrefix: z.string().min(1),
+  role: z.string().min(1),
+  expiresAt: z.string().nullable(),
+  lastUsed: z.string().nullable(),
+  createdAt: z.string(),
+  revoked: z.boolean(),
+});
+
+const CurrentUserSchema = z.object({
+  id: z.string().min(1),
+  email: z.string().email(),
+  name: z.string(),
+  role: z.string().min(1),
+});
+
+const IssuedKeySchema = z.object({
+  key: z.string().min(1),
+  id: z.string().min(1),
+  name: z.string(),
+});
+
+function parseApiKeyList(raw: unknown): { keys: ApiKey[] } {
+  const parsed = z.object({ keys: z.array(ApiKeySchema) }).safeParse(raw);
+  if (!parsed.success) throw new Error('The server returned invalid API-key data.');
+  return parsed.data;
+}
+
+function parseCurrentUser(raw: unknown): z.infer<typeof CurrentUserSchema> {
+  const parsed = CurrentUserSchema.safeParse(raw);
+  if (!parsed.success) throw new Error('The server returned invalid user data.');
+  return parsed.data;
+}
+
+function parseIssuedKey(raw: unknown): z.infer<typeof IssuedKeySchema> {
+  const parsed = IssuedKeySchema.safeParse(raw);
+  if (!parsed.success) throw new Error('The server returned an invalid API key.');
+  return parsed.data;
+}
+
 export default function ApiKeysPage() {
   const session = useRequireSession();
   const qc = useQueryClient();
@@ -36,14 +80,14 @@ export default function ApiKeysPage() {
     queryKey: ['api-keys'],
     queryFn: async () => {
       const r = await apiKeyApi.list();
-      return (r.data as unknown as { keys: ApiKey[] }) ?? { keys: [] };
+      return parseApiKeyList(r.data);
     },
   });
   const me = useQuery({
     queryKey: ['me'],
     queryFn: async () => {
       const r = await userApi.me();
-      return r.data as { id: string; email: string; name: string; role: string };
+      return parseCurrentUser(r.data);
     },
   });
   const [name, setName] = useState('');
@@ -56,7 +100,7 @@ export default function ApiKeysPage() {
       return apiKeyApi.create({ name: name || 'untitled', role, userId: session.userId });
     },
     onSuccess: async (resp) => {
-      const o = resp.data as unknown as { key: string; id: string; name: string };
+      const o = parseIssuedKey(resp.data);
       setIssued(o);
       setName('');
       void qc.invalidateQueries({ queryKey: ['api-keys'] });
@@ -160,41 +204,41 @@ export default function ApiKeysPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
+            rows={rows}
+            rowKey={(r) => r.id}
             columns={[
-              { key: 'name', header: 'Name', render: (r) => String(r['name']) },
+              { key: 'name', header: 'Name', render: (r) => r.name },
               {
                 key: 'prefix',
                 header: 'Prefix',
-                render: (r) => <span className="font-mono text-xs">{String(r['keyPrefix'])}…</span>,
+                render: (r) => <span className="font-mono text-xs">{r.keyPrefix}…</span>,
               },
-              { key: 'role', header: 'Role', render: (r) => <Badge>{String(r['role'])}</Badge> },
+              { key: 'role', header: 'Role', render: (r) => <Badge>{r.role}</Badge> },
               {
                 key: 'last',
                 header: 'Last used',
-                render: (r) => r['lastUsed'] ? new Date(String(r['lastUsed'])).toLocaleString() : '—',
+                render: (r) => r.lastUsed ? new Date(r.lastUsed).toLocaleString() : '—',
               },
               {
                 key: 'created',
                 header: 'Created',
-                render: (r) => new Date(String(r['createdAt'])).toLocaleString(),
+                render: (r) => new Date(r.createdAt).toLocaleString(),
               },
               {
                 key: 'state',
                 header: 'State',
-                render: (r) => r['revoked']
+                render: (r) => r.revoked
                   ? <Badge className="bg-surface-3 text-text-muted">revoked</Badge>
                   : <Badge className="bg-success/15 text-success">active</Badge>,
               },
               {
                 key: 'actions',
                 header: '',
-                render: (r) => r['revoked'] ? null : (
+                render: (r) => r.revoked ? null : (
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => revoke.mutate(String(r['id']))}
+                    onClick={() => revoke.mutate(r.id)}
                   >
                     <KeyRound className="mr-1 h-3 w-3" />
                     Revoke
