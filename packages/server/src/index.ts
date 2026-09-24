@@ -280,6 +280,10 @@ async function main() {
     executionRepo: repos.execution,
     datasetRepo: repos.dataset,
     evalRepo: repos.eval,
+    evalRouteConfig: {
+      allowedHosts: config.server.evalAllowedHosts ?? [],
+      allowPrivateNetworks: config.server.allowPrivateNetworks ?? config.server.nodeEnv !== 'production',
+    },
     preconditionRepo: repos.precondition,
     alertRepo: repos.alert,
     scheduleRepo: repos.schedule,

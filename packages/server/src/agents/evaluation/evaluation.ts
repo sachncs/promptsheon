@@ -2,6 +2,7 @@ import type { AppConfig, EvalRun, DatasetCase, Manifest } from '@promptsheon/sha
 import {
   buildEvaluatorRegistry,
   getEvaluator,
+  listEvaluators,
   type Evaluator,
   type EvalInput,
   type EvalResult,
@@ -15,6 +16,18 @@ export class EvaluationAgent {
   constructor(config: AppConfig) {
     this.evaluators = buildEvaluatorRegistry(config);
     this.suiteRunner = new EvalSuiteRunner(config);
+  }
+
+  /** Return the evaluator names exposed by this agent. */
+  listEvaluators(): string[] {
+    return listEvaluators(this.evaluators);
+  }
+
+  /** Score one output with a named evaluator, or return null when unknown. */
+  async evaluate(input: EvalInput, evaluatorName: string): Promise<EvalResult | null> {
+    const evaluator = this.evaluators.get(evaluatorName);
+    if (!evaluator) return null;
+    return evaluator.evaluate(input);
   }
 
   /**

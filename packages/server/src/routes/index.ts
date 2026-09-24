@@ -7,7 +7,7 @@ import { registerVersionRoutes } from './version.js';
 import { registerReleaseRoutes } from './release.js';
 import { registerExecutionRoutes } from './execution.js';
 import { registerDatasetRoutes } from './dataset.js';
-import { registerEvalRoutes } from './eval.js';
+import { registerEvalRoutes, type EvalRouteConfig } from './eval.js';
 import { registerPreconditionRoutes } from './precondition.js';
 import { registerAlertRoutes } from './alert.js';
 import { registerScheduleRoutes } from './schedule.js';
@@ -124,6 +124,7 @@ export interface AppDeps {
   llmSettings: LlmSettingsService;
   invocationAgent: InvocationAgent;
   evalAgent: EvaluationAgent;
+  evalRouteConfig: EvalRouteConfig;
   evolutionAgent: EvolutionAgent;
   compiler: ReasoningCompiler;
   planner: IdeaPlannerAgent;
@@ -213,7 +214,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     sseHub: deps.sseHub,
   });
   registerDatasetRoutes(app, deps.datasetRepo);
-  registerEvalRoutes(app, deps.evalRepo, deps.evalAgent);
+  registerEvalRoutes(app, deps.evalRepo, deps.evalAgent, deps.evalRouteConfig);
   registerPreconditionRoutes(app, deps.preconditionRepo);
   registerAlertRoutes(app, deps.alertRepo);
   registerScheduleRoutes(app, new ScheduleService(deps.scheduleRepo));

@@ -6,7 +6,7 @@ import {
 } from '@promptsheon/shared';
 import type { EvalRepo } from '../repos/eval.js';
 import type { EvaluationAgent } from '../agents/evaluation/evaluation.js';
-import { buildEvaluatorRegistry, listEvaluators } from '../evaluation/evaluators.js';
+import type { EvalInput } from '../evaluation/evaluators.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 import { validateOutboundUrl } from '../security/outbound-url.js';
 
@@ -33,7 +33,17 @@ function orgOf(request: FastifyRequest): string | null {
   return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
-export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAgent: EvaluationAgent) {
+export interface EvalRouteConfig {
+  allowedHosts: string[];
+  allowPrivateNetworks: boolean;
+}
+
+export function registerEvalRoutes(
+  app: FastifyInstance,
+  repo: EvalRepo,
+  evalAgent: EvaluationAgent,
+  config: EvalRouteConfig = { allowedHosts: [], allowPrivateNetworks: true },
+) {
   app.get('/api/eval-runs', async (request, reply) => {
     const organizationId = orgOf(request);
     if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
@@ -82,8 +92,8 @@ export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAge
     const organizationId = orgOf(request);
     if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     const outbound = validateOutboundUrl(getActualUrl, {
-      allowedHosts: (process.env['PROMPTSHEON_EVAL_ALLOWED_HOSTS'] ?? '').split(',').map((host) => host.trim()),
-      allowPrivateNetworks: (process.env['PROMPTSHEON_NODE_ENV'] ?? process.env['NODE_ENV'] ?? 'development') !== 'production',
+      allowedHosts: config.allowedHosts,
+      allowPrivateNetworks: config.allowPrivateNetworks,
     });
     if (!outbound.ok) {
       return reply.code(422).send({ error: { code: 'UNSAFE_OUTBOUND_URL', message: outbound.reason } });
@@ -122,27 +132,22 @@ export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAge
   });
 
   app.get('/api/eval/evaluators', async (_request, reply) => {
-    const config = (evalAgent as unknown as { config: import('@promptsheon/shared').AppConfig }).config;
-    const reg = buildEvaluatorRegistry(config);
-    return reply.send({ evaluators: listEvaluators(reg) });
+    return reply.send({ evaluators: evalAgent.listEvaluators() });
   });
 
   app.post('/api/eval/score', async (request, reply) => {
     const parsed = parseBody(reply, ScoreInputSchema, request.body);
     if (!parsed.ok) return;
-    const config = (evalAgent as unknown as { config: import('@promptsheon/shared').AppConfig }).config;
-    const reg = buildEvaluatorRegistry(config);
     const evaluatorName = parsed.data.evaluator || 'llm-judge';
-    const evaluator = reg.get(evaluatorName);
-    if (!evaluator) {
-      return reply.code(404).send({ error: { code: 'UNKNOWN_EVALUATOR', message: evaluatorName } });
-    }
-    const result = await evaluator.evaluate({
+    const result = await evalAgent.evaluate({
       actual: parsed.data.actual,
       expected: parsed.data.expected,
       inputs: parsed.data.inputs,
       context: parsed.data.context,
-    });
+    } satisfies EvalInput, evaluatorName);
+    if (!result) {
+      return reply.code(404).send({ error: { code: 'UNKNOWN_EVALUATOR', message: evaluatorName } });
+    }
     return reply.send({
       evaluator: evaluatorName,
       ...result,
