@@ -2,7 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { NotFoundError } from '@promptsheon/shared';
 import type { ManifestApprovalService } from '../application/manifest-approval-service.js';
-import { parseBody } from './validate.js';
+import { parseBody, parseParams } from './validate.js';
+
+const HashParamsSchema = z.object({
+  hash: z.string().trim().min(1).max(255),
+});
 
 const ManifestApprovalSchema = z.object({
   userId: z.string().min(1).max(255),
@@ -30,7 +34,9 @@ export function registerManifestApprovalRoutes(
   deps: { service: ManifestApprovalService },
 ) {
   app.post('/api/manifests/:hash/approve', async (request, reply) => {
-    const { hash } = request.params as { hash: string };
+    const parsedParams = parseParams(reply, HashParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { hash } = parsedParams.data;
     const parsed = parseBody(reply, ManifestApprovalSchema, request.body);
     if (!parsed.ok) return;
 
@@ -40,7 +46,9 @@ export function registerManifestApprovalRoutes(
   });
 
   app.post('/api/manifests/:hash/reject', async (request, reply) => {
-    const { hash } = request.params as { hash: string };
+    const parsedParams = parseParams(reply, HashParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { hash } = parsedParams.data;
     const parsed = parseBody(reply, ManifestRejectionSchema, request.body);
     if (!parsed.ok) return;
 
@@ -50,7 +58,9 @@ export function registerManifestApprovalRoutes(
   });
 
   app.get('/api/manifests/:hash/approvals', async (request, reply) => {
-    const { hash } = request.params as { hash: string };
+    const parsedParams = parseParams(reply, HashParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { hash } = parsedParams.data;
     const summary = deps.service.get(hash);
     if (!summary) throw new NotFoundError('manifest', hash);
     return reply.send(summary);

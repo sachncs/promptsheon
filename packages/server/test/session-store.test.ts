@@ -114,9 +114,9 @@ describe('POST /api/sessions', () => {
     expect(response.statusCode).toBe(200);
   });
 
-  it('GET /api/sessions/:id returns 404 for missing', async () => {
+  it('rejects malformed session identifiers before lookup', async () => {
     const response = await app.inject({ method: 'GET', url: '/api/sessions/nope' });
-    expect(response.statusCode).toBe(404);
+    expect(response.statusCode).toBe(422);
   });
 
   it('DELETE /api/sessions/:id removes session', async () => {

@@ -117,6 +117,15 @@ describe('POST /api/manifests/:hash/approve|reject', () => {
     expect(body.distinctApprovers).toBe(0);
   });
 
+  it('rejects an empty manifest hash before invoking the service', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/manifests/%20/approve',
+      payload: { userId: 'user1' },
+    });
+    expect(response.statusCode).toBe(422);
+  });
+
   it('counts 2 distinct approvers', async () => {
     await app.inject({ method: 'POST', url: `/api/manifests/${hash}/approve`, payload: { userId: 'user1' } });
     await app.inject({ method: 'POST', url: `/api/manifests/${hash}/approve`, payload: { userId: 'user2' } });

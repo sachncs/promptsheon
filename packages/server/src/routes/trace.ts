@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { TraceService } from '../application/trace-service.js';
-import { parseQuery } from './validate.js';
+import { parseParams, parseQuery } from './validate.js';
 
 const ListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -18,6 +18,8 @@ const RollupQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(365).default(30),
   environment: z.string().min(1).max(60).optional(),
 });
+
+const TraceParamsSchema = z.object({ id: z.string().uuid() });
 
 interface RequestUserContext {
   userId?: string;
@@ -82,7 +84,9 @@ export function registerTraceRoutes(
     '/api/traces/:id',
     { preHandler: deps.requireAdmin() },
     async (request, reply) => {
-      const { id } = request.params as { id: string };
+      const parsedParams = parseParams(reply, TraceParamsSchema, request.params);
+      if (!parsedParams.ok) return;
+      const { id } = parsedParams.data;
       const orgId = orgOf(request);
       if (!orgId) {
         return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });

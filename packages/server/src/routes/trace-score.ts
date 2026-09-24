@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { TraceService } from '../application/trace-service.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 
 const RunAutoEvalSchema = z.object({
   judgeModel: z.string().min(1).max(120).optional(),
@@ -17,6 +17,8 @@ const SummaryQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(90).default(7),
   evaluator: z.string().min(1).max(120).optional(),
 });
+
+const TraceParamsSchema = z.object({ id: z.string().uuid() });
 
 interface RequestUserContext {
   userId?: string;
@@ -45,7 +47,9 @@ export function registerTraceScoreRoutes(
   deps: { service: TraceService },
 ) {
   app.get('/api/traces/:id/scores', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, TraceParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const orgId = orgOf(request);
     if (!orgId) {
       return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
@@ -58,7 +62,9 @@ export function registerTraceScoreRoutes(
   });
 
   app.post('/api/traces/:id/auto-eval', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, TraceParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const orgId = orgOf(request);
     if (!orgId) {
       return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
