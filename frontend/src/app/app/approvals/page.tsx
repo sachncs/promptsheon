@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ShieldCheck, ShieldAlert, Inbox } from 'lucide-react';
-import { workspaceApi, projectApi, releaseApi } from '@/lib/api';
+import { workspaceApi, projectApi, releaseApi, type WorkspaceRow } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -36,7 +36,7 @@ export default function ApprovalsPage() {
     queryKey: ['workspaces'],
     queryFn: () => workspaceApi.list(1).then((r) => r.data),
   });
-  const wsFirst = Array.isArray(workspaces.data) ? workspaces.data[0] as { id?: string } : undefined;
+  const wsFirst: WorkspaceRow | undefined = workspaces.data?.[0];
   const wsId = wsFirst?.id;
 
   const projects = useQuery({
@@ -44,7 +44,7 @@ export default function ApprovalsPage() {
     queryFn: () => (wsId ? projectApi.list(wsId).then((r) => r.data) : Promise.resolve([])),
     enabled: Boolean(wsId),
   });
-  const projectList = Array.isArray(projects.data) ? projects.data as Array<{ id: string; name?: string }> : [];
+  const projectList: Array<{ id: string; name?: string }> = Array.isArray(projects.data) ? projects.data : [];
 
   const allReleases = useQuery({
     queryKey: ['approvals', 'releases', projectList.map((p) => p.id)],
@@ -71,7 +71,7 @@ export default function ApprovalsPage() {
   if (projects.isError) return <QueryError message={projects.error} onRetry={() => void projects.refetch()} />;
   if (allReleases.isError) return <QueryError message={allReleases.error} onRetry={() => void allReleases.refetch()} />;
 
-  const rows = ((allReleases.data ?? []) as Release[]).filter(
+  const rows = (allReleases.data ?? []).filter(
     (r) => r.state === 'review' || r.state === 'draft',
   );
 
@@ -104,17 +104,17 @@ export default function ApprovalsPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => { router.push(`/app/releases/${String(r['id'])}`); }}
+            rows={rows}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => { router.push(`/app/releases/${r.id}`); }}
             columns={[
               {
                 key: 'cap',
                 header: 'Capability',
                 render: (r) => (
                   <div>
-                    <div className="font-medium text-text-strong">{String(r['capabilityName'] ?? '—')}</div>
-                    <div className="text-xs text-text-subtle">v{String(r['capabilityVersion'] ?? '?')} · {String(r['environment'] ?? '—')}</div>
+                    <div className="font-medium text-text-strong">{r.capabilityName ?? '—'}</div>
+                    <div className="text-xs text-text-subtle">v{r.capabilityVersion ?? '?'} · {r.environment ?? '—'}</div>
                   </div>
                 ),
               },
@@ -122,7 +122,7 @@ export default function ApprovalsPage() {
                 key: 'approvals',
                 header: 'Votes',
                 render: (r) => {
-                  const a = (r['approvals'] as Release['approvals']) ?? [];
+                  const a = r.approvals ?? [];
                   if (a.length === 0) return <span className="text-text-subtle text-xs">no votes yet</span>;
                   return (
                     <div className="flex items-center gap-1.5">
@@ -148,19 +148,19 @@ export default function ApprovalsPage() {
                 key: 'canary',
                 header: 'Canary',
                 render: (r) => {
-                  const pct = Number(r['canaryPercent'] ?? 0);
+                  const pct = r.canaryPercent ?? 0;
                   return <span className="font-mono text-xs text-text-muted">{pct}%</span>;
                 },
               },
               {
                 key: 'hash',
                 header: 'Hash',
-                render: (r) => r['manifestHash'] ? <HashChip hash={String(r['manifestHash'])} /> : <span className="text-text-muted">—</span>,
+                render: (r) => r.manifestHash ? <HashChip hash={r.manifestHash} /> : <span className="text-text-muted">—</span>,
               },
               {
                 key: 'state',
                 header: 'State',
-                render: (r) => <StatusPill kind={statusKindOf(r['state'])} />,
+                render: (r) => <StatusPill kind={statusKindOf(r.state)} />,
               },
               {
                 key: 'when',
