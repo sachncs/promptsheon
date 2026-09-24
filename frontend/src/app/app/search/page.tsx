@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useDeferredValue } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useDeferredValue } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Search as SearchIcon } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
@@ -15,14 +15,10 @@ import { QueryError } from '@/components/brand/query-error';
 
 export default function SearchPage() {
   const session = useRequireSession();
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const [q, setQ] = useState(() => searchParams.get('q') ?? '');
+  const q = searchParams.get('q') ?? '';
   const deferredQuery = useDeferredValue(q.trim());
-
-  useEffect(() => {
-    const next = searchParams.get('q') ?? '';
-    if (next !== q) setQ(next);
-  }, [q, searchParams]);
 
   const results = useQuery({
     queryKey: ['search', deferredQuery],
@@ -43,15 +39,25 @@ export default function SearchPage() {
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-subtle" />
           <Input
             autoFocus
+            aria-label="Search capabilities, releases, and audit entries"
             placeholder="Search capability names, release notes, audit messages…"
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              const nextParams = new URLSearchParams(searchParams.toString());
+              const value = e.target.value;
+              if (value) nextParams.set('q', value);
+              else nextParams.delete('q');
+              const query = nextParams.toString();
+              router.replace(query ? `/app/search?${query}` : '/app/search', { scroll: false });
+            }}
             className="pl-9 h-9 bg-surface-1 border-border-subtle"
           />
         </div>
-        <div className="mt-5">
+        <div className="mt-5" aria-live="polite">
           {deferredQuery.length < 2 ? (
             <p className="text-text-muted text-sm">Type at least two characters.</p>
+          ) : results.isFetching ? (
+            <p className="text-text-muted text-sm">Searching…</p>
           ) : rows.length === 0 ? (
             <EmptyState
               title="No matches"
