@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { QueryError } from '@/components/brand/query-error';
+import { useToast } from '@/components/brand/toast';
 
 interface FlagItem {
   key: string;
@@ -27,6 +28,7 @@ interface FlagItem {
 export default function FeatureFlagsPage() {
   const session = useRequireSession();
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   const flags = useQuery({
     queryKey: ['feature-flags'],
@@ -49,7 +51,9 @@ export default function FeatureFlagsPage() {
       setNewKey('');
       setNewValue('true');
       setEditing({});
+      toast({ title: 'Feature flag saved', variant: 'success' });
     },
+    onError: (error) => toast({ title: 'Could not save feature flag', description: (error as Error).message, variant: 'destructive' }),
   });
 
   const toggle = useMutation({
@@ -58,7 +62,11 @@ export default function FeatureFlagsPage() {
       const next = !(current?.enabled ?? false);
       return featureFlagApi.update(key, { value: current?.value, enabled: next });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['feature-flags'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['feature-flags'] });
+      toast({ title: 'Feature flag updated', variant: 'success' });
+    },
+    onError: (error) => toast({ title: 'Could not update feature flag', description: (error as Error).message, variant: 'destructive' }),
   });
 
   if (!session) return null;
@@ -180,6 +188,8 @@ export default function FeatureFlagsPage() {
                   <Switch
                     checked={Boolean(r['enabled'])}
                     onCheckedChange={() => toggle.mutate(String(r['key']))}
+                    disabled={toggle.isPending}
+                    aria-label={`Toggle feature flag ${String(r['key'])}`}
                   />
                 ),
               },
