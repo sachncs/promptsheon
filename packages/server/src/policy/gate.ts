@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { CedarAuthorizer } from './authorizer.js';
-import { applySystemActorOverride, principalFromRequest, type Principal } from './principal.js';
+import type { Principal } from './principal.js';
 
 export { CedarAuthorizer } from './authorizer.js';
 
@@ -32,29 +32,23 @@ interface CedarContext {
 
 /**
  * Build a Fastify preHandler that gates the request on a Cedar
- * decision. The principal is extracted from the request headers
- * (IN-0.4); if no principal is present the system-actor override
- * applies, and if that's also off the gate passes through. That's
- * the same "skip when no org context" behaviour the old
- * `rolePreHandler` had, so existing tests that don't set up a
- * tenant keep working.
+ * decision. The principal must already be established by the
+ * authentication middleware; raw headers are never interpreted by
+ * the policy layer. Requests without an authenticated principal
+ * are left to the authentication/org-context hooks to reject.
  */
 export function cedarGate(opts: CedarGateOptions) {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     const principal = extractPrincipal(request);
     if (principal === null) {
-      // No principal in the request and the system-actor override
-      // is off. The original rolePreHandler skipped in this case;
-      // preserve that.
+      // Authentication and org-context middleware own unauthenticated
+      // request handling; Cedar only evaluates verified identities.
       return;
     }
     const authorizer = opts.authorizer ?? loadDefaultAuthorizer();
     if (authorizer === null) {
-      // Authorizer hasn't been initialised (env var not set, or
-      // we're in a test that didn't wire it up). Fall through and
-      // let the request reach the route. This preserves the
-      // behaviour of the old rolePreHandler which also skipped
-      // when no org context was present.
+      // Authorizer configuration is handled at the composition root;
+      // isolated tests may intentionally omit it.
       return;
     }
     const decision = authorizer.authorize({
@@ -82,7 +76,7 @@ function principalType(p: Principal): string {
 function extractPrincipal(request: FastifyRequest): Principal | null {
   if (request.principal) return request.principal;
   if (request.userId) {
-    const orgId = request.agentOrgId ?? request.orgContext?.orgId ?? headerValue(request, 'x-org-id') ?? 'unscoped';
+    const orgId = request.agentOrgId ?? request.orgContext?.orgId ?? 'unscoped';
     return {
       type: 'User',
       id: request.userId,
@@ -90,14 +84,7 @@ function extractPrincipal(request: FastifyRequest): Principal | null {
       role: request.orgContext?.role ?? request.userRole ?? 'viewer',
     };
   }
-  const headers = request.headers as Record<string, string | undefined>;
-  const principal = principalFromRequest(headers);
-  return applySystemActorOverride(principal);
-}
-
-function headerValue(request: FastifyRequest, name: string): string | undefined {
-  const value = request.headers[name];
-  return Array.isArray(value) ? value[0] : value;
+  return null;
 }
 
 let defaultAuthorizer: CedarAuthorizer | null = null;

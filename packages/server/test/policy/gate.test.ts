@@ -49,6 +49,15 @@ describe('Cedar preHandler on /api/orgs', () => {
     teamRepo = new TeamRepo(db);
     membershipRepo = new MembershipRepo(db);
     app = Fastify();
+    app.addHook('preHandler', async (request) => {
+      const type = request.headers['x-principal-type'];
+      const id = request.headers['x-principal-id'];
+      if (type === 'role' && typeof id === 'string') {
+        request.principal = { type: 'Role', id, orgId: 'org-1', role: id };
+      } else if (process.env['PROMPTSHEON_ALLOW_SYSTEM_ACTOR'] === 'true') {
+        request.principal = { type: 'System', id: 'bootstrap' };
+      }
+    });
     app.setErrorHandler((error, _request, reply) => {
       if (error.name === 'NotFoundError') return reply.code(404).send({ error: { code: 'NOT_FOUND', message: error.message } });
       if (error.statusCode) return reply.code(error.statusCode).send({ error: { code: 'APP_ERROR', message: error.message } });
