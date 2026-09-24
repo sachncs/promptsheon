@@ -271,6 +271,8 @@ async function main() {
   retention.start();
 
   await registerRoutes(app, {
+    nodeEnvironment: config.server.nodeEnv,
+    scimBearerToken: config.auth.scimBearerToken,
     db,
     workspaceRepo: repos.workspace,
     projectRepo: repos.project,

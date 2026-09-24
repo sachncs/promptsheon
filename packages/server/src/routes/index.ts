@@ -107,6 +107,8 @@ import type Database from 'better-sqlite3';
 import type { BudgetDeps } from './budget.js';
 
 export interface AppDeps {
+  nodeEnvironment: string;
+  scimBearerToken?: string;
   db: Database.Database;
   workspaceRepo: WorkspaceRepo;
   projectRepo: ProjectRepo;
@@ -326,7 +328,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     auditChain: deps.auditChain,
     userRepo: deps.userRepo,
     membershipRepo: deps.membershipRepo,
-    scimBearerToken: resolveScimBearerToken(process.env['PROMPTSHEON_NODE_ENV'] ?? process.env['NODE_ENV'] ?? 'development'),
+    scimBearerToken: resolveScimBearerToken(deps.nodeEnvironment, deps.scimBearerToken),
   });
   registerSecurityRoutes(app, { scanRepo: deps.promptScanRepo });
   registerAuditReportRoutes(app, { auditChain: deps.auditChain });

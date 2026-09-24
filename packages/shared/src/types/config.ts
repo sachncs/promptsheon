@@ -39,6 +39,8 @@ export interface AppConfig {
   auth: {
     enabled: boolean;
     jwtSecret: string;
+    /** Optional SCIM bearer token, loaded only at the composition root. */
+    scimBearerToken?: string;
   };
   selfEvolve: {
     enabled: boolean;

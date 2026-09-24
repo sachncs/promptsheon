@@ -87,6 +87,7 @@ export function loadConfig(): AppConfig {
     auth: {
       enabled: envBool('PROMPTSHEON_AUTH', false),
       jwtSecret: envString('PROMPTSHEON_JWT_SECRET', ''),
+      scimBearerToken: envString('PROMPTSHEON_SCIM_TOKEN', ''),
     },
     selfEvolve: {
       enabled: envBool('PROMPTSHEON_SELF_EVOLVE_ENABLED', false),
