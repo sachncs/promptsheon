@@ -103,6 +103,7 @@ async function main() {
   // factory lives in src/repos/factory.ts and replaces the 41
   // manual `new XRepo(db)` calls this function used to carry.
   const repos = buildRepos(db);
+  const repositoryService = new RepositoryService(repos.repo);
   const identityService = new IdentityService(new AgentIdentityRepo(db));
 
   const auditChain = new AuditChain(db, config.server.fipsMode);
@@ -328,7 +329,7 @@ async function main() {
     llmRouter,
     repoDeps: {
       repoRepo: repos.repo,
-      repositoryService: new RepositoryService(repos.repo),
+      repositoryService,
       branchRepo: repos.branch,
       tagRepo: repos.tag,
     },
@@ -346,7 +347,7 @@ async function main() {
       mrRepo: repos.mergeRequest,
     },
     signingDeps: {
-      repoRepo: repos.repo,
+      repositoryService,
       commitRepo: repos.commit,
       signingKeyRepo: repos.signingKey,
     },

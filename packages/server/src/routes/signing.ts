@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { createHash, createPublicKey, verify, type KeyObject } from 'node:crypto';
-import type { RepoRepo } from '../repos/repo.js';
 import { CommitRepo, deriveCommitOid } from '../repos/commit.js';
 import { SigningKeyRepo, fingerprintSpki } from '../repos/signing-key.js';
+import type { RepositoryService } from '../application/repository-service.js';
 import { commitInputPayload } from '@promptsheon/shared';
 import { parseBody, parseParams } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
@@ -36,7 +36,7 @@ const SigningKeyParamsSchema = z.object({
 const CommitOidParamsSchema = z.object({ oid: z.string().trim().min(1).max(200) });
 
 export interface SigningDeps {
-  repoRepo: RepoRepo;
+  repositoryService: RepositoryService;
   commitRepo: CommitRepo;
   signingKeyRepo: SigningKeyRepo;
 }
@@ -174,7 +174,7 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
     if (!key || key.deactivatedAt) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'signing key not found' } });
     }
-    if (!deps.repoRepo.findByIdInOrg(commit.repositoryId, key.organizationId)) {
+    if (!deps.repositoryService.get(commit.repositoryId, key.organizationId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'commit not found' } });
     }
     const userId = request.userId ?? 'system';
@@ -226,7 +226,7 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
     if (organizationId && key.organizationId !== organizationId) {
       return reply.send({ valid: false, reason: 'key_scope_mismatch' });
     }
-    if (!deps.repoRepo.findByIdInOrg(commit.repositoryId, key.organizationId)) {
+    if (!deps.repositoryService.get(commit.repositoryId, key.organizationId)) {
       return reply.send({ valid: false, reason: 'key_scope_mismatch' });
     }
     const msg = signedMessage({
