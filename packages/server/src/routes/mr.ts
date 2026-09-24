@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { RepoRepo } from '../repos/repo.js';
 import type { BranchRepo } from '../repos/branch.js';
 import type { MergeRequestRepo } from '../repos/mr.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
 const OpenMRSchema = z.object({
@@ -34,6 +34,8 @@ const MergeSchema = z.object({
 const MergeRequestListQuerySchema = z.object({
   status: z.enum(['open', 'closed', 'all']).default('open'),
 });
+const RepositoryParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
+const MergeRequestParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
 
 export interface MRDeps {
   repoRepo: RepoRepo;
@@ -48,7 +50,9 @@ function repositoryForRequest(repoRepo: RepoRepo, request: FastifyRequest, id: s
 
 export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): void {
   app.get('/api/repos/:id/merge-requests', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     if (!repositoryForRequest(deps.repoRepo, request, id)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     }
@@ -72,7 +76,9 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
   });
 
   app.get('/api/merge-requests/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, MergeRequestParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const mr = deps.mrRepo.findById(id);
     if (!mr) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
     if (!repositoryForRequest(deps.repoRepo, request, mr.repositoryId)) {
@@ -92,7 +98,9 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
   });
 
   app.post('/api/repos/:id/merge-requests', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, OpenMRSchema, request.body);
     if (!parsed.ok) return;
     const repo = repositoryForRequest(deps.repoRepo, request, id);
@@ -115,7 +123,9 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
   });
 
   app.post('/api/merge-requests/:id/decisions', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, MergeRequestParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, DecisionSchema, request.body);
     if (!parsed.ok) return;
     const mr = deps.mrRepo.findById(id);
@@ -144,7 +154,9 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
   });
 
   app.post('/api/merge-requests/:id/comments', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, MergeRequestParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, CommentSchema, request.body);
     if (!parsed.ok) return;
     const mr = deps.mrRepo.findById(id);
@@ -163,7 +175,9 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
   });
 
   app.post('/api/merge-requests/:id/merge', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, MergeRequestParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, MergeSchema, request.body);
     if (!parsed.ok) return;
     const mr = deps.mrRepo.findById(id);
@@ -189,7 +203,9 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
   });
 
   app.post('/api/merge-requests/:id/close', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, MergeRequestParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const mr = deps.mrRepo.findById(id);
     if (!mr) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
     if (!repositoryForRequest(deps.repoRepo, request, mr.repositoryId)) {
