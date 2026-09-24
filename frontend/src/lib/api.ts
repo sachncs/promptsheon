@@ -103,6 +103,20 @@ export interface EvalSuite {
   updatedAt: string;
 }
 
+export interface EvalSuiteVersion {
+  id: string;
+  suiteId: string;
+  version: number;
+  graderConfig: unknown[];
+  passThreshold: number;
+  borderlineBand: number;
+  k: number;
+  n: number;
+  notes: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
 export type EvalRunStatus = 'running' | 'passed' | 'failed' | 'error';
 
 export interface EvalRun {
@@ -268,6 +282,20 @@ const EvalSuiteSchema = z.object({
   updatedAt: z.string(),
 });
 
+const EvalSuiteVersionSchema = z.object({
+  id: z.string(),
+  suiteId: z.string(),
+  version: z.number().int().positive(),
+  graderConfig: z.array(z.unknown()),
+  passThreshold: z.number().min(0).max(1),
+  borderlineBand: z.number().min(0).max(1),
+  k: z.number().int().nonnegative(),
+  n: z.number().int().nonnegative(),
+  notes: z.string().nullable(),
+  createdBy: z.string(),
+  createdAt: z.string(),
+});
+
 const EvalRunSchema = z.object({
   id: z.string(),
   releaseId: z.string(),
@@ -430,6 +458,19 @@ function parseEvalSuites(raw: unknown): EvalSuite[] {
     }
     return parsed.data;
   });
+}
+
+function parseEvalSuiteDetail(raw: unknown): { suite: EvalSuite; versions: EvalSuiteVersion[] } {
+  if (!raw || typeof raw !== 'object') {
+    throw new ApiError('The server returned invalid eval suite details.', { code: 'INVALID_RESPONSE' });
+  }
+  const value = raw as Record<string, unknown>;
+  const suite = EvalSuiteSchema.safeParse(value['suite']);
+  const versions = z.array(EvalSuiteVersionSchema).safeParse(value['versions']);
+  if (!suite.success || !versions.success) {
+    throw new ApiError('The server returned invalid eval suite details.', { code: 'INVALID_RESPONSE' });
+  }
+  return { suite: suite.data, versions: versions.data };
 }
 
 function parseEvalRun(raw: unknown): EvalRun {
@@ -1146,7 +1187,10 @@ export const evalSuiteApi = {
     const r = await client.get<unknown>(`/eval-suites${capabilityId ? `?capabilityId=${capabilityId}` : ''}`);
     return parseEvalSuites(r.data);
   },
-  get: (id: string) => client.get(`/eval-suites/${id}`).then((r) => r.data),
+  get: async (id: string): Promise<{ data: { suite: EvalSuite; versions: EvalSuiteVersion[] } }> => {
+    const r = await client.get<unknown>(`/eval-suites/${id}`);
+    return { data: parseEvalSuiteDetail(r.data) };
+  },
   create: (input: {
     capabilityId: string;
     name: string;
