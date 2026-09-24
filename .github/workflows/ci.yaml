@@ -26,6 +26,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: workspace typecheck
         run: pnpm typecheck
+      - name: frontend lint
+        run: pnpm --dir frontend lint
 
   test:
     name: Server Tests
