@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
+import { QueryError } from '@/components/brand/query-error';
 
 interface Finding {
   rule: string;
@@ -56,6 +57,7 @@ export default function SecurityPage() {
   });
 
   if (!session) return null;
+  if (summary.isError) return <QueryError message={(summary.error as Error).message} onRetry={() => void summary.refetch()} />;
 
   return (
     <div className="space-y-6">

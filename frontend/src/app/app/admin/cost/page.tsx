@@ -11,6 +11,7 @@ import { StatCard } from '@/components/brand/stat-card';
 import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
 import { BarChart } from '@/components/brand/bar-chart';
+import { QueryError } from '@/components/brand/query-error';
 
 interface Rollup {
   capabilityId: string;
@@ -24,6 +25,7 @@ export default function CostPage() {
   const workspaces = useQuery({
     queryKey: ['workspaces'],
     queryFn: () => workspaceApi.list(1).then((r) => r.data),
+    enabled: Boolean(session),
   });
   const wsFirst = Array.isArray(workspaces.data) ? workspaces.data[0] : undefined;
   const wsId = (wsFirst as { id?: string } | undefined)?.id;
@@ -59,6 +61,10 @@ export default function CostPage() {
       .map(([day, cost]) => ({ label: day, value: cost }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [rows]);
+
+  if (!session) return null;
+  if (workspaces.isError) return <QueryError message={(workspaces.error as Error).message} onRetry={() => void workspaces.refetch()} />;
+  if (costs.isError) return <QueryError message={(costs.error as Error).message} onRetry={() => void costs.refetch()} />;
 
   return (
     <div className="space-y-6">

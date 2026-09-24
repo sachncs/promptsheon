@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { ThemedSelect } from '@/components/brand/themed-select';
 import { HashChip } from '@/components/brand/hash-chip';
 import type { LucideIcon } from 'lucide-react';
+import { QueryError } from '@/components/brand/query-error';
 
 const ROLE_OPTIONS: Array<{ value: TeamMember['role']; label: string }> = [
   { value: 'viewer', label: 'Viewer' },
@@ -72,6 +73,8 @@ export default function TeamsPage() {
   const [ssoSecret, setSsoSecret] = useState('');
 
   if (!session) return null;
+  if (teams.isError) return <QueryError message={(teams.error as Error).message} onRetry={() => void teams.refetch()} />;
+  if (sso.isError) return <QueryError message={(sso.error as Error).message} onRetry={() => void sso.refetch()} />;
   const items = teams.data?.items ?? [];
 
   return (
