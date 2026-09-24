@@ -92,6 +92,11 @@ describe('POST /api/releases/:id/rollback', () => {
     db.close();
   });
 
+  it('rejects malformed release identifiers before repository access', async () => {
+    const response = await app.inject({ method: 'POST', url: '/api/releases/not-a-uuid/rollback', payload: {} });
+    expect(response.statusCode).toBe(422);
+  });
+
   it('rollback to most recent rolled-back release', async () => {
     const v1 = makeRelease(repo, 'cap1', 'prod', 1, 'alice');
     const v2 = makeRelease(repo, 'cap1', 'prod', 2, 'alice');

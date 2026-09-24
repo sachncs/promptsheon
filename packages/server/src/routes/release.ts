@@ -9,7 +9,7 @@ import {
 import type { ReleaseRepo } from '../repos/release.js';
 import type { ReleaseOverlayRepo } from '../repos/release-overlay.js';
 import { ManifestRepo } from '../repos/manifest.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import { AuditChain } from '../audit/chain.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { selectByCanary } from '../application/canary-routing.js';
@@ -51,6 +51,8 @@ const CanaryRuleSchema = z.object({
   segmentExpr: z.string().optional(),
   windowSeconds: z.number().int().min(0).max(86400).optional(),
 });
+
+const ReleaseParamsSchema = z.object({ id: z.string().uuid() });
 
 const MIN_APPROVERS = 2;
 
@@ -120,7 +122,9 @@ export function registerReleaseRoutes(
   app.get('/api/releases/:id', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const item = repo.findByIdInOrg(id, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
     return reply.send(item);
@@ -129,7 +133,9 @@ export function registerReleaseRoutes(
   app.get('/api/releases/:id/transitions', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     if (!repo.findByIdInOrg(id, organizationId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
     }
@@ -139,7 +145,9 @@ export function registerReleaseRoutes(
   app.get('/api/releases/:id/notes', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const item = repo.findByIdInOrg(id, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
     const previous = repo.findPreviousActiveInOrg(
@@ -214,7 +222,9 @@ export function registerReleaseRoutes(
   app.post('/api/releases/:id/transition', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, TransitionSchema, request.body);
     if (!parsed.ok) return;
     const existing = repo.findByIdInOrg(id, organizationId);
@@ -261,7 +271,9 @@ export function registerReleaseRoutes(
   app.put('/api/releases/:id/overlay', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, OverlaySchema, request.body);
     if (!parsed.ok) return;
     if (!repo.findByIdInOrg(id, organizationId)) {
@@ -277,7 +289,9 @@ export function registerReleaseRoutes(
   app.get('/api/releases/:id/overlay', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     if (!repo.findByIdInOrg(id, organizationId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
     }
@@ -290,7 +304,9 @@ export function registerReleaseRoutes(
   app.put('/api/releases/:id/canary-rule', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, CanaryRuleSchema, request.body);
     if (!parsed.ok) return;
     if (!repo.findByIdInOrg(id, organizationId)) {
@@ -313,7 +329,9 @@ export function registerReleaseRoutes(
   app.put('/api/releases/:id/canary', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, CanaryBodySchema, request.body);
     if (!parsed.ok) return;
     const item = repo.findByIdInOrg(id, organizationId);
@@ -335,7 +353,9 @@ export function registerReleaseRoutes(
   app.post('/api/releases/:id/rollback', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const current = repo.findByIdInOrg(id, organizationId);
     if (!current) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
 

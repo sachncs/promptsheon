@@ -153,7 +153,7 @@ describe('POST /api/releases/:id/transition (approval gate)', () => {
   });
 
   it('returns 404 for unknown release', async () => {
-    const response = await app.inject({ method: 'POST', url: '/api/releases/nonexistent/transition', payload: { to: 'active' } });
+    const response = await app.inject({ method: 'POST', url: '/api/releases/00000000-0000-4000-8000-000000000000/transition', payload: { to: 'active' } });
     expect(response.statusCode).toBe(404);
   });
 });
