@@ -167,32 +167,32 @@ export default function AlertRulesPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
+            rows={rows}
+            rowKey={(r) => r.id}
             columns={[
-              { key: 'name', header: 'Name', render: (r) => <code className="font-mono text-xs">{String(r['name'] ?? '—')}</code> },
-              { key: 'type', header: 'Type', render: (r) => <Badge>{String(r['type'] ?? '—')}</Badge> },
-              { key: 'severity', header: 'Severity', render: (r) => <Badge>{String(r['severity'] ?? '—')}</Badge> },
+              { key: 'name', header: 'Name', render: (r) => <code className="font-mono text-xs">{r.name ?? '—'}</code> },
+              { key: 'type', header: 'Type', render: (r) => <Badge>{r.type ?? '—'}</Badge> },
+              { key: 'severity', header: 'Severity', render: (r) => <Badge>{r.severity ?? '—'}</Badge> },
               {
                 key: 'threshold',
                 header: 'Threshold',
-                render: (r) => r['threshold'] !== undefined ? <span className="font-mono text-xs">{String(r['threshold'])}</span> : '—',
+                render: (r) => r.threshold !== undefined ? <span className="font-mono text-xs">{r.threshold}</span> : '—',
               },
               {
                 key: 'window',
                 header: 'Window',
-                render: (r) => r['window'] !== undefined ? `${String(r['window'])}s` : '—',
+                render: (r) => r.window !== undefined ? `${r.window}s` : '—',
               },
               {
                 key: 'created',
                 header: 'Created',
-                render: (r) => r['createdAt'] ? new Date(String(r['createdAt'])).toLocaleDateString() : '—',
+                render: (r) => r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—',
               },
               {
                 key: 'actions',
                 header: '',
                 render: (r) => (
-                  <Button size="sm" variant="outline" onClick={() => remove.mutate(String(r['id']))}>
+                  <Button size="sm" variant="outline" onClick={() => remove.mutate(r.id)}>
                     <Trash2 className="mr-1 size-3" />
                     Delete
                   </Button>
