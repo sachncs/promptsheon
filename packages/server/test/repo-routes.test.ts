@@ -78,7 +78,11 @@ describe('repository / branch / file / commit round-trip', () => {
         branchRepo,
         tagRepo,
       });
-      await registerContentsRoutes(instance, { repoRepo, branchRepo, repoStore });
+      await registerContentsRoutes(instance, {
+        repositoryService: new RepositoryService(repoRepo),
+        branchRepo,
+        repoStore,
+      });
       await registerCommitRoutes(instance, { repoRepo, branchRepo, repoStore, commitRepo });
     });
     await app.ready();

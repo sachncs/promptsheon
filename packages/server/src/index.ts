@@ -333,7 +333,6 @@ async function main() {
       tagRepo: repos.tag,
     },
     contentsDeps: {
-      repoRepo: repos.repo,
       branchRepo: repos.branch,
       repoStore: repos.repoStore,
     },

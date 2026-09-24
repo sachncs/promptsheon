@@ -2,9 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { normalizePath } from '../repo/path.js';
-import type { RepoRepo } from '../repos/repo.js';
 import type { RepoStore } from '../repos/repo-store.js';
 import type { BranchRepo } from '../repos/branch.js';
+import type { RepositoryService } from '../application/repository-service.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
@@ -37,14 +37,13 @@ const FileParamsSchema = z.object({
 });
 
 export interface ContentsDeps {
-  repoRepo: RepoRepo;
+  repositoryService: RepositoryService;
   branchRepo: BranchRepo;
   repoStore: RepoStore;
 }
 
-function repositoryForRequest(repoRepo: RepoRepo, request: FastifyRequest, id: string) {
-  const organizationId = request.orgContext?.orgId;
-  return organizationId ? repoRepo.findByIdInOrg(id, organizationId) : repoRepo.findById(id);
+function repositoryForRequest(repositoryService: RepositoryService, request: FastifyRequest, id: string) {
+  return repositoryService.get(id, request.orgContext?.orgId);
 }
 
 export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps): void {
@@ -54,7 +53,7 @@ export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps)
     const { id } = parsedParams.data;
     const parsed = parseQuery(reply, ListQuerySchema, request.query);
     if (!parsed.ok) return;
-    if (!repositoryForRequest(deps.repoRepo, request, id)) {
+    if (!repositoryForRequest(deps.repositoryService, request, id)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     }
     return reply.send(deps.repoStore.list(id, parsed.data.ref));
@@ -76,7 +75,7 @@ export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps)
     const { ref } = parsed.data;
     const path = normalizePath(pathRaw);
     if (!path) return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'path required' } });
-    if (!repositoryForRequest(deps.repoRepo, request, id)) {
+    if (!repositoryForRequest(deps.repositoryService, request, id)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     }
     const meta = deps.repoStore.getFile(id, ref, path);
@@ -108,7 +107,7 @@ export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps)
     if (!parsedB.ok) return;
     const path = normalizePath(pathRaw ?? parsedB.data.path);
     if (!path) return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'path required' } });
-    const repo = repositoryForRequest(deps.repoRepo, request, id);
+    const repo = repositoryForRequest(deps.repositoryService, request, id);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     const ref = parsedQ.data.ref;
     const entry = deps.repoStore.putFile(
@@ -137,7 +136,7 @@ export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps)
     if (!parsed.ok) return;
     const path = normalizePath(pathRaw);
     if (!path) return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'path required' } });
-    if (!repositoryForRequest(deps.repoRepo, request, id)) {
+    if (!repositoryForRequest(deps.repositoryService, request, id)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     }
     const ok = deps.repoStore.deleteFile(id, parsed.data.ref, path);
