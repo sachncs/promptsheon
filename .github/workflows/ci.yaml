@@ -14,6 +14,7 @@ jobs:
   typecheck:
     name: TypeScript Type-Check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -34,6 +35,7 @@ jobs:
   test:
     name: Server Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: typecheck
     steps:
       - uses: actions/checkout@v7
@@ -48,6 +50,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: typecheck
     steps:
       - uses: actions/checkout@v7
@@ -62,6 +65,7 @@ jobs:
   e2e:
     name: Browser Smoke Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [typecheck, test, build]
     steps:
       - uses: actions/checkout@v7
@@ -81,6 +85,7 @@ jobs:
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: [test, build]
     if: github.event_name == 'push'
     steps:
