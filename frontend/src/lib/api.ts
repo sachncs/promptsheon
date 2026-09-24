@@ -196,6 +196,23 @@ export interface SearchResult {
   body: string;
 }
 
+export type AlertSeverity = 'info' | 'warning' | 'critical';
+export type AlertStatus = 'active' | 'resolved';
+
+export interface Alert {
+  id: string;
+  ruleId: string | null;
+  ruleName: string;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  message: string;
+  details: string | null;
+  triggeredAt: string;
+  resolvedAt: string | null;
+  acknowledgedAt: string | null;
+  acknowledgedBy: string | null;
+}
+
 const CostRollupSchema = z.object({
   capabilityId: z.string(),
   day: z.string(),
@@ -306,6 +323,20 @@ const SearchResultSchema = z.object({
   body: z.string(),
 });
 
+const AlertSchema = z.object({
+  id: z.string(),
+  ruleId: z.string().nullable(),
+  ruleName: z.string(),
+  severity: z.enum(['info', 'warning', 'critical']),
+  status: z.enum(['active', 'resolved']),
+  message: z.string(),
+  details: z.string().nullable(),
+  triggeredAt: z.string(),
+  resolvedAt: z.string().nullable(),
+  acknowledgedAt: z.string().nullable(),
+  acknowledgedBy: z.string().nullable(),
+});
+
 function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
   return unwrapList<unknown>(raw).map((entry) => {
     const parsed = VaultKeyringEntrySchema.safeParse(entry);
@@ -413,6 +444,12 @@ function parseCapabilityManifest(raw: unknown): CapabilityManifestResponse {
 function parseSearchResults(raw: unknown): SearchResult[] {
   const parsed = z.array(SearchResultSchema).safeParse(unwrapList<unknown>(raw));
   if (!parsed.success) throw new ApiError('The server returned invalid search results.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseAlerts(raw: unknown): Alert[] {
+  const parsed = z.array(AlertSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid alert data.', { code: 'INVALID_RESPONSE' });
   return parsed.data;
 }
 
@@ -678,7 +715,10 @@ export const alertApi = {
   createRule: (data: { name: string; type: string; severity: string; threshold?: number; window?: number }) =>
     client.post('/alert-rules', data),
   deleteRule: (id: string) => client.delete(`/alert-rules/${id}`),
-  listAlerts: () => client.get('/alerts'),
+  listAlerts: async (): Promise<{ data: Alert[] }> => {
+    const r = await client.get<unknown>('/alerts');
+    return { data: parseAlerts(r.data) };
+  },
   acknowledge: (id: string) => client.put(`/alerts/${id}/acknowledge`),
 };
 
