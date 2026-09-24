@@ -112,18 +112,22 @@ function NavGroupSection({
     (item) => pathname === item.href || pathname.startsWith(item.href + '/'),
   );
   const [open, setOpen] = React.useState(hasActive);
+  const groupId = `navigation-${group.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
   return (
     <div className={cn('py-2', !last && 'border-b border-border-subtle')}>
       <button
+        type="button"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={groupId}
         className="flex w-full items-center justify-between px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle hover:text-text-muted"
       >
         <span>{group.label}</span>
         {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
       </button>
       {open && (
-        <nav className="space-y-0.5 px-2">
+        <nav id={groupId} aria-label={`${group.label} navigation`} className="space-y-0.5 px-2">
           {group.items.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
@@ -180,6 +184,15 @@ export function AppSidebar({
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
+
+  React.useEffect(() => {
+    if (!mobileOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onMobileClose?.();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [mobileOpen, onMobileClose]);
 
   return (
     <>
