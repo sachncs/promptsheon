@@ -12,7 +12,7 @@ import {
 } from '../application/execution-replay-service.js';
 import { ReplayInputsUnavailableError } from '../repos/execution.js';
 import { selectByCanary } from './release.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import type { Manifest } from '@promptsheon/shared';
 import { NotFoundError } from '@promptsheon/shared';
 import { createHash } from 'node:crypto';
@@ -30,6 +30,10 @@ const ExecuteManifestSchema = z.object({
   inputs: z.record(z.string(), z.unknown()),
   environment: z.string().optional().default('dev'),
   traceId: z.string().optional(),
+});
+
+const ExecutionParamsSchema = z.object({
+  id: z.string().min(1).max(200),
 });
 
 function hashInputs(inputs: Record<string, unknown>): string {
@@ -73,7 +77,9 @@ export function registerExecutionRoutes(
   });
 
   app.get('/api/executions/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsed = parseParams(reply, ExecutionParamsSchema, request.params);
+    if (!parsed.ok) return;
+    const { id } = parsed.data;
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
     const item = deps.executionRepo.findByIdInOrg(id, organizationId);
@@ -197,7 +203,9 @@ export function registerExecutionRoutes(
    *  - 422: the original is replayed against a manifest that's now invalid.
    */
   app.post('/api/executions/:id/replay', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsed = parseParams(reply, ExecutionParamsSchema, request.params);
+    if (!parsed.ok) return;
+    const { id } = parsed.data;
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
     if (!deps.executionRepo.findByIdInOrg(id, organizationId)) {
@@ -245,7 +253,9 @@ export function registerExecutionRoutes(
    * attempt (success, divergence, failure) with its outcome and diff.
    */
   app.get('/api/executions/:id/replays', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsed = parseParams(reply, ExecutionParamsSchema, request.params);
+    if (!parsed.ok) return;
+    const { id } = parsed.data;
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
     if (!deps.executionRepo.findByIdInOrg(id, organizationId)) {
