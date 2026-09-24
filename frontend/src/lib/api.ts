@@ -13,9 +13,7 @@ export class ApiError extends Error {
   }
 }
 
-export function getErrorMessage(error: unknown, fallback = 'Something went wrong.'): string {
-  return error instanceof Error && error.message.trim() !== '' ? error.message : fallback;
-}
+export { getErrorMessage } from './errors';
 
 const client = axios.create({
   baseURL: '/api',
@@ -98,14 +96,24 @@ export function unwrapFirst<T>(raw: unknown, pluralKey?: string): T | null {
 
 export function subscribeSSE(channel: string, onEvent: (event: unknown) => void): () => void {
   if (typeof window === 'undefined') return () => undefined;
+  const encodedChannel = encodeURIComponent(channel.trim());
+  if (encodedChannel === '') return () => undefined;
   let cancelled = false;
   let active: EventSource | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   const open = () => {
     if (cancelled) return;
-    active = new EventSource(`/api/events/${channel}`);
-    active.onmessage = (e) => onEvent(JSON.parse(e.data));
+    active = new EventSource(`/api/events/${encodedChannel}`);
+    active.onmessage = (e) => {
+      let payload: unknown;
+      try {
+        payload = JSON.parse(e.data) as unknown;
+      } catch {
+        payload = { raw: e.data };
+      }
+      onEvent(payload);
+    };
     active.onerror = () => {
       active?.close();
       active = null;
