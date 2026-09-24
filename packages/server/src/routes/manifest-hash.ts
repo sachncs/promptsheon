@@ -25,7 +25,7 @@ export function registerManifestHashRoutes(app: FastifyInstance, deps: { manifes
         },
       });
     }
-    const manifest = parsed.data as unknown as Parameters<typeof deps.manifestRepo.create>[0];
+    const manifest = parsed.data;
     const meta = manifest.metadata as Record<string, unknown>;
     const goal = typeof meta['goal'] === 'string' ? meta['goal'] : '';
     const createdBy = typeof meta['createdBy'] === 'string' ? meta['createdBy'] : 'unknown';

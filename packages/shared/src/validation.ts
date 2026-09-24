@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Manifest, SubCapabilityManifest } from './types/manifest.js';
 
 export const CreateWorkspaceSchema = z.object({
   name: z.string().min(1).max(255),
@@ -138,9 +139,9 @@ export const ManifestEdgeSchema = z.object({
   mapping: z.record(z.string(), z.string()).default({}),
 });
 
-export type ManifestNodeInput = z.infer<typeof SubCapabilityManifestSchema>;
+export type ManifestNodeInput = SubCapabilityManifest;
 
-export const SubCapabilityManifestSchema: z.ZodType<unknown> = z.lazy(() =>
+export const SubCapabilityManifestSchema: z.ZodType<SubCapabilityManifest> = z.lazy(() =>
   z.object({
     id: z.string().min(1),
     name: z.string().min(1),
@@ -160,7 +161,7 @@ export const SubCapabilityManifestSchema: z.ZodType<unknown> = z.lazy(() =>
   }),
 );
 
-export const ManifestSchema = z.object({
+export const ManifestSchema: z.ZodType<Manifest> = z.object({
   id: z.string().min(1),
   version: z.number().int().min(1),
   prompt: PromptConfigSchema,
