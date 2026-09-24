@@ -30,15 +30,31 @@ function envString(key: string, fallback: string): string {
 function envInt(key: string, fallback: number): number {
   const raw = process.env[key];
   if (!raw) return fallback;
-  const n = Number.parseInt(raw, 10);
-  if (Number.isNaN(n)) return fallback;
+  if (!/^-?\d+$/.test(raw.trim())) {
+    throw new Error(`${key} must be an integer`);
+  }
+  const n = Number(raw);
+  if (!Number.isSafeInteger(n)) {
+    throw new Error(`${key} must be a safe integer`);
+  }
   return n;
 }
 
 function envBool(key: string, fallback: boolean): boolean {
   const raw = process.env[key];
   if (!raw) return fallback;
-  return raw === '1' || raw === 'true' || raw === 'yes';
+  switch (raw.trim().toLowerCase()) {
+    case '1':
+    case 'true':
+    case 'yes':
+      return true;
+    case '0':
+    case 'false':
+    case 'no':
+      return false;
+    default:
+      throw new Error(`${key} must be a boolean`);
+  }
 }
 
 export function loadConfig(): AppConfig {
