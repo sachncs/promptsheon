@@ -1,10 +1,43 @@
 import type { Capability } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
-import { BaseRepo, camelize, type Paginated } from './base.js';
+import { z } from 'zod';
+import { BaseRepo, type Paginated } from './base.js';
 
-function toCapability(row: Record<string, unknown>): Capability {
-  const value = camelize(row) as unknown as Capability;
-  return { ...value, selfEvolveEnabled: Boolean(row.self_evolve_enabled) };
+const CapabilityRowSchema = z.object({
+  id: z.string(),
+  project_id: z.string(),
+  name: z.string(),
+  description: z.string().nullish().transform((value) => value ?? ''),
+  created_at: z.string(),
+  updated_at: z.string(),
+  self_evolve_enabled: z.union([z.number().int(), z.boolean()]),
+  self_evolve_min_score: z.number().min(0).max(1),
+  self_evolve_max_revisions: z.number().int().nonnegative(),
+  self_evolve_cooldown_sec: z.number().int().nonnegative(),
+  self_evolve_target_env: z.string(),
+  self_evolve_dataset_id: z.string().nullish().transform((value) => value ?? ''),
+});
+
+const CountSchema = z.object({ count: z.number().int().nonnegative() });
+
+function toCapability(row: unknown): Capability {
+  const value = CapabilityRowSchema.parse(row);
+  return {
+    id: value.id,
+    projectId: value.project_id,
+    name: value.name,
+    description: value.description,
+    createdAt: value.created_at,
+    updatedAt: value.updated_at,
+    selfEvolveEnabled: typeof value.self_evolve_enabled === 'boolean'
+      ? value.self_evolve_enabled
+      : value.self_evolve_enabled === 1,
+    selfEvolveMinScore: value.self_evolve_min_score,
+    selfEvolveMaxRevisions: value.self_evolve_max_revisions,
+    selfEvolveCooldownSec: value.self_evolve_cooldown_sec,
+    selfEvolveTargetEnv: value.self_evolve_target_env,
+    selfEvolveDatasetId: value.self_evolve_dataset_id,
+  };
 }
 
 export class CapabilityRepo extends BaseRepo<Capability> {
@@ -13,14 +46,21 @@ export class CapabilityRepo extends BaseRepo<Capability> {
   }
 
   override findById(id: string): Capability | null {
-    const row = this.db.prepare('SELECT * FROM capabilities WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    const row = this.db.prepare('SELECT * FROM capabilities WHERE id = ?').get(id);
     return row ? toCapability(row) : null;
+  }
+
+  override findMany(opts: { page: number; pageSize: number }): Paginated<Capability> {
+    const total = CountSchema.parse(this.db.prepare('SELECT COUNT(*) AS count FROM capabilities').get()).count;
+    const rows = this.db.prepare('SELECT * FROM capabilities LIMIT ? OFFSET ?')
+      .all(opts.pageSize, (opts.page - 1) * opts.pageSize);
+    return { items: rows.map(toCapability), total };
   }
 
   findByProjectId(projectId: string): Capability[] {
     return this.db.prepare('SELECT * FROM capabilities WHERE project_id = ?')
       .all(projectId)
-      .map((row) => toCapability(row as Record<string, unknown>));
+      .map(toCapability);
   }
 
   findByProjectIdInOrg(projectId: string, organizationId: string): Capability[] {
@@ -28,7 +68,7 @@ export class CapabilityRepo extends BaseRepo<Capability> {
       `SELECT c.* FROM capabilities c JOIN projects p ON p.id = c.project_id
        JOIN workspaces w ON w.id = p.workspace_id
        WHERE c.project_id = ? AND w.org_id = ? ORDER BY c.created_at DESC`,
-    ).all(projectId, organizationId).map((row) => toCapability(row as Record<string, unknown>));
+    ).all(projectId, organizationId).map(toCapability);
   }
 
   findByIdInOrg(id: string, organizationId: string): Capability | null {
@@ -36,16 +76,16 @@ export class CapabilityRepo extends BaseRepo<Capability> {
       `SELECT c.* FROM capabilities c JOIN projects p ON p.id = c.project_id
        JOIN workspaces w ON w.id = p.workspace_id
        WHERE c.id = ? AND w.org_id = ?`,
-    ).get(id, organizationId) as Record<string, unknown> | undefined;
+    ).get(id, organizationId);
     return row ? toCapability(row) : null;
   }
 
   findManyInOrg(organizationId: string, opts: { page: number; pageSize: number }): Paginated<Capability> {
     const joins = ' FROM capabilities c JOIN projects p ON p.id = c.project_id JOIN workspaces w ON w.id = p.workspace_id WHERE w.org_id = ?';
-    const total = (this.db.prepare(`SELECT COUNT(*) AS count${joins}`).get(organizationId) as { count: number }).count;
+    const total = CountSchema.parse(this.db.prepare(`SELECT COUNT(*) AS count${joins}`).get(organizationId)).count;
     const rows = this.db.prepare(`SELECT c.*${joins} ORDER BY c.created_at DESC LIMIT ? OFFSET ?`)
-      .all(organizationId, opts.pageSize, (opts.page - 1) * opts.pageSize) as Array<Record<string, unknown>>;
-    return { items: rows.map((row) => toCapability(row)), total };
+      .all(organizationId, opts.pageSize, (opts.page - 1) * opts.pageSize);
+    return { items: rows.map(toCapability), total };
   }
 
   createInOrg(data: { projectId: string; name: string; description?: string }, organizationId: string): Capability | null {
