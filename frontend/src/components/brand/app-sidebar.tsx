@@ -165,7 +165,7 @@ export function AppSidebar({
 
   const workspaces = useQuery({
     queryKey: ['workspaces'],
-    queryFn: () => workspaceApi.list(1).then((r) => r.data).catch(() => []),
+    queryFn: () => workspaceApi.list(1).then((r) => r.data),
   });
   const workspaceList = Array.isArray(workspaces.data) ? workspaces.data as Array<{ id: string; name?: string }> : [];
   const currentWsId = session?.orgId ?? workspaceList[0]?.id;
@@ -201,7 +201,18 @@ export function AppSidebar({
         </Link>
       </div>
 
-      {workspaceList.length > 0 && (
+      {workspaces.isError ? (
+        <div className="border-b border-border-subtle p-3">
+          <div className="text-xs text-destructive">Unable to load workspaces.</div>
+          <button
+            type="button"
+            className="mt-2 text-xs font-medium text-brand-highlight hover:underline"
+            onClick={() => void workspaces.refetch()}
+          >
+            Try again
+          </button>
+        </div>
+      ) : workspaceList.length > 0 && (
         <div className="border-b border-border-subtle p-3">
           <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle">Workspace</div>
           <div className="mt-2">
