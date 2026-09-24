@@ -30,8 +30,8 @@ const PUBLIC_PATHS = new Set([
  *
  *  - `Authorization: Bearer <token>` → sha256 lookup in api_keys.
  *  - `Authorization: SVID <token>`   → ed25519 verification against
- *    the operator signing key (env var
- *    `PROMPTSHEON_SVID_PUBLIC_KEY_PEM` for v1; the per-org signing
+ *    the operator signing key (`PROMPTSHEON_SVID_PUBLIC_KEY_PEM`
+ *    resolved at startup for v1; the per-org signing
  *    key lookup wires in through SigningKeyRepo in AG-7). On
  *    success the request is stamped with `principal: 'Agent'`
  *    + the SVID subject + org + classification so the Cedar
@@ -47,14 +47,14 @@ const PUBLIC_PATHS = new Set([
  * bypass the auth check and tag the request as `bootstrap` or
  * `public`. The SVID route (`/api/identity/...`) is registered
  * AFTER this middleware and depends on the
- * `PROMPTSHEON_SVID_PUBLIC_KEY_PEM` env var to be set.
+ * startup config to be set.
  */
 export function authMiddleware(
   config: AppConfig,
   apiKeyRepo: ApiKeyRepo,
   opts: { svidPublicKeyPem?: string } = {},
 ) {
-  const svidPublicKeyPem = opts.svidPublicKeyPem ?? process.env['PROMPTSHEON_SVID_PUBLIC_KEY_PEM'];
+  const svidPublicKeyPem = opts.svidPublicKeyPem;
   return async (request: FastifyRequest, reply: FastifyReply) => {
     if (request.url.startsWith(BOOTSTRAP_PREFIX)) {
       request.userId = 'bootstrap';

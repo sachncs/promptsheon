@@ -92,6 +92,7 @@ export function loadConfig(): AppConfig {
       enabled: envBool('PROMPTSHEON_AUTH', false),
       jwtSecret: envString('PROMPTSHEON_JWT_SECRET', ''),
       scimBearerToken: envString('PROMPTSHEON_SCIM_TOKEN', ''),
+      svidPublicKeyPem: process.env['PROMPTSHEON_SVID_PUBLIC_KEY_PEM'] || undefined,
     },
     selfEvolve: {
       enabled: envBool('PROMPTSHEON_SELF_EVOLVE_ENABLED', false),

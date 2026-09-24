@@ -233,7 +233,12 @@ async function main() {
     ],
   );
 
-  app.addHook('preHandler', authMiddleware(config, repos.apiKey));
+  app.addHook(
+    'preHandler',
+    authMiddleware(config, repos.apiKey, config.auth.svidPublicKeyPem
+      ? { svidPublicKeyPem: config.auth.svidPublicKeyPem }
+      : {}),
+  );
   app.addHook('preHandler', orgContextMiddleware({ membershipRepo: repos.membership }));
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {

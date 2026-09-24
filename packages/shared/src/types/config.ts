@@ -49,6 +49,8 @@ export interface AppConfig {
     jwtSecret: string;
     /** Optional SCIM bearer token, loaded only at the composition root. */
     scimBearerToken?: string;
+    /** Optional SVID verification key, loaded only at the composition root. */
+    svidPublicKeyPem?: string;
   };
   selfEvolve: {
     enabled: boolean;
