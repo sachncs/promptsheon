@@ -41,7 +41,7 @@ describe('audit routes', () => {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     });
     app.addHook('preHandler', (request, _reply, done) => {
-      (request as Record<string, unknown>)['orgContext'] = { orgId: 'org-1' };
+      request.orgContext = { userId: 'u-test', orgId: 'org-1', role: 'admin' };
       done();
     });
     await app.register(async (instance) => {

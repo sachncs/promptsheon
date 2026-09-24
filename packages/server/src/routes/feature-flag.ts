@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { parseBody, parseParams } from './validate.js';
 import type { FeatureFlagRepo } from '../repos/feature-flag.js';
@@ -19,13 +19,8 @@ const FeatureFlagNameParamsSchema = z.object({
   name: z.string().trim().min(1).max(120).regex(/^[a-z0-9._-]+$/),
 });
 
-interface RequestUserContext {
-  userId?: string;
-}
-
-function actorOf(request: unknown): string {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.userId ?? 'system';
+function actorOf(request: FastifyRequest): string {
+  return request.userId ?? 'system';
 }
 
 export function registerFeatureFlagRoutes(

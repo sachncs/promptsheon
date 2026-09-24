@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { createHash, randomBytes } from 'node:crypto';
 import type { ApiKeyRepo } from '../repos/api-key.js';
@@ -13,13 +13,8 @@ const CreateApiKeySchema = z.object({
 });
 const ApiKeyParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
 
-interface RequestUserContext {
-  userId?: string;
-}
-
-function actorOf(request: unknown): string {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.userId ?? 'system';
+function actorOf(request: FastifyRequest): string {
+  return request.userId ?? 'system';
 }
 
 /**

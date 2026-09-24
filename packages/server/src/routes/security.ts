@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { PromptScanRepo } from '../repos/prompt-scan.js';
 import { scan } from '../security/prompt-scanner.js';
@@ -10,44 +10,12 @@ const ScanTextSchema = z.object({
   resourceId: z.string().min(1).max(120).optional(),
 });
 
-interface RequestUserContext {
-  userId?: string;
-  agentOrgId?: string;
-  orgContext?: { organizationId?: string; orgId?: string };
+function orgOf(request: FastifyRequest): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
-interface RequestLike {
-  userId?: string;
-  agentOrgId?: string;
-  orgContext?: { organizationId?: string; orgId?: string };
-  headers: Record<string, string | string[] | undefined>;
-}
-
-function orgOf(request: unknown): string | null {
-  const req = request as RequestLike | undefined;
-  if (!req) return null;
-  if (req.orgContext?.organizationId) return req.orgContext.organizationId;
-  if (req.orgContext?.orgId) return req.orgContext.orgId;
-  if (req.agentOrgId) return req.agentOrgId;
-  // Headers remain a compatibility fallback for direct, auth-disabled
-  // route tests. Never let them override an authenticated principal.
-  if (req.userId) return null;
-  const raw = req.headers['x-org-id'];
-  if (typeof raw === 'string') return raw;
-  if (Array.isArray(raw) && typeof raw[0] === 'string') return raw[0];
-  return null;
-}
-
-function actorOf(request: unknown): string | null {
-  const req = request as RequestLike | undefined;
-  if (!req) return null;
-  if (req.userId) return req.userId;
-  // Headers remain a compatibility fallback only when no authenticated
-  // identity was established by the auth middleware.
-  const raw = req.headers['x-user-id'];
-  if (typeof raw === 'string') return raw;
-  if (Array.isArray(raw) && typeof raw[0] === 'string') return raw[0];
-  return null;
+function actorOf(request: FastifyRequest): string | null {
+  return request.userId ?? null;
 }
 
 const ListScansQuerySchema = z.object({

@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AuditChain } from '../audit/chain.js';
 import type { AuditReplicationService } from '../application/audit-replication-service.js';
@@ -32,9 +32,8 @@ const AuditReplicationFrameSchema = z.object({
  * Register audit-trail HTTP routes. Returns the immutable chain
  * (oldest first) and exposes verify() for tamper checks.
  */
-function organizationOf(request: unknown): string | undefined {
-  const ctx = (request as { orgContext?: { orgId?: string }; agentOrgId?: string } | undefined) ?? {};
-  return ctx.orgContext?.orgId ?? ctx.agentOrgId;
+function organizationOf(request: FastifyRequest): string | undefined {
+  return request.orgContext?.orgId ?? request.agentOrgId;
 }
 
 export function registerAuditRoutes(

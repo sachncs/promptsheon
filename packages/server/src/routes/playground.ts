@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { Gateway, GatewayRequest } from '../llm/gateway.js';
 import { parseBody, statusCodeOf } from './validate.js';
@@ -29,13 +29,8 @@ const SweepSchema = z.object({
   variants: z.array(SweepVariantSchema).min(1).max(10),
 });
 
-interface RequestUserContext {
-  userId?: string;
-}
-
-function actorOf(request: unknown): string {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.userId ?? 'unscoped';
+function actorOf(request: FastifyRequest): string {
+  return request.userId ?? 'unscoped';
 }
 
 /**

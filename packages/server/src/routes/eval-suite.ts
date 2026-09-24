@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
   cohensKappa,
@@ -14,12 +14,11 @@ import type { EvalSuiteService } from '../application/eval-suite-service.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
-function actorOf(request: unknown): string {
-  const ctx = (request as { userId?: string } | undefined) ?? {};
-  return ctx.userId ?? 'system';
+function actorOf(request: FastifyRequest): string {
+  return request.userId ?? 'system';
 }
 
-function organizationIdOf(request: { orgContext?: { orgId?: string }; agentOrgId?: string }): string | undefined {
+function organizationIdOf(request: FastifyRequest): string | undefined {
   return request.orgContext?.orgId ?? request.agentOrgId;
 }
 
