@@ -7,7 +7,7 @@ import type { AuditChain } from '../audit/chain.js';
 import type { UserRepo } from '../repos/user.js';
 import type { MembershipRepo } from '../repos/org.js';
 import type { VaultRepo } from '../repos/vault.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 
 interface RequestUserContext {
   userId?: string;
@@ -55,6 +55,15 @@ const ScimPatchSchema = z.object({
     path: z.string().optional(),
     value: z.unknown().optional(),
   })).min(1),
+});
+
+const TeamParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
+});
+
+const TeamMemberParamsSchema = z.object({
+  teamId: z.string().trim().min(1).max(255),
+  userId: z.string().trim().min(1).max(255),
 });
 
 /**
@@ -115,7 +124,9 @@ export function registerTeamRoutes(
   });
 
   app.post('/api/teams/:id/members', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, TeamParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const orgId = orgOf(request);
     if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT' } });
     const parsed = parseBody(reply, AddMemberSchema, request.body);
@@ -135,7 +146,9 @@ export function registerTeamRoutes(
   });
 
   app.delete('/api/teams/:teamId/members/:userId', async (request, reply) => {
-    const { teamId, userId } = request.params as { teamId: string; userId: string };
+    const parsedParams = parseParams(reply, TeamMemberParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { teamId, userId } = parsedParams.data;
     const orgId = orgOf(request);
     if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT' } });
     if (actorRole(request) !== 'admin') return reply.code(403).send({ error: { code: 'INSUFFICIENT_ROLE' } });
@@ -301,7 +314,9 @@ export function registerTeamRoutes(
     }
     const parsed = parseBody(reply, ScimPatchSchema, request.body);
     if (!parsed.ok) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, TeamParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const user = deps.userRepo.findByIdInOrg(id, orgId);
     if (!user) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'SCIM user not found' } });
     for (const operation of parsed.data.Operations) {
@@ -320,7 +335,9 @@ export function registerTeamRoutes(
     if (!deps.membershipRepo) {
       return reply.code(503).send({ error: { code: 'SCIM_NOT_CONFIGURED', message: 'SCIM persistence is not configured' } });
     }
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, TeamParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     if (!deps.membershipRepo.removeOrgMember(orgId, id)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'SCIM user not found' } });
     }

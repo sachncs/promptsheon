@@ -118,6 +118,17 @@ describe('Team + SCIM routes', () => {
       });
       expect(r.statusCode).toBe(422);
     });
+
+    it('rejects a blank team route parameter', async () => {
+      const { app } = buildApp('admin');
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/teams/%20/members',
+        payload: { userId: 'u1' },
+      });
+      expect(response.statusCode).toBe(422);
+      expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+    });
   });
 
   describe('team membership', () => {

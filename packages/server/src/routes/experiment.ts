@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import type { ExperimentRepo } from '../repos/experiment.js';
 
 const VariantSchema = z.object({
@@ -20,13 +20,23 @@ const ExperimentSummaryQuerySchema = z.object({
   bayesSamples: z.coerce.number().int().min(100).max(100_000).default(10_000),
 });
 
+const ReleaseParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
+});
+
+const VariantParamsSchema = z.object({
+  variantId: z.string().trim().min(1).max(255),
+});
+
 export interface ExperimentDeps {
   experimentRepo: ExperimentRepo;
 }
 
 export function registerExperimentRoutes(app: FastifyInstance, deps: ExperimentDeps): void {
   app.get('/api/releases/:id/experiments', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     return reply.send({
       variants: deps.experimentRepo.listVariants(id),
       assignments: deps.experimentRepo.listVariants(id).flatMap((v) =>
@@ -44,7 +54,9 @@ export function registerExperimentRoutes(app: FastifyInstance, deps: ExperimentD
    * "no data yet" is a normal experiment state.
    */
   app.get('/api/releases/:id/experiments/summary', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseQuery(reply, ExperimentSummaryQuerySchema, request.query);
     if (!parsed.ok) return;
     const { alpha, bayesSamples } = parsed.data;
@@ -56,7 +68,9 @@ export function registerExperimentRoutes(app: FastifyInstance, deps: ExperimentD
   });
 
   app.post('/api/releases/:id/experiments', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, VariantSchema, request.body);
     if (!parsed.ok) return;
     const variant = deps.experimentRepo.createVariant({
@@ -69,7 +83,9 @@ export function registerExperimentRoutes(app: FastifyInstance, deps: ExperimentD
   });
 
   app.post('/api/experiments/:variantId/assignments', async (request, reply) => {
-    const { variantId } = request.params as { variantId: string };
+    const parsedParams = parseParams(reply, VariantParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { variantId } = parsedParams.data;
     const parsed = parseBody(reply, AssignmentSchema, request.body);
     if (!parsed.ok) return;
     const a = deps.experimentRepo.recordAssignment({
