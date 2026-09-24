@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Cog, Save } from 'lucide-react';
 import { settingsApi, unwrapList } from '@/lib/api';
@@ -49,18 +49,16 @@ export default function SettingsPage() {
 
   const [draft, setDraft] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    const next: Record<string, string> = {};
-    for (const k of known) {
-      if (k.current !== undefined && k.current !== null) next[k.key] = String(k.current);
-      else next[k.key] = '';
-    }
-    setDraft(next);
-  }, [list.map((s) => `${s.key}:${String(s.value ?? '')}`).join('|')]);
-
   const save = useMutation({
     mutationFn: ({ key, value }: { key: string; value: unknown }) => settingsApi.set(key, value),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+    onSuccess: (_data, variables) => {
+      setDraft((previous) => {
+        const next = { ...previous };
+        delete next[variables.key];
+        return next;
+      });
+      void qc.invalidateQueries({ queryKey: ['settings'] });
+    },
   });
 
   if (!session) return null;
@@ -84,7 +82,9 @@ export default function SettingsPage() {
         />
         <div className="divide-y divide-border-subtle">
           {known.map((k) => {
-            const dirty = (draft[k.key] ?? '') !== (k.current !== undefined && k.current !== null ? String(k.current) : '');
+            const serverValue = k.current !== undefined && k.current !== null ? String(k.current) : '';
+            const value = draft[k.key] ?? serverValue;
+            const dirty = draft[k.key] !== undefined && value !== serverValue;
             return (
               <div key={k.key} className="grid grid-cols-1 items-start gap-3 px-5 py-4 md:grid-cols-12 md:items-center md:gap-4">
                 <div className="md:col-span-4">
@@ -93,8 +93,18 @@ export default function SettingsPage() {
                 </div>
                 <div className="md:col-span-5">
                   <Input
-                    value={draft[k.key] ?? ''}
-                    onChange={(e) => setDraft((prev) => ({ ...prev, [k.key]: e.target.value }))}
+                    value={value}
+                    onChange={(e) => {
+                      const nextValue = e.target.value;
+                      setDraft((previous) => {
+                        if (nextValue === serverValue) {
+                          const next = { ...previous };
+                          delete next[k.key];
+                          return next;
+                        }
+                        return { ...previous, [k.key]: nextValue };
+                      });
+                    }}
                     placeholder={k.placeholder}
                     className="font-mono text-sm"
                   />
@@ -110,7 +120,7 @@ export default function SettingsPage() {
                     disabled={!dirty || save.isPending}
                     aria-label={`Save ${k.label}`}
                     onClick={() => {
-                      const raw = draft[k.key] ?? '';
+                      const raw = value;
                       let parsed: unknown = raw;
                       const num = Number(raw);
                       if (!Number.isNaN(num) && raw.trim() !== '' && /^-?\d+(\.\d+)?$/.test(raw.trim())) {
