@@ -1,10 +1,42 @@
 import type { Release } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
-import { BaseRepo, camelize, type Paginated } from './base.js';
+import { z } from 'zod';
+import { BaseRepo, type Paginated } from './base.js';
 
-function toRelease(row: Record<string, unknown>): Release {
-  return camelize(row) as unknown as Release;
+const ReleaseRowSchema = z.object({
+  id: z.string(),
+  capability_id: z.string(),
+  capability_version: z.number().int().positive(),
+  capability_version_id: z.string().nullable(),
+  manifest: z.string(),
+  environment: z.enum(['dev', 'staging', 'prod']),
+  status: z.enum(['draft', 'review', 'approved', 'canary', 'active', 'rolled_back']),
+  approved_by: z.string(),
+  replaces_release_id: z.string().nullable(),
+  created_at: z.string(),
+  created_by: z.string(),
+  activated_at: z.string().nullable(),
+  canary_percent: z.number().int().min(0).max(100),
+});
+
+function toRelease(row: unknown): Release {
+  const value = ReleaseRowSchema.parse(row);
+  return {
+    id: value.id,
+    capabilityId: value.capability_id,
+    capabilityVersion: value.capability_version,
+    capabilityVersionId: value.capability_version_id,
+    manifest: value.manifest,
+    environment: value.environment,
+    status: value.status,
+    approvedBy: value.approved_by,
+    replacesReleaseId: value.replaces_release_id,
+    createdAt: value.created_at,
+    createdBy: value.created_by,
+    activatedAt: value.activated_at,
+    canaryPercent: value.canary_percent,
+  };
 }
 
 export class ReleaseRepo extends BaseRepo<Release> {
@@ -15,7 +47,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
   findByCapabilityId(capabilityId: string): Release[] {
     return this.db.prepare('SELECT * FROM releases WHERE capability_id = ?')
       .all(capabilityId)
-      .map((row) => toRelease(row as Record<string, unknown>));
+      .map(toRelease);
   }
 
   findByCapabilityIdInOrg(capabilityId: string, organizationId: string): Release[] {
@@ -27,7 +59,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
        WHERE r.capability_id = ? AND w.org_id = ?
        ORDER BY r.created_at DESC`,
     ).all(capabilityId, organizationId)
-      .map((row) => toRelease(row as Record<string, unknown>));
+      .map(toRelease);
   }
 
   findManyInOrg(
@@ -41,10 +73,12 @@ export class ReleaseRepo extends BaseRepo<Release> {
       JOIN workspaces w ON w.id = p.workspace_id
       WHERE w.org_id = ?${opts.status ? ' AND r.status = ?' : ''}`;
     const params = opts.status ? [organizationId, opts.status] : [organizationId];
-    const total = (this.db.prepare(`SELECT COUNT(*) AS count ${joins}`).get(...params) as { count: number }).count;
+    const total = z.object({ count: z.number().int().nonnegative() }).parse(
+      this.db.prepare(`SELECT COUNT(*) AS count ${joins}`).get(...params),
+    ).count;
     const rows = this.db.prepare(
       `SELECT r.* ${joins} ORDER BY r.created_at DESC LIMIT ? OFFSET ?`,
-    ).all(...params, opts.pageSize, (opts.page - 1) * opts.pageSize) as Array<Record<string, unknown>>;
+    ).all(...params, opts.pageSize, (opts.page - 1) * opts.pageSize);
     return { items: rows.map(toRelease), total };
   }
 
@@ -58,7 +92,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
          JOIN workspaces w ON w.id = p.workspace_id
          WHERE r.id = ? AND w.org_id = ?`,
       )
-      .get(id, organizationId) as Record<string, unknown> | undefined;
+      .get(id, organizationId);
     return row ? toRelease(row) : null;
   }
 
@@ -88,14 +122,14 @@ export class ReleaseRepo extends BaseRepo<Release> {
 
   findActive(capabilityId: string, environment: string): Release | null {
     const row = this.db.prepare("SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'active'")
-      .get(capabilityId, environment) as Record<string, unknown> | undefined;
+      .get(capabilityId, environment);
     return row ? toRelease(row) : null;
   }
 
   findByCapabilityAndEnv(capabilityId: string, environment: string): Release[] {
     return this.db.prepare('SELECT * FROM releases WHERE capability_id = ? AND environment = ?')
       .all(capabilityId, environment)
-      .map((row) => toRelease(row as Record<string, unknown>));
+      .map(toRelease);
   }
 
   create(data: { capabilityId: string; capabilityVersion: number; capabilityVersionId: string | null; manifest: string; environment: string; createdBy?: string; canaryPercent?: number }): Release {
@@ -199,13 +233,13 @@ export class ReleaseRepo extends BaseRepo<Release> {
   findActiveByCapabilityAndEnv(capabilityId: string, environment: string): Release[] {
     return this.db.prepare(
       "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'active'",
-    ).all(capabilityId, environment).map((row) => toRelease(row as Record<string, unknown>));
+    ).all(capabilityId, environment).map(toRelease);
   }
 
   findActiveByManifestHash(manifestHash: string): Release[] {
     const all = this.db.prepare(
       "SELECT * FROM releases WHERE status = 'active'",
-    ).all().map((row) => toRelease(row as Record<string, unknown>));
+    ).all().map(toRelease);
     return all.filter((r) => {
       try {
         const obj = JSON.parse(r.manifest) as Record<string, unknown>;
@@ -225,7 +259,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
        JOIN workspaces w ON w.id = p.workspace_id
        WHERE r.status = 'active' AND w.org_id = ?`,
     ).all(organizationId)
-      .map((row) => toRelease(row as Record<string, unknown>))
+      .map(toRelease)
       .filter((release) => {
         try {
           const manifest = JSON.parse(release.manifest) as Record<string, unknown>;
@@ -239,7 +273,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
   findPreviousActive(capabilityId: string, environment: string, currentVersion: number): Release | null {
     const row = this.db.prepare(
       "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'rolled_back' AND capability_version < ? ORDER BY capability_version DESC LIMIT 1",
-    ).get(capabilityId, environment, currentVersion) as Record<string, unknown> | undefined;
+    ).get(capabilityId, environment, currentVersion);
     return row ? toRelease(row) : null;
   }
 
@@ -253,7 +287,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
          AND r.status = 'rolled_back'
          AND r.capability_version < ? AND w.org_id = ?
        ORDER BY r.capability_version DESC LIMIT 1`,
-    ).get(capabilityId, environment, currentVersion, organizationId) as Record<string, unknown> | undefined;
+    ).get(capabilityId, environment, currentVersion, organizationId);
     return row ? toRelease(row) : null;
   }
 
