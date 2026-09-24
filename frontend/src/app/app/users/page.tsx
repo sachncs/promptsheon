@@ -24,6 +24,14 @@ interface UserItem {
 
 const ROLE_OPTIONS = ['admin', 'approver', 'editor', 'viewer'] as const;
 
+function currentUserIdOf(raw: unknown): string | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const user = (raw as { user?: unknown }).user;
+  if (!user || typeof user !== 'object') return undefined;
+  const id = (user as { id?: unknown }).id;
+  return typeof id === 'string' ? id : undefined;
+}
+
 export default function UsersPage() {
   const session = useRequireSession();
   const qc = useQueryClient();
@@ -47,8 +55,8 @@ export default function UsersPage() {
   if (me.isLoading) return <div className="text-sm text-text-muted">Loading member permissions…</div>;
   if (me.isError) return <QueryError message={me.error} onRetry={() => void me.refetch()} />;
 
-  const rows = (users.data ?? []) as UserItem[];
-  const meId = (me.data as { user?: { id?: string } }).user?.id;
+  const rows = users.data ?? [];
+  const meId = currentUserIdOf(me.data);
 
   return (
     <div className="space-y-6">
@@ -74,16 +82,16 @@ export default function UsersPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
+            rows={rows}
+            rowKey={(r) => r.id}
             columns={[
               {
                 key: 'name',
                 header: 'Name',
                 render: (r) => (
                   <div>
-                    <div className="font-medium text-text-strong">{String(r['name'] ?? r['email'] ?? '—')}</div>
-                    {r['email'] ? <div className="text-xs text-text-subtle">{String(r['email'])}</div> : null}
+                    <div className="font-medium text-text-strong">{r.name ?? r.email ?? '—'}</div>
+                    {r.email ? <div className="text-xs text-text-subtle">{r.email}</div> : null}
                   </div>
                 ),
               },
@@ -91,8 +99,8 @@ export default function UsersPage() {
                 key: 'role',
                 header: 'Role',
                 render: (r) => {
-                  const id = String(r['id']);
-                  const role = String(r['role'] ?? 'viewer');
+                  const id = r.id;
+                  const role = r.role ?? 'viewer';
                   const isMe = id === meId;
                   return (
                     <div className="flex items-center gap-2">
@@ -113,12 +121,12 @@ export default function UsersPage() {
               {
                 key: 'created',
                 header: 'Joined',
-                render: (r) => r['createdAt'] ? new Date(String(r['createdAt'])).toLocaleDateString() : '—',
+                render: (r) => r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—',
               },
               {
                 key: 'lastSeen',
                 header: 'Last seen',
-                render: (r) => r['lastSeenAt'] ? new Date(String(r['lastSeenAt'])).toLocaleString() : 'never',
+                render: (r) => r.lastSeenAt ? new Date(r.lastSeenAt).toLocaleString() : 'never',
               },
             ]}
           />
