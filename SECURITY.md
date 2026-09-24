@@ -1,9 +1,3 @@
----
-layout: page
-title: Security
-subtitle: Threat model, disclosure policy, and hardening layers.
----
-
 # Security
 
 Promptsheon ships with a documented threat model, a SOC2 control set, and a public audit chain. This page is the operator-facing summary. The full documents live in the repo.
@@ -87,6 +81,6 @@ Follow the disclosure process in [`SECURITY.md`](https://github.com/sachncs/prom
 
 | You want to… | Read this |
 |--------------|-----------|
-| Read the architecture | [Architecture]({{ '/architecture/' | relative_url }}) |
-| Hit the HTTP API | [API reference]({{ '/api-reference/' | relative_url }}) |
-| Understand the model | [Core concepts]({{ '/core-concepts/' | relative_url }}) |
+| Read the architecture | [Architecture](https://sachncs.github.io/promptsheon/docs/architecture/) |
+| Hit the HTTP API | [API reference](https://sachncs.github.io/promptsheon/docs/api/) |
+| Understand the model | [Quickstart](https://sachncs.github.io/promptsheon/docs/quickstart/) |

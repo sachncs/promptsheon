@@ -1,9 +1,3 @@
----
-layout: page
-title: Contributing
-subtitle: How to set up a dev environment, file issues, and submit changes.
----
-
 # Contributing
 
 Read [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) together with `AGENTS.md`
@@ -89,5 +83,5 @@ This project follows the [Contributor Covenant v2.1](https://github.com/sachncs/
 |--------------|-----------|
 | Read the engineering standards | [`AGENTS.md`](https://github.com/sachncs/promptsheon/blob/master/AGENTS.md) |
 | Read the engineering guide | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) |
-| Solve a specific problem | [FAQ]({{ '/faq/' | relative_url }}) |
-| Read the architecture | [Architecture]({{ '/architecture/' | relative_url }}) |
+| Solve a specific problem | [Troubleshooting](https://sachncs.github.io/promptsheon/docs/troubleshooting/) |
+| Read the architecture | [Architecture](https://sachncs.github.io/promptsheon/docs/architecture/) |

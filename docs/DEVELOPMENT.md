@@ -188,7 +188,7 @@ production databases and CAS paths. Production deployments should:
 - capture audit-chain verification and database/CAS backup checks in the
   operational runbook.
 
-See [`../configuration.md`](../configuration.md), [`../architecture.md`](../architecture.md), [`../SECURITY.md`](../SECURITY.md), and
+See the [native configuration and operations guide](https://sachncs.github.io/promptsheon/docs/operations/), the [architecture guide](https://sachncs.github.io/promptsheon/docs/architecture/), [`../SECURITY.md`](../SECURITY.md), and
 `docs/operations/` for deployment-specific details.
 
 ## Debugging and troubleshooting
