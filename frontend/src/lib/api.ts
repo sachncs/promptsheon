@@ -475,6 +475,14 @@ const RepositorySummarySchema = z.object({
   updatedAt: z.string(),
 });
 
+function parseRepository(raw: unknown): RepositorySummary {
+  const parsed = RepositorySummarySchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ApiError('The server returned invalid repository data.', { code: 'INVALID_RESPONSE' });
+  }
+  return parsed.data;
+}
+
 function parseRepositoryList(raw: unknown): RepositorySummary[] {
   const items = unwrapList<unknown>(raw);
   const parsed = z.array(RepositorySummarySchema).safeParse(items);
@@ -487,7 +495,7 @@ function parseRepositoryList(raw: unknown): RepositorySummary[] {
 export const repoApi = {
   list: (workspaceId: string): Promise<RepositorySummary[]> =>
     client.get<unknown>(`/repos?workspaceId=${encodeURIComponent(workspaceId)}`).then((r) => parseRepositoryList(r.data)),
-  get: (id: string) => client.get(`/repos/${id}`).then((r) => r.data),
+  get: (id: string): Promise<RepositorySummary> => client.get<unknown>(`/repos/${id}`).then((r) => parseRepository(r.data)),
   create: (input: {
     workspaceId: string;
     name: string;
@@ -501,7 +509,12 @@ export const repoApi = {
   listBranches: (repoId: string) => client.get(`/repos/${repoId}/branches`).then((r) => r.data),
   listTags: (repoId: string) => client.get(`/repos/${repoId}/tags`).then((r) => r.data),
   listContents: (repoId: string, ref = 'main') => client.get(`/repos/${repoId}/contents?ref=${encodeURIComponent(ref)}`).then((r) => r.data),
-  getFile: (repoId: string, path: string, ref = 'main') => client.get(`/repos/${repoId}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`),
+  getFile: (repoId: string, path: string, ref = 'main'): Promise<{ data: { content?: string | undefined } }> =>
+    client.get<unknown>(`/repos/${repoId}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`).then((r) => {
+      const parsed = z.object({ content: z.string().optional() }).safeParse(r.data);
+      if (!parsed.success) throw new ApiError('The server returned invalid file content.', { code: 'INVALID_RESPONSE' });
+      return { data: parsed.data };
+    }),
   putFile: (repoId: string, path: string, content: string, ref = 'main') =>
     client.put(`/repos/${repoId}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`, { path, content, ref }).then((r) => r.data),
   commit: (repoId: string, ref: string, message: string, parents?: string[]) =>

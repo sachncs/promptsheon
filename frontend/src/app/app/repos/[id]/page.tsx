@@ -82,7 +82,7 @@ export default function RepositoryDetail() {
     <div className="text-text-muted text-sm">Repository not found.</div>
   );
 
-  const r = repo.data as Record<string, unknown>;
+  const r = repo.data;
 
   return (
     <div className="space-y-6">
@@ -92,9 +92,9 @@ export default function RepositoryDetail() {
         </Link>
         <PageHeader
           eyebrow="Repository"
-          title={String(r['name'] ?? '—')}
-          subtitle={`Branch strategy default: ${String(r['defaultBranch'])}. Visibility ${String(r['visibility'])}. Approvers ${String(r['minApprovers'])}+ .`}
-          actions={<HashChip hash={String(r['id'])} length={32} />}
+          title={r.name}
+          subtitle={`Branch strategy default: ${r.defaultBranch}. Visibility ${r.visibility}. Approvers ${r.minApprovers}+ .`}
+          actions={<HashChip hash={r.id} length={32} />}
         />
       </div>
 
@@ -141,8 +141,7 @@ export default function RepositoryDetail() {
                     setViewOid(String(r['blobOid']));
                     try {
                       const r2 = await repoApi.getFile(id, path, ref);
-                      const d = r2.data as unknown as { content?: string };
-                      setViewContent(typeof d.content === 'string' ? d.content : '(binary)');
+                      setViewContent(r2.data.content ?? '(binary)');
                     } catch {
                       setViewContent('(failed to load)');
                     }
