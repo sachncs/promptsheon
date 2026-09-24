@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerExecutionRoutes } from '../src/routes/execution.js';
+import { ExecutionService } from '../src/application/execution-service.js';
+import { selectByCanary } from '../src/application/canary-routing.js';
 import { ExecutionRepo } from '../src/repos/execution.js';
-import { ReleaseRepo } from '../src/repos/release.js';
 import { ManifestRepo } from '../src/repos/manifest.js';
+import { TraceRepo } from '../src/repos/trace.js';
 import { ManifestGraphExecutor } from '../src/agents/executor/executor.js';
 import { SseHub } from '../src/sse/hub.js';
+import { ExecutionReplayService } from '../src/application/execution-replay-service.js';
 import { computeManifestHash } from '../src/repos/manifest.js';
 import { applyMigrations } from '@promptsheon/shared';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -85,6 +88,7 @@ describe('POST /api/executions', () => {
     insertTestData(db);
     manifestRepo = new ManifestRepo(db);
     executionRepo = new ExecutionRepo(db);
+    const traceRepo = new TraceRepo(db);
     hub = new SseHub();
     executor = new ManifestGraphExecutor({ config: buildConfig(), hub });
 
@@ -105,11 +109,16 @@ describe('POST /api/executions', () => {
     await app.register(async (instance) => {
       await registerExecutionRoutes(instance, {
         executionRepo,
-        manifestRepo,
-        executor,
+        executionService: new ExecutionService(
+          manifestRepo,
+          { findActiveByManifestHashInOrg: () => [{ id: 'rel-sse', canaryPercent: 0 }] },
+          traceRepo,
+          executionRepo,
+          executor,
+          selectByCanary,
+        ),
         sseHub: hub,
-        releaseRepo: { findActiveByManifestHashInOrg: () => [{ id: 'rel-sse', canaryPercent: 0 }] } as never,
-        traceRepo: { startRun: () => ({ id: 'stub-trace' }), finalize: () => undefined } as never,
+        replayService: new ExecutionReplayService(executionRepo, manifestRepo, traceRepo, executor),
       });
     });
     await app.ready();

@@ -12,6 +12,7 @@ import { ManifestRepo } from '../repos/manifest.js';
 import { parseBody, parseQuery } from './validate.js';
 import { AuditChain } from '../audit/chain.js';
 import { createHash, randomUUID } from 'node:crypto';
+import { selectByCanary } from '../application/canary-routing.js';
 
 const ListQuerySchema = PaginationSchema.extend({
   capabilityId: z.string().uuid().optional(),
@@ -101,23 +102,6 @@ export function approvalGate(
  * Each active release in the (capability, env) pool gets weight = canaryPercent.
  * Falls back to the only active release if there's only one.
  */
-export function selectByCanary(
-  pool: Array<{ id: string; canaryPercent: number }>,
-  rng: () => number = Math.random,
-): string | null {
-  if (pool.length === 0) return null;
-  if (pool.length === 1) return pool[0].id;
-  const total = pool.reduce((sum, r) => sum + r.canaryPercent, 0);
-  if (total <= 0) return pool[0].id;
-  const r = rng() * total;
-  let acc = 0;
-  for (const release of pool) {
-    acc += release.canaryPercent;
-    if (r < acc) return release.id;
-  }
-  return pool[pool.length - 1].id;
-}
-
 export function registerReleaseRoutes(
   app: FastifyInstance,
   repo: ReleaseRepo,

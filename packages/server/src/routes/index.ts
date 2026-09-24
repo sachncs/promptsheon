@@ -72,6 +72,8 @@ import { createTraceService } from '../application/trace-service.js';
 import { EvalSuiteService } from '../application/eval-suite-service.js';
 import { GraderRunner } from '../agents/evaluation/grader-runner.js';
 import { ExecutionReplayService } from '../application/execution-replay-service.js';
+import { ExecutionService } from '../application/execution-service.js';
+import { selectByCanary } from '../application/canary-routing.js';
 import type { LlmSettingsService } from '../application/llm-settings-service.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
@@ -193,10 +195,14 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   });
   registerExecutionRoutes(app, {
     executionRepo: deps.executionRepo,
-    releaseRepo: deps.releaseRepo,
-    manifestRepo: deps.manifestRepo,
-    traceRepo: deps.traceRepo,
-    executor: deps.executor,
+    executionService: new ExecutionService(
+      deps.manifestRepo,
+      deps.releaseRepo,
+      deps.traceRepo,
+      deps.executionRepo,
+      deps.executor,
+      selectByCanary,
+    ),
     replayService: new ExecutionReplayService(
       deps.executionRepo,
       deps.manifestRepo,

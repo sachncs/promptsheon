@@ -9,6 +9,8 @@ import { ExecutionRepo, ReplayInputsUnavailableError } from '../src/repos/execut
 import { ManifestRepo } from '../src/repos/manifest.js';
 import { TraceRepo } from '../src/repos/trace.js';
 import { registerExecutionRoutes } from '../src/routes/execution.js';
+import { ExecutionService } from '../src/application/execution-service.js';
+import { selectByCanary } from '../src/application/canary-routing.js';
 import { ManifestGraphExecutor } from '../src/agents/executor/executor.js';
 import { ExecutionReplayService } from '../src/application/execution-replay-service.js';
 import { SseHub } from '../src/sse/hub.js';
@@ -138,10 +140,14 @@ async function setupHarness(): Promise<TestHarness> {
   await app.register(async (instance) => {
     await registerExecutionRoutes(instance, {
       executionRepo,
-      releaseRepo: { findActiveByManifestHashInOrg: () => [] } as never,
-      manifestRepo,
-      traceRepo,
-      executor,
+      executionService: new ExecutionService(
+        manifestRepo,
+        { findActiveByManifestHashInOrg: () => [] },
+        traceRepo,
+        executionRepo,
+        executor,
+        selectByCanary,
+      ),
       replayService: new ExecutionReplayService(executionRepo, manifestRepo, traceRepo, executor),
     });
   });

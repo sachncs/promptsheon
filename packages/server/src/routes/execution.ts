@@ -1,21 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { ExecutionRepo } from '../repos/execution.js';
-import type { ReleaseRepo } from '../repos/release.js';
-import type { ManifestRepo } from '../repos/manifest.js';
-import type { TraceRepo } from '../repos/trace.js';
-import type { ManifestGraphExecutor } from '../agents/executor/index.js';
 import {
   ExecutionReplayService,
   ReplayManifestMissingError,
   ReplayNotFoundError,
 } from '../application/execution-replay-service.js';
 import { ReplayInputsUnavailableError } from '../repos/execution.js';
-import { selectByCanary } from './release.js';
+import type { ExecutionService } from '../application/execution-service.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
-import type { Manifest } from '@promptsheon/shared';
 import { NotFoundError } from '@promptsheon/shared';
-import { createHash } from 'node:crypto';
 import type { SseHub } from '../sse/hub.js';
 import { ExecutionSseStreamer } from '../sse/streamer.js';
 
@@ -36,10 +30,6 @@ const ExecutionParamsSchema = z.object({
   id: z.string().min(1).max(200),
 });
 
-function hashInputs(inputs: Record<string, unknown>): string {
-  return createHash('sha256').update(JSON.stringify(inputs)).digest('hex');
-}
-
 function organizationIdOf(request: { orgContext?: { orgId?: string }; agentOrgId?: string }): string | null {
   return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
@@ -58,10 +48,7 @@ export function registerExecutionRoutes(
   app: FastifyInstance,
   deps: {
     executionRepo: ExecutionRepo;
-    releaseRepo: ReleaseRepo;
-    manifestRepo: ManifestRepo;
-    traceRepo: TraceRepo;
-    executor: ManifestGraphExecutor;
+    executionService: ExecutionService;
     replayService: ExecutionReplayService;
     sseHub?: SseHub;
   },
@@ -93,21 +80,6 @@ export function registerExecutionRoutes(
     const { manifestHash, inputs, environment, traceId } = parsed.data;
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
-    const manifest = deps.manifestRepo.findByHashInOrg(manifestHash, organizationId);
-    if (!manifest) {
-      throw new NotFoundError('manifest', manifestHash);
-    }
-
-    // Canary routing: when multiple active releases exist for this
-    // manifest, distribute traffic by canaryPercent. With 0 or 1
-    // active release, no routing is needed.
-    const activeReleases = deps.releaseRepo.findActiveByManifestHashInOrg(manifestHash, organizationId);
-    const pickedReleaseId = selectByCanary(
-      activeReleases.map((r) => ({ id: r.id, canaryPercent: r.canaryPercent })),
-    );
-    if (activeReleases.length === 0) {
-      return reply.code(404).send({ error: { code: 'NO_ACTIVE_RELEASE', message: 'No active release for manifest' } });
-    }
 
     const executionId = crypto.randomUUID();
 
@@ -126,28 +98,29 @@ export function registerExecutionRoutes(
       request.raw.on('close', () => streamer.close());
     }
 
-    const traceRun = deps.traceRepo.startRun({
-      organizationId,
-      executionId,
-      environment,
-      name: `manifest:${manifestHash.slice(0, 12)}`,
-      model: manifest.model?.modelId ?? null,
-      attributes: { manifestHash, route: '/api/executions' },
-    });
     const controller = new AbortController();
     request.raw.on('close', () => {
       if (!controller.signal.aborted) controller.abort();
     });
     let trace;
     try {
-      trace = await deps.executor.execute(manifestHash, manifest, {
+      const result = await deps.executionService.run(manifestHash, organizationId, {
         executionId,
         inputs,
         environment,
         traceId,
         signal: controller.signal,
-        traceRunId: traceRun.id,
       });
+      if (result.kind === 'manifest-not-found') throw new NotFoundError('manifest', manifestHash);
+      if (result.kind === 'no-active-release') {
+        if (streamer) {
+          streamer.sendDone();
+          streamer.close();
+          return reply;
+        }
+        return reply.code(404).send({ error: { code: 'NO_ACTIVE_RELEASE', message: 'No active release for manifest' } });
+      }
+      trace = result;
     } catch (err) {
       // SSE: don't let the global error handler try to write a 500
       // — the response stream is already open.
@@ -158,27 +131,6 @@ export function registerExecutionRoutes(
       }
       throw err;
     }
-    deps.traceRepo.finalize(traceRun.id, trace.status === 'completed' ? 'success' : 'error', {
-      tokens: trace.totalTokens,
-      costUsd: trace.totalCost,
-    });
-    deps.executionRepo.create({
-      capabilityVersionId: manifest.id,
-      inputs: JSON.stringify(inputs),
-      inputHash: hashInputs(inputs),
-      outputs: JSON.stringify(trace.nodeResults),
-      model: manifest.model.modelId,
-      provider: manifest.model.provider,
-      latencyMs: trace.totalLatencyMs,
-      costUsd: trace.totalCost,
-      promptTokens: 0,
-      completionTokens: 0,
-      totalTokens: trace.totalTokens,
-      error: trace.error ?? '',
-      traceId: traceId ?? executionId,
-      environment,
-    });
-
     if (streamer) {
       // Final summary frame so consumers don't need to also fetch
       // /api/executions/:id. Closes the streamer afterwards.
@@ -187,7 +139,7 @@ export function registerExecutionRoutes(
       return reply;
     }
 
-    return reply.send({ ...trace, pickedReleaseId });
+    return reply.send({ ...trace.trace, pickedReleaseId: trace.pickedReleaseId });
   });
 
   /**
