@@ -56,8 +56,9 @@ export default function TraceDetailPage() {
 
   const { run, spans } = data;
   const startedMs = Date.parse(run.startTime);
-  const endedMs = run.endTime ? Date.parse(run.endTime) : Date.now();
-  const durationMs = Math.max(0, endedMs - startedMs);
+  const durationMs = run.endTime
+    ? Math.max(0, Date.parse(run.endTime) - startedMs)
+    : null;
 
   // Build span tree: top-level spans are root nodes; everything
   // else hangs under its parentSpanId.
@@ -96,7 +97,7 @@ export default function TraceDetailPage() {
       <Surface padded={false}>
         <SurfaceHeader className="px-5 pt-5" title="Run summary" />
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 px-5 pb-5 text-sm md:grid-cols-4">
-          <SummaryCell label="Duration" value={`${durationMs} ms`} Icon={Clock} />
+          <SummaryCell label="Duration" value={durationMs === null ? 'Running' : `${durationMs} ms`} Icon={Clock} />
           <SummaryCell label="Tokens" value={run.totalTokens.toLocaleString()} Icon={Cpu} />
           <SummaryCell label="Cost" value={`$${run.totalCostUsd.toFixed(4)}`} Icon={DollarSign} />
           <SummaryCell label="Spans" value={String(spans.length)} Icon={GitBranch} />
@@ -192,8 +193,9 @@ function SpanNode({
   depth: number;
 }) {
   const startMs = Date.parse(span.startTime);
-  const endMs = span.endTime ? Date.parse(span.endTime) : Date.now();
-  const ms = Math.max(0, endMs - startMs);
+  const ms = span.endTime
+    ? Math.max(0, Date.parse(span.endTime) - startMs)
+    : null;
   return (
     <li>
       <div
@@ -210,7 +212,9 @@ function SpanNode({
             <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-text-muted">
               {span.kind}
             </span>
-            <span className="text-xs text-text-subtle">{ms} ms</span>
+            <span className="text-xs text-text-subtle">
+              {ms === null ? 'Running' : `${ms} ms`}
+            </span>
             {span.model && (
               <span className="text-xs text-text-muted">· {span.model}</span>
             )}

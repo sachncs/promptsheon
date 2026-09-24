@@ -179,8 +179,9 @@ function SummaryTile({
 
 function TraceRow({ run }: { run: TraceRunSummary }) {
   const startedMs = Date.parse(run.startTime);
-  const endedMs = run.endTime ? Date.parse(run.endTime) : Date.now();
-  const durationMs = Math.max(0, endedMs - startedMs);
+  const durationMs = run.endTime
+    ? Math.max(0, Date.parse(run.endTime) - startedMs)
+    : null;
   return (
     <li>
       <Link
@@ -207,7 +208,7 @@ function TraceRow({ run }: { run: TraceRunSummary }) {
           <div className="mt-0.5 flex items-center gap-3 text-xs text-text-muted">
             <span>{new Date(run.startTime).toLocaleString()}</span>
             <span>·</span>
-            <span>{durationMs} ms</span>
+            <span>{durationMs === null ? 'Running' : `${durationMs} ms`}</span>
             <span>·</span>
             <span>{run.totalTokens.toLocaleString()} tokens</span>
             <span>·</span>
