@@ -798,6 +798,20 @@ export interface RepoEntry {
   size: number;
 }
 
+export interface CommitItem {
+  oid: string;
+  repositoryId: string;
+  ref: string;
+  treeOid: string;
+  parents: string[];
+  authorId: string;
+  message: string;
+  timestamp: string;
+  signature?: string | null | undefined;
+  signedKeyId?: string | null | undefined;
+  signedAt?: string | null | undefined;
+}
+
 export interface RepositorySummary {
   id: string;
   workspaceId: string;
@@ -824,6 +838,36 @@ const RepositorySummarySchema = z.object({
   updatedAt: z.string(),
 });
 
+const BranchItemSchema = z.object({
+  id: z.string(),
+  repositoryId: z.string(),
+  name: z.string(),
+  headCommitOid: z.string().nullable(),
+  isProtected: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const RepoEntrySchema = z.object({
+  path: z.string(),
+  blobOid: z.string(),
+  size: z.number().int().nonnegative(),
+});
+
+const CommitItemSchema = z.object({
+  oid: z.string(),
+  repositoryId: z.string(),
+  ref: z.string(),
+  treeOid: z.string(),
+  parents: z.array(z.string()),
+  authorId: z.string(),
+  message: z.string(),
+  timestamp: z.string(),
+  signature: z.string().nullable().optional(),
+  signedKeyId: z.string().nullable().optional(),
+  signedAt: z.string().nullable().optional(),
+});
+
 function parseRepository(raw: unknown): RepositorySummary {
   const parsed = RepositorySummarySchema.safeParse(raw);
   if (!parsed.success) {
@@ -841,6 +885,24 @@ function parseRepositoryList(raw: unknown): RepositorySummary[] {
   return parsed.data;
 }
 
+function parseBranchList(raw: unknown): BranchItem[] {
+  const parsed = z.array(BranchItemSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid branch data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseRepoEntryList(raw: unknown): RepoEntry[] {
+  const parsed = z.array(RepoEntrySchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid repository contents.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseCommitList(raw: unknown): CommitItem[] {
+  const parsed = z.array(CommitItemSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid commit data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
 export const repoApi = {
   list: (workspaceId: string): Promise<RepositorySummary[]> =>
     client.get<unknown>(`/repos?workspaceId=${encodeURIComponent(workspaceId)}`).then((r) => parseRepositoryList(r.data)),
@@ -855,9 +917,15 @@ export const repoApi = {
     minApprovers?: number;
     requireSignedReleases?: boolean;
   }) => client.post('/repos', input).then((r) => r.data),
-  listBranches: (repoId: string) => client.get(`/repos/${repoId}/branches`).then((r) => r.data),
+  listBranches: async (repoId: string): Promise<BranchItem[]> => {
+    const r = await client.get<unknown>(`/repos/${repoId}/branches`);
+    return parseBranchList(r.data);
+  },
   listTags: (repoId: string) => client.get(`/repos/${repoId}/tags`).then((r) => r.data),
-  listContents: (repoId: string, ref = 'main') => client.get(`/repos/${repoId}/contents?ref=${encodeURIComponent(ref)}`).then((r) => r.data),
+  listContents: async (repoId: string, ref = 'main'): Promise<RepoEntry[]> => {
+    const r = await client.get<unknown>(`/repos/${repoId}/contents?ref=${encodeURIComponent(ref)}`);
+    return parseRepoEntryList(r.data);
+  },
   getFile: (repoId: string, path: string, ref = 'main'): Promise<{ data: { content?: string | undefined } }> =>
     client.get<unknown>(`/repos/${repoId}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`).then((r) => {
       const parsed = z.object({ content: z.string().optional() }).safeParse(r.data);
@@ -868,7 +936,10 @@ export const repoApi = {
     client.put(`/repos/${repoId}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`, { path, content, ref }).then((r) => r.data),
   commit: (repoId: string, ref: string, message: string, parents?: string[]) =>
     client.post(`/repos/${repoId}/commits`, { ref, message, parents }).then((r) => r.data),
-  listCommits: (repoId: string, ref: string) => client.get(`/repos/${repoId}/commits?ref=${encodeURIComponent(ref)}`).then((r) => r.data),
+  listCommits: async (repoId: string, ref: string): Promise<CommitItem[]> => {
+    const r = await client.get<unknown>(`/repos/${repoId}/commits?ref=${encodeURIComponent(ref)}`);
+    return parseCommitList(r.data);
+  },
   listMRs: async (repoId: string, status?: string): Promise<MergeRequest[]> => {
     const r = await client.get<unknown>(`/repos/${repoId}/merge-requests${status ? `?status=${status}` : ''}`);
     return parseMergeRequests(r.data);

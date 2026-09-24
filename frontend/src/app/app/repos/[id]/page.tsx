@@ -132,13 +132,13 @@ export default function RepositoryDetail() {
                 <div className="text-text-muted text-sm">No staged files.</div>
               ) : (
                 <DataTable
-                  rows={(contents.data ?? []) as Array<Record<string, unknown>>}
-                  rowKey={(r) => String(r['path'])}
+                  rows={contents.data ?? []}
+                  rowKey={(r) => r.path}
                   onRowClick={async (r) => {
-                    const path = String(r['path']);
+                    const path = r.path;
                     setViewPath(path);
                     setViewContent(null);
-                    setViewOid(String(r['blobOid']));
+                    setViewOid(r.blobOid);
                     try {
                       const r2 = await repoApi.getFile(id, path, ref);
                       setViewContent(r2.data.content ?? '(binary)');
@@ -150,14 +150,14 @@ export default function RepositoryDetail() {
                     {
                       key: 'path',
                       header: 'Path',
-                      render: (r) => <span className="font-mono text-xs text-text-default">{String(r['path'])}</span>,
+                      render: (r) => <span className="font-mono text-xs text-text-default">{r.path}</span>,
                     },
                     {
                       key: 'oid',
                       header: 'Blob',
-                      render: (r) => <HashChip hash={String(r['blobOid'])} length={16} />,
+                      render: (r) => <HashChip hash={r.blobOid} length={16} />,
                     },
-                    { key: 'size', header: 'Size', render: (r) => `${String(r['size'])} b` },
+                    { key: 'size', header: 'Size', render: (r) => `${r.size} b` },
                   ]}
                 />
               )}
@@ -225,21 +225,21 @@ export default function RepositoryDetail() {
               <QueryError message={branches.error} onRetry={() => void branches.refetch()} />
             ) : <DataTable
               className="rounded-none border-0 border-t border-border-subtle"
-              rows={(branches.data ?? []) as Array<Record<string, unknown>>}
-              rowKey={(r) => String(r['id'])}
+              rows={branches.data ?? []}
+              rowKey={(r) => r.id}
               columns={[
-                { key: 'name', header: 'Name', render: (r) => <span className="font-mono text-xs">{String(r['name'])}</span> },
+                { key: 'name', header: 'Name', render: (r) => <span className="font-mono text-xs">{r.name}</span> },
                 {
                   key: 'head',
                   header: 'Head',
-                  render: (r) => (r['headCommitOid']
-                    ? <HashChip hash={String(r['headCommitOid'])} length={16} />
+                  render: (r) => (r.headCommitOid
+                    ? <HashChip hash={r.headCommitOid} length={16} />
                     : <span className="text-text-subtle text-xs">—</span>),
                 },
                 {
                   key: 'protected',
                   header: 'Protected',
-                  render: (r) => (r['isProtected'] ? <StatusPill kind="approved" /> : <StatusPill kind="neutral" label="—" />),
+                  render: (r) => (r.isProtected ? <StatusPill kind="approved" /> : <StatusPill kind="neutral" label="—" />),
                 },
               ]}
             />}
@@ -255,13 +255,13 @@ export default function RepositoryDetail() {
               <div className="px-5 pb-5 text-text-muted text-sm">No commits yet.</div>
             ) : (
               <ul className="divide-y divide-border-subtle">
-                {((commits.data ?? []) as Array<Record<string, unknown>>).map((c) => (
-                  <li key={String(c['oid'])} className="flex items-center gap-3 px-5 py-3">
+                {(commits.data ?? []).map((c) => (
+                  <li key={c.oid} className="flex items-center gap-3 px-5 py-3">
                     <History className="h-4 w-4 text-text-muted" />
-                    <HashChip hash={String(c['oid'])} length={16} />
-                    <div className="flex-1 truncate text-sm text-text-default">{String(c['message'])}</div>
+                    <HashChip hash={c.oid} length={16} />
+                    <div className="flex-1 truncate text-sm text-text-default">{c.message}</div>
                     <span className="text-xs text-text-subtle">
-                      {new Date(String(c['timestamp'] ?? Date.now())).toLocaleString()}
+                      {new Date(c.timestamp).toLocaleString()}
                     </span>
                   </li>
                 ))}
