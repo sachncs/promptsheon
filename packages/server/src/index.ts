@@ -35,6 +35,13 @@ import { LlmSettingsService } from './application/llm-settings-service.js';
 import type { Agent } from '@strands-agents/sdk';
 import type Database from 'better-sqlite3';
 
+declare module 'fastify' {
+  interface FastifyRequest {
+    requestId?: string;
+    requestStartTime?: number;
+  }
+}
+
 /**
  * Load the Cedar policy file at boot and install the singleton
  * authorizer. The policy file is the single source of truth for
@@ -119,22 +126,20 @@ async function main() {
   app.addHook('onRequest', async (request, reply) => {
     const requestIdHeader = request.headers['x-request-id'];
     const requestId = typeof requestIdHeader === 'string' && requestIdHeader || randomUUID();
-    const requestMetadata = request as unknown as Record<string, string | number>;
-    requestMetadata.requestId = requestId;
-    requestMetadata.startTime = Date.now();
+    request.requestId = requestId;
+    request.requestStartTime = Date.now();
     reply.header('X-Request-Id', requestId);
   });
 
   app.addHook('onResponse', async (request, reply) => {
-    const requestMetadata = request as unknown as Record<string, string | number>;
-    const requestId = requestMetadata.requestId;
-    const startTime = requestMetadata.startTime || Date.now();
+    const requestId = request.requestId;
+    const startTime = request.requestStartTime ?? Date.now();
     app.log.info({
       requestId,
       method: request.method,
       url: request.url,
       status: reply.statusCode,
-      durationMs: Date.now() - Number(startTime),
+      durationMs: Date.now() - startTime,
     }, 'request');
   });
 
@@ -142,7 +147,7 @@ async function main() {
     max: Number.parseInt(process.env['PROMPTSHEON_RATE_LIMIT_MAX'] ?? '100', 10),
     timeWindow: '1 minute',
     keyGenerator: (req) => {
-      return (req as unknown as Record<string, string>).userId ?? req.ip ?? 'unknown';
+      return req.userId ?? req.ip ?? 'unknown';
     },
   });
 
