@@ -124,4 +124,17 @@ describe('POST /api/sessions', () => {
     const response = await app.inject({ method: 'DELETE', url: `/api/sessions/${created.sessionId}` });
     expect(response.statusCode).toBe(204);
   });
+
+  it('rejects malformed session creation and message payloads', async () => {
+    const invalidCreate = await app.inject({ method: 'POST', url: '/api/sessions', payload: { capabilityVersionId: 'legacy' } });
+    expect(invalidCreate.statusCode).toBe(422);
+
+    const created = (await app.inject({ method: 'POST', url: '/api/sessions', payload: {} })).json() as { sessionId: string };
+    const invalidMessages = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${created.sessionId}/messages`,
+      payload: { messages: [{ role: 'user', content: [{ type: 'image' }] }] },
+    });
+    expect(invalidMessages.statusCode).toBe(422);
+  });
 });

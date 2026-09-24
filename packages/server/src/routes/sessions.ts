@@ -3,23 +3,19 @@ import { z } from 'zod';
 import { SessionStore } from '../sessions/store.js';
 import { parseBody } from './validate.js';
 
-const CreateSessionSchema = z.object({
-  capabilityVersionId: z.string().optional(),
-});
+const CreateSessionSchema = z.object({}).strict();
 
 const AppendSchema = z.object({
   messages: z.array(z.object({
     role: z.enum(['user', 'assistant']),
-    content: z.array(z.union([
-      z.object({ text: z.string() }),
-      z.object({ type: z.string(), text: z.string().optional() }),
-    ])),
+    content: z.array(z.object({ text: z.string() })),
   })),
 });
 
 export function registerSessionRoutes(app: FastifyInstance, deps: { store: SessionStore }) {
   app.post('/api/sessions', async (request, reply) => {
-    parseBody(reply, CreateSessionSchema, request.body);
+    const parsed = parseBody(reply, CreateSessionSchema, request.body);
+    if (!parsed.ok) return;
     const session = await deps.store.create();
     return reply.code(201).send(session);
   });
@@ -35,7 +31,7 @@ export function registerSessionRoutes(app: FastifyInstance, deps: { store: Sessi
     const { id } = request.params as { id: string };
     const parsed = parseBody(reply, AppendSchema, request.body);
     if (!parsed.ok) return;
-    const session = await deps.store.appendMessages(id, parsed.data.messages as never);
+    const session = await deps.store.appendMessages(id, parsed.data.messages);
     if (!session) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Session not found' } });
     return reply.send(session);
   });
