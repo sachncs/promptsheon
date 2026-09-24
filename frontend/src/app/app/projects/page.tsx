@@ -133,17 +133,17 @@ export default function ProjectsPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => { router.push(`/app/workspaces/${String(r['workspaceId'] ?? wsId)}/projects`); }}
+            rows={rows}
+            rowKey={(r) => r.id ?? `project-${r.name}`}
+            onRowClick={(r) => { router.push(`/app/workspaces/${r.workspaceId ?? wsId}/projects`); }}
             columns={[
               {
                 key: 'name',
                 header: 'Project',
                 render: (r) => (
                   <div>
-                    <div className="font-medium text-text-strong">{String(r['name'] ?? '—')}</div>
-                    {r['description'] ? <div className="text-xs text-text-subtle">{String(r['description'])}</div> : null}
+                  <div className="font-medium text-text-strong">{r.name || '—'}</div>
+                    {r.description ? <div className="text-xs text-text-subtle">{r.description}</div> : null}
                   </div>
                 ),
               },
@@ -151,20 +151,20 @@ export default function ProjectsPage() {
                 key: 'capabilities',
                 header: 'Capabilities',
                 render: (r) => {
-                  const n = r['capabilityCount'];
-                  return n !== undefined ? <span className="font-mono text-xs">{String(n)}</span> : '—';
+                  const n = r.capabilityCount;
+                  return n !== undefined ? <span className="font-mono text-xs">{n}</span> : '—';
                 },
               },
               {
                 key: 'updated',
                 header: 'Updated',
-                render: (r) => r['updatedAt'] ? new Date(String(r['updatedAt'])).toLocaleDateString() : '—',
+                render: (r) => r.updatedAt ? new Date(r.updatedAt).toLocaleDateString() : '—',
               },
               {
                 key: 'actions',
                 header: '',
                 render: (r) => (
-                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); if (window.confirm('Delete this project? Capabilities inside it may also be removed.')) remove.mutate(String(r['id'])); }}>
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); if (window.confirm('Delete this project? Capabilities inside it may also be removed.')) remove.mutate(r.id); }}>
                     <Trash2 className="mr-1 size-3" />
                     Delete
                   </Button>
