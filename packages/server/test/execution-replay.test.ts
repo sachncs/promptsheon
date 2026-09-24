@@ -177,11 +177,31 @@ describe('ExecutionReplayService / POST /api/executions/:id/replay', () => {
       traceId: 'trace-1',
       environment: 'prod',
     });
-    const ctx = h.executionRepo.findReplayContext(original.id);
+    const ctx = h.executionRepo.findReplayContextInOrg(original.id, 'unscoped');
     expect(ctx).not.toBeNull();
     expect(ctx!.manifestHash).toBe('placeholder');
     expect(ctx!.parsedInputs).toEqual({ foo: 'bar', n: 42 });
     expect(ctx!.execution.id).toBe(original.id);
+  });
+
+  it('does not resolve replay context outside the owning organization', () => {
+    const original = h.executionRepo.create({
+      capabilityVersionId: 'cv1',
+      inputs: JSON.stringify({ foo: 'bar' }),
+      outputs: '{}',
+      model: 'gpt-4',
+      provider: 'openai',
+      latencyMs: 0,
+      costUsd: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      error: '',
+      traceId: 'trace-tenant',
+      environment: 'prod',
+    });
+
+    expect(h.executionRepo.findReplayContextInOrg(original.id, 'other-org')).toBeNull();
   });
 
   it('throws ReplayInputsUnavailableError for legacy hash-stored inputs', () => {
@@ -192,7 +212,7 @@ describe('ExecutionReplayService / POST /api/executions/:id/replay', () => {
          VALUES (?, 'cv1', ?, '{}', '', '', 0, 0, 0, 0, 0, '', '', '', '2026-01-01T00:00:00Z')`,
       )
       .run(id, 'not-json-pre-migr');
-    expect(() => h.executionRepo.findReplayContext(id)).toThrow(ReplayInputsUnavailableError);
+    expect(() => h.executionRepo.findReplayContextInOrg(id, 'unscoped')).toThrow(ReplayInputsUnavailableError);
   });
 
   it('incrementReplayCount is idempotent and updates the count', () => {

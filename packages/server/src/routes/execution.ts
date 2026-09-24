@@ -204,7 +204,7 @@ export function registerExecutionRoutes(
       return reply.code(404).send({ error: { code: 'EXECUTION_NOT_FOUND', message: `execution ${id} not found` } });
     }
     try {
-      const result = await deps.replayService.replay(id, { organizationId });
+      const result = await deps.replayService.replay(id, organizationId);
       return reply.code(201).send({
         replayExecutionId: result.replayed.id,
         replayOf: result.original.id,

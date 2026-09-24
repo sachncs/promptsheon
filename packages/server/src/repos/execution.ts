@@ -148,20 +148,22 @@ export class ExecutionRepo extends BaseRepo<Execution> {
    * rows store a hash here) we throw a deterministic error so the
    * caller can return 409 instead of attempting an undefined replay.
    */
-  findReplayContext(id: string): {
+  findReplayContextInOrg(id: string, organizationId: string): {
     execution: Execution;
     manifestHash: string;
     parsedInputs: Record<string, unknown>;
   } | null {
-    const execution = this.findById(id);
-    if (!execution) return null;
-    if (!execution.capabilityVersionId) return null;
     const row = this.db.prepare(
-      `SELECT manifest_hash AS manifestHash
-       FROM capability_versions
-       WHERE id = ?`,
-    ).get(execution.capabilityVersionId) as { manifestHash: string | null } | undefined;
+      `SELECT e.*, v.manifest_hash AS manifestHash
+       FROM executions e
+       JOIN capability_versions v ON v.id = e.capability_version_id
+       JOIN capabilities c ON c.id = v.capability_id
+       JOIN projects p ON p.id = c.project_id
+       JOIN workspaces w ON w.id = p.workspace_id
+       WHERE e.id = ? AND w.org_id = ?`,
+    ).get(id, organizationId) as (Record<string, unknown> & { manifestHash: string | null }) | undefined;
     if (!row?.manifestHash) return null;
+    const execution = toExecution(row);
     let parsed: Record<string, unknown>;
     try {
       const raw = JSON.parse(execution.inputs) as unknown;

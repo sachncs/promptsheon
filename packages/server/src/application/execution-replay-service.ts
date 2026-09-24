@@ -34,14 +34,14 @@ export class ExecutionReplayService {
 
   async replay(
     originalId: string,
-    env: { organizationId?: string } = {},
+    organizationId: string,
   ): Promise<ReplayResult> {
-    const context = this.executionRepo.findReplayContext(originalId);
+    const context = this.executionRepo.findReplayContextInOrg(originalId, organizationId);
     if (!context) {
       throw new ReplayNotFoundError(originalId);
     }
     const { execution: original, manifestHash, parsedInputs } = context;
-    const manifest = this.manifestRepo.findByHash(manifestHash);
+    const manifest = this.manifestRepo.findByHashInOrg(manifestHash, organizationId);
     if (!manifest) {
       this.executionRepo.recordReplay({
         originalExecutionId: originalId,
@@ -84,7 +84,7 @@ export class ExecutionReplayService {
     const replayExecutionId = replayed.id;
 
     const traceRun = this.traceRepo.startRun({
-      organizationId: env.organizationId ?? 'unscoped',
+      organizationId,
       executionId: replayExecutionId,
       environment: original.environment,
       name: `replay:${manifestHash.slice(0, 12)}`,
