@@ -15,6 +15,7 @@ import { HashChip } from '@/components/brand/hash-chip';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function WorkspacesPage() {
   const session = useRequireSession();
@@ -26,10 +27,10 @@ export default function WorkspacesPage() {
 
   const ws = useQuery({
     queryKey: ['workspaces'],
-    queryFn: () => workspaceApi.list(1).then((r) => r.data).catch(() => [] as Array<Record<string, unknown>>),
+    queryFn: () => workspaceApi.list(1).then((r) => r.data),
     enabled: Boolean(session),
   });
-  const rows = (Array.isArray(ws.data) ? ws.data : []) as Array<Record<string, unknown>>;
+  const rows = (ws.data ?? []) as unknown as Array<Record<string, unknown>>;
 
   const create = useMutation({
     mutationFn: () => {
@@ -62,6 +63,7 @@ export default function WorkspacesPage() {
   });
 
   if (!session) return null;
+  if (ws.isError) return <QueryError message={ws.error.message} onRetry={() => void ws.refetch()} />;
 
   return (
     <div className="space-y-6">
