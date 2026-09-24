@@ -4,30 +4,35 @@ const steps = [
     step: '01',
     title: 'Author',
     body: 'Describe the capability. The planner decomposes it into a DAG of agents, policies, and tools.',
+    output: 'Draft manifest',
     tone: 'indigo',
   },
   {
     step: '02',
     title: 'Compile',
     body: 'The compiler produces an immutable manifest. Its content hash is its identity — same input, same artifact, forever.',
+    output: 'Immutable content hash',
     tone: 'emerald',
   },
   {
     step: '03',
     title: 'Evaluate',
     body: 'Run suites. Gate on threshold. Block merges on regressions. Parallel scorers in one pass.',
+    output: 'Score + regression decision',
     tone: 'amber',
   },
   {
     step: '04',
     title: 'Approve',
     body: 'A second pair of eyes signs off. The creator cannot approve their own release. Reason is logged.',
+    output: 'Signed approval + audit row',
     tone: 'rose',
   },
   {
     step: '05',
     title: 'Canary → Active',
     body: 'Weighted rollout. Live eval scores watch for drift. One-click rollback when the world changes.',
+    output: 'Traffic state + rollback target',
     tone: 'sky',
   },
 ];
@@ -39,6 +44,24 @@ const tones: Record<string, { dot: string; text: string; bg: string }> = {
   rose:    { dot: 'bg-rose-500',    text: 'text-rose-500',    bg: 'bg-rose-500/10'    },
   sky:     { dot: 'bg-sky-500',     text: 'text-sky-500',     bg: 'bg-sky-500/10'     },
 };
+
+const evidence = [
+  {
+    label: 'Content',
+    value: 'sha256:9c4f…a02b',
+    detail: 'The exact manifest that was evaluated and approved.',
+  },
+  {
+    label: 'Decision',
+    value: '0.92 / 0.90 threshold',
+    detail: 'The release gate and the score that cleared it.',
+  },
+  {
+    label: 'Recovery',
+    value: 'v2 ready to restore',
+    detail: 'The previous active version stays available for rollback.',
+  },
+];
 ---
 
 <section id="workflow" class="ps-section border-t border-[var(--line)]">
@@ -67,7 +90,7 @@ const tones: Record<string, { dot: string; text: string; bg: string }> = {
             </div>
             <div class="mt-4 flex items-center gap-2 text-[11px] text-[var(--ink-muted)]">
               <span class="ps-hash">v3</span>
-              <span>11.2k LOC manifest · sha256:9c4f…a02b</span>
+              <span>refund-triage@v3 · sha256:9c4f…a02b</span>
             </div>
           </div>
         </div>
@@ -94,10 +117,36 @@ const tones: Record<string, { dot: string; text: string; bg: string }> = {
               <p class="mt-1.5 text-[14.5px] leading-relaxed text-[var(--ink-muted)] text-pretty">
                 {s.body}
               </p>
+              <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--line)] pt-3">
+                <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-subtle)]">Output</span>
+                <span class="rounded-md bg-[var(--bg-subtle)] px-2 py-1 font-mono text-[11px] text-[var(--ink)]">
+                  {s.output}
+                </span>
+              </div>
             </div>
           </li>
         ))}
       </ol>
+    </div>
+
+    <div class="ps-reveal mt-16 border-t border-[var(--line)] pt-8" style="--reveal-delay: 180ms">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div class="ps-eyebrow">Evidence trail</div>
+          <h3 class="ps-display mt-3 text-display-sm">The release carries its evidence.</h3>
+        </div>
+        <a class="ps-link text-[13px]" href="/docs/architecture/">See the architecture <span aria-hidden="true">→</span></a>
+      </div>
+
+      <div class="mt-7 grid gap-4 md:grid-cols-3">
+        {evidence.map((item) => (
+          <article class="rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)] p-5 shadow-soft">
+            <div class="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-subtle)]">{item.label}</div>
+            <div class="mt-3 font-mono text-[13px] font-semibold text-[var(--ink-strong)]">{item.value}</div>
+            <p class="mt-2 text-[13px] leading-relaxed text-[var(--ink-muted)]">{item.detail}</p>
+          </article>
+        ))}
+      </div>
     </div>
   </div>
 </section>
