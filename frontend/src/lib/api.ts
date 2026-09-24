@@ -316,8 +316,9 @@ export const approvalApi = {
 };
 
 export const compilerApi = {
-  compile: (prompt: string) => client.post('/compiler/compile', { prompt }),
-  decompile: (manifest: string) => client.post('/compiler/decompile', { manifest }),
+  compile: (manifest: unknown, options?: { capabilityContext?: string; constraints?: string[] }) =>
+    client.post('/compiler/compile', { manifest, ...options }),
+  decompile: (manifest: unknown) => client.post('/compiler/decompile', { manifest }),
 };
 
 export const selfEvolveApi = {
