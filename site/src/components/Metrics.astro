@@ -1,9 +1,9 @@
 ---
 const metrics = [
-  { value: 76,   suffix: '',  label: 'REST endpoints' },
-  { value: 5,    suffix: '',  label: 'specialised agents' },
-  { value: 12,   suffix: '+', label: 'integrations' },
-  { value: 100,  suffix: '%', label: 'self-hosted' },
+  { value: 1, suffix: '', label: 'release artifact', detail: 'Prompts, tools, policies, and limits move together.' },
+  { value: 5, suffix: '', label: 'gated lifecycle steps', detail: 'Author, compile, evaluate, approve, release.' },
+  { value: 0, suffix: '', label: 'telemetry by default', detail: 'Your infrastructure, your data, your operating boundary.' },
+  { value: 1, suffix: '', label: 'clear rollback path', detail: 'Return to a known content hash when needed.' },
 ];
 ---
 
@@ -21,6 +21,7 @@ const metrics = [
           <div class="mt-3 text-[12.5px] font-medium uppercase tracking-[0.14em] text-[var(--ink-subtle)]">
             {m.label}
           </div>
+          <p class="mx-auto mt-2 max-w-[15rem] text-[12px] leading-relaxed text-[var(--ink-muted)] lg:mx-0">{m.detail}</p>
         </div>
       ))}
     </div>

@@ -263,6 +263,23 @@
           </div>
         </div>
       </div>
+
+      <div class="mt-8 grid gap-3 md:grid-cols-3">
+        {[
+          { number: '01', title: 'Define the capability', text: 'Keep prompts, tools, policies, and runtime limits together in one manifest.', href: '#capabilities' },
+          { number: '02', title: 'Prove the change', text: 'Run evaluations and review evidence before a release can move forward.', href: '#workflow' },
+          { number: '03', title: 'Release with a way back', text: 'Canary the version, watch it in production, and roll back by content hash.', href: '#trust' },
+        ].map((item, i) => (
+          <a href={item.href} class="ps-reveal group rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)] p-4 transition-all hover:-translate-y-0.5 hover:border-[var(--line-strong)] hover:shadow-soft" style={`--reveal-delay: ${i * 70}ms`}>
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-[11px] text-[var(--accent)]">{item.number}</span>
+              <span class="text-[var(--accent)] transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
+            </div>
+            <h2 class="mt-3 text-[14px] font-semibold tracking-tight text-[var(--ink-strong)]">{item.title}</h2>
+            <p class="mt-1.5 text-[12.5px] leading-relaxed text-[var(--ink-muted)]">{item.text}</p>
+          </a>
+        ))}
+      </div>
     </div>
   </div>
 </section>
