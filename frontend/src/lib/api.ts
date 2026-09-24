@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ManifestSchema } from '@promptsheon/shared/validation';
 import type { Manifest } from '@promptsheon/shared';
 import type { Execution } from '@promptsheon/shared';
+import type { Schedule } from '@promptsheon/shared';
 import { clearSession, getSession } from './session';
 
 export class ApiError extends Error {
@@ -309,6 +310,7 @@ export interface AuditEntry {
 }
 
 export type { Execution };
+export type { Schedule };
 
 const CostRollupSchema = z.object({
   capabilityId: z.string(),
@@ -547,6 +549,21 @@ const ExecutionSchema = z.object({
   inputHash: z.string().nullable(),
 });
 
+const ScheduleSchema = z.object({
+  id: z.string(),
+  workspaceId: z.string(),
+  releaseId: z.string(),
+  kind: z.string(),
+  cron: z.string(),
+  webhookPath: z.string(),
+  nextFireAt: z.string(),
+  lastFireAt: z.string().nullable(),
+  firedCount: z.number().int().nonnegative(),
+  enabled: z.boolean(),
+  createdAt: z.string(),
+  createdBy: z.string(),
+});
+
 function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
   return unwrapList<unknown>(raw).map((entry) => {
     const parsed = VaultKeyringEntrySchema.safeParse(entry);
@@ -719,6 +736,23 @@ function parseExecutionPage(raw: unknown): { items: Execution[]; total: number }
   const total = value['total'];
   if (!items || typeof total !== 'number' || !Number.isInteger(total) || total < 0) {
     throw new ApiError('The server returned invalid execution data.', { code: 'INVALID_RESPONSE' });
+  }
+  return { items, total };
+}
+
+function parseSchedule(raw: unknown): Schedule {
+  const parsed = ScheduleSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid schedule data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseSchedulePage(raw: unknown): { items: Schedule[]; total: number } {
+  if (!raw || typeof raw !== 'object') throw new ApiError('The server returned invalid schedule data.', { code: 'INVALID_RESPONSE' });
+  const value = raw as Record<string, unknown>;
+  const items = Array.isArray(value['items']) ? value['items'].map(parseSchedule) : null;
+  const total = value['total'];
+  if (!items || typeof total !== 'number' || !Number.isInteger(total) || total < 0) {
+    throw new ApiError('The server returned invalid schedule data.', { code: 'INVALID_RESPONSE' });
   }
   return { items, total };
 }
@@ -1038,9 +1072,18 @@ export const alertApi = {
 };
 
 export const scheduleApi = {
-  list: () => client.get('/schedules'),
-  get: (id: string) => client.get(`/schedules/${id}`),
-  create: (data: { workspaceId: string; releaseId: string; kind: string; cron: string }) => client.post('/schedules', data),
+  list: async (): Promise<{ data: { items: Schedule[]; total: number } }> => {
+    const r = await client.get<unknown>('/schedules');
+    return { data: parseSchedulePage(r.data) };
+  },
+  get: async (id: string): Promise<{ data: Schedule }> => {
+    const r = await client.get<unknown>(`/schedules/${id}`);
+    return { data: parseSchedule(r.data) };
+  },
+  create: async (data: { workspaceId: string; releaseId: string; kind: string; cron: string }): Promise<{ data: Schedule }> => {
+    const r = await client.post<unknown>('/schedules', data);
+    return { data: parseSchedule(r.data) };
+  },
   delete: (id: string) => client.delete(`/schedules/${id}`),
 };
 

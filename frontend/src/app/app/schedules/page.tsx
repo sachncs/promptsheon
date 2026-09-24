@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, Plus, Trash2 } from 'lucide-react';
-import { getErrorMessage, scheduleApi, workspaceApi, releaseApi, projectApi, unwrapList } from '@/lib/api';
+import { getErrorMessage, scheduleApi, workspaceApi, releaseApi, type Release, type Schedule } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -14,31 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { QueryError } from '@/components/brand/query-error';
-
-interface ScheduleItem {
-  id: string;
-  workspaceId?: string;
-  releaseId?: string;
-  releaseName?: string;
-  kind?: string;
-  cron?: string;
-  enabled?: boolean;
-  createdAt?: string;
-  lastRunAt?: string | null;
-  nextRunAt?: string | null;
-}
-
-interface ProjectItem {
-  id: string;
-  name?: string;
-}
-
-interface ReleaseLite {
-  id: string;
-  capabilityName?: string;
-  capabilityVersion?: number;
-  environment?: string;
-}
 
 const KIND_OPTIONS = [
   { value: 'eval', label: 'Eval run' },
@@ -52,14 +27,6 @@ function isScheduleKind(value: string): value is ScheduleKind {
   return KIND_OPTIONS.some((option) => option.value === value);
 }
 
-function stringField(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
-
-function numberField(value: unknown): number | undefined {
-  return typeof value === 'number' ? value : undefined;
-}
-
 export default function SchedulesPage() {
   const session = useRequireSession();
   const qc = useQueryClient();
@@ -71,39 +38,17 @@ export default function SchedulesPage() {
   const wsFirst = workspaces.data?.[0];
   const wsId = wsFirst?.id;
 
-  const projects = useQuery({
-    queryKey: ['projects', wsId],
-    queryFn: () => (wsId ? projectApi.list(wsId).then((r) => r.data) : Promise.resolve([])),
-    enabled: Boolean(wsId),
-  });
-  const projectList = unwrapList<ProjectItem>(projects.data);
-
   const allReleases = useQuery({
-    queryKey: ['releases-for-schedules', projectList.map((p) => p.id)],
-    queryFn: async (): Promise<ReleaseLite[]> => {
-      const byProject = await Promise.all(projectList.map(async (p) => {
-        const data = await releaseApi.list(p.id).then((res) => res.data);
-        const releaseRows = unwrapList<Record<string, unknown>>(data);
-        return releaseRows.map((rel) => {
-          const lite: ReleaseLite = { id: stringField(rel['id']) ?? '' };
-          if (p.name !== undefined) lite.capabilityName = p.name;
-          const cv = numberField(rel['capabilityVersion']);
-          if (cv !== undefined) lite.capabilityVersion = cv;
-          const env = stringField(rel['environment']);
-          if (env !== undefined) lite.environment = env;
-          return lite;
-        });
-      }));
-      return byProject.flat().filter((r) => r.id);
-    },
-    enabled: projectList.length > 0,
+    queryKey: ['releases-for-schedules'],
+    queryFn: () => releaseApi.listAll(1, 100).then((res) => res.data.items),
+    enabled: Boolean(wsId),
   });
 
   const schedules = useQuery({
     queryKey: ['schedules'],
-    queryFn: () => scheduleApi.list().then((r) => unwrapList<ScheduleItem>(r.data)),
+    queryFn: () => scheduleApi.list().then((r) => r.data),
   });
-  const rows = schedules.data ?? [];
+  const rows: Schedule[] = schedules.data?.items ?? [];
 
   const [releaseId, setReleaseId] = useState('');
   const [kind, setKind] = useState<ScheduleKind>('eval');
@@ -127,10 +72,9 @@ export default function SchedulesPage() {
 
   if (!session) return null;
   if (workspaces.isError) return <QueryError message={getErrorMessage(workspaces.error)} onRetry={() => void workspaces.refetch()} />;
-  if (projects.isError) return <QueryError message={getErrorMessage(projects.error)} onRetry={() => void projects.refetch()} />;
   if (allReleases.isError) return <QueryError message={getErrorMessage(allReleases.error)} onRetry={() => void allReleases.refetch()} />;
   if (schedules.isError) return <QueryError message={getErrorMessage(schedules.error)} onRetry={() => void schedules.refetch()} />;
-  if (workspaces.isPending || projects.isPending || (projectList.length > 0 && allReleases.isPending) || schedules.isPending) {
+  if (workspaces.isPending || (Boolean(wsId) && allReleases.isPending) || schedules.isPending) {
     return (
       <div className="space-y-6" aria-busy="true">
         <PageHeader eyebrow="Release" title="Schedules" subtitle="Cron-based schedules for eval runs, release rotations, and self-evolve cycles." />
@@ -139,7 +83,7 @@ export default function SchedulesPage() {
     );
   }
 
-  const releases = allReleases.data ?? [];
+  const releases: Release[] = allReleases.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -164,7 +108,7 @@ export default function SchedulesPage() {
                 placeholder="— pick a release —"
                 options={releases.map((r) => ({
                   value: r.id,
-                  label: `${r.capabilityName ?? '?'} v${r.capabilityVersion ?? '?'} · ${r.environment ?? '—'}`,
+                  label: `${r.capabilityId} v${r.capabilityVersion} · ${r.environment}`,
                 }))}
                 ariaLabel="Pick a release"
                 triggerClassName="w-full"
@@ -232,29 +176,29 @@ export default function SchedulesPage() {
               {
                 key: 'kind',
                 header: 'Kind',
-                render: (r) => <Badge>{r.kind ?? 'eval'}</Badge>,
+                render: (r) => <Badge>{r.kind}</Badge>,
               },
               {
                 key: 'release',
                 header: 'Release',
                 render: (r) => (
-                  <span className="font-mono text-xs text-text-muted">{r.releaseId ? `${r.releaseId.slice(0, 16)}…` : '—'}</span>
+                  <span className="font-mono text-xs text-text-muted">{r.releaseId.slice(0, 16)}…</span>
                 ),
               },
               {
                 key: 'cron',
                 header: 'Cron',
-                render: (r) => <code className="font-mono text-xs">{r.cron ?? '—'}</code>,
+                render: (r) => <code className="font-mono text-xs">{r.cron}</code>,
               },
               {
                 key: 'last',
                 header: 'Last run',
-                render: (r) => r.lastRunAt ? new Date(r.lastRunAt).toLocaleString() : '—',
+                render: (r) => r.lastFireAt ? new Date(r.lastFireAt).toLocaleString() : '—',
               },
               {
                 key: 'next',
                 header: 'Next run',
-                render: (r) => r.nextRunAt ? new Date(r.nextRunAt).toLocaleString() : '—',
+                render: (r) => new Date(r.nextFireAt).toLocaleString(),
               },
               {
                 key: 'actions',
