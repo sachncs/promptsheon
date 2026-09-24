@@ -49,11 +49,6 @@ export default function TeamsPage() {
       setShowNew(false);
     },
   });
-  const addMember = useMutation({
-    mutationFn: ({ teamId, userId, role }: { teamId: string; userId: string; role: TeamMember['role'] }) =>
-      teamApi.addMember(teamId, { userId, role }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['teams'] }),
-  });
   const removeMember = useMutation({
     mutationFn: ({ teamId, userId }: { teamId: string; userId: string }) =>
       teamApi.removeMember(teamId, userId),

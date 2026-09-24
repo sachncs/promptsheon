@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldGroup } from '@/components/brand/field';
 import { ThemedSelect } from '@/components/brand/themed-select';
 import { Input } from '@/components/ui/input';
-import { capabilityApi, releaseApi, versionApi, unwrapList, unwrapFirst } from '@/lib/api';
+import { releaseApi, versionApi, unwrapList, unwrapFirst } from '@/lib/api';
 
 const CreateReleaseSchema = z.object({
   capabilityId: z.string().uuid({ message: 'pick a capability' }),
@@ -28,8 +28,6 @@ const CreateReleaseSchema = z.object({
   manifest: z.string().min(2, 'manifest required'),
   canaryPercent: z.coerce.number().int().min(0).max(100).optional().default(0),
 });
-
-type CreateReleaseInput = z.infer<typeof CreateReleaseSchema>;
 
 interface CapabilitySummary {
   id: string;

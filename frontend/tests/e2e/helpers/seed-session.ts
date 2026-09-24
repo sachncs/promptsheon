@@ -1,4 +1,4 @@
-import { test, expect, type Page, request } from '@playwright/test';
+import { type Page, request } from '@playwright/test';
 
 /**
  * Boot a fresh admin via the backend bootstrap API and seed the

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Flag, Plus, Save, Trash2 } from 'lucide-react';
+import { Flag, Plus, Save } from 'lucide-react';
 import { featureFlagApi } from '@/lib/api';
 import { unwrapList } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';

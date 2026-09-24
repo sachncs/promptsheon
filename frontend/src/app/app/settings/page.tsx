@@ -8,7 +8,6 @@ import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
-import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';

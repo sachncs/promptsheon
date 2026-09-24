@@ -14,7 +14,6 @@ import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { HashChip } from '@/components/brand/hash-chip';
 import { ThemedSelect } from '@/components/brand/themed-select';
-import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/brand/empty-state';
 import { cn } from '@/lib/utils';
 import { QueryError } from '@/components/brand/query-error';

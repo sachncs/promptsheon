@@ -9,7 +9,6 @@ import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
 import { ThemedSelect } from '@/components/brand/themed-select';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { QueryError } from '@/components/brand/query-error';
 

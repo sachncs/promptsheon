@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { manifestApi, validateDagClient, executionApi } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';

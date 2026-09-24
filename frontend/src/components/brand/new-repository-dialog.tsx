@@ -17,7 +17,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { ThemedSelect } from '@/components/brand/themed-select';
 import { Field, FieldGroup } from '@/components/brand/field';
 import { repoApi } from '@/lib/api';
@@ -38,13 +37,8 @@ const CreateRepositorySchema = z.object({
 });
 
 type FormValues = z.input<typeof CreateRepositorySchema>;
-type CreateRepositoryInput = z.input<typeof CreateRepositorySchema>;
 type CreateRepositoryOutput = z.output<typeof CreateRepositorySchema>;
-// Keep the names exported even though RHF's form uses the input
-// form and api.ts uses the output form (because of .default()).
-export type { CreateRepositoryInput, CreateRepositoryOutput };
-
-type CreateRepositoryFormValues = z.infer<typeof CreateRepositorySchema>;
+export type { CreateRepositoryOutput };
 
 export interface NewRepositoryDialogProps {
   workspaceId?: string;

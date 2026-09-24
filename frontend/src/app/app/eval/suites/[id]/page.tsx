@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ArrowLeft, FlaskConical, Play, Sparkles } from 'lucide-react';
+import { ArrowLeft, FlaskConical, Play } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
 import { evalSuiteApi } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';

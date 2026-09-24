@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import {
-  ArrowRight, Boxes, FlaskConical, GitBranch, Workflow, Lock, ShieldCheck,
-  Layers, Activity, ScrollText, Terminal, CheckCircle2, Sparkles,
-  Compass, Fingerprint, Network, Rocket, Telescope,
+  ArrowRight, Boxes, FlaskConical, GitBranch, Lock, ShieldCheck,
+  Layers, ScrollText, Terminal, CheckCircle2,
+  Compass, Fingerprint, Network, Telescope,
 } from 'lucide-react';
 import { Logo } from '@/brand/logo';
 import { LogoMark } from '@/brand/logo-mark';

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Webhook, Power, Trash2 } from 'lucide-react';
+import { Plus, Webhook, Trash2 } from 'lucide-react';
 import { webhookApi } from '@/lib/api';
 import { unwrapList } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';

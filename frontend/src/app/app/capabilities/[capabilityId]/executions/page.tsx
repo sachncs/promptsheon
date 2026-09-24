@@ -8,7 +8,6 @@ import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
 import { StatusPill } from '@/components/brand/status-pill';
-import { HashChip } from '@/components/brand/hash-chip';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Play } from 'lucide-react';
 import Link from 'next/link';

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, ScrollText, ShieldCheck, AlertCircle } from 'lucide-react';
+import { CheckCircle2, ScrollText, ShieldCheck } from 'lucide-react';
 import { auditApi } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';

@@ -61,7 +61,7 @@ test.describe('tier 1: route smoke (authenticated)', () => {
   });
 
   for (const path of ROUTES) {
-    test(`renders ${path} without a console error`, async ({ page, baseURL }) => {
+    test(`renders ${path} without a console error`, async ({ page }) => {
       if (!cachedSession) throw new Error('session not bootstrapped');
 
       // Wipe per-test and seed fresh.

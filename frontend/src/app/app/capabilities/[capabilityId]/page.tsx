@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import {
-  ArrowLeft, Workflow, FlaskConical, GitBranch, ScrollText, ShieldCheck,
+  ArrowLeft, GitBranch,
   Box, Boxes,
 } from 'lucide-react';
 import { capabilityApi, versionApi, manifestApi, releaseApi } from '@/lib/api';

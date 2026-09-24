@@ -10,7 +10,7 @@ import { bootstrapAdminViaApi, seedSession, clearClientState, type SessionInfo }
 let admin: SessionInfo | null = null;
 
 test.describe('tier 7: manifest detail (real page)', () => {
-  test.beforeAll(async ({ baseURL, request }) => {
+  test.beforeAll(async ({ baseURL }) => {
     if (!baseURL) throw new Error('baseURL not provided');
     if (!admin) {
       admin = await bootstrapAdminViaApi(baseURL, {

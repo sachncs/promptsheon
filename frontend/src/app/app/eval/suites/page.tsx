@@ -1,8 +1,7 @@
 'use client';
 
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { FlaskConical, Plus, Beaker } from 'lucide-react';
-import Link from 'next/link';
+import { FlaskConical, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
