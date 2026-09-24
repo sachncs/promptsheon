@@ -1,11 +1,40 @@
 import type { Schedule } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
-import { BaseRepo, camelize, type Paginated } from './base.js';
+import { z } from 'zod';
+import { BaseRepo, type Paginated } from './base.js';
 import { nextCronFire } from '../scheduler/cron.js';
 
-function toSchedule(row: Record<string, unknown>): Schedule {
-  const value = camelize(row);
-  return { ...value, enabled: Boolean(value['enabled']) } as unknown as Schedule;
+const ScheduleRowSchema = z.object({
+  id: z.string(),
+  workspace_id: z.string(),
+  release_id: z.string(),
+  kind: z.string(),
+  cron: z.string(),
+  webhook_path: z.string(),
+  next_fire_at: z.string(),
+  last_fire_at: z.string().nullable(),
+  fired_count: z.number().int().nonnegative(),
+  enabled: z.union([z.number().int(), z.boolean()]),
+  created_at: z.string(),
+  created_by: z.string(),
+});
+
+function toSchedule(row: unknown): Schedule {
+  const value = ScheduleRowSchema.parse(row);
+  return {
+    id: value.id,
+    workspaceId: value.workspace_id,
+    releaseId: value.release_id,
+    kind: value.kind,
+    cron: value.cron,
+    webhookPath: value.webhook_path,
+    nextFireAt: value.next_fire_at,
+    lastFireAt: value.last_fire_at,
+    firedCount: value.fired_count,
+    enabled: typeof value.enabled === 'boolean' ? value.enabled : value.enabled === 1,
+    createdAt: value.created_at,
+    createdBy: value.created_by,
+  };
 }
 
 export class ScheduleRepo extends BaseRepo<Schedule> {
@@ -14,24 +43,28 @@ export class ScheduleRepo extends BaseRepo<Schedule> {
   }
 
   override findById(id: string): Schedule | null {
-    const schedule = super.findById(id);
-    return schedule ? toSchedule(schedule as unknown as Record<string, unknown>) : null;
+    const row = this.db.prepare('SELECT * FROM schedules WHERE id = ?').get(id);
+    return row ? toSchedule(row) : null;
   }
 
   override findMany(opts: { page: number; pageSize: number }): Paginated<Schedule> {
-    const result = super.findMany(opts);
-    return { ...result, items: result.items.map((schedule) => toSchedule(schedule as unknown as Record<string, unknown>)) };
+    const total = z.object({ count: z.number().int().nonnegative() }).parse(
+      this.db.prepare('SELECT COUNT(*) AS count FROM schedules').get(),
+    ).count;
+    const rows = this.db.prepare('SELECT * FROM schedules LIMIT ? OFFSET ?')
+      .all(opts.pageSize, (opts.page - 1) * opts.pageSize);
+    return { items: rows.map(toSchedule), total };
   }
 
   findDueSchedules(now: Date): Schedule[] {
     const rows = this.db.prepare("SELECT * FROM schedules WHERE enabled = 1 AND next_fire_at <= ?")
-      .all(now.toISOString()) as Array<Record<string, unknown>>;
+      .all(now.toISOString());
     return rows.map(toSchedule);
   }
 
   findByReleaseId(releaseId: string): Schedule[] {
     const rows = this.db.prepare('SELECT * FROM schedules WHERE release_id = ?')
-      .all(releaseId) as Array<Record<string, unknown>>;
+      .all(releaseId);
     return rows.map(toSchedule);
   }
 
