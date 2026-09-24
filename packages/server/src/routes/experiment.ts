@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { parseBody } from './validate.js';
+import { parseBody, parseQuery } from './validate.js';
 import type { ExperimentRepo } from '../repos/experiment.js';
 
 const VariantSchema = z.object({
@@ -13,6 +13,11 @@ const AssignmentSchema = z.object({
   caseId: z.string(),
   variantId: z.string(),
   outcome: z.enum(['pass', 'fail', 'borderline', 'error']),
+});
+
+const ExperimentSummaryQuerySchema = z.object({
+  alpha: z.coerce.number().min(0).max(1).default(0.05),
+  bayesSamples: z.coerce.number().int().min(100).max(100_000).default(10_000),
 });
 
 export interface ExperimentDeps {
@@ -40,11 +45,12 @@ export function registerExperimentRoutes(app: FastifyInstance, deps: ExperimentD
    */
   app.get('/api/releases/:id/experiments/summary', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const alpha = Number((request.query as { alpha?: string }).alpha ?? '0.05');
-    const bayesSamples = Number((request.query as { bayesSamples?: string }).bayesSamples ?? '10000');
+    const parsed = parseQuery(reply, ExperimentSummaryQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { alpha, bayesSamples } = parsed.data;
     const summary = deps.experimentRepo.summarize(id, {
-      alpha: Number.isFinite(alpha) ? alpha : 0.05,
-      bayesSamples: Number.isFinite(bayesSamples) ? bayesSamples : 10_000,
+      alpha,
+      bayesSamples,
     });
     return reply.send({ summary });
   });

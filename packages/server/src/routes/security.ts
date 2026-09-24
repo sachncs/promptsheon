@@ -57,6 +57,10 @@ const ListScansQuerySchema = z.object({
   resourceId: z.string().min(1).max(120).optional(),
 });
 
+const SecuritySummaryQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).default(30),
+});
+
 /**
  * T2-3 security surface.
  *   POST /api/security/scan              — run the static scanner
@@ -122,8 +126,10 @@ export function registerSecurityRoutes(
         error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' },
       });
     }
-    const days = Number((request.query as { days?: string }).days ?? '30');
-    const summary = deps.scanRepo.summaryByOrg(orgId, Math.min(Math.max(days, 1), 365));
+    const parsed = parseQuery(reply, SecuritySummaryQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { days } = parsed.data;
+    const summary = deps.scanRepo.summaryByOrg(orgId, days);
     return reply.send({ orgId, days, ...summary });
   });
 }

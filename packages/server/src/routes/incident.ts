@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { parseBody } from './validate.js';
+import { parseBody, parseQuery } from './validate.js';
 import type { IncidentRepo } from '../repos/incident.js';
 
 const ProposeSchema = z.object({
@@ -19,6 +19,11 @@ const DecideSchema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
+const IncidentListQuerySchema = z.object({
+  suiteId: z.string().min(1).max(200).optional(),
+  status: z.enum(['open', 'accepted', 'rejected']).optional(),
+});
+
 export interface IncidentDeps {
   incidentRepo: IncidentRepo;
   actorId: () => string;
@@ -26,8 +31,9 @@ export interface IncidentDeps {
 
 export function registerIncidentRoutes(app: FastifyInstance, deps: IncidentDeps): void {
   app.get('/api/incidents', async (request, reply) => {
-    const { suiteId, status } = request.query as { suiteId?: string; status?: 'open' | 'accepted' | 'rejected' };
-    return reply.send(deps.incidentRepo.list({ suiteId, status }));
+    const parsed = parseQuery(reply, IncidentListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    return reply.send(deps.incidentRepo.list(parsed.data));
   });
 
   app.post('/api/incidents/propose', async (request, reply) => {
