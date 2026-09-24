@@ -67,6 +67,16 @@ export default function ApprovalsPage() {
   });
 
   if (!session) return null;
+  if (workspaces.isPending || projects.isPending || (projectList.length > 0 && allReleases.isPending)) {
+    return (
+      <div className="space-y-6" aria-busy="true" aria-live="polite">
+        <PageHeader eyebrow="Quality" title="Approvals queue" subtitle="Loading releases that need review…" />
+        <Surface className="h-72 animate-pulse bg-surface-2/40">
+          <span className="sr-only">Loading approvals</span>
+        </Surface>
+      </div>
+    );
+  }
   if (workspaces.isError) return <QueryError message={workspaces.error} onRetry={() => void workspaces.refetch()} />;
   if (projects.isError) return <QueryError message={projects.error} onRetry={() => void projects.refetch()} />;
   if (allReleases.isError) return <QueryError message={allReleases.error} onRetry={() => void allReleases.refetch()} />;
