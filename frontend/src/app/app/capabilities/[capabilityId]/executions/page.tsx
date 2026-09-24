@@ -59,15 +59,15 @@ export default function ExecutionsPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
+            rows={rows}
+            rowKey={(r) => r.id}
             columns={[
               {
                 key: 'id',
                 header: 'Run',
                 render: (r) => (
-                  <Link href={`/app/executions/${String(r['id'])}`} className="font-mono text-xs text-brand-highlight hover:underline">
-                    {String(r['id']).slice(0, 12)}…
+                  <Link href={`/app/executions/${r.id}`} className="font-mono text-xs text-brand-highlight hover:underline">
+                    {r.id.slice(0, 12)}…
                   </Link>
                 ),
               },
@@ -76,30 +76,28 @@ export default function ExecutionsPage() {
                 header: 'Status',
                 render: (r) => (
                   <StatusPill
-                    kind={r['status'] === 'completed' ? 'active' : r['status'] === 'failed' ? 'rejected' : 'review'}
-                    label={String(r['status'])}
+                    kind={r.status === 'completed' ? 'active' : r.status === 'failed' ? 'rejected' : 'review'}
+                    label={r.status}
                   />
                 ),
               },
               {
                 key: 'started',
                 header: 'Started',
-                render: (r) => r['startedAt'] ? new Date(String(r['startedAt'])).toLocaleString() : '—',
+                render: (r) => r.startedAt ? new Date(r.startedAt).toLocaleString() : '—',
               },
               {
                 key: 'cost',
                 header: 'Cost',
                 render: (r) => {
-                  const c = Number(r['totalCost'] ?? 0);
-                  return `$${(c / 1_000_000).toFixed(4)}`;
+                  return `$${(r.totalCost / 1_000_000).toFixed(4)}`;
                 },
               },
               {
                 key: 'latency',
                 header: 'Latency',
                 render: (r) => {
-                  const ms = Number(r['totalLatencyMs'] ?? 0);
-                  return `${ms.toLocaleString()}ms`;
+                  return `${r.totalLatencyMs.toLocaleString()}ms`;
                 },
               },
             ]}

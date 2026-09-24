@@ -129,9 +129,9 @@ export default function DatasetsPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => setActiveDatasetId(String(r['id']))}
+            rows={rows}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => setActiveDatasetId(r.id)}
             columns={[
               {
                 key: 'name',
@@ -139,22 +139,22 @@ export default function DatasetsPage() {
                 render: (r) => (
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setActiveDatasetId(String(r['id'])); }}
+                    onClick={(e) => { e.stopPropagation(); setActiveDatasetId(r.id); }}
                     className="font-medium text-text-strong hover:underline"
                   >
-                    {String(r['name'])}
+                    {r.name}
                   </button>
                 ),
               },
               {
                 key: 'id',
                 header: 'Identifier',
-                render: (r) => <HashChip hash={String(r['id'])} />,
+                render: (r) => <HashChip hash={r.id} />,
               },
               {
                 key: 'created',
                 header: 'Created',
-                render: (r) => r['createdAt'] ? new Date(String(r['createdAt'])).toLocaleDateString() : '—',
+                render: (r) => r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—',
               },
               {
                 key: 'actions',
@@ -163,7 +163,7 @@ export default function DatasetsPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={(e) => { e.stopPropagation(); deleteDataset.mutate(String(r['id'])); }}
+                    onClick={(e) => { e.stopPropagation(); deleteDataset.mutate(r.id); }}
                   >
                     <Trash2 className="mr-1 size-3" />
                     Delete

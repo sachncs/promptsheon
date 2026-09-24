@@ -52,25 +52,25 @@ export default function ReleasesPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => router.push(`/app/releases/${String(r['id'])}`)}
+            rows={rows}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => router.push(`/app/releases/${r.id}`)}
             columns={[
-              { key: 'env', header: 'Environment', render: (r) => <span className="font-medium">{String(r['environment'])}</span> },
+              { key: 'env', header: 'Environment', render: (r) => <span className="font-medium">{r.environment}</span> },
               {
                 key: 'state',
                 header: 'Status',
                 render: (r) => (
                   <StatusPill
-                    kind={r['status'] === 'active' ? 'active' : r['status'] === 'canary' ? 'review' : 'neutral'}
-                    label={String(r['status'])}
+                    kind={r.status === 'active' ? 'active' : r.status === 'canary' ? 'review' : 'neutral'}
+                    label={r.status}
                   />
                 ),
               },
               {
                 key: 'created',
                 header: 'Created',
-                render: (r) => r['createdAt'] ? new Date(String(r['createdAt'])).toLocaleString() : '—',
+                render: (r) => r.createdAt ? new Date(r.createdAt).toLocaleString() : '—',
               },
             ]}
           />
