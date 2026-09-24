@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { QueryError } from '@/components/brand/query-error';
 
 interface ProjectRow {
   id: string;
@@ -33,7 +34,7 @@ export default function WorkspaceProjectsPage() {
 
   const projects = useQuery({
     queryKey: ['projects', workspaceId],
-    queryFn: () => projectApi.list(workspaceId!).then((r) => r.data).catch(() => [] as ProjectRow[]),
+    queryFn: () => projectApi.list(workspaceId!).then((r) => r.data),
     enabled: Boolean(workspaceId) && Boolean(session),
   });
 
@@ -68,6 +69,8 @@ export default function WorkspaceProjectsPage() {
   });
 
   const rows = (Array.isArray(projects.data) ? projects.data : []) as ProjectRow[];
+
+  if (projects.isError) return <QueryError message={(projects.error as Error).message} onRetry={() => void projects.refetch()} />;
 
   return (
     <div className="space-y-6">

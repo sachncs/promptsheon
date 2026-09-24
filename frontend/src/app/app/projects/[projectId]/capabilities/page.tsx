@@ -11,6 +11,7 @@ import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function ProjectCapabilitiesPage() {
   const params = useParams<{ projectId: string }>();
@@ -20,11 +21,13 @@ export default function ProjectCapabilitiesPage() {
 
   const capabilities = useQuery({
     queryKey: ['capabilities', projectId],
-    queryFn: () => capabilityApi.list(projectId!).then((r) => r.data).catch(() => []),
+    queryFn: () => capabilityApi.list(projectId!).then((r) => r.data),
     enabled: Boolean(projectId) && Boolean(session),
   });
 
   const rows = (Array.isArray(capabilities.data) ? capabilities.data : []) as Array<{ id: string; name: string; description?: string }>;
+
+  if (capabilities.isError) return <QueryError message={(capabilities.error as Error).message} onRetry={() => void capabilities.refetch()} />;
 
   return (
     <div className="space-y-6">

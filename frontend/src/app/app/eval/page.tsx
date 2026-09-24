@@ -12,16 +12,19 @@ import { DataTable } from '@/components/brand/data-table';
 import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function EvalListPage() {
   const session = useRequireSession();
   const router = useRouter();
   const evals = useQuery({
     queryKey: ['eval-runs'],
-    queryFn: () => evalApi.list().then((r) => r.data).catch(() => []),
+    queryFn: () => evalApi.list().then((r) => r.data),
     enabled: Boolean(session),
   });
   const rows = Array.isArray(evals.data) ? evals.data : [];
+
+  if (evals.isError) return <QueryError message={(evals.error as Error).message} onRetry={() => void evals.refetch()} />;
 
   return (
     <div className="space-y-6">

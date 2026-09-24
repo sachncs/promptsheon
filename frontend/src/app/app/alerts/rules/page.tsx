@@ -13,6 +13,7 @@ import { ThemedSelect } from '@/components/brand/themed-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { QueryError } from '@/components/brand/query-error';
 
 interface AlertRule {
   id: string;
@@ -41,7 +42,7 @@ export default function AlertRulesPage() {
 
   const rules = useQuery({
     queryKey: ['alert-rules'],
-    queryFn: () => alertApi.listRules().then((r) => r.data).catch(() => [] as AlertRule[]),
+    queryFn: () => alertApi.listRules().then((r) => r.data),
   });
   const rows = (rules.data ?? []) as AlertRule[];
 
@@ -78,6 +79,7 @@ export default function AlertRulesPage() {
   });
 
   if (!session) return null;
+  if (rules.isError) return <QueryError message={(rules.error as Error).message} onRetry={() => void rules.refetch()} />;
 
   return (
     <div className="space-y-6">

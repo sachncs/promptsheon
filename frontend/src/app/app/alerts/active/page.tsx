@@ -8,15 +8,18 @@ import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function AlertsActivePage() {
   const session = useRequireSession();
   const alerts = useQuery({
     queryKey: ['alerts', 'active'],
-    queryFn: () => alertApi.listAlerts().then((r) => r.data).catch(() => []),
+    queryFn: () => alertApi.listAlerts().then((r) => r.data),
     enabled: Boolean(session),
   });
   const rows = Array.isArray(alerts.data) ? alerts.data : [];
+
+  if (alerts.isError) return <QueryError message={(alerts.error as Error).message} onRetry={() => void alerts.refetch()} />;
 
   return (
     <div className="space-y-6">
