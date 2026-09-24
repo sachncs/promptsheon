@@ -290,22 +290,22 @@ export default function RepositoryDetail() {
             ) : (
               <DataTable
                 className="rounded-none border-0 border-t border-border-subtle"
-                rows={(mrs.data ?? []) as Array<Record<string, unknown>>}
-                rowKey={(r) => String(r['id'])}
-                onRowClick={(r) => { router.push(`/app/merge-requests/${String(r['id'])}`); }}
+                rows={mrs.data ?? []}
+                rowKey={(r) => r.id}
+                onRowClick={(r) => { router.push(`/app/merge-requests/${r.id}`); }}
                 columns={[
-                  { key: 'n', header: '#', render: (r) => `#${String(r['number'])}` },
-                  { key: 'title', header: 'Title', render: (r) => <span className="font-medium text-text-strong">{String(r['title'])}</span> },
+                  { key: 'n', header: '#', render: (r) => `#${r.number}` },
+                  { key: 'title', header: 'Title', render: (r) => <span className="font-medium text-text-strong">{r.title}</span> },
                   {
                     key: 'branches',
                     header: 'Branches',
                     render: (r) => (
                       <span className="font-mono text-xs text-text-muted">
-                        {String(r['sourceBranch'])} → {String(r['targetBranch'])}
+                        {r.sourceBranch} → {r.targetBranch}
                       </span>
                     ),
                   },
-                  { key: 'state', header: 'State', render: (r) => <StatusPill kind={String(r['status']) === 'open' ? 'review' : 'active'} /> },
+                  { key: 'state', header: 'State', render: (r) => <StatusPill kind={r.status === 'open' ? 'review' : 'active'} /> },
                 ]}
               />
             )}

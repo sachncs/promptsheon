@@ -130,6 +130,44 @@ export interface EvalResult {
   latencyMs: number;
 }
 
+export type MergeRequestStatus = 'open' | 'merged' | 'closed';
+
+export interface MergeRequest {
+  id: string;
+  repositoryId: string;
+  number: number;
+  title: string;
+  description: string | null;
+  sourceBranch: string;
+  targetBranch: string;
+  sourceCommitOid: string;
+  mergeCommitOid: string | null;
+  authorId: string;
+  status: MergeRequestStatus;
+  approvedBy: string[];
+  requestedReviewers: string[];
+  createdAt: string;
+  updatedAt: string;
+  mergedAt: string | null;
+}
+
+export interface MergeRequestApproval {
+  mergeRequestId: string;
+  userId: string;
+  decision: 'approve' | 'request_changes';
+  commentId: string | null;
+  createdAt: string;
+}
+
+export interface MergeRequestComment {
+  id: string;
+  mergeRequestId: string;
+  authorId: string;
+  path: string | null;
+  body: string;
+  createdAt: string;
+}
+
 const CostRollupSchema = z.object({
   capabilityId: z.string(),
   day: z.string(),
@@ -174,6 +212,42 @@ const EvalResultSchema = z.object({
   actual: z.string(),
   error: z.string(),
   latencyMs: z.number().nonnegative(),
+});
+
+const MergeRequestSchema = z.object({
+  id: z.string(),
+  repositoryId: z.string(),
+  number: z.number().int().positive(),
+  title: z.string(),
+  description: z.string().nullable(),
+  sourceBranch: z.string(),
+  targetBranch: z.string(),
+  sourceCommitOid: z.string(),
+  mergeCommitOid: z.string().nullable(),
+  authorId: z.string(),
+  status: z.enum(['open', 'merged', 'closed']),
+  approvedBy: z.array(z.string()),
+  requestedReviewers: z.array(z.string()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  mergedAt: z.string().nullable(),
+});
+
+const MergeRequestApprovalSchema = z.object({
+  mergeRequestId: z.string(),
+  userId: z.string(),
+  decision: z.enum(['approve', 'request_changes']),
+  commentId: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+const MergeRequestCommentSchema = z.object({
+  id: z.string(),
+  mergeRequestId: z.string(),
+  authorId: z.string(),
+  path: z.string().nullable(),
+  body: z.string(),
+  createdAt: z.string(),
 });
 
 function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
@@ -222,6 +296,44 @@ function parseEvalResults(raw: unknown): EvalResult[] {
     }
     return parsed.data;
   });
+}
+
+function parseMergeRequest(raw: unknown): MergeRequest {
+  const parsed = MergeRequestSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ApiError('The server returned invalid merge request data.', { code: 'INVALID_RESPONSE' });
+  }
+  return parsed.data;
+}
+
+function parseMergeRequests(raw: unknown): MergeRequest[] {
+  return unwrapList<unknown>(raw).map(parseMergeRequest);
+}
+
+function parseMergeRequestDetail(raw: unknown): {
+  mr: MergeRequest;
+  approvals: MergeRequestApproval[];
+  comments: MergeRequestComment[];
+} {
+  if (!raw || typeof raw !== 'object') {
+    throw new ApiError('The server returned invalid merge request details.', { code: 'INVALID_RESPONSE' });
+  }
+  const value = raw as Record<string, unknown>;
+  const mr = parseMergeRequest(value['mr']);
+  const approvals = Array.isArray(value['approvals']) ? value['approvals'].map((entry) => {
+    const parsed = MergeRequestApprovalSchema.safeParse(entry);
+    if (!parsed.success) throw new ApiError('The server returned invalid merge request approvals.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  }) : null;
+  const comments = Array.isArray(value['comments']) ? value['comments'].map((entry) => {
+    const parsed = MergeRequestCommentSchema.safeParse(entry);
+    if (!parsed.success) throw new ApiError('The server returned invalid merge request comments.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  }) : null;
+  if (!approvals || !comments) {
+    throw new ApiError('The server returned invalid merge request details.', { code: 'INVALID_RESPONSE' });
+  }
+  return { mr, approvals, comments };
 }
 
 const WorkspaceRowSchema = z.object({
@@ -686,8 +798,10 @@ export const repoApi = {
   commit: (repoId: string, ref: string, message: string, parents?: string[]) =>
     client.post(`/repos/${repoId}/commits`, { ref, message, parents }).then((r) => r.data),
   listCommits: (repoId: string, ref: string) => client.get(`/repos/${repoId}/commits?ref=${encodeURIComponent(ref)}`).then((r) => r.data),
-  listMRs: (repoId: string, status?: string) =>
-    client.get(`/repos/${repoId}/merge-requests${status ? `?status=${status}` : ''}`).then((r) => r.data),
+  listMRs: async (repoId: string, status?: string): Promise<MergeRequest[]> => {
+    const r = await client.get<unknown>(`/repos/${repoId}/merge-requests${status ? `?status=${status}` : ''}`);
+    return parseMergeRequests(r.data);
+  },
   openMR: (input: {
     repositoryId: string;
     title: string;
@@ -696,7 +810,14 @@ export const repoApi = {
     targetBranch: string;
     sourceCommitOid: string;
   }) => client.post(`/repos/${input.repositoryId}/merge-requests`, input).then((r) => r.data),
-  getMR: (id: string) => client.get(`/merge-requests/${id}`).then((r) => r.data),
+  getMR: async (id: string): Promise<{
+    mr: MergeRequest;
+    approvals: MergeRequestApproval[];
+    comments: MergeRequestComment[];
+  }> => {
+    const r = await client.get<unknown>(`/merge-requests/${id}`);
+    return parseMergeRequestDetail(r.data);
+  },
   decideMR: (id: string, decision: 'approve' | 'request_changes', comment?: string) =>
     client.post(`/merge-requests/${id}/decisions`, { decision, comment }).then((r) => r.data),
   commentMR: (id: string, body: string, path?: string) =>
