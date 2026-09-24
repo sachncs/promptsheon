@@ -33,8 +33,8 @@ test.describe('tier 8: approvals flow', () => {
       },
     });
     if (r.status() === 409) r = await ctx.get('/api/bootstrap/admin');
-    const admin = (await r.json()) as { user: { id: string }; org: { id: string } };
-    const H = { 'X-User-Id': admin.user.id, 'X-Org-Id': admin.org.id };
+    const admin = (await r.json()) as { apiKey: string; user: { id: string }; org: { id: string } };
+    const H = { Authorization: `Bearer ${admin.apiKey}` };
 
     const ws = await ctx.post('/api/workspaces', {
       headers: H,

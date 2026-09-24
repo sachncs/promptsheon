@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import Database from 'better-sqlite3';
 import { orgContextMiddleware, requireRole, getOrgContext } from '../src/middleware/org-context.js';
+import type { Principal } from '../src/policy/principal.js';
 import { MembershipRepo } from '../src/repos/org.js';
 import { applyMigrations } from '@promptsheon/shared';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -58,24 +59,31 @@ describe('orgContextMiddleware', () => {
     db.close();
   });
 
-  it('returns 401 when X-User-Id and X-Org-Id are missing', async () => {
+  it('returns 401 when no authenticated principal is present', async () => {
     const response = await app.inject({ method: 'GET', url: '/api/whoami' });
     expect(response.statusCode).toBe(401);
   });
 
   it('returns 403 when user is not a member of org', async () => {
-    const response = await app.inject({
+    const isolated = Fastify();
+    isolated.addHook('preHandler', async (request) => {
+      request.principal = { type: 'User', id: 'nonexistent', orgId: 'o1', role: 'admin' } satisfies Principal;
+    });
+    isolated.addHook('preHandler', orgContextMiddleware({ membershipRepo }));
+    isolated.get('/api/whoami', async (request) => getOrgContext(request));
+    await isolated.ready();
+    const response = await isolated.inject({
       method: 'GET',
       url: '/api/whoami',
-      headers: { 'x-user-id': 'nonexistent', 'x-org-id': 'o1' },
     });
     expect(response.statusCode).toBe(403);
+    await isolated.close();
   });
 
   it('does not allow X-User-Id to override an authenticated request identity', async () => {
     const isolated = Fastify();
     isolated.addHook('preHandler', async (request) => {
-      request.userId = 'u1';
+      request.principal = { type: 'User', id: 'u1', orgId: 'o1', role: 'admin' } satisfies Principal;
     });
     isolated.addHook('preHandler', orgContextMiddleware({ membershipRepo }));
     isolated.get('/api/whoami', async (request) => getOrgContext(request));
@@ -84,7 +92,7 @@ describe('orgContextMiddleware', () => {
     const response = await isolated.inject({
       method: 'GET',
       url: '/api/whoami',
-      headers: { 'x-user-id': 'nonexistent', 'x-org-id': 'o1' },
+      headers: { 'x-user-id': 'ignored', 'x-org-id': 'ignored' },
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ userId: 'u1', role: 'admin' });
@@ -94,8 +102,7 @@ describe('orgContextMiddleware', () => {
   it('rejects an organization header that conflicts with verified credential scope', async () => {
     const isolated = Fastify();
     isolated.addHook('preHandler', async (request) => {
-      request.userId = 'u1';
-      request.authenticatedOrgId = 'o1';
+      request.principal = { type: 'User', id: 'u1', orgId: 'o2', role: 'admin' } satisfies Principal;
     });
     isolated.addHook('preHandler', orgContextMiddleware({ membershipRepo }));
     isolated.get('/api/whoami', async (request) => getOrgContext(request));
@@ -104,9 +111,9 @@ describe('orgContextMiddleware', () => {
     const response = await isolated.inject({
       method: 'GET',
       url: '/api/whoami',
-      headers: { 'x-org-id': 'o2' },
+      headers: { 'x-org-id': 'o1' },
     });
-    expect(response.statusCode).toBe(404);
+    expect(response.statusCode).toBe(403);
     await isolated.close();
   });
 

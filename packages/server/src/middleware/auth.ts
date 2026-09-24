@@ -9,7 +9,6 @@ declare module 'fastify' {
   interface FastifyRequest {
     userId?: string;
     userRole?: string;
-    authenticatedOrgId?: string;
     agentOrgId?: string;
     agentClassification?: string;
     principal?: Principal;
@@ -26,8 +25,8 @@ const PUBLIC_PATHS = new Set([
 ]);
 
 /**
- * Auth middleware — Bearer + SVID; legacy X-User-Id fallback
- * is only honoured when auth is *disabled*.
+ * Auth middleware — Bearer + SVID authentication with an explicit
+ * development system principal when authentication is disabled.
  *
  *  - `Authorization: Bearer <token>` → sha256 lookup in api_keys.
  *  - `Authorization: SVID <token>`   → ed25519 verification against
@@ -39,11 +38,9 @@ const PUBLIC_PATHS = new Set([
  *    gate can authorize the action.
  *
  * When auth is enabled (the production default), any request
- * without a Bearer / SVID header is rejected with 401 — the
- * legacy X-User-Id fallback is intentionally NOT honoured, since
- * it bypasses every maker-checker / approval / audit chain that
- * depends on the request's identity. When auth is disabled (dev /
- * test), X-User-Id is honoured so curl-based smoke checks work.
+ * without a Bearer / SVID header is rejected with 401. When auth is
+ * disabled, requests receive an explicit development system principal;
+ * request headers are never interpreted as identity data.
  *
  * Public paths (`/api/openapi.json`, `/api/health`, `/api/ready`,
  * `/api/audit/verify`, `/api/audit/state`, `/api/bootstrap/...`)
@@ -71,12 +68,10 @@ export function authMiddleware(
     }
 
     if (!config.auth.enabled) {
-      const headerUser = request.headers['x-user-id'];
-      if (typeof headerUser === 'string' && headerUser.length > 0) {
-        request.userId = headerUser;
-      } else {
-        request.userId = 'api';
-      }
+      request.userId = 'development';
+      request.userRole = 'admin';
+      request.principal = { type: 'System', id: 'development' };
+      request.orgContextBypass = true;
       return;
     }
 
@@ -100,7 +95,6 @@ export function authMiddleware(
         }
         request.userId = apiKey.userId;
         request.userRole = apiKey.role;
-        request.authenticatedOrgId = apiKey.organizationId;
         request.principal = {
           type: 'User',
           id: apiKey.userId,

@@ -112,8 +112,6 @@ async function main() {
       'Authorization',
       'X-Request-Id',
       'Idempotency-Key',
-      'X-User-Id',
-      'X-Org-Id',
     ],
     credentials: true,
   });

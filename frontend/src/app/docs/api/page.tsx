@@ -8,7 +8,7 @@ export default function ApiDoc() {
   return (
     <DocPage
       title="API reference"
-      subtitle="OpenAPI 3.1 document at /api/openapi.json. Bearer auth. X-User-Id + X-Org-Id internal fallback for dev tooling."
+      subtitle="OpenAPI 3.1 document at /api/openapi.json. Protected endpoints require an organization-scoped Bearer API key."
     >
       <h2>Download</h2>
       <DocCurl cmd="curl http://127.0.0.1:8080/api/openapi.json | jq" />

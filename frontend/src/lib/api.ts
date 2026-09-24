@@ -31,12 +31,6 @@ client.interceptors.request.use((config) => {
   if (session?.apiKey) {
     config.headers.set('Authorization', `Bearer ${session.apiKey}`);
   }
-  if (session?.userId) {
-    config.headers.set('X-User-Id', session.userId);
-  }
-  if (session?.orgId) {
-    config.headers.set('X-Org-Id', session.orgId);
-  }
   return config;
 });
 
@@ -976,8 +970,6 @@ export const executionApi = {
       accept: 'text/event-stream',
     };
     if (session?.apiKey) headers.Authorization = `Bearer ${session.apiKey}`;
-    if (session?.userId) headers['X-User-Id'] = session.userId;
-    if (session?.orgId) headers['X-Org-Id'] = session.orgId;
     void fetch(url, {
       method: 'POST',
       headers,

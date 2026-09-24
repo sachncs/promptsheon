@@ -10,16 +10,11 @@ import type {
 /**
  * Typed fetch wrapper over the public REST API.
  *
- * Auth is via org-scoped API key (Bearer). The server is configured
- * to issue keys through /api/api-keys (Phase 3 follow-up); for
- * v0.1 the SDK uses the existing X-User-Id / X-Org-Id internal
- * auth path until a public Bearer route is added.
+ * Auth is via an organization-scoped API key sent as a Bearer token.
  */
 export interface SdkOptions {
   baseUrl?: string;
   apiKey?: string;
-  orgId?: string;
-  userId?: string;
 }
 
 interface RequestOptions {
@@ -31,21 +26,15 @@ interface RequestOptions {
 export class PromptsheonClient {
   private readonly baseUrl: string;
   private readonly apiKey: string | undefined;
-  private readonly orgId: string | undefined;
-  private readonly userId: string | undefined;
 
   constructor(opts: SdkOptions = {}) {
     this.baseUrl = opts.baseUrl ?? 'http://127.0.0.1:8080';
     this.apiKey = opts.apiKey;
-    this.orgId = opts.orgId;
-    this.userId = opts.userId;
   }
 
   private async call<T>({ method, path, body }: RequestOptions): Promise<T> {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (this.apiKey) headers['authorization'] = `Bearer ${this.apiKey}`;
-    if (this.orgId) headers['x-org-id'] = this.orgId;
-    if (this.userId) headers['x-user-id'] = this.userId;
     const init: RequestInit = { method, headers };
     if (body !== undefined) init.body = JSON.stringify(body);
     const res = await fetch(`${this.baseUrl}/api${path}`, init);
