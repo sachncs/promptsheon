@@ -16,6 +16,7 @@ import { StepRail, type Step } from '@/components/brand/step-rail';
 import { HashChip } from '@/components/brand/hash-chip';
 import { Timeline } from '@/components/brand/timeline';
 import { EmptyState } from '@/components/brand/empty-state';
+import { QueryError } from '@/components/brand/query-error';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
 import { useToast } from '@/components/brand/toast';
 import { Button } from '@/components/ui/button';
@@ -45,7 +46,7 @@ export default function ReleaseDetailPage() {
 
   const release = useQuery({
     queryKey: ['release', id],
-    queryFn: () => releaseApi.get(id).then((r) => r.data).catch(() => null),
+    queryFn: () => releaseApi.get(id).then((r) => r.data),
     enabled: Boolean(id),
   });
 
@@ -57,7 +58,7 @@ export default function ReleaseDetailPage() {
 
   const audit = useQuery({
     queryKey: ['audit', 'release', id],
-    queryFn: () => auditApi.list({ resource: id }).then((r) => r.data).catch(() => []),
+    queryFn: () => auditApi.list({ resource: id }).then((r) => r.data),
     enabled: Boolean(id),
   });
 
@@ -109,6 +110,7 @@ export default function ReleaseDetailPage() {
 
   if (!session) return null;
   if (release.isLoading) return <div className="text-text-muted text-sm">Loading release…</div>;
+  if (release.isError) return <QueryError message={release.error.message} onRetry={() => void release.refetch()} />;
   if (!release.data) {
     return (
       <EmptyState
@@ -213,7 +215,9 @@ export default function ReleaseDetailPage() {
         <TabsContent value="approvals">
           <Surface>
             <SurfaceHeader title="Approvals" description="Maker-checker coverage on this release." />
-            {(approvals.data as unknown[] | undefined)?.length ? (
+            {approvals.isError ? (
+              <QueryError message={approvals.error.message} onRetry={() => void approvals.refetch()} />
+            ) : (approvals.data as unknown[] | undefined)?.length ? (
               <ul className="space-y-3">
                 {((approvals.data as Array<{ userId?: string; vote?: string; comment?: string; createdAt?: string }>) ?? []).map((a) => (
                   <li key={`${a.userId ?? 'reviewer'}-${a.createdAt ?? 'unknown'}`} className="flex items-center gap-3">
@@ -263,7 +267,9 @@ export default function ReleaseDetailPage() {
         <TabsContent value="audit">
           <Surface>
             <SurfaceHeader title="Lifecycle" description="Append-only audit events for this release." />
-            {(audit.data as unknown[] | undefined)?.length ? (
+            {audit.isError ? (
+              <QueryError message={audit.error.message} onRetry={() => void audit.refetch()} />
+            ) : (audit.data as unknown[] | undefined)?.length ? (
               <Timeline
                 entries={((audit.data as Array<{ id: string; action?: string; actor?: string; createdAt?: string }>) ?? []).map((a) => ({
                   id: a.id,
