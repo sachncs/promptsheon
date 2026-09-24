@@ -14,6 +14,8 @@ export interface TopNavLink {
 }
 
 export function TopNav({ links, className }: { links: TopNavLink[]; className?: string | undefined }) {
+  const [mobileOpen, setMobileOpen] = React.useState(false);
+
   return (
     <header
       className={cn(
@@ -59,13 +61,36 @@ export function TopNav({ links, className }: { links: TopNavLink[]; className?: 
           </Link>
           <button
             type="button"
+            onClick={() => setMobileOpen((open) => !open)}
             className="md:hidden grid h-9 w-9 place-items-center rounded-md text-text-muted hover:bg-surface-2"
             aria-label="Menu"
+            aria-controls="mobile-navigation"
+            aria-expanded={mobileOpen}
           >
             <Menu className="h-4 w-4" />
           </button>
         </div>
       </div>
+      {mobileOpen && (
+        <nav
+          id="mobile-navigation"
+          aria-label="Mobile navigation"
+          className="border-t border-border-subtle bg-surface-0 px-6 py-3 md:hidden"
+        >
+          <div className="mx-auto flex max-w-6xl flex-col gap-1">
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileOpen(false)}
+                className="rounded-md px-3 py-2.5 text-sm text-text-muted hover:bg-surface-2 hover:text-text-default"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
+      )}
     </header>
   );
 }
