@@ -13,6 +13,7 @@ import { Field, FieldGroup } from '@/components/brand/field';
 import { ThemedSelect } from '@/components/brand/themed-select';
 import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
+import { getErrorMessage } from '@/lib/errors';
 
 interface Variant {
   prompt: string;
@@ -180,8 +181,8 @@ export default function PlaygroundPage() {
       )}
       {completeMutation.error && (
         <Surface>
-          <div className="px-5 py-4 text-sm text-destructive">
-            {String((completeMutation.error as Error).message)}
+          <div role="alert" className="px-5 py-4 text-sm text-destructive">
+            {getErrorMessage(completeMutation.error, 'The provider request failed.')}
           </div>
         </Surface>
       )}
@@ -241,6 +242,11 @@ export default function PlaygroundPage() {
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />
               {sweepMutation.isPending ? 'Running sweep…' : `Run ${variants.length} variant${variants.length === 1 ? '' : 's'}`}
             </Button>
+            {sweepMutation.isError && (
+              <div role="alert" className="mt-3 text-sm text-destructive">
+                {getErrorMessage(sweepMutation.error, 'The parameter sweep failed.')}
+              </div>
+            )}
           </div>
         )}
       </Surface>
