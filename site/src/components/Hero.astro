@@ -8,7 +8,7 @@ const base = import.meta.env.BASE_URL;
   <!-- Floating ambient orbs for cinematic depth -->
   <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
     <div class="absolute -left-32 top-24 h-[420px] w-[420px] rounded-full bg-[var(--accent)] opacity-[0.07] blur-[120px]"></div>
-    <div class="absolute right-[-160px] top-0 h-[480px] w-[480px] rounded-full bg-indigo-400 opacity-[0.05] blur-[140px] dark:opacity-[0.10]"></div>
+    <div class="absolute right-[-160px] top-0 h-[480px] w-[480px] rounded-full bg-[var(--brand-silver)] opacity-[0.10] blur-[140px] dark:opacity-[0.14]"></div>
   </div>
 
   <div class="ps-container relative">
@@ -16,8 +16,8 @@ const base = import.meta.env.BASE_URL;
       <!-- Eyebrow -->
       <div class="ps-reveal inline-flex items-center gap-2.5 rounded-full border border-[var(--line)] bg-[var(--bg-overlay)] px-3.5 py-1.5 text-[12px] text-[var(--ink-muted)] backdrop-blur">
         <span class="relative flex h-1.5 w-1.5">
-          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75"></span>
-          <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--brand-steel)] opacity-50"></span>
+          <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--brand-steel)]"></span>
         </span>
         Open source · self-hosted · built for accountable AI delivery
       </div>
@@ -64,25 +64,25 @@ const base = import.meta.env.BASE_URL;
         style="--reveal-delay: 320ms"
       >
         <span class="inline-flex items-center gap-1.5">
-          <svg class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg class="h-3.5 w-3.5 text-[var(--brand-steel)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5" />
           </svg>
           Fastify + Next.js 16
         </span>
         <span class="inline-flex items-center gap-1.5">
-          <svg class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg class="h-3.5 w-3.5 text-[var(--brand-steel)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5" />
           </svg>
           Strands Agents SDK
         </span>
         <span class="inline-flex items-center gap-1.5">
-          <svg class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg class="h-3.5 w-3.5 text-[var(--brand-steel)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5" />
           </svg>
           Cedar policy engine
         </span>
         <span class="inline-flex items-center gap-1.5">
-          <svg class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg class="h-3.5 w-3.5 text-[var(--brand-steel)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5" />
           </svg>
           Runs on your laptop
@@ -96,7 +96,7 @@ const base = import.meta.env.BASE_URL;
       style="--reveal-delay: 360ms"
     >
       <!-- Subtle outer glow -->
-      <div aria-hidden="true" class="absolute -inset-10 -z-10 rounded-[2.5rem] bg-gradient-to-br from-[var(--accent)] to-fuchsia-500 opacity-20 blur-3xl"></div>
+      <div aria-hidden="true" class="absolute -inset-10 -z-10 rounded-[2.5rem] bg-gradient-to-br from-[var(--brand-steel)] to-[var(--brand-silver)] opacity-20 blur-3xl"></div>
 
       <div class="relative overflow-hidden rounded-[1.75rem] border border-[var(--line-strong)] bg-[var(--bg-elevated)] shadow-[0_50px_120px_-30px_rgba(15,17,23,0.35)]">
         <!-- Window chrome -->
@@ -131,10 +131,10 @@ const base = import.meta.env.BASE_URL;
             </div>
             <ul class="space-y-2">
               {[
-                { type: 'planner',   name: 'classify',  model: 'claude-3-5', tone: '#6366F1' },
-                { type: 'agent',     name: 'retrieve',  model: 'tool: orders', tone: '#10B981' },
-                { type: 'guardrail', name: 'reviewer',  model: 'policy v2',   tone: '#F59E0B' },
-                { type: 'agent',     name: 'respond',   model: 'pii-redact',  tone: '#10B981' },
+                { type: 'planner',   name: 'classify',  model: 'claude-3-5', tone: '#4E555B' },
+                { type: 'agent',     name: 'retrieve',  model: 'tool: orders', tone: '#8A9299' },
+                { type: 'guardrail', name: 'reviewer',  model: 'policy v2',   tone: '#B9BEC3' },
+                { type: 'agent',     name: 'respond',   model: 'pii-redact',  tone: '#6C737A' },
               ].map((node) => (
                 <li class="group flex items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--bg-elevated)] p-2.5 transition-colors hover:border-[var(--line-strong)]">
                   <span class="flex h-7 w-7 items-center justify-center rounded-md text-[10px] font-bold uppercase tracking-wider text-white" style={`background:${node.tone}`}>
@@ -144,7 +144,7 @@ const base = import.meta.env.BASE_URL;
                     <div class="truncate text-[12.5px] font-medium text-[var(--ink-strong)]">{node.name}</div>
                     <div class="truncate font-mono text-[10.5px] text-[var(--ink-subtle)]">{node.model}</div>
                   </div>
-                  <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse-soft"></span>
+                  <span class="h-1.5 w-1.5 rounded-full bg-[var(--brand-steel)] animate-pulse-soft"></span>
                 </li>
               ))}
             </ul>
@@ -157,7 +157,7 @@ const base = import.meta.env.BASE_URL;
                     <span>canary</span><span class="font-mono text-[var(--ink-subtle)]">20%</span>
                   </div>
                   <div class="mt-1 h-1 overflow-hidden rounded-full bg-[var(--line)]">
-                    <div class="h-full rounded-full bg-amber-500" style="width:20%"></div>
+                    <div class="h-full rounded-full bg-[var(--brand-silver)]" style="width:20%"></div>
                   </div>
                 </div>
                 <div>
@@ -165,7 +165,7 @@ const base = import.meta.env.BASE_URL;
                     <span>stable</span><span class="font-mono text-[var(--ink-subtle)]">80%</span>
                   </div>
                   <div class="mt-1 h-1 overflow-hidden rounded-full bg-[var(--line)]">
-                    <div class="h-full rounded-full bg-emerald-500" style="width:80%"></div>
+                    <div class="h-full rounded-full bg-[var(--brand-steel)]" style="width:80%"></div>
                   </div>
                 </div>
               </div>
@@ -207,14 +207,14 @@ const base = import.meta.env.BASE_URL;
                 <div class="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-subtle)]">Score</div>
                 <div class="mt-1.5 flex items-baseline gap-1.5">
                   <span class="font-mono text-[22px] font-semibold text-[var(--ink-strong)]">0.94</span>
-                  <span class="text-[11px] text-emerald-600 dark:text-emerald-400">▲ 0.02</span>
+                  <span class="text-[11px] text-[var(--brand-steel)]">▲ 0.02</span>
                 </div>
               </div>
               <div class="p-4">
                 <div class="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-subtle)]">Latency p95</div>
                 <div class="mt-1.5 flex items-baseline gap-1.5">
                   <span class="font-mono text-[22px] font-semibold text-[var(--ink-strong)]">1.2s</span>
-                  <span class="text-[11px] text-emerald-600 dark:text-emerald-400">▼ 0.3s</span>
+                  <span class="text-[11px] text-[var(--brand-steel)]">▼ 0.3s</span>
                 </div>
               </div>
               <div class="p-4">
@@ -229,7 +229,7 @@ const base = import.meta.env.BASE_URL;
             <!-- Footer row: approval state -->
             <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] bg-[var(--bg-elevated)] px-5 py-3 text-[11.5px]">
               <div class="flex items-center gap-2 text-[var(--ink-muted)]">
-                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
                   <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M20 6L9 17l-5-5" />
                   </svg>

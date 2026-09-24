@@ -4,54 +4,59 @@
 
 /* =========================================================================
    Promptsheon — product site
-   Design system grounded in restraint: monochrome ink, a single accent,
-   generous whitespace, and a near-imperceptible surface tint that lets
-   the typography do the work. Inspired by Apple's clarity and the dark
-   elegance of Linear / Vercel product pages.
+   Promptsheon chrome palette: obsidian, graphite, steel, silver, and white.
+   The logo is the source of truth. Colour is reserved for system status;
+   the brand surface stays quiet, tactile, and product-led.
    ========================================================================= */
 
 @layer base {
   :root {
-    /* Light-mode surface scale — soft, near-white, very subtle warmth. */
-    --bg:           #FBFBFD;
+    --brand-obsidian: #090A0B;
+    --brand-graphite: #24282C;
+    --brand-steel:    #6C737A;
+    --brand-silver:   #B9BEC3;
+    --brand-chrome:   #F2F4F5;
+
+    /* Light-mode surface scale — cool chrome, never colourful. */
+    --bg:           #F7F8F9;
     --bg-elevated:  #FFFFFF;
-    --bg-subtle:    #F4F5F8;
+    --bg-subtle:    #ECEFF1;
     --bg-overlay:   rgba(255, 255, 255, 0.72);
-    --bg-code:      #0E1322;
-    --bg-code-soft: #11141E;
-    --ink:          #0B0D14;
-    --ink-strong:   #05060A;
-    --ink-muted:    #4B5471;
-    --ink-subtle:   #6E7693;
-    --line:         rgba(15, 17, 23, 0.08);
-    --line-strong:  rgba(15, 17, 23, 0.14);
-    --accent:       #4F46E5;
-    --accent-soft:  rgba(79, 70, 229, 0.08);
-    --accent-ring:  rgba(79, 70, 229, 0.22);
-    --success:      #10B981;
-    --warn:         #F59E0B;
-    --danger:       #EF4444;
+    --bg-code:      #0D0F10;
+    --bg-code-soft: #15181A;
+    --ink:          #30353A;
+    --ink-strong:   #090A0B;
+    --ink-muted:    #5B636B;
+    --ink-subtle:   #7A838B;
+    --line:         rgba(36, 40, 44, 0.10);
+    --line-strong:  rgba(36, 40, 44, 0.18);
+    --accent:       #2F353A;
+    --accent-soft:  rgba(47, 53, 58, 0.09);
+    --accent-ring:  rgba(47, 53, 58, 0.24);
+    --success:      #66736D;
+    --warn:         #8C7D68;
+    --danger:       #956D70;
     --noise-opacity: 0.035;
     --shadow-color: 220 30% 5%;
   }
 
   .dark {
-    /* Dark-mode surface scale — cinematic, deep navy-black, never pure #000. */
-    --bg:           #07080D;
-    --bg-elevated:  #0C0E16;
-    --bg-subtle:    #11141E;
-    --bg-overlay:   rgba(7, 8, 13, 0.7);
-    --bg-code:      #0B0D14;
-    --bg-code-soft: #11141E;
-    --ink:          #E8ECF5;
+    /* Dark-mode surface scale — obsidian and polished graphite. */
+    --bg:           #08090A;
+    --bg-elevated:  #101214;
+    --bg-subtle:    #181B1E;
+    --bg-overlay:   rgba(8, 9, 10, 0.74);
+    --bg-code:      #0A0B0C;
+    --bg-code-soft: #151719;
+    --ink:          #DDE1E4;
     --ink-strong:   #FFFFFF;
-    --ink-muted:    #9DA6BD;
-    --ink-subtle:   #6C7591;
-    --line:         rgba(232, 236, 245, 0.08);
-    --line-strong:  rgba(232, 236, 245, 0.14);
-    --accent:       #818CF8;
-    --accent-soft:  rgba(129, 140, 248, 0.12);
-    --accent-ring:  rgba(129, 140, 248, 0.32);
+    --ink-muted:    #A4ABB1;
+    --ink-subtle:   #778087;
+    --line:         rgba(221, 225, 228, 0.10);
+    --line-strong:  rgba(221, 225, 228, 0.18);
+    --accent:       #C5CBD0;
+    --accent-soft:  rgba(197, 203, 208, 0.13);
+    --accent-ring:  rgba(197, 203, 208, 0.34);
     --noise-opacity: 0.06;
     --shadow-color: 220 30% 2%;
   }
