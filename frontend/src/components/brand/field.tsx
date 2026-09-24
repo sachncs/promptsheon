@@ -18,6 +18,24 @@ export function Field({
   className?: string;
   children: React.ReactNode;
 }) {
+  const generatedId = React.useId();
+  const errorId = `${htmlFor ?? generatedId}-error`;
+  const describedBy = error ? errorId : undefined;
+  const enhancedChildren = React.Children.map(children, (child) => {
+    if (!React.isValidElement(child)) return child;
+    const childProps = child.props as {
+      'aria-describedby'?: string;
+      'aria-invalid'?: boolean | 'true' | 'false';
+      'aria-required'?: boolean | 'true' | 'false';
+    };
+    const existingDescribedBy = childProps['aria-describedby'];
+    return React.cloneElement(child, {
+      'aria-describedby': [existingDescribedBy, describedBy].filter(Boolean).join(' ') || undefined,
+      'aria-invalid': error ? true : childProps['aria-invalid'],
+      'aria-required': required ? true : childProps['aria-required'],
+    } as React.HTMLAttributes<HTMLElement>);
+  });
+
   return (
     <div className={cn('space-y-1.5', className)}>
       {label && (
@@ -29,8 +47,8 @@ export function Field({
           {hint && <span className="font-normal normal-case tracking-normal text-text-muted">{hint}</span>}
         </label>
       )}
-      {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {enhancedChildren}
+      {error && <p id={errorId} role="alert" className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
