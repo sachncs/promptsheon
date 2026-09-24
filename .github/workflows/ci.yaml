@@ -26,6 +26,10 @@ jobs:
         run: pnpm typecheck
       - name: frontend lint
         run: pnpm --dir frontend lint
+      - name: public site check
+        run: pnpm --dir site exec astro check
+      - name: public site build
+        run: pnpm --dir site build
 
   test:
     name: Server Tests
