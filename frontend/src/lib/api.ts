@@ -189,6 +189,13 @@ export interface CapabilityManifestResponse {
   size: number;
 }
 
+export interface SearchResult {
+  kind: string;
+  resourceId: string;
+  title: string;
+  body: string;
+}
+
 const CostRollupSchema = z.object({
   capabilityId: z.string(),
   day: z.string(),
@@ -292,6 +299,13 @@ const CapabilityManifestResponseSchema = z.object({
   size: z.number().int().nonnegative(),
 });
 
+const SearchResultSchema = z.object({
+  kind: z.string(),
+  resourceId: z.string(),
+  title: z.string(),
+  body: z.string(),
+});
+
 function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
   return unwrapList<unknown>(raw).map((entry) => {
     const parsed = VaultKeyringEntrySchema.safeParse(entry);
@@ -393,6 +407,12 @@ function parseCapabilityManifest(raw: unknown): CapabilityManifestResponse {
   if (!parsed.success) {
     throw new ApiError('The server returned invalid capability manifest data.', { code: 'INVALID_RESPONSE' });
   }
+  return parsed.data;
+}
+
+function parseSearchResults(raw: unknown): SearchResult[] {
+  const parsed = z.array(SearchResultSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid search results.', { code: 'INVALID_RESPONSE' });
   return parsed.data;
 }
 
@@ -1294,6 +1314,8 @@ export const traceScoreApi = {
 };
 
 export const searchApi = {
-  q: (q: string, type?: string) =>
-    client.get(`/search?q=${encodeURIComponent(q)}${type ? `&type=${encodeURIComponent(type)}` : ''}`).then((r) => r.data),
+  q: async (q: string, type?: string): Promise<SearchResult[]> => {
+    const r = await client.get<unknown>(`/search?q=${encodeURIComponent(q)}${type ? `&type=${encodeURIComponent(type)}` : ''}`);
+    return parseSearchResults(r.data);
+  },
 };

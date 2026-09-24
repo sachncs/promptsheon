@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Search as SearchIcon } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
-import { searchApi } from '@/lib/api';
+import { searchApi, type SearchResult } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface } from '@/components/brand/surface';
 import { EmptyState } from '@/components/brand/empty-state';
@@ -30,7 +30,7 @@ export default function SearchPage() {
     enabled: deferredQuery.length >= 2,
   });
 
-  const rows = (results.data ?? []) as Array<Record<string, unknown>>;
+  const rows: SearchResult[] = results.data ?? [];
 
   if (!session) return null;
   if (results.isError) return <QueryError message={results.error} onRetry={() => void results.refetch()} />;
@@ -61,14 +61,14 @@ export default function SearchPage() {
             />
           ) : (
             <ul className="divide-y divide-border-subtle">
-              {rows.map((r, i) => (
-                <li key={String(r['resource_id']) ?? i} className="py-3">
+              {rows.map((r) => (
+                <li key={`${r.kind}-${r.resourceId}`} className="py-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs uppercase tracking-wider text-text-subtle">{String(r['kind'])}</span>
-                    <HashChip hash={String(r['resource_id'] ?? '')} length={16} />
+                    <span className="text-xs uppercase tracking-wider text-text-subtle">{r.kind}</span>
+                    <HashChip hash={r.resourceId} length={16} />
                   </div>
-                  <div className="mt-1 text-sm text-text-strong">{String(r['title'])}</div>
-                  <div className="mt-1 line-clamp-2 text-xs text-text-muted">{String(r['body'])}</div>
+                  <div className="mt-1 text-sm text-text-strong">{r.title}</div>
+                  <div className="mt-1 line-clamp-2 text-xs text-text-muted">{r.body}</div>
                 </li>
               ))}
             </ul>
