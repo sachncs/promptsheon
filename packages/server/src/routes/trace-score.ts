@@ -1,8 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { TraceRepo } from '../repos/trace.js';
-import type { TraceScoreRepo } from '../repos/trace-score.js';
-import type { AutoEval } from '../observability/auto-eval.js';
+import type { TraceService } from '../application/trace-service.js';
 import { parseBody, parseQuery } from './validate.js';
 
 const RunAutoEvalSchema = z.object({
@@ -44,7 +42,7 @@ function orgOf(request: unknown): string | null {
  */
 export function registerTraceScoreRoutes(
   app: FastifyInstance,
-  deps: { traceRepo: TraceRepo; scoreRepo: TraceScoreRepo; autoEval: AutoEval },
+  deps: { service: TraceService },
 ) {
   app.get('/api/traces/:id/scores', async (request, reply) => {
     const { id } = request.params as { id: string };
@@ -52,12 +50,11 @@ export function registerTraceScoreRoutes(
     if (!orgId) {
       return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     }
-    const run = deps.traceRepo.findByIdInOrg(id, orgId);
-    if (!run) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'trace_run not found' } });
     const parsed = parseQuery(reply, ListScoresQuerySchema, request.query);
     if (!parsed.ok) return;
-    const items = deps.scoreRepo.listByRun(id);
-    return reply.send({ run, items, total: items.length });
+    const scores = deps.service.scores(orgId, id);
+    if (!scores) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'trace_run not found' } });
+    return reply.send(scores);
   });
 
   app.post('/api/traces/:id/auto-eval', async (request, reply) => {
@@ -66,13 +63,13 @@ export function registerTraceScoreRoutes(
     if (!orgId) {
       return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     }
-    if (!deps.traceRepo.findByIdInOrg(id, orgId)) {
-      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'trace_run not found' } });
-    }
     const parsed = parseBody(reply, RunAutoEvalSchema, request.body ?? {});
     if (!parsed.ok) return;
     try {
-      const written = await deps.autoEval.run(id, parsed.data);
+      const written = await deps.service.autoEval(orgId, id, parsed.data);
+      if (written === null) {
+        return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'trace_run not found' } });
+      }
       return reply.send({ traceRunId: id, written });
     } catch (err) {
       return reply.code(404).send({
@@ -91,7 +88,7 @@ export function registerTraceScoreRoutes(
     const parsed = parseQuery(reply, SummaryQuerySchema, request.query);
     if (!parsed.ok) return;
     const { days, evaluator } = parsed.data;
-    const out = deps.scoreRepo.summaryByOrg(orgId, {
+    const out = deps.service.summary(orgId, {
       days,
       ...(evaluator ? { evaluator } : {}),
     });

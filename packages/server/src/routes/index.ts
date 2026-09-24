@@ -68,6 +68,7 @@ import { HealthService } from '../application/health-service.js';
 import { SqliteHealthProbe } from '../infrastructure/sqlite-health-probe.js';
 import { IdentityService } from '../application/identity-service.js';
 import { AgentIdentityRepo } from '../repos/agent-identity.js';
+import { createTraceService } from '../application/trace-service.js';
 import type { LlmSettingsService } from '../application/llm-settings-service.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
@@ -273,14 +274,17 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
       },
     });
   }
+  const traceService = createTraceService({
+    traces: deps.traceRepo,
+    scores: deps.traceScoreRepo,
+    evaluator: deps.autoEval,
+  });
   registerTraceRoutes(app, {
-    traceRepo: deps.traceRepo,
+    service: traceService,
     requireAdmin: () => requireAdmin() as unknown as (request: unknown, reply: unknown) => Promise<void>,
   });
   registerTraceScoreRoutes(app, {
-    traceRepo: deps.traceRepo,
-    scoreRepo: deps.traceScoreRepo,
-    autoEval: deps.autoEval,
+    service: traceService,
   });
   registerPlaygroundRoutes(app, { gateway: deps.gateway });
   registerAnalyticsRoutes(app, { repo: deps.userAnalyticsRepo });

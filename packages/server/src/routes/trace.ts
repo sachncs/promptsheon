@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { TraceRepo } from '../repos/trace.js';
+import type { TraceService } from '../application/trace-service.js';
 import { parseQuery } from './validate.js';
 
 const ListQuerySchema = z.object({
@@ -41,7 +41,7 @@ function orgOf(request: unknown): string | null {
  */
 export function registerTraceRoutes(
   app: FastifyInstance,
-  deps: { traceRepo: TraceRepo; requireAdmin: () => (request: unknown, reply: unknown) => Promise<void> },
+  deps: { service: TraceService; requireAdmin: () => (request: unknown, reply: unknown) => Promise<void> },
 ) {
   app.get(
     '/api/traces/rollup',
@@ -56,7 +56,7 @@ export function registerTraceRoutes(
       const parsed = parseQuery(reply, RollupQuerySchema, request.query);
       if (!parsed.ok) return;
       const { days, environment } = parsed.data;
-      const items = deps.traceRepo.rollupByOrg(orgId, { days, environment });
+      const items = deps.service.rollup(orgId, { days, environment });
       return reply.send({ orgId, days, environment: environment ?? null, items });
     },
   );
@@ -73,7 +73,7 @@ export function registerTraceRoutes(
       }
       const parsed = parseQuery(reply, ListQuerySchema, request.query);
       if (!parsed.ok) return;
-      const data = deps.traceRepo.listByOrg(orgId, parsed.data);
+      const data = deps.service.list(orgId, parsed.data);
       return reply.send(data);
     },
   );
@@ -87,10 +87,9 @@ export function registerTraceRoutes(
       if (!orgId) {
         return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
       }
-      const run = deps.traceRepo.findByIdInOrg(id, orgId);
-      if (!run) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'trace run not found' } });
-      const spans = deps.traceRepo.findSpansByRun(id);
-      return reply.send({ run, spans });
+      const trace = deps.service.get(orgId, id);
+      if (!trace) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'trace run not found' } });
+      return reply.send(trace);
     },
   );
 }
