@@ -95,11 +95,32 @@ jobs:
         run: docker run --rm promptsheon:ci node server/dist/index.js --check
       - name: Boot the server and hit /api/health
         run: |
-          docker run --rm -d --name promptsheon-ci \
+          set -Eeuo pipefail
+          container_name=promptsheon-ci
+          cleanup() {
+            docker logs "$container_name" || true
+            docker rm -f "$container_name" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker run --rm -d --name "$container_name" \
             -p 8080:8080 \
+            -e PROMPTSHEON_AUTH=true \
+            -e PROMPTSHEON_JWT_SECRET=ci-only-secret-with-at-least-32-characters \
+            -e PROMPTSHEON_CORS_ORIGIN=http://127.0.0.1:3000 \
+            -e PROMPTSHEON_WEBHOOK_SECRET=ci-only-webhook-secret \
+            -e PROMPTSHEON_SCIM_TOKEN=ci-only-scim-token \
             -e PROMPTSHEON_DB_PATH=/tmp/promptsheon.db \
             -e PROMPTSHEON_CAS_PATH=/tmp/.promptsheon \
             promptsheon:ci
-          sleep 5
-          curl -fsS http://127.0.0.1:8080/api/health | jq .
-          docker stop promptsheon-ci
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:8080/api/ready | jq .; then
+              curl --fail --silent --show-error http://127.0.0.1:8080/api/health | jq .
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo 'Server did not become ready within 30 seconds' >&2
+          exit 1
