@@ -12,13 +12,14 @@ import { HashChip } from '@/components/brand/hash-chip';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Play } from 'lucide-react';
 import Link from 'next/link';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function ExecutionsPage() {
   const params = useParams<{ capabilityId: string }>();
   const capabilityId = params.capabilityId;
   const session = useRequireSession();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['executions', capabilityId],
     queryFn: () => executionApi.list(capabilityId!).then((r) => r.data),
     enabled: Boolean(capabilityId) && Boolean(session),
@@ -31,6 +32,12 @@ export default function ExecutionsPage() {
     totalCost: number;
     totalLatencyMs: number;
   }>;
+
+  if (!session) return null;
+
+  if (isError) {
+    return <QueryError message={(error as Error).message} onRetry={() => void refetch()} />;
+  }
 
   return (
     <div className="space-y-6">

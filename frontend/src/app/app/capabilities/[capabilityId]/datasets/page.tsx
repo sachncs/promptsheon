@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { QueryError } from '@/components/brand/query-error';
 
 interface DatasetSummary {
   id: string;
@@ -86,6 +87,12 @@ export default function DatasetsPage() {
   });
 
   const rows = (Array.isArray(datasets.data) ? datasets.data : []) as DatasetSummary[];
+
+  if (!session) return null;
+
+  if (datasets.isError) {
+    return <QueryError message={(datasets.error as Error).message} onRetry={() => void datasets.refetch()} />;
+  }
 
   return (
     <div className="space-y-6">

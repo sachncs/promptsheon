@@ -55,9 +55,6 @@ export default function PreconditionsPage() {
 
   const rows = (Array.isArray(data.data) ? data.data : []) as PreconditionRow[];
 
-  if (data.isError) return <QueryError message={(data.error as Error).message} onRetry={() => void data.refetch()} />;
-  if (versions.isError) return <QueryError message={(versions.error as Error).message} onRetry={() => void versions.refetch()} />;
-
   const [name, setName] = useState('');
   const [command, setCommand] = useState('');
 
@@ -88,6 +85,10 @@ export default function PreconditionsPage() {
     },
     onError: (err) => toast({ title: 'Update failed', variant: 'destructive', description: (err as Error).message }),
   });
+
+  if (!session) return null;
+  if (data.isError) return <QueryError message={(data.error as Error).message} onRetry={() => void data.refetch()} />;
+  if (versions.isError) return <QueryError message={(versions.error as Error).message} onRetry={() => void versions.refetch()} />;
 
   return (
     <div className="space-y-6">

@@ -10,6 +10,7 @@ import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
 import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function ReleasesPage() {
   const params = useParams<{ capabilityId: string }>();
@@ -17,13 +18,19 @@ export default function ReleasesPage() {
   const session = useRequireSession();
   const router = useRouter();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['releases', capabilityId],
     queryFn: () => releaseApi.list(capabilityId!).then((r) => r.data),
     enabled: Boolean(capabilityId) && Boolean(session),
   });
 
   const rows = (Array.isArray(data) ? data : []) as Array<{ id: string; environment: string; status: string; createdAt: string }>;
+
+  if (!session) return null;
+
+  if (isError) {
+    return <QueryError message={(error as Error).message} onRetry={() => void refetch()} />;
+  }
 
   return (
     <div className="space-y-6">

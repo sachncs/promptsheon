@@ -11,13 +11,14 @@ import { StatusPill } from '@/components/brand/status-pill';
 import { Progress } from '@/components/ui/progress';
 import { EmptyState } from '@/components/brand/empty-state';
 import { FlaskConical } from 'lucide-react';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function EvalRunsPage() {
   const params = useParams<{ capabilityId: string }>();
   const capabilityId = params.capabilityId;
   const session = useRequireSession();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['eval-runs', capabilityId],
     queryFn: () => evalApi.list().then((r) => r.data),
     enabled: Boolean(capabilityId) && Boolean(session),
@@ -30,6 +31,12 @@ export default function EvalRunsPage() {
     status: string;
     startedAt: string;
   }>;
+
+  if (!session) return null;
+
+  if (isError) {
+    return <QueryError message={(error as Error).message} onRetry={() => void refetch()} />;
+  }
 
   return (
     <div className="space-y-6">
