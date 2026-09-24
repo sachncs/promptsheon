@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { parseBody } from './validate.js';
+import { parseBody, parseParams } from './validate.js';
 import type { FeatureFlagRepo } from '../repos/feature-flag.js';
 import type { AuditChain } from '../audit/chain.js';
 import { requireAdmin } from '../middleware/admin.js';
@@ -15,6 +15,9 @@ const PutFeatureFlagSchema = z.object({
 });
 
 const FeatureFlagInputSchema = PutFeatureFlagSchema.omit({ name: true });
+const FeatureFlagNameParamsSchema = z.object({
+  name: z.string().trim().min(1).max(120).regex(/^[a-z0-9._-]+$/),
+});
 
 interface RequestUserContext {
   userId?: string;
@@ -34,7 +37,9 @@ export function registerFeatureFlagRoutes(
   });
 
   app.put('/api/feature-flags/:name', { preHandler: requireAdmin() }, async (request, reply) => {
-    const { name } = request.params as { name: string };
+    const parsedParams = parseParams(reply, FeatureFlagNameParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { name } = parsedParams.data;
     const parsedInput = parseBody(reply, FeatureFlagInputSchema, request.body);
     if (!parsedInput.ok) return;
     const parsed = PutFeatureFlagSchema.safeParse({ ...parsedInput.data, name });
@@ -55,7 +60,9 @@ export function registerFeatureFlagRoutes(
   });
 
   app.delete('/api/feature-flags/:name', { preHandler: requireAdmin() }, async (request, reply) => {
-    const { name } = request.params as { name: string };
+    const parsedParams = parseParams(reply, FeatureFlagNameParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { name } = parsedParams.data;
     const removed = deps.repo.delete(name);
     if (!removed) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'feature flag not found' } });
