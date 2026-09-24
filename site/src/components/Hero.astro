@@ -33,9 +33,9 @@ const base = import.meta.env.BASE_URL;
         class="ps-reveal ps-display mt-8 text-[clamp(2.75rem,7vw,5.75rem)]"
         style="--reveal-delay: 80ms"
       >
-        Ship AI capabilities with
+        Build agents that
         <span class="block bg-gradient-to-br from-[var(--ink-strong)] via-[var(--ink-strong)] to-[var(--accent)] bg-clip-text text-transparent dark:from-white dark:via-white dark:to-[#A5B4FC]">
-          an evidence trail.
+          get better with evidence.
         </span>
       </h1>
 
@@ -43,9 +43,9 @@ const base = import.meta.env.BASE_URL;
         class="ps-reveal mx-auto mt-7 max-w-2xl text-[18px] leading-relaxed text-[var(--ink-muted)] sm:text-[19px] text-pretty"
         style="--reveal-delay: 160ms"
       >
-        Promptsheon turns prompts, agents, tools, policies, and evaluations into one
-        versioned release workflow — so your team can see what changed, prove it works,
-        and roll it back when reality disagrees.
+        Promptsheon is an adaptive agent engineering platform for building, executing,
+        evaluating, and continuously improving AI agents and multi-agent systems. Every
+        run becomes evidence for the next better configuration.
       </p>
 
       <div
@@ -61,7 +61,7 @@ const base = import.meta.env.BASE_URL;
           </span>
         </a>
         <a href="#workflow" class="ps-btn ps-btn-secondary ps-btn-lg">
-          See the release path
+          See the adaptation loop
         </a>
       </div>
 
@@ -273,9 +273,9 @@ const base = import.meta.env.BASE_URL;
 
       <div class="mt-8 grid gap-3 md:grid-cols-3">
         {[
-          { number: '01', title: 'Define the capability', text: 'Keep prompts, tools, policies, and runtime limits together in one manifest.', href: '#capabilities' },
-          { number: '02', title: 'Prove the change', text: 'Run evaluations and review evidence before a release can move forward.', href: '#workflow' },
-          { number: '03', title: 'Release with a way back', text: 'Canary the version, watch it in production, and roll back by content hash.', href: '#trust' },
+          { number: '01', title: 'Compose the system', text: 'Define agents, tools, policies, context, models, and budgets as one immutable specification.', href: '#capabilities' },
+          { number: '02', title: 'Measure execution', text: 'Observe quality, cost, latency, context, tools, permissions, and failure modes across real work.', href: '#workflow' },
+          { number: '03', title: 'Promote what works', text: 'Compare candidates, validate mutations, and keep a reversible lineage for every change.', href: '#trust' },
         ].map((item, i) => (
           <a href={item.href} class="ps-reveal group rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)] p-4 transition-all hover:-translate-y-0.5 hover:border-[var(--line-strong)] hover:shadow-soft" style={`--reveal-delay: ${i * 70}ms`}>
             <div class="flex items-center justify-between">

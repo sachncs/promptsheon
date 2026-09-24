@@ -2,9 +2,30 @@
 import DocsLayout from '@components/DocsLayout.astro';
 ---
 
-<DocsLayout title="Architecture" description="The boundaries that keep capability authoring, policy, persistence, and runtime execution understandable as the system grows.">
+<DocsLayout title="Architecture" description="The control-plane model behind Promptsheon: immutable agent specifications, evidence-producing execution, and bounded adaptation.">
   <h2>The system in one sentence</h2>
-  <p>Promptsheon turns an AI capability manifest into a governed release artifact, then exposes the resulting state to operators and runtimes through an authenticated API.</p>
+  <p>Promptsheon is an adaptive agent engineering platform for building, executing, evaluating, and continuously improving AI agents and multi-agent systems.</p>
+
+  <h2>The product model</h2>
+  <p>An agent is not just a prompt attached to a model. It is an immutable, content-addressed executable specification composed of role, objective, prompts, guardrails, capabilities, tools, permissions, context, model and routing policies, execution rules, evaluation intent, budgets, and lifecycle.</p>
+  <pre><code>AgentSpec = role + objective + prompt + guardrails + tools
+          + permissions + context + model + routing
+          + execution + evaluation + budget + lifecycle
+
+Create → Execute → Observe → Evaluate → Compare
+       → Learn → Mutate → Validate → Promote</code></pre>
+
+  <h2>Four control-plane responsibilities</h2>
+  <div class="not-prose grid gap-3 sm:grid-cols-2">
+    {[
+      ['Architect', 'Translates an objective into an executable organization: agent responsibilities, topology, interfaces, capabilities, and evaluation strategy.'],
+      ['Operator', 'Executes the specification: scheduling, parallelism, model routing, tools, retries, state, caching, and result materialization.'],
+      ['Evaluator', 'Measures quality and efficiency before, during, and after execution, then turns observations into comparable evidence.'],
+      ['Governor', 'Enforces hard limits for context, tokens, models, latency, cost, concurrency, tools, permissions, memory, and execution.'],
+    ].map(([name, text]) => (
+      <div class="rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)] p-5"><h3 class="text-[15px] font-semibold text-[var(--ink-strong)]">{name}</h3><p class="mt-2 text-[13px] leading-relaxed text-[var(--ink-muted)]">{text}</p></div>
+    ))}
+  </div>
 
   <h2>Four boundaries</h2>
   <div class="not-prose grid gap-3 sm:grid-cols-2">

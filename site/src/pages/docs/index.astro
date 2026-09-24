@@ -4,6 +4,7 @@ import DocsLayout from '@components/DocsLayout.astro';
 const base = import.meta.env.BASE_URL;
 
 const guides = [
+  { title: 'Product model', text: 'Understand the Architect, Operator, Evaluator, and Governor model before you build.', href: `${base}docs/product/`, tag: 'Start here' },
   { title: 'Quickstart', text: 'Run the platform locally, connect a provider, and ship a first capability.', href: `${base}docs/quickstart/`, tag: '10 minutes' },
   { title: 'Local development', text: 'Understand the workspace, run each surface independently, and debug the request path.', href: `${base}docs/local-development/`, tag: 'Build locally' },
   { title: 'Testing', text: 'Choose the right test tier for domain rules, APIs, browser flows, and release confidence.', href: `${base}docs/testing/`, tag: 'Quality gates' },
@@ -32,10 +33,10 @@ const guides = [
 
   <section class="mt-14 rounded-2xl border border-[var(--line)] bg-[var(--bg-code)] p-6 text-[#E8ECF5] sm:p-8">
     <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-silver)]">The mental model</div>
-    <h2 class="mt-3 text-[25px] font-semibold tracking-tight">Promptsheon is a release system for AI behaviour.</h2>
-    <p class="mt-3 max-w-2xl text-[14px] leading-relaxed text-white/65">You define a capability as a versioned manifest. The platform evaluates it, applies policy, records the decision, and moves an approved version through canary to production. The interface is the control plane; your runtime remains yours.</p>
+    <h2 class="mt-3 text-[25px] font-semibold tracking-tight">Promptsheon is an adaptive system for agent improvement.</h2>
+    <p class="mt-3 max-w-2xl text-[14px] leading-relaxed text-white/65">You define an agentic system as an immutable specification. The platform executes it, measures evidence, learns what changed, and validates better candidates under real resource constraints.</p>
     <div class="mt-7 grid gap-3 text-[12px] sm:grid-cols-4">
-      {['Author', 'Evaluate', 'Approve', 'Release'].map((step, index) => (
+      {['Create', 'Execute', 'Evaluate', 'Promote'].map((step, index) => (
         <div class="rounded-lg border border-white/10 bg-white/[0.04] p-3">
           <div class="font-mono text-white/40">0{index + 1}</div>
           <div class="mt-2 font-medium text-white">{step}</div>

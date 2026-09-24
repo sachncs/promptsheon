@@ -3,22 +3,22 @@ const base = import.meta.env.BASE_URL;
 
 const audiences = [
   {
-    role: 'Platform & AI engineering',
-    title: 'Turn agent behaviour into a release artifact.',
-    body: 'Keep prompts, tools, policies, models, and runtime limits together in a versioned manifest your team can review, reproduce, and promote.',
-    signal: 'Less tribal knowledge',
+    role: 'Architect',
+    title: 'Design agent systems as executable specifications.',
+    body: 'Compose prompts, tools, policies, context, models, budgets, and evaluations into immutable agent and organization graphs with inspectable lineage.',
+    signal: 'Design with intent',
   },
   {
-    role: 'Product & application teams',
-    title: 'Ship useful behaviour without guessing.',
-    body: 'Compare candidate versions against real datasets, watch the metrics that matter, and move from a promising demo to a controlled canary.',
-    signal: 'Shorter feedback loops',
+    role: 'Operator',
+    title: 'Execute the right work with the right resources.',
+    body: 'Schedule dependencies, route models, invoke tools, reuse safe results, and enforce limits while the runtime turns a specification into outcomes.',
+    signal: 'Reliable execution',
   },
   {
-    role: 'Security, risk & operations',
-    title: 'Know what changed when production changes.',
-    body: 'Use approvals, Cedar policies, hash-linked audit history, health checks, and rollback to make AI operations accountable and recoverable.',
-    signal: 'Evidence at every step',
+    role: 'Evaluator + Governor',
+    title: 'Improve quality under real constraints.',
+    body: 'Measure outcomes, cost, latency, context, tools, and permissions, then enforce hard limits so better results do not depend on unlimited computation.',
+    signal: 'Evidence over intuition',
   },
 ];
 ---
@@ -29,12 +29,12 @@ const audiences = [
       <div class="lg:sticky lg:top-28 lg:self-start">
         <div class="ps-reveal ps-eyebrow">Who it is for</div>
         <h2 class="ps-reveal ps-display mt-4 text-display-lg" style="--reveal-delay: 80ms">
-          The handoff from demo to dependable system.
+          The system between a promising agent and a better one.
         </h2>
         <p class="ps-reveal mt-5 max-w-md text-[16.5px] leading-relaxed text-[var(--ink-muted)] text-pretty" style="--reveal-delay: 160ms">
-          Promptsheon gives the people building AI systems a shared language for
-          intent, evidence, approval, and change. It is the layer that makes the
-          work legible to everyone else who has to operate it.
+          Most agent platforms focus on running agents. Promptsheon focuses on
+          making agent systems improve: create, execute, observe, evaluate, compare,
+          learn, mutate, validate, and promote.
         </p>
         <a href={`${base}docs/architecture/`} class="ps-reveal mt-7 inline-flex items-center gap-2 text-[13.5px] font-medium text-[var(--accent)] hover:underline" style="--reveal-delay: 220ms">
           See the architecture <span aria-hidden="true">→</span>

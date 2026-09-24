@@ -1,0 +1,47 @@
+---
+import DocsLayout from '@components/DocsLayout.astro';
+---
+
+<DocsLayout title="Product model" description="The product thesis, control-plane responsibilities, and evidence loop that define Promptsheon.">
+  <h2>The thesis</h2>
+  <p>Most agent platforms focus on running agents. Promptsheon focuses on making agent systems improve. It is a platform for building, executing, evaluating, and continuously improving AI agents and multi-agent systems.</p>
+
+  <p>The fundamental unit is not a prompt or even a running agent. It is an immutable, measurable, evolvable computational specification. Every meaningful change creates a new identity, so improvement remains inspectable, reversible, reproducible, and attributable.</p>
+
+  <h2>An agent is a specification</h2>
+  <pre><code>Agent = role + objective + prompt + guardrails
+      + capabilities + tools + permissions
+      + context + model + routing
+      + execution + memory + evaluation
+      + budget + lifecycle</code></pre>
+
+  <p>Each component can be content-addressed and evolved independently. An agent identity is the composition of those component identities, not a mutable label. This gives teams a precise lineage of what changed and why.</p>
+
+  <h2>The four responsibilities</h2>
+  <h3>Architect</h3>
+  <p>Translates an objective into an executable organization: responsibilities, topology, interfaces, capabilities, and success criteria. Its output is an immutable specification graph.</p>
+
+  <h3>Operator</h3>
+  <p>Executes that graph as a dependency-aware runtime. It schedules work, runs independent actions in parallel, routes models, invokes tools, manages retries, reuses safe results, and materializes outputs.</p>
+
+  <h3>Evaluator</h3>
+  <p>Measures the system before, during, and after execution. It observes outcome quality, failures, context use, model use, tool use, latency, tokens, cost, retries, and human intervention.</p>
+
+  <h3>Governor</h3>
+  <p>Enforces hard constraints for scarce resources: context, tokens, models, latency, cost, concurrency, tools, permissions, memory, and execution time. The objective is quality under constraints, not quality at unlimited cost.</p>
+
+  <h2>The improvement loop</h2>
+  <pre><code>Create → Execute → Observe → Evaluate → Compare
+       → Learn → Mutate → Validate → Promote</code></pre>
+
+  <p>A candidate should not replace a production agent because it looks promising. Compare it against comparable workloads through benchmark suites, historical replay, shadow execution, or controlled rollout. Promote only when the evidence supports the expected improvement and the existing version remains recoverable.</p>
+
+  <h2>What the system learns</h2>
+  <ul>
+    <li>Which prompts, models, routes, tools, and guardrails improve a workload.</li>
+    <li>Which context is actually used and which context only adds tokens.</li>
+    <li>When a fast model is sufficient and when escalation is justified.</li>
+    <li>Which permissions are unnecessary or which missing capabilities cause failure.</li>
+    <li>When one agent is enough and when multi-agent coordination earns its cost.</li>
+  </ul>
+</DocsLayout>
