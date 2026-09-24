@@ -37,6 +37,10 @@ const providerLabels: Record<Provider, { title: string; hint: string }> = {
   custom:    { title: 'Custom endpoint', hint: 'Any OpenAI- or Anthropic-compatible URL' },
 };
 
+function isProvider(value: string | undefined): value is Provider {
+  return value !== undefined && value in providerDefaults;
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const status = useQuery({ queryKey: ['bootstrap', 'status'], queryFn: () => bootstrapApi.status() });
@@ -210,15 +214,14 @@ function LlmStep({
   onBack: () => void;
   onNext: () => void;
 }) {
-  const [provider, setProvider] = React.useState<Provider>(
-    (presetProvider as Provider) ?? 'openai',
-  );
-  const [model, setModel] = React.useState(providerDefaults.openai.model);
+  const initialProvider = isProvider(presetProvider) ? presetProvider : 'openai';
+  const [provider, setProvider] = React.useState<Provider>(initialProvider);
+  const [model, setModel] = React.useState(providerDefaults[initialProvider].model);
   const [apiKey, setApiKey] = React.useState('');
   const [bedrockRegion, setBedrockRegion] = React.useState('us-east-1');
   const [bedrockAccess, setBedrockAccess] = React.useState('');
   const [bedrockSecret, setBedrockSecret] = React.useState('');
-  const [baseUrl, setBaseUrl] = React.useState(providerDefaults.openai.baseUrl);
+  const [baseUrl, setBaseUrl] = React.useState(providerDefaults[initialProvider].baseUrl);
   const [formError, setFormError] = React.useState<string | null>(null);
 
   const [probeState, setProbeState] = React.useState<
@@ -228,12 +231,13 @@ function LlmStep({
     | { kind: 'error'; message: string }
   >({ kind: 'idle' });
 
-  React.useEffect(() => {
-    setModel(providerDefaults[provider].model);
-    setBaseUrl(providerDefaults[provider].baseUrl);
+  function selectProvider(next: Provider): void {
+    setProvider(next);
+    setModel(providerDefaults[next].model);
+    setBaseUrl(providerDefaults[next].baseUrl);
     setProbeState({ kind: 'idle' });
     setFormError(null);
-  }, [provider]);
+  }
 
   async function probe(): Promise<void> {
     setFormError(null);
@@ -306,7 +310,7 @@ function LlmStep({
           <button
             key={p}
             type="button"
-            onClick={() => setProvider(p)}
+            onClick={() => selectProvider(p)}
             className={cn(
               'rounded-xl border px-3 py-3 text-left transition-colors',
               provider === p
