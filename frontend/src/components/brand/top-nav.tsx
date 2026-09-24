@@ -51,12 +51,12 @@ export function TopNav({ links, className }: { links: TopNavLink[]; className?: 
             <Github className="h-4 w-4" />
           </a>
           <ThemeToggle className="text-text-muted hover:text-text-default" />
-          <Link href="/onboarding">
+          <Link href="/onboarding" className="hidden sm:inline-flex">
             <Button variant="ghost" size="sm" className="text-text-default">
               Sign in
             </Button>
           </Link>
-          <Link href="/onboarding">
+          <Link href="/onboarding" className="hidden sm:inline-flex">
             <Button size="sm">Open dashboard</Button>
           </Link>
           <button
@@ -88,6 +88,14 @@ export function TopNav({ links, className }: { links: TopNavLink[]; className?: 
                 {link.label}
               </Link>
             ))}
+            <div className="mt-2 flex gap-2 border-t border-border-subtle pt-3">
+              <Link href="/onboarding" onClick={() => setMobileOpen(false)} className="flex-1">
+                <Button variant="ghost" className="w-full">Sign in</Button>
+              </Link>
+              <Link href="/onboarding" onClick={() => setMobileOpen(false)} className="flex-1">
+                <Button className="w-full">Open dashboard</Button>
+              </Link>
+            </div>
           </div>
         </nav>
       )}
