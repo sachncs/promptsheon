@@ -129,6 +129,12 @@ describe('repository / branch / file / commit round-trip', () => {
     expect(hidden.statusCode).toBe(404);
   });
 
+  it('rejects malformed repository route parameters before repository access', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/repos/not-a-uuid' });
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+  });
+
   it('refuses to delete the default branch', async () => {
     const created = (
       await app.inject({

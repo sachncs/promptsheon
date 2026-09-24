@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
-import { parseBody } from './validate.js';
+import { parseBody, parseParams } from './validate.js';
 import type { AuditChain } from '../audit/chain.js';
 import { requireAdmin } from '../middleware/admin.js';
 import { OutgoingWebhookRepo, type OutgoingWebhookRecord } from '../repos/outgoing-webhook.js';
@@ -33,6 +33,10 @@ const UpdateWebhookSchema = z.object({
   url: HttpUrl.optional(),
   events: z.array(z.string().min(1).max(120)).min(1).max(64).optional(),
   active: z.boolean().optional(),
+});
+
+const WebhookParamsSchema = z.object({
+  id: z.string().uuid(),
 });
 
 export class WebhookCrudStore {
@@ -136,7 +140,9 @@ export function registerWebhookCrudRoutes(
   app.put('/api/webhooks/:id', { preHandler: requireAdmin() }, async (request, reply) => {
     const orgId = orgOf(request);
     if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, WebhookParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, UpdateWebhookSchema, request.body);
     if (!parsed.ok) return;
     const updated = store.update(id, orgId, parsed.data);
@@ -157,7 +163,9 @@ export function registerWebhookCrudRoutes(
   app.delete('/api/webhooks/:id', { preHandler: requireAdmin() }, async (request, reply) => {
     const orgId = orgOf(request);
     if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, WebhookParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const removed = store.delete(id, orgId);
     if (!removed) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'webhook not found' } });

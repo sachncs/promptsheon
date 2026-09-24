@@ -151,6 +151,20 @@ describe('PUT /api/webhooks/:id', () => {
     });
     expect(missing.statusCode).toBe(404);
   });
+
+  it('rejects malformed webhook route parameters', async () => {
+    const ctx = buildApp();
+    await ctx.app.ready();
+    const response = await ctx.app.inject({
+      method: 'PUT',
+      url: '/api/webhooks/not-a-uuid',
+      payload: { active: true },
+    });
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+    await ctx.app.close();
+    ctx.db.close();
+  });
 });
 
 describe('DELETE /api/webhooks/:id', () => {
