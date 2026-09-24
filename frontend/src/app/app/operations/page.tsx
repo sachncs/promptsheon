@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Activity, AlertTriangle, GitMerge, ShieldAlert } from 'lucide-react';
-import { releaseApi, workspaceApi, projectApi, evalApi, alertApi, unwrapList } from '@/lib/api';
+import { releaseApi, workspaceApi, projectApi, evalApi, alertApi, unwrapList, type WorkspaceRow } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -54,7 +54,7 @@ export default function OperationsPage() {
     queryKey: ['workspaces'],
     queryFn: () => workspaceApi.list(1).then((r) => r.data),
   });
-  const wsFirst = Array.isArray(workspaces.data) ? workspaces.data[0] as { id?: string; name?: string } : undefined;
+  const wsFirst: WorkspaceRow | undefined = workspaces.data?.[0];
   const wsId = wsFirst?.id;
 
   const projects = useQuery({
@@ -62,7 +62,7 @@ export default function OperationsPage() {
     queryFn: () => (wsId ? projectApi.list(wsId).then((r) => r.data) : Promise.resolve([])),
     enabled: Boolean(wsId),
   });
-  const projectList = Array.isArray(projects.data) ? projects.data as Array<{ id: string; name?: string }> : [];
+  const projectList: Array<{ id: string; name?: string }> = Array.isArray(projects.data) ? projects.data : [];
 
   const allReleases = useQuery({
     queryKey: ['operations', 'releases', projectList.map((p) => p.id)],
@@ -99,12 +99,12 @@ export default function OperationsPage() {
   if (recentEvals.isError) return <QueryError message={recentEvals.error} onRetry={() => void recentEvals.refetch()} />;
   if (alerts.isError) return <QueryError message={alerts.error} onRetry={() => void alerts.refetch()} />;
 
-  const releases = (allReleases.data ?? []) as Release[];
+  const releases = allReleases.data ?? [];
   const activeReleases = releases.filter((r) => r.state === 'active');
   const canaryReleases = releases.filter((r) => r.state === 'canary');
   const draftReleases = releases.filter((r) => r.state === 'draft' || r.state === 'review');
-  const evals = (recentEvals.data ?? []) as EvalRun[];
-  const unackAlerts = ((alerts.data ?? []) as AlertItem[]).filter((a) => !a.acknowledged);
+  const evals = recentEvals.data ?? [];
+  const unackAlerts = (alerts.data ?? []).filter((a) => !a.acknowledged);
 
   const last24h = evals.filter((e) => {
     if (!e.startedAt) return false;
@@ -168,17 +168,17 @@ export default function OperationsPage() {
           ) : (
             <DataTable
               className="rounded-none border-0 border-t border-border-subtle"
-              rows={canaryReleases as unknown as Array<Record<string, unknown>>}
-              rowKey={(r) => String(r['id'])}
-              onRowClick={(r) => { router.push(`/app/releases/${String(r['id'])}`); }}
+              rows={canaryReleases}
+              rowKey={(r) => r.id}
+              onRowClick={(r) => { router.push(`/app/releases/${r.id}`); }}
               columns={[
                 {
                   key: 'cap',
                   header: 'Capability',
                   render: (r) => (
                     <div>
-                      <div className="font-medium text-text-strong">{String(r['capabilityName'] ?? '—')}</div>
-                      <div className="text-xs text-text-subtle">v{String(r['capabilityVersion'] ?? '?')} · {String(r['environment'] ?? '—')}</div>
+                      <div className="font-medium text-text-strong">{r.capabilityName ?? '—'}</div>
+                      <div className="text-xs text-text-subtle">v{r.capabilityVersion ?? '?'} · {r.environment ?? '—'}</div>
                     </div>
                   ),
                 },
@@ -186,7 +186,7 @@ export default function OperationsPage() {
                   key: 'canary',
                   header: 'Canary',
                   render: (r) => {
-                    const pct = Number(r['canaryPercent'] ?? 0);
+                    const pct = r.canaryPercent ?? 0;
                     return (
                       <div className="flex items-center gap-2">
                         <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-2">
@@ -200,9 +200,9 @@ export default function OperationsPage() {
                 {
                   key: 'hash',
                   header: 'Hash',
-                  render: (r) => r['manifestHash'] ? <HashChip hash={String(r['manifestHash'])} /> : <span className="text-text-muted">—</span>,
+                  render: (r) => r.manifestHash ? <HashChip hash={r.manifestHash} /> : <span className="text-text-muted">—</span>,
                 },
-                { key: 'state', header: 'State', render: (r) => <StatusPill kind={statusKindOf(r['state'])} /> },
+                { key: 'state', header: 'State', render: (r) => <StatusPill kind={statusKindOf(r.state)} /> },
               ]}
             />
           )}
@@ -224,28 +224,28 @@ export default function OperationsPage() {
           ) : (
             <DataTable
               className="rounded-none border-0 border-t border-border-subtle"
-              rows={evals.slice(0, 8) as unknown as Array<Record<string, unknown>>}
-              rowKey={(r) => String(r['id'])}
-              onRowClick={(r) => { router.push(`/app/eval/${String(r['id'])}`); }}
+              rows={evals.slice(0, 8)}
+              rowKey={(r) => r.id}
+              onRowClick={(r) => { router.push(`/app/eval/${r.id}`); }}
               columns={[
-                { key: 'run', header: 'Run', render: (r) => <span className="font-mono text-xs">{String(r['id']).slice(0, 12)}…</span> },
+                { key: 'run', header: 'Run', render: (r) => <span className="font-mono text-xs">{r.id.slice(0, 12)}…</span> },
                 {
                   key: 'score',
                   header: 'Score',
                   render: (r) => {
-                    const s = r['score'] as number | undefined;
+                    const s = r.score;
                     return s !== undefined ? `${(s * 100).toFixed(0)}%` : '—';
                   },
                 },
                 {
                   key: 'cases',
                   header: 'Cases',
-                  render: (r) => `${String(r['passed'] ?? '—')}/${String(r['total'] ?? '—')}`,
+                  render: (r) => `${r.passed ?? '—'}/${r.total ?? '—'}`,
                 },
                 {
                   key: 'when',
                   header: 'When',
-                  render: (r) => r['startedAt'] ? new Date(String(r['startedAt'])).toLocaleString() : '—',
+                  render: (r) => r.startedAt ? new Date(r.startedAt).toLocaleString() : '—',
                 },
               ]}
             />
