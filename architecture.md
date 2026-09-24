@@ -73,7 +73,9 @@ Every package is a pnpm workspace member. A single `pnpm install` resolves the w
 `packages/server/src/index.ts` (`main()`):
 
 1. `loadConfig()` reads environment variables and returns an `AppConfig`.
-2. `validateConfig(config)` fails the boot on missing JWT secret or bad port.
+2. `validateConfig(config)` fails the boot on missing/weak authentication
+   secrets, invalid ports, malformed runtime limits, empty critical paths, or
+   an unsafe production CORS configuration.
 3. `createConnection(config)` opens the SQLite database.
 4. `runMigrations(db)` applies every migration under `packages/shared/db/migrations/`.
 5. `AuditChain` and `CedarAuthorizer` are constructed and installed as singletons.

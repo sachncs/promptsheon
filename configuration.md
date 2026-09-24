@@ -84,4 +84,13 @@ Copy `.env.example` to `.env` and edit as needed. The repo's `.gitignore` blocks
 
 ## Validate at boot
 
-The server calls `validateConfig()` immediately after `loadConfig()`. A missing `PROMPTSHEON_JWT_SECRET` when `PROMPTSHEON_AUTH=true`, or a port outside `1..65535`, fails the boot with a clear error. See [`packages/server/src/config/validate.ts`](https://github.com/sachncs/promptsheon/blob/master/packages/server/src/config/validate.ts).
+The server calls `validateConfig()` immediately after `loadConfig()`. Any
+invalid security, path, runtime-limit, or network setting fails the boot with
+a clear error. See [`packages/server/src/config/validate.ts`](https://github.com/sachncs/promptsheon/blob/master/packages/server/src/config/validate.ts).
+
+Configuration parsing is fail-fast: malformed integer and boolean values are
+rejected instead of silently falling back to defaults. Enabled authentication
+requires a secret of at least 32 characters. Production also requires
+authentication and an explicit CORS origin; `*` and an empty origin are
+rejected. Critical paths, LLM identifiers, and self-evolution limits are
+validated before the database or HTTP listener starts.

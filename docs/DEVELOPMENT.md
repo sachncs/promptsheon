@@ -188,7 +188,7 @@ production databases and CAS paths. Production deployments should:
 - capture audit-chain verification and database/CAS backup checks in the
   operational runbook.
 
-See `configuration.md`, `architecture.md`, `SECURITY.md`, and
+See [`../configuration.md`](../configuration.md), [`../architecture.md`](../architecture.md), [`../SECURITY.md`](../SECURITY.md), and
 `docs/operations/` for deployment-specific details.
 
 ## Debugging and troubleshooting

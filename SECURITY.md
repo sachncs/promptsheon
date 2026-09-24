@@ -51,7 +51,7 @@ Every state transition appends a frame to a hash-linked log. The chain is public
 - **Rate limiting** — `@fastify/rate-limit` caps at 100 requests per minute per user (or per IP for unauthenticated calls).
 - **CORS** — single origin, configured via `PROMPTSHEON_CORS_ORIGIN`. Defaults to `http://localhost:3000` for local dev.
 - **SSRF guards** — outbound LLM URLs are validated against a private-IP blocklist.
-- **Input validation** — every request body is parsed through Zod before any handler runs.
+- **Input validation** — request bodies, queries, and route parameters are parsed through Zod before any handler runs; malformed configuration fails at boot.
 - **Maker-checker** — releases require two non-creator approvals before activation.
 - **Webhook replay protection** — incoming webhooks carry an HMAC signature and a one-shot nonce.
 
