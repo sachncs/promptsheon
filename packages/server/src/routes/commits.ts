@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import type { RepoRepo } from '../repos/repo.js';
 import type { RepoStore } from '../repos/repo-store.js';
 import type { BranchRepo } from '../repos/branch.js';
 import { CommitRepo } from '../repos/commit.js';
+import type { RepositoryService } from '../application/repository-service.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
@@ -21,15 +21,14 @@ const RepositoryParamsSchema = z.object({ id: z.string().trim().min(1).max(255) 
 const CommitParamsSchema = z.object({ oid: z.string().trim().min(1).max(200) });
 
 export interface CommitDeps {
-  repoRepo: RepoRepo;
+  repositoryService: RepositoryService;
   branchRepo: BranchRepo;
   repoStore: RepoStore;
   commitRepo: CommitRepo;
 }
 
-function repositoryForRequest(repoRepo: RepoRepo, request: FastifyRequest, id: string) {
-  const organizationId = request.orgContext?.orgId;
-  return organizationId ? repoRepo.findByIdInOrg(id, organizationId) : repoRepo.findById(id);
+function repositoryForRequest(repositoryService: RepositoryService, request: FastifyRequest, id: string) {
+  return repositoryService.get(id, request.orgContext?.orgId);
 }
 
 export function registerCommitRoutes(app: FastifyInstance, deps: CommitDeps): void {
@@ -39,7 +38,7 @@ export function registerCommitRoutes(app: FastifyInstance, deps: CommitDeps): vo
     const { id } = parsedParams.data;
     const parsed = parseBody(reply, CreateCommitSchema, request.body);
     if (!parsed.ok) return;
-    const repo = repositoryForRequest(deps.repoRepo, request, id);
+    const repo = repositoryForRequest(deps.repositoryService, request, id);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
 
     const branch = deps.branchRepo.findByName(id, parsed.data.ref);
@@ -85,7 +84,7 @@ export function registerCommitRoutes(app: FastifyInstance, deps: CommitDeps): vo
     const { oid } = parsedParams.data;
     const commit = deps.commitRepo.findByOid(oid);
     if (!commit) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'commit not found' } });
-    if (!repositoryForRequest(deps.repoRepo, request, commit.repositoryId)) {
+    if (!repositoryForRequest(deps.repositoryService, request, commit.repositoryId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'commit not found' } });
     }
     return reply.send(commit);
@@ -104,7 +103,7 @@ export function registerCommitRoutes(app: FastifyInstance, deps: CommitDeps): vo
     const parsed = parseQuery(reply, ListCommitsQuerySchema, request.query);
     if (!parsed.ok) return;
     const { ref } = parsed.data;
-    if (!repositoryForRequest(deps.repoRepo, request, id)) {
+    if (!repositoryForRequest(deps.repositoryService, request, id)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     }
     return reply.send(deps.commitRepo.listForRef(id, ref));

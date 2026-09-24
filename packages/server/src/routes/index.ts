@@ -152,7 +152,7 @@ export interface AppDeps {
   gateway: import('../llm/gateway.js').Gateway;
   repoDeps: RepoDeps;
   contentsDeps: Omit<ContentsDeps, 'repositoryService'>;
-  commitDeps: CommitDeps;
+  commitDeps: Omit<CommitDeps, 'repositoryService'>;
   mrDeps: MRDeps;
   signingDeps: SigningDeps;
   evalSuiteDeps: EvalSuiteRouteDeps;
@@ -275,7 +275,10 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     ...deps.contentsDeps,
     repositoryService: deps.repoDeps.repositoryService,
   });
-  registerCommitRoutes(app, deps.commitDeps);
+  registerCommitRoutes(app, {
+    ...deps.commitDeps,
+    repositoryService: deps.repoDeps.repositoryService,
+  });
   registerMergeRequestRoutes(app, deps.mrDeps);
   registerSigningRoutes(app, deps.signingDeps);
   const suiteExecution = deps.evalSuiteDeps.suiteExecution ?? new EvalSuiteService(

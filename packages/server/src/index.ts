@@ -337,7 +337,6 @@ async function main() {
       repoStore: repos.repoStore,
     },
     commitDeps: {
-      repoRepo: repos.repo,
       branchRepo: repos.branch,
       repoStore: repos.repoStore,
       commitRepo: repos.commit,
