@@ -23,14 +23,9 @@ export function useSession() {
 export function useRequireSession() {
   const router = useRouter();
   const session = useSession();
-  const [hydrated, setHydrated] = React.useState(false);
 
   React.useEffect(() => {
-    setHydrated(true);
-  }, []);
-
-  React.useEffect(() => {
-    if (hydrated && !session) router.replace('/onboarding');
-  }, [hydrated, session, router]);
-  return hydrated ? session : null;
+    if (!session) router.replace('/onboarding');
+  }, [session, router]);
+  return session;
 }
