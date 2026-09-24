@@ -70,7 +70,7 @@ const links: NavLink[] = [
           <span class="font-mono text-[12px] text-[var(--ink-subtle)]">GitHub</span>
         </a>
 
-        <a href={`${base}docs/quickstart/`} class="ps-btn ps-btn-primary">
+        <a href={`${base}docs/quickstart/`} class="ps-btn ps-btn-primary hidden sm:inline-flex">
           Start with docs
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M5 12h14M13 5l7 7-7 7" />
@@ -113,6 +113,12 @@ const links: NavLink[] = [
         ))}
       </nav>
       <div class="mt-2 border-t border-[var(--line)] pt-2">
+        <a href={`${base}docs/quickstart/`} class="ps-btn ps-btn-primary mb-1 w-full justify-center">
+          Start with the quickstart
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14M13 5l7 7-7 7" />
+          </svg>
+        </a>
         <button
           id="mobile-theme-toggle"
           type="button"
