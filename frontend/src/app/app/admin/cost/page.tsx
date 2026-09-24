@@ -29,7 +29,7 @@ export default function CostPage() {
     enabled: Boolean(wsId),
   });
 
-  const rows = costs.data ?? [];
+  const rows = useMemo(() => costs.data ?? [], [costs.data]);
   const totalMicros = rows.reduce((acc, r) => acc + r.costMicros, 0);
   const totalExec = rows.reduce((acc, r) => acc + r.executions, 0);
   const capabilityIds = new Set(rows.map((r) => r.capabilityId));

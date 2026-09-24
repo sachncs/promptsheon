@@ -43,7 +43,7 @@ export default function AuditPage() {
     queryFn: () => auditApi.list().then((r) => r.data),
     enabled: Boolean(session),
   });
-  const allRows = audit.data ?? [];
+  const allRows = useMemo(() => audit.data ?? [], [audit.data]);
 
   const resourceOptions = useMemo(() => {
     const set = new Set<string>();

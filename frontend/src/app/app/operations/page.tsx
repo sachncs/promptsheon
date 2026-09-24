@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Activity, AlertTriangle, GitMerge, ShieldAlert } from 'lucide-react';
 import { releaseApi, evalApi, alertApi, type Alert } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
@@ -17,6 +18,7 @@ import { QueryError } from '@/components/brand/query-error';
 export default function OperationsPage() {
   const session = useRequireSession();
   const router = useRouter();
+  const [now] = useState(() => Date.now());
 
   const allReleases = useQuery({
     queryKey: ['operations', 'releases'],
@@ -61,7 +63,7 @@ export default function OperationsPage() {
   const last24h = evals.filter((e) => {
     if (!e.startedAt) return false;
     const t = new Date(e.startedAt).getTime();
-    return Date.now() - t < 24 * 60 * 60 * 1000;
+    return now - t < 24 * 60 * 60 * 1000;
   });
   const passRate =
     last24h.length > 0
