@@ -2,6 +2,7 @@ import axios from 'axios';
 import { z } from 'zod';
 import { ManifestSchema } from '@promptsheon/shared/validation';
 import type { Manifest } from '@promptsheon/shared';
+import type { Execution } from '@promptsheon/shared';
 import { clearSession, getSession } from './session';
 
 export class ApiError extends Error {
@@ -307,6 +308,8 @@ export interface AuditEntry {
   resourceId: string;
 }
 
+export type { Execution };
+
 const CostRollupSchema = z.object({
   capabilityId: z.string(),
   day: z.string(),
@@ -523,6 +526,27 @@ const AuditEntrySchema = z.object({
   resourceId: z.string(),
 });
 
+const ExecutionSchema = z.object({
+  id: z.string(),
+  capabilityVersionId: z.string().nullable(),
+  timestamp: z.string(),
+  inputs: z.string(),
+  outputs: z.string(),
+  model: z.string(),
+  provider: z.string(),
+  latencyMs: z.number().nonnegative(),
+  costUsd: z.number().nonnegative(),
+  promptTokens: z.number().int().nonnegative(),
+  completionTokens: z.number().int().nonnegative(),
+  totalTokens: z.number().int().nonnegative(),
+  error: z.string(),
+  traceId: z.string(),
+  environment: z.string(),
+  replayOf: z.string().nullable(),
+  replayCount: z.number().int().nonnegative(),
+  inputHash: z.string().nullable(),
+});
+
 function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
   return unwrapList<unknown>(raw).map((entry) => {
     const parsed = VaultKeyringEntrySchema.safeParse(entry);
@@ -680,6 +704,23 @@ function parseAuditEntries(raw: unknown): AuditEntry[] {
   const parsed = z.array(AuditEntrySchema).safeParse(entries);
   if (!parsed.success) throw new ApiError('The server returned invalid audit data.', { code: 'INVALID_RESPONSE' });
   return parsed.data;
+}
+
+function parseExecution(raw: unknown): Execution {
+  const parsed = ExecutionSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid execution data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseExecutionPage(raw: unknown): { items: Execution[]; total: number } {
+  if (!raw || typeof raw !== 'object') throw new ApiError('The server returned invalid execution data.', { code: 'INVALID_RESPONSE' });
+  const value = raw as Record<string, unknown>;
+  const items = Array.isArray(value['items']) ? value['items'].map(parseExecution) : null;
+  const total = value['total'];
+  if (!items || typeof total !== 'number' || !Number.isInteger(total) || total < 0) {
+    throw new ApiError('The server returned invalid execution data.', { code: 'INVALID_RESPONSE' });
+  }
+  return { items, total };
 }
 
 function parseRelease(raw: unknown): Release {
@@ -872,8 +913,14 @@ export const releaseApi = {
 };
 
 export const executionApi = {
-  list: (capabilityVersionId: string) => client.get('/executions', { params: { capabilityVersionId } }),
-  get: (id: string) => client.get(`/executions/${id}`),
+  list: async (capabilityVersionId: string): Promise<{ data: { items: Execution[]; total: number } }> => {
+    const r = await client.get<unknown>('/executions', { params: { capabilityVersionId } });
+    return { data: parseExecutionPage(r.data) };
+  },
+  get: async (id: string): Promise<{ data: Execution }> => {
+    const r = await client.get<unknown>(`/executions/${id}`);
+    return { data: parseExecution(r.data) };
+  },
   execute: (data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string }) =>
     client.post('/executions', data),
   replay: (id: string) => client.post(`/executions/${id}/replay`),

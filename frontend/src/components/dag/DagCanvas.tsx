@@ -19,7 +19,7 @@ import { CapabilityNode, type CapabilityNodeData } from './CapabilityNode';
 
 const nodeTypes = { capability: CapabilityNode };
 
-export type DagNode = Node<CapabilityNodeData & Record<string, unknown>>;
+export type DagNode = Node<CapabilityNodeData>;
 
 export interface DagCanvasProps {
   nodes: DagNode[];

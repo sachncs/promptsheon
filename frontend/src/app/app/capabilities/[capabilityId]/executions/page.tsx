@@ -24,13 +24,7 @@ export default function ExecutionsPage() {
     enabled: Boolean(capabilityId) && Boolean(session),
   });
 
-  const rows = (Array.isArray(data) ? data : []) as Array<{
-    id: string;
-    status: string;
-    startedAt: string;
-    totalCost: number;
-    totalLatencyMs: number;
-  }>;
+  const rows = data?.items ?? [];
 
   if (!session) return null;
 
@@ -75,28 +69,28 @@ export default function ExecutionsPage() {
                 header: 'Status',
                 render: (r) => (
                   <StatusPill
-                    kind={r.status === 'completed' ? 'active' : r.status === 'failed' ? 'rejected' : 'review'}
-                    label={r.status}
+                    kind={r.error ? 'rejected' : 'active'}
+                    label={r.error ? 'error' : 'completed'}
                   />
                 ),
               },
               {
                 key: 'started',
                 header: 'Started',
-                render: (r) => r.startedAt ? new Date(r.startedAt).toLocaleString() : '—',
+                render: (r) => new Date(r.timestamp).toLocaleString(),
               },
               {
                 key: 'cost',
                 header: 'Cost',
                 render: (r) => {
-                  return `$${(r.totalCost / 1_000_000).toFixed(4)}`;
+                  return `$${r.costUsd.toFixed(4)}`;
                 },
               },
               {
                 key: 'latency',
                 header: 'Latency',
                 render: (r) => {
-                  return `${r.totalLatencyMs.toLocaleString()}ms`;
+                  return `${r.latencyMs.toLocaleString()}ms`;
                 },
               },
             ]}

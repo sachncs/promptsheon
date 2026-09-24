@@ -1,12 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-export interface CapabilityNodeData {
+export interface CapabilityNodeData extends Record<string, unknown> {
   id: string;
   name: string;
   goal: string;
@@ -23,8 +23,8 @@ const statusColor: Record<string, string> = {
   failed: 'border-red-500',
 };
 
-function CapabilityNodeImpl({ data, selected }: NodeProps) {
-  const d = data as unknown as CapabilityNodeData;
+function CapabilityNodeImpl({ data, selected }: NodeProps<Node<CapabilityNodeData>>) {
+  const d = data;
   return (
     <Card
       className={cn(
