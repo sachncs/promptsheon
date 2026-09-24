@@ -6,6 +6,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { registerIdentityRoutes } from '../../src/routes/identity.js';
+import { IdentityService } from '../../src/application/identity-service.js';
+import { AgentIdentityRepo } from '../../src/repos/agent-identity.js';
 import { generateSvidSigningKey, mintSVID, verifySVID } from '../../src/identity/svid.js';
 import { installDefaultAuthorizer, CedarAuthorizer } from '../../src/policy/gate.js';
 import { resolve } from 'node:path';
@@ -52,7 +54,7 @@ describe('identity routes', () => {
       request.orgContext = { userId: 'admin', orgId: 'o-1', role: 'admin' };
     });
     await app.register(async (instance) => {
-      await registerIdentityRoutes(instance, { db });
+      await registerIdentityRoutes(instance, { service: new IdentityService(new AgentIdentityRepo(db)) });
     });
     await app.ready();
   });

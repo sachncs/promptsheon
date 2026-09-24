@@ -66,6 +66,8 @@ import { ManifestApprovalService } from '../application/manifest-approval-servic
 import { AuditReplicationService } from '../application/audit-replication-service.js';
 import { HealthService } from '../application/health-service.js';
 import { SqliteHealthProbe } from '../infrastructure/sqlite-health-probe.js';
+import { IdentityService } from '../application/identity-service.js';
+import { AgentIdentityRepo } from '../repos/agent-identity.js';
 import type { LlmSettingsService } from '../application/llm-settings-service.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
@@ -296,5 +298,5 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   if (deps.budgetDeps) {
     registerBudgetRoutes(app, deps.budgetDeps);
   }
-  registerIdentityRoutes(app, { db: deps.db });
+  registerIdentityRoutes(app, { service: new IdentityService(new AgentIdentityRepo(deps.db)) });
 }
