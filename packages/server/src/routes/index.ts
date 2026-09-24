@@ -63,6 +63,7 @@ import { WorkspaceService } from '../application/workspace-service.js';
 import { ProjectService } from '../application/project-service.js';
 import { CapabilityService } from '../application/capability-service.js';
 import { ManifestApprovalService } from '../application/manifest-approval-service.js';
+import { AuditReplicationService } from '../application/audit-replication-service.js';
 import type { LlmSettingsService } from '../application/llm-settings-service.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
@@ -221,7 +222,10 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerWebhookRoutes(app, { receiver: deps.webhookReceiver, executor: deps.executor, manifestRepo: deps.manifestRepo });
   registerWebhookCrudRoutes(app, { auditChain: deps.auditChain, repo: deps.outgoingWebhookRepo });
   registerFeatureFlagRoutes(app, { repo: deps.featureFlagRepo, auditChain: deps.auditChain });
-  registerAuditRoutes(app, { auditChain: deps.auditChain, db: deps.db });
+  registerAuditRoutes(app, {
+    auditChain: deps.auditChain,
+    replication: new AuditReplicationService(deps.auditChain),
+  });
   registerUserRoutes(app, {
     userRepo: deps.userRepo,
     auditChain: deps.auditChain,

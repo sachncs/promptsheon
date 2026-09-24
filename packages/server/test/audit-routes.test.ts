@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerAuditRoutes } from '../src/routes/audit.js';
+import { AuditReplicationService } from '../src/application/audit-replication-service.js';
 import { AuditChain } from '../src/audit/chain.js';
 import { applyMigrations } from '@promptsheon/shared';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -44,7 +45,7 @@ describe('audit routes', () => {
       done();
     });
     await app.register(async (instance) => {
-      registerAuditRoutes(instance, { auditChain: audit, db });
+      registerAuditRoutes(instance, { auditChain: audit, replication: new AuditReplicationService(audit) });
     });
     await app.ready();
   });

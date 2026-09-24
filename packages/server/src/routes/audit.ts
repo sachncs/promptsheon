@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { AuditChain } from '../audit/chain.js';
+import type { AuditReplicationService } from '../application/audit-replication-service.js';
 
 const ListQuerySchema = z.object({
   resource: z.string().optional(),
@@ -10,6 +11,21 @@ const ListQuerySchema = z.object({
 });
 
 const VerifyQuerySchema = z.object({});
+const AuditReplicationFrameSchema = z.object({
+  rowid: z.number().int().nonnegative(),
+  previousHash: z.string(),
+  entry: z.object({
+    id: z.string().min(1),
+    userId: z.string().min(1),
+    action: z.string().min(1),
+    resource: z.string().min(1),
+    details: z.string(),
+    timestamp: z.string().datetime(),
+    entryHash: z.string().min(1),
+    resourceKind: z.string().min(1),
+    resourceId: z.string().min(1),
+  }),
+});
 
 /**
  * Register audit-trail HTTP routes. Returns the immutable chain
@@ -22,7 +38,7 @@ function organizationOf(request: unknown): string | undefined {
 
 export function registerAuditRoutes(
   app: FastifyInstance,
-  deps: { auditChain: AuditChain; db: import('better-sqlite3').Database },
+  deps: { auditChain: AuditChain; replication: AuditReplicationService },
 ) {
   app.get('/api/audit', async (request, reply) => {
     const organizationId = organizationOf(request);
@@ -65,63 +81,13 @@ export function registerAuditRoutes(
    * not need this route.
    */
   app.post('/api/audit/ingest', async (request, reply) => {
-    const frame = request.body as {
-      rowid: number;
-      previousHash: string;
-      entry: {
-        id: string;
-        userId: string;
-        action: string;
-        resource: string;
-        details: string;
-        timestamp: string;
-        entryHash: string;
-        resourceKind: string;
-        resourceId: string;
-      };
-    };
-    if (
-      typeof frame !== 'object' ||
-      frame === null ||
-      typeof frame.rowid !== 'number' ||
-      typeof frame.previousHash !== 'string' ||
-      !frame.entry ||
-      typeof frame.entry.id !== 'string'
-    ) {
+    const parsed = AuditReplicationFrameSchema.safeParse(request.body);
+    if (!parsed.success) {
       return reply.code(400).send({
         error: { code: 'INVALID_FRAME', message: 'malformed audit frame' },
       });
     }
-    const insert = deps.db.prepare(
-      `INSERT OR IGNORE INTO audit_entries
-         (id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str, resource_kind, resource_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-    const result = insert.run(
-      frame.entry.id,
-      frame.entry.userId,
-      frame.entry.action,
-      frame.entry.resource,
-      frame.entry.details,
-      frame.entry.timestamp,
-      frame.previousHash,
-      frame.entry.entryHash,
-      frame.entry.timestamp,
-      frame.entry.resourceKind,
-      frame.entry.resourceId,
-    );
-    if (result.changes > 0) {
-      // Update the chain state — only advance if we just inserted
-      // a new row. Duplicate inserts leave the state alone.
-      deps.db
-        .prepare(
-          `UPDATE audit_chain_state
-           SET last_hash = ?, last_rowid = ?
-           WHERE id = 0 AND last_rowid < ?`,
-        )
-        .run(frame.entry.entryHash, frame.rowid, frame.rowid);
-    }
-    return reply.send({ ok: true, duplicate: result.changes === 0 });
+    return reply.send({ ok: true, ...deps.replication.ingest(parsed.data) });
   });
 
   /**
