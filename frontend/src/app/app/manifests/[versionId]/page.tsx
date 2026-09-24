@@ -147,7 +147,7 @@ export default function ManifestDetailPage() {
                 >
                   Releases
                 </Link>{' '}
-                to cast a vote; it will surface here under this manifest's hash.
+                to cast a vote; it will surface here under this manifest&apos;s hash.
               </div>
             </Surface>
           </TabsContent>
@@ -156,7 +156,7 @@ export default function ManifestDetailPage() {
             <Surface>
               <div className="text-sm text-text-muted">
                 History is derived from <code>audit_entries</code> for{' '}
-                <code>resource = 'manifest'</code>. Run{' '}
+                <code>resource = &apos;manifest&apos;</code>. Run{' '}
                 <a
                   href="/api/audit/verify"
                   target="_blank"

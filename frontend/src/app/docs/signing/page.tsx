@@ -8,10 +8,10 @@ export default function SigningDoc() {
   return (
     <DocPage
       title="Operator signing keys"
-      subtitle="ed25519 detached signatures produced off-box. Anchor trust on the operator's HSM."
+      subtitle="ed25519 detached signatures produced off-box. Anchor trust on the operator&apos;s HSM."
     >
       <h2>Why operator-managed keys?</h2>
-      <p>Provenance is meaningful only when the private key never leaves the operator's machine. Promptsheon
+      <p>Provenance is meaningful only when the private key never leaves the operator&apos;s machine. Promptsheon
         records the public half and the detached signature; the platform never sees the secret.</p>
 
       <h2>Workflow</h2>

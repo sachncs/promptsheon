@@ -225,7 +225,10 @@ export default function ReleaseDetailPage() {
                     <ShieldCheck className={`h-4 w-4 ${a.vote === 'approve' ? 'text-success' : a.vote === 'reject' ? 'text-destructive' : 'text-info'}`} />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm text-text-strong">{a.userId ?? 'Reviewer'}</div>
-                      <div className="text-xs text-text-muted">{a.vote === 'approve' ? 'approved' : a.vote === 'reject' ? 'rejected' : 'pending'} · {new Date(a.createdAt ?? Date.now()).toLocaleString()}</div>
+                      <div className="text-xs text-text-muted">
+                        {a.vote === 'approve' ? 'approved' : a.vote === 'reject' ? 'rejected' : 'pending'} ·{' '}
+                        {a.createdAt ? new Date(a.createdAt).toLocaleString() : 'Pending timestamp'}
+                      </div>
                     </div>
                   </li>
                 ))}
@@ -276,7 +279,7 @@ export default function ReleaseDetailPage() {
                   id: a.id,
                   title: String(a.action ?? 'event'),
                   actor: a.actor,
-                  timestamp: new Date(a.createdAt ?? Date.now()).toLocaleString(),
+                  timestamp: a.createdAt ? new Date(a.createdAt).toLocaleString() : 'Unknown time',
                   tone: 'info' as const,
                 }))}
               />
