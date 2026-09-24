@@ -65,7 +65,7 @@ const RepositoryTagParamsSchema = z.object({
 
 export interface RepoDeps {
   repoRepo: RepoRepo;
-  repositoryService?: RepositoryService;
+  repositoryService: RepositoryService;
   branchRepo: BranchRepo;
   tagRepo: TagRepo;
 }
@@ -74,9 +74,8 @@ function orgId(request: FastifyRequest): string | undefined {
   return request.orgContext?.orgId;
 }
 
-function repositoryForRequest(repoRepo: RepoRepo, request: FastifyRequest, id: string) {
-  const organizationId = orgId(request);
-  return organizationId ? repoRepo.findByIdInOrg(id, organizationId) : repoRepo.findById(id);
+function repositoryForRequest(repositoryService: RepositoryService, request: FastifyRequest, id: string) {
+  return repositoryService.get(id, orgId(request));
 }
 
 export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
@@ -85,11 +84,7 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     if (!parsed.ok) return;
     const { workspaceId } = parsed.data;
     const organizationId = orgId(request);
-    const repos = deps.repositoryService
-      ? deps.repositoryService.listByWorkspace(workspaceId, organizationId)
-      : organizationId && !deps.repoRepo.workspaceBelongsToOrg(workspaceId, organizationId)
-        ? null
-        : deps.repoRepo.listByWorkspace(workspaceId);
+    const repos = deps.repositoryService.listByWorkspace(workspaceId, organizationId);
     if (!repos) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'workspace not found' } });
     return reply.send(repos);
   });
@@ -105,9 +100,7 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
     if (!parsedParams.ok) return;
     const { id } = parsedParams.data;
-    const repo = deps.repositoryService
-      ? deps.repositoryService.get(id, orgId(request))
-      : repositoryForRequest(deps.repoRepo, request, id);
+    const repo = deps.repositoryService.get(id, orgId(request));
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     return reply.send(repo);
   });
@@ -125,11 +118,7 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     const organizationId = orgId(request);
     let repo;
     try {
-      repo = deps.repositoryService
-        ? deps.repositoryService.create(parsed.data, organizationId)
-        : organizationId && !deps.repoRepo.workspaceBelongsToOrg(parsed.data.workspaceId, organizationId)
-          ? null
-          : deps.repoRepo.create(parsed.data);
+      repo = deps.repositoryService.create(parsed.data, organizationId);
       if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'workspace not found' } });
     } catch (err) {
       if (err instanceof RepositoryExistsError) {
@@ -159,13 +148,9 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     const { id } = parsedParams.data;
     const parsed = parseBody(reply, UpdateRepoSchema, request.body);
     if (!parsed.ok) return;
-    const existing = deps.repositoryService
-      ? deps.repositoryService.get(id, orgId(request))
-      : repositoryForRequest(deps.repoRepo, request, id);
+    const existing = deps.repositoryService.get(id, orgId(request));
     if (!existing) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
-    const repo = deps.repositoryService
-      ? deps.repositoryService.update(id, parsed.data, orgId(request))
-      : deps.repoRepo.update(id, parsed.data);
+    const repo = deps.repositoryService.update(id, parsed.data, orgId(request));
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     return reply.send(repo);
   });
@@ -182,7 +167,7 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
     if (!parsedParams.ok) return;
     const { id } = parsedParams.data;
-    if (!repositoryForRequest(deps.repoRepo, request, id)) {
+    if (!repositoryForRequest(deps.repositoryService, request, id)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     }
     return reply.send(deps.branchRepo.list(id));
@@ -201,7 +186,7 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     const { id } = parsedParams.data;
     const parsed = parseBody(reply, CreateBranchSchema, request.body);
     if (!parsed.ok) return;
-    const repo = repositoryForRequest(deps.repoRepo, request, id);
+    const repo = repositoryForRequest(deps.repositoryService, request, id);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     const parent = parsed.data.fromBranch
       ? deps.branchRepo.findByName(id, parsed.data.fromBranch)
@@ -230,7 +215,7 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     const parsedParams = parseParams(reply, RepositoryBranchParamsSchema, request.params);
     if (!parsedParams.ok) return;
     const { id, name } = parsedParams.data;
-    const repo = repositoryForRequest(deps.repoRepo, request, id);
+    const repo = repositoryForRequest(deps.repositoryService, request, id);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     if (name === repo.defaultBranch) {
       return reply.code(422).send({ error: { code: 'PROTECTED', message: 'cannot delete default branch' } });
@@ -251,7 +236,7 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
     if (!parsedParams.ok) return;
     const { id } = parsedParams.data;
-    if (!repositoryForRequest(deps.repoRepo, request, id)) {
+    if (!repositoryForRequest(deps.repositoryService, request, id)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     }
     return reply.send(deps.tagRepo.list(id));
@@ -270,7 +255,7 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     const { id } = parsedParams.data;
     const parsed = parseBody(reply, CreateTagSchema, request.body);
     if (!parsed.ok) return;
-    const repo = repositoryForRequest(deps.repoRepo, request, id);
+    const repo = repositoryForRequest(deps.repositoryService, request, id);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     const taggerId =
       request.userId ?? 'system';
@@ -296,7 +281,7 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     const parsedParams = parseParams(reply, RepositoryTagParamsSchema, request.params);
     if (!parsedParams.ok) return;
     const { id, name } = parsedParams.data;
-    if (!repositoryForRequest(deps.repoRepo, request, id)) {
+    if (!repositoryForRequest(deps.repositoryService, request, id)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     }
     const ok = deps.tagRepo.delete(id, name);

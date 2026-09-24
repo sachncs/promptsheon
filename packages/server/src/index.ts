@@ -33,6 +33,7 @@ import { LlmRouter } from './llm/router.js';
 import { Gateway, ResponseCache, FallbackChain, RateLimiter } from './llm/gateway.js';
 import { LlmSettingsService } from './application/llm-settings-service.js';
 import { IdentityService } from './application/identity-service.js';
+import { RepositoryService } from './application/repository-service.js';
 import { AgentIdentityRepo } from './repos/agent-identity.js';
 import type { Agent } from '@strands-agents/sdk';
 import type Database from 'better-sqlite3';
@@ -327,6 +328,7 @@ async function main() {
     llmRouter,
     repoDeps: {
       repoRepo: repos.repo,
+      repositoryService: new RepositoryService(repos.repo),
       branchRepo: repos.branch,
       tagRepo: repos.tag,
     },

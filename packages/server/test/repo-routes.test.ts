@@ -13,6 +13,7 @@ import { CommitRepo } from '../src/repos/commit.js';
 import { registerRepoRoutes } from '../src/routes/repo.js';
 import { registerContentsRoutes } from '../src/routes/contents.js';
 import { registerCommitRoutes } from '../src/routes/commits.js';
+import { RepositoryService } from '../src/application/repository-service.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(__dirname, '..', '..', 'shared', 'db', 'migrations');
@@ -71,7 +72,12 @@ describe('repository / branch / file / commit round-trip', () => {
           request.orgContext = { userId: 'tester', orgId, role: 'admin' };
         }
       });
-      await registerRepoRoutes(instance, { repoRepo, branchRepo, tagRepo });
+      await registerRepoRoutes(instance, {
+        repoRepo,
+        repositoryService: new RepositoryService(repoRepo),
+        branchRepo,
+        tagRepo,
+      });
       await registerContentsRoutes(instance, { repoRepo, branchRepo, repoStore });
       await registerCommitRoutes(instance, { repoRepo, branchRepo, repoStore, commitRepo });
     });

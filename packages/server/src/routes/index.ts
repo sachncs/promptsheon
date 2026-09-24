@@ -270,7 +270,6 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
 
   registerRepoRoutes(app, {
     ...deps.repoDeps,
-    repositoryService: new RepositoryService(deps.repoDeps.repoRepo),
   });
   registerContentsRoutes(app, deps.contentsDeps);
   registerCommitRoutes(app, deps.commitDeps);
