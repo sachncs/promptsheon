@@ -14,7 +14,7 @@ Promptsheon is a TypeScript codebase (Fastify 5 + better-sqlite3 backend, Next.j
 
 ## Prerequisites
 
-- **Node.js 26 or newer.** Check with `node --version`.
+- **Node.js 22 or newer.** Check with `node --version`.
 - **pnpm 11.** `corepack enable && corepack prepare pnpm@11 --activate`.
 - **Git.**
 

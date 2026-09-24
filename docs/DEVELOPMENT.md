@@ -21,8 +21,8 @@ documentation in the same change set.
 
 ### Prerequisites
 
-- Node.js 20 or newer (the CI image currently uses the repository-supported
-  current LTS line).
+- Node.js 22 or newer (the CI image and package engine constraint use this
+  production baseline).
 - pnpm 11, enabled through Corepack.
 - An LLM provider credential for workflows that invoke an agent. Route and
   repository tests do not require a live provider.

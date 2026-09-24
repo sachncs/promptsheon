@@ -94,7 +94,7 @@ ten minutes.
 
 ## Before you start
 
-You'll need **Node.js 26 or newer** and **pnpm 11** installed on
+You'll need **Node.js 22 or newer** and **pnpm 11** installed on
 your computer.
 
 If you don't know what Node.js is or whether you have it:
@@ -102,7 +102,7 @@ If you don't know what Node.js is or whether you have it:
 1. Open a terminal (on macOS: `Cmd + Space`, type "Terminal"; on
    Windows: open "PowerShell"; on Linux: open your usual terminal).
 2. Type `node --version` and press Enter.
-3. If you see a version number starting with `26`, you're set.
+3. If you see a version number starting with `22` or higher, you're set.
 4. If you see "command not found" or an older version, follow the
    [official Node.js installer guide](https://nodejs.org/en/download/package-manager).
 
@@ -299,7 +299,7 @@ For operators / maintainers:
 
 | Category       | Technology                                       |
 |----------------|--------------------------------------------------|
-| Runtime        | Node.js ≥ 26, pnpm 11 workspaces                |
+| Runtime        | Node.js ≥ 22, pnpm 11 workspaces                |
 | Language       | TypeScript (strict, exactOptionalPropertyTypes)  |
 | HTTP           | [Fastify 5](https://fastify.dev)                 |
 | Validation     | [Zod 4](https://zod.dev)                         |
