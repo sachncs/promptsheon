@@ -20,6 +20,7 @@ import { DagMini } from '@/components/brand/dag-mini';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 type Tab = 'overview' | 'versions' | 'graph' | 'releases';
 
@@ -38,7 +39,7 @@ export default function CapabilityDetailPage() {
 
   const versions = useQuery({
     queryKey: ['versions', id],
-    queryFn: () => versionApi.list(id).then((r) => r.data).catch(() => []),
+    queryFn: () => versionApi.list(id).then((r) => r.data),
     enabled: Boolean(id) && Boolean(session),
   });
 
@@ -46,13 +47,13 @@ export default function CapabilityDetailPage() {
 
   const manifest = useQuery({
     queryKey: ['manifest', id],
-    queryFn: () => manifestApi.get(id).then((r) => r.data).catch(() => null),
+    queryFn: () => manifestApi.get(id).then((r) => r.data),
     enabled: Boolean(id) && Boolean(session),
   });
 
   const releases = useQuery({
     queryKey: ['releases', id],
-    queryFn: () => releaseApi.list(id).then((r) => r.data).catch(() => []),
+    queryFn: () => releaseApi.list(id).then((r) => r.data),
     enabled: Boolean(id) && Boolean(session),
   });
   const releaseList = Array.isArray(releases.data) ? releases.data : [];
@@ -60,6 +61,11 @@ export default function CapabilityDetailPage() {
   if (cap.isLoading) {
     return <div className="text-text-muted text-sm">Loading…</div>;
   }
+
+  if (cap.isError) return <QueryError message={cap.error.message} onRetry={() => void cap.refetch()} />;
+  if (versions.isError) return <QueryError message={versions.error.message} onRetry={() => void versions.refetch()} />;
+  if (manifest.isError) return <QueryError message={manifest.error.message} onRetry={() => void manifest.refetch()} />;
+  if (releases.isError) return <QueryError message={releases.error.message} onRetry={() => void releases.refetch()} />;
 
   if (!cap.data) {
     return (
