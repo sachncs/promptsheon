@@ -9,7 +9,7 @@ import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { QueryError } from '@/components/brand/query-error';
@@ -62,7 +62,7 @@ export default function EvalRunPage() {
           eyebrow="Evaluation"
           title={`Run ${String(r['id'] ?? '').slice(0, 8)}`}
           subtitle="Per-case results, scoring summary, regression detection, and threshold gate visualisation."
-          actions={<StatusPill kind={(r['status'] as never) ?? 'pending'} />}
+          actions={<StatusPill kind={statusKindOf(r['status'], 'pending')} />}
         />
       </div>
 
@@ -105,7 +105,7 @@ export default function EvalRunPage() {
             { key: 'expected', header: 'Expected', render: (row) => <span className="font-mono text-xs text-text-muted">{String(row['expected'] ?? '').slice(0, 80)}</span> },
             { key: 'actual', header: 'Actual', render: (row) => <span className="font-mono text-xs text-text-default">{String(row['actual'] ?? '').slice(0, 80)}</span> },
             { key: 'score', header: 'Score', render: (row) => row['score'] != null ? `${(Number(row['score']) * 100).toFixed(0)}%` : '—' },
-            { key: 'decision', header: 'Decision', render: (row) => <StatusPill kind={(row['passed'] === false ? 'rejected' : 'approved') as never} label={row['passed'] === false ? 'fail' : 'pass'} /> },
+            { key: 'decision', header: 'Decision', render: (row) => <StatusPill kind={row['passed'] === false ? 'rejected' : 'approved'} label={row['passed'] === false ? 'fail' : 'pass'} /> },
             { key: 'reg', header: '', render: (row) => row['regression'] ? <TrendingDown className="h-3.5 w-3.5 text-warning" /> : null },
           ]}
           empty={

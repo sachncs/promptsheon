@@ -9,7 +9,7 @@ import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatCard } from '@/components/brand/stat-card';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -116,7 +116,7 @@ export default function SelfEvolvePage() {
           <Surface>
             <SurfaceHeader title="Current state" />
             <div className="flex flex-wrap items-center gap-3">
-              <StatusPill kind={(s?.status as never) ?? 'neutral'} />
+              <StatusPill kind={statusKindOf(s?.status)} />
               <Badge>{s?.status === 'cooling-down' ? 'awaiting cooldown' : s?.status ?? 'idle'}</Badge>
               {error && <span className="text-xs text-destructive">{error}</span>}
             </div>

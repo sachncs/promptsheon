@@ -12,7 +12,7 @@ import { capabilityApi, versionApi, manifestApi, releaseApi } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
 import { Timeline } from '@/components/brand/timeline';
 import { DataTable } from '@/components/brand/data-table';
@@ -93,7 +93,7 @@ export default function CapabilityDetailPage() {
           actions={
             <div className="flex items-center gap-2">
               {c.manifestHash && <HashChip hash={c.manifestHash} />}
-              <StatusPill kind={(c.state as never) ?? 'active'} />
+              <StatusPill kind={statusKindOf(c.state, 'active')} />
               <Link href={`/app/diff?capability=${c.id}`}>
                 <Button variant="outline" size="sm">Diff a version</Button>
               </Link>
@@ -194,7 +194,7 @@ export default function CapabilityDetailPage() {
               columns={[
                 { key: 'v', header: 'Version', render: (r: Record<string, unknown>) => `v${String(r['capabilityVersion'] ?? '?')}` },
                 { key: 'env', header: 'Environment', render: (r: Record<string, unknown>) => <span className="font-mono text-xs">{String(r['environment'] ?? 'production')}</span> },
-                { key: 'state', header: 'State', render: (r: Record<string, unknown>) => <StatusPill kind={(r['state'] as never) ?? 'neutral'} /> },
+                { key: 'state', header: 'State', render: (r: Record<string, unknown>) => <StatusPill kind={statusKindOf(r['state'])} /> },
                 { key: 'hash', header: 'Content', render: (r: Record<string, unknown>) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} /> },
                 { key: 'canary', header: 'Canary', render: (r: Record<string, unknown>) => r['canaryPercent'] != null ? `${String(r['canaryPercent'])}%` : '—' },
               ]}

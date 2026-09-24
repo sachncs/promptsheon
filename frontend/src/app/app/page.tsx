@@ -9,7 +9,7 @@ import {
 import { useRequireSession } from '@/hooks/use-session';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatCard } from '@/components/brand/stat-card';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
 import { TrustScore } from '@/components/brand/trust-score';
 import { Timeline } from '@/components/brand/timeline';
@@ -227,7 +227,7 @@ function Dashboard() {
               columns={[
                 { key: 'cap', header: 'Capability', render: (r) => String(r['capabilityName'] ?? '—') },
                 { key: 'ver', header: 'Version', render: (r) => `v${r['capabilityVersion'] ?? '?'}` },
-                { key: 'state', header: 'State', render: (r) => <StatusPill kind={(r['status'] as never) ?? 'neutral'} /> },
+                { key: 'state', header: 'State', render: (r) => <StatusPill kind={statusKindOf(r['status'])} /> },
                 { key: 'hash', header: 'Content', render: (r) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} /> },
                 { key: 'env', header: 'Env', render: (r) => <span className="font-mono text-xs text-text-muted">{String(r['environment'] ?? 'production')}</span> },
               ]}

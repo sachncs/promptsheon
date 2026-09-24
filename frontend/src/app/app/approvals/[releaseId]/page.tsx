@@ -10,7 +10,7 @@ import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { HashChip } from '@/components/brand/hash-chip';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -92,7 +92,7 @@ export default function ReleaseApprovalPage() {
         subtitle={data?.environment ? `${data.environment} · ${data.state ?? '—'}` : 'Approve or reject this release.'}
         actions={
           <div className="flex items-center gap-2">
-            {data?.state ? <StatusPill kind={(data.state as never) ?? 'neutral'} /> : null}
+            {data?.state ? <StatusPill kind={statusKindOf(data.state)} /> : null}
             {data?.manifestHash ? <HashChip hash={data.manifestHash} /> : null}
           </div>
         }

@@ -10,7 +10,7 @@ import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatCard } from '@/components/brand/stat-card';
 import { DataTable } from '@/components/brand/data-table';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { HashChip } from '@/components/brand/hash-chip';
 import { QueryError } from '@/components/brand/query-error';
@@ -202,7 +202,7 @@ export default function OperationsPage() {
                   header: 'Hash',
                   render: (r) => r['manifestHash'] ? <HashChip hash={String(r['manifestHash'])} /> : <span className="text-text-muted">—</span>,
                 },
-                { key: 'state', header: 'State', render: (r) => <StatusPill kind={(r['state'] as never) ?? 'neutral'} /> },
+                { key: 'state', header: 'State', render: (r) => <StatusPill kind={statusKindOf(r['state'])} /> },
               ]}
             />
           )}

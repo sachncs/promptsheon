@@ -10,7 +10,7 @@ import { workspaceApi, projectApi, capabilityApi, unwrapList } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
@@ -125,7 +125,7 @@ export default function CapabilitiesRegistryPage() {
                 header: 'Content',
                 render: (r) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} />,
               },
-              { key: 'state', header: 'State', render: (r) => <StatusPill kind={(r['status'] as never) ?? 'neutral'} /> },
+              { key: 'state', header: 'State', render: (r) => <StatusPill kind={statusKindOf(r['status'])} /> },
             ]}
           />
         </Surface>

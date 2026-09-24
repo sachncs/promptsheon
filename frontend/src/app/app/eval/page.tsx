@@ -9,7 +9,7 @@ import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { QueryError } from '@/components/brand/query-error';
@@ -61,7 +61,7 @@ export default function EvalListPage() {
               { key: 'dataset', header: 'Dataset', render: (r) => String(r['datasetId'] ?? '—') },
               { key: 'scorer', header: 'Scorer', render: (r) => String(r['scorer'] ?? '—') },
               { key: 'score', header: 'Score', render: (r) => r['score'] != null ? `${(Number(r['score']) * 100).toFixed(0)}%` : '—' },
-              { key: 'state', header: 'Status', render: (r) => <StatusPill kind={(r['status'] as never) ?? 'pending'} /> },
+              { key: 'state', header: 'Status', render: (r) => <StatusPill kind={statusKindOf(r['status'], 'pending')} /> },
               { key: 'started', header: 'Started', render: (r) => new Date(String(r['startedAt'] ?? r['createdAt'] ?? Date.now())).toLocaleString() },
             ]}
           />

@@ -9,7 +9,7 @@ import { useRequireSession } from '@/hooks/use-session';
 import { workspaceApi, projectApi, capabilityApi, releaseApi } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface } from '@/components/brand/surface';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Tabs, TabsList, TabsTrigger } from '@/components/brand/tabs';
@@ -160,7 +160,7 @@ export default function ReleasesPage() {
                   <ArrowUpRight className="size-4 shrink-0 text-text-subtle opacity-0 transition-opacity group-hover:opacity-100" />
                 </div>
                 <div className="mt-3 flex items-center gap-2">
-                  <StatusPill kind={(state as never) ?? 'neutral'} />
+                  <StatusPill kind={statusKindOf(state)} />
                   {canary > 0 && (
                     <div className="flex items-center gap-2">
                       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-2">

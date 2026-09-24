@@ -10,7 +10,7 @@ import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatCard } from '@/components/brand/stat-card';
 import { HashChip } from '@/components/brand/hash-chip';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { QueryError } from '@/components/brand/query-error';
@@ -168,7 +168,7 @@ export default function ExecutionDetailPage() {
           {data.status && (
             <div className="flex items-center gap-2">
               <span className="text-xs uppercase tracking-wider text-text-subtle">State</span>
-              <StatusPill kind={(data.status as never) ?? 'neutral'} />
+              <StatusPill kind={statusKindOf(data.status)} />
             </div>
           )}
 
