@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
-import { evalSuiteApi } from '@/lib/api';
+import { evalSuiteApi, type EvalSuite } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
@@ -55,7 +55,7 @@ export default function EvalSuitesPage() {
   if (suites.isError) {
     return <QueryError message={suites.error} onRetry={() => void suites.refetch()} />;
   }
-  const rows = Array.isArray(suites.data) ? (suites.data as Array<Record<string, unknown>>) : [];
+  const rows: EvalSuite[] = suites.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -156,18 +156,18 @@ export default function EvalSuitesPage() {
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
             rows={rows}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => { router.push(`/app/eval/suites/${String(r['id'])}`); }}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => { router.push(`/app/eval/suites/${r.id}`); }}
             columns={[
-              { key: 'name', header: 'Name', render: (r) => <span className="font-medium text-text-strong">{String(r['name'])}</span> },
-              { key: 'capability', header: 'Capability', render: (r) => <span className="font-mono text-xs">{String(r['capabilityId'])}</span> },
-              { key: 'threshold', header: 'Threshold', render: (r) => `${(Number(r['passThreshold']) * 100).toFixed(0)}%` },
-              { key: 'borderline', header: 'Borderline', render: (r) => `±${(Number(r['borderlineBand']) * 100).toFixed(0)}%` },
-              { key: 'version', header: 'Version', render: (r) => `v${String(r['currentVersion'])}` },
+              { key: 'name', header: 'Name', render: (r) => <span className="font-medium text-text-strong">{r.name}</span> },
+              { key: 'capability', header: 'Capability', render: (r) => <span className="font-mono text-xs">{r.capabilityId}</span> },
+              { key: 'threshold', header: 'Threshold', render: (r) => `${(r.passThreshold * 100).toFixed(0)}%` },
+              { key: 'borderline', header: 'Borderline', render: (r) => `±${(r.borderlineBand * 100).toFixed(0)}%` },
+              { key: 'version', header: 'Version', render: (r) => `v${r.currentVersion}` },
               {
                 key: 'created',
                 header: 'Created',
-                render: (r) => new Date(String(r['createdAt'])).toLocaleDateString(),
+                render: (r) => new Date(r.createdAt).toLocaleDateString(),
               },
             ]}
           />

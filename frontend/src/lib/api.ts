@@ -89,11 +89,39 @@ export interface CostRollup {
   executions: number;
 }
 
+export interface EvalSuite {
+  id: string;
+  capabilityId: string;
+  repositoryId: string | null;
+  name: string;
+  description: string | null;
+  currentVersion: number;
+  passThreshold: number;
+  borderlineBand: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const CostRollupSchema = z.object({
   capabilityId: z.string(),
   day: z.string(),
   costMicros: z.number().int().nonnegative(),
   executions: z.number().int().nonnegative(),
+});
+
+const EvalSuiteSchema = z.object({
+  id: z.string(),
+  capabilityId: z.string(),
+  repositoryId: z.string().nullable(),
+  name: z.string(),
+  description: z.string().nullable(),
+  currentVersion: z.number().int().positive(),
+  passThreshold: z.number().min(0).max(1),
+  borderlineBand: z.number().min(0).max(1),
+  createdBy: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
@@ -111,6 +139,16 @@ function parseCostRollups(raw: unknown): CostRollup[] {
     const parsed = CostRollupSchema.safeParse(entry);
     if (!parsed.success) {
       throw new ApiError('The server returned invalid cost rollup data.', { code: 'INVALID_RESPONSE' });
+    }
+    return parsed.data;
+  });
+}
+
+function parseEvalSuites(raw: unknown): EvalSuite[] {
+  return unwrapList<unknown>(raw).map((entry) => {
+    const parsed = EvalSuiteSchema.safeParse(entry);
+    if (!parsed.success) {
+      throw new ApiError('The server returned invalid eval suite data.', { code: 'INVALID_RESPONSE' });
     }
     return parsed.data;
   });
@@ -599,8 +637,10 @@ export const signingKeysApi = {
 };
 
 export const evalSuiteApi = {
-  list: (capabilityId?: string) =>
-    client.get(`/eval-suites${capabilityId ? `?capabilityId=${capabilityId}` : ''}`).then((r) => r.data),
+  list: async (capabilityId?: string): Promise<EvalSuite[]> => {
+    const r = await client.get<unknown>(`/eval-suites${capabilityId ? `?capabilityId=${capabilityId}` : ''}`);
+    return parseEvalSuites(r.data);
+  },
   get: (id: string) => client.get(`/eval-suites/${id}`).then((r) => r.data),
   create: (input: {
     capabilityId: string;
