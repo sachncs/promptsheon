@@ -284,6 +284,7 @@ async function main() {
       allowedHosts: config.server.evalAllowedHosts ?? [],
       allowPrivateNetworks: config.server.allowPrivateNetworks ?? config.server.nodeEnv !== 'production',
     },
+    e2eSessionEnabled: config.server.e2eSessionEnabled ?? false,
     preconditionRepo: repos.precondition,
     alertRepo: repos.alert,
     scheduleRepo: repos.schedule,

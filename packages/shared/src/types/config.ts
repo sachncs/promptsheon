@@ -24,6 +24,8 @@ export interface AppConfig {
     evalAllowedHosts?: string[];
     /** Whether evaluation requests may target private network addresses. */
     allowPrivateNetworks?: boolean;
+    /** Enable the dedicated end-to-end browser session helper. */
+    e2eSessionEnabled?: boolean;
   };
   llm: {
     defaultProvider: string;

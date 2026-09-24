@@ -74,6 +74,7 @@ export function loadConfig(): AppConfig {
         .map((host) => host.trim())
         .filter((host) => host.length > 0),
       allowPrivateNetworks: envString('PROMPTSHEON_NODE_ENV', envString('NODE_ENV', 'development')) !== 'production',
+      e2eSessionEnabled: envBool('PROMPTSHEON_E2E', false),
     },
     llm: {
       defaultProvider: envString('PROMPTSHEON_LLM_PROVIDER', 'openai'),

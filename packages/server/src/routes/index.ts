@@ -141,6 +141,7 @@ export interface AppDeps {
   budgetDeps?: BudgetDeps;
   auditChain: AuditChain;
   apiKeyRepo: ApiKeyRepo;
+  e2eSessionEnabled: boolean;
   outgoingWebhookRepo: OutgoingWebhookRepo;
   releaseOverlayRepo: ReleaseOverlayRepo;
   userRepo: UserRepo;
@@ -262,6 +263,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     llmSettings: deps.llmSettings,
     llmRouter: deps.llmRouter,
     apiKeyRepo: deps.apiKeyRepo,
+    e2eSessionEnabled: deps.e2eSessionEnabled,
   });
 
   registerRepoRoutes(app, {

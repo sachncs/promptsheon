@@ -57,8 +57,13 @@ const SaveLlmSchema = z.object({
   { message: 'Custom provider needs baseUrl + apiKey; Bedrock needs bedrock object; others need apiKey' },
 );
 
-function issueE2eSessionKey(apiKeyRepo: ApiKeyRepo | undefined, userId: string, organizationId: string): string | undefined {
-  if (process.env['PROMPTSHEON_E2E'] !== 'true' || !apiKeyRepo) return undefined;
+function issueE2eSessionKey(
+  enabled: boolean,
+  apiKeyRepo: ApiKeyRepo | undefined,
+  userId: string,
+  organizationId: string,
+): string | undefined {
+  if (!enabled || !apiKeyRepo) return undefined;
   const apiKey = `pk_${randomBytes(24).toString('hex')}`;
   apiKeyRepo.create({
     userId,
@@ -81,6 +86,7 @@ export function registerBootstrapRoutes(
     llmRouter: LlmRouter;
     apiKeyRepo?: ApiKeyRepo;
     llmSettings: LlmSettingsService;
+    e2eSessionEnabled?: boolean;
   },
 ): void {
   app.get('/api/bootstrap/status', async (_request, reply) => {
@@ -115,7 +121,7 @@ export function registerBootstrapRoutes(
       return reply.code(404).send({ error: { code: 'NO_ORG', message: 'Organisation not found.' } });
     }
     const provider = await deps.settingsResolver.get<string>('llm.provider').catch(() => undefined);
-    const apiKey = issueE2eSessionKey(deps.apiKeyRepo, admin.id, org.id);
+    const apiKey = issueE2eSessionKey(deps.e2eSessionEnabled ?? false, deps.apiKeyRepo, admin.id, org.id);
     return reply.send({
       user: { id: admin.id, email: admin.email, name: admin.name, role: admin.role },
       org: { id: org.id, name: org.name, slug: org.slug },
