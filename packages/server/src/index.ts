@@ -342,7 +342,6 @@ async function main() {
       commitRepo: repos.commit,
     },
     mrDeps: {
-      repoRepo: repos.repo,
       branchRepo: repos.branch,
       mrRepo: repos.mergeRequest,
     },

@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import type { RepoRepo } from '../repos/repo.js';
 import type { BranchRepo } from '../repos/branch.js';
 import type { MergeRequestRepo } from '../repos/mr.js';
+import type { RepositoryService } from '../application/repository-service.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
@@ -38,14 +38,13 @@ const RepositoryParamsSchema = z.object({ id: z.string().trim().min(1).max(255) 
 const MergeRequestParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
 
 export interface MRDeps {
-  repoRepo: RepoRepo;
+  repositoryService: RepositoryService;
   branchRepo: BranchRepo;
   mrRepo: MergeRequestRepo;
 }
 
-function repositoryForRequest(repoRepo: RepoRepo, request: FastifyRequest, id: string) {
-  const organizationId = request.orgContext?.orgId;
-  return organizationId ? repoRepo.findByIdInOrg(id, organizationId) : repoRepo.findById(id);
+function repositoryForRequest(repositoryService: RepositoryService, request: FastifyRequest, id: string) {
+  return repositoryService.get(id, request.orgContext?.orgId);
 }
 
 export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): void {
@@ -53,7 +52,7 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
     const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
     if (!parsedParams.ok) return;
     const { id } = parsedParams.data;
-    if (!repositoryForRequest(deps.repoRepo, request, id)) {
+    if (!repositoryForRequest(deps.repositoryService, request, id)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     }
     const parsed = parseQuery(reply, MergeRequestListQuerySchema, request.query);
@@ -81,7 +80,7 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
     const { id } = parsedParams.data;
     const mr = deps.mrRepo.findById(id);
     if (!mr) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
-    if (!repositoryForRequest(deps.repoRepo, request, mr.repositoryId)) {
+    if (!repositoryForRequest(deps.repositoryService, request, mr.repositoryId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
     }
     return reply.send({
@@ -103,7 +102,7 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
     const { id } = parsedParams.data;
     const parsed = parseBody(reply, OpenMRSchema, request.body);
     if (!parsed.ok) return;
-    const repo = repositoryForRequest(deps.repoRepo, request, id);
+    const repo = repositoryForRequest(deps.repositoryService, request, id);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     if (parsed.data.sourceBranch === parsed.data.targetBranch) {
       return reply.code(422).send({ error: { code: 'SAME_TARGET', message: 'source and target branches must differ' } });
@@ -130,7 +129,7 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
     if (!parsed.ok) return;
     const mr = deps.mrRepo.findById(id);
     if (!mr) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
-    if (!repositoryForRequest(deps.repoRepo, request, mr.repositoryId)) {
+    if (!repositoryForRequest(deps.repositoryService, request, mr.repositoryId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
     }
     if (mr.status !== 'open') {
@@ -161,7 +160,7 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
     if (!parsed.ok) return;
     const mr = deps.mrRepo.findById(id);
     if (!mr) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
-    if (!repositoryForRequest(deps.repoRepo, request, mr.repositoryId)) {
+    if (!repositoryForRequest(deps.repositoryService, request, mr.repositoryId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
     }
     const userId = request.userId ?? 'system';
@@ -182,13 +181,11 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
     if (!parsed.ok) return;
     const mr = deps.mrRepo.findById(id);
     if (!mr) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
-    if (!repositoryForRequest(deps.repoRepo, request, mr.repositoryId)) {
+    if (!repositoryForRequest(deps.repositoryService, request, mr.repositoryId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
     }
     const approvals = deps.mrRepo.listApprovals(id).filter((a) => a.decision === 'approve');
-    const repo = request.orgContext?.orgId
-      ? deps.repoRepo.findByIdInOrg(mr.repositoryId, request.orgContext.orgId)
-      : deps.repoRepo.findById(mr.repositoryId);
+    const repo = deps.repositoryService.get(mr.repositoryId, request.orgContext?.orgId);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     if (approvals.length < repo.minApprovers) {
       return reply.code(422).send({
@@ -208,7 +205,7 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
     const { id } = parsedParams.data;
     const mr = deps.mrRepo.findById(id);
     if (!mr) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
-    if (!repositoryForRequest(deps.repoRepo, request, mr.repositoryId)) {
+    if (!repositoryForRequest(deps.repositoryService, request, mr.repositoryId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
     }
     const updated = deps.mrRepo.setStatus(id, 'closed', null);

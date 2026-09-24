@@ -9,6 +9,7 @@ import { RepoRepo } from '../src/repos/repo.js';
 import { BranchRepo } from '../src/repos/branch.js';
 import { MergeRequestRepo } from '../src/repos/mr.js';
 import { registerMergeRequestRoutes } from '../src/routes/mr.js';
+import { RepositoryService } from '../src/application/repository-service.js';
 
 function loadMigrations() {
   const migrationsDir = path.resolve(
@@ -70,7 +71,11 @@ describe('merge request maker-checker', () => {
       return reply.code(500).send({ error: { code: 'X', message: String(e) } });
     });
     await app.register(async (i) => {
-      await registerMergeRequestRoutes(i, { repoRepo, branchRepo, mrRepo });
+      await registerMergeRequestRoutes(i, {
+        repositoryService: new RepositoryService(repoRepo),
+        branchRepo,
+        mrRepo,
+      });
     });
     await app.ready();
   });

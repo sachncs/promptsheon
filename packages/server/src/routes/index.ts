@@ -153,7 +153,7 @@ export interface AppDeps {
   repoDeps: RepoDeps;
   contentsDeps: Omit<ContentsDeps, 'repositoryService'>;
   commitDeps: Omit<CommitDeps, 'repositoryService'>;
-  mrDeps: MRDeps;
+  mrDeps: Omit<MRDeps, 'repositoryService'>;
   signingDeps: SigningDeps;
   evalSuiteDeps: EvalSuiteRouteDeps;
   vaultDeps: VaultRouteDeps;
@@ -279,7 +279,10 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     ...deps.commitDeps,
     repositoryService: deps.repoDeps.repositoryService,
   });
-  registerMergeRequestRoutes(app, deps.mrDeps);
+  registerMergeRequestRoutes(app, {
+    ...deps.mrDeps,
+    repositoryService: deps.repoDeps.repositoryService,
+  });
   registerSigningRoutes(app, deps.signingDeps);
   const suiteExecution = deps.evalSuiteDeps.suiteExecution ?? new EvalSuiteService(
     deps.evalSuiteDeps.suiteRepo,
