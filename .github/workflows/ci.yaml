@@ -86,7 +86,9 @@ jobs:
       - name: Build the promptsheon image
         run: docker build -t promptsheon:ci .
       - name: Smoke check (syntax + import graph)
-        run: docker run --rm promptsheon:ci node server/dist/index.js --check
+        run: >-
+          docker run --rm
+          promptsheon:ci --check server/dist/index.js
       - name: Boot the server and hit /api/health
         run: |
           set -Eeuo pipefail

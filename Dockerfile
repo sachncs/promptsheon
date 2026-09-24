@@ -16,7 +16,7 @@ ARG PNPM_VERSION=11.23.0
 # ---------------------------------------------------------------------------
 FROM node:${NODE_VERSION}-alpine AS builder
 ARG PNPM_VERSION
-RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+RUN npm install --global pnpm@${PNPM_VERSION}
 
 WORKDIR /app
 
@@ -34,15 +34,14 @@ COPY extensions/promptsheon/package.json ./extensions/promptsheon/
 RUN pnpm fetch --frozen-lockfile
 
 # Now copy the full source tree.
-COPY tsconfig.base.json ./
 COPY packages ./packages
 COPY frontend ./frontend
 COPY extensions ./extensions
 
-# Allow native builds for better-sqlite3 + esbuild in this
-# stage. The runtime image doesn't need them.
+# Allow native builds for runtime and frontend dependencies in
+# this stage. The runtime image doesn't need the build toolchain.
 RUN pnpm config set --location=project --json \
-  'onlyBuiltDependencies' '["better-sqlite3", "esbuild"]' \
+  'onlyBuiltDependencies' '["better-sqlite3", "esbuild", "sharp"]' \
   || true
 
 RUN pnpm install --frozen-lockfile --offline
@@ -52,8 +51,8 @@ RUN pnpm --filter @promptsheon/frontend build
 
 # Trim node_modules down to production-only deps for the
 # runtime image. Keeps the image small.
-RUN pnpm deploy --filter @promptsheon/server --prod /app/deploy/server
-RUN pnpm deploy --filter @promptsheon/frontend --prod /app/deploy/frontend
+RUN pnpm deploy --legacy --filter @promptsheon/server --prod /app/deploy/server
+RUN pnpm deploy --legacy --filter @promptsheon/frontend --prod /app/deploy/frontend
 
 # ---------------------------------------------------------------------------
 # Runtime
@@ -83,6 +82,7 @@ WORKDIR /app
 # Copy the production-only deploy trees.
 COPY --from=builder --chown=promptsheon:promptsheon /app/deploy/server /app/server
 COPY --from=builder --chown=promptsheon:promptsheon /app/deploy/frontend /app/frontend
+COPY --from=builder --chown=promptsheon:promptsheon /app/packages/shared/db /app/shared/db
 
 USER promptsheon
 

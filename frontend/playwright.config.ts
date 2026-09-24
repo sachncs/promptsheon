@@ -22,7 +22,7 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: {
-    command: `cd .. && PROMPTSHEON_PORT=${BACKEND_PORT} PROMPTSHEON_FRONTEND_PORT=${PORT} PROMPTSHEON_DB_PATH=${DATABASE_PATH} PROMPTSHEON_AUTH=true PROMPTSHEON_JWT_SECRET=e2e-only-secret-with-at-least-32-characters PROMPTSHEON_E2E=true PROMPTSHEON_RATE_LIMIT_MAX=10000 pnpm --dir packages dev`,
+    command: `cd .. && pnpm --dir packages/shared build && PROMPTSHEON_PORT=${BACKEND_PORT} PROMPTSHEON_FRONTEND_PORT=${PORT} PROMPTSHEON_DB_PATH=${DATABASE_PATH} PROMPTSHEON_AUTH=true PROMPTSHEON_JWT_SECRET=e2e-only-secret-with-at-least-32-characters PROMPTSHEON_E2E=true PROMPTSHEON_RATE_LIMIT_MAX=10000 pnpm --dir packages dev`,
     url: BASE_URL,
     // Never attach to an unrelated process that happens to own the port.
     // The dev command starts both the frontend and the API; reusing only the
