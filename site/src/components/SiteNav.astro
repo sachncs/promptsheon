@@ -44,7 +44,8 @@ const links: NavLink[] = [
         <button
           id="theme-toggle"
           type="button"
-          aria-label="Toggle theme"
+          aria-label="Switch to dark mode"
+          aria-pressed="false"
           class="hidden h-9 w-9 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--ink-strong)] sm:inline-flex"
         >
           <svg class="theme-sun h-[16px] w-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -122,7 +123,8 @@ const links: NavLink[] = [
         <button
           id="mobile-theme-toggle"
           type="button"
-          aria-label="Toggle theme"
+          aria-label="Switch to dark mode"
+          aria-pressed="false"
           class="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--ink-strong)]"
         >
           <svg class="theme-sun h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -132,7 +134,7 @@ const links: NavLink[] = [
           <svg class="theme-moon h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
           </svg>
-          <span>Toggle theme</span>
+          <span class="theme-label">Use dark mode</span>
         </button>
       </div>
     </div>
@@ -152,10 +154,22 @@ const links: NavLink[] = [
   window.addEventListener('scroll', onScroll, { passive: true });
 
   const themeToggles = document.querySelectorAll('#theme-toggle, #mobile-theme-toggle');
+  function syncThemeControls() {
+    const isDark = document.documentElement.classList.contains('dark');
+    const label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+    themeToggles.forEach((toggle) => {
+      toggle.setAttribute('aria-label', label);
+      toggle.setAttribute('aria-pressed', String(isDark));
+      const text = toggle.querySelector('.theme-label');
+      if (text) text.textContent = isDark ? 'Use light mode' : 'Use dark mode';
+    });
+  }
+  syncThemeControls();
   themeToggles.forEach((toggle) => {
     toggle.addEventListener('click', () => {
       const isDark = document.documentElement.classList.toggle('dark');
       localStorage.setItem('promptsheon-theme', isDark ? 'dark' : 'light');
+      syncThemeControls();
     });
   });
 

@@ -295,8 +295,9 @@
 
   /* The theme control lives in the shared navigation, so its state styles
      must be global rather than scoped to the homepage hero. */
-  html:not(.dark) .theme-moon { display: none; }
-  html.dark .theme-sun { display: none; }
+  /* Show the icon for the theme the control will switch to. */
+  html:not(.dark) .theme-sun { display: none; }
+  html.dark .theme-moon { display: none; }
 
   /* Background grid — subtle, anchored to top */
   .ps-grid-bg {
