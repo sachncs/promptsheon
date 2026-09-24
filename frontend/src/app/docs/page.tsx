@@ -8,12 +8,12 @@ export default function DocsIndex() {
       <header>
         <div className="text-micro font-semibold uppercase tracking-[0.16em] text-text-subtle">Promptsheon</div>
         <h1 className="mt-3 font-semibold text-h1 text-text-strong">
-          The control plane for AI capabilities.
+          The adaptive agent engineering platform.
         </h1>
         <p className="mt-4 max-w-2xl text-text-muted text-base leading-relaxed">
-          Git-native version control, content-addressed artifacts, governed releases, evaluation
-          gates, audit chain, and an operator-managed signing path — all backed by a single repository
-          per workspace. Self-hosted. Apache-2.0.
+          Build, execute, evaluate, and continuously improve AI agents and multi-agent systems.
+          Promptsheon turns immutable agent specifications and execution evidence into safer,
+          more efficient candidates. Self-hosted. Apache-2.0.
         </p>
       </header>
 
@@ -37,11 +37,11 @@ export default function DocsIndex() {
       </section>
 
       <section>
-        <h2 className="font-semibold text-h2 text-text-strong">A capability is a multi-agent DAG</h2>
+        <h2 className="font-semibold text-h2 text-text-strong">An agent is an executable specification</h2>
         <p className="mt-3 text-text-muted text-base leading-relaxed">
-          A capability lives in a repository on a branch. The DAG inside it composes agents, prompts,
-          tools, MCP servers, guardrails, evaluation hooks, and memory contracts. Compiling the tree
-          yields a content-addressed manifest that drives execution and authoring review.
+          An AgentSpec composes role, objective, prompts, tools, permissions, context, model and
+          routing policies, execution rules, evaluation intent, budgets, and lifecycle. Its content
+          identity makes every meaningful change inspectable and reversible.
         </p>
         <div className="mt-4 rounded-xl border border-border-subtle bg-surface-0 p-5">
           <p className="text-sm font-semibold text-text-default">Example layout</p>
