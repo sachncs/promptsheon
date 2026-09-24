@@ -5,7 +5,7 @@ import { normalizePath } from '../repo/path.js';
 import type { RepoRepo } from '../repos/repo.js';
 import type { RepoStore } from '../repos/repo-store.js';
 import type { BranchRepo } from '../repos/branch.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
 const PutFileSchema = z.object({
@@ -30,6 +30,11 @@ const PutQuerySchema = z.object({
 const DeleteQuerySchema = z.object({
   ref: z.string().default('main'),
 });
+const RepositoryParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
+const FileParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
+  '*': z.string().min(1).max(1000),
+});
 
 export interface ContentsDeps {
   repoRepo: RepoRepo;
@@ -44,7 +49,9 @@ function repositoryForRequest(repoRepo: RepoRepo, request: FastifyRequest, id: s
 
 export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps): void {
   app.get('/api/repos/:id/contents', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseQuery(reply, ListQuerySchema, request.query);
     if (!parsed.ok) return;
     if (!repositoryForRequest(deps.repoRepo, request, id)) {
@@ -61,7 +68,9 @@ export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps)
   });
 
   app.get('/api/repos/:id/contents/*', async (request, reply) => {
-    const { id, '*': pathRaw } = request.params as { id: string; '*': string };
+    const parsedParams = parseParams(reply, FileParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id, '*': pathRaw } = parsedParams.data;
     const parsed = parseQuery(reply, FileQuerySchema, request.query);
     if (!parsed.ok) return;
     const { ref } = parsed.data;
@@ -90,7 +99,9 @@ export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps)
   });
 
   app.put('/api/repos/:id/contents/*', async (request, reply) => {
-    const { id, '*': pathRaw } = request.params as { id: string; '*': string };
+    const parsedParams = parseParams(reply, FileParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id, '*': pathRaw } = parsedParams.data;
     const parsedQ = parseQuery(reply, PutQuerySchema, request.query);
     if (!parsedQ.ok) return;
     const parsedB = parseBody(reply, PutFileSchema, request.body);
@@ -119,7 +130,9 @@ export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps)
   });
 
   app.delete('/api/repos/:id/contents/*', async (request, reply) => {
-    const { id, '*': pathRaw } = request.params as { id: string; '*': string };
+    const parsedParams = parseParams(reply, FileParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id, '*': pathRaw } = parsedParams.data;
     const parsed = parseQuery(reply, DeleteQuerySchema, request.query);
     if (!parsed.ok) return;
     const path = normalizePath(pathRaw);
