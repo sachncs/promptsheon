@@ -213,6 +213,21 @@ export interface Alert {
   acknowledgedBy: string | null;
 }
 
+export interface Capability {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  selfEvolveEnabled: boolean;
+  selfEvolveMinScore: number;
+  selfEvolveMaxRevisions: number;
+  selfEvolveCooldownSec: number;
+  selfEvolveTargetEnv: string;
+  selfEvolveDatasetId: string;
+}
+
 const CostRollupSchema = z.object({
   capabilityId: z.string(),
   day: z.string(),
@@ -337,6 +352,21 @@ const AlertSchema = z.object({
   acknowledgedBy: z.string().nullable(),
 });
 
+const CapabilitySchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  name: z.string(),
+  description: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  selfEvolveEnabled: z.boolean(),
+  selfEvolveMinScore: z.number().min(0).max(1),
+  selfEvolveMaxRevisions: z.number().int().nonnegative(),
+  selfEvolveCooldownSec: z.number().int().nonnegative(),
+  selfEvolveTargetEnv: z.string(),
+  selfEvolveDatasetId: z.string(),
+});
+
 function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
   return unwrapList<unknown>(raw).map((entry) => {
     const parsed = VaultKeyringEntrySchema.safeParse(entry);
@@ -450,6 +480,12 @@ function parseSearchResults(raw: unknown): SearchResult[] {
 function parseAlerts(raw: unknown): Alert[] {
   const parsed = z.array(AlertSchema).safeParse(unwrapList<unknown>(raw));
   if (!parsed.success) throw new ApiError('The server returned invalid alert data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseCapabilities(raw: unknown): Capability[] {
+  const parsed = z.array(CapabilitySchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid capability data.', { code: 'INVALID_RESPONSE' });
   return parsed.data;
 }
 
@@ -567,8 +603,16 @@ export const projectApi = {
 };
 
 export const capabilityApi = {
-  list: (projectId: string) => client.get('/capabilities', { params: { projectId } }),
-  get: (id: string) => client.get(`/capabilities/${id}`),
+  list: async (projectId: string): Promise<{ data: Capability[] }> => {
+    const r = await client.get<unknown>('/capabilities', { params: { projectId } });
+    return { data: parseCapabilities(r.data) };
+  },
+  get: async (id: string): Promise<{ data: Capability }> => {
+    const r = await client.get<unknown>(`/capabilities/${id}`);
+    const parsed = CapabilitySchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid capability data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
   create: (data: { projectId: string; name: string; description?: string }) => client.post('/capabilities', data),
   update: (id: string, data: { name?: string; description?: string }) => client.put(`/capabilities/${id}`, data),
   delete: (id: string) => client.delete(`/capabilities/${id}`),

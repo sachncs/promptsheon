@@ -6,11 +6,10 @@ import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { Boxes, Workflow, Plus } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
-import { workspaceApi, projectApi, capabilityApi, unwrapList } from '@/lib/api';
+import { workspaceApi, projectApi, capabilityApi, type Capability } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
-import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
@@ -33,11 +32,11 @@ export default function CapabilitiesRegistryPage() {
     queryKey: ['capabilities', 'all', allProjects.map((p) => p.id)],
     queryFn: async () => {
       const responses = await Promise.all(allProjects.map((p) => capabilityApi.list(p.id)));
-      const out: Array<Record<string, unknown> & { projectName: string }> = [];
+      const out: Array<Capability & { projectName: string }> = [];
       responses.forEach((response, index) => {
         const project = allProjects[index];
         if (!project) return;
-        out.push(...unwrapList<Record<string, unknown>>(response.data).map((capability) => ({ ...capability, projectName: project.name })));
+        out.push(...response.data.map((capability) => ({ ...capability, projectName: project.name })));
       });
       return out;
     },
@@ -93,19 +92,19 @@ export default function CapabilitiesRegistryPage() {
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
             rows={rows}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => { router.push(`/app/capabilities/${String(r['id'])}`); }}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => { router.push(`/app/capabilities/${r.id}`); }}
             columns={[
               {
                 key: 'name',
                 header: 'Capability',
                 render: (r) => (
-                  <Link href={`/app/capabilities/${String(r['id'])}`} className="text-text-strong font-medium hover:underline">
-                    {String(r['name'] ?? '—')}
+                  <Link href={`/app/capabilities/${r.id}`} className="text-text-strong font-medium hover:underline">
+                    {r.name}
                   </Link>
                 ),
               },
-              { key: 'project', header: 'Project', render: (r) => <span className="text-text-muted">{String(r['projectName'])}</span> },
+              { key: 'project', header: 'Project', render: (r) => <span className="text-text-muted">{r.projectName}</span> },
               {
                 key: 'shape',
                 header: 'Shape',
@@ -118,14 +117,13 @@ export default function CapabilitiesRegistryPage() {
               {
                 key: 'latest',
                 header: 'Latest',
-                render: (r) => <span className="font-mono text-xs text-text-muted">v{String(r['latestVersion'] ?? r['version'] ?? '1')}</span>,
+                render: () => <span className="font-mono text-xs text-text-muted">—</span>,
               },
               {
                 key: 'hash',
-                header: 'Content',
-                render: (r) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} />,
+                header: 'Identifier',
+                render: (r) => <HashChip hash={r.id} />,
               },
-              { key: 'state', header: 'State', render: (r) => <StatusPill kind={statusKindOf(r['status'])} /> },
             ]}
           />
         </Surface>

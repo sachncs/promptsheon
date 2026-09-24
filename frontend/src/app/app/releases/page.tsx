@@ -39,10 +39,10 @@ export default function ReleasesPage() {
   const capabilities = useQuery({
     queryKey: ['capabilities', 'all', allProjects.map((p) => p.id)],
     queryFn: async () => {
-      const out: Array<Record<string, unknown>> = [];
+      const out: Array<{ id: string; name: string }> = [];
       for (const p of allProjects) {
         const list = await capabilityApi.list(p.id).then((r) => r.data);
-        if (Array.isArray(list)) out.push(...(list as Array<Record<string, unknown>>));
+        out.push(...list.map((capability) => ({ id: capability.id, name: capability.name })));
       }
       return out;
     },
@@ -55,12 +55,12 @@ export default function ReleasesPage() {
       const out: Array<Record<string, unknown>> = [];
       const caps = capabilities.data ?? [];
       for (const c of caps) {
-        const list = await releaseApi.list(String(c['id'])).then((r) => r.data);
+        const list = await releaseApi.list(c.id).then((r) => r.data);
         if (Array.isArray(list)) {
           out.push(...list.map((rel: Record<string, unknown>) => ({
             ...rel,
-            capabilityName: String(c['name'] ?? '—'),
-            capabilityId: String(c['id']),
+            capabilityName: c.name,
+            capabilityId: c.id,
           })));
         }
       }
