@@ -66,8 +66,7 @@ import { ManifestApprovalService } from '../application/manifest-approval-servic
 import { AuditReplicationService } from '../application/audit-replication-service.js';
 import { HealthService } from '../application/health-service.js';
 import { SqliteHealthProbe } from '../infrastructure/sqlite-health-probe.js';
-import { IdentityService } from '../application/identity-service.js';
-import { AgentIdentityRepo } from '../repos/agent-identity.js';
+import type { IdentityService } from '../application/identity-service.js';
 import { createTraceService } from '../application/trace-service.js';
 import { EvalSuiteService } from '../application/eval-suite-service.js';
 import { GraderRunner } from '../agents/evaluation/grader-runner.js';
@@ -164,6 +163,7 @@ export interface AppDeps {
   traceScoreRepo: import('../repos/trace-score.js').TraceScoreRepo;
   autoEval: import('../observability/auto-eval.js').AutoEval;
   userAnalyticsRepo: import('../repos/user-analytics.js').UserAnalyticsRepo;
+  identityService: IdentityService;
   teamRepo: import('../repos/team.js').TeamRepo;
   orgTeamRepo: import('../repos/org.js').TeamRepo;
   ssoConfigRepo: import('../repos/team.js').SsoConfigRepo;
@@ -330,5 +330,5 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   if (deps.budgetDeps) {
     registerBudgetRoutes(app, deps.budgetDeps);
   }
-  registerIdentityRoutes(app, { service: new IdentityService(new AgentIdentityRepo(deps.db)) });
+  registerIdentityRoutes(app, { service: deps.identityService });
 }

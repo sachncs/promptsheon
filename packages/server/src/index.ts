@@ -32,6 +32,8 @@ import { ChaosConfig } from './hardening/chaos.js';
 import { LlmRouter } from './llm/router.js';
 import { Gateway, ResponseCache, FallbackChain, RateLimiter } from './llm/gateway.js';
 import { LlmSettingsService } from './application/llm-settings-service.js';
+import { IdentityService } from './application/identity-service.js';
+import { AgentIdentityRepo } from './repos/agent-identity.js';
 import type { Agent } from '@strands-agents/sdk';
 import type Database from 'better-sqlite3';
 
@@ -101,6 +103,7 @@ async function main() {
   // factory lives in src/repos/factory.ts and replaces the 41
   // manual `new XRepo(db)` calls this function used to carry.
   const repos = buildRepos(db);
+  const identityService = new IdentityService(new AgentIdentityRepo(db));
 
   const auditChain = new AuditChain(db, config.server.fipsMode);
   const app = Fastify({ logger: true, bodyLimit: 2_097_152 });
@@ -358,6 +361,7 @@ async function main() {
     traceScoreRepo: repos.traceScore,
     autoEval,
     userAnalyticsRepo: repos.userAnalytics,
+    identityService,
     teamRepo: repos.team,
     orgTeamRepo: repos.orgTeam,
     ssoConfigRepo: repos.ssoConfig,
