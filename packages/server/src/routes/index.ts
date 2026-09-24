@@ -92,6 +92,7 @@ import type { EvalRepo } from '../repos/eval.js';
 import type { PreconditionRepo } from '../repos/precondition.js';
 import type { AlertRepo } from '../repos/alert.js';
 import type { ScheduleRepo } from '../repos/schedule.js';
+import { ScheduleService } from '../application/schedule-service.js';
 import type { SseHub } from '../sse/hub.js';
 import type { SettingsResolver } from '../settings/resolver.js';
 import type { InvocationAgent } from '../agents/invocation.js';
@@ -215,7 +216,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerEvalRoutes(app, deps.evalRepo, deps.evalAgent);
   registerPreconditionRoutes(app, deps.preconditionRepo);
   registerAlertRoutes(app, deps.alertRepo);
-  registerScheduleRoutes(app, deps.scheduleRepo);
+  registerScheduleRoutes(app, new ScheduleService(deps.scheduleRepo));
   registerSettingsRoutes(app, deps.settingsResolver);
   registerSseRoutes(app, deps.sseHub);
   registerSelfEvolveRoutes(app, deps.evolutionAgent, deps.capabilityRepo);
