@@ -5,13 +5,17 @@ import type { RepoRepo } from '../repos/repo.js';
 import type { RepoStore } from '../repos/repo-store.js';
 import type { BranchRepo } from '../repos/branch.js';
 import { CommitRepo } from '../repos/commit.js';
-import { parseBody } from './validate.js';
+import { parseBody, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
 const CreateCommitSchema = z.object({
   ref: z.string().min(1),
   message: z.string().min(1).max(500),
   parents: z.array(z.string().regex(/^[a-f0-9]{64}$/)).optional(),
+});
+
+const ListCommitsQuerySchema = z.object({
+  ref: z.string().min(1).max(200),
 });
 
 export interface CommitDeps {
@@ -89,10 +93,9 @@ export function registerCommitRoutes(app: FastifyInstance, deps: CommitDeps): vo
 
   app.get('/api/repos/:id/commits', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { ref } = request.query as { ref?: string };
-    if (!ref) {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'ref required' } });
-    }
+    const parsed = parseQuery(reply, ListCommitsQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { ref } = parsed.data;
     if (!repositoryForRequest(deps.repoRepo, request, id)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     }
@@ -103,5 +106,6 @@ export function registerCommitRoutes(app: FastifyInstance, deps: CommitDeps): vo
     path: '/api/repos/:id/commits',
     summary: 'List commits for a ref',
     tags: ['commits'],
+    query: ListCommitsQuerySchema,
   });
 }

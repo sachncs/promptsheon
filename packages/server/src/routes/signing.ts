@@ -21,6 +21,13 @@ const SignCommitSchema = z.object({
 
 const DeactivateKeySchema = z.object({});
 
+const SignHelperSchema = z.object({
+  commitOid: z.string().min(1).max(200),
+  ref: z.string().min(1).max(200),
+  approverId: z.string().min(1).max(200),
+  timestamp: z.string().datetime({ offset: true }),
+});
+
 export interface SigningDeps {
   repoRepo: RepoRepo;
   commitRepo: CommitRepo;
@@ -234,12 +241,9 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
   });
 
   app.post('/api/commits/_sign-helper', async (request, reply) => {
-    const { commitOid, ref, approverId, timestamp } = request.body as {
-      commitOid?: string; ref?: string; approverId?: string; timestamp?: string;
-    };
-    if (!commitOid || !ref || !approverId || !timestamp) {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'all fields required' } });
-    }
+    const parsed = parseBody(reply, SignHelperSchema, request.body);
+    if (!parsed.ok) return;
+    const { commitOid, ref, approverId, timestamp } = parsed.data;
     return reply.send({
       message: signedMessage({ commitOid, ref, approverId, timestamp }).toString('base64'),
       algorithm: 'ed25519',

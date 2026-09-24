@@ -19,6 +19,10 @@ const ListQuerySchema = z.object({
   ref: z.string().default('main'),
 });
 
+const FileQuerySchema = z.object({
+  ref: z.string().min(1).max(200).default('main'),
+});
+
 const PutQuerySchema = z.object({
   ref: z.string().default('main'),
 });
@@ -58,7 +62,9 @@ export function registerContentsRoutes(app: FastifyInstance, deps: ContentsDeps)
 
   app.get('/api/repos/:id/contents/*', async (request, reply) => {
     const { id, '*': pathRaw } = request.params as { id: string; '*': string };
-    const { ref = 'main' } = request.query as { ref?: string };
+    const parsed = parseQuery(reply, FileQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { ref } = parsed.data;
     const path = normalizePath(pathRaw);
     if (!path) return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'path required' } });
     if (!repositoryForRequest(deps.repoRepo, request, id)) {
