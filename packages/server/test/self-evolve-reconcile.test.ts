@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerSelfEvolveRoutes } from '../src/routes/self-evolve.js';
 import type { CapabilityRepo } from '../src/repos/capability.js';
-import type { EvalRepo } from '../src/repos/eval.js';
 import type { Capability } from '@promptsheon/shared';
 
 class StubRepo {
@@ -11,8 +10,6 @@ class StubRepo {
   findById(id: string): Capability | null { return this.items.get(id) ?? null; }
   findByIdInOrg(id: string): Capability | null { return this.findById(id); }
 }
-
-class StubEvalRepo {}
 
 class StubEvolutionAgent {
   private readonly states = new Map<string, { status: string; cycleCount: number }>();
@@ -60,7 +57,6 @@ describe('self-evolve path reconciliation', () => {
       app,
       evolutionAgent as unknown as Parameters<typeof registerSelfEvolveRoutes>[1],
       capRepo,
-      new StubEvalRepo() as unknown as EvalRepo,
     );
     await app.ready();
   });

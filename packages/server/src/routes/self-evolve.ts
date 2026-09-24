@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { EvolutionAgent } from '../agents/evolution/evolution.js';
 import type { CapabilityRepo } from '../repos/capability.js';
-import type { EvalRepo } from '../repos/eval.js';
 import { parseBody, parseParams } from './validate.js';
 
 const RunCycleSchema = z.object({
@@ -27,7 +26,6 @@ export function registerSelfEvolveRoutes(
   app: FastifyInstance,
   evolutionAgent: EvolutionAgent,
   capabilityRepo: CapabilityRepo,
-  _evalRepo: EvalRepo,
 ) {
   app.post('/api/self-evolve/run', async (request, reply) => {
     const parsed = parseBody(reply, RunCycleSchema, request.body);
