@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 interface ProjectRow {
   id: string;
@@ -56,7 +57,7 @@ export default function WorkspaceProjectsPage() {
       setDescription('');
       toast({ title: 'Project created', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const remove = useMutation({
@@ -65,7 +66,7 @@ export default function WorkspaceProjectsPage() {
       qc.invalidateQueries({ queryKey: ['projects', workspaceId] });
       toast({ title: 'Project deleted', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Delete failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Delete failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const rows = (Array.isArray(projects.data) ? projects.data : []) as ProjectRow[];

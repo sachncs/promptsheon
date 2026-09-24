@@ -17,6 +17,7 @@ import { HashChip } from '@/components/brand/hash-chip';
 import { Timeline } from '@/components/brand/timeline';
 import { EmptyState } from '@/components/brand/empty-state';
 import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
 import { useToast } from '@/components/brand/toast';
 import { Button } from '@/components/ui/button';
@@ -77,7 +78,7 @@ export default function ReleaseDetailPage() {
       refreshRelease();
       toast({ title: 'Release activated', variant: 'success', description: 'Now receiving 100% of production traffic.' });
     } catch (err) {
-      toast({ title: 'Activate failed', variant: 'destructive', description: (err as Error).message });
+      toast({ title: 'Activate failed', variant: 'destructive', description: getErrorMessage(err) });
     }
   };
 
@@ -93,7 +94,7 @@ export default function ReleaseDetailPage() {
       refreshRelease();
       toast({ title: `Canary at ${pct}%`, variant: 'success', description: 'Weighted rollout updated.' });
     } catch (err) {
-      toast({ title: 'Canary failed', variant: 'destructive', description: (err as Error).message });
+      toast({ title: 'Canary failed', variant: 'destructive', description: getErrorMessage(err) });
     }
   };
 
@@ -104,7 +105,7 @@ export default function ReleaseDetailPage() {
       refreshRelease();
       toast({ title: 'Rolled back', variant: 'success', description: 'Atomic rollback completed.' });
     } catch (err) {
-      toast({ title: 'Rollback failed', variant: 'destructive', description: (err as Error).message });
+      toast({ title: 'Rollback failed', variant: 'destructive', description: getErrorMessage(err) });
     }
   };
 

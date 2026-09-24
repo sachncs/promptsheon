@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 interface PreconditionRow {
   id: string;
@@ -73,7 +74,7 @@ export default function PreconditionsPage() {
       setCommand('');
       toast({ title: 'Precondition created', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const toggle = useMutation({
@@ -83,7 +84,7 @@ export default function PreconditionsPage() {
       qc.invalidateQueries({ queryKey: ['preconditions', capabilityId] });
       toast({ title: 'Precondition updated', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Update failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Update failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   if (!session) return null;

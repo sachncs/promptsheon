@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 interface SelfEvolveState {
   capabilityId?: string;
@@ -46,7 +47,7 @@ export default function SelfEvolvePage() {
       qc.invalidateQueries({ queryKey: ['self-evolve', capabilityId] });
       setError(null);
     },
-    onError: (err) => setError((err as Error).message),
+    onError: (err) => setError(getErrorMessage(err)),
   });
 
   if (!session) return null;

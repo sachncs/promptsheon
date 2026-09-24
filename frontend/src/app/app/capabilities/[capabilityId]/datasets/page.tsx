@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 interface DatasetSummary {
   id: string;
@@ -51,7 +52,7 @@ export default function DatasetsPage() {
       setName('');
       toast({ title: 'Dataset created', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const deleteDataset = useMutation({
@@ -60,7 +61,7 @@ export default function DatasetsPage() {
       qc.invalidateQueries({ queryKey: ['datasets', capabilityId] });
       toast({ title: 'Dataset deleted', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Delete failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Delete failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const addCase = useMutation({
@@ -83,7 +84,7 @@ export default function DatasetsPage() {
       setCaseDescription('');
       toast({ title: 'Case added', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Add case failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Add case failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const rows = (Array.isArray(datasets.data) ? datasets.data : []) as DatasetSummary[];
