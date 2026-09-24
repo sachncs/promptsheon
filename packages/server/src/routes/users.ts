@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { UserRepo } from '../repos/user.js';
-import { parseBody } from './validate.js';
+import { parseBody, parseParams } from './validate.js';
 import { AuditChain } from '../audit/chain.js';
 import { requireAdmin } from '../middleware/admin.js';
 import type { MembershipRepo } from '../repos/org.js';
@@ -14,6 +14,10 @@ const CreateUserSchema = z.object({
 
 const UpdateRoleSchema = z.object({
   role: z.enum(['admin', 'editor', 'reader', 'system']),
+});
+
+const UserParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
 });
 
 interface RequestUserContext {
@@ -60,7 +64,9 @@ export function registerUserRoutes(
   app.get('/api/users/:id', async (request, reply) => {
     const orgId = requireOrganization(request, reply);
     if (!orgId) return;
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, UserParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const user = deps.userRepo.findByIdInOrg(id, orgId);
     if (!user) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'User not found' } });
@@ -95,7 +101,9 @@ export function registerUserRoutes(
 
   app.put('/api/users/:id/role', { preHandler: requireAdmin() }, async (request, reply) => {
     const orgId = requireOrganization(request, reply);
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, UserParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, UpdateRoleSchema, request.body);
     if (!parsed.ok) return;
     if (!orgId) return;
