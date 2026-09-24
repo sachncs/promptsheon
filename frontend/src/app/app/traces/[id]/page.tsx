@@ -113,7 +113,7 @@ export default function TraceDetailPage() {
         <SurfaceHeader className="px-5 pt-5" title="Span tree" description={`${roots.length} root span(s).`} />
         <ul className="px-5 pb-5">
           {roots.map((s) => (
-            <SpanNode key={s.id} span={s} children={childrenByParent.get(s.id) ?? []} depth={0} />
+            <SpanNode key={s.id} span={s} nestedSpans={childrenByParent.get(s.id) ?? []} depth={0} />
           ))}
         </ul>
       </Surface>
@@ -185,11 +185,11 @@ function ScoreRow({ score }: { score: TraceScore }) {
 
 function SpanNode({
   span,
-  children,
+  nestedSpans,
   depth,
 }: {
   span: TraceSpan;
-  children: TraceSpan[];
+  nestedSpans: TraceSpan[];
   depth: number;
 }) {
   const startMs = Date.parse(span.startTime);
@@ -247,10 +247,10 @@ function SpanNode({
           )}
         </div>
       </div>
-      {children.length > 0 && (
+      {nestedSpans.length > 0 && (
         <ul>
-          {children.map((c) => (
-            <SpanNode key={c.id} span={c} children={[]} depth={depth + 1} />
+          {nestedSpans.map((c) => (
+            <SpanNode key={c.id} span={c} nestedSpans={[]} depth={depth + 1} />
           ))}
         </ul>
       )}
