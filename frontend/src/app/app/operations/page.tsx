@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Activity, AlertTriangle, GitMerge, ShieldAlert } from 'lucide-react';
-import { releaseApi, workspaceApi, projectApi, evalApi, alertApi, unwrapList, type WorkspaceRow } from '@/lib/api';
+import { releaseApi, evalApi, alertApi, type Alert } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -12,93 +12,30 @@ import { StatCard } from '@/components/brand/stat-card';
 import { DataTable } from '@/components/brand/data-table';
 import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
-import { HashChip } from '@/components/brand/hash-chip';
 import { QueryError } from '@/components/brand/query-error';
-
-interface Release {
-  id: string;
-  capabilityId?: string;
-  capabilityName?: string;
-  capabilityVersion?: number;
-  environment?: string;
-  state?: string;
-  canaryPercent?: number;
-  manifestHash?: string;
-  updatedAt?: string;
-}
-
-interface EvalRun {
-  id: string;
-  releaseId?: string;
-  score?: number;
-  passed?: number;
-  total?: number;
-  startedAt?: string;
-  completedAt?: string;
-}
-
-interface AlertItem {
-  id: string;
-  ruleName?: string;
-  severity?: string;
-  message?: string;
-  at?: string;
-  acknowledged?: boolean;
-}
 
 export default function OperationsPage() {
   const session = useRequireSession();
   const router = useRouter();
 
-  const workspaces = useQuery({
-    queryKey: ['workspaces'],
-    queryFn: () => workspaceApi.list(1).then((r) => r.data),
-  });
-  const wsFirst: WorkspaceRow | undefined = workspaces.data?.[0];
-  const wsId = wsFirst?.id;
-
-  const projects = useQuery({
-    queryKey: ['projects', wsId],
-    queryFn: () => (wsId ? projectApi.list(wsId).then((r) => r.data) : Promise.resolve([])),
-    enabled: Boolean(wsId),
-  });
-  const projectList: Array<{ id: string; name?: string }> = Array.isArray(projects.data) ? projects.data : [];
-
   const allReleases = useQuery({
-    queryKey: ['operations', 'releases', projectList.map((p) => p.id)],
-    queryFn: async () => {
-      const byProject = await Promise.all(projectList.map(async (p) => {
-        const data = await releaseApi.list(p.id).then((res) => res.data);
-        if (!Array.isArray(data)) throw new Error(`Invalid releases response for ${p.name ?? p.id}`);
-        return data.map((rel) => {
-          const base = rel as Release;
-          const merged: Release = { ...base, capabilityId: base.capabilityId ?? p.id };
-          if (p.name !== undefined) merged.capabilityName = p.name;
-          return merged;
-        });
-      }));
-      return byProject.flat();
-    },
-    enabled: projectList.length > 0,
+    queryKey: ['operations', 'releases'],
+    queryFn: () => releaseApi.listAll(1, 100).then((res) => res.data.items),
   });
 
   const recentEvals = useQuery({
     queryKey: ['eval-runs', 'recent'],
-    queryFn: () => evalApi.list().then((r) => unwrapList<EvalRun>(r.data)),
+    queryFn: () => evalApi.list().then((r) => r.data),
   });
 
   const alerts = useQuery({
     queryKey: ['alerts'],
-    queryFn: () => alertApi.listAlerts().then((r) => r.data as AlertItem[]),
+    queryFn: () => alertApi.listAlerts().then((r) => r.data),
   });
 
   if (!session) return null;
   if (
-    workspaces.isPending ||
-    projects.isPending ||
-    (projectList.length > 0 && allReleases.isPending) ||
-    recentEvals.isPending ||
-    alerts.isPending
+    allReleases.isPending || recentEvals.isPending || alerts.isPending
   ) {
     return (
       <div className="space-y-6" aria-busy="true" aria-live="polite">
@@ -110,18 +47,16 @@ export default function OperationsPage() {
       </div>
     );
   }
-  if (workspaces.isError) return <QueryError message={workspaces.error} onRetry={() => void workspaces.refetch()} />;
-  if (projects.isError) return <QueryError message={projects.error} onRetry={() => void projects.refetch()} />;
   if (allReleases.isError) return <QueryError message={allReleases.error} onRetry={() => void allReleases.refetch()} />;
   if (recentEvals.isError) return <QueryError message={recentEvals.error} onRetry={() => void recentEvals.refetch()} />;
   if (alerts.isError) return <QueryError message={alerts.error} onRetry={() => void alerts.refetch()} />;
 
   const releases = allReleases.data ?? [];
-  const activeReleases = releases.filter((r) => r.state === 'active');
-  const canaryReleases = releases.filter((r) => r.state === 'canary');
-  const draftReleases = releases.filter((r) => r.state === 'draft' || r.state === 'review');
+  const activeReleases = releases.filter((r) => r.status === 'active');
+  const canaryReleases = releases.filter((r) => r.status === 'canary');
+  const draftReleases = releases.filter((r) => r.status === 'draft' || r.status === 'review');
   const evals = recentEvals.data ?? [];
-  const unackAlerts = (alerts.data ?? []).filter((a) => !a.acknowledged);
+  const unackAlerts: Alert[] = (alerts.data ?? []).filter((a) => a.status === 'active' && a.acknowledgedAt === null);
 
   const last24h = evals.filter((e) => {
     if (!e.startedAt) return false;
@@ -194,8 +129,8 @@ export default function OperationsPage() {
                   header: 'Capability',
                   render: (r) => (
                     <div>
-                      <div className="font-medium text-text-strong">{r.capabilityName ?? '—'}</div>
-                      <div className="text-xs text-text-subtle">v{r.capabilityVersion ?? '?'} · {r.environment ?? '—'}</div>
+                      <div className="font-medium text-text-strong">{r.capabilityId}</div>
+                      <div className="text-xs text-text-subtle">v{r.capabilityVersion} · {r.environment}</div>
                     </div>
                   ),
                 },
@@ -203,7 +138,7 @@ export default function OperationsPage() {
                   key: 'canary',
                   header: 'Canary',
                   render: (r) => {
-                    const pct = r.canaryPercent ?? 0;
+                    const pct = r.canaryPercent;
                     return (
                       <div className="flex items-center gap-2">
                         <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-2">
@@ -215,11 +150,11 @@ export default function OperationsPage() {
                   },
                 },
                 {
-                  key: 'hash',
-                  header: 'Hash',
-                  render: (r) => r.manifestHash ? <HashChip hash={r.manifestHash} /> : <span className="text-text-muted">—</span>,
+                  key: 'id',
+                  header: 'Release ID',
+                  render: (r) => <span className="font-mono text-xs text-text-muted">{r.id}</span>,
                 },
-                { key: 'state', header: 'State', render: (r) => <StatusPill kind={statusKindOf(r.state)} /> },
+                { key: 'state', header: 'State', render: (r) => <StatusPill kind={statusKindOf(r.status)} /> },
               ]}
             />
           )}
@@ -251,18 +186,18 @@ export default function OperationsPage() {
                   header: 'Score',
                   render: (r) => {
                     const s = r.score;
-                    return s !== undefined ? `${(s * 100).toFixed(0)}%` : '—';
+                    return `${(s * 100).toFixed(0)}%`;
                   },
                 },
                 {
                   key: 'cases',
                   header: 'Cases',
-                  render: (r) => `${r.passed ?? '—'}/${r.total ?? '—'}`,
+                  render: (r) => `${r.passed}/${r.total}`,
                 },
                 {
                   key: 'when',
                   header: 'When',
-                  render: (r) => r.startedAt ? new Date(r.startedAt).toLocaleString() : '—',
+                  render: (r) => new Date(r.startedAt).toLocaleString(),
                 },
               ]}
             />
@@ -291,8 +226,8 @@ export default function OperationsPage() {
                 <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="font-medium text-text-strong">{a.ruleName ?? a.message ?? a.id}</span>
-                    <span className="text-xs text-text-subtle">{a.at ? new Date(a.at).toLocaleString() : '—'}</span>
+                    <span className="font-medium text-text-strong">{a.ruleName || a.id}</span>
+                    <span className="text-xs text-text-subtle">{new Date(a.triggeredAt).toLocaleString()}</span>
                   </div>
                   {a.message && <p className="mt-1 text-text-muted">{a.message}</p>}
                 </div>

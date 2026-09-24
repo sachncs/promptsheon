@@ -293,6 +293,18 @@ export interface PendingApprovalSummary {
   updatedAt: string;
 }
 
+export interface AuditEntry {
+  id: string;
+  userId: string;
+  action: string;
+  resource: string;
+  details: string;
+  timestamp: string;
+  entryHash: string;
+  resourceKind: string;
+  resourceId: string;
+}
+
 const CostRollupSchema = z.object({
   capabilityId: z.string(),
   day: z.string(),
@@ -492,6 +504,18 @@ const PendingApprovalSummarySchema = z.object({
   updatedAt: z.string(),
 });
 
+const AuditEntrySchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  action: z.string(),
+  resource: z.string(),
+  details: z.string(),
+  timestamp: z.string(),
+  entryHash: z.string(),
+  resourceKind: z.string(),
+  resourceId: z.string(),
+});
+
 function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
   return unwrapList<unknown>(raw).map((entry) => {
     const parsed = VaultKeyringEntrySchema.safeParse(entry);
@@ -640,6 +664,14 @@ function parseProjects(raw: unknown): Project[] {
 function parseReleases(raw: unknown): Release[] {
   const parsed = z.array(ReleaseSchema).safeParse(unwrapList<unknown>(raw));
   if (!parsed.success) throw new ApiError('The server returned invalid release data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseAuditEntries(raw: unknown): AuditEntry[] {
+  const value = raw && typeof raw === 'object' ? raw as Record<string, unknown> : undefined;
+  const entries = value?.['entries'];
+  const parsed = z.array(AuditEntrySchema).safeParse(entries);
+  if (!parsed.success) throw new ApiError('The server returned invalid audit data.', { code: 'INVALID_RESPONSE' });
   return parsed.data;
 }
 
@@ -1499,7 +1531,10 @@ export interface AuditReport {
 }
 
 export const auditApi = {
-  list: (params?: { resource?: string; action?: string }) => client.get('/audit', { params }),
+  list: async (params?: { resource?: string; action?: string }): Promise<{ data: AuditEntry[] }> => {
+    const r = await client.get<unknown>('/audit', { params });
+    return { data: parseAuditEntries(r.data) };
+  },
   report: (opts: {
     fromTime?: string;
     toTime?: string;

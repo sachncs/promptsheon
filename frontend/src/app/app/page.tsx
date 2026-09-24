@@ -10,7 +10,6 @@ import { useRequireSession } from '@/hooks/use-session';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatCard } from '@/components/brand/stat-card';
 import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
-import { HashChip } from '@/components/brand/hash-chip';
 import { TrustScore } from '@/components/brand/trust-score';
 import { Timeline } from '@/components/brand/timeline';
 import { EmptyState } from '@/components/brand/empty-state';
@@ -18,7 +17,19 @@ import { DataTable } from '@/components/brand/data-table';
 import { AnimatedNumber } from '@/components/brand/animated-number';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
 import { Button } from '@/components/ui/button';
-import { workspaceApi, projectApi, capabilityApi, releaseApi, evalApi, auditApi, approvalApi, unwrapList, type WorkspaceRow } from '@/lib/api';
+import {
+  workspaceApi,
+  projectApi,
+  capabilityApi,
+  releaseApi,
+  evalApi,
+  auditApi,
+  approvalApi,
+  type EvalRun,
+  type PendingApprovalSummary,
+  type WorkspaceRow,
+  type Release,
+} from '@/lib/api';
 import { QueryError } from '@/components/brand/query-error';
 
 export default function ControlPlanePage() {
@@ -31,49 +42,39 @@ function useDashboardData() {
     queryKey: ['workspaces'],
     queryFn: () => workspaceApi.list(1).then((r) => r.data),
   });
-  const workspaceList = unwrapList<WorkspaceRow>(workspaces.data);
+  const workspaceList: WorkspaceRow[] = workspaces.data ?? [];
   const workspaceIds = workspaceList.map((workspace) => workspace.id);
 
   const projects = useQuery({
     queryKey: ['projects', 'all', workspaceIds],
     queryFn: async () => {
       const responses = await Promise.all(workspaceIds.map((workspaceId) => projectApi.list(workspaceId)));
-      return responses.flatMap((response) => unwrapList<Record<string, unknown>>(response.data));
+      return responses.flatMap((response) => response.data);
     },
     enabled: workspaceIds.length > 0,
   });
-  const projectList = unwrapList<Record<string, unknown>>(projects.data);
-  const projectIds = projectList.flatMap((project) => {
-    const id = project['id'];
-    return typeof id === 'string' ? [id] : [];
-  });
+  const projectList = projects.data ?? [];
+  const projectIds = projectList.map((project) => project.id);
 
   const capabilities = useQuery({
     queryKey: ['capabilities', 'all', projectIds],
     queryFn: async () => {
       const responses = await Promise.all(projectIds.map((projectId) => capabilityApi.list(projectId)));
-      return responses.flatMap((response) => unwrapList<Record<string, unknown>>(response.data));
+      return responses.flatMap((response) => response.data);
     },
     enabled: projectIds.length > 0,
   });
-  const capabilityList = unwrapList<{ id: string; name: string }>(capabilities.data);
+  const capabilityList = capabilities.data ?? [];
 
   const releases = useQuery({
     queryKey: ['releases', 'all'],
-    queryFn: async () => {
-      const data = await releaseApi.listAll(1, 100).then((res) => res.data);
-      const names = new Map(capabilityList.map((capability) => [capability.id, capability.name]));
-      return unwrapList<Record<string, unknown>>(data).map((release) => ({
-        ...release,
-        capabilityName: names.get(String(release['capabilityId'])) ?? 'Unknown capability',
-      }));
-    },
-    enabled: capabilityList.length > 0,
+    queryFn: () => releaseApi.listAll(1, 100).then((res) => res.data),
+    enabled: workspaceList.length > 0,
   });
 
   const evals = useQuery({ queryKey: ['eval-runs'], queryFn: () => evalApi.list().then((r) => r.data) });
   const audits = useQuery({ queryKey: ['audit', 'recent'], queryFn: () => auditApi.list().then((r) => r.data) });
-  const approvals = useQuery({
+  const approvals = useQuery<{ approvals: PendingApprovalSummary[] }>({
     queryKey: ['approvals', 'all'],
     queryFn: () => approvalApi.listPending().then((r) => r.data),
   });
@@ -90,15 +91,21 @@ function Dashboard() {
     return <QueryError message={failedQuery.error} onRetry={() => void failedQuery.refetch()} />;
   }
 
-  const loadingQuery = [d.workspaces, d.projects, d.capabilities, d.releases, d.evals, d.audits, d.approvals]
-    .some((query) => query.isPending);
+  const loadingQuery = d.workspaces.isPending
+    || (d.workspaceList.length > 0 && d.projects.isPending)
+    || ((d.projects.data?.length ?? 0) > 0 && d.capabilities.isPending)
+    || (d.workspaceList.length > 0 && d.releases.isPending)
+    || d.evals.isPending
+    || d.audits.isPending
+    || d.approvals.isPending;
   if (loadingQuery) return <DashboardLoading />;
 
   const capabilityCount = d.capabilityList.length;
-  const releaseList = unwrapList<Record<string, unknown>>(d.releases.data);
-  const evalList = unwrapList<Record<string, unknown>>(d.evals.data);
-  const auditList = unwrapList<Record<string, unknown>>(d.audits.data);
-  const approvalList = unwrapList<Record<string, unknown>>(d.approvals.data);
+  const capabilityNames = new Map(d.capabilityList.map((capability) => [capability.id, capability.name]));
+  const releaseList = d.releases.data?.items ?? [];
+  const evalList = d.evals.data ?? [];
+  const auditList = d.audits.data ?? [];
+  const approvalList = d.approvals.data?.approvals ?? [];
 
   const noWorkspace = d.workspaceList.length === 0;
 
@@ -125,7 +132,7 @@ function Dashboard() {
   }
 
   const trustScore = computeTrust(evalList, approvalList, releaseList);
-  const openReleases = releaseList.filter((r) => r['status'] === 'active' || r['status'] === 'canary').length;
+  const openReleases = releaseList.filter((r) => r.status === 'active' || r.status === 'canary').length;
 
   const wsFirst = d.workspaceList[0];
   const wsName = wsFirst?.name ?? 'your workspace';
@@ -223,13 +230,13 @@ function Dashboard() {
           ) : (
             <DataTable
               rows={releaseList.slice(0, 6)}
-              rowKey={(r) => String(r['id'])}
+              rowKey={(r) => r.id}
               columns={[
-                { key: 'cap', header: 'Capability', render: (r) => String(r['capabilityName'] ?? '—') },
-                { key: 'ver', header: 'Version', render: (r) => `v${r['capabilityVersion'] ?? '?'}` },
-                { key: 'state', header: 'State', render: (r) => <StatusPill kind={statusKindOf(r['status'])} /> },
-                { key: 'hash', header: 'Content', render: (r) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} /> },
-                { key: 'env', header: 'Env', render: (r) => <span className="font-mono text-xs text-text-muted">{String(r['environment'] ?? 'production')}</span> },
+                { key: 'cap', header: 'Capability', render: (r) => capabilityNames.get(r.capabilityId) ?? r.capabilityId },
+                { key: 'ver', header: 'Version', render: (r) => `v${r.capabilityVersion}` },
+                { key: 'state', header: 'State', render: (r) => <StatusPill kind={statusKindOf(r.status)} /> },
+                { key: 'id', header: 'Release ID', render: (r) => <span className="font-mono text-xs text-text-muted">{r.id}</span> },
+                { key: 'env', header: 'Env', render: (r) => <span className="font-mono text-xs text-text-muted">{r.environment}</span> },
               ]}
             />
           )}
@@ -264,15 +271,15 @@ function Dashboard() {
             ) : (
               <ol className="space-y-3">
                 {approvalList.slice(0, 4).map((a) => (
-                  <li key={String(a['id'])} className="flex items-center gap-3 rounded-lg border border-border-subtle bg-surface-2/40 p-3">
+                  <li key={a.releaseId} className="flex items-center gap-3 rounded-lg border border-border-subtle bg-surface-2/40 p-3">
                     <div className="grid h-8 w-8 place-items-center rounded-md bg-surface-2">
                       <AlertCircle className="h-4 w-4 text-warning" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="truncate text-sm text-text-strong">{String(a['title'] ?? a['id'])}</div>
+                      <div className="truncate font-mono text-sm text-text-strong">{a.releaseId}</div>
                       <div className="text-xs text-text-muted">Awaiting approval</div>
                     </div>
-                    <Link href={`/app/approvals/${a['releaseId'] ?? a['id']}`}>
+                    <Link href={`/app/approvals/${a.releaseId}`}>
                       <Button variant="ghost" size="sm">Review <ArrowRight className="ml-1 h-3 w-3" /></Button>
                     </Link>
                   </li>
@@ -298,10 +305,10 @@ function Dashboard() {
             ) : (
               <Timeline
                 entries={auditList.slice(0, 8).map((a) => ({
-                  id: String(a['id']),
-                  title: String(a['action'] ?? 'event'),
-                  description: String(a['resource'] ?? ''),
-                  timestamp: new Date(String(a['createdAt'] ?? a['timestamp'] ?? Date.now())).toLocaleString(),
+                  id: a.id,
+                  title: a.action,
+                  description: a.resource,
+                  timestamp: new Date(a.timestamp).toLocaleString(),
                   tone: 'neutral' as const,
                 }))}
               />
@@ -361,13 +368,13 @@ function PageHeader({ eyebrow, title, subtitle, actions }: { eyebrow: string; ti
   );
 }
 
-function passRate(evalList: Array<Record<string, unknown>>): number {
+function passRate(evalList: EvalRun[]): number {
   if (evalList.length === 0) return 0;
-  const passed = evalList.filter((e) => e['status'] === 'passed' || e['passed']).length;
+  const passed = evalList.filter((e) => e.status === 'passed').length;
   return (passed / evalList.length) * 100;
 }
 
-function computeTrust(evals: Array<Record<string, unknown>>, approvals: Array<Record<string, unknown>>, releases: Array<Record<string, unknown>>): number {
+function computeTrust(evals: EvalRun[], approvals: PendingApprovalSummary[], releases: Release[]): number {
   const pr = passRate(evals);
   const ap = approvals.length === 0 ? 100 : 60;
   const rr = releases.length > 0 ? 90 : 70;
