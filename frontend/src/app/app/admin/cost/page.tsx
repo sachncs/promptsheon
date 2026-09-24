@@ -134,20 +134,20 @@ export default function CostPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => `${String(r['capabilityId'])}-${String(r['day'])}`}
+            rows={rows}
+            rowKey={(r) => `${r.capabilityId}-${r.day}`}
             columns={[
-              { key: 'day', header: 'Day', render: (r) => String(r['day']) },
+              { key: 'day', header: 'Day', render: (r) => r.day },
               {
                 key: 'capability',
                 header: 'Capability',
-                render: (r) => <span className="font-mono text-xs">{String(r['capabilityId']).slice(0, 12)}…</span>,
+                render: (r) => <span className="font-mono text-xs">{r.capabilityId.slice(0, 12)}…</span>,
               },
-              { key: 'exec', header: 'Executions', render: (r) => String(r['executions']) },
+              { key: 'exec', header: 'Executions', render: (r) => r.executions },
               {
                 key: 'cost',
                 header: 'Cost',
-                render: (r) => `$${(Number(r['costMicros']) / 1_000_000).toFixed(4)}`,
+                render: (r) => `$${(r.costMicros / 1_000_000).toFixed(4)}`,
               },
             ]}
           />
