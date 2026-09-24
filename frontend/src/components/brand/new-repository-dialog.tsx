@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { z } from 'zod';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, GitBranch } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -62,6 +62,8 @@ export function NewRepositoryDialog({ workspaceId, workspaces, disabled }: NewRe
       requireSignedReleases: false,
     },
   });
+  const workspaceIdValue = useWatch({ control: form.control, name: 'workspaceId' });
+  const visibilityValue = useWatch({ control: form.control, name: 'visibility' });
 
   const onSubmit = form.handleSubmit(async (data) => {
     const output = CreateRepositorySchema.parse(data) as CreateRepositoryOutput;
@@ -106,7 +108,7 @@ export function NewRepositoryDialog({ workspaceId, workspaces, disabled }: NewRe
                 error={form.formState.errors.workspaceId?.message}
               >
                 <ThemedSelect
-                  value={form.watch('workspaceId')}
+                  value={workspaceIdValue}
                   onValueChange={(v) => form.setValue('workspaceId', v, { shouldValidate: true })}
                   options={workspaces.map((w) => ({ value: w.id, label: w.name }))}
                 />
@@ -126,7 +128,7 @@ export function NewRepositoryDialog({ workspaceId, workspaces, disabled }: NewRe
             </Field>
             <Field label="Visibility" htmlFor="repo-visibility" error={form.formState.errors.visibility?.message}>
               <ThemedSelect
-                value={form.watch('visibility') ?? 'private'}
+                value={visibilityValue ?? 'private'}
                 onValueChange={(v) => form.setValue('visibility', v as 'private' | 'internal' | 'public', { shouldValidate: true })}
                 options={[
                   { value: 'private', label: 'Private (default)' },
