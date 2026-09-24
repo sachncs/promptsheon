@@ -45,7 +45,7 @@ export function registerCommitRoutes(app: FastifyInstance, deps: CommitDeps): vo
 
     const { treeOid } = deps.repoStore.pinTree(id, parsed.data.ref);
     const authorId =
-      (request as unknown as { userId?: string }).userId ?? 'system';
+      request.userId ?? 'system';
 
     const parents = parsed.data.parents && parsed.data.parents.length > 0
       ? parsed.data.parents

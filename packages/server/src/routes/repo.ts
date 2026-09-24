@@ -245,7 +245,7 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     const repo = repositoryForRequest(deps.repoRepo, request, id);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     const taggerId =
-      (request as unknown as { userId?: string }).userId ?? 'system';
+      request.userId ?? 'system';
     const tag = deps.tagRepo.create({
       repositoryId: id,
       name: parsed.data.name,

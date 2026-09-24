@@ -100,7 +100,7 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
     if (parsed.data.sourceBranch === parsed.data.targetBranch) {
       return reply.code(422).send({ error: { code: 'SAME_TARGET', message: 'source and target branches must differ' } });
     }
-    const userId = (request as unknown as { userId?: string }).userId ?? 'system';
+    const userId = request.userId ?? 'system';
     const mr = deps.mrRepo.create({
       repositoryId: id,
       title: parsed.data.title,
@@ -126,7 +126,7 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
     if (mr.status !== 'open') {
       return reply.code(422).send({ error: { code: 'INVALID_STATUS', message: 'merge request is not open' } });
     }
-    const userId = (request as unknown as { userId?: string }).userId ?? 'system';
+    const userId = request.userId ?? 'system';
     if (userId === mr.authorId) {
       return reply.code(422).send({ error: { code: 'SELF_DECISION', message: 'author cannot review their own merge request' } });
     }
@@ -152,7 +152,7 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
     if (!repositoryForRequest(deps.repoRepo, request, mr.repositoryId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
     }
-    const userId = (request as unknown as { userId?: string }).userId ?? 'system';
+    const userId = request.userId ?? 'system';
     const comment = deps.mrRepo.addComment({
       mergeRequestId: id,
       authorId: userId,

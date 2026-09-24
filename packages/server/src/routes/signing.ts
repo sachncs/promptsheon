@@ -110,7 +110,7 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
     } catch {
       return reply.code(422).send({ error: { code: 'INVALID_KEY', message: 'public key PEM unparseable' } });
     }
-    const userId = (request as unknown as { userId?: string }).userId ?? 'system';
+    const userId = request.userId ?? 'system';
     const created = deps.signingKeyRepo.create({
       organizationId: id,
       label: parsed.data.label,
@@ -162,7 +162,7 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
     if (!deps.repoRepo.findByIdInOrg(commit.repositoryId, key.organizationId)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'commit not found' } });
     }
-    const userId = (request as unknown as { userId?: string }).userId ?? 'system';
+    const userId = request.userId ?? 'system';
     const timestamp = new Date().toISOString();
     const msg = signedMessage({
       commitOid: oid,
