@@ -78,8 +78,9 @@ export function registerTraceScoreRoutes(
       }
       return reply.send({ traceRunId: id, written });
     } catch (err) {
-      return reply.code(404).send({
-        error: { code: 'AUTO_EVAL_FAILED', message: (err as Error).message },
+      request.log.error({ err, traceRunId: id, organizationId: orgId }, 'trace auto-evaluation failed');
+      return reply.code(502).send({
+        error: { code: 'AUTO_EVAL_FAILED', message: 'Automatic evaluation could not be completed.' },
       });
     }
   });

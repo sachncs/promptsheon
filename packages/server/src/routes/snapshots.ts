@@ -35,7 +35,8 @@ export function registerSnapshotRoutes(app: FastifyInstance, deps: { store: Snap
       await deps.store.restore(agent, id);
       return reply.send({ ok: true, agentId: parsed.data.agentId, snapshotId: id });
     } catch (e) {
-      return reply.code(500).send({ error: { code: 'RESTORE_FAILED', message: (e as Error).message } });
+      request.log.error({ err: e, snapshotId: id, agentId: parsed.data.agentId }, 'snapshot restore failed');
+      return reply.code(500).send({ error: { code: 'RESTORE_FAILED', message: 'The snapshot could not be restored.' } });
     }
   });
 }

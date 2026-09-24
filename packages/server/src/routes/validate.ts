@@ -41,6 +41,15 @@ export function sendNotFound(reply: FastifyReply, resource: string, id: string):
   return reply.code(404).send({ error: { code: 'NOT_FOUND', message: error.message } });
 }
 
+/** Return a valid HTTP status carried by an unknown application error. */
+export function statusCodeOf(error: unknown, fallback: number): number {
+  if (typeof error !== 'object' || error === null || !('statusCode' in error)) return fallback;
+  const statusCode = error.statusCode;
+  return typeof statusCode === 'number' && Number.isInteger(statusCode) && statusCode >= 400 && statusCode <= 599
+    ? statusCode
+    : fallback;
+}
+
 function parse<S extends z.ZodTypeAny>(
   reply: FastifyReply,
   schema: S,
