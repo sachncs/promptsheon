@@ -224,7 +224,6 @@ These keep promptsheon credible but won't differentiate.
 | **Embedding / vector store / RAG connectors** | A separate product category; partner with Pinecone / Qdrant / Weaviate instead. |
 | **Fine-tuning pipelines** | Open-weights fine-tuning only; partner with Hugging Face or provider-native. |
 | **Prompt templates marketplace / community** | Network-effect play. Don't build until T1-T2 are done. |
-| **VS Code extension for prompt authoring** | Nice-to-have. Low ROI until the playground (T1-2) lands. |
 | **CLI improvements** | Basic CLI exists; needs better scripting + CI integration. |
 | **More framework integrations** | Vercel AI SDK, LlamaIndex, Haystack. Reach-based; low moat. |
 

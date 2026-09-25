@@ -21,7 +21,7 @@ documentation in the same change set.
 
 ### Prerequisites
 
-- Node.js 22 or newer (the CI image and package engine constraint use this
+- Node.js 26 or newer (the CI image and package engine constraint use this
   production baseline).
 - pnpm 11, enabled through Corepack.
 - An LLM provider credential for workflows that invoke an agent. Route and

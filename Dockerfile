@@ -29,14 +29,12 @@ COPY packages/server/package.json ./packages/server/
 COPY packages/cli/package.json ./packages/cli/
 COPY packages/sdk/package.json ./packages/sdk/
 COPY frontend/package.json ./frontend/
-COPY extensions/promptsheon/package.json ./extensions/promptsheon/
 
 RUN pnpm fetch --frozen-lockfile
 
 # Now copy the full source tree.
 COPY packages ./packages
 COPY frontend ./frontend
-COPY extensions ./extensions
 
 # Allow native builds for runtime and frontend dependencies in
 # this stage. The runtime image doesn't need the build toolchain.

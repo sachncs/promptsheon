@@ -1,6 +1,5 @@
 packages:
   - 'packages/*'
-  - 'extensions/promptsheon'
   - 'frontend'
   - 'site'
 allowBuilds:

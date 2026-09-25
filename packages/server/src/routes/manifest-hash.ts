@@ -46,8 +46,7 @@ export function registerManifestHashRoutes(app: FastifyInstance, deps: { manifes
    * Pure-validation endpoint. Accepts a manifest body (possibly
    * incomplete — a draft from the editor), runs the same Zod
    * schema as POST /api/manifests, and returns the parsed issue
-   * list. Never persists. Used by the VS Code extension's
-   * validate-on-save hook.
+   * list. Never persists. Used by local tooling and CI validation.
    */
   app.post('/api/manifests/validate', async (request, reply) => {
     let merged: Record<string, unknown>;

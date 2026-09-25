@@ -2,13 +2,13 @@
 
 Read [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) together with `AGENTS.md`
 before making changes. The development guide covers architecture, testing,
-operations, extension points, and the explicit breaking-change policy.
+operations, and the explicit breaking-change policy.
 
 Promptsheon is a TypeScript codebase (Fastify 5 + better-sqlite3 backend, Next.js 16 + React 19 frontend) organised as a pnpm workspace. This page covers the practical workflow. The engineering standards — type safety, validation, naming, testing bar, lifecycle, repository conventions — live in [`AGENTS.md`](https://github.com/sachncs/promptsheon/blob/master/AGENTS.md). Read AGENTS.md before opening your first PR.
 
 ## Prerequisites
 
-- **Node.js 22 or newer.** Check with `node --version`.
+- **Node.js 26 or newer.** Check with `node --version`.
 - **pnpm 11.** `corepack enable && corepack prepare pnpm@11 --activate`.
 - **Git.**
 
