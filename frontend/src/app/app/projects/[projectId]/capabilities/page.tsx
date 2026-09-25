@@ -11,6 +11,7 @@ import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function ProjectCapabilitiesPage() {
   const params = useParams<{ projectId: string }>();
@@ -20,11 +21,13 @@ export default function ProjectCapabilitiesPage() {
 
   const capabilities = useQuery({
     queryKey: ['capabilities', projectId],
-    queryFn: () => capabilityApi.list(projectId!).then((r) => r.data).catch(() => []),
+    queryFn: () => capabilityApi.list(projectId!).then((r) => r.data),
     enabled: Boolean(projectId) && Boolean(session),
   });
 
   const rows = (Array.isArray(capabilities.data) ? capabilities.data : []) as Array<{ id: string; name: string; description?: string }>;
+
+  if (capabilities.isError) return <QueryError message={capabilities.error} onRetry={() => void capabilities.refetch()} />;
 
   return (
     <div className="space-y-6">
@@ -51,23 +54,23 @@ export default function ProjectCapabilitiesPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => router.push(`/app/capabilities/${String(r['id'])}`)}
+            rows={rows}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => router.push(`/app/capabilities/${r.id}`)}
             columns={[
               {
                 key: 'name',
                 header: 'Capability',
                 render: (r) => (
-                  <Link href={`/app/capabilities/${String(r['id'])}`} className="font-medium text-text-strong hover:underline">
-                    {String(r['name'])}
+                  <Link href={`/app/capabilities/${r.id}`} className="font-medium text-text-strong hover:underline">
+                    {r.name}
                   </Link>
                 ),
               },
               {
                 key: 'description',
                 header: 'Description',
-                render: (r) => <span className="text-text-muted">{String(r['description'] ?? '—')}</span>,
+                render: (r) => <span className="text-text-muted">{r.description ?? '—'}</span>,
               },
             ]}
           />

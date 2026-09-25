@@ -19,7 +19,6 @@ export function StepIndicator({
   return (
     <ol className={cn('flex w-full', className)}>
       {steps.map((step, i) => {
-        const Icon = step.icon;
         const active = i === currentIndex;
         const done = i < currentIndex;
         return (

@@ -1,9 +1,10 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { parseBody } from './validate.js';
-import type { VaultRepo, Kms } from '../repos/vault.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
+import type { VaultKeyringEntry, VaultRepo, Kms } from '../repos/vault.js';
 import type { OrgExportService } from '../repos/vault-extras.js';
 import type { CostRollupRepo } from '../repos/vault-extras.js';
+import type { SearchRepo } from '../repos/search.js';
 
 const VaultSetSchema = z.object({
   organizationId: z.string(),
@@ -24,6 +25,15 @@ const CostQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(365).optional(),
 });
 
+const SecretsQuerySchema = z.object({
+  organizationId: z.string().min(1).max(200),
+});
+
+const SearchQuerySchema = z.object({
+  q: z.string().max(500).optional(),
+  type: z.string().min(1).max(80).optional(),
+});
+
 const RollupIngestSchema = z.object({
   capabilityId: z.string(),
   input: z.number().int().min(0).optional(),
@@ -37,33 +47,43 @@ const RotateKeySchema = z.object({
   reencrypt: z.boolean().optional(),
 });
 
+const OrganizationParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
+});
+
 export interface VaultRouteDeps {
   vaultRepo: VaultRepo;
   orgExportService: OrgExportService;
   costRollupRepo: CostRollupRepo;
+  searchRepo: SearchRepo;
   kms: Kms;
-  adminOnly: (request: unknown) => boolean;
+  adminOnly: (request: FastifyRequest) => boolean;
 }
 
-function actorOf(request: unknown): string {
-  const ctx = (request as { userId?: string } | undefined) ?? {};
-  return ctx.userId ?? 'system';
+function activeOrg(request: FastifyRequest): string | undefined {
+  return request.orgContext?.orgId ?? request.agentOrgId;
 }
 
-function parseQuerySchema(
-  reply: { code: (n: number) => { send: (p: unknown) => void } },
-  query: unknown,
-): { ok: true; data: { organizationId: string; days?: number } } | { ok: false } {
-  const schema = z.object({
-    organizationId: z.string(),
-    days: z.coerce.number().int().min(1).max(365).optional(),
-  });
-  const result = schema.safeParse(query);
-  if (result.success) return { ok: true, data: result.data };
-  reply.code(422).send({
-    error: { code: 'VALIDATION_ERROR', message: 'Query validation failed' },
-  });
-  return { ok: false };
+function assertOrgScope(
+  request: FastifyRequest,
+  requestedOrgId: string,
+  reply: FastifyReply,
+): boolean {
+  const current = activeOrg(request);
+  if (current && current !== requestedOrgId) {
+    void reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
+    return false;
+  }
+  return true;
+}
+
+function actorOf(request: FastifyRequest): string {
+  return request.userId ?? 'system';
+}
+
+function publicKeyringEntry(entry: VaultKeyringEntry): Omit<VaultKeyringEntry, 'ciphertext'> {
+  const { ciphertext: _ciphertext, ...metadata } = entry;
+  return metadata;
 }
 
 function escapeFts(s: string): string {
@@ -73,10 +93,10 @@ function escapeFts(s: string): string {
 export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps): void {
   // Vault
   app.get('/api/vault/secrets', async (request, reply) => {
-    const { organizationId } = request.query as { organizationId?: string };
-    if (!organizationId) {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'organizationId required' } });
-    }
+    const parsed = parseQuery(reply, SecretsQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { organizationId } = parsed.data;
+    if (!assertOrgScope(request, organizationId, reply)) return;
     return reply.send(deps.vaultRepo.list(organizationId));
   });
 
@@ -86,6 +106,7 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
     }
     const parsed = parseBody(reply, VaultSetSchema, request.body);
     if (!parsed.ok) return;
+    if (!assertOrgScope(request, parsed.data.organizationId, reply)) return;
     const created = deps.vaultRepo.set(
       parsed.data.organizationId,
       parsed.data.name,
@@ -100,7 +121,7 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
     if (!deps.adminOnly(request)) {
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
     }
-    return reply.send(deps.vaultRepo.listKeyring());
+    return reply.send(deps.vaultRepo.listKeyring().map(publicKeyringEntry));
   });
 
   app.post('/api/vault/keys/rotate', async (request, reply) => {
@@ -118,7 +139,7 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
     if (parsed.data.reencrypt !== false) {
       re = deps.vaultRepo.reencryptAllFromKey(current.fingerprint, next.fingerprint);
     }
-    return reply.send({ key: next, reencrypted: re });
+    return reply.send({ key: publicKeyringEntry(next), reencrypted: re });
   });
 
   // Export + purge
@@ -126,7 +147,10 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
     if (!deps.adminOnly(request)) {
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
     }
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!assertOrgScope(request, id, reply)) return;
     const exp = await deps.orgExportService.exportAll(id, actorOf(request));
     deps.orgExportService.recordExport(exp);
     return reply.code(202).send(exp);
@@ -136,15 +160,25 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
     if (!deps.adminOnly(request)) {
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
     }
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!assertOrgScope(request, id, reply)) return;
     const result = deps.orgExportService.schedulePurge(id, actorOf(request));
     return reply.send(result);
   });
 
   // Cost / analytics
   app.post('/api/analytics/rollups', async (request, reply) => {
+    const organizationId = activeOrg(request);
+    if (!organizationId) {
+      return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    }
     const parsed = parseBody(reply, RollupIngestSchema, request.body);
     if (!parsed.ok) return;
+    if (!deps.costRollupRepo.capabilityBelongsToOrg(parsed.data.capabilityId, organizationId)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'capability not found' } });
+    }
     const today = new Date().toISOString().slice(0, 10);
     deps.costRollupRepo.record(
       parsed.data.capabilityId,
@@ -158,22 +192,18 @@ export function registerVaultRoutes(app: FastifyInstance, deps: VaultRouteDeps):
   });
 
   app.get('/api/analytics/cost', async (request, reply) => {
-    const parsed = parseQuerySchema(reply, request.query);
+    const parsed = parseQuery(reply, CostQuerySchema, request.query);
     if (!parsed.ok) return;
+    if (!assertOrgScope(request, parsed.data.organizationId, reply)) return;
     return reply.send(deps.costRollupRepo.rollupsForOrg(parsed.data.organizationId, parsed.data.days ?? 30));
   });
 
   // Search (FTS5)
   app.get('/api/search', async (request, reply) => {
-    const { q, type } = request.query as { q?: string; type?: string };
+    const parsed = parseQuery(reply, SearchQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { q, type } = parsed.data;
     if (!q || q.length < 2) return reply.send([]);
-    const where = type ? 'AND kind = ?' : '';
-    const params: unknown[] = [escapeFts(q)];
-    if (type) params.push(type);
-    const db = (deps.costRollupRepo as unknown as { db: { prepare: (s: string) => { all: (...p: unknown[]) => Array<{ kind: string; resource_id: string; title: string; body: string }> } } }).db;
-    const rows = db
-      .prepare(`SELECT kind, resource_id, title, body FROM search_index WHERE search_index MATCH ? ${where} ORDER BY rank LIMIT 50`)
-      .all(...params);
-    return reply.send(rows);
+    return reply.send(deps.searchRepo.search(escapeFts(q), type));
   });
 }

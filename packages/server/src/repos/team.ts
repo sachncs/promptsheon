@@ -92,6 +92,11 @@ export class TeamRepo {
     return row ? rowToTeam(row) : null;
   }
 
+  findByIdInOrg(id: string, organizationId: string): Team | null {
+    const row = this.db.prepare('SELECT * FROM teams WHERE id = ? AND organisation_id = ?').get(id, organizationId) as TeamRow | undefined;
+    return row ? rowToTeam(row) : null;
+  }
+
   listByOrg(organizationId: string): Team[] {
     const rows = this.db
       .prepare('SELECT * FROM teams WHERE organisation_id = ? ORDER BY name ASC')
@@ -115,11 +120,21 @@ export class TeamRepo {
     return { teamId, userId, role, createdAt: now };
   }
 
+  addMemberInOrg(teamId: string, organizationId: string, userId: string, role: TeamMember['role'] = 'member'): TeamMember | null {
+    if (!this.findByIdInOrg(teamId, organizationId)) return null;
+    return this.addMember(teamId, userId, role);
+  }
+
   removeMember(teamId: string, userId: string): boolean {
     const r = this.db
       .prepare('DELETE FROM team_members WHERE team_id = ? AND user_id = ?')
       .run(teamId, userId);
     return r.changes > 0;
+  }
+
+  removeMemberInOrg(teamId: string, organizationId: string, userId: string): boolean {
+    if (!this.findByIdInOrg(teamId, organizationId)) return false;
+    return this.removeMember(teamId, userId);
   }
 
   listMembers(teamId: string): TeamMember[] {

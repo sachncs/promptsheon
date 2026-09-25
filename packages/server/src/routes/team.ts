@@ -1,24 +1,20 @@
-import { createHash, randomUUID } from 'node:crypto';
-import type { FastifyInstance } from 'fastify';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { NotFoundError } from '@promptsheon/shared';
 import type { TeamRepo, SsoConfigRepo } from '../repos/team.js';
 import type { AuditChain } from '../audit/chain.js';
-import { parseBody, parseQuery } from './validate.js';
+import type { UserRepo } from '../repos/user.js';
+import type { MembershipRepo } from '../repos/org.js';
+import type { VaultRepo } from '../repos/vault.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 
-interface RequestUserContext {
-  userId?: string;
-  orgContext?: { organizationId?: string; role?: string };
+function orgOf(request: FastifyRequest): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
-function orgOf(request: unknown): string | null {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.organizationId ?? null;
-}
-
-function actorRole(request: unknown): string {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.role ?? 'reader';
+function actorRole(request: FastifyRequest): string {
+  return request.orgContext?.role ?? 'reader';
 }
 
 const CreateTeamSchema = z.object({
@@ -38,6 +34,28 @@ const ScimUserSchema = z.object({
   emails: z.array(z.object({ value: z.string().email(), primary: z.boolean().optional() })).min(1),
   active: z.boolean().optional().default(true),
   roles: z.array(z.string()).optional().default([]),
+});
+
+const ScimListQuerySchema = z.object({
+  startIndex: z.coerce.number().int().min(1).default(1),
+  count: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+const ScimPatchSchema = z.object({
+  Operations: z.array(z.object({
+    op: z.enum(['add', 'replace', 'remove']),
+    path: z.string().optional(),
+    value: z.unknown().optional(),
+  })).min(1),
+});
+
+const TeamParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
+});
+
+const TeamMemberParamsSchema = z.object({
+  teamId: z.string().trim().min(1).max(255),
+  userId: z.string().trim().min(1).max(255),
 });
 
 /**
@@ -61,7 +79,15 @@ const ScimUserSchema = z.object({
  */
 export function registerTeamRoutes(
   app: FastifyInstance,
-  deps: { teamRepo: TeamRepo; ssoConfigRepo: SsoConfigRepo; auditChain: AuditChain; scimBearerToken: string },
+  deps: {
+    teamRepo: TeamRepo;
+    ssoConfigRepo: SsoConfigRepo;
+    auditChain: AuditChain;
+    scimBearerToken: string;
+    userRepo?: UserRepo;
+    membershipRepo?: MembershipRepo;
+    vaultRepo?: VaultRepo;
+  },
 ) {
   // ===== Teams =====
   app.get('/api/teams', async (request, reply) => {
@@ -79,7 +105,7 @@ export function registerTeamRoutes(
     if (!parsed.ok) return;
     const team = deps.teamRepo.create({ organizationId: orgId, ...parsed.data });
     deps.auditChain.append({
-      userId: (request as RequestUserContext).userId ?? 'system',
+      userId: request.userId ?? 'system',
       action: 'team.create',
       resource: 'team',
       details: JSON.stringify({ teamId: team.id, slug: team.slug }),
@@ -90,13 +116,18 @@ export function registerTeamRoutes(
   });
 
   app.post('/api/teams/:id/members', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, TeamParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    const orgId = orgOf(request);
+    if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT' } });
     const parsed = parseBody(reply, AddMemberSchema, request.body);
     if (!parsed.ok) return;
     if (actorRole(request) !== 'admin') return reply.code(403).send({ error: { code: 'INSUFFICIENT_ROLE' } });
-    const member = deps.teamRepo.addMember(id, parsed.data.userId, parsed.data.role);
+    const member = deps.teamRepo.addMemberInOrg(id, orgId, parsed.data.userId, parsed.data.role);
+    if (!member) return reply.code(404).send({ error: { code: 'NOT_FOUND' } });
     deps.auditChain.append({
-      userId: (request as RequestUserContext).userId ?? 'system',
+      userId: request.userId ?? 'system',
       action: 'team.add_member',
       resource: 'team_member',
       details: JSON.stringify({ teamId: id, userId: parsed.data.userId, role: parsed.data.role }),
@@ -107,12 +138,16 @@ export function registerTeamRoutes(
   });
 
   app.delete('/api/teams/:teamId/members/:userId', async (request, reply) => {
-    const { teamId, userId } = request.params as { teamId: string; userId: string };
+    const parsedParams = parseParams(reply, TeamMemberParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { teamId, userId } = parsedParams.data;
+    const orgId = orgOf(request);
+    if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT' } });
     if (actorRole(request) !== 'admin') return reply.code(403).send({ error: { code: 'INSUFFICIENT_ROLE' } });
-    const ok = deps.teamRepo.removeMember(teamId, userId);
+    const ok = deps.teamRepo.removeMemberInOrg(teamId, orgId, userId);
     if (!ok) return reply.code(404).send({ error: { code: 'NOT_FOUND' } });
     deps.auditChain.append({
-      userId: (request as RequestUserContext).userId ?? 'system',
+      userId: request.userId ?? 'system',
       action: 'team.remove_member',
       resource: 'team_member',
       details: JSON.stringify({ teamId, userId }),
@@ -140,17 +175,23 @@ export function registerTeamRoutes(
     });
     const parsed = parseBody(reply, schema, request.body);
     if (!parsed.ok) return;
-    // clientSecret is encrypted via the vault before storage.
-    // Real implementation would call deps.vault.encrypt.
-    const placeholderCiphertext = createHash('sha256')
-      .update(parsed.data.clientSecret)
-      .digest('hex');
+    if (!deps.vaultRepo) {
+      return reply.code(503).send({
+        error: { code: 'OIDC_NOT_CONFIGURED', message: 'OIDC secret storage is not configured' },
+      });
+    }
+    deps.vaultRepo.set(
+      orgId,
+      'oidc-client-secret',
+      parsed.data.clientSecret,
+      request.userId ?? 'system',
+    );
     deps.ssoConfigRepo.upsert({
       organizationId: orgId,
       provider: parsed.data.provider,
       issuer: parsed.data.issuer,
       clientId: parsed.data.clientId,
-      clientSecretEncrypted: placeholderCiphertext,
+      clientSecretEncrypted: `vault://${orgId}/oidc-client-secret`,
       scopes: parsed.data.scopes,
       audience: parsed.data.audience,
       groupsClaim: parsed.data.groupsClaim,
@@ -158,7 +199,7 @@ export function registerTeamRoutes(
       nameClaim: parsed.data.nameClaim,
     });
     deps.auditChain.append({
-      userId: (request as RequestUserContext).userId ?? 'system',
+      userId: request.userId ?? 'system',
       action: 'sso.config_update',
       resource: 'sso_config',
       details: JSON.stringify({ provider: parsed.data.provider, issuer: parsed.data.issuer }),
@@ -199,9 +240,9 @@ export function registerTeamRoutes(
       return false;
     }
     const presented = token.slice('Bearer '.length).trim();
-    const expected = createHash('sha256').update(deps.scimBearerToken).digest('hex');
-    const actual = createHash('sha256').update(presented).digest('hex');
-    if (expected !== actual) {
+    const expected = createHash('sha256').update(deps.scimBearerToken).digest();
+    const actual = createHash('sha256').update(presented).digest();
+    if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
       reply.code(401).send({ error: { code: 'UNAUTHORIZED' } });
       return false;
     }
@@ -211,54 +252,87 @@ export function registerTeamRoutes(
   app.get('/api/scim/v2/Users', async (request, reply) => {
     if (!(await scimAuth(request, reply))) return;
     const orgId = orgOf(request);
-    const startIndex = Number((request.query as Record<string, string>).startIndex ?? '1');
-    const count = Math.min(Number((request.query as Record<string, string>).count ?? '50'), 200);
-    const rows = (deps.teamRepo as unknown as { db: unknown }).db
-      ? []
-      : [];
-    void orgId;
-    void startIndex;
-    void count;
+    if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT' } });
+    if (!deps.userRepo || !deps.membershipRepo) {
+      return reply.code(503).send({ error: { code: 'SCIM_NOT_CONFIGURED', message: 'SCIM persistence is not configured' } });
+    }
+    const parsed = parseQuery(reply, ScimListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const allUsers = deps.userRepo.listForOrg(orgId);
+    const rows = allUsers.slice(parsed.data.startIndex - 1, parsed.data.startIndex - 1 + parsed.data.count);
     return reply.send({
       schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
-      totalResults: rows.length,
-      Resources: rows,
+      totalResults: allUsers.length,
+      startIndex: parsed.data.startIndex,
+      itemsPerPage: rows.length,
+      Resources: rows.map((user) => toScimUser(user)),
     });
   });
 
   app.post('/api/scim/v2/Users', async (request, reply) => {
     if (!(await scimAuth(request, reply))) return;
+    const orgId = orgOf(request);
+    if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT' } });
     const parsed = parseBody(reply, ScimUserSchema, request.body);
     if (!parsed.ok) return;
-    const orgId = orgOf(request) ?? 'unscoped';
+    if (!deps.userRepo || !deps.membershipRepo) {
+      return reply.code(503).send({ error: { code: 'SCIM_NOT_CONFIGURED', message: 'SCIM persistence is not configured' } });
+    }
     const email = parsed.data.emails.find((e) => e.primary)?.value ?? parsed.data.emails[0]?.value;
     if (!email) {
       return reply.code(400).send({ error: { code: 'MISSING_EMAIL', message: 'at least one email required' } });
     }
-    const userId = `scim-${randomUUID()}`;
+    const existing = deps.userRepo.findByEmail(email);
+    const user = existing ?? deps.userRepo.create({ email, name: parsed.data.displayName ?? parsed.data.userName, role: 'reader' });
+    const memberRole = parsed.data.roles.some((role) => role.toLowerCase() === 'admin') ? 'admin' : 'viewer';
+    deps.membershipRepo.addOrgMember(orgId, user.id, memberRole);
     deps.auditChain.append({
-      userId,
+      userId: user.id,
       action: 'scim.user_create',
       resource: 'user',
       details: JSON.stringify({ userName: parsed.data.userName, email }),
       resourceKind: 'user',
-      resourceId: userId,
+      resourceId: user.id,
     });
-    return reply.code(201).send({
-      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-      id: userId,
-      userName: parsed.data.userName,
-      displayName: parsed.data.displayName ?? parsed.data.userName,
-      emails: parsed.data.emails,
-      active: parsed.data.active ?? true,
-      meta: { resourceType: 'User' },
-      organizationId: orgId,
-    });
+    return reply.code(existing ? 200 : 201).send(toScimUser(user));
+  });
+
+  app.patch('/api/scim/v2/Users/:id', async (request, reply) => {
+    if (!(await scimAuth(request, reply))) return;
+    const orgId = orgOf(request);
+    if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT' } });
+    if (!deps.userRepo || !deps.membershipRepo) {
+      return reply.code(503).send({ error: { code: 'SCIM_NOT_CONFIGURED', message: 'SCIM persistence is not configured' } });
+    }
+    const parsed = parseBody(reply, ScimPatchSchema, request.body);
+    if (!parsed.ok) return;
+    const parsedParams = parseParams(reply, TeamParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    const user = deps.userRepo.findByIdInOrg(id, orgId);
+    if (!user) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'SCIM user not found' } });
+    for (const operation of parsed.data.Operations) {
+      if ((operation.path ?? '').toLowerCase() !== 'active') continue;
+      const value = typeof operation.value === 'boolean' ? operation.value : undefined;
+      if (value === false || operation.op === 'remove') deps.membershipRepo.removeOrgMember(orgId, id);
+      if (value === true) deps.membershipRepo.addOrgMember(orgId, id, 'viewer');
+    }
+    return reply.send(toScimUser(user, deps.membershipRepo.findOrgMembers(orgId).some((member) => member.userId === id)));
   });
 
   app.delete('/api/scim/v2/Users/:id', async (request, reply) => {
     if (!(await scimAuth(request, reply))) return;
-    const { id } = request.params as { id: string };
+    const orgId = orgOf(request);
+    if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT' } });
+    if (!deps.membershipRepo) {
+      return reply.code(503).send({ error: { code: 'SCIM_NOT_CONFIGURED', message: 'SCIM persistence is not configured' } });
+    }
+    const parsedParams = parseParams(reply, TeamParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!deps.membershipRepo.removeOrgMember(orgId, id)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'SCIM user not found' } });
+    }
     deps.auditChain.append({
       userId: id,
       action: 'scim.user_deactivate',
@@ -269,4 +343,16 @@ export function registerTeamRoutes(
     });
     return reply.code(204).send();
   });
+}
+
+function toScimUser(user: { id: string; email: string; name: string; createdAt: string }, active = true): Record<string, unknown> {
+  return {
+    schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+    id: user.id,
+    userName: user.email,
+    displayName: user.name,
+    emails: [{ value: user.email, primary: true }],
+    active,
+    meta: { resourceType: 'User', created: user.createdAt },
+  };
 }

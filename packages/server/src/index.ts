@@ -1,4 +1,4 @@
-import Fastify, { type FastifyError } from 'fastify';
+import Fastify, { type FastifyError, type FastifyRequest } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
@@ -24,7 +24,6 @@ import { AutoEval } from './observability/auto-eval.js';
 import { CostForecastService } from './analysis/forecast.js';
 import { CasStore } from '@promptsheon/shared';
 import { setupObservability } from './observability/setup.js';
-import type { GoalSummary } from './routes/goals.js';
 import { SessionStore } from './sessions/store.js';
 import { SnapshotStore } from './snapshots/store.js';
 import { CedarAuthorizer, installDefaultAuthorizer } from './policy/gate.js';
@@ -32,8 +31,19 @@ import { WebhookReceiver } from './webhooks/receiver.js';
 import { ChaosConfig } from './hardening/chaos.js';
 import { LlmRouter } from './llm/router.js';
 import { Gateway, ResponseCache, FallbackChain, RateLimiter } from './llm/gateway.js';
+import { LlmSettingsService } from './application/llm-settings-service.js';
+import { IdentityService } from './application/identity-service.js';
+import { RepositoryService } from './application/repository-service.js';
+import { AgentIdentityRepo } from './repos/agent-identity.js';
 import type { Agent } from '@strands-agents/sdk';
 import type Database from 'better-sqlite3';
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    requestId?: string;
+    requestStartTime?: number;
+  }
+}
 
 /**
  * Load the Cedar policy file at boot and install the singleton
@@ -41,8 +51,7 @@ import type Database from 'better-sqlite3';
  * every authorization decision in the platform; failing to load
  * it is a fatal error.
  */
-async function setupPolicy(): Promise<void> {
-  const policyPath = process.env['PROMPTSHEON_POLICY_FILE'];
+async function setupPolicy(policyPath?: string): Promise<void> {
   const authorizer = new CedarAuthorizer({ ...(policyPath ? { policyPath } : {}) });
   authorizer.load();
   installDefaultAuthorizer(authorizer);
@@ -52,8 +61,8 @@ async function setupPolicy(): Promise<void> {
  * Resolve the webhook secret. Refuses to boot in production
  * with the dev fallback.
  */
-function resolveWebhookSecret(nodeEnv: string): string {
-  const fromEnv = process.env['PROMPTSHEON_WEBHOOK_SECRET'];
+function resolveWebhookSecret(nodeEnv: string, configuredSecret?: string): string {
+  const fromEnv = configuredSecret;
   if (fromEnv && fromEnv.length > 0) return fromEnv;
   if (nodeEnv !== 'production') return 'dev-secret';
   throw new Error(
@@ -79,9 +88,8 @@ function buildForecastService(db: Database.Database, repos: Repos): CostForecast
  * resolved org-context role off the Fastify request and
  * returns true iff the caller is an admin.
  */
-function adminOnly(request: unknown): boolean {
-  const ctx = request as { orgContext?: { role?: string } } | undefined;
-  return ctx?.orgContext?.role === 'admin';
+function adminOnly(request: FastifyRequest): boolean {
+  return request.orgContext?.role === 'admin';
 }
 
 async function main() {
@@ -95,6 +103,8 @@ async function main() {
   // factory lives in src/repos/factory.ts and replaces the 41
   // manual `new XRepo(db)` calls this function used to carry.
   const repos = buildRepos(db);
+  const repositoryService = new RepositoryService(repos.repo);
+  const identityService = new IdentityService(new AgentIdentityRepo(db));
 
   const auditChain = new AuditChain(db, config.server.fipsMode);
   const app = Fastify({ logger: true, bodyLimit: 2_097_152 });
@@ -108,37 +118,40 @@ async function main() {
   await app.register(cors, {
     origin: config.server.corsOrigin,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Request-Id',
+      'Idempotency-Key',
+    ],
     credentials: true,
   });
 
   app.addHook('onRequest', async (request, reply) => {
     const requestIdHeader = request.headers['x-request-id'];
     const requestId = typeof requestIdHeader === 'string' && requestIdHeader || randomUUID();
-    const requestMetadata = request as unknown as Record<string, string | number>;
-    requestMetadata.requestId = requestId;
-    requestMetadata.startTime = Date.now();
+    request.requestId = requestId;
+    request.requestStartTime = Date.now();
     reply.header('X-Request-Id', requestId);
   });
 
   app.addHook('onResponse', async (request, reply) => {
-    const requestMetadata = request as unknown as Record<string, string | number>;
-    const requestId = requestMetadata.requestId;
-    const startTime = requestMetadata.startTime || Date.now();
+    const requestId = request.requestId;
+    const startTime = request.requestStartTime ?? Date.now();
     app.log.info({
       requestId,
       method: request.method,
       url: request.url,
       status: reply.statusCode,
-      durationMs: Date.now() - Number(startTime),
+      durationMs: Date.now() - startTime,
     }, 'request');
   });
 
   await app.register(rateLimit, {
-    max: 100,
+    max: config.server.rateLimitMax ?? 100,
     timeWindow: '1 minute',
     keyGenerator: (req) => {
-      return (req as unknown as Record<string, string>).userId ?? req.ip ?? 'unknown';
+      return req.userId ?? req.ip ?? 'unknown';
     },
   });
 
@@ -148,12 +161,14 @@ async function main() {
     process.env as Record<string, string>,
     repos.systemConfig,
   );
+  const llmSettings = new LlmSettingsService(settingsResolver, repos.vault, repos.user, repos.membership);
+  await llmSettings.hydrateConfig(config);
 
   const casStore = new CasStore(config.server.casPath);
   await casStore.init();
 
   setupObservability(config);
-  await setupPolicy();
+  await setupPolicy(config.server.policyFile);
 
   const cutoverReport = repos.manifest.ensureCutover({ createdBy: 'system-cutover' });
   app.log.info(
@@ -172,7 +187,7 @@ async function main() {
   const compiler = new ReasoningCompiler(config);
   const planner = new IdeaPlannerAgent(config);
   const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo: repos.manifest });
-  const llmRouter = new LlmRouter();
+  const llmRouter = new LlmRouter(config.llm.credentials);
   const autoEval = new AutoEval({ traceRepo: repos.trace, scoreRepo: repos.traceScore, router: llmRouter });
   const gateway = new Gateway({
     cache: new ResponseCache(2048),
@@ -187,18 +202,6 @@ async function main() {
     executor,
     cas: casStore,
   });
-  const activeGoals = new Map<string, GoalSummary>();
-  setInterval(() => {
-    for (const [hash, state] of (goalEvolver as unknown as { state: Map<string, unknown> }).state ?? new Map()) {
-      const s = state as { currentHash: string; bestHash: string; bestScore: number; iteration: number };
-      activeGoals.set(hash, {
-        manifestHash: hash,
-        bestScore: s.bestScore,
-        iterations: s.iteration,
-        lastUpdated: new Date().toISOString(),
-      });
-    }
-  }, 1000).unref();
   const sessionStore = new SessionStore({
     storageDir: `${config.server.casPath}/sessions`,
     persist: true,
@@ -219,7 +222,7 @@ async function main() {
         url: 'https://example.com/github',
         events: ['push', 'pull_request'],
         active: true,
-        secret: resolveWebhookSecret(config.server.nodeEnv),
+        secret: resolveWebhookSecret(config.server.nodeEnv, config.server.webhookSecret),
       },
     ],
     [
@@ -232,7 +235,12 @@ async function main() {
     ],
   );
 
-  app.addHook('preHandler', authMiddleware(config, repos.apiKey));
+  app.addHook(
+    'preHandler',
+    authMiddleware(config, repos.apiKey, config.auth.svidPublicKeyPem
+      ? { svidPublicKeyPem: config.auth.svidPublicKeyPem }
+      : {}),
+  );
   app.addHook('preHandler', orgContextMiddleware({ membershipRepo: repos.membership }));
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
@@ -269,6 +277,8 @@ async function main() {
   retention.start();
 
   await registerRoutes(app, {
+    nodeEnvironment: config.server.nodeEnv,
+    scimBearerToken: config.auth.scimBearerToken,
     db,
     workspaceRepo: repos.workspace,
     projectRepo: repos.project,
@@ -278,12 +288,17 @@ async function main() {
     executionRepo: repos.execution,
     datasetRepo: repos.dataset,
     evalRepo: repos.eval,
+    evalRouteConfig: {
+      allowedHosts: config.server.evalAllowedHosts ?? [],
+      allowPrivateNetworks: config.server.allowPrivateNetworks ?? config.server.nodeEnv !== 'production',
+    },
+    e2eSessionEnabled: config.server.e2eSessionEnabled ?? false,
     preconditionRepo: repos.precondition,
     alertRepo: repos.alert,
     scheduleRepo: repos.schedule,
-    approvalRepo: repos.approval,
     sseHub,
     settingsResolver,
+    llmSettings,
     invocationAgent,
     evalAgent,
     evolutionAgent,
@@ -292,7 +307,7 @@ async function main() {
     planner,
     executor,
     manifestRepo: repos.manifest,
-    getActiveGoals: () => Array.from(activeGoals.values()),
+    getActiveGoals: () => goalEvolver.listSummaries(),
     sessionStore,
     snapshotStore,
     getAgent: (id: string) => {
@@ -303,35 +318,35 @@ async function main() {
       return agentRegistry.get(id) ?? null;
     },
     membershipRepo: repos.membership,
+    orgRepo: repos.org,
     webhookReceiver,
     chaosConfig,
     auditChain,
     apiKeyRepo: repos.apiKey,
+    outgoingWebhookRepo: repos.outgoingWebhook,
+    releaseOverlayRepo: repos.releaseOverlay,
     userRepo: repos.user,
     llmRouter,
     repoDeps: {
-      repoRepo: repos.repo,
+      repositoryService,
       branchRepo: repos.branch,
       tagRepo: repos.tag,
     },
     contentsDeps: {
-      repoRepo: repos.repo,
       branchRepo: repos.branch,
       repoStore: repos.repoStore,
     },
     commitDeps: {
-      repoRepo: repos.repo,
       branchRepo: repos.branch,
       repoStore: repos.repoStore,
       commitRepo: repos.commit,
     },
     mrDeps: {
-      repoRepo: repos.repo,
       branchRepo: repos.branch,
       mrRepo: repos.mergeRequest,
     },
     signingDeps: {
-      repoRepo: repos.repo,
+      repositoryService,
       commitRepo: repos.commit,
       signingKeyRepo: repos.signingKey,
     },
@@ -343,6 +358,7 @@ async function main() {
       vaultRepo: repos.vault,
       orgExportService: repos.orgExport,
       costRollupRepo: repos.costRollup,
+      searchRepo: repos.search,
       kms: repos.vault.kms,
       adminOnly,
     },
@@ -355,8 +371,11 @@ async function main() {
     traceScoreRepo: repos.traceScore,
     autoEval,
     userAnalyticsRepo: repos.userAnalytics,
+    identityService,
     teamRepo: repos.team,
+    orgTeamRepo: repos.orgTeam,
     ssoConfigRepo: repos.ssoConfig,
+    vaultRepo: repos.vault,
     promptScanRepo: repos.promptScan,
     gateway,
     budgetDeps: {
@@ -381,6 +400,8 @@ async function main() {
   const shutdown = async (signal: string) => {
     app.log.info(`Received ${signal}, shutting down gracefully`);
     scheduler.stop();
+    retention.stop();
+    sseHub.destroy();
     await app.close();
     db.close();
     process.exit(0);

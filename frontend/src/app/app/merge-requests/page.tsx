@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { GitMerge, ArrowRight } from 'lucide-react';
-import { workspaceApi, repoApi } from '@/lib/api';
+import { workspaceApi, repoApi, type MergeRequest } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -12,18 +12,11 @@ import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
-interface MergeRequestRow {
-  id: string;
+interface MergeRequestRow extends MergeRequest {
   repoId?: string;
   repoName?: string;
-  title?: string;
-  status?: 'open' | 'merged' | 'closed';
-  sourceBranch?: string;
-  targetBranch?: string;
-  author?: string;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 export default function MergeRequestsIndex() {
@@ -46,40 +39,19 @@ export default function MergeRequestsIndex() {
   const allMrs = useQuery({
     queryKey: ['merge-requests-all', (repos.data ?? []).map((r: { id: string }) => r.id).join(',')],
     queryFn: async (): Promise<MergeRequestRow[]> => {
-      const out: MergeRequestRow[] = [];
-      for (const r of repos.data ?? []) {
-        try {
+      const byRepository = await Promise.all((repos.data ?? []).map(async (r: { id: string; name: string }) => {
           const mrs = await repoApi.listMRs(r.id);
-          for (const m of mrs as Array<Record<string, unknown>>) {
-            const row: MergeRequestRow = {
-              id: String(m['id'] ?? ''),
-              repoId: r.id,
-              repoName: r.name,
-            };
-            const title = m['title'];
-            if (typeof title === 'string') row.title = title;
-            const status = m['status'];
-            if (status === 'open' || status === 'merged' || status === 'closed') row.status = status;
-            const sourceBranch = m['sourceBranch'];
-            if (typeof sourceBranch === 'string') row.sourceBranch = sourceBranch;
-            const targetBranch = m['targetBranch'];
-            if (typeof targetBranch === 'string') row.targetBranch = targetBranch;
-            const author = m['authorId'];
-            if (typeof author === 'string') row.author = author;
-            const createdAt = m['createdAt'];
-            if (typeof createdAt === 'string') row.createdAt = createdAt;
-            const updatedAt = m['updatedAt'];
-            if (typeof updatedAt === 'string') row.updatedAt = updatedAt;
-            out.push(row);
-          }
-        } catch { /* skip */ }
-      }
-      return out;
+          return mrs.map((m): MergeRequestRow => ({ ...m, repoId: r.id, repoName: r.name }));
+        }));
+      return byRepository.flat();
     },
     enabled: (repos.data ?? []).length > 0,
   });
 
   if (!session) return null;
+  if (workspaces.isError) return <QueryError message={workspaces.error} onRetry={() => void workspaces.refetch()} />;
+  if (repos.isError) return <QueryError message={repos.error} onRetry={() => void repos.refetch()} />;
+  if (allMrs.isError) return <QueryError message={allMrs.error} onRetry={() => void allMrs.refetch()} />;
 
   const rows = allMrs.data ?? [];
 
@@ -112,17 +84,17 @@ export default function MergeRequestsIndex() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => { router.push(`/app/merge-requests/${String(r['id'])}`); }}
+            rows={rows}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => { router.push(`/app/merge-requests/${r.id}`); }}
             columns={[
               {
                 key: 'title',
                 header: 'Title',
                 render: (r) => (
                   <div>
-                    <div className="font-medium text-text-strong">{String(r['title'] ?? '—')}</div>
-                    {r['repoName'] ? <div className="text-xs text-text-subtle">{String(r['repoName'])}</div> : null}
+                    <div className="font-medium text-text-strong">{r.title}</div>
+                    {r.repoName ? <div className="text-xs text-text-subtle">{r.repoName}</div> : null}
                   </div>
                 ),
               },
@@ -131,7 +103,7 @@ export default function MergeRequestsIndex() {
                 header: 'Branches',
                 render: (r) => (
                   <span className="font-mono text-xs text-text-muted">
-                    {String(r['sourceBranch'] ?? '?')} <ArrowRight className="mx-1 inline size-3" /> {String(r['targetBranch'] ?? '?')}
+                    {r.sourceBranch} <ArrowRight className="mx-1 inline size-3" /> {r.targetBranch}
                   </span>
                 ),
               },
@@ -139,7 +111,7 @@ export default function MergeRequestsIndex() {
                 key: 'status',
                 header: 'Status',
                 render: (r) => {
-                  const status = String(r['status'] ?? 'open');
+                  const status = r.status;
                   const tone = status === 'merged' ? 'bg-success/15 text-success' : status === 'closed' ? 'bg-destructive/15 text-destructive' : 'bg-info/15 text-info';
                   return <Badge className={tone}>{status}</Badge>;
                 },
@@ -147,12 +119,12 @@ export default function MergeRequestsIndex() {
               {
                 key: 'author',
                 header: 'Author',
-                render: (r) => r['author'] ? <span className="font-mono text-xs">{String(r['author']).slice(0, 12)}…</span> : '—',
+                render: (r) => <span className="font-mono text-xs">{r.authorId.slice(0, 12)}…</span>,
               },
               {
                 key: 'updated',
                 header: 'Updated',
-                render: (r) => r['updatedAt'] ? new Date(String(r['updatedAt'])).toLocaleString() : '—',
+                render: (r) => new Date(r.updatedAt).toLocaleString(),
               },
             ]}
           />

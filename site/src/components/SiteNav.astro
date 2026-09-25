@@ -1,6 +1,8 @@
 ---
 import Logo from './Logo.astro';
 
+const base = import.meta.env.BASE_URL;
+
 interface NavLink {
   label: string;
   href: string;
@@ -8,11 +10,12 @@ interface NavLink {
 }
 
 const links: NavLink[] = [
-  { label: 'Overview',     href: '#overview' },
-  { label: 'Capabilities', href: '#capabilities' },
-  { label: 'Workflow',     href: '#workflow' },
-  { label: 'Trust',        href: '#trust' },
-  { label: 'Docs',         href: 'https://github.com/sachncs/promptsheon#readme', external: true },
+  { label: 'Overview',     href: `${base}#overview` },
+  { label: 'Who it is for',  href: `${base}#audience` },
+  { label: 'Capabilities', href: `${base}#capabilities` },
+  { label: 'Workflow',     href: `${base}#workflow` },
+  { label: 'Trust',        href: `${base}#trust` },
+  { label: 'Docs',         href: `${base}docs/` },
 ];
 ---
 
@@ -41,7 +44,8 @@ const links: NavLink[] = [
         <button
           id="theme-toggle"
           type="button"
-          aria-label="Toggle theme"
+          aria-label="Switch to dark mode"
+          aria-pressed="false"
           class="hidden h-9 w-9 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--ink-strong)] sm:inline-flex"
         >
           <svg class="theme-sun h-[16px] w-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -67,8 +71,8 @@ const links: NavLink[] = [
           <span class="font-mono text-[12px] text-[var(--ink-subtle)]">GitHub</span>
         </a>
 
-        <a href="#install" class="ps-btn ps-btn-primary">
-          Get started
+        <a href={`${base}docs/quickstart/`} class="ps-btn ps-btn-primary hidden sm:inline-flex">
+          Start with docs
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M5 12h14M13 5l7 7-7 7" />
           </svg>
@@ -77,7 +81,7 @@ const links: NavLink[] = [
         <button
           id="mobile-nav-toggle"
           type="button"
-          aria-label="Toggle menu"
+          aria-label="Open navigation"
           aria-expanded="false"
           aria-controls="mobile-nav-panel"
           class="grid h-9 w-9 place-items-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--ink-strong)] lg:hidden"
@@ -109,6 +113,30 @@ const links: NavLink[] = [
           </a>
         ))}
       </nav>
+      <div class="mt-2 border-t border-[var(--line)] pt-2">
+        <a href={`${base}docs/quickstart/`} class="ps-btn ps-btn-primary mb-1 w-full justify-center">
+          Start with the quickstart
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14M13 5l7 7-7 7" />
+          </svg>
+        </a>
+        <button
+          id="mobile-theme-toggle"
+          type="button"
+          aria-label="Switch to dark mode"
+          aria-pressed="false"
+          class="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--ink-strong)]"
+        >
+          <svg class="theme-sun h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+          </svg>
+          <svg class="theme-moon h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+          <span class="theme-label">Use dark mode</span>
+        </button>
+      </div>
     </div>
   </div>
 </header>
@@ -125,43 +153,74 @@ const links: NavLink[] = [
   onScroll();
   window.addEventListener('scroll', onScroll, { passive: true });
 
-  const toggle = document.getElementById('theme-toggle');
-  if (toggle) {
+  const themeToggles = document.querySelectorAll('#theme-toggle, #mobile-theme-toggle');
+  function syncThemeControls() {
+    const isDark = document.documentElement.classList.contains('dark');
+    const label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+    themeToggles.forEach((toggle) => {
+      toggle.setAttribute('aria-label', label);
+      toggle.setAttribute('aria-pressed', String(isDark));
+      const text = toggle.querySelector('.theme-label');
+      if (text) text.textContent = isDark ? 'Use light mode' : 'Use dark mode';
+    });
+  }
+  syncThemeControls();
+  themeToggles.forEach((toggle) => {
     toggle.addEventListener('click', () => {
       const isDark = document.documentElement.classList.toggle('dark');
       localStorage.setItem('promptsheon-theme', isDark ? 'dark' : 'light');
+      syncThemeControls();
     });
-  }
+  });
 
   const mobileToggle = document.getElementById('mobile-nav-toggle');
   const mobilePanel = document.getElementById('mobile-nav-panel');
   const iconMenu = mobileToggle?.querySelector('.icon-menu') as HTMLElement | null;
   const iconClose = mobileToggle?.querySelector('.icon-close') as HTMLElement | null;
+  let previousBodyOverflow = '';
 
-  if (mobileToggle && mobilePanel) {
-    mobileToggle.addEventListener('click', () => {
-      const open = !mobilePanel.classList.contains('hidden');
+  if (mobileToggle instanceof HTMLButtonElement && mobilePanel instanceof HTMLElement) {
+    const toggle = mobileToggle;
+    const panel = mobilePanel;
+
+    function setMobileNav(open: boolean, restoreFocus = false) {
       if (open) {
-        mobilePanel.classList.add('hidden');
-        mobileToggle.setAttribute('aria-expanded', 'false');
-        iconMenu?.classList.remove('hidden');
-        iconClose?.classList.add('hidden');
+        previousBodyOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
       } else {
-        mobilePanel.classList.remove('hidden');
-        mobileToggle.setAttribute('aria-expanded', 'true');
-        iconMenu?.classList.add('hidden');
-        iconClose?.classList.remove('hidden');
+        panel.classList.add('hidden');
+        document.body.style.overflow = previousBodyOverflow;
       }
+
+      if (open) panel.classList.remove('hidden');
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+      iconMenu?.classList.toggle('hidden', open);
+      iconClose?.classList.toggle('hidden', !open);
+
+      if (restoreFocus) toggle.focus();
+    }
+
+    toggle.addEventListener('click', () => {
+      const open = !panel.classList.contains('hidden');
+      setMobileNav(!open);
     });
 
     // Close on link click
-    mobilePanel.querySelectorAll('a').forEach((a) => {
-      a.addEventListener('click', () => {
-        mobilePanel.classList.add('hidden');
-        mobileToggle.setAttribute('aria-expanded', 'false');
-        iconMenu?.classList.remove('hidden');
-        iconClose?.classList.add('hidden');
-      });
+    panel.querySelectorAll('a').forEach((a) => {
+      a.addEventListener('click', () => setMobileNav(false));
     });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !panel.classList.contains('hidden')) {
+        setMobileNav(false, true);
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth >= 1024 && !panel.classList.contains('hidden')) {
+        setMobileNav(false);
+      }
+    }, { passive: true });
   }
 </script>

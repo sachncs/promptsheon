@@ -4,74 +4,39 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ShieldCheck, ShieldAlert, Inbox } from 'lucide-react';
-import { workspaceApi, projectApi, releaseApi } from '@/lib/api';
+import { approvalApi, type PendingApprovalSummary } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
 import { Button } from '@/components/ui/button';
-
-interface Release {
-  id: string;
-  capabilityId?: string;
-  capabilityName?: string;
-  capabilityVersion?: number;
-  environment?: string;
-  state?: string;
-  canaryPercent?: number;
-  manifestHash?: string;
-  updatedAt?: string;
-  approvals?: Array<{ voter: string; decision: 'approve' | 'reject'; at: string }>;
-}
+import { QueryError } from '@/components/brand/query-error';
 
 export default function ApprovalsPage() {
   const session = useRequireSession();
   const router = useRouter();
-
-  const workspaces = useQuery({
-    queryKey: ['workspaces'],
-    queryFn: () => workspaceApi.list(1).then((r) => r.data),
-  });
-  const wsFirst = Array.isArray(workspaces.data) ? workspaces.data[0] as { id?: string } : undefined;
-  const wsId = wsFirst?.id;
-
-  const projects = useQuery({
-    queryKey: ['projects', wsId],
-    queryFn: () => (wsId ? projectApi.list(wsId).then((r) => r.data) : Promise.resolve([])),
-    enabled: Boolean(wsId),
-  });
-  const projectList = Array.isArray(projects.data) ? projects.data as Array<{ id: string; name?: string }> : [];
-
-  const allReleases = useQuery({
-    queryKey: ['approvals', 'releases', projectList.map((p) => p.id)],
-    queryFn: async (): Promise<Release[]> => {
-      const out: Release[] = [];
-      for (const p of projectList) {
-        try {
-          const r = await releaseApi.list(p.id).then((res) => res.data);
-          if (Array.isArray(r)) {
-            for (const rel of r) {
-              const base = rel as Release;
-              const merged: Release = { ...base, capabilityId: base.capabilityId ?? p.id };
-              if (p.name !== undefined) merged.capabilityName = p.name;
-              out.push(merged);
-            }
-          }
-        } catch { /* skip */ }
-      }
-      return out;
-    },
-    enabled: projectList.length > 0,
+  const approvals = useQuery({
+    queryKey: ['approvals', 'pending'],
+    queryFn: () => approvalApi.listPending().then((r) => r.data.approvals),
   });
 
   if (!session) return null;
+  if (approvals.isPending) {
+    return (
+      <div className="space-y-6" aria-busy="true" aria-live="polite">
+        <PageHeader eyebrow="Quality" title="Approvals queue" subtitle="Loading releases that need review…" />
+        <Surface className="h-72 animate-pulse bg-surface-2/40">
+          <span className="sr-only">Loading approvals</span>
+        </Surface>
+      </div>
+    );
+  }
+  if (approvals.isError) return <QueryError message={approvals.error} onRetry={() => void approvals.refetch()} />;
 
-  const rows = ((allReleases.data ?? []) as Release[]).filter(
-    (r) => r.state === 'review' || r.state === 'draft',
-  );
+  const rows: PendingApprovalSummary[] = approvals.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -91,28 +56,28 @@ export default function ApprovalsPage() {
           <EmptyState
             icon={Inbox}
             title="No approvals queued"
-            description="When a release enters review or draft state, it appears here for a second reviewer."
+            description="When a release enters review, it appears here for a second reviewer."
             action={
               <Link href="/app/releases">
                 <Button>Browse releases</Button>
               </Link>
             }
-            className="m-5 border-0 bg-transparent shadow-none p-12"
+            className="m-5 border-0 bg-transparent p-12 shadow-none"
           />
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => { router.push(`/app/releases/${String(r['id'])}`); }}
+            rows={rows}
+            rowKey={(r) => r.releaseId}
+            onRowClick={(r) => { router.push(`/app/approvals/${r.releaseId}`); }}
             columns={[
               {
-                key: 'cap',
-                header: 'Capability',
+                key: 'release',
+                header: 'Release',
                 render: (r) => (
                   <div>
-                    <div className="font-medium text-text-strong">{String(r['capabilityName'] ?? '—')}</div>
-                    <div className="text-xs text-text-subtle">v{String(r['capabilityVersion'] ?? '?')} · {String(r['environment'] ?? '—')}</div>
+                    <div className="font-mono text-sm font-medium text-text-strong">{r.releaseId}</div>
+                    <div className="text-xs text-text-subtle">Updated {new Date(r.updatedAt).toLocaleString()}</div>
                   </div>
                 ),
               },
@@ -120,22 +85,21 @@ export default function ApprovalsPage() {
                 key: 'approvals',
                 header: 'Votes',
                 render: (r) => {
-                  const a = (r['approvals'] as Release['approvals']) ?? [];
-                  if (a.length === 0) return <span className="text-text-subtle text-xs">no votes yet</span>;
+                  if (r.approvals.length === 0) return <span className="text-xs text-text-subtle">no votes yet</span>;
                   return (
-                    <div className="flex items-center gap-1.5">
-                      {a.map((v, i) => (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {r.approvals.map((vote) => (
                         <span
-                          key={i}
+                          key={`${vote.userId}:${vote.createdAt}`}
                           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
-                            v.decision === 'approve'
+                            vote.vote === 'approve'
                               ? 'bg-success/15 text-success'
                               : 'bg-destructive/15 text-destructive'
                           }`}
-                          title={`${v.voter} · ${new Date(v.at).toLocaleString()}`}
+                          title={`${vote.userId} · ${new Date(vote.createdAt).toLocaleString()}`}
                         >
-                          {v.decision === 'approve' ? <ShieldCheck className="size-3" /> : <ShieldAlert className="size-3" />}
-                          {v.voter}
+                          {vote.vote === 'approve' ? <ShieldCheck className="size-3" /> : <ShieldAlert className="size-3" />}
+                          {vote.userId}
                         </span>
                       ))}
                     </div>
@@ -143,27 +107,14 @@ export default function ApprovalsPage() {
                 },
               },
               {
-                key: 'canary',
-                header: 'Canary',
-                render: (r) => {
-                  const pct = Number(r['canaryPercent'] ?? 0);
-                  return <span className="font-mono text-xs text-text-muted">{pct}%</span>;
-                },
-              },
-              {
                 key: 'hash',
-                header: 'Hash',
-                render: (r) => r['manifestHash'] ? <HashChip hash={String(r['manifestHash'])} /> : <span className="text-text-muted">—</span>,
+                header: 'Manifest',
+                render: (r) => <HashChip hash={r.manifestHash} />,
               },
               {
                 key: 'state',
                 header: 'State',
-                render: (r) => <StatusPill kind={(r['state'] as never) ?? 'neutral'} />,
-              },
-              {
-                key: 'when',
-                header: 'Updated',
-                render: (r) => r['updatedAt'] ? new Date(String(r['updatedAt'])).toLocaleString() : '—',
+                render: () => <StatusPill kind={statusKindOf('review')} />,
               },
             ]}
           />

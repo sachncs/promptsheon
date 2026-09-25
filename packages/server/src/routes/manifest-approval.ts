@@ -1,9 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { NotFoundError } from '@promptsheon/shared';
-import type { ManifestRepo } from '../repos/manifest.js';
-import { parseBody } from './validate.js';
-import { AuditChain } from '../audit/chain.js';
+import type { ManifestApprovalService } from '../application/manifest-approval-service.js';
+import { parseBody, parseParams } from './validate.js';
+
+const HashParamsSchema = z.object({
+  hash: z.string().trim().min(1).max(255),
+});
 
 const ManifestApprovalSchema = z.object({
   userId: z.string().min(1).max(255),
@@ -28,66 +31,38 @@ const ManifestRejectionSchema = z.object({
  */
 export function registerManifestApprovalRoutes(
   app: FastifyInstance,
-  deps: { manifestRepo: ManifestRepo; auditChain: AuditChain },
+  deps: { service: ManifestApprovalService },
 ) {
   app.post('/api/manifests/:hash/approve', async (request, reply) => {
-    const { hash } = request.params as { hash: string };
+    const parsedParams = parseParams(reply, HashParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { hash } = parsedParams.data;
     const parsed = parseBody(reply, ManifestApprovalSchema, request.body);
     if (!parsed.ok) return;
 
-    const manifest = deps.manifestRepo.findByHash(hash);
-    if (!manifest) throw new NotFoundError('manifest', hash);
-
-    deps.manifestRepo.upsertApproval(hash, parsed.data.userId, 'approve', parsed.data.comment);
-    deps.auditChain.append({
-      userId: parsed.data.userId,
-      action: 'manifest.approve',
-      resource: 'manifest',
-      details: JSON.stringify({ manifestHash: hash, comment: parsed.data.comment }),
-      resourceKind: 'manifest',
-      resourceId: hash,
-    });
-    const approvals = deps.manifestRepo.findApprovals(hash);
-    return reply.send({
-      hash,
-      approvals,
-      distinctApprovers: deps.manifestRepo.countDistinctApprovers(hash),
-    });
+    const summary = deps.service.vote(hash, parsed.data.userId, 'approve', parsed.data.comment);
+    if (!summary) throw new NotFoundError('manifest', hash);
+    return reply.send(summary);
   });
 
   app.post('/api/manifests/:hash/reject', async (request, reply) => {
-    const { hash } = request.params as { hash: string };
+    const parsedParams = parseParams(reply, HashParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { hash } = parsedParams.data;
     const parsed = parseBody(reply, ManifestRejectionSchema, request.body);
     if (!parsed.ok) return;
 
-    const manifest = deps.manifestRepo.findByHash(hash);
-    if (!manifest) throw new NotFoundError('manifest', hash);
-
-    deps.manifestRepo.upsertApproval(hash, parsed.data.userId, 'reject', parsed.data.comment);
-    deps.auditChain.append({
-      userId: parsed.data.userId,
-      action: 'manifest.reject',
-      resource: 'manifest',
-      details: JSON.stringify({ manifestHash: hash, comment: parsed.data.comment }),
-      resourceKind: 'manifest',
-      resourceId: hash,
-    });
-    const approvals = deps.manifestRepo.findApprovals(hash);
-    return reply.send({
-      hash,
-      approvals,
-      distinctApprovers: deps.manifestRepo.countDistinctApprovers(hash),
-    });
+    const summary = deps.service.vote(hash, parsed.data.userId, 'reject', parsed.data.comment);
+    if (!summary) throw new NotFoundError('manifest', hash);
+    return reply.send(summary);
   });
 
   app.get('/api/manifests/:hash/approvals', async (request, reply) => {
-    const { hash } = request.params as { hash: string };
-    const manifest = deps.manifestRepo.findByHash(hash);
-    if (!manifest) throw new NotFoundError('manifest', hash);
-    return reply.send({
-      hash,
-      approvals: deps.manifestRepo.findApprovals(hash),
-      distinctApprovers: deps.manifestRepo.countDistinctApprovers(hash),
-    });
+    const parsedParams = parseParams(reply, HashParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { hash } = parsedParams.data;
+    const summary = deps.service.get(hash);
+    if (!summary) throw new NotFoundError('manifest', hash);
+    return reply.send(summary);
   });
 }

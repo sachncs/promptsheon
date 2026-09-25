@@ -1,0 +1,42 @@
+---
+import DocsLayout from '@components/DocsLayout.astro';
+---
+
+<DocsLayout title="Contributing" description="A developer-first contribution path for changes that are easy to understand, verify, and operate.">
+  <h2>Start with the boundary</h2>
+  <p>Before editing, identify whether the change belongs to shared domain types, a server application service, an infrastructure adapter, an HTTP route, the frontend client contract, or the website. Keep dependencies pointed inward and avoid making a route own business rules.</p>
+
+  <h2>Local workflow</h2>
+  <pre><code>pnpm install
+pnpm typecheck
+pnpm test
+pnpm --dir frontend lint
+pnpm --dir frontend test:e2e
+pnpm --dir site build</code></pre>
+  <p>Make one logical change at a time. Add or update tests with the change, keep migrations explicit, and verify generated output is not accidentally committed.</p>
+
+  <h2>Quality bar</h2>
+  <ul>
+    <li>External input is validated with Zod at the boundary.</li>
+    <li>Repositories own persistence; routes do not contain raw SQL.</li>
+    <li>Application services own use-case decisions and side effects.</li>
+    <li>Exported APIs are typed, documented, and intentionally small.</li>
+    <li>Errors are handled with stable codes and actionable context.</li>
+    <li>UI changes include loading, empty, error, responsive, and keyboard states.</li>
+  </ul>
+
+  <h2>Testing strategy</h2>
+  <p>Use unit tests for domain rules and pure services, integration tests for repositories and routes, browser tests for critical user journeys, and production-like smoke checks for health and deployment. A green test is useful only when it covers the failure mode the change could introduce.</p>
+
+  <h2>Breaking changes</h2>
+  <p>This project prioritizes a clean architecture over indefinite compatibility. When a breaking change simplifies boundaries, document the migration, update all first-party callers, and remove the old path rather than carrying a permanent compatibility shim.</p>
+
+  <h2>Review checklist</h2>
+  <ol>
+    <li>Can a new maintainer explain the dependency direction?</li>
+    <li>Is the smallest cohesive abstraction being changed?</li>
+    <li>Are failure paths and authorization boundaries tested?</li>
+    <li>Are docs, configuration, migrations, and API contracts synchronized?</li>
+    <li>Can the change be reverted or rolled forward safely?</li>
+  </ol>
+</DocsLayout>

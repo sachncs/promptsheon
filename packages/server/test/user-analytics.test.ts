@@ -64,9 +64,16 @@ describe('UserAnalyticsRepo', () => {
   it('perDay() returns one row per day with tokens + cost', () => {
     makeRun('alice', 100, 0.001, 0);
     makeRun('alice', 50, 0.0005, 1);
-    const rows = repo.perDay('alice', 7);
+    const rows = repo.perDay('alice', 'org-1', 7);
     expect(rows.length).toBe(2);
     expect(rows.reduce((acc, r) => acc + r.tokens, 0)).toBe(150);
+  });
+
+  it('scopes per-user usage to the requested organization', () => {
+    makeRun('alice', 100, 0.001, 0);
+    db.prepare(`INSERT INTO trace_runs (id, organization_id, actor_id, environment, name, start_time) VALUES ('other-run', 'org-2', 'alice', 'dev', 'other', ?)`).run(new Date().toISOString());
+    const rows = repo.perDay('alice', 'org-1', 7);
+    expect(rows.reduce((acc, r) => acc + r.tokens, 0)).toBe(100);
   });
 
   it('leaderboardByOrg ranks users by tokens and excludes unscoped', () => {

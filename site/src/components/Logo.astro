@@ -8,6 +8,7 @@ export interface Props {
 }
 
 const { size = 'sm', showWordmark = true, className = '' } = Astro.props;
+const base = import.meta.env.BASE_URL;
 const cfg = {
   sm: { mark: 24, text: 'text-[15px]', gap: 'gap-2.5' },
   md: { mark: 32, text: 'text-lg',     gap: 'gap-3'   },
@@ -15,7 +16,7 @@ const cfg = {
 }[size];
 ---
 
-<a href="/" class={`inline-flex items-center ${cfg.gap} select-none group ${className}`} aria-label="Promptsheon home">
+<a href={base} class={`inline-flex items-center ${cfg.gap} select-none group ${className}`} aria-label="Promptsheon home">
   <LogoMark size={cfg.mark} />
   {showWordmark && (
     <span

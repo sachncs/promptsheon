@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { AuditChain } from '../audit/chain.js';
@@ -13,14 +13,8 @@ const ReportQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(10000).default(1000),
 });
 
-interface RequestUserContext {
-  userId?: string;
-  orgContext?: { organizationId?: string; role?: string };
-}
-
-function orgOf(request: unknown): string | null {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.organizationId ?? null;
+function orgOf(request: FastifyRequest): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
 interface AuditReportEntry {
@@ -88,29 +82,7 @@ export function registerAuditReportRoutes(
     const limit = data.limit;
 
     const verification = deps.auditChain.verify();
-    // Fetch the chain ourselves (verify() doesn't return entries) so
-    // we can re-use the same ordering as the chain head computation.
-    const chainRows = (deps.auditChain as unknown as { db: import('better-sqlite3').Database }).db
-      .prepare(
-        `SELECT id, user_id AS userId, action, resource, details, timestamp,
-                previous_hash AS previousHash, entry_hash AS entryHash,
-                timestamp_str AS timestampStr, resource_kind AS resourceKind,
-                resource_id AS resourceId
-         FROM audit_entries ORDER BY rowid ASC`,
-      )
-      .all() as Array<{
-        id: string;
-        userId: string;
-        action: string;
-        resource: string;
-        details: string;
-        timestamp: string;
-        previousHash: string;
-        entryHash: string;
-        timestampStr: string;
-        resourceKind: string;
-        resourceId: string;
-      }>;
+    const chainRows = deps.auditChain.entriesForOrganization(orgId);
     const chainHead = chainRows.length > 0 ? chainRows[chainRows.length - 1]?.entryHash ?? '' : '';
 
     // Apply filters
@@ -125,7 +97,7 @@ export function registerAuditReportRoutes(
     const report: Omit<AuditReport, 'signature'> = {
       id: `report-${Date.now()}-${randomShort()}`,
       generatedAt: new Date().toISOString(),
-      generatedBy: (request as RequestUserContext).userId ?? null,
+      generatedBy: request.userId ?? null,
       organizationId: orgId,
       range: { from, to },
       filters: {

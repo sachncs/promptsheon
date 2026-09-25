@@ -9,6 +9,7 @@ const BACKEND_PORT = process.env['PROMPTSHEON_PORT'] ?? '8080';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  allowedDevOrigins: ['127.0.0.1', 'localhost'],
   transpilePackages: ['@xyflow/react'],
   turbopack: {
     root: path.join(__dirname, '..'),

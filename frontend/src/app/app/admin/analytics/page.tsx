@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { ThemedSelect } from '@/components/brand/themed-select';
 import { StatCard } from '@/components/brand/stat-card';
 import type { LucideIcon } from 'lucide-react';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function AnalyticsPage() {
   const session = useRequireSession();
@@ -29,6 +30,8 @@ export default function AnalyticsPage() {
   });
 
   if (!session) return null;
+  if (totals.isError) return <QueryError message={totals.error} onRetry={() => void totals.refetch()} />;
+  if (leaderboard.isError) return <QueryError message={leaderboard.error} onRetry={() => void leaderboard.refetch()} />;
 
   return (
     <div className="space-y-6">

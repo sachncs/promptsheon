@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { StatusPill } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
 import { client } from '@/lib/api';
+import { QueryError } from '@/components/brand/query-error';
 
 interface GoalSummary {
   manifestHash: string;
@@ -29,6 +30,12 @@ export default function GoalsPage() {
     enabled: Boolean(session),
   });
   const list = goals.data?.goals ?? [];
+
+  if (!session) return null;
+
+  if (goals.isError) {
+    return <QueryError message={goals.error} onRetry={() => void goals.refetch()} />;
+  }
 
   return (
     <div className="space-y-6">

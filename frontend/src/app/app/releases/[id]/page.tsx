@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
-import { releaseApi, approvalApi, auditApi } from '@/lib/api';
+import { releaseApi, approvalApi, auditApi, unwrapList } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatusPill, type StatusKind } from '@/components/brand/status-pill';
@@ -16,6 +16,8 @@ import { StepRail, type Step } from '@/components/brand/step-rail';
 import { HashChip } from '@/components/brand/hash-chip';
 import { Timeline } from '@/components/brand/timeline';
 import { EmptyState } from '@/components/brand/empty-state';
+import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
 import { useToast } from '@/components/brand/toast';
 import { Button } from '@/components/ui/button';
@@ -45,19 +47,19 @@ export default function ReleaseDetailPage() {
 
   const release = useQuery({
     queryKey: ['release', id],
-    queryFn: () => releaseApi.get(id).then((r) => r.data).catch(() => null),
+    queryFn: () => releaseApi.get(id).then((r) => r.data),
     enabled: Boolean(id),
   });
 
   const approvals = useQuery({
     queryKey: ['approvals', id],
-    queryFn: () => approvalApi.list(id).then((r) => r.data).catch(() => []),
+    queryFn: () => approvalApi.list(id).then((r) => unwrapList<{ userId?: string; vote?: string; comment?: string; createdAt?: string }>(r.data)),
     enabled: Boolean(id),
   });
 
   const audit = useQuery({
     queryKey: ['audit', 'release', id],
-    queryFn: () => auditApi.list({ resource: id }).then((r) => r.data).catch(() => []),
+    queryFn: () => auditApi.list({ resource: id }).then((r) => r.data),
     enabled: Boolean(id),
   });
 
@@ -72,11 +74,11 @@ export default function ReleaseDetailPage() {
 
   const handleActivate = async () => {
     try {
-      await releaseApi.activate(id);
+      await releaseApi.transition(id, 'active');
       refreshRelease();
       toast({ title: 'Release activated', variant: 'success', description: 'Now receiving 100% of production traffic.' });
     } catch (err) {
-      toast({ title: 'Activate failed', variant: 'destructive', description: (err as Error).message });
+      toast({ title: 'Activate failed', variant: 'destructive', description: getErrorMessage(err) });
     }
   };
 
@@ -92,7 +94,7 @@ export default function ReleaseDetailPage() {
       refreshRelease();
       toast({ title: `Canary at ${pct}%`, variant: 'success', description: 'Weighted rollout updated.' });
     } catch (err) {
-      toast({ title: 'Canary failed', variant: 'destructive', description: (err as Error).message });
+      toast({ title: 'Canary failed', variant: 'destructive', description: getErrorMessage(err) });
     }
   };
 
@@ -103,12 +105,13 @@ export default function ReleaseDetailPage() {
       refreshRelease();
       toast({ title: 'Rolled back', variant: 'success', description: 'Atomic rollback completed.' });
     } catch (err) {
-      toast({ title: 'Rollback failed', variant: 'destructive', description: (err as Error).message });
+      toast({ title: 'Rollback failed', variant: 'destructive', description: getErrorMessage(err) });
     }
   };
 
   if (!session) return null;
   if (release.isLoading) return <div className="text-text-muted text-sm">Loading release…</div>;
+  if (release.isError) return <QueryError message={release.error} onRetry={() => void release.refetch()} />;
   if (!release.data) {
     return (
       <EmptyState
@@ -213,14 +216,19 @@ export default function ReleaseDetailPage() {
         <TabsContent value="approvals">
           <Surface>
             <SurfaceHeader title="Approvals" description="Maker-checker coverage on this release." />
-            {(approvals.data as unknown[] | undefined)?.length ? (
+            {approvals.isError ? (
+              <QueryError message={approvals.error} onRetry={() => void approvals.refetch()} />
+            ) : (approvals.data as unknown[] | undefined)?.length ? (
               <ul className="space-y-3">
-                {((approvals.data as Array<{ id: string; actor?: string; decision?: string; createdAt?: string }>) ?? []).map((a) => (
-                  <li key={a.id} className="flex items-center gap-3">
-                    <ShieldCheck className={`h-4 w-4 ${a.decision === 'approve' ? 'text-success' : a.decision === 'reject' ? 'text-destructive' : 'text-info'}`} />
+                {((approvals.data as Array<{ userId?: string; vote?: string; comment?: string; createdAt?: string }>) ?? []).map((a) => (
+                  <li key={`${a.userId ?? 'reviewer'}-${a.createdAt ?? 'unknown'}`} className="flex items-center gap-3">
+                    <ShieldCheck className={`h-4 w-4 ${a.vote === 'approve' ? 'text-success' : a.vote === 'reject' ? 'text-destructive' : 'text-info'}`} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm text-text-strong">{a.actor ?? a.id}</div>
-                      <div className="text-xs text-text-muted">{a.decision === 'approve' ? 'approved' : a.decision === 'reject' ? 'rejected' : 'pending'} · {new Date(a.createdAt ?? Date.now()).toLocaleString()}</div>
+                      <div className="text-sm text-text-strong">{a.userId ?? 'Reviewer'}</div>
+                      <div className="text-xs text-text-muted">
+                        {a.vote === 'approve' ? 'approved' : a.vote === 'reject' ? 'rejected' : 'pending'} ·{' '}
+                        {a.createdAt ? new Date(a.createdAt).toLocaleString() : 'Pending timestamp'}
+                      </div>
                     </div>
                   </li>
                 ))}
@@ -263,13 +271,15 @@ export default function ReleaseDetailPage() {
         <TabsContent value="audit">
           <Surface>
             <SurfaceHeader title="Lifecycle" description="Append-only audit events for this release." />
-            {(audit.data as unknown[] | undefined)?.length ? (
+            {audit.isError ? (
+              <QueryError message={audit.error} onRetry={() => void audit.refetch()} />
+            ) : (audit.data as unknown[] | undefined)?.length ? (
               <Timeline
                 entries={((audit.data as Array<{ id: string; action?: string; actor?: string; createdAt?: string }>) ?? []).map((a) => ({
                   id: a.id,
                   title: String(a.action ?? 'event'),
                   actor: a.actor,
-                  timestamp: new Date(a.createdAt ?? Date.now()).toLocaleString(),
+                  timestamp: a.createdAt ? new Date(a.createdAt).toLocaleString() : 'Unknown time',
                   tone: 'info' as const,
                 }))}
               />

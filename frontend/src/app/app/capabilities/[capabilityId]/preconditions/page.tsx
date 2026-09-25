@@ -15,6 +15,8 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 interface PreconditionRow {
   id: string;
@@ -44,7 +46,7 @@ export default function PreconditionsPage() {
 
   const versions = useQuery({
     queryKey: ['versions', capabilityId],
-    queryFn: () => versionApi.list(capabilityId!).then((r) => r.data).catch(() => [] as VersionRow[]),
+    queryFn: () => versionApi.list(capabilityId!).then((r) => r.data),
     enabled: Boolean(capabilityId) && Boolean(session),
   });
   const latestVersionId = useMemo(() => {
@@ -72,7 +74,7 @@ export default function PreconditionsPage() {
       setCommand('');
       toast({ title: 'Precondition created', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const toggle = useMutation({
@@ -82,8 +84,12 @@ export default function PreconditionsPage() {
       qc.invalidateQueries({ queryKey: ['preconditions', capabilityId] });
       toast({ title: 'Precondition updated', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Update failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Update failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
+
+  if (!session) return null;
+  if (data.isError) return <QueryError message={data.error} onRetry={() => void data.refetch()} />;
+  if (versions.isError) return <QueryError message={versions.error} onRetry={() => void versions.refetch()} />;
 
   return (
     <div className="space-y-6">
@@ -147,18 +153,18 @@ export default function PreconditionsPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
+            rows={rows}
+            rowKey={(r) => r.id}
             columns={[
               {
                 key: 'name',
                 header: 'Name',
-                render: (r) => <span className="font-medium text-text-strong">{String(r['name'])}</span>,
+                render: (r) => <span className="font-medium text-text-strong">{r.name}</span>,
               },
               {
                 key: 'command',
                 header: 'Command',
-                render: (r) => <code className="font-mono text-xs text-text-muted">{String(r['command'])}</code>,
+                render: (r) => <code className="font-mono text-xs text-text-muted">{r.command}</code>,
               },
               {
                 key: 'enabled',
@@ -166,12 +172,12 @@ export default function PreconditionsPage() {
                 render: (r) => (
                   <div className="flex items-center gap-2">
                     <Switch
-                      checked={Boolean(r['enabled'])}
-                      onCheckedChange={() => toggle.mutate(r as unknown as PreconditionRow)}
+                      checked={r.enabled}
+                      onCheckedChange={() => toggle.mutate(r)}
                     />
                     <StatusPill
-                      kind={r['enabled'] ? 'approved' : 'neutral'}
-                      label={r['enabled'] ? 'On' : 'Off'}
+                      kind={r.enabled ? 'approved' : 'neutral'}
+                      label={r.enabled ? 'On' : 'Off'}
                     />
                   </div>
                 ),

@@ -227,6 +227,15 @@ function buildApp(): { app: FastifyInstance; repo: PromptScanRepo } {
   ).run();
   const repo = new PromptScanRepo(db);
   const app = Fastify({ logger: false });
+  app.addHook('preHandler', (request, _reply, done) => {
+    const userId = request.headers['x-user-id'];
+    const orgId = request.headers['x-org-id'];
+    request.userId = typeof userId === 'string' ? userId : undefined;
+    if (typeof orgId === 'string') {
+      request.orgContext = { userId: request.userId ?? 'test-user', orgId, role: 'admin' };
+    }
+    done();
+  });
   registerSecurityRoutes(app, { scanRepo: repo });
   return { app, repo };
 }

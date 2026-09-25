@@ -3,8 +3,11 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import Database from 'better-sqlite3';
 import { runMigrations } from '../src/db/index.js';
 import { WorkspaceRepo } from '../src/repos/workspace.js';
+import { WorkspaceService } from '../src/application/workspace-service.js';
 import { registerWorkspaceRoutes } from '../src/routes/workspace.js';
 import { registerHealthRoutes } from '../src/routes/health.js';
+import { HealthService } from '../src/application/health-service.js';
+import { SqliteHealthProbe } from '../src/infrastructure/sqlite-health-probe.js';
 
 describe('Fastify routes', () => {
   let db: Database.Database;
@@ -16,9 +19,12 @@ describe('Fastify routes', () => {
     await runMigrations(db);
 
     app = Fastify({ logger: false });
+    app.addHook('onRequest', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = 'legacy';
+    });
     const workspaceRepo = new WorkspaceRepo(db);
-    registerWorkspaceRoutes(app, workspaceRepo);
-    registerHealthRoutes(app, db);
+    registerWorkspaceRoutes(app, new WorkspaceService(workspaceRepo));
+    registerHealthRoutes(app, new HealthService(new SqliteHealthProbe(db)));
     await app.ready();
   });
 
@@ -34,6 +40,49 @@ describe('Fastify routes', () => {
     expect(body.status).toBe('ok');
     expect(body.db).toBe('ok');
     expect(typeof body.timestamp).toBe('string');
+  });
+
+  it('GET /api/ready verifies database readiness', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/ready' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ status: string; db: string }>()).toMatchObject({ status: 'ready', db: 'ok' });
+  });
+
+  it('GET /api/health fails closed when the database is unhealthy', async () => {
+    const unhealthyApp = Fastify({ logger: false });
+    registerHealthRoutes(
+      unhealthyApp,
+      new HealthService({ ping: () => false, quickCheck: () => false }),
+    );
+    await unhealthyApp.ready();
+
+    const res = await unhealthyApp.inject({ method: 'GET', url: '/api/health' });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json<{ status: string; db: string; error: string }>()).toMatchObject({
+      status: 'error',
+      db: 'error',
+      error: 'database unavailable',
+    });
+    await unhealthyApp.close();
+  });
+
+  it('GET /api/ready fails closed when the database is not ready', async () => {
+    const notReadyApp = Fastify({ logger: false });
+    registerHealthRoutes(
+      notReadyApp,
+      new HealthService({ ping: () => true, quickCheck: () => false }),
+    );
+    await notReadyApp.ready();
+
+    const res = await notReadyApp.inject({ method: 'GET', url: '/api/ready' });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json<{ status: string; db: string }>()).toMatchObject({
+      status: 'not_ready',
+      db: 'error',
+    });
+    await notReadyApp.close();
   });
 
   it('POST /api/workspaces then GET /api/workspaces/:id returns 200', async () => {
@@ -73,5 +122,20 @@ describe('Fastify routes', () => {
       url: '/api/workspaces/00000000-0000-0000-0000-000000000000',
     });
     expect(res.statusCode).toBe(404);
+  });
+
+  it('rejects malformed workspace ids before querying the repository', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/workspaces/not-a-uuid' });
+    expect(res.statusCode).toBe(422);
+    expect(res.json<{ error: { code: string } }>().error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 404 when deleting a workspace that does not exist', async () => {
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/api/workspaces/00000000-0000-0000-0000-000000000000',
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json<{ error: { code: string } }>().error.code).toBe('NOT_FOUND');
   });
 });

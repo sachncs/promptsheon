@@ -1,0 +1,36 @@
+---
+import DocsLayout from '@components/DocsLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<DocsLayout title="Deployment" description="Move a verified build into production with explicit configuration, durable state, health gates, and a known rollback target.">
+  <h2>Prepare the release</h2>
+  <ol>
+    <li>Pin the source revision and package lockfile used to build the release.</li>
+    <li>Run typecheck, server tests, frontend checks, browser tests, and the site build.</li>
+    <li>Capture the capability manifest hash, evaluation result, approval, and migration set as release artifacts.</li>
+    <li>Build and scan the deployable images or packages in CI.</li>
+  </ol>
+
+  <h2>Production shape</h2>
+  <p>Terminate TLS at the edge, keep the API private to trusted callers where possible, and mount persistent storage for SQLite and the content-addressed store. Inject secrets through the deployment system. Do not bake provider keys into images or frontend bundles.</p>
+  <pre><code>PROMPTSHEON_NODE_ENV=production
+PROMPTSHEON_AUTH=true
+PROMPTSHEON_CORS_ORIGIN=https://console.example.com
+PROMPTSHEON_DB_PATH=/var/lib/promptsheon/promptsheon.db
+PROMPTSHEON_CAS_PATH=/var/lib/promptsheon/cas</code></pre>
+
+  <h2>Admission and rollout</h2>
+  <ol>
+    <li>Apply migrations before admitting traffic and verify <code>/api/ready</code>.</li>
+    <li>Deploy with a graceful shutdown window for schedulers, SSE clients, and the database.</li>
+    <li>Route a small canary slice and compare error rate, latency, cost, and evaluation signals.</li>
+    <li>Promote only when the evidence matches the release gate.</li>
+    <li>Keep the previous verified content hash and deployable revision available.</li>
+  </ol>
+
+  <h2>Rollback contract</h2>
+  <p>Rollback should be a deliberate promotion of the last known-good artifact, not an ad-hoc edit on a running host. Preserve the audit entry, reason, operator, and observed impact. Verify readiness and the capability hash after the rollback.</p>
+
+  <p><a href={`${base}docs/operations/`}>Continue to production operations →</a></p>
+</DocsLayout>

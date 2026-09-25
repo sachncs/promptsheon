@@ -1,0 +1,32 @@
+---
+import DocsLayout from '@components/DocsLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<DocsLayout title="Troubleshooting" description="Start with observable evidence, narrow the fault domain, and recover without hiding the original failure.">
+  <h2>Start with the request ID</h2>
+  <ol>
+    <li>Check <code>/api/health</code> for process liveness and <code>/api/ready</code> for dependency readiness.</li>
+    <li>Capture the <code>X-Request-Id</code> from the failing response.</li>
+    <li>Search structured logs for that ID and identify the first failing boundary.</li>
+    <li>Inspect the audit history before retrying a mutating operation.</li>
+  </ol>
+
+  <h2>Failure patterns</h2>
+  <div class="not-prose space-y-3">
+    {[
+      ['The API will not start', 'Check configuration parsing, database path permissions, migration status, and whether the configured port is already in use.'],
+      ['The console cannot authenticate', 'Verify the API origin, cookie/session settings, CORS configuration, clock skew, and that browser code is not reading server secrets.'],
+      ['A provider call fails', 'Check the selected model, provider endpoint, secret injection, timeout, outbound policy, and provider response logs. Redact credentials before sharing diagnostics.'],
+      ['A release is blocked', 'Read the validation and evaluation result, approval requirement, policy decision, and current release state. Do not bypass a gate by editing persistence directly.'],
+      ['The website link is broken', 'Check the generated route under the configured base path. Internal links must use Astro’s base URL rather than an origin-root path.'],
+    ].map(([title, text]) => (
+      <article class="rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)] p-5"><h3 class="text-[15px] font-semibold text-[var(--ink-strong)]">{title}</h3><p class="mt-2 text-[13px] leading-relaxed text-[var(--ink-muted)]">{text}</p></article>
+    ))}
+  </div>
+
+  <h2>Recover safely</h2>
+  <p>If user impact is ongoing, route traffic back to the last verified content hash, preserve evidence, and open an incident record. Restore the database and CAS together; restoring only one can break manifest identity and audit interpretation.</p>
+
+  <p><a href={`${base}docs/operations/`}>Read the full operations guide →</a></p>
+</DocsLayout>

@@ -1,9 +1,7 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import type { TraceRepo } from '../repos/trace.js';
-import type { TraceScoreRepo } from '../repos/trace-score.js';
-import type { AutoEval } from '../observability/auto-eval.js';
-import { parseBody, parseQuery } from './validate.js';
+import type { TraceService } from '../application/trace-service.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 
 const RunAutoEvalSchema = z.object({
   judgeModel: z.string().min(1).max(120).optional(),
@@ -15,14 +13,15 @@ const ListScoresQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
 });
 
-interface RequestUserContext {
-  userId?: string;
-  orgContext?: { organizationId?: string };
-}
+const SummaryQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(90).default(7),
+  evaluator: z.string().min(1).max(120).optional(),
+});
 
-function orgOf(request: unknown): string | null {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.organizationId ?? null;
+const TraceParamsSchema = z.object({ id: z.string().uuid() });
+
+function orgOf(request: FastifyRequest): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
 /**
@@ -38,28 +37,43 @@ function orgOf(request: unknown): string | null {
  */
 export function registerTraceScoreRoutes(
   app: FastifyInstance,
-  deps: { traceRepo: TraceRepo; scoreRepo: TraceScoreRepo; autoEval: AutoEval },
+  deps: { service: TraceService },
 ) {
   app.get('/api/traces/:id/scores', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const run = deps.traceRepo.findById(id);
-    if (!run) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'trace_run not found' } });
+    const parsedParams = parseParams(reply, TraceParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    const orgId = orgOf(request);
+    if (!orgId) {
+      return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    }
     const parsed = parseQuery(reply, ListScoresQuerySchema, request.query);
     if (!parsed.ok) return;
-    const items = deps.scoreRepo.listByRun(id);
-    return reply.send({ run, items, total: items.length });
+    const scores = deps.service.scores(orgId, id);
+    if (!scores) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'trace_run not found' } });
+    return reply.send(scores);
   });
 
   app.post('/api/traces/:id/auto-eval', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, TraceParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    const orgId = orgOf(request);
+    if (!orgId) {
+      return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    }
     const parsed = parseBody(reply, RunAutoEvalSchema, request.body ?? {});
     if (!parsed.ok) return;
     try {
-      const written = await deps.autoEval.run(id, parsed.data);
+      const written = await deps.service.autoEval(orgId, id, parsed.data);
+      if (written === null) {
+        return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'trace_run not found' } });
+      }
       return reply.send({ traceRunId: id, written });
     } catch (err) {
-      return reply.code(404).send({
-        error: { code: 'AUTO_EVAL_FAILED', message: (err as Error).message },
+      request.log.error({ err, traceRunId: id, organizationId: orgId }, 'trace auto-evaluation failed');
+      return reply.code(502).send({
+        error: { code: 'AUTO_EVAL_FAILED', message: 'Automatic evaluation could not be completed.' },
       });
     }
   });
@@ -71,10 +85,11 @@ export function registerTraceScoreRoutes(
         .code(401)
         .send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     }
-    const days = Number((request.query as { days?: string }).days ?? '7');
-    const evaluator = (request.query as { evaluator?: string }).evaluator;
-    const out = deps.scoreRepo.summaryByOrg(orgId, {
-      days: Math.min(Math.max(days, 1), 90),
+    const parsed = parseQuery(reply, SummaryQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { days, evaluator } = parsed.data;
+    const out = deps.service.summary(orgId, {
+      days,
       ...(evaluator ? { evaluator } : {}),
     });
     return reply.send({ orgId, days, ...out });

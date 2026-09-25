@@ -10,28 +10,10 @@ import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatCard } from '@/components/brand/stat-card';
 import { HashChip } from '@/components/brand/hash-chip';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
-
-interface ExecutionDetail {
-  id: string;
-  capabilityId?: string;
-  capabilityVersionId?: string;
-  capabilityName?: string;
-  manifestHash?: string;
-  inputs?: Record<string, unknown>;
-  outputs?: Record<string, unknown>;
-  status?: string;
-  startedAt?: string;
-  completedAt?: string;
-  durationMs?: number;
-  costMicros?: number;
-  trace?: Array<{ node: string; at: string; event: string; data?: Record<string, unknown> }>;
-  error?: { message: string; stack?: string };
-  replayOf?: string | null;
-  replayCount?: number;
-}
+import { QueryError } from '@/components/brand/query-error';
 
 export default function ExecutionDetailPage() {
   const session = useRequireSession();
@@ -42,7 +24,7 @@ export default function ExecutionDetailPage() {
 
   const detail = useQuery({
     queryKey: ['execution', id],
-    queryFn: () => executionApi.get(id).then((r) => r.data as ExecutionDetail),
+    queryFn: () => executionApi.get(id).then((r) => r.data),
     enabled: Boolean(id),
     retry: false,
   });
@@ -63,7 +45,10 @@ export default function ExecutionDetailPage() {
 
   const data = detail.data;
   const isError = detail.isError;
-  const canReplay = !data?.replayOf;
+  const canReplay = data?.replayOf === null;
+  const inputs = data ? parseJson(data.inputs) : null;
+  const outputs = data ? parseJson(data.outputs) : null;
+  const status = data ? (data.error ? 'error' : 'completed') : undefined;
 
   return (
     <div className="space-y-6">
@@ -75,15 +60,15 @@ export default function ExecutionDetailPage() {
 
       <PageHeader
         eyebrow="Execution"
-        title={data?.capabilityName ? `${data.capabilityName} execution` : `Execution ${id.slice(0, 12)}…`}
+        title={`Execution ${id.slice(0, 12)}…`}
         subtitle={
           data?.replayOf
-            ? `Replay of execution ${data.replayOf.slice(0, 12)}… — same manifest, model, environment, and inputs.`
+            ? `Replay of execution ${data.replayOf.slice(0, 12)}… — same model, environment, and inputs.`
             : 'A single invocation of a capability. Inputs, outputs, and trace.'
         }
         actions={
           <div className="flex items-center gap-2">
-            {data?.manifestHash ? <HashChip hash={data.manifestHash} /> : null}
+            {data?.inputHash ? <HashChip hash={data.inputHash} /> : null}
             {canReplay ? (
               <Button
                 variant="secondary"
@@ -100,6 +85,12 @@ export default function ExecutionDetailPage() {
       />
 
       {isError ? (
+        <QueryError message={detail.error} onRetry={() => void detail.refetch()} />
+      ) : detail.isLoading ? (
+        <Surface>
+          <div className="text-sm text-text-muted">Loading execution…</div>
+        </Surface>
+      ) : !data ? (
         <EmptyState
           icon={Play}
           title="Execution not found"
@@ -110,36 +101,32 @@ export default function ExecutionDetailPage() {
             </Link>
           }
         />
-      ) : !data ? (
-        <Surface>
-          <div className="text-sm text-text-muted">{detail.isLoading ? 'Loading execution…' : 'No execution data.'}</div>
-        </Surface>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-4">
             <StatCard
               label="Status"
-              value={data.status ?? 'unknown'}
+              value={status ?? 'unknown'}
               icon={Activity}
-              hint={data.completedAt ? new Date(data.completedAt).toLocaleString() : (data.startedAt ? `started ${new Date(data.startedAt).toLocaleString()}` : '—')}
+              hint={new Date(data.timestamp).toLocaleString()}
             />
             <StatCard
               label="Duration"
-              value={data.durationMs !== undefined ? `${(data.durationMs / 1000).toFixed(2)}s` : '—'}
+              value={`${(data.latencyMs / 1000).toFixed(2)}s`}
               icon={Clock}
-              hint={data.startedAt ? new Date(data.startedAt).toLocaleString() : undefined}
+              hint={data.environment}
             />
             <StatCard
               label="Cost"
-              value={data.costMicros !== undefined ? `$${(data.costMicros / 1_000_000).toFixed(4)}` : '—'}
+              value={`$${data.costUsd.toFixed(4)}`}
               icon={DollarSign}
               hint="micros / 1,000,000"
             />
             <StatCard
               label="Manifest"
-              value={data.manifestHash ? data.manifestHash.slice(0, 12) + '…' : '—'}
+              value={data.capabilityVersionId ? data.capabilityVersionId.slice(0, 12) + '…' : '—'}
               icon={Hash}
-              hint={data.capabilityVersionId ? `version ${data.capabilityVersionId.slice(0, 8)}` : undefined}
+              hint={`${data.provider}/${data.model}`}
             />
           </div>
 
@@ -162,10 +149,10 @@ export default function ExecutionDetailPage() {
             </div>
           ) : null}
 
-          {data.status && (
+          {status && (
             <div className="flex items-center gap-2">
               <span className="text-xs uppercase tracking-wider text-text-subtle">State</span>
-              <StatusPill kind={(data.status as never) ?? 'neutral'} />
+              <StatusPill kind={statusKindOf(status)} />
             </div>
           )}
 
@@ -173,46 +160,34 @@ export default function ExecutionDetailPage() {
             <Surface padded={false}>
               <SurfaceHeader className="px-5 pt-5" title="Inputs" description="What was passed to the capability." />
               <pre className="mx-5 mb-5 max-h-96 overflow-auto rounded-md bg-surface-0 p-3 font-mono text-xs leading-relaxed text-text-default">
-                {data.inputs ? JSON.stringify(data.inputs, null, 2) : '(no inputs recorded)'}
+                {inputs ? JSON.stringify(inputs, null, 2) : '(no inputs recorded)'}
               </pre>
             </Surface>
 
             <Surface padded={false}>
               <SurfaceHeader className="px-5 pt-5" title="Outputs" description="What the capability returned." />
               <pre className="mx-5 mb-5 max-h-96 overflow-auto rounded-md bg-surface-0 p-3 font-mono text-xs leading-relaxed text-text-default">
-                {data.outputs ? JSON.stringify(data.outputs, null, 2) : '(no outputs yet)'}
+                {outputs ? JSON.stringify(outputs, null, 2) : '(no outputs yet)'}
               </pre>
             </Surface>
           </div>
 
-          {data.trace && data.trace.length > 0 && (
-            <Surface padded={false}>
-              <SurfaceHeader className="px-5 pt-5" title="Trace" description="Per-node events captured during execution." />
-              <ol className="divide-y divide-border-subtle">
-                {data.trace.map((t, i) => (
-                  <li key={i} className="grid grid-cols-12 gap-3 px-5 py-3 text-sm">
-                    <span className="col-span-2 font-mono text-xs text-text-subtle">{new Date(t.at).toLocaleTimeString()}</span>
-                    <span className="col-span-3 font-medium text-text-strong">{t.node}</span>
-                    <span className="col-span-7 text-text-muted">{t.event}{t.data ? ` — ${JSON.stringify(t.data)}` : ''}</span>
-                  </li>
-                ))}
-              </ol>
-            </Surface>
-          )}
-
           {data.error && (
             <Surface>
               <div className="text-sm font-semibold text-destructive">Error</div>
-              <p className="mt-1 text-sm text-text-default">{data.error.message}</p>
-              {data.error.stack && (
-                <pre className="mt-3 max-h-48 overflow-auto rounded-md bg-surface-0 p-3 font-mono text-xs text-text-muted">
-                  {data.error.stack}
-                </pre>
-              )}
+              <p className="mt-1 text-sm text-text-default">{data.error}</p>
             </Surface>
           )}
         </>
       )}
     </div>
   );
+}
+
+function parseJson(value: string): unknown {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value;
+  }
 }

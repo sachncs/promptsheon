@@ -9,19 +9,22 @@ import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function EvalListPage() {
   const session = useRequireSession();
   const router = useRouter();
   const evals = useQuery({
     queryKey: ['eval-runs'],
-    queryFn: () => evalApi.list().then((r) => r.data).catch(() => []),
+    queryFn: () => evalApi.list().then((r) => r.data),
     enabled: Boolean(session),
   });
   const rows = Array.isArray(evals.data) ? evals.data : [];
+
+  if (evals.isError) return <QueryError message={evals.error} onRetry={() => void evals.refetch()} />;
 
   return (
     <div className="space-y-6">
@@ -51,15 +54,15 @@ export default function EvalListPage() {
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
             rows={rows}
-            rowKey={(r: Record<string, unknown>) => String(r['id'])}
-            onRowClick={(r) => { router.push(`/app/eval/${String(r['id'])}`); }}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => { router.push(`/app/eval/${r.id}`); }}
             columns={[
-              { key: 'release', header: 'Release', render: (r) => String(r['releaseId'] ?? '—') },
-              { key: 'dataset', header: 'Dataset', render: (r) => String(r['datasetId'] ?? '—') },
-              { key: 'scorer', header: 'Scorer', render: (r) => String(r['scorer'] ?? '—') },
-              { key: 'score', header: 'Score', render: (r) => r['score'] != null ? `${(Number(r['score']) * 100).toFixed(0)}%` : '—' },
-              { key: 'state', header: 'Status', render: (r) => <StatusPill kind={(r['status'] as never) ?? 'pending'} /> },
-              { key: 'started', header: 'Started', render: (r) => new Date(String(r['startedAt'] ?? r['createdAt'] ?? Date.now())).toLocaleString() },
+              { key: 'release', header: 'Release', render: (r) => r.releaseId },
+              { key: 'dataset', header: 'Dataset', render: (r) => r.datasetId },
+              { key: 'scorer', header: 'Scorer', render: (r) => r.scorer },
+              { key: 'score', header: 'Score', render: (r) => `${(r.score * 100).toFixed(0)}%` },
+              { key: 'state', header: 'Status', render: (r) => <StatusPill kind={statusKindOf(r.status, 'pending')} /> },
+              { key: 'started', header: 'Started', render: (r) => new Date(r.startedAt).toLocaleString() },
             ]}
           />
         </Surface>

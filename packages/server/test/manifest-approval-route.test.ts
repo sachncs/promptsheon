@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerManifestApprovalRoutes } from '../src/routes/manifest-approval.js';
+import { ManifestApprovalService } from '../src/application/manifest-approval-service.js';
 import { AuditChain } from '../src/audit/chain.js';
 import { ManifestRepo, computeManifestHash } from '../src/repos/manifest.js';
 import { applyMigrations } from '@promptsheon/shared';
@@ -81,7 +82,9 @@ describe('POST /api/manifests/:hash/approve|reject', () => {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     });
     await app.register(async (instance) => {
-      await registerManifestApprovalRoutes(instance, { manifestRepo, auditChain: new AuditChain(db) });
+      await registerManifestApprovalRoutes(instance, {
+        service: new ManifestApprovalService(manifestRepo, new AuditChain(db)),
+      });
     });
     await app.ready();
   });
@@ -112,6 +115,15 @@ describe('POST /api/manifests/:hash/approve|reject', () => {
     expect(response.statusCode).toBe(200);
     const body = response.json() as { distinctApprovers: number };
     expect(body.distinctApprovers).toBe(0);
+  });
+
+  it('rejects an empty manifest hash before invoking the service', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/manifests/%20/approve',
+      payload: { userId: 'user1' },
+    });
+    expect(response.statusCode).toBe(422);
   });
 
   it('counts 2 distinct approvers', async () => {

@@ -70,6 +70,14 @@ function toVersion(row: VersionRow): EvalSuiteVersion {
 export class EvalSuiteRepo {
   constructor(private db: Database.Database) {}
 
+  private capabilityScope(organizationId: string): string {
+    return `
+      JOIN capabilities c ON c.id = s.capability_id
+      JOIN projects p ON p.id = c.project_id
+      JOIN workspaces w ON w.id = p.workspace_id
+      WHERE w.org_id = ?`;
+  }
+
   list(capabilityId?: string): EvalSuite[] {
     if (capabilityId) {
       const rows = this.db
@@ -83,11 +91,84 @@ export class EvalSuiteRepo {
     return rows.map(toSuite);
   }
 
+  listInOrg(organizationId: string, capabilityId?: string): EvalSuite[] {
+    const capabilityFilter = capabilityId ? ' AND s.capability_id = ?' : '';
+    const params = capabilityId ? [organizationId, capabilityId] : [organizationId];
+    const rows = this.db
+      .prepare(
+        `SELECT s.* FROM eval_suites s
+         ${this.capabilityScope(organizationId)}${capabilityFilter}
+         ORDER BY s.created_at DESC`,
+      )
+      .all(...params) as SuiteRow[];
+    return rows.map(toSuite);
+  }
+
+  listForRepositoryInOrg(repositoryId: string, organizationId: string): EvalSuite[] {
+    const rows = this.db
+      .prepare(
+        `SELECT s.* FROM eval_suites s
+         ${this.capabilityScope(organizationId)} AND s.repository_id = ?
+         ORDER BY s.created_at DESC`,
+      )
+      .all(organizationId, repositoryId) as SuiteRow[];
+    return rows.map(toSuite);
+  }
+
   findById(id: string): EvalSuite | null {
     const row = this.db
       .prepare('SELECT * FROM eval_suites WHERE id = ?')
       .get(id) as SuiteRow | undefined;
     return row ? toSuite(row) : null;
+  }
+
+  findByIdInOrg(id: string, organizationId: string): EvalSuite | null {
+    const row = this.db
+      .prepare(
+        `SELECT s.* FROM eval_suites s
+         ${this.capabilityScope(organizationId)} AND s.id = ?`,
+      )
+      .get(organizationId, id) as SuiteRow | undefined;
+    return row ? toSuite(row) : null;
+  }
+
+  capabilityBelongsToOrg(capabilityId: string, organizationId: string): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT 1 AS present FROM capabilities c
+         JOIN projects p ON p.id = c.project_id
+         JOIN workspaces w ON w.id = p.workspace_id
+         WHERE c.id = ? AND w.org_id = ?`,
+      )
+      .get(capabilityId, organizationId) as { present: number } | undefined;
+    return row !== undefined;
+  }
+
+  repositoryBelongsToOrg(repositoryId: string, organizationId: string): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT 1 AS present FROM repositories r
+         JOIN workspaces w ON w.id = r.workspace_id
+         WHERE r.id = ? AND w.org_id = ?`,
+      )
+      .get(repositoryId, organizationId) as { present: number } | undefined;
+    return row !== undefined;
+  }
+
+  createInOrg(input: {
+    capabilityId: string;
+    repositoryId: string | null;
+    name: string;
+    description: string | null;
+    passThreshold: number;
+    borderlineBand: number;
+    createdBy: string;
+    initialGraders: GraderSpec[];
+    notes: string | null;
+  }, organizationId: string): { suite: EvalSuite; version: EvalSuiteVersion } | null {
+    if (!this.capabilityBelongsToOrg(input.capabilityId, organizationId)) return null;
+    if (input.repositoryId && !this.repositoryBelongsToOrg(input.repositoryId, organizationId)) return null;
+    return this.create(input);
   }
 
   create(input: {
@@ -169,10 +250,32 @@ export class EvalSuiteRepo {
     return row ? toVersion(row) : null;
   }
 
+  findVersionByIdInOrg(id: string, organizationId: string): EvalSuiteVersion | null {
+    const row = this.db
+      .prepare(
+        `SELECT v.* FROM eval_suite_versions v
+         JOIN eval_suites s ON s.id = v.suite_id
+         ${this.capabilityScope(organizationId)} AND v.id = ?`,
+      )
+      .get(organizationId, id) as VersionRow | undefined;
+    return row ? toVersion(row) : null;
+  }
+
   findVersion(suiteId: string, version: number): EvalSuiteVersion | null {
     const row = this.db
       .prepare('SELECT * FROM eval_suite_versions WHERE suite_id = ? AND version = ?')
       .get(suiteId, version) as VersionRow | undefined;
+    return row ? toVersion(row) : null;
+  }
+
+  findVersionInOrg(suiteId: string, version: number, organizationId: string): EvalSuiteVersion | null {
+    const row = this.db
+      .prepare(
+        `SELECT v.* FROM eval_suite_versions v
+         JOIN eval_suites s ON s.id = v.suite_id
+         ${this.capabilityScope(organizationId)} AND s.id = ? AND v.version = ?`,
+      )
+      .get(organizationId, suiteId, version) as VersionRow | undefined;
     return row ? toVersion(row) : null;
   }
 }
@@ -198,6 +301,20 @@ export class HumanReviewRepo {
         'SELECT * FROM human_review_queue WHERE decided_at IS NULL ORDER BY submitted_at ASC',
       )
       .all() as ReviewRow[];
+  }
+
+  listOpenInOrg(organizationId: string): ReviewRow[] {
+    return this.db
+      .prepare(
+        `SELECT h.* FROM human_review_queue h
+         JOIN eval_suites s ON s.id = h.suite_id
+         JOIN capabilities c ON c.id = s.capability_id
+         JOIN projects p ON p.id = c.project_id
+         JOIN workspaces w ON w.id = p.workspace_id
+         WHERE h.decided_at IS NULL AND w.org_id = ?
+         ORDER BY h.submitted_at ASC`,
+      )
+      .all(organizationId) as ReviewRow[];
   }
 
   enqueue(caseId: string, suiteId: string, suiteRunId: string | null): ReviewRow {
@@ -230,6 +347,23 @@ export class HumanReviewRepo {
       )
       .run(reviewerId, new Date().toISOString(), decision, notes, id);
     return this.findById(id);
+  }
+
+  decideInOrg(id: string, organizationId: string, reviewerId: string, decision: 'approve' | 'reject', notes: string | null): ReviewRow | null {
+    const result = this.db
+      .prepare(
+        `UPDATE human_review_queue
+         SET reviewer_id = ?, decided_at = ?, decision = ?, notes = ?
+         WHERE id = ? AND EXISTS (
+           SELECT 1 FROM eval_suites s
+           JOIN capabilities c ON c.id = s.capability_id
+           JOIN projects p ON p.id = c.project_id
+           JOIN workspaces w ON w.id = p.workspace_id
+           WHERE s.id = human_review_queue.suite_id AND w.org_id = ?
+         )`,
+      )
+      .run(reviewerId, new Date().toISOString(), decision, notes, id, organizationId);
+    return result.changes > 0 ? this.findById(id) : null;
   }
 
   findById(id: string): ReviewRow | null {

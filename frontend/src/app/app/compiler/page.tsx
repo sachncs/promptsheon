@@ -10,6 +10,7 @@ import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { EmptyState } from '@/components/brand/empty-state';
+import { getErrorMessage } from '@/lib/errors';
 
 type Mode = 'compile' | 'decompile';
 
@@ -108,6 +109,11 @@ export default function CompilerPage() {
               )}
             </Button>
           </div>
+          {mutation.isError && (
+            <div role="alert" className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {getErrorMessage(mutation.error, 'The compiler request failed. Try again.')}
+            </div>
+          )}
         </Surface>
 
         <Surface>

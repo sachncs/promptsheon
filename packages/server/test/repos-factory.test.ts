@@ -22,7 +22,7 @@ describe('buildRepos (issue #64 — composition-root refactor)', () => {
       'userAnalytics', 'team', 'ssoConfig', 'promptScan', 'redteam',
       'experiment', 'incident', 'orgSettings', 'featureFlag', 'capability',
       'version', 'release', 'execution', 'dataset', 'eval', 'precondition',
-      'alert', 'schedule', 'approval', 'apiKey', 'user', 'systemConfig',
+      'alert', 'schedule', 'apiKey', 'user', 'systemConfig',
       'manifest', 'membership', 'webhook', 'idempotency',
     ];
     for (const key of expectedKeys) {

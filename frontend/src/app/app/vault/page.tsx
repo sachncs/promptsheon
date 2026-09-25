@@ -13,19 +13,26 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 export default function VaultPage() {
   const session = useRequireSession();
   const qc = useQueryClient();
   const { toast } = useToast();
-  const keys = useQuery({ queryKey: ['vault', 'keys'], queryFn: () => vaultApi.listKeys() });
+  const keys = useQuery({
+    queryKey: ['vault', 'keys'],
+    queryFn: () => vaultApi.listKeys(),
+    enabled: Boolean(session),
+  });
+  const rows = keys.data ?? [];
   const rotate = useMutation({
     mutationFn: () => vaultApi.rotateKey(`key-${Date.now()}`, true),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['vault', 'keys'] });
       toast({ title: 'Key rotated', variant: 'success', description: 'Ciphertext re-encrypted with the new key version.' });
     },
-    onError: (err) => toast({ title: 'Rotate failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Rotate failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const [name, setName] = useState('OPENAI_API_KEY');
@@ -38,8 +45,14 @@ export default function VaultPage() {
       qc.invalidateQueries({ queryKey: ['vault', 'keys'] });
       toast({ title: 'Secret stored', variant: 'success', description: `${name} written to the vault.` });
     },
-    onError: (err) => toast({ title: 'Write failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Write failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
+
+  if (!session) return null;
+
+  if (keys.isError) {
+    return <QueryError message={keys.error} onRetry={() => void keys.refetch()} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -57,30 +70,30 @@ export default function VaultPage() {
             {rotate.isPending ? 'Rotating…' : 'Rotate key'}
           </Button>
         </div>
-        {Array.isArray(keys.data) && keys.data.length > 0 ? (
+        {rows.length > 0 ? (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={(keys.data as Array<Record<string, unknown>>)}
-            rowKey={(r) => String(r['id'])}
+            rows={rows}
+            rowKey={(r) => String(r.id)}
             columns={[
-              { key: 'label', header: 'Label', render: (r) => String(r['label']) },
-              { key: 'fingerprint', header: 'Fingerprint', render: (r) => <span className="font-mono text-xs">{String(r['fingerprint']).slice(0, 24)}…</span> },
+              { key: 'label', header: 'Label', render: (r) => r.label },
+              { key: 'fingerprint', header: 'Fingerprint', render: (r) => <span className="font-mono text-xs">{r.fingerprint.slice(0, 24)}…</span> },
               {
                 key: 'active',
                 header: 'Active',
-                render: (r) => (r['active']
+                render: (r) => (r.active
                   ? <Badge className="bg-success/15 text-success">active</Badge>
                   : <span className="text-text-subtle text-xs">—</span>),
               },
               {
                 key: 'created',
                 header: 'Created',
-                render: (r) => new Date(String(r['createdAt'])).toLocaleString(),
+                render: (r) => new Date(r.createdAt).toLocaleString(),
               },
               {
                 key: 'rotated',
                 header: 'Rotated',
-                render: (r) => r['rotatedAt'] ? new Date(String(r['rotatedAt'])).toLocaleString() : '—',
+                render: (r) => r.rotatedAt ? new Date(r.rotatedAt).toLocaleString() : '—',
               },
             ]}
             empty={

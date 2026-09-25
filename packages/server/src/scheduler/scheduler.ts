@@ -19,12 +19,14 @@ export class Scheduler {
   }
 
   start(pollIntervalMs = 10_000): void {
+    if (this.interval) return;
     this.interval = setInterval(() => { this.poll().catch(console.error); }, pollIntervalMs);
     this.poll().catch(console.error);
   }
 
   stop(): void {
     if (this.interval) clearInterval(this.interval);
+    this.interval = null;
   }
 
   async poll(): Promise<void> {
@@ -41,7 +43,7 @@ export class Scheduler {
 
         try {
           await handler(schedule);
-          await this.scheduleRepo.update(schedule.id, { nextFireAt: new Date().toISOString() });
+          await this.scheduleRepo.advance(schedule.id, new Date());
           this.sseHub.broadcast({
             type: 'status',
             data: { scheduleId: schedule.id, status: 'fired' },

@@ -33,6 +33,9 @@ describe('api-keys routes', () => {
     db = (await import('better-sqlite3')).default(':memory:');
     db.pragma('foreign_keys = ON');
     applyMigrations(db, loadAllMigrations());
+    db.prepare("INSERT INTO orgs (id, name, slug, created_at, updated_at) VALUES ('org-keys', 'Keys', 'keys', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").run();
+    db.prepare("INSERT INTO users (id, org_id, email, name, role, created_at, updated_at) VALUES ('u-keys-admin', 'org-keys', 'admin@keys.test', 'Admin', 'admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), ('u-keys-target', 'org-keys', 'target@keys.test', 'Target', 'admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").run();
+    db.prepare("INSERT INTO org_members (org_id, user_id, role, joined_at) VALUES ('org-keys', 'u-keys-admin', 'admin', CURRENT_TIMESTAMP), ('org-keys', 'u-keys-target', 'admin', CURRENT_TIMESTAMP)").run();
     repo = new ApiKeyRepo(db);
     audit = new AuditChain(db);
     app = Fastify({ logger: false });
@@ -41,8 +44,8 @@ describe('api-keys routes', () => {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     });
     app.addHook('preHandler', (request, _reply, done) => {
-      (request as Record<string, unknown>)['userId'] = 'u-admin';
-      (request as Record<string, unknown>)['orgContext'] = { organizationId: '00000000-0000-4000-8000-000000000001', role: 'admin' };
+      request.userId = 'u-keys-admin';
+      request.orgContext = { userId: 'u-keys-admin', orgId: 'org-keys', role: 'admin' };
       done();
     });
     await app.register(async (instance) => {
@@ -57,7 +60,7 @@ describe('api-keys routes', () => {
   });
 
   it('creates an API key, returns plaintext once, then lists with prefix only', async () => {
-    const create = await app.inject({ method: 'POST', url: '/api/api-keys', payload: { name: 'k1', userId: 'api', role: 'reader' } });
+    const create = await app.inject({ method: 'POST', url: '/api/api-keys', payload: { name: 'k1', userId: 'u-keys-target', role: 'reader' } });
     expect(create.statusCode).toBe(201);
     const body = create.json() as { key: string; keyPrefix: string; id: string };
     expect(body.key).toMatch(/^pk_/);
@@ -70,7 +73,7 @@ describe('api-keys routes', () => {
   });
 
   it('revokes an API key and writes an audit entry', async () => {
-    const create = await app.inject({ method: 'POST', url: '/api/api-keys', payload: { name: 'k2', userId: 'api', role: 'reader' } });
+    const create = await app.inject({ method: 'POST', url: '/api/api-keys', payload: { name: 'k2', userId: 'u-keys-target', role: 'reader' } });
     const { id } = create.json() as { id: string };
     const del = await app.inject({ method: 'DELETE', url: `/api/api-keys/${id}` });
     expect(del.statusCode).toBe(204);

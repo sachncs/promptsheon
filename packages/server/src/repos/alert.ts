@@ -1,16 +1,27 @@
 import type { AlertRule, Alert } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
-import { BaseRepo } from './base.js';
+import { BaseRepo, camelize } from './base.js';
+
+function toAlertRule(row: Record<string, unknown>): AlertRule {
+  const value = camelize(row) as unknown as AlertRule;
+  return { ...value, enabled: Boolean(row.enabled) };
+}
+
+function toAlert(row: Record<string, unknown>): Alert {
+  return camelize(row) as unknown as Alert;
+}
 
 export class AlertRepo {
   constructor(private db: Database.Database) {}
 
   findRules(): AlertRule[] {
-    return this.db.prepare('SELECT * FROM alert_rules').all() as AlertRule[];
+    return this.db.prepare('SELECT * FROM alert_rules').all()
+      .map((row) => toAlertRule(row as Record<string, unknown>));
   }
 
   findRuleById(id: string): AlertRule | null {
-    return this.db.prepare('SELECT * FROM alert_rules WHERE id = ?').get(id) as AlertRule | null;
+    const row = this.db.prepare('SELECT * FROM alert_rules WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    return row ? toAlertRule(row) : null;
   }
 
   createRule(data: { name: string; type: string; severity: string; enabled?: boolean; threshold?: number; duration?: number; window?: number; config?: string }): AlertRule {
@@ -40,14 +51,17 @@ export class AlertRepo {
   }
 
   findAlertById(id: string): Alert | null {
-    return this.db.prepare('SELECT * FROM alerts WHERE id = ?').get(id) as Alert | null;
+    const row = this.db.prepare('SELECT * FROM alerts WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    return row ? toAlert(row) : null;
   }
 
   findAlerts(status?: string): Alert[] {
     if (status) {
-      return this.db.prepare('SELECT * FROM alerts WHERE status = ?').all(status) as Alert[];
+      return this.db.prepare('SELECT * FROM alerts WHERE status = ?').all(status)
+        .map((row) => toAlert(row as Record<string, unknown>));
     }
-    return this.db.prepare('SELECT * FROM alerts').all() as Alert[];
+    return this.db.prepare('SELECT * FROM alerts').all()
+      .map((row) => toAlert(row as Record<string, unknown>));
   }
 
   createAlert(data: { ruleId: string | null; ruleName: string; severity: string; message: string; details?: string }): Alert {

@@ -7,7 +7,10 @@ import { applyMigrations } from '@promptsheon/shared';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerTeamRoutes } from '../src/routes/team.js';
 import { TeamRepo, SsoConfigRepo } from '../src/repos/team.js';
+import { UserRepo } from '../src/repos/user.js';
+import { MembershipRepo } from '../src/repos/org.js';
 import { AuditChain } from '../src/audit/chain.js';
+import { LocalKms, VaultRepo } from '../src/repos/vault.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(__dirname, '..', '..', 'shared', 'db', 'migrations');
@@ -31,20 +34,27 @@ function openDb(): Database.Database {
   return db;
 }
 
-function buildApp(role: 'admin' | 'reader'): { app: FastifyInstance; db: Database.Database } {
+function buildApp(role: 'admin' | 'reader'): { app: FastifyInstance; db: Database.Database; vaultRepo: VaultRepo } {
   const db = openDb();
   const teamRepo = new TeamRepo(db);
   const ssoRepo = new SsoConfigRepo(db);
+  const userRepo = new UserRepo(db);
+  const membershipRepo = new MembershipRepo(db);
   const audit = new AuditChain(db);
+  const vaultRepo = new VaultRepo(db, new LocalKms(db));
   db.prepare(
     `INSERT OR IGNORE INTO orgs (id, name, slug, created_at, updated_at)
      VALUES ('00000000-0000-4000-8000-000000000001', 'Test Org', 'test-org', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+  ).run();
+  db.prepare(
+    `INSERT OR IGNORE INTO users (id, email, name, role, created_at, updated_at)
+     VALUES ('u-test', 'test@example.com', 'Test User', 'admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
   ).run();
   const app = Fastify({ logger: false });
   app.addHook('preHandler', (request, _reply, done) => {
     (request as Record<string, unknown>)['userId'] = 'u-test';
     (request as Record<string, unknown>)['orgContext'] = {
-      organizationId: '00000000-0000-4000-8000-000000000001',
+      orgId: '00000000-0000-4000-8000-000000000001',
       role,
     };
     done();
@@ -54,11 +64,20 @@ function buildApp(role: 'admin' | 'reader'): { app: FastifyInstance; db: Databas
     ssoConfigRepo: ssoRepo,
     auditChain: audit,
     scimBearerToken: 'test-scim-token',
+    userRepo,
+    membershipRepo,
+    vaultRepo,
   });
-  return { app, db };
+  return { app, db, vaultRepo };
 }
 
 describe('Team + SCIM routes', () => {
+  it('does not allow an active org member to address another org by id', async () => {
+    const { app } = buildApp('admin');
+    const response = await app.inject({ method: 'GET', url: '/api/orgs/org-other/teams' });
+    expect(response.statusCode).toBe(404);
+  });
+
   describe('teams CRUD', () => {
     it('admin can create + list teams', async () => {
       const { app, db } = buildApp('admin');
@@ -99,6 +118,17 @@ describe('Team + SCIM routes', () => {
       });
       expect(r.statusCode).toBe(422);
     });
+
+    it('rejects a blank team route parameter', async () => {
+      const { app } = buildApp('admin');
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/teams/%20/members',
+        payload: { userId: 'u1' },
+      });
+      expect(response.statusCode).toBe(422);
+      expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+    });
   });
 
   describe('team membership', () => {
@@ -114,7 +144,7 @@ describe('Team + SCIM routes', () => {
       void t;
       teamId = db
         .prepare(
-          `INSERT INTO teams (id, org_id, organisation_id, name, slug, description, created_at, updated_at) VALUES ('t1','org-1','org-1','Core','core','',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+          `INSERT INTO teams (id, org_id, organisation_id, name, slug, description, created_at, updated_at) VALUES ('t1','00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','Core','core','',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
         )
         .run().lastInsertRowid as string;
       const r = await app.inject({
@@ -123,6 +153,18 @@ describe('Team + SCIM routes', () => {
         payload: { userId: 'u1', role: 'member' },
       });
       void r;
+    });
+
+    it('rejects membership changes for a team in another organization', async () => {
+      const { app, db } = buildApp('admin');
+      db.prepare(`INSERT INTO orgs (id,name,slug,created_at,updated_at) VALUES ('org-other','Other','other',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).run();
+      db.prepare(`INSERT INTO teams (id,org_id,organisation_id,name,slug,description,created_at,updated_at) VALUES ('foreign-team','org-other','org-other','Foreign','foreign','',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).run();
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/teams/foreign-team/members',
+        payload: { userId: 'u1', role: 'member' },
+      });
+      expect(response.statusCode).toBe(404);
     });
 
     it('admin can add and remove members', async () => {
@@ -134,7 +176,7 @@ describe('Team + SCIM routes', () => {
         `INSERT INTO users (id, email, name, role, created_at, updated_at) VALUES ('u1', 'a@b.test', 'A', 'member', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
       ).run();
       await db.prepare(
-        `INSERT INTO teams (id, org_id, organisation_id, name, slug, description, created_at, updated_at) VALUES ('t1','org-1','org-1','Core','core','',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+        `INSERT INTO teams (id, org_id, organisation_id, name, slug, description, created_at, updated_at) VALUES ('t1','00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','Core','core','',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
       ).run();
       const add = await app.inject({
         method: 'POST',
@@ -210,7 +252,7 @@ describe('Team + SCIM routes', () => {
       });
       expect(r.statusCode).toBe(201);
       const body = r.json() as { id: string; schemas: string[] };
-      expect(body.id).toMatch(/^scim-/);
+      expect(body.id).toMatch(/^[0-9a-f-]{36}$/);
       expect(body.schemas).toContain('urn:ietf:params:scim:schemas:core:2.0:User');
     });
 
@@ -235,11 +277,36 @@ describe('Team + SCIM routes', () => {
       // Zod rejects the missing emails array with 422.
       expect([400, 422]).toContain(r.statusCode);
     });
+
+    it('persists users, supports pagination, and deactivates an org membership', async () => {
+      const { app, db } = buildApp('admin');
+      const headers = { authorization: 'Bearer test-scim-token' };
+      const created = await app.inject({
+        method: 'POST',
+        url: '/api/scim/v2/Users',
+        headers,
+        payload: { userName: 'carol', emails: [{ value: 'carol@corp.test', primary: true }] },
+      });
+      const userId = (created.json() as { id: string }).id;
+      const listed = await app.inject({ method: 'GET', url: '/api/scim/v2/Users?startIndex=1&count=1', headers });
+      expect(listed.statusCode).toBe(200);
+      expect((listed.json() as { totalResults: number; Resources: Array<{ id: string }> }).totalResults).toBe(1);
+
+      const patched = await app.inject({
+        method: 'PATCH',
+        url: `/api/scim/v2/Users/${userId}`,
+        headers,
+        payload: { Operations: [{ op: 'replace', path: 'active', value: false }] },
+      });
+      expect(patched.statusCode).toBe(200);
+      expect((patched.json() as { active: boolean }).active).toBe(false);
+      expect(db.prepare('SELECT COUNT(*) AS c FROM org_members WHERE user_id = ?').get(userId)).toEqual({ c: 0 });
+    });
   });
 
   describe('SSO config', () => {
     it('admin can set the OIDC config; secret is not echoed back', async () => {
-      const { app, db } = buildApp('admin');
+      const { app, db, vaultRepo } = buildApp('admin');
       const r = await app.inject({
         method: 'POST',
         url: '/api/auth/oidc/config',
@@ -257,6 +324,10 @@ describe('Team + SCIM routes', () => {
         )
         .get('00000000-0000-4000-8000-000000000001') as { client_secret_encrypted: string };
       expect(stored.client_secret_encrypted).not.toBe('super-secret');
+      expect(stored.client_secret_encrypted).toBe(
+        'vault://00000000-0000-4000-8000-000000000001/oidc-client-secret',
+      );
+      expect(vaultRepo.resolve('00000000-0000-4000-8000-000000000001', 'oidc-client-secret')).toBe('super-secret');
       const get = await app.inject({ method: 'GET', url: '/api/auth/oidc/config' });
       expect(get.statusCode).toBe(200);
       const config = get.json() as { configured: boolean; clientSecretEncrypted?: string; clientSecret?: string };

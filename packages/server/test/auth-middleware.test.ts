@@ -38,7 +38,7 @@ function makeReply(): MockReply {
 }
 
 function makeApiKeyRepo(opts: {
-  find?: (keyHash: string) => Promise<{ id: string; userId: string; role: string; revoked: boolean; expiresAt?: string } | null>;
+  find?: (keyHash: string) => Promise<{ id: string; userId: string; organizationId?: string; role: string; revoked: boolean; expiresAt?: string } | null>;
   updateLastUsed?: (id: string) => Promise<void>;
 }) {
   return {
@@ -102,11 +102,12 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
     expect(mock.code).toBe(401);
   });
 
-  it('accepts Bearer token and stamps userId + userRole on the request', async () => {
+  it('accepts Bearer token and stamps the verified identity on the request', async () => {
     const apiKeyRepo = makeApiKeyRepo({
       find: async () => ({
         id: 'k1',
         userId: 'u1',
+        organizationId: 'org-1',
         role: 'admin',
         revoked: false,
       }),
@@ -119,6 +120,12 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
     expect(mock.code).toBe(200);
     expect((req as unknown as Record<string, string>).userId).toBe('u1');
     expect((req as unknown as Record<string, string>).userRole).toBe('admin');
+    expect((req as unknown as FastifyRequest).principal).toEqual({
+      type: 'User',
+      id: 'u1',
+      orgId: 'org-1',
+      role: 'admin',
+    });
   });
 
   it('rejects revoked Bearer tokens with 401', async () => {
@@ -149,17 +156,18 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
     expect(mock.code).toBe(401);
   });
 
-  it('honours X-User-Id fallback only when auth is disabled', async () => {
+  it('uses an explicit development principal when auth is disabled', async () => {
     const config: AppConfig = {
       ...baseConfig,
       auth: { enabled: false, jwtSecret: '' },
     };
     const mw = authMiddleware(config, makeApiKeyRepo({}));
-    const req = makeReq({ 'x-user-id': 'dev' });
+    const req = makeReq({ 'x-user-id': 'ignored' });
     const mock = makeReply();
     await mw(req, mock.reply);
     expect(mock.code).toBe(200);
-    expect((req as unknown as Record<string, string>).userId).toBe('dev');
+    expect((req as unknown as Record<string, string>).userId).toBe('development');
+    expect((req as unknown as FastifyRequest).principal).toEqual({ type: 'System', id: 'development' });
   });
 
   it('tags the request as bootstrap on /api/bootstrap/* paths', async () => {
@@ -173,7 +181,7 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
 
   it('tags the request as public on the documented public paths', async () => {
     const mw = authMiddleware(baseConfig, makeApiKeyRepo({}));
-    for (const path of ['/api/health', '/api/openapi.json', '/api/audit/verify', '/api/audit/state']) {
+    for (const path of ['/api/health', '/api/ready', '/api/openapi.json', '/api/audit/verify', '/api/audit/state']) {
       const req = makeReq({}, path);
       const mock = makeReply();
       await mw(req, mock.reply);

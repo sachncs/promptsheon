@@ -6,7 +6,6 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyMigrations } from '@promptsheon/shared';
 import { registerApprovalRoutes } from '../src/routes/approval.js';
-import { ApprovalRepo } from '../src/repos/approval.js';
 import { ReleaseRepo } from '../src/repos/release.js';
 import { ManifestRepo } from '../src/repos/manifest.js';
 import { AuditChain } from '../src/audit/chain.js';
@@ -46,9 +45,9 @@ function seedRepoRelease(db: Database.Database, releaseRepo: ReleaseRepo, manife
     `INSERT INTO orgs (id, name, slug, created_at, updated_at) VALUES (?, 'O', 'o', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
   ).run(ORG_ID);
   db.prepare(
-    `INSERT INTO workspaces (id, name, organization, created_at, updated_at)
-     VALUES (?, 'W', 'O', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-  ).run(workspaceId);
+    `INSERT INTO workspaces (id, org_id, name, organization, created_at, updated_at)
+     VALUES (?, ?, 'W', 'O', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+  ).run(workspaceId, ORG_ID);
   db.prepare(
     `INSERT INTO projects (id, workspace_id, name, description, created_at, updated_at)
      VALUES (?, ?, 'P', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
@@ -86,7 +85,6 @@ function seedRepoRelease(db: Database.Database, releaseRepo: ReleaseRepo, manife
 
 describe('approval route reconciliation', () => {
   let app: FastifyInstance;
-  let approvalRepo: ApprovalRepo;
   let releaseRepo: ReleaseRepo;
   let manifestRepo: ManifestRepo;
   let db: Database.Database;
@@ -94,7 +92,6 @@ describe('approval route reconciliation', () => {
 
   beforeEach(async () => {
     db = openDb();
-    approvalRepo = new ApprovalRepo(db);
     releaseRepo = new ReleaseRepo(db);
     manifestRepo = new ManifestRepo(db);
     releaseId = seedRepoRelease(db, releaseRepo, manifestRepo);
@@ -107,15 +104,11 @@ describe('approval route reconciliation', () => {
     });
     app.addHook('preHandler', (request, _reply, done) => {
       (request as Record<string, unknown>)['userId'] = VOTER;
+      (request as Record<string, unknown>)['orgContext'] = { orgId: ORG_ID };
       done();
     });
-    registerApprovalRoutes(app, approvalRepo, { releaseRepo, manifestRepo });
+    registerApprovalRoutes(app, { releaseRepo, manifestRepo });
     await app.ready();
-  });
-
-  it('GET /api/approvals/:releaseId returns 404 when no row exists yet', async () => {
-    const r = await app.inject({ method: 'GET', url: `/api/approvals/${releaseId}` });
-    expect(r.statusCode).toBe(404);
   });
 
   it('GET /api/approvals?releaseId returns the row after a vote', async () => {
@@ -138,9 +131,21 @@ describe('approval route reconciliation', () => {
     expect(body.approvals).toEqual([]);
   });
 
-  it('GET /api/approvals without releaseId returns 400', async () => {
+  it('GET /api/approvals without releaseId returns a validation error', async () => {
     const r = await app.inject({ method: 'GET', url: '/api/approvals' });
-    expect(r.statusCode).toBe(400);
+    expect(r.statusCode).toBe(422);
+  });
+
+  it('GET /api/approvals/pending lists review releases with canonical approvals', async () => {
+    db.prepare("UPDATE releases SET status = 'review' WHERE id = ?").run(releaseId);
+    await app.inject({
+      method: 'POST',
+      url: `/api/releases/${releaseId}/approvals`,
+      payload: { decision: 'approve' },
+    });
+    const r = await app.inject({ method: 'GET', url: '/api/approvals/pending' });
+    expect(r.statusCode).toBe(200);
+    expect((r.json() as { approvals: Array<{ releaseId: string }> }).approvals[0]?.releaseId).toBe(releaseId);
   });
 
   it('POST /api/releases/:releaseId/approvals records a vote', async () => {
@@ -173,14 +178,4 @@ describe('approval route reconciliation', () => {
     expect(r.statusCode).toBe(422);
   });
 
-  it('legacy POST /api/approvals still upserts the votes blob', async () => {
-    const r = await app.inject({
-      method: 'POST',
-      url: '/api/approvals',
-      payload: { releaseId, votes: 'legacy-blob' },
-    });
-    expect(r.statusCode).toBe(201);
-    const gotten = approvalRepo.getByReleaseId(releaseId);
-    expect(gotten?.votes).toBe('legacy-blob');
-  });
 });

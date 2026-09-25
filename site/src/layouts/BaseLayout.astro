@@ -11,8 +11,8 @@ export interface Props {
 }
 
 const {
-  title = 'Promptsheon — The control plane for AI capabilities',
-  description = 'Promptsheon manages prompts, agents, policies, tools, MCP servers, guardrails, and evaluation suites as content-addressed, governed, version-controlled release artifacts. Not chat. Not notebooks. Production infrastructure.',
+  title = 'Promptsheon — The adaptive agent engineering platform',
+  description = 'Promptsheon helps teams build, execute, evaluate, and continuously improve AI agents and multi-agent systems with measurable evidence.',
   ogImage = '/og.png',
 } = Astro.props;
 ---
@@ -20,6 +20,7 @@ const {
 <!doctype html>
 <html lang="en">
   <head>
+    <script is:inline>document.documentElement.classList.add('js');</script>
     <SiteHead title={title} description={description} ogImage={ogImage} />
   </head>
   <body class="bg-surface text-ink antialiased">
@@ -34,16 +35,6 @@ const {
     </main>
 
     <SiteFooter />
-
-    <script is:inline>
-      // Theme bootstrap — applied before paint to avoid a flash.
-      (() => {
-        const stored = localStorage.getItem('promptsheon-theme');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const theme = stored ?? (prefersDark ? 'dark' : 'light');
-        if (theme === 'dark') document.documentElement.classList.add('dark');
-      })();
-    </script>
 
 <script>
       // Reveal-on-scroll observer — minimal and dependency-free.

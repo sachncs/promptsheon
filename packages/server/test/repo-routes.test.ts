@@ -13,6 +13,7 @@ import { CommitRepo } from '../src/repos/commit.js';
 import { registerRepoRoutes } from '../src/routes/repo.js';
 import { registerContentsRoutes } from '../src/routes/contents.js';
 import { registerCommitRoutes } from '../src/routes/commits.js';
+import { RepositoryService } from '../src/application/repository-service.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(__dirname, '..', '..', 'shared', 'db', 'migrations');
@@ -30,6 +31,8 @@ function loadAllMigrations() {
 }
 
 const WS_ID = 'a3c642fe-b277-412c-a6e6-3a8c66f68589';
+const ORG_A = '00000000-0000-4000-8000-0000000000a1';
+const ORG_B = '00000000-0000-4000-8000-0000000000b1';
 
 describe('repository / branch / file / commit round-trip', () => {
   let app: FastifyInstance;
@@ -63,9 +66,28 @@ describe('repository / branch / file / commit round-trip', () => {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: String(error) } });
     });
     await app.register(async (instance) => {
-      await registerRepoRoutes(instance, { repoRepo, branchRepo, tagRepo });
-      await registerContentsRoutes(instance, { repoRepo, branchRepo, repoStore });
-      await registerCommitRoutes(instance, { repoRepo, branchRepo, repoStore, commitRepo });
+      instance.addHook('onRequest', async (request) => {
+        const orgId = request.headers['x-test-org'];
+        if (typeof orgId === 'string') {
+          request.orgContext = { userId: 'tester', orgId, role: 'admin' };
+        }
+      });
+      await registerRepoRoutes(instance, {
+        repositoryService: new RepositoryService(repoRepo),
+        branchRepo,
+        tagRepo,
+      });
+      await registerContentsRoutes(instance, {
+        repositoryService: new RepositoryService(repoRepo),
+        branchRepo,
+        repoStore,
+      });
+      await registerCommitRoutes(instance, {
+        repositoryService: new RepositoryService(repoRepo),
+        branchRepo,
+        repoStore,
+        commitRepo,
+      });
     });
     await app.ready();
   });
@@ -97,6 +119,34 @@ describe('repository / branch / file / commit round-trip', () => {
     expect(first.statusCode).toBe(201);
     const dup = await app.inject({ method: 'POST', url: '/api/repos', payload: create });
     expect(dup.statusCode).toBe(409);
+  });
+
+  it('does not expose a repository through a different organization context', async () => {
+    db.prepare(`INSERT INTO orgs (id, name, slug, created_at, updated_at) VALUES (?, 'Org A', 'org-a', ?, ?)`)
+      .run(ORG_A, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+    db.prepare('UPDATE workspaces SET org_id = ? WHERE id = ?').run(ORG_A, WS_ID);
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/repos',
+      headers: { 'x-test-org': ORG_A },
+      payload: { workspaceId: WS_ID, name: 'tenant-repo' },
+    });
+    expect(created.statusCode).toBe(201);
+    const repo = created.json() as { id: string };
+
+    const hidden = await app.inject({
+      method: 'GET',
+      url: `/api/repos/${repo.id}`,
+      headers: { 'x-test-org': ORG_B },
+    });
+    expect(hidden.statusCode).toBe(404);
+  });
+
+  it('rejects malformed repository route parameters before repository access', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/repos/not-a-uuid' });
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
   });
 
   it('refuses to delete the default branch', async () => {

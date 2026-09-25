@@ -23,9 +23,7 @@ let cached: ObservabilityHandles | null = null;
 export function setupObservability(config: AppConfig): ObservabilityHandles {
   if (cached) return cached;
 
-  const otelEndpoint = process.env['PROMPTSHEON_OTEL_ENDPOINT'];
-
-  if (otelEndpoint) {
+  if (config.server.otelEndpoint) {
     try {
       setupTracer({ exporters: { otlp: true } });
     } catch (e) {

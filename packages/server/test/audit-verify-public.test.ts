@@ -6,6 +6,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyMigrations } from '@promptsheon/shared';
 import { registerAuditRoutes } from '../src/routes/audit.js';
+import { AuditReplicationService } from '../src/application/audit-replication-service.js';
 import { AuditChain } from '../src/audit/chain.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -43,7 +44,7 @@ describe('audit/verify whitelist', () => {
       resourceId: 't1',
     });
     const app = Fastify({ logger: false });
-    registerAuditRoutes(app, { auditChain, db });
+    registerAuditRoutes(app, { auditChain, replication: new AuditReplicationService(auditChain) });
     await app.ready();
     const res = await app.inject({ method: 'GET', url: '/api/audit/verify' });
     expect(res.statusCode).toBe(200);
@@ -55,7 +56,7 @@ describe('audit/verify whitelist', () => {
     const db = openDb();
     const auditChain = new AuditChain(db);
     const app = Fastify({ logger: false });
-    registerAuditRoutes(app, { auditChain, db });
+    registerAuditRoutes(app, { auditChain, replication: new AuditReplicationService(auditChain) });
     await app.ready();
     const res = await app.inject({ method: 'GET', url: '/api/audit/verify' });
     expect(res.statusCode).toBe(200);
@@ -67,7 +68,7 @@ describe('audit/verify whitelist', () => {
     const db = openDb();
     const auditChain = new AuditChain(db);
     const app = Fastify({ logger: false });
-    registerAuditRoutes(app, { auditChain, db });
+    registerAuditRoutes(app, { auditChain, replication: new AuditReplicationService(auditChain) });
     await app.ready();
     const res = await app.inject({ method: 'GET', url: '/api/audit/state' });
     expect(res.statusCode).toBe(200);

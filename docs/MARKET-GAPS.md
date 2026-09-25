@@ -71,7 +71,7 @@ Sourced from `frontend/src/app/`, `packages/server/src/routes/`, and `packages/s
 - 6-state machine (`draft → review → approved → canary → active → rolled_back`).
 - **Maker-checker gate**: ≥2 distinct non-creator approvers required; creator cannot self-approve.
 - Canary routing (`canaryPercent` weighted split across active releases for the same manifest).
-- One-click rollback / supersede.
+- One-click rollback.
 - Git-native: `merge_requests` with author ≠ reviewer enforcement.
 - Per-org **operator signing keys** (ed25519).
 

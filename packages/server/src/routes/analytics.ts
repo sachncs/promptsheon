@@ -1,10 +1,9 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { UserAnalyticsRepo } from '../repos/user-analytics.js';
 import { parseQuery } from './validate.js';
 
-const UserAnalyticsQuerySchema = z.object({
-  userId: z.string().min(1).max(120),
+const UserAnalyticsDaysQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(365).default(30),
 });
 
@@ -13,14 +12,12 @@ const OrgAnalyticsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(25),
 });
 
-interface RequestUserContext {
-  userId?: string;
-  orgContext?: { organizationId?: string };
-}
+const UserAnalyticsPathSchema = z.object({
+  userId: z.string().min(1).max(120),
+});
 
-function orgOf(request: unknown): string | null {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.orgContext?.organizationId ?? null;
+function orgOf(request: FastifyRequest): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
 /**
@@ -35,11 +32,19 @@ export function registerAnalyticsRoutes(
   deps: { repo: UserAnalyticsRepo },
 ) {
   app.get('/api/analytics/users/:userId', async (request, reply) => {
-    const { userId } = request.params as { userId: string };
-    const parsed = parseQuery(reply, UserAnalyticsQuerySchema, { ...(request.query as Record<string, unknown>), userId });
+    const organizationId = orgOf(request);
+    if (!organizationId) {
+      return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    }
+    const parsedPath = UserAnalyticsPathSchema.safeParse(request.params);
+    if (!parsedPath.success) {
+      return reply.code(422).send({ error: { code: 'VALIDATION_ERROR', message: 'Path validation failed' } });
+    }
+    const parsed = parseQuery(reply, UserAnalyticsDaysQuerySchema, request.query);
     if (!parsed.ok) return;
-    const days = parsed.data.days;
-    const perDay = deps.repo.perDay(userId, days);
+    const { userId } = parsedPath.data;
+    const { days } = parsed.data;
+    const perDay = deps.repo.perDay(userId, organizationId, days);
     return reply.send({ userId, days, perDay });
   });
 

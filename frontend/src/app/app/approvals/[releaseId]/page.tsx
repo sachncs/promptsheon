@@ -5,30 +5,16 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ShieldCheck, ShieldAlert } from 'lucide-react';
-import { approvalApi, releaseApi } from '@/lib/api';
+import { approvalApi, releaseApi, type ApprovalEntry, type Release } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { HashChip } from '@/components/brand/hash-chip';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-
-interface ReleaseDetail {
-  id: string;
-  capabilityId?: string;
-  capabilityName?: string;
-  capabilityVersion?: number;
-  environment?: string;
-  state?: string;
-  manifestHash?: string;
-  canaryPercent?: number;
-  approvals?: Array<{ id: string; voter: string; decision: 'approve' | 'reject'; comment?: string; at: string }>;
-  createdBy?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
+import { QueryError } from '@/components/brand/query-error';
 
 export default function ReleaseApprovalPage() {
   const session = useRequireSession();
@@ -38,13 +24,13 @@ export default function ReleaseApprovalPage() {
 
   const release = useQuery({
     queryKey: ['release', releaseId],
-    queryFn: () => releaseApi.get(releaseId).then((r) => r.data as ReleaseDetail),
+    queryFn: () => releaseApi.get(releaseId).then((r) => r.data),
     enabled: Boolean(releaseId),
     retry: false,
   });
   const approvals = useQuery({
     queryKey: ['approvals', releaseId],
-    queryFn: () => approvalApi.list(releaseId).then((r) => r.data).catch(() => [] as Array<{ id: string; voter: string; decision: 'approve' | 'reject'; comment?: string; at: string }>),
+    queryFn: () => approvalApi.list(releaseId).then((r) => r.data.approvals),
     enabled: Boolean(releaseId),
   });
 
@@ -67,11 +53,11 @@ export default function ReleaseApprovalPage() {
 
   if (!session) return null;
 
-  const data = release.data;
-  const approvalRows = ((approvals.data ?? []) as NonNullable<ReleaseDetail['approvals']>).concat(data?.approvals ?? []);
+  const data: Release | undefined = release.data;
+  const approvalRows: ApprovalEntry[] = approvals.data ?? [];
   const seen = new Set<string>();
   const dedup = approvalRows.filter((a) => {
-    const key = `${a.voter}:${a.decision}:${a.at}`;
+    const key = `${a.userId}:${a.vote}:${a.createdAt}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -87,19 +73,19 @@ export default function ReleaseApprovalPage() {
 
       <PageHeader
         eyebrow="Approval"
-        title={data?.capabilityName ? `${data.capabilityName} v${data.capabilityVersion ?? '?'}` : 'Release approval'}
-        subtitle={data?.environment ? `${data.environment} · ${data.state ?? '—'}` : 'Approve or reject this release.'}
+        title={data ? `Release v${data.capabilityVersion}` : 'Release approval'}
+        subtitle={data ? `${data.environment} · ${data.status}` : 'Approve or reject this release.'}
         actions={
           <div className="flex items-center gap-2">
-            {data?.state ? <StatusPill kind={(data.state as never) ?? 'neutral'} /> : null}
-            {data?.manifestHash ? <HashChip hash={data.manifestHash} /> : null}
+            {data?.status ? <StatusPill kind={statusKindOf(data.status)} /> : null}
+            {data ? <HashChip hash={data.id} /> : null}
           </div>
         }
       />
 
       {release.isError ? (
         <Surface>
-          <div className="text-sm text-text-muted">Release not found.</div>
+          <QueryError message={release.error} onRetry={() => void release.refetch()} />
         </Surface>
       ) : !data ? (
         <Surface>
@@ -158,7 +144,9 @@ export default function ReleaseApprovalPage() {
 
           <Surface padded={false}>
             <SurfaceHeader className="px-5 pt-5" title="Vote history" description={`${dedup.length} vote(s)`} />
-            {dedup.length === 0 ? (
+            {approvals.isError ? (
+              <QueryError message={approvals.error} onRetry={() => void approvals.refetch()} />
+            ) : dedup.length === 0 ? (
               <div className="px-5 pb-5 text-sm text-text-muted">No votes yet.</div>
             ) : (
               <ul className="divide-y divide-border-subtle">
@@ -166,12 +154,12 @@ export default function ReleaseApprovalPage() {
                   <li key={i} className="px-5 py-3 text-sm">
                     <div className="flex items-baseline justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <Badge className={a.decision === 'approve' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}>
-                          {a.decision}
+                        <Badge className={a.vote === 'approve' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}>
+                          {a.vote}
                         </Badge>
-                        <span className="font-medium text-text-strong">{a.voter}</span>
+                        <span className="font-medium text-text-strong">{a.userId}</span>
                       </div>
-                      <span className="text-xs text-text-subtle">{new Date(a.at).toLocaleString()}</span>
+                      <span className="text-xs text-text-subtle">{new Date(a.createdAt).toLocaleString()}</span>
                     </div>
                     {a.comment && <p className="mt-1 text-text-muted">{a.comment}</p>}
                   </li>

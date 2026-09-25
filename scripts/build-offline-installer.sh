@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-OUT_DIR="$(cd "$(dirname "$0")/.." && pwd)/dist"
+OUT_DIR="${OUT_DIR:-$(cd "$(dirname "$0")/.." && pwd)/dist}"
 NAME="promptsheon-offline-$(date +%Y%m%d-%H%M%S)"
 DEST="$OUT_DIR/$NAME"
 

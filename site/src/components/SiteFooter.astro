@@ -1,6 +1,8 @@
 ---
 import Logo from './Logo.astro';
 
+const base = import.meta.env.BASE_URL;
+
 interface NavItem {
   label: string;
   href: string;
@@ -11,19 +13,19 @@ const sections: { label: string; items: NavItem[] }[] = [
   {
     label: 'Product',
     items: [
-      { label: 'Overview',     href: '#overview' },
-      { label: 'Capabilities', href: '#capabilities' },
-      { label: 'Workflow',     href: '#workflow' },
-      { label: 'Trust',        href: '#trust' },
+      { label: 'Overview',     href: `${base}#overview` },
+      { label: 'Capabilities', href: `${base}#capabilities` },
+      { label: 'Workflow',     href: `${base}#workflow` },
+      { label: 'Trust',        href: `${base}#trust` },
     ],
   },
   {
     label: 'Resources',
     items: [
-      { label: 'Documentation', href: 'https://github.com/sachncs/promptsheon#readme', external: true },
-      { label: 'Getting started', href: 'https://github.com/sachncs/promptsheon/blob/master/getting-started.md', external: true },
-      { label: 'Architecture',  href: 'https://github.com/sachncs/promptsheon/blob/master/architecture.md', external: true },
-      { label: 'API reference', href: 'https://github.com/sachncs/promptsheon/blob/master/api-reference.md', external: true },
+      { label: 'Documentation', href: `${base}docs/` },
+      { label: 'Getting started', href: `${base}docs/quickstart/` },
+      { label: 'Architecture',  href: `${base}docs/architecture/` },
+      { label: 'API reference', href: `${base}docs/api/` },
     ],
   },
   {
@@ -38,9 +40,9 @@ const sections: { label: string; items: NavItem[] }[] = [
   {
     label: 'Community',
     items: [
-      { label: 'Contributing', href: 'https://github.com/sachncs/promptsheon/blob/master/CONTRIBUTING.md', external: true },
+      { label: 'Contributing', href: `${base}docs/contributing/` },
+      { label: 'Operations', href: `${base}docs/operations/` },
       { label: 'Code of conduct', href: 'https://github.com/sachncs/promptsheon/blob/master/CODE_OF_CONDUCT.md', external: true },
-      { label: 'Changelog',   href: 'https://github.com/sachncs/promptsheon/blob/master/CHANGELOG.md', external: true },
       { label: 'License',     href: 'https://github.com/sachncs/promptsheon/blob/master/LICENSE', external: true },
     ],
   },
@@ -53,8 +55,8 @@ const sections: { label: string; items: NavItem[] }[] = [
       <div class="lg:col-span-4">
         <Logo size="md" />
         <p class="mt-5 max-w-sm text-[15px] leading-relaxed text-[var(--ink-muted)] text-pretty">
-          The control plane for AI capabilities. Author multi-agent prompts, ship them safely,
-          prove they don&rsquo;t regress, and roll back when they do.
+          The adaptive agent engineering platform. Build, execute, evaluate, and continuously
+          improve AI agents and multi-agent systems with measurable evidence.
         </p>
         <div class="mt-6 flex items-center gap-2">
           <span class="ps-pill">Apache&nbsp;2.0</span>
@@ -79,7 +81,7 @@ const sections: { label: string; items: NavItem[] }[] = [
             rel="noopener noreferrer"
             class="inline-flex h-10 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--bg-elevated)] px-4 text-[13px] font-medium text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] hover:border-[var(--line-strong)]"
           >
-            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse-soft"></span>
+            <span class="h-1.5 w-1.5 rounded-full bg-[var(--brand-steel)] animate-pulse-soft"></span>
             v0.1
           </a>
         </div>

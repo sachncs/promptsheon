@@ -1,11 +1,23 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { WebhookReceiver } from '../webhooks/receiver.js';
 import type { ManifestGraphExecutor } from '../agents/executor/index.js';
 import type { ManifestRepo } from '../repos/manifest.js';
+import { parseParams } from './validate.js';
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    rawBody?: Buffer;
+  }
+}
 
 const MAX_BODY_SIZE = 1_048_576; // 1 MiB
 const REPLAY_CACHE_TTL_MS = 5 * 60 * 1000;
+
+const IncomingWebhookParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
+});
 
 interface ReplayEntry {
   id: string;
@@ -47,9 +59,6 @@ class ReplayCache {
   }
 }
 
-const replayCache = new ReplayCache();
-setInterval(() => replayCache.prune(), 60_000).unref();
-
 function mapPayloadToInputs(mapping: Record<string, string>, payload: unknown): Record<string, unknown> {
   const inputs: Record<string, unknown> = {};
   const obj = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>;
@@ -73,6 +82,14 @@ export function registerWebhookRoutes(
     manifestRepo?: ManifestRepo;
   },
 ) {
+  const replayCache = new ReplayCache();
+  const replayPruneTimer = setInterval(() => replayCache.prune(), 60_000);
+  replayPruneTimer.unref();
+  app.addHook('onClose', (_instance, done) => {
+    clearInterval(replayPruneTimer);
+    done();
+  });
+
   app.removeContentTypeParser(['application/json']);
   app.addContentTypeParser(
     'application/json',
@@ -84,16 +101,18 @@ export function registerWebhookRoutes(
       }
       try {
         const json = body.length === 0 ? {} : JSON.parse(body.toString());
-        (req as unknown as { rawBody?: Buffer | string }).rawBody = body;
+        req.rawBody = typeof body === 'string' ? Buffer.from(body) : body;
         done(null, json);
       } catch (e) {
-        done(e as Error);
+        done(e instanceof Error ? e : new Error(String(e)));
       }
     },
   );
 
   app.post('/api/webhooks/incoming/:id', async (request: FastifyRequest, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, IncomingWebhookParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const sigHeader = request.headers['x-webhook-signature'];
     if (typeof sigHeader !== 'string' || sigHeader === '') {
       return reply.code(401).send({ error: { code: 'MISSING_SIGNATURE', message: 'X-Webhook-Signature header required' } });
@@ -101,8 +120,7 @@ export function registerWebhookRoutes(
     if (!request.headers['content-type']?.startsWith('application/json')) {
       return reply.code(415).send({ error: { code: 'UNSUPPORTED_MEDIA_TYPE', message: 'application/json required' } });
     }
-    const rawBody = (request as unknown as { rawBody?: Buffer | string }).rawBody;
-    const body = typeof rawBody === 'string' ? Buffer.from(rawBody) : rawBody;
+    const body = request.rawBody;
     if (!body || body.length === 0) {
       return reply.code(400).send({ error: { code: 'EMPTY_BODY', message: 'Webhook body required' } });
     }
@@ -139,8 +157,7 @@ export function registerWebhookRoutes(
       replayCache.remember({ id: eventId, endpointId: id, expiresAt: Date.now() + REPLAY_CACHE_TTL_MS });
     }
 
-    const route = deps.receiver['routes'] as Array<{ endpointId: string; eventType: string; manifestHash: string; inputMapping: Record<string, string> }> | undefined;
-    const matched = route?.find((r) => r.endpointId === id && r.eventType === eventType);
+    const matched = deps.receiver.findRoute(id, eventType);
     let executionId: string | null = null;
     if (matched?.manifestHash && deps.executor && deps.manifestRepo) {
       const manifest = deps.manifestRepo.findByHash(matched.manifestHash);
@@ -155,9 +172,7 @@ export function registerWebhookRoutes(
             environment: 'webhook',
           })
           .then((trace) => {
-            deps.receiver['events'] as unknown as Array<{ id: string; routedToExecutionId: string | null }>;
-            const ev = (deps.receiver as unknown as { events: Array<{ id: string; routedToExecutionId?: string | null }> }).events.find((e) => e.id === result.event.id);
-            if (ev) (ev as { routedToExecutionId?: string | null }).routedToExecutionId = trace.executionId;
+            deps.receiver.markRoutedToExecution(result.event.id, trace.executionId);
           })
           .catch(() => {
             // Swallow execution errors; webhook is fire-and-forget.

@@ -12,6 +12,7 @@ export const BootstrapStatusSchema = z.object({
 export type BootstrapStatus = z.infer<typeof BootstrapStatusSchema>;
 
 export const CreateAdminResponseSchema = z.object({
+  apiKey: z.string().min(1).optional(),
   user: z.object({
     id: z.string(),
     email: z.string(),
@@ -83,6 +84,7 @@ export function toSession(input: CreateAdminResponse, provider: string | null): 
     orgId: input.org.id,
     orgName: input.org.name,
     provider,
+    ...(input.apiKey ? { apiKey: input.apiKey } : {}),
     completedAt: new Date().toISOString(),
   };
 }

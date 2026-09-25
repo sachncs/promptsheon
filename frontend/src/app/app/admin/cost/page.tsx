@@ -4,37 +4,32 @@ import { useQuery } from '@tanstack/react-query';
 import { Activity } from 'lucide-react';
 import { useMemo } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
-import { workspaceApi, costApi } from '@/lib/api';
+import { workspaceApi, costApi, type CostRollup } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatCard } from '@/components/brand/stat-card';
 import { DataTable } from '@/components/brand/data-table';
 import { EmptyState } from '@/components/brand/empty-state';
 import { BarChart } from '@/components/brand/bar-chart';
-
-interface Rollup {
-  capabilityId: string;
-  day: string;
-  costMicros: number;
-  executions: number;
-}
+import { QueryError } from '@/components/brand/query-error';
 
 export default function CostPage() {
   const session = useRequireSession();
   const workspaces = useQuery({
     queryKey: ['workspaces'],
     queryFn: () => workspaceApi.list(1).then((r) => r.data),
+    enabled: Boolean(session),
   });
   const wsFirst = Array.isArray(workspaces.data) ? workspaces.data[0] : undefined;
   const wsId = (wsFirst as { id?: string } | undefined)?.id;
 
   const costs = useQuery({
     queryKey: ['cost', wsId],
-    queryFn: () => (wsId ? costApi.forOrg(wsId, 30) : Promise.resolve([] as Rollup[])),
+    queryFn: () => (wsId ? costApi.forOrg(wsId, 30).then((r) => r.data) : Promise.resolve([] as CostRollup[])),
     enabled: Boolean(wsId),
   });
 
-  const rows = (costs.data ?? []) as Rollup[];
+  const rows = useMemo(() => costs.data ?? [], [costs.data]);
   const totalMicros = rows.reduce((acc, r) => acc + r.costMicros, 0);
   const totalExec = rows.reduce((acc, r) => acc + r.executions, 0);
   const capabilityIds = new Set(rows.map((r) => r.capabilityId));
@@ -59,6 +54,10 @@ export default function CostPage() {
       .map(([day, cost]) => ({ label: day, value: cost }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [rows]);
+
+  if (!session) return null;
+  if (workspaces.isError) return <QueryError message={workspaces.error} onRetry={() => void workspaces.refetch()} />;
+  if (costs.isError) return <QueryError message={costs.error} onRetry={() => void costs.refetch()} />;
 
   return (
     <div className="space-y-6">
@@ -128,20 +127,20 @@ export default function CostPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => `${String(r['capabilityId'])}-${String(r['day'])}`}
+            rows={rows}
+            rowKey={(r) => `${r.capabilityId}-${r.day}`}
             columns={[
-              { key: 'day', header: 'Day', render: (r) => String(r['day']) },
+              { key: 'day', header: 'Day', render: (r) => r.day },
               {
                 key: 'capability',
                 header: 'Capability',
-                render: (r) => <span className="font-mono text-xs">{String(r['capabilityId']).slice(0, 12)}…</span>,
+                render: (r) => <span className="font-mono text-xs">{r.capabilityId.slice(0, 12)}…</span>,
               },
-              { key: 'exec', header: 'Executions', render: (r) => String(r['executions']) },
+              { key: 'exec', header: 'Executions', render: (r) => r.executions },
               {
                 key: 'cost',
                 header: 'Cost',
-                render: (r) => `$${(Number(r['costMicros']) / 1_000_000).toFixed(4)}`,
+                render: (r) => `$${(r.costMicros / 1_000_000).toFixed(4)}`,
               },
             ]}
           />

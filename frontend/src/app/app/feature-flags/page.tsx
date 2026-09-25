@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Flag, Plus, Save, Trash2 } from 'lucide-react';
+import { Flag, Plus, Save } from 'lucide-react';
 import { featureFlagApi } from '@/lib/api';
+import { unwrapList } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -12,6 +13,9 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
+import { useToast } from '@/components/brand/toast';
 
 interface FlagItem {
   key: string;
@@ -25,12 +29,13 @@ interface FlagItem {
 export default function FeatureFlagsPage() {
   const session = useRequireSession();
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   const flags = useQuery({
     queryKey: ['feature-flags'],
-    queryFn: () => featureFlagApi.list().then((r) => r.data).catch(() => [] as FlagItem[]),
+    queryFn: () => featureFlagApi.list().then((r) => unwrapList<FlagItem>(r.data, 'flags')),
   });
-  const rows = (flags.data ?? []) as FlagItem[];
+  const rows = (flags.data ?? []).map((flag) => ({ ...flag, key: flag.key ?? (flag as FlagItem & { name?: string }).name ?? '' }));
 
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('true');
@@ -47,7 +52,9 @@ export default function FeatureFlagsPage() {
       setNewKey('');
       setNewValue('true');
       setEditing({});
+      toast({ title: 'Feature flag saved', variant: 'success' });
     },
+    onError: (error) => toast({ title: 'Could not save feature flag', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   const toggle = useMutation({
@@ -56,10 +63,15 @@ export default function FeatureFlagsPage() {
       const next = !(current?.enabled ?? false);
       return featureFlagApi.update(key, { value: current?.value, enabled: next });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['feature-flags'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['feature-flags'] });
+      toast({ title: 'Feature flag updated', variant: 'success' });
+    },
+    onError: (error) => toast({ title: 'Could not update feature flag', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   if (!session) return null;
+  if (flags.isError) return <QueryError message={flags.error} onRetry={() => void flags.refetch()} />;
 
   return (
     <div className="space-y-6">
@@ -73,8 +85,9 @@ export default function FeatureFlagsPage() {
         <SurfaceHeader title="New flag" description="Boolean or JSON values. Update PUT /api/feature-flags/:key with the new value to flip rollout state." />
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Key</label>
+            <label htmlFor="feature-flag-key" className="text-xs uppercase tracking-wider text-text-subtle">Key</label>
             <Input
+              id="feature-flag-key"
               value={newKey}
               onChange={(e) => setNewKey(e.target.value)}
               placeholder="enable-refund-fast-path"
@@ -82,8 +95,9 @@ export default function FeatureFlagsPage() {
             />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Value (JSON or bool)</label>
+            <label htmlFor="feature-flag-value" className="text-xs uppercase tracking-wider text-text-subtle">Value (JSON or bool)</label>
             <Input
+              id="feature-flag-value"
               value={newValue}
               onChange={(e) => setNewValue(e.target.value)}
               placeholder='true | false | {"percent": 25}'
@@ -112,7 +126,7 @@ export default function FeatureFlagsPage() {
           </div>
         </div>
         {upsert.isError && (
-          <div className="mt-3 text-xs text-destructive">{(upsert.error as Error).message}</div>
+          <div className="mt-3 text-xs text-destructive">{getErrorMessage(upsert.error)}</div>
         )}
       </Surface>
 
@@ -128,19 +142,19 @@ export default function FeatureFlagsPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['key'])}
+            rows={rows}
+            rowKey={(r) => r.key}
             columns={[
               {
                 key: 'key',
                 header: 'Key',
-                render: (r) => <code className="font-mono text-xs">{String(r['key'])}</code>,
+                render: (r) => <code className="font-mono text-xs">{r.key}</code>,
               },
               {
                 key: 'value',
                 header: 'Value',
                 render: (r) => {
-                  const k = String(r['key']);
+                  const k = r.key;
                   const isEditing = k in editing;
                   const value = isEditing ? editing[k] : JSON.stringify(r['value']);
                   return (
@@ -173,8 +187,10 @@ export default function FeatureFlagsPage() {
                 header: 'Enabled',
                 render: (r) => (
                   <Switch
-                    checked={Boolean(r['enabled'])}
-                    onCheckedChange={() => toggle.mutate(String(r['key']))}
+                    checked={Boolean(r.enabled)}
+                    onCheckedChange={() => toggle.mutate(r.key)}
+                    disabled={toggle.isPending}
+                    aria-label={`Toggle feature flag ${r.key}`}
                   />
                 ),
               },
@@ -182,8 +198,8 @@ export default function FeatureFlagsPage() {
                 key: 'updated',
                 header: 'Updated',
                 render: (r) => {
-                  const v = r['updatedAt'];
-                  return v ? new Date(String(v)).toLocaleString() : '—';
+                  const v = r.updatedAt;
+                  return v ? new Date(v).toLocaleString() : '—';
                 },
               },
             ]}

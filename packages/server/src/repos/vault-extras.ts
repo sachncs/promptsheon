@@ -163,6 +163,19 @@ export class CostRollupRepo {
       .run(capabilityId, day, input, output, costMicros, executions);
   }
 
+  capabilityBelongsToOrg(capabilityId: string, organizationId: string): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT 1 AS present
+         FROM capabilities c
+         JOIN projects p ON p.id = c.project_id
+         JOIN workspaces w ON w.id = p.workspace_id
+         WHERE c.id = ? AND w.org_id = ?`,
+      )
+      .get(capabilityId, organizationId) as { present: number } | undefined;
+    return row?.present === 1;
+  }
+
   forCapability(capabilityId: string, days: number): Array<{
     day: string;
     inputTokens: number;

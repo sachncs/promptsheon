@@ -89,9 +89,8 @@ export function extractPromptText(body: unknown): string | null {
   if (!body || typeof body !== 'object') return null;
   const messages = (body as { messages?: unknown }).messages;
   if (!Array.isArray(messages)) {
-    // Single-turn fallback: `prompt` (legacy) or `input`.
-    const single = (body as { prompt?: unknown; input?: unknown });
-    if (typeof single.prompt === 'string') return single.prompt;
+    // Single-turn request bodies use the canonical `input` field.
+    const single = (body as { input?: unknown });
     if (typeof single.input === 'string') return single.input;
     return null;
   }

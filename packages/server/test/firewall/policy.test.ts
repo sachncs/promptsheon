@@ -13,8 +13,8 @@ describe('extractPromptText', () => {
     expect(extractPromptText({ foo: 'bar' })).toBeNull();
   });
 
-  it('reads the legacy `prompt` string', () => {
-    expect(extractPromptText({ prompt: 'hello world' })).toBe('hello world');
+  it('does not accept the removed `prompt` string shape', () => {
+    expect(extractPromptText({ prompt: 'hello world' })).toBeNull();
   });
 
   it('reads the modern `input` string', () => {

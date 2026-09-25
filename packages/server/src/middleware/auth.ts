@@ -3,67 +3,75 @@ import { createHash } from 'node:crypto';
 import type { AppConfig } from '@promptsheon/shared';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 import { verifySVID } from '../identity/svid.js';
+import type { Principal } from '../policy/principal.js';
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    userId?: string;
+    userRole?: string;
+    agentOrgId?: string;
+    agentClassification?: string;
+    principal?: Principal;
+  }
+}
 
 const BOOTSTRAP_PREFIX = '/api/bootstrap/';
 const PUBLIC_PATHS = new Set([
   '/api/openapi.json',
   '/api/health',
+  '/api/ready',
   '/api/audit/verify',
   '/api/audit/state',
 ]);
 
 /**
- * Auth middleware — Bearer + SVID; legacy X-User-Id fallback
- * is only honoured when auth is *disabled*.
+ * Auth middleware — Bearer + SVID authentication with an explicit
+ * development system principal when authentication is disabled.
  *
  *  - `Authorization: Bearer <token>` → sha256 lookup in api_keys.
  *  - `Authorization: SVID <token>`   → ed25519 verification against
- *    the operator signing key (env var
- *    `PROMPTSHEON_SVID_PUBLIC_KEY_PEM` for v1; the per-org signing
+ *    the operator signing key (`PROMPTSHEON_SVID_PUBLIC_KEY_PEM`
+ *    resolved at startup for v1; the per-org signing
  *    key lookup wires in through SigningKeyRepo in AG-7). On
  *    success the request is stamped with `principal: 'Agent'`
  *    + the SVID subject + org + classification so the Cedar
  *    gate can authorize the action.
  *
  * When auth is enabled (the production default), any request
- * without a Bearer / SVID header is rejected with 401 — the
- * legacy X-User-Id fallback is intentionally NOT honoured, since
- * it bypasses every maker-checker / approval / audit chain that
- * depends on the request's identity. When auth is disabled (dev /
- * test), X-User-Id is honoured so curl-based smoke checks work.
+ * without a Bearer / SVID header is rejected with 401. When auth is
+ * disabled, requests receive an explicit development system principal;
+ * request headers are never interpreted as identity data.
  *
- * Public paths (`/api/openapi.json`, `/api/health`,
+ * Public paths (`/api/openapi.json`, `/api/health`, `/api/ready`,
  * `/api/audit/verify`, `/api/audit/state`, `/api/bootstrap/...`)
  * bypass the auth check and tag the request as `bootstrap` or
  * `public`. The SVID route (`/api/identity/...`) is registered
  * AFTER this middleware and depends on the
- * `PROMPTSHEON_SVID_PUBLIC_KEY_PEM` env var to be set.
+ * startup config to be set.
  */
 export function authMiddleware(
   config: AppConfig,
   apiKeyRepo: ApiKeyRepo,
   opts: { svidPublicKeyPem?: string } = {},
 ) {
-  const svidPublicKeyPem = opts.svidPublicKeyPem ?? process.env['PROMPTSHEON_SVID_PUBLIC_KEY_PEM'];
+  const svidPublicKeyPem = opts.svidPublicKeyPem;
   return async (request: FastifyRequest, reply: FastifyReply) => {
     if (request.url.startsWith(BOOTSTRAP_PREFIX)) {
-      (request as unknown as Record<string, string>).userId = 'bootstrap';
-      (request as unknown as { orgContextBypass?: boolean }).orgContextBypass = true;
+      request.userId = 'bootstrap';
+      request.orgContextBypass = true;
       return;
     }
     if (PUBLIC_PATHS.has(request.url.split('?')[0] ?? '')) {
-      (request as unknown as Record<string, string>).userId = 'public';
-      (request as unknown as { orgContextBypass?: boolean }).orgContextBypass = true;
+      request.userId = 'public';
+      request.orgContextBypass = true;
       return;
     }
 
     if (!config.auth.enabled) {
-      const headerUser = request.headers['x-user-id'];
-      if (typeof headerUser === 'string' && headerUser.length > 0) {
-        (request as unknown as Record<string, string>).userId = headerUser;
-      } else {
-        (request as unknown as Record<string, string>).userId = 'api';
-      }
+      request.userId = 'development';
+      request.userRole = 'admin';
+      request.principal = { type: 'System', id: 'development' };
+      request.orgContextBypass = true;
       return;
     }
 
@@ -82,8 +90,17 @@ export function authMiddleware(
           return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'API key expired' } });
         }
 
-        (request as unknown as Record<string, string>).userId = apiKey.userId;
-        (request as unknown as Record<string, string>).userRole = apiKey.role;
+        if (!apiKey.organizationId) {
+          return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'API key has no organization scope' } });
+        }
+        request.userId = apiKey.userId;
+        request.userRole = apiKey.role;
+        request.principal = {
+          type: 'User',
+          id: apiKey.userId,
+          orgId: apiKey.organizationId,
+          role: apiKey.role,
+        };
         void apiKeyRepo.updateLastUsed(apiKey.id);
         return;
       }
@@ -104,11 +121,11 @@ export function authMiddleware(
             error: { code: 'INVALID_SVID', message: 'SVID failed signature or freshness check' },
           });
         }
-        (request as unknown as Record<string, string>).userId = v.payload.sub;
-        (request as unknown as Record<string, string>).agentOrgId = v.payload.org;
-        (request as unknown as Record<string, string>).agentClassification = v.payload.cls;
-        (request as unknown as { orgContextBypass?: boolean }).orgContextBypass = true;
-        (request as unknown as { principal?: unknown }).principal = {
+        request.userId = v.payload.sub;
+        request.agentOrgId = v.payload.org;
+        request.agentClassification = v.payload.cls;
+        request.orgContextBypass = true;
+        request.principal = {
           type: 'Agent',
           id: v.payload.sub,
           orgId: v.payload.org,

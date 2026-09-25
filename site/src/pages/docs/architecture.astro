@@ -1,0 +1,64 @@
+---
+import DocsLayout from '@components/DocsLayout.astro';
+---
+
+<DocsLayout title="Architecture" description="The control-plane model behind Promptsheon: immutable agent specifications, evidence-producing execution, and bounded adaptation.">
+  <h2>The system in one sentence</h2>
+  <p>Promptsheon is an adaptive agent engineering platform for building, executing, evaluating, and continuously improving AI agents and multi-agent systems.</p>
+
+  <h2>The product model</h2>
+  <p>An agent is not just a prompt attached to a model. It is an immutable, content-addressed executable specification composed of role, objective, prompts, guardrails, capabilities, tools, permissions, context, model and routing policies, execution rules, evaluation intent, budgets, and lifecycle.</p>
+  <pre><code>AgentSpec = role + objective + prompt + guardrails + tools
+          + permissions + context + model + routing
+          + execution + evaluation + budget + lifecycle
+
+Create → Execute → Observe → Evaluate → Compare
+       → Learn → Mutate → Validate → Promote</code></pre>
+
+  <h2>Four control-plane responsibilities</h2>
+  <div class="not-prose grid gap-3 sm:grid-cols-2">
+    {[
+      ['Architect', 'Translates an objective into an executable organization: agent responsibilities, topology, interfaces, capabilities, and evaluation strategy.'],
+      ['Operator', 'Executes the specification: scheduling, parallelism, model routing, tools, retries, state, caching, and result materialization.'],
+      ['Evaluator', 'Measures quality and efficiency before, during, and after execution, then turns observations into comparable evidence.'],
+      ['Governor', 'Enforces hard limits for context, tokens, models, latency, cost, concurrency, tools, permissions, memory, and execution.'],
+    ].map(([name, text]) => (
+      <div class="rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)] p-5"><h3 class="text-[15px] font-semibold text-[var(--ink-strong)]">{name}</h3><p class="mt-2 text-[13px] leading-relaxed text-[var(--ink-muted)]">{text}</p></div>
+    ))}
+  </div>
+
+  <h2>Four boundaries</h2>
+  <div class="not-prose grid gap-3 sm:grid-cols-2">
+    {[
+      ['Domain', 'Types, invariants, transitions, hashes, and policy concepts. No Fastify or SQLite dependency.'],
+      ['Application', 'Use cases such as release transitions, schedules, approvals, identity, and evaluation orchestration.'],
+      ['Infrastructure', 'SQLite repositories, CAS, vault/KMS adapters, LLM providers, schedulers, and observability.'],
+      ['Interface', 'Fastify routes, validation, HTTP error contracts, SSE, CLI, SDK, and the Next.js console.'],
+    ].map(([name, text]) => (
+      <div class="rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)] p-5"><h3 class="text-[15px] font-semibold text-[var(--ink-strong)]">{name}</h3><p class="mt-2 text-[13px] leading-relaxed text-[var(--ink-muted)]">{text}</p></div>
+    ))}
+  </div>
+
+  <h2>Dependency direction</h2>
+  <pre><code>interface / route  →  application service  →  port / repository
+       ↓                         ↓
+   validation              domain invariant
+       ↓                         ↓
+ infrastructure adapter  →  SQLite, vault, provider</code></pre>
+  <p>Routes parse and translate. Services decide. Repositories persist. Domain code owns rules. When a route needs to construct a database repository or reach into a provider directly, that is a boundary smell.</p>
+
+  <h2>Release lifecycle</h2>
+  <p>Draft, review, approval, canary, active, and rollback are explicit transitions. The release service checks the current state, approval requirements, authorization, and audit side effects before changing persistence. Consumers should use the service rather than duplicating transition rules.</p>
+
+  <h2>Why content addressing matters</h2>
+  <p>A manifest’s hash gives the team a stable identity for the exact content that was evaluated and released. It makes diffs reviewable, rollback deterministic, and audit records meaningful even when names or labels change.</p>
+
+  <h2>Adding a feature</h2>
+  <ol>
+    <li>Define the domain concept and invariant.</li>
+    <li>Expose the smallest application service or port needed.</li>
+    <li>Add the infrastructure adapter and repository mapping.</li>
+    <li>Add a validated interface route and typed client contract.</li>
+    <li>Cover the invariant, failure path, integration boundary, and browser-critical flow.</li>
+  </ol>
+</DocsLayout>

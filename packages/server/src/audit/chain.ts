@@ -1,6 +1,7 @@
 import { createHash, getFips, randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import type { AuditEntry } from '@promptsheon/shared';
+import type { AuditReplicationFrame } from '../application/audit-replication-service.js';
 
 /**
  * Compute the SHA-256 of an audit entry's hash input.
@@ -144,9 +145,64 @@ export class AuditChain {
     return { valid: true };
   }
 
+  /** Return audit entries authored by users belonging to one organization. */
+  entriesForOrganization(organizationId: string): AuditEntry[] {
+    return this.db
+      .prepare(
+        `SELECT ae.id,
+                ae.user_id AS userId,
+                ae.action,
+                ae.resource,
+                ae.details,
+                ae.timestamp,
+                ae.previous_hash AS previousHash,
+                ae.entry_hash AS entryHash,
+                ae.timestamp_str AS timestampStr,
+                ae.resource_kind AS resourceKind,
+                ae.resource_id AS resourceId
+         FROM audit_entries ae
+         JOIN users u ON u.id = ae.user_id
+         WHERE u.org_id = ?
+         ORDER BY ae.rowid ASC`,
+      )
+      .all(organizationId) as AuditEntry[];
+  }
+
   getChainState(): { lastHash: string; lastRowid: number } {
     return this.db.prepare(
       'SELECT last_hash as lastHash, last_rowid as lastRowid FROM audit_chain_state WHERE id = 0'
     ).get() as { lastHash: string; lastRowid: number };
+  }
+
+  /** Persist one replicated frame without duplicating an existing entry. */
+  ingest(frame: AuditReplicationFrame): { duplicate: boolean } {
+    const insert = this.db.prepare(
+      `INSERT OR IGNORE INTO audit_entries
+         (id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str, resource_kind, resource_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    const result = insert.run(
+      frame.entry.id,
+      frame.entry.userId,
+      frame.entry.action,
+      frame.entry.resource,
+      frame.entry.details,
+      frame.entry.timestamp,
+      frame.previousHash,
+      frame.entry.entryHash,
+      frame.entry.timestamp,
+      frame.entry.resourceKind,
+      frame.entry.resourceId,
+    );
+    if (result.changes > 0) {
+      this.db
+        .prepare(
+          `UPDATE audit_chain_state
+           SET last_hash = ?, last_rowid = ?
+           WHERE id = 0 AND last_rowid < ?`,
+        )
+        .run(frame.entry.entryHash, frame.rowid, frame.rowid);
+    }
+    return { duplicate: result.changes === 0 };
   }
 }

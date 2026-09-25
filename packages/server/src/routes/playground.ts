@@ -1,7 +1,7 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { Gateway, GatewayRequest } from '../llm/gateway.js';
-import { parseBody } from './validate.js';
+import { parseBody, statusCodeOf } from './validate.js';
 
 const CompleteSchema = z.object({
   prompt: z.string().min(1).max(64_000),
@@ -29,13 +29,8 @@ const SweepSchema = z.object({
   variants: z.array(SweepVariantSchema).min(1).max(10),
 });
 
-interface RequestUserContext {
-  userId?: string;
-}
-
-function actorOf(request: unknown): string {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.userId ?? 'unscoped';
+function actorOf(request: FastifyRequest): string {
+  return request.userId ?? 'unscoped';
 }
 
 /**
@@ -64,11 +59,12 @@ export function registerPlaygroundRoutes(app: FastifyInstance, deps: { gateway: 
       const result = await deps.gateway.complete(gwRequest, { actorId: actorOf(request) });
       return reply.send(result);
     } catch (err) {
-      const status = (err as { statusCode?: number }).statusCode ?? 502;
+      const status = statusCodeOf(err, 502);
+      request.log.error({ err, status }, 'playground provider request failed');
       return reply.code(status).send({
         error: {
           code: status === 429 ? 'RATE_LIMITED' : 'PROVIDER_ERROR',
-          message: (err as Error).message,
+          message: status === 429 ? 'The provider rate limit was reached.' : 'The provider request failed.',
         },
       });
     }
@@ -98,7 +94,7 @@ export function registerPlaygroundRoutes(app: FastifyInstance, deps: { gateway: 
         variant: variants[i],
         status: r.status,
         value: r.status === 'fulfilled' ? r.value : undefined,
-        error: r.status === 'rejected' ? (r.reason as Error).message : undefined,
+        error: r.status === 'rejected' ? 'The provider request failed.' : undefined,
       })),
     });
   });

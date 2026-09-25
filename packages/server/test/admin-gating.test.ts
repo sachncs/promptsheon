@@ -49,7 +49,7 @@ function buildApp(role: 'admin' | 'editor' | 'reader'): { app: FastifyInstance; 
   app.addHook('preHandler', (request, _reply, done) => {
     (request as Record<string, unknown>)['userId'] = 'u-test';
     (request as Record<string, unknown>)['orgContext'] = {
-      organizationId: '00000000-0000-4000-8000-000000000001',
+      orgId: '00000000-0000-4000-8000-000000000001',
       role,
     };
     done();
@@ -93,6 +93,11 @@ describe('admin gating', () => {
       });
       expect(r.statusCode).toBe(200);
     });
+
+    it('200 on GET /api/settings', async () => {
+      const r = await ctx.app.inject({ method: 'GET', url: '/api/settings' });
+      expect(r.statusCode).toBe(200);
+    });
   });
 
   describe('reader role', () => {
@@ -122,6 +127,16 @@ describe('admin gating', () => {
         url: '/api/settings/foo',
         payload: { value: 'bar' },
       });
+      expect(r.statusCode).toBe(403);
+    });
+
+    it('403 on GET /api/settings', async () => {
+      const r = await ctx.app.inject({ method: 'GET', url: '/api/settings' });
+      expect(r.statusCode).toBe(403);
+    });
+
+    it('403 on GET /api/settings/foo', async () => {
+      const r = await ctx.app.inject({ method: 'GET', url: '/api/settings/foo' });
       expect(r.statusCode).toBe(403);
     });
 

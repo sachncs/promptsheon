@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
   CreateEvalRunSchema,
@@ -6,8 +6,9 @@ import {
 } from '@promptsheon/shared';
 import type { EvalRepo } from '../repos/eval.js';
 import type { EvaluationAgent } from '../agents/evaluation/evaluation.js';
-import { buildEvaluatorRegistry, listEvaluators } from '../evaluation/evaluators.js';
-import { parseBody, parseQuery } from './validate.js';
+import type { EvalInput } from '../evaluation/evaluators.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
+import { validateOutboundUrl } from '../security/outbound-url.js';
 
 const ListQuerySchema = PaginationSchema.extend({
   releaseId: z.string().uuid().optional(),
@@ -26,31 +27,61 @@ const ScoreInputSchema = z.object({
   evaluator: z.string().optional(),
 });
 
-export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAgent: EvaluationAgent) {
+const EvalRunParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
+
+function orgOf(request: FastifyRequest): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
+}
+
+export interface EvalRouteConfig {
+  allowedHosts: string[];
+  allowPrivateNetworks: boolean;
+}
+
+export function registerEvalRoutes(
+  app: FastifyInstance,
+  repo: EvalRepo,
+  evalAgent: EvaluationAgent,
+  config: EvalRouteConfig = { allowedHosts: [], allowPrivateNetworks: true },
+) {
   app.get('/api/eval-runs', async (request, reply) => {
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     const parsed = parseQuery(reply, ListQuerySchema, request.query);
     if (!parsed.ok) return;
     const { releaseId, page, pageSize } = parsed.data;
-    if (releaseId) return reply.send(repo.findRunsByReleaseId(releaseId));
-    return reply.send(repo.findMany({ page, pageSize }));
+    if (releaseId) return reply.send(repo.findRunsByReleaseIdInOrg(releaseId, organizationId));
+    return reply.send(repo.findManyInOrg(organizationId, { page, pageSize }));
   });
 
   app.get('/api/eval-runs/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const item = repo.findRunById(id);
+    const parsedParams = parseParams(reply, EvalRunParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    const item = repo.findRunByIdInOrg(id, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
     return reply.send(item);
   });
 
   app.post('/api/eval-runs', async (request, reply) => {
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
     const parsed = parseBody(reply, CreateEvalRunSchema, request.body);
     if (!parsed.ok) return;
-    const item = repo.createRun(parsed.data);
+    const item = repo.createRun(parsed.data, organizationId);
+    if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release or dataset not found' } });
     return reply.code(201).send(item);
   });
 
   app.get('/api/eval-runs/:id/results', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, EvalRunParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    if (!repo.findRunByIdInOrg(id, organizationId)) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Eval run not found' } });
     return reply.send(repo.findResultsByRunId(id));
   });
 
@@ -58,45 +89,65 @@ export function registerEvalRoutes(app: FastifyInstance, repo: EvalRepo, evalAge
     const parsed = parseBody(reply, RunEvalSchema, request.body);
     if (!parsed.ok) return;
     const { evalRunId, getActualUrl } = parsed.data;
-    const evalRun = repo.findRunById(evalRunId);
+    const organizationId = orgOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    const outbound = validateOutboundUrl(getActualUrl, {
+      allowedHosts: config.allowedHosts,
+      allowPrivateNetworks: config.allowPrivateNetworks,
+    });
+    if (!outbound.ok) {
+      return reply.code(422).send({ error: { code: 'UNSAFE_OUTBOUND_URL', message: outbound.reason } });
+    }
+    const evalRun = repo.findRunByIdInOrg(evalRunId, organizationId);
     if (!evalRun) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Eval run not found' } });
 
     const getActual = async (inputs: Record<string, unknown>): Promise<string> => {
-      const res = await fetch(getActualUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(inputs),
-      });
-      return res.text();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15_000);
+      let res: Response;
+      try {
+        res = await fetch(outbound.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(inputs),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (!res.ok) throw new Error(`actual endpoint returned ${res.status}`);
+      const body = await res.arrayBuffer();
+      if (body.byteLength > 2 * 1024 * 1024) throw new Error('actual endpoint response exceeds 2 MiB');
+      return new TextDecoder().decode(body);
     };
 
-    const result = await evalAgent.runEval(evalRun, [], getActual);
+    let result;
+    try {
+      result = await evalAgent.runEval(evalRun, [], getActual);
+    } catch {
+      return reply.code(502).send({ error: { code: 'EVAL_ENDPOINT_FAILED', message: 'evaluation endpoint failed' } });
+    }
     repo.updateRun(evalRunId, result);
     return reply.send(result);
   });
 
   app.get('/api/eval/evaluators', async (_request, reply) => {
-    const config = (evalAgent as unknown as { config: import('@promptsheon/shared').AppConfig }).config;
-    const reg = buildEvaluatorRegistry(config);
-    return reply.send({ evaluators: listEvaluators(reg) });
+    return reply.send({ evaluators: evalAgent.listEvaluators() });
   });
 
   app.post('/api/eval/score', async (request, reply) => {
     const parsed = parseBody(reply, ScoreInputSchema, request.body);
     if (!parsed.ok) return;
-    const config = (evalAgent as unknown as { config: import('@promptsheon/shared').AppConfig }).config;
-    const reg = buildEvaluatorRegistry(config);
     const evaluatorName = parsed.data.evaluator || 'llm-judge';
-    const evaluator = reg.get(evaluatorName);
-    if (!evaluator) {
-      return reply.code(404).send({ error: { code: 'UNKNOWN_EVALUATOR', message: evaluatorName } });
-    }
-    const result = await evaluator.evaluate({
+    const result = await evalAgent.evaluate({
       actual: parsed.data.actual,
       expected: parsed.data.expected,
       inputs: parsed.data.inputs,
       context: parsed.data.context,
-    });
+    } satisfies EvalInput, evaluatorName);
+    if (!result) {
+      return reply.code(404).send({ error: { code: 'UNKNOWN_EVALUATOR', message: evaluatorName } });
+    }
     return reply.send({
       evaluator: evaluatorName,
       ...result,

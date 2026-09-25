@@ -1,6 +1,6 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { parseBody } from './validate.js';
+import { parseBody, parseParams } from './validate.js';
 import type { FeatureFlagRepo } from '../repos/feature-flag.js';
 import type { AuditChain } from '../audit/chain.js';
 import { requireAdmin } from '../middleware/admin.js';
@@ -14,13 +14,13 @@ const PutFeatureFlagSchema = z.object({
   value: z.unknown().optional(),
 });
 
-interface RequestUserContext {
-  userId?: string;
-}
+const FeatureFlagInputSchema = PutFeatureFlagSchema.omit({ name: true });
+const FeatureFlagNameParamsSchema = z.object({
+  name: z.string().trim().min(1).max(120).regex(/^[a-z0-9._-]+$/),
+});
 
-function actorOf(request: unknown): string {
-  const ctx = (request as RequestUserContext | undefined) ?? {};
-  return ctx.userId ?? 'system';
+function actorOf(request: FastifyRequest): string {
+  return request.userId ?? 'system';
 }
 
 export function registerFeatureFlagRoutes(
@@ -32,10 +32,15 @@ export function registerFeatureFlagRoutes(
   });
 
   app.put('/api/feature-flags/:name', { preHandler: requireAdmin() }, async (request, reply) => {
-    const { name } = request.params as { name: string };
-    const merged = { ...(request.body as Record<string, unknown> | undefined), name };
-    const parsed = parseBody(reply, PutFeatureFlagSchema, merged);
-    if (!parsed.ok) return;
+    const parsedParams = parseParams(reply, FeatureFlagNameParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { name } = parsedParams.data;
+    const parsedInput = parseBody(reply, FeatureFlagInputSchema, request.body);
+    if (!parsedInput.ok) return;
+    const parsed = PutFeatureFlagSchema.safeParse({ ...parsedInput.data, name });
+    if (!parsed.success) {
+      return reply.code(422).send({ error: { code: 'VALIDATION_ERROR', message: 'Request body validation failed' } });
+    }
     const before = deps.repo.find(name);
     const flag = deps.repo.upsert(parsed.data);
     deps.auditChain.append({
@@ -50,7 +55,9 @@ export function registerFeatureFlagRoutes(
   });
 
   app.delete('/api/feature-flags/:name', { preHandler: requireAdmin() }, async (request, reply) => {
-    const { name } = request.params as { name: string };
+    const parsedParams = parseParams(reply, FeatureFlagNameParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { name } = parsedParams.data;
     const removed = deps.repo.delete(name);
     if (!removed) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'feature flag not found' } });

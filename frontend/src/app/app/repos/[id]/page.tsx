@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, GitBranch, GitMerge, Save, Plus, History, ShieldCheck, FileText } from 'lucide-react';
+import { ArrowLeft, Save, Plus, History } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
-import { repoApi, type RepoEntry, type BranchItem } from '@/lib/api';
+import { repoApi, type BranchItem } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
@@ -17,6 +17,7 @@ import { ThemedSelect } from '@/components/brand/themed-select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QueryError } from '@/components/brand/query-error';
 
 type Tab = 'tree' | 'branches' | 'merge-requests' | 'commits';
 
@@ -31,29 +32,29 @@ export default function RepositoryDetail() {
   const repo = useQuery({
     queryKey: ['repo', id],
     queryFn: () => repoApi.get(id),
-    enabled: Boolean(id),
+    enabled: Boolean(session && id),
   });
 
   const [ref, setRef] = useState<string>('main');
   const branches = useQuery({
     queryKey: ['branches', id],
     queryFn: () => repoApi.listBranches(id),
-    enabled: Boolean(id),
+    enabled: Boolean(session && id),
   });
   const contents = useQuery({
     queryKey: ['contents', id, ref],
     queryFn: () => repoApi.listContents(id, ref),
-    enabled: Boolean(id),
+    enabled: Boolean(session && id),
   });
   const commits = useQuery({
     queryKey: ['commits', id, ref],
     queryFn: () => repoApi.listCommits(id, ref),
-    enabled: Boolean(id),
+    enabled: Boolean(session && id),
   });
   const mrs = useQuery({
     queryKey: ['mr', id],
     queryFn: () => repoApi.listMRs(id, 'open'),
-    enabled: Boolean(id),
+    enabled: Boolean(session && id),
   });
 
   const [newPath, setNewPath] = useState('prompts/main.md');
@@ -73,12 +74,15 @@ export default function RepositoryDetail() {
 
   if (!session) return null;
 
+  if (repo.isError) {
+    return <QueryError message={repo.error} onRetry={() => void repo.refetch()} />;
+  }
   if (repo.isLoading) return <div className="text-text-muted text-sm">Loading…</div>;
   if (!repo.data) return (
     <div className="text-text-muted text-sm">Repository not found.</div>
   );
 
-  const r = repo.data as Record<string, unknown>;
+  const r = repo.data;
 
   return (
     <div className="space-y-6">
@@ -88,9 +92,9 @@ export default function RepositoryDetail() {
         </Link>
         <PageHeader
           eyebrow="Repository"
-          title={String(r['name'] ?? '—')}
-          subtitle={`Branch strategy default: ${String(r['defaultBranch'])}. Visibility ${String(r['visibility'])}. Approvers ${String(r['minApprovers'])}+ .`}
-          actions={<HashChip hash={String(r['id'])} length={32} />}
+          title={r.name}
+          subtitle={`Branch strategy default: ${r.defaultBranch}. Visibility ${r.visibility}. Approvers ${r.minApprovers}+ .`}
+          actions={<HashChip hash={r.id} length={32} />}
         />
       </div>
 
@@ -122,21 +126,22 @@ export default function RepositoryDetail() {
           <div className="space-y-5">
             <Surface>
               <SurfaceHeader title={`Tree at ${ref}`} description={`${(contents.data ?? []).length} entries staged on this ref`} />
-              {(contents.data ?? []).length === 0 ? (
+              {contents.isError ? (
+                <QueryError message={contents.error} onRetry={() => void contents.refetch()} />
+              ) : (contents.data ?? []).length === 0 ? (
                 <div className="text-text-muted text-sm">No staged files.</div>
               ) : (
                 <DataTable
-                  rows={(contents.data ?? []) as Array<Record<string, unknown>>}
-                  rowKey={(r) => String(r['path'])}
+                  rows={contents.data ?? []}
+                  rowKey={(r) => r.path}
                   onRowClick={async (r) => {
-                    const path = String(r['path']);
+                    const path = r.path;
                     setViewPath(path);
                     setViewContent(null);
-                    setViewOid(String(r['blobOid']));
+                    setViewOid(r.blobOid);
                     try {
                       const r2 = await repoApi.getFile(id, path, ref);
-                      const d = r2.data as unknown as { content?: string };
-                      setViewContent(typeof d.content === 'string' ? d.content : '(binary)');
+                      setViewContent(r2.data.content ?? '(binary)');
                     } catch {
                       setViewContent('(failed to load)');
                     }
@@ -145,14 +150,14 @@ export default function RepositoryDetail() {
                     {
                       key: 'path',
                       header: 'Path',
-                      render: (r) => <span className="font-mono text-xs text-text-default">{String(r['path'])}</span>,
+                      render: (r) => <span className="font-mono text-xs text-text-default">{r.path}</span>,
                     },
                     {
                       key: 'oid',
                       header: 'Blob',
-                      render: (r) => <HashChip hash={String(r['blobOid'])} length={16} />,
+                      render: (r) => <HashChip hash={r.blobOid} length={16} />,
                     },
-                    { key: 'size', header: 'Size', render: (r) => `${String(r['size'])} b` },
+                    { key: 'size', header: 'Size', render: (r) => `${r.size} b` },
                   ]}
                 />
               )}
@@ -216,43 +221,47 @@ export default function RepositoryDetail() {
         <TabsContent value="branches">
           <Surface padded={false}>
             <SurfaceHeader className="px-5 pt-5" title="Branches" description="Movable refs with optional protection." />
-            <DataTable
+            {branches.isError ? (
+              <QueryError message={branches.error} onRetry={() => void branches.refetch()} />
+            ) : <DataTable
               className="rounded-none border-0 border-t border-border-subtle"
-              rows={(branches.data ?? []) as Array<Record<string, unknown>>}
-              rowKey={(r) => String(r['id'])}
+              rows={branches.data ?? []}
+              rowKey={(r) => r.id}
               columns={[
-                { key: 'name', header: 'Name', render: (r) => <span className="font-mono text-xs">{String(r['name'])}</span> },
+                { key: 'name', header: 'Name', render: (r) => <span className="font-mono text-xs">{r.name}</span> },
                 {
                   key: 'head',
                   header: 'Head',
-                  render: (r) => (r['headCommitOid']
-                    ? <HashChip hash={String(r['headCommitOid'])} length={16} />
+                  render: (r) => (r.headCommitOid
+                    ? <HashChip hash={r.headCommitOid} length={16} />
                     : <span className="text-text-subtle text-xs">—</span>),
                 },
                 {
                   key: 'protected',
                   header: 'Protected',
-                  render: (r) => (r['isProtected'] ? <StatusPill kind="approved" /> : <StatusPill kind="neutral" label="—" />),
+                  render: (r) => (r.isProtected ? <StatusPill kind="approved" /> : <StatusPill kind="neutral" label="—" />),
                 },
               ]}
-            />
+            />}
           </Surface>
         </TabsContent>
 
         <TabsContent value="commits">
           <Surface padded={false}>
             <SurfaceHeader className="px-5 pt-5" title={`Commits on ${ref}`} />
-            {(commits.data ?? []).length === 0 ? (
+            {commits.isError ? (
+              <QueryError message={commits.error} onRetry={() => void commits.refetch()} />
+            ) : (commits.data ?? []).length === 0 ? (
               <div className="px-5 pb-5 text-text-muted text-sm">No commits yet.</div>
             ) : (
               <ul className="divide-y divide-border-subtle">
-                {((commits.data ?? []) as Array<Record<string, unknown>>).map((c) => (
-                  <li key={String(c['oid'])} className="flex items-center gap-3 px-5 py-3">
+                {(commits.data ?? []).map((c) => (
+                  <li key={c.oid} className="flex items-center gap-3 px-5 py-3">
                     <History className="h-4 w-4 text-text-muted" />
-                    <HashChip hash={String(c['oid'])} length={16} />
-                    <div className="flex-1 truncate text-sm text-text-default">{String(c['message'])}</div>
+                    <HashChip hash={c.oid} length={16} />
+                    <div className="flex-1 truncate text-sm text-text-default">{c.message}</div>
                     <span className="text-xs text-text-subtle">
-                      {new Date(String(c['timestamp'] ?? Date.now())).toLocaleString()}
+                      {new Date(c.timestamp).toLocaleString()}
                     </span>
                   </li>
                 ))}
@@ -274,27 +283,29 @@ export default function RepositoryDetail() {
                 </Link>
               }
             />
-            {(mrs.data ?? []).length === 0 ? (
+            {mrs.isError ? (
+              <QueryError message={mrs.error} onRetry={() => void mrs.refetch()} />
+            ) : (mrs.data ?? []).length === 0 ? (
               <div className="px-5 pb-5 text-text-muted text-sm">No open merge requests.</div>
             ) : (
               <DataTable
                 className="rounded-none border-0 border-t border-border-subtle"
-                rows={(mrs.data ?? []) as Array<Record<string, unknown>>}
-                rowKey={(r) => String(r['id'])}
-                onRowClick={(r) => { router.push(`/app/merge-requests/${String(r['id'])}`); }}
+                rows={mrs.data ?? []}
+                rowKey={(r) => r.id}
+                onRowClick={(r) => { router.push(`/app/merge-requests/${r.id}`); }}
                 columns={[
-                  { key: 'n', header: '#', render: (r) => `#${String(r['number'])}` },
-                  { key: 'title', header: 'Title', render: (r) => <span className="font-medium text-text-strong">{String(r['title'])}</span> },
+                  { key: 'n', header: '#', render: (r) => `#${r.number}` },
+                  { key: 'title', header: 'Title', render: (r) => <span className="font-medium text-text-strong">{r.title}</span> },
                   {
                     key: 'branches',
                     header: 'Branches',
                     render: (r) => (
                       <span className="font-mono text-xs text-text-muted">
-                        {String(r['sourceBranch'])} → {String(r['targetBranch'])}
+                        {r.sourceBranch} → {r.targetBranch}
                       </span>
                     ),
                   },
-                  { key: 'state', header: 'State', render: (r) => <StatusPill kind={String(r['status']) === 'open' ? 'review' : 'active'} /> },
+                  { key: 'state', header: 'State', render: (r) => <StatusPill kind={r.status === 'open' ? 'review' : 'active'} /> },
                 ]}
               />
             )}

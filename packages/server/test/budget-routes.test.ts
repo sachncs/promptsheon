@@ -57,6 +57,10 @@ describe('GET /api/admin/budgets + /api/admin/cost-forecast', () => {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     });
     await app.register(async (instance) => {
+      instance.addHook('onRequest', async (request) => {
+        const orgId = request.headers['x-test-org'];
+        if (typeof orgId === 'string') request.orgContext = { userId: 'tester', orgId, role: 'admin' };
+      });
       registerBudgetRoutes(instance, { budgetRepo, forecastService });
     });
     await app.ready();
@@ -73,9 +77,18 @@ describe('GET /api/admin/budgets + /api/admin/cost-forecast', () => {
     expect(res.json()).toEqual({ items: [] });
   });
 
-  it('GET /api/admin/budgets without organizationId returns 400', async () => {
+  it('GET /api/admin/budgets without organizationId returns a validation error', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/admin/budgets' });
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(422);
+  });
+
+  it('does not allow an active org to query another organization', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/budgets?organizationId=org-1',
+      headers: { 'x-test-org': 'org-2' },
+    });
+    expect(res.statusCode).toBe(404);
   });
 
   it('POST /api/admin/budgets creates a budget', async () => {

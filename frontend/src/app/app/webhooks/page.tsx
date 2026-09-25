@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Webhook, Power, Trash2 } from 'lucide-react';
+import { Plus, Webhook, Trash2 } from 'lucide-react';
 import { webhookApi } from '@/lib/api';
+import { unwrapList } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -13,6 +14,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
+import { useToast } from '@/components/brand/toast';
 
 interface WebhookItem {
   id: string;
@@ -39,35 +43,51 @@ const EVENT_PRESETS = [
 export default function WebhooksPage() {
   const session = useRequireSession();
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   const hooks = useQuery({
     queryKey: ['webhooks'],
-    queryFn: () => webhookApi.list().then((r) => r.data).catch(() => [] as WebhookItem[]),
+    queryFn: () => webhookApi.list().then((r) => unwrapList<WebhookItem>(r.data, 'webhooks')),
+    enabled: Boolean(session),
   });
-  const rows = (hooks.data ?? []) as WebhookItem[];
+  const rows = hooks.data ?? [];
 
   const [url, setUrl] = useState('');
   const [events, setEvents] = useState<string[]>(['release.activated', 'approval.requested']);
 
   const create = useMutation({
-    mutationFn: () => webhookApi.create({ url, events }),
+    mutationFn: () => {
+      if (!session) throw new Error('A session is required to add a webhook');
+      return webhookApi.create({ organizationId: session.orgId, label: url, url, events });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['webhooks'] });
       setUrl('');
+      toast({ title: 'Webhook added', variant: 'success' });
     },
+    onError: (error) => toast({ title: 'Could not add webhook', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   const toggle = useMutation({
     mutationFn: (item: WebhookItem) => webhookApi.update(item.id, { active: !(item.active ?? false) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['webhooks'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['webhooks'] });
+      toast({ title: 'Webhook updated', variant: 'success' });
+    },
+    onError: (error) => toast({ title: 'Could not update webhook', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => webhookApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['webhooks'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['webhooks'] });
+      toast({ title: 'Webhook deleted', variant: 'success' });
+    },
+    onError: (error) => toast({ title: 'Could not delete webhook', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   if (!session) return null;
+  if (hooks.isError) return <QueryError message={hooks.error} onRetry={() => void hooks.refetch()} />;
 
   const toggleEvent = (ev: string) => {
     setEvents((prev) => prev.includes(ev) ? prev.filter((e) => e !== ev) : [...prev, ev]);
@@ -85,8 +105,9 @@ export default function WebhooksPage() {
         <SurfaceHeader title="Add a webhook" description="Receives signed POSTs at the URL you specify." />
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">URL</label>
+            <label htmlFor="webhook-url" className="text-xs uppercase tracking-wider text-text-subtle">URL</label>
             <Input
+              id="webhook-url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://example.com/webhooks/promptsheon"
@@ -103,6 +124,8 @@ export default function WebhooksPage() {
                     key={ev}
                     type="button"
                     onClick={() => toggleEvent(ev)}
+                    aria-pressed={active}
+                    aria-label={`${active ? 'Remove' : 'Add'} ${ev} event`}
                     className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
                       active
                         ? 'border-brand bg-brand text-brand-foreground'
@@ -123,7 +146,7 @@ export default function WebhooksPage() {
           </Button>
         </div>
         {create.isError && (
-          <div className="mt-3 text-xs text-destructive">{(create.error as Error).message}</div>
+          <div className="mt-3 text-xs text-destructive">{getErrorMessage(create.error)}</div>
         )}
       </Surface>
 
@@ -139,19 +162,19 @@ export default function WebhooksPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
+            rows={rows}
+            rowKey={(r) => r.id}
             columns={[
               {
                 key: 'url',
                 header: 'URL',
-                render: (r) => <code className="font-mono text-xs">{String(r['url'] ?? '—')}</code>,
+                render: (r) => <code className="font-mono text-xs">{r.url ?? '—'}</code>,
               },
               {
                 key: 'events',
                 header: 'Events',
                 render: (r) => {
-                  const evs = (r['events'] as string[] | undefined) ?? [];
+                  const evs = r.events ?? [];
                   return (
                     <div className="flex flex-wrap gap-1">
                       {evs.slice(0, 3).map((ev) => <Badge key={ev}>{ev}</Badge>)}
@@ -164,9 +187,9 @@ export default function WebhooksPage() {
                 key: 'delivery',
                 header: 'Delivery',
                 render: (r) => {
-                  const total = Number(r['deliveryCount'] ?? 0);
-                  const fail = Number(r['failureCount'] ?? 0);
-                  const last = r['lastDeliveredAt'] ? new Date(String(r['lastDeliveredAt'])).toLocaleString() : 'never';
+                  const total = r.deliveryCount ?? 0;
+                  const fail = r.failureCount ?? 0;
+                  const last = r.lastDeliveredAt ? new Date(r.lastDeliveredAt).toLocaleString() : 'never';
                   return (
                     <div className="text-xs">
                       <div className="text-text-default">{total} sent · {fail} failed</div>
@@ -180,8 +203,8 @@ export default function WebhooksPage() {
                 header: 'Active',
                 render: (r) => (
                   <Switch
-                    checked={Boolean(r['active'])}
-                    onCheckedChange={() => toggle.mutate(r as unknown as WebhookItem)}
+                    checked={Boolean(r.active)}
+                    onCheckedChange={() => toggle.mutate(r)}
                   />
                 ),
               },
@@ -189,7 +212,7 @@ export default function WebhooksPage() {
                 key: 'actions',
                 header: '',
                 render: (r) => (
-                  <Button size="sm" variant="outline" onClick={() => remove.mutate(String(r['id']))}>
+                  <Button size="sm" variant="outline" onClick={() => remove.mutate(r.id)}>
                     <Trash2 className="mr-1 size-3" />
                     Delete
                   </Button>

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, Plus, Trash2 } from 'lucide-react';
-import { scheduleApi, workspaceApi, releaseApi, projectApi } from '@/lib/api';
+import { getErrorMessage, scheduleApi, workspaceApi, releaseApi, type Release, type Schedule } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -13,32 +13,19 @@ import { ThemedSelect } from '@/components/brand/themed-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-
-interface ScheduleItem {
-  id: string;
-  workspaceId?: string;
-  releaseId?: string;
-  releaseName?: string;
-  kind?: string;
-  cron?: string;
-  enabled?: boolean;
-  createdAt?: string;
-  lastRunAt?: string | null;
-  nextRunAt?: string | null;
-}
-
-interface ReleaseLite {
-  id: string;
-  capabilityName?: string;
-  capabilityVersion?: number;
-  environment?: string;
-}
+import { QueryError } from '@/components/brand/query-error';
 
 const KIND_OPTIONS = [
   { value: 'eval', label: 'Eval run' },
   { value: 'self-evolve', label: 'Self-evolve cycle' },
   { value: 'release-rotation', label: 'Release rotation' },
 ] as const;
+
+type ScheduleKind = typeof KIND_OPTIONS[number]['value'];
+
+function isScheduleKind(value: string): value is ScheduleKind {
+  return KIND_OPTIONS.some((option) => option.value === value);
+}
 
 export default function SchedulesPage() {
   const session = useRequireSession();
@@ -48,49 +35,23 @@ export default function SchedulesPage() {
     queryKey: ['workspaces'],
     queryFn: () => workspaceApi.list(1).then((r) => r.data),
   });
-  const wsFirst = Array.isArray(workspaces.data) ? workspaces.data[0] as { id?: string } : undefined;
+  const wsFirst = workspaces.data?.[0];
   const wsId = wsFirst?.id;
 
-  const projects = useQuery({
-    queryKey: ['projects', wsId],
-    queryFn: () => (wsId ? projectApi.list(wsId).then((r) => r.data) : Promise.resolve([])),
-    enabled: Boolean(wsId),
-  });
-  const projectList = Array.isArray(projects.data) ? projects.data as Array<{ id: string; name?: string }> : [];
-
   const allReleases = useQuery({
-    queryKey: ['releases-for-schedules', projectList.map((p) => p.id)],
-    queryFn: async (): Promise<ReleaseLite[]> => {
-      const out: ReleaseLite[] = [];
-      for (const p of projectList) {
-        try {
-          const r = await releaseApi.list(p.id).then((res) => res.data);
-          if (Array.isArray(r)) {
-            for (const rel of r) {
-              const lite: ReleaseLite = { id: String((rel as { id?: unknown }).id ?? '') };
-              if (p.name !== undefined) lite.capabilityName = p.name;
-              const cv = Number((rel as { capabilityVersion?: unknown }).capabilityVersion ?? 0);
-              if (cv) lite.capabilityVersion = cv;
-              const env = (rel as { environment?: unknown }).environment as string | undefined;
-              if (env !== undefined) lite.environment = env;
-              out.push(lite);
-            }
-          }
-        } catch { /* skip */ }
-      }
-      return out.filter((r) => r.id);
-    },
-    enabled: projectList.length > 0,
+    queryKey: ['releases-for-schedules'],
+    queryFn: () => releaseApi.listAll(1, 100).then((res) => res.data.items),
+    enabled: Boolean(wsId),
   });
 
   const schedules = useQuery({
     queryKey: ['schedules'],
-    queryFn: () => scheduleApi.list().then((r) => r.data).catch(() => [] as ScheduleItem[]),
+    queryFn: () => scheduleApi.list().then((r) => r.data),
   });
-  const rows = (schedules.data ?? []) as ScheduleItem[];
+  const rows: Schedule[] = schedules.data?.items ?? [];
 
   const [releaseId, setReleaseId] = useState('');
-  const [kind, setKind] = useState<typeof KIND_OPTIONS[number]['value']>('eval');
+  const [kind, setKind] = useState<ScheduleKind>('eval');
   const [cron, setCron] = useState('0 */6 * * *');
 
   const create = useMutation({
@@ -110,8 +71,19 @@ export default function SchedulesPage() {
   });
 
   if (!session) return null;
+  if (workspaces.isError) return <QueryError message={getErrorMessage(workspaces.error)} onRetry={() => void workspaces.refetch()} />;
+  if (allReleases.isError) return <QueryError message={getErrorMessage(allReleases.error)} onRetry={() => void allReleases.refetch()} />;
+  if (schedules.isError) return <QueryError message={getErrorMessage(schedules.error)} onRetry={() => void schedules.refetch()} />;
+  if (workspaces.isPending || (Boolean(wsId) && allReleases.isPending) || schedules.isPending) {
+    return (
+      <div className="space-y-6" aria-busy="true">
+        <PageHeader eyebrow="Release" title="Schedules" subtitle="Cron-based schedules for eval runs, release rotations, and self-evolve cycles." />
+        <Surface className="h-72 animate-pulse bg-surface-2/40"><span className="sr-only">Loading schedules</span></Surface>
+      </div>
+    );
+  }
 
-  const releases = (allReleases.data ?? []) as ReleaseLite[];
+  const releases: Release[] = allReleases.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -124,7 +96,7 @@ export default function SchedulesPage() {
       <Surface>
         <SurfaceHeader
           title="New schedule"
-          description={wsId ? `In workspace ${wsFirst?.id?.slice(0, 8) ?? ''}` : 'No workspace available'}
+          description={wsId ? `In workspace ${wsFirst?.name ?? wsId.slice(0, 8)}` : 'Create a workspace before scheduling a release.'}
         />
         <div className="grid gap-3 sm:grid-cols-4">
           <div>
@@ -136,7 +108,7 @@ export default function SchedulesPage() {
                 placeholder="— pick a release —"
                 options={releases.map((r) => ({
                   value: r.id,
-                  label: `${r.capabilityName ?? '?'} v${r.capabilityVersion ?? '?'} · ${r.environment ?? '—'}`,
+                  label: `${r.capabilityId} v${r.capabilityVersion} · ${r.environment}`,
                 }))}
                 ariaLabel="Pick a release"
                 triggerClassName="w-full"
@@ -148,7 +120,7 @@ export default function SchedulesPage() {
             <div className="mt-2">
               <ThemedSelect
                 value={kind}
-                onValueChange={(v) => setKind(v as typeof KIND_OPTIONS[number]['value'])}
+                onValueChange={(v) => { if (isScheduleKind(v)) setKind(v); }}
                 options={KIND_OPTIONS.map((k) => ({ value: k.value, label: k.label }))}
                 ariaLabel="Schedule kind"
                 triggerClassName="w-full"
@@ -156,8 +128,9 @@ export default function SchedulesPage() {
             </div>
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Cron</label>
+            <label htmlFor="schedule-cron" className="text-xs uppercase tracking-wider text-text-subtle">Cron</label>
             <Input
+              id="schedule-cron"
               value={cron}
               onChange={(e) => setCron(e.target.value)}
               placeholder="0 */6 * * *"
@@ -167,7 +140,7 @@ export default function SchedulesPage() {
           <div className="flex items-end">
             <Button
               onClick={() => create.mutate()}
-              disabled={!releaseId || !cron || create.isPending}
+              disabled={!wsId || !releaseId || !cron.trim() || create.isPending}
               className="w-full"
             >
               <Plus className="mr-1.5 size-3.5" />
@@ -175,8 +148,9 @@ export default function SchedulesPage() {
             </Button>
           </div>
         </div>
-        {create.isError && (
-          <div className="mt-3 text-xs text-destructive">{(create.error as Error).message}</div>
+        {create.isError && <div role="alert" className="mt-3 text-xs text-destructive">{getErrorMessage(create.error, 'The schedule could not be created.')}</div>}
+        {!allReleases.isPending && releases.length === 0 && wsId && (
+          <p className="mt-3 text-xs text-text-muted">Publish a release first; schedules can only target published releases.</p>
         )}
       </Surface>
 
@@ -196,35 +170,35 @@ export default function SchedulesPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
+            rows={rows}
+            rowKey={(r) => r.id}
             columns={[
               {
                 key: 'kind',
                 header: 'Kind',
-                render: (r) => <Badge>{String(r['kind'] ?? 'eval')}</Badge>,
+                render: (r) => <Badge>{r.kind}</Badge>,
               },
               {
                 key: 'release',
                 header: 'Release',
                 render: (r) => (
-                  <span className="font-mono text-xs text-text-muted">{String(r['releaseId'] ?? '—').slice(0, 16)}…</span>
+                  <span className="font-mono text-xs text-text-muted">{r.releaseId.slice(0, 16)}…</span>
                 ),
               },
               {
                 key: 'cron',
                 header: 'Cron',
-                render: (r) => <code className="font-mono text-xs">{String(r['cron'] ?? '—')}</code>,
+                render: (r) => <code className="font-mono text-xs">{r.cron}</code>,
               },
               {
                 key: 'last',
                 header: 'Last run',
-                render: (r) => r['lastRunAt'] ? new Date(String(r['lastRunAt'])).toLocaleString() : '—',
+                render: (r) => r.lastFireAt ? new Date(r.lastFireAt).toLocaleString() : '—',
               },
               {
                 key: 'next',
                 header: 'Next run',
-                render: (r) => r['nextRunAt'] ? new Date(String(r['nextRunAt'])).toLocaleString() : '—',
+                render: (r) => new Date(r.nextFireAt).toLocaleString(),
               },
               {
                 key: 'actions',
@@ -233,10 +207,13 @@ export default function SchedulesPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => remove.mutate(String(r['id']))}
+                    onClick={() => {
+                      if (window.confirm('Delete this schedule? This cannot be undone.')) remove.mutate(r.id);
+                    }}
+                    disabled={remove.isPending}
                   >
                     <Trash2 className="mr-1 size-3" />
-                    Delete
+                    {remove.isPending ? 'Deleting…' : 'Delete'}
                   </Button>
                 ),
               },

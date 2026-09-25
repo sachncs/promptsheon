@@ -4,20 +4,21 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { GitBranch, GitMerge, Plus, ArrowUpRight } from 'lucide-react';
+import { GitBranch, ArrowUpRight } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
-import { workspaceApi, projectApi, capabilityApi, releaseApi } from '@/lib/api';
+import { workspaceApi, projectApi, capabilityApi, releaseApi, type Release } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
-import { Surface } from '@/components/brand/surface';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Tabs, TabsList, TabsTrigger } from '@/components/brand/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NewReleaseDialog } from '@/components/brand/new-release-dialog';
+import { QueryError } from '@/components/brand/query-error';
 
 type FilterState = 'all' | 'draft' | 'review' | 'approved' | 'canary' | 'active' | 'rolled-back';
+type ReleaseRow = Release & { capabilityName: string };
 
 export default function ReleasesPage() {
   const session = useRequireSession();
@@ -38,10 +39,10 @@ export default function ReleasesPage() {
   const capabilities = useQuery({
     queryKey: ['capabilities', 'all', allProjects.map((p) => p.id)],
     queryFn: async () => {
-      const out: Array<Record<string, unknown>> = [];
+      const out: Array<{ id: string; name: string }> = [];
       for (const p of allProjects) {
-        const list = await capabilityApi.list(p.id).then((r) => r.data).catch(() => []);
-        if (Array.isArray(list)) out.push(...(list as Array<Record<string, unknown>>));
+        const list = await capabilityApi.list(p.id).then((r) => r.data);
+        out.push(...list.map((capability) => ({ id: capability.id, name: capability.name })));
       }
       return out;
     },
@@ -51,19 +52,18 @@ export default function ReleasesPage() {
   const releases = useQuery({
     queryKey: ['releases', 'all', capabilities.data],
     queryFn: async () => {
-      const out: Array<Record<string, unknown>> = [];
+      const out: ReleaseRow[] = [];
       const caps = capabilities.data ?? [];
       for (const c of caps) {
-        const list = await releaseApi.list(String(c['id'])).then((r) => r.data).catch(() => []);
+        const list = await releaseApi.list(c.id).then((r) => r.data);
         if (Array.isArray(list)) {
-          out.push(...list.map((rel: Record<string, unknown>) => ({
+          out.push(...list.map((rel) => ({
             ...rel,
-            capabilityName: String(c['name'] ?? '—'),
-            capabilityId: String(c['id']),
+            capabilityName: c.name,
           })));
         }
       }
-      return out.sort((a, b) => String(b['createdAt'] ?? '').localeCompare(String(a['createdAt'] ?? '')));
+      return out.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     },
     enabled: Array.isArray(capabilities.data) && capabilities.data.length > 0,
   });
@@ -71,17 +71,20 @@ export default function ReleasesPage() {
   const rows = useMemo(() => {
     const arr = Array.isArray(releases.data) ? releases.data : [];
     return arr.filter((r) => {
-      if (filter !== 'all' && String(r['state'] ?? '') !== filter) return false;
+      if (filter !== 'all' && r.status !== filter) return false;
       if (search) {
         const q = search.toLowerCase();
-        if (!String(r['capabilityName'] ?? '').toLowerCase().includes(q) &&
-            !String(r['manifestHash'] ?? '').toLowerCase().includes(q)) return false;
+        if (!r.capabilityName.toLowerCase().includes(q) && !r.id.toLowerCase().includes(q)) return false;
       }
       return true;
     });
   }, [releases.data, filter, search]);
 
   if (!session) return null;
+  if (workspaces.isError) return <QueryError message={workspaces.error} onRetry={() => void workspaces.refetch()} />;
+  if (projects.isError) return <QueryError message={projects.error} onRetry={() => void projects.refetch()} />;
+  if (capabilities.isError) return <QueryError message={capabilities.error} onRetry={() => void capabilities.refetch()} />;
+  if (releases.isError) return <QueryError message={releases.error} onRetry={() => void releases.refetch()} />;
 
   const total = Array.isArray(releases.data) ? releases.data.length : 0;
 
@@ -132,14 +135,14 @@ export default function ReleasesPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {rows.map((r) => {
-            const id = String(r['id']);
-            const name = String(r['capabilityName'] ?? '—');
-            const version = String(r['capabilityVersion'] ?? '?');
-            const env = String(r['environment'] ?? 'production');
-            const state = String(r['state'] ?? 'neutral');
-            const canary = Number(r['canaryPercent'] ?? 0);
-            const hash = String(r['manifestHash'] ?? id);
-            const updated = new Date(String(r['updatedAt'] ?? r['createdAt'] ?? Date.now()));
+            const id = r.id;
+            const name = r.capabilityName;
+            const version = r.capabilityVersion;
+            const env = r.environment;
+            const state = r.status;
+            const canary = r.canaryPercent;
+            const hash = r.id;
+            const updated = new Date(r.createdAt);
             return (
               <button
                 key={id}
@@ -155,7 +158,7 @@ export default function ReleasesPage() {
                   <ArrowUpRight className="size-4 shrink-0 text-text-subtle opacity-0 transition-opacity group-hover:opacity-100" />
                 </div>
                 <div className="mt-3 flex items-center gap-2">
-                  <StatusPill kind={(state as never) ?? 'neutral'} />
+                  <StatusPill kind={statusKindOf(state)} />
                   {canary > 0 && (
                     <div className="flex items-center gap-2">
                       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-2">

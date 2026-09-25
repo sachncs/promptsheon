@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Boxes, Plus, Trash2 } from 'lucide-react';
-import { projectApi, workspaceApi } from '@/lib/api';
+import { projectApi, workspaceApi, type WorkspaceRow } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -14,6 +14,8 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 interface ProjectItem {
   id: string;
@@ -32,9 +34,9 @@ export default function ProjectsPage() {
 
   const workspaces = useQuery({
     queryKey: ['workspaces'],
-    queryFn: () => workspaceApi.list(1).then((r) => r.data),
+    queryFn: () => workspaceApi.list(1, 100).then((r) => r.data),
   });
-  const wsFirst = Array.isArray(workspaces.data) ? workspaces.data[0] as { id?: string } : undefined;
+  const wsFirst: WorkspaceRow | undefined = workspaces.data?.[0];
   const wsId = wsFirst?.id;
 
   const projects = useQuery({
@@ -67,6 +69,11 @@ export default function ProjectsPage() {
   });
 
   if (!session) return null;
+  const failedQuery = [workspaces, projects].find((query) => query.isError);
+  if (failedQuery) return <QueryError message={failedQuery.error} onRetry={() => void failedQuery.refetch()} />;
+  if (workspaces.isPending || (Boolean(wsId) && projects.isPending)) {
+    return <div className="space-y-6" aria-busy="true"><PageHeader eyebrow="Admin" title="Projects" /><Surface className="h-72 animate-pulse bg-surface-2/40"><span className="sr-only">Loading projects</span></Surface></div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -105,7 +112,7 @@ export default function ProjectsPage() {
           </Button>
         </div>
         {create.isError && (
-          <div className="mt-3 text-xs text-destructive">{(create.error as Error).message}</div>
+          <div className="mt-3 text-xs text-destructive">{getErrorMessage(create.error)}</div>
         )}
       </Surface>
 
@@ -126,17 +133,17 @@ export default function ProjectsPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => { router.push(`/app/workspaces/${String(r['workspaceId'] ?? wsId)}/projects`); }}
+            rows={rows}
+            rowKey={(r) => r.id ?? `project-${r.name}`}
+            onRowClick={(r) => { router.push(`/app/workspaces/${r.workspaceId ?? wsId}/projects`); }}
             columns={[
               {
                 key: 'name',
                 header: 'Project',
                 render: (r) => (
                   <div>
-                    <div className="font-medium text-text-strong">{String(r['name'] ?? '—')}</div>
-                    {r['description'] ? <div className="text-xs text-text-subtle">{String(r['description'])}</div> : null}
+                  <div className="font-medium text-text-strong">{r.name || '—'}</div>
+                    {r.description ? <div className="text-xs text-text-subtle">{r.description}</div> : null}
                   </div>
                 ),
               },
@@ -144,20 +151,20 @@ export default function ProjectsPage() {
                 key: 'capabilities',
                 header: 'Capabilities',
                 render: (r) => {
-                  const n = r['capabilityCount'];
-                  return n !== undefined ? <span className="font-mono text-xs">{String(n)}</span> : '—';
+                  const n = r.capabilityCount;
+                  return n !== undefined ? <span className="font-mono text-xs">{n}</span> : '—';
                 },
               },
               {
                 key: 'updated',
                 header: 'Updated',
-                render: (r) => r['updatedAt'] ? new Date(String(r['updatedAt'])).toLocaleDateString() : '—',
+                render: (r) => r.updatedAt ? new Date(r.updatedAt).toLocaleDateString() : '—',
               },
               {
                 key: 'actions',
                 header: '',
                 render: (r) => (
-                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); remove.mutate(String(r['id'])); }}>
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); if (window.confirm('Delete this project? Capabilities inside it may also be removed.')) remove.mutate(r.id); }}>
                     <Trash2 className="mr-1 size-3" />
                     Delete
                   </Button>

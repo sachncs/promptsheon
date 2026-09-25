@@ -11,13 +11,14 @@ import { StatusPill } from '@/components/brand/status-pill';
 import { Progress } from '@/components/ui/progress';
 import { EmptyState } from '@/components/brand/empty-state';
 import { FlaskConical } from 'lucide-react';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function EvalRunsPage() {
   const params = useParams<{ capabilityId: string }>();
   const capabilityId = params.capabilityId;
   const session = useRequireSession();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['eval-runs', capabilityId],
     queryFn: () => evalApi.list().then((r) => r.data),
     enabled: Boolean(capabilityId) && Boolean(session),
@@ -30,6 +31,12 @@ export default function EvalRunsPage() {
     status: string;
     startedAt: string;
   }>;
+
+  if (!session) return null;
+
+  if (isError) {
+    return <QueryError message={error} onRetry={() => void refetch()} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -51,16 +58,16 @@ export default function EvalRunsPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
+            rows={rows}
+            rowKey={(r) => r.id}
             columns={[
-              { key: 'id', header: 'Run', render: (r) => <span className="font-mono text-xs">{String(r['id']).slice(0, 12)}…</span> },
-              { key: 'scorer', header: 'Scorer', render: (r) => String(r['scorer'] ?? '—') },
+              { key: 'id', header: 'Run', render: (r) => <span className="font-mono text-xs">{r.id.slice(0, 12)}…</span> },
+              { key: 'scorer', header: 'Scorer', render: (r) => r.scorer || '—' },
               {
                 key: 'score',
                 header: 'Score',
                 render: (r) => {
-                  const s = Number(r['score'] ?? 0);
+                  const s = r.score;
                   return (
                     <div className="flex items-center gap-2 w-40">
                       <Progress value={s * 100} />
@@ -74,15 +81,15 @@ export default function EvalRunsPage() {
                 header: 'Status',
                 render: (r) => (
                   <StatusPill
-                    kind={r['status'] === 'passed' ? 'active' : r['status'] === 'failed' ? 'rejected' : 'review'}
-                    label={String(r['status'])}
+                    kind={r.status === 'passed' ? 'active' : r.status === 'failed' ? 'rejected' : 'review'}
+                    label={r.status}
                   />
                 ),
               },
               {
                 key: 'started',
                 header: 'Started',
-                render: (r) => r['startedAt'] ? new Date(String(r['startedAt'])).toLocaleString() : '—',
+                render: (r) => r.startedAt ? new Date(r.startedAt).toLocaleString() : '—',
               },
             ]}
           />

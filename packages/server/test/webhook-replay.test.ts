@@ -127,4 +127,38 @@ describe('webhook executor wiring + replay protection', () => {
     });
     expect(second.statusCode).toBe(202);
   });
+
+  it('does not share replay state between app instances', async () => {
+    const body = JSON.stringify({ ref: 'main' });
+    const ts = Math.floor(Date.now() / 1000);
+    const sig = sign(SECRET, ts, body);
+    const eventId = 'isolated-event';
+    const otherApp = Fastify({ logger: false });
+    await otherApp.register(async (instance) => {
+      registerWebhookRoutes(instance, {
+        receiver: new WebhookReceiver(
+          [{ id: ENDPOINT_ID, url: 'https://example.com/hook', events: ['push'], active: true, secret: SECRET }],
+          [],
+        ),
+      });
+    });
+    await otherApp.ready();
+
+    const first = await app.inject({
+      method: 'POST',
+      url: `/api/webhooks/incoming/${ENDPOINT_ID}`,
+      headers: { 'content-type': 'application/json', 'x-webhook-signature': sig, 'x-webhook-event': 'push', 'x-webhook-event-id': eventId },
+      payload: body,
+    });
+    const second = await otherApp.inject({
+      method: 'POST',
+      url: `/api/webhooks/incoming/${ENDPOINT_ID}`,
+      headers: { 'content-type': 'application/json', 'x-webhook-signature': sig, 'x-webhook-event': 'push', 'x-webhook-event-id': eventId },
+      payload: body,
+    });
+
+    expect(first.statusCode).toBe(202);
+    expect(second.statusCode).toBe(202);
+    await otherApp.close();
+  });
 });

@@ -1,9 +1,3 @@
----
-layout: page
-title: Security
-subtitle: Threat model, disclosure policy, and hardening layers.
----
-
 # Security
 
 Promptsheon ships with a documented threat model, a SOC2 control set, and a public audit chain. This page is the operator-facing summary. The full documents live in the repo.
@@ -51,7 +45,7 @@ Every state transition appends a frame to a hash-linked log. The chain is public
 - **Rate limiting** — `@fastify/rate-limit` caps at 100 requests per minute per user (or per IP for unauthenticated calls).
 - **CORS** — single origin, configured via `PROMPTSHEON_CORS_ORIGIN`. Defaults to `http://localhost:3000` for local dev.
 - **SSRF guards** — outbound LLM URLs are validated against a private-IP blocklist.
-- **Input validation** — every request body is parsed through Zod before any handler runs.
+- **Input validation** — request bodies, queries, and route parameters are parsed through Zod before any handler runs; malformed configuration fails at boot.
 - **Maker-checker** — releases require two non-creator approvals before activation.
 - **Webhook replay protection** — incoming webhooks carry an HMAC signature and a one-shot nonce.
 
@@ -87,6 +81,6 @@ Follow the disclosure process in [`SECURITY.md`](https://github.com/sachncs/prom
 
 | You want to… | Read this |
 |--------------|-----------|
-| Read the architecture | [Architecture]({{ '/architecture/' | relative_url }}) |
-| Hit the HTTP API | [API reference]({{ '/api-reference/' | relative_url }}) |
-| Understand the model | [Core concepts]({{ '/core-concepts/' | relative_url }}) |
+| Read the architecture | [Architecture](https://sachncs.github.io/promptsheon/docs/architecture/) |
+| Hit the HTTP API | [API reference](https://sachncs.github.io/promptsheon/docs/api/) |
+| Understand the model | [Quickstart](https://sachncs.github.io/promptsheon/docs/quickstart/) |

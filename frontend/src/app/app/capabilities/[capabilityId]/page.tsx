@@ -5,14 +5,14 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import {
-  ArrowLeft, Workflow, FlaskConical, GitBranch, ScrollText, ShieldCheck,
+  ArrowLeft, GitBranch,
   Box, Boxes,
 } from 'lucide-react';
 import { capabilityApi, versionApi, manifestApi, releaseApi } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
 import { Timeline } from '@/components/brand/timeline';
 import { DataTable } from '@/components/brand/data-table';
@@ -20,6 +20,7 @@ import { DagMini } from '@/components/brand/dag-mini';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 type Tab = 'overview' | 'versions' | 'graph' | 'releases';
 
@@ -38,7 +39,7 @@ export default function CapabilityDetailPage() {
 
   const versions = useQuery({
     queryKey: ['versions', id],
-    queryFn: () => versionApi.list(id).then((r) => r.data).catch(() => []),
+    queryFn: () => versionApi.list(id).then((r) => r.data),
     enabled: Boolean(id) && Boolean(session),
   });
 
@@ -46,13 +47,13 @@ export default function CapabilityDetailPage() {
 
   const manifest = useQuery({
     queryKey: ['manifest', id],
-    queryFn: () => manifestApi.get(id).then((r) => r.data).catch(() => null),
+    queryFn: () => manifestApi.get(id).then((r) => r.data),
     enabled: Boolean(id) && Boolean(session),
   });
 
   const releases = useQuery({
     queryKey: ['releases', id],
-    queryFn: () => releaseApi.list(id).then((r) => r.data).catch(() => []),
+    queryFn: () => releaseApi.list(id).then((r) => r.data),
     enabled: Boolean(id) && Boolean(session),
   });
   const releaseList = Array.isArray(releases.data) ? releases.data : [];
@@ -60,6 +61,11 @@ export default function CapabilityDetailPage() {
   if (cap.isLoading) {
     return <div className="text-text-muted text-sm">Loading…</div>;
   }
+
+  if (cap.isError) return <QueryError message={cap.error} onRetry={() => void cap.refetch()} />;
+  if (versions.isError) return <QueryError message={versions.error} onRetry={() => void versions.refetch()} />;
+  if (manifest.isError) return <QueryError message={manifest.error} onRetry={() => void manifest.refetch()} />;
+  if (releases.isError) return <QueryError message={releases.error} onRetry={() => void releases.refetch()} />;
 
   if (!cap.data) {
     return (
@@ -87,7 +93,7 @@ export default function CapabilityDetailPage() {
           actions={
             <div className="flex items-center gap-2">
               {c.manifestHash && <HashChip hash={c.manifestHash} />}
-              <StatusPill kind={(c.state as never) ?? 'active'} />
+              <StatusPill kind={statusKindOf(c.state, 'active')} />
               <Link href={`/app/diff?capability=${c.id}`}>
                 <Button variant="outline" size="sm">Diff a version</Button>
               </Link>
@@ -126,11 +132,11 @@ export default function CapabilityDetailPage() {
                 <EmptyState icon={Box} title="No versions yet" description="Compile a draft to create the first version." />
               ) : (
                 <Timeline
-                  entries={versionList.slice(0, 6).map((v: Record<string, unknown>) => ({
-                    id: String(v['id']),
-                    title: `v${String(v['version'] ?? '?')}`,
-                    description: String(v['summary'] ?? 'Compiled'),
-                    timestamp: new Date(String(v['createdAt'] ?? Date.now())).toLocaleString(),
+                  entries={versionList.slice(0, 6).map((v) => ({
+                    id: v.id,
+                    title: `v${v.version}`,
+                    description: 'Compiled',
+                    timestamp: new Date(v.createdAt).toLocaleString(),
                     icon: GitBranch,
                     tone: 'info',
                   }))}
@@ -146,17 +152,17 @@ export default function CapabilityDetailPage() {
             <DataTable
               className="rounded-none border-0 border-t border-border-subtle"
               rows={versionList}
-              rowKey={(r: Record<string, unknown>) => String(r['id'])}
+              rowKey={(r) => r.id}
               columns={[
-                { key: 'v', header: 'Version', render: (r: Record<string, unknown>) => <span className="font-mono text-xs">v{String(r['version'] ?? '?')}</span> },
-                { key: 'hash', header: 'Hash', render: (r: Record<string, unknown>) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} /> },
-                { key: 'author', header: 'Author', render: (r: Record<string, unknown>) => String(r['createdBy'] ?? 'system') },
-                { key: 'created', header: 'Created', render: (r: Record<string, unknown>) => new Date(String(r['createdAt'] ?? Date.now())).toLocaleString() },
+                { key: 'v', header: 'Version', render: (r) => <span className="font-mono text-xs">v{r.version}</span> },
+                { key: 'hash', header: 'Hash', render: (r) => <HashChip hash={r.manifestHash || r.id} /> },
+                { key: 'author', header: 'Author', render: (r) => r.createdBy || 'system' },
+                { key: 'created', header: 'Created', render: (r) => new Date(r.createdAt).toLocaleString() },
                 {
                   key: 'actions',
                   header: '',
-                  render: (r: Record<string, unknown>) => (
-                    <Link href={`/app/diff?capability=${id}&version=${String(r['version'] ?? '')}`} className="text-xs text-brand-highlight hover:underline">
+                  render: (r) => (
+                    <Link href={`/app/diff?capability=${id}&version=${r.version}`} className="text-xs text-brand-highlight hover:underline">
                       Diff
                     </Link>
                   ),
@@ -170,8 +176,8 @@ export default function CapabilityDetailPage() {
           <Surface>
             <SurfaceHeader title="Multi-agent DAG" description="The structure of this capability: agents, tools, memory, policies, and the edges between them." />
             <DagMini
-              nodes={nodesForManifest(manifest.data as Record<string, unknown> | null)}
-              edges={edgesForManifest(manifest.data as Record<string, unknown> | null)}
+              nodes={nodesForManifest(recordOf(manifest.data?.manifest))}
+              edges={edgesForManifest(recordOf(manifest.data?.manifest))}
               className="mt-3 rounded-lg border border-border-subtle bg-surface-0"
             />
           </Surface>
@@ -183,14 +189,14 @@ export default function CapabilityDetailPage() {
             <DataTable
               className="rounded-none border-0 border-t border-border-subtle"
               rows={releaseList}
-              rowKey={(r: Record<string, unknown>) => String(r['id'])}
-              onRowClick={(r) => { router.push(`/app/releases/${String(r['id'])}`); }}
+              rowKey={(r) => r.id}
+              onRowClick={(r) => { router.push(`/app/releases/${r.id}`); }}
               columns={[
-                { key: 'v', header: 'Version', render: (r: Record<string, unknown>) => `v${String(r['capabilityVersion'] ?? '?')}` },
-                { key: 'env', header: 'Environment', render: (r: Record<string, unknown>) => <span className="font-mono text-xs">{String(r['environment'] ?? 'production')}</span> },
-                { key: 'state', header: 'State', render: (r: Record<string, unknown>) => <StatusPill kind={(r['state'] as never) ?? 'neutral'} /> },
-                { key: 'hash', header: 'Content', render: (r: Record<string, unknown>) => <HashChip hash={String(r['manifestHash'] ?? r['id'])} /> },
-                { key: 'canary', header: 'Canary', render: (r: Record<string, unknown>) => r['canaryPercent'] != null ? `${String(r['canaryPercent'])}%` : '—' },
+                { key: 'v', header: 'Version', render: (r) => `v${r.capabilityVersion}` },
+                { key: 'env', header: 'Environment', render: (r) => <span className="font-mono text-xs">{r.environment}</span> },
+                { key: 'state', header: 'State', render: (r) => <StatusPill kind={statusKindOf(r.status)} /> },
+                { key: 'hash', header: 'Identifier', render: (r) => <HashChip hash={r.id} /> },
+                { key: 'canary', header: 'Canary', render: (r) => `${r.canaryPercent}%` },
               ]}
             />
           </Surface>
@@ -207,6 +213,12 @@ function Detail({ label, value, mono }: { label: string; value: React.ReactNode;
       <dd className={mono ? 'font-mono text-xs text-text-default' : 'text-sm text-text-default'}>{value}</dd>
     </div>
   );
+}
+
+function recordOf(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
 }
 
 interface ManifestLike { nodes?: Array<{ id: string; label?: string }>; edges?: Array<{ from: string; to: string }> }

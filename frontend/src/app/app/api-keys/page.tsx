@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { KeyRound, Plus, Shield } from 'lucide-react';
 import { apiKeyApi, userApi } from '@/lib/api';
@@ -12,6 +13,9 @@ import { ThemedSelect } from '@/components/brand/themed-select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
+import { useToast } from '@/components/brand/toast';
 
 interface ApiKey {
   id: string;
@@ -25,21 +29,65 @@ interface ApiKey {
   revoked: boolean;
 }
 
+const ApiKeySchema = z.object({
+  id: z.string().min(1),
+  userId: z.string().min(1),
+  name: z.string(),
+  keyPrefix: z.string().min(1),
+  role: z.string().min(1),
+  expiresAt: z.string().nullable(),
+  lastUsed: z.string().nullable(),
+  createdAt: z.string(),
+  revoked: z.boolean(),
+});
+
+const CurrentUserSchema = z.object({
+  id: z.string().min(1),
+  email: z.string().email(),
+  name: z.string(),
+  role: z.string().min(1),
+});
+
+const IssuedKeySchema = z.object({
+  key: z.string().min(1),
+  id: z.string().min(1),
+  name: z.string(),
+});
+
+function parseApiKeyList(raw: unknown): { keys: ApiKey[] } {
+  const parsed = z.object({ keys: z.array(ApiKeySchema) }).safeParse(raw);
+  if (!parsed.success) throw new Error('The server returned invalid API-key data.');
+  return parsed.data;
+}
+
+function parseCurrentUser(raw: unknown): z.infer<typeof CurrentUserSchema> {
+  const parsed = CurrentUserSchema.safeParse(raw);
+  if (!parsed.success) throw new Error('The server returned invalid user data.');
+  return parsed.data;
+}
+
+function parseIssuedKey(raw: unknown): z.infer<typeof IssuedKeySchema> {
+  const parsed = IssuedKeySchema.safeParse(raw);
+  if (!parsed.success) throw new Error('The server returned an invalid API key.');
+  return parsed.data;
+}
+
 export default function ApiKeysPage() {
   const session = useRequireSession();
   const qc = useQueryClient();
+  const { toast } = useToast();
   const keys = useQuery({
     queryKey: ['api-keys'],
     queryFn: async () => {
       const r = await apiKeyApi.list();
-      return (r.data as unknown as { keys: ApiKey[] }) ?? { keys: [] };
+      return parseApiKeyList(r.data);
     },
   });
   const me = useQuery({
     queryKey: ['me'],
     queryFn: async () => {
       const r = await userApi.me();
-      return r.data as unknown as { user: { id: string; email: string; name: string; role: string } };
+      return parseCurrentUser(r.data);
     },
   });
   const [name, setName] = useState('');
@@ -47,21 +95,31 @@ export default function ApiKeysPage() {
   const [issued, setIssued] = useState<{ key: string; id: string; name: string } | null>(null);
 
   const create = useMutation({
-    mutationFn: () => apiKeyApi.create({ name: name || 'untitled', role }),
+    mutationFn: () => {
+      if (!session) throw new Error('A session is required to issue an API key');
+      return apiKeyApi.create({ name: name || 'untitled', role, userId: session.userId });
+    },
     onSuccess: async (resp) => {
-      const o = resp.data as unknown as { key: string; id: string; name: string };
+      const o = parseIssuedKey(resp.data);
       setIssued(o);
       setName('');
       void qc.invalidateQueries({ queryKey: ['api-keys'] });
+      toast({ title: 'API key issued', description: 'Copy it now; it will not be shown again.', variant: 'success' });
     },
+    onError: (error) => toast({ title: 'Could not issue API key', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   const revoke = useMutation({
     mutationFn: (id: string) => apiKeyApi.revoke(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['api-keys'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['api-keys'] });
+      toast({ title: 'API key revoked', variant: 'success' });
+    },
+    onError: (error) => toast({ title: 'Could not revoke API key', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   if (!session) return null;
+  if (keys.isError) return <QueryError message={keys.error} onRetry={() => void keys.refetch()} />;
   const rows = keys.data?.keys ?? [];
 
   return (
@@ -75,12 +133,13 @@ export default function ApiKeysPage() {
       <Surface>
         <SurfaceHeader
           title="Issue a key"
-          description={me.data ? `as ${me.data.user.email}` : 'as the current actor'}
+          description={me.data ? `as ${me.data.email}` : 'as the current actor'}
         />
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Name</label>
+            <label htmlFor="api-key-name" className="text-xs uppercase tracking-wider text-text-subtle">Name</label>
             <Input
+              id="api-key-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="mt-2"
@@ -118,6 +177,19 @@ export default function ApiKeysPage() {
             <pre className="mt-2 overflow-x-auto rounded-md bg-surface-0 p-3 font-mono text-xs text-text-default">
 {issued.key}
             </pre>
+            <Button
+              className="mt-3"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                void navigator.clipboard.writeText(issued.key).then(
+                  () => toast({ title: 'API key copied', variant: 'success' }),
+                  () => toast({ title: 'Copy failed', description: 'Select and copy the key manually.', variant: 'destructive' }),
+                );
+              }}
+            >
+              Copy key
+            </Button>
             <div className="mt-2 text-xs text-text-muted">
               Use as <code className="rounded bg-surface-2 px-1 py-0.5">Authorization: Bearer {issued.key}</code>
             </div>
@@ -132,41 +204,41 @@ export default function ApiKeysPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
+            rows={rows}
+            rowKey={(r) => r.id}
             columns={[
-              { key: 'name', header: 'Name', render: (r) => String(r['name']) },
+              { key: 'name', header: 'Name', render: (r) => r.name },
               {
                 key: 'prefix',
                 header: 'Prefix',
-                render: (r) => <span className="font-mono text-xs">{String(r['keyPrefix'])}…</span>,
+                render: (r) => <span className="font-mono text-xs">{r.keyPrefix}…</span>,
               },
-              { key: 'role', header: 'Role', render: (r) => <Badge>{String(r['role'])}</Badge> },
+              { key: 'role', header: 'Role', render: (r) => <Badge>{r.role}</Badge> },
               {
                 key: 'last',
                 header: 'Last used',
-                render: (r) => r['lastUsed'] ? new Date(String(r['lastUsed'])).toLocaleString() : '—',
+                render: (r) => r.lastUsed ? new Date(r.lastUsed).toLocaleString() : '—',
               },
               {
                 key: 'created',
                 header: 'Created',
-                render: (r) => new Date(String(r['createdAt'])).toLocaleString(),
+                render: (r) => new Date(r.createdAt).toLocaleString(),
               },
               {
                 key: 'state',
                 header: 'State',
-                render: (r) => r['revoked']
+                render: (r) => r.revoked
                   ? <Badge className="bg-surface-3 text-text-muted">revoked</Badge>
                   : <Badge className="bg-success/15 text-success">active</Badge>,
               },
               {
                 key: 'actions',
                 header: '',
-                render: (r) => r['revoked'] ? null : (
+                render: (r) => r.revoked ? null : (
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => revoke.mutate(String(r['id']))}
+                    onClick={() => revoke.mutate(r.id)}
                   >
                     <KeyRound className="mr-1 h-3 w-3" />
                     Revoke

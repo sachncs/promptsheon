@@ -9,7 +9,10 @@ import { ExecutionRepo, ReplayInputsUnavailableError } from '../src/repos/execut
 import { ManifestRepo } from '../src/repos/manifest.js';
 import { TraceRepo } from '../src/repos/trace.js';
 import { registerExecutionRoutes } from '../src/routes/execution.js';
+import { ExecutionService } from '../src/application/execution-service.js';
+import { selectByCanary } from '../src/application/canary-routing.js';
 import { ManifestGraphExecutor } from '../src/agents/executor/executor.js';
+import { ExecutionReplayService } from '../src/application/execution-replay-service.js';
 import { SseHub } from '../src/sse/hub.js';
 import type { ExecutionTrace } from '../src/agents/executor/index.js';
 
@@ -83,8 +86,8 @@ function buildLeafManifest(id = 'm1'): Manifest {
 
 function insertTestData(db: ReturnType<typeof Database>): void {
   db.prepare(
-    `INSERT INTO workspaces (id, name, organization, created_at, updated_at)
-     VALUES ('ws1', 'Test WS', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`,
+    `INSERT INTO workspaces (id, org_id, name, organization, created_at, updated_at)
+     VALUES ('ws1', 'unscoped', 'Test WS', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`,
   ).run();
   db.prepare(
     `INSERT INTO projects (id, workspace_id, name, description, created_at, updated_at)
@@ -121,6 +124,10 @@ async function setupHarness(): Promise<TestHarness> {
   const hub = new SseHub();
   const executor = new ManifestGraphExecutor({ config: buildConfig(), hub });
   const app = Fastify();
+  app.addHook('preHandler', (request, _reply, done) => {
+    (request as Record<string, unknown>)['orgContext'] = { orgId: 'unscoped' };
+    done();
+  });
   app.setErrorHandler((error, _request, reply) => {
     if (error.name === 'NotFoundError') {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: error.message } });
@@ -133,11 +140,15 @@ async function setupHarness(): Promise<TestHarness> {
   await app.register(async (instance) => {
     await registerExecutionRoutes(instance, {
       executionRepo,
-      releaseRepo: { findActiveByManifestHash: () => [] } as never,
-      manifestRepo,
-      versionRepo: { findById: () => null } as never,
-      traceRepo,
-      executor,
+      executionService: new ExecutionService(
+        manifestRepo,
+        { findActiveByManifestHashInOrg: () => [] },
+        traceRepo,
+        executionRepo,
+        executor,
+        selectByCanary,
+      ),
+      replayService: new ExecutionReplayService(executionRepo, manifestRepo, traceRepo, executor),
     });
   });
   await app.ready();
@@ -172,11 +183,31 @@ describe('ExecutionReplayService / POST /api/executions/:id/replay', () => {
       traceId: 'trace-1',
       environment: 'prod',
     });
-    const ctx = h.executionRepo.findReplayContext(original.id);
+    const ctx = h.executionRepo.findReplayContextInOrg(original.id, 'unscoped');
     expect(ctx).not.toBeNull();
     expect(ctx!.manifestHash).toBe('placeholder');
     expect(ctx!.parsedInputs).toEqual({ foo: 'bar', n: 42 });
     expect(ctx!.execution.id).toBe(original.id);
+  });
+
+  it('does not resolve replay context outside the owning organization', () => {
+    const original = h.executionRepo.create({
+      capabilityVersionId: 'cv1',
+      inputs: JSON.stringify({ foo: 'bar' }),
+      outputs: '{}',
+      model: 'gpt-4',
+      provider: 'openai',
+      latencyMs: 0,
+      costUsd: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      error: '',
+      traceId: 'trace-tenant',
+      environment: 'prod',
+    });
+
+    expect(h.executionRepo.findReplayContextInOrg(original.id, 'other-org')).toBeNull();
   });
 
   it('throws ReplayInputsUnavailableError for legacy hash-stored inputs', () => {
@@ -187,7 +218,7 @@ describe('ExecutionReplayService / POST /api/executions/:id/replay', () => {
          VALUES (?, 'cv1', ?, '{}', '', '', 0, 0, 0, 0, 0, '', '', '', '2026-01-01T00:00:00Z')`,
       )
       .run(id, 'not-json-pre-migr');
-    expect(() => h.executionRepo.findReplayContext(id)).toThrow(ReplayInputsUnavailableError);
+    expect(() => h.executionRepo.findReplayContextInOrg(id, 'unscoped')).toThrow(ReplayInputsUnavailableError);
   });
 
   it('incrementReplayCount is idempotent and updates the count', () => {

@@ -43,47 +43,8 @@ interface CommentRow {
   created_at: string;
 }
 
-function toMR(row: MRRow): MergeRequest {
-  const approvals = approvalsFor(row.id);
-  return {
-    id: row.id,
-    repositoryId: row.repository_id,
-    number: row.number,
-    title: row.title,
-    description: row.description,
-    sourceBranch: row.source_branch,
-    targetBranch: row.target_branch,
-    sourceCommitOid: row.source_commit_oid,
-    mergeCommitOid: row.merge_commit_oid,
-    authorId: row.author_id,
-    status: row.status,
-    approvedBy: approvals.filter((a) => a.decision === 'approve').map((a) => a.userId),
-    requestedReviewers: JSON.parse(row.requested_reviewers) as string[],
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    mergedAt: row.merged_at,
-  };
-}
-
-function approvalsFor(mrId: string): MergeRequestApproval[] {
-  const db = (globalThis as unknown as { __mrRepoDb?: Database.Database }).__mrRepoDb;
-  if (!db) return [];
-  const rows = db
-    .prepare('SELECT * FROM merge_request_approvals WHERE merge_request_id = ?')
-    .all(mrId) as ApprovalRow[];
-  return rows.map((r) => ({
-    mergeRequestId: r.merge_request_id,
-    userId: r.user_id,
-    decision: r.decision,
-    commentId: r.comment_id,
-    createdAt: r.created_at,
-  }));
-}
-
 export class MergeRequestRepo {
-  constructor(private db: Database.Database) {
-    (globalThis as unknown as { __mrRepoDb?: Database.Database }).__mrRepoDb = db;
-  }
+  constructor(private db: Database.Database) {}
 
   listOpen(repositoryId: string): MergeRequest[] {
     const rows = this.db
@@ -92,21 +53,21 @@ export class MergeRequestRepo {
          ORDER BY number DESC`,
       )
       .all(repositoryId) as MRRow[];
-    return rows.map(toMR);
+    return rows.map((row) => this.toMR(row));
   }
 
   listAll(repositoryId: string): MergeRequest[] {
     const rows = this.db
       .prepare('SELECT * FROM merge_requests WHERE repository_id = ? ORDER BY number DESC')
       .all(repositoryId) as MRRow[];
-    return rows.map(toMR);
+    return rows.map((row) => this.toMR(row));
   }
 
   findById(id: string): MergeRequest | null {
     const row = this.db
       .prepare('SELECT * FROM merge_requests WHERE id = ?')
       .get(id) as MRRow | undefined;
-    return row ? toMR(row) : null;
+    return row ? this.toMR(row) : null;
   }
 
   nextNumber(repositoryId: string): number {
@@ -207,6 +168,41 @@ export class MergeRequestRepo {
   }
 
   listApprovals(mrId: string): MergeRequestApproval[] {
-    return approvalsFor(mrId);
+    return this.approvalsFor(mrId);
+  }
+
+  private toMR(row: MRRow): MergeRequest {
+    const approvals = this.approvalsFor(row.id);
+    return {
+      id: row.id,
+      repositoryId: row.repository_id,
+      number: row.number,
+      title: row.title,
+      description: row.description,
+      sourceBranch: row.source_branch,
+      targetBranch: row.target_branch,
+      sourceCommitOid: row.source_commit_oid,
+      mergeCommitOid: row.merge_commit_oid,
+      authorId: row.author_id,
+      status: row.status,
+      approvedBy: approvals.filter((a) => a.decision === 'approve').map((a) => a.userId),
+      requestedReviewers: JSON.parse(row.requested_reviewers) as string[],
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      mergedAt: row.merged_at,
+    };
+  }
+
+  private approvalsFor(mrId: string): MergeRequestApproval[] {
+    const rows = this.db
+      .prepare('SELECT * FROM merge_request_approvals WHERE merge_request_id = ?')
+      .all(mrId) as ApprovalRow[];
+    return rows.map((r) => ({
+      mergeRequestId: r.merge_request_id,
+      userId: r.user_id,
+      decision: r.decision,
+      commentId: r.comment_id,
+      createdAt: r.created_at,
+    }));
   }
 }

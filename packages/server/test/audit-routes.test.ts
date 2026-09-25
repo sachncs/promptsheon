@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerAuditRoutes } from '../src/routes/audit.js';
+import { AuditReplicationService } from '../src/application/audit-replication-service.js';
 import { AuditChain } from '../src/audit/chain.js';
 import { applyMigrations } from '@promptsheon/shared';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -31,14 +32,20 @@ describe('audit routes', () => {
     db = (await import('better-sqlite3')).default(':memory:');
     db.pragma('foreign_keys = ON');
     applyMigrations(db, loadAllMigrations());
+    db.prepare(`INSERT INTO orgs (id, name, slug, created_at, updated_at) VALUES ('org-1', 'Org', 'org', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`).run();
+    db.prepare(`INSERT INTO users (id, org_id, email, name, role, created_at, updated_at) VALUES ('u-test', 'org-1', 'test@example.com', 'Test', 'admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`).run();
     audit = new AuditChain(db);
     app = Fastify({ logger: false });
     app.setErrorHandler((error, _request, reply) => {
       if (error.statusCode) return reply.code(error.statusCode).send({ error: { code: 'APP_ERROR', message: error.message } });
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     });
+    app.addHook('preHandler', (request, _reply, done) => {
+      request.orgContext = { userId: 'u-test', orgId: 'org-1', role: 'admin' };
+      done();
+    });
     await app.register(async (instance) => {
-      registerAuditRoutes(instance, { auditChain: audit, db });
+      registerAuditRoutes(instance, { auditChain: audit, replication: new AuditReplicationService(audit) });
     });
     await app.ready();
   });
@@ -49,8 +56,8 @@ describe('audit routes', () => {
   });
 
   it('appends + lists entries, returns verify state', async () => {
-    audit.append({ userId: 'api', action: 'test.action', resource: 'thing', details: '{}', resourceKind: 'thing', resourceId: '1' });
-    audit.append({ userId: 'api', action: 'test.action2', resource: 'thing', details: '{}', resourceKind: 'thing', resourceId: '1' });
+    audit.append({ userId: 'u-test', action: 'test.action', resource: 'thing', details: '{}', resourceKind: 'thing', resourceId: '1' });
+    audit.append({ userId: 'u-test', action: 'test.action2', resource: 'thing', details: '{}', resourceKind: 'thing', resourceId: '1' });
 
     const list = await app.inject({ method: 'GET', url: '/api/audit' });
     const listBody = list.json() as { entries: Array<{ action: string }> };
@@ -68,8 +75,8 @@ describe('audit routes', () => {
   });
 
   it('filters entries by action', async () => {
-    audit.append({ userId: 'api', action: 'alpha', resource: 'r', details: '{}', resourceKind: 'r', resourceId: '1' });
-    audit.append({ userId: 'api', action: 'beta', resource: 'r', details: '{}', resourceKind: 'r', resourceId: '1' });
+    audit.append({ userId: 'u-test', action: 'alpha', resource: 'r', details: '{}', resourceKind: 'r', resourceId: '1' });
+    audit.append({ userId: 'u-test', action: 'beta', resource: 'r', details: '{}', resourceKind: 'r', resourceId: '1' });
     const res = await app.inject({ method: 'GET', url: '/api/audit?action=alpha' });
     const body = res.json() as { entries: Array<{ action: string }> };
     expect(body.entries.length).toBe(1);

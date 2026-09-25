@@ -9,10 +9,12 @@ import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatCard } from '@/components/brand/stat-card';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 interface SelfEvolveState {
   capabilityId?: string;
@@ -35,7 +37,7 @@ export default function SelfEvolvePage() {
   const state = useQuery({
     queryKey: ['self-evolve', capabilityId],
     queryFn: () => selfEvolveApi.getState(capabilityId).then((r) => r.data as SelfEvolveState),
-    enabled: Boolean(capabilityId),
+    enabled: Boolean(capabilityId) && Boolean(session),
     refetchInterval: 5000,
   });
 
@@ -45,14 +47,13 @@ export default function SelfEvolvePage() {
       qc.invalidateQueries({ queryKey: ['self-evolve', capabilityId] });
       setError(null);
     },
-    onError: (err) => setError((err as Error).message),
+    onError: (err) => setError(getErrorMessage(err)),
   });
 
   if (!session) return null;
 
   const s = state.data;
   const isLoading = state.isLoading;
-  const isError = state.isError && !s;
 
   return (
     <div className="space-y-6">
@@ -71,7 +72,9 @@ export default function SelfEvolvePage() {
         }
       />
 
-      {isError ? (
+      {state.isError ? (
+        <QueryError message={state.error} onRetry={() => void state.refetch()} />
+      ) : !s && !isLoading ? (
         <EmptyState
           icon={Activity}
           title="Capability not found"
@@ -113,7 +116,7 @@ export default function SelfEvolvePage() {
           <Surface>
             <SurfaceHeader title="Current state" />
             <div className="flex flex-wrap items-center gap-3">
-              <StatusPill kind={(s?.status as never) ?? 'neutral'} />
+              <StatusPill kind={statusKindOf(s?.status)} />
               <Badge>{s?.status === 'cooling-down' ? 'awaiting cooldown' : s?.status ?? 'idle'}</Badge>
               {error && <span className="text-xs text-destructive">{error}</span>}
             </div>

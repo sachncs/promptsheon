@@ -12,6 +12,7 @@ import { HashChip } from '@/components/brand/hash-chip';
 import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { ThemedSelect } from '@/components/brand/themed-select';
+import { QueryError } from '@/components/brand/query-error';
 import type { LucideIcon } from 'lucide-react';
 
 export default function TracesPage() {
@@ -40,6 +41,14 @@ export default function TracesPage() {
   });
 
   if (!session) return null;
+
+  if (traces.isError) {
+    return <QueryError message={traces.error} onRetry={() => void traces.refetch()} />;
+  }
+
+  if (rollup.isError) {
+    return <QueryError message={rollup.error} onRetry={() => void rollup.refetch()} />;
+  }
 
   const runList = traces.data?.items ?? [];
   const total = traces.data?.total ?? 0;
@@ -170,8 +179,9 @@ function SummaryTile({
 
 function TraceRow({ run }: { run: TraceRunSummary }) {
   const startedMs = Date.parse(run.startTime);
-  const endedMs = run.endTime ? Date.parse(run.endTime) : Date.now();
-  const durationMs = Math.max(0, endedMs - startedMs);
+  const durationMs = run.endTime
+    ? Math.max(0, Date.parse(run.endTime) - startedMs)
+    : null;
   return (
     <li>
       <Link
@@ -198,7 +208,7 @@ function TraceRow({ run }: { run: TraceRunSummary }) {
           <div className="mt-0.5 flex items-center gap-3 text-xs text-text-muted">
             <span>{new Date(run.startTime).toLocaleString()}</span>
             <span>·</span>
-            <span>{durationMs} ms</span>
+            <span>{durationMs === null ? 'Running' : `${durationMs} ms`}</span>
             <span>·</span>
             <span>{run.totalTokens.toLocaleString()} tokens</span>
             <span>·</span>

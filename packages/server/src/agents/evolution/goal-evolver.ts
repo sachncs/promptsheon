@@ -444,6 +444,16 @@ Produce a revised sub-manifest with an improved system prompt. Output JSON match
     if (!s) return undefined;
     return { currentHash: s.currentHash, bestHash: s.bestHash, bestScore: s.bestScore, iteration: s.iteration };
   }
+
+  /** Return lightweight summaries directly from the agent-owned state. */
+  listSummaries(): Array<{ manifestHash: string; bestScore: number; iterations: number; lastUpdated: string }> {
+    return Array.from(this.state.entries()).map(([manifestHash, state]) => ({
+      manifestHash,
+      bestScore: state.bestScore,
+      iterations: state.iteration,
+      lastUpdated: state.history.at(-1)?.at ?? new Date(0).toISOString(),
+    }));
+  }
 }
 
 interface GoalEvolutionState {

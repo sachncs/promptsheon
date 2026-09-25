@@ -1,7 +1,7 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { SEEDS } from '@promptsheon/shared';
-import { parseBody } from './validate.js';
+import { parseBody, parseParams } from './validate.js';
 import type { RedteamRepo } from '../repos/redteam.js';
 
 const RunBodySchema = z.object({
@@ -14,9 +14,13 @@ const RunBodySchema = z.object({
   })),
 });
 
+const RedteamPackParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
+});
+
 export interface RedteamDeps {
   redteamRepo: RedteamRepo;
-  adminOnly: (request: unknown) => boolean;
+  adminOnly: (request: FastifyRequest) => boolean;
 }
 
 export function registerRedteamRoutes(app: FastifyInstance, deps: RedteamDeps): void {
@@ -25,7 +29,9 @@ export function registerRedteamRoutes(app: FastifyInstance, deps: RedteamDeps): 
   });
 
   app.get('/api/redteam/packs/:id/cases', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, RedteamPackParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     if (!deps.redteamRepo.findPack(id)) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'pack not found' } });
     }

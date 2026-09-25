@@ -5,15 +5,18 @@ export function createModel(config: AppConfig) {
   const provider = config.llm.defaultProvider;
   const modelId = config.llm.defaultModel;
   const baseUrl = config.llm.baseUrl;
+  const credentials = config.llm.credentials;
 
   switch (provider) {
     case 'openai': {
       try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { OpenAIModel } = require('@strands-agents/sdk/models/openai');
-        return baseUrl
-          ? new OpenAIModel({ modelId, baseURL: baseUrl })
-          : new OpenAIModel({ modelId });
+        return new OpenAIModel({
+          modelId,
+          ...(baseUrl ? { baseURL: baseUrl } : {}),
+          ...(credentials?.openaiApiKey ? { apiKey: credentials.openaiApiKey } : {}),
+        });
       } catch {
         return new BedrockModel({ modelId });
       }
@@ -22,9 +25,11 @@ export function createModel(config: AppConfig) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { AnthropicModel } = require('@strands-agents/sdk/models/anthropic');
-        return baseUrl
-          ? new AnthropicModel({ modelId, baseURL: baseUrl })
-          : new AnthropicModel({ modelId });
+        return new AnthropicModel({
+          modelId,
+          ...(baseUrl ? { baseURL: baseUrl } : {}),
+          ...(credentials?.anthropicApiKey ? { apiKey: credentials.anthropicApiKey } : {}),
+        });
       } catch {
         return new BedrockModel({ modelId });
       }
@@ -37,13 +42,31 @@ export function createModel(config: AppConfig) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { AnthropicModel } = require('@strands-agents/sdk/models/anthropic');
-        return new AnthropicModel({ modelId, baseURL: baseUrl });
+        return new AnthropicModel({
+          modelId,
+          baseURL: baseUrl,
+          ...(credentials?.customApiKey ? { apiKey: credentials.customApiKey } : {}),
+        });
       } catch {
         return new BedrockModel({ modelId });
       }
     }
     case 'bedrock':
     default:
-      return new BedrockModel({ modelId });
+      return new BedrockModel({
+        modelId,
+        ...(credentials?.bedrock
+          ? {
+              region: credentials.bedrock.region,
+              clientConfig: {
+                region: credentials.bedrock.region,
+                credentials: {
+                  accessKeyId: credentials.bedrock.accessKeyId,
+                  secretAccessKey: credentials.bedrock.secretAccessKey,
+                },
+              },
+            }
+          : {}),
+      });
   }
 }

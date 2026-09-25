@@ -15,6 +15,7 @@ import { ThemedSelect } from '@/components/brand/themed-select';
 import { HashChip } from '@/components/brand/hash-chip';
 import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function AuditReportsPage() {
   const session = useRequireSession();
@@ -123,14 +124,13 @@ export default function AuditReportsPage() {
             <Button onClick={() => setSubmitted({ actor, resource, action, fromTime, toTime })}>
               Generate report
             </Button>
-            {report.error && (
-              <span className="ml-3 text-xs text-destructive">{String((report.error as Error).message)}</span>
-            )}
           </div>
         </div>
       </Surface>
 
-      {report.data ? (
+      {report.isError && submitted ? (
+        <QueryError message={report.error} onRetry={() => void report.refetch()} />
+      ) : report.data ? (
         <Surface padded={false}>
           <SurfaceHeader
             className="px-5 pt-5"

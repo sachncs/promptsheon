@@ -4,6 +4,7 @@ import { registerReleaseRoutes } from '../src/routes/release.js';
 import { ManifestRepo } from '../src/repos/manifest.js';
 import { ReleaseRepo } from '../src/repos/release.js';
 import { AuditChain } from '../src/audit/chain.js';
+import { ReleaseOverlayRepo } from '../src/repos/release-overlay.js';
 import { applyMigrations } from '@promptsheon/shared';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -48,8 +49,8 @@ describe('POST /api/releases/:id/rollback', () => {
     db.pragma('foreign_keys = ON');
     applyMigrations(db, loadAllMigrations());
     db.prepare(`
-      INSERT INTO workspaces (id, name, organization, created_at, updated_at)
-      VALUES ('ws1', 'ws', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')
+      INSERT INTO workspaces (id, name, organization, org_id, created_at, updated_at)
+      VALUES ('ws1', 'ws', '', 'legacy', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')
     `).run();
     db.prepare(`
       INSERT INTO projects (id, workspace_id, name, description, created_at, updated_at)
@@ -67,6 +68,9 @@ describe('POST /api/releases/:id/rollback', () => {
     `).run();
     repo = new ReleaseRepo(db);
     app = Fastify();
+    app.addHook('onRequest', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = 'legacy';
+    });
     app.setErrorHandler((error, _request, reply) => {
       if (error.statusCode) {
         return reply.code(error.statusCode).send({ error: { code: 'APP_ERROR', message: error.message } });
@@ -74,7 +78,11 @@ describe('POST /api/releases/:id/rollback', () => {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     });
     await app.register(async (instance) => {
-      await registerReleaseRoutes(instance, repo, { manifestRepo: new ManifestRepo(db), auditChain: new AuditChain(db) });
+      await registerReleaseRoutes(instance, repo, {
+        manifestRepo: new ManifestRepo(db),
+        auditChain: new AuditChain(db),
+        overlayRepo: new ReleaseOverlayRepo(db),
+      });
     });
     await app.ready();
   });
@@ -84,7 +92,12 @@ describe('POST /api/releases/:id/rollback', () => {
     db.close();
   });
 
-  it('rollback to most recent superseded release', async () => {
+  it('rejects malformed release identifiers before repository access', async () => {
+    const response = await app.inject({ method: 'POST', url: '/api/releases/not-a-uuid/rollback', payload: {} });
+    expect(response.statusCode).toBe(422);
+  });
+
+  it('rollback to most recent rolled-back release', async () => {
     const v1 = makeRelease(repo, 'cap1', 'prod', 1, 'alice');
     const v2 = makeRelease(repo, 'cap1', 'prod', 2, 'alice');
     const v3 = makeRelease(repo, 'cap1', 'prod', 3, 'alice');
@@ -97,11 +110,11 @@ describe('POST /api/releases/:id/rollback', () => {
 
     const response = await app.inject({ method: 'POST', url: `/api/releases/${v3}/rollback`, payload: {} });
     expect(response.statusCode).toBe(200);
-    const body = response.json() as { reactivated: { id: string; status: string }; superseded: { id: string; status: string } };
+    const body = response.json() as { reactivated: { id: string; status: string }; rolledBack: { id: string; status: string } };
     expect(body.reactivated.id).toBe(v2);
     expect(body.reactivated.status).toBe('active');
-    expect(body.superseded.id).toBe(v3);
-    expect(body.superseded.status).toBe('rolled_back');
+    expect(body.rolledBack.id).toBe(v3);
+    expect(body.rolledBack.status).toBe('rolled_back');
   });
 
   it('rollback to specific release by toReleaseId', async () => {
@@ -109,9 +122,9 @@ describe('POST /api/releases/:id/rollback', () => {
     const v2 = makeRelease(repo, 'cap1', 'prod', 2, 'alice');
     const v3 = makeRelease(repo, 'cap1', 'prod', 3, 'alice');
     repo.updateStatus(v1, 'active');
-    repo.updateStatus(v1, 'superseded');
+    repo.updateStatus(v1, 'rolled_back');
     repo.updateStatus(v2, 'active');
-    repo.updateStatus(v2, 'superseded');
+    repo.updateStatus(v2, 'rolled_back');
     repo.updateStatus(v3, 'active');
     void v2;
 
@@ -149,5 +162,29 @@ describe('POST /api/releases/:id/rollback', () => {
     expect(response.statusCode).toBe(200);
     const body = response.json() as { canaryPercent: number };
     expect(body.canaryPercent).toBe(30);
+  });
+
+  it('persists environment overlays and replaces them atomically', async () => {
+    const releaseId = makeRelease(repo, 'cap1', 'prod', 1, 'alice');
+    const first = await app.inject({
+      method: 'PUT',
+      url: `/api/releases/${releaseId}/overlay?environment=staging`,
+      payload: { patch: { timeoutMs: 1000, model: 'fast' } },
+    });
+    expect(first.statusCode).toBe(200);
+
+    const second = await app.inject({
+      method: 'PUT',
+      url: `/api/releases/${releaseId}/overlay?environment=staging`,
+      payload: { patch: { timeoutMs: 2000 } },
+    });
+    expect(second.statusCode).toBe(200);
+
+    const read = await app.inject({
+      method: 'GET',
+      url: `/api/releases/${releaseId}/overlay?environment=staging`,
+    });
+    expect(read.statusCode).toBe(200);
+    expect(read.json()).toMatchObject({ id: releaseId, environment: 'staging', patch: { timeoutMs: 2000 } });
   });
 });

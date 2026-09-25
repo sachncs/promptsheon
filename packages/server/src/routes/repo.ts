@@ -5,11 +5,13 @@ import type {
   RepositoryCreateInput,
   RepositoryUpdateInput,
 } from '@promptsheon/shared';
-import { RepoRepo, RepositoryExistsError } from '../repos/repo.js';
+import { RepositoryExistsError } from '../repos/repo.js';
 import type { BranchRepo } from '../repos/branch.js';
 import type { TagRepo } from '../repos/tag.js';
-import { parseBody } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
+import type { FastifyRequest } from 'fastify';
+import type { RepositoryService } from '../application/repository-service.js';
 
 const CreateRepoSchema = z.object({
   workspaceId: z.string().uuid(),
@@ -43,31 +45,61 @@ const CreateTagSchema = z.object({
   message: z.string().max(500).optional(),
 });
 
+const ListRepositoriesQuerySchema = z.object({
+  workspaceId: z.string().uuid(),
+});
+
+const RepositoryParamsSchema = z.object({
+  id: z.string().uuid(),
+});
+
+const RepositoryBranchParamsSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(120),
+});
+
+const RepositoryTagParamsSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(120),
+});
+
 export interface RepoDeps {
-  repoRepo: RepoRepo;
+  repositoryService: RepositoryService;
   branchRepo: BranchRepo;
   tagRepo: TagRepo;
 }
 
+function orgId(request: FastifyRequest): string | undefined {
+  return request.orgContext?.orgId;
+}
+
+function repositoryForRequest(repositoryService: RepositoryService, request: FastifyRequest, id: string) {
+  return repositoryService.get(id, orgId(request));
+}
+
 export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
   app.get('/api/repos', async (request, reply) => {
-    const { workspaceId } = request.query as { workspaceId?: string };
-    if (!workspaceId) {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'workspaceId required' } });
-    }
-    return reply.send(deps.repoRepo.listByWorkspace(workspaceId));
+    const parsed = parseQuery(reply, ListRepositoriesQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { workspaceId } = parsed.data;
+    const organizationId = orgId(request);
+    const repos = deps.repositoryService.listByWorkspace(workspaceId, organizationId);
+    if (!repos) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'workspace not found' } });
+    return reply.send(repos);
   });
   registerRouteDoc({
     method: 'get',
     path: '/api/repos',
     summary: 'List repositories in a workspace',
     tags: ['repos'],
-    query: z.object({ workspaceId: z.string().uuid() }),
+    query: ListRepositoriesQuerySchema,
   });
 
   app.get('/api/repos/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const repo = deps.repoRepo.findById(id);
+    const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    const repo = deps.repositoryService.get(id, orgId(request));
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     return reply.send(repo);
   });
@@ -76,15 +108,17 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     path: '/api/repos/:id',
     summary: 'Fetch a single repository',
     tags: ['repos'],
-    params: z.object({ id: z.string().uuid() }),
+    params: RepositoryParamsSchema,
   });
 
   app.post('/api/repos', async (request, reply) => {
     const parsed = parseBody(reply, CreateRepoSchema, request.body);
     if (!parsed.ok) return;
+    const organizationId = orgId(request);
     let repo;
     try {
-      repo = deps.repoRepo.create(parsed.data);
+      repo = deps.repositoryService.create(parsed.data, organizationId);
+      if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'workspace not found' } });
     } catch (err) {
       if (err instanceof RepositoryExistsError) {
         return reply.code(409).send({ error: { code: 'REPO_EXISTS', message: err.message } });
@@ -108,10 +142,14 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
   });
 
   app.patch('/api/repos/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, UpdateRepoSchema, request.body);
     if (!parsed.ok) return;
-    const repo = deps.repoRepo.update(id, parsed.data);
+    const existing = deps.repositoryService.get(id, orgId(request));
+    if (!existing) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
+    const repo = deps.repositoryService.update(id, parsed.data, orgId(request));
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     return reply.send(repo);
   });
@@ -120,12 +158,17 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     path: '/api/repos/:id',
     summary: 'Update repository settings',
     tags: ['repos'],
-    params: z.object({ id: z.string().uuid() }),
+    params: RepositoryParamsSchema,
     body: UpdateRepoSchema,
   });
 
   app.get('/api/repos/:id/branches', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!repositoryForRequest(deps.repositoryService, request, id)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
+    }
     return reply.send(deps.branchRepo.list(id));
   });
   registerRouteDoc({
@@ -133,14 +176,16 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     path: '/api/repos/:id/branches',
     summary: 'List branches',
     tags: ['branches'],
-    params: z.object({ id: z.string().uuid() }),
+    params: RepositoryParamsSchema,
   });
 
   app.post('/api/repos/:id/branches', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, CreateBranchSchema, request.body);
     if (!parsed.ok) return;
-    const repo = deps.repoRepo.findById(id);
+    const repo = repositoryForRequest(deps.repositoryService, request, id);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     const parent = parsed.data.fromBranch
       ? deps.branchRepo.findByName(id, parsed.data.fromBranch)
@@ -161,13 +206,15 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     path: '/api/repos/:id/branches',
     summary: 'Create a branch',
     tags: ['branches'],
-    params: z.object({ id: z.string().uuid() }),
+    params: RepositoryParamsSchema,
     body: CreateBranchSchema,
   });
 
   app.delete('/api/repos/:id/branches/:name', async (request, reply) => {
-    const { id, name } = request.params as { id: string; name: string };
-    const repo = deps.repoRepo.findById(id);
+    const parsedParams = parseParams(reply, RepositoryBranchParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id, name } = parsedParams.data;
+    const repo = repositoryForRequest(deps.repositoryService, request, id);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     if (name === repo.defaultBranch) {
       return reply.code(422).send({ error: { code: 'PROTECTED', message: 'cannot delete default branch' } });
@@ -181,11 +228,16 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     path: '/api/repos/:id/branches/:name',
     summary: 'Delete a non-default branch',
     tags: ['branches'],
-    params: z.object({ id: z.string().uuid(), name: z.string() }),
+    params: RepositoryBranchParamsSchema,
   });
 
   app.get('/api/repos/:id/tags', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!repositoryForRequest(deps.repositoryService, request, id)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
+    }
     return reply.send(deps.tagRepo.list(id));
   });
   registerRouteDoc({
@@ -193,17 +245,19 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     path: '/api/repos/:id/tags',
     summary: 'List tags',
     tags: ['tags'],
-    params: z.object({ id: z.string().uuid() }),
+    params: RepositoryParamsSchema,
   });
 
   app.post('/api/repos/:id/tags', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, CreateTagSchema, request.body);
     if (!parsed.ok) return;
-    const repo = deps.repoRepo.findById(id);
+    const repo = repositoryForRequest(deps.repositoryService, request, id);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     const taggerId =
-      (request as unknown as { userId?: string }).userId ?? 'system';
+      request.userId ?? 'system';
     const tag = deps.tagRepo.create({
       repositoryId: id,
       name: parsed.data.name,
@@ -218,12 +272,17 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     path: '/api/repos/:id/tags',
     summary: 'Tag a commit',
     tags: ['tags'],
-    params: z.object({ id: z.string().uuid() }),
+    params: RepositoryParamsSchema,
     body: CreateTagSchema,
   });
 
   app.delete('/api/repos/:id/tags/:name', async (request, reply) => {
-    const { id, name } = request.params as { id: string; name: string };
+    const parsedParams = parseParams(reply, RepositoryTagParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id, name } = parsedParams.data;
+    if (!repositoryForRequest(deps.repositoryService, request, id)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
+    }
     const ok = deps.tagRepo.delete(id, name);
     if (!ok) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'tag not found' } });
     return reply.code(204).send();
@@ -233,6 +292,6 @@ export function registerRepoRoutes(app: FastifyInstance, deps: RepoDeps): void {
     path: '/api/repos/:id/tags/:name',
     summary: 'Untag a release',
     tags: ['tags'],
-    params: z.object({ id: z.string().uuid(), name: z.string() }),
+    params: RepositoryTagParamsSchema,
   });
 }

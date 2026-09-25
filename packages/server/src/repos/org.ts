@@ -28,6 +28,14 @@ export class OrgRepo extends BaseRepo<Org> {
       .run(merged.name, merged.slug, merged.updatedAt, id);
     return merged;
   }
+
+  findManyForIds(ids: string[]): Org[] {
+    if (ids.length === 0) return [];
+    const placeholders = ids.map(() => '?').join(', ');
+    return this.db
+      .prepare(`SELECT * FROM orgs WHERE id IN (${placeholders}) ORDER BY created_at ASC`)
+      .all(...ids) as Org[];
+  }
 }
 
 export class TeamRepo extends BaseRepo<Team> {

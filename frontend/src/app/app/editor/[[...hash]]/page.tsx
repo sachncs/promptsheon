@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { manifestApi, validateDagClient, executionApi } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
@@ -20,13 +19,14 @@ import {
 } from 'lucide-react';
 import { DagCanvas } from '@/components/dag/DagCanvas';
 import { NodeConfigPanel } from '@/components/dag/NodeConfigPanel';
+import { QueryError } from '@/components/brand/query-error';
 import type { Manifest, SubCapabilityManifest } from '@promptsheon/shared';
 import type { Edge } from '@xyflow/react';
 
 const blankManifest: Manifest = {
   id: '',
   version: 1,
-  prompt: { systemPrompt: '', userTemplate: '{{input}}' },
+  prompt: { systemPrompt: 'You are a helpful assistant.', userTemplate: '{{input}}' },
   model: { provider: 'openai', modelId: 'gpt-4', temperature: 0.7, maxTokens: 4096 },
   runtime: { timeoutMs: 30000, nodeTimeoutMs: 10000, totalTimeoutMs: 300000, maxRetries: 3, canaryPercent: 0, concurrencyLimit: 10 },
   context: { inputsSchema: {}, outputsSchema: {}, requiredContextVars: [] },
@@ -69,15 +69,17 @@ export default function ManifestEditorPage() {
   const queryClient = useQueryClient();
   const [manifest, setManifest] = React.useState<Manifest>(blankManifest);
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
-  const [validationErrors, setValidationErrors] = React.useState<string[]>([]);
 
-  const { data: loaded } = useQuery({
+  const { data: loaded, isError: loadError, error: loadErrorDetail, refetch: refetchManifest } = useQuery({
     queryKey: ['manifest', hash],
-    queryFn: () => manifestApi.getByHash(hash!).then((r) => r.data as Manifest),
-    enabled: !!hash,
+    queryFn: () => manifestApi.getByHash(hash!).then((r) => r.data),
+    enabled: Boolean(session && hash),
   });
 
   React.useEffect(() => {
+    // The query is an external source of truth when opening an existing manifest.
+    // Local edits remain owned by the editor state after the initial hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (loaded) setManifest(loaded);
   }, [loaded]);
 
@@ -104,13 +106,7 @@ export default function ManifestEditorPage() {
     return { nodes: ns, edges: es };
   }, [manifest]);
 
-  const validate = React.useCallback(() => {
-    setValidationErrors(validateDagClient(manifest));
-  }, [manifest]);
-
-  React.useEffect(() => {
-    validate();
-  }, [manifest, validate]);
+  const validationErrors = React.useMemo(() => validateDagClient(manifest), [manifest]);
 
   const handleNodesChange = React.useCallback((updated: Array<{ id: string; data: { name: unknown; goal: unknown } }>) => {
     setManifest((prev) => {
@@ -150,7 +146,7 @@ export default function ManifestEditorPage() {
   }, [manifest.nodes.length]);
 
   const saveMutation = useMutation({
-    mutationFn: () => manifestApi.create(manifest).then((r) => r.data as { hash: string }),
+    mutationFn: () => manifestApi.create(manifest).then((r) => r.data),
     onSuccess: ({ hash: newHash }) => {
       void queryClient.invalidateQueries({ queryKey: ['manifests'] });
       void queryClient.invalidateQueries({ queryKey: ['manifest', newHash] });
@@ -176,6 +172,11 @@ export default function ManifestEditorPage() {
   const isValid = validationErrors.length === 0;
   const [fullscreen, setFullscreen] = React.useState(false);
   const { toast } = useToast();
+
+  if (!session) return null;
+  if (loadError) {
+    return <QueryError message={loadErrorDetail} onRetry={() => void refetchManifest()} />;
+  }
 
   const TEMPLATES: Array<{ id: string; label: string; description: string; build: () => Manifest }> = [
     {

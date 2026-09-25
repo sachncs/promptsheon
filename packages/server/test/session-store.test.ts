@@ -114,14 +114,27 @@ describe('POST /api/sessions', () => {
     expect(response.statusCode).toBe(200);
   });
 
-  it('GET /api/sessions/:id returns 404 for missing', async () => {
+  it('rejects malformed session identifiers before lookup', async () => {
     const response = await app.inject({ method: 'GET', url: '/api/sessions/nope' });
-    expect(response.statusCode).toBe(404);
+    expect(response.statusCode).toBe(422);
   });
 
   it('DELETE /api/sessions/:id removes session', async () => {
     const created = (await app.inject({ method: 'POST', url: '/api/sessions', payload: {} })).json() as { sessionId: string };
     const response = await app.inject({ method: 'DELETE', url: `/api/sessions/${created.sessionId}` });
     expect(response.statusCode).toBe(204);
+  });
+
+  it('rejects malformed session creation and message payloads', async () => {
+    const invalidCreate = await app.inject({ method: 'POST', url: '/api/sessions', payload: { capabilityVersionId: 'legacy' } });
+    expect(invalidCreate.statusCode).toBe(422);
+
+    const created = (await app.inject({ method: 'POST', url: '/api/sessions', payload: {} })).json() as { sessionId: string };
+    const invalidMessages = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${created.sessionId}/messages`,
+      payload: { messages: [{ role: 'user', content: [{ type: 'image' }] }] },
+    });
+    expect(invalidMessages.statusCode).toBe(422);
   });
 });

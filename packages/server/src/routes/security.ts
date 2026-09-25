@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { PromptScanRepo } from '../repos/prompt-scan.js';
 import { scan } from '../security/prompt-scanner.js';
@@ -10,35 +10,12 @@ const ScanTextSchema = z.object({
   resourceId: z.string().min(1).max(120).optional(),
 });
 
-interface RequestUserContext {
-  userId?: string;
-  orgContext?: { organizationId?: string };
+function orgOf(request: FastifyRequest): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
-interface RequestLike {
-  userId?: string;
-  orgContext?: { organizationId?: string };
-  headers: Record<string, string | string[] | undefined>;
-}
-
-function orgOf(request: unknown): string | null {
-  const req = request as RequestLike | undefined;
-  if (!req) return null;
-  if (req.orgContext?.organizationId) return req.orgContext.organizationId;
-  const raw = req.headers['x-org-id'];
-  if (typeof raw === 'string') return raw;
-  if (Array.isArray(raw) && typeof raw[0] === 'string') return raw[0];
-  return null;
-}
-
-function actorOf(request: unknown): string | null {
-  const req = request as RequestLike | undefined;
-  if (!req) return null;
-  if (req.userId) return req.userId;
-  const raw = req.headers['x-user-id'];
-  if (typeof raw === 'string') return raw;
-  if (Array.isArray(raw) && typeof raw[0] === 'string') return raw[0];
-  return null;
+function actorOf(request: FastifyRequest): string | null {
+  return request.userId ?? null;
 }
 
 const ListScansQuerySchema = z.object({
@@ -46,6 +23,10 @@ const ListScansQuerySchema = z.object({
   verdict: z.enum(['clean', 'warn', 'block']).optional(),
   resourceKind: z.string().min(1).max(60).optional(),
   resourceId: z.string().min(1).max(120).optional(),
+});
+
+const SecuritySummaryQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).default(30),
 });
 
 /**
@@ -113,8 +94,10 @@ export function registerSecurityRoutes(
         error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' },
       });
     }
-    const days = Number((request.query as { days?: string }).days ?? '30');
-    const summary = deps.scanRepo.summaryByOrg(orgId, Math.min(Math.max(days, 1), 365));
+    const parsed = parseQuery(reply, SecuritySummaryQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { days } = parsed.data;
+    const summary = deps.scanRepo.summaryByOrg(orgId, days);
     return reply.send({ orgId, days, ...summary });
   });
 }

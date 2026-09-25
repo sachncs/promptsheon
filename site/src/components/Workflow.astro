@@ -1,44 +1,69 @@
 ---
+const base = import.meta.env.BASE_URL;
+
 const steps = [
   {
     step: '01',
-    title: 'Author',
-    body: 'Describe the capability. The planner decomposes it into a DAG of agents, policies, and tools.',
+    title: 'Create',
+    body: 'Turn an objective into an immutable agent or organization specification with explicit policies and success criteria.',
+    output: 'Content-addressed AgentSpec',
     tone: 'indigo',
   },
   {
     step: '02',
-    title: 'Compile',
-    body: 'The compiler produces an immutable manifest. Its content hash is its identity — same input, same artifact, forever.',
+    title: 'Execute',
+    body: 'The Operator schedules the graph, routes models, invokes tools, and produces a trace within its budget.',
+    output: 'Execution trace + artifacts',
     tone: 'emerald',
   },
   {
     step: '03',
-    title: 'Evaluate',
-    body: 'Run suites. Gate on threshold. Block merges on regressions. Parallel scorers in one pass.',
+    title: 'Observe + evaluate',
+    body: 'Measure outcome quality, tokens, context, latency, cost, retries, tools, permissions, and human intervention.',
+    output: 'Evidence vector + decision',
     tone: 'amber',
   },
   {
     step: '04',
-    title: 'Approve',
-    body: 'A second pair of eyes signs off. The creator cannot approve their own release. Reason is logged.',
+    title: 'Learn',
+    body: 'Compare like workloads, trace causality through lineage, and store reusable patterns about what improves an agent.',
+    output: 'Pattern + recommendation',
     tone: 'rose',
   },
   {
     step: '05',
-    title: 'Canary → Active',
-    body: 'Weighted rollout. Live eval scores watch for drift. One-click rollback when the world changes.',
+    title: 'Mutate → validate → promote',
+    body: 'Test a targeted change through replay, benchmarks, shadow traffic, or controlled rollout before promotion.',
+    output: 'Candidate lineage + promotion',
     tone: 'sky',
   },
 ];
 
 const tones: Record<string, { dot: string; text: string; bg: string }> = {
-  indigo:  { dot: 'bg-indigo-500',  text: 'text-indigo-500',  bg: 'bg-indigo-500/10'  },
-  emerald: { dot: 'bg-emerald-500', text: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-  amber:   { dot: 'bg-amber-500',   text: 'text-amber-500',   bg: 'bg-amber-500/10'   },
-  rose:    { dot: 'bg-rose-500',    text: 'text-rose-500',    bg: 'bg-rose-500/10'    },
-  sky:     { dot: 'bg-sky-500',     text: 'text-sky-500',     bg: 'bg-sky-500/10'     },
+  indigo:  { dot: 'bg-[var(--brand-graphite)]', text: 'text-[var(--brand-graphite)]', bg: 'bg-[var(--brand-graphite)]/10' },
+  emerald: { dot: 'bg-[var(--brand-steel)]', text: 'text-[var(--brand-steel)]', bg: 'bg-[var(--brand-steel)]/10' },
+  amber:   { dot: 'bg-[var(--brand-silver)]', text: 'text-[var(--brand-steel)]', bg: 'bg-[var(--brand-silver)]/20' },
+  rose:    { dot: 'bg-[var(--brand-graphite)]', text: 'text-[var(--brand-graphite)]', bg: 'bg-[var(--brand-graphite)]/10' },
+  sky:     { dot: 'bg-[var(--brand-steel)]', text: 'text-[var(--brand-steel)]', bg: 'bg-[var(--brand-steel)]/10' },
 };
+
+const evidence = [
+  {
+    label: 'Content',
+    value: 'sha256:9c4f…a02b',
+    detail: 'The exact manifest that was evaluated and approved.',
+  },
+  {
+    label: 'Decision',
+    value: '0.92 / 0.90 threshold',
+    detail: 'The release gate and the score that cleared it.',
+  },
+  {
+    label: 'Recovery',
+    value: 'v2 ready to restore',
+    detail: 'The previous active version stays available for rollback.',
+  },
+];
 ---
 
 <section id="workflow" class="ps-section border-t border-[var(--line)]">
@@ -47,18 +72,18 @@ const tones: Record<string, { dot: string; text: string; bg: string }> = {
       <div class="lg:col-span-4 lg:sticky lg:top-28 lg:self-start">
         <div class="ps-reveal ps-eyebrow">Workflow</div>
         <h2 class="ps-reveal ps-display mt-4 text-display-lg" style="--reveal-delay: 80ms">
-          From intent to release.
+          From execution to improvement.
         </h2>
         <p class="ps-reveal mt-5 text-[16.5px] leading-relaxed text-[var(--ink-muted)] text-pretty" style="--reveal-delay: 160ms">
-          Capabilities move through a deterministic state machine. Every transition
-          records who acted and on what evidence. Nothing ships without a hash.
+          Every execution becomes evidence. The platform uses that evidence to decide
+          what to change, what to keep, and what the system can safely afford.
         </p>
 
         <div class="ps-reveal mt-8 hidden lg:block" style="--reveal-delay: 220ms">
           <div class="rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)] p-5 shadow-soft">
-            <div class="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-subtle)]">State machine</div>
+            <div class="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-subtle)]">Adaptive loop</div>
             <div class="mt-4 flex flex-wrap items-center gap-1.5 text-[11px] font-medium">
-              {['draft', 'review', 'approved', 'canary', 'active'].map((state, idx) => (
+              {['create', 'execute', 'observe', 'learn', 'promote'].map((state, idx) => (
                 <>
                   <span class="rounded-md bg-[var(--bg-subtle)] px-2 py-1 font-mono text-[var(--ink)]">{state}</span>
                   {idx < 4 && <span class="text-[var(--ink-subtle)]">→</span>}
@@ -67,7 +92,7 @@ const tones: Record<string, { dot: string; text: string; bg: string }> = {
             </div>
             <div class="mt-4 flex items-center gap-2 text-[11px] text-[var(--ink-muted)]">
               <span class="ps-hash">v3</span>
-              <span>11.2k LOC manifest · sha256:9c4f…a02b</span>
+              <span>agent:8f37… · candidate:9c4f…</span>
             </div>
           </div>
         </div>
@@ -94,10 +119,36 @@ const tones: Record<string, { dot: string; text: string; bg: string }> = {
               <p class="mt-1.5 text-[14.5px] leading-relaxed text-[var(--ink-muted)] text-pretty">
                 {s.body}
               </p>
+              <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--line)] pt-3">
+                <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-subtle)]">Output</span>
+                <span class="rounded-md bg-[var(--bg-subtle)] px-2 py-1 font-mono text-[11px] text-[var(--ink)]">
+                  {s.output}
+                </span>
+              </div>
             </div>
           </li>
         ))}
       </ol>
+    </div>
+
+    <div class="ps-reveal mt-16 border-t border-[var(--line)] pt-8" style="--reveal-delay: 180ms">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div class="ps-eyebrow">Evidence trail</div>
+          <h3 class="ps-display mt-3 text-display-sm">The release carries its evidence.</h3>
+        </div>
+        <a class="ps-link text-[13px]" href={`${base}docs/architecture/`}>See the architecture <span aria-hidden="true">→</span></a>
+      </div>
+
+      <div class="mt-7 grid gap-4 md:grid-cols-3">
+        {evidence.map((item) => (
+          <article class="rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)] p-5 shadow-soft">
+            <div class="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-subtle)]">{item.label}</div>
+            <div class="mt-3 font-mono text-[13px] font-semibold text-[var(--ink-strong)]">{item.value}</div>
+            <p class="mt-2 text-[13px] leading-relaxed text-[var(--ink-muted)]">{item.detail}</p>
+          </article>
+        ))}
+      </div>
     </div>
   </div>
 </section>

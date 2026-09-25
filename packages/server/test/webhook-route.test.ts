@@ -47,6 +47,17 @@ describe('POST /api/webhooks/incoming/:id', () => {
     expect(response.statusCode).toBe(401);
   });
 
+  it('rejects a blank endpoint route parameter', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/webhooks/incoming/%20',
+      headers: { 'content-type': 'application/json' },
+      payload: { ref: 'main' },
+    });
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+  });
+
   it('returns 401 with invalid signature', async () => {
     const response = await app.inject({
       method: 'POST',

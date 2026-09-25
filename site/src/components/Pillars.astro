@@ -1,22 +1,22 @@
 ---
 const pillars = [
   {
-    name: 'Content-addressed registry',
-    detail: 'manifest CAS',
+    name: 'Architect',
+    detail: 'design the system',
     icon: 'cube',
-    body: 'Every manifest, prompt block, tool spec, and policy snapshot is hashed and stored by content. Same input, same hash, every time. Identities are immutable.',
+    body: 'Translate objectives into immutable agent and organization specifications: responsibilities, topology, capabilities, policies, and success criteria.',
   },
   {
-    name: 'Evaluation engine',
-    detail: 'eval passes',
+    name: 'Operator',
+    detail: 'execute the graph',
     icon: 'flask',
-    body: 'Run datasets, score with deterministic or LLM-judge scorers, gate releases on thresholds, detect regressions, compare models in parallel.',
+    body: 'Schedule dependencies, route models, invoke tools, manage retries, reuse safe results, and materialize outcomes within resource budgets.',
   },
   {
-    name: 'Governed releases',
-    detail: 'release path',
+    name: 'Evaluator + Governor',
+    detail: 'learn under limits',
     icon: 'branch',
-    body: 'Draft → review → approved → canary → active → rolled back. Every transition is signed, audited, and reversible in one click.',
+    body: 'Measure quality and efficiency, discover what changed, enforce hard constraints, and promote only the mutations supported by evidence.',
   },
 ];
 
@@ -27,20 +27,20 @@ const icons: Record<string, string> = {
 };
 ---
 
-<section id="overview" class="ps-section">
+<section id="overview" class="ps-section-tight">
   <div class="ps-container">
     <div class="mx-auto max-w-3xl text-center">
-      <div class="ps-reveal ps-eyebrow">Three pillars</div>
+      <div class="ps-reveal ps-eyebrow">The control plane</div>
       <h2 class="ps-reveal ps-display mt-4 text-display-lg" style="--reveal-delay: 80ms">
-        Treat AI capabilities like software.
+        Build systems that learn how to improve.
       </h2>
       <p class="ps-reveal mx-auto mt-5 max-w-2xl text-[17px] leading-relaxed text-[var(--ink-muted)] text-pretty" style="--reveal-delay: 160ms">
-        The same practices you expect from infrastructure: addressable artifacts,
-        reproducible builds, gated releases, and an audit chain that survives a regulator.
+        Promptsheon combines architecture, execution, measurement, and resource
+        governance into one adaptive runtime for agentic software.
       </p>
     </div>
 
-    <div class="mt-16 grid gap-5 md:grid-cols-3">
+    <div class="mt-12 grid gap-5 md:grid-cols-3">
       {pillars.map((p, i) => (
         <article
           class="ps-card ps-reveal group relative overflow-hidden p-7"

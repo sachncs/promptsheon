@@ -1,9 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { OrgRepo, TeamRepo, MembershipRepo } from '../repos/org.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import { NotFoundError } from '@promptsheon/shared';
 import { cedarGate } from '../policy/gate.js';
+import { assertOrgScope } from '../middleware/org-context.js';
 
 const ListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
@@ -26,6 +27,15 @@ const AddOrgMemberSchema = z.object({
   role: z.enum(['admin', 'approver', 'editor', 'viewer']),
 });
 
+const OrganizationParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
+});
+
+const OrganizationMemberParamsSchema = z.object({
+  orgId: z.string().trim().min(1).max(255),
+  userId: z.string().trim().min(1).max(255),
+});
+
 /**
  * Cedar preHandler factory. Replaces the old role-based
  * `rolePreHandler`; the policy file's role clauses (Role::"admin"
@@ -42,6 +52,11 @@ export function registerOrgTeamRoutes(app: FastifyInstance, deps: {
   app.get('/api/orgs', async (request, reply) => {
     const parsed = parseQuery(reply, ListQuerySchema, request.query);
     if (!parsed.ok) return;
+    const context = request.orgContext;
+    if (context) {
+      const ids = deps.membershipRepo.findOrgsForUser(context.userId);
+      return reply.send({ orgs: deps.orgRepo.findManyForIds(ids).slice(0, parsed.data.limit) });
+    }
     return reply.send({ orgs: deps.orgRepo.findMany({ page: 1, pageSize: parsed.data.limit }) });
   });
 
@@ -57,14 +72,20 @@ export function registerOrgTeamRoutes(app: FastifyInstance, deps: {
   });
 
   app.get('/api/orgs/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!assertOrgScope(request, id, reply)) return;
     const org = deps.orgRepo.findById(id);
     if (!org) throw new NotFoundError('org', id);
     return reply.send(org);
   });
 
   app.put('/api/orgs/:id', { preHandler: adminOnly }, async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!assertOrgScope(request, id, reply)) return;
     const parsed = parseBody(reply, UpdateOrgSchema, request.body);
     if (!parsed.ok) return;
     const org = deps.orgRepo.update(id, parsed.data);
@@ -73,12 +94,18 @@ export function registerOrgTeamRoutes(app: FastifyInstance, deps: {
   });
 
   app.get('/api/orgs/:id/members', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!assertOrgScope(request, id, reply)) return;
     return reply.send({ members: deps.membershipRepo.findOrgMembers(id) });
   });
 
   app.post('/api/orgs/:id/members', { preHandler: adminOnly }, async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!assertOrgScope(request, id, reply)) return;
     const parsed = parseBody(reply, AddOrgMemberSchema, request.body);
     if (!parsed.ok) return;
     const member = deps.membershipRepo.addOrgMember(id, parsed.data.userId, parsed.data.role);
@@ -86,19 +113,28 @@ export function registerOrgTeamRoutes(app: FastifyInstance, deps: {
   });
 
   app.delete('/api/orgs/:orgId/members/:userId', { preHandler: adminOnly }, async (request, reply) => {
-    const { orgId, userId } = request.params as { orgId: string; userId: string };
+    const parsedParams = parseParams(reply, OrganizationMemberParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { orgId, userId } = parsedParams.data;
+    if (!assertOrgScope(request, orgId, reply)) return;
     const ok = deps.membershipRepo.removeOrgMember(orgId, userId);
     if (!ok) throw new NotFoundError('org_member', `${orgId}:${userId}`);
     return reply.code(204).send();
   });
 
   app.get('/api/orgs/:id/teams', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!assertOrgScope(request, id, reply)) return;
     return reply.send({ teams: deps.teamRepo.findByOrgId(id) });
   });
 
   app.post('/api/orgs/:id/teams', { preHandler: adminOrApprover }, async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!assertOrgScope(request, id, reply)) return;
     const parsed = parseBody(reply, CreateTeamSchema, request.body);
     if (!parsed.ok) return;
     const team = deps.teamRepo.create({ orgId: id, name: parsed.data.name });

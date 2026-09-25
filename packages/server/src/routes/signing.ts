@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { createHash, createPublicKey, verify, type KeyObject } from 'node:crypto';
-import type { RepoRepo } from '../repos/repo.js';
 import { CommitRepo, deriveCommitOid } from '../repos/commit.js';
 import { SigningKeyRepo, fingerprintSpki } from '../repos/signing-key.js';
+import type { RepositoryService } from '../application/repository-service.js';
 import { commitInputPayload } from '@promptsheon/shared';
-import { parseBody } from './validate.js';
+import { parseBody, parseParams } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
 const UploadKeySchema = z.object({
@@ -21,10 +21,28 @@ const SignCommitSchema = z.object({
 
 const DeactivateKeySchema = z.object({});
 
+const SignHelperSchema = z.object({
+  commitOid: z.string().min(1).max(200),
+  ref: z.string().min(1).max(200),
+  approverId: z.string().min(1).max(200),
+  timestamp: z.string().datetime({ offset: true }),
+});
+
+const OrganizationParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
+const SigningKeyParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
+  keyId: z.string().trim().min(1).max(255),
+});
+const CommitOidParamsSchema = z.object({ oid: z.string().trim().min(1).max(200) });
+
 export interface SigningDeps {
-  repoRepo: RepoRepo;
+  repositoryService: RepositoryService;
   commitRepo: CommitRepo;
   signingKeyRepo: SigningKeyRepo;
+}
+
+function organizationIdOf(request: { orgContext?: { orgId?: string }; agentOrgId?: string }): string | undefined {
+  return request.orgContext?.orgId ?? request.agentOrgId;
 }
 
 /** Canonical payload the operator signs for a commit. */
@@ -69,7 +87,13 @@ function loadPublicKey(pem: string): KeyObject {
 
 export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): void {
   app.get('/api/orgs/:id/signing-keys', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    const organizationId = organizationIdOf(request);
+    if (organizationId && organizationId !== id) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
+    }
     return reply.send(deps.signingKeyRepo.list(id));
   });
   registerRouteDoc({
@@ -80,7 +104,13 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
   });
 
   app.post('/api/orgs/:id/signing-keys', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    const organizationId = organizationIdOf(request);
+    if (organizationId && organizationId !== id) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
+    }
     const parsed = parseBody(reply, UploadKeySchema, request.body);
     if (!parsed.ok) return;
     if (parsed.data.organizationId !== id) {
@@ -91,7 +121,7 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
     } catch {
       return reply.code(422).send({ error: { code: 'INVALID_KEY', message: 'public key PEM unparseable' } });
     }
-    const userId = (request as unknown as { userId?: string }).userId ?? 'system';
+    const userId = request.userId ?? 'system';
     const created = deps.signingKeyRepo.create({
       organizationId: id,
       label: parsed.data.label,
@@ -109,8 +139,16 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
   });
 
   app.delete('/api/orgs/:id/signing-keys/:keyId', async (request, reply) => {
-    const { keyId } = request.params as { keyId: string };
-    const updated = deps.signingKeyRepo.deactivate(keyId);
+    const parsedParams = parseParams(reply, SigningKeyParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id, keyId } = parsedParams.data;
+    const organizationId = organizationIdOf(request);
+    if (organizationId && organizationId !== id) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
+    }
+    const updated = organizationId
+      ? deps.signingKeyRepo.deactivateInOrg(keyId, organizationId)
+      : deps.signingKeyRepo.deactivate(keyId);
     if (!updated) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'signing key not found' } });
     return reply.send(updated);
   });
@@ -122,16 +160,24 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
   });
 
   app.post('/api/commits/:oid/sign', async (request, reply) => {
-    const { oid } = request.params as { oid: string };
+    const parsedParams = parseParams(reply, CommitOidParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { oid } = parsedParams.data;
     const parsed = parseBody(reply, SignCommitSchema, request.body);
     if (!parsed.ok) return;
     const commit = deps.commitRepo.findByOid(oid);
     if (!commit) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'commit not found' } });
-    const key = deps.signingKeyRepo.findById(parsed.data.keyId);
+    const organizationId = organizationIdOf(request);
+    const key = organizationId
+      ? deps.signingKeyRepo.findByIdInOrg(parsed.data.keyId, organizationId)
+      : deps.signingKeyRepo.findById(parsed.data.keyId);
     if (!key || key.deactivatedAt) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'signing key not found' } });
     }
-    const userId = (request as unknown as { userId?: string }).userId ?? 'system';
+    if (!deps.repositoryService.get(commit.repositoryId, key.organizationId)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'commit not found' } });
+    }
+    const userId = request.userId ?? 'system';
     const timestamp = new Date().toISOString();
     const msg = signedMessage({
       commitOid: oid,
@@ -162,15 +208,26 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
   });
 
   app.get('/api/commits/:oid/verify', async (request, reply) => {
-    const { oid } = request.params as { oid: string };
+    const parsedParams = parseParams(reply, CommitOidParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { oid } = parsedParams.data;
     const commit = deps.commitRepo.findByOid(oid);
     if (!commit) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'commit not found' } });
     if (!commit.signature || !commit.signedKeyId || !commit.signedAt) {
       return reply.send({ valid: false, reason: 'unsigned' });
     }
-    const key = deps.signingKeyRepo.findById(commit.signedKeyId);
+    const organizationId = organizationIdOf(request);
+    const key = organizationId
+      ? deps.signingKeyRepo.findByIdInOrg(commit.signedKeyId, organizationId)
+      : deps.signingKeyRepo.findById(commit.signedKeyId);
     if (!key || key.deactivatedAt) {
       return reply.send({ valid: false, reason: 'key_deactivated' });
+    }
+    if (organizationId && key.organizationId !== organizationId) {
+      return reply.send({ valid: false, reason: 'key_scope_mismatch' });
+    }
+    if (!deps.repositoryService.get(commit.repositoryId, key.organizationId)) {
+      return reply.send({ valid: false, reason: 'key_scope_mismatch' });
     }
     const msg = signedMessage({
       commitOid: oid,
@@ -201,12 +258,9 @@ export function registerSigningRoutes(app: FastifyInstance, deps: SigningDeps): 
   });
 
   app.post('/api/commits/_sign-helper', async (request, reply) => {
-    const { commitOid, ref, approverId, timestamp } = request.body as {
-      commitOid?: string; ref?: string; approverId?: string; timestamp?: string;
-    };
-    if (!commitOid || !ref || !approverId || !timestamp) {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'all fields required' } });
-    }
+    const parsed = parseBody(reply, SignHelperSchema, request.body);
+    if (!parsed.ok) return;
+    const { commitOid, ref, approverId, timestamp } = parsed.data;
     return reply.send({
       message: signedMessage({ commitOid, ref, approverId, timestamp }).toString('base64'),
       algorithm: 'ed25519',

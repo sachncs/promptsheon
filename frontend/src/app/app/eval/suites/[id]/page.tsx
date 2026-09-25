@@ -4,12 +4,13 @@ import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ArrowLeft, FlaskConical, Play, Sparkles } from 'lucide-react';
+import { ArrowLeft, FlaskConical, Play } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
 import { evalSuiteApi } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function EvalSuiteDetailPage() {
   const session = useRequireSession();
@@ -19,7 +20,7 @@ export default function EvalSuiteDetailPage() {
 
   const suite = useQuery({
     queryKey: ['eval-suite', id],
-    queryFn: () => evalSuiteApi.get(id),
+    queryFn: () => evalSuiteApi.get(id).then((r) => r.data),
     enabled: Boolean(id),
   });
   const run = useMutation({
@@ -27,10 +28,13 @@ export default function EvalSuiteDetailPage() {
   });
 
   if (!session) return null;
+  if (suite.isError) {
+    return <QueryError message={suite.error} onRetry={() => void suite.refetch()} />;
+  }
   if (suite.isLoading) return <div className="text-text-muted text-sm">Loading…</div>;
   if (!suite.data) return <div className="text-text-muted text-sm">Suite not found.</div>;
 
-  const out = suite.data as { suite: Record<string, unknown>; versions: Array<Record<string, unknown>> };
+  const out = suite.data;
 
   return (
     <div className="space-y-6">
@@ -40,8 +44,8 @@ export default function EvalSuiteDetailPage() {
         </Link>
         <PageHeader
           eyebrow="Eval suite"
-          title={String(out.suite.name)}
-          subtitle={`Threshold ${(Number(out.suite.passThreshold) * 100).toFixed(0)}% · Borderline ±${(Number(out.suite.borderlineBand) * 100).toFixed(0)}% · ${out.versions.length} version(s)`}
+          title={out.suite.name}
+          subtitle={`Threshold ${(out.suite.passThreshold * 100).toFixed(0)}% · Borderline ±${(out.suite.borderlineBand * 100).toFixed(0)}% · ${out.versions.length} version(s)`}
           actions={<FlaskConical className="h-5 w-5 text-brand-highlight" />}
         />
       </div>
@@ -54,10 +58,10 @@ export default function EvalSuiteDetailPage() {
           ) : (
             <ul className="space-y-2">
               {out.versions.map((v) => (
-                <li key={String(v.id)} className="rounded-lg border border-border-subtle bg-surface-2/40 p-3">
-                  <div className="text-sm font-medium text-text-default">v{String(v.version)}</div>
+                <li key={v.id} className="rounded-lg border border-border-subtle bg-surface-2/40 p-3">
+                  <div className="text-sm font-medium text-text-default">v{v.version}</div>
                   <div className="text-xs text-text-subtle">
-                    k={String(v.k)} n={String(v.n)} · {(v.graderConfig as unknown[]).length} grader(s)
+                    k={v.k} n={v.n} · {v.graderConfig.length} grader(s)
                   </div>
                 </li>
               ))}

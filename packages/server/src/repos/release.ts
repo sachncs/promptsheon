@@ -1,7 +1,43 @@
 import type { Release } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
-import { BaseRepo } from './base.js';
+import { z } from 'zod';
+import { BaseRepo, type Paginated } from './base.js';
+
+const ReleaseRowSchema = z.object({
+  id: z.string(),
+  capability_id: z.string(),
+  capability_version: z.number().int().positive(),
+  capability_version_id: z.string().nullable(),
+  manifest: z.string(),
+  environment: z.enum(['dev', 'staging', 'prod']),
+  status: z.enum(['draft', 'review', 'approved', 'canary', 'active', 'rolled_back']),
+  approved_by: z.string(),
+  replaces_release_id: z.string().nullable(),
+  created_at: z.string(),
+  created_by: z.string(),
+  activated_at: z.string().nullable(),
+  canary_percent: z.number().int().min(0).max(100),
+});
+
+function toRelease(row: unknown): Release {
+  const value = ReleaseRowSchema.parse(row);
+  return {
+    id: value.id,
+    capabilityId: value.capability_id,
+    capabilityVersion: value.capability_version,
+    capabilityVersionId: value.capability_version_id,
+    manifest: value.manifest,
+    environment: value.environment,
+    status: value.status,
+    approvedBy: value.approved_by,
+    replacesReleaseId: value.replaces_release_id,
+    createdAt: value.created_at,
+    createdBy: value.created_by,
+    activatedAt: value.activated_at,
+    canaryPercent: value.canary_percent,
+  };
+}
 
 export class ReleaseRepo extends BaseRepo<Release> {
   constructor(db: Database.Database) {
@@ -10,17 +46,90 @@ export class ReleaseRepo extends BaseRepo<Release> {
 
   findByCapabilityId(capabilityId: string): Release[] {
     return this.db.prepare('SELECT * FROM releases WHERE capability_id = ?')
-      .all(capabilityId) as Release[];
+      .all(capabilityId)
+      .map(toRelease);
+  }
+
+  findByCapabilityIdInOrg(capabilityId: string, organizationId: string): Release[] {
+    return this.db.prepare(
+      `SELECT r.* FROM releases r
+       JOIN capabilities c ON c.id = r.capability_id
+       JOIN projects p ON p.id = c.project_id
+       JOIN workspaces w ON w.id = p.workspace_id
+       WHERE r.capability_id = ? AND w.org_id = ?
+       ORDER BY r.created_at DESC`,
+    ).all(capabilityId, organizationId)
+      .map(toRelease);
+  }
+
+  findManyInOrg(
+    organizationId: string,
+    opts: { page: number; pageSize: number; status?: string },
+  ): Paginated<Release> {
+    const joins = `
+      FROM releases r
+      JOIN capabilities c ON c.id = r.capability_id
+      JOIN projects p ON p.id = c.project_id
+      JOIN workspaces w ON w.id = p.workspace_id
+      WHERE w.org_id = ?${opts.status ? ' AND r.status = ?' : ''}`;
+    const params = opts.status ? [organizationId, opts.status] : [organizationId];
+    const total = z.object({ count: z.number().int().nonnegative() }).parse(
+      this.db.prepare(`SELECT COUNT(*) AS count ${joins}`).get(...params),
+    ).count;
+    const rows = this.db.prepare(
+      `SELECT r.* ${joins} ORDER BY r.created_at DESC LIMIT ? OFFSET ?`,
+    ).all(...params, opts.pageSize, (opts.page - 1) * opts.pageSize);
+    return { items: rows.map(toRelease), total };
+  }
+
+  findByIdInOrg(id: string, organizationId: string): Release | null {
+    const row = this.db
+      .prepare(
+        `SELECT r.*
+         FROM releases r
+         JOIN capabilities c ON c.id = r.capability_id
+         JOIN projects p ON p.id = c.project_id
+         JOIN workspaces w ON w.id = p.workspace_id
+         WHERE r.id = ? AND w.org_id = ?`,
+      )
+      .get(id, organizationId);
+    return row ? toRelease(row) : null;
+  }
+
+  createInOrg(
+    data: { capabilityId: string; capabilityVersion: number; capabilityVersionId: string | null; manifest: string; environment: string; createdBy?: string; canaryPercent?: number },
+    organizationId: string,
+  ): Release | null {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const result = this.db.prepare(`
+      INSERT INTO releases (id, capability_id, capability_version, capability_version_id, manifest, environment, status, created_by, canary_percent, created_at, updated_at)
+      SELECT ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?
+      WHERE EXISTS (
+        SELECT 1 FROM capabilities c
+        JOIN projects p ON p.id = c.project_id
+        JOIN workspaces w ON w.id = p.workspace_id
+        WHERE c.id = ? AND w.org_id = ?
+      )
+    `).run(
+      id, data.capabilityId, data.capabilityVersion, data.capabilityVersionId,
+      data.manifest, data.environment, data.createdBy ?? '', data.canaryPercent ?? 0,
+      now, now, data.capabilityId, organizationId,
+    );
+    if (result.changes === 0) return null;
+    return this.findByIdInOrg(id, organizationId);
   }
 
   findActive(capabilityId: string, environment: string): Release | null {
-    return this.db.prepare("SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'active'")
-      .get(capabilityId, environment) as Release | null;
+    const row = this.db.prepare("SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'active'")
+      .get(capabilityId, environment);
+    return row ? toRelease(row) : null;
   }
 
   findByCapabilityAndEnv(capabilityId: string, environment: string): Release[] {
     return this.db.prepare('SELECT * FROM releases WHERE capability_id = ? AND environment = ?')
-      .all(capabilityId, environment) as Release[];
+      .all(capabilityId, environment)
+      .map(toRelease);
   }
 
   create(data: { capabilityId: string; capabilityVersion: number; capabilityVersionId: string | null; manifest: string; environment: string; createdBy?: string; canaryPercent?: number }): Release {
@@ -33,7 +142,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
       capabilityVersionId: data.capabilityVersionId, manifest: data.manifest,
       environment: data.environment as Release['environment'], status: 'draft', createdBy: data.createdBy ?? '',
       approvedBy: '', canaryPercent: data.canaryPercent ?? 0, createdAt: now,
-      replacesReleaseId: null, activatedAt: null, supersededAt: null, supersededBy: null,
+      replacesReleaseId: null, activatedAt: null,
     };
   }
 
@@ -42,6 +151,20 @@ export class ReleaseRepo extends BaseRepo<Release> {
     if (!existing) return null;
     this.db.prepare(`UPDATE releases SET status = ?, updated_at = ? WHERE id = ?`)
       .run(status, new Date().toISOString(), id);
+    return { ...existing, status };
+  }
+
+  updateStatusInOrg(id: string, organizationId: string, status: Release['status']): Release | null {
+    const existing = this.findByIdInOrg(id, organizationId);
+    if (!existing) return null;
+    this.db.prepare(`
+      UPDATE releases SET status = ?, updated_at = ?
+      WHERE id = ? AND EXISTS (
+        SELECT 1 FROM capabilities c JOIN projects p ON p.id = c.project_id
+        JOIN workspaces w ON w.id = p.workspace_id
+        WHERE c.id = releases.capability_id AND w.org_id = ?
+      )
+    `).run(status, new Date().toISOString(), id, organizationId);
     return { ...existing, status };
   }
 
@@ -78,6 +201,27 @@ export class ReleaseRepo extends BaseRepo<Release> {
     return { rolledBack, reactivated };
   }
 
+  rollbackAtomicallyInOrg(
+    currentId: string,
+    targetId: string,
+    organizationId: string,
+  ): { rolledBack: Release; reactivated: Release } | null {
+    const current = this.findByIdInOrg(currentId, organizationId);
+    const target = this.findByIdInOrg(targetId, organizationId);
+    if (!current || !target || currentId === targetId) return null;
+    let result: { rolledBack: Release; reactivated: Release } | null = null;
+    this.db.transaction(() => {
+      const now = new Date().toISOString();
+      this.db.prepare("UPDATE releases SET status = 'rolled_back', updated_at = ? WHERE id = ?").run(now, currentId);
+      this.db.prepare("UPDATE releases SET status = 'active', updated_at = ? WHERE id = ?").run(now, targetId);
+      result = {
+        rolledBack: { ...current, status: 'rolled_back' },
+        reactivated: { ...target, status: 'active' },
+      };
+    })();
+    return result;
+  }
+
   /**
    * Compute the deterministic manifest_hash for a stored release.manifest
    * blob. Used by the activation gate to look up approval state.
@@ -89,13 +233,13 @@ export class ReleaseRepo extends BaseRepo<Release> {
   findActiveByCapabilityAndEnv(capabilityId: string, environment: string): Release[] {
     return this.db.prepare(
       "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'active'",
-    ).all(capabilityId, environment) as Release[];
+    ).all(capabilityId, environment).map(toRelease);
   }
 
   findActiveByManifestHash(manifestHash: string): Release[] {
     const all = this.db.prepare(
       "SELECT * FROM releases WHERE status = 'active'",
-    ).all() as Release[];
+    ).all().map(toRelease);
     return all.filter((r) => {
       try {
         const obj = JSON.parse(r.manifest) as Record<string, unknown>;
@@ -107,18 +251,44 @@ export class ReleaseRepo extends BaseRepo<Release> {
     });
   }
 
-  /**
-   * Find the most recent rolled-back release for a (capability, env) pair
-   * with capability_version < currentVersion. Used by rollback to find
-   * the previous known-good release.
-   */
-  findPreviousActive(capabilityId: string, environment: string, currentVersion: number): Release | null {
-    // Pre-v0.4 releases use 'superseded'; the 6-state machine uses
-    // 'rolled_back'. Both are terminal states; either should be a
-    // valid rollback target.
+  findActiveByManifestHashInOrg(manifestHash: string, organizationId: string): Release[] {
     return this.db.prepare(
-      "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status IN ('rolled_back', 'superseded') AND capability_version < ? ORDER BY capability_version DESC LIMIT 1",
-    ).get(capabilityId, environment, currentVersion) as Release | null;
+      `SELECT r.* FROM releases r
+       JOIN capabilities c ON c.id = r.capability_id
+       JOIN projects p ON p.id = c.project_id
+       JOIN workspaces w ON w.id = p.workspace_id
+       WHERE r.status = 'active' AND w.org_id = ?`,
+    ).all(organizationId)
+      .map(toRelease)
+      .filter((release) => {
+        try {
+          const manifest = JSON.parse(release.manifest) as Record<string, unknown>;
+          if (manifest['manifestHash'] === manifestHash) return true;
+        } catch { /* fall through to raw blob hash */ }
+        return createHash('sha256').update(release.manifest).digest('hex') === manifestHash;
+      });
+  }
+
+  /** Find the most recent rolled-back release for a capability and environment. */
+  findPreviousActive(capabilityId: string, environment: string, currentVersion: number): Release | null {
+    const row = this.db.prepare(
+      "SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'rolled_back' AND capability_version < ? ORDER BY capability_version DESC LIMIT 1",
+    ).get(capabilityId, environment, currentVersion);
+    return row ? toRelease(row) : null;
+  }
+
+  findPreviousActiveInOrg(capabilityId: string, environment: string, currentVersion: number, organizationId: string): Release | null {
+    const row = this.db.prepare(
+      `SELECT r.* FROM releases r
+       JOIN capabilities c ON c.id = r.capability_id
+       JOIN projects p ON p.id = c.project_id
+       JOIN workspaces w ON w.id = p.workspace_id
+       WHERE r.capability_id = ? AND r.environment = ?
+         AND r.status = 'rolled_back'
+         AND r.capability_version < ? AND w.org_id = ?
+       ORDER BY r.capability_version DESC LIMIT 1`,
+    ).get(capabilityId, environment, currentVersion, organizationId);
+    return row ? toRelease(row) : null;
   }
 
   updateCanaryPercent(id: string, percent: number): Release | null {
@@ -126,6 +296,20 @@ export class ReleaseRepo extends BaseRepo<Release> {
     if (!existing) return null;
     this.db.prepare(`UPDATE releases SET canary_percent = ?, updated_at = ? WHERE id = ?`)
       .run(percent, new Date().toISOString(), id);
+    return { ...existing, canaryPercent: percent };
+  }
+
+  updateCanaryPercentInOrg(id: string, organizationId: string, percent: number): Release | null {
+    const existing = this.findByIdInOrg(id, organizationId);
+    if (!existing) return null;
+    this.db.prepare(`
+      UPDATE releases SET canary_percent = ?, updated_at = ?
+      WHERE id = ? AND EXISTS (
+        SELECT 1 FROM capabilities c JOIN projects p ON p.id = c.project_id
+        JOIN workspaces w ON w.id = p.workspace_id
+        WHERE c.id = releases.capability_id AND w.org_id = ?
+      )
+    `).run(percent, new Date().toISOString(), id, organizationId);
     return { ...existing, canaryPercent: percent };
   }
 

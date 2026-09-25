@@ -16,6 +16,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 interface ProjectRow {
   id: string;
@@ -33,7 +35,7 @@ export default function WorkspaceProjectsPage() {
 
   const projects = useQuery({
     queryKey: ['projects', workspaceId],
-    queryFn: () => projectApi.list(workspaceId!).then((r) => r.data).catch(() => [] as ProjectRow[]),
+    queryFn: () => projectApi.list(workspaceId!).then((r) => r.data),
     enabled: Boolean(workspaceId) && Boolean(session),
   });
 
@@ -55,7 +57,7 @@ export default function WorkspaceProjectsPage() {
       setDescription('');
       toast({ title: 'Project created', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const remove = useMutation({
@@ -64,10 +66,12 @@ export default function WorkspaceProjectsPage() {
       qc.invalidateQueries({ queryKey: ['projects', workspaceId] });
       toast({ title: 'Project deleted', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Delete failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Delete failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const rows = (Array.isArray(projects.data) ? projects.data : []) as ProjectRow[];
+
+  if (projects.isError) return <QueryError message={projects.error} onRetry={() => void projects.refetch()} />;
 
   return (
     <div className="space-y-6">
@@ -119,23 +123,23 @@ export default function WorkspaceProjectsPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => router.push(`/app/projects/${String(r['id'])}/capabilities`)}
+            rows={rows}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => router.push(`/app/projects/${r.id}/capabilities`)}
             columns={[
               {
                 key: 'name',
                 header: 'Project',
                 render: (r) => (
-                  <Link href={`/app/projects/${String(r['id'])}/capabilities`} className="font-medium text-text-strong hover:underline">
-                    {String(r['name'])}
+                  <Link href={`/app/projects/${r.id}/capabilities`} className="font-medium text-text-strong hover:underline">
+                    {r.name}
                   </Link>
                 ),
               },
               {
                 key: 'description',
                 header: 'Description',
-                render: (r) => r['description'] ? <span className="text-text-muted">{String(r['description'])}</span> : <span className="text-text-subtle">—</span>,
+                render: (r) => r.description ? <span className="text-text-muted">{r.description}</span> : <span className="text-text-subtle">—</span>,
               },
               {
                 key: 'actions',
@@ -144,7 +148,7 @@ export default function WorkspaceProjectsPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={(e) => { e.stopPropagation(); remove.mutate(String(r['id'])); }}
+                    onClick={(e) => { e.stopPropagation(); remove.mutate(r.id); }}
                   >
                     <Trash2 className="mr-1 size-3" />
                     Delete

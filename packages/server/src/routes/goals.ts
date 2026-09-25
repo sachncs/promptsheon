@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import type { GoalBasedEvolutionAgent, EvolutionSnapshot } from '../agents/evolution/goal-evolver.js';
-import { parseQuery } from './validate.js';
+import { parseParams, parseQuery } from './validate.js';
 import { z } from 'zod';
 
 const ListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
+const GoalParamsSchema = z.object({ hash: z.string().trim().min(1).max(255) });
 
 export interface GoalSummary {
   manifestHash: string;
@@ -38,12 +39,15 @@ export function registerGoalObservabilityRoutes(
   deps: { goalEvolver: GoalBasedEvolutionAgent; getActiveGoals: () => GoalSummary[] },
 ) {
   app.get('/api/goals', async (request, reply) => {
-    parseQuery(reply, ListQuerySchema, request.query);
+    const parsed = parseQuery(reply, ListQuerySchema, request.query);
+    if (!parsed.ok) return;
     return reply.send({ goals: deps.getActiveGoals() });
   });
 
   app.get('/api/goals/:hash', async (request, reply) => {
-    const { hash } = request.params as { hash: string };
+    const parsedParams = parseParams(reply, GoalParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { hash } = parsedParams.data;
     const state = deps.goalEvolver.getState(hash);
     if (!state) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Goal state not found' } });

@@ -1,21 +1,26 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { parseBody } from './validate.js';
+import { parseBody, parseParams } from './validate.js';
 import type { RetentionSweeper } from '../scheduler/retention-sweeper.js';
+import { assertOrgScope } from '../middleware/org-context.js';
 
 const RetentionSchema = z.object({
   organizationId: z.string(),
   days: z.number().int().min(1).max(3650),
 });
+const OrganizationParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
 
 export interface RetentionRouteDeps {
   sweeper: RetentionSweeper;
-  adminOnly: (request: unknown) => boolean;
+  adminOnly: (request: FastifyRequest) => boolean;
 }
 
 export function registerRetentionRoutes(app: FastifyInstance, deps: RetentionRouteDeps): void {
   app.get('/api/orgs/:id/retention', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!assertOrgScope(request, id, reply)) return;
     if (!deps.adminOnly(request)) {
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
     }
@@ -26,7 +31,10 @@ export function registerRetentionRoutes(app: FastifyInstance, deps: RetentionRou
   });
 
   app.put('/api/orgs/:id/retention', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!assertOrgScope(request, id, reply)) return;
     if (!deps.adminOnly(request)) {
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
     }
@@ -40,7 +48,10 @@ export function registerRetentionRoutes(app: FastifyInstance, deps: RetentionRou
   });
 
   app.post('/api/orgs/:id/retention/sweep', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, OrganizationParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!assertOrgScope(request, id, reply)) return;
     if (!deps.adminOnly(request)) {
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
     }

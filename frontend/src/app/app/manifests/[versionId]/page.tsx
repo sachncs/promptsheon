@@ -4,36 +4,25 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ScrollText, ArrowLeft, ClipboardCopy } from 'lucide-react';
+import { ArrowLeft, ClipboardCopy } from 'lucide-react';
 import { manifestApi } from '@/lib/api';
+import type { Manifest } from '@promptsheon/shared';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { HashChip } from '@/components/brand/hash-chip';
-import { EmptyState } from '@/components/brand/empty-state';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/brand/tabs';
-
-interface ManifestDetail {
-  hash: string;
-  manifest?: unknown;
-  capabilityId?: string;
-  capabilityName?: string;
-  capabilityVersion?: number;
-  createdAt?: string;
-  createdBy?: string;
-  size?: number;
-}
+import { QueryError } from '@/components/brand/query-error';
 
 export default function ManifestDetailPage() {
   const session = useRequireSession();
   const params = useParams<{ versionId: string }>();
-  const versionId = params.versionId ?? '';
+  const hash = params.versionId ?? '';
 
   const detail = useQuery({
-    queryKey: ['manifest', versionId],
-    queryFn: () => manifestApi.get(versionId).then((r) => r.data as ManifestDetail),
-    enabled: Boolean(versionId),
+    queryKey: ['manifest', hash],
+    queryFn: () => manifestApi.getByHash(hash).then((r) => r.data),
+    enabled: Boolean(hash),
     retry: false,
   });
 
@@ -44,15 +33,10 @@ export default function ManifestDetailPage() {
   const data = detail.data;
   const isError = detail.isError;
 
-  const sourceText = (() => {
-    if (data === undefined) return '';
-    if (typeof data.manifest === 'string') return data.manifest;
-    try {
-      return JSON.stringify(data.manifest, null, 2);
-    } catch {
-      return '';
-    }
-  })();
+  const sourceText = data ? JSON.stringify(data, null, 2) : '';
+  const capabilityId = data ? stringMetadata(data, 'capabilityId') : undefined;
+  const capabilityName = data ? stringMetadata(data, 'capabilityName') : undefined;
+  const createdBy = data ? stringMetadata(data, 'createdBy') : undefined;
 
   return (
     <div className="space-y-6">
@@ -68,25 +52,14 @@ export default function ManifestDetailPage() {
       <PageHeader
         eyebrow="Manifest"
         title={
-          data?.capabilityName
-            ? `${data.capabilityName} v${data.capabilityVersion ?? '?'}`
-            : 'Manifest detail'
+          capabilityName ? `${capabilityName} v${data?.version ?? '?'}` : 'Manifest detail'
         }
         subtitle="A content-addressed, compiled artifact. Its hash is its identity; its lineage is preserved."
-        actions={data?.hash ? <HashChip hash={data.hash} /> : undefined}
+        actions={hash ? <HashChip hash={hash} /> : undefined}
       />
 
       {isError ? (
-        <EmptyState
-          icon={ScrollText}
-          title="Manifest not found"
-          description={`No manifest matches versionId ${versionId.slice(0, 16)}. Open a capability to inspect its compiled manifests.`}
-          action={
-            <Link href="/app/capabilities">
-              <Button>Open registry</Button>
-            </Link>
-          }
-        />
+        <QueryError message={detail.error} onRetry={() => void detail.refetch()} />
       ) : !data ? (
         <Surface>
           <div className="text-sm text-text-muted">
@@ -111,22 +84,22 @@ export default function ManifestDetailPage() {
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 font-mono text-xs text-text-default hover:text-brand-highlight"
-                      onClick={() => navigator.clipboard?.writeText(data.hash)}
+                      onClick={() => navigator.clipboard?.writeText(hash)}
                     >
-                      <span>{data.hash}</span>
+                      <span>{hash}</span>
                       <ClipboardCopy className="size-3" aria-hidden="true" />
                     </button>
                   </dd>
                 </div>
-                {data.capabilityId && (
+                {capabilityId && (
                   <div>
                     <dt className="text-xs uppercase tracking-wider text-text-subtle">Capability</dt>
                     <dd className="mt-1 text-text-default">
                       <Link
-                        href={`/app/capabilities/${data.capabilityId}`}
+                        href={`/app/capabilities/${capabilityId}`}
                         className="hover:underline"
                       >
-                        {data.capabilityName ?? data.capabilityId}
+                        {capabilityName ?? capabilityId}
                       </Link>
                     </dd>
                   </div>
@@ -137,16 +110,16 @@ export default function ManifestDetailPage() {
                     <dd className="mt-1 text-text-default">{new Date(data.createdAt).toLocaleString()}</dd>
                   </div>
                 )}
-                {data.createdBy && (
+                {createdBy && (
                   <div>
                     <dt className="text-xs uppercase tracking-wider text-text-subtle">Author</dt>
-                    <dd className="mt-1 text-text-default">{data.createdBy}</dd>
+                    <dd className="mt-1 text-text-default">{createdBy}</dd>
                   </div>
                 )}
-                {data.size !== undefined && (
+                {sourceText && (
                   <div>
                     <dt className="text-xs uppercase tracking-wider text-text-subtle">Size</dt>
-                    <dd className="mt-1 text-text-default">{data.size.toLocaleString()} bytes</dd>
+                    <dd className="mt-1 text-text-default">{new Blob([sourceText]).size.toLocaleString()} bytes</dd>
                   </div>
                 )}
               </dl>
@@ -174,7 +147,7 @@ export default function ManifestDetailPage() {
                 >
                   Releases
                 </Link>{' '}
-                to cast a vote; it will surface here under this manifest's hash.
+                to cast a vote; it will surface here under this manifest&apos;s hash.
               </div>
             </Surface>
           </TabsContent>
@@ -183,7 +156,7 @@ export default function ManifestDetailPage() {
             <Surface>
               <div className="text-sm text-text-muted">
                 History is derived from <code>audit_entries</code> for{' '}
-                <code>resource = 'manifest'</code>. Run{' '}
+                <code>resource = &apos;manifest&apos;</code>. Run{' '}
                 <a
                   href="/api/audit/verify"
                   target="_blank"
@@ -200,4 +173,9 @@ export default function ManifestDetailPage() {
       )}
     </div>
   );
+}
+
+function stringMetadata(manifest: Manifest, key: string): string | undefined {
+  const value = manifest.metadata[key];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }

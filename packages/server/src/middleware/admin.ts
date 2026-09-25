@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { getOrgContext } from './org-context.js';
 
 export { getOrgContext };
@@ -32,16 +32,4 @@ export function requireAdmin() {
         .send({ error: { code: 'INSUFFICIENT_ROLE', message: 'Requires admin role' } });
     }
   };
-}
-
-/**
- * Higher-order helper to apply a preHandler to a single register
- * invocation. Useful for legacy routes that aren't ready for the
- * full { preHandler, handler } form yet.
- */
-export function applyAdminToExisting(app: FastifyInstance, method: string, path: string) {
-  const route = app[method.toLowerCase() as 'get' | 'post' | 'put' | 'delete'];
-  if (typeof route === 'function' && (route as unknown as { __patchedAdmin?: Set<string> }).__patchedAdmin?.has(path)) return;
-  const existing = (app as unknown as { _routes?: unknown[] })._routes;
-  void existing;
 }

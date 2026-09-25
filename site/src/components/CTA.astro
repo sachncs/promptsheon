@@ -1,5 +1,7 @@
 ---
 import LogoMark from './LogoMark.astro';
+
+const base = import.meta.env.BASE_URL;
 ---
 
 <section id="install" class="ps-section relative overflow-hidden border-t border-[var(--line)]">
@@ -14,11 +16,12 @@ import LogoMark from './LogoMark.astro';
         <LogoMark size={48} />
       </div>
       <h2 class="ps-reveal ps-display mt-8 text-display-lg" style="--reveal-delay: 80ms">
-        Ship AI capabilities, not prompts.
+        Build agents that improve.
       </h2>
       <p class="ps-reveal mx-auto mt-5 max-w-xl text-[17px] leading-relaxed text-[var(--ink-muted)] text-pretty" style="--reveal-delay: 160ms">
         Set up Promptsheon on your own infrastructure. Configure your provider,
-        create your first capability, route a release. Ten minutes from
+        create your first AgentSpec, and turn execution evidence into a better candidate.
+        Ten minutes from
         <code class="rounded bg-[var(--bg-subtle)] px-1.5 py-0.5 font-mono text-[13.5px] text-[var(--ink)]">git clone</code> to first canary.
       </p>
 
@@ -54,12 +57,7 @@ import LogoMark from './LogoMark.astro';
           </svg>
           Star on GitHub
         </a>
-        <a
-          href="https://github.com/sachncs/promptsheon/blob/master/getting-started.md"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="ps-btn ps-btn-secondary ps-btn-lg"
-        >
+        <a href={`${base}docs/quickstart/`} class="ps-btn ps-btn-secondary ps-btn-lg">
           Read the guide
         </a>
       </div>

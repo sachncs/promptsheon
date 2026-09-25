@@ -76,8 +76,8 @@ All endpoints live under `/api/`. Endpoints with `:id` style parameters expect a
 | `GET` | `/api/releases` | List releases (paginated, optionally filtered by `capabilityId`) | — | `200 Release[]` |
 | `GET` | `/api/releases/:id` | Fetch one release | — | `200 Release` / `404` |
 | `POST` | `/api/releases` | Create a release (adds `capabilityVersionId`, `manifest`, `createdBy?` to `CreateReleaseSchema`) | `CreateBodySchema` (`CreateReleaseSchema` + `capabilityVersionId`, `manifest`, `createdBy?`) | `201 Release` |
-| `PUT` | `/api/releases/:id/activate` | Transition a release to `active` | — | `200 Release` |
-| `PUT` | `/api/releases/:id/supersede` | Transition a release to `superseded` | — | `200 Release` |
+| `POST` | `/api/releases/:id/transition` | Apply a validated release state transition | `{ to, reason? }` | `200 Release` / `409` / `422` |
+| `POST` | `/api/releases/:id/rollback` | Atomically roll back to a previous release | `{ toReleaseId? }` | `200 { rolledBack, reactivated }` |
 
 ---
 
@@ -87,7 +87,7 @@ All endpoints live under `/api/`. Endpoints with `:id` style parameters expect a
 |--------|------|---------|------|----------|
 | `GET` | `/api/executions` | List executions (paginated, optionally filtered by `capabilityVersionId`) | — | `200 Execution[]` |
 | `GET` | `/api/executions/:id` | Fetch one execution | — | `200 Execution` / `404` |
-| `POST` | `/api/invoke` | Invoke a capability version via the Strands `InvocationAgent`; persists the execution | `InvokeExecutionSchema` (`capabilityVersionId`, `inputs`, `environment?`, `traceId?`) | `200 Execution` |
+| `POST` | `/api/executions` | Execute the manifest selected by an active release; persists the execution | `ExecuteManifestSchema` (`manifestHash`, `inputs`, `environment?`, `traceId?`) | `200 Execution` |
 
 ---
 
@@ -176,8 +176,9 @@ All endpoints live under `/api/`. Endpoints with `:id` style parameters expect a
 
 | Method | Path | Purpose | Body | Response |
 |--------|------|---------|------|----------|
-| `GET` | `/api/approvals/:releaseId` | Fetch the approval record for a release | — | `200 Approval` / `404` |
-| `POST` | `/api/approvals` | Upsert the approval votes for a release | `UpsertApprovalSchema` (`releaseId`, `votes`) | `201 { releaseId, votes }` |
+| `GET` | `/api/approvals/pending` | List releases in review with canonical manifest approvals | — | `200 { approvals: [...] }` |
+| `GET` | `/api/approvals?releaseId=...` | Fetch manifest approval decisions for a release | — | `200 Approval summary` |
+| `POST` | `/api/releases/:releaseId/approvals` | Record the authenticated user's release decision | `{ decision, comment? }` | `201 Approval summary` |
 
 ---
 
@@ -204,5 +205,5 @@ All endpoints live under `/api/`. Endpoints with `:id` style parameters expect a
 - **Pagination** — query parameters `page` (default 1) and `pageSize` (default 20, max 100) via `PaginationSchema`.
 - **IDs** — UUIDs, validated as `z.string().uuid()` by the relevant schemas.
 - **Error envelope** — every error response is `{ error: { code: ErrorCode, message, issues? } }` (`routes/validate.ts:35`).
-- **Auth** — when `PROMPTSHEON_AUTH=true`, requests must carry an API key (`Authorization: Bearer <key>` or `X-API-Key`).
+- **Auth** — when `PROMPTSHEON_AUTH=true`, requests must carry an API key (`Authorization: Bearer <key>` or `X-API-Key`). API keys are bound to one organization at issuance; a conflicting `X-Org-Id` is rejected.
 - **Content-Type** — `application/json` for request and response bodies; `text/event-stream` for SSE.

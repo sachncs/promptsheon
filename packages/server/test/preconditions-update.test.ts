@@ -38,7 +38,7 @@ const CAP = '00000000-0000-4000-8000-00000000000c';
 
 function seed(db: Database.Database) {
   db.prepare(`INSERT INTO orgs (id,name,slug,created_at,updated_at) VALUES (?, 'O','o',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).run(ORG);
-  db.prepare(`INSERT INTO workspaces (id,name,organization,created_at,updated_at) VALUES (?, 'W','O',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).run(WS);
+  db.prepare(`INSERT INTO workspaces (id,name,organization,org_id,created_at,updated_at) VALUES (?, 'W','O',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).run(WS, ORG);
   db.prepare(`INSERT INTO projects (id,workspace_id,name,description,created_at,updated_at) VALUES (?, ?, 'P','', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`).run(PROJECT, WS);
   db.prepare(`INSERT INTO capabilities (id,project_id,name,description,created_at,updated_at) VALUES (?, ?, 'C','', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`).run(CAP, PROJECT);
 }
@@ -56,6 +56,9 @@ describe('PUT /api/preconditions/:id', () => {
     });
 
     const app = Fastify({ logger: false });
+    app.addHook('onRequest', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = ORG;
+    });
     registerPreconditionRoutes(app, repo);
     await app.ready();
 
@@ -82,6 +85,9 @@ describe('PUT /api/preconditions/:id', () => {
       enabled: true,
     });
     const app = Fastify({ logger: false });
+    app.addHook('onRequest', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = ORG;
+    });
     app.setErrorHandler((err, _r, reply) => {
       process.stderr.write('CAPTURED ERROR: ' + ((err as Error).stack ?? (err as Error).message) + '\n');
       return reply.code(500).send({ error: { code: 'INTERNAL', message: (err as Error).message } });
@@ -114,6 +120,9 @@ describe('PUT /api/preconditions/:id', () => {
       enabled: true,
     });
     const app = Fastify({ logger: false });
+    app.addHook('onRequest', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = ORG;
+    });
     registerPreconditionRoutes(app, repo);
     await app.ready();
     const r = await app.inject({
@@ -128,6 +137,9 @@ describe('PUT /api/preconditions/:id', () => {
     const db = openDb();
     seed(db);
     const app = Fastify({ logger: false });
+    app.addHook('onRequest', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = ORG;
+    });
     registerPreconditionRoutes(app, new PreconditionRepo(db));
     await app.ready();
     const r = await app.inject({

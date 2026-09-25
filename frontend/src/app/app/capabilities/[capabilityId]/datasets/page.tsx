@@ -15,6 +15,8 @@ import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 interface DatasetSummary {
   id: string;
@@ -50,7 +52,7 @@ export default function DatasetsPage() {
       setName('');
       toast({ title: 'Dataset created', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const deleteDataset = useMutation({
@@ -59,7 +61,7 @@ export default function DatasetsPage() {
       qc.invalidateQueries({ queryKey: ['datasets', capabilityId] });
       toast({ title: 'Dataset deleted', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Delete failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Delete failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const addCase = useMutation({
@@ -82,10 +84,16 @@ export default function DatasetsPage() {
       setCaseDescription('');
       toast({ title: 'Case added', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Add case failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Add case failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const rows = (Array.isArray(datasets.data) ? datasets.data : []) as DatasetSummary[];
+
+  if (!session) return null;
+
+  if (datasets.isError) {
+    return <QueryError message={datasets.error} onRetry={() => void datasets.refetch()} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -121,9 +129,9 @@ export default function DatasetsPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={rows as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => setActiveDatasetId(String(r['id']))}
+            rows={rows}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => setActiveDatasetId(r.id)}
             columns={[
               {
                 key: 'name',
@@ -131,22 +139,22 @@ export default function DatasetsPage() {
                 render: (r) => (
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setActiveDatasetId(String(r['id'])); }}
+                    onClick={(e) => { e.stopPropagation(); setActiveDatasetId(r.id); }}
                     className="font-medium text-text-strong hover:underline"
                   >
-                    {String(r['name'])}
+                    {r.name}
                   </button>
                 ),
               },
               {
                 key: 'id',
                 header: 'Identifier',
-                render: (r) => <HashChip hash={String(r['id'])} />,
+                render: (r) => <HashChip hash={r.id} />,
               },
               {
                 key: 'created',
                 header: 'Created',
-                render: (r) => r['createdAt'] ? new Date(String(r['createdAt'])).toLocaleDateString() : '—',
+                render: (r) => r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—',
               },
               {
                 key: 'actions',
@@ -155,7 +163,7 @@ export default function DatasetsPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={(e) => { e.stopPropagation(); deleteDataset.mutate(String(r['id'])); }}
+                    onClick={(e) => { e.stopPropagation(); deleteDataset.mutate(r.id); }}
                   >
                     <Trash2 className="mr-1 size-3" />
                     Delete

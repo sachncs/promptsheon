@@ -51,6 +51,12 @@ describe('TraceRepo', () => {
     expect(fetched?.attributes['foo']).toBe('bar');
   });
 
+  it('findByIdInOrg does not cross tenant boundaries', () => {
+    const run = repo.startRun({ organizationId: 'org-a', name: 'tenant trace' });
+    expect(repo.findByIdInOrg(run.id, 'org-a')?.id).toBe(run.id);
+    expect(repo.findByIdInOrg(run.id, 'org-b')).toBeNull();
+  });
+
   it('addSpan + findSpansByRun returns children in time order', () => {
     const run = repo.startRun({ organizationId: 'org-1', name: 'rt' });
     const s1 = repo.addSpan({ traceRunId: run.id, name: 'first', kind: 'agent' });

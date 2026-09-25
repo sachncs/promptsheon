@@ -8,15 +8,15 @@ import { useMemo, useState } from 'react';
 import {
   ArrowLeft, GitCompareArrows, ScrollText,
 } from 'lucide-react';
-import { versionApi, releaseApi } from '@/lib/api';
+import { manifestApi, versionApi, type CapabilityVersion } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { HashChip } from '@/components/brand/hash-chip';
 import { ThemedSelect } from '@/components/brand/themed-select';
-import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/brand/empty-state';
 import { cn } from '@/lib/utils';
+import { QueryError } from '@/components/brand/query-error';
 
 type Mode = 'unified' | 'split';
 
@@ -30,23 +30,23 @@ function DiffPageInner() {
 
   const fromVer = useQuery({
     queryKey: ['versions', capabilityParam],
-    queryFn: () => capabilityParam ? versionApi.list(capabilityParam).then((r) => r.data).catch(() => []) : Promise.resolve([]),
+    queryFn: () => capabilityParam ? versionApi.list(capabilityParam).then((r) => r.data) : Promise.resolve([]),
     enabled: Boolean(capabilityParam) && Boolean(session),
   });
 
-  const versions = (Array.isArray(fromVer.data) ? fromVer.data : []) as Array<Record<string, unknown>>;
+  const versions: CapabilityVersion[] = fromVer.data ?? [];
 
   const [fromId, setFromId] = useState<string>(initialFrom);
   const [toId, setToId] = useState<string>(initialTo);
 
   const fromData = useQuery({
     queryKey: ['manifest', fromId],
-    queryFn: () => fromId ? releaseApi.get(fromId).then((r) => r.data).catch(() => null) : Promise.resolve(null),
+    queryFn: () => fromId ? manifestApi.get(fromId).then((r) => r.data) : Promise.resolve(null),
     enabled: Boolean(fromId) && Boolean(session),
   });
   const toData = useQuery({
     queryKey: ['manifest', toId],
-    queryFn: () => toId ? releaseApi.get(toId).then((r) => r.data).catch(() => null) : Promise.resolve(null),
+    queryFn: () => toId ? manifestApi.get(toId).then((r) => r.data) : Promise.resolve(null),
     enabled: Boolean(toId) && Boolean(session),
   });
 
@@ -55,8 +55,12 @@ function DiffPageInner() {
 
   const unifiedLines = useMemo(() => unifiedDiff(fromText, toText), [fromText, toText]);
 
-  const fromHash = (fromData.data as { manifestHash?: string } | null | undefined)?.manifestHash ?? '';
-  const toHash = (toData.data as { manifestHash?: string } | null | undefined)?.manifestHash ?? '';
+  const fromHash = fromData.data?.hash ?? '';
+  const toHash = toData.data?.hash ?? '';
+
+  if (fromVer.isError) return <QueryError message={fromVer.error} onRetry={() => void fromVer.refetch()} />;
+  if (fromData.isError) return <QueryError message={fromData.error} onRetry={() => void fromData.refetch()} />;
+  if (toData.isError) return <QueryError message={toData.error} onRetry={() => void toData.refetch()} />;
 
   return (
     <div className="space-y-6">
@@ -139,7 +143,7 @@ function SourcePicker({
   onChange,
 }: {
   label: string;
-  versions: Array<Record<string, unknown>>;
+  versions: CapabilityVersion[];
   value: string;
   onChange: (id: string) => void;
 }) {
@@ -152,9 +156,9 @@ function SourcePicker({
           onValueChange={onChange}
           placeholder="Choose a version…"
           options={versions.map((v) => {
-            const id = String(v['id']);
-            const vNum = String(v['version'] ?? '?');
-            const h = String(v['manifestHash'] ?? v['id']);
+            const id = v.id;
+            const vNum = String(v.version);
+            const h = v.manifestHash || v.id;
             return { value: id, label: `v${vNum} · ${h.slice(0, 8)}` };
           })}
           ariaLabel={label}

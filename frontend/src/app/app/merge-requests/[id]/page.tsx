@@ -13,6 +13,7 @@ import { StatusPill } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function MergeRequestDetail() {
   const session = useRequireSession();
@@ -27,12 +28,13 @@ export default function MergeRequestDetail() {
   });
 
   if (!session) return null;
+  if (mr.isError) return <QueryError message={mr.error} onRetry={() => void mr.refetch()} />;
   if (mr.isLoading) return <div className="text-text-muted text-sm">Loading…</div>;
   if (!mr.data) return <div className="text-text-muted text-sm">Merge request not found.</div>;
 
-  const detail = mr.data as { mr: Record<string, unknown>; approvals: Array<Record<string, unknown>>; comments: Array<Record<string, unknown>> };
+  const detail = mr.data;
   const m = detail.mr;
-  const status = String(m.status);
+  const status = m.status;
 
   async function decide(decision: 'approve' | 'request_changes') {
     await repoApi.decideMR(id, decision, comment || undefined);
@@ -47,9 +49,9 @@ export default function MergeRequestDetail() {
           <ArrowLeft className="h-3 w-3" />Repositories
         </Link>
         <PageHeader
-          eyebrow={`Merge request #${String(m.number)}`}
-          title={String(m.title)}
-          subtitle={`${String(m.sourceBranch)} → ${String(m.targetBranch)} · ${String(m.authorId)}`}
+          eyebrow={`Merge request #${m.number}`}
+          title={m.title}
+          subtitle={`${m.sourceBranch} → ${m.targetBranch} · ${m.authorId}`}
           actions={<StatusPill kind={status === 'open' ? 'review' : status === 'merged' ? 'active' : 'rolled-back'} />}
         />
       </div>
@@ -57,8 +59,8 @@ export default function MergeRequestDetail() {
       <div className="grid gap-5 lg:grid-cols-3">
         <Surface className="lg:col-span-2">
           <SurfaceHeader title="Description" />
-          {String(m.description ?? '') ? (
-            <p className="whitespace-pre-wrap text-sm text-text-default">{String(m.description)}</p>
+          {m.description ? (
+            <p className="whitespace-pre-wrap text-sm text-text-default">{m.description}</p>
           ) : (
             <p className="text-text-muted text-sm">No description provided.</p>
           )}
@@ -69,12 +71,12 @@ export default function MergeRequestDetail() {
           ) : (
             <ul className="space-y-3">
               {detail.comments.map((c) => (
-                <li key={String(c.id)} className="rounded-lg border border-border-subtle bg-surface-2/40 p-3">
+                <li key={c.id} className="rounded-lg border border-border-subtle bg-surface-2/40 p-3">
                   <div className="text-xs text-text-subtle">
-                    {String(c.authorId)} · {new Date(String(c.createdAt)).toLocaleString()}
-                    {c.path ? <span className="ml-2 font-mono">[{String(c.path)}]</span> : null}
+                    {c.authorId} · {new Date(c.createdAt).toLocaleString()}
+                    {c.path ? <span className="ml-2 font-mono">[{c.path}]</span> : null}
                   </div>
-                  <div className="mt-1 text-sm text-text-default whitespace-pre-wrap">{String(c.body)}</div>
+                  <div className="mt-1 text-sm text-text-default whitespace-pre-wrap">{c.body}</div>
                 </li>
               ))}
             </ul>
@@ -104,16 +106,16 @@ export default function MergeRequestDetail() {
           ) : (
             <ul className="space-y-2">
               {detail.approvals.map((a) => (
-                <li key={`${String(a.userId)}-${String(a.createdAt)}`} className="flex items-center gap-2">
+                <li key={`${a.userId}-${a.createdAt}`} className="flex items-center gap-2">
                   <StatusPill kind={a.decision === 'approve' ? 'approved' : 'rejected'} label={String(a.decision)} />
-                  <span className="text-xs text-text-muted">{String(a.userId)}</span>
+                  <span className="text-xs text-text-muted">{a.userId}</span>
                 </li>
               ))}
             </ul>
           )}
 
           <SurfaceHeader title="Source commit" className="mt-6" />
-          <HashChip hash={String(m.sourceCommitOid)} length={32} />
+          <HashChip hash={m.sourceCommitOid} length={32} />
         </Surface>
       </div>
     </div>

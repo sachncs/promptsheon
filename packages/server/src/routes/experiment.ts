@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { parseBody } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import type { ExperimentRepo } from '../repos/experiment.js';
 
 const VariantSchema = z.object({
@@ -15,13 +15,28 @@ const AssignmentSchema = z.object({
   outcome: z.enum(['pass', 'fail', 'borderline', 'error']),
 });
 
+const ExperimentSummaryQuerySchema = z.object({
+  alpha: z.coerce.number().min(0).max(1).default(0.05),
+  bayesSamples: z.coerce.number().int().min(100).max(100_000).default(10_000),
+});
+
+const ReleaseParamsSchema = z.object({
+  id: z.string().trim().min(1).max(255),
+});
+
+const VariantParamsSchema = z.object({
+  variantId: z.string().trim().min(1).max(255),
+});
+
 export interface ExperimentDeps {
   experimentRepo: ExperimentRepo;
 }
 
 export function registerExperimentRoutes(app: FastifyInstance, deps: ExperimentDeps): void {
   app.get('/api/releases/:id/experiments', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     return reply.send({
       variants: deps.experimentRepo.listVariants(id),
       assignments: deps.experimentRepo.listVariants(id).flatMap((v) =>
@@ -39,18 +54,23 @@ export function registerExperimentRoutes(app: FastifyInstance, deps: ExperimentD
    * "no data yet" is a normal experiment state.
    */
   app.get('/api/releases/:id/experiments/summary', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const alpha = Number((request.query as { alpha?: string }).alpha ?? '0.05');
-    const bayesSamples = Number((request.query as { bayesSamples?: string }).bayesSamples ?? '10000');
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    const parsed = parseQuery(reply, ExperimentSummaryQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { alpha, bayesSamples } = parsed.data;
     const summary = deps.experimentRepo.summarize(id, {
-      alpha: Number.isFinite(alpha) ? alpha : 0.05,
-      bayesSamples: Number.isFinite(bayesSamples) ? bayesSamples : 10_000,
+      alpha,
+      bayesSamples,
     });
     return reply.send({ summary });
   });
 
   app.post('/api/releases/:id/experiments', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, VariantSchema, request.body);
     if (!parsed.ok) return;
     const variant = deps.experimentRepo.createVariant({
@@ -63,7 +83,9 @@ export function registerExperimentRoutes(app: FastifyInstance, deps: ExperimentD
   });
 
   app.post('/api/experiments/:variantId/assignments', async (request, reply) => {
-    const { variantId } = request.params as { variantId: string };
+    const parsedParams = parseParams(reply, VariantParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { variantId } = parsedParams.data;
     const parsed = parseBody(reply, AssignmentSchema, request.body);
     if (!parsed.ok) return;
     const a = deps.experimentRepo.recordAssignment({

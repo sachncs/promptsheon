@@ -66,6 +66,14 @@ export class SigningKeyRepo {
     return row ? toKey(row) : null;
   }
 
+  /** Return a signing key only when it belongs to the requested organization. */
+  findByIdInOrg(id: string, organizationId: string): SigningKey | null {
+    const row = this.db
+      .prepare('SELECT * FROM signing_keys WHERE id = ? AND organization_id = ?')
+      .get(id, organizationId) as Row | undefined;
+    return row ? toKey(row) : null;
+  }
+
   create(input: SigningKeyCreateInput): SigningKey {
     const fingerprint = fingerprintSpki(input.publicKeyPem);
     const id = randomUUID();
@@ -84,5 +92,12 @@ export class SigningKeyRepo {
       .prepare('UPDATE signing_keys SET deactivated_at = CURRENT_TIMESTAMP WHERE id = ?')
       .run(id);
     return this.findById(id);
+  }
+
+  deactivateInOrg(id: string, organizationId: string): SigningKey | null {
+    this.db
+      .prepare('UPDATE signing_keys SET deactivated_at = CURRENT_TIMESTAMP WHERE id = ? AND organization_id = ?')
+      .run(id, organizationId);
+    return this.findByIdInOrg(id, organizationId);
   }
 }

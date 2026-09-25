@@ -30,15 +30,31 @@ function envString(key: string, fallback: string): string {
 function envInt(key: string, fallback: number): number {
   const raw = process.env[key];
   if (!raw) return fallback;
-  const n = Number.parseInt(raw, 10);
-  if (Number.isNaN(n)) return fallback;
+  if (!/^-?\d+$/.test(raw.trim())) {
+    throw new Error(`${key} must be an integer`);
+  }
+  const n = Number(raw);
+  if (!Number.isSafeInteger(n)) {
+    throw new Error(`${key} must be a safe integer`);
+  }
   return n;
 }
 
 function envBool(key: string, fallback: boolean): boolean {
   const raw = process.env[key];
   if (!raw) return fallback;
-  return raw === '1' || raw === 'true' || raw === 'yes';
+  switch (raw.trim().toLowerCase()) {
+    case '1':
+    case 'true':
+    case 'yes':
+      return true;
+    case '0':
+    case 'false':
+    case 'no':
+      return false;
+    default:
+      throw new Error(`${key} must be a boolean`);
+  }
 }
 
 export function loadConfig(): AppConfig {
@@ -53,6 +69,16 @@ export function loadConfig(): AppConfig {
       logLevel: envString('PROMPTSHEON_LOG_LEVEL', 'info'),
       nodeEnv: envString('PROMPTSHEON_NODE_ENV', envString('NODE_ENV', 'development')),
       fipsMode: envBool('PROMPTSHEON_FIPS_MODE', false),
+      evalAllowedHosts: envString('PROMPTSHEON_EVAL_ALLOWED_HOSTS', '')
+        .split(',')
+        .map((host) => host.trim())
+        .filter((host) => host.length > 0),
+      allowPrivateNetworks: envString('PROMPTSHEON_NODE_ENV', envString('NODE_ENV', 'development')) !== 'production',
+      e2eSessionEnabled: envBool('PROMPTSHEON_E2E', false),
+      policyFile: process.env['PROMPTSHEON_POLICY_FILE'] || undefined,
+      webhookSecret: process.env['PROMPTSHEON_WEBHOOK_SECRET'] || undefined,
+      rateLimitMax: envInt('PROMPTSHEON_RATE_LIMIT_MAX', 100),
+      otelEndpoint: process.env['PROMPTSHEON_OTEL_ENDPOINT'] || undefined,
     },
     llm: {
       defaultProvider: envString('PROMPTSHEON_LLM_PROVIDER', 'openai'),
@@ -65,6 +91,8 @@ export function loadConfig(): AppConfig {
     auth: {
       enabled: envBool('PROMPTSHEON_AUTH', false),
       jwtSecret: envString('PROMPTSHEON_JWT_SECRET', ''),
+      scimBearerToken: envString('PROMPTSHEON_SCIM_TOKEN', ''),
+      svidPublicKeyPem: process.env['PROMPTSHEON_SVID_PUBLIC_KEY_PEM'] || undefined,
     },
     selfEvolve: {
       enabled: envBool('PROMPTSHEON_SELF_EVOLVE_ENABLED', false),

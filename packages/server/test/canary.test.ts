@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { selectByCanary } from '../src/routes/release.js';
+import { selectByCanary } from '../src/application/canary-routing.js';
 
 describe('selectByCanary', () => {
   it('returns null on empty pool', () => {

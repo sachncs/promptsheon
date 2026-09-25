@@ -1,9 +1,10 @@
 import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import type { RepoRepo } from '../repos/repo.js';
 import type { BranchRepo } from '../repos/branch.js';
 import type { MergeRequestRepo } from '../repos/mr.js';
-import { parseBody } from './validate.js';
+import type { RepositoryService } from '../application/repository-service.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
 const OpenMRSchema = z.object({
@@ -30,16 +31,33 @@ const MergeSchema = z.object({
   mergeCommitOid: z.string().regex(/^[a-f0-9]{64}$/),
 });
 
+const MergeRequestListQuerySchema = z.object({
+  status: z.enum(['open', 'closed', 'all']).default('open'),
+});
+const RepositoryParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
+const MergeRequestParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
+
 export interface MRDeps {
-  repoRepo: RepoRepo;
+  repositoryService: RepositoryService;
   branchRepo: BranchRepo;
   mrRepo: MergeRequestRepo;
 }
 
+function repositoryForRequest(repositoryService: RepositoryService, request: FastifyRequest, id: string) {
+  return repositoryService.get(id, request.orgContext?.orgId);
+}
+
 export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): void {
   app.get('/api/repos/:id/merge-requests', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const { status } = request.query as { status?: string };
+    const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    if (!repositoryForRequest(deps.repositoryService, request, id)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
+    }
+    const parsed = parseQuery(reply, MergeRequestListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { status } = parsed.data;
     const list =
       status === 'closed'
         ? [...deps.mrRepo.listAll(id)].filter((mr) => mr.status !== 'open')
@@ -53,12 +71,18 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
     path: '/api/repos/:id/merge-requests',
     summary: 'List merge requests (filtered by ?status=open|closed|all)',
     tags: ['merge-requests'],
+    query: MergeRequestListQuerySchema,
   });
 
   app.get('/api/merge-requests/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, MergeRequestParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const mr = deps.mrRepo.findById(id);
     if (!mr) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
+    if (!repositoryForRequest(deps.repositoryService, request, mr.repositoryId)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
+    }
     return reply.send({
       mr,
       approvals: deps.mrRepo.listApprovals(id),
@@ -73,15 +97,17 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
   });
 
   app.post('/api/repos/:id/merge-requests', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, RepositoryParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, OpenMRSchema, request.body);
     if (!parsed.ok) return;
-    const repo = deps.repoRepo.findById(id);
+    const repo = repositoryForRequest(deps.repositoryService, request, id);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     if (parsed.data.sourceBranch === parsed.data.targetBranch) {
       return reply.code(422).send({ error: { code: 'SAME_TARGET', message: 'source and target branches must differ' } });
     }
-    const userId = (request as unknown as { userId?: string }).userId ?? 'system';
+    const userId = request.userId ?? 'system';
     const mr = deps.mrRepo.create({
       repositoryId: id,
       title: parsed.data.title,
@@ -96,15 +122,20 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
   });
 
   app.post('/api/merge-requests/:id/decisions', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, MergeRequestParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, DecisionSchema, request.body);
     if (!parsed.ok) return;
     const mr = deps.mrRepo.findById(id);
     if (!mr) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
+    if (!repositoryForRequest(deps.repositoryService, request, mr.repositoryId)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
+    }
     if (mr.status !== 'open') {
       return reply.code(422).send({ error: { code: 'INVALID_STATUS', message: 'merge request is not open' } });
     }
-    const userId = (request as unknown as { userId?: string }).userId ?? 'system';
+    const userId = request.userId ?? 'system';
     if (userId === mr.authorId) {
       return reply.code(422).send({ error: { code: 'SELF_DECISION', message: 'author cannot review their own merge request' } });
     }
@@ -122,12 +153,17 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
   });
 
   app.post('/api/merge-requests/:id/comments', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, MergeRequestParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, CommentSchema, request.body);
     if (!parsed.ok) return;
     const mr = deps.mrRepo.findById(id);
     if (!mr) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
-    const userId = (request as unknown as { userId?: string }).userId ?? 'system';
+    if (!repositoryForRequest(deps.repositoryService, request, mr.repositoryId)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
+    }
+    const userId = request.userId ?? 'system';
     const comment = deps.mrRepo.addComment({
       mergeRequestId: id,
       authorId: userId,
@@ -138,13 +174,18 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
   });
 
   app.post('/api/merge-requests/:id/merge', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, MergeRequestParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, MergeSchema, request.body);
     if (!parsed.ok) return;
     const mr = deps.mrRepo.findById(id);
     if (!mr) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
+    if (!repositoryForRequest(deps.repositoryService, request, mr.repositoryId)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
+    }
     const approvals = deps.mrRepo.listApprovals(id).filter((a) => a.decision === 'approve');
-    const repo = deps.repoRepo.findById(mr.repositoryId);
+    const repo = deps.repositoryService.get(mr.repositoryId, request.orgContext?.orgId);
     if (!repo) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'repository not found' } });
     if (approvals.length < repo.minApprovers) {
       return reply.code(422).send({
@@ -159,9 +200,14 @@ export function registerMergeRequestRoutes(app: FastifyInstance, deps: MRDeps): 
   });
 
   app.post('/api/merge-requests/:id/close', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, MergeRequestParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const mr = deps.mrRepo.findById(id);
     if (!mr) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
+    if (!repositoryForRequest(deps.repositoryService, request, mr.repositoryId)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'merge request not found' } });
+    }
     const updated = deps.mrRepo.setStatus(id, 'closed', null);
     return reply.send(updated);
   });

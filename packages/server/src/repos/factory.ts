@@ -31,14 +31,16 @@ import { EvalRepo } from './eval.js';
 import { PreconditionRepo } from './precondition.js';
 import { AlertRepo } from './alert.js';
 import { ScheduleRepo } from './schedule.js';
-import { ApprovalRepo } from './approval.js';
 import { ApiKeyRepo } from './api-key.js';
 import { UserRepo } from './user.js';
 import { SystemConfigRepo } from './system-config.js';
 import { ManifestRepo } from './manifest.js';
-import { MembershipRepo } from './org.js';
+import { OrgRepo, TeamRepo as OrgTeamRepo, MembershipRepo } from './org.js';
 import { WebhookRepo } from './webhook.js';
+import { OutgoingWebhookRepo } from './outgoing-webhook.js';
 import { IdempotencyRepo } from './idempotency.js';
+import { ReleaseOverlayRepo } from './release-overlay.js';
+import { SearchRepo } from './search.js';
 
 /**
  * Bundle of every repo in the server. Built once from a
@@ -65,6 +67,7 @@ export interface Repos {
   traceScore: TraceScoreRepo;
   userAnalytics: UserAnalyticsRepo;
   team: TeamRepo;
+  orgTeam: OrgTeamRepo;
   ssoConfig: SsoConfigRepo;
   promptScan: PromptScanRepo;
   redteam: RedteamRepo;
@@ -81,14 +84,17 @@ export interface Repos {
   precondition: PreconditionRepo;
   alert: AlertRepo;
   schedule: ScheduleRepo;
-  approval: ApprovalRepo;
   apiKey: ApiKeyRepo;
   user: UserRepo;
   systemConfig: SystemConfigRepo;
   manifest: ManifestRepo;
   membership: MembershipRepo;
+  org: OrgRepo;
   webhook: WebhookRepo;
+  outgoingWebhook: OutgoingWebhookRepo;
+  releaseOverlay: ReleaseOverlayRepo;
   idempotency: IdempotencyRepo;
+  search: SearchRepo;
 }
 
 /**
@@ -121,6 +127,7 @@ export function buildRepos(db: Database.Database): Repos {
     traceScore: new TraceScoreRepo(db),
     userAnalytics: new UserAnalyticsRepo(db),
     team: new TeamRepo(db),
+    orgTeam: new OrgTeamRepo(db),
     ssoConfig: new SsoConfigRepo(db),
     promptScan: new PromptScanRepo(db),
     redteam: new RedteamRepo(db),
@@ -137,14 +144,17 @@ export function buildRepos(db: Database.Database): Repos {
     precondition: new PreconditionRepo(db),
     alert: new AlertRepo(db),
     schedule: new ScheduleRepo(db),
-    approval: new ApprovalRepo(db),
     apiKey: new ApiKeyRepo(db),
     user: new UserRepo(db),
     systemConfig: new SystemConfigRepo(db),
     manifest: new ManifestRepo(db),
     membership: new MembershipRepo(db),
+    org: new OrgRepo(db),
     webhook: new WebhookRepo(db),
+    outgoingWebhook: new OutgoingWebhookRepo(db),
+    releaseOverlay: new ReleaseOverlayRepo(db),
     idempotency: new IdempotencyRepo(db),
+    search: new SearchRepo(db),
   };
 }
 
@@ -164,7 +174,6 @@ export { ScheduleRepo } from './schedule.js';
 export { ApiKeyRepo } from './api-key.js';
 export { WebhookRepo } from './webhook.js';
 export { FeatureFlagRepo } from './feature-flag.js';
-export { ApprovalRepo } from './approval.js';
 export { SystemConfigRepo } from './system-config.js';
 export { IdempotencyRepo } from './idempotency.js';
 export { ManifestRepo, computeManifestHash } from './manifest.js';

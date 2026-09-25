@@ -1,16 +1,14 @@
----
-layout: page
-title: Contributing
-subtitle: How to set up a dev environment, file issues, and submit changes.
----
-
 # Contributing
+
+Read [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) together with `AGENTS.md`
+before making changes. The development guide covers architecture, testing,
+operations, extension points, and the explicit breaking-change policy.
 
 Promptsheon is a TypeScript codebase (Fastify 5 + better-sqlite3 backend, Next.js 16 + React 19 frontend) organised as a pnpm workspace. This page covers the practical workflow. The engineering standards — type safety, validation, naming, testing bar, lifecycle, repository conventions — live in [`AGENTS.md`](https://github.com/sachncs/promptsheon/blob/master/AGENTS.md). Read AGENTS.md before opening your first PR.
 
 ## Prerequisites
 
-- **Node.js 26 or newer.** Check with `node --version`.
+- **Node.js 22 or newer.** Check with `node --version`.
 - **pnpm 11.** `corepack enable && corepack prepare pnpm@11 --activate`.
 - **Git.**
 
@@ -84,5 +82,6 @@ This project follows the [Contributor Covenant v2.1](https://github.com/sachncs/
 | You want to… | Read this |
 |--------------|-----------|
 | Read the engineering standards | [`AGENTS.md`](https://github.com/sachncs/promptsheon/blob/master/AGENTS.md) |
-| Solve a specific problem | [FAQ]({{ '/faq/' | relative_url }}) |
-| Read the architecture | [Architecture]({{ '/architecture/' | relative_url }}) |
+| Read the engineering guide | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) |
+| Solve a specific problem | [Troubleshooting](https://sachncs.github.io/promptsheon/docs/troubleshooting/) |
+| Read the architecture | [Architecture](https://sachncs.github.io/promptsheon/docs/architecture/) |

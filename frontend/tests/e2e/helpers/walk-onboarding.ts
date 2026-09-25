@@ -76,9 +76,9 @@ export async function clearClientState(page: Page): Promise<void> {
  * produces, so tests can skip the 4-step onboarding when they only
  * need authenticated reads.
  *
- * The session is what the API client's X-User-Id / X-Org-Id
- * request headers are derived from. Without seeding, every /app/*
- * call returns 401 and the page redirects to /onboarding.
+ * The session stores the organization metadata used by the UI. In a
+ * protected environment, authenticated API calls also require the
+ * bootstrap-issued Bearer API key.
  */
 export async function seedSession(
   context: BrowserContext,

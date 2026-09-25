@@ -1,59 +1,60 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AuditChain } from '../audit/chain.js';
-import { applyMigrations } from '@promptsheon/shared';
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import type { AuditReplicationService } from '../application/audit-replication-service.js';
+import { parseQuery } from './validate.js';
 
 const ListQuerySchema = z.object({
-  resource: z.string().optional(),
-  action: z.string().optional(),
+  resource: z.string().max(120).optional(),
+  action: z.string().max(120).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional().default(100),
   offset: z.coerce.number().int().min(0).optional().default(0),
 });
 
 const VerifyQuerySchema = z.object({});
+const AuditReplicationFrameSchema = z.object({
+  rowid: z.number().int().nonnegative(),
+  previousHash: z.string(),
+  entry: z.object({
+    id: z.string().min(1),
+    userId: z.string().min(1),
+    action: z.string().min(1),
+    resource: z.string().min(1),
+    details: z.string(),
+    timestamp: z.string().datetime(),
+    entryHash: z.string().min(1),
+    resourceKind: z.string().min(1),
+    resourceId: z.string().min(1),
+  }),
+});
 
 /**
  * Register audit-trail HTTP routes. Returns the immutable chain
  * (oldest first) and exposes verify() for tamper checks.
  */
-export function registerAuditRoutes(app: FastifyInstance, deps: { auditChain: AuditChain; db: import('better-sqlite3').Database }) {
-  app.get('/api/audit', async (request, reply) => {
-    const params = request.query as Record<string, string | undefined>;
-    const limit = Math.min(parseInt(params['limit'] ?? '100', 10) || 100, 500);
-    const offset = parseInt(params['offset'] ?? '0', 10) || 0;
-    const resource = params['resource'];
-    const action = params['action'];
+function organizationOf(request: FastifyRequest): string | undefined {
+  return request.orgContext?.orgId ?? request.agentOrgId;
+}
 
-    const where: string[] = [];
-    const args: unknown[] = [];
-    if (resource) { where.push('resource = ?'); args.push(resource); }
-    if (action) { where.push('action = ?'); args.push(action); }
-    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
-    const rows = deps.db
-      .prepare(
-        `SELECT id, user_id AS userId, action, resource, details, timestamp,
-                previous_hash AS previousHash, entry_hash AS entryHash,
-                timestamp_str AS timestampStr,
-                resource_kind AS resourceKind, resource_id AS resourceId
-         FROM audit_entries ${whereClause}
-         ORDER BY rowid DESC LIMIT ? OFFSET ?`,
-      )
-      .all(...args, limit, offset) as Array<{
-      id: string;
-      userId: string;
-      action: string;
-      resource: string;
-      details: string;
-      timestamp: string;
-      previousHash: string;
-      entryHash: string;
-      timestampStr: string;
-      resourceKind: string;
-      resourceId: string;
-    }>;
+export function registerAuditRoutes(
+  app: FastifyInstance,
+  deps: { auditChain: AuditChain; replication: AuditReplicationService },
+) {
+  app.get('/api/audit', async (request, reply) => {
+    const organizationId = organizationOf(request);
+    if (!organizationId) {
+      return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    }
+    const parsed = parseQuery(reply, ListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { limit, offset, resource, action } = parsed.data;
+
+    const rows = deps.auditChain
+      .entriesForOrganization(organizationId)
+      .filter((entry) => !resource || entry.resource === resource)
+      .filter((entry) => !action || entry.action === action)
+      .reverse()
+      .slice(offset, offset + limit);
 
     return reply.send({ entries: rows, limit, offset });
   });
@@ -78,63 +79,13 @@ export function registerAuditRoutes(app: FastifyInstance, deps: { auditChain: Au
    * not need this route.
    */
   app.post('/api/audit/ingest', async (request, reply) => {
-    const frame = request.body as {
-      rowid: number;
-      previousHash: string;
-      entry: {
-        id: string;
-        userId: string;
-        action: string;
-        resource: string;
-        details: string;
-        timestamp: string;
-        entryHash: string;
-        resourceKind: string;
-        resourceId: string;
-      };
-    };
-    if (
-      typeof frame !== 'object' ||
-      frame === null ||
-      typeof frame.rowid !== 'number' ||
-      typeof frame.previousHash !== 'string' ||
-      !frame.entry ||
-      typeof frame.entry.id !== 'string'
-    ) {
+    const parsed = AuditReplicationFrameSchema.safeParse(request.body);
+    if (!parsed.success) {
       return reply.code(400).send({
         error: { code: 'INVALID_FRAME', message: 'malformed audit frame' },
       });
     }
-    const insert = deps.db.prepare(
-      `INSERT OR IGNORE INTO audit_entries
-         (id, user_id, action, resource, details, timestamp, previous_hash, entry_hash, timestamp_str, resource_kind, resource_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-    const result = insert.run(
-      frame.entry.id,
-      frame.entry.userId,
-      frame.entry.action,
-      frame.entry.resource,
-      frame.entry.details,
-      frame.entry.timestamp,
-      frame.previousHash,
-      frame.entry.entryHash,
-      frame.entry.timestamp,
-      frame.entry.resourceKind,
-      frame.entry.resourceId,
-    );
-    if (result.changes > 0) {
-      // Update the chain state — only advance if we just inserted
-      // a new row. Duplicate inserts leave the state alone.
-      deps.db
-        .prepare(
-          `UPDATE audit_chain_state
-           SET last_hash = ?, last_rowid = ?
-           WHERE id = 0 AND last_rowid < ?`,
-        )
-        .run(frame.entry.entryHash, frame.rowid, frame.rowid);
-    }
-    return reply.send({ ok: true, duplicate: result.changes === 0 });
+    return reply.send({ ok: true, ...deps.replication.ingest(parsed.data) });
   });
 
   /**

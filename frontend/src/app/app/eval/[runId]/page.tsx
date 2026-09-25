@@ -3,15 +3,16 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, FlaskConical, ListChecks, TrendingDown } from 'lucide-react';
-import { evalApi } from '@/lib/api';
+import { AlertTriangle, ArrowLeft, FlaskConical, ListChecks } from 'lucide-react';
+import { evalApi, type EvalResult } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
-import { StatusPill } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
+import { QueryError } from '@/components/brand/query-error';
 
 export default function EvalRunPage() {
   const session = useRequireSession();
@@ -20,17 +21,18 @@ export default function EvalRunPage() {
 
   const run = useQuery({
     queryKey: ['eval-run', id],
-    queryFn: () => evalApi.get(id).then((r) => r.data).catch(() => null),
+    queryFn: () => evalApi.get(id).then((r) => r.data),
     enabled: Boolean(id) && Boolean(session),
   });
 
   const results = useQuery({
     queryKey: ['eval-run', id, 'results'],
-    queryFn: () => evalApi.getResults(id).then((r) => r.data).catch(() => []),
+    queryFn: () => evalApi.getResults(id).then((r) => r.data),
     enabled: Boolean(id) && Boolean(session),
   });
 
   if (run.isLoading) return <div className="text-text-muted text-sm">Loading run…</div>;
+  if (run.isError) return <QueryError message={run.error} onRetry={() => void run.refetch()} />;
   if (!run.data) {
     return (
       <EmptyState
@@ -45,9 +47,10 @@ export default function EvalRunPage() {
       />
     );
   }
+  if (results.isError) return <QueryError message={results.error} onRetry={() => void results.refetch()} />;
 
-  const r = run.data as Record<string, unknown>;
-  const rows = (Array.isArray(results.data) ? results.data : []) as Array<Record<string, unknown>>;
+  const evalRun = run.data;
+  const rows: EvalResult[] = results.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -57,9 +60,9 @@ export default function EvalRunPage() {
         </Link>
         <PageHeader
           eyebrow="Evaluation"
-          title={`Run ${String(r['id'] ?? '').slice(0, 8)}`}
-          subtitle="Per-case results, scoring summary, regression detection, and threshold gate visualisation."
-          actions={<StatusPill kind={(r['status'] as never) ?? 'pending'} />}
+          title={`Run ${evalRun.id.slice(0, 8)}`}
+          subtitle="Per-case results, scoring summary, and threshold gate visualisation."
+          actions={<StatusPill kind={statusKindOf(evalRun.status, 'pending')} />}
         />
       </div>
 
@@ -67,21 +70,21 @@ export default function EvalRunPage() {
         <div className="rounded-xl border border-border-subtle bg-surface-1 p-5">
           <div className="text-xs uppercase tracking-wider text-text-subtle">Score</div>
           <div className="mt-3 text-3xl font-semibold text-text-strong">
-            {r['score'] != null ? `${(Number(r['score']) * 100).toFixed(1)}%` : '—'}
+            {(evalRun.score * 100).toFixed(1)}%
           </div>
-          <div className="mt-1 text-sm text-text-muted">Pass threshold {r['threshold'] != null ? `${(Number(r['threshold']) * 100).toFixed(0)}%` : '92%'}</div>
+          <div className="mt-1 text-sm text-text-muted">Scored by {evalRun.scorer}</div>
         </div>
         <div className="rounded-xl border border-border-subtle bg-surface-1 p-5">
           <div className="text-xs uppercase tracking-wider text-text-subtle">Cases</div>
           <div className="mt-3 text-3xl font-semibold text-text-strong">{rows.length}</div>
-          <div className="mt-1 text-sm text-text-muted">{String(r['datasetName'] ?? 'dataset')}</div>
+          <div className="mt-1 text-sm text-text-muted">Dataset {evalRun.datasetId.slice(0, 12)}…</div>
         </div>
         <div className="rounded-xl border border-border-subtle bg-surface-1 p-5">
-          <div className="text-xs uppercase tracking-wider text-text-subtle">Regressions</div>
+          <div className="text-xs uppercase tracking-wider text-text-subtle">Failed cases</div>
           <div className="mt-3 text-3xl font-semibold text-warning">
-            {rows.filter((row) => row['regression']).length}
+            {evalRun.failed}
           </div>
-          <div className="mt-1 text-sm text-text-muted">vs. baseline release</div>
+          <div className="mt-1 text-sm text-text-muted">of {evalRun.total} total cases</div>
         </div>
       </div>
 
@@ -89,21 +92,19 @@ export default function EvalRunPage() {
         <SurfaceHeader
           className="px-5 pt-5"
           title="Per-case results"
-          description="Inputs, expected, and actual outputs. Decision column shows the scorer's verdict."
+          description="Actual outputs, failures, and latency for each evaluated case."
           actions={<ListChecks className="h-4 w-4 text-text-muted" />}
         />
         <DataTable
           className="rounded-none border-0 border-t border-border-subtle"
           rows={rows}
-          rowKey={(row, idx) => String(row['caseId'] ?? row['id'] ?? `row-${idx ?? 0}`)}
+          rowKey={(row) => row.id}
           columns={[
-            { key: 'name', header: 'Case', render: (row) => String(row['name'] ?? row['caseId'] ?? '—') },
-            { key: 'input', header: 'Input', render: (row) => <span className="font-mono text-xs text-text-muted">{String(row['input'] ?? '').slice(0, 80)}</span> },
-            { key: 'expected', header: 'Expected', render: (row) => <span className="font-mono text-xs text-text-muted">{String(row['expected'] ?? '').slice(0, 80)}</span> },
-            { key: 'actual', header: 'Actual', render: (row) => <span className="font-mono text-xs text-text-default">{String(row['actual'] ?? '').slice(0, 80)}</span> },
-            { key: 'score', header: 'Score', render: (row) => row['score'] != null ? `${(Number(row['score']) * 100).toFixed(0)}%` : '—' },
-            { key: 'decision', header: 'Decision', render: (row) => <StatusPill kind={(row['passed'] === false ? 'rejected' : 'approved') as never} label={row['passed'] === false ? 'fail' : 'pass'} /> },
-            { key: 'reg', header: '', render: (row) => row['regression'] ? <TrendingDown className="h-3.5 w-3.5 text-warning" /> : null },
+            { key: 'case', header: 'Case', render: (row) => row.caseId ?? `Case ${row.seq}` },
+            { key: 'actual', header: 'Actual', render: (row) => <span className="font-mono text-xs text-text-default">{row.actual.slice(0, 80)}</span> },
+            { key: 'error', header: 'Error', render: (row) => row.error ? <span className="inline-flex items-center gap-1 text-xs text-destructive"><AlertTriangle className="size-3" />{row.error.slice(0, 80)}</span> : '—' },
+            { key: 'latency', header: 'Latency', render: (row) => `${row.latencyMs.toLocaleString()}ms` },
+            { key: 'decision', header: 'Decision', render: (row) => <StatusPill kind={row.passed ? 'approved' : 'rejected'} label={row.passed ? 'pass' : 'fail'} /> },
           ]}
           empty={
             <EmptyState

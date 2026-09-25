@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { walkOnboarding, clearClientState } from './helpers/walk-onboarding';
+import { walkOnboarding } from './helpers/walk-onboarding';
 
 const LLM_KEY = process.env['E2E_LLM_KEY'] ?? '';
 const LLM_BASE = process.env['E2E_LLM_BASE_URL'] ?? 'https://api.minimax.io/anthropic';

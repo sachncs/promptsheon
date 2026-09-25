@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerExecutionRoutes } from '../src/routes/execution.js';
+import { ExecutionService } from '../src/application/execution-service.js';
+import { selectByCanary } from '../src/application/canary-routing.js';
 import { ExecutionRepo } from '../src/repos/execution.js';
-import { ReleaseRepo } from '../src/repos/release.js';
 import { ManifestRepo } from '../src/repos/manifest.js';
+import { TraceRepo } from '../src/repos/trace.js';
 import { ManifestGraphExecutor } from '../src/agents/executor/executor.js';
 import { SseHub } from '../src/sse/hub.js';
+import { ExecutionReplayService } from '../src/application/execution-replay-service.js';
 import { computeManifestHash } from '../src/repos/manifest.js';
 import { applyMigrations } from '@promptsheon/shared';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -57,8 +60,8 @@ function buildLeafManifest(id: string, version = 1, capabilityId = 'cap1'): Mani
 
 function insertTestData(db: ReturnType<typeof Database>): void {
   db.prepare(`
-    INSERT INTO workspaces (id, name, organization, created_at, updated_at)
-    VALUES ('ws1', 'Test WS', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')
+    INSERT INTO workspaces (id, org_id, name, organization, created_at, updated_at)
+    VALUES ('ws1', 'unscoped', 'Test WS', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')
   `).run();
   db.prepare(`
     INSERT INTO projects (id, workspace_id, name, description, created_at, updated_at)
@@ -85,10 +88,15 @@ describe('POST /api/executions', () => {
     insertTestData(db);
     manifestRepo = new ManifestRepo(db);
     executionRepo = new ExecutionRepo(db);
+    const traceRepo = new TraceRepo(db);
     hub = new SseHub();
     executor = new ManifestGraphExecutor({ config: buildConfig(), hub });
 
     app = Fastify();
+    app.addHook('preHandler', (request, _reply, done) => {
+      (request as Record<string, unknown>)['orgContext'] = { orgId: 'unscoped' };
+      done();
+    });
     app.setErrorHandler((error, _request, reply) => {
       if (error.name === 'NotFoundError') {
         return reply.code(404).send({ error: { code: 'NOT_FOUND', message: error.message } });
@@ -101,12 +109,16 @@ describe('POST /api/executions', () => {
     await app.register(async (instance) => {
       await registerExecutionRoutes(instance, {
         executionRepo,
-        manifestRepo,
-        executor,
+        executionService: new ExecutionService(
+          manifestRepo,
+          { findActiveByManifestHashInOrg: () => [{ id: 'rel-sse', canaryPercent: 0 }] },
+          traceRepo,
+          executionRepo,
+          executor,
+          selectByCanary,
+        ),
         sseHub: hub,
-        releaseRepo: { findActiveByManifestHash: () => [{ id: 'rel-sse', canaryPercent: 0 }] } as never,
-        versionRepo: { findById: () => null } as never,
-        traceRepo: { startRun: () => ({ id: 'stub-trace' }), finalize: () => undefined } as never,
+        replayService: new ExecutionReplayService(executionRepo, manifestRepo, traceRepo, executor),
       });
     });
     await app.ready();

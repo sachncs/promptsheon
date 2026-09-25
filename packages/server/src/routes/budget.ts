@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { CostBudgetRepo } from '../repos/budget.js';
 import type { CostForecastService } from '../analysis/forecast.js';
-import { parseBody, parseQuery } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import { NotFoundError } from '@promptsheon/shared';
 
 const CreateBudgetSchema = z.object({
@@ -27,9 +27,31 @@ const ForecastQuerySchema = z.object({
   windowDays: z.coerce.number().int().min(7).max(180).optional().default(30),
 });
 
+const BudgetListQuerySchema = z.object({
+  organizationId: z.string().min(1).max(200),
+});
+const BudgetParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
+
 export interface BudgetDeps {
   budgetRepo: CostBudgetRepo;
   forecastService: CostForecastService;
+}
+
+function activeOrg(request: { orgContext?: { orgId?: string }; agentOrgId?: string }): string | undefined {
+  return request.orgContext?.orgId ?? request.agentOrgId;
+}
+
+function assertOrgScope(
+  request: { orgContext?: { orgId?: string }; agentOrgId?: string },
+  requestedOrgId: string,
+  reply: { code: (status: number) => { send: (body: unknown) => unknown } },
+): boolean {
+  const current = activeOrg(request);
+  if (current && current !== requestedOrgId) {
+    void reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'organization not found' } });
+    return false;
+  }
+  return true;
 }
 
 export function registerBudgetRoutes(app: FastifyInstance, deps: BudgetDeps): void {
@@ -37,16 +59,17 @@ export function registerBudgetRoutes(app: FastifyInstance, deps: BudgetDeps): vo
    * List the org's budgets.
    */
   app.get('/api/admin/budgets', async (request, reply) => {
-    const orgId = (request.query as { organizationId?: string }).organizationId;
-    if (!orgId) {
-      return reply.code(400).send({ error: { code: 'MISSING_ORG', message: 'organizationId required' } });
-    }
+    const parsed = parseQuery(reply, BudgetListQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { organizationId: orgId } = parsed.data;
+    if (!assertOrgScope(request, orgId, reply)) return;
     return reply.send({ items: deps.budgetRepo.listForOrg(orgId) });
   });
 
   app.post('/api/admin/budgets', async (request, reply) => {
     const parsed = parseBody(reply, CreateBudgetSchema, request.body);
     if (!parsed.ok) return;
+    if (!assertOrgScope(request, parsed.data.organizationId, reply)) return;
     try {
       const created = deps.budgetRepo.create(parsed.data);
       return reply.code(201).send(created);
@@ -67,9 +90,14 @@ export function registerBudgetRoutes(app: FastifyInstance, deps: BudgetDeps): vo
   });
 
   app.patch('/api/admin/budgets/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, BudgetParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, UpdateBudgetSchema, request.body);
     if (!parsed.ok) return;
+    const existing = deps.budgetRepo.findById(id);
+    if (!existing) throw new NotFoundError('budget', id);
+    if (!assertOrgScope(request, existing.organizationId, reply)) return;
     const updated = deps.budgetRepo.update(id, parsed.data);
     if (!updated) {
       throw new NotFoundError('budget', id);
@@ -78,7 +106,12 @@ export function registerBudgetRoutes(app: FastifyInstance, deps: BudgetDeps): vo
   });
 
   app.delete('/api/admin/budgets/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, BudgetParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
+    const existing = deps.budgetRepo.findById(id);
+    if (!existing) throw new NotFoundError('budget', id);
+    if (!assertOrgScope(request, existing.organizationId, reply)) return;
     if (!deps.budgetRepo.delete(id)) {
       throw new NotFoundError('budget', id);
     }
@@ -93,6 +126,7 @@ export function registerBudgetRoutes(app: FastifyInstance, deps: BudgetDeps): vo
   app.get('/api/admin/cost-forecast', async (request, reply) => {
     const parsed = parseQuery(reply, ForecastQuerySchema, request.query);
     if (!parsed.ok) return;
+    if (!assertOrgScope(request, parsed.data.organizationId, reply)) return;
     const result = deps.forecastService.compute(parsed.data.organizationId, {
       windowDays: parsed.data.windowDays,
     });

@@ -3,11 +3,16 @@ import { SessionManager, type Storage } from '@strands-agents/sdk';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { Message } from '@strands-agents/sdk';
+import { Message, type Message as MessageType } from '@strands-agents/sdk';
+
+export interface SessionMessageInput {
+  role: 'user' | 'assistant';
+  content: Array<{ text: string }>;
+}
 
 export interface SessionState {
   sessionId: string;
-  messages: Message[];
+  messages: MessageType[];
   appState: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -68,10 +73,10 @@ export class SessionStore {
     return this.sessions.get(sessionId) ?? null;
   }
 
-  async appendMessages(sessionId: string, messages: Message[]): Promise<SessionState | null> {
+  async appendMessages(sessionId: string, messages: SessionMessageInput[]): Promise<SessionState | null> {
     const state = this.sessions.get(sessionId);
     if (!state) return null;
-    state.messages.push(...messages);
+    state.messages.push(...messages.map((message) => Message.fromMessageData(message)));
     state.updatedAt = new Date().toISOString();
     await this.persist(state);
     return state;

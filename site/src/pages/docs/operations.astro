@@ -1,0 +1,41 @@
+---
+import DocsLayout from '@components/DocsLayout.astro';
+---
+
+<DocsLayout title="Operations" description="Run Promptsheon responsibly: configure production, verify readiness, observe behaviour, and recover from failure.">
+  <h2>Production baseline</h2>
+  <p>Run the API behind TLS termination and keep the database, CAS directory, and deployment secrets on persistent storage. Production refuses unsafe defaults for authentication, CORS, webhook signing, and SCIM.</p>
+  <pre><code>PROMPTSHEON_NODE_ENV=production
+PROMPTSHEON_AUTH=true
+PROMPTSHEON_JWT_SECRET=&lt;at-least-32-characters&gt;
+PROMPTSHEON_CORS_ORIGIN=https://console.example.com
+PROMPTSHEON_WEBHOOK_SECRET=&lt;random-secret&gt;
+PROMPTSHEON_SCIM_TOKEN=&lt;random-secret&gt;
+PROMPTSHEON_DB_PATH=/var/lib/promptsheon/promptsheon.db
+PROMPTSHEON_CAS_PATH=/var/lib/promptsheon/cas</code></pre>
+
+  <h2>Health, readiness, and shutdown</h2>
+  <p>Use <code>/api/health</code> for liveness and <code>/api/ready</code> for traffic admission. A failed database probe returns 503 rather than presenting a false healthy response. Send SIGTERM during deploys so schedulers, SSE connections, and the database close cleanly.</p>
+
+  <h2>What to monitor</h2>
+  <ul>
+    <li>Readiness failures and database quick-check latency.</li>
+    <li>Request duration and error rate grouped by route and request ID.</li>
+    <li>LLM provider latency, retries, failures, token cost, and fallback usage.</li>
+    <li>Evaluation score movement before and after release promotion.</li>
+    <li>Audit-chain verification and webhook replay/rejection events.</li>
+    <li>CAS and SQLite disk usage, backup freshness, and migration status.</li>
+  </ul>
+
+  <h2>Backup and recovery</h2>
+  <p>Back up the SQLite database and CAS directory together. Test restoration into an isolated instance, run migrations, verify readiness, and compare a known content hash before routing traffic. A backup that has never been restored is an assumption, not a recovery plan.</p>
+
+  <h2>Troubleshooting</h2>
+  <ol>
+    <li>Check <code>/api/ready</code> and capture the <code>X-Request-Id</code>.</li>
+    <li>Inspect structured server logs for that request ID.</li>
+    <li>Verify the provider secret, model, endpoint, timeout, and allowed outbound host policy.</li>
+    <li>Check the release audit trail before retrying a promotion.</li>
+    <li>Roll back to the last verified content hash if user impact is ongoing.</li>
+  </ol>
+</DocsLayout>

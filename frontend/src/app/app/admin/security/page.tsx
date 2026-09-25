@@ -9,10 +9,10 @@ import { client } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { Field, FieldGroup } from '@/components/brand/field';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { StatusPill } from '@/components/brand/status-pill';
 import { EmptyState } from '@/components/brand/empty-state';
+import { QueryError } from '@/components/brand/query-error';
 
 interface Finding {
   rule: string;
@@ -56,6 +56,7 @@ export default function SecurityPage() {
   });
 
   if (!session) return null;
+  if (summary.isError) return <QueryError message={summary.error} onRetry={() => void summary.refetch()} />;
 
   return (
     <div className="space-y-6">

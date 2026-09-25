@@ -1,0 +1,38 @@
+---
+import DocsLayout from '@components/DocsLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<DocsLayout title="Testing" description="Use focused tests for fast feedback, then widen verification to the full user journey and production surface.">
+  <h2>Run the quality gates</h2>
+  <pre><code>pnpm typecheck
+pnpm test
+pnpm --dir frontend lint
+pnpm --dir frontend typecheck
+pnpm --dir frontend test:e2e
+pnpm build:site</code></pre>
+  <p>Run the narrowest relevant check while iterating, then run the complete set before merging. A green unit suite does not prove that a browser journey, generated docs route, or deployment asset works.</p>
+
+  <h2>Test by boundary</h2>
+  <div class="not-prose grid gap-3 sm:grid-cols-2">
+    {[
+      ['Domain and application', 'Test invariants, transitions, authorization decisions, and failure paths without SQLite or Fastify.'],
+      ['Repositories and routes', 'Verify persistence mappings, validation, stable error envelopes, authentication, and request correlation.'],
+      ['Frontend', 'Cover loading, empty, error, form validation, cancellation, keyboard, and responsive states.'],
+      ['Website', 'Build all static routes, inspect links against the configured base path, and verify docs navigation.'],
+    ].map(([title, text]) => (
+      <article class="rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)] p-5"><h3 class="text-[15px] font-semibold text-[var(--ink-strong)]">{title}</h3><p class="mt-2 text-[13px] leading-relaxed text-[var(--ink-muted)]">{text}</p></article>
+    ))}
+  </div>
+
+  <h2>Before opening a change</h2>
+  <ol>
+    <li>Add a regression test for the failure or behavior that motivated the change.</li>
+    <li>Confirm external inputs still use Zod schemas and public responses remain compatible.</li>
+    <li>Run the browser flow when a route, auth boundary, form, or navigation path changes.</li>
+    <li>Run the site build when copy, docs, assets, or internal links change.</li>
+    <li>Record any required migration, environment variable, or rollback step in the docs.</li>
+  </ol>
+
+  <p><a href={`${base}docs/contributing/`}>Read the contribution quality bar →</a></p>
+</DocsLayout>

@@ -24,6 +24,7 @@ export interface WebhookEvent {
   signatureValid: boolean;
   routedToManifestHash: string | null;
   receivedAt: string;
+  routedToExecutionId?: string | null;
 }
 
 /**
@@ -113,5 +114,26 @@ export class WebhookReceiver {
 
   findById(id: string): WebhookEvent | null {
     return this.events.find((e) => e.id === id) ?? null;
+  }
+
+  /**
+   * Return the route configured for an endpoint and event type.
+   *
+   * The route is exposed through the receiver boundary so callers do not
+   * depend on the receiver's private storage representation.
+   */
+  findRoute(endpointId: string, eventType: string): RoutingConfig | null {
+    return this.routes.find((route) => route.endpointId === endpointId && route.eventType === eventType) ?? null;
+  }
+
+  /**
+   * Associate a successfully dispatched event with its execution.
+   * Returns false when the event no longer exists.
+   */
+  markRoutedToExecution(eventId: string, executionId: string): boolean {
+    const event = this.findById(eventId);
+    if (!event) return false;
+    event.routedToExecutionId = executionId;
+    return true;
   }
 }

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, ScrollText, ShieldCheck, AlertCircle } from 'lucide-react';
+import { CheckCircle2, ScrollText, ShieldCheck } from 'lucide-react';
 import { auditApi } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
@@ -16,19 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Drawer, DrawerContent } from '@/components/brand/drawer';
 import { ThemedSelect } from '@/components/brand/themed-select';
-
-interface AuditEntry {
-  id: string;
-  action?: string;
-  resource?: string;
-  resourceKind?: string;
-  resourceId?: string;
-  actor?: string;
-  createdAt?: string;
-  hash?: string;
-  prevHash?: string | null;
-  details?: string;
-}
+import { QueryError } from '@/components/brand/query-error';
 
 const DATE_RANGES = ['24h', '7d', '30d', 'all'] as const;
 type DateRange = (typeof DATE_RANGES)[number];
@@ -52,14 +40,14 @@ export default function AuditPage() {
 
   const audit = useQuery({
     queryKey: ['audit', 'all'],
-    queryFn: () => auditApi.list().then((r) => r.data).catch(() => []),
+    queryFn: () => auditApi.list().then((r) => r.data),
     enabled: Boolean(session),
   });
-  const allRows = ((audit.data ?? []) as AuditEntry[]);
+  const allRows = useMemo(() => audit.data ?? [], [audit.data]);
 
   const resourceOptions = useMemo(() => {
     const set = new Set<string>();
-    for (const r of allRows) if (r.resourceKind) set.add(r.resourceKind);
+    for (const r of allRows) if (r.resource) set.add(r.resource);
     return [
       { value: '', label: 'All resources' },
       ...[...set].sort().map((v) => ({ value: v, label: v })),
@@ -77,15 +65,18 @@ export default function AuditPage() {
 
   const filtered = useMemo(() => {
     return allRows.filter((r) => {
-      if (!withinRange(r.createdAt, range)) return false;
-      if (resource && r.resourceKind !== resource) return false;
+      if (!withinRange(r.timestamp, range)) return false;
+      if (resource && r.resource !== resource) return false;
       if (action && r.action !== action) return false;
-      if (actorFilter && !(r.actor ?? '').toLowerCase().includes(actorFilter.toLowerCase())) return false;
+      if (actorFilter && !r.userId.toLowerCase().includes(actorFilter.toLowerCase())) return false;
       return true;
     });
   }, [allRows, range, resource, action, actorFilter]);
 
   const open = openId ? filtered.find((r) => r.id === openId) : null;
+
+  if (!session) return null;
+  if (audit.isError) return <QueryError message={audit.error} onRetry={() => void audit.refetch()} />;
 
   return (
     <div className="space-y-6">
@@ -150,43 +141,42 @@ export default function AuditPage() {
         ) : (
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={filtered as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => setOpenId(String(r['id']))}
+            rows={filtered}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => setOpenId(r.id)}
             columns={[
               {
                 key: 'when',
                 header: 'When',
                 render: (r) => (
                   <span className="font-mono text-xs text-text-muted">
-                    {r['createdAt'] ? new Date(String(r['createdAt'])).toLocaleString() : '—'}
+                    {new Date(r.timestamp).toLocaleString()}
                   </span>
                 ),
               },
               {
                 key: 'action',
                 header: 'Action',
-                render: (r) => <code className="font-mono text-xs">{String(r['action'] ?? '—')}</code>,
+                render: (r) => <code className="font-mono text-xs">{r.action}</code>,
               },
               {
                 key: 'resource',
                 header: 'Resource',
                 render: (r) => (
                   <span className="font-mono text-xs">
-                    {String(r['resourceKind'] ?? '—')}
-                    {r['resourceId'] ? <span className="text-text-subtle">/{String(r['resourceId']).slice(0, 12)}…</span> : null}
+                    {r.resourceKind}/{r.resourceId.slice(0, 12)}…
                   </span>
                 ),
               },
               {
                 key: 'actor',
                 header: 'Actor',
-                render: (r) => r['actor'] ? <span className="font-mono text-xs">{String(r['actor'])}</span> : '—',
+                render: (r) => <span className="font-mono text-xs">{r.userId}</span>,
               },
               {
                 key: 'hash',
                 header: 'Hash',
-                render: (r) => r['hash'] ? <HashChip hash={String(r['hash'])} /> : <span className="text-text-subtle">—</span>,
+                render: (r) => <HashChip hash={r.entryHash} />,
               },
               {
                 key: 'verify',
@@ -206,34 +196,30 @@ export default function AuditPage() {
         {open && (
           <DrawerContent
             title={open.action ?? 'event'}
-            description={open.createdAt ? new Date(open.createdAt).toLocaleString() : ''}
+            description={new Date(open.timestamp).toLocaleString()}
           >
             <div className="space-y-5">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <div className="text-xs uppercase tracking-wider text-text-subtle">Resource</div>
-                  <div className="mt-1 font-mono text-xs text-text-default">{open.resourceKind ?? '—'}</div>
+                  <div className="mt-1 font-mono text-xs text-text-default">{open.resourceKind}</div>
                 </div>
                 <div>
                   <div className="text-xs uppercase tracking-wider text-text-subtle">Resource id</div>
-                  <div className="mt-1 font-mono text-xs text-text-default">{open.resourceId ?? '—'}</div>
+                  <div className="mt-1 font-mono text-xs text-text-default">{open.resourceId}</div>
                 </div>
                 <div>
                   <div className="text-xs uppercase tracking-wider text-text-subtle">Actor</div>
-                  <div className="mt-1 font-mono text-xs text-text-default">{open.actor ?? '—'}</div>
+                  <div className="mt-1 font-mono text-xs text-text-default">{open.userId}</div>
                 </div>
                 <div>
                   <div className="text-xs uppercase tracking-wider text-text-subtle">Action</div>
-                  <div className="mt-1 font-mono text-xs text-text-default">{open.action ?? '—'}</div>
+                  <div className="mt-1 font-mono text-xs text-text-default">{open.action}</div>
                 </div>
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wider text-text-subtle">Hash</div>
-                <div className="mt-1">{open.hash ? <HashChip hash={open.hash} /> : <span className="text-text-subtle">—</span>}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wider text-text-subtle">Previous hash</div>
-                <div className="mt-1">{open.prevHash ? <HashChip hash={open.prevHash} /> : <span className="text-text-subtle">— (genesis)</span>}</div>
+                <div className="mt-1"><HashChip hash={open.entryHash} /></div>
               </div>
               {open.details && (
                 <div>

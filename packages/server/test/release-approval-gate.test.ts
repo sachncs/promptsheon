@@ -4,6 +4,7 @@ import { registerReleaseRoutes, approvalGate } from '../src/routes/release.js';
 import { ReleaseRepo } from '../src/repos/release.js';
 import { ManifestRepo } from '../src/repos/manifest.js';
 import { AuditChain } from '../src/audit/chain.js';
+import { ReleaseOverlayRepo } from '../src/repos/release-overlay.js';
 import { applyMigrations } from '@promptsheon/shared';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -53,7 +54,7 @@ describe('approvalGate (pure logic)', () => {
   });
 });
 
-describe('PUT /api/releases/:id/activate (approval gate)', () => {
+describe('POST /api/releases/:id/transition (approval gate)', () => {
   let app: FastifyInstance;
   let db: ReturnType<typeof import('better-sqlite3')>;
   let releaseRepo: ReleaseRepo;
@@ -64,7 +65,7 @@ describe('PUT /api/releases/:id/activate (approval gate)', () => {
     db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
     applyMigrations(db, loadAllMigrations());
-    db.prepare(`INSERT INTO workspaces (id, name, organization, created_at, updated_at) VALUES ('ws1', 'ws', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
+    db.prepare(`INSERT INTO workspaces (id, name, organization, org_id, created_at, updated_at) VALUES ('ws1', 'ws', '', 'legacy', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
     db.prepare(`INSERT INTO projects (id, workspace_id, name, description, created_at, updated_at) VALUES ('proj1', 'ws1', 'p', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
     db.prepare(`INSERT INTO capabilities (id, project_id, name, description, created_at, updated_at) VALUES ('cap1', 'proj1', 'c', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
     db.prepare(`INSERT INTO users (id, email, name, role, created_at, updated_at) VALUES ('system', 'system@local', 'System', 'admin', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`).run();
@@ -75,12 +76,19 @@ describe('PUT /api/releases/:id/activate (approval gate)', () => {
     manifestRepo = new ManifestRepo(db);
 
     app = Fastify({ logger: false });
+    app.addHook('onRequest', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = 'legacy';
+    });
     app.setErrorHandler((error, _request, reply) => {
       if (error.statusCode) return reply.code(error.statusCode).send({ error: { code: 'APP_ERROR', message: error.message } });
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     });
     await app.register(async (instance) => {
-      await registerReleaseRoutes(instance, releaseRepo, { manifestRepo, auditChain: new AuditChain(db) });
+      await registerReleaseRoutes(instance, releaseRepo, {
+        manifestRepo,
+        auditChain: new AuditChain(db),
+        overlayRepo: new ReleaseOverlayRepo(db),
+      });
     });
     await app.ready();
   });
@@ -114,37 +122,38 @@ describe('PUT /api/releases/:id/activate (approval gate)', () => {
       capabilityId: 'cap1', capabilityVersion: 1, capabilityVersionId: null,
       manifest: JSON.stringify(manifest), environment: 'prod', createdBy: creator, canaryPercent: 0,
     });
+    releaseRepo.updateStatus(release.id, 'canary');
     return release.id;
   }
 
   it('returns 409 when no approvers', async () => {
     const id = seedApprovedRelease('alice', []);
-    const response = await app.inject({ method: 'PUT', url: `/api/releases/${id}/activate` });
+    const response = await app.inject({ method: 'POST', url: `/api/releases/${id}/transition`, payload: { to: 'active' } });
     expect(response.statusCode).toBe(409);
   });
 
   it('returns 409 when creator is approver (maker-checker)', async () => {
     const id = seedApprovedRelease('alice', ['alice', 'bob']);
-    const response = await app.inject({ method: 'PUT', url: `/api/releases/${id}/activate` });
+    const response = await app.inject({ method: 'POST', url: `/api/releases/${id}/transition`, payload: { to: 'active' } });
     expect(response.statusCode).toBe(409);
   });
 
   it('returns 409 when only 1 approver', async () => {
     const id = seedApprovedRelease('alice', ['bob']);
-    const response = await app.inject({ method: 'PUT', url: `/api/releases/${id}/activate` });
+    const response = await app.inject({ method: 'POST', url: `/api/releases/${id}/transition`, payload: { to: 'active' } });
     expect(response.statusCode).toBe(409);
   });
 
   it('returns 200 when 2+ distinct approvers (different from creator)', async () => {
     const id = seedApprovedRelease('alice', ['bob', 'carol']);
-    const response = await app.inject({ method: 'PUT', url: `/api/releases/${id}/activate` });
+    const response = await app.inject({ method: 'POST', url: `/api/releases/${id}/transition`, payload: { to: 'active' } });
     expect(response.statusCode).toBe(200);
     const body = response.json() as { status: string };
     expect(body.status).toBe('active');
   });
 
   it('returns 404 for unknown release', async () => {
-    const response = await app.inject({ method: 'PUT', url: '/api/releases/nonexistent/activate' });
+    const response = await app.inject({ method: 'POST', url: '/api/releases/00000000-0000-4000-8000-000000000000/transition', payload: { to: 'active' } });
     expect(response.statusCode).toBe(404);
   });
 });

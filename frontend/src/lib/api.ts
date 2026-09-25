@@ -1,18 +1,35 @@
 import axios from 'axios';
-import { getSession } from './session';
+import { z } from 'zod';
+import { ManifestSchema } from '@promptsheon/shared/validation';
+import type { Manifest } from '@promptsheon/shared';
+import type { Execution } from '@promptsheon/shared';
+import type { Schedule } from '@promptsheon/shared';
+import { clearSession, getSession } from './session';
+
+export class ApiError extends Error {
+  readonly status: number | undefined;
+  readonly code: string | undefined;
+
+  constructor(message: string, options: { status?: number | undefined; code?: string | undefined } = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = options.status;
+    this.code = options.code;
+  }
+}
+
+export { getErrorMessage } from './errors';
 
 const client = axios.create({
   baseURL: '/api',
+  timeout: 15_000,
   headers: { 'Content-Type': 'application/json' },
 });
 
 client.interceptors.request.use((config) => {
   const session = getSession();
-  if (session?.userId) {
-    config.headers.set('X-User-Id', session.userId);
-  }
-  if (session?.orgId) {
-    config.headers.set('X-Org-Id', session.orgId);
+  if (session?.apiKey) {
+    config.headers.set('Authorization', `Bearer ${session.apiKey}`);
   }
   return config;
 });
@@ -20,8 +37,18 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (res) => res,
   (err) => {
-    const message = err.response?.data?.error?.message ?? err.message;
-    return Promise.reject(new Error(message));
+    const status = typeof err.response?.status === 'number' ? err.response.status : undefined;
+    const payload = err.response?.data?.error;
+    const message = typeof payload?.message === 'string'
+      ? payload.message
+      : err.code === 'ECONNABORTED'
+        ? 'The request timed out. Please try again.'
+        : err.message || 'The request failed.';
+    if (status === 401) clearSession();
+    return Promise.reject(new ApiError(message, {
+      status,
+      code: typeof payload?.code === 'string' ? payload.code : undefined,
+    }));
   },
 );
 
@@ -33,6 +60,721 @@ export interface WorkspaceRow {
   organization: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface VaultKeyringEntry {
+  id: number;
+  label: string;
+  fingerprint: string;
+  active: boolean;
+  createdAt: string;
+  rotatedAt: string | null;
+}
+
+const VaultKeyringEntrySchema = z.object({
+  id: z.number().int(),
+  label: z.string(),
+  fingerprint: z.string(),
+  active: z.boolean(),
+  createdAt: z.string(),
+  rotatedAt: z.string().nullable(),
+});
+
+export interface CostRollup {
+  capabilityId: string;
+  day: string;
+  costMicros: number;
+  executions: number;
+}
+
+export interface EvalSuite {
+  id: string;
+  capabilityId: string;
+  repositoryId: string | null;
+  name: string;
+  description: string | null;
+  currentVersion: number;
+  passThreshold: number;
+  borderlineBand: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvalSuiteVersion {
+  id: string;
+  suiteId: string;
+  version: number;
+  graderConfig: unknown[];
+  passThreshold: number;
+  borderlineBand: number;
+  k: number;
+  n: number;
+  notes: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+export type EvalRunStatus = 'running' | 'passed' | 'failed' | 'error';
+
+export interface EvalRun {
+  id: string;
+  releaseId: string;
+  datasetId: string;
+  scorer: string;
+  score: number;
+  passed: number;
+  failed: number;
+  total: number;
+  status: EvalRunStatus;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+export interface EvalResult {
+  id: string;
+  runId: string;
+  caseId: string | null;
+  seq: number;
+  passed: boolean;
+  actual: string;
+  error: string;
+  latencyMs: number;
+}
+
+export type MergeRequestStatus = 'open' | 'merged' | 'closed';
+
+export interface MergeRequest {
+  id: string;
+  repositoryId: string;
+  number: number;
+  title: string;
+  description: string | null;
+  sourceBranch: string;
+  targetBranch: string;
+  sourceCommitOid: string;
+  mergeCommitOid: string | null;
+  authorId: string;
+  status: MergeRequestStatus;
+  approvedBy: string[];
+  requestedReviewers: string[];
+  createdAt: string;
+  updatedAt: string;
+  mergedAt: string | null;
+}
+
+export interface MergeRequestApproval {
+  mergeRequestId: string;
+  userId: string;
+  decision: 'approve' | 'request_changes';
+  commentId: string | null;
+  createdAt: string;
+}
+
+export interface MergeRequestComment {
+  id: string;
+  mergeRequestId: string;
+  authorId: string;
+  path: string | null;
+  body: string;
+  createdAt: string;
+}
+
+export interface CapabilityVersion {
+  id: string;
+  capabilityId: string;
+  version: number;
+  manifest: string;
+  manifestHash: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface CapabilityManifestResponse {
+  id: string;
+  hash: string;
+  manifest: unknown;
+  capabilityId: string;
+  capabilityVersion: number;
+  createdAt: string;
+  createdBy: string;
+  size: number;
+}
+
+export interface SearchResult {
+  kind: string;
+  resourceId: string;
+  title: string;
+  body: string;
+}
+
+export type AlertSeverity = 'info' | 'warning' | 'critical';
+export type AlertStatus = 'active' | 'resolved';
+
+export interface Alert {
+  id: string;
+  ruleId: string | null;
+  ruleName: string;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  message: string;
+  details: string | null;
+  triggeredAt: string;
+  resolvedAt: string | null;
+  acknowledgedAt: string | null;
+  acknowledgedBy: string | null;
+}
+
+export interface Capability {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  selfEvolveEnabled: boolean;
+  selfEvolveMinScore: number;
+  selfEvolveMaxRevisions: number;
+  selfEvolveCooldownSec: number;
+  selfEvolveTargetEnv: string;
+  selfEvolveDatasetId: string;
+}
+
+export interface Project {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ReleaseStatus = 'draft' | 'review' | 'approved' | 'canary' | 'active' | 'rolled_back';
+export type ReleaseEnvironment = 'dev' | 'staging' | 'prod';
+
+export interface Release {
+  id: string;
+  capabilityId: string;
+  capabilityVersion: number;
+  capabilityVersionId: string | null;
+  manifest: string;
+  environment: ReleaseEnvironment;
+  status: ReleaseStatus;
+  approvedBy: string;
+  replacesReleaseId: string | null;
+  createdAt: string;
+  createdBy: string;
+  activatedAt: string | null;
+  canaryPercent: number;
+}
+
+export type ApprovalVote = 'approve' | 'reject';
+
+export interface ApprovalEntry {
+  userId: string;
+  vote: ApprovalVote;
+  comment: string;
+  createdAt: string;
+}
+
+export interface ApprovalSummary {
+  releaseId: string;
+  manifestHash?: string | undefined;
+  distinctApprovers: number;
+  approvals: ApprovalEntry[];
+}
+
+export interface PendingApprovalSummary {
+  releaseId: string;
+  manifestHash: string;
+  approvals: ApprovalEntry[];
+  updatedAt: string;
+}
+
+export interface AuditEntry {
+  id: string;
+  userId: string;
+  action: string;
+  resource: string;
+  details: string;
+  timestamp: string;
+  entryHash: string;
+  resourceKind: string;
+  resourceId: string;
+}
+
+export type { Execution };
+export type { Schedule };
+
+const CostRollupSchema = z.object({
+  capabilityId: z.string(),
+  day: z.string(),
+  costMicros: z.number().int().nonnegative(),
+  executions: z.number().int().nonnegative(),
+});
+
+const EvalSuiteSchema = z.object({
+  id: z.string(),
+  capabilityId: z.string(),
+  repositoryId: z.string().nullable(),
+  name: z.string(),
+  description: z.string().nullable(),
+  currentVersion: z.number().int().positive(),
+  passThreshold: z.number().min(0).max(1),
+  borderlineBand: z.number().min(0).max(1),
+  createdBy: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const EvalSuiteVersionSchema = z.object({
+  id: z.string(),
+  suiteId: z.string(),
+  version: z.number().int().positive(),
+  graderConfig: z.array(z.unknown()),
+  passThreshold: z.number().min(0).max(1),
+  borderlineBand: z.number().min(0).max(1),
+  k: z.number().int().nonnegative(),
+  n: z.number().int().nonnegative(),
+  notes: z.string().nullable(),
+  createdBy: z.string(),
+  createdAt: z.string(),
+});
+
+const EvalRunSchema = z.object({
+  id: z.string(),
+  releaseId: z.string(),
+  datasetId: z.string(),
+  scorer: z.string(),
+  score: z.number().min(0).max(1),
+  passed: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  status: z.enum(['running', 'passed', 'failed', 'error']),
+  startedAt: z.string(),
+  finishedAt: z.string().nullable(),
+});
+
+const EvalResultSchema = z.object({
+  id: z.string(),
+  runId: z.string(),
+  caseId: z.string().nullable(),
+  seq: z.number().int().nonnegative(),
+  passed: z.boolean(),
+  actual: z.string(),
+  error: z.string(),
+  latencyMs: z.number().nonnegative(),
+});
+
+const MergeRequestSchema = z.object({
+  id: z.string(),
+  repositoryId: z.string(),
+  number: z.number().int().positive(),
+  title: z.string(),
+  description: z.string().nullable(),
+  sourceBranch: z.string(),
+  targetBranch: z.string(),
+  sourceCommitOid: z.string(),
+  mergeCommitOid: z.string().nullable(),
+  authorId: z.string(),
+  status: z.enum(['open', 'merged', 'closed']),
+  approvedBy: z.array(z.string()),
+  requestedReviewers: z.array(z.string()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  mergedAt: z.string().nullable(),
+});
+
+const MergeRequestApprovalSchema = z.object({
+  mergeRequestId: z.string(),
+  userId: z.string(),
+  decision: z.enum(['approve', 'request_changes']),
+  commentId: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+const MergeRequestCommentSchema = z.object({
+  id: z.string(),
+  mergeRequestId: z.string(),
+  authorId: z.string(),
+  path: z.string().nullable(),
+  body: z.string(),
+  createdAt: z.string(),
+});
+
+const CapabilityVersionSchema = z.object({
+  id: z.string(),
+  capabilityId: z.string(),
+  version: z.number().int().positive(),
+  manifest: z.string(),
+  manifestHash: z.string(),
+  createdAt: z.string(),
+  createdBy: z.string(),
+});
+
+const CapabilityManifestResponseSchema = z.object({
+  id: z.string(),
+  hash: z.string(),
+  manifest: z.unknown(),
+  capabilityId: z.string(),
+  capabilityVersion: z.number().int().positive(),
+  createdAt: z.string(),
+  createdBy: z.string(),
+  size: z.number().int().nonnegative(),
+});
+
+const SearchResultSchema = z.object({
+  kind: z.string(),
+  resourceId: z.string(),
+  title: z.string(),
+  body: z.string(),
+});
+
+const AlertSchema = z.object({
+  id: z.string(),
+  ruleId: z.string().nullable(),
+  ruleName: z.string(),
+  severity: z.enum(['info', 'warning', 'critical']),
+  status: z.enum(['active', 'resolved']),
+  message: z.string(),
+  details: z.string().nullable(),
+  triggeredAt: z.string(),
+  resolvedAt: z.string().nullable(),
+  acknowledgedAt: z.string().nullable(),
+  acknowledgedBy: z.string().nullable(),
+});
+
+const CapabilitySchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  name: z.string(),
+  description: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  selfEvolveEnabled: z.boolean(),
+  selfEvolveMinScore: z.number().min(0).max(1),
+  selfEvolveMaxRevisions: z.number().int().nonnegative(),
+  selfEvolveCooldownSec: z.number().int().nonnegative(),
+  selfEvolveTargetEnv: z.string(),
+  selfEvolveDatasetId: z.string(),
+});
+
+const ProjectSchema = z.object({
+  id: z.string(),
+  workspaceId: z.string(),
+  name: z.string(),
+  description: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const ReleaseSchema = z.object({
+  id: z.string(),
+  capabilityId: z.string(),
+  capabilityVersion: z.number().int().positive(),
+  capabilityVersionId: z.string().nullable(),
+  manifest: z.string(),
+  environment: z.enum(['dev', 'staging', 'prod']),
+  status: z.enum(['draft', 'review', 'approved', 'canary', 'active', 'rolled_back']),
+  approvedBy: z.string(),
+  replacesReleaseId: z.string().nullable(),
+  createdAt: z.string(),
+  createdBy: z.string(),
+  activatedAt: z.string().nullable(),
+  canaryPercent: z.number().int().min(0).max(100),
+});
+
+const ApprovalEntrySchema = z.object({
+  userId: z.string(),
+  vote: z.enum(['approve', 'reject']),
+  comment: z.string(),
+  createdAt: z.string(),
+});
+
+const ApprovalSummarySchema = z.object({
+  releaseId: z.string(),
+  manifestHash: z.string().optional(),
+  distinctApprovers: z.number().int().nonnegative(),
+  approvals: z.array(ApprovalEntrySchema),
+});
+
+const PendingApprovalSummarySchema = z.object({
+  releaseId: z.string(),
+  manifestHash: z.string(),
+  approvals: z.array(ApprovalEntrySchema),
+  updatedAt: z.string(),
+});
+
+function assertManifest(value: unknown): asserts value is Manifest {
+  const parsed = ManifestSchema.safeParse(value);
+  if (!parsed.success) throw new ApiError('The server returned invalid manifest data.', { code: 'INVALID_RESPONSE' });
+}
+
+const AuditEntrySchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  action: z.string(),
+  resource: z.string(),
+  details: z.string(),
+  timestamp: z.string(),
+  entryHash: z.string(),
+  resourceKind: z.string(),
+  resourceId: z.string(),
+});
+
+const ExecutionSchema = z.object({
+  id: z.string(),
+  capabilityVersionId: z.string().nullable(),
+  timestamp: z.string(),
+  inputs: z.string(),
+  outputs: z.string(),
+  model: z.string(),
+  provider: z.string(),
+  latencyMs: z.number().nonnegative(),
+  costUsd: z.number().nonnegative(),
+  promptTokens: z.number().int().nonnegative(),
+  completionTokens: z.number().int().nonnegative(),
+  totalTokens: z.number().int().nonnegative(),
+  error: z.string(),
+  traceId: z.string(),
+  environment: z.string(),
+  replayOf: z.string().nullable(),
+  replayCount: z.number().int().nonnegative(),
+  inputHash: z.string().nullable(),
+});
+
+const ScheduleSchema = z.object({
+  id: z.string(),
+  workspaceId: z.string(),
+  releaseId: z.string(),
+  kind: z.string(),
+  cron: z.string(),
+  webhookPath: z.string(),
+  nextFireAt: z.string(),
+  lastFireAt: z.string().nullable(),
+  firedCount: z.number().int().nonnegative(),
+  enabled: z.boolean(),
+  createdAt: z.string(),
+  createdBy: z.string(),
+});
+
+function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
+  return unwrapList<unknown>(raw).map((entry) => {
+    const parsed = VaultKeyringEntrySchema.safeParse(entry);
+    if (!parsed.success) {
+      throw new ApiError('The server returned an invalid vault keyring.', { code: 'INVALID_RESPONSE' });
+    }
+    return parsed.data;
+  });
+}
+
+function parseCostRollups(raw: unknown): CostRollup[] {
+  return unwrapList<unknown>(raw).map((entry) => {
+    const parsed = CostRollupSchema.safeParse(entry);
+    if (!parsed.success) {
+      throw new ApiError('The server returned invalid cost rollup data.', { code: 'INVALID_RESPONSE' });
+    }
+    return parsed.data;
+  });
+}
+
+function parseEvalSuites(raw: unknown): EvalSuite[] {
+  return unwrapList<unknown>(raw).map((entry) => {
+    const parsed = EvalSuiteSchema.safeParse(entry);
+    if (!parsed.success) {
+      throw new ApiError('The server returned invalid eval suite data.', { code: 'INVALID_RESPONSE' });
+    }
+    return parsed.data;
+  });
+}
+
+function parseEvalSuiteDetail(raw: unknown): { suite: EvalSuite; versions: EvalSuiteVersion[] } {
+  if (!raw || typeof raw !== 'object') {
+    throw new ApiError('The server returned invalid eval suite details.', { code: 'INVALID_RESPONSE' });
+  }
+  const value = raw as Record<string, unknown>;
+  const suite = EvalSuiteSchema.safeParse(value['suite']);
+  const versions = z.array(EvalSuiteVersionSchema).safeParse(value['versions']);
+  if (!suite.success || !versions.success) {
+    throw new ApiError('The server returned invalid eval suite details.', { code: 'INVALID_RESPONSE' });
+  }
+  return { suite: suite.data, versions: versions.data };
+}
+
+function parseEvalRun(raw: unknown): EvalRun {
+  const parsed = EvalRunSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ApiError('The server returned invalid eval run data.', { code: 'INVALID_RESPONSE' });
+  }
+  return parsed.data;
+}
+
+function parseEvalRuns(raw: unknown): EvalRun[] {
+  return unwrapList<unknown>(raw).map(parseEvalRun);
+}
+
+function parseEvalResults(raw: unknown): EvalResult[] {
+  return unwrapList<unknown>(raw).map((entry) => {
+    const parsed = EvalResultSchema.safeParse(entry);
+    if (!parsed.success) {
+      throw new ApiError('The server returned invalid eval result data.', { code: 'INVALID_RESPONSE' });
+    }
+    return parsed.data;
+  });
+}
+
+function parseMergeRequest(raw: unknown): MergeRequest {
+  const parsed = MergeRequestSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ApiError('The server returned invalid merge request data.', { code: 'INVALID_RESPONSE' });
+  }
+  return parsed.data;
+}
+
+function parseMergeRequests(raw: unknown): MergeRequest[] {
+  return unwrapList<unknown>(raw).map(parseMergeRequest);
+}
+
+function parseMergeRequestDetail(raw: unknown): {
+  mr: MergeRequest;
+  approvals: MergeRequestApproval[];
+  comments: MergeRequestComment[];
+} {
+  if (!raw || typeof raw !== 'object') {
+    throw new ApiError('The server returned invalid merge request details.', { code: 'INVALID_RESPONSE' });
+  }
+  const value = raw as Record<string, unknown>;
+  const mr = parseMergeRequest(value['mr']);
+  const approvals = Array.isArray(value['approvals']) ? value['approvals'].map((entry) => {
+    const parsed = MergeRequestApprovalSchema.safeParse(entry);
+    if (!parsed.success) throw new ApiError('The server returned invalid merge request approvals.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  }) : null;
+  const comments = Array.isArray(value['comments']) ? value['comments'].map((entry) => {
+    const parsed = MergeRequestCommentSchema.safeParse(entry);
+    if (!parsed.success) throw new ApiError('The server returned invalid merge request comments.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  }) : null;
+  if (!approvals || !comments) {
+    throw new ApiError('The server returned invalid merge request details.', { code: 'INVALID_RESPONSE' });
+  }
+  return { mr, approvals, comments };
+}
+
+function parseCapabilityVersions(raw: unknown): CapabilityVersion[] {
+  return unwrapList<unknown>(raw).map((entry) => {
+    const parsed = CapabilityVersionSchema.safeParse(entry);
+    if (!parsed.success) {
+      throw new ApiError('The server returned invalid capability version data.', { code: 'INVALID_RESPONSE' });
+    }
+    return parsed.data;
+  });
+}
+
+function parseCapabilityManifest(raw: unknown): CapabilityManifestResponse {
+  const parsed = CapabilityManifestResponseSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ApiError('The server returned invalid capability manifest data.', { code: 'INVALID_RESPONSE' });
+  }
+  return parsed.data;
+}
+
+function parseSearchResults(raw: unknown): SearchResult[] {
+  const parsed = z.array(SearchResultSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid search results.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseAlerts(raw: unknown): Alert[] {
+  const parsed = z.array(AlertSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid alert data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseCapabilities(raw: unknown): Capability[] {
+  const parsed = z.array(CapabilitySchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid capability data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseProjects(raw: unknown): Project[] {
+  const parsed = z.array(ProjectSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid project data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseReleases(raw: unknown): Release[] {
+  const parsed = z.array(ReleaseSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid release data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseAuditEntries(raw: unknown): AuditEntry[] {
+  const value = raw && typeof raw === 'object' ? raw as Record<string, unknown> : undefined;
+  const entries = value?.['entries'];
+  const parsed = z.array(AuditEntrySchema).safeParse(entries);
+  if (!parsed.success) throw new ApiError('The server returned invalid audit data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseExecution(raw: unknown): Execution {
+  const parsed = ExecutionSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid execution data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseExecutionPage(raw: unknown): { items: Execution[]; total: number } {
+  if (!raw || typeof raw !== 'object') throw new ApiError('The server returned invalid execution data.', { code: 'INVALID_RESPONSE' });
+  const value = raw as Record<string, unknown>;
+  const items = Array.isArray(value['items']) ? value['items'].map(parseExecution) : null;
+  const total = value['total'];
+  if (!items || typeof total !== 'number' || !Number.isInteger(total) || total < 0) {
+    throw new ApiError('The server returned invalid execution data.', { code: 'INVALID_RESPONSE' });
+  }
+  return { items, total };
+}
+
+function parseSchedule(raw: unknown): Schedule {
+  const parsed = ScheduleSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid schedule data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseSchedulePage(raw: unknown): { items: Schedule[]; total: number } {
+  if (!raw || typeof raw !== 'object') throw new ApiError('The server returned invalid schedule data.', { code: 'INVALID_RESPONSE' });
+  const value = raw as Record<string, unknown>;
+  const items = Array.isArray(value['items']) ? value['items'].map(parseSchedule) : null;
+  const total = value['total'];
+  if (!items || typeof total !== 'number' || !Number.isInteger(total) || total < 0) {
+    throw new ApiError('The server returned invalid schedule data.', { code: 'INVALID_RESPONSE' });
+  }
+  return { items, total };
+}
+
+function parseRelease(raw: unknown): Release {
+  const parsed = ReleaseSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid release data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+const WorkspaceRowSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  organization: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+function parseWorkspace(raw: unknown): WorkspaceRow {
+  const parsed = WorkspaceRowSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ApiError('The server returned an invalid workspace.', { code: 'INVALID_RESPONSE' });
+  }
+  return parsed.data;
+}
+
+function parseWorkspaceList(raw: unknown): WorkspaceRow[] {
+  return unwrapList<unknown>(raw).map(parseWorkspace);
 }
 
 /**
@@ -68,14 +810,24 @@ export function unwrapFirst<T>(raw: unknown, pluralKey?: string): T | null {
 
 export function subscribeSSE(channel: string, onEvent: (event: unknown) => void): () => void {
   if (typeof window === 'undefined') return () => undefined;
+  const encodedChannel = encodeURIComponent(channel.trim());
+  if (encodedChannel === '') return () => undefined;
   let cancelled = false;
   let active: EventSource | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   const open = () => {
     if (cancelled) return;
-    active = new EventSource(`/api/events/${channel}`);
-    active.onmessage = (e) => onEvent(JSON.parse(e.data));
+    active = new EventSource(`/api/events/${encodedChannel}`);
+    active.onmessage = (e) => {
+      let payload: unknown;
+      try {
+        payload = JSON.parse(e.data) as unknown;
+      } catch {
+        payload = { raw: e.data };
+      }
+      onEvent(payload);
+    };
     active.onerror = () => {
       active?.close();
       active = null;
@@ -95,52 +847,92 @@ export function subscribeSSE(channel: string, onEvent: (event: unknown) => void)
 }
 
 export const workspaceApi = {
-  list: async (page = 1): Promise<{ data: WorkspaceRow[] }> => {
-    const r = await client.get<{ items?: WorkspaceRow[]; total?: number }>('/workspaces', {
-      params: { page },
+  list: async (page = 1, pageSize = 100): Promise<{ data: WorkspaceRow[] }> => {
+    const r = await client.get<unknown>('/workspaces', {
+      params: { page, pageSize },
     });
-    return { data: unwrapList<WorkspaceRow>(r.data) };
+    return { data: parseWorkspaceList(r.data) };
   },
   get: (id: string): Promise<{ data: WorkspaceRow }> =>
-    client.get(`/workspaces/${id}`).then((r) => ({ data: r.data as WorkspaceRow })),
+    client.get<unknown>(`/workspaces/${id}`).then((r) => ({ data: parseWorkspace(r.data) })),
   create: (data: { name: string; organization?: string }): Promise<{ data: WorkspaceRow }> =>
-    client.post('/workspaces', data).then((r) => ({ data: r.data as WorkspaceRow })),
+    client.post<unknown>('/workspaces', data).then((r) => ({ data: parseWorkspace(r.data) })),
   update: (id: string, data: { name?: string; organization?: string }): Promise<{ data: WorkspaceRow }> =>
-    client.put(`/workspaces/${id}`, data).then((r) => ({ data: r.data as WorkspaceRow })),
+    client.put<unknown>(`/workspaces/${id}`, data).then((r) => ({ data: parseWorkspace(r.data) })),
   delete: (id: string) => client.delete(`/workspaces/${id}`),
 };
 
 export const projectApi = {
-  list: (workspaceId: string) => client.get('/projects', { params: { workspaceId } }),
-  get: (id: string) => client.get(`/projects/${id}`),
+  list: async (workspaceId: string): Promise<{ data: Project[] }> => {
+    const r = await client.get<unknown>('/projects', { params: { workspaceId } });
+    return { data: parseProjects(r.data) };
+  },
+  get: async (id: string): Promise<{ data: Project }> => {
+    const r = await client.get<unknown>(`/projects/${id}`);
+    const parsed = ProjectSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid project data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
   create: (data: { workspaceId: string; name: string; description?: string }) => client.post('/projects', data),
   update: (id: string, data: { name?: string; description?: string }) => client.put(`/projects/${id}`, data),
   delete: (id: string) => client.delete(`/projects/${id}`),
 };
 
 export const capabilityApi = {
-  list: (projectId: string) => client.get('/capabilities', { params: { projectId } }),
-  get: (id: string) => client.get(`/capabilities/${id}`),
+  list: async (projectId: string): Promise<{ data: Capability[] }> => {
+    const r = await client.get<unknown>('/capabilities', { params: { projectId } });
+    return { data: parseCapabilities(r.data) };
+  },
+  get: async (id: string): Promise<{ data: Capability }> => {
+    const r = await client.get<unknown>(`/capabilities/${id}`);
+    const parsed = CapabilitySchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid capability data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
   create: (data: { projectId: string; name: string; description?: string }) => client.post('/capabilities', data),
   update: (id: string, data: { name?: string; description?: string }) => client.put(`/capabilities/${id}`, data),
   delete: (id: string) => client.delete(`/capabilities/${id}`),
 };
 
 export const versionApi = {
-  list: (capabilityId: string) => client.get('/capability-versions', { params: { capabilityId } }),
-  get: (id: string) => client.get(`/capability-versions/${id}`),
+  list: async (capabilityId: string): Promise<{ data: CapabilityVersion[] }> => {
+    const r = await client.get<unknown>('/capability-versions', { params: { capabilityId } });
+    return { data: parseCapabilityVersions(r.data) };
+  },
+  get: async (id: string): Promise<{ data: CapabilityVersion }> => {
+    const r = await client.get<unknown>(`/capability-versions/${id}`);
+    const parsed = CapabilityVersionSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid capability version data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
   create: (data: { capabilityId: string; version: number; manifest: string; manifestHash: string; createdBy?: string }) =>
     client.post('/capability-versions', data),
 };
 
 export const releaseApi = {
-  list: (capabilityId: string) => client.get('/releases', { params: { capabilityId } }),
-  get: (id: string) => client.get(`/releases/${id}`),
+  list: async (capabilityId: string): Promise<{ data: Release[] }> => {
+    const r = await client.get<unknown>('/releases', { params: { capabilityId } });
+    return { data: parseReleases(r.data) };
+  },
+  listAll: async (page = 1, pageSize = 100): Promise<{ data: { items: Release[]; total: number } }> => {
+    const r = await client.get<unknown>('/releases', { params: { page, pageSize } });
+    if (!r.data || typeof r.data !== 'object') throw new ApiError('The server returned invalid release data.', { code: 'INVALID_RESPONSE' });
+    const value = r.data as Record<string, unknown>;
+    const items = parseReleases(value['items']);
+    if (typeof value['total'] !== 'number' || !Number.isInteger(value['total']) || value['total'] < 0) {
+      throw new ApiError('The server returned invalid release totals.', { code: 'INVALID_RESPONSE' });
+    }
+    return { data: { items, total: value['total'] } };
+  },
+  get: async (id: string): Promise<{ data: Release }> => {
+    const r = await client.get<unknown>(`/releases/${id}`);
+    return { data: parseRelease(r.data) };
+  },
   create: (data: { capabilityId: string; capabilityVersion: number; capabilityVersionId: string | null; manifest: string; environment: string }) =>
     client.post('/releases', data),
-  activate: (id: string) => client.put(`/releases/${id}/activate`),
+  transition: (id: string, to: 'draft' | 'review' | 'approved' | 'canary' | 'active' | 'rolled_back', reason?: string) =>
+    client.post(`/releases/${id}/transition`, { to, ...(reason ? { reason } : {}) }),
   canary: (id: string, percent: number) => client.put(`/releases/${id}/canary`, { percent }),
-  supersede: (id: string) => client.put(`/releases/${id}/supersede`),
   rollback: (id: string, toReleaseId?: string) => {
     const body: { toReleaseId?: string } = {};
     if (toReleaseId !== undefined) body.toReleaseId = toReleaseId;
@@ -149,8 +941,14 @@ export const releaseApi = {
 };
 
 export const executionApi = {
-  list: (capabilityVersionId: string) => client.get('/executions', { params: { capabilityVersionId } }),
-  get: (id: string) => client.get(`/executions/${id}`),
+  list: async (capabilityVersionId: string): Promise<{ data: { items: Execution[]; total: number } }> => {
+    const r = await client.get<unknown>('/executions', { params: { capabilityVersionId } });
+    return { data: parseExecutionPage(r.data) };
+  },
+  get: async (id: string): Promise<{ data: Execution }> => {
+    const r = await client.get<unknown>(`/executions/${id}`);
+    return { data: parseExecution(r.data) };
+  },
   execute: (data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string }) =>
     client.post('/executions', data),
   replay: (id: string) => client.post(`/executions/${id}/replay`),
@@ -166,12 +964,15 @@ export const executionApi = {
     const controller = new AbortController();
     const base = baseURL();
     const url = `${base}/api/executions`;
+    const session = getSession();
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+      accept: 'text/event-stream',
+    };
+    if (session?.apiKey) headers.Authorization = `Bearer ${session.apiKey}`;
     void fetch(url, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        accept: 'text/event-stream',
-      },
+      headers,
       body: JSON.stringify(data),
       signal: controller.signal,
     }).then(async (res) => {
@@ -179,7 +980,6 @@ export const executionApi = {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      // eslint-disable-next-line no-constant-condition
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -221,8 +1021,6 @@ function parseSseBlock(block: string): { event: string; data: Record<string, unk
 }
 
 export const invokeApi = {
-  invoke: (data: { capabilityVersionId: string; inputs: Record<string, unknown>; environment?: string; traceId?: string }) =>
-    client.post('/invoke', data),
   // Use the canonical manifest-driven path for in-product calls.
   execute: (data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string }) =>
     client.post('/executions', data),
@@ -238,10 +1036,19 @@ export const datasetApi = {
 };
 
 export const evalApi = {
-  list: (releaseId?: string) => client.get('/eval-runs', { params: { releaseId } }),
-  get: (id: string) => client.get(`/eval-runs/${id}`),
+  list: async (releaseId?: string): Promise<{ data: EvalRun[] }> => {
+    const r = await client.get<unknown>('/eval-runs', { params: { releaseId } });
+    return { data: parseEvalRuns(r.data) };
+  },
+  get: async (id: string): Promise<{ data: EvalRun }> => {
+    const r = await client.get<unknown>(`/eval-runs/${id}`);
+    return { data: parseEvalRun(r.data) };
+  },
   create: (data: { releaseId: string; datasetId: string; scorer: string }) => client.post('/eval-runs', data),
-  getResults: (id: string) => client.get(`/eval-runs/${id}/results`),
+  getResults: async (id: string): Promise<{ data: EvalResult[] }> => {
+    const r = await client.get<unknown>(`/eval-runs/${id}/results`);
+    return { data: parseEvalResults(r.data) };
+  },
 };
 
 export const alertApi = {
@@ -249,14 +1056,26 @@ export const alertApi = {
   createRule: (data: { name: string; type: string; severity: string; threshold?: number; window?: number }) =>
     client.post('/alert-rules', data),
   deleteRule: (id: string) => client.delete(`/alert-rules/${id}`),
-  listAlerts: () => client.get('/alerts'),
+  listAlerts: async (): Promise<{ data: Alert[] }> => {
+    const r = await client.get<unknown>('/alerts');
+    return { data: parseAlerts(r.data) };
+  },
   acknowledge: (id: string) => client.put(`/alerts/${id}/acknowledge`),
 };
 
 export const scheduleApi = {
-  list: () => client.get('/schedules'),
-  get: (id: string) => client.get(`/schedules/${id}`),
-  create: (data: { workspaceId: string; releaseId: string; kind: string; cron: string }) => client.post('/schedules', data),
+  list: async (): Promise<{ data: { items: Schedule[]; total: number } }> => {
+    const r = await client.get<unknown>('/schedules');
+    return { data: parseSchedulePage(r.data) };
+  },
+  get: async (id: string): Promise<{ data: Schedule }> => {
+    const r = await client.get<unknown>(`/schedules/${id}`);
+    return { data: parseSchedule(r.data) };
+  },
+  create: async (data: { workspaceId: string; releaseId: string; kind: string; cron: string }): Promise<{ data: Schedule }> => {
+    const r = await client.post<unknown>('/schedules', data);
+    return { data: parseSchedule(r.data) };
+  },
   delete: (id: string) => client.delete(`/schedules/${id}`),
 };
 
@@ -275,14 +1094,27 @@ export const preconditionApi = {
 };
 
 export const approvalApi = {
-  list: (releaseId: string) => client.get('/approvals', { params: { releaseId } }),
+  list: async (releaseId: string): Promise<{ data: ApprovalSummary }> => {
+    const r = await client.get<unknown>('/approvals', { params: { releaseId } });
+    const parsed = ApprovalSummarySchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid approval data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  listPending: async (): Promise<{ data: { approvals: PendingApprovalSummary[] } }> => {
+    const r = await client.get<unknown>('/approvals/pending');
+    if (!r.data || typeof r.data !== 'object') throw new ApiError('The server returned invalid pending approvals.', { code: 'INVALID_RESPONSE' });
+    const parsed = z.object({ approvals: z.array(PendingApprovalSummarySchema) }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid pending approvals.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
   vote: (releaseId: string, data: { decision: 'approve' | 'reject'; comment?: string }) =>
     client.post(`/releases/${releaseId}/approvals`, data),
 };
 
 export const compilerApi = {
-  compile: (prompt: string) => client.post('/compiler/compile', { prompt }),
-  decompile: (manifest: string) => client.post('/compiler/decompile', { manifest }),
+  compile: (manifest: unknown, options?: { capabilityContext?: string; constraints?: string[] }) =>
+    client.post('/compiler/compile', { manifest, ...options }),
+  decompile: (manifest: unknown) => client.post('/compiler/decompile', { manifest }),
 };
 
 export const selfEvolveApi = {
@@ -291,9 +1123,21 @@ export const selfEvolveApi = {
 };
 
 export const manifestApi = {
-  get: (versionId: string) => client.get(`/capability-versions/${versionId}/manifest`),
-  getByHash: (hash: string) => client.get(`/manifests/${hash}`),
-  create: (data: unknown) => client.post('/manifests', data),
+  get: async (versionId: string): Promise<{ data: CapabilityManifestResponse }> => {
+    const r = await client.get<unknown>(`/capability-versions/${versionId}/manifest`);
+    return { data: parseCapabilityManifest(r.data) };
+  },
+  getByHash: async (hash: string): Promise<{ data: Manifest }> => {
+    const r = await client.get<unknown>(`/manifests/${encodeURIComponent(hash)}`);
+    assertManifest(r.data);
+    return { data: r.data };
+  },
+  create: async (data: Manifest): Promise<{ data: { hash: string } }> => {
+    const r = await client.post<unknown>('/manifests', data);
+    const parsed = z.object({ hash: z.string().min(1) }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid manifest creation data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
 };
 
 /**
@@ -336,14 +1180,14 @@ export function validateDagClient(manifest: { nodes: Array<{ id: string }>; edge
 
 export const webhookApi = {
   list: () => client.get('/webhooks'),
-  create: (data: { url: string; events: string[] }) => client.post('/webhooks', data),
+  create: (data: { organizationId: string; label: string; url: string; events: string[] }) => client.post('/webhooks', data),
   update: (id: string, data: { url?: string; events?: string[]; active?: boolean }) => client.put(`/webhooks/${id}`, data),
   delete: (id: string) => client.delete(`/webhooks/${id}`),
 };
 
 export const apiKeyApi = {
   list: () => client.get('/api-keys'),
-  create: (data: { name: string; role: string }) => client.post('/api-keys', data),
+  create: (data: { name: string; role: string; userId: string }) => client.post('/api-keys', data),
   revoke: (id: string) => client.delete(`/api-keys/${id}`),
 };
 
@@ -384,9 +1228,115 @@ export interface RepoEntry {
   size: number;
 }
 
+export interface CommitItem {
+  oid: string;
+  repositoryId: string;
+  ref: string;
+  treeOid: string;
+  parents: string[];
+  authorId: string;
+  message: string;
+  timestamp: string;
+  signature?: string | null | undefined;
+  signedKeyId?: string | null | undefined;
+  signedAt?: string | null | undefined;
+}
+
+export interface RepositorySummary {
+  id: string;
+  workspaceId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  defaultBranch: string;
+  visibility: 'private' | 'internal' | 'public';
+  minApprovers: number;
+  requireSignedReleases: boolean;
+  updatedAt: string;
+}
+
+const RepositorySummarySchema = z.object({
+  id: z.string().min(1),
+  workspaceId: z.string().min(1),
+  name: z.string().min(1),
+  slug: z.string().min(1),
+  description: z.string().nullable(),
+  defaultBranch: z.string().min(1),
+  visibility: z.enum(['private', 'internal', 'public']),
+  minApprovers: z.number().int().nonnegative(),
+  requireSignedReleases: z.boolean(),
+  updatedAt: z.string(),
+});
+
+const BranchItemSchema = z.object({
+  id: z.string(),
+  repositoryId: z.string(),
+  name: z.string(),
+  headCommitOid: z.string().nullable(),
+  isProtected: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const RepoEntrySchema = z.object({
+  path: z.string(),
+  blobOid: z.string(),
+  size: z.number().int().nonnegative(),
+});
+
+const CommitItemSchema = z.object({
+  oid: z.string(),
+  repositoryId: z.string(),
+  ref: z.string(),
+  treeOid: z.string(),
+  parents: z.array(z.string()),
+  authorId: z.string(),
+  message: z.string(),
+  timestamp: z.string(),
+  signature: z.string().nullable().optional(),
+  signedKeyId: z.string().nullable().optional(),
+  signedAt: z.string().nullable().optional(),
+});
+
+function parseRepository(raw: unknown): RepositorySummary {
+  const parsed = RepositorySummarySchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ApiError('The server returned invalid repository data.', { code: 'INVALID_RESPONSE' });
+  }
+  return parsed.data;
+}
+
+function parseRepositoryList(raw: unknown): RepositorySummary[] {
+  const items = unwrapList<unknown>(raw);
+  const parsed = z.array(RepositorySummarySchema).safeParse(items);
+  if (!parsed.success) {
+    throw new ApiError('The server returned invalid repository data.', { code: 'INVALID_RESPONSE' });
+  }
+  return parsed.data;
+}
+
+function parseBranchList(raw: unknown): BranchItem[] {
+  const parsed = z.array(BranchItemSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid branch data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseRepoEntryList(raw: unknown): RepoEntry[] {
+  const parsed = z.array(RepoEntrySchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid repository contents.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseCommitList(raw: unknown): CommitItem[] {
+  const parsed = z.array(CommitItemSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid commit data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
 export const repoApi = {
-  list: (workspaceId: string) => client.get(`/repos?workspaceId=${encodeURIComponent(workspaceId)}`).then((r) => r.data),
-  get: (id: string) => client.get(`/repos/${id}`).then((r) => r.data),
+  list: (workspaceId: string): Promise<RepositorySummary[]> =>
+    client.get<unknown>(`/repos?workspaceId=${encodeURIComponent(workspaceId)}`).then((r) => parseRepositoryList(r.data)),
+  get: (id: string): Promise<RepositorySummary> => client.get<unknown>(`/repos/${id}`).then((r) => parseRepository(r.data)),
   create: (input: {
     workspaceId: string;
     name: string;
@@ -397,17 +1347,33 @@ export const repoApi = {
     minApprovers?: number;
     requireSignedReleases?: boolean;
   }) => client.post('/repos', input).then((r) => r.data),
-  listBranches: (repoId: string) => client.get(`/repos/${repoId}/branches`).then((r) => r.data),
+  listBranches: async (repoId: string): Promise<BranchItem[]> => {
+    const r = await client.get<unknown>(`/repos/${repoId}/branches`);
+    return parseBranchList(r.data);
+  },
   listTags: (repoId: string) => client.get(`/repos/${repoId}/tags`).then((r) => r.data),
-  listContents: (repoId: string, ref = 'main') => client.get(`/repos/${repoId}/contents?ref=${encodeURIComponent(ref)}`).then((r) => r.data),
-  getFile: (repoId: string, path: string, ref = 'main') => client.get(`/repos/${repoId}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`),
+  listContents: async (repoId: string, ref = 'main'): Promise<RepoEntry[]> => {
+    const r = await client.get<unknown>(`/repos/${repoId}/contents?ref=${encodeURIComponent(ref)}`);
+    return parseRepoEntryList(r.data);
+  },
+  getFile: (repoId: string, path: string, ref = 'main'): Promise<{ data: { content?: string | undefined } }> =>
+    client.get<unknown>(`/repos/${repoId}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`).then((r) => {
+      const parsed = z.object({ content: z.string().optional() }).safeParse(r.data);
+      if (!parsed.success) throw new ApiError('The server returned invalid file content.', { code: 'INVALID_RESPONSE' });
+      return { data: parsed.data };
+    }),
   putFile: (repoId: string, path: string, content: string, ref = 'main') =>
     client.put(`/repos/${repoId}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`, { path, content, ref }).then((r) => r.data),
   commit: (repoId: string, ref: string, message: string, parents?: string[]) =>
     client.post(`/repos/${repoId}/commits`, { ref, message, parents }).then((r) => r.data),
-  listCommits: (repoId: string, ref: string) => client.get(`/repos/${repoId}/commits?ref=${encodeURIComponent(ref)}`).then((r) => r.data),
-  listMRs: (repoId: string, status?: string) =>
-    client.get(`/repos/${repoId}/merge-requests${status ? `?status=${status}` : ''}`).then((r) => r.data),
+  listCommits: async (repoId: string, ref: string): Promise<CommitItem[]> => {
+    const r = await client.get<unknown>(`/repos/${repoId}/commits?ref=${encodeURIComponent(ref)}`);
+    return parseCommitList(r.data);
+  },
+  listMRs: async (repoId: string, status?: string): Promise<MergeRequest[]> => {
+    const r = await client.get<unknown>(`/repos/${repoId}/merge-requests${status ? `?status=${status}` : ''}`);
+    return parseMergeRequests(r.data);
+  },
   openMR: (input: {
     repositoryId: string;
     title: string;
@@ -416,7 +1382,14 @@ export const repoApi = {
     targetBranch: string;
     sourceCommitOid: string;
   }) => client.post(`/repos/${input.repositoryId}/merge-requests`, input).then((r) => r.data),
-  getMR: (id: string) => client.get(`/merge-requests/${id}`).then((r) => r.data),
+  getMR: async (id: string): Promise<{
+    mr: MergeRequest;
+    approvals: MergeRequestApproval[];
+    comments: MergeRequestComment[];
+  }> => {
+    const r = await client.get<unknown>(`/merge-requests/${id}`);
+    return parseMergeRequestDetail(r.data);
+  },
   decideMR: (id: string, decision: 'approve' | 'request_changes', comment?: string) =>
     client.post(`/merge-requests/${id}/decisions`, { decision, comment }).then((r) => r.data),
   commentMR: (id: string, body: string, path?: string) =>
@@ -433,9 +1406,14 @@ export const signingKeysApi = {
 };
 
 export const evalSuiteApi = {
-  list: (capabilityId?: string) =>
-    client.get(`/eval-suites${capabilityId ? `?capabilityId=${capabilityId}` : ''}`).then((r) => r.data),
-  get: (id: string) => client.get(`/eval-suites/${id}`).then((r) => r.data),
+  list: async (capabilityId?: string): Promise<EvalSuite[]> => {
+    const r = await client.get<unknown>(`/eval-suites${capabilityId ? `?capabilityId=${capabilityId}` : ''}`);
+    return parseEvalSuites(r.data);
+  },
+  get: async (id: string): Promise<{ data: { suite: EvalSuite; versions: EvalSuiteVersion[] } }> => {
+    const r = await client.get<unknown>(`/eval-suites/${id}`);
+    return { data: parseEvalSuiteDetail(r.data) };
+  },
   create: (input: {
     capabilityId: string;
     name: string;
@@ -453,7 +1431,10 @@ export const evalSuiteApi = {
 export const vaultApi = {
   listSecrets: (organizationId: string) =>
     client.get(`/vault/secrets?organizationId=${encodeURIComponent(organizationId)}`).then((r) => r.data),
-  listKeys: () => client.get('/vault/keys').then((r) => r.data),
+  listKeys: async (): Promise<VaultKeyringEntry[]> => {
+    const r = await client.get<unknown>('/vault/keys');
+    return parseVaultKeyring(r.data);
+  },
   rotateKey: (label: string, reencrypt = true) =>
     client.post('/vault/keys/rotate', { label, reencrypt }).then((r) => r.data),
   writeSecret: (organizationId: string, name: string, value: string) =>
@@ -470,8 +1451,10 @@ export const retentionApi = {
 };
 
 export const costApi = {
-  forOrg: (organizationId: string, days = 30) =>
-    client.get(`/analytics/cost?organizationId=${encodeURIComponent(organizationId)}&days=${days}`).then((r) => r.data),
+  forOrg: async (organizationId: string, days = 30): Promise<{ data: CostRollup[] }> => {
+    const r = await client.get<unknown>(`/analytics/cost?organizationId=${encodeURIComponent(organizationId)}&days=${days}`);
+    return { data: parseCostRollups(r.data) };
+  },
   ingest: (row: { capabilityId: string; input?: number; output?: number; costMicros?: number; executions?: number }) =>
     client.post('/analytics/rollups', row),
 };
@@ -645,7 +1628,10 @@ export interface AuditReport {
 }
 
 export const auditApi = {
-  list: (params?: { resource?: string; action?: string }) => client.get('/audit', { params }),
+  list: async (params?: { resource?: string; action?: string }): Promise<{ data: AuditEntry[] }> => {
+    const r = await client.get<unknown>('/audit', { params });
+    return { data: parseAuditEntries(r.data) };
+  },
   report: (opts: {
     fromTime?: string;
     toTime?: string;
@@ -744,6 +1730,8 @@ export const traceScoreApi = {
 };
 
 export const searchApi = {
-  q: (q: string, type?: string) =>
-    client.get(`/search?q=${encodeURIComponent(q)}${type ? `&type=${encodeURIComponent(type)}` : ''}`).then((r) => r.data),
+  q: async (q: string, type?: string): Promise<SearchResult[]> => {
+    const r = await client.get<unknown>(`/search?q=${encodeURIComponent(q)}${type ? `&type=${encodeURIComponent(type)}` : ''}`);
+    return parseSearchResults(r.data);
+  },
 };

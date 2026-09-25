@@ -6,6 +6,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { registerIdentityRoutes } from '../../src/routes/identity.js';
+import { IdentityService } from '../../src/application/identity-service.js';
+import { AgentIdentityRepo } from '../../src/repos/agent-identity.js';
 import { generateSvidSigningKey, mintSVID, verifySVID } from '../../src/identity/svid.js';
 import { installDefaultAuthorizer, CedarAuthorizer } from '../../src/policy/gate.js';
 import { resolve } from 'node:path';
@@ -48,8 +50,11 @@ describe('identity routes', () => {
       if (error.statusCode) return reply.code(error.statusCode).send({ error: { code: 'APP_ERROR', message: error.message } });
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     });
+    app.addHook('preHandler', async (request) => {
+      request.orgContext = { userId: 'admin', orgId: 'o-1', role: 'admin' };
+    });
     await app.register(async (instance) => {
-      await registerIdentityRoutes(instance, { db });
+      await registerIdentityRoutes(instance, { service: new IdentityService(new AgentIdentityRepo(db)) });
     });
     await app.ready();
   });
@@ -70,6 +75,15 @@ describe('identity routes', () => {
       const body = response.json() as { token: string; hash: string };
       expect(body.token.startsWith('psk_a-1_')).toBe(true);
       expect(body.hash).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it('rejects minting credentials for another organization', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/identity/keys',
+        payload: { agentId: 'a-1', organizationId: 'o-2' },
+      });
+      expect(response.statusCode).toBe(404);
     });
 
     it('rejects an invalid body with 422', async () => {
@@ -143,12 +157,32 @@ describe('identity routes', () => {
       expect(revoked).toBeDefined();
     });
 
+    it('does not revoke an identity from another organization', async () => {
+      const id = 'svid-other-org';
+      db.prepare(
+        `INSERT INTO agent_identities (id, agent_id, organization_id, mode, credential, scope, issued_at, expires_at)
+         VALUES (?, 'a-1', 'o-2', 'apikey', 'hash', '[]', '2026-01-01T00:00:00Z', '2099-01-01T00:00:00Z')`,
+      ).run(id);
+      const response = await app.inject({ method: 'DELETE', url: `/api/identity/${id}` });
+      expect(response.statusCode).toBe(404);
+      expect((db.prepare('SELECT revoked_at FROM agent_identities WHERE id = ?').get(id) as { revoked_at: string | null }).revoked_at).toBeNull();
+    });
+
     it('returns 404 for an unknown id', async () => {
       const response = await app.inject({
         method: 'DELETE',
         url: '/api/identity/missing-id',
       });
       expect(response.statusCode).toBe(404);
+    });
+
+    it('rejects a blank route id', async () => {
+      const response = await app.inject({
+        method: 'DELETE',
+        url: '/api/identity/%20',
+      });
+      expect(response.statusCode).toBe(422);
+      expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
     });
   });
 });

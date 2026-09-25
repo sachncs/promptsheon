@@ -7,7 +7,7 @@ import { registerVersionRoutes } from './version.js';
 import { registerReleaseRoutes } from './release.js';
 import { registerExecutionRoutes } from './execution.js';
 import { registerDatasetRoutes } from './dataset.js';
-import { registerEvalRoutes } from './eval.js';
+import { registerEvalRoutes, type EvalRouteConfig } from './eval.js';
 import { registerPreconditionRoutes } from './precondition.js';
 import { registerAlertRoutes } from './alert.js';
 import { registerScheduleRoutes } from './schedule.js';
@@ -28,7 +28,6 @@ import { registerOrgTeamRoutes } from './org-team.js';
 import { registerWebhookRoutes } from './webhooks-incoming.js';
 import { registerWebhookCrudRoutes } from './webhooks-crud.js';
 import { registerFeatureFlagRoutes } from './feature-flag.js';
-import { OrgRepo, TeamRepo } from '../repos/org.js';
 import { WebhookReceiver } from '../webhooks/receiver.js';
 import { registerChaosRoutes } from './chaos.js';
 import { AuditChain } from '../audit/chain.js';
@@ -38,6 +37,7 @@ import { registerApiKeyRoutes } from './api-keys.js';
 import { registerBootstrapRoutes } from './bootstrap.js';
 import type { LlmRouter } from '../llm/router.js';
 import { registerRepoRoutes, type RepoDeps } from './repo.js';
+import { RepositoryService } from '../application/repository-service.js';
 import { registerContentsRoutes, type ContentsDeps } from './contents.js';
 import { registerCommitRoutes, type CommitDeps } from './commits.js';
 import { registerMergeRequestRoutes, type MRDeps } from './mr.js';
@@ -59,8 +59,26 @@ import { registerSecurityRoutes } from './security.js';
 import { registerAuditReportRoutes } from './audit-report.js';
 import { registerBudgetRoutes } from './budget.js';
 import { registerIdentityRoutes } from './identity.js';
+import { WorkspaceService } from '../application/workspace-service.js';
+import { ProjectService } from '../application/project-service.js';
+import { CapabilityService } from '../application/capability-service.js';
+import { ManifestApprovalService } from '../application/manifest-approval-service.js';
+import { AuditReplicationService } from '../application/audit-replication-service.js';
+import { HealthService } from '../application/health-service.js';
+import { SqliteHealthProbe } from '../infrastructure/sqlite-health-probe.js';
+import type { IdentityService } from '../application/identity-service.js';
+import { createTraceService } from '../application/trace-service.js';
+import { EvalSuiteService } from '../application/eval-suite-service.js';
+import { GraderRunner } from '../agents/evaluation/grader-runner.js';
+import { ExecutionReplayService } from '../application/execution-replay-service.js';
+import { ExecutionService } from '../application/execution-service.js';
+import { selectByCanary } from '../application/canary-routing.js';
+import type { LlmSettingsService } from '../application/llm-settings-service.js';
 import type { UserRepo } from '../repos/user.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
+import type { OutgoingWebhookRepo } from '../repos/outgoing-webhook.js';
+import type { ReleaseOverlayRepo } from '../repos/release-overlay.js';
+import type { VaultRepo } from '../repos/vault.js';
 
 import type { WorkspaceRepo } from '../repos/workspace.js';
 import type { ProjectRepo } from '../repos/project.js';
@@ -73,7 +91,7 @@ import type { EvalRepo } from '../repos/eval.js';
 import type { PreconditionRepo } from '../repos/precondition.js';
 import type { AlertRepo } from '../repos/alert.js';
 import type { ScheduleRepo } from '../repos/schedule.js';
-import type { ApprovalRepo } from '../repos/approval.js';
+import { ScheduleService } from '../application/schedule-service.js';
 import type { SseHub } from '../sse/hub.js';
 import type { SettingsResolver } from '../settings/resolver.js';
 import type { InvocationAgent } from '../agents/invocation.js';
@@ -89,6 +107,8 @@ import type Database from 'better-sqlite3';
 import type { BudgetDeps } from './budget.js';
 
 export interface AppDeps {
+  nodeEnvironment: string;
+  scimBearerToken?: string;
   db: Database.Database;
   workspaceRepo: WorkspaceRepo;
   projectRepo: ProjectRepo;
@@ -101,11 +121,12 @@ export interface AppDeps {
   preconditionRepo: PreconditionRepo;
   alertRepo: AlertRepo;
   scheduleRepo: ScheduleRepo;
-  approvalRepo: ApprovalRepo;
   sseHub: SseHub;
   settingsResolver: SettingsResolver;
+  llmSettings: LlmSettingsService;
   invocationAgent: InvocationAgent;
   evalAgent: EvaluationAgent;
+  evalRouteConfig: EvalRouteConfig;
   evolutionAgent: EvolutionAgent;
   compiler: ReasoningCompiler;
   planner: IdeaPlannerAgent;
@@ -122,13 +143,17 @@ export interface AppDeps {
   budgetDeps?: BudgetDeps;
   auditChain: AuditChain;
   apiKeyRepo: ApiKeyRepo;
+  e2eSessionEnabled: boolean;
+  outgoingWebhookRepo: OutgoingWebhookRepo;
+  releaseOverlayRepo: ReleaseOverlayRepo;
   userRepo: UserRepo;
+  orgRepo: import('../repos/org.js').OrgRepo;
   llmRouter: LlmRouter;
   gateway: import('../llm/gateway.js').Gateway;
   repoDeps: RepoDeps;
-  contentsDeps: ContentsDeps;
-  commitDeps: CommitDeps;
-  mrDeps: MRDeps;
+  contentsDeps: Omit<ContentsDeps, 'repositoryService'>;
+  commitDeps: Omit<CommitDeps, 'repositoryService'>;
+  mrDeps: Omit<MRDeps, 'repositoryService'>;
   signingDeps: SigningDeps;
   evalSuiteDeps: EvalSuiteRouteDeps;
   vaultDeps: VaultRouteDeps;
@@ -142,40 +167,71 @@ export interface AppDeps {
   traceScoreRepo: import('../repos/trace-score.js').TraceScoreRepo;
   autoEval: import('../observability/auto-eval.js').AutoEval;
   userAnalyticsRepo: import('../repos/user-analytics.js').UserAnalyticsRepo;
+  identityService: IdentityService;
   teamRepo: import('../repos/team.js').TeamRepo;
+  orgTeamRepo: import('../repos/org.js').TeamRepo;
   ssoConfigRepo: import('../repos/team.js').SsoConfigRepo;
+  vaultRepo: VaultRepo;
   promptScanRepo: import('../repos/prompt-scan.js').PromptScanRepo;
 }
 
+/**
+ * Resolve the SCIM bearer secret at the composition root. A known fallback is
+ * acceptable for local development, but production must never boot with a
+ * credential that an attacker can guess from the source tree.
+ */
+export function resolveScimBearerToken(environment: string, configuredToken = process.env['PROMPTSHEON_SCIM_TOKEN']): string {
+  if (configuredToken) return configuredToken;
+  if (environment === 'production') {
+    throw new Error('PROMPTSHEON_SCIM_TOKEN is required in production');
+  }
+  return 'dev-scim-token';
+}
+
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
-  registerWorkspaceRoutes(app, deps.workspaceRepo);
-  registerProjectRoutes(app, deps.projectRepo);
-  registerCapabilityRoutes(app, deps.capabilityRepo);
-  registerVersionRoutes(app, deps.versionRepo, deps.manifestRepo, deps.db);
-  registerReleaseRoutes(app, deps.releaseRepo, { manifestRepo: deps.manifestRepo, auditChain: deps.auditChain });
+  registerWorkspaceRoutes(app, new WorkspaceService(deps.workspaceRepo));
+  registerProjectRoutes(app, new ProjectService(deps.projectRepo));
+  registerCapabilityRoutes(app, new CapabilityService(deps.capabilityRepo));
+  registerVersionRoutes(app, deps.versionRepo, deps.manifestRepo);
+  registerReleaseRoutes(app, deps.releaseRepo, {
+    manifestRepo: deps.manifestRepo,
+    auditChain: deps.auditChain,
+    overlayRepo: deps.releaseOverlayRepo,
+  });
   registerExecutionRoutes(app, {
     executionRepo: deps.executionRepo,
-    releaseRepo: deps.releaseRepo,
-    manifestRepo: deps.manifestRepo,
-    versionRepo: deps.versionRepo,
-    traceRepo: deps.traceRepo,
-    executor: deps.executor,
+    executionService: new ExecutionService(
+      deps.manifestRepo,
+      deps.releaseRepo,
+      deps.traceRepo,
+      deps.executionRepo,
+      deps.executor,
+      selectByCanary,
+    ),
+    replayService: new ExecutionReplayService(
+      deps.executionRepo,
+      deps.manifestRepo,
+      deps.traceRepo,
+      deps.executor,
+    ),
     sseHub: deps.sseHub,
   });
   registerDatasetRoutes(app, deps.datasetRepo);
-  registerEvalRoutes(app, deps.evalRepo, deps.evalAgent);
+  registerEvalRoutes(app, deps.evalRepo, deps.evalAgent, deps.evalRouteConfig);
   registerPreconditionRoutes(app, deps.preconditionRepo);
   registerAlertRoutes(app, deps.alertRepo);
-  registerScheduleRoutes(app, deps.scheduleRepo);
+  registerScheduleRoutes(app, new ScheduleService(deps.scheduleRepo));
   registerSettingsRoutes(app, deps.settingsResolver);
   registerSseRoutes(app, deps.sseHub);
-  registerSelfEvolveRoutes(app, deps.evolutionAgent, deps.capabilityRepo, deps.evalRepo);
-  registerApprovalRoutes(app, deps.approvalRepo, { releaseRepo: deps.releaseRepo, manifestRepo: deps.manifestRepo });
+  registerSelfEvolveRoutes(app, deps.evolutionAgent, deps.capabilityRepo);
+  registerApprovalRoutes(app, { releaseRepo: deps.releaseRepo, manifestRepo: deps.manifestRepo });
   registerCompilerRoutes(app, deps.compiler);
-  registerHealthRoutes(app, deps.db);
+  registerHealthRoutes(app, new HealthService(new SqliteHealthProbe(deps.db)));
   registerIdeaRoutes(app, { planner: deps.planner });
   registerGoalEvolveRoutes(app, { goalEvolver: deps.goalEvolver, manifestRepo: deps.manifestRepo });
-  registerManifestApprovalRoutes(app, { manifestRepo: deps.manifestRepo, auditChain: deps.auditChain });
+  registerManifestApprovalRoutes(app, {
+    service: new ManifestApprovalService(deps.manifestRepo, deps.auditChain),
+  });
   registerGoalObservabilityRoutes(app, {
     goalEvolver: deps.goalEvolver,
     getActiveGoals: deps.getActiveGoals,
@@ -184,29 +240,63 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerSnapshotRoutes(app, { store: deps.snapshotStore, getAgent: deps.getAgent });
   registerManifestHashRoutes(app, { manifestRepo: deps.manifestRepo });
   registerOrgTeamRoutes(app, {
-    orgRepo: new OrgRepo(deps.db),
-    teamRepo: new TeamRepo(deps.db),
+    orgRepo: deps.orgRepo,
+    teamRepo: deps.orgTeamRepo,
     membershipRepo: deps.membershipRepo,
   });
   registerWebhookRoutes(app, { receiver: deps.webhookReceiver, executor: deps.executor, manifestRepo: deps.manifestRepo });
-  registerWebhookCrudRoutes(app, { auditChain: deps.auditChain });
+  registerWebhookCrudRoutes(app, { auditChain: deps.auditChain, repo: deps.outgoingWebhookRepo });
   registerFeatureFlagRoutes(app, { repo: deps.featureFlagRepo, auditChain: deps.auditChain });
-  registerAuditRoutes(app, { auditChain: deps.auditChain, db: deps.db });
-  registerUserRoutes(app, { userRepo: deps.userRepo, auditChain: deps.auditChain });
+  registerAuditRoutes(app, {
+    auditChain: deps.auditChain,
+    replication: new AuditReplicationService(deps.auditChain),
+  });
+  registerUserRoutes(app, {
+    userRepo: deps.userRepo,
+    auditChain: deps.auditChain,
+    membershipRepo: deps.membershipRepo,
+  });
   registerApiKeyRoutes(app, { apiKeyRepo: deps.apiKeyRepo, auditChain: deps.auditChain });
   registerBootstrapRoutes(app, {
-    db: deps.db,
     userRepo: deps.userRepo,
+    orgRepo: deps.orgRepo,
+    membershipRepo: deps.membershipRepo,
     settingsResolver: deps.settingsResolver,
+    llmSettings: deps.llmSettings,
     llmRouter: deps.llmRouter,
+    apiKeyRepo: deps.apiKeyRepo,
+    e2eSessionEnabled: deps.e2eSessionEnabled,
   });
 
-  registerRepoRoutes(app, deps.repoDeps);
-  registerContentsRoutes(app, deps.contentsDeps);
-  registerCommitRoutes(app, deps.commitDeps);
-  registerMergeRequestRoutes(app, deps.mrDeps);
+  registerRepoRoutes(app, {
+    ...deps.repoDeps,
+  });
+  registerContentsRoutes(app, {
+    ...deps.contentsDeps,
+    repositoryService: deps.repoDeps.repositoryService,
+  });
+  registerCommitRoutes(app, {
+    ...deps.commitDeps,
+    repositoryService: deps.repoDeps.repositoryService,
+  });
+  registerMergeRequestRoutes(app, {
+    ...deps.mrDeps,
+    repositoryService: deps.repoDeps.repositoryService,
+  });
   registerSigningRoutes(app, deps.signingDeps);
-  registerEvalSuiteRoutes(app, deps.evalSuiteDeps);
+  const suiteExecution = deps.evalSuiteDeps.suiteExecution ?? new EvalSuiteService(
+    deps.evalSuiteDeps.suiteRepo,
+    {
+      create: (specs) => {
+        const runner = new GraderRunner(specs);
+        return {
+          run: (input) => runner.run(input),
+        };
+      },
+    },
+    deps.evalSuiteDeps.humanReviewRepo,
+  );
+  registerEvalSuiteRoutes(app, { ...deps.evalSuiteDeps, suiteExecution });
   registerVaultRoutes(app, deps.vaultDeps);
   registerOpenApiRoutes(app);
   registerRetentionRoutes(app, deps.retentionDeps);
@@ -225,27 +315,33 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
       },
     });
   }
+  const traceService = createTraceService({
+    traces: deps.traceRepo,
+    scores: deps.traceScoreRepo,
+    evaluator: deps.autoEval,
+  });
   registerTraceRoutes(app, {
-    traceRepo: deps.traceRepo,
-    requireAdmin: () => requireAdmin() as unknown as (request: unknown, reply: unknown) => Promise<void>,
+    service: traceService,
+    requireAdmin,
   });
   registerTraceScoreRoutes(app, {
-    traceRepo: deps.traceRepo,
-    scoreRepo: deps.traceScoreRepo,
-    autoEval: deps.autoEval,
+    service: traceService,
   });
   registerPlaygroundRoutes(app, { gateway: deps.gateway });
   registerAnalyticsRoutes(app, { repo: deps.userAnalyticsRepo });
   registerTeamRoutes(app, {
     teamRepo: deps.teamRepo,
     ssoConfigRepo: deps.ssoConfigRepo,
+    vaultRepo: deps.vaultRepo,
     auditChain: deps.auditChain,
-    scimBearerToken: process.env['PROMPTSHEON_SCIM_TOKEN'] ?? 'dev-scim-token',
+    userRepo: deps.userRepo,
+    membershipRepo: deps.membershipRepo,
+    scimBearerToken: resolveScimBearerToken(deps.nodeEnvironment, deps.scimBearerToken),
   });
   registerSecurityRoutes(app, { scanRepo: deps.promptScanRepo });
   registerAuditReportRoutes(app, { auditChain: deps.auditChain });
   if (deps.budgetDeps) {
     registerBudgetRoutes(app, deps.budgetDeps);
   }
-  registerIdentityRoutes(app, { db: deps.db });
+  registerIdentityRoutes(app, { service: deps.identityService });
 }

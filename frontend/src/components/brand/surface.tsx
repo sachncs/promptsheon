@@ -34,12 +34,12 @@ export function SurfaceHeader({
   className?: string | undefined;
 }) {
   return (
-    <header className={cn('flex items-start justify-between gap-4 mb-5', className)}>
+    <header className={cn('mb-5 flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4', className)}>
       <div className="min-w-0">
         <h2 className="text-base font-semibold tracking-tight text-text-strong">{title}</h2>
         {description && <p className="mt-1 text-sm text-text-muted">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>}
     </header>
   );
 }

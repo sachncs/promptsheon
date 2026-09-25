@@ -39,7 +39,7 @@ export default function Quickstart() {
       <h2>5. Run the eval gate</h2>
       <DocCurl
         cmd={`curl -X POST http://127.0.0.1:8080/api/eval-suites \\
-  -H 'X-User-Id: <uid>' -H 'X-Org-Id: <org>' \\
+  -H 'authorization: Bearer $PROMPTSHEON_API_KEY' \\
   -d '{"capabilityId":"<cap>","name":"smoke","initialGraders":[{"name":"match","kind":"regex_match","weight":1,"config":{"pattern":"hello","field":"output"}}]}'`}
       />
       <p>Returns <code>{`{ suite, version: { id } }`}</code>. Promote to <code>active</code> through the release workflow.</p>

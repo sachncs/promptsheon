@@ -1,7 +1,8 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
-  passAtK,
+  cohensKappa,
+  krippendorffAlpha,
   type EvalSuite,
   type GraderSpec,
 } from '@promptsheon/shared';
@@ -9,13 +10,16 @@ import {
   type EvalSuiteRepo,
   type HumanReviewRepo,
 } from '../repos/eval-suite.js';
-import { GraderRunner } from '../agents/evaluation/grader-runner.js';
-import { parseBody } from './validate.js';
+import type { EvalSuiteService } from '../application/eval-suite-service.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
-function actorOf(request: unknown): string {
-  const ctx = (request as { userId?: string } | undefined) ?? {};
-  return ctx.userId ?? 'system';
+function actorOf(request: FastifyRequest): string {
+  return request.userId ?? 'system';
+}
+
+function organizationIdOf(request: FastifyRequest): string | undefined {
+  return request.orgContext?.orgId ?? request.agentOrgId;
 }
 
 const CreateSuiteSchema = z.object({
@@ -38,9 +42,56 @@ const CreateSuiteSchema = z.object({
           'llm_rubric',
         ]),
         weight: z.number().min(0).max(1),
-        config: z.record(z.string(), z.unknown()),
+        config: z.discriminatedUnion('kind', [
+          z.object({
+            kind: z.literal('regex_match'),
+            pattern: z.string(),
+            flags: z.string().optional(),
+            field: z.enum(['output', 'transcript', 'metadata']),
+          }),
+          z.object({
+            kind: z.literal('schema_state_check'),
+            schema: z.record(z.string(), z.unknown()),
+            jqExpr: z.string().optional(),
+            field: z.enum(['output', 'finalState']),
+          }),
+          z.object({
+            kind: z.literal('tool_call_assertion'),
+            calls: z.array(z.object({
+              tool: z.string().min(1),
+              argsMatcher: z.record(z.string(), z.unknown()),
+              resultMatcher: z.record(z.string(), z.unknown()).optional(),
+            })),
+          }),
+          z.object({
+            kind: z.literal('transcript_diff'),
+            referenceTranscript: z.string(),
+            ignoreTimestamps: z.boolean().optional(),
+          }),
+          z.object({
+            kind: z.literal('llm_rubric'),
+            rubric: z.string().min(1),
+            model: z.string().min(1),
+            anchors: z.array(z.object({
+              score: z.number(),
+              label: z.string(),
+              description: z.string(),
+            })),
+          }),
+        ]),
       }),
     )
+    .superRefine((graders, context) => {
+      graders.forEach((grader, index) => {
+        if (grader.config.kind !== grader.kind) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'grader kind must match config.kind',
+            path: [index, 'config', 'kind'],
+          });
+        }
+      });
+    })
     .optional(),
 });
 
@@ -98,36 +149,43 @@ const ReviewDecisionSchema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
+const ListSuiteQuerySchema = z.object({
+  capabilityId: z.string().min(1).max(200).optional(),
+});
+
+const CalibrationSchema = z.object({
+  a: z.array(z.string().max(100_000)).min(1).max(10_000),
+  b: z.array(z.string().max(100_000)).min(1).max(10_000),
+}).superRefine((value, context) => {
+  if (value.a.length !== value.b.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'equal non-empty arrays required',
+      path: ['b'],
+    });
+  }
+});
+
+const SuiteIdParamsSchema = z.object({
+  id: z.string().min(1).max(200),
+});
+
 export interface EvalSuiteRouteDeps {
   suiteRepo: EvalSuiteRepo;
   humanReviewRepo: HumanReviewRepo;
+  suiteExecution?: EvalSuiteService;
 }
-
-interface RunSummary {
-  runId: string;
-  suiteId: string;
-  suiteVersionId: string;
-  passThreshold: number;
-  passAtK: number;
-  rawScore: number;
-  passed: boolean;
-  borderlineCount: number;
-  gradedAt: string;
-}
-
-/**
- * Per-process cache for in-flight runs so the gate endpoint can
- * reuse the latest score without a database roundtrip.
- */
-const runCache = new Map<string, RunSummary>();
 
 export function registerEvalSuiteRoutes(
   app: FastifyInstance,
   deps: EvalSuiteRouteDeps,
 ): void {
   app.get('/api/eval-suites', async (request, reply) => {
-    const { capabilityId } = request.query as { capabilityId?: string };
-    return reply.send(deps.suiteRepo.list(capabilityId));
+    const parsed = parseQuery(reply, ListSuiteQuerySchema, request.query);
+    if (!parsed.ok) return;
+    const { capabilityId } = parsed.data;
+    const organizationId = organizationIdOf(request);
+    return reply.send(organizationId ? deps.suiteRepo.listInOrg(organizationId, capabilityId) : deps.suiteRepo.list(capabilityId));
   });
   registerRouteDoc({
     method: 'get',
@@ -143,12 +201,9 @@ export function registerEvalSuiteRoutes(
       name: g.name,
       kind: g.kind,
       weight: g.weight,
-      // The Zod record coerce widens the config to `Record<string, unknown>`
-      // but our grader spec expects a discriminator-bearing union; cast at
-      // the boundary. The runner validates `kind` again at run time.
-      config: g.config as never,
+      config: g.config,
     }));
-    const out = deps.suiteRepo.create({
+    const input = {
       capabilityId: parsed.data.capabilityId,
       repositoryId: parsed.data.repositoryId ?? null,
       name: parsed.data.name,
@@ -158,7 +213,10 @@ export function registerEvalSuiteRoutes(
       createdBy: actorOf(request),
       initialGraders: initial,
       notes: parsed.data.notes ?? null,
-    });
+    };
+    const organizationId = organizationIdOf(request);
+    const out = organizationId ? deps.suiteRepo.createInOrg(input, organizationId) : deps.suiteRepo.create(input);
+    if (!out) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'capability not found' } });
     return reply.code(201).send(out);
   });
   registerRouteDoc({
@@ -170,8 +228,11 @@ export function registerEvalSuiteRoutes(
   });
 
   app.get('/api/eval-suites/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const suite = deps.suiteRepo.findById(id);
+    const parsed = parseParams(reply, SuiteIdParamsSchema, request.params);
+    if (!parsed.ok) return;
+    const { id } = parsed.data;
+    const organizationId = organizationIdOf(request);
+    const suite = organizationId ? deps.suiteRepo.findByIdInOrg(id, organizationId) : deps.suiteRepo.findById(id);
     if (!suite) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'suite not found' } });
     return reply.send({ suite, versions: deps.suiteRepo.listVersions(id) });
   });
@@ -183,60 +244,20 @@ export function registerEvalSuiteRoutes(
   });
 
   app.post('/api/eval-suites/:id/run', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, SuiteIdParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, RunSuiteSchema, request.body ?? {});
     if (!parsed.ok) return;
-    const suite = deps.suiteRepo.findById(id);
-    if (!suite) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'suite not found' } });
-    const version = parsed.data.suiteVersionId
-      ? deps.suiteRepo.findVersionById(parsed.data.suiteVersionId)
-      : deps.suiteRepo.findVersion(id, suite.currentVersion);
-    if (!version) return reply.code(404).send({ error: { code: 'NOT_VERSION', message: 'suite has no versioned graders' } });
-    const trials = parsed.data.trials ?? [
-      { caseId: 'sample-1', output: 'hello', finalState: {} },
-    ];
-    const n = parsed.data.n ?? trials.length;
-    const k = parsed.data.k ?? 1;
-    const runner = new GraderRunner(version.graderConfig);
-    const graded = trials.map((t) => ({
-      trial: t,
-      result: runner.run({
-        output: t.output,
-        transcript: t.transcript ?? '',
-        finalState: t.finalState ?? {},
-        toolCalls: t.toolCalls ?? [],
-        referenceTranscript: t.referenceTranscript ?? '',
-      }),
-    }));
-    const successes = graded.filter((g) => g.result.passed).length;
-    const passAtKValue = passAtK(n, k, successes);
-    const rawScore =
-      graded.reduce((acc, g) => acc + g.result.weightedScore, 0) / Math.max(1, graded.length);
-    const passed = rawScore >= suite.passThreshold;
-    const borderlineBand = graded.filter(
-      (g) => Math.abs(g.result.weightedScore - suite.passThreshold) <= suite.borderlineBand && !g.result.passed,
-    ).length;
-
-    for (const g of graded) {
-      if (Math.abs(g.result.weightedScore - suite.passThreshold) <= suite.borderlineBand) {
-        deps.humanReviewRepo.enqueue(g.trial.caseId, suite.id, null);
-      }
+    const organizationId = organizationIdOf(request);
+    const result = deps.suiteExecution?.run(id, organizationId, parsed.data);
+    if (!result || result.kind === 'suite-not-found') {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'suite not found' } });
     }
-
-    const runId = `run-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const summary: RunSummary = {
-      runId,
-      suiteId: suite.id,
-      suiteVersionId: version.id,
-      passThreshold: suite.passThreshold,
-      passAtK: passAtKValue,
-      rawScore,
-      passed,
-      borderlineCount: borderlineBand,
-      gradedAt: new Date().toISOString(),
-    };
-    runCache.set(runId, summary);
-    return reply.code(201).send({ ...summary, results: graded });
+    if (result.kind === 'version-not-found') {
+      return reply.code(404).send({ error: { code: 'NOT_VERSION', message: 'suite has no versioned graders' } });
+    }
+    return reply.code(201).send(result.value);
   });
 
   /**
@@ -244,11 +265,14 @@ export function registerEvalSuiteRoutes(
    * Accepts a list of graded trials and returns pass/fail.
    */
   app.post('/api/repos/:id/eval-gate', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, SuiteIdParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, GateSchema, request.body);
     if (!parsed.ok) return;
-    const suites = deps.suiteRepo.list();
-    if (suites.length === 0) {
+    const organizationId = organizationIdOf(request);
+    const result = deps.suiteExecution?.gate(id, organizationId, parsed.data.trials);
+    if (!result || result.suites.length === 0) {
       return reply.send({
         ok: true,
         score: 1,
@@ -257,51 +281,24 @@ export function registerEvalSuiteRoutes(
         note: `repository ${id} has no suites; gate passes by default`,
       });
     }
-    // Use each suite's current version + the first graders we have.
-    const summaries: Array<{
-      suiteId: string;
-      suiteName: string;
-      ok: boolean;
-      rawScore: number;
-      threshold: number;
-    }> = [];
-    for (const suite of suites) {
-      const version = deps.suiteRepo.findVersion(suite.id, suite.currentVersion);
-      if (!version) continue;
-      const runner = new GraderRunner(version.graderConfig);
-      const graded = parsed.data.trials.map((t) =>
-        runner.run({
-          output: t.output,
-          transcript: t.transcript ?? '',
-          finalState: t.finalState ?? {},
-          toolCalls: t.toolCalls ?? [],
-          referenceTranscript: '',
-        }),
-      );
-      const rawScore =
-        graded.reduce((acc, g) => acc + g.weightedScore, 0) / Math.max(1, graded.length);
-      const ok = rawScore >= suite.passThreshold;
-      summaries.push({
-        suiteId: suite.id,
-        suiteName: suite.name,
-        ok,
-        rawScore,
-        threshold: suite.passThreshold,
-      });
-    }
-    const ok = summaries.every((s) => s.ok);
-    return reply.send({ ok, score: summaries[0]?.rawScore ?? 1, regressions: summaries.filter((s) => !s.ok), suites: summaries });
+    return reply.send(result);
   });
 
   app.get('/api/human-review', async (request, reply) => {
-    return reply.send(deps.humanReviewRepo.listOpen());
+    const organizationId = organizationIdOf(request);
+    return reply.send(organizationId ? deps.humanReviewRepo.listOpenInOrg(organizationId) : deps.humanReviewRepo.listOpen());
   });
 
   app.post('/api/human-review/:id/decide', async (request, reply) => {
-    const { id } = request.params as { id: string };
+    const parsedParams = parseParams(reply, SuiteIdParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const { id } = parsedParams.data;
     const parsed = parseBody(reply, ReviewDecisionSchema, request.body);
     if (!parsed.ok) return;
-    const review = deps.humanReviewRepo.decide(id, actorOf(request), parsed.data.decision, parsed.data.notes ?? null);
+    const organizationId = organizationIdOf(request);
+    const review = organizationId
+      ? deps.humanReviewRepo.decideInOrg(id, organizationId, actorOf(request), parsed.data.decision, parsed.data.notes ?? null)
+      : deps.humanReviewRepo.decide(id, actorOf(request), parsed.data.decision, parsed.data.notes ?? null);
     if (!review) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'review not found' } });
     return reply.send(review);
   });
@@ -310,13 +307,9 @@ export function registerEvalSuiteRoutes(
   // equal length, returns Cohen's kappa and Krippendorff's alpha
   // (nominal). Used by /app/eval/calibrations UI.
   app.post('/api/eval/calibrate', async (request, reply) => {
-    const body = request.body as { a?: string[]; b?: string[] };
-    const a = body.a ?? [];
-    const b = body.b ?? [];
-    if (a.length !== b.length || a.length === 0) {
-      return reply.code(422).send({ error: { code: 'BAD_INPUT', message: 'equal non-empty arrays required' } });
-    }
-    const { cohensKappa, krippendorffAlpha } = await import('@promptsheon/shared');
+    const parsed = parseBody(reply, CalibrationSchema, request.body);
+    if (!parsed.ok) return;
+    const { a, b } = parsed.data;
     return reply.send({
       n: a.length,
       cohensKappa: cohensKappa(a, b),

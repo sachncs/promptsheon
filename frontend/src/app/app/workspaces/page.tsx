@@ -15,6 +15,8 @@ import { HashChip } from '@/components/brand/hash-chip';
 import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 export default function WorkspacesPage() {
   const session = useRequireSession();
@@ -26,10 +28,10 @@ export default function WorkspacesPage() {
 
   const ws = useQuery({
     queryKey: ['workspaces'],
-    queryFn: () => workspaceApi.list(1).then((r) => r.data).catch(() => [] as Array<Record<string, unknown>>),
+    queryFn: () => workspaceApi.list(1).then((r) => r.data),
     enabled: Boolean(session),
   });
-  const rows = (Array.isArray(ws.data) ? ws.data : []) as Array<Record<string, unknown>>;
+  const rows = ws.data ?? [];
 
   const create = useMutation({
     mutationFn: () => {
@@ -41,7 +43,7 @@ export default function WorkspacesPage() {
       qc.invalidateQueries({ queryKey: ['workspaces'] });
       setName('');
       setOrganization('');
-      const created = data?.data as { id?: string } | undefined;
+      const created = data.data;
       if (created?.id) {
         toast({ title: 'Workspace created', variant: 'success', description: 'Open it to start adding projects.' });
         router.push(`/app/workspaces/${created.id}/projects`);
@@ -49,7 +51,7 @@ export default function WorkspacesPage() {
         toast({ title: 'Workspace created', variant: 'success' });
       }
     },
-    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Create failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   const remove = useMutation({
@@ -58,10 +60,11 @@ export default function WorkspacesPage() {
       qc.invalidateQueries({ queryKey: ['workspaces'] });
       toast({ title: 'Workspace deleted', variant: 'success' });
     },
-    onError: (err) => toast({ title: 'Delete failed', variant: 'destructive', description: (err as Error).message }),
+    onError: (err) => toast({ title: 'Delete failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
   if (!session) return null;
+  if (ws.isError) return <QueryError message={ws.error} onRetry={() => void ws.refetch()} />;
 
   return (
     <div className="space-y-6">
@@ -78,8 +81,9 @@ export default function WorkspacesPage() {
         />
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="sm:col-span-2">
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Name</label>
+            <label htmlFor="workspace-name" className="text-xs uppercase tracking-wider text-text-subtle">Name</label>
             <Input
+              id="workspace-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="refund-triage"
@@ -87,8 +91,9 @@ export default function WorkspacesPage() {
             />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Organisation label</label>
+            <label htmlFor="workspace-organization" className="text-xs uppercase tracking-wider text-text-subtle">Organisation label</label>
             <Input
+              id="workspace-organization"
               value={organization}
               onChange={(e) => setOrganization(e.target.value)}
               placeholder="Acme AI"
@@ -103,7 +108,7 @@ export default function WorkspacesPage() {
           </Button>
         </div>
         {create.isError && (
-          <div className="mt-3 text-xs text-destructive">{(create.error as Error).message}</div>
+          <div className="mt-3 text-xs text-destructive">{getErrorMessage(create.error)}</div>
         )}
       </Surface>
 
@@ -120,15 +125,15 @@ export default function WorkspacesPage() {
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
             rows={rows}
-            rowKey={(r) => String(r['id'])}
-            onRowClick={(r) => router.push(`/app/workspaces/${String(r['id'])}/projects`)}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => router.push(`/app/workspaces/${r.id}/projects`)}
             columns={[
               {
                 key: 'name',
                 header: 'Name',
                 render: (r) => (
-                  <Link href={`/app/workspaces/${String(r['id'])}/projects`} className="font-medium text-text-strong hover:underline">
-                    {String(r['name'] ?? '—')}
+                  <Link href={`/app/workspaces/${r.id}/projects`} className="font-medium text-text-strong hover:underline">
+                    {r.name || '—'}
                   </Link>
                 ),
               },
@@ -136,14 +141,14 @@ export default function WorkspacesPage() {
                 key: 'org',
                 header: 'Organisation',
                 render: (r) => {
-                  const org = (r['organization'] as string | undefined) ?? '';
+                  const org = r.organization;
                   return org ? <span className="text-text-muted">{org}</span> : <span className="text-text-subtle">—</span>;
                 },
               },
               {
                 key: 'id',
                 header: 'Identifier',
-                render: (r) => <HashChip hash={String(r['id'])} />,
+                render: (r) => <HashChip hash={r.id} />,
               },
               {
                 key: 'actions',
@@ -154,7 +159,7 @@ export default function WorkspacesPage() {
                     variant="outline"
                     onClick={(e) => {
                       e.stopPropagation();
-                      remove.mutate(String(r['id']));
+                      remove.mutate(r.id);
                     }}
                   >
                     <Trash2 className="mr-1 size-3" />

@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import {
-  ArrowRight, Boxes, FlaskConical, GitBranch, Workflow, Lock, ShieldCheck,
-  Layers, Activity, ScrollText, Terminal, CheckCircle2, Sparkles,
-  Compass, Fingerprint, Network, Rocket, Telescope,
+  ArrowRight, Boxes, FlaskConical, GitBranch, Lock, ShieldCheck,
+  Layers, ScrollText, Terminal, CheckCircle2,
+  Compass, Fingerprint, Network, Telescope,
 } from 'lucide-react';
 import { Logo } from '@/brand/logo';
 import { LogoMark } from '@/brand/logo-mark';
@@ -43,19 +43,18 @@ export default function LandingPage() {
                 v0.1 — Self-host. No telemetry. Apache-2.0.
               </div>
               <h1 className="mt-6 font-semibold text-h1 md:text-display">
-                The control plane for<br />
-                <span className="ps-gradient-text">AI capabilities.</span>
+                Build agents that<br />
+                <span className="ps-gradient-text">get better with evidence.</span>
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-relaxed text-text-muted">
-                Promptsheon manages prompts, agents, policies, tools, MCP servers,
-                guardrails, and evaluation suites as content-addressed, governed,
-                version-controlled release artifacts. Not chat. Not notebooks.
-                Production infrastructure.
+                Promptsheon is an adaptive agent engineering platform for building,
+                executing, evaluating, and continuously improving AI agents and
+                multi-agent systems. Every run becomes evidence for the next better configuration.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link href="/onboarding">
                   <Button size="lg">
-                    Open dashboard
+                    Start building
                     <ArrowRight className="ml-1.5 h-4 w-4" />
                   </Button>
                 </Link>
@@ -124,35 +123,35 @@ export default function LandingPage() {
         <Container className="py-20">
           <div className="text-center">
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-text-subtle">
-              Three pillars
+              The control plane
             </div>
             <h2 className="mt-3 font-semibold text-h2 md:text-h1 text-text-strong">
-              Treat AI capabilities like software.
+              Build systems that learn how to improve.
             </h2>
             <p className="mt-4 text-text-muted max-w-2xl mx-auto text-base leading-relaxed">
-              The same practices you expect from infrastructure: addressable artifacts,
-              reproducible builds, gated releases, and an audit chain.
+              Promptsheon combines architecture, execution, measurement, and resource
+              governance into one adaptive runtime for agentic software.
             </p>
           </div>
           <div className="mt-12 grid gap-5 md:grid-cols-3">
             {[
               {
                 icon: Boxes,
-                title: 'Content-addressed registry',
-                text: 'Every manifest, prompt block, tool spec, and policy snapshot is hashed and stored by content. Same input, same hash, every time.',
-                detail: 'manifest CAS',
+                title: 'Architect',
+                text: 'Translate objectives into immutable agent and organization specifications: responsibilities, topology, capabilities, policies, and success criteria.',
+                detail: 'design the system',
               },
               {
                 icon: FlaskConical,
-                title: 'Evaluation engine',
-                text: 'Run datasets, score with deterministic or LLM-judge scorers, gate releases on thresholds, detect regressions, compare models.',
-                detail: 'eval passes',
+                title: 'Operator',
+                text: 'Schedule dependencies, route models, invoke tools, manage retries, reuse safe results, and materialize outcomes within resource budgets.',
+                detail: 'execute the graph',
               },
               {
                 icon: GitBranch,
-                title: 'Governed releases',
-                text: 'Draft → review → approved → canary → active → rolled back. Every transition is signed, audited, reversible in one click.',
-                detail: 'release path',
+                title: 'Evaluator + Governor',
+                text: 'Measure quality and efficiency, discover what changed, enforce hard constraints, and promote only mutations supported by evidence.',
+                detail: 'learn under limits',
               },
             ].map(({ icon: Icon, title, text, detail }) => (
               <article
@@ -182,20 +181,20 @@ export default function LandingPage() {
                 Workflow
               </div>
               <h2 className="mt-3 font-semibold text-h2 md:text-h1 text-text-strong">
-                From intent to release.
+                From execution to improvement.
               </h2>
               <p className="mt-4 text-text-muted text-base leading-relaxed">
-                Capabilities move through a deterministic state machine. Every transition
-                records who acted and on what evidence.
+                Every execution becomes evidence. The platform uses it to decide what to
+                change, what to keep, and what the system can safely afford.
               </p>
             </div>
             <ol className="lg:col-span-8 space-y-4">
               {[
-                { step: '01', title: 'Author', body: 'Describe the capability. The planner decomposes it into a DAG of agents, policies, and tools.' },
-                { step: '02', title: 'Compile', body: 'The compiler produces an immutable manifest. Its content hash is its identity.' },
-                { step: '03', title: 'Evaluate', body: 'Run suites. Gate on threshold. Block merges on regressions.' },
-                { step: '04', title: 'Approve', body: 'A second pair of eyes signs off. The creator cannot approve their own release.' },
-                { step: '05', title: 'Canary → Active', body: 'Weighted rollout. Live eval scores watch for drift. One-click rollback.' },
+                { step: '01', title: 'Create', body: 'Turn an objective into an immutable agent or organization specification with explicit policies and success criteria.' },
+                { step: '02', title: 'Execute', body: 'The Operator schedules the graph, routes models, invokes tools, and produces a trace within its budget.' },
+                { step: '03', title: 'Observe + evaluate', body: 'Measure outcome quality, tokens, context, latency, cost, retries, tools, permissions, and human intervention.' },
+                { step: '04', title: 'Learn', body: 'Compare like workloads, trace causality through lineage, and store reusable patterns about what improves an agent.' },
+                { step: '05', title: 'Mutate → validate → promote', body: 'Test a targeted change through replay, benchmarks, shadow traffic, or controlled rollout before promotion.' },
               ].map((s) => (
                 <li key={s.step} className="flex gap-5 rounded-xl border border-border-subtle bg-surface-1 p-5">
                   <div className="shrink-0 grid h-10 w-10 place-items-center rounded-lg border border-border-subtle bg-surface-2 font-mono text-xs text-text-muted">
@@ -251,11 +250,11 @@ export default function LandingPage() {
         <Container className="py-20 text-center">
           <LogoMark size={48} className="mx-auto" />
           <h2 className="mt-6 font-semibold text-h2 md:text-h1 text-text-strong">
-            Ship AI capabilities, not prompts.
+            Build agents that improve.
           </h2>
           <p className="mt-4 text-text-muted max-w-xl mx-auto text-base leading-relaxed">
             Set up Promptsheon on your own infrastructure. Configure your provider,
-            create your first capability, route a release.
+            create your first AgentSpec, and turn execution evidence into a better candidate.
           </p>
           <div className="mt-8 flex items-center justify-center gap-3">
             <Link href="/onboarding">
@@ -450,7 +449,7 @@ export default function LandingPage() {
             <div className="md:col-span-2">
               <Logo size="sm" showWordmark />
               <p className="mt-3 max-w-xs text-sm text-text-muted">
-                The control plane for AI capabilities. Self-hosted, content-addressed, governed.
+                The adaptive agent engineering platform. Build, execute, evaluate, and continuously improve with measurable evidence.
               </p>
               <div className="mt-4 flex items-center gap-2">
                 <Badge>Apache-2.0</Badge>

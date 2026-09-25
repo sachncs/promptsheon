@@ -29,6 +29,11 @@ and you have a fully working prompt-management platform with
 multi-provider LLM, an audit chain, webhooks, eval scorers, and a
 live DAG editor.
 
+For development and contribution work, start with the
+[engineering guide](docs/DEVELOPMENT.md). It documents the clean-architecture
+boundaries, environment setup, testing strategy, production operation, and
+the explicit breaking-change policy.
+
 Built on the
 [`@strands-agents/sdk`](https://github.com/strands-agents/harness-sdk) for
 every AI call: planning is a 5-agent `Swarm`, execution is a `Graph`
@@ -62,7 +67,7 @@ ten minutes.
   execution preview.
 - **Releases with canary rollout** — versioned releases,
   per-environment activation, weighted traffic split, and
-  one-click rollback / supersede.
+  one-click rollback.
 - **Maker-checker approvals** — release creator cannot approve their
   own release; approvals are persisted with reason and voter.
 - **Strands-powered planning** — a `Swarm` of 5 specialised agents
@@ -89,7 +94,7 @@ ten minutes.
 
 ## Before you start
 
-You'll need **Node.js 26 or newer** and **pnpm 11** installed on
+You'll need **Node.js 22 or newer** and **pnpm 11** installed on
 your computer.
 
 If you don't know what Node.js is or whether you have it:
@@ -97,7 +102,7 @@ If you don't know what Node.js is or whether you have it:
 1. Open a terminal (on macOS: `Cmd + Space`, type "Terminal"; on
    Windows: open "PowerShell"; on Linux: open your usual terminal).
 2. Type `node --version` and press Enter.
-3. If you see a version number starting with `26`, you're set.
+3. If you see a version number starting with `22` or higher, you're set.
 4. If you see "command not found" or an older version, follow the
    [official Node.js installer guide](https://nodejs.org/en/download/package-manager).
 
@@ -210,7 +215,7 @@ import { workspaceApi, capabilityApi, releaseApi } from '@/lib/api';
 
 const ws = await workspaceApi.create({ name: 'refund-triage' });
 const cap = await capabilityApi.list(projectId);
-const release = await releaseApi.activate(releaseId);
+const release = await releaseApi.transition(releaseId, 'active');
 // → 409 APPROVAL_REQUIRED until 2 distinct non-creator approvals
 //    are on the manifest hash. The gate fires correctly now that
 //    BaseRepo.findById returns camelCase rows.
@@ -294,7 +299,7 @@ For operators / maintainers:
 
 | Category       | Technology                                       |
 |----------------|--------------------------------------------------|
-| Runtime        | Node.js ≥ 26, pnpm 11 workspaces                |
+| Runtime        | Node.js ≥ 22, pnpm 11 workspaces                |
 | Language       | TypeScript (strict, exactOptionalPropertyTypes)  |
 | HTTP           | [Fastify 5](https://fastify.dev)                 |
 | Validation     | [Zod 4](https://zod.dev)                         |
@@ -368,7 +373,7 @@ chore: bump @strands-agents/sdk to 1.14
   webhooks + replay protection, chaos hooks, OpenTelemetry.
 - **v0.4.2** (current) — admin gates on 14 management routes,
   maker-checker gate now fires correctly for self-approvals,
-  `/api/invoke` SDK alias, `/api/goals/:hash` drilldown, DAG
+  `/api/executions` workflow, `/api/goals/:hash` drilldown, DAG
   editor drafts persist, `BaseRepo` camelCase mapper,
   Playwright tier suite rewritten against the new contracts
   (619 server tests + 41-route smoke + 5 new auth/forms/audit/

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify from 'fastify';
 import { registerCompilerRoutes } from '../src/routes/compiler.js';
 
 class StubCompiler {
@@ -11,46 +11,60 @@ class StubCompiler {
   }
 }
 
-describe('compiler route legacy {prompt} acceptance', () => {
-  it('accepts {prompt: string} and routes to compile()', async () => {
-    const app = Fastify({ logger: false });
-    registerCompilerRoutes(app, new StubCompiler() as unknown as Parameters<typeof registerCompilerRoutes>[1]);
+const manifest = {
+  id: 'manifest-1',
+  version: 1,
+  prompt: { systemPrompt: 'a raw prompt to compile', userTemplate: '{{input}}' },
+  model: { provider: 'openai', modelId: 'gpt-4', temperature: 0.7, maxTokens: 4096 },
+  runtime: { timeoutMs: 30000, nodeTimeoutMs: 10000, totalTimeoutMs: 300000, maxRetries: 3, canaryPercent: 0, concurrencyLimit: 10 },
+  context: { inputsSchema: {}, outputsSchema: {}, requiredContextVars: [] },
+  memory: { enabled: false, type: 'stateless' },
+  guardrails: { pre: [], post: [] },
+  tools: [],
+  mcpServers: [],
+  evaluation: { datasets: [], scorers: [], passThreshold: 0.7 },
+  nodes: [],
+  edges: [],
+  metadata: {},
+};
+
+function createApp() {
+  const app = Fastify({ logger: false });
+  registerCompilerRoutes(app, new StubCompiler() as never);
+  return app;
+}
+
+describe('compiler route', () => {
+  it('accepts a validated manifest and routes to compile()', async () => {
+    const app = createApp();
     await app.ready();
-    const r = await app.inject({
+    const response = await app.inject({ method: 'POST', url: '/api/compiler/compile', payload: { manifest } });
+    expect(response.statusCode).toBe(200);
+    expect((response.json() as { manifest: { compiled: boolean } }).manifest.compiled).toBe(true);
+  });
+
+  it('passes compiler context and constraints', async () => {
+    const app = createApp();
+    await app.ready();
+    const response = await app.inject({
       method: 'POST',
       url: '/api/compiler/compile',
-      payload: { prompt: 'a raw prompt to compile' },
+      payload: { manifest, capabilityContext: 'ctx', constraints: ['c1'] },
     });
-    expect(r.statusCode).toBe(200);
-    const body = r.json() as { manifest: { compiled: boolean } };
-    expect(body.manifest.compiled).toBe(true);
+    expect(response.statusCode).toBe(200);
   });
 
-  it('still accepts the legacy {manifest, capabilityContext, constraints} shape', async () => {
-    const app = Fastify({ logger: false });
-    registerCompilerRoutes(app, new StubCompiler() as unknown as Parameters<typeof registerCompilerRoutes>[1]);
+  it('returns 422 when manifest is missing', async () => {
+    const app = createApp();
     await app.ready();
-    const r = await app.inject({
-      method: 'POST',
-      url: '/api/compiler/compile',
-      payload: { manifest: { id: 'x' }, capabilityContext: 'ctx', constraints: ['c1'] },
-    });
-    expect(r.statusCode).toBe(200);
+    const response = await app.inject({ method: 'POST', url: '/api/compiler/compile', payload: {} });
+    expect(response.statusCode).toBe(422);
   });
 
-  it('returns 422 when neither manifest nor prompt is provided', async () => {
-    const app = Fastify({ logger: false });
-    registerCompilerRoutes(app, new StubCompiler() as unknown as Parameters<typeof registerCompilerRoutes>[1]);
+  it('rejects the removed prompt-only contract', async () => {
+    const app = createApp();
     await app.ready();
-    const r = await app.inject({ method: 'POST', url: '/api/compiler/compile', payload: {} });
-    expect(r.statusCode).toBe(422);
-  });
-
-  it('returns 422 when prompt is empty string', async () => {
-    const app = Fastify({ logger: false });
-    registerCompilerRoutes(app, new StubCompiler() as unknown as Parameters<typeof registerCompilerRoutes>[1]);
-    await app.ready();
-    const r = await app.inject({ method: 'POST', url: '/api/compiler/compile', payload: { prompt: '' } });
-    expect(r.statusCode).toBe(422);
+    const response = await app.inject({ method: 'POST', url: '/api/compiler/compile', payload: { prompt: 'raw prompt' } });
+    expect(response.statusCode).toBe(422);
   });
 });

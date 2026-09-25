@@ -17,7 +17,8 @@ import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { workspaceApi } from '@/lib/api';
-import { clearSession, getSession } from '@/lib/session';
+import { clearSession } from '@/lib/session';
+import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/components/theme/theme-provider';
 import { cn } from '@/lib/utils';
 
@@ -97,31 +98,50 @@ const groups: NavGroup[] = [
   },
 ];
 
-function NavGroupSection({ group, last }: { group: NavGroup; last?: boolean }) {
-  const pathname = usePathname();
-  const hasActive = group.items.some(
-    (item) => pathname === item.href || pathname.startsWith(item.href + '/'),
-  );
+function isNavItemActive(pathname: string, href: string): boolean {
+  if (href === '/app') return pathname === href;
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function NavGroupSection({
+  group,
+  pathname,
+  hasActive,
+  last,
+  onNavigate,
+}: {
+  group: NavGroup;
+  pathname: string;
+  hasActive: boolean;
+  last?: boolean;
+  onNavigate?: (() => void) | undefined;
+}) {
   const [open, setOpen] = React.useState(hasActive);
+  const groupId = `navigation-${group.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
   return (
     <div className={cn('py-2', !last && 'border-b border-border-subtle')}>
       <button
+        type="button"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={groupId}
         className="flex w-full items-center justify-between px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle hover:text-text-muted"
       >
         <span>{group.label}</span>
         {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
       </button>
       {open && (
-        <nav className="space-y-0.5 px-2">
+        <nav id={groupId} aria-label={`${group.label} navigation`} className="space-y-0.5 px-2">
           {group.items.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+            const isActive = isNavItemActive(pathname, item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                {...(onNavigate ? { onClick: onNavigate } : {})}
+                aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors',
                   isActive
@@ -140,8 +160,15 @@ function NavGroupSection({ group, last }: { group: NavGroup; last?: boolean }) {
   );
 }
 
-export function AppSidebar() {
-  const session = getSession();
+export function AppSidebar({
+  mobileOpen = false,
+  onMobileClose,
+}: {
+  mobileOpen?: boolean;
+  onMobileClose?: (() => void) | undefined;
+}) {
+  const pathname = usePathname();
+  const session = useSession();
   const router = useRouter();
   const [userOpen, setUserOpen] = React.useState(false);
   const { theme, setTheme } = useTheme();
@@ -149,7 +176,7 @@ export function AppSidebar() {
 
   const workspaces = useQuery({
     queryKey: ['workspaces'],
-    queryFn: () => workspaceApi.list(1).then((r) => r.data).catch(() => []),
+    queryFn: () => workspaceApi.list(1).then((r) => r.data),
   });
   const workspaceList = Array.isArray(workspaces.data) ? workspaces.data as Array<{ id: string; name?: string }> : [];
   const currentWsId = session?.orgId ?? workspaceList[0]?.id;
@@ -165,15 +192,51 @@ export function AppSidebar() {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
-  return (
-    <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border-subtle bg-surface-1">
-      <div className="flex h-14 items-center border-b border-border-subtle px-4">
-        <Link href="/app" aria-label="Promptsheon home">
-          <Logo size="sm" />
-        </Link>
-      </div>
+  React.useEffect(() => {
+    if (!mobileOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onMobileClose?.();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [mobileOpen, onMobileClose]);
 
-      {workspaceList.length > 0 && (
+  return (
+    <>
+      {mobileOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] md:hidden"
+          onClick={onMobileClose}
+          aria-label="Close navigation"
+        />
+      )}
+      <aside
+        id="app-mobile-navigation"
+        aria-label="Application navigation"
+        className={cn(
+          'w-64 shrink-0 flex-col border-r border-border-subtle bg-surface-1',
+          mobileOpen ? 'fixed inset-y-0 left-0 z-50 flex shadow-3 md:static md:z-auto md:shadow-none' : 'hidden md:flex',
+        )}
+      >
+        <div className="flex h-14 items-center border-b border-border-subtle px-4">
+          <Link href="/app" aria-label="Promptsheon home">
+            <Logo size="sm" />
+          </Link>
+        </div>
+
+      {workspaces.isError ? (
+        <div className="border-b border-border-subtle p-3">
+          <div className="text-xs text-destructive">Unable to load workspaces.</div>
+          <button
+            type="button"
+            className="mt-2 text-xs font-medium text-brand-highlight hover:underline"
+            onClick={() => void workspaces.refetch()}
+          >
+            Try again
+          </button>
+        </div>
+      ) : workspaceList.length > 0 && (
         <div className="border-b border-border-subtle p-3">
           <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle">Workspace</div>
           <div className="mt-2">
@@ -197,9 +260,19 @@ export function AppSidebar() {
       )}
 
       <div className="flex-1 overflow-y-auto">
-        {groups.map((group, i) => (
-          <NavGroupSection key={group.label} group={group} last={i === groups.length - 1} />
-        ))}
+        {groups.map((group, i) => {
+          const hasActive = group.items.some((item) => isNavItemActive(pathname, item.href));
+          return (
+            <NavGroupSection
+              key={`${group.label}-${hasActive}`}
+              group={group}
+              pathname={pathname}
+              hasActive={hasActive}
+              last={i === groups.length - 1}
+              onNavigate={onMobileClose}
+            />
+          );
+        })}
       </div>
 
       <Separator />
@@ -262,7 +335,7 @@ export function AppSidebar() {
             <div className="my-2 border-t border-border-subtle" />
             <button
               type="button"
-              onClick={() => { clearSession(); window.location.href = '/'; }}
+              onClick={() => { clearSession(); router.push('/'); }}
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-text-muted hover:bg-surface-2 hover:text-text-strong"
             >
               <LogOut className="size-3.5" /> Sign out
@@ -270,6 +343,7 @@ export function AppSidebar() {
           </div>
         )}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

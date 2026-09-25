@@ -42,6 +42,12 @@ interface KeyringRow {
   rotated_at: string | null;
 }
 
+const DEV_KEY_FINGERPRINT = 'dev-key-2026';
+
+function devKeyBytes(): Buffer {
+  return createHash('sha256').update('promptsheon-dev-vault-key').digest();
+}
+
 /**
  * KMS abstraction. The default `LocalKms` returns keys from the
  * dev-materialised keyring table; production deployments swap in
@@ -60,6 +66,7 @@ export class LocalKms implements Kms {
   constructor(private db: Database.Database) {}
 
   resolve(fingerprint: string): Buffer | null {
+    if (fingerprint === DEV_KEY_FINGERPRINT) return devKeyBytes();
     const row = this.db
       .prepare('SELECT ciphertext FROM vault_keyring WHERE fingerprint = ?')
       .get(fingerprint) as { ciphertext: string | null } | undefined;
@@ -127,9 +134,7 @@ export class VaultRepo {
 
   /** Plaintext cipher used in the very first dev install. */
   static devKeyBytes(): Buffer {
-    return Buffer.from('promptsheon-dev-vault-key', 'utf-8').length === 32
-      ? Buffer.from('promptsheon-dev-vault-key')
-      : createHash('sha256').update('promptsheon-dev-vault-key').digest();
+    return devKeyBytes();
   }
 
   list(orgId: string): VaultSecret[] {

@@ -1,7 +1,55 @@
 import type { Execution, ExecutionReplay } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { BaseRepo } from './base.js';
+
+const ExecutionRowSchema = z.object({
+  id: z.string(),
+  capability_version_id: z.string().nullable(),
+  timestamp: z.string(),
+  inputs: z.string(),
+  outputs: z.string(),
+  model: z.string(),
+  provider: z.string(),
+  latency_ms: z.number().int().nonnegative(),
+  cost_usd: z.number().nonnegative(),
+  prompt_tokens: z.number().int().nonnegative(),
+  completion_tokens: z.number().int().nonnegative(),
+  total_tokens: z.number().int().nonnegative(),
+  error: z.string(),
+  trace_id: z.string(),
+  environment: z.string(),
+  replay_of: z.string().nullable(),
+  replay_count: z.number().int().nonnegative(),
+  input_hash: z.string().nullable(),
+});
+
+const CountSchema = z.object({ count: z.number().int().nonnegative() });
+
+function toExecution(row: unknown): Execution {
+  const value = ExecutionRowSchema.parse(row);
+  return {
+    id: value.id,
+    capabilityVersionId: value.capability_version_id,
+    timestamp: value.timestamp,
+    inputs: value.inputs,
+    outputs: value.outputs,
+    model: value.model,
+    provider: value.provider,
+    latencyMs: value.latency_ms,
+    costUsd: value.cost_usd,
+    promptTokens: value.prompt_tokens,
+    completionTokens: value.completion_tokens,
+    totalTokens: value.total_tokens,
+    error: value.error,
+    traceId: value.trace_id,
+    environment: value.environment,
+    replayOf: value.replay_of,
+    replayCount: value.replay_count,
+    inputHash: value.input_hash,
+  };
+}
 
 export class ExecutionRepo extends BaseRepo<Execution> {
   constructor(db: Database.Database) {
@@ -9,15 +57,59 @@ export class ExecutionRepo extends BaseRepo<Execution> {
   }
 
   findByVersionId(versionId: string, opts: { page: number; pageSize: number }): { items: Execution[]; total: number } {
-    const total = (this.db.prepare('SELECT COUNT(*) as count FROM executions WHERE capability_version_id = ?').get(versionId) as { count: number }).count;
+    const total = CountSchema.parse(
+      this.db.prepare('SELECT COUNT(*) as count FROM executions WHERE capability_version_id = ?').get(versionId),
+    ).count;
     const items = this.db.prepare('SELECT * FROM executions WHERE capability_version_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?')
-      .all(versionId, opts.pageSize, (opts.page - 1) * opts.pageSize) as Execution[];
+      .all(versionId, opts.pageSize, (opts.page - 1) * opts.pageSize)
+      .map(toExecution);
+    return { items, total };
+  }
+
+  findByVersionIdInOrg(versionId: string, organizationId: string, opts: { page: number; pageSize: number }): { items: Execution[]; total: number } {
+    const scope = `FROM executions e
+      JOIN capability_versions v ON v.id = e.capability_version_id
+      JOIN capabilities c ON c.id = v.capability_id
+      JOIN projects p ON p.id = c.project_id
+      JOIN workspaces w ON w.id = p.workspace_id
+      WHERE v.id = ? AND w.org_id = ?`;
+    const total = CountSchema.parse(this.db.prepare(`SELECT COUNT(*) AS count ${scope}`).get(versionId, organizationId)).count;
+    const items = this.db.prepare(`SELECT e.* ${scope} ORDER BY e.timestamp DESC LIMIT ? OFFSET ?`)
+      .all(versionId, organizationId, opts.pageSize, (opts.page - 1) * opts.pageSize)
+      .map(toExecution);
+    return { items, total };
+  }
+
+  findByIdInOrg(id: string, organizationId: string): Execution | null {
+    const row = this.db.prepare(
+      `SELECT e.* FROM executions e
+       JOIN capability_versions v ON v.id = e.capability_version_id
+       JOIN capabilities c ON c.id = v.capability_id
+       JOIN projects p ON p.id = c.project_id
+       JOIN workspaces w ON w.id = p.workspace_id
+       WHERE e.id = ? AND w.org_id = ?`,
+    ).get(id, organizationId);
+    return row ? toExecution(row) : null;
+  }
+
+  findManyInOrg(organizationId: string, opts: { page: number; pageSize: number }): { items: Execution[]; total: number } {
+    const scope = `FROM executions e
+      JOIN capability_versions v ON v.id = e.capability_version_id
+      JOIN capabilities c ON c.id = v.capability_id
+      JOIN projects p ON p.id = c.project_id
+      JOIN workspaces w ON w.id = p.workspace_id
+      WHERE w.org_id = ?`;
+    const total = CountSchema.parse(this.db.prepare(`SELECT COUNT(*) AS count ${scope}`).get(organizationId)).count;
+    const items = this.db.prepare(`SELECT e.* ${scope} ORDER BY e.timestamp DESC LIMIT ? OFFSET ?`)
+      .all(organizationId, opts.pageSize, (opts.page - 1) * opts.pageSize)
+      .map(toExecution);
     return { items, total };
   }
 
   findRecent(capabilityId: string, limit = 100): Execution[] {
     return this.db.prepare(`SELECT e.* FROM executions e JOIN capability_versions v ON e.capability_version_id = v.id WHERE v.capability_id = ? ORDER BY e.timestamp DESC LIMIT ?`)
-      .all(capabilityId, limit) as Execution[];
+      .all(capabilityId, limit)
+      .map(toExecution);
   }
 
   create(data: {
@@ -102,20 +194,24 @@ export class ExecutionRepo extends BaseRepo<Execution> {
    * rows store a hash here) we throw a deterministic error so the
    * caller can return 409 instead of attempting an undefined replay.
    */
-  findReplayContext(id: string): {
+  findReplayContextInOrg(id: string, organizationId: string): {
     execution: Execution;
     manifestHash: string;
     parsedInputs: Record<string, unknown>;
   } | null {
-    const execution = this.findById(id);
-    if (!execution) return null;
-    if (!execution.capabilityVersionId) return null;
     const row = this.db.prepare(
-      `SELECT manifest_hash AS manifestHash
-       FROM capability_versions
-       WHERE id = ?`,
-    ).get(execution.capabilityVersionId) as { manifestHash: string | null } | undefined;
-    if (!row?.manifestHash) return null;
+      `SELECT e.*, v.manifest_hash AS manifestHash
+       FROM executions e
+       JOIN capability_versions v ON v.id = e.capability_version_id
+       JOIN capabilities c ON c.id = v.capability_id
+       JOIN projects p ON p.id = c.project_id
+       JOIN workspaces w ON w.id = p.workspace_id
+       WHERE e.id = ? AND w.org_id = ?`,
+    ).get(id, organizationId);
+    if (!row) return null;
+    const parsedRow = ExecutionRowSchema.extend({ manifestHash: z.string().nullable() }).parse(row);
+    if (!parsedRow.manifestHash) return null;
+    const execution = toExecution(parsedRow);
     let parsed: Record<string, unknown>;
     try {
       const raw = JSON.parse(execution.inputs) as unknown;
@@ -126,7 +222,7 @@ export class ExecutionRepo extends BaseRepo<Execution> {
     } catch {
       throw new ReplayInputsUnavailableError(id);
     }
-    return { execution, manifestHash: row.manifestHash, parsedInputs: parsed };
+    return { execution, manifestHash: parsedRow.manifestHash, parsedInputs: parsed };
   }
 
   /**
@@ -138,10 +234,12 @@ export class ExecutionRepo extends BaseRepo<Execution> {
       `UPDATE executions SET replay_count = replay_count + 1 WHERE id = ?`,
     ).run(id);
     if (result.changes === 0) return null;
-    const row = this.db.prepare(
-      `SELECT replay_count AS replayCount FROM executions WHERE id = ?`,
-    ).get(id) as { replayCount: number } | undefined;
-    return row?.replayCount ?? null;
+    const row = z.object({ replayCount: z.number().int().nonnegative() }).safeParse(
+      this.db.prepare(
+        `SELECT replay_count AS replayCount FROM executions WHERE id = ?`,
+      ).get(id),
+    );
+    return row.success ? row.data.replayCount : null;
   }
 
   recordReplay(data: {
@@ -186,7 +284,7 @@ export class ExecutionRepo extends BaseRepo<Execution> {
   findReplaysByOriginal(originalId: string, limit = 100): ExecutionReplay[] {
     const rows = this.db.prepare(
       `SELECT * FROM execution_replays WHERE original_execution_id = ? ORDER BY created_at DESC, id DESC LIMIT ?`,
-    ).all(originalId, limit) as Array<Record<string, unknown>>;
+    ).all(originalId, limit);
     return rows.map((r) => replayRowToObject(r));
   }
 }
@@ -205,17 +303,31 @@ export class ReplayInputsUnavailableError extends Error {
   }
 }
 
-function replayRowToObject(row: Record<string, unknown>): ExecutionReplay {
+const ExecutionReplayRowSchema = z.object({
+  id: z.string(),
+  original_execution_id: z.string(),
+  replay_execution_id: z.string().nullable(),
+  outcome: z.enum(['started', 'completed', 'diverged', 'failed']),
+  inputs_match: z.union([z.number().int(), z.boolean()]),
+  manifest_match: z.union([z.number().int(), z.boolean()]),
+  model_match: z.union([z.number().int(), z.boolean()]),
+  environment_match: z.union([z.number().int(), z.boolean()]),
+  diff_summary: z.string().nullable(),
+  created_at: z.string(),
+});
+
+function replayRowToObject(row: unknown): ExecutionReplay {
+  const value = ExecutionReplayRowSchema.parse(row);
   return {
-    id: row['id'] as string,
-    originalExecutionId: row['original_execution_id'] as string,
-    replayExecutionId: (row['replay_execution_id'] as string | null) ?? null,
-    outcome: row['outcome'] as ExecutionReplay['outcome'],
-    inputsMatch: ((row['inputs_match'] as number) ?? 0) === 1,
-    manifestMatch: ((row['manifest_match'] as number) ?? 0) === 1,
-    modelMatch: ((row['model_match'] as number) ?? 0) === 1,
-    environmentMatch: ((row['environment_match'] as number) ?? 0) === 1,
-    diffSummary: (row['diff_summary'] as string | null) ?? null,
-    createdAt: row['created_at'] as string,
+    id: value.id,
+    originalExecutionId: value.original_execution_id,
+    replayExecutionId: value.replay_execution_id,
+    outcome: value.outcome,
+    inputsMatch: value.inputs_match === true || value.inputs_match === 1,
+    manifestMatch: value.manifest_match === true || value.manifest_match === 1,
+    modelMatch: value.model_match === true || value.model_match === 1,
+    environmentMatch: value.environment_match === true || value.environment_match === 1,
+    diffSummary: value.diff_summary,
+    createdAt: value.created_at,
   };
 }

@@ -55,6 +55,7 @@ server is running.
 Key endpoints:
 
 - `GET /api/health` — Health check
+- `GET /api/ready` — Readiness probe with a SQLite integrity check
 - `POST /api/invoke` — Invoke a capability via Strands agent
 - `POST /api/executions` — Execute a capability (streams over SSE when `Accept: text/event-stream`)
 - `POST /api/eval/run` — Run an evaluation

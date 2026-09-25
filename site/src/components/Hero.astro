@@ -1,4 +1,7 @@
 ---
+import LogoMark from './LogoMark.astro';
+
+const base = import.meta.env.BASE_URL;
 ---
 
 <section class="relative overflow-hidden ps-vignette ps-noise">
@@ -7,46 +10,50 @@
   <!-- Floating ambient orbs for cinematic depth -->
   <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
     <div class="absolute -left-32 top-24 h-[420px] w-[420px] rounded-full bg-[var(--accent)] opacity-[0.07] blur-[120px]"></div>
-    <div class="absolute right-[-160px] top-0 h-[480px] w-[480px] rounded-full bg-indigo-400 opacity-[0.05] blur-[140px] dark:opacity-[0.10]"></div>
+    <div class="absolute right-[-160px] top-0 h-[480px] w-[480px] rounded-full bg-[var(--brand-silver)] opacity-[0.10] blur-[140px] dark:opacity-[0.14]"></div>
   </div>
 
   <div class="ps-container relative">
-    <div class="pt-28 pb-20 text-center sm:pt-36 sm:pb-28 lg:pt-44 lg:pb-36">
+    <div class="pt-20 pb-16 text-center sm:pt-24 sm:pb-20 lg:pt-28 lg:pb-24">
+      <div class="ps-reveal mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-[1.75rem] border border-[var(--line-strong)] bg-[var(--bg-elevated)] p-3 shadow-[0_18px_50px_-18px_rgba(0,0,0,0.6)] sm:mb-8 sm:h-24 sm:w-24 sm:rounded-[2rem] sm:p-4">
+        <LogoMark size={88} className="h-full w-full" />
+      </div>
+
       <!-- Eyebrow -->
       <div class="ps-reveal inline-flex items-center gap-2.5 rounded-full border border-[var(--line)] bg-[var(--bg-overlay)] px-3.5 py-1.5 text-[12px] text-[var(--ink-muted)] backdrop-blur">
         <span class="relative flex h-1.5 w-1.5">
-          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75"></span>
-          <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--brand-steel)] opacity-50"></span>
+          <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--brand-steel)]"></span>
         </span>
-        v0.1 — Self-hosted. No telemetry. Apache-2.0.
+        Open source · self-hosted · built for accountable AI delivery
       </div>
 
       <!-- Headline -->
       <h1
-        class="ps-reveal ps-display mt-8 text-[clamp(2.75rem,7vw,5.75rem)]"
+        class="ps-reveal ps-display mt-6 text-[clamp(2.75rem,7vw,5.75rem)]"
         style="--reveal-delay: 80ms"
       >
-        The control plane for
+        Build agents that
         <span class="block bg-gradient-to-br from-[var(--ink-strong)] via-[var(--ink-strong)] to-[var(--accent)] bg-clip-text text-transparent dark:from-white dark:via-white dark:to-[#A5B4FC]">
-          AI capabilities.
+          get better with evidence.
         </span>
       </h1>
 
       <p
-        class="ps-reveal mx-auto mt-7 max-w-2xl text-[18px] leading-relaxed text-[var(--ink-muted)] sm:text-[19px] text-pretty"
+        class="ps-reveal mx-auto mt-5 max-w-2xl text-[18px] leading-relaxed text-[var(--ink-muted)] sm:text-[19px] text-pretty"
         style="--reveal-delay: 160ms"
       >
-        Promptsheon manages prompts, agents, policies, tools, MCP servers, guardrails,
-        and evaluation suites as content-addressed, governed, version-controlled release
-        artifacts. Not chat. Not notebooks. <span class="text-[var(--ink)]">Production infrastructure.</span>
+        Promptsheon is an adaptive agent engineering platform for building, executing,
+        evaluating, and continuously improving AI agents and multi-agent systems. Every
+        run becomes evidence for the next better configuration.
       </p>
 
       <div
-        class="ps-reveal mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-3"
+        class="ps-reveal mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-3"
         style="--reveal-delay: 240ms"
       >
-        <a href="#install" class="ps-btn ps-btn-primary ps-btn-lg group">
-          <span>Get started</span>
+        <a href={`${base}docs/quickstart/`} class="ps-btn ps-btn-primary ps-btn-lg group">
+          <span>Read the quickstart</span>
           <span class="arrow-nudge">
             <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M5 12h14M13 5l7 7-7 7" />
@@ -54,34 +61,34 @@
           </span>
         </a>
         <a href="#workflow" class="ps-btn ps-btn-secondary ps-btn-lg">
-          See the workflow
+          See the adaptation loop
         </a>
       </div>
 
       <div
-        class="ps-reveal mt-12 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12.5px] text-[var(--ink-subtle)]"
+        class="ps-reveal mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12.5px] text-[var(--ink-subtle)]"
         style="--reveal-delay: 320ms"
       >
         <span class="inline-flex items-center gap-1.5">
-          <svg class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg class="h-3.5 w-3.5 text-[var(--brand-steel)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5" />
           </svg>
           Fastify + Next.js 16
         </span>
         <span class="inline-flex items-center gap-1.5">
-          <svg class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg class="h-3.5 w-3.5 text-[var(--brand-steel)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5" />
           </svg>
           Strands Agents SDK
         </span>
         <span class="inline-flex items-center gap-1.5">
-          <svg class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg class="h-3.5 w-3.5 text-[var(--brand-steel)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5" />
           </svg>
           Cedar policy engine
         </span>
         <span class="inline-flex items-center gap-1.5">
-          <svg class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg class="h-3.5 w-3.5 text-[var(--brand-steel)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5" />
           </svg>
           Runs on your laptop
@@ -91,11 +98,11 @@
 
     <!-- Product preview / hero card -->
     <div
-      class="ps-reveal relative mx-auto mt-12 max-w-[1080px] sm:mt-16"
+      class="ps-reveal relative mx-auto mt-8 max-w-[1080px] sm:mt-10"
       style="--reveal-delay: 360ms"
     >
       <!-- Subtle outer glow -->
-      <div aria-hidden="true" class="absolute -inset-10 -z-10 rounded-[2.5rem] bg-gradient-to-br from-[var(--accent)] to-fuchsia-500 opacity-20 blur-3xl"></div>
+      <div aria-hidden="true" class="absolute -inset-10 -z-10 rounded-[2.5rem] bg-gradient-to-br from-[var(--brand-steel)] to-[var(--brand-silver)] opacity-20 blur-3xl"></div>
 
       <div class="relative overflow-hidden rounded-[1.75rem] border border-[var(--line-strong)] bg-[var(--bg-elevated)] shadow-[0_50px_120px_-30px_rgba(15,17,23,0.35)]">
         <!-- Window chrome -->
@@ -130,10 +137,10 @@
             </div>
             <ul class="space-y-2">
               {[
-                { type: 'planner',   name: 'classify',  model: 'claude-3-5', tone: '#6366F1' },
-                { type: 'agent',     name: 'retrieve',  model: 'tool: orders', tone: '#10B981' },
-                { type: 'guardrail', name: 'reviewer',  model: 'policy v2',   tone: '#F59E0B' },
-                { type: 'agent',     name: 'respond',   model: 'pii-redact',  tone: '#10B981' },
+                { type: 'planner',   name: 'classify',  model: 'claude-3-5', tone: '#4E555B' },
+                { type: 'agent',     name: 'retrieve',  model: 'tool: orders', tone: '#8A9299' },
+                { type: 'guardrail', name: 'reviewer',  model: 'policy v2',   tone: '#B9BEC3' },
+                { type: 'agent',     name: 'respond',   model: 'pii-redact',  tone: '#6C737A' },
               ].map((node) => (
                 <li class="group flex items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--bg-elevated)] p-2.5 transition-colors hover:border-[var(--line-strong)]">
                   <span class="flex h-7 w-7 items-center justify-center rounded-md text-[10px] font-bold uppercase tracking-wider text-white" style={`background:${node.tone}`}>
@@ -143,7 +150,7 @@
                     <div class="truncate text-[12.5px] font-medium text-[var(--ink-strong)]">{node.name}</div>
                     <div class="truncate font-mono text-[10.5px] text-[var(--ink-subtle)]">{node.model}</div>
                   </div>
-                  <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse-soft"></span>
+                  <span class="h-1.5 w-1.5 rounded-full bg-[var(--brand-steel)] animate-pulse-soft"></span>
                 </li>
               ))}
             </ul>
@@ -156,7 +163,7 @@
                     <span>canary</span><span class="font-mono text-[var(--ink-subtle)]">20%</span>
                   </div>
                   <div class="mt-1 h-1 overflow-hidden rounded-full bg-[var(--line)]">
-                    <div class="h-full rounded-full bg-amber-500" style="width:20%"></div>
+                    <div class="h-full rounded-full bg-[var(--brand-silver)]" style="width:20%"></div>
                   </div>
                 </div>
                 <div>
@@ -164,7 +171,7 @@
                     <span>stable</span><span class="font-mono text-[var(--ink-subtle)]">80%</span>
                   </div>
                   <div class="mt-1 h-1 overflow-hidden rounded-full bg-[var(--line)]">
-                    <div class="h-full rounded-full bg-emerald-500" style="width:80%"></div>
+                    <div class="h-full rounded-full bg-[var(--brand-steel)]" style="width:80%"></div>
                   </div>
                 </div>
               </div>
@@ -177,7 +184,6 @@
             <div class="flex items-center gap-1 border-b border-[var(--line)] bg-[var(--bg-elevated)] px-3 pt-2.5">
               <span class="rounded-t-md border-b-2 border-[var(--accent)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--ink-strong)]">Manifest</span>
               <span class="px-3 py-1.5 text-[12.5px] text-[var(--ink-muted)]">Evals</span>
-              <span class="px-3 py-1.5 text-[12.5px] text-[var(--ink-muted)]">Audit</span>
               <span class="px-3 py-1.5 text-[12.5px] text-[var(--ink-muted)]">Activity</span>
               <span class="ml-auto flex items-center gap-1.5 pb-1.5 pr-1">
                 <span class="ps-hash">sha256:9c4f…a02b</span>
@@ -207,14 +213,14 @@
                 <div class="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-subtle)]">Score</div>
                 <div class="mt-1.5 flex items-baseline gap-1.5">
                   <span class="font-mono text-[22px] font-semibold text-[var(--ink-strong)]">0.94</span>
-                  <span class="text-[11px] text-emerald-600 dark:text-emerald-400">▲ 0.02</span>
+                  <span class="text-[11px] text-[var(--brand-steel)]">▲ 0.02</span>
                 </div>
               </div>
               <div class="p-4">
                 <div class="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-subtle)]">Latency p95</div>
                 <div class="mt-1.5 flex items-baseline gap-1.5">
                   <span class="font-mono text-[22px] font-semibold text-[var(--ink-strong)]">1.2s</span>
-                  <span class="text-[11px] text-emerald-600 dark:text-emerald-400">▼ 0.3s</span>
+                  <span class="text-[11px] text-[var(--brand-steel)]">▼ 0.3s</span>
                 </div>
               </div>
               <div class="p-4">
@@ -229,7 +235,7 @@
             <!-- Footer row: approval state -->
             <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] bg-[var(--bg-elevated)] px-5 py-3 text-[11.5px]">
               <div class="flex items-center gap-2 text-[var(--ink-muted)]">
-                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
                   <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M20 6L9 17l-5-5" />
                   </svg>
@@ -238,7 +244,7 @@
               </div>
               <div class="flex items-center gap-2">
                 <span class="ps-hash">0x9c…a02b</span>
-                <button class="rounded-md border border-[var(--line)] bg-[var(--bg-elevated)] px-2.5 py-1 font-medium text-[var(--ink)] transition-colors hover:border-[var(--line-strong)]">View audit</button>
+                <a href={`${base}docs/operations/`} class="rounded-md border border-[var(--line)] bg-[var(--bg-elevated)] px-2.5 py-1 font-medium text-[var(--ink)] transition-colors hover:border-[var(--line-strong)]">View audit</a>
               </div>
             </div>
           </div>
@@ -264,6 +270,23 @@
           </div>
         </div>
       </div>
+
+      <div class="mt-8 grid gap-3 md:grid-cols-3">
+        {[
+          { number: '01', title: 'Compose the system', text: 'Define agents, tools, policies, context, models, and budgets as one immutable specification.', href: '#capabilities' },
+          { number: '02', title: 'Measure execution', text: 'Observe quality, cost, latency, context, tools, permissions, and failure modes across real work.', href: '#workflow' },
+          { number: '03', title: 'Promote what works', text: 'Compare candidates, validate mutations, and keep a reversible lineage for every change.', href: '#trust' },
+        ].map((item, i) => (
+          <a href={item.href} class="ps-reveal group rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)] p-4 transition-all hover:-translate-y-0.5 hover:border-[var(--line-strong)] hover:shadow-soft" style={`--reveal-delay: ${i * 70}ms`}>
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-[11px] text-[var(--accent)]">{item.number}</span>
+              <span class="text-[var(--accent)] transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
+            </div>
+            <h2 class="mt-3 text-[14px] font-semibold tracking-tight text-[var(--ink-strong)]">{item.title}</h2>
+            <p class="mt-1.5 text-[12.5px] leading-relaxed text-[var(--ink-muted)]">{item.text}</p>
+          </a>
+        ))}
+      </div>
     </div>
   </div>
 </section>
@@ -271,6 +294,4 @@
 <style>
   .arrow-nudge { transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1); }
   .ps-btn-primary:hover .arrow-nudge { transform: translateX(3px); }
-  :global(html:not(.dark)) .theme-moon { display: none; }
-  :global(html.dark) .theme-sun { display: none; }
 </style>

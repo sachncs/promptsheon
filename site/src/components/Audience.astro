@@ -1,0 +1,57 @@
+---
+const base = import.meta.env.BASE_URL;
+
+const audiences = [
+  {
+    role: 'AI & platform engineers',
+    title: 'Turn agent experiments into systems you can ship.',
+    body: 'Move from prompt notebooks to versioned specifications with explicit tools, policies, budgets, evaluations, and lineage.',
+    signal: 'From prototype to product',
+  },
+  {
+    role: 'Runtime & operations teams',
+    title: 'Operate the graph with measurable control.',
+    body: 'Route models, schedule dependencies, invoke tools, reuse safe results, and enforce resource limits while work is running.',
+    signal: 'Reliable execution',
+  },
+  {
+    role: 'Product, security & risk owners',
+    title: 'Promote improvements with evidence, not optimism.',
+    body: 'Compare outcomes, cost, latency, permissions, and drift, then keep approval history and a reversible path for every release.',
+    signal: 'Evidence over intuition',
+  },
+];
+---
+
+<section id="audience" class="ps-section border-t border-[var(--line)] bg-[var(--bg-subtle)]">
+  <div class="ps-container">
+    <div class="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
+      <div class="lg:sticky lg:top-28 lg:self-start">
+        <div class="ps-reveal ps-eyebrow">Who it is for</div>
+        <h2 class="ps-reveal ps-display mt-4 text-display-lg" style="--reveal-delay: 80ms">
+          From promising agent to dependable product.
+        </h2>
+        <p class="ps-reveal mt-5 max-w-md text-[16.5px] leading-relaxed text-[var(--ink-muted)] text-pretty" style="--reveal-delay: 160ms">
+          Promptsheon gives the people who build, run, and govern agent systems a
+          shared path from first experiment to a safer, measurable release.
+        </p>
+        <a href={`${base}docs/architecture/`} class="ps-reveal mt-7 inline-flex items-center gap-2 text-[13.5px] font-medium text-[var(--accent)] hover:underline" style="--reveal-delay: 220ms">
+          See the architecture <span aria-hidden="true">→</span>
+        </a>
+      </div>
+
+      <div class="grid gap-4">
+        {audiences.map((audience, i) => (
+          <article class="ps-card ps-reveal group p-6 sm:p-7" style={`--reveal-delay: ${i * 80}ms`}>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <span class="ps-eyebrow">{audience.role}</span>
+              <span class="rounded-full border border-[var(--line)] bg-[var(--bg-subtle)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-subtle)]">{audience.signal}</span>
+            </div>
+            <h3 class="mt-5 max-w-xl text-[21px] font-semibold tracking-tight text-[var(--ink-strong)]">{audience.title}</h3>
+            <p class="mt-2 max-w-2xl text-[14.5px] leading-relaxed text-[var(--ink-muted)] text-pretty">{audience.body}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>

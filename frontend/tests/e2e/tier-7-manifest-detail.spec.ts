@@ -10,7 +10,7 @@ import { bootstrapAdminViaApi, seedSession, clearClientState, type SessionInfo }
 let admin: SessionInfo | null = null;
 
 test.describe('tier 7: manifest detail (real page)', () => {
-  test.beforeAll(async ({ baseURL, request }) => {
+  test.beforeAll(async ({ baseURL }) => {
     if (!baseURL) throw new Error('baseURL not provided');
     if (!admin) {
       admin = await bootstrapAdminViaApi(baseURL, {
@@ -46,8 +46,8 @@ test.describe('tier 7: manifest detail (real page)', () => {
 
     // 4. Navigate to the manifest detail page; Overview + Source tab should render
     await page.goto(`/app/manifests/${hash}`);
-    await expect(page.getByText(/metadata/i)).toBeVisible();
-    await expect(page.getByText(/source/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Metadata' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Source' })).toBeVisible();
     await expect(page.getByText(/hash/i).first()).toBeVisible();
   });
 });

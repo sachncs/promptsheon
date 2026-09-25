@@ -1,17 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Cog, Save } from 'lucide-react';
-import { settingsApi } from '@/lib/api';
+import { settingsApi, unwrapList } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
-import { EmptyState } from '@/components/brand/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { QueryError } from '@/components/brand/query-error';
 
 interface SettingItem {
   key: string;
@@ -37,10 +37,10 @@ export default function SettingsPage() {
 
   const settings = useQuery({
     queryKey: ['settings'],
-    queryFn: () => settingsApi.list().then((r) => r.data).catch(() => ({ settings: [] as SettingItem[] })),
+    queryFn: () => settingsApi.list().then((r) => r.data),
   });
 
-  const list = ((settings.data as { settings?: SettingItem[] } | undefined)?.settings ?? []) as SettingItem[];
+  const list = unwrapList<SettingItem>(settings.data);
   const known = KNOWN_KEYS.map((k) => {
     const found = list.find((s) => s.key === k.key);
     return { ...k, current: found?.value, updatedAt: found?.updatedAt };
@@ -49,21 +49,22 @@ export default function SettingsPage() {
 
   const [draft, setDraft] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    const next: Record<string, string> = {};
-    for (const k of known) {
-      if (k.current !== undefined && k.current !== null) next[k.key] = String(k.current);
-      else next[k.key] = '';
-    }
-    setDraft(next);
-  }, [list.map((s) => `${s.key}:${String(s.value ?? '')}`).join('|')]);
-
   const save = useMutation({
     mutationFn: ({ key, value }: { key: string; value: unknown }) => settingsApi.set(key, value),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+    onSuccess: (_data, variables) => {
+      setDraft((previous) => {
+        const next = { ...previous };
+        delete next[variables.key];
+        return next;
+      });
+      void qc.invalidateQueries({ queryKey: ['settings'] });
+    },
   });
 
   if (!session) return null;
+  if (settings.isError) {
+    return <QueryError message={settings.error instanceof Error ? settings.error : 'You do not have permission to view settings.'} onRetry={() => void settings.refetch()} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -81,32 +82,45 @@ export default function SettingsPage() {
         />
         <div className="divide-y divide-border-subtle">
           {known.map((k) => {
-            const dirty = (draft[k.key] ?? '') !== (k.current !== undefined && k.current !== null ? String(k.current) : '');
+            const serverValue = k.current !== undefined && k.current !== null ? String(k.current) : '';
+            const value = draft[k.key] ?? serverValue;
+            const dirty = draft[k.key] !== undefined && value !== serverValue;
             return (
-              <div key={k.key} className="grid grid-cols-12 items-center gap-4 px-5 py-4">
-                <div className="col-span-4">
+              <div key={k.key} className="grid grid-cols-1 items-start gap-3 px-5 py-4 md:grid-cols-12 md:items-center md:gap-4">
+                <div className="md:col-span-4">
                   <div className="text-sm font-medium text-text-strong">{k.label}</div>
                   <code className="font-mono text-xs text-text-subtle">{k.key}</code>
                 </div>
-                <div className="col-span-5">
+                <div className="md:col-span-5">
                   <Input
-                    value={draft[k.key] ?? ''}
-                    onChange={(e) => setDraft((prev) => ({ ...prev, [k.key]: e.target.value }))}
+                    value={value}
+                    onChange={(e) => {
+                      const nextValue = e.target.value;
+                      setDraft((previous) => {
+                        if (nextValue === serverValue) {
+                          const next = { ...previous };
+                          delete next[k.key];
+                          return next;
+                        }
+                        return { ...previous, [k.key]: nextValue };
+                      });
+                    }}
                     placeholder={k.placeholder}
                     className="font-mono text-sm"
                   />
                   <p className="mt-1 text-xs text-text-muted">{k.description}</p>
                 </div>
-                <div className="col-span-2 text-xs text-text-subtle">
+                <div className="text-xs text-text-subtle md:col-span-2">
                   {k.updatedAt ? new Date(k.updatedAt).toLocaleDateString() : '—'}
                 </div>
-                <div className="col-span-1 flex justify-end">
+                <div className="flex justify-start md:col-span-1 md:justify-end">
                   <Button
                     size="sm"
                     variant={dirty ? 'default' : 'outline'}
                     disabled={!dirty || save.isPending}
+                    aria-label={`Save ${k.label}`}
                     onClick={() => {
-                      const raw = draft[k.key] ?? '';
+                      const raw = value;
                       let parsed: unknown = raw;
                       const num = Number(raw);
                       if (!Number.isNaN(num) && raw.trim() !== '' && /^-?\d+(\.\d+)?$/.test(raw.trim())) {
@@ -124,17 +138,25 @@ export default function SettingsPage() {
         </div>
       </Surface>
 
+      {save.isError && (
+        <Surface className="border-destructive/30 bg-destructive/5">
+          <p className="text-sm text-destructive">
+            {save.error instanceof Error ? save.error.message : 'The setting could not be saved. Try again.'}
+          </p>
+        </Surface>
+      )}
+
       {extras.length > 0 && (
         <Surface padded={false}>
           <SurfaceHeader className="px-5 pt-5" title="Other settings" description={`${extras.length} not surfaced in this UI.`} />
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
-            rows={extras as unknown as Array<Record<string, unknown>>}
-            rowKey={(r) => String(r['key'])}
+            rows={extras}
+            rowKey={(r) => r.key}
             columns={[
-              { key: 'key', header: 'Key', render: (r) => <code className="font-mono text-xs">{String(r['key'])}</code> },
-              { key: 'value', header: 'Value', render: (r) => <code className="font-mono text-xs">{String(JSON.stringify(r['value']))}</code> },
-              { key: 'when', header: 'Updated', render: (r) => r['updatedAt'] ? new Date(String(r['updatedAt'])).toLocaleString() : '—' },
+              { key: 'key', header: 'Key', render: (r) => <code className="font-mono text-xs">{r.key}</code> },
+              { key: 'value', header: 'Value', render: (r) => <code className="font-mono text-xs">{JSON.stringify(r.value)}</code> },
+              { key: 'when', header: 'Updated', render: (r) => r.updatedAt ? new Date(r.updatedAt).toLocaleString() : '—' },
             ]}
           />
         </Surface>
