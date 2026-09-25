@@ -1,511 +1,204 @@
-<p align="center">
-  <h1 align="center">promptsheon</h1>
-  <p align="center">A self-hosted prompt-management platform — DAG editor, canary releases, maker-checker approvals, eval suites, and self-evolution — all powered by Strands Agents.</p>
-  <p align="center">
-    <a href="#installation"><img src="https://img.shields.io/badge/node-%E2%89%A526-green" alt="Node.js"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-blue" alt="License"></a>
-    <a href="https://github.com/sachncs/promptsheon/releases/latest"><img src="https://img.shields.io/github/v/release/sachncs/promptsheon" alt="Latest release"></a>
-    <a href="https://github.com/sachncs/promptsheon/actions"><img src="https://img.shields.io/github/actions/workflow/status/sachncs/promptsheon/ci.yaml?branch=master" alt="CI"></a>
-    <a href="https://github.com/sachncs/promptsheon/stargazers"><img src="https://img.shields.io/github/stars/sachncs/promptsheon" alt="Stars"></a>
-    <a href="https://github.com/sachncs/promptsheon/blob/master/AGENTS.md"><img src="https://img.shields.io/badge/code%20style-AGENTS-constitution-orange" alt="AGENTS constitution"></a>
-  </p>
-</p>
+# Promptsheon
 
----
+Promptsheon is an adaptive agent engineering platform for building,
+executing, evaluating, and continuously improving AI agents and multi-agent
+systems.
 
-## What is this?
+It gives teams one controlled path from an agent specification to an
+evidence-backed release:
 
-Promptsheon is a single self-hosted platform that answers one
-question:
+```text
+Compose → Execute → Observe → Evaluate → Compare → Improve → Promote
+```
 
-> *"How do I author a multi-agent prompt, ship it safely to
-> production, prove it doesn't regress, and roll it back if it
-> does?"*
+Promptsheon is self-hosted, open source, and designed for teams that need
+lineage, evaluation, policy, auditability, and rollback around agentic
+software—not another prompt notebook or opaque hosted runtime.
 
-It is a Fastify backend on `:8080` plus a Next.js web UI on `:3000`,
-talking to a local SQLite file and a content-addressed store. No
-cloud account, no signup, no telemetry — `pnpm install && pnpm dev`
-and you have a fully working prompt-management platform with
-multi-provider LLM, an audit chain, webhooks, eval scorers, and a
-live DAG editor.
+[Product site](https://sachncs.github.io/promptsheon/) · [Developer documentation](https://sachncs.github.io/promptsheon/docs/) · [Issues](https://github.com/sachncs/promptsheon/issues)
 
-For development and contribution work, start with the
-[engineering guide](docs/DEVELOPMENT.md). It documents the clean-architecture
-boundaries, environment setup, testing strategy, production operation, and
-the explicit breaking-change policy.
+![CI](https://github.com/sachncs/promptsheon/actions/workflows/ci.yaml/badge.svg?branch=master)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue)
+![Node](https://img.shields.io/badge/node-%3E%3D26-green)
 
-Built on the
-[`@strands-agents/sdk`](https://github.com/strands-agents/harness-sdk) for
-every AI call: planning is a 5-agent `Swarm`, execution is a `Graph`
-of per-node `Agent`s, and standalone `Agent`s handle compilation,
-scoring, and self-evolution.
+## What it provides
 
----
+- **Agent specifications** — compose prompts, models, tools, context,
+  guardrails, permissions, budgets, and evaluation intent as one versioned
+  artifact.
+- **DAG execution** — run dependent work with routing, retries, parallelism,
+  tool calls, state, and resource limits.
+- **Evaluation and regression gates** — compare quality, latency, token use,
+  cost, tool behaviour, and failure modes against repeatable workloads.
+- **Controlled releases** — use approvals, canaries, signed commits, explicit
+  transitions, and rollback.
+- **Content-addressed lineage** — identify the exact manifest that was
+  evaluated and promoted.
+- **Governance and operations** — Cedar authorization, organization scope,
+  hash-linked audit records, webhooks, health/readiness checks, and optional
+  OpenTelemetry instrumentation.
+- **Programmatic access** — Fastify HTTP API, typed TypeScript SDK, and CI CLI.
 
-## Who is this for?
+## Quickstart
 
-You, even if:
+### Requirements
 
-- You've never written TypeScript before.
-- You don't know what a "multi-agent DAG" is.
-- You've never shipped a prompt to production.
-
-If you can install Node.js and run `pnpm dev`, you can use
-Promptsheon. When the docs use a word you don't know, look it up
-in the [Glossary](https://github.com/sachncs/promptsheon#what-can-it-do)
-or in [AGENTS.md](AGENTS.md).
-
-If you've used Fastify or Next.js before, you'll be productive in
-ten minutes.
-
----
-
-## What can it do?
-
-- **DAG-based capability editor** — drag-and-drop nodes for
-  Planner, Agent, Tool, and Guardrail; per-node config; live
-  execution preview.
-- **Releases with canary rollout** — versioned releases,
-  per-environment activation, weighted traffic split, and
-  one-click rollback.
-- **Maker-checker approvals** — release creator cannot approve their
-  own release; approvals are persisted with reason and voter.
-- **Strands-powered planning** — a `Swarm` of 5 specialised agents
-  decomposes a goal into a capability DAG.
-- **Strands-powered execution** — each capability node becomes a
-  `Graph` node with its own `Agent`, shared scratchpad, and
-  observability hooks.
-- **Multi-provider LLM** — OpenAI, Anthropic, AWS Bedrock, or a
-  custom OpenAI/Anthropic-compatible endpoint. Strands handles
-  retries, timeouts, and structured-output validation.
-- **Eval suites + scorers** — declarative dataset cases, pluggable
-  scorers (LLM-judge, regex, exact-match), and parallel run results.
-- **Self-evolution loop** — monitors live eval scores of an active
-  release; on regression it triggers a re-plan and re-release with
-  cooldown.
-- **Audit chain** — append-only, hash-linked audit log with a
-  cryptographic verification endpoint.
-- **Content-addressed store (CAS)** — every compiled manifest is
-  hashed and stored by content, never by name.
-- **Maker-checker webhooks** — incoming webhooks with HMAC
-  verification and replay protection.
-
----
-
-## Before you start
-
-You'll need **Node.js 22 or newer** and **pnpm 11** installed on
-your computer.
-
-If you don't know what Node.js is or whether you have it:
-
-1. Open a terminal (on macOS: `Cmd + Space`, type "Terminal"; on
-   Windows: open "PowerShell"; on Linux: open your usual terminal).
-2. Type `node --version` and press Enter.
-3. If you see a version number starting with `22` or higher, you're set.
-4. If you see "command not found" or an older version, follow the
-   [official Node.js installer guide](https://nodejs.org/en/download/package-manager).
-
-You'll also need at least one LLM API key — OpenAI, Anthropic, or
-your own OpenAI-compatible endpoint. Promptsheon supports
-custom-URL providers so a private gateway works out of the box.
-
----
-
-## Installation
-
-Pick whichever option fits your setup:
-
-### Option 1 — From source (recommended for development)
+- Node.js 26.8.1 or newer (`.nvmrc` is included).
+- pnpm 11.23.0.
+- An LLM provider credential for workflows that invoke an agent.
 
 ```bash
-# 1. Download the code
 git clone https://github.com/sachncs/promptsheon.git
 cd promptsheon
-
-# 2. Install dependencies for every workspace
+nvm use
+corepack enable
+corepack prepare pnpm@11.23.0 --activate
 pnpm install
-
-# 3. Copy the env template and edit it
 cp .env.example .env
-$EDITOR .env   # fill in OPENAI_API_KEY (or ANTHROPIC_API_KEY)
-
-# 4. Start the backend + the frontend together
+$EDITOR .env
 pnpm dev
 ```
 
-By default the backend listens on `http://localhost:8080` and the
-frontend on `http://localhost:3000`. No external services beyond
-the LLM provider you choose.
-
-> 💡 **The frontend's `next.config.ts` rewrites `/api/*` →
-> `http://localhost:8080/api/*` automatically.** You only need both
-> servers running.
-
-### Option 2 — From source, hot reload (two terminals)
+Open `http://localhost:3000`. The Fastify API listens on
+`http://localhost:8080`; the Next.js console proxies `/api/*` to it locally.
 
 ```bash
-# terminal 1
-cd packages
-pnpm dev:server    # Fastify + tsx watch, :8080
-
-# terminal 2
-cd packages
-pnpm dev:frontend  # Next.js + Turbopack, :3000
+curl http://localhost:8080/api/health
+curl http://localhost:8080/api/ready
 ```
 
-### Option 3 — Docker (no Node install needed)
+The first useful workflow is:
+
+1. Complete onboarding and create a workspace.
+2. Create a project and capability.
+3. Compose the agent graph and save its manifest.
+4. Attach an evaluation suite and run a candidate.
+5. Collect independent approvals and activate a release.
+6. Compare the active release with the next candidate before promoting it.
+
+Read the [quickstart](https://sachncs.github.io/promptsheon/docs/quickstart/) for the guided path.
+
+## Integration surfaces
+
+### HTTP API
+
+Use the API for automation and custom control planes:
+
+```bash
+curl "$PROMPTSHEON_API_URL/api/releases" \
+  -H "Authorization: Bearer $PROMPTSHEON_API_KEY" \
+  -H "Accept: application/json"
+```
+
+The running server exposes OpenAPI at `/api/openapi.json`. See the [API and SDK guide](https://sachncs.github.io/promptsheon/docs/api/).
+
+### TypeScript SDK
+
+The workspace package is currently private and builds from this repository:
+
+```bash
+pnpm --filter @promptsheon/sdk build
+```
+
+```ts
+import { PromptsheonClient } from '@promptsheon/sdk';
+
+const client = new PromptsheonClient({
+  baseUrl: process.env.PROMPTSHEON_API_URL,
+  apiKey: process.env.PROMPTSHEON_API_KEY,
+});
+
+const repositories = await client.listRepos(process.env.PROMPTSHEON_WORKSPACE_ID!);
+console.log(repositories);
+```
+
+Keep API keys on the server. Never read platform or provider secrets from browser bundles.
+
+### CLI
+
+```bash
+pnpm --filter @promptsheon/cli build
+export PROMPTSHEON_API_URL=http://127.0.0.1:8080
+export PROMPTSHEON_API_KEY=pk_your_key_here
+export PROMPTSHEON_WORKSPACE_ID=workspace-uuid
+
+node packages/cli/dist/index.js login
+node packages/cli/dist/index.js repos list --json
+node packages/cli/dist/index.js release get "$RELEASE_ID" --json
+node packages/cli/dist/index.js release approve "$RELEASE_ID" --dry-run --json
+```
+
+## Repository map
+
+```text
+packages/shared/       contracts, validation, migrations, pure logic
+packages/server/       Fastify API, application services, repos, agents
+packages/cli/          CI and operator command-line adapter
+packages/sdk/          typed client and framework integrations
+frontend/              Next.js 16 console and Playwright suite
+site/                  Astro product website and developer docs
+```
+
+The intended dependency direction is:
+
+```text
+HTTP / UI adapters → application use cases → domain contracts
+                         ↓                    ↑
+                  infrastructure ports ← adapters
+```
+
+Routes validate and translate input. Application services own workflow
+decisions. Repositories own prepared SQLite access and scoping. Concrete
+adapters are assembled in the composition root. Read the [architecture guide](https://sachncs.github.io/promptsheon/docs/architecture/)
+and [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+
+## Development commands
+
+```bash
+pnpm dev
+pnpm dev:server
+pnpm dev:frontend
+pnpm dev:site
+pnpm typecheck
+pnpm test
+pnpm --dir frontend lint
+pnpm --dir frontend test:e2e
+pnpm --dir frontend build
+pnpm --dir site build
+```
+
+CI also builds the public site so documentation regressions cannot merge unnoticed.
+
+## Production
+
+Production requires explicit authentication, CORS, webhook and SCIM secrets,
+persistent SQLite/CAS storage, and readiness gating. Configure `.env.example`
+through your deployment secret manager; never commit credentials or bake them
+into images.
 
 ```bash
 docker build -t promptsheon:latest .
 docker run --rm -p 8080:8080 \
-  -e OPENAI_API_KEY=$OPENAI_API_KEY \
-  -v $PWD/.promptsheon:/data \
+  -e PROMPTSHEON_AUTH=true \
+  -e PROMPTSHEON_JWT_SECRET="$PROMPTSHEON_JWT_SECRET" \
+  -e PROMPTSHEON_CORS_ORIGIN="http://localhost:3000" \
+  -e PROMPTSHEON_WEBHOOK_SECRET="$PROMPTSHEON_WEBHOOK_SECRET" \
+  -e PROMPTSHEON_SCIM_TOKEN="$PROMPTSHEON_SCIM_TOKEN" \
+  -v "$PWD/.promptsheon:/data" \
   promptsheon:latest
 ```
 
-The image ships a multi-stage build that compiles the shared, server, and frontend workspaces into a single non-root container. It listens on `:8080` and serves both the API and the UI from the same port. The audit chain and SQLite database live on the volume you mount at `/data`.
-
----
-
-## Your first run — the command line
-
-The fastest way to see Promptsheon work:
-
-```bash
-# 1. Confirm the backend is up
-curl http://localhost:8080/api/health
-# {"status":"ok","service":"promptsheon-server", …}
-
-# 2. Open the UI in a browser
-open http://localhost:3000      # macOS
-xdg-open http://localhost:3000   # Linux
-
-# 3. Walk the wizard:
-#    - Welcome
-#    - Admin + org
-#    - LLM provider (OpenAI / Anthropic / Bedrock / Custom)
-#    - Finish
-```
-
-You'll land on the control-plane dashboard with a "Create workspace"
-CTA. From there:
-
-1. **Workspaces** → create a workspace.
-2. **Projects** → create a project inside that workspace.
-3. **Capabilities** → open the DAG editor (or click one of the
-   templates: *Customer support triage*, *Doc Q&A*, *Blank canvas*).
-4. **Save** → the manifest is hashed into the CAS.
-5. **Releases** → create a v1 release; cast two non-creator
-   approvals; **activate**.
-
-That's the full maker-checker loop. Once activated, every
-`POST /api/executions` call routes through that release.
-
----
-
-## Your first run — TypeScript SDK
-
-If you'd rather drive the API from your own code, the repo ships a
-typed fetch client in `frontend/src/lib/api.ts`. From a Next.js page
-or any TS project:
-
-```typescript
-import { workspaceApi, capabilityApi, releaseApi } from '@/lib/api';
-
-const ws = await workspaceApi.create({ name: 'refund-triage' });
-const cap = await capabilityApi.list(projectId);
-const release = await releaseApi.transition(releaseId, 'active');
-// → 409 APPROVAL_REQUIRED until 2 distinct non-creator approvals
-//    are on the manifest hash. The gate fires correctly now that
-//    BaseRepo.findById returns camelCase rows.
-```
-
-The full type definitions and request shapes are documented in
-[`packages/server/API.md`](packages/server/API.md).
-
----
-
-## Configuration
-
-All configuration is via environment variables prefixed with
-`PROMPTSHEON_`. Copy `.env.example` to `.env` and edit as needed.
-**Never commit `.env`** — it is in `.gitignore`.
-
-| Variable                       | Purpose                                | Default                       |
-|--------------------------------|----------------------------------------|-------------------------------|
-| `PROMPTSHEON_PORT`             | HTTP listen port                        | `8080`                        |
-| `PROMPTSHEON_HOST`             | Bind address                            | `127.0.0.1`                   |
-| `PROMPTSHEON_DB_PATH`          | SQLite file path                        | `promptsheon.db`               |
-| `PROMPTSHEON_CAS_PATH`         | Content-addressed store directory      | `.promptsheon`                |
-| `PROMPTSHEON_FRONTEND_PATH`    | Path to the built frontend              | `./frontend/.next`             |
-| `PROMPTSHEON_CORS_ORIGIN`      | Allowed CORS origin                     | `http://localhost:3000`        |
-| `PROMPTSHEON_LOG_LEVEL`        | Pino log level                          | `info`                        |
-| `PROMPTSHEON_NODE_ENV`         | `production` / `development` / `test`   | `development`                 |
-| `PROMPTSHEON_AUTH`             | Enable JWT bearer-token auth            | `false`                        |
-| `PROMPTSHEON_JWT_SECRET`       | HMAC secret for token verification     | `""`                           |
-| `PROMPTSHEON_LLM_PROVIDER`     | `openai` / `anthropic` / `bedrock` / `custom` | `openai`         |
-| `PROMPTSHEON_LLM_MODEL`        | Model id (e.g. `gpt-4`, `claude-3-5-sonnet-20241022`) | `gpt-4`        |
-| `PROMPTSHEON_LLM_API_KEY_ENV`   | Env var holding the API key             | `OPENAI_API_KEY`               |
-| `PROMPTSHEON_LLM_MAX_RETRIES`   | Strands retry budget                    | `5`                            |
-| `PROMPTSHEON_LLM_TIMEOUT_MS`    | Per-request LLM timeout                 | `120000`                       |
-| `OPENAI_API_KEY`               | OpenAI provider key                    | —                              |
-| `ANTHROPIC_API_KEY`            | Anthropic provider key                 | —                              |
-| `AWS_BEDROCK_REGION`           | Bedrock region (e.g. `us-east-1`)      | `us-east-1`                    |
-| `PROMPTSHEON_WEBHOOK_SECRET`    | HMAC secret for incoming webhooks — **required in production** | `""`           |
-| `PROMPTSHEON_ALLOW_SYSTEM_ACTOR` | Allow `X-User-Id: api` bypass — off in production | `true` (dev)             |
-| `PROMPTSHEON_SELF_EVOLVE_ENABLED`     | Enable the self-evolution loop   | `false`                        |
-| `PROMPTSHEON_SELF_EVOLVE_COOLDOWN_SEC` | Min seconds between re-evolves | `900`                          |
-| `PROMPTSHEON_SELF_EVOLVE_MAX_CONCURRENT` | Cap concurrent evolutions per worker | `3`                       |
-| `PROMPTSHEON_OTEL_ENDPOINT`    | OpenTelemetry OTLP collector URL       | `""`                           |
-| `PROMPTSHEON_FIPS_MODE`        | Enforce FIPS-validated crypto for the audit chain (requires a FIPS Node build) | `false` |
-| `PROMPTSHEON_REPLICA_INTERVAL_MS` | Audit-chain replicator poll interval | `5000`                        |
-| `PROMPTSHEON_REPLICA_ONESHOT` | Replicator exits after a single batch   | `false`                        |
-
-> 💡 For a **Custom** OpenAI/Anthropic-compatible endpoint, set
-> `PROMPTSHEON_LLM_PROVIDER=custom` and supply the credentials
-> inline during the onboarding wizard (Base URL + API key + Model
-> name). The Settings store persists these per-org.
-
----
-
-## Where to go next
-
-For everyone:
-
-- **[CHANGELOG](CHANGELOG.md)** — what changed and when.
-- **[REST API Reference](packages/server/API.md)** — every endpoint
-  with request/response shapes.
-- **[AGENTS.md](AGENTS.md)** — the engineering constitution: type
-  safety, validation, repo layout, testing bar, naming, lifecycle.
-  Read it before opening a PR.
-
-For operators / maintainers:
-
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** — how to set up a dev
-  environment and submit changes.
-- **[SECURITY.md](SECURITY.md)** — the disclosure policy. Please
-  don't file security issues as public GitHub issues.
-- **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — the standards we
-  expect everyone to follow.
-- **[packages/server/README.md](packages/server/README.md)** — backend
-  architecture, agent subsystems, hardening layers.
-- **[packages/shared/README.md](packages/shared/README.md)** — domain
-  types, Zod schemas, the SQLite migration runner, the CAS.
-
----
-
-## Tech stack
-
-| Category       | Technology                                       |
-|----------------|--------------------------------------------------|
-| Runtime        | Node.js ≥ 22, pnpm 11 workspaces                |
-| Language       | TypeScript (strict, exactOptionalPropertyTypes)  |
-| HTTP           | [Fastify 5](https://fastify.dev)                 |
-| Validation     | [Zod 4](https://zod.dev)                         |
-| Database       | SQLite via [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) |
-| AI             | [`@strands-agents/sdk`](https://github.com/strands-agents/harness-sdk) — `Agent`, `Swarm`, `Graph` |
-| LLM providers  | OpenAI, Anthropic, AWS Bedrock, custom OpenAI/Anthropic-compatible |
-| Frontend       | [Next.js 16](https://nextjs.org) (App Router, Turbopack) |
-| UI             | [React 19](https://react.dev), [shadcn/ui](https://ui.shadcn.com), [Tailwind v4](https://tailwindcss.com) |
-| Data fetching  | [TanStack React Query 5](https://tanstack.com/query), [axios](https://axios-http.com) |
-| DAG editor     | [@xyflow/react 12](https://reactflow.dev)        |
-| Icons          | [lucide-react](https://lucide.dev)               |
-| Observability  | [OpenTelemetry](https://opentelemetry.io), [Pino](https://getpino.io) |
-| Hashing        | Node `crypto` (audit chain, manifest CAS, HMAC)  |
-| Tests          | [Vitest 4](https://vitest.dev) (server + shared), [Playwright](https://playwright.dev) (frontend) |
-
----
-
-## Development
-
-```bash
-pnpm install                # install all workspace deps
-pnpm typecheck              # tsc across shared + server + frontend
-pnpm --dir packages/server test   # vitest, 86 files / 619 cases
-pnpm --dir packages/shared test   # vitest, 4 files / 36 cases
-pnpm --dir frontend test:e2e      # Playwright tier suite, 10 specs
-pnpm --dir frontend build          # next build
-```
-
-To regenerate the architecture counts above, run `bash scripts/stats.sh`.
-
-### Per-package workflow
-
-```bash
-# backend
-cd packages/server
-pnpm dev        # Fastify + tsx watch, :8080
-pnpm test       # vitest
-pnpm build      # tsc → dist/
-
-# frontend
-cd frontend
-pnpm dev        # http://localhost:3000 (Turbopack)
-pnpm test:e2e   # Playwright tier suite
-pnpm build      # next build
-
-# shared
-cd packages/shared
-pnpm build      # tsc → dist + copies db/migrations
-```
-
-### Commit conventions
-
-We use [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-feat: add canary-percent setter on release route
-fix: clamp audit-chain hash to 32 bytes
-docs: document PROMPTSHEON_WEBHOOK_SECRET
-refactor: extract capability-version repo
-test: add adversarial eval fixtures
-chore: bump @strands-agents/sdk to 1.14
-```
-
----
-
-## Roadmap
-
-- **v0.1.0 — v0.3.0** (shipped) — Fastify + Strands backend,
-  Next.js frontend, DAG editor, releases + canary, maker-checker
-  approvals, audit chain, eval suites, self-evolution loop,
-  webhooks + replay protection, chaos hooks, OpenTelemetry.
-- **v0.4.2** (current) — admin gates on 14 management routes,
-  maker-checker gate now fires correctly for self-approvals,
-  `/api/executions` workflow, `/api/goals/:hash` drilldown, DAG
-  editor drafts persist, `BaseRepo` camelCase mapper,
-  Playwright tier suite rewritten against the new contracts
-  (619 server tests + 41-route smoke + 5 new auth/forms/audit/
-  manifest-detail/approvals/admin-gating tier specs).
-- **v0.5.0** (next) — Docker packaging shipped
-  (`Dockerfile` + multi-stage build), production deployment
-  guide, RBAC refinement on the maker-checker flow, dataset
-  import/export.
-- **Backlog** — gRPC interface alongside HTTP, multi-tenant SSO,
-  Postgres adapter behind the better-sqlite3 repo layer, Helm chart
-  for Kubernetes, OpenAPI → typed client codegen.
-
-Have an idea? [Open a feature request](https://github.com/sachncs/promptsheon/issues/new).
-
----
-
-## Contributing
-
-Contributions are welcome. See
-[`CONTRIBUTING.md`](CONTRIBUTING.md) for the process, coding
-standards, and Conventional Commits workflow. Bug reports and
-feature requests use the [issue templates](.github/ISSUE_TEMPLATE/).
-
-The full engineering standards — type safety, validation, repo
-layout, testing bar, naming, lifecycle — are codified in
-[`AGENTS.md`](AGENTS.md). Read it before opening a PR.
-
-## Code of Conduct
-
-This project follows the
-[Contributor Covenant v2.1](CODE_OF_CONDUCT.md). By participating,
-you are expected to uphold that standard.
-
-## Security
-
-Please do **not** file security vulnerabilities as public GitHub
-issues. See [`SECURITY.md`](SECURITY.md) for the disclosure policy.
-
-### Prompt-security benchmark
-
-The shipped scanner (`packages/server/src/security/prompt-scanner.ts`)
-is exercised by a curated dataset at
-[`docs/security/benchmark/dataset.json`](docs/security/benchmark/dataset.json)
-covering OWASP LLM01..LLM10 plus edge cases. Run it with:
-
-```
-pnpm --filter @promptsheon/server bench:security
-```
-
-It writes [`docs/security/benchmark/RESULTS.md`](docs/security/benchmark/RESULTS.md)
-with a per-case verdict + the rules that fired. CI should gate on a
-100% pass rate so a regex tweak never silently regresses coverage.
-
-### On-prem / air-gapped deploys
-
-Government, defense, and regulated customers run on hosts with no
-outbound internet. The repo ships an offline installer that bundles
-every dependency, the SBOM, and a `systemd` bootstrap:
-
-```
-bash scripts/build-offline-installer.sh    # build the tarball
-sudo bash bin/bootstrap.sh --fips          # install + FIPS mode
-```
-
-The step-by-step runbook —
-[`docs/operations/air-gap-rhel.md`](docs/operations/air-gap-rhel.md) —
-covers pre-flight, FIPS-mode requirements, upgrades, backups,
-DR, and the FIPS gate's `refuse to boot` contract.
-
-### Running the firewall sidecar
-
-The firewall sits in front of *any* LLM application (not just
-promptsheon-managed ones) and inspects every prompt + response
-against the T2-3 scanner. Block / warn / allow decisions are
-written to the audit chain so `/api/audit/verify` covers sidecar
-traffic end-to-end.
-
-```bash
-# Start the sidecar with an OpenAI-compatible upstream:
-PROMPTSHEON_FIREWALL_UPSTREAM_URL=https://api.openai.com \
-PROMPTSHEON_FIREWALL_PORT=9090 \
-  pnpm --filter @promptsheon/server firewall
-```
-
-Point any client at `http://127.0.0.1:9090/v1/chat/completions`
-instead of the upstream URL. The firewall transparently forwards
-when the scanner verdict is `clean`, attaches an
-`X-Promptsheon-Warning` header on `warn`, and rejects with
-`422 PROMPT_BLOCKED`. The implementation lives at
-`packages/server/src/firewall/`; the policy + scanner extension
-shipped with T3-5 carries over unchanged.
-
-### Framework integrations
-
-`packages/sdk/src/integrations/` ships adapters for the three
-agent frameworks the doc names. All three route through the
-promptsheon OpenAI-compatible gateway so caching + the audit
-chain apply transparently.
-
-```ts
-// Vercel AI SDK
-import { openai } from '@ai-sdk/openai';
-import { withPromptsheon } from '@promptsheon/sdk/integrations/vercel-ai-sdk';
-const model = withPromptsheon(openai('gpt-4'), {
-  gatewayUrl: 'https://promptsheon.example.com',
-  apiKey: process.env.PROMPTSHEON_API_KEY!,
-});
-
-// LlamaIndex
-import { PromptsheonLLM } from '@promptsheon/sdk/integrations/llamaindex';
-const llm = new PromptsheonLLM({
-  gatewayUrl: 'https://promptsheon.example.com',
-  apiKey: process.env.PROMPTSHEON_API_KEY!,
-  model: 'gpt-4',
-});
-
-// Haystack
-import { PromptsheonGenerator } from '@promptsheon/sdk/integrations/haystack';
-const generator = new PromptsheonGenerator({
-  gatewayUrl: 'https://promptsheon.example.com',
-  apiKey: process.env.PROMPTSHEON_API_KEY!,
-  model: 'gpt-4',
-});
-```
-
-The adapters use structural typing (no `@ai-sdk/provider`,
-`llama-index-core`, or `@haystack/core` runtime dep) so the SDK
-stays framework-optional — install the framework package
-yourself and pass a model that satisfies the shape. 9 vitest
-cases exercise the wire format against an in-process
-OpenAI-shaped stub.
+Use `/api/health` for liveness and `/api/ready` for traffic admission. Back up
+SQLite and the content-addressed store together, test restoration, and keep
+the last verified content hash available for rollback. Read the [deployment](https://sachncs.github.io/promptsheon/docs/deployment/), [operations](https://sachncs.github.io/promptsheon/docs/operations/), and [troubleshooting](https://sachncs.github.io/promptsheon/docs/troubleshooting/) guides.
+
+## Security and contributing
+
+Do not open public issues for security vulnerabilities; follow [`SECURITY.md`](SECURITY.md).
+For contributions, read [`AGENTS.md`](AGENTS.md), [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md),
+and the [contributing guide](https://sachncs.github.io/promptsheon/docs/contributing/).
+Changes should be small, atomic, tested, and documented when they alter a public surface.
 
 ## License
 
-[Apache-2.0](LICENSE) © 2026 Sachin — **sachncs@gmail.com**.
+Promptsheon is available under the [Apache License 2.0](LICENSE).

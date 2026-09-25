@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- Removed the experimental VS Code extension workspace. Promptsheon now
+  focuses on the self-hosted API, Next.js console, CLI, SDK, and public
+  developer documentation; the extension was not part of the supported
+  product surface.
+
+### Changed
+- Aligned the repository runtime baseline on Node.js 26.8.1 through `.nvmrc`,
+  package engine constraints, CI, Docker, and contributor documentation.
+- Rewrote the root README around the current product model, quickstart,
+  integration surfaces, architecture, operations, and supported commands.
+- Updated the public API/SDK guide with executable SDK and CLI workflows.
+- Moved release-service construction into the application composition root and
+  removed the unused repository-route escape hatch.
+
 ### Added
 - **Docker packaging** — multi-stage `Dockerfile` that compiles
   the shared + server + frontend workspaces into a single
