@@ -62,6 +62,7 @@ import { registerIdentityRoutes } from './identity.js';
 import { WorkspaceService } from '../application/workspace-service.js';
 import { ProjectService } from '../application/project-service.js';
 import { CapabilityService } from '../application/capability-service.js';
+import type { ReleaseService } from '../application/release-service.js';
 import { ManifestApprovalService } from '../application/manifest-approval-service.js';
 import { AuditReplicationService } from '../application/audit-replication-service.js';
 import { HealthService } from '../application/health-service.js';
@@ -115,6 +116,7 @@ export interface AppDeps {
   capabilityRepo: CapabilityRepo;
   versionRepo: VersionRepo;
   releaseRepo: ReleaseRepo;
+  releaseService: ReleaseService;
   executionRepo: ExecutionRepo;
   datasetRepo: DatasetRepo;
   evalRepo: EvalRepo;
@@ -197,6 +199,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     manifestRepo: deps.manifestRepo,
     auditChain: deps.auditChain,
     overlayRepo: deps.releaseOverlayRepo,
+    releaseService: deps.releaseService,
   });
   registerExecutionRoutes(app, {
     executionRepo: deps.executionRepo,

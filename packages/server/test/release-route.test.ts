@@ -5,6 +5,7 @@ import { ManifestRepo } from '../src/repos/manifest.js';
 import { ReleaseRepo } from '../src/repos/release.js';
 import { AuditChain } from '../src/audit/chain.js';
 import { ReleaseOverlayRepo } from '../src/repos/release-overlay.js';
+import { ReleaseService } from '../src/application/release-service.js';
 import { applyMigrations } from '@promptsheon/shared';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -82,6 +83,7 @@ describe('POST /api/releases/:id/rollback', () => {
         manifestRepo: new ManifestRepo(db),
         auditChain: new AuditChain(db),
         overlayRepo: new ReleaseOverlayRepo(db),
+        releaseService: new ReleaseService(repo, new ManifestRepo(db), new AuditChain(db)),
       });
     });
     await app.ready();

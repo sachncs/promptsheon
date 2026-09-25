@@ -84,10 +84,8 @@ function requireOrganization(request: FastifyRequest, reply: FastifyReply): stri
 export function registerReleaseRoutes(
   app: FastifyInstance,
   repo: ReleaseRepo,
-  deps: { manifestRepo: ManifestRepo; auditChain: AuditChain; overlayRepo: ReleaseOverlayRepo },
+  deps: { manifestRepo: ManifestRepo; auditChain: AuditChain; overlayRepo: ReleaseOverlayRepo; releaseService: ReleaseService },
 ) {
-  const releaseService = new ReleaseService(repo, deps.manifestRepo, deps.auditChain);
-
   app.get('/api/releases', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
@@ -209,7 +207,7 @@ export function registerReleaseRoutes(
     const existing = repo.findByIdInOrg(id, organizationId);
     if (!existing) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
     try {
-      const item = releaseService.transition({
+      const item = deps.releaseService.transition({
         releaseId: id,
         organizationId,
         actorId: actorOf(request),

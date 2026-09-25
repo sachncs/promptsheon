@@ -34,6 +34,7 @@ import { Gateway, ResponseCache, FallbackChain, RateLimiter } from './llm/gatewa
 import { LlmSettingsService } from './application/llm-settings-service.js';
 import { IdentityService } from './application/identity-service.js';
 import { RepositoryService } from './application/repository-service.js';
+import { ReleaseService } from './application/release-service.js';
 import { AgentIdentityRepo } from './repos/agent-identity.js';
 import type { Agent } from '@strands-agents/sdk';
 import type Database from 'better-sqlite3';
@@ -107,6 +108,7 @@ async function main() {
   const identityService = new IdentityService(new AgentIdentityRepo(db));
 
   const auditChain = new AuditChain(db, config.server.fipsMode);
+  const releaseService = new ReleaseService(repos.release, repos.manifest, auditChain);
   const app = Fastify({ logger: true, bodyLimit: 2_097_152 });
 
   if (config.server.fipsMode) {
@@ -307,6 +309,7 @@ async function main() {
     planner,
     executor,
     manifestRepo: repos.manifest,
+    releaseService,
     getActiveGoals: () => goalEvolver.listSummaries(),
     sessionStore,
     snapshotStore,
