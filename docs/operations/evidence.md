@@ -60,6 +60,12 @@ preferentially. Writer failures are swallowed by the sink so core execution
 state remains authoritative. The sink is flushed during graceful server
 shutdown.
 
+For high-volume distributed traces, configure the OpenTelemetry collector or
+SDK with a parent-based ratio sampler, for example
+`OTEL_TRACES_SAMPLER=parentbased_traceidratio` and
+`OTEL_TRACES_SAMPLER_ARG=0.1`. Evidence records remain the authoritative
+policy/error/release history and are not replaced by trace sampling.
+
 When investigating evidence lag, inspect queue depth and writer errors in the
 service logs, then compare the execution timeline with the evidence query.
 Increasing the buffer should be preceded by measuring memory and write
