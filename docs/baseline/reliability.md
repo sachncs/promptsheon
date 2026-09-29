@@ -46,8 +46,23 @@ The latest local verification run recorded approximately:
 
 These timings are machine-dependent and are retained only as a regression
 signal. API throughput and SQLite write-contention targets still require a
-dedicated load profile in Phase 2 and Phase 9; they must not be inferred from
-unit-test timings.
+dedicated full-application load profile in Phase 2 and Phase 9.
+
+The reproducible baseline harness (`pnpm benchmark:baseline`) currently
+measures a synthetic Fastify `/api/health` route backed by SQLite and concurrent
+SQLite writes. On the capture machine it produced:
+
+| Benchmark | Configuration | Result |
+|---|---|---:|
+| HTTP health throughput | 2,000 requests, concurrency 16 | 8,497 req/s |
+| HTTP health p95 latency | Same run | 2.56 ms |
+| SQLite concurrent writes | 4 workers × 250 writes, WAL mode | 14,090 writes/s |
+
+These figures are dispatch/storage baselines, not production capacity claims.
+They intentionally exclude LLM providers, full route registration, external
+tools, evaluation workloads, and network distance. Phase 2 and Phase 9 must
+replace them with workload-representative measurements before capacity is
+accepted.
 
 ## Initial reliability objectives
 
