@@ -41,9 +41,11 @@ If a new sensitive field is introduced:
 The default evidence retention is 90 days. An administrator can set an
 organization-specific value from 1 to 3650 days with
 `PUT /api/orgs/:id/retention`, then run an immediate scoped sweep with
-`POST /api/orgs/:id/retention/sweep`. The background sweeper performs the same
-operation every six hours. Deletions are organization-scoped and are recorded
-in the audit chain; audit entries themselves are not swept.
+`POST /api/orgs/:id/retention/sweep`. Add the validated `retentionClass` query
+parameter to delete one evidence class; omit it to sweep all classes. The
+background sweeper performs the all-class operation every six hours. Deletions
+are organization-scoped and are recorded in the audit chain; audit entries
+themselves are not swept.
 
 Use the organization retention API for deletion requests rather than issuing
 SQL directly. Verify the returned `evidence_records` deletion count and run a

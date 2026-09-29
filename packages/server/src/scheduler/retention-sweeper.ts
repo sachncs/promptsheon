@@ -75,7 +75,7 @@ export class RetentionSweeper {
       .run(`org.retention.days.${orgId}`, String(days));
   }
 
-  sweepOnce(orgId?: string): SweepResult[] {
+  sweepOnce(orgId?: string, retentionClass?: string): SweepResult[] {
     const out: SweepResult[] = [];
     const organizations = orgId ? [orgId] : this.organizationIds();
     this.db.transaction(() => {
@@ -117,7 +117,7 @@ export class RetentionSweeper {
           out.push({ table: 'human_review_queue', deletedRows: reviews.changes, cutoff });
         }
 
-        const evidenceRows = this.evidence?.deleteBefore(currentOrgId, cutoff);
+        const evidenceRows = this.evidence?.deleteBefore(currentOrgId, cutoff, retentionClass);
         if (evidenceRows && evidenceRows > 0) {
           out.push({ table: 'evidence_records', deletedRows: evidenceRows, cutoff });
         }

@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { parseBody, parseParams } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 import type { RetentionSweeper } from '../scheduler/retention-sweeper.js';
 import { assertOrgScope } from '../middleware/org-context.js';
 
@@ -9,6 +9,7 @@ const RetentionSchema = z.object({
   days: z.number().int().min(1).max(3650),
 });
 const OrganizationParamsSchema = z.object({ id: z.string().trim().min(1).max(255) });
+const SweepQuerySchema = z.object({ retentionClass: z.string().trim().min(1).max(80).optional() });
 
 export interface RetentionRouteDeps {
   sweeper: RetentionSweeper;
@@ -55,7 +56,9 @@ export function registerRetentionRoutes(app: FastifyInstance, deps: RetentionRou
     if (!deps.adminOnly(request)) {
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin only' } });
     }
-    const results = deps.sweeper.sweepOnce(id);
+    const parsedQuery = parseQuery(reply, SweepQuerySchema, request.query);
+    if (!parsedQuery.ok) return;
+    const results = deps.sweeper.sweepOnce(id, parsedQuery.data.retentionClass);
     return reply.send({ swept: results });
   });
 }
