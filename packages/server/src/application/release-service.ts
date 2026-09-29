@@ -79,6 +79,11 @@ export interface AuditWriter {
   }): void;
 }
 
+/** Evaluation gate used before a release can become approvable or active. */
+export interface ReleaseEvaluationGate {
+  hasPassingEvaluation(releaseId: string, organizationId: string): boolean;
+}
+
 /**
  * Evaluate the maker-checker gate for a release manifest.
  *
@@ -111,6 +116,7 @@ export class ReleaseService {
     private readonly manifestRepo: ManifestApprovalStore,
     private readonly auditChain: AuditWriter,
     dependencies: ReleaseServiceDependencies = {},
+    private readonly evaluationGate?: ReleaseEvaluationGate,
   ) {
     this.createId = dependencies.createId ?? randomUUID;
     this.now = dependencies.now ?? (() => new Date().toISOString());
@@ -127,6 +133,9 @@ export class ReleaseService {
     if (input.to === 'approved' || input.to === 'canary' || input.to === 'active') {
       const gateFailure = approvalGate(existing, this.manifestRepo);
       if (gateFailure) throw new ReleaseApprovalRequiredError(gateFailure);
+      if (this.evaluationGate && !this.evaluationGate.hasPassingEvaluation(input.releaseId, input.organizationId)) {
+        throw new ReleaseApprovalRequiredError('a passing evaluation run is required before release promotion');
+      }
     }
 
     const updated = this.repo.updateStatusInOrg(input.releaseId, input.organizationId, input.to);

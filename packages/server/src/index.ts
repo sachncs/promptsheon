@@ -114,7 +114,11 @@ async function main() {
   const identityService = new IdentityService(new AgentIdentityRepo(db));
 
   const auditChain = new AuditChain(db, config.server.fipsMode);
-  const releaseService = new ReleaseService(repos.release, repos.manifest, auditChain);
+  const releaseService = new ReleaseService(repos.release, repos.manifest, auditChain, {}, {
+    hasPassingEvaluation: (releaseId, organizationId) => repos.eval
+      .findRunsByReleaseIdInOrg(releaseId, organizationId)
+      .some((run) => run.status === 'passed'),
+  });
   const app = Fastify({ logger: true, bodyLimit: 2_097_152 });
 
   if (config.server.fipsMode) {
