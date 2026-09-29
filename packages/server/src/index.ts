@@ -284,6 +284,7 @@ async function main() {
       },
     },
     () => new Date(),
+    repos.evidence,
   );
   retention.start();
 

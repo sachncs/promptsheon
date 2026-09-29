@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import type { EvidenceRepo } from '../repos/evidence.js';
 
 const DEFAULT_RETENTION_DAYS = 90;
 
@@ -41,6 +42,7 @@ export class RetentionSweeper {
     private db: Database.Database,
     private appendAudit: AuditAppender,
     private clock: () => Date = () => new Date(),
+    private readonly evidence?: EvidenceRepo,
   ) {}
 
   start(periodMs = 6 * 60 * 60 * 1000): void {
@@ -113,6 +115,11 @@ export class RetentionSweeper {
           .run(cutoff, currentOrgId);
         if (reviews.changes > 0) {
           out.push({ table: 'human_review_queue', deletedRows: reviews.changes, cutoff });
+        }
+
+        const evidenceRows = this.evidence?.deleteBefore(currentOrgId, cutoff);
+        if (evidenceRows && evidenceRows > 0) {
+          out.push({ table: 'evidence_records', deletedRows: evidenceRows, cutoff });
         }
       }
     })();

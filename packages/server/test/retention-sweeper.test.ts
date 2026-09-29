@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3';
 import { runMigrations } from '../src/db/index.js';
 import { RetentionSweeper } from '../src/scheduler/retention-sweeper.js';
+import { EvidenceRepo } from '../src/repos/evidence.js';
 
 describe('RetentionSweeper', () => {
   it('uses each organization retention policy and keeps newer rows', async () => {
@@ -24,14 +25,17 @@ describe('RetentionSweeper', () => {
     db.prepare(`INSERT INTO eval_runs (id, release_id, dataset_id, scorer, started_at) VALUES ('run-old', 'release-a', 'dataset-a', 'test', '2020-01-01T00:00:00.000Z')`).run();
     db.prepare(`INSERT INTO eval_results (id, run_id, seq, actual) VALUES ('result-old', 'run-old', 1, '{}')`).run();
     db.prepare(`INSERT INTO human_review_queue (id, case_id, suite_id, submitted_at) VALUES ('review-old', 'case-a', 'suite-a', '2020-01-01T00:00:00.000Z')`).run();
+    const evidence = new EvidenceRepo(db);
+    evidence.append({ eventType: 'error.observed', organizationId: 'org-a', correlationId: 'corr-a', occurredAt: '2020-01-01T00:00:00.000Z', payload: {} });
 
     const auditEntries: unknown[] = [];
-    const sweeper = new RetentionSweeper(db, { append: (entry) => auditEntries.push(entry) }, () => new Date('2026-01-01T00:00:00.000Z'));
+    const sweeper = new RetentionSweeper(db, { append: (entry) => auditEntries.push(entry) }, () => new Date('2026-01-01T00:00:00.000Z'), evidence);
     const results = sweeper.sweepOnce('org-a');
 
     expect(results).toEqual([
       { table: 'eval_results', deletedRows: 1, cutoff: '2025-12-02T00:00:00.000Z' },
       { table: 'human_review_queue', deletedRows: 1, cutoff: '2025-12-02T00:00:00.000Z' },
+      { table: 'evidence_records', deletedRows: 1, cutoff: '2025-12-02T00:00:00.000Z' },
     ]);
     expect(db.prepare('SELECT COUNT(*) AS count FROM eval_results').get()).toEqual({ count: 0 });
     expect(db.prepare('SELECT COUNT(*) AS count FROM human_review_queue').get()).toEqual({ count: 0 });
