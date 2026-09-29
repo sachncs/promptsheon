@@ -55,7 +55,9 @@ test.describe('tier 7: manifest detail (real page)', () => {
     await page.getByRole('button', { name: /customer support triage/i }).click();
 
     // 2. Save
-    await page.getByRole('button', { name: /save/i }).click();
+    const saveButton = page.getByRole('button', { name: /save/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
 
     // 3. After save, URL navigates to /app/editor/<hash>
     await page.waitForURL(/\/app\/editor\//, { timeout: 10_000 });
