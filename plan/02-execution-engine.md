@@ -72,3 +72,18 @@ resource usage.
 - Resource limits are enforced under load.
 - Restarting the service does not silently lose or duplicate work.
 
+## Implementation status
+
+Implemented in the current Phase 2 slice:
+
+- Durable SQLite execution jobs with explicit lifecycle transitions.
+- Idempotent enqueue, atomic leases, bounded retries, jitter, cancellation,
+  recovery, graceful shutdown, and organization concurrency limits.
+- Workspace-scoped execution API and queue metrics.
+- Immutable agent-hash loading through the Phase 1 specification repository.
+- Execution budget checks, provider/tool ports, DAG dependency scheduling with
+  bounded parallelism, and durable per-step checkpoints/resume.
+
+Remaining exit-gate work includes wiring provider adapters to the shared
+ports/circuit breaker, end-to-end tool permission enforcement, load/contention
+benchmarks, and full remote verification after the final Phase 2 changes.

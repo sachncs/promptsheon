@@ -11,4 +11,5 @@ export type {
   ToolAdapter,
   ToolAuthorizer,
   ToolInvocationContext,
+  ToolRegistry,
 } from '../../application/execution-ports.js';
