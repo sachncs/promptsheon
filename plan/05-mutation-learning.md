@@ -23,10 +23,14 @@ structured changes, risk, confidence, author, and evaluation linkage. The API
 supports listing, inspection, and guarded approve/reject/abandon decisions.
 The console exposes the review queue and requires an auditable decision reason.
 The local simulator can author deterministic proposals without an LLM key.
+The goal evolution endpoint now runs in proposal mode: it writes the candidate
+to content-addressed storage, records the proposal, and leaves the active
+manifest unchanged until an explicit decision.
 
 Candidate generation, automatic candidate materialisation, evaluation gates,
-and promotion integration remain in progress. Approval records do not activate
-anything by themselves.
+and promotion integration remain in progress. The approval ledger is not yet
+connected to release promotion, so an approved proposal is still an explicit
+operator handoff rather than an automatic activation.
 
 - Define immutable `MutationProposal` records containing source hash, proposed
   changes, rationale, expected outcome, author/system, risk, and confidence.
