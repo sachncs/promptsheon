@@ -1,28 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { walkOnboarding } from './helpers/walk-onboarding';
 
-const LLM_KEY = process.env['E2E_LLM_KEY'] ?? '';
-const LLM_BASE = process.env['E2E_LLM_BASE_URL'] ?? 'https://api.minimax.io/anthropic';
-const LLM_MODEL = process.env['E2E_LLM_MODEL'] ?? 'MiniMax-M3';
-
 test.describe('tier 3: app shell after onboarding', () => {
-  test.beforeAll(() => {
-    if (!LLM_KEY) {
-      throw new Error(
-        'E2E_LLM_KEY must be set; the smoke test makes a real LLM probe call during onboarding.',
-      );
-    }
-  });
-
   test('walks real onboarding and lands on /app with all sub-routes reachable', async ({ page, baseURL }) => {
     test.setTimeout(60_000);
 
-    await walkOnboarding(page, {
-      baseUrl: baseURL,
-      llmApiKey: LLM_KEY,
-      llmBaseUrl: LLM_BASE,
-      llmModel: LLM_MODEL,
-    });
+    await walkOnboarding(page);
 
     // AppShell sidebar should be visible.
     await expect(page.locator('aside').first()).toBeVisible();

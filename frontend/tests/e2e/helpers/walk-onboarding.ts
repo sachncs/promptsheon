@@ -1,30 +1,15 @@
 import type { Page, BrowserContext } from '@playwright/test';
 
-export interface OnboardingOptions {
-  baseUrl: string;
-  llmApiKey: string;
-  llmBaseUrl: string;
-  llmModel: string;
-}
-
 const UNIQUE = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 /**
  * Walks the full 4-step /onboarding flow:
  *   1. Welcome
  *   2. Admin + org
- *   3. LLM provider (custom URL + key + model) — real probe call
+ *   3. LLM provider (credential-free local simulator)
  *   4. Finish → /app
- *
- * The probe is a live call to whatever URL the caller provided.
- * Caller is expected to pass a key that the URL accepts. Tests
- * should use any working endpoint — the production secrets are
- * never read from the test environment.
  */
-export async function walkOnboarding(
-  page: Page,
-  options: OnboardingOptions,
-): Promise<void> {
+export async function walkOnboarding(page: Page): Promise<void> {
   await page.goto('/onboarding');
 
   // Welcome
@@ -36,16 +21,12 @@ export async function walkOnboarding(
   await page.getByLabel(/organisation name/i).fill(`E2E Org ${UNIQUE}`);
   await page.getByRole('button', { name: /continue/i }).click();
 
-  // LLM step
-  // Pick the 'Custom endpoint' tile (the 4th option in the new
-  // provider grid).
-  await page.getByRole('button', { name: /custom endpoint/i }).click();
+  // LLM step: use the built-in simulator so the browser suite is
+  // deterministic and never needs a live provider credential.
+  await page.getByRole('button', { name: /local simulator/i }).click();
+  await page.getByLabel(/model name/i).fill('promptsheon-e2e-simulator');
 
-  await page.getByLabel(/base url/i).fill(options.llmBaseUrl);
-  await page.getByLabel(/model name/i).fill(options.llmModel);
-  await page.getByLabel(/^api key$/i).fill(options.llmApiKey);
-
-  // Test connection (real HTTP to llmBaseUrl)
+  // Test connection against the local simulator.
   await page.getByRole('button', { name: /test connection/i }).click();
 
   // Wait for probe to succeed: "Connected · NNms · model" appears.

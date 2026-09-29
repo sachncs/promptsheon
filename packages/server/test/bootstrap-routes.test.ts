@@ -102,4 +102,49 @@ describe('bootstrap routes', () => {
 
     db.close();
   });
+
+  it('validates and saves the credential-free simulator without an API key', async () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    await runMigrations(db);
+    const users = new UserRepo(db);
+    const orgs = new OrgRepo(db);
+    const memberships = new MembershipRepo(db);
+    const org = orgs.create({ name: 'Simulator Org', slug: 'simulator-org' });
+    const admin = users.create({ email: 'simulator@example.com', name: 'Simulator Admin', role: 'admin' });
+    memberships.addOrgMember(org.id, admin.id, 'admin');
+    const settingsResolver = new SettingsResolver({}, {}, new SystemConfigRepo(db));
+    const llmSettings = new LlmSettingsService(settingsResolver, new VaultRepo(db, new LocalKms(db)), users, memberships);
+    const app = Fastify({ logger: false });
+
+    registerBootstrapRoutes(app, {
+      userRepo: users,
+      orgRepo: orgs,
+      membershipRepo: memberships,
+      settingsResolver,
+      llmRouter: new LlmRouter(),
+      llmSettings,
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/bootstrap/validate-llm',
+      payload: { provider: 'simulated', model: 'promptsheon-test' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ ok: true, model: 'promptsheon-test' });
+
+    const save = await app.inject({
+      method: 'POST',
+      url: '/api/bootstrap/llm',
+      payload: { provider: 'simulated', model: 'promptsheon-test' },
+    });
+    expect(save.statusCode).toBe(200);
+    expect(await settingsResolver.get('llm.provider')).toBe('simulated');
+    expect(await llmSettings.hasCredentials('simulated')).toBe(true);
+
+    await app.close();
+    db.close();
+  });
 });

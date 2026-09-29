@@ -185,7 +185,9 @@ export function registerBootstrapRoutes(
     // here.
     const data = parsed.data;
     let probeInput: Parameters<typeof deps.llmRouter.probe>[0];
-    if (data.provider === 'bedrock') {
+    if (data.provider === 'simulated') {
+      probeInput = { provider: 'simulated', model: data.model };
+    } else if (data.provider === 'bedrock') {
       if (!data.bedrock) {
         return reply.code(422).send({
           error: { code: 'VALIDATION_ERROR', message: 'Bedrock credentials are required' },
