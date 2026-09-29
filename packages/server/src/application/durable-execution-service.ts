@@ -154,6 +154,12 @@ export class DurableExecutionService {
             payload: totals,
             traceRunId,
           });
+          this.recordEvidence({
+            eventType: 'resource.consumed',
+            job,
+            payload: totals,
+            traceRunId,
+          });
           if (traceRunId) this.traces?.finalize(traceRunId, 'success', { tokens: totals.totalTokens, costUsd: totals.costUsd });
           return result;
         } catch (error) {
@@ -161,6 +167,12 @@ export class DurableExecutionService {
             eventType: context.signal.aborted ? 'execution.cancelled' : 'execution.failed',
             job,
             payload: { error: error instanceof Error ? error.message : String(error) },
+            traceRunId,
+          });
+          this.recordEvidence({
+            eventType: 'error.observed',
+            job,
+            payload: { error: error instanceof Error ? error.name : 'unknown' },
             traceRunId,
           });
           if (traceRunId) this.traces?.finalize(traceRunId, 'error');
@@ -181,7 +193,7 @@ export class DurableExecutionService {
   }
 
   private recordEvidence(input: {
-    eventType: 'execution.started' | 'execution.completed' | 'execution.failed' | 'execution.cancelled' | 'permission.decided';
+    eventType: 'execution.started' | 'execution.completed' | 'execution.failed' | 'execution.cancelled' | 'permission.decided' | 'resource.consumed' | 'error.observed';
     job: ExecutionJob;
     payload: unknown;
     traceRunId?: string;
@@ -211,12 +223,13 @@ function stableJson(value: unknown): string {
   return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(',')}}`;
 }
 
-function executionTotals(value: unknown): { totalTokens: number; costUsd: number } {
-  if (!value || typeof value !== 'object') return { totalTokens: 0, costUsd: 0 };
+function executionTotals(value: unknown): { totalTokens: number; costUsd: number; totalLatencyMs: number } {
+  if (!value || typeof value !== 'object') return { totalTokens: 0, costUsd: 0, totalLatencyMs: 0 };
   const record = value as Record<string, unknown>;
   return {
     totalTokens: typeof record['totalTokens'] === 'number' ? record['totalTokens'] : 0,
     costUsd: typeof record['totalCost'] === 'number' ? record['totalCost'] : 0,
+    totalLatencyMs: typeof record['totalLatencyMs'] === 'number' ? record['totalLatencyMs'] : 0,
   };
 }
 

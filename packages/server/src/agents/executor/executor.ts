@@ -293,6 +293,7 @@ export class ManifestGraphExecutor {
         const prompt = this.buildPrompt(node, options.inputs, preCheck.redactedValues[0] as string | undefined);
         let result: unknown;
         if (this.deps.modelAdapter && node.manifest.tools.length === 0 && (this.deps.modelAdapter.provider === '*' || this.deps.modelAdapter.provider === provider)) {
+          const modelStartedAt = Date.now();
           const response = await providerLimiter.run(() => breaker.execute(() => this.deps.modelAdapter!.invoke({
             provider,
             model: node.manifest.model.modelId,
@@ -309,6 +310,8 @@ export class ManifestGraphExecutor {
             promptTokens: response.promptTokens,
             completionTokens: response.completionTokens,
             costUsd: response.costUsd,
+            latencyMs: Date.now() - modelStartedAt,
+            providerRequestId: response.providerRequestId,
           });
           result = {
             lastMessage: { content: [{ type: 'textBlock', text: response.text }] },
@@ -332,16 +335,17 @@ export class ManifestGraphExecutor {
                 this.toolLimiters.set(toolKey, toolLimiter);
                 return toolLimiter.run(
                   async () => {
+                    const toolStartedAt = Date.now();
                     try {
                       const result = await toolBreaker.execute(() => toolRegistry.invoke(name, input, {
                         organizationId: options.organizationId!,
                         executionId: options.executionId,
                         signal,
                       }, toolAuthorizer));
-                      this.recordEvidence(options, manifestHash, node.id, 'tool.called', { name, success: true });
+                      this.recordEvidence(options, manifestHash, node.id, 'tool.called', { name, success: true, latencyMs: Date.now() - toolStartedAt });
                       return result;
                     } catch (error) {
-                      this.recordEvidence(options, manifestHash, node.id, 'tool.called', { name, success: false, error: error instanceof Error ? error.name : 'unknown' });
+                      this.recordEvidence(options, manifestHash, node.id, 'tool.called', { name, success: false, latencyMs: Date.now() - toolStartedAt, error: error instanceof Error ? error.name : 'unknown' });
                       throw error;
                     }
                   },
