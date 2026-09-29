@@ -59,6 +59,7 @@ import { registerSecurityRoutes } from './security.js';
 import { registerAuditReportRoutes } from './audit-report.js';
 import { registerBudgetRoutes } from './budget.js';
 import { registerIdentityRoutes } from './identity.js';
+import { registerAgentSpecificationRoutes } from './agent-specification.js';
 import { WorkspaceService } from '../application/workspace-service.js';
 import { ProjectService } from '../application/project-service.js';
 import { CapabilityService } from '../application/capability-service.js';
@@ -106,6 +107,7 @@ import type { GoalBasedEvolutionAgent } from '../agents/evolution/goal-evolver.j
 import type { ChaosConfig } from '../hardening/chaos.js';
 import type Database from 'better-sqlite3';
 import type { BudgetDeps } from './budget.js';
+import type { AgentSpecificationRepo } from '../repos/agent-specification.js';
 
 export interface AppDeps {
   nodeEnvironment: string;
@@ -175,6 +177,7 @@ export interface AppDeps {
   ssoConfigRepo: import('../repos/team.js').SsoConfigRepo;
   vaultRepo: VaultRepo;
   promptScanRepo: import('../repos/prompt-scan.js').PromptScanRepo;
+  agentSpecificationRepo: AgentSpecificationRepo;
 }
 
 /**
@@ -365,4 +368,5 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     registerBudgetRoutes(app, deps.budgetDeps);
   }
   registerIdentityRoutes(app, { service: deps.identityService });
+  registerAgentSpecificationRoutes(app, { repo: deps.agentSpecificationRepo, workspaceRepo: deps.workspaceRepo });
 }

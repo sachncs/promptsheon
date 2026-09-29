@@ -382,6 +382,7 @@ async function main() {
     ssoConfigRepo: repos.ssoConfig,
     vaultRepo: repos.vault,
     promptScanRepo: repos.promptScan,
+    agentSpecificationRepo: repos.agentSpecification!,
     gateway,
     budgetDeps: {
       budgetRepo: repos.budget,

@@ -21,6 +21,12 @@ export interface AgentSpecificationRecord {
   specification: AgentSpecification;
 }
 
+export interface SpecificationDiffEntry {
+  path: string;
+  before: unknown;
+  after: unknown;
+}
+
 interface SpecificationRow {
   hash: string;
   workspace_id: string;
@@ -83,6 +89,13 @@ export class AgentSpecificationRepo {
     return this.toRecord(row, specification);
   }
 
+  async diff(workspaceId: string, leftHash: string, rightHash: string): Promise<SpecificationDiffEntry[]> {
+    const [left, right] = await Promise.all([this.get(workspaceId, leftHash), this.get(workspaceId, rightHash)]);
+    const changes: SpecificationDiffEntry[] = [];
+    collectDiff(left.specification, right.specification, '', changes);
+    return changes;
+  }
+
   listLineage(workspaceId: string, hash: string): Array<Omit<AgentSpecificationRecord, 'specification'>> {
     const rows: SpecificationRow[] = [];
     const seen = new Set<string>();
@@ -131,4 +144,28 @@ export class AgentSpecificationRepo {
       publishedAt: row.published_at,
     };
   }
+}
+
+function collectDiff(left: unknown, right: unknown, path: string, changes: SpecificationDiffEntry[]): void {
+  if (Object.is(left, right)) return;
+  if (Array.isArray(left) && Array.isArray(right)) {
+    const length = Math.max(left.length, right.length);
+    for (let index = 0; index < length; index++) {
+      collectDiff(left[index], right[index], `${path}/${index}`, changes);
+    }
+    return;
+  }
+  if (left && right && typeof left === 'object' && typeof right === 'object') {
+    const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+    for (const key of [...keys].sort()) {
+      collectDiff(
+        (left as Record<string, unknown>)[key],
+        (right as Record<string, unknown>)[key],
+        `${path}/${key}`,
+        changes,
+      );
+    }
+    return;
+  }
+  changes.push({ path: path || '/', before: left, after: right });
 }
