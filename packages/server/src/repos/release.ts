@@ -305,6 +305,18 @@ export class ReleaseRepo extends BaseRepo<Release> {
     return row ? toRelease(row) : null;
   }
 
+  listCanaryReleases(): Array<{ releaseId: string; organizationId: string }> {
+    const rows = this.db.prepare(
+      `SELECT r.id AS release_id, w.org_id AS organization_id
+       FROM releases r
+       JOIN capabilities c ON c.id = r.capability_id
+       JOIN projects p ON p.id = c.project_id
+       JOIN workspaces w ON w.id = p.workspace_id
+       WHERE r.status = 'canary' ORDER BY r.created_at ASC`,
+    ).all() as Array<{ release_id: string; organization_id: string }>;
+    return rows.map((row) => ({ releaseId: row.release_id, organizationId: row.organization_id }));
+  }
+
   updateCanaryPercent(id: string, percent: number): Release | null {
     const existing = this.findById(id);
     if (!existing) return null;

@@ -19,6 +19,7 @@ import { EvolutionAgent } from './agents/evolution/evolution.js';
 import { GoalBasedEvolutionAgent } from './agents/evolution/goal-evolver.js';
 import { MutationPromotionService } from './application/mutation-promotion-service.js';
 import { CanaryRollbackService } from './application/canary-rollback-service.js';
+import { CanaryRollbackMonitor } from './scheduler/canary-rollback-monitor.js';
 import { ReasoningCompiler } from './agents/compiler/compiler.js';
 import { IdeaPlannerAgent } from './agents/planner/index.js';
 import { ManifestGraphExecutor } from './agents/executor/index.js';
@@ -122,6 +123,7 @@ async function main() {
   });
   const canaryRollbackService = new CanaryRollbackService(repos.release, repos.eval, auditChain);
   const app = Fastify({ logger: true, bodyLimit: 2_097_152 });
+  const canaryRollbackMonitor = new CanaryRollbackMonitor(repos.release, canaryRollbackService, app.log);
 
   if (config.server.fipsMode) {
     app.log.warn('PROMPTSHEON_FIPS_MODE=true — audit chain requires a FIPS-validated Node build');
@@ -428,6 +430,7 @@ async function main() {
 
   const scheduler = new Scheduler(repos.schedule, sseHub);
   scheduler.start();
+  canaryRollbackMonitor.start();
 
   const port = config.server.port;
   const host = config.server.host;
@@ -437,6 +440,7 @@ async function main() {
   const shutdown = async (signal: string) => {
     app.log.info({ event: 'server.stopping', signal }, 'server.stopping');
     scheduler.stop();
+    canaryRollbackMonitor.stop();
     await durableWorker.stop();
     retention.stop();
     sseHub.destroy();
