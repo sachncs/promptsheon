@@ -821,6 +821,11 @@
     },
     {
       "file": "packages/server/src/routes/release.ts",
+      "method": "POST",
+      "path": "/api/releases/:id/sign"
+    },
+    {
+      "file": "packages/server/src/routes/release.ts",
       "method": "PUT",
       "path": "/api/releases/:id/overlay"
     },
@@ -1315,6 +1320,7 @@
     "packages/server/src/application/project-service.ts",
     "packages/server/src/application/provider-adapters.ts",
     "packages/server/src/application/release-service.ts",
+    "packages/server/src/application/release-signing.ts",
     "packages/server/src/application/repository-service.ts",
     "packages/server/src/application/schedule-service.ts",
     "packages/server/src/application/trace-service.ts",
@@ -1435,7 +1441,8 @@
     "packages/shared/db/migrations/058_evidence_records.up.sql",
     "packages/shared/db/migrations/059_eval_suite_runs.up.sql",
     "packages/shared/db/migrations/060_mutation_proposals.up.sql",
-    "packages/shared/db/migrations/061_mutation_promotion.up.sql"
+    "packages/shared/db/migrations/061_mutation_promotion.up.sql",
+    "packages/shared/db/migrations/062_release_signatures.up.sql"
   ],
   "frontendRoutes": [
     {

@@ -20,9 +20,11 @@ Mutation candidates can be explicitly promoted into draft releases after
 approval. Release transitions into `approved`, `canary`, or `active` now also
 require an organization-scoped passing evaluation run in addition to the
 maker-checker approval gate. Draft creation never activates traffic.
+Release manifests can now be signed with organization-scoped Ed25519 keys;
+promotion verifies the signature against the canonical manifest hash and
+rejects missing, tampered, or deactivated-key signatures.
 
-Canary rollout automation, rollback triggers, signed release manifests, and
-signed release manifests, and full promotion concurrency testing remain in
+Canary rollout automation and full promotion concurrency testing remain in
 progress. A deterministic canary health assessment now evaluates the latest
 organization-scoped run and atomically rolls back a regressed canary/active
 release to its active peer. A bounded background monitor now assesses all

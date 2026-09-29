@@ -21,6 +21,7 @@ import {
 import type { CanaryRollbackService } from '../application/canary-rollback-service.js';
 import type { SigningKeyRepo } from '../repos/signing-key.js';
 import { releaseManifestHash, signedReleaseMessage } from '../application/release-signing.js';
+import { registerFallbackRouteDoc } from '../openapi.js';
 
 export { approvalGate } from '../application/release-service.js';
 
@@ -94,6 +95,9 @@ export function registerReleaseRoutes(
   repo: ReleaseRepo,
   deps: { manifestRepo: ManifestRepo; auditChain: AuditChain; overlayRepo: ReleaseOverlayRepo; releaseService: ReleaseService; signingKeyRepo: SigningKeyRepo; canaryRollbackService?: CanaryRollbackService },
 ) {
+  registerFallbackRouteDoc('post', '/api/releases/:id/sign');
+  registerFallbackRouteDoc('post', '/api/releases/:id/auto-rollback');
+
   app.get('/api/releases', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
