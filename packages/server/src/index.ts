@@ -196,7 +196,7 @@ async function main() {
   const llmRouter = new LlmRouter(config.llm.credentials);
   const toolRegistry = new ToolRegistry();
   const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo: repos.manifest, modelAdapter: new RouterModelAdapter(llmRouter), toolRegistry });
-  const durableExecution = new DurableExecutionService(repos.executionJob, repos.agentSpecification!, executor, repos.executionCheckpoint, toolRegistry);
+  const durableExecution = new DurableExecutionService(repos.executionJob, repos.agentSpecification!, executor, repos.executionCheckpoint, toolRegistry, undefined, repos.evidence);
   const durableWorker = durableExecution.createWorker();
   durableWorker.start();
   const autoEval = new AutoEval({ traceRepo: repos.trace, scoreRepo: repos.traceScore, router: llmRouter });

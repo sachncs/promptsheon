@@ -8,6 +8,7 @@ import type { ExecutionCheckpointRepo } from '../repos/execution-checkpoint.js';
 import { ExecutionTimeoutError } from '../agents/executor/executor.js';
 import { ExecutionWorkError } from './durable-execution-worker.js';
 import type { ToolAuthorizer, ToolRegistry } from './execution-ports.js';
+import type { EvidenceRepo } from '../repos/evidence.js';
 
 export class ExecutionWorkspaceScopeError extends Error {
   constructor(jobId: string, workspaceId: string) {
@@ -45,6 +46,7 @@ export class DurableExecutionService {
     private readonly checkpoints: ExecutionCheckpointRepo,
     private readonly tools?: ToolRegistry,
     private readonly toolAuthorizer?: ToolAuthorizer,
+    private readonly evidence?: EvidenceRepo,
   ) {}
 
   enqueue(input: {
@@ -88,6 +90,11 @@ export class DurableExecutionService {
   createWorker(options: Partial<ExecutionWorkerOptions> = {}): DurableExecutionWorker {
     this.worker = new DurableExecutionWorker(this.jobs, {
       run: async (job, context) => {
+        this.recordEvidence({
+          eventType: 'execution.started',
+          job,
+          payload: { inputHash: job.inputHash, attempt: job.attempts },
+        });
         const record = await this.manifests.get(job.workspaceId, job.agentHash);
         const inputs = z.record(z.string(), z.unknown()).parse(JSON.parse(job.inputJson));
         const estimatedInputTokens = Math.ceil(job.inputJson.length / 4);
@@ -124,8 +131,18 @@ export class DurableExecutionService {
           if (totals.costUsd > record.specification.resourceBudget.maxCostUsd) {
             throw new ExecutionWorkError('cost budget exhausted');
           }
+          this.recordEvidence({
+            eventType: 'execution.completed',
+            job,
+            payload: totals,
+          });
           return result;
         } catch (error) {
+          this.recordEvidence({
+            eventType: context.signal.aborted ? 'execution.cancelled' : 'execution.failed',
+            job,
+            payload: { error: error instanceof Error ? error.message : String(error) },
+          });
           if (error instanceof ExecutionTimeoutError) throw new ExecutionWorkError(error.message, false, true);
           throw error;
         }
@@ -140,6 +157,26 @@ export class DurableExecutionService {
       ...(options.random === undefined ? {} : { random: options.random }),
     }, this.checkpoints);
     return this.worker;
+  }
+
+  private recordEvidence(input: {
+    eventType: 'execution.started' | 'execution.completed' | 'execution.failed' | 'execution.cancelled';
+    job: ExecutionJob;
+    payload: unknown;
+  }): void {
+    if (!this.evidence) return;
+    try {
+      this.evidence.append({
+        eventType: input.eventType,
+        organizationId: input.job.organizationId,
+        correlationId: input.job.id,
+        executionId: input.job.id,
+        agentHash: input.job.agentHash,
+        payload: input.payload,
+      });
+    } catch {
+      // Evidence is non-critical telemetry. Execution state remains authoritative.
+    }
   }
 }
 
