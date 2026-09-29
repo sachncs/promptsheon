@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { EvalSuiteService, type EvalSuiteStore, type GraderFactory } from '../../src/application/eval-suite-service.js';
+import { EvalSuiteService, type EvalSuiteRunStore, type EvalSuiteStore, type GraderFactory } from '../../src/application/eval-suite-service.js';
 import type { EvalSuite, EvalSuiteVersion } from '@promptsheon/shared';
 
 const suite: EvalSuite = {
@@ -99,6 +99,25 @@ describe('EvalSuiteService', () => {
 
     expect(service.run(suite.id, 'org-a', {})).toEqual({ kind: 'version-not-found' });
     expect(deps.grader.create).not.toHaveBeenCalled();
+  });
+
+  it('persists a completed run and each trial when a run store is supplied', () => {
+    const deps = dependencies();
+    const runStore: EvalSuiteRunStore = {
+      createRun: vi.fn(),
+      addTrialResult: vi.fn(),
+      finishRun: vi.fn(),
+      failRun: vi.fn(),
+    };
+    const service = new EvalSuiteService(deps.store, deps.grader, deps.reviews, runStore);
+
+    const result = service.run(suite.id, 'org-a', { trials: [{ caseId: 'case-1', output: 'ok' }] });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') return;
+    expect(runStore.createRun).toHaveBeenCalledWith(expect.objectContaining({ id: result.value.runId, suiteId: suite.id }));
+    expect(runStore.addTrialResult).toHaveBeenCalledWith(expect.objectContaining({ runId: result.value.runId, caseId: 'case-1' }));
+    expect(runStore.finishRun).toHaveBeenCalledWith(expect.objectContaining({ id: result.value.runId, passed: true }));
   });
 
   it('evaluates every repository suite through its current version', () => {
