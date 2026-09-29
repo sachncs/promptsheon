@@ -9,6 +9,7 @@ import type { ManifestRepo } from '../../repos/manifest.js';
 import { ChaosConfig, ChaosFailureError } from '../../hardening/chaos.js';
 import { checkCostCap, recordCost, type CostLimitConfig } from '../../hardening/cost-caps.js';
 import { findRedTeamMatches } from '../../hardening/redteam.js';
+import { CircuitBreaker } from '../../application/execution-resilience.js';
 
 export interface ExecutionTrace {
   executionId: string;
@@ -87,6 +88,7 @@ export class ManifestGraphExecutor {
    * resolve a running agent for `takeSnapshot` / `loadSnapshot`.
    */
   private readonly liveAgents = new Map<string, Agent>();
+  private readonly providerCircuitBreakers = new Map<string, CircuitBreaker>();
 
   constructor(
     private deps: {
@@ -266,10 +268,13 @@ export class ManifestGraphExecutor {
         const agentKey = `${options.executionId}:${node.id}`;
         this.liveAgents.set(agentKey, agent);
         const limits = buildInvocationLimits(node.limits);
-        const result = await agent.invoke(
+        const provider = node.manifest.model.provider;
+        const breaker = this.providerCircuitBreakers.get(provider) ?? new CircuitBreaker(`durable-provider:${provider}`);
+        this.providerCircuitBreakers.set(provider, breaker);
+        const result = await breaker.execute(() => agent.invoke(
           this.buildPrompt(node, options.inputs, preCheck.redactedValues[0] as string | undefined),
           { ...(limits ? { limits } : {}) },
-        );
+        ));
         if (Date.now() - executionStartedAtMs >= manifest.runtime.totalTimeoutMs) {
           throw new ExecutionTimeoutError();
         }

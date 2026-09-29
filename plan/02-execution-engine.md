@@ -84,6 +84,8 @@ Implemented in the current Phase 2 slice:
 - Execution budget checks, provider/tool ports, DAG dependency scheduling with
   bounded parallelism, and durable per-step checkpoints/resume.
 
-Remaining exit-gate work includes wiring provider adapters to the shared
-ports/circuit breaker, end-to-end tool permission enforcement, load/contention
-benchmarks, and full remote verification after the final Phase 2 changes.
+Remaining exit-gate work includes replacing the legacy Strands provider
+construction with injected provider adapters, end-to-end tool permission
+enforcement for actual tool calls, load/contention benchmarks, and final
+verification after those changes. Circuit breakers now protect both the
+gateway provider path and durable node invocations.
