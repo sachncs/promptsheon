@@ -9,7 +9,7 @@ import type { ManifestRepo } from '../../repos/manifest.js';
 import { ChaosConfig, ChaosFailureError } from '../../hardening/chaos.js';
 import { checkCostCap, recordCost, type CostLimitConfig } from '../../hardening/cost-caps.js';
 import { findRedTeamMatches } from '../../hardening/redteam.js';
-import { CircuitBreaker } from '../../application/execution-resilience.js';
+import { CircuitBreaker, ConcurrencyLimiter } from '../../application/execution-resilience.js';
 import type { ModelAdapter, ToolAuthorizer, ToolRegistry } from '../../application/execution-ports.js';
 
 export interface ExecutionTrace {
@@ -93,6 +93,9 @@ export class ManifestGraphExecutor {
    */
   private readonly liveAgents = new Map<string, Agent>();
   private readonly providerCircuitBreakers = new Map<string, CircuitBreaker>();
+  private readonly providerLimiters = new Map<string, ConcurrencyLimiter>();
+  private readonly toolCircuitBreakers = new Map<string, CircuitBreaker>();
+  private readonly toolLimiters = new Map<string, ConcurrencyLimiter>();
 
   constructor(
     private deps: {
@@ -107,6 +110,8 @@ export class ManifestGraphExecutor {
       modelAdapter?: ModelAdapter;
       toolRegistry?: ToolRegistry;
       toolAuthorizer?: ToolAuthorizer;
+      providerConcurrencyLimit?: number;
+      toolConcurrencyLimit?: number;
     },
   ) {}
 
@@ -276,10 +281,12 @@ export class ManifestGraphExecutor {
         const provider = node.manifest.model.provider;
         const breaker = this.providerCircuitBreakers.get(provider) ?? new CircuitBreaker(`durable-provider:${provider}`);
         this.providerCircuitBreakers.set(provider, breaker);
+        const providerLimiter = this.providerLimiters.get(provider) ?? new ConcurrencyLimiter(this.deps.providerConcurrencyLimit ?? 8);
+        this.providerLimiters.set(provider, providerLimiter);
         const prompt = this.buildPrompt(node, options.inputs, preCheck.redactedValues[0] as string | undefined);
         let result: unknown;
         if (this.deps.modelAdapter && node.manifest.tools.length === 0 && (this.deps.modelAdapter.provider === '*' || this.deps.modelAdapter.provider === provider)) {
-          const response = await breaker.execute(() => this.deps.modelAdapter!.invoke({
+          const response = await providerLimiter.run(() => breaker.execute(() => this.deps.modelAdapter!.invoke({
             provider,
             model: node.manifest.model.modelId,
             systemPrompt: '',
@@ -287,7 +294,7 @@ export class ManifestGraphExecutor {
             maxOutputTokens: node.manifest.model.maxTokens ?? node.limits.outputTokens ?? 4096,
             temperature: node.manifest.model.temperature ?? 0,
             signal: options.signal ?? new AbortController().signal,
-          }));
+          })), options.signal);
           result = {
             lastMessage: { content: [{ type: 'textBlock', text: response.text }] },
             metrics: { accumulatedUsage: { totalTokens: response.promptTokens + response.completionTokens, costUsd: response.costUsd } },
@@ -302,15 +309,28 @@ export class ManifestGraphExecutor {
             ...(perNodeHookCtx ? { metricsHookCtx: perNodeHookCtx } : {}),
             toolAdapters,
             ...(toolRegistry && toolAuthorizer && options.organizationId ? {
-              invokeTool: (name, input, signal) => toolRegistry.invoke(name, input, {
-                organizationId: options.organizationId!,
-                executionId: options.executionId,
-                signal,
-              }, toolAuthorizer),
+              invokeTool: (name, input, signal) => {
+                const toolKey = `${provider}:${name}`;
+                const toolBreaker = this.toolCircuitBreakers.get(toolKey) ?? new CircuitBreaker(`durable-tool:${toolKey}`);
+                this.toolCircuitBreakers.set(toolKey, toolBreaker);
+                const toolLimiter = this.toolLimiters.get(toolKey) ?? new ConcurrencyLimiter(this.deps.toolConcurrencyLimit ?? 16);
+                this.toolLimiters.set(toolKey, toolLimiter);
+                return toolLimiter.run(
+                  () => toolBreaker.execute(() => toolRegistry.invoke(name, input, {
+                    organizationId: options.organizationId!,
+                    executionId: options.executionId,
+                    signal,
+                  }, toolAuthorizer)),
+                  signal,
+                );
+              },
             } : {}),
           });
           this.liveAgents.set(agentKey, agent);
-          result = await breaker.execute(() => agent.invoke(prompt, { ...(limits ? { limits } : {}), ...(options.signal ? { cancelSignal: options.signal } : {}) }));
+          result = await providerLimiter.run(
+            () => breaker.execute(() => agent.invoke(prompt, { ...(limits ? { limits } : {}), ...(options.signal ? { cancelSignal: options.signal } : {}) })),
+            options.signal,
+          );
         }
         if (Date.now() - executionStartedAtMs >= manifest.runtime.totalTimeoutMs) {
           throw new ExecutionTimeoutError();

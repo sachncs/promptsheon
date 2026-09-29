@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ToolRegistry, type ToolAdapter } from '../src/application/execution-ports.js';
-import { CircuitBreaker, CircuitOpenError } from '../src/application/execution-resilience.js';
+import { CircuitBreaker, CircuitOpenError, ConcurrencyLimiter } from '../src/application/execution-resilience.js';
 
 const tool: ToolAdapter = {
   name: 'search', description: 'Search', inputSchema: {},
@@ -24,5 +24,34 @@ describe('execution resilience ports', () => {
     await expect(breaker.execute(async () => 'blocked')).rejects.toBeInstanceOf(CircuitOpenError);
     clock = 100;
     await expect(breaker.execute(async () => 'recovered')).resolves.toBe('recovered');
+  });
+
+  it('bounds concurrent work and releases capacity after completion', async () => {
+    const limiter = new ConcurrencyLimiter(1);
+    let release!: () => void;
+    const first = limiter.run(() => new Promise<string>((resolve) => { release = () => resolve('first'); }));
+    await Promise.resolve();
+    const second = limiter.run(async () => 'second');
+    expect(limiter.active).toBe(1);
+    expect(limiter.queued).toBe(1);
+    release();
+    await expect(first).resolves.toBe('first');
+    await expect(second).resolves.toBe('second');
+    expect(limiter.active).toBe(0);
+    expect(limiter.queued).toBe(0);
+  });
+
+  it('cancels a queued operation without consuming capacity', async () => {
+    const limiter = new ConcurrencyLimiter(1);
+    let release!: () => void;
+    const first = limiter.run(() => new Promise<void>((resolve) => { release = resolve; }));
+    const controller = new AbortController();
+    const queued = limiter.run(async () => 'never', controller.signal);
+    controller.abort();
+    await expect(queued).rejects.toThrow('concurrency wait cancelled');
+    expect(limiter.queued).toBe(0);
+    release();
+    await first;
+    expect(limiter.active).toBe(0);
   });
 });
