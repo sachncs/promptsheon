@@ -1,0 +1,111 @@
+'use client';
+
+import * as React from 'react';
+import { Check, GitPullRequest, X } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { mutationProposalApi, type MutationProposal } from '@/lib/api';
+import { useRequireSession } from '@/hooks/use-session';
+import { PageHeader } from '@/components/brand/page-header';
+import { Surface, SurfaceHeader } from '@/components/brand/surface';
+import { EmptyState } from '@/components/brand/empty-state';
+import { QueryError } from '@/components/brand/query-error';
+import { StatusPill, statusKindOf, type StatusKind } from '@/components/brand/status-pill';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+
+function riskLabel(risk: MutationProposal['risk']): StatusKind {
+  return risk === 'critical' || risk === 'high' ? 'error' : risk === 'medium' ? 'review' : 'active';
+}
+
+export default function MutationProposalsPage() {
+  const session = useRequireSession();
+  const queryClient = useQueryClient();
+  const [reasonById, setReasonById] = React.useState<Record<string, string>>({});
+  const proposals = useQuery({
+    queryKey: ['mutation-proposals'],
+    queryFn: () => mutationProposalApi.list(),
+    enabled: Boolean(session),
+  });
+  const decide = useMutation({
+    mutationFn: ({ id, decision }: { id: string; decision: 'approve' | 'reject' | 'abandon' }) => {
+      const reason = reasonById[id]?.trim();
+      if (!reason) throw new Error('Add a decision reason before continuing.');
+      return mutationProposalApi.decide(id, decision, reason);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mutation-proposals'] }),
+  });
+
+  if (!session) return null;
+  if (proposals.isPending) {
+    return <div className="space-y-6" aria-busy="true"><PageHeader eyebrow="Build" title="Mutation proposals" subtitle="Loading candidate changes…" /><Surface className="h-72 animate-pulse bg-surface-2/40"><span className="sr-only">Loading proposals</span></Surface></div>;
+  }
+  if (proposals.isError) return <QueryError message={proposals.error} onRetry={() => void proposals.refetch()} />;
+
+  const rows = proposals.data ?? [];
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Build"
+        title="Mutation proposals"
+        subtitle="Review evidence-backed candidates before they can enter the release workflow. Proposals never activate themselves."
+      />
+      <Surface padded={false}>
+        <SurfaceHeader className="px-5 pt-5" title="Candidate changes" description={`${rows.length} proposal${rows.length === 1 ? '' : 's'} in this organisation`} />
+        {rows.length === 0 ? (
+          <EmptyState icon={GitPullRequest} title="No mutation proposals" description="When the evolution loop finds a candidate, its rationale and risk will appear here for review." className="m-5 border-0 bg-transparent p-12 shadow-none" />
+        ) : (
+          <div className="divide-y divide-border-subtle border-t border-border-subtle">
+            {rows.map((proposal) => {
+              const actionable = proposal.status === 'proposed' || proposal.status === 'validated';
+              return (
+                <article key={proposal.id} className="space-y-4 p-5">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs text-text-subtle">{proposal.id}</span>
+                        <StatusPill kind={statusKindOf(proposal.status, 'pending')} label={proposal.status} />
+                        <StatusPill kind={riskLabel(proposal.risk)} label={`${proposal.risk} risk`} />
+                        <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-text-muted">{proposal.mutationKind}</span>
+                      </div>
+                      <h2 className="mt-3 text-sm font-semibold text-text-strong">{proposal.expectedOutcome}</h2>
+                      <p className="mt-1 text-sm leading-relaxed text-text-muted">{proposal.rationale}</p>
+                    </div>
+                    <div className="shrink-0 text-left text-xs text-text-subtle lg:text-right">
+                      <div>Confidence {Math.round(proposal.confidence * 100)}%</div>
+                      <div className="mt-1">Source <span className="font-mono">{proposal.sourceHash.slice(0, 12)}</span></div>
+                    </div>
+                  </div>
+                  <details className="rounded-lg border border-border-subtle bg-surface-2/50 px-3 py-2 text-xs">
+                    <summary className="cursor-pointer font-medium text-text-muted">View proposed changes</summary>
+                    <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-text-subtle">{JSON.stringify(proposal.changes, null, 2)}</pre>
+                  </details>
+                  {actionable ? (
+                    <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+                      <Textarea
+                        value={reasonById[proposal.id] ?? ''}
+                        onChange={(event) => setReasonById((current) => ({ ...current, [proposal.id]: event.target.value }))}
+                        placeholder="Decision reason (required for auditability)"
+                        rows={2}
+                        aria-label={`Decision reason for ${proposal.id}`}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" onClick={() => decide.mutate({ id: proposal.id, decision: 'approve' })} disabled={decide.isPending}>
+                          <Check /> Approve
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => decide.mutate({ id: proposal.id, decision: 'reject' })} disabled={decide.isPending}>
+                          <X /> Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ) : proposal.decisionReason ? (
+                    <p className="text-xs text-text-subtle">Decision: {proposal.decisionReason}</p>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </Surface>
+    </div>
+  );
+}

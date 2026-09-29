@@ -131,6 +131,28 @@ export interface EvalSuiteRun {
   error: string | null;
 }
 
+export interface MutationProposal {
+  id: string;
+  organizationId: string;
+  sourceHash: string;
+  candidateHash: string | null;
+  mutationKind: 'prompt' | 'guardrail' | 'model' | 'routing' | 'context' | 'tool' | 'permission' | 'execution' | 'memory' | 'budget';
+  changes: Record<string, unknown>;
+  rationale: string;
+  expectedOutcome: string;
+  authorType: 'human' | 'system' | 'simulator';
+  authorId: string;
+  risk: 'low' | 'medium' | 'high' | 'critical';
+  confidence: number;
+  status: 'proposed' | 'validated' | 'approved' | 'rejected' | 'abandoned';
+  evaluationRunId: string | null;
+  decisionReason: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type EvalRunStatus = 'running' | 'passed' | 'failed' | 'error';
 
 export interface EvalRun {
@@ -371,6 +393,28 @@ const EvalSuiteRunSchema = z.object({
   startedAt: z.string(),
   finishedAt: z.string().nullable(),
   error: z.string().nullable(),
+});
+
+const MutationProposalSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  sourceHash: z.string(),
+  candidateHash: z.string().nullable(),
+  mutationKind: z.enum(['prompt', 'guardrail', 'model', 'routing', 'context', 'tool', 'permission', 'execution', 'memory', 'budget']),
+  changes: z.record(z.string(), z.unknown()),
+  rationale: z.string(),
+  expectedOutcome: z.string(),
+  authorType: z.enum(['human', 'system', 'simulator']),
+  authorId: z.string(),
+  risk: z.enum(['low', 'medium', 'high', 'critical']),
+  confidence: z.number().min(0).max(1),
+  status: z.enum(['proposed', 'validated', 'approved', 'rejected', 'abandoned']),
+  evaluationRunId: z.string().nullable(),
+  decisionReason: z.string().nullable(),
+  reviewedBy: z.string().nullable(),
+  reviewedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 const EvalRunSchema = z.object({
@@ -639,6 +683,12 @@ function parseEvalSuiteRuns(raw: unknown): EvalSuiteRun[] {
     if (!parsed.success) throw new ApiError('The server returned invalid eval suite run data.', { code: 'INVALID_RESPONSE' });
     return parsed.data;
   });
+}
+
+function parseMutationProposals(raw: unknown): MutationProposal[] {
+  const parsed = z.array(MutationProposalSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid mutation proposal data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
 }
 
 function parseEvalRun(raw: unknown): EvalRun {
@@ -1476,6 +1526,23 @@ export const evalSuiteApi = {
     client.post(`/eval-suites/${suiteId}/run`, trials).then((r) => r.data),
   gate: (repoId: string, trials: unknown) =>
     client.post(`/repos/${repoId}/eval-gate`, { trials }).then((r) => r.data),
+};
+
+export const mutationProposalApi = {
+  list: async (filter: { status?: MutationProposal['status']; sourceHash?: string } = {}): Promise<MutationProposal[]> => {
+    const params = new URLSearchParams();
+    if (filter.status) params.set('status', filter.status);
+    if (filter.sourceHash) params.set('sourceHash', filter.sourceHash);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const r = await client.get<unknown>(`/mutation-proposals${suffix}`);
+    return parseMutationProposals(r.data);
+  },
+  decide: async (id: string, decision: 'approve' | 'reject' | 'abandon', reason: string): Promise<MutationProposal> => {
+    const r = await client.post<unknown>(`/mutation-proposals/${id}/decision`, { decision, reason });
+    const parsed = MutationProposalSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid mutation proposal data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
 };
 
 export const vaultApi = {
