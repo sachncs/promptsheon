@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validateDag } from '../src/agents/executor/dag-validator.js';
-import { buildNodeAgent, buildGraph, buildInvocationLimits } from '../src/agents/executor/node-builder.js';
+import { buildHarnessNodeAgent, buildNodeAgent, buildGraph, buildInvocationLimits } from '../src/agents/executor/node-builder.js';
 import { FunctionTool, type ToolContext } from '@strands-agents/sdk';
 import { ToolRegistry, type ToolAdapter } from '../src/application/execution-ports.js';
 import type { AppConfig, Manifest, SubCapabilityManifest } from '@promptsheon/shared';
@@ -187,6 +187,12 @@ describe('buildNodeAgent', () => {
     const node = buildLeafManifest('restricted-node');
     node.manifest.metadata = { allowedTools: ['approved-tool'] };
     expect(buildNodeAgent(node, buildConfig())).toBeDefined();
+  });
+
+  it('constructs the production runtime through Strands Harness without implicit capabilities', async () => {
+    const agent = await buildHarnessNodeAgent(buildLeafManifest('harness-node'), buildConfig());
+    expect(agent).toBeDefined();
+    expect(agent.tools).toHaveLength(0);
   });
 
   it('invokes a registered adapter through the agent tool bridge', async () => {

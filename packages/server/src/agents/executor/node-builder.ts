@@ -1,5 +1,6 @@
 import { Agent, FunctionTool, Graph, AfterInvocationEvent, BeforeInvocationEvent, BeforeToolCallEvent } from '@strands-agents/sdk';
 import type { Graph as GraphType, HookCallback } from '@strands-agents/sdk';
+import { createHarness } from '@strands-agents/harness';
 import type { AppConfig, Manifest, SubCapabilityManifest } from '@promptsheon/shared';
 import { createModel } from '../model.js';
 import { validateDag } from './dag-validator.js';
@@ -47,6 +48,51 @@ export function buildNodeAgent(
 ): Agent {
   const conv = buildConversationManager(node.conversationManager);
   const retry = buildRetryStrategy(node.retry);
+  const agent = new Agent({
+    id: node.id,
+    model: createModel(config, node.manifest.model),
+    systemPrompt: node.manifest.prompt.systemPrompt,
+    tools: buildNodeTools(node, options),
+    ...(conv ? { conversationManager: conv } : {}),
+    ...(retry ? { retryStrategy: retry } : {}),
+  });
+
+  configureNodeAgent(agent, node, options);
+  return agent;
+}
+
+/**
+ * Build a node with Strands' first-party Harness defaults while retaining
+ * Promptsheon's manifest-owned tool and permission boundaries.
+ */
+export async function buildHarnessNodeAgent(
+  node: SubCapabilityManifest,
+  config: AppConfig,
+  options: BuildNodeAgentOptions = {},
+): Promise<Agent> {
+  const conv = buildConversationManager(node.conversationManager);
+  const retry = buildRetryStrategy(node.retry);
+  const agent = await createHarness({
+    id: node.id,
+    model: createModel(config, node.manifest.model),
+    systemPrompt: node.manifest.prompt.systemPrompt,
+    tools: buildNodeTools(node, options),
+    builtinTools: [],
+    builtinPlugins: [],
+    session: false,
+    memory: false,
+    skills: false,
+    contextManager: false,
+    backgroundTasks: false,
+    ...(conv ? { conversationManager: conv } : {}),
+    ...(retry ? { retryStrategy: retry } : {}),
+  });
+
+  configureNodeAgent(agent, node, options);
+  return agent;
+}
+
+function buildNodeTools(node: SubCapabilityManifest, options: BuildNodeAgentOptions): Array<Agent | FunctionTool> {
   const adapters = new Map((options.toolAdapters ?? []).map((tool) => [tool.name, tool]));
   const adapterTools = node.manifest.tools
     .map((spec) => adapters.get(spec.name))
@@ -63,18 +109,14 @@ export function buildNodeAgent(
         return JSON.stringify(await output) ?? 'null';
       },
     }));
-  const agent = new Agent({
-    id: node.id,
-    model: createModel(config, node.manifest.model),
-    systemPrompt: node.manifest.prompt.systemPrompt,
-    tools: [
-      ...node.manifest.tools.map((tool) => toolRegistry.get(tool.name)).filter((tool): tool is Agent => tool !== undefined),
-      ...adapterTools,
-    ],
-    ...(conv ? { conversationManager: conv } : {}),
-    ...(retry ? { retryStrategy: retry } : {}),
-  });
 
+  return [
+    ...node.manifest.tools.map((tool) => toolRegistry.get(tool.name)).filter((tool): tool is Agent => tool !== undefined),
+    ...adapterTools,
+  ];
+}
+
+function configureNodeAgent(agent: Agent, node: SubCapabilityManifest, options: BuildNodeAgentOptions): void {
   if (options.metricsHookCtx) {
     const cb = createMetricsHook(options.metricsHookCtx);
     agent.addHook(AfterInvocationEvent, cb);
@@ -94,7 +136,6 @@ export function buildNodeAgent(
     });
   }
 
-  return agent;
 }
 
 export function buildInvocationLimits(config: { turns?: number; outputTokens?: number; totalTokens?: number }): { turns?: number; outputTokens?: number; totalTokens?: number } | undefined {

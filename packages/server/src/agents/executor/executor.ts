@@ -1,7 +1,7 @@
 import type { AppConfig, Manifest } from '@promptsheon/shared';
 import { Agent } from '@strands-agents/sdk';
 import { SseHub } from '../../sse/hub.js';
-import { buildGraph, buildInvocationLimits, buildNodeAgent } from './node-builder.js';
+import { buildGraph, buildHarnessNodeAgent, buildInvocationLimits } from './node-builder.js';
 import { validateDag } from './dag-validator.js';
 import { runAllGuardrails, type GuardrailBroadcast } from './guardrails.js';
 import { NotFoundError } from '@promptsheon/shared';
@@ -345,7 +345,7 @@ export class ManifestGraphExecutor {
           const toolAdapters = toolRegistry
             ? node.manifest.tools.map((tool) => toolRegistry.get(tool.name)).filter((tool): tool is NonNullable<typeof tool> => tool !== null)
             : [];
-          const agent = buildNodeAgent(node, this.deps.config, {
+          const agent = await buildHarnessNodeAgent(node, this.deps.config, {
             ...(perNodeHookCtx ? { metricsHookCtx: perNodeHookCtx } : {}),
             toolAdapters,
             ...(toolRegistry && toolAuthorizer && options.organizationId ? {
