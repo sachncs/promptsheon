@@ -77,6 +77,18 @@ describe('RateLimiter', () => {
     const c = rl.take('a', 1);
     expect(c.allowed).toBe(false);
   });
+
+  it('bounds the number of actor buckets and evicts the least recently updated bucket', () => {
+    const rl = new RateLimiter({ capacity: 1, refillPerSecond: 0, maxBuckets: 2 });
+    rl.take('oldest', 1);
+    rl.take('newer', 1);
+    expect(rl.size()).toBe(2);
+
+    rl.take('latest', 1);
+
+    expect(rl.size()).toBe(2);
+    expect(rl.take('oldest', 1).allowed).toBe(true);
+  });
 });
 
 describe('Gateway', () => {

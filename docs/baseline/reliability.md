@@ -64,6 +64,25 @@ tools, evaluation workloads, and network distance. Phase 2 and Phase 9 must
 replace them with workload-representative measurements before capacity is
 accepted.
 
+## Boundedness review
+
+The baseline audit identified these long-lived or potentially unbounded areas:
+
+| Area | Current control | Follow-up |
+|---|---|---|
+| Agent execution retries | Manifest retry schema and provider timeout limits | Phase 2: classify retryable failures and measure retry amplification |
+| Replication loop | Explicit daemon loop with `--oneshot` mode and bounded batches of 500 | Phase 2: add cancellation and shutdown telemetry |
+| Scheduler polling | One active interval, non-overlapping `poll`, explicit `stop` | Phase 2: bound due-work per poll and record queue age |
+| Webhook replay cache | Five-minute TTL plus 10,000-entry cap with oldest-entry eviction | Phase 3: move replay state to durable/shared storage for multi-node deployments |
+| Gateway rate-limit buckets | 10,000 actor-bucket cap with oldest-updated eviction | Phase 2: expose eviction metrics and choose a tenant-aware policy |
+| Response cache | LRU cap of 1,024 entries by default | Phase 3: measure hit rate and memory footprint |
+| Sessions and evidence | Durable product data, not an implicit cache | Phase 3/9: retention, quotas, pagination, and deletion enforcement |
+| Statistical sampling loops | Rejection sampling for valid random draws | Phase 4: add iteration caps and failure telemetry for adversarial inputs |
+
+This table is a review register, not proof that all limits are production
+adequate. Each follow-up requires a test and a measured limit before its phase
+can be accepted.
+
 ## Initial reliability objectives
 
 These targets are the starting point for load-test design. They must be

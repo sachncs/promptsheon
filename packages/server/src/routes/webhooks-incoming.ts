@@ -14,6 +14,7 @@ declare module 'fastify' {
 
 const MAX_BODY_SIZE = 1_048_576; // 1 MiB
 const REPLAY_CACHE_TTL_MS = 5 * 60 * 1000;
+const MAX_REPLAY_ENTRIES = 10_000;
 
 const IncomingWebhookParamsSchema = z.object({
   id: z.string().trim().min(1).max(255),
@@ -37,6 +38,11 @@ class ReplayCache {
   private map = new Map<string, ReplayEntry>();
 
   remember(entry: ReplayEntry): void {
+    this.prune();
+    if (this.map.size >= MAX_REPLAY_ENTRIES) {
+      const oldestKey = this.map.keys().next().value;
+      if (oldestKey !== undefined) this.map.delete(oldestKey);
+    }
     this.map.set(`${entry.endpointId}:${entry.id}`, entry);
   }
 

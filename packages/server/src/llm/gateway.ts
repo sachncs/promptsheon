@@ -151,16 +151,22 @@ export interface RateLimitState {
 export class RateLimiter {
   private readonly capacity: number;
   private readonly refillPerSecond: number;
+  private readonly maxBuckets: number;
   private readonly buckets = new Map<string, { tokens: number; updatedAt: number }>();
 
-  constructor(opts: { capacity: number; refillPerSecond: number }) {
+  constructor(opts: { capacity: number; refillPerSecond: number; maxBuckets?: number }) {
     this.capacity = opts.capacity;
     this.refillPerSecond = opts.refillPerSecond;
+    this.maxBuckets = Math.max(1, opts.maxBuckets ?? 10_000);
   }
 
   take(key: string, cost = 1): { allowed: boolean; state: RateLimitState } {
     const now = Date.now();
-    const bucket = this.buckets.get(key) ?? { tokens: this.capacity, updatedAt: now };
+    let bucket = this.buckets.get(key);
+    if (!bucket) {
+      this.evictOldestBucketIfFull();
+      bucket = { tokens: this.capacity, updatedAt: now };
+    }
     const elapsed = (now - bucket.updatedAt) / 1000;
     bucket.tokens = Math.min(this.capacity, bucket.tokens + elapsed * this.refillPerSecond);
     bucket.updatedAt = now;
@@ -184,6 +190,23 @@ export class RateLimiter {
 
   reset(key: string): void {
     this.buckets.delete(key);
+  }
+
+  size(): number {
+    return this.buckets.size;
+  }
+
+  private evictOldestBucketIfFull(): void {
+    if (this.buckets.size < this.maxBuckets) return;
+    let oldestKey: string | undefined;
+    let oldestUpdatedAt = Number.POSITIVE_INFINITY;
+    for (const [key, bucket] of this.buckets) {
+      if (bucket.updatedAt < oldestUpdatedAt) {
+        oldestKey = key;
+        oldestUpdatedAt = bucket.updatedAt;
+      }
+    }
+    if (oldestKey !== undefined) this.buckets.delete(oldestKey);
   }
 }
 
