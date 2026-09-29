@@ -192,7 +192,7 @@ async function main() {
   const compiler = new ReasoningCompiler(config);
   const planner = new IdeaPlannerAgent(config);
   const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo: repos.manifest });
-  const durableExecution = new DurableExecutionService(repos.executionJob, repos.agentSpecification!, executor);
+  const durableExecution = new DurableExecutionService(repos.executionJob, repos.agentSpecification!, executor, repos.executionCheckpoint);
   const durableWorker = durableExecution.createWorker();
   durableWorker.start();
   const llmRouter = new LlmRouter(config.llm.credentials);

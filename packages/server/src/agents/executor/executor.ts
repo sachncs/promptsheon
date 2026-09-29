@@ -151,13 +151,13 @@ export class ManifestGraphExecutor {
       timestamp: startedAt,
     });
 
-    for (const node of manifest.nodes) {
+    const runNode = async (node: Manifest['nodes'][number]): Promise<void> => {
       if (Date.now() - executionStartedAtMs >= manifest.runtime.totalTimeoutMs) {
         throw new ExecutionTimeoutError();
       }
       if (options.signal?.aborted) {
         trace.status = 'cancelled';
-        break;
+        return;
       }
       const nodeStartedAt = Date.now();
       const recoveredOutput = recovered.get(node.id);
@@ -171,7 +171,7 @@ export class ManifestGraphExecutor {
           totalTokens: 0,
           error: '',
         };
-        continue;
+        return;
       }
       trace.nodeResults[node.id] = {
         nodeId: node.id,
@@ -211,7 +211,7 @@ export class ManifestGraphExecutor {
             data: { kind: 'redteam_blocked', executionId: options.executionId, nodeId: node.id, patterns: redteamHits },
             timestamp: new Date().toISOString(),
           });
-          break;
+          return;
         }
       }
 
@@ -238,7 +238,7 @@ export class ManifestGraphExecutor {
             data: { kind: 'cost_cap_blocked', executionId: options.executionId, nodeId: node.id, reason: capResult.reason },
             timestamp: new Date().toISOString(),
           });
-          break;
+          return;
         }
       }
 
@@ -247,7 +247,7 @@ export class ManifestGraphExecutor {
         trace.nodeResults[node.id]!.error = 'pre-guardrail blocked';
         trace.status = 'failed';
         trace.error = `pre-guardrail blocked for node ${node.id}`;
-        break;
+        return;
       }
 
       try {
@@ -339,8 +339,31 @@ export class ManifestGraphExecutor {
           data: { kind: 'node_failed', executionId: options.executionId, nodeId: node.id, error: err.message },
           timestamp: new Date().toISOString(),
         });
+        return;
+      }
+    };
+
+    const pending = new Map(manifest.nodes.map((node) => [node.id, node]));
+    const completed = new Set<string>(recovered.keys());
+    while (pending.size > 0 && trace.status === 'completed') {
+      if (options.signal?.aborted) {
+        trace.status = 'cancelled';
         break;
       }
+      const ready = [...pending.values()].filter((node) =>
+        manifest.edges.filter((edge) => edge.to === node.id).every((edge) => completed.has(edge.from)),
+      );
+      if (ready.length === 0) {
+        trace.status = 'failed';
+        trace.error = 'DAG scheduler could not resolve dependencies';
+        break;
+      }
+      const batch = ready.slice(0, Math.max(1, manifest.runtime.concurrencyLimit));
+      await Promise.all(batch.map(async (node) => {
+        await runNode(node);
+        pending.delete(node.id);
+        if (trace.nodeResults[node.id]?.status === 'completed') completed.add(node.id);
+      }));
     }
 
     trace.endedAt = new Date().toISOString();
