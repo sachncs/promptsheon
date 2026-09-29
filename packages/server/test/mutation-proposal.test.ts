@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3';
-import { applyMigrations } from '@promptsheon/shared';
+import { applyMigrations, CasStore } from '@promptsheon/shared';
 import { buildValidManifest } from '../../shared/src/manifest-schema.js';
 import { MutationProposalRepo } from '../src/repos/mutation-proposal.js';
 import { MutationPromotionService } from '../src/application/mutation-promotion-service.js';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'shared', 'db', 'migrations');
 
@@ -47,10 +49,15 @@ describe('MutationProposalRepo', () => {
     const db = new Database(':memory:');
     applyMigrations(db, migrations());
     const repo = new MutationProposalRepo(db);
+    const casPath = await mkdtemp(join(tmpdir(), 'promptsheon-cas-'));
+    const cas = new CasStore(casPath);
+    await cas.init();
+    const manifest = buildValidManifest({ metadata: { capabilityId: 'cap-a', goal: 'answer accurately' } });
+    const candidateHash = await cas.writeObject({ type: 'blob', data: Buffer.from(JSON.stringify(manifest)) });
     const proposal = repo.create({
       organizationId: 'org-a',
       sourceHash: 'source-a',
-      candidateHash: 'candidate-a',
+      candidateHash,
       mutationKind: 'prompt',
       changes: { path: 'prompt.systemPrompt' },
       rationale: 'clarity',
@@ -61,12 +68,11 @@ describe('MutationProposalRepo', () => {
       confidence: 0.8,
     });
     repo.decide({ id: proposal.id, organizationId: 'org-a', status: 'approved', reviewerId: 'reviewer', reason: 'safe candidate' });
-    const manifest = buildValidManifest({ metadata: { capabilityId: 'cap-a', goal: 'answer accurately' } });
     let registeredHash = '';
     const release = { id: 'release-a', status: 'draft', environment: 'dev' };
     const service = new MutationPromotionService(
       repo,
-      { readObject: async () => ({ type: 'blob', data: Buffer.from(JSON.stringify(manifest)) }) } as never,
+      cas,
       { registerFromRaw: (input: { manifestHash: string }) => { registeredHash = input.manifestHash; } } as never,
       { findByIdInOrg: () => null, createInOrg: () => release } as never,
     );
@@ -75,7 +81,8 @@ describe('MutationProposalRepo', () => {
 
     expect(result.release).toEqual(release);
     expect(result.proposal.promotedReleaseId).toBe('release-a');
-    expect(registeredHash).toBe('candidate-a');
+    expect(registeredHash).toBe(candidateHash);
     db.close();
+    await rm(casPath, { recursive: true, force: true });
   });
 });
