@@ -4,6 +4,7 @@ export * from './cas/index.js';
 export * from './sse.js';
 export * from './errors.js';
 export * from './agent-specification.js';
+export * from './execution-state.js';
 export * from './db-migrate.js';
 export * from './eval/pass-at-k.js';
 export * from './eval/pareto.js';

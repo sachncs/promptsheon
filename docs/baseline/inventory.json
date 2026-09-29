@@ -395,6 +395,21 @@
       "path": "/api/eval/score"
     },
     {
+      "file": "packages/server/src/routes/execution-jobs.ts",
+      "method": "POST",
+      "path": "/api/workspaces/:workspaceId/execution-jobs"
+    },
+    {
+      "file": "packages/server/src/routes/execution-jobs.ts",
+      "method": "GET",
+      "path": "/api/workspaces/:workspaceId/execution-jobs/:id"
+    },
+    {
+      "file": "packages/server/src/routes/execution-jobs.ts",
+      "method": "POST",
+      "path": "/api/workspaces/:workspaceId/execution-jobs/:id/cancel"
+    },
+    {
       "file": "packages/server/src/routes/execution.ts",
       "method": "GET",
       "path": "/api/executions"
@@ -1219,6 +1234,8 @@
     "packages/server/src/application/audit-replication-service.ts",
     "packages/server/src/application/canary-routing.ts",
     "packages/server/src/application/capability-service.ts",
+    "packages/server/src/application/durable-execution-service.ts",
+    "packages/server/src/application/durable-execution-worker.ts",
     "packages/server/src/application/eval-suite-service.ts",
     "packages/server/src/application/execution-replay-service.ts",
     "packages/server/src/application/execution-service.ts",
@@ -1246,6 +1263,7 @@
     "packages/server/src/repos/dataset.ts",
     "packages/server/src/repos/eval-suite.ts",
     "packages/server/src/repos/eval.ts",
+    "packages/server/src/repos/execution-job.ts",
     "packages/server/src/repos/execution.ts",
     "packages/server/src/repos/experiment.ts",
     "packages/server/src/repos/factory.ts",
@@ -1338,7 +1356,8 @@
     "packages/shared/db/migrations/052_outgoing_webhooks.up.sql",
     "packages/shared/db/migrations/053_release_overlays.up.sql",
     "packages/shared/db/migrations/054_api_key_organization.up.sql",
-    "packages/shared/db/migrations/055_agent_specifications.up.sql"
+    "packages/shared/db/migrations/055_agent_specifications.up.sql",
+    "packages/shared/db/migrations/056_execution_jobs.up.sql"
   ],
   "frontendRoutes": [
     {

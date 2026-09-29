@@ -60,6 +60,7 @@ import { registerAuditReportRoutes } from './audit-report.js';
 import { registerBudgetRoutes } from './budget.js';
 import { registerIdentityRoutes } from './identity.js';
 import { registerAgentSpecificationRoutes } from './agent-specification.js';
+import { registerExecutionJobRoutes } from './execution-jobs.js';
 import { WorkspaceService } from '../application/workspace-service.js';
 import { ProjectService } from '../application/project-service.js';
 import { CapabilityService } from '../application/capability-service.js';
@@ -108,6 +109,7 @@ import type { ChaosConfig } from '../hardening/chaos.js';
 import type Database from 'better-sqlite3';
 import type { BudgetDeps } from './budget.js';
 import type { AgentSpecificationRepo } from '../repos/agent-specification.js';
+import type { DurableExecutionService } from '../application/durable-execution-service.js';
 
 export interface AppDeps {
   nodeEnvironment: string;
@@ -178,6 +180,7 @@ export interface AppDeps {
   vaultRepo: VaultRepo;
   promptScanRepo: import('../repos/prompt-scan.js').PromptScanRepo;
   agentSpecificationRepo: AgentSpecificationRepo;
+  durableExecutionService: DurableExecutionService;
 }
 
 /**
@@ -369,4 +372,5 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   }
   registerIdentityRoutes(app, { service: deps.identityService });
   registerAgentSpecificationRoutes(app, { repo: deps.agentSpecificationRepo, workspaceRepo: deps.workspaceRepo });
+  registerExecutionJobRoutes(app, { service: deps.durableExecutionService, workspaceRepo: deps.workspaceRepo });
 }

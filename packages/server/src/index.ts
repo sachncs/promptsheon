@@ -37,6 +37,7 @@ import { RepositoryService } from './application/repository-service.js';
 import { ReleaseService } from './application/release-service.js';
 import { AgentIdentityRepo } from './repos/agent-identity.js';
 import { AgentSpecificationRepo } from './repos/agent-specification.js';
+import { DurableExecutionService } from './application/durable-execution-service.js';
 import type { Agent } from '@strands-agents/sdk';
 import type Database from 'better-sqlite3';
 
@@ -191,6 +192,9 @@ async function main() {
   const compiler = new ReasoningCompiler(config);
   const planner = new IdeaPlannerAgent(config);
   const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo: repos.manifest });
+  const durableExecution = new DurableExecutionService(repos.executionJob, repos.agentSpecification!, executor);
+  const durableWorker = durableExecution.createWorker();
+  durableWorker.start();
   const llmRouter = new LlmRouter(config.llm.credentials);
   const autoEval = new AutoEval({ traceRepo: repos.trace, scoreRepo: repos.traceScore, router: llmRouter });
   const gateway = new Gateway({
@@ -383,6 +387,7 @@ async function main() {
     vaultRepo: repos.vault,
     promptScanRepo: repos.promptScan,
     agentSpecificationRepo: repos.agentSpecification!,
+    durableExecutionService: durableExecution,
     gateway,
     budgetDeps: {
       budgetRepo: repos.budget,
@@ -406,6 +411,7 @@ async function main() {
   const shutdown = async (signal: string) => {
     app.log.info(`Received ${signal}, shutting down gracefully`);
     scheduler.stop();
+    await durableWorker.stop();
     retention.stop();
     sseHub.destroy();
     await app.close();
