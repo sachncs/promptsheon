@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 import type { MutationProposalRepo } from '../repos/mutation-proposal.js';
+import type { MutationPromotionService } from '../application/mutation-promotion-service.js';
 import { registerFallbackRouteDoc } from '../openapi.js';
 
 const MutationKindSchema = z.enum(['prompt', 'guardrail', 'model', 'routing', 'context', 'tool', 'permission', 'execution', 'memory', 'budget']);
@@ -31,6 +32,7 @@ const DecideSchema = z.object({
   decision: z.enum(['approve', 'reject', 'abandon']),
   reason: z.string().trim().min(1).max(4000),
 });
+const PromoteSchema = z.object({ environment: z.enum(['dev', 'staging', 'prod']).default('dev') });
 
 interface OrgRequest {
   orgContext?: { orgId?: string };
@@ -43,6 +45,7 @@ function organizationIdOf(request: OrgRequest): string | null {
 
 export interface MutationProposalDeps {
   mutationProposalRepo: MutationProposalRepo;
+  promotionService: MutationPromotionService;
   actorId: (request: OrgRequest) => string;
 }
 
@@ -51,6 +54,7 @@ export function registerMutationProposalRoutes(app: FastifyInstance, deps: Mutat
   registerFallbackRouteDoc('post', '/api/mutation-proposals');
   registerFallbackRouteDoc('get', '/api/mutation-proposals/:id');
   registerFallbackRouteDoc('post', '/api/mutation-proposals/:id/decision');
+  registerFallbackRouteDoc('post', '/api/mutation-proposals/:id/promote');
 
   app.get('/api/mutation-proposals', async (request, reply) => {
     const organizationId = organizationIdOf(request);
@@ -100,5 +104,27 @@ export function registerMutationProposalRoutes(app: FastifyInstance, deps: Mutat
     });
     if (!proposal) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'mutation proposal not found or already decided' } });
     return reply.send(proposal);
+  });
+
+  app.post('/api/mutation-proposals/:id/promote', async (request, reply) => {
+    const organizationId = organizationIdOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    const parsedParams = parseParams(reply, IdParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const parsed = parseBody(reply, PromoteSchema, request.body);
+    if (!parsed.ok) return;
+    try {
+      const result = await deps.promotionService.promote({
+        proposalId: parsedParams.data.id,
+        organizationId,
+        actorId: deps.actorId(request),
+        environment: parsed.data.environment,
+      });
+      return reply.code(201).send(result);
+    } catch (error) {
+      request.log.warn({ err: error }, 'mutation proposal promotion rejected');
+      const message = error instanceof Error ? error.message : 'mutation proposal promotion failed';
+      return reply.code(422).send({ error: { code: 'PROMOTION_REJECTED', message } });
+    }
   });
 }

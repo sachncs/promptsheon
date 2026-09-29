@@ -34,4 +34,6 @@ export interface MutationProposal {
   reviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  promotedReleaseId: string | null;
+  promotedAt: string | null;
 }

@@ -17,6 +17,7 @@ import { InvocationAgent } from './agents/invocation.js';
 import { EvaluationAgent } from './agents/evaluation/evaluation.js';
 import { EvolutionAgent } from './agents/evolution/evolution.js';
 import { GoalBasedEvolutionAgent } from './agents/evolution/goal-evolver.js';
+import { MutationPromotionService } from './application/mutation-promotion-service.js';
 import { ReasoningCompiler } from './agents/compiler/compiler.js';
 import { IdeaPlannerAgent } from './agents/planner/index.js';
 import { ManifestGraphExecutor } from './agents/executor/index.js';
@@ -219,6 +220,12 @@ async function main() {
     traceRepo: repos.trace,
     mutationProposalRepo: repos.mutationProposal,
   });
+  const mutationPromotionService = new MutationPromotionService(
+    repos.mutationProposal,
+    casStore,
+    repos.manifest,
+    repos.release,
+  );
   const sessionStore = new SessionStore({
     storageDir: `${config.server.casPath}/sessions`,
     persist: true,
@@ -389,7 +396,7 @@ async function main() {
     traceRepo: repos.trace,
     traceScoreRepo: repos.traceScore,
     evidenceRepo: repos.evidence,
-    mutationProposalDeps: { mutationProposalRepo: repos.mutationProposal, actorId: () => 'system' },
+    mutationProposalDeps: { mutationProposalRepo: repos.mutationProposal, promotionService: mutationPromotionService, actorId: () => 'system' },
     autoEval,
     userAnalyticsRepo: repos.userAnalytics,
     identityService,

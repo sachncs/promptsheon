@@ -28,6 +28,8 @@ interface MutationProposalRow {
   reviewed_at: string | null;
   created_at: string;
   updated_at: string;
+  promoted_release_id: string | null;
+  promoted_at: string | null;
 }
 
 function toProposal(row: MutationProposalRow): MutationProposal {
@@ -51,6 +53,8 @@ function toProposal(row: MutationProposalRow): MutationProposal {
     reviewedAt: row.reviewed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    promotedReleaseId: row.promoted_release_id,
+    promotedAt: row.promoted_at,
   };
 }
 
@@ -133,5 +137,15 @@ export class MutationProposalRepo {
     ).run(input.status, input.reviewerId, input.reason, input.id, input.organizationId);
     if (result.changes === 0) return null;
     return this.findInOrg(input.id, input.organizationId);
+  }
+
+  markPromoted(id: string, organizationId: string, releaseId: string): MutationProposal | null {
+    const result = this.db.prepare(
+      `UPDATE mutation_proposals
+       SET promoted_release_id = ?, promoted_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND organization_id = ? AND status = 'approved' AND promoted_release_id IS NULL`,
+    ).run(releaseId, id, organizationId);
+    if (result.changes === 0) return this.findInOrg(id, organizationId);
+    return this.findInOrg(id, organizationId);
   }
 }
