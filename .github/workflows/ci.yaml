@@ -37,6 +37,8 @@ jobs:
         run: pnpm --dir site build
       - name: documentation link check
         run: pnpm check:docs
+      - name: repository inventory check
+        run: pnpm inventory:generate && git diff --exit-code -- docs/baseline/inventory.json
 
   test:
     name: Server Tests
