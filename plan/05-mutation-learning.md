@@ -29,8 +29,9 @@ manifest unchanged until an explicit decision.
 
 Candidate generation, automatic candidate materialisation, evaluation gates,
 and promotion integration remain in progress. The approval ledger is not yet
-connected to release promotion, so an approved proposal is still an explicit
-operator handoff rather than an automatic activation.
+connected to automatic activation: an approved proposal can now be explicitly
+materialised as a draft release, while activation remains governed by the
+existing release approval and lifecycle gates.
 
 - Define immutable `MutationProposal` records containing source hash, proposed
   changes, rationale, expected outcome, author/system, risk, and confidence.

@@ -645,6 +645,11 @@
       "path": "/api/mutation-proposals/:id/decision"
     },
     {
+      "file": "packages/server/src/routes/mutation-proposals.ts",
+      "method": "POST",
+      "path": "/api/mutation-proposals/:id/promote"
+    },
+    {
       "file": "packages/server/src/routes/org-settings.ts",
       "method": "GET",
       "path": "/api/orgs/:id/settings"
@@ -1300,6 +1305,7 @@
     "packages/server/src/application/identity-service.ts",
     "packages/server/src/application/llm-settings-service.ts",
     "packages/server/src/application/manifest-approval-service.ts",
+    "packages/server/src/application/mutation-promotion-service.ts",
     "packages/server/src/application/project-service.ts",
     "packages/server/src/application/provider-adapters.ts",
     "packages/server/src/application/release-service.ts",
@@ -1422,7 +1428,8 @@
     "packages/shared/db/migrations/057_execution_checkpoints.up.sql",
     "packages/shared/db/migrations/058_evidence_records.up.sql",
     "packages/shared/db/migrations/059_eval_suite_runs.up.sql",
-    "packages/shared/db/migrations/060_mutation_proposals.up.sql"
+    "packages/shared/db/migrations/060_mutation_proposals.up.sql",
+    "packages/shared/db/migrations/061_mutation_promotion.up.sql"
   ],
   "frontendRoutes": [
     {
