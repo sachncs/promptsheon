@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Activity, Coins, Cpu, Layers } from 'lucide-react';
+import { ArrowLeft, Activity, AlertTriangle, Coins, Cpu, Gauge, Layers } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
 import { traceApi, type TraceRunSummary } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
@@ -40,6 +40,13 @@ export default function TracesPage() {
     refetchInterval: 30_000,
   });
 
+  const summary = useQuery({
+    queryKey: ['traces', 'summary', 7],
+    queryFn: () => traceApi.summary(7),
+    enabled: Boolean(session),
+    refetchInterval: 30_000,
+  });
+
   if (!session) return null;
 
   if (traces.isError) {
@@ -50,11 +57,17 @@ export default function TracesPage() {
     return <QueryError message={rollup.error} onRetry={() => void rollup.refetch()} />;
   }
 
+  if (summary.isError) {
+    return <QueryError message={summary.error} onRetry={() => void summary.refetch()} />;
+  }
+
   const runList = traces.data?.items ?? [];
   const total = traces.data?.total ?? 0;
   const sumTokens = rollup.data?.items.reduce((acc, r) => acc + r.tokens, 0) ?? 0;
   const sumCost = rollup.data?.items.reduce((acc, r) => acc + r.cost, 0) ?? 0;
   const sumRuns = rollup.data?.items.reduce((acc, r) => acc + r.runs, 0) ?? 0;
+  const operational = summary.data?.summary;
+  const errorRate = operational && operational.runs > 0 ? (operational.errors / operational.runs) * 100 : 0;
 
   return (
     <div className="space-y-6">
@@ -91,6 +104,33 @@ export default function TracesPage() {
           value={`$${sumCost.toFixed(4)}`}
           hint="per execution, raw-string SHA256 cost"
           Icon={Coins}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <SummaryTile
+          label="Error rate (7d)"
+          value={`${errorRate.toFixed(1)}%`}
+          hint={`${operational?.errors ?? 0} failed runs`}
+          Icon={AlertTriangle}
+        />
+        <SummaryTile
+          label="Avg latency"
+          value={`${Math.round(operational?.averageLatencyMs ?? 0)} ms`}
+          hint="completed traces"
+          Icon={Gauge}
+        />
+        <SummaryTile
+          label="Models observed"
+          value={String(operational?.models.length ?? 0)}
+          hint="provider/model health"
+          Icon={Layers}
+        />
+        <SummaryTile
+          label="Evidence"
+          value="Redacted"
+          hint="before persistence"
+          Icon={Cpu}
         />
       </div>
 

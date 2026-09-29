@@ -29,6 +29,7 @@ function orgOf(request: FastifyRequest): string | null {
  * GET /api/traces — list trace runs for the active org, newest first.
  * GET /api/traces/:id — fetch one run with its full span tree.
  * GET /api/traces/rollup — per-day tokens + cost for the active org.
+ * GET /api/traces/summary — throughput, latency, errors, cost, tokens, and model health.
  *
  * Read-only surface; the writer paths are the executor + the
  * gateway / eval-on-trace hooks. Admin role is required so a
@@ -53,6 +54,18 @@ export function registerTraceRoutes(
       const { days, environment } = parsed.data;
       const items = deps.service.rollup(orgId, { days, environment });
       return reply.send({ orgId, days, environment: environment ?? null, items });
+    },
+  );
+
+  app.get(
+    '/api/traces/summary',
+    { preHandler: deps.requireAdmin() },
+    async (request, reply) => {
+      const orgId = orgOf(request);
+      if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+      const parsed = parseQuery(reply, RollupQuerySchema, request.query);
+      if (!parsed.ok) return;
+      return reply.send({ orgId, days: parsed.data.days, summary: deps.service.operationalSummary(orgId, parsed.data.days) });
     },
   );
 

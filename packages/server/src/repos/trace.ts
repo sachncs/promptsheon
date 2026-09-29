@@ -39,6 +39,15 @@ export interface TraceSpan {
   outputText: string | null;
 }
 
+export interface TraceOperationalSummary {
+  runs: number;
+  errors: number;
+  averageLatencyMs: number;
+  tokens: number;
+  cost: number;
+  models: Array<{ model: string; runs: number; errors: number; tokens: number; cost: number }>;
+}
+
 interface TraceRunRow {
   id: string;
   organization_id: string;
@@ -379,5 +388,38 @@ export class TraceRepo extends BaseRepo<TraceRun> {
          ORDER BY day DESC`,
       )
       .all(...args) as Array<{ day: string; tokens: number; cost: number; runs: number }>;
+  }
+
+  operationalSummary(organizationId: string, days = 7): TraceOperationalSummary {
+    const since = new Date(Date.now() - days * 86_400_000).toISOString();
+    const totals = this.db.prepare(`
+      SELECT COUNT(*) AS runs,
+             SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS errors,
+             COALESCE(AVG(CASE WHEN end_time IS NOT NULL THEN (julianday(end_time) - julianday(start_time)) * 86400000.0 END), 0) AS average_latency_ms,
+             COALESCE(SUM(total_tokens), 0) AS tokens,
+             COALESCE(SUM(total_cost_usd), 0) AS cost
+      FROM trace_runs
+      WHERE organization_id = ? AND start_time >= ?
+    `).get(organizationId, since) as { runs: number; errors: number; average_latency_ms: number; tokens: number; cost: number };
+    const models = this.db.prepare(`
+      SELECT COALESCE(model, 'unknown') AS model,
+             COUNT(*) AS runs,
+             SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS errors,
+             COALESCE(SUM(total_tokens), 0) AS tokens,
+             COALESCE(SUM(total_cost_usd), 0) AS cost
+      FROM trace_runs
+      WHERE organization_id = ? AND start_time >= ?
+      GROUP BY COALESCE(model, 'unknown')
+      ORDER BY runs DESC
+      LIMIT 20
+    `).all(organizationId, since) as TraceOperationalSummary['models'];
+    return {
+      runs: totals.runs,
+      errors: totals.errors,
+      averageLatencyMs: totals.average_latency_ms,
+      tokens: totals.tokens,
+      cost: totals.cost,
+      models,
+    };
   }
 }

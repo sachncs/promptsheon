@@ -1,4 +1,4 @@
-import type { TraceRun, TraceSpan } from '../repos/trace.js';
+import type { TraceOperationalSummary, TraceRun, TraceSpan } from '../repos/trace.js';
 import type { TraceScore } from '../repos/trace-score.js';
 
 export interface TraceListOptions {
@@ -37,6 +37,7 @@ export interface TraceStore {
     cost: number;
     runs: number;
   }>;
+  operationalSummary(organizationId: string, days?: number): TraceOperationalSummary;
 }
 
 export interface TraceScoreStore {
@@ -78,6 +79,10 @@ export class TraceService {
 
   rollup(organizationId: string, options: TraceRollupOptions) {
     return this.deps.traces.rollupByOrg(organizationId, options);
+  }
+
+  operationalSummary(organizationId: string, days = 7) {
+    return this.deps.traces.operationalSummary(organizationId, days);
   }
 
   get(organizationId: string, traceRunId: string): TraceDetail | null {

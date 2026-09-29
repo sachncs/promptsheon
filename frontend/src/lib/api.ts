@@ -1473,6 +1473,15 @@ export interface TraceRunSummary {
   model: string | null;
 }
 
+export interface TraceOperationalSummary {
+  runs: number;
+  errors: number;
+  averageLatencyMs: number;
+  tokens: number;
+  cost: number;
+  models: Array<{ model: string; runs: number; errors: number; tokens: number; cost: number }>;
+}
+
 export interface TraceSpan {
   id: string;
   traceRunId: string;
@@ -1568,6 +1577,8 @@ export const traceApi = {
         { params: { days } },
       )
       .then((r) => r.data),
+  summary: (days = 7) =>
+    client.get<{ orgId: string; days: number; summary: TraceOperationalSummary }>('/traces/summary', { params: { days } }).then((r) => r.data),
 };
 
 export interface TraceScore {

@@ -135,4 +135,19 @@ describe('TraceRepo', () => {
     expect(rows[0]?.tokens).toBe(150);
     expect(rows[0]?.runs).toBe(2);
   });
+
+  it('operationalSummary aggregates throughput, errors, cost, tokens, and models', () => {
+    const success = repo.startRun({ organizationId: 'org-summary', name: 'success', model: 'provider/model-a' });
+    repo.addSpan({ traceRunId: success.id, name: 'call', totalTokens: 120, costUsd: 0.004 });
+    repo.finalize(success.id, 'success');
+    const failure = repo.startRun({ organizationId: 'org-summary', name: 'failure', model: 'provider/model-a' });
+    repo.finalize(failure.id, 'error');
+
+    const summary = repo.operationalSummary('org-summary', 7);
+    expect(summary.runs).toBe(2);
+    expect(summary.errors).toBe(1);
+    expect(summary.tokens).toBe(120);
+    expect(summary.cost).toBeCloseTo(0.004, 6);
+    expect(summary.models[0]).toMatchObject({ model: 'provider/model-a', runs: 2, errors: 1, tokens: 120 });
+  });
 });
