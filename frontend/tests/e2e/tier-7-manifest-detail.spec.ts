@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, request } from '@playwright/test';
 import { bootstrapAdminViaApi, seedSession, clearClientState, type SessionInfo } from './helpers/seed-session';
 
 /**
@@ -30,6 +30,25 @@ test.describe('tier 7: manifest detail (real page)', () => {
 
     await clearClientState(page);
     await seedSession(page, admin);
+
+    // The editor intentionally requires an explicit project owner before a
+    // manifest can become a capability version. Create the minimum owned
+    // graph here so this test exercises saving rather than an empty-state
+    // validation path.
+    const api = await request.newContext({ baseURL });
+    const headers = { Authorization: `Bearer ${admin.apiKey}` };
+    const workspaceResponse = await api.post('/api/workspaces', {
+      headers,
+      data: { name: `Tier7 workspace ${Date.now()}`, organization: admin.orgName },
+    });
+    expect(workspaceResponse.ok(), await workspaceResponse.text()).toBeTruthy();
+    const workspace = (await workspaceResponse.json()) as { id: string };
+    const projectResponse = await api.post('/api/projects', {
+      headers,
+      data: { workspaceId: workspace.id, name: `Tier7 project ${Date.now()}`, description: '' },
+    });
+    expect(projectResponse.ok(), await projectResponse.text()).toBeTruthy();
+    await api.dispose();
 
     // 1. Open the editor and apply the triage template
     await page.goto('/app/editor');
