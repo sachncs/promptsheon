@@ -62,6 +62,7 @@ import { registerIdentityRoutes } from './identity.js';
 import { registerAgentSpecificationRoutes } from './agent-specification.js';
 import { registerExecutionJobRoutes } from './execution-jobs.js';
 import { registerEvidenceRoutes } from './evidence.js';
+import type { CanaryRollbackService } from '../application/canary-rollback-service.js';
 import { registerMutationProposalRoutes, type MutationProposalDeps } from './mutation-proposals.js';
 import { WorkspaceService } from '../application/workspace-service.js';
 import { ProjectService } from '../application/project-service.js';
@@ -185,6 +186,7 @@ export interface AppDeps {
   promptScanRepo: import('../repos/prompt-scan.js').PromptScanRepo;
   agentSpecificationRepo: AgentSpecificationRepo;
   durableExecutionService: DurableExecutionService;
+  canaryRollbackService: CanaryRollbackService;
 }
 
 /**
@@ -228,6 +230,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     auditChain: deps.auditChain,
     overlayRepo: deps.releaseOverlayRepo,
     releaseService: deps.releaseService,
+    canaryRollbackService: deps.canaryRollbackService,
   });
   registerExecutionRoutes(app, {
     executionRepo: deps.executionRepo,

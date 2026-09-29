@@ -18,6 +18,7 @@ import {
   ReleaseNotFoundError,
   ReleaseService,
 } from '../application/release-service.js';
+import type { CanaryRollbackService } from '../application/canary-rollback-service.js';
 
 export { approvalGate } from '../application/release-service.js';
 
@@ -84,7 +85,7 @@ function requireOrganization(request: FastifyRequest, reply: FastifyReply): stri
 export function registerReleaseRoutes(
   app: FastifyInstance,
   repo: ReleaseRepo,
-  deps: { manifestRepo: ManifestRepo; auditChain: AuditChain; overlayRepo: ReleaseOverlayRepo; releaseService: ReleaseService },
+  deps: { manifestRepo: ManifestRepo; auditChain: AuditChain; overlayRepo: ReleaseOverlayRepo; releaseService: ReleaseService; canaryRollbackService?: CanaryRollbackService },
 ) {
   app.get('/api/releases', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
@@ -346,5 +347,14 @@ export function registerReleaseRoutes(
       resourceId: current.id,
     });
     return reply.send(result);
+  });
+
+  app.post('/api/releases/:id/auto-rollback', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    if (!deps.canaryRollbackService) return reply.code(503).send({ error: { code: 'UNAVAILABLE', message: 'automatic rollback is not configured' } });
+    return reply.send(deps.canaryRollbackService.assess(parsedParams.data.id, organizationId, actorOf(request)));
   });
 }

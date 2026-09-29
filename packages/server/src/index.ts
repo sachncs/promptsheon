@@ -18,6 +18,7 @@ import { EvaluationAgent } from './agents/evaluation/evaluation.js';
 import { EvolutionAgent } from './agents/evolution/evolution.js';
 import { GoalBasedEvolutionAgent } from './agents/evolution/goal-evolver.js';
 import { MutationPromotionService } from './application/mutation-promotion-service.js';
+import { CanaryRollbackService } from './application/canary-rollback-service.js';
 import { ReasoningCompiler } from './agents/compiler/compiler.js';
 import { IdeaPlannerAgent } from './agents/planner/index.js';
 import { ManifestGraphExecutor } from './agents/executor/index.js';
@@ -119,6 +120,7 @@ async function main() {
       .findRunsByReleaseIdInOrg(releaseId, organizationId)
       .some((run) => run.status === 'passed'),
   });
+  const canaryRollbackService = new CanaryRollbackService(repos.release, repos.eval, auditChain);
   const app = Fastify({ logger: true, bodyLimit: 2_097_152 });
 
   if (config.server.fipsMode) {
@@ -411,6 +413,7 @@ async function main() {
     promptScanRepo: repos.promptScan,
     agentSpecificationRepo: repos.agentSpecification!,
     durableExecutionService: durableExecution,
+    canaryRollbackService,
     gateway,
     budgetDeps: {
       budgetRepo: repos.budget,

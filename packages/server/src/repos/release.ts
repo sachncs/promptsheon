@@ -291,6 +291,20 @@ export class ReleaseRepo extends BaseRepo<Release> {
     return row ? toRelease(row) : null;
   }
 
+  /** Return the current active peer used as the deterministic rollback target. */
+  findActivePeerInOrg(current: Release, organizationId: string): Release | null {
+    const row = this.db.prepare(
+      `SELECT r.* FROM releases r
+       JOIN capabilities c ON c.id = r.capability_id
+       JOIN projects p ON p.id = c.project_id
+       JOIN workspaces w ON w.id = p.workspace_id
+       WHERE r.capability_id = ? AND r.environment = ? AND r.status = 'active'
+         AND r.id <> ? AND w.org_id = ?
+       ORDER BY r.created_at DESC LIMIT 1`,
+    ).get(current.capabilityId, current.environment, current.id, organizationId);
+    return row ? toRelease(row) : null;
+  }
+
   updateCanaryPercent(id: string, percent: number): Release | null {
     const existing = this.findById(id);
     if (!existing) return null;
