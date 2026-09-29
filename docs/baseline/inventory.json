@@ -1244,6 +1244,7 @@
     "packages/server/src/application/eval-suite-service.ts",
     "packages/server/src/application/execution-ports.ts",
     "packages/server/src/application/execution-replay-service.ts",
+    "packages/server/src/application/execution-resilience.ts",
     "packages/server/src/application/execution-service.ts",
     "packages/server/src/application/health-service.ts",
     "packages/server/src/application/identity-service.ts",
