@@ -324,6 +324,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
       },
     },
     deps.evalSuiteDeps.humanReviewRepo,
+    deps.evalSuiteDeps.runStore ?? deps.evalSuiteDeps.suiteRepo,
   );
   registerEvalSuiteRoutes(app, { ...deps.evalSuiteDeps, suiteExecution });
   registerVaultRoutes(app, deps.vaultDeps);

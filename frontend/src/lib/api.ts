@@ -115,6 +115,22 @@ export interface EvalSuiteVersion {
   createdAt: string;
 }
 
+export interface EvalSuiteRun {
+  id: string;
+  suiteId: string;
+  suiteVersionId: string;
+  n: number;
+  k: number;
+  passAtK: number;
+  rawScore: number;
+  passed: boolean;
+  borderlineCount: number;
+  status: 'running' | 'completed' | 'failed';
+  startedAt: string;
+  finishedAt: string | null;
+  error: string | null;
+}
+
 export type EvalRunStatus = 'running' | 'passed' | 'failed' | 'error';
 
 export interface EvalRun {
@@ -339,6 +355,22 @@ const EvalSuiteVersionSchema = z.object({
   notes: z.string().nullable(),
   createdBy: z.string(),
   createdAt: z.string(),
+});
+
+const EvalSuiteRunSchema = z.object({
+  id: z.string(),
+  suiteId: z.string(),
+  suiteVersionId: z.string(),
+  n: z.number().int().positive(),
+  k: z.number().int().positive(),
+  passAtK: z.number().min(0).max(1),
+  rawScore: z.number().min(0).max(1),
+  passed: z.boolean(),
+  borderlineCount: z.number().int().nonnegative(),
+  status: z.enum(['running', 'completed', 'failed']),
+  startedAt: z.string(),
+  finishedAt: z.string().nullable(),
+  error: z.string().nullable(),
 });
 
 const EvalRunSchema = z.object({
@@ -599,6 +631,14 @@ function parseEvalSuiteDetail(raw: unknown): { suite: EvalSuite; versions: EvalS
     throw new ApiError('The server returned invalid eval suite details.', { code: 'INVALID_RESPONSE' });
   }
   return { suite: suite.data, versions: versions.data };
+}
+
+function parseEvalSuiteRuns(raw: unknown): EvalSuiteRun[] {
+  return unwrapList<unknown>(raw).map((entry) => {
+    const parsed = EvalSuiteRunSchema.safeParse(entry);
+    if (!parsed.success) throw new ApiError('The server returned invalid eval suite run data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  });
 }
 
 function parseEvalRun(raw: unknown): EvalRun {
@@ -1413,6 +1453,16 @@ export const evalSuiteApi = {
   get: async (id: string): Promise<{ data: { suite: EvalSuite; versions: EvalSuiteVersion[] } }> => {
     const r = await client.get<unknown>(`/eval-suites/${id}`);
     return { data: parseEvalSuiteDetail(r.data) };
+  },
+  runs: async (id: string): Promise<EvalSuiteRun[]> => {
+    const r = await client.get<unknown>(`/eval-suites/${id}/runs`);
+    return parseEvalSuiteRuns(r.data);
+  },
+  runDetail: async (suiteId: string, runId: string): Promise<{ run: EvalSuiteRun; results: unknown[] }> => {
+    const r = await client.get<{ run: unknown; results: unknown[] }>(`/eval-suites/${suiteId}/runs/${runId}`);
+    const run = EvalSuiteRunSchema.safeParse(r.data.run);
+    if (!run.success || !Array.isArray(r.data.results)) throw new ApiError('The server returned invalid eval suite run details.', { code: 'INVALID_RESPONSE' });
+    return { run: run.data, results: r.data.results };
   },
   create: (input: {
     capabilityId: string;

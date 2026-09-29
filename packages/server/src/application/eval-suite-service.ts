@@ -48,6 +48,22 @@ export interface HumanReviewQueue {
   enqueue(caseId: string, suiteId: string, suiteRunId: string | null): unknown;
 }
 
+/** Durable persistence port for suite runs and per-trial grader results. */
+export interface EvalSuiteRunStore {
+  createRun(input: { id: string; suiteId: string; suiteVersionId: string; n: number; k: number; startedAt: string }): void;
+  addTrialResult(input: {
+    runId: string;
+    seq: number;
+    caseId: string;
+    passed: boolean;
+    weightedScore: number;
+    trial: Record<string, unknown>;
+    graderResult: Record<string, unknown>;
+  }): void;
+  finishRun(input: { id: string; passAtK: number; rawScore: number; passed: boolean; borderlineCount: number; finishedAt: string }): void;
+  failRun(id: string, error: string, finishedAt?: string): void;
+}
+
 export type EvalSuiteRunResult =
   | { kind: 'suite-not-found' }
   | { kind: 'version-not-found' }
@@ -80,6 +96,7 @@ export class EvalSuiteService {
     private readonly store: EvalSuiteStore,
     private readonly graders: GraderFactory,
     private readonly reviews: HumanReviewQueue,
+    private readonly runStore?: EvalSuiteRunStore,
   ) {}
 
   run(
@@ -106,12 +123,47 @@ export class EvalSuiteService {
     const k = input.k ?? 1;
     const runner = this.graders.create(version.graderConfig);
     const runId = `run-${randomUUID()}`;
-    const results = trials.map((trial) => ({ trial, result: runner.run(trial) }));
+    this.runStore?.createRun({
+      id: runId,
+      suiteId: suite.id,
+      suiteVersionId: version.id,
+      n,
+      k,
+      startedAt: new Date().toISOString(),
+    });
+    let results: Array<{ trial: EvalTrial; result: GraderResult }>;
+    try {
+      results = trials.map((trial) => ({ trial, result: runner.run(trial) }));
+    } catch (error) {
+      this.runStore?.failRun(runId, error instanceof Error ? error.message : 'grader failed');
+      throw error;
+    }
     const successes = results.filter(({ result }) => result.passed).length;
     const rawScore = results.reduce((total, { result }) => total + result.weightedScore, 0) / Math.max(1, results.length);
     const borderline = results.filter(
       ({ result }) => Math.abs(result.weightedScore - suite.passThreshold) <= suite.borderlineBand && !result.passed,
     );
+    results.forEach(({ trial, result }, seq) => {
+      this.runStore?.addTrialResult({
+        runId,
+        seq,
+        caseId: trial.caseId,
+        passed: result.passed,
+        weightedScore: result.weightedScore,
+        trial: trial as unknown as Record<string, unknown>,
+        graderResult: result as unknown as Record<string, unknown>,
+      });
+    });
+    const passAtKValue = passAtK(n, k, successes);
+    const passed = rawScore >= suite.passThreshold;
+    this.runStore?.finishRun({
+      id: runId,
+      passAtK: passAtKValue,
+      rawScore,
+      passed,
+      borderlineCount: borderline.length,
+      finishedAt: new Date().toISOString(),
+    });
     for (const { trial, result } of results) {
       if (Math.abs(result.weightedScore - suite.passThreshold) <= suite.borderlineBand) {
         this.reviews.enqueue(trial.caseId, suite.id, runId);
@@ -125,9 +177,9 @@ export class EvalSuiteService {
         suiteId: suite.id,
         suiteVersionId: version.id,
         passThreshold: suite.passThreshold,
-        passAtK: passAtK(n, k, successes),
+        passAtK: passAtKValue,
         rawScore,
-        passed: rawScore >= suite.passThreshold,
+        passed,
         borderlineCount: borderline.length,
         gradedAt: new Date().toISOString(),
         results,

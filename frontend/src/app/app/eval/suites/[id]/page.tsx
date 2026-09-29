@@ -3,7 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FlaskConical, Play } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
 import { evalSuiteApi } from '@/lib/api';
@@ -16,6 +16,8 @@ export default function EvalSuiteDetailPage() {
   const session = useRequireSession();
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const queryClient = useQueryClient();
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [trialsJson, setTrialsJson] = useState(JSON.stringify([{ caseId: 'sample', output: 'hello world' }], null, 2));
 
   const suite = useQuery({
@@ -23,8 +25,22 @@ export default function EvalSuiteDetailPage() {
     queryFn: () => evalSuiteApi.get(id).then((r) => r.data),
     enabled: Boolean(id),
   });
+  const runs = useQuery({
+    queryKey: ['eval-suite-runs', id],
+    queryFn: () => evalSuiteApi.runs(id),
+    enabled: Boolean(id),
+  });
+  const runDetail = useQuery({
+    queryKey: ['eval-suite-run', id, selectedRunId],
+    queryFn: () => evalSuiteApi.runDetail(id, selectedRunId ?? ''),
+    enabled: Boolean(id && selectedRunId),
+  });
   const run = useMutation({
     mutationFn: () => evalSuiteApi.run(id, { trials: JSON.parse(trialsJson) }),
+    onSuccess: (result: { runId?: string }) => {
+      void queryClient.invalidateQueries({ queryKey: ['eval-suite-runs', id] });
+      if (result.runId) setSelectedRunId(result.runId);
+    },
   });
 
   if (!session) return null;
@@ -88,6 +104,34 @@ export default function EvalSuiteDetailPage() {
           )}
         </Surface>
       </div>
+
+      <Surface>
+        <SurfaceHeader title="Run history" description="Durable runs survive refreshes and can be inspected by trial." />
+        {runs.isError ? <p className="text-sm text-destructive">Run history could not be loaded.</p> : null}
+        {!runs.isError && (runs.data?.length ?? 0) === 0 ? <p className="text-sm text-text-muted">No runs yet. Run the suite above to create the first record.</p> : null}
+        <div className="space-y-2">
+          {(runs.data ?? []).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setSelectedRunId(item.id)}
+              className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors ${selectedRunId === item.id ? 'border-brand bg-brand/5' : 'border-border-subtle hover:border-border-strong'}`}
+            >
+              <span>
+                <span className="font-mono text-xs">{item.id.slice(0, 14)}</span>
+                <span className="ml-3 text-text-muted">{new Date(item.startedAt).toLocaleString()}</span>
+              </span>
+              <span className={item.passed ? 'text-success' : 'text-destructive'}>{(item.rawScore * 100).toFixed(0)}% · {item.status}</span>
+            </button>
+          ))}
+        </div>
+        {runDetail.data ? (
+          <div className="mt-4 border-t border-border-subtle pt-4">
+            <div className="mb-2 text-xs uppercase tracking-wider text-text-subtle">Selected trial results</div>
+            <pre className="max-h-72 overflow-auto rounded-md border border-border-subtle bg-surface-0 p-3 font-mono text-xs text-text-default">{JSON.stringify(runDetail.data.results, null, 2)}</pre>
+          </div>
+        ) : null}
+      </Surface>
     </div>
   );
 }

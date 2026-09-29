@@ -70,6 +70,9 @@ export type {
   TranscriptDiffConfig,
   LlmRubricConfig,
   EvalSuiteRunInput,
+  EvalSuiteRun,
+  EvalSuiteRunStatus,
+  EvalSuiteTrialResult,
 } from './eval-suite.js';
 export type { AlertRule, Alert, AlertStatus, AlertSeverity } from './alert.js';
 export type { Precondition } from './precondition.js';

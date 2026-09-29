@@ -10,7 +10,7 @@ import {
   type EvalSuiteRepo,
   type HumanReviewRepo,
 } from '../repos/eval-suite.js';
-import type { EvalSuiteService } from '../application/eval-suite-service.js';
+import type { EvalSuiteRunStore, EvalSuiteService } from '../application/eval-suite-service.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 import { registerRouteDoc } from '../openapi.js';
 
@@ -174,6 +174,7 @@ export interface EvalSuiteRouteDeps {
   suiteRepo: EvalSuiteRepo;
   humanReviewRepo: HumanReviewRepo;
   suiteExecution?: EvalSuiteService;
+  runStore?: EvalSuiteRunStore;
 }
 
 export function registerEvalSuiteRoutes(
@@ -226,6 +227,34 @@ export function registerEvalSuiteRoutes(
     tags: ['evals'],
     body: CreateSuiteSchema,
   });
+
+  app.get('/api/eval-suites/:id/runs', async (request, reply) => {
+    const parsed = parseParams(reply, SuiteIdParamsSchema, request.params);
+    if (!parsed.ok) return;
+    const organizationId = organizationIdOf(request);
+    const suite = organizationId
+      ? deps.suiteRepo.findByIdInOrg(parsed.data.id, organizationId)
+      : deps.suiteRepo.findById(parsed.data.id);
+    if (!suite) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'suite not found' } });
+    return reply.send({ items: organizationId ? deps.suiteRepo.listRunsInOrg(suite.id, organizationId) : deps.suiteRepo.listRuns(suite.id) });
+  });
+  registerRouteDoc({ method: 'get', path: '/api/eval-suites/:id/runs', summary: 'List durable runs for an evaluation suite', tags: ['evals'] });
+
+  app.get('/api/eval-suites/:id/runs/:runId', async (request, reply) => {
+    const parsed = parseParams(reply, z.object({ id: z.string().min(1).max(200), runId: z.string().uuid() }), request.params);
+    if (!parsed.ok) return;
+    const organizationId = organizationIdOf(request);
+    const suite = organizationId
+      ? deps.suiteRepo.findByIdInOrg(parsed.data.id, organizationId)
+      : deps.suiteRepo.findById(parsed.data.id);
+    if (!suite) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'suite not found' } });
+    const run = organizationId
+      ? deps.suiteRepo.findRunInOrg(parsed.data.runId, organizationId)
+      : deps.suiteRepo.findRun(parsed.data.runId);
+    if (!run || run.suiteId !== suite.id) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'suite run not found' } });
+    return reply.send({ run, results: deps.suiteRepo.listTrialResults(run.id) });
+  });
+  registerRouteDoc({ method: 'get', path: '/api/eval-suites/:id/runs/:runId', summary: 'Fetch a durable suite run and trial results', tags: ['evals'] });
 
   app.get('/api/eval-suites/:id', async (request, reply) => {
     const parsed = parseParams(reply, SuiteIdParamsSchema, request.params);

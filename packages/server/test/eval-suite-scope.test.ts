@@ -26,6 +26,18 @@ describe('eval suite organization scope', () => {
         suite_run_id TEXT, submitted_at TEXT NOT NULL, reviewer_id TEXT,
         decided_at TEXT, decision TEXT, notes TEXT
       );
+      CREATE TABLE eval_suite_runs (
+        id TEXT PRIMARY KEY, suite_id TEXT NOT NULL, suite_version_id TEXT NOT NULL,
+        n INTEGER NOT NULL, k INTEGER NOT NULL, pass_at_k REAL NOT NULL DEFAULT 0,
+        raw_score REAL NOT NULL DEFAULT 0, passed INTEGER NOT NULL DEFAULT 0,
+        borderline_count INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL,
+        started_at TEXT NOT NULL, finished_at TEXT, error TEXT
+      );
+      CREATE TABLE eval_suite_trial_results (
+        id TEXT PRIMARY KEY, run_id TEXT NOT NULL, seq INTEGER NOT NULL,
+        case_id TEXT NOT NULL, passed INTEGER NOT NULL, weighted_score REAL NOT NULL,
+        trial_json TEXT NOT NULL, grader_result_json TEXT NOT NULL
+      );
     `);
     db.prepare('INSERT INTO workspaces VALUES (?, ?)').run('ws-a', 'org-a');
     db.prepare('INSERT INTO workspaces VALUES (?, ?)').run('ws-b', 'org-b');
@@ -67,6 +79,17 @@ describe('eval suite organization scope', () => {
     expect(reviews.listOpenInOrg('org-a').map((review) => review.id)).toEqual(['review-a']);
     expect(reviews.decideInOrg('review-b', 'org-a', 'reviewer', 'approve', null)).toBeNull();
     expect(reviews.findById('review-b')?.decision).toBeNull();
+
+    suites.createRun({ id: 'run-a', suiteId: 'suite-a', suiteVersionId: 'version-a', n: 1, k: 1, startedAt: '2026-01-01' });
+    suites.addTrialResult({
+      runId: 'run-a', seq: 0, caseId: 'case-a', passed: true, weightedScore: 1,
+      trial: { output: 'ok' }, graderResult: { results: [] },
+    });
+    suites.finishRun({ id: 'run-a', passAtK: 1, rawScore: 1, passed: true, borderlineCount: 0, finishedAt: '2026-01-01' });
+    expect(suites.listRunsInOrg('suite-a', 'org-a')[0]?.id).toBe('run-a');
+    expect(suites.findRunInOrg('run-a', 'org-a')?.passed).toBe(true);
+    expect(suites.listTrialResults('run-a')[0]?.caseId).toBe('case-a');
+    expect(suites.findRunInOrg('run-a', 'org-b')).toBeNull();
     db.close();
   });
 });

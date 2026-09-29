@@ -62,3 +62,10 @@ performance decisions.
 - Promotion can be blocked by quality, safety, cost, or latency regression.
 - Evaluation runs are resumable, attributable, and reproducible.
 
+## Implementation status
+
+The current vertical slice now persists suite run summaries and individual
+trial grader results, scopes reads to the organization, correlates borderline
+human review items with their durable run ID, and exposes run history and
+trial inspection in the console. The local simulator provides deterministic
+fixtures for these flows without a provider credential.

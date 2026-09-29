@@ -332,6 +332,16 @@
     {
       "file": "packages/server/src/routes/eval-suite.ts",
       "method": "GET",
+      "path": "/api/eval-suites/:id/runs"
+    },
+    {
+      "file": "packages/server/src/routes/eval-suite.ts",
+      "method": "GET",
+      "path": "/api/eval-suites/:id/runs/:runId"
+    },
+    {
+      "file": "packages/server/src/routes/eval-suite.ts",
+      "method": "GET",
       "path": "/api/eval-suites/:id"
     },
     {
@@ -1389,7 +1399,8 @@
     "packages/shared/db/migrations/055_agent_specifications.up.sql",
     "packages/shared/db/migrations/056_execution_jobs.up.sql",
     "packages/shared/db/migrations/057_execution_checkpoints.up.sql",
-    "packages/shared/db/migrations/058_evidence_records.up.sql"
+    "packages/shared/db/migrations/058_evidence_records.up.sql",
+    "packages/shared/db/migrations/059_eval_suite_runs.up.sql"
   ],
   "frontendRoutes": [
     {

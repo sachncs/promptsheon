@@ -95,3 +95,34 @@ export interface EvalSuiteRunInput {
   triggeredBy: string;
   reason: 'manual' | 'release.gate' | 'schedule' | 'incident';
 }
+
+export type EvalSuiteRunStatus = 'running' | 'completed' | 'failed';
+
+/** Durable summary of one suite execution. */
+export interface EvalSuiteRun {
+  id: string;
+  suiteId: string;
+  suiteVersionId: string;
+  n: number;
+  k: number;
+  passAtK: number;
+  rawScore: number;
+  passed: boolean;
+  borderlineCount: number;
+  status: EvalSuiteRunStatus;
+  startedAt: string;
+  finishedAt: string | null;
+  error: string | null;
+}
+
+/** Persisted result for one trial in a suite run. */
+export interface EvalSuiteTrialResult {
+  id: string;
+  runId: string;
+  seq: number;
+  caseId: string;
+  passed: boolean;
+  weightedScore: number;
+  trial: Record<string, unknown>;
+  graderResult: Record<string, unknown>;
+}

@@ -3,6 +3,9 @@ import { randomUUID } from 'node:crypto';
 import type {
   EvalSuite,
   EvalSuiteVersion,
+  EvalSuiteRun,
+  EvalSuiteRunStatus,
+  EvalSuiteTrialResult,
   EvalSuiteRunInput,
   GraderSpec,
 } from '@promptsheon/shared';
@@ -33,6 +36,64 @@ interface VersionRow {
   notes: string | null;
   created_by: string;
   created_at: string;
+}
+
+interface SuiteRunRow {
+  id: string;
+  suite_id: string;
+  suite_version_id: string;
+  n: number;
+  k: number;
+  pass_at_k: number;
+  raw_score: number;
+  passed: number;
+  borderline_count: number;
+  status: EvalSuiteRunStatus;
+  started_at: string;
+  finished_at: string | null;
+  error: string | null;
+}
+
+interface SuiteTrialResultRow {
+  id: string;
+  run_id: string;
+  seq: number;
+  case_id: string;
+  passed: number;
+  weighted_score: number;
+  trial_json: string;
+  grader_result_json: string;
+}
+
+function toRun(row: SuiteRunRow): EvalSuiteRun {
+  return {
+    id: row.id,
+    suiteId: row.suite_id,
+    suiteVersionId: row.suite_version_id,
+    n: row.n,
+    k: row.k,
+    passAtK: row.pass_at_k,
+    rawScore: row.raw_score,
+    passed: Boolean(row.passed),
+    borderlineCount: row.borderline_count,
+    status: row.status,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+    error: row.error,
+  };
+}
+
+function toTrialResult(row: SuiteTrialResultRow): EvalSuiteTrialResult {
+  return {
+    id: row.id,
+    runId: row.run_id,
+    seq: row.seq,
+    caseId: row.case_id,
+    passed: Boolean(row.passed),
+    weightedScore: row.weighted_score,
+    trial: JSON.parse(row.trial_json) as Record<string, unknown>,
+    graderResult: JSON.parse(row.grader_result_json) as Record<string, unknown>,
+  };
 }
 
 function toSuite(row: SuiteRow): EvalSuite {
@@ -277,6 +338,96 @@ export class EvalSuiteRepo {
       )
       .get(organizationId, suiteId, version) as VersionRow | undefined;
     return row ? toVersion(row) : null;
+  }
+
+  createRun(input: { id: string; suiteId: string; suiteVersionId: string; n: number; k: number; startedAt: string }): void {
+    this.db.prepare(`
+      INSERT INTO eval_suite_runs
+        (id, suite_id, suite_version_id, n, k, status, started_at)
+      VALUES (?, ?, ?, ?, ?, 'running', ?)
+    `).run(input.id, input.suiteId, input.suiteVersionId, input.n, input.k, input.startedAt);
+  }
+
+  addTrialResult(input: {
+    runId: string;
+    seq: number;
+    caseId: string;
+    passed: boolean;
+    weightedScore: number;
+    trial: Record<string, unknown>;
+    graderResult: Record<string, unknown>;
+  }): void {
+    this.db.prepare(`
+      INSERT INTO eval_suite_trial_results
+        (id, run_id, seq, case_id, passed, weighted_score, trial_json, grader_result_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      randomUUID(), input.runId, input.seq, input.caseId, input.passed ? 1 : 0,
+      input.weightedScore, JSON.stringify(input.trial), JSON.stringify(input.graderResult),
+    );
+  }
+
+  finishRun(input: {
+    id: string;
+    passAtK: number;
+    rawScore: number;
+    passed: boolean;
+    borderlineCount: number;
+    finishedAt: string;
+  }): void {
+    this.db.prepare(`
+      UPDATE eval_suite_runs
+      SET pass_at_k = ?, raw_score = ?, passed = ?, borderline_count = ?,
+          status = 'completed', finished_at = ?, error = NULL
+      WHERE id = ?
+    `).run(input.passAtK, input.rawScore, input.passed ? 1 : 0, input.borderlineCount, input.finishedAt, input.id);
+  }
+
+  failRun(id: string, error: string, finishedAt = new Date().toISOString()): void {
+    this.db.prepare(`
+      UPDATE eval_suite_runs SET status = 'failed', finished_at = ?, error = ? WHERE id = ?
+    `).run(finishedAt, error.slice(0, 2000), id);
+  }
+
+  listRuns(suiteId: string): EvalSuiteRun[] {
+    return (this.db.prepare(
+      'SELECT * FROM eval_suite_runs WHERE suite_id = ? ORDER BY started_at DESC',
+    ).all(suiteId) as SuiteRunRow[]).map(toRun);
+  }
+
+  listRunsInOrg(suiteId: string, organizationId: string): EvalSuiteRun[] {
+    return (this.db.prepare(`
+      SELECT r.* FROM eval_suite_runs r
+      JOIN eval_suites s ON s.id = r.suite_id
+      JOIN capabilities c ON c.id = s.capability_id
+      JOIN projects p ON p.id = c.project_id
+      JOIN workspaces w ON w.id = p.workspace_id
+      WHERE r.suite_id = ? AND w.org_id = ?
+      ORDER BY r.started_at DESC
+    `).all(suiteId, organizationId) as SuiteRunRow[]).map(toRun);
+  }
+
+  findRun(id: string): EvalSuiteRun | null {
+    const row = this.db.prepare('SELECT * FROM eval_suite_runs WHERE id = ?').get(id) as SuiteRunRow | undefined;
+    return row ? toRun(row) : null;
+  }
+
+  findRunInOrg(id: string, organizationId: string): EvalSuiteRun | null {
+    const row = this.db.prepare(`
+      SELECT r.* FROM eval_suite_runs r
+      JOIN eval_suites s ON s.id = r.suite_id
+      JOIN capabilities c ON c.id = s.capability_id
+      JOIN projects p ON p.id = c.project_id
+      JOIN workspaces w ON w.id = p.workspace_id
+      WHERE r.id = ? AND w.org_id = ?
+    `).get(id, organizationId) as SuiteRunRow | undefined;
+    return row ? toRun(row) : null;
+  }
+
+  listTrialResults(runId: string): EvalSuiteTrialResult[] {
+    return (this.db.prepare(
+      'SELECT * FROM eval_suite_trial_results WHERE run_id = ? ORDER BY seq',
+    ).all(runId) as SuiteTrialResultRow[]).map(toTrialResult);
   }
 }
 
