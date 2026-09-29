@@ -7,6 +7,7 @@ against a known baseline.
 - [Capability matrix](capability-matrix.md)
 - [Repository inventory](inventory.json)
 - [Reliability and throughput baseline](reliability.md)
+- [Flaky-test register](flaky-tests.md)
 
 Refresh this evidence when a supported surface, runtime, deployment contract,
 or quality gate changes.
