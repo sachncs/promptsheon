@@ -149,3 +149,23 @@ export async function specificationPublishCommand(client: ApiClient, hash: strin
   if (!hash) throw new BadArgsError('spec publish <hash> — hash is required');
   return client.post(`/workspaces/${workspaceId()}/agent-specifications/${hash}/publish`, {}, opts);
 }
+
+export async function executionSubmitCommand(client: ApiClient, agentHash: string, inputPath: string, idempotencyKey: string, opts: { dryRun: boolean }): Promise<unknown> {
+  if (!agentHash || !/^[0-9a-f]{64}$/.test(agentHash)) throw new BadArgsError('execution submit <agentHash> <input-file> <idempotency-key> — a 64-character agent hash is required');
+  if (!idempotencyKey) throw new BadArgsError('execution submit — idempotency key is required');
+  return client.post(`/workspaces/${workspaceId()}/execution-jobs`, { agentHash, inputs: await specificationFile(inputPath), idempotencyKey }, opts);
+}
+
+export async function executionGetCommand(client: ApiClient, id: string): Promise<unknown> {
+  if (!id) throw new BadArgsError('execution get <id> — id is required');
+  return client.get(`/workspaces/${workspaceId()}/execution-jobs/${id}`);
+}
+
+export async function executionCancelCommand(client: ApiClient, id: string, opts: { dryRun: boolean }): Promise<unknown> {
+  if (!id) throw new BadArgsError('execution cancel <id> — id is required');
+  return client.post(`/workspaces/${workspaceId()}/execution-jobs/${id}/cancel`, {}, opts);
+}
+
+export async function executionMetricsCommand(client: ApiClient): Promise<unknown> {
+  return client.get('/execution-jobs/metrics');
+}

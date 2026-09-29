@@ -27,6 +27,36 @@ export interface AgentSpecificationDiffEntry {
   after: unknown;
 }
 
+export type ExecutionJobState = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'timed-out' | 'partially-completed';
+
+export interface ExecutionJob {
+  id: string;
+  organizationId: string;
+  workspaceId: string;
+  agentHash: string;
+  inputHash: string;
+  idempotencyKey: string;
+  state: ExecutionJobState;
+  attempts: number;
+  maxAttempts: number;
+  resultJson: string | null;
+  error: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface ExecutionQueueMetrics {
+  queued: number;
+  running: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+  timedOut: number;
+  partiallyCompleted: number;
+  oldestQueuedAt: string | null;
+}
+
 /**
  * Typed fetch wrapper over the public REST API.
  *
@@ -189,6 +219,22 @@ export class PromptsheonClient {
 
   publishAgentSpecification(workspaceId: string, hash: string): Promise<AgentSpecificationRecord> {
     return this.call({ method: 'POST', path: `/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/${encodeURIComponent(hash)}/publish` });
+  }
+
+  enqueueExecution(input: { workspaceId: string; agentHash: string; inputs: Record<string, unknown>; idempotencyKey: string; maxAttempts?: number }): Promise<ExecutionJob> {
+    return this.call({ method: 'POST', path: `/workspaces/${encodeURIComponent(input.workspaceId)}/execution-jobs`, body: { agentHash: input.agentHash, inputs: input.inputs, idempotencyKey: input.idempotencyKey, ...(input.maxAttempts === undefined ? {} : { maxAttempts: input.maxAttempts }) } });
+  }
+
+  getExecution(workspaceId: string, id: string): Promise<ExecutionJob> {
+    return this.call({ method: 'GET', path: `/workspaces/${encodeURIComponent(workspaceId)}/execution-jobs/${encodeURIComponent(id)}` });
+  }
+
+  cancelExecution(workspaceId: string, id: string): Promise<ExecutionJob> {
+    return this.call({ method: 'POST', path: `/workspaces/${encodeURIComponent(workspaceId)}/execution-jobs/${encodeURIComponent(id)}/cancel` });
+  }
+
+  getExecutionMetrics(): Promise<ExecutionQueueMetrics> {
+    return this.call({ method: 'GET', path: '/execution-jobs/metrics' });
   }
 }
 

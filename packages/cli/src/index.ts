@@ -19,6 +19,10 @@ import { PROMPTSHEON_CLI_VERSION, EXIT } from './version.js';
 import { makeClient, parseFlags, print, handleError } from './output.js';
 import {
   evalGateCommand,
+  executionCancelCommand,
+  executionGetCommand,
+  executionMetricsCommand,
+  executionSubmitCommand,
   loginCommand,
   manifestScanCommand,
   releaseApproveCommand,
@@ -52,6 +56,10 @@ Commands:
   spec diff <left> <right>           diff two specification hashes
   spec lineage <hash>                show specification lineage
   spec publish <hash>                publish a specification revision
+  execution submit <hash> <file> <key> submit a durable execution job
+  execution get <id>                 inspect a durable execution job
+  execution cancel <id>              cancel a durable execution job
+  execution metrics                  show execution queue metrics
 
 Env:
   PROMPTSHEON_API_URL                default http://127.0.0.1:8080
@@ -155,6 +163,27 @@ async function main(argv: string[]): Promise<number> {
           }
           if (sub === 'publish') {
             print(flags.format, await specificationPublishCommand(client, positional[2] ?? '', { dryRun: flags.dryRun }));
+            return EXIT.OK;
+          }
+          usage();
+          return EXIT.BAD_ARGS;
+        }
+        case 'execution': {
+          const sub = positional[1];
+          if (sub === 'submit') {
+            print(flags.format, await executionSubmitCommand(client, positional[2] ?? '', positional[3] ?? '', positional[4] ?? '', { dryRun: flags.dryRun }));
+            return EXIT.OK;
+          }
+          if (sub === 'get') {
+            print(flags.format, await executionGetCommand(client, positional[2] ?? ''));
+            return EXIT.OK;
+          }
+          if (sub === 'cancel') {
+            print(flags.format, await executionCancelCommand(client, positional[2] ?? '', { dryRun: flags.dryRun }));
+            return EXIT.OK;
+          }
+          if (sub === 'metrics') {
+            print(flags.format, await executionMetricsCommand(client));
             return EXIT.OK;
           }
           usage();
