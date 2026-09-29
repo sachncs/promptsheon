@@ -121,4 +121,20 @@ describe('ReleaseService', () => {
     })).toThrow('valid operator signature is required');
     expect(store.updateStatusInOrg).not.toHaveBeenCalled();
   });
+
+  it('does not overwrite a release changed by a concurrent transition', () => {
+    const { service, store } = makeService();
+    const compareAndSwap = vi.fn(() => null);
+    store.updateStatusInOrgIfCurrent = compareAndSwap;
+
+    expect(() => service.transition({
+      releaseId: release.id,
+      organizationId: 'org-1',
+      actorId: 'operator',
+      to: 'approved',
+    })).toThrow('release release-1 was not found');
+    expect(compareAndSwap).toHaveBeenCalledWith(release.id, 'org-1', 'review', 'approved');
+    expect(store.updateStatusInOrg).not.toHaveBeenCalled();
+    expect(store.appendTransition).not.toHaveBeenCalled();
+  });
 });

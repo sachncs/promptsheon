@@ -193,6 +193,18 @@ export class ReleaseRepo extends BaseRepo<Release> {
     return { ...existing, status };
   }
 
+  updateStatusInOrgIfCurrent(id: string, organizationId: string, expected: Release['status'], status: Release['status']): Release | null {
+    const result = this.db.prepare(`
+      UPDATE releases SET status = ?, updated_at = ?
+      WHERE id = ? AND status = ? AND EXISTS (
+        SELECT 1 FROM capabilities c JOIN projects p ON p.id = c.project_id
+        JOIN workspaces w ON w.id = p.workspace_id
+        WHERE c.id = releases.capability_id AND w.org_id = ?
+      )
+    `).run(status, new Date().toISOString(), id, expected, organizationId);
+    return result.changes > 0 ? this.findByIdInOrg(id, organizationId) : null;
+  }
+
   /**
    * Atomically rollback: roll back the current release and reactivate
    * the target in a single transaction. The UNIQUE(active-per-cap-env)
@@ -213,12 +225,10 @@ export class ReleaseRepo extends BaseRepo<Release> {
     let rolledBack: Release | null = null;
     let reactivated: Release | null = null;
     this.db.transaction(() => {
-      this.db.prepare(
-        "UPDATE releases SET status = 'rolled_back', updated_at = ? WHERE id = ?",
-      ).run(new Date().toISOString(), currentId);
-      this.db.prepare(
-        "UPDATE releases SET status = 'active', updated_at = ? WHERE id = ?",
-      ).run(new Date().toISOString(), targetId);
+      const currentUpdate = this.db.prepare("UPDATE releases SET status = 'rolled_back', updated_at = ? WHERE id = ? AND status IN ('canary', 'active')").run(new Date().toISOString(), currentId);
+      if (currentUpdate.changes !== 1) throw new Error('current release changed before rollback');
+      const targetUpdate = this.db.prepare("UPDATE releases SET status = 'active', updated_at = ? WHERE id = ? AND status = 'active'").run(new Date().toISOString(), targetId);
+      if (targetUpdate.changes !== 1) throw new Error('rollback target changed before rollback');
       rolledBack = { ...current, status: 'rolled_back' };
       reactivated = { ...target, status: 'active' };
     })();
@@ -237,8 +247,9 @@ export class ReleaseRepo extends BaseRepo<Release> {
     let result: { rolledBack: Release; reactivated: Release } | null = null;
     this.db.transaction(() => {
       const now = new Date().toISOString();
-      this.db.prepare("UPDATE releases SET status = 'rolled_back', updated_at = ? WHERE id = ?").run(now, currentId);
-      this.db.prepare("UPDATE releases SET status = 'active', updated_at = ? WHERE id = ?").run(now, targetId);
+      const currentUpdate = this.db.prepare("UPDATE releases SET status = 'rolled_back', updated_at = ? WHERE id = ? AND status IN ('canary', 'active')").run(now, currentId);
+      if (currentUpdate.changes !== 1) throw new Error('current release changed before rollback');
+      const targetUpdate = this.db.prepare("UPDATE releases SET status = 'active', updated_at = ? WHERE id = ? AND status = 'active'").run(now, targetId);
       result = {
         rolledBack: { ...current, status: 'rolled_back' },
         reactivated: { ...target, status: 'active' },

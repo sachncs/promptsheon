@@ -50,6 +50,7 @@ export interface TransitionReleaseInput {
 export interface ReleaseStore {
   findByIdInOrg(releaseId: string, organizationId: string): Release | null;
   updateStatusInOrg(releaseId: string, organizationId: string, status: ReleaseStatus): Release | null;
+  updateStatusInOrgIfCurrent?(releaseId: string, organizationId: string, expected: ReleaseStatus, status: ReleaseStatus): Release | null;
   appendTransition(row: {
     id: string;
     releaseId: string;
@@ -146,7 +147,9 @@ export class ReleaseService {
       }
     }
 
-    const updated = this.repo.updateStatusInOrg(input.releaseId, input.organizationId, input.to);
+    const updated = this.repo.updateStatusInOrgIfCurrent
+      ? this.repo.updateStatusInOrgIfCurrent(input.releaseId, input.organizationId, existing.status, input.to)
+      : this.repo.updateStatusInOrg(input.releaseId, input.organizationId, input.to);
     if (!updated) throw new ReleaseNotFoundError(input.releaseId);
 
     this.repo.appendTransition({
