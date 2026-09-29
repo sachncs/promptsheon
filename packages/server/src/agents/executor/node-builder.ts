@@ -1,4 +1,4 @@
-import { Agent, Graph, AfterInvocationEvent, BeforeInvocationEvent } from '@strands-agents/sdk';
+import { Agent, Graph, AfterInvocationEvent, BeforeInvocationEvent, BeforeToolCallEvent } from '@strands-agents/sdk';
 import type { Graph as GraphType, HookCallback } from '@strands-agents/sdk';
 import type { AppConfig, Manifest, SubCapabilityManifest } from '@promptsheon/shared';
 import { createModel } from '../model.js';
@@ -48,6 +48,7 @@ export function buildNodeAgent(
     id: node.id,
     model: createModel(config),
     systemPrompt: node.manifest.prompt.systemPrompt,
+    tools: node.manifest.tools.map((tool) => toolRegistry.get(tool.name)).filter((tool): tool is Agent => tool !== undefined),
     ...(conv ? { conversationManager: conv } : {}),
     ...(retry ? { retryStrategy: retry } : {}),
   });
@@ -62,6 +63,13 @@ export function buildNodeAgent(
     } else {
       agent.addHook(BeforeInvocationEvent, cb as HookCallback<BeforeInvocationEvent>);
     }
+  }
+  const allowedTools = node.manifest.metadata['allowedTools'];
+  if (Array.isArray(allowedTools)) {
+    const allowed = new Set(allowedTools.filter((tool): tool is string => typeof tool === 'string'));
+    agent.addHook(BeforeToolCallEvent, (event) => {
+      if (!allowed.has(event.toolUse.name)) event.cancel = `tool permission denied: ${event.toolUse.name}`;
+    });
   }
 
   return agent;

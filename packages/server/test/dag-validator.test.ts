@@ -180,6 +180,12 @@ describe('buildNodeAgent', () => {
     const agent = buildNodeAgent(node, buildConfig());
     expect(agent).toBeDefined();
   });
+
+  it('constructs an agent with a declared tool permission boundary', () => {
+    const node = buildLeafManifest('restricted-node');
+    node.manifest.metadata = { allowedTools: ['approved-tool'] };
+    expect(buildNodeAgent(node, buildConfig())).toBeDefined();
+  });
 });
 
 describe('buildInvocationLimits', () => {

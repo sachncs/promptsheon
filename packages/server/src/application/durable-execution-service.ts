@@ -180,7 +180,7 @@ function toManifest(record: AgentSpecificationRecord): Manifest {
     evaluation: { datasets: specification.evaluationPolicy.suites, scorers: [], passThreshold: specification.evaluationPolicy.requiredScore },
     nodes: [],
     edges: [],
-    metadata: { agentHash: record.hash, workspaceId: record.workspaceId },
+    metadata: { agentHash: record.hash, workspaceId: record.workspaceId, allowedTools: specification.permissions.allowedTools },
     createdAt: record.createdAt,
     updatedAt: record.createdAt,
   };
