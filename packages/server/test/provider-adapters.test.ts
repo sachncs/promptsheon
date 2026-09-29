@@ -22,4 +22,18 @@ describe('RouterModelAdapter', () => {
     await expect(adapter.invoke(request(controller.signal))).rejects.toThrow('cancelled');
     expect(calls).toBe(0);
   });
+
+  it('preserves provider rate-limit classification', async () => {
+    const error = Object.assign(new Error('too many requests'), { statusCode: 429 });
+    const adapter = new RouterModelAdapter({ complete: async () => { throw error; } });
+    await expect(adapter.invoke(request(new AbortController().signal))).rejects.toMatchObject({ statusCode: 429 });
+  });
+
+  it('forwards provider timeout failures without converting them into success', async () => {
+    const adapter = new RouterModelAdapter({ complete: async (input) => {
+      expect(input.signal?.aborted).toBe(false);
+      throw Object.assign(new Error('provider timeout'), { name: 'TimeoutError' });
+    } });
+    await expect(adapter.invoke(request(new AbortController().signal))).rejects.toMatchObject({ name: 'TimeoutError' });
+  });
 });
