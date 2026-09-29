@@ -4,3 +4,11 @@ export { validateDag } from './dag-validator.js';
 export { buildNodeAgent, buildGraph, buildInvocationLimits } from './node-builder.js';
 export { runAllGuardrails, runGuardrail } from './guardrails.js';
 export type { GuardrailContext, GuardrailBroadcast } from './guardrails.js';
+export type {
+  ModelAdapter,
+  ModelRequest,
+  ModelResponse,
+  ToolAdapter,
+  ToolAuthorizer,
+  ToolInvocationContext,
+} from '../../application/execution-ports.js';

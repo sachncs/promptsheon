@@ -5,6 +5,8 @@ import type { ExecutionJob, ExecutionJobRepo } from '../repos/execution-job.js';
 import { DurableExecutionWorker, type ExecutionWorkerOptions } from './durable-execution-worker.js';
 import { z } from 'zod';
 import type { ExecutionCheckpointRepo } from '../repos/execution-checkpoint.js';
+import { ExecutionTimeoutError } from '../agents/executor/executor.js';
+import { ExecutionWorkError } from './durable-execution-worker.js';
 
 interface ManifestStore {
   get(workspaceId: string, hash: string): Promise<AgentSpecificationRecord>;
@@ -24,6 +26,7 @@ interface ManifestRunner {
 
 /** Application boundary for durable execution submission and worker lifecycle. */
 export class DurableExecutionService {
+  private worker: DurableExecutionWorker | undefined;
   constructor(
     private readonly jobs: ExecutionJobRepo,
     private readonly manifests: ManifestStore,
@@ -57,19 +60,38 @@ export class DurableExecutionService {
   }
 
   cancel(organizationId: string, id: string): ExecutionJob {
+    if (this.worker) return this.worker.cancel(organizationId, id);
     return this.jobs.cancel(organizationId, id);
   }
 
   createWorker(options: Partial<ExecutionWorkerOptions> = {}): DurableExecutionWorker {
-    return new DurableExecutionWorker(this.jobs, {
+    this.worker = new DurableExecutionWorker(this.jobs, {
       run: async (job, context) => {
         const record = await this.manifests.get(job.workspaceId, job.agentHash);
-        return this.runner.execute(job.agentHash, toManifest(record), {
-          executionId: job.id,
-          inputs: z.record(z.string(), z.unknown()).parse(JSON.parse(job.inputJson)),
-          signal: context.signal,
-          checkpoints: context.checkpoint,
-        });
+        const inputs = z.record(z.string(), z.unknown()).parse(JSON.parse(job.inputJson));
+        const estimatedInputTokens = Math.ceil(job.inputJson.length / 4);
+        if (estimatedInputTokens > record.specification.resourceBudget.maxInputTokens) {
+          throw new ExecutionWorkError('input token budget exhausted');
+        }
+        try {
+          const result = await this.runner.execute(job.agentHash, toManifest(record), {
+            executionId: job.id,
+            inputs,
+            signal: context.signal,
+            checkpoints: context.checkpoint,
+          });
+          const totals = executionTotals(result);
+          if (totals.totalTokens > record.specification.resourceBudget.maxInputTokens + record.specification.resourceBudget.maxOutputTokens) {
+            throw new ExecutionWorkError('token budget exhausted');
+          }
+          if (totals.costUsd > record.specification.resourceBudget.maxCostUsd) {
+            throw new ExecutionWorkError('cost budget exhausted');
+          }
+          return result;
+        } catch (error) {
+          if (error instanceof ExecutionTimeoutError) throw new ExecutionWorkError(error.message, false, true);
+          throw error;
+        }
       },
     }, {
       workerId: options.workerId ?? `worker-${randomUUID()}`,
@@ -79,7 +101,17 @@ export class DurableExecutionService {
       maxBackoffMs: options.maxBackoffMs ?? 30_000,
       ...(options.random === undefined ? {} : { random: options.random }),
     }, this.checkpoints);
+    return this.worker;
   }
+}
+
+function executionTotals(value: unknown): { totalTokens: number; costUsd: number } {
+  if (!value || typeof value !== 'object') return { totalTokens: 0, costUsd: 0 };
+  const record = value as Record<string, unknown>;
+  return {
+    totalTokens: typeof record['totalTokens'] === 'number' ? record['totalTokens'] : 0,
+    costUsd: typeof record['totalCost'] === 'number' ? record['totalCost'] : 0,
+  };
 }
 
 function toManifest(record: AgentSpecificationRecord): Manifest {

@@ -23,7 +23,7 @@ export interface ExecutionWorkContext {
 
 /** Error metadata used by the worker to decide whether a failed attempt is retryable. */
 export class ExecutionWorkError extends Error {
-  constructor(message: string, readonly retryable = false) {
+  constructor(message: string, readonly retryable = false, readonly timedOut = false) {
     super(message);
     this.name = 'ExecutionWorkError';
   }
@@ -120,7 +120,9 @@ export class DurableExecutionWorker {
       const workError = error instanceof ExecutionWorkError
         ? error
         : new ExecutionWorkError(error instanceof Error ? error.message : String(error));
-      if (workError.retryable && job.attempts < job.maxAttempts) {
+      if (workError.timedOut) {
+        this.safeTransition(job, 'timed-out', workError.message);
+      } else if (workError.retryable && job.attempts < job.maxAttempts) {
         this.requeue(job, workError.message);
       } else {
         this.safeTransition(job, 'failed', workError.message);

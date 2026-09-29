@@ -62,7 +62,7 @@ const EvaluationPolicySchema = z.strictObject({
 const ResourceBudgetSchema = z.strictObject({
   maxInputTokens: z.number().int().min(1).max(10_000_000).default(100_000),
   maxOutputTokens: z.number().int().min(1).max(1_000_000).default(16_000),
-  maxCostUsd: z.number().finite().min(0).max(1_000_000).default(0),
+  maxCostUsd: z.number().finite().min(0).max(1_000_000).default(1),
   maxWallTimeMs: z.number().int().min(1).max(86_400_000).default(3_600_000),
 });
 
@@ -101,7 +101,7 @@ export const AgentSpecificationSchema = z.strictObject({
   executionPolicy: ExecutionPolicySchema.default({ timeoutMs: 120_000, maxAttempts: 1, concurrency: 1, deterministic: true }),
   memoryPolicy: MemoryPolicySchema.default({ mode: 'none', retentionSeconds: 0 }),
   evaluationPolicy: EvaluationPolicySchema.default({ suites: [], requiredScore: 0 }),
-  resourceBudget: ResourceBudgetSchema.default({ maxInputTokens: 100_000, maxOutputTokens: 16_000, maxCostUsd: 0, maxWallTimeMs: 3_600_000 }),
+  resourceBudget: ResourceBudgetSchema.default({ maxInputTokens: 100_000, maxOutputTokens: 16_000, maxCostUsd: 1, maxWallTimeMs: 3_600_000 }),
   lifecycle: LifecycleSchema,
   metadata: JsonObjectSchema.default({}),
 });

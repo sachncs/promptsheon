@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { z } from 'zod';
 
 export interface ExecutionCheckpoint {
   executionId: string;
@@ -42,7 +43,7 @@ export class ExecutionCheckpointRepo {
       stepId: row.step_id,
       state: row.state,
       output: row.output,
-      metadata: JSON.parse(row.metadata) as Record<string, unknown>,
+      metadata: z.record(z.string(), z.unknown()).parse(JSON.parse(row.metadata)),
       createdAt: row.created_at,
     }));
   }

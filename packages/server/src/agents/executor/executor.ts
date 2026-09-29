@@ -33,6 +33,14 @@ export interface NodeRunResult {
   error: string;
 }
 
+/** Raised when the immutable execution wall-clock budget is exhausted. */
+export class ExecutionTimeoutError extends Error {
+  constructor() {
+    super('execution wall-clock budget exhausted');
+    this.name = 'ExecutionTimeoutError';
+  }
+}
+
 export interface ExecuteOptions {
   executionId: string;
   inputs: Record<string, unknown>;
@@ -144,6 +152,9 @@ export class ManifestGraphExecutor {
     });
 
     for (const node of manifest.nodes) {
+      if (Date.now() - executionStartedAtMs >= manifest.runtime.totalTimeoutMs) {
+        throw new ExecutionTimeoutError();
+      }
       if (options.signal?.aborted) {
         trace.status = 'cancelled';
         break;
@@ -259,6 +270,9 @@ export class ManifestGraphExecutor {
           this.buildPrompt(node, options.inputs, preCheck.redactedValues[0] as string | undefined),
           { ...(limits ? { limits } : {}) },
         );
+        if (Date.now() - executionStartedAtMs >= manifest.runtime.totalTimeoutMs) {
+          throw new ExecutionTimeoutError();
+        }
         this.liveAgents.delete(agentKey);
         const outputText = this.extractText(result);
         const metrics = result.metrics;
