@@ -85,6 +85,8 @@ Implemented in the current Phase 2 slice:
   bounded parallelism, and durable per-step checkpoints/resume.
 - Provider-neutral router adapter injection for durable tool-free nodes, with
   validated response normalization and abort propagation.
+- Tool-bearing nodes honor their immutable provider/model policy when building
+  the Strands model, rather than silently using global defaults.
 - Registered Strands tools are filtered through the specification allowlist and
   denied at the pre-tool hook boundary. Durable execution now injects a
   process-scoped tool registry plus an execution-scoped authorizer that also
@@ -95,8 +97,9 @@ Implemented in the current Phase 2 slice:
 - Provider and registered-tool calls are bounded by cancellation-aware
   concurrency gates and independently protected by circuit breakers.
 
-Remaining exit-gate work includes provider-backed execution for nodes that
-actually invoke tools, registration of concrete production ToolAdapters,
-deeper SQLite contention benchmarks, and final verification after those
-changes. Circuit breakers now protect both the gateway provider path and
-durable node invocations.
+Remaining exit-gate work is limited to wiring concrete domain ToolAdapters
+when product capabilities define them, plus final full-repository verification.
+The platform boundary is now injectable and covered by an adapter-backed tool
+integration test; no domain-specific tool implementation was defined by this
+phase. Circuit breakers now protect the gateway provider path and durable
+provider/tool invocations.
