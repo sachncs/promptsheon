@@ -17,6 +17,8 @@ corrections are represented as a new event rather than mutation of history.
 The user-facing trace page reads evidence through
 `GET /api/traces/:id/evidence`; organization-wide administrators can query or
 export it through `GET /api/evidence` and `GET /api/evidence/export`.
+The trace dashboard reads `GET /api/traces/summary` for seven-day throughput,
+error rate, latency, token/cost totals, and model-level health breakdowns.
 
 ## Redaction policy
 
@@ -61,6 +63,24 @@ service logs, then compare the execution timeline with the evidence query.
 Increasing the buffer should be preceded by measuring memory and write
 throughput; it is not a substitute for fixing a slow database or retention
 backlog.
+
+## Alerting baseline
+
+Configure alert rules for the operational summary and execution queue with
+thresholds appropriate to the organization. The minimum production baseline
+is:
+
+| Signal | Starting threshold | Response |
+| --- | ---: | --- |
+| Queue age | 60 s | inspect worker capacity and provider latency |
+| Error rate | 5% over 5 min | inspect the evidence failure events and provider/model split |
+| Average latency | 2 s over 5 min | inspect model, tool, and guardrail spans |
+| Cost spike | 2× seven-day baseline | check routing changes and token budgets |
+| Evidence lag/drops | any sustained drop or writer failure | inspect sink metrics and database throughput |
+
+These are starting thresholds, not universal SLOs. Alert rule changes should
+be reviewed with the owning team and recorded with the release or incident
+that motivated them.
 
 ## Verification checklist
 
