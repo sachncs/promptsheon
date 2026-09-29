@@ -72,4 +72,18 @@ describe('ExecutionJobRepo', () => {
     expect(() => limited.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: 'b'.repeat(64), inputHash: 'j'.repeat(64), inputJson: '{}', idempotencyKey: 'capacity-2' })).toThrow(ExecutionQueueCapacityError);
     expect(limited.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: 'a'.repeat(64), inputHash: 'i'.repeat(64), inputJson: '{}', idempotencyKey: 'capacity-1' }).id).toBe(first.id);
   });
+
+  it('claims a high-volume queue exactly once', () => {
+    const jobs = Array.from({ length: 250 }, (_, index) => repo.enqueue({
+      organizationId: 'org1', workspaceId: 'ws1', agentHash: 'a'.repeat(64), inputHash: String(index).padStart(64, '0'), inputJson: JSON.stringify({ index }), idempotencyKey: `load-${index}`,
+    }));
+    const claimed = new Set<string>();
+    for (let index = 0; index < jobs.length; index++) {
+      const job = repo.claimNext('load-worker', 10_000);
+      expect(job).not.toBeNull();
+      if (job) claimed.add(job.id);
+    }
+    expect(claimed.size).toBe(jobs.length);
+    expect(repo.claimNext('load-worker', 10_000)).toBeNull();
+  });
 });
