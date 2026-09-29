@@ -10,6 +10,7 @@ import { ChaosConfig, ChaosFailureError } from '../../hardening/chaos.js';
 import { checkCostCap, recordCost, type CostLimitConfig } from '../../hardening/cost-caps.js';
 import { findRedTeamMatches } from '../../hardening/redteam.js';
 import { CircuitBreaker } from '../../application/execution-resilience.js';
+import type { ModelAdapter } from '../../application/execution-ports.js';
 
 export interface ExecutionTrace {
   executionId: string;
@@ -100,6 +101,7 @@ export class ManifestGraphExecutor {
       costOrgId?: string;
       costCapabilityId?: string;
       traceRepo?: import('../../repos/trace.js').TraceRepo;
+      modelAdapter?: ModelAdapter;
     },
   ) {}
 
@@ -264,23 +266,38 @@ export class ManifestGraphExecutor {
         const perNodeHookCtx = metricsHookCtx
           ? { ...metricsHookCtx, invocationStartedAt: Date.now() }
           : undefined;
-        const agent = buildNodeAgent(node, this.deps.config, perNodeHookCtx ? { metricsHookCtx: perNodeHookCtx } : {});
         const agentKey = `${options.executionId}:${node.id}`;
-        this.liveAgents.set(agentKey, agent);
         const limits = buildInvocationLimits(node.limits);
         const provider = node.manifest.model.provider;
         const breaker = this.providerCircuitBreakers.get(provider) ?? new CircuitBreaker(`durable-provider:${provider}`);
         this.providerCircuitBreakers.set(provider, breaker);
-        const result = await breaker.execute(() => agent.invoke(
-          this.buildPrompt(node, options.inputs, preCheck.redactedValues[0] as string | undefined),
-          { ...(limits ? { limits } : {}) },
-        ));
+        const prompt = this.buildPrompt(node, options.inputs, preCheck.redactedValues[0] as string | undefined);
+        let result: unknown;
+        if (this.deps.modelAdapter && node.manifest.tools.length === 0 && (this.deps.modelAdapter.provider === '*' || this.deps.modelAdapter.provider === provider)) {
+          const response = await breaker.execute(() => this.deps.modelAdapter!.invoke({
+            provider,
+            model: node.manifest.model.modelId,
+            systemPrompt: '',
+            input: prompt,
+            maxOutputTokens: node.manifest.model.maxTokens ?? node.limits.outputTokens ?? 4096,
+            temperature: node.manifest.model.temperature ?? 0,
+            signal: options.signal ?? new AbortController().signal,
+          }));
+          result = {
+            lastMessage: { content: [{ type: 'textBlock', text: response.text }] },
+            metrics: { accumulatedUsage: { totalTokens: response.promptTokens + response.completionTokens, costUsd: response.costUsd } },
+          };
+        } else {
+          const agent = buildNodeAgent(node, this.deps.config, perNodeHookCtx ? { metricsHookCtx: perNodeHookCtx } : {});
+          this.liveAgents.set(agentKey, agent);
+          result = await breaker.execute(() => agent.invoke(prompt, { ...(limits ? { limits } : {}), ...(options.signal ? { cancelSignal: options.signal } : {}) }));
+        }
         if (Date.now() - executionStartedAtMs >= manifest.runtime.totalTimeoutMs) {
           throw new ExecutionTimeoutError();
         }
         this.liveAgents.delete(agentKey);
         const outputText = this.extractText(result);
-        const metrics = result.metrics;
+        const metrics = (result as { metrics?: { accumulatedUsage?: { totalTokens?: number; costUsd?: number } } }).metrics;
         const totalTokens = metrics?.accumulatedUsage?.totalTokens ?? 0;
 
         const postCheck = runAllGuardrails(node.postGuardrails, {
@@ -293,9 +310,8 @@ export class ManifestGraphExecutor {
 
         const finalOutput = postCheck.redactedValues[0] as string ?? outputText;
         const latencyMs = Date.now() - nodeStartedAt;
-        const cost = metrics?.accumulatedUsage?.totalTokens
-          ? (metrics.accumulatedUsage.totalTokens / 1000) * 0.00003
-          : 0;
+        const cost = metrics?.accumulatedUsage?.costUsd
+          ?? (metrics?.accumulatedUsage?.totalTokens ? (metrics.accumulatedUsage.totalTokens / 1000) * 0.00003 : 0);
 
         trace.nodeResults[node.id] = {
           nodeId: node.id,

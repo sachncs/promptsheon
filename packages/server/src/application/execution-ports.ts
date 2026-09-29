@@ -1,5 +1,6 @@
 /** Provider-neutral request passed to a model adapter. */
 export interface ModelRequest {
+  provider?: string;
   model: string;
   systemPrompt: string;
   input: string;
