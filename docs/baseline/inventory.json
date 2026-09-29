@@ -1097,6 +1097,11 @@
     {
       "file": "packages/server/src/routes/trace.ts",
       "method": "GET",
+      "path": "/api/traces/summary"
+    },
+    {
+      "file": "packages/server/src/routes/trace.ts",
+      "method": "GET",
       "path": "/api/traces"
     },
     {
