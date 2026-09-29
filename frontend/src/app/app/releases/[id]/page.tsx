@@ -109,6 +109,20 @@ export default function ReleaseDetailPage() {
     }
   };
 
+  const handleAutoRollback = async () => {
+    try {
+      const assessment = await releaseApi.autoRollback(id);
+      refreshRelease();
+      toast({
+        title: assessment.action === 'rolled_back' ? 'Regression detected — rolled back' : 'Canary is healthy',
+        variant: assessment.action === 'rolled_back' ? 'warning' : 'success',
+        description: assessment.reason,
+      });
+    } catch (err) {
+      toast({ title: 'Canary assessment failed', variant: 'destructive', description: getErrorMessage(err) });
+    }
+  };
+
   if (!session) return null;
   if (release.isLoading) return <div className="text-text-muted text-sm">Loading release…</div>;
   if (release.isError) return <QueryError message={release.error} onRetry={() => void release.refetch()} />;
@@ -263,6 +277,9 @@ export default function ReleaseDetailPage() {
                     live eval scores monitor for drift. Increase the canary percent over time, or activate to
                     send 100% of traffic to this release.
                   </p>
+                  <Button size="sm" variant="outline" onClick={handleAutoRollback} disabled={isTerminal || (releaseStatus !== 'canary' && releaseStatus !== 'active')}>
+                    <AlertCircle className="mr-1.5 h-3.5 w-3.5" />Assess health &amp; auto-rollback
+                  </Button>
                 </div>
               );
             })()}

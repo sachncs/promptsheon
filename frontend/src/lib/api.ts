@@ -564,6 +564,14 @@ const ReleaseSchema = z.object({
   canaryPercent: z.number().int().min(0).max(100),
 });
 
+const CanaryAssessmentSchema = z.object({
+  action: z.enum(['no_action', 'rolled_back']),
+  reason: z.string(),
+  releaseId: z.string(),
+  targetReleaseId: z.string().optional(),
+  evaluationId: z.string().optional(),
+});
+
 const ApprovalEntrySchema = z.object({
   userId: z.string(),
   vote: z.enum(['approve', 'reject']),
@@ -1031,6 +1039,12 @@ export const releaseApi = {
     const body: { toReleaseId?: string } = {};
     if (toReleaseId !== undefined) body.toReleaseId = toReleaseId;
     return client.post(`/releases/${id}/rollback`, body);
+  },
+  autoRollback: async (id: string): Promise<{ action: 'no_action' | 'rolled_back'; reason: string; releaseId: string; targetReleaseId?: string | undefined; evaluationId?: string | undefined }> => {
+    const r = await client.post<unknown>(`/releases/${id}/auto-rollback`, {});
+    const parsed = CanaryAssessmentSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid canary assessment data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
   },
 };
 
