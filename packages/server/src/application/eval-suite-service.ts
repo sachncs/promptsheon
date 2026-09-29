@@ -90,6 +90,25 @@ export interface EvalGateSummary {
   suites: Array<{ suiteId: string; suiteName: string; ok: boolean; rawScore: number; threshold: number }>;
 }
 
+function serializeTrial(trial: EvalTrial): Record<string, unknown> {
+  return {
+    caseId: trial.caseId,
+    output: trial.output,
+    ...(trial.transcript === undefined ? {} : { transcript: trial.transcript }),
+    ...(trial.finalState === undefined ? {} : { finalState: trial.finalState }),
+    ...(trial.toolCalls === undefined ? {} : { toolCalls: trial.toolCalls }),
+    ...(trial.referenceTranscript === undefined ? {} : { referenceTranscript: trial.referenceTranscript }),
+  };
+}
+
+function serializeGraderResult(result: GraderResult): Record<string, unknown> {
+  return {
+    results: result.results,
+    weightedScore: result.weightedScore,
+    passed: result.passed,
+  };
+}
+
 /** Coordinates suite version selection, grading, scoring, and review routing. */
 export class EvalSuiteService {
   constructor(
@@ -150,8 +169,8 @@ export class EvalSuiteService {
         caseId: trial.caseId,
         passed: result.passed,
         weightedScore: result.weightedScore,
-        trial: trial as unknown as Record<string, unknown>,
-        graderResult: result as unknown as Record<string, unknown>,
+        trial: serializeTrial(trial),
+        graderResult: serializeGraderResult(result),
       });
     });
     const passAtKValue = passAtK(n, k, successes);
