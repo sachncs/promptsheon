@@ -61,6 +61,7 @@ import { registerBudgetRoutes } from './budget.js';
 import { registerIdentityRoutes } from './identity.js';
 import { registerAgentSpecificationRoutes } from './agent-specification.js';
 import { registerExecutionJobRoutes } from './execution-jobs.js';
+import { registerEvidenceRoutes } from './evidence.js';
 import { WorkspaceService } from '../application/workspace-service.js';
 import { ProjectService } from '../application/project-service.js';
 import { CapabilityService } from '../application/capability-service.js';
@@ -171,6 +172,7 @@ export interface AppDeps {
   featureFlagRepo: import('../repos/feature-flag.js').FeatureFlagRepo;
   traceRepo: import('../repos/trace.js').TraceRepo;
   traceScoreRepo: import('../repos/trace-score.js').TraceScoreRepo;
+  evidenceRepo: import('../repos/evidence.js').EvidenceRepo;
   autoEval: import('../observability/auto-eval.js').AutoEval;
   userAnalyticsRepo: import('../repos/user-analytics.js').UserAnalyticsRepo;
   identityService: IdentityService;
@@ -354,6 +356,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerTraceScoreRoutes(app, {
     service: traceService,
   });
+  registerEvidenceRoutes(app, { repo: deps.evidenceRepo, requireAdmin });
   registerPlaygroundRoutes(app, { gateway: deps.gateway });
   registerAnalyticsRoutes(app, { repo: deps.userAnalyticsRepo });
   registerTeamRoutes(app, {

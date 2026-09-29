@@ -44,6 +44,7 @@ import { SearchRepo } from './search.js';
 import type { AgentSpecificationRepo } from './agent-specification.js';
 import { ExecutionJobRepo } from './execution-job.js';
 import { ExecutionCheckpointRepo } from './execution-checkpoint.js';
+import { EvidenceRepo } from './evidence.js';
 
 /**
  * Bundle of every repo in the server. Built once from a
@@ -102,6 +103,7 @@ export interface Repos {
   agentSpecification?: AgentSpecificationRepo;
   executionJob: ExecutionJobRepo;
   executionCheckpoint: ExecutionCheckpointRepo;
+  evidence: EvidenceRepo;
 }
 
 /**
@@ -164,6 +166,7 @@ export function buildRepos(db: Database.Database): Repos {
     search: new SearchRepo(db),
     executionJob: new ExecutionJobRepo(db),
     executionCheckpoint: new ExecutionCheckpointRepo(db),
+    evidence: new EvidenceRepo(db),
   };
 }
 
@@ -189,5 +192,6 @@ export { ManifestRepo, computeManifestHash } from './manifest.js';
 export { AgentSpecificationRepo } from './agent-specification.js';
 export { ExecutionJobRepo } from './execution-job.js';
 export { ExecutionCheckpointRepo } from './execution-checkpoint.js';
+export { EvidenceRepo } from './evidence.js';
 export type { CutoverReport } from './manifest.js';
 export { OrgRepo, TeamRepo, MembershipRepo } from './org.js';

@@ -6,6 +6,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EvidenceRepo } from '../src/repos/evidence.js';
 import { hashTelemetry, redactTelemetry } from '../src/observability/redaction.js';
+import Fastify from 'fastify';
+import { registerEvidenceRoutes } from '../src/routes/evidence.js';
 
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'shared', 'db', 'migrations');
 const migrations: MigrationSql[] = readdirSync(migrationsDir)
@@ -49,6 +51,28 @@ describe('evidence and telemetry redaction', () => {
     expect(repo.deleteBefore('org-1', '2021-01-01T00:00:00.000Z', 'short')).toBe(1);
     expect(repo.listByOrganization('org-1')).toHaveLength(0);
     expect(repo.listByOrganization('org-2')).toHaveLength(1);
+    db.close();
+  });
+
+  it('serves tenant-scoped timeline and JSON export routes', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db, migrations);
+    const repo = new EvidenceRepo(db);
+    repo.append({ eventType: 'execution.started', organizationId: 'org-1', correlationId: 'c1', traceId: 'trace-1', payload: { ok: true } });
+    repo.append({ eventType: 'execution.started', organizationId: 'org-2', correlationId: 'c2', traceId: 'trace-2', payload: { ok: false } });
+    const app = Fastify();
+    app.addHook('preHandler', async (request) => {
+      request.orgContext = { orgId: 'org-1' } as typeof request.orgContext;
+    });
+    registerEvidenceRoutes(app, { repo, requireAdmin: () => async () => undefined });
+    await app.ready();
+    const timeline = await app.inject({ method: 'GET', url: '/api/evidence' });
+    expect(timeline.statusCode).toBe(200);
+    expect(timeline.json().items).toHaveLength(1);
+    const exported = await app.inject({ method: 'GET', url: '/api/evidence/export' });
+    expect(exported.statusCode).toBe(200);
+    expect(exported.headers['content-disposition']).toContain('promptsheon-evidence.json');
+    await app.close();
     db.close();
   });
 });

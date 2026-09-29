@@ -381,6 +381,7 @@ async function main() {
     featureFlagRepo: repos.featureFlag,
     traceRepo: repos.trace,
     traceScoreRepo: repos.traceScore,
+    evidenceRepo: repos.evidence,
     autoEval,
     userAnalyticsRepo: repos.userAnalytics,
     identityService,
