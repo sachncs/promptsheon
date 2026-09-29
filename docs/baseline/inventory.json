@@ -10,6 +10,36 @@
   ],
   "routes": [
     {
+      "file": "packages/server/src/routes/agent-specification.ts",
+      "method": "POST",
+      "path": "/api/workspaces/:workspaceId/agent-specifications/validate"
+    },
+    {
+      "file": "packages/server/src/routes/agent-specification.ts",
+      "method": "POST",
+      "path": "/api/workspaces/:workspaceId/agent-specifications"
+    },
+    {
+      "file": "packages/server/src/routes/agent-specification.ts",
+      "method": "POST",
+      "path": "/api/workspaces/:workspaceId/agent-specifications/diff"
+    },
+    {
+      "file": "packages/server/src/routes/agent-specification.ts",
+      "method": "GET",
+      "path": "/api/workspaces/:workspaceId/agent-specifications/:hash"
+    },
+    {
+      "file": "packages/server/src/routes/agent-specification.ts",
+      "method": "GET",
+      "path": "/api/workspaces/:workspaceId/agent-specifications/:hash/lineage"
+    },
+    {
+      "file": "packages/server/src/routes/agent-specification.ts",
+      "method": "POST",
+      "path": "/api/workspaces/:workspaceId/agent-specifications/:hash/publish"
+    },
+    {
       "file": "packages/server/src/routes/alert.ts",
       "method": "GET",
       "path": "/api/alert-rules"
@@ -1205,6 +1235,7 @@
   ],
   "repositories": [
     "packages/server/src/repos/agent-identity.ts",
+    "packages/server/src/repos/agent-specification.ts",
     "packages/server/src/repos/alert.ts",
     "packages/server/src/repos/api-key.ts",
     "packages/server/src/repos/base.ts",
@@ -1306,7 +1337,8 @@
     "packages/shared/db/migrations/051_identity.up.sql",
     "packages/shared/db/migrations/052_outgoing_webhooks.up.sql",
     "packages/shared/db/migrations/053_release_overlays.up.sql",
-    "packages/shared/db/migrations/054_api_key_organization.up.sql"
+    "packages/shared/db/migrations/054_api_key_organization.up.sql",
+    "packages/shared/db/migrations/055_agent_specifications.up.sql"
   ],
   "frontendRoutes": [
     {
@@ -1577,7 +1609,13 @@
     "eval gate <repoId>",
     "release get <id>",
     "release approve <id>",
-    "manifest scan <hash>"
+    "manifest scan <hash>",
+    "spec validate <file>",
+    "spec create <file>",
+    "spec get <hash>",
+    "spec diff <left> <right>",
+    "spec lineage <hash>",
+    "spec publish <hash>"
   ],
   "sdkMethods": [
     "listRepos",
@@ -1590,7 +1628,13 @@
     "signCommit",
     "verifyCommit",
     "listSuites",
-    "evalGate"
+    "evalGate",
+    "validateAgentSpecification",
+    "createAgentSpecification",
+    "getAgentSpecification",
+    "diffAgentSpecifications",
+    "listAgentSpecificationLineage",
+    "publishAgentSpecification"
   ],
   "providerAndAgentModules": [
     "packages/server/src/llm/gateway.ts",
