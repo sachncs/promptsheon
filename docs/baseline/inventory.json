@@ -1775,6 +1775,7 @@
     "packages/server/src/agents/utils.ts"
   ],
   "schedulersAndJobs": [
+    "packages/server/src/scheduler/canary-rollback-monitor.ts",
     "packages/server/src/scheduler/cron.ts",
     "packages/server/src/scheduler/index.ts",
     "packages/server/src/scheduler/retention-sweeper.ts",

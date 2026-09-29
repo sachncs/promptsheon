@@ -25,7 +25,8 @@ Canary rollout automation, rollback triggers, signed release manifests, and
 signed release manifests, and full promotion concurrency testing remain in
 progress. A deterministic canary health assessment now evaluates the latest
 organization-scoped run and atomically rolls back a regressed canary/active
-release to its active peer.
+release to its active peer. A bounded background monitor now assesses all
+canaries every minute, prevents overlapping polls, and stops during shutdown.
 
 - Define lifecycle states: draft, validated, approved, canary, active,
   deprecated, rolled back, and archived.
