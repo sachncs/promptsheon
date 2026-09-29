@@ -1721,6 +1721,7 @@
     "packages/server/src/agents/planner/index.ts",
     "packages/server/src/agents/planner/planner.ts",
     "packages/server/src/agents/planner/types.ts",
+    "packages/server/src/agents/simulated-model.ts",
     "packages/server/src/agents/utils.ts"
   ],
   "schedulersAndJobs": [
