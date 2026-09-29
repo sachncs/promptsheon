@@ -152,6 +152,9 @@ decisions. Repositories own prepared SQLite access and scoping. Concrete
 adapters are assembled in the composition root. Read the [architecture guide](https://sachncs.github.io/promptsheon/docs/architecture/)
 and [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 
+The implementation roadmap, ownership model, reliability requirements, and
+phase exit criteria are tracked in [`plan/`](plan/README.md).
+
 ## Development commands
 
 ```bash
