@@ -121,14 +121,14 @@ export default function EvalRunsPage() {
               <SelectContent>{(evaluators.data ?? ['deterministic']).map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
-          <Field label="Agent endpoint (optional for creating a run)">
+          <Field label="Agent endpoint">
             <Input value={actualUrl} onChange={(event) => setActualUrl(event.target.value)} placeholder="https://your-agent.example/evaluate" />
           </Field>
         </div>
         <div className="mt-4 flex items-center justify-between gap-3">
-          <p className="text-xs text-text-muted">Without an endpoint, the run is created and remains ready. A run needs at least one dataset case.</p>
-          <Button onClick={() => createRun.mutate()} disabled={!selectedReleaseId || !selectedDatasetId || !selectedScorer || createRun.isPending}>
-            {createRun.isPending ? 'Running…' : actualUrl.trim() ? 'Create and run' : 'Create run'}
+          <p className="text-xs text-text-muted">The endpoint receives each case input and must return the agent output. A run needs at least one dataset case.</p>
+          <Button onClick={() => createRun.mutate()} disabled={!selectedReleaseId || !selectedDatasetId || !selectedScorer || !actualUrl.trim() || createRun.isPending}>
+            {createRun.isPending ? 'Running…' : 'Create and run'}
           </Button>
         </div>
       </Surface>
