@@ -198,7 +198,7 @@ async function main() {
   const toolRegistry = new ToolRegistry();
   const evidenceSink = new AsyncEvidenceSink(repos.evidence);
   app.addHook('onClose', async () => { await evidenceSink.flush(); });
-  const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo: repos.manifest, modelAdapter: new RouterModelAdapter(llmRouter), toolRegistry, evidence: evidenceSink });
+  const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo: repos.manifest, traceRepo: repos.trace, modelAdapter: new RouterModelAdapter(llmRouter), toolRegistry, evidence: evidenceSink });
   const durableExecution = new DurableExecutionService(repos.executionJob, repos.agentSpecification!, executor, repos.executionCheckpoint, toolRegistry, undefined, evidenceSink, repos.trace);
   const durableWorker = durableExecution.createWorker();
   durableWorker.start();
