@@ -1,9 +1,14 @@
 import { Agent, BedrockModel } from '@strands-agents/sdk';
 import type { AppConfig } from '@promptsheon/shared';
 
-export function createModel(config: AppConfig) {
-  const provider = config.llm.defaultProvider;
-  const modelId = config.llm.defaultModel;
+export interface ModelPolicyOverride {
+  provider: string;
+  modelId: string;
+}
+
+export function createModel(config: AppConfig, override?: ModelPolicyOverride) {
+  const provider = override?.provider ?? config.llm.defaultProvider;
+  const modelId = override?.modelId ?? config.llm.defaultModel;
   const baseUrl = config.llm.baseUrl;
   const credentials = config.llm.credentials;
 

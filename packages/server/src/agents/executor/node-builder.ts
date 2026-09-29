@@ -65,7 +65,7 @@ export function buildNodeAgent(
     }));
   const agent = new Agent({
     id: node.id,
-    model: createModel(config),
+    model: createModel(config, node.manifest.model),
     systemPrompt: node.manifest.prompt.systemPrompt,
     tools: [
       ...node.manifest.tools.map((tool) => toolRegistry.get(tool.name)).filter((tool): tool is Agent => tool !== undefined),
