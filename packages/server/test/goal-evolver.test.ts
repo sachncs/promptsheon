@@ -122,6 +122,27 @@ describe('GoalBasedEvolutionAgent', () => {
   });
 
   describe('evolve', () => {
+    it('revises deterministically with the local simulator and no provider key', async () => {
+      const config = buildConfig();
+      config.llm.defaultProvider = 'simulated';
+      const localAgent = new GoalBasedEvolutionAgent({
+        config,
+        hub,
+        executor: executor as unknown as ManifestGraphExecutor,
+        cas: new FakeCas() as never,
+      });
+      const m = buildManifest({ evaluation: { datasets: [], scorers: [], passThreshold: 0.99 } });
+      executor.trace.nodeResults = {
+        a: { nodeId: 'a', status: 'failed', output: '', latencyMs: 100, costUsd: 0, totalTokens: 10, error: 'fail' },
+      };
+
+      const result = await localAgent.evolve('h', m, { maxIterations: 1, cooldownMs: 0, costBudget: 100 });
+
+      expect(result.passed).toBe(false);
+      expect(result.error).toBeUndefined();
+      expect(result.history[0]?.revised).toBe(true);
+    });
+
     it('returns immediately when DAG is invalid', async () => {
       const result = await agent.evolve('h', buildManifest({ nodes: [] as never[], edges: [{ from: 'x', to: 'y', mapping: {} }] }), {
         maxIterations: 5, cooldownMs: 0, costBudget: 100,

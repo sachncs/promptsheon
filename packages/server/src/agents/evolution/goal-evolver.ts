@@ -398,8 +398,19 @@ ${node.manifest.prompt.systemPrompt}
 
 Produce a revised sub-manifest with an improved system prompt. Output JSON matching the schema.`;
 
+    if (this.deps.config.llm.defaultProvider === 'simulated') {
+      return {
+        revisedSubManifest: {
+          systemPrompt: `${node.manifest.prompt.systemPrompt}\n\nSimulation refinement: clarify the goal and preserve deterministic behaviour.`,
+        },
+        changes: ['Added a deterministic local-simulator refinement.'],
+        reasoning: 'No provider call was made; this candidate is repeatable and credential-free for local development.',
+      };
+    }
+
     const result = await this.revisionAgent.invoke(prompt);
-    return RevisionSchema.parse(JSON.parse(extractText(result)));
+    const parsed: unknown = JSON.parse(extractText(result));
+    return RevisionSchema.parse(parsed);
   }
 
   setReviseOverride(fn: (manifest: Manifest, nodeId: string, score: number) => Promise<Revision>): void {

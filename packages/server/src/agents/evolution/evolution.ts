@@ -21,7 +21,7 @@ export class EvolutionAgent {
   private revisionAgent: Agent;
   private state = new Map<string, SelfEvolveState>();
 
-  constructor(config: AppConfig, private deps: { cas: CasStore }) {
+  constructor(private config: AppConfig, private deps: { cas: CasStore }) {
     this.revisionAgent = new Agent({
       model: createModel(config),
       systemPrompt: `You are a prompt revision agent. Your job is to improve a prompt based on evaluation failures.
@@ -56,12 +56,14 @@ Output a JSON object with:
       return { action: 'no_change', state };
     }
 
-    const result = await this.revisionAgent.invoke(JSON.stringify({
-      currentManifest: current,
-      failingCases: [],
-      evaluationSummary: `Score: ${score}, threshold: ${threshold}`,
-    }));
-    const revised = JSON.parse(extractText(result)) as { revisedManifest: Manifest };
+    const revised = this.config.llm.defaultProvider === 'simulated'
+      ? {
+          revisedManifest: {
+            ...current,
+            systemPrompt: `${current.systemPrompt}\n\nSimulation refinement: preserve successful behaviour and clarify the observed failing case.`,
+          },
+        }
+      : await this.reviseManifest(current, score, threshold);
 
     const newHash = await this.saveManifest(revised.revisedManifest);
     const existing = this.state.get(capabilityId);
@@ -79,6 +81,17 @@ Output a JSON object with:
     return this.state.get(capabilityId);
   }
 
+  private async reviseManifest(current: Manifest, score: number, threshold: number): Promise<{ revisedManifest: Manifest }> {
+    const result = await this.revisionAgent.invoke(JSON.stringify({
+      currentManifest: current,
+      failingCases: [],
+      evaluationSummary: `Score: ${score}, threshold: ${threshold}`,
+    }));
+    const parsed: unknown = JSON.parse(extractText(result));
+    if (!isManifestRevision(parsed)) throw new Error('revision agent returned an invalid manifest');
+    return parsed;
+  }
+
   private async loadManifest(hash: string): Promise<Manifest> {
     const obj = await this.deps.cas.readObject(hash);
     if (obj.type !== 'blob') throw new Error('expected blob');
@@ -88,4 +101,15 @@ Output a JSON object with:
   private async saveManifest(manifest: Manifest): Promise<string> {
     return this.deps.cas.writeObject({ type: 'blob', data: Buffer.from(JSON.stringify(manifest)) });
   }
+}
+
+function isManifestRevision(value: unknown): value is { revisedManifest: Manifest } {
+  if (!value || typeof value !== 'object' || !('revisedManifest' in value)) return false;
+  const revisedManifest = value.revisedManifest;
+  if (!revisedManifest || typeof revisedManifest !== 'object') return false;
+  const manifest = Object.fromEntries(Object.entries(revisedManifest));
+  return typeof manifest.systemPrompt === 'string'
+    && Array.isArray(manifest.tools)
+    && typeof manifest.parameters === 'object'
+    && manifest.parameters !== null;
 }
