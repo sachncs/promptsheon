@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { validateDag } from '../src/agents/executor/dag-validator.js';
 import { buildNodeAgent, buildGraph, buildInvocationLimits } from '../src/agents/executor/node-builder.js';
+import { FunctionTool, type ToolContext } from '@strands-agents/sdk';
+import { ToolRegistry, type ToolAdapter } from '../src/application/execution-ports.js';
 import type { AppConfig, Manifest, SubCapabilityManifest } from '@promptsheon/shared';
 
 function buildConfig(): AppConfig {
@@ -185,6 +187,42 @@ describe('buildNodeAgent', () => {
     const node = buildLeafManifest('restricted-node');
     node.manifest.metadata = { allowedTools: ['approved-tool'] };
     expect(buildNodeAgent(node, buildConfig())).toBeDefined();
+  });
+
+  it('invokes a registered adapter through the agent tool bridge', async () => {
+    const node = buildLeafManifest('adapter-node');
+    node.manifest.tools = [{ name: 'search', description: 'Search', inputSchema: { type: 'object' } }];
+    const registry = new ToolRegistry();
+    const calls: Array<{ organizationId: string; executionId: string }> = [];
+    const adapter: ToolAdapter = {
+      name: 'search',
+      description: 'Search',
+      inputSchema: { type: 'object' },
+      invoke: async (input, context) => {
+        calls.push({ organizationId: context.organizationId, executionId: context.executionId });
+        return { result: input['query'] };
+      },
+    };
+    registry.register(adapter);
+    const agent = buildNodeAgent(node, buildConfig(), {
+      toolAdapters: [adapter],
+      invokeTool: (name, input, signal) => registry.invoke(name, input, {
+        organizationId: 'org-1',
+        executionId: 'run-1',
+        signal,
+      }, { authorize: (toolName, organizationId, executionId) => toolName === 'search' && organizationId === 'org-1' && executionId === 'run-1' }),
+    });
+    const tool = agent.tools.find((candidate) => candidate instanceof FunctionTool);
+    if (!(tool instanceof FunctionTool)) throw new Error('adapter tool was not registered');
+    const context: ToolContext = {
+      agent,
+      cancelSignal: new AbortController().signal,
+      invocationState: {},
+      toolUse: { name: 'search', toolUseId: 'tool-1', input: { query: 'hello' } },
+    };
+    const result = await tool.invoke({ query: 'hello' }, context);
+    expect(result).toBe(JSON.stringify({ result: 'hello' }));
+    expect(calls).toEqual([{ organizationId: 'org-1', executionId: 'run-1' }]);
   });
 });
 
