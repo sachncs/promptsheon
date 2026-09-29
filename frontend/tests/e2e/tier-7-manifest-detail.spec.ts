@@ -53,6 +53,7 @@ test.describe('tier 7: manifest detail (real page)', () => {
     // 1. Open the editor and apply the triage template
     await page.goto('/app/editor');
     await page.getByRole('button', { name: /customer support triage/i }).click();
+    await page.getByLabel('Or create capability').fill('Tier 7 triage capability');
 
     // 2. Save
     const saveButton = page.getByRole('button', { name: /save/i });
