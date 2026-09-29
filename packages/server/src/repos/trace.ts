@@ -256,6 +256,9 @@ export class TraceRepo extends BaseRepo<TraceRun> {
     patch: {
       status?: 'ok' | 'error';
       endTime?: string;
+      model?: string;
+      promptTokens?: number;
+      completionTokens?: number;
       totalTokens?: number;
       costUsd?: number;
       outputText?: string;
@@ -266,6 +269,9 @@ export class TraceRepo extends BaseRepo<TraceRun> {
         `UPDATE trace_spans
          SET status = COALESCE(?, status),
              end_time = COALESCE(?, end_time),
+             model = COALESCE(?, model),
+             prompt_tokens = COALESCE(?, prompt_tokens),
+             completion_tokens = COALESCE(?, completion_tokens),
              total_tokens = COALESCE(?, total_tokens),
              cost_usd = COALESCE(?, cost_usd),
              output_text = COALESCE(?, output_text)
@@ -274,6 +280,9 @@ export class TraceRepo extends BaseRepo<TraceRun> {
       .run(
         patch.status ?? null,
         patch.endTime ?? new Date().toISOString(),
+        patch.model ?? null,
+        patch.promptTokens ?? null,
+        patch.completionTokens ?? null,
         patch.totalTokens ?? null,
         patch.costUsd ?? null,
         patch.outputText ?? null,

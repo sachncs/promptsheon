@@ -295,15 +295,33 @@ export class ManifestGraphExecutor {
         let result: unknown;
         if (this.deps.modelAdapter && node.manifest.tools.length === 0 && (this.deps.modelAdapter.provider === '*' || this.deps.modelAdapter.provider === provider)) {
           const modelStartedAt = Date.now();
-          const response = await providerLimiter.run(() => breaker.execute(() => this.deps.modelAdapter!.invoke({
+          const modelSpan = this.openSpan(options, node.id, 'llm', {
             provider,
             model: node.manifest.model.modelId,
-            systemPrompt: '',
-            input: prompt,
-            maxOutputTokens: node.manifest.model.maxTokens ?? node.limits.outputTokens ?? 4096,
-            temperature: node.manifest.model.temperature ?? 0,
-            signal: options.signal ?? new AbortController().signal,
-          })), options.signal);
+            inputLength: prompt.length,
+          });
+          let response;
+          try {
+            response = await providerLimiter.run(() => breaker.execute(() => this.deps.modelAdapter!.invoke({
+              provider,
+              model: node.manifest.model.modelId,
+              systemPrompt: '',
+              input: prompt,
+              maxOutputTokens: node.manifest.model.maxTokens ?? node.limits.outputTokens ?? 4096,
+              temperature: node.manifest.model.temperature ?? 0,
+              signal: options.signal ?? new AbortController().signal,
+            })), options.signal);
+            this.closeSpan(modelSpan, 'ok', {
+              model: node.manifest.model.modelId,
+              promptTokens: response.promptTokens,
+              completionTokens: response.completionTokens,
+              totalTokens: response.promptTokens + response.completionTokens,
+              costUsd: response.costUsd,
+            });
+          } catch (error) {
+            this.closeSpan(modelSpan, 'error');
+            throw error;
+          }
           this.recordEvidence(options, manifestHash, node.id, 'model.called', {
           provider,
             model: node.manifest.model.modelId,
@@ -340,6 +358,7 @@ export class ManifestGraphExecutor {
                 return toolLimiter.run(
                   async () => {
                     const toolStartedAt = Date.now();
+                    const toolSpan = this.openSpan(options, node.id, 'tool', { name });
                     try {
                       const result = await toolBreaker.execute(() => toolRegistry.invoke(name, input, {
                         organizationId: options.organizationId!,
@@ -347,9 +366,11 @@ export class ManifestGraphExecutor {
                         signal,
                       }, toolAuthorizer));
                       this.recordEvidence(options, manifestHash, node.id, 'tool.called', { name, success: true, inputHash: hashTelemetry(input), latencyMs: Date.now() - toolStartedAt });
+                      this.closeSpan(toolSpan, 'ok');
                       return result;
                     } catch (error) {
                       this.recordEvidence(options, manifestHash, node.id, 'tool.called', { name, success: false, inputHash: hashTelemetry(input), latencyMs: Date.now() - toolStartedAt, error: error instanceof Error ? error.name : 'unknown' });
+                      this.closeSpan(toolSpan, 'error');
                       throw error;
                     }
                   },
@@ -495,6 +516,39 @@ export class ManifestGraphExecutor {
       });
     } catch {
       // Telemetry is best-effort and must never change execution semantics.
+    }
+  }
+
+  private openSpan(
+    options: ExecuteOptions,
+    stepId: string,
+    kind: 'llm' | 'tool',
+    attributes: Record<string, unknown>,
+  ): { id: string } | undefined {
+    if (!this.deps.traceRepo || !options.traceRunId) return undefined;
+    try {
+      const span = this.deps.traceRepo.addSpan({
+        traceRunId: options.traceRunId,
+        name: `${kind}:${stepId}`,
+        kind,
+        attributes: { executionId: options.executionId, stepId, ...attributes },
+      });
+      return { id: span.id };
+    } catch {
+      return undefined;
+    }
+  }
+
+  private closeSpan(
+    span: { id: string } | undefined,
+    status: 'ok' | 'error',
+    metadata: { model?: string; promptTokens?: number; completionTokens?: number; totalTokens?: number; costUsd?: number } = {},
+  ): void {
+    if (!span || !this.deps.traceRepo) return;
+    try {
+      this.deps.traceRepo.finishSpan(span.id, { status, ...metadata });
+    } catch {
+      // Trace persistence is best-effort and must never alter execution.
     }
   }
 
