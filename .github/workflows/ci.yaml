@@ -37,6 +37,8 @@ jobs:
         run: pnpm --dir site build
       - name: documentation link check
         run: pnpm check:docs
+      - name: supported product claims check
+        run: pnpm check:claims
       - name: repository inventory check
         run: pnpm inventory:generate && git diff --exit-code -- docs/baseline/inventory.json
 

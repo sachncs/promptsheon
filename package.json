@@ -13,6 +13,7 @@
     "typecheck": "pnpm --dir packages typecheck",
     "test": "pnpm --dir packages test",
     "check:docs": "node scripts/check-doc-links.mjs",
+    "check:claims": "node scripts/check-supported-claims.mjs",
     "inventory:generate": "node scripts/generate-inventory.mjs",
     "stop": "lsof -ti:3000,8080 2>/dev/null | xargs -r kill -9 2>/dev/null; true"
   },

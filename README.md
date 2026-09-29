@@ -168,6 +168,9 @@ pnpm --dir frontend lint
 pnpm --dir frontend test:e2e
 pnpm --dir frontend build
 pnpm --dir site build
+pnpm check:docs
+pnpm check:claims
+pnpm inventory:generate
 ```
 
 CI also builds the public site so documentation regressions cannot merge unnoticed.
