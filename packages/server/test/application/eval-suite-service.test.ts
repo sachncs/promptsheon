@@ -85,7 +85,9 @@ describe('EvalSuiteService', () => {
     expect(result.value.rawScore).toBeCloseTo(0.925);
     expect(result.value.passAtK).toBe(0.5);
     expect(result.value.borderlineCount).toBe(1);
-    expect(deps.reviews.enqueue).toHaveBeenCalledWith('borderline', suite.id, null);
+    const runId = result.value.runId;
+    expect(runId).toMatch(/^run-/);
+    expect(deps.reviews.enqueue).toHaveBeenCalledWith('borderline', suite.id, runId);
     expect(deps.store.findByIdInOrg).toHaveBeenCalledWith(suite.id, 'org-a');
     expect(deps.store.findVersionInOrg).toHaveBeenCalledWith(suite.id, suite.currentVersion, 'org-a');
   });

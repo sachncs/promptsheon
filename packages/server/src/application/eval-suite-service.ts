@@ -105,6 +105,7 @@ export class EvalSuiteService {
     const n = input.n ?? trials.length;
     const k = input.k ?? 1;
     const runner = this.graders.create(version.graderConfig);
+    const runId = `run-${randomUUID()}`;
     const results = trials.map((trial) => ({ trial, result: runner.run(trial) }));
     const successes = results.filter(({ result }) => result.passed).length;
     const rawScore = results.reduce((total, { result }) => total + result.weightedScore, 0) / Math.max(1, results.length);
@@ -113,14 +114,14 @@ export class EvalSuiteService {
     );
     for (const { trial, result } of results) {
       if (Math.abs(result.weightedScore - suite.passThreshold) <= suite.borderlineBand) {
-        this.reviews.enqueue(trial.caseId, suite.id, null);
+        this.reviews.enqueue(trial.caseId, suite.id, runId);
       }
     }
 
     return {
       kind: 'success',
       value: {
-        runId: `run-${randomUUID()}`,
+        runId,
         suiteId: suite.id,
         suiteVersionId: version.id,
         passThreshold: suite.passThreshold,
