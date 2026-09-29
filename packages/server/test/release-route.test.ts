@@ -60,7 +60,8 @@ describe('POST /api/releases/:id/rollback', () => {
     `).run();
     db.prepare(`
       INSERT INTO capabilities (id, project_id, name, description, created_at, updated_at)
-      VALUES ('cap1', 'proj1', 'C', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')
+      VALUES ('cap1', 'proj1', 'C', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+             ('00000000-0000-4000-8000-000000000001', 'proj1', 'Local release test', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')
     `).run();
     db.prepare(`
       INSERT INTO capability_versions (id, capability_id, version, manifest, created_at)
@@ -98,6 +99,41 @@ describe('POST /api/releases/:id/rollback', () => {
 
   it('rejects malformed release identifiers before repository access', async () => {
     const response = await app.inject({ method: 'POST', url: '/api/releases/not-a-uuid/rollback', payload: {} });
+    expect(response.statusCode).toBe(422);
+  });
+
+  it('creates a draft release and persists its initial transition for local system auth', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/releases',
+      payload: {
+        capabilityId: '00000000-0000-4000-8000-000000000001',
+        capabilityVersion: 1,
+        capabilityVersionId: null,
+        manifest: JSON.stringify({ id: 'manifest-1' }),
+        environment: 'dev',
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    const body = response.json() as { id: string; status: string };
+    expect(body.status).toBe('draft');
+    expect(repo.listTransitions(body.id)).toEqual([
+      expect.objectContaining({ releaseId: body.id, toStatus: 'draft', actorId: 'api' }),
+    ]);
+  });
+
+  it('rejects a release with a non-JSON manifest before persistence', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/releases',
+      payload: {
+        capabilityId: '00000000-0000-4000-8000-000000000001',
+        capabilityVersion: 1,
+        capabilityVersionId: null,
+        manifest: 'not-json',
+        environment: 'dev',
+      },
+    });
     expect(response.statusCode).toBe(422);
   });
 
