@@ -8,6 +8,7 @@ import type { OrgRepo, MembershipRepo } from '../repos/org.js';
 import type { LlmRouter } from '../llm/router.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 import type { LlmSettingsService } from '../application/llm-settings-service.js';
+import type { AuditChain } from '../audit/chain.js';
 
 const CreateAdminSchema = z.object({
   adminName: z.string().min(1).max(120),
@@ -88,6 +89,7 @@ export function registerBootstrapRoutes(
     llmRouter: LlmRouter;
     apiKeyRepo?: ApiKeyRepo;
     llmSettings: LlmSettingsService;
+    auditChain?: AuditChain;
     e2eSessionEnabled?: boolean;
   },
 ): void {
@@ -145,11 +147,11 @@ export function registerBootstrapRoutes(
 
     const slug = parsed.data.orgSlug ?? slugify(parsed.data.orgName) + '-' + randomBytes(2).toString('hex');
     const org = deps.orgRepo.create({ name: parsed.data.orgName, slug });
-    const user = deps.userRepo.create({
+    const user = deps.userRepo.createInOrg({
       email: parsed.data.adminEmail,
       name: parsed.data.adminName,
       role: 'admin',
-    });
+    }, org.id);
     deps.membershipRepo.addOrgMember(org.id, user.id, 'admin');
 
     const browserApiKey = deps.apiKeyRepo
@@ -165,6 +167,15 @@ export function registerBootstrapRoutes(
         role: 'admin',
       });
     }
+
+    deps.auditChain?.append({
+      userId: user.id,
+      action: 'bootstrap.admin.created',
+      resource: 'organization',
+      details: JSON.stringify({ organizationId: org.id, organizationSlug: org.slug }),
+      resourceKind: 'organization',
+      resourceId: org.id,
+    });
 
     return reply.code(201).send({
       user: { id: user.id, email: user.email, name: user.name, role: user.role },

@@ -300,6 +300,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     llmSettings: deps.llmSettings,
     llmRouter: deps.llmRouter,
     apiKeyRepo: deps.apiKeyRepo,
+    auditChain: deps.auditChain,
     e2eSessionEnabled: deps.e2eSessionEnabled,
   });
 

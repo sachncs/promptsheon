@@ -9,7 +9,7 @@ test.describe('tier 3: app shell after onboarding', () => {
 
     // AppShell sidebar should be visible.
     await expect(page.locator('aside').first()).toBeVisible();
-    await expect(page.getByText(/control plane/i)).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Control plane' })).toBeVisible();
 
     // Visit each sub-route through the session.
     const subRoutes = [

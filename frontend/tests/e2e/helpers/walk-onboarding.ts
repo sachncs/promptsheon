@@ -12,6 +12,12 @@ const UNIQUE = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 export async function walkOnboarding(page: Page): Promise<void> {
   await page.goto('/onboarding');
 
+  // The E2E web server intentionally reuses one database for the suite.
+  // Once the first test completes bootstrap, onboarding restores the admin
+  // session and redirects directly to the control plane. Treat that as the
+  // completed form of this journey instead of trying to repeat setup.
+  await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined);
+  if (new URL(page.url()).pathname.startsWith('/app')) return;
   // Welcome
   await page.getByRole('button', { name: /begin setup/i }).click();
 
