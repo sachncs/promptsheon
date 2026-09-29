@@ -1492,6 +1492,23 @@ export interface TraceSpan {
   outputText: string | null;
 }
 
+export interface EvidenceRecord {
+  id: string;
+  eventType: string;
+  schemaVersion: string;
+  occurredAt: string;
+  organizationId: string;
+  correlationId: string;
+  traceId: string | null;
+  executionId: string | null;
+  agentHash: string | null;
+  stepId: string | null;
+  retentionClass: string;
+  payload: unknown;
+  payloadHash: string;
+  createdAt: string;
+}
+
 export interface PlaygroundRun {
   content: string;
   provider: string;
@@ -1542,6 +1559,8 @@ export const traceApi = {
       .then((r) => r.data),
   get: (id: string) =>
     client.get<{ run: TraceRunSummary; spans: TraceSpan[] }>(`/traces/${id}`).then((r) => r.data),
+  evidence: (id: string) =>
+    client.get<{ traceId: string; items: EvidenceRecord[]; total: number }>(`/traces/${id}/evidence`).then((r) => r.data),
   rollup: (days = 30) =>
     client
       .get<{ days: number; items: Array<{ day: string; tokens: number; cost: number; runs: number }> }>(

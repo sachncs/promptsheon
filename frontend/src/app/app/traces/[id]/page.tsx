@@ -3,9 +3,9 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, AlertCircle, Beaker, Clock, Cpu, DollarSign, GitBranch, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Beaker, Clock, Cpu, DollarSign, GitBranch, Radio, type LucideIcon } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
-import { traceApi, traceScoreApi, type TraceScore, type TraceSpan } from '@/lib/api';
+import { traceApi, traceScoreApi, type EvidenceRecord, type TraceScore, type TraceSpan } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { HashChip } from '@/components/brand/hash-chip';
@@ -27,6 +27,11 @@ export default function TraceDetailPage() {
   const scores = useQuery({
     queryKey: ['trace-scores', id],
     queryFn: () => traceScoreApi.list(id),
+    enabled: Boolean(session && id),
+  });
+  const evidence = useQuery({
+    queryKey: ['trace-evidence', id],
+    queryFn: () => traceApi.evidence(id),
     enabled: Boolean(session && id),
   });
   const autoEval = useMutation({
@@ -110,6 +115,28 @@ export default function TraceDetailPage() {
       </Surface>
 
       <Surface padded={false}>
+        <SurfaceHeader
+          className="px-5 pt-5"
+          title="Execution evidence"
+          description={`${evidence.data?.total ?? 0} immutable decision record(s), redacted before storage.`}
+        />
+        {evidence.isError ? (
+          <QueryError message={evidence.error} onRetry={() => void evidence.refetch()} />
+        ) : evidence.data && evidence.data.items.length > 0 ? (
+          <ul className="divide-y divide-border-subtle">
+            {evidence.data.items.map((item) => <EvidenceRow key={item.id} item={item} />)}
+          </ul>
+        ) : (
+          <EmptyState
+            className="m-5 border-0 bg-transparent shadow-none p-12"
+            icon={Radio}
+            title="No execution evidence yet"
+            description="Decision records appear here as the execution runs. Sensitive values are redacted at ingestion."
+          />
+        )}
+      </Surface>
+
+      <Surface padded={false}>
         <SurfaceHeader className="px-5 pt-5" title="Span tree" description={`${roots.length} root span(s).`} />
         <ul className="px-5 pb-5">
           {roots.map((s) => (
@@ -153,6 +180,26 @@ export default function TraceDetailPage() {
         )}
       </Surface>
     </div>
+  );
+}
+
+function EvidenceRow({ item }: { item: EvidenceRecord }) {
+  return (
+    <li className="px-5 py-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusPill kind={item.eventType.endsWith('failed') ? 'error' : 'active'} label={item.eventType} />
+        {item.stepId && <span className="font-mono text-xs text-text-muted">step:{item.stepId}</span>}
+        <time className="ml-auto text-xs text-text-subtle" dateTime={item.occurredAt}>
+          {new Date(item.occurredAt).toLocaleTimeString()}
+        </time>
+      </div>
+      <details className="mt-2">
+        <summary className="cursor-pointer text-xs text-text-muted hover:text-text-default">redacted payload</summary>
+        <pre className="mt-1 max-h-40 overflow-auto rounded-md bg-surface-0 p-2 font-mono text-[11px] leading-relaxed text-text-default">
+          {JSON.stringify(item.payload, null, 2)}
+        </pre>
+      </details>
+    </li>
   );
 }
 
