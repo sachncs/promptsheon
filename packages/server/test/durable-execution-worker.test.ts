@@ -107,7 +107,7 @@ describe('DurableExecutionWorker', () => {
   });
 
   it('shares a SQLite queue across workers without duplicate ownership', async () => {
-    const queued = Array.from({ length: 50 }, (_, index) => jobs.enqueue({
+    const queued = Array.from({ length: 250 }, (_, index) => jobs.enqueue({
       organizationId: 'org1', workspaceId: 'ws1', agentHash: hash('a'), inputHash: String(index).padStart(64, '0'), inputJson: '{}', idempotencyKey: `workers-${index}`,
     }));
     const seen = new Set<string>();
