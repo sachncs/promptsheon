@@ -11,6 +11,7 @@ import { checkCostCap, recordCost, type CostLimitConfig } from '../../hardening/
 import { findRedTeamMatches } from '../../hardening/redteam.js';
 import { CircuitBreaker, ConcurrencyLimiter } from '../../application/execution-resilience.js';
 import type { ModelAdapter, ToolAuthorizer, ToolRegistry } from '../../application/execution-ports.js';
+import type { EvidenceRecorder } from '../../observability/evidence-sink.js';
 
 export interface ExecutionTrace {
   executionId: string;
@@ -112,6 +113,7 @@ export class ManifestGraphExecutor {
       toolAuthorizer?: ToolAuthorizer;
       providerConcurrencyLimit?: number;
       toolConcurrencyLimit?: number;
+      evidence?: EvidenceRecorder;
     },
   ) {}
 
@@ -209,6 +211,11 @@ export class ManifestGraphExecutor {
         values: [JSON.stringify(options.inputs)],
         phase: 'pre',
       }, broadcast);
+      this.recordEvidence(options, manifestHash, node.id, 'guardrail.decided', {
+        phase: 'pre',
+        allowed: preCheck.allowed,
+        guardrailCount: node.preGuardrails.length,
+      });
 
       // Red-team scan: any of the configured patterns matching an
       // input value fails the node with a 4xx-class error. The
@@ -295,6 +302,14 @@ export class ManifestGraphExecutor {
             temperature: node.manifest.model.temperature ?? 0,
             signal: options.signal ?? new AbortController().signal,
           })), options.signal);
+          this.recordEvidence(options, manifestHash, node.id, 'model.called', {
+            provider,
+            model: node.manifest.model.modelId,
+            promptLength: prompt.length,
+            promptTokens: response.promptTokens,
+            completionTokens: response.completionTokens,
+            costUsd: response.costUsd,
+          });
           result = {
             lastMessage: { content: [{ type: 'textBlock', text: response.text }] },
             metrics: { accumulatedUsage: { totalTokens: response.promptTokens + response.completionTokens, costUsd: response.costUsd } },
@@ -316,11 +331,20 @@ export class ManifestGraphExecutor {
                 const toolLimiter = this.toolLimiters.get(toolKey) ?? new ConcurrencyLimiter(this.deps.toolConcurrencyLimit ?? 16);
                 this.toolLimiters.set(toolKey, toolLimiter);
                 return toolLimiter.run(
-                  () => toolBreaker.execute(() => toolRegistry.invoke(name, input, {
-                    organizationId: options.organizationId!,
-                    executionId: options.executionId,
-                    signal,
-                  }, toolAuthorizer)),
+                  async () => {
+                    try {
+                      const result = await toolBreaker.execute(() => toolRegistry.invoke(name, input, {
+                        organizationId: options.organizationId!,
+                        executionId: options.executionId,
+                        signal,
+                      }, toolAuthorizer));
+                      this.recordEvidence(options, manifestHash, node.id, 'tool.called', { name, success: true });
+                      return result;
+                    } catch (error) {
+                      this.recordEvidence(options, manifestHash, node.id, 'tool.called', { name, success: false, error: error instanceof Error ? error.name : 'unknown' });
+                      throw error;
+                    }
+                  },
                   signal,
                 );
               },
@@ -347,6 +371,11 @@ export class ManifestGraphExecutor {
           values: [outputText],
           phase: 'post',
         }, broadcast);
+        this.recordEvidence(options, manifestHash, node.id, 'guardrail.decided', {
+          phase: 'post',
+          allowed: postCheck.allowed,
+          guardrailCount: node.postGuardrails.length,
+        });
 
         const finalOutput = postCheck.redactedValues[0] as string ?? outputText;
         const latencyMs = Date.now() - nodeStartedAt;
@@ -434,6 +463,29 @@ export class ManifestGraphExecutor {
       timestamp: trace.endedAt,
     });
     return trace;
+  }
+
+  private recordEvidence(
+    options: ExecuteOptions,
+    agentHash: string,
+    stepId: string,
+    eventType: 'model.called' | 'tool.called' | 'guardrail.decided',
+    payload: Record<string, unknown>,
+  ): void {
+    try {
+      this.deps.evidence?.record({
+        eventType,
+        organizationId: options.organizationId ?? 'unscoped',
+        correlationId: options.executionId,
+        traceId: options.traceRunId ?? null,
+        executionId: options.executionId,
+        agentHash,
+        stepId,
+        payload,
+      });
+    } catch {
+      // Telemetry is best-effort and must never change execution semantics.
+    }
   }
 
   /**

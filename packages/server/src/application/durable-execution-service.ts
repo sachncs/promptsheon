@@ -111,8 +111,14 @@ export class DurableExecutionService {
           const toolAuthorizer: ToolAuthorizer = {
             authorize: async (toolName, organizationId, executionId) => {
               if (organizationId !== job.organizationId || executionId !== job.id) return false;
-              if (!allowedTools.has(toolName)) return false;
-              return this.toolAuthorizer?.authorize(toolName, organizationId, executionId) ?? true;
+              if (!allowedTools.has(toolName)) {
+                this.recordEvidence({ eventType: 'permission.decided', job, payload: { toolName, allowed: false } });
+                return false;
+              }
+              const allowed = this.toolAuthorizer?.authorize(toolName, organizationId, executionId) ?? true;
+              const result = await allowed;
+              this.recordEvidence({ eventType: 'permission.decided', job, payload: { toolName, allowed: result } });
+              return result;
             },
           };
           const result = await this.runner.execute(job.agentHash, manifest, {
@@ -160,7 +166,7 @@ export class DurableExecutionService {
   }
 
   private recordEvidence(input: {
-    eventType: 'execution.started' | 'execution.completed' | 'execution.failed' | 'execution.cancelled';
+    eventType: 'execution.started' | 'execution.completed' | 'execution.failed' | 'execution.cancelled' | 'permission.decided';
     job: ExecutionJob;
     payload: unknown;
   }): void {
