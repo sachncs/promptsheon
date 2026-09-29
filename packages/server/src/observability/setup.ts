@@ -39,6 +39,13 @@ export function setupObservability(config: AppConfig): ObservabilityHandles {
   const logger = pino({
     level: config.server.logLevel,
     base: { service: 'promptsheon-server' },
+    redact: {
+      paths: [
+        '*.apiKey', '*.api_key', '*.authorization', '*.cookie', '*.password', '*.secret', '*.token',
+        'req.headers.authorization', 'req.headers.cookie',
+      ],
+      censor: '[REDACTED]',
+    },
   });
 
   try {

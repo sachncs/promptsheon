@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { BaseRepo, camelize } from './base.js';
+import { redactTelemetry } from '../observability/redaction.js';
 
 export interface TraceRun {
   id: string;
@@ -124,6 +125,7 @@ export interface CreateTraceRunInput {
 }
 
 export interface CreateTraceSpanInput {
+  id?: string;
   traceRunId: string;
   parentSpanId?: string | null;
   name: string;
@@ -201,7 +203,10 @@ export class TraceRepo extends BaseRepo<TraceRun> {
   }
 
   addSpan(input: CreateTraceSpanInput): TraceSpan {
-    const id = randomUUID();
+    const id = input.id ?? randomUUID();
+    const attributes = redactTelemetry(input.attributes ?? {});
+    const inputText = redactTelemetry(input.inputText ?? null);
+    const outputText = redactTelemetry(input.outputText ?? null);
     this.db
       .prepare(
         `INSERT INTO trace_spans (id, trace_run_id, parent_span_id, name, kind, start_time,
@@ -217,14 +222,14 @@ export class TraceRepo extends BaseRepo<TraceRun> {
         input.kind ?? 'internal',
         input.startTime ?? new Date().toISOString(),
         'ok',
-        JSON.stringify(input.attributes ?? {}),
+        JSON.stringify(attributes),
         input.model ?? null,
         input.promptTokens ?? null,
         input.completionTokens ?? null,
         input.totalTokens ?? null,
         input.costUsd ?? null,
-        truncate(input.inputText ?? null),
-        truncate(input.outputText ?? null),
+        truncate(typeof inputText === 'string' ? inputText : null),
+        truncate(typeof outputText === 'string' ? outputText : null),
       );
     const row = this.db.prepare('SELECT * FROM trace_spans WHERE id = ?').get(id) as TraceSpanRow;
     return rowToSpan(row);

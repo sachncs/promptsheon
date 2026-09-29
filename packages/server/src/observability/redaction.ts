@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 const SENSITIVE_KEY = /(?:api[-_]?key|authorization|cookie|password|secret|token|credential|private[-_]?key|access[-_]?key)/i;
 const PII_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/(api[-_]?key|authorization|password|secret|token)\s*[:=]\s*[^\s,;]+/gi, '$1=[REDACTED]'],
   [/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[REDACTED_EMAIL]'],
   [/\b\d{3}-\d{2}-\d{4}\b/g, '[REDACTED_SSN]'],
   [/\b(?:\d[ -]*?){13,19}\b/g, '[REDACTED_CARD]'],

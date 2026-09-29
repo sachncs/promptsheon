@@ -52,6 +52,7 @@ export class Span {
     const meta = this.llmMeta;
     const totalTokens = meta?.totalTokens ?? (meta?.promptTokens ?? 0) + (meta?.completionTokens ?? 0);
     this.tracer.repo.addSpan({
+      id: this.id,
       traceRunId: this.tracer.run.id,
       parentSpanId: this.parentId,
       name: this.name,
@@ -104,8 +105,6 @@ export class Tracer {
       kind: kind ?? 'internal',
       startTime: new Date(span.start).toISOString(),
     });
-    // Mutate the id so end() persists to the right row.
-    (span as unknown as { id: string }).id = this.repo.findSpansByRun(this.run.id).find((s) => s.name === name)?.id ?? span.id;
     return span;
   }
 

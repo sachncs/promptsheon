@@ -90,6 +90,19 @@ describe('TraceRepo', () => {
     expect(fetched?.totalCostUsd).toBeCloseTo(0.006, 5);
   });
 
+  it('redacts sensitive span text and preserves explicit span ids', () => {
+    const run = repo.startRun({ organizationId: 'org-a', name: 'redaction' });
+    const span = repo.addSpan({
+      id: 'span-fixed',
+      traceRunId: run.id,
+      name: 'model',
+      inputText: 'token=secret email=a@example.com',
+      outputText: 'safe',
+    });
+    expect(span.id).toBe('span-fixed');
+    expect(span.inputText).toBe('token=[REDACTED] email=[REDACTED_EMAIL]');
+  });
+
   it('listByOrg supports filters and pagination', () => {
     for (let i = 0; i < 5; i++) {
       const r = repo.startRun({ organizationId: 'org-A', name: `run-${i}`, environment: 'dev' });
