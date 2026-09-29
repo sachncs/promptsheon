@@ -12,6 +12,7 @@ import { findRedTeamMatches } from '../../hardening/redteam.js';
 import { CircuitBreaker, ConcurrencyLimiter } from '../../application/execution-resilience.js';
 import type { ModelAdapter, ToolAuthorizer, ToolRegistry } from '../../application/execution-ports.js';
 import type { EvidenceRecorder } from '../../observability/evidence-sink.js';
+import { hashTelemetry } from '../../observability/redaction.js';
 
 export interface ExecutionTrace {
   executionId: string;
@@ -304,9 +305,12 @@ export class ManifestGraphExecutor {
             signal: options.signal ?? new AbortController().signal,
           })), options.signal);
           this.recordEvidence(options, manifestHash, node.id, 'model.called', {
-            provider,
+          provider,
             model: node.manifest.model.modelId,
             promptLength: prompt.length,
+            inputHash: hashTelemetry(prompt),
+            outputLength: response.text.length,
+            outputHash: hashTelemetry(response.text),
             promptTokens: response.promptTokens,
             completionTokens: response.completionTokens,
             costUsd: response.costUsd,
@@ -342,10 +346,10 @@ export class ManifestGraphExecutor {
                         executionId: options.executionId,
                         signal,
                       }, toolAuthorizer));
-                      this.recordEvidence(options, manifestHash, node.id, 'tool.called', { name, success: true, latencyMs: Date.now() - toolStartedAt });
+                      this.recordEvidence(options, manifestHash, node.id, 'tool.called', { name, success: true, inputHash: hashTelemetry(input), latencyMs: Date.now() - toolStartedAt });
                       return result;
                     } catch (error) {
-                      this.recordEvidence(options, manifestHash, node.id, 'tool.called', { name, success: false, latencyMs: Date.now() - toolStartedAt, error: error instanceof Error ? error.name : 'unknown' });
+                      this.recordEvidence(options, manifestHash, node.id, 'tool.called', { name, success: false, inputHash: hashTelemetry(input), latencyMs: Date.now() - toolStartedAt, error: error instanceof Error ? error.name : 'unknown' });
                       throw error;
                     }
                   },
@@ -379,6 +383,8 @@ export class ManifestGraphExecutor {
           phase: 'post',
           allowed: postCheck.allowed,
           guardrailCount: node.postGuardrails.length,
+          outputLength: outputText.length,
+          outputHash: hashTelemetry(outputText),
         });
 
         const finalOutput = postCheck.redactedValues[0] as string ?? outputText;
