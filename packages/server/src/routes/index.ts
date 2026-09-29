@@ -230,6 +230,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     auditChain: deps.auditChain,
     overlayRepo: deps.releaseOverlayRepo,
     releaseService: deps.releaseService,
+    signingKeyRepo: deps.signingDeps.signingKeyRepo,
     canaryRollbackService: deps.canaryRollbackService,
   });
   registerExecutionRoutes(app, {

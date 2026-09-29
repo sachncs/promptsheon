@@ -18,6 +18,9 @@ const ReleaseRowSchema = z.object({
   created_by: z.string(),
   activated_at: z.string().nullable(),
   canary_percent: z.number().int().min(0).max(100),
+  release_signature: z.string().nullable(),
+  signed_key_id: z.string().nullable(),
+  signed_at: z.string().nullable(),
 });
 
 function toRelease(row: unknown): Release {
@@ -36,6 +39,9 @@ function toRelease(row: unknown): Release {
     createdBy: value.created_by,
     activatedAt: value.activated_at,
     canaryPercent: value.canary_percent,
+    signature: value.release_signature,
+    signedKeyId: value.signed_key_id,
+    signedAt: value.signed_at,
   };
 }
 
@@ -120,6 +126,24 @@ export class ReleaseRepo extends BaseRepo<Release> {
     return this.findByIdInOrg(id, organizationId);
   }
 
+  attachSignatureInOrg(input: {
+    releaseId: string;
+    organizationId: string;
+    signature: string;
+    signedKeyId: string;
+    signedAt: string;
+  }): Release | null {
+    const result = this.db.prepare(
+      `UPDATE releases SET release_signature = ?, signed_key_id = ?, signed_at = ?, updated_at = ?
+       WHERE id = ? AND EXISTS (
+         SELECT 1 FROM capabilities c JOIN projects p ON p.id = c.project_id
+         JOIN workspaces w ON w.id = p.workspace_id
+         WHERE c.id = releases.capability_id AND w.org_id = ?
+       )`,
+    ).run(input.signature, input.signedKeyId, input.signedAt, new Date().toISOString(), input.releaseId, input.organizationId);
+    return result.changes > 0 ? this.findByIdInOrg(input.releaseId, input.organizationId) : null;
+  }
+
   findActive(capabilityId: string, environment: string): Release | null {
     const row = this.db.prepare("SELECT * FROM releases WHERE capability_id = ? AND environment = ? AND status = 'active'")
       .get(capabilityId, environment);
@@ -143,6 +167,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
       environment: data.environment as Release['environment'], status: 'draft', createdBy: data.createdBy ?? '',
       approvedBy: '', canaryPercent: data.canaryPercent ?? 0, createdAt: now,
       replacesReleaseId: null, activatedAt: null,
+      signature: null, signedKeyId: null, signedAt: null,
     };
   }
 

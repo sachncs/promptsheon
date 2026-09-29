@@ -6,6 +6,7 @@ import {
   type AuditWriter,
   type ManifestApprovalStore,
   type ReleaseEvaluationGate,
+  type ReleaseSignatureGate,
   type ReleaseStore,
 } from '../../src/application/release-service.js';
 import type { Release } from '@promptsheon/shared';
@@ -26,7 +27,7 @@ const release: Release = {
   canaryPercent: 0,
 };
 
-function makeService(approvers: string[] = ['reviewer-a', 'reviewer-b'], evaluationGate?: ReleaseEvaluationGate) {
+function makeService(approvers: string[] = ['reviewer-a', 'reviewer-b'], evaluationGate?: ReleaseEvaluationGate, signatureGate?: ReleaseSignatureGate) {
   const store: ReleaseStore = {
     findByIdInOrg: vi.fn(() => release),
     updateStatusInOrg: vi.fn((_id, _org, status) => ({ ...release, status })),
@@ -40,7 +41,7 @@ function makeService(approvers: string[] = ['reviewer-a', 'reviewer-b'], evaluat
   const service = new ReleaseService(store, approvals, audit, {
     createId: () => 'transition-1',
     now: () => '2026-01-01T00:01:00.000Z',
-  }, evaluationGate);
+  }, evaluationGate, signatureGate);
   return { service, store, approvals, audit };
 }
 
@@ -106,5 +107,18 @@ describe('ReleaseService', () => {
     })).toThrow('passing evaluation run is required');
     expect(store.updateStatusInOrg).not.toHaveBeenCalled();
     expect(evaluationGate.hasPassingEvaluation).toHaveBeenCalledWith(release.id, 'org-1');
+  });
+
+  it('rejects promotion when the release signature is missing', () => {
+    const signatureGate: ReleaseSignatureGate = { hasValidSignature: vi.fn(() => false) };
+    const { service, store } = makeService(['reviewer-a', 'reviewer-b'], undefined, signatureGate);
+
+    expect(() => service.transition({
+      releaseId: release.id,
+      organizationId: 'org-1',
+      actorId: 'operator',
+      to: 'approved',
+    })).toThrow('valid operator signature is required');
+    expect(store.updateStatusInOrg).not.toHaveBeenCalled();
   });
 });

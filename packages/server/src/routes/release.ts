@@ -9,7 +9,7 @@ import type { ReleaseOverlayRepo } from '../repos/release-overlay.js';
 import { ManifestRepo } from '../repos/manifest.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 import { AuditChain } from '../audit/chain.js';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, createPublicKey, randomUUID, verify } from 'node:crypto';
 import { selectByCanary } from '../application/canary-routing.js';
 import {
   approvalGate,
@@ -19,6 +19,8 @@ import {
   ReleaseService,
 } from '../application/release-service.js';
 import type { CanaryRollbackService } from '../application/canary-rollback-service.js';
+import type { SigningKeyRepo } from '../repos/signing-key.js';
+import { releaseManifestHash, signedReleaseMessage } from '../application/release-signing.js';
 
 export { approvalGate } from '../application/release-service.js';
 
@@ -44,6 +46,11 @@ const RollbackBodySchema = z.object({
 const TransitionSchema = z.object({
   to: z.enum(['draft', 'review', 'approved', 'canary', 'active', 'rolled_back']),
   reason: z.string().max(500).optional(),
+});
+const SignReleaseSchema = z.object({
+  keyId: z.string().trim().min(1).max(255),
+  signature: z.string().min(1),
+  signedAt: z.string().datetime({ offset: true }),
 });
 
 const OverlaySchema = z.object({
@@ -85,7 +92,7 @@ function requireOrganization(request: FastifyRequest, reply: FastifyReply): stri
 export function registerReleaseRoutes(
   app: FastifyInstance,
   repo: ReleaseRepo,
-  deps: { manifestRepo: ManifestRepo; auditChain: AuditChain; overlayRepo: ReleaseOverlayRepo; releaseService: ReleaseService; canaryRollbackService?: CanaryRollbackService },
+  deps: { manifestRepo: ManifestRepo; auditChain: AuditChain; overlayRepo: ReleaseOverlayRepo; releaseService: ReleaseService; signingKeyRepo: SigningKeyRepo; canaryRollbackService?: CanaryRollbackService },
 ) {
   app.get('/api/releases', async (request, reply) => {
     const organizationId = requireOrganization(request, reply);
@@ -228,6 +235,36 @@ export function registerReleaseRoutes(
       }
       throw error;
     }
+  });
+
+  app.post('/api/releases/:id/sign', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
+    const parsedParams = parseParams(reply, ReleaseParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const parsed = parseBody(reply, SignReleaseSchema, request.body);
+    if (!parsed.ok) return;
+    const release = repo.findByIdInOrg(parsedParams.data.id, organizationId);
+    if (!release) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
+    const key = deps.signingKeyRepo.findByIdInOrg(parsed.data.keyId, organizationId);
+    if (!key || key.deactivatedAt) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'signing key not found' } });
+    const message = signedReleaseMessage({ releaseId: release.id, manifestHash: releaseManifestHash(release.manifest), timestamp: parsed.data.signedAt });
+    let valid = false;
+    try {
+      valid = verify(null, message, createPublicKey(key.publicKeyPem), Buffer.from(parsed.data.signature, 'base64'));
+    } catch {
+      valid = false;
+    }
+    if (!valid) return reply.code(422).send({ error: { code: 'BAD_SIGNATURE', message: 'signature failed verification' } });
+    const updated = repo.attachSignatureInOrg({
+      releaseId: release.id,
+      organizationId,
+      signature: parsed.data.signature,
+      signedKeyId: key.id,
+      signedAt: parsed.data.signedAt,
+    });
+    if (!updated) return reply.code(409).send({ error: { code: 'SIGNATURE_CONFLICT', message: 'release signature could not be persisted' } });
+    return reply.send(updated);
   });
 
   app.put('/api/releases/:id/overlay', async (request, reply) => {

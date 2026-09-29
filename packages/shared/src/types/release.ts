@@ -31,6 +31,9 @@ export interface Release {
   createdBy: string;
   activatedAt: string | null;
   canaryPercent: number;
+  signature?: string | null;
+  signedKeyId?: string | null;
+  signedAt?: string | null;
 }
 
 export interface ReleaseTransition {

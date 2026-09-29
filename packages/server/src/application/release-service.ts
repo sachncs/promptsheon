@@ -84,6 +84,10 @@ export interface ReleaseEvaluationGate {
   hasPassingEvaluation(releaseId: string, organizationId: string): boolean;
 }
 
+export interface ReleaseSignatureGate {
+  hasValidSignature(release: Release, organizationId: string): boolean;
+}
+
 /**
  * Evaluate the maker-checker gate for a release manifest.
  *
@@ -117,6 +121,7 @@ export class ReleaseService {
     private readonly auditChain: AuditWriter,
     dependencies: ReleaseServiceDependencies = {},
     private readonly evaluationGate?: ReleaseEvaluationGate,
+    private readonly signatureGate?: ReleaseSignatureGate,
   ) {
     this.createId = dependencies.createId ?? randomUUID;
     this.now = dependencies.now ?? (() => new Date().toISOString());
@@ -135,6 +140,9 @@ export class ReleaseService {
       if (gateFailure) throw new ReleaseApprovalRequiredError(gateFailure);
       if (this.evaluationGate && !this.evaluationGate.hasPassingEvaluation(input.releaseId, input.organizationId)) {
         throw new ReleaseApprovalRequiredError('a passing evaluation run is required before release promotion');
+      }
+      if (this.signatureGate && !this.signatureGate.hasValidSignature(existing, input.organizationId)) {
+        throw new ReleaseApprovalRequiredError('a valid operator signature is required before release promotion');
       }
     }
 

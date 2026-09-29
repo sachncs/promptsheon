@@ -20,6 +20,7 @@ import { GoalBasedEvolutionAgent } from './agents/evolution/goal-evolver.js';
 import { MutationPromotionService } from './application/mutation-promotion-service.js';
 import { CanaryRollbackService } from './application/canary-rollback-service.js';
 import { CanaryRollbackMonitor } from './scheduler/canary-rollback-monitor.js';
+import { verifyReleaseSignature } from './application/release-signing.js';
 import { ReasoningCompiler } from './agents/compiler/compiler.js';
 import { IdeaPlannerAgent } from './agents/planner/index.js';
 import { ManifestGraphExecutor } from './agents/executor/index.js';
@@ -120,6 +121,12 @@ async function main() {
     hasPassingEvaluation: (releaseId, organizationId) => repos.eval
       .findRunsByReleaseIdInOrg(releaseId, organizationId)
       .some((run) => run.status === 'passed'),
+  }, {
+    hasValidSignature: (release, organizationId) => {
+      if (!release.signedKeyId) return false;
+      const key = repos.signingKey.findByIdInOrg(release.signedKeyId, organizationId);
+      return Boolean(key && !key.deactivatedAt && verifyReleaseSignature(release, key.publicKeyPem));
+    },
   });
   const canaryRollbackService = new CanaryRollbackService(repos.release, repos.eval, auditChain);
   const app = Fastify({ logger: true, bodyLimit: 2_097_152 });
