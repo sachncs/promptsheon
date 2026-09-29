@@ -133,7 +133,7 @@ export default function LandingPage() {
               governance into one adaptive runtime for agentic software.
             </p>
           </div>
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
+          <div className="mx-auto mt-12 grid max-w-4xl gap-5 md:grid-cols-2">
             {[
               {
                 icon: Boxes,
@@ -401,25 +401,6 @@ export default function LandingPage() {
               </ul>
               <div className="mt-6">
                 <Link href="/onboarding"><Button className="w-full">Get started</Button></Link>
-              </div>
-            </Surface>
-            <Surface>
-              <SurfaceHeader
-                title="Cloud (soon)"
-                actions={<Badge>Waitlist</Badge>}
-              />
-              <div className="text-3xl font-semibold text-text-strong">TBD</div>
-              <p className="mt-1 text-sm text-text-muted">Hosted Promptsheon with managed upgrades.</p>
-              <ul className="mt-5 space-y-2 text-sm">
-                {['Same Apache-2.0 codebase', 'Zero-ops upgrade path', 'Backups + observability included', 'Region-pinned'].map((f) => (
-                  <li key={f} className="flex items-start gap-2">
-                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-text-muted" />
-                    <span className="text-text-muted">{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-6">
-                <Button variant="outline" className="w-full" disabled>Join waitlist</Button>
               </div>
             </Surface>
             <Surface>

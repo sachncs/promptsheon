@@ -18,22 +18,6 @@ const tiers = [
     highlight: true,
   },
   {
-    name: 'Cloud (soon)',
-    badge: 'Waitlist',
-    price: 'TBD',
-    period: 'when ready',
-    blurb: 'Hosted Promptsheon with managed upgrades.',
-    cta: 'Join waitlist',
-    href: 'mailto:sachncs@gmail.com?subject=Promptsheon%20Cloud%20waitlist',
-    features: [
-      'Same Apache-2.0 codebase',
-      'Zero-ops upgrade path',
-      'Backups + observability included',
-      'Region-pinned deployments',
-    ],
-    disabled: false,
-  },
-  {
     name: 'Enterprise',
     badge: null,
     price: 'Talk to us',
@@ -64,7 +48,7 @@ const tiers = [
       </p>
     </div>
 
-    <div class="mt-14 grid gap-5 md:grid-cols-3">
+    <div class="mx-auto mt-14 grid max-w-4xl gap-5 md:grid-cols-2">
       {tiers.map((tier, i) => (
         <article
           class={`ps-reveal relative rounded-2xl p-7 transition-all ${
@@ -112,14 +96,12 @@ const tiers = [
           <div class="mt-8">
             <a
               href={tier.href}
-              class={`ps-btn w-full ${tier.highlight ? 'ps-btn-primary' : 'ps-btn-secondary'} ${tier.disabled ? 'pointer-events-none opacity-50' : ''}`}
+              class={`ps-btn w-full ${tier.highlight ? 'ps-btn-primary' : 'ps-btn-secondary'}`}
             >
               {tier.cta}
-              {!tier.disabled && (
-                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M5 12h14M13 5l7 7-7 7" />
-                </svg>
-              )}
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14M13 5l7 7-7 7" />
+              </svg>
             </a>
           </div>
         </article>

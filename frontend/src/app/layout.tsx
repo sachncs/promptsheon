@@ -8,6 +8,10 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Promptsheon',
   description: 'The control plane for AI capabilities. Git-native, content-addressed, governed.',
+  icons: {
+    icon: '/promptsheon-mark-hd.png',
+    apple: '/promptsheon-mark-hd.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
