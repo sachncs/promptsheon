@@ -4,7 +4,7 @@ import type { UserRepo } from '../repos/user.js';
 import type { VaultRepo } from '../repos/vault.js';
 import type { SettingsResolver } from '../settings/resolver.js';
 
-export type LlmProvider = 'openai' | 'anthropic' | 'bedrock' | 'custom';
+export type LlmProvider = 'openai' | 'anthropic' | 'bedrock' | 'custom' | 'simulated';
 
 export interface LlmSettingsInput {
   provider: LlmProvider;
@@ -73,6 +73,7 @@ export class LlmSettingsService {
 
   async hasCredentials(provider: string | undefined): Promise<boolean> {
     if (!provider) return false;
+    if (provider === 'simulated') return true;
     if (provider === 'openai') return Boolean(await this.readSecret('llm.openaiApiKey'));
     if (provider === 'anthropic') return Boolean(await this.readSecret('llm.anthropicApiKey'));
     if (provider === 'custom') return Boolean(await this.readSecret('llm.customApiKey'));

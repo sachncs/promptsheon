@@ -1,5 +1,6 @@
-import { Agent, BedrockModel } from '@strands-agents/sdk';
+import { BedrockModel } from '@strands-agents/sdk';
 import type { AppConfig } from '@promptsheon/shared';
+import { SimulatedModel } from './simulated-model.js';
 
 export interface ModelPolicyOverride {
   provider: string;
@@ -13,6 +14,8 @@ export function createModel(config: AppConfig, override?: ModelPolicyOverride) {
   const credentials = config.llm.credentials;
 
   switch (provider) {
+    case 'simulated':
+      return new SimulatedModel(modelId);
     case 'openai': {
       try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports

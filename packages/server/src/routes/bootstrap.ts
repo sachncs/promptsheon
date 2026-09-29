@@ -17,7 +17,7 @@ const CreateAdminSchema = z.object({
 });
 
 const ValidateLlmSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom']),
+  provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom', 'simulated']),
   // For the OpenAI / Anthropic / Custom paths, apiKey is required.
   // For Bedrock, the bedrock object is required instead.
   apiKey: z.string().min(1).optional(),
@@ -32,6 +32,7 @@ const ValidateLlmSchema = z.object({
 }).refine(
   (data) => {
     if (data.provider === 'bedrock') return Boolean(data.bedrock);
+    if (data.provider === 'simulated') return true;
     if (data.provider === 'custom') return Boolean(data.baseUrl) && Boolean(data.apiKey);
     return Boolean(data.apiKey);
   },
@@ -39,7 +40,7 @@ const ValidateLlmSchema = z.object({
 );
 
 const SaveLlmSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom']),
+  provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom', 'simulated']),
   model: z.string().min(1, 'Model name is required'),
   apiKey: z.string().min(1).optional(),
   bedrock: z.object({
@@ -51,6 +52,7 @@ const SaveLlmSchema = z.object({
 }).refine(
   (data) => {
     if (data.provider === 'bedrock') return Boolean(data.bedrock);
+    if (data.provider === 'simulated') return true;
     if (data.provider === 'custom') return Boolean(data.baseUrl) && Boolean(data.apiKey);
     return Boolean(data.apiKey);
   },

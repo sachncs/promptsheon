@@ -39,5 +39,8 @@ pnpm dev:site</code></pre>
   <h2>Configuration discipline</h2>
   <p>Copy <code>.env.example</code> for local work, keep credentials out of browser code and logs, and use the injected configuration boundary. If a test needs a provider, use the repository's fake or test adapter rather than a live secret.</p>
 
+  <h2>Develop without an API key</h2>
+  <p>Choose <code>Local simulator</code> during onboarding. It is a deterministic, credential-free provider that exercises the gateway, Harness agent runtime, execution evidence, and evaluation flows without making network calls. Every response is marked <code>[simulation:…]</code> so it cannot be confused with provider output.</p>
+
   <p><a href={`${base}docs/architecture/`}>Read the architecture guide →</a></p>
 </DocsLayout>

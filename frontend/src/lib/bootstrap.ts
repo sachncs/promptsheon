@@ -55,7 +55,7 @@ export const bootstrapApi = {
     return CreateAdminResponseSchema.parse(data);
   },
   validateLlm: async (input: {
-    provider: 'openai' | 'anthropic' | 'bedrock' | 'custom';
+    provider: 'openai' | 'anthropic' | 'bedrock' | 'custom' | 'simulated';
     apiKey?: string | undefined;
     bedrock?: { region: string; accessKeyId: string; secretAccessKey: string } | undefined;
     model: string;
@@ -65,7 +65,7 @@ export const bootstrapApi = {
     return LlmProbeResponseSchema.parse(data);
   },
   saveLlm: async (input: {
-    provider: 'openai' | 'anthropic' | 'bedrock' | 'custom';
+    provider: 'openai' | 'anthropic' | 'bedrock' | 'custom' | 'simulated';
     model: string;
     apiKey?: string | undefined;
     bedrock?: { region: string; accessKeyId: string; secretAccessKey: string } | undefined;

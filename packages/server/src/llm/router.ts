@@ -2,9 +2,9 @@ import { z } from 'zod';
 import type { LlmCredentials } from '@promptsheon/shared';
 
 export const LlmProbeRequestSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom']),
+  provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom', 'simulated']),
   model: z.string().min(1, 'Model name is required'),
-  apiKey: z.string().min(1, 'API key is required'),
+  apiKey: z.string().min(1).optional(),
   bedrock: z
     .object({
       region: z.string().min(1),
@@ -15,6 +15,10 @@ export const LlmProbeRequestSchema = z.object({
   // For the 'custom' provider, baseUrl overrides the hardcoded
   // OpenAI / Anthropic endpoints. Required when provider === 'custom'.
   baseUrl: z.string().url().optional(),
+}).superRefine((value, context) => {
+  if (value.provider !== 'bedrock' && value.provider !== 'simulated' && !value.apiKey) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'API key is required for this provider', path: ['apiKey'] });
+  }
 });
 
 export type LlmProbeRequest = z.infer<typeof LlmProbeRequestSchema>;
@@ -58,6 +62,8 @@ export class LlmRouter {
         return this.probeBedrock(req, started);
       case 'custom':
         return this.probeCustom(req, started);
+      case 'simulated':
+        return { latencyMs: Date.now() - started, model: req.model, skipped: true, skipReason: 'local deterministic simulator' };
     }
   }
 
@@ -83,6 +89,9 @@ export class LlmRouter {
         throw new Error('Bedrock completion not yet wired through the gateway; use /api/executions with an active release');
       case 'custom':
         content = await this.completeCustom(req, promptTokens);
+        break;
+      case 'simulated':
+        content = `[simulation:${req.model}] ${req.prompt}`;
         break;
       default:
         throw new Error(`unknown provider: ${req.provider}`);

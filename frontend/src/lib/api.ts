@@ -1533,7 +1533,7 @@ export const playgroundApi = {
   complete: (data: {
     prompt: string;
     model: string;
-    provider: 'openai' | 'anthropic' | 'bedrock' | 'custom';
+    provider: 'openai' | 'anthropic' | 'bedrock' | 'custom' | 'simulated';
     temperature?: number;
     baseUrl?: string;
     apiKey?: string;
@@ -1542,7 +1542,7 @@ export const playgroundApi = {
     base: {
       prompt: string;
       model: string;
-      provider: 'openai' | 'anthropic' | 'bedrock' | 'custom';
+    provider: 'openai' | 'anthropic' | 'bedrock' | 'custom' | 'simulated';
       baseUrl?: string;
       apiKey?: string;
     };

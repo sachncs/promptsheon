@@ -6,7 +6,7 @@ import { parseBody, statusCodeOf } from './validate.js';
 const CompleteSchema = z.object({
   prompt: z.string().min(1).max(64_000),
   model: z.string().min(1).max(120),
-  provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom']),
+  provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom', 'simulated']),
   temperature: z.coerce.number().min(0).max(2).default(0.7),
   baseUrl: z.string().url().optional(),
   apiKey: z.string().min(1).optional(),
@@ -22,7 +22,7 @@ const SweepSchema = z.object({
   base: z.object({
     prompt: z.string().min(1).max(64_000),
     model: z.string().min(1).max(120),
-    provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom']),
+    provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom', 'simulated']),
     baseUrl: z.string().url().optional(),
     apiKey: z.string().min(1).optional(),
   }),

@@ -27,7 +27,7 @@ export default function PlaygroundPage() {
   const session = useRequireSession();
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const [model, setModel] = useState('gpt-4');
-  const [provider, setProvider] = useState<'openai' | 'anthropic' | 'bedrock' | 'custom'>('custom');
+  const [provider, setProvider] = useState<'openai' | 'anthropic' | 'bedrock' | 'custom' | 'simulated'>('simulated');
   const [baseUrl, setBaseUrl] = useState('https://api.minimax.io/anthropic');
   const [apiKey, setApiKey] = useState('');
   const [temperature, setTemperature] = useState(DEFAULT_TEMP);
@@ -109,6 +109,7 @@ export default function PlaygroundPage() {
                 value={provider}
                 onValueChange={(v) => setProvider(v as typeof provider)}
                 options={[
+                  { value: 'simulated', label: 'Local simulator' },
                   { value: 'openai', label: 'OpenAI' },
                   { value: 'anthropic', label: 'Anthropic' },
                   { value: 'bedrock', label: 'Bedrock' },

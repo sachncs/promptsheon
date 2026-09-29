@@ -21,13 +21,14 @@ const steps = [
   { id: 'finish', label: 'Finish', icon: CheckCircle2 },
 ];
 
-type Provider = 'openai' | 'anthropic' | 'bedrock' | 'custom';
+type Provider = 'openai' | 'anthropic' | 'bedrock' | 'custom' | 'simulated';
 
 const providerDefaults: Record<Provider, { model: string; placeholder: string; baseUrl: string; apiStyle: 'anthropic' | 'openai' }> = {
   openai:    { model: 'gpt-4o-mini',                       placeholder: 'sk-…',                                                                              baseUrl: 'https://api.openai.com',                    apiStyle: 'openai' },
   anthropic: { model: 'claude-3-5-haiku-latest',          placeholder: 'sk-ant-…',                                                                           baseUrl: 'https://api.anthropic.com',                 apiStyle: 'anthropic' },
   bedrock:   { model: 'anthropic.claude-3-5-sonnet-20241022-v2:0', placeholder: '',                                                                       baseUrl: '',                                          apiStyle: 'anthropic' },
   custom:    { model: '',                                  placeholder: 'paste your model id',                                                                baseUrl: 'https://api.minimax.io/anthropic',          apiStyle: 'anthropic' },
+  simulated: { model: 'promptsheon-simulator',             placeholder: '',                                                                                     baseUrl: '',                                          apiStyle: 'openai' },
 };
 
 const providerLabels: Record<Provider, { title: string; hint: string }> = {
@@ -35,6 +36,7 @@ const providerLabels: Record<Provider, { title: string; hint: string }> = {
   anthropic: { title: 'Anthropic',       hint: 'claude-3-5-sonnet, claude-3-5-haiku' },
   bedrock:   { title: 'AWS Bedrock',     hint: 'Claude on AWS' },
   custom:    { title: 'Custom endpoint', hint: 'Any OpenAI- or Anthropic-compatible URL' },
+  simulated: { title: 'Local simulator', hint: 'Credential-free deterministic development mode' },
 };
 
 function isProvider(value: string | undefined): value is Provider {
@@ -245,7 +247,9 @@ function LlmStep({
       setFormError('Please add a model name before testing the connection.');
       return;
     }
-    if (provider === 'bedrock') {
+    if (provider === 'simulated') {
+      // The simulator is intentionally credential-free.
+    } else if (provider === 'bedrock') {
       if (!bedrockAccess.trim() || !bedrockSecret.trim()) {
         setFormError('Enter the AWS access key id and secret before testing.');
         return;
@@ -265,7 +269,7 @@ function LlmStep({
       const baseReq: Parameters<typeof bootstrapApi.validateLlm>[0] = { provider, model: model.trim() };
       if (provider === 'bedrock') {
         baseReq.bedrock = { region: bedrockRegion, accessKeyId: bedrockAccess.trim(), secretAccessKey: bedrockSecret.trim() };
-      } else {
+      } else if (provider !== 'simulated') {
         baseReq.apiKey = apiKey.trim();
         if (provider === 'custom' && baseUrl.trim()) baseReq.baseUrl = baseUrl.trim();
       }
@@ -282,7 +286,7 @@ function LlmStep({
       const req: Parameters<typeof bootstrapApi.saveLlm>[0] = { provider, model: model.trim() };
       if (provider === 'bedrock') {
         req.bedrock = { region: bedrockRegion, accessKeyId: bedrockAccess.trim(), secretAccessKey: bedrockSecret.trim() };
-      } else {
+      } else if (provider !== 'simulated') {
         req.apiKey = apiKey.trim();
         if (provider === 'custom' && baseUrl.trim()) req.baseUrl = baseUrl.trim();
       }
@@ -303,9 +307,9 @@ function LlmStep({
 
   return (
     <section>
-      <Header title="Connect a model provider" subtitle="Promptsheon delegates every agent call through the provider you choose. The key is stored encrypted at rest and only ever returned as a masked value." />
+      <Header title="Choose a model provider" subtitle="Use the local simulator to explore the product loop without credentials, or connect a real provider when you are ready." />
 
-      <div className="grid gap-2 sm:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-5">
         {(Object.keys(providerDefaults) as Provider[]).map((p) => (
           <button
             key={p}
@@ -351,7 +355,11 @@ function LlmStep({
             mono
           />
         </Field>
-        {provider === 'bedrock' ? (
+        {provider === 'simulated' ? (
+          <div className="rounded-lg border border-brand/30 bg-brand/5 px-3 py-3 text-sm text-text-muted">
+            The simulator returns deterministic, clearly labelled responses. It never calls a network provider and does not need an API key.
+          </div>
+        ) : provider === 'bedrock' ? (
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Region" htmlFor="region">
               <Input id="region" value={bedrockRegion} onChange={(e) => setBedrockRegion(e.target.value)} />

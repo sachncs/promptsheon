@@ -21,7 +21,8 @@ export default function Quickstart() {
   -d '{"adminName":"Ada","adminEmail":"ada@example.com","orgName":"Acme AI"}'`}
       />
 
-      <h2>3. Connect a model provider</h2>
+      <h2>3. Choose a model provider</h2>
+      <p>For a complete local walkthrough without credentials, choose <code>Local simulator</code> during onboarding. It returns deterministic responses marked <code>[simulation:…]</code> and never makes a network call.</p>
       <DocCurl
         cmd={`curl -X POST http://127.0.0.1:8080/api/bootstrap/llm \\
   -H 'content-type: application/json' \\
