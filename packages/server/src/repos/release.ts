@@ -227,7 +227,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
     this.db.transaction(() => {
       const currentUpdate = this.db.prepare("UPDATE releases SET status = 'rolled_back', updated_at = ? WHERE id = ? AND status IN ('canary', 'active')").run(new Date().toISOString(), currentId);
       if (currentUpdate.changes !== 1) throw new Error('current release changed before rollback');
-      const targetUpdate = this.db.prepare("UPDATE releases SET status = 'active', updated_at = ? WHERE id = ? AND status = 'active'").run(new Date().toISOString(), targetId);
+      const targetUpdate = this.db.prepare("UPDATE releases SET status = 'active', updated_at = ? WHERE id = ? AND status IN ('active', 'rolled_back')").run(new Date().toISOString(), targetId);
       if (targetUpdate.changes !== 1) throw new Error('rollback target changed before rollback');
       rolledBack = { ...current, status: 'rolled_back' };
       reactivated = { ...target, status: 'active' };
@@ -249,7 +249,8 @@ export class ReleaseRepo extends BaseRepo<Release> {
       const now = new Date().toISOString();
       const currentUpdate = this.db.prepare("UPDATE releases SET status = 'rolled_back', updated_at = ? WHERE id = ? AND status IN ('canary', 'active')").run(now, currentId);
       if (currentUpdate.changes !== 1) throw new Error('current release changed before rollback');
-      const targetUpdate = this.db.prepare("UPDATE releases SET status = 'active', updated_at = ? WHERE id = ? AND status = 'active'").run(now, targetId);
+      const targetUpdate = this.db.prepare("UPDATE releases SET status = 'active', updated_at = ? WHERE id = ? AND status IN ('active', 'rolled_back')").run(now, targetId);
+      if (targetUpdate.changes !== 1) throw new Error('rollback target changed before rollback');
       result = {
         rolledBack: { ...current, status: 'rolled_back' },
         reactivated: { ...target, status: 'active' },

@@ -5,6 +5,7 @@ import { ManifestRepo } from '../src/repos/manifest.js';
 import { ReleaseRepo } from '../src/repos/release.js';
 import { AuditChain } from '../src/audit/chain.js';
 import { ReleaseOverlayRepo } from '../src/repos/release-overlay.js';
+import { SigningKeyRepo } from '../src/repos/signing-key.js';
 import { ReleaseService } from '../src/application/release-service.js';
 import { applyMigrations } from '@promptsheon/shared';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -83,6 +84,7 @@ describe('POST /api/releases/:id/rollback', () => {
         manifestRepo: new ManifestRepo(db),
         auditChain: new AuditChain(db),
         overlayRepo: new ReleaseOverlayRepo(db),
+        signingKeyRepo: new SigningKeyRepo(db),
         releaseService: new ReleaseService(repo, new ManifestRepo(db), new AuditChain(db)),
       });
     });
@@ -188,5 +190,38 @@ describe('POST /api/releases/:id/rollback', () => {
     });
     expect(read.statusCode).toBe(200);
     expect(read.json()).toMatchObject({ id: releaseId, environment: 'staging', patch: { timeoutMs: 2000 } });
+  });
+
+  it('rejects a stale compare-and-swap release transition', () => {
+    const releaseId = makeRelease(repo, 'cap1', 'prod', 1, 'alice');
+    repo.updateStatus(releaseId, 'review');
+
+    expect(repo.updateStatusInOrgIfCurrent(releaseId, 'legacy', 'draft', 'approved')).toBeNull();
+    expect(repo.findById(releaseId)?.status).toBe('review');
+    expect(repo.updateStatusInOrgIfCurrent(releaseId, 'legacy', 'review', 'approved')?.status).toBe('approved');
+  });
+
+  it('rolls back the transaction when the target changes before activation', () => {
+    const targetId = makeRelease(repo, 'cap1', 'prod', 1, 'alice');
+    const currentId = makeRelease(repo, 'cap1', 'prod', 2, 'alice');
+    repo.updateStatus(currentId, 'canary');
+
+    expect(() => repo.rollbackAtomicallyInOrg(currentId, targetId, 'legacy')).toThrow(/rollback target changed/);
+    expect(repo.findById(currentId)?.status).toBe('canary');
+    expect(repo.findById(targetId)?.status).toBe('draft');
+  });
+
+  it('atomically reactivates the target and rolls back the current release', () => {
+    const targetId = makeRelease(repo, 'cap1', 'prod', 1, 'alice');
+    const currentId = makeRelease(repo, 'cap1', 'prod', 2, 'alice');
+    repo.updateStatus(targetId, 'active');
+    repo.updateStatus(currentId, 'canary');
+
+    const result = repo.rollbackAtomicallyInOrg(currentId, targetId, 'legacy');
+
+    expect(result.reactivated.id).toBe(targetId);
+    expect(result.rolledBack.id).toBe(currentId);
+    expect(repo.findById(currentId)?.status).toBe('rolled_back');
+    expect(repo.findById(targetId)?.status).toBe('active');
   });
 });
