@@ -1,9 +1,10 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { Check, GitPullRequest, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { mutationProposalApi, type MutationProposal } from '@/lib/api';
+import { mutationProposalApi, type MutationProposal, type ReleaseEnvironment } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -21,6 +22,7 @@ export default function MutationProposalsPage() {
   const session = useRequireSession();
   const queryClient = useQueryClient();
   const [reasonById, setReasonById] = React.useState<Record<string, string>>({});
+  const [environment, setEnvironment] = React.useState<ReleaseEnvironment>('dev');
   const proposals = useQuery({
     queryKey: ['mutation-proposals'],
     queryFn: () => mutationProposalApi.list(),
@@ -32,6 +34,10 @@ export default function MutationProposalsPage() {
       if (!reason) throw new Error('Add a decision reason before continuing.');
       return mutationProposalApi.decide(id, decision, reason);
     },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mutation-proposals'] }),
+  });
+  const promote = useMutation({
+    mutationFn: (id: string) => mutationProposalApi.promote(id, environment),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mutation-proposals'] }),
   });
 
@@ -97,6 +103,25 @@ export default function MutationProposalsPage() {
                         </Button>
                       </div>
                     </div>
+                  ) : proposal.status === 'approved' && !proposal.promotedReleaseId ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="text-xs text-text-muted" htmlFor={`environment-${proposal.id}`}>Create draft for</label>
+                      <select
+                        id={`environment-${proposal.id}`}
+                        value={environment}
+                        onChange={(event) => setEnvironment(event.target.value as ReleaseEnvironment)}
+                        className="h-8 rounded-lg border border-border-subtle bg-surface-1 px-2 text-xs text-text-default"
+                      >
+                        <option value="dev">Development</option>
+                        <option value="staging">Staging</option>
+                        <option value="prod">Production</option>
+                      </select>
+                      <Button size="sm" variant="outline" onClick={() => promote.mutate(proposal.id)} disabled={promote.isPending}>
+                        {promote.isPending ? 'Creating draft…' : 'Create draft release'}
+                      </Button>
+                    </div>
+                  ) : proposal.promotedReleaseId ? (
+                    <p className="text-xs text-text-subtle">Draft release created: <Link className="text-brand hover:underline" href={`/app/releases/${proposal.promotedReleaseId}`}>{proposal.promotedReleaseId}</Link></p>
                   ) : proposal.decisionReason ? (
                     <p className="text-xs text-text-subtle">Decision: {proposal.decisionReason}</p>
                   ) : null}
