@@ -41,6 +41,8 @@ interface SpecificationRow {
 
 /** Persistence boundary for immutable specifications and their lineage. */
 export class AgentSpecificationRepo {
+  private readonly parsedCache = new Map<string, AgentSpecification>();
+
   constructor(
     private readonly db: Database.Database,
     private readonly cas: CasStore,
@@ -80,11 +82,18 @@ export class AgentSpecificationRepo {
       'SELECT * FROM agent_specifications WHERE workspace_id = ? AND hash = ?',
     ).get(workspaceId, hash) as SpecificationRow | undefined;
     if (!row) throw new NotFoundError('agent specification', hash);
-    const specification = AgentSpecificationSchema.parse(JSON.parse(
-      (await this.cas.readBlob(hash)).toString('utf8'),
-    ) as unknown);
+    const bytes = await this.cas.readBlob(hash);
+    const cached = this.parsedCache.get(hash);
+    const specification = cached ?? AgentSpecificationSchema.parse(JSON.parse(bytes.toString('utf8')) as unknown);
     if (hashAgentSpecification(specification) !== hash) {
       throw new Error(`agent specification hash mismatch: ${hash}`);
+    }
+    if (!cached) {
+      this.parsedCache.set(hash, specification);
+      if (this.parsedCache.size > 1_024) {
+        const oldest = this.parsedCache.keys().next().value;
+        if (oldest) this.parsedCache.delete(oldest);
+      }
     }
     return this.toRecord(row, specification);
   }

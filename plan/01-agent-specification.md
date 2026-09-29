@@ -79,3 +79,8 @@ of truth for every later execution and improvement decision.
 - No published specification can be modified in place.
 - Lineage and diffs are queryable and tested under concurrent writes.
 
+## Implementation status
+
+The contract, canonicalizer, SHA-256 addressing, atomic CAS, SQLite metadata,
+tenant-scoped repository, API workflows, SDK methods, and CLI commands are
+implemented. Full repository and remote CI verification remains the exit gate.
