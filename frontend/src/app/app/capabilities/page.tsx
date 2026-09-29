@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { Boxes, Workflow, Plus } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
-import { workspaceApi, projectApi, capabilityApi, type Capability } from '@/lib/api';
+import { workspaceApi, projectApi, capabilityApi, versionApi, type Capability } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
@@ -47,6 +47,22 @@ export default function CapabilitiesRegistryPage() {
     const arr = Array.isArray(capabilities.data) ? capabilities.data : [];
     return arr;
   }, [capabilities.data]);
+
+  const latestVersions = useQuery({
+    queryKey: ['capability-latest-versions', rows.map((capability) => capability.id)],
+    queryFn: async () => {
+      const entries = await Promise.all(rows.map(async (capability) => {
+        const response = await versionApi.list(capability.id);
+        const latest = response.data.reduce<typeof response.data[number] | null>(
+          (current, version) => (!current || version.version > current.version ? version : current),
+          null,
+        );
+        return [capability.id, latest] as const;
+      }));
+      return new Map(entries);
+    },
+    enabled: rows.length > 0,
+  });
 
   if (!session) return null;
 
@@ -117,7 +133,10 @@ export default function CapabilitiesRegistryPage() {
               {
                 key: 'latest',
                 header: 'Latest',
-                render: () => <span className="font-mono text-xs text-text-muted">—</span>,
+                render: (r) => {
+                  const latest = latestVersions.data?.get(r.id);
+                  return latest ? <HashChip hash={latest.manifestHash} /> : <span className="font-mono text-xs text-text-muted">—</span>;
+                },
               },
               {
                 key: 'hash',

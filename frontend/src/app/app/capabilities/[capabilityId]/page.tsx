@@ -45,10 +45,11 @@ export default function CapabilityDetailPage() {
 
   const versionList = Array.isArray(versions.data) ? versions.data : [];
 
+  const latestVersionId = versionList[0]?.id;
   const manifest = useQuery({
-    queryKey: ['manifest', id],
-    queryFn: () => manifestApi.get(id).then((r) => r.data),
-    enabled: Boolean(id) && Boolean(session),
+    queryKey: ['manifest', latestVersionId],
+    queryFn: () => manifestApi.get(latestVersionId!).then((r) => r.data),
+    enabled: Boolean(latestVersionId) && Boolean(session),
   });
 
   const releases = useQuery({
