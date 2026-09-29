@@ -144,6 +144,7 @@ export default function ReleaseDetailPage() {
   const r = release.data as {
     id: string; capabilityName?: string; capabilityVersion?: number; status?: string; state?: string;
     manifestHash?: string; environment?: string; canaryPercent?: number;
+    signature?: string | null; signedKeyId?: string | null; signedAt?: string | null;
     createdAt?: string; updatedAt?: string;
   };
 
@@ -215,6 +216,15 @@ export default function ReleaseDetailPage() {
               <div>
                 <dt className="text-xs uppercase tracking-wider text-text-subtle">State</dt>
                 <dd className="mt-1"><StatusPill kind={statusKindOf(releaseStatus, 'draft')} label={releaseStatus} /></dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wider text-text-subtle">Release signature</dt>
+                <dd className="mt-1">
+                  <StatusPill
+                    kind={r.signature && r.signedKeyId ? 'approved' : 'warning'}
+                    label={r.signature && r.signedKeyId ? 'signed' : 'unsigned — signing required'}
+                  />
+                </dd>
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wider text-text-subtle">Updated</dt>

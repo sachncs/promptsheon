@@ -306,6 +306,9 @@ export interface Release {
   createdBy: string;
   activatedAt: string | null;
   canaryPercent: number;
+  signature?: string | null | undefined;
+  signedKeyId?: string | null | undefined;
+  signedAt?: string | null | undefined;
 }
 
 export type ApprovalVote = 'approve' | 'reject';
@@ -562,6 +565,9 @@ const ReleaseSchema = z.object({
   createdBy: z.string(),
   activatedAt: z.string().nullable(),
   canaryPercent: z.number().int().min(0).max(100),
+  signature: z.string().nullable().optional(),
+  signedKeyId: z.string().nullable().optional(),
+  signedAt: z.string().nullable().optional(),
 });
 
 const CanaryAssessmentSchema = z.object({
