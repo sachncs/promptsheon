@@ -15,6 +15,19 @@ without allowing uncontrolled self-modification.
 
 ## Implementation
 
+## Implementation status
+
+The first governed slice is now implemented: mutation proposals are stored as
+tenant-scoped records with immutable source references, explicit mutation kinds,
+structured changes, risk, confidence, author, and evaluation linkage. The API
+supports listing, inspection, and guarded approve/reject/abandon decisions.
+The console exposes the review queue and requires an auditable decision reason.
+The local simulator can author deterministic proposals without an LLM key.
+
+Candidate generation, automatic candidate materialisation, evaluation gates,
+and promotion integration remain in progress. Approval records do not activate
+anything by themselves.
+
 - Define immutable `MutationProposal` records containing source hash, proposed
   changes, rationale, expected outcome, author/system, risk, and confidence.
 - Implement bounded mutation types:
@@ -65,4 +78,3 @@ without allowing uncontrolled self-modification.
 - The platform can propose improvements but cannot silently activate them.
 - Every candidate is immutable, evaluated, risk-classified, and explainable.
 - Mutation workloads are bounded and isolated from production traffic.
-
