@@ -16,6 +16,7 @@ engineering measurements, not production SLO commitments.
 | Public site production build | Passing |
 | Docker build and readiness smoke | Required by push CI |
 | Runtime OpenAPI route-surface smoke | Required by Docker CI; must expose at least 100 API path contracts |
+| Runtime API contract smoke | Required by Docker CI; exercises every documented method/path and rejects unexpected 5xx responses |
 | Browser smoke suite | Required by push CI |
 | Documentation local-link check | Added in Phase 0 |
 

@@ -135,6 +135,7 @@ jobs:
               openapi_route_count=$(curl --fail --silent --show-error http://127.0.0.1:8080/api/openapi.json | jq '.paths | length')
               test "$openapi_route_count" -ge 100
               echo "OpenAPI route paths: $openapi_route_count"
+              node scripts/check-api-routes.mjs
               exit 0
             fi
             sleep 1
