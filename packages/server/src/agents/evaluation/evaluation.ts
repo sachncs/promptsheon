@@ -47,10 +47,18 @@ export class EvaluationAgent {
     getActual: (inputs: Record<string, unknown>) => Promise<string>,
     onProgress?: (completed: number, total: number) => void,
     manifest?: Manifest,
+    onCaseResult?: (result: {
+      caseId: string;
+      seq: number;
+      passed: boolean;
+      actual: string;
+      error: string;
+      latencyMs: number;
+    }) => void,
   ): Promise<EvalRun> {
     const multiScorer = manifest && manifest.evaluation.scorers.length > 1;
     if (multiScorer) {
-      return this.runMultiScorerEval(evalRun, cases, getActual, onProgress, manifest);
+      return this.runMultiScorerEval(evalRun, cases, getActual, onProgress, manifest, onCaseResult);
     }
 
     const scorerName = evalRun.scorer || 'llm-judge';
@@ -64,6 +72,7 @@ export class EvaluationAgent {
       const inputs = JSON.parse(testCase.inputs) as Record<string, unknown>;
       const expected = JSON.parse(testCase.expected);
 
+      const startedAt = Date.now();
       const actual = await getActual(inputs);
       const evalInput: EvalInput = {
         actual,
@@ -74,6 +83,15 @@ export class EvaluationAgent {
 
       if (result.passed) passed++;
       else failed++;
+
+      onCaseResult?.({
+        caseId: testCase.id,
+        seq: testCase.seq,
+        passed: result.passed,
+        actual,
+        error: result.reasoning,
+        latencyMs: Date.now() - startedAt,
+      });
 
       onProgress?.(i + 1, cases.length);
     }
@@ -95,6 +113,14 @@ export class EvaluationAgent {
     getActual: (inputs: Record<string, unknown>) => Promise<string>,
     onProgress: ((completed: number, total: number) => void) | undefined,
     manifest: Manifest,
+    onCaseResult: ((result: {
+      caseId: string;
+      seq: number;
+      passed: boolean;
+      actual: string;
+      error: string;
+      latencyMs: number;
+    }) => void) | undefined,
   ): Promise<EvalRun> {
     let casesPassed = 0;
     let casesFailed = 0;
@@ -103,6 +129,7 @@ export class EvaluationAgent {
       const testCase = cases[i];
       const inputs = JSON.parse(testCase.inputs) as Record<string, unknown>;
       const expected = JSON.parse(testCase.expected);
+      const startedAt = Date.now();
       const actual = await getActual(inputs);
 
       const suiteResult = await this.suiteRunner.run(manifest, {
@@ -113,6 +140,15 @@ export class EvaluationAgent {
 
       if (suiteResult.passed) casesPassed++;
       else casesFailed++;
+
+      onCaseResult?.({
+        caseId: testCase.id,
+        seq: testCase.seq,
+        passed: suiteResult.passed,
+        actual,
+        error: suiteResult.scorerResults.map((item) => item.reasoning).join('; '),
+        latencyMs: Date.now() - startedAt,
+      });
 
       onProgress?.(i + 1, cases.length);
     }

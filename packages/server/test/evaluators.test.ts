@@ -12,15 +12,15 @@ function buildConfig(): AppConfig {
 }
 
 describe('buildEvaluatorRegistry', () => {
-  it('builds registry with 5 evaluators', () => {
+  it('builds registry with 6 evaluators', () => {
     const reg = buildEvaluatorRegistry(buildConfig());
-    expect(reg.size).toBe(5);
+    expect(reg.size).toBe(6);
   });
 
-  it('evaluators are: llm-judge, helpfulness, coherence, correctness, goal-success-rate', () => {
+  it('evaluators include the credential-free deterministic scorer', () => {
     const reg = buildEvaluatorRegistry(buildConfig());
     expect(listEvaluators(reg).sort()).toEqual([
-      'coherence', 'correctness', 'goal-success-rate', 'helpfulness', 'llm-judge',
+      'coherence', 'correctness', 'deterministic', 'goal-success-rate', 'helpfulness', 'llm-judge',
     ]);
   });
 

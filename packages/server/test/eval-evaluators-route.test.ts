@@ -62,7 +62,7 @@ describe('GET /api/eval/evaluators and POST /api/eval/score', () => {
     db.close();
   });
 
-  it('GET /api/eval/evaluators returns the 5 evaluator names', async () => {
+  it('GET /api/eval/evaluators returns the built-in evaluator names', async () => {
     const response = await app.inject({ method: 'GET', url: '/api/eval/evaluators' });
     expect(response.statusCode).toBe(200);
     const body = response.json() as { evaluators: string[] };
@@ -71,6 +71,7 @@ describe('GET /api/eval/evaluators and POST /api/eval/score', () => {
     expect(body.evaluators).toContain('coherence');
     expect(body.evaluators).toContain('correctness');
     expect(body.evaluators).toContain('goal-success-rate');
+    expect(body.evaluators).toContain('deterministic');
   });
 
   it('POST /api/eval/score returns 404 for unknown evaluator', async () => {

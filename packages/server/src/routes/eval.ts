@@ -5,6 +5,7 @@ import {
   PaginationSchema,
 } from '@promptsheon/shared';
 import type { EvalRepo } from '../repos/eval.js';
+import type { DatasetRepo } from '../repos/dataset.js';
 import type { EvaluationAgent } from '../agents/evaluation/evaluation.js';
 import type { EvalInput } from '../evaluation/evaluators.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
@@ -43,6 +44,7 @@ export function registerEvalRoutes(
   repo: EvalRepo,
   evalAgent: EvaluationAgent,
   config: EvalRouteConfig = { allowedHosts: [], allowPrivateNetworks: true },
+  datasetRepo?: DatasetRepo,
 ) {
   app.get('/api/eval-runs', async (request, reply) => {
     const organizationId = orgOf(request);
@@ -100,6 +102,15 @@ export function registerEvalRoutes(
     }
     const evalRun = repo.findRunByIdInOrg(evalRunId, organizationId);
     if (!evalRun) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Eval run not found' } });
+    if (!datasetRepo) {
+      return reply.code(500).send({ error: { code: 'EVAL_DATASET_UNAVAILABLE', message: 'evaluation dataset repository is not configured' } });
+    }
+    const dataset = datasetRepo.findByIdInOrg(evalRun.datasetId, organizationId);
+    if (!dataset) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Eval dataset not found' } });
+    const cases = datasetRepo.findCases(evalRun.datasetId);
+    if (cases.length === 0) {
+      return reply.code(422).send({ error: { code: 'EVAL_DATASET_EMPTY', message: 'evaluation dataset has no cases' } });
+    }
 
     const getActual = async (inputs: Record<string, unknown>): Promise<string> => {
       const controller = new AbortController();
@@ -123,7 +134,24 @@ export function registerEvalRoutes(
 
     let result;
     try {
-      result = await evalAgent.runEval(evalRun, [], getActual);
+      result = await evalAgent.runEval(
+        evalRun,
+        cases,
+        getActual,
+        undefined,
+        undefined,
+        (caseResult) => {
+          repo.addResult({
+            runId: evalRun.id,
+            caseId: caseResult.caseId,
+            seq: caseResult.seq,
+            passed: caseResult.passed,
+            actual: caseResult.actual,
+            error: caseResult.error,
+            latencyMs: caseResult.latencyMs,
+          });
+        },
+      );
     } catch {
       return reply.code(502).send({ error: { code: 'EVAL_ENDPOINT_FAILED', message: 'evaluation endpoint failed' } });
     }

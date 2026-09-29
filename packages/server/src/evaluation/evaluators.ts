@@ -26,6 +26,30 @@ export interface Evaluator {
   evaluate(input: EvalInput): Promise<EvalResult>;
 }
 
+class DeterministicEvaluator implements Evaluator {
+  readonly name = 'deterministic';
+
+  async evaluate(input: EvalInput): Promise<EvalResult> {
+    const actual = canonicalText(input.actual);
+    const expected = canonicalText(input.expected);
+    const passed = actual === expected;
+    return {
+      score: passed ? 1 : 0,
+      passed,
+      reasoning: passed ? 'actual output matches expected output' : 'actual output does not match expected output',
+    };
+  }
+}
+
+function canonicalText(value: string): string {
+  const trimmed = value.trim();
+  try {
+    return JSON.stringify(JSON.parse(trimmed));
+  } catch {
+    return trimmed;
+  }
+}
+
 const NUMERIC_RESULT = z.object({
   score: z.number().min(0).max(1),
   passed: z.boolean(),
@@ -55,6 +79,7 @@ class LLMJudgeEvaluator implements Evaluator {
  */
 export function buildEvaluatorRegistry(config: AppConfig): Map<string, Evaluator> {
   const reg = new Map<string, Evaluator>();
+  reg.set('deterministic', new DeterministicEvaluator());
   reg.set('llm-judge', new LLMJudgeEvaluator('llm-judge', config,
     'You are an evaluation judge. Score the actual output against expected on 0-1. Return JSON { score, passed, reasoning }.',
   ));

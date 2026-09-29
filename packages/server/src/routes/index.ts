@@ -253,7 +253,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     sseHub: deps.sseHub,
   });
   registerDatasetRoutes(app, deps.datasetRepo);
-  registerEvalRoutes(app, deps.evalRepo, deps.evalAgent, deps.evalRouteConfig);
+  registerEvalRoutes(app, deps.evalRepo, deps.evalAgent, deps.evalRouteConfig, deps.datasetRepo);
   registerPreconditionRoutes(app, deps.preconditionRepo);
   registerAlertRoutes(app, deps.alertRepo);
   registerScheduleRoutes(app, new ScheduleService(deps.scheduleRepo));
