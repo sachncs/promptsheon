@@ -153,6 +153,7 @@ export function registerEvalRoutes(
         },
       );
     } catch {
+      repo.updateRun(evalRunId, { status: 'error' });
       return reply.code(502).send({ error: { code: 'EVAL_ENDPOINT_FAILED', message: 'evaluation endpoint failed' } });
     }
     repo.updateRun(evalRunId, result);
