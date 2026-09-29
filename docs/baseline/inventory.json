@@ -625,6 +625,26 @@
       "path": "/api/merge-requests/:id/close"
     },
     {
+      "file": "packages/server/src/routes/mutation-proposals.ts",
+      "method": "GET",
+      "path": "/api/mutation-proposals"
+    },
+    {
+      "file": "packages/server/src/routes/mutation-proposals.ts",
+      "method": "POST",
+      "path": "/api/mutation-proposals"
+    },
+    {
+      "file": "packages/server/src/routes/mutation-proposals.ts",
+      "method": "GET",
+      "path": "/api/mutation-proposals/:id"
+    },
+    {
+      "file": "packages/server/src/routes/mutation-proposals.ts",
+      "method": "POST",
+      "path": "/api/mutation-proposals/:id/decision"
+    },
+    {
       "file": "packages/server/src/routes/org-settings.ts",
       "method": "GET",
       "path": "/api/orgs/:id/settings"
@@ -1314,6 +1334,7 @@
     "packages/server/src/repos/kms-adapters.ts",
     "packages/server/src/repos/manifest.ts",
     "packages/server/src/repos/mr.ts",
+    "packages/server/src/repos/mutation-proposal.ts",
     "packages/server/src/repos/org-settings.ts",
     "packages/server/src/repos/org.ts",
     "packages/server/src/repos/outgoing-webhook.ts",
@@ -1400,7 +1421,8 @@
     "packages/shared/db/migrations/056_execution_jobs.up.sql",
     "packages/shared/db/migrations/057_execution_checkpoints.up.sql",
     "packages/shared/db/migrations/058_evidence_records.up.sql",
-    "packages/shared/db/migrations/059_eval_suite_runs.up.sql"
+    "packages/shared/db/migrations/059_eval_suite_runs.up.sql",
+    "packages/shared/db/migrations/060_mutation_proposals.up.sql"
   ],
   "frontendRoutes": [
     {

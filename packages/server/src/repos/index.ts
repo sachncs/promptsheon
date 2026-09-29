@@ -1,4 +1,5 @@
 export { WorkspaceRepo } from './workspace.js';
+export { MutationProposalRepo } from './mutation-proposal.js';
 export { ProjectRepo } from './project.js';
 export { CapabilityRepo } from './capability.js';
 export { VersionRepo } from './version.js';

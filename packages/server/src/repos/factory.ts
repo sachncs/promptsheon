@@ -45,6 +45,7 @@ import type { AgentSpecificationRepo } from './agent-specification.js';
 import { ExecutionJobRepo } from './execution-job.js';
 import { ExecutionCheckpointRepo } from './execution-checkpoint.js';
 import { EvidenceRepo } from './evidence.js';
+import { MutationProposalRepo } from './mutation-proposal.js';
 
 /**
  * Bundle of every repo in the server. Built once from a
@@ -104,6 +105,7 @@ export interface Repos {
   executionJob: ExecutionJobRepo;
   executionCheckpoint: ExecutionCheckpointRepo;
   evidence: EvidenceRepo;
+  mutationProposal: MutationProposalRepo;
 }
 
 /**
@@ -167,6 +169,7 @@ export function buildRepos(db: Database.Database): Repos {
     executionJob: new ExecutionJobRepo(db),
     executionCheckpoint: new ExecutionCheckpointRepo(db),
     evidence: new EvidenceRepo(db),
+    mutationProposal: new MutationProposalRepo(db),
   };
 }
 

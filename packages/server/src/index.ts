@@ -388,6 +388,7 @@ async function main() {
     traceRepo: repos.trace,
     traceScoreRepo: repos.traceScore,
     evidenceRepo: repos.evidence,
+    mutationProposalDeps: { mutationProposalRepo: repos.mutationProposal, actorId: () => 'system' },
     autoEval,
     userAnalyticsRepo: repos.userAnalytics,
     identityService,
