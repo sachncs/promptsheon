@@ -1,8 +1,9 @@
 import { createHash, createPublicKey, verify } from 'node:crypto';
 import type { Release } from '@promptsheon/shared';
+import { computeManifestHashFromJson } from '../repos/manifest.js';
 
 export function releaseManifestHash(manifest: string): string {
-  return createHash('sha256').update(manifest).digest('hex');
+  return computeManifestHashFromJson(manifest);
 }
 
 export function signedReleaseMessage(input: { releaseId: string; manifestHash: string; timestamp: string }): Buffer {

@@ -1,5 +1,4 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { PaginationSchema } from '@promptsheon/shared';
 import type { VersionRepo } from '../repos/version.js';
@@ -86,18 +85,21 @@ export function registerVersionRoutes(
     if (!organizationId) return;
     const parsed = parseBody(reply, CreateVersionSchema, request.body);
     if (!parsed.ok) return;
+    let canonicalHash: string;
+    try {
+      canonicalHash = manifestRepo.computeManifestHash(parsed.data.manifest);
+    } catch {
+      return reply.code(422).send({ error: { code: 'INVALID_MANIFEST', message: 'manifest must be a valid JSON object' } });
+    }
+    if (parsed.data.manifestHash !== canonicalHash) {
+      return reply.code(422).send({ error: { code: 'MANIFEST_HASH_MISMATCH', message: 'manifestHash does not match manifest content' } });
+    }
     const item = repo.createInOrg(parsed.data, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'capability not found' } });
 
-    // BUG-1 fix: also register the manifest in manifest_dag so the
-    // maker-checker / approval flow can look it up by hash. Without
-    // this, no release in the system can ever pass the gate.
-    //
-    // The release activation gate computes the manifest hash by
-    // sha256-hashing the raw manifest string. We do the same here
-    // so the registered row matches what the gate will look up.
+    // Register the manifest in manifest_dag so maker-checker approvals can
+    // resolve the exact content-addressed version.
     try {
-      const canonicalHash = createHash('sha256').update(parsed.data.manifest).digest('hex');
       manifestRepo.registerFromRaw({
         capabilityId: parsed.data.capabilityId,
         version: parsed.data.version,

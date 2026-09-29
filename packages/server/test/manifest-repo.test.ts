@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { ManifestRepo, computeManifestHash } from '../src/repos/manifest.js';
+import { ManifestRepo, computeManifestHash, computeManifestHashFromJson } from '../src/repos/manifest.js';
 import { applyMigrations } from '@promptsheon/shared';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -67,6 +67,12 @@ describe('computeManifestHash', () => {
     const m1 = buildValidManifest();
     const m2 = buildValidManifest({ version: 2 });
     expect(computeManifestHash(m1)).not.toBe(computeManifestHash(m2));
+  });
+
+  it('ignores JSON formatting and key order at every nesting level', () => {
+    const first = '{"id":"m1","nested":{"z":1,"a":[{"b":2,"a":1}]}}';
+    const second = '{ "nested": { "a": [ { "a": 1, "b": 2 } ], "z": 1 }, "id": "m1" }';
+    expect(computeManifestHashFromJson(first)).toBe(computeManifestHashFromJson(second));
   });
 });
 

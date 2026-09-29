@@ -12,8 +12,33 @@ import { NotFoundError } from '@promptsheon/shared';
  * Used as the CAS content-address. Stable across runs.
  */
 export function computeManifestHash(manifest: Manifest): string {
-  const normalized = JSON.stringify(manifest, Object.keys(manifest).sort());
+  return computeJsonObjectHash(manifest);
+}
+
+/** Compute a content hash from a JSON-encoded manifest object. */
+export function computeManifestHashFromJson(manifestJson: string): string {
+  const parsed: unknown = JSON.parse(manifestJson);
+  if (!isJsonObject(parsed)) throw new Error('manifest must be a JSON object');
+  return computeJsonObjectHash(parsed);
+}
+
+function computeJsonObjectHash(value: object): string {
+  const normalized = JSON.stringify(sortJson(value));
   return createHash('sha256').update(normalized).digest('hex');
+}
+
+function sortJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortJson);
+  if (!isJsonObject(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, nested]) => [key, sortJson(nested)]),
+  );
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -33,8 +58,7 @@ export class ManifestRepo {
    * (key-sorted) so both call paths produce the same hash.
    */
   computeManifestHash(manifestJson: string): string {
-    const parsed = JSON.parse(manifestJson) as unknown as Parameters<typeof computeManifestHash>[0];
-    return computeManifestHash(parsed);
+    return computeManifestHashFromJson(manifestJson);
   }
 
   findByHash(hash: string): Manifest | null {

@@ -1,8 +1,8 @@
 import type { Release } from '@promptsheon/shared';
 import type Database from 'better-sqlite3';
-import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { BaseRepo, type Paginated } from './base.js';
+import { computeManifestHashFromJson } from './manifest.js';
 
 const ReleaseRowSchema = z.object({
   id: z.string(),
@@ -264,7 +264,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
    * blob. Used by the activation gate to look up approval state.
    */
   computeManifestHash(manifestJson: string): string {
-    return createHash('sha256').update(manifestJson).digest('hex');
+    return computeManifestHashFromJson(manifestJson);
   }
 
   findActiveByCapabilityAndEnv(capabilityId: string, environment: string): Release[] {
@@ -277,14 +277,12 @@ export class ReleaseRepo extends BaseRepo<Release> {
     const all = this.db.prepare(
       "SELECT * FROM releases WHERE status = 'active'",
     ).all().map(toRelease);
-    return all.filter((r) => {
+    return all.filter((release) => {
       try {
-        const obj = JSON.parse(r.manifest) as Record<string, unknown>;
-        if (obj['manifestHash'] === manifestHash) return true;
-      } catch { /* ignore */ }
-      const { createHash } = require('node:crypto') as typeof import('node:crypto');
-      const h = createHash('sha256').update(r.manifest).digest('hex');
-      return h === manifestHash;
+        return this.computeManifestHash(release.manifest) === manifestHash;
+      } catch {
+        return false;
+      }
     });
   }
 
@@ -299,10 +297,10 @@ export class ReleaseRepo extends BaseRepo<Release> {
       .map(toRelease)
       .filter((release) => {
         try {
-          const manifest = JSON.parse(release.manifest) as Record<string, unknown>;
-          if (manifest['manifestHash'] === manifestHash) return true;
-        } catch { /* fall through to raw blob hash */ }
-        return createHash('sha256').update(release.manifest).digest('hex') === manifestHash;
+          return this.computeManifestHash(release.manifest) === manifestHash;
+        } catch {
+          return false;
+        }
       });
   }
 

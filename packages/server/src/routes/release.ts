@@ -6,10 +6,10 @@ import {
 } from '@promptsheon/shared';
 import type { ReleaseRepo } from '../repos/release.js';
 import type { ReleaseOverlayRepo } from '../repos/release-overlay.js';
-import { ManifestRepo } from '../repos/manifest.js';
+import { ManifestRepo, computeManifestHashFromJson } from '../repos/manifest.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 import { AuditChain } from '../audit/chain.js';
-import { createHash, createPublicKey, randomUUID, verify } from 'node:crypto';
+import { createPublicKey, randomUUID, verify } from 'node:crypto';
 import { selectByCanary } from '../application/canary-routing.js';
 import {
   approvalGate,
@@ -171,12 +171,10 @@ export function registerReleaseRoutes(
     const item = repo.createInOrg(parsed.data, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'capability not found' } });
 
-    // BUG-1 follow-on: a release has its own manifest distinct from
-    // any version's. Register it in manifest_dag so the maker-checker
-    // approval flow can find it by hash. Use the same raw-string
-    // SHA-256 the activation gate uses so the hash keys match.
+    // Register the release manifest under its content-addressed identity so
+    // maker-checker approvals, activation, and signing use the same hash.
     try {
-      const manifestHash = createHash('sha256').update(parsed.data.manifest).digest('hex');
+      const manifestHash = computeManifestHashFromJson(parsed.data.manifest);
       deps.manifestRepo.registerFromRaw({
         capabilityId: parsed.data.capabilityId,
         version: parsed.data.capabilityVersion,
