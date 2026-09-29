@@ -31,6 +31,7 @@ describe('DatasetRepo organization scoping', () => {
 
     const repo = new DatasetRepo(db);
     expect(repo.findByIdInOrg('dataset-a', 'org-a')?.id).toBe('dataset-a');
+    expect(repo.findCasesInOrg('dataset-a', 'org-a')?.[0]?.datasetId).toBe('dataset-a');
     expect(repo.findByIdInOrg('dataset-a', 'org-b')).toBeNull();
     expect(repo.findCasesInOrg('dataset-a', 'org-b')).toBeNull();
     expect(repo.deleteCaseInOrg('case-a', 'dataset-a', 'org-b')).toBe(false);

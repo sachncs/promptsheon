@@ -1163,7 +1163,20 @@ export const evalApi = {
     const r = await client.get<unknown>(`/eval-runs/${id}`);
     return { data: parseEvalRun(r.data) };
   },
-  create: (data: { releaseId: string; datasetId: string; scorer: string }) => client.post('/eval-runs', data),
+  create: async (data: { releaseId: string; datasetId: string; scorer: string }): Promise<{ data: EvalRun }> => {
+    const r = await client.post<unknown>('/eval-runs', data);
+    return { data: parseEvalRun(r.data) };
+  },
+  run: async (data: { evalRunId: string; getActualUrl: string }): Promise<{ data: EvalRun }> => {
+    const r = await client.post<unknown>('/eval/run', data, { timeout: 130_000 });
+    return { data: parseEvalRun(r.data) };
+  },
+  evaluators: async (): Promise<{ data: string[] }> => {
+    const r = await client.get<unknown>('/eval/evaluators');
+    const parsed = z.object({ evaluators: z.array(z.string().min(1)) }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid evaluator data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data.evaluators };
+  },
   getResults: async (id: string): Promise<{ data: EvalResult[] }> => {
     const r = await client.get<unknown>(`/eval-runs/${id}/results`);
     return { data: parseEvalResults(r.data) };

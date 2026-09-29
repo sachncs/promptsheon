@@ -30,6 +30,9 @@ const styles: Record<StatusKind, { dot: string; ring: string; text: string; labe
 /** Convert an untrusted API status into a renderable, accessible status kind. */
 export function statusKindOf(value: unknown, fallback: StatusKind = 'neutral'): StatusKind {
   if (typeof value !== 'string') return fallback;
+  if (value === 'passed') return 'active';
+  if (value === 'failed') return 'rejected';
+  if (value === 'running') return 'pending';
   return Object.prototype.hasOwnProperty.call(styles, value) ? (value as StatusKind) : fallback;
 }
 

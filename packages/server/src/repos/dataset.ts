@@ -72,7 +72,8 @@ export class DatasetRepo extends BaseRepo<Dataset> {
 
   findCases(datasetId: string): DatasetCase[] {
     return this.db.prepare('SELECT * FROM dataset_cases WHERE dataset_id = ? ORDER BY seq')
-      .all(datasetId) as DatasetCase[];
+      .all(datasetId)
+      .map((row) => camelize(row as Record<string, unknown>) as unknown as DatasetCase);
   }
 
   findCasesInOrg(datasetId: string, organizationId: string): DatasetCase[] | null {
