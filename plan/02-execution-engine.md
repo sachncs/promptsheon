@@ -86,11 +86,15 @@ Implemented in the current Phase 2 slice:
 - Provider-neutral router adapter injection for durable tool-free nodes, with
   validated response normalization and abort propagation.
 - Registered Strands tools are filtered through the specification allowlist and
-  denied at the pre-tool hook boundary; queue throughput coverage exercises
-  250 durable claims without duplicate ownership.
+  denied at the pre-tool hook boundary. Durable execution now injects a
+  process-scoped tool registry plus an execution-scoped authorizer that also
+  enforces organization, execution, and immutable specification allowlists.
+- Queue throughput coverage exercises 250 durable claims without duplicate
+  ownership, and a two-worker SQLite contention regression covers shared queue
+  ownership under concurrent polling.
 
 Remaining exit-gate work includes provider-backed execution for nodes that
-actually invoke tools, end-to-end ToolAdapter registration and authorization,
+actually invoke tools, registration of concrete production ToolAdapters,
 deeper SQLite contention benchmarks, and final verification after those
 changes. Circuit breakers now protect both the gateway provider path and
 durable node invocations.
