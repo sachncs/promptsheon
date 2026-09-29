@@ -35,6 +35,8 @@ jobs:
         run: pnpm --dir site exec astro check
       - name: public site build
         run: pnpm --dir site build
+      - name: documentation link check
+        run: pnpm check:docs
 
   test:
     name: Server Tests
