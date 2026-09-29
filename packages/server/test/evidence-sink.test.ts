@@ -23,6 +23,7 @@ describe('AsyncEvidenceSink', () => {
     sink.record(input('model.called', 'model-2'));
     sink.record(input('model.called', 'model-3'));
     sink.record(input('execution.failed', 'failed'));
+    expect(sink.metrics().dropped).toBe(1);
     await sink.flush();
     expect(written.map((record) => record.correlationId)).toEqual(['model-3', 'failed']);
   });
@@ -31,5 +32,6 @@ describe('AsyncEvidenceSink', () => {
     const sink = new AsyncEvidenceSink({ append: () => { throw new Error('telemetry unavailable'); } });
     sink.record(input('error.observed', 'error'));
     await expect(sink.flush()).resolves.toBeUndefined();
+    expect(sink.metrics().writeFailures).toBe(1);
   });
 });
