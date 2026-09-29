@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { walkOnboarding } from './helpers/walk-onboarding';
 
 test.describe('tier 5: editor', () => {
-  test('pick "Customer support triage" template seeds 4 nodes in the canvas', async ({ page, baseURL }) => {
+  test('pick "Customer support triage" template seeds 4 nodes in the canvas', async ({ page }) => {
     test.setTimeout(60_000);
     await walkOnboarding(page);
 

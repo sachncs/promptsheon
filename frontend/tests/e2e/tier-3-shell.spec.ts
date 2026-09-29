@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { walkOnboarding } from './helpers/walk-onboarding';
 
 test.describe('tier 3: app shell after onboarding', () => {
-  test('walks real onboarding and lands on /app with all sub-routes reachable', async ({ page, baseURL }) => {
+  test('walks real onboarding and lands on /app with all sub-routes reachable', async ({ page }) => {
     test.setTimeout(60_000);
 
     await walkOnboarding(page);

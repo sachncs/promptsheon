@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { walkOnboarding } from './helpers/walk-onboarding';
 
 test.describe('tier 6: audit + releases', () => {
-  test('audit: clicking a row opens the drawer with the hash chip', async ({ page, baseURL }) => {
+  test('audit: clicking a row opens the drawer with the hash chip', async ({ page }) => {
     test.setTimeout(60_000);
     await walkOnboarding(page);
 
@@ -15,7 +15,7 @@ test.describe('tier 6: audit + releases', () => {
     await expect(page.locator('[role="dialog"]').filter({ hasText: /hash/i }).first()).toBeVisible({ timeout: 5_000 });
   });
 
-  test('releases: list page renders without redirecting to /onboarding', async ({ page, baseURL }) => {
+  test('releases: list page renders without redirecting to /onboarding', async ({ page }) => {
     test.setTimeout(60_000);
     await walkOnboarding(page);
     await page.goto('/app/releases');
