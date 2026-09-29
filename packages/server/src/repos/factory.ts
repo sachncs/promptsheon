@@ -41,6 +41,7 @@ import { OutgoingWebhookRepo } from './outgoing-webhook.js';
 import { IdempotencyRepo } from './idempotency.js';
 import { ReleaseOverlayRepo } from './release-overlay.js';
 import { SearchRepo } from './search.js';
+import type { AgentSpecificationRepo } from './agent-specification.js';
 
 /**
  * Bundle of every repo in the server. Built once from a
@@ -95,6 +96,8 @@ export interface Repos {
   releaseOverlay: ReleaseOverlayRepo;
   idempotency: IdempotencyRepo;
   search: SearchRepo;
+  /** Installed by the composition root after the CAS path is initialized. */
+  agentSpecification?: AgentSpecificationRepo;
 }
 
 /**
@@ -177,5 +180,6 @@ export { FeatureFlagRepo } from './feature-flag.js';
 export { SystemConfigRepo } from './system-config.js';
 export { IdempotencyRepo } from './idempotency.js';
 export { ManifestRepo, computeManifestHash } from './manifest.js';
+export { AgentSpecificationRepo } from './agent-specification.js';
 export type { CutoverReport } from './manifest.js';
 export { OrgRepo, TeamRepo, MembershipRepo } from './org.js';

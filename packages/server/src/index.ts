@@ -36,6 +36,7 @@ import { IdentityService } from './application/identity-service.js';
 import { RepositoryService } from './application/repository-service.js';
 import { ReleaseService } from './application/release-service.js';
 import { AgentIdentityRepo } from './repos/agent-identity.js';
+import { AgentSpecificationRepo } from './repos/agent-specification.js';
 import type { Agent } from '@strands-agents/sdk';
 import type Database from 'better-sqlite3';
 
@@ -168,6 +169,7 @@ async function main() {
 
   const casStore = new CasStore(config.server.casPath);
   await casStore.init();
+  repos.agentSpecification = new AgentSpecificationRepo(db, casStore);
 
   setupObservability(config);
   await setupPolicy(config.server.policyFile);

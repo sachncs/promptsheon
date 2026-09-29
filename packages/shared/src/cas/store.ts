@@ -1,8 +1,8 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { gzip, gunzip } from 'node:zlib';
 import { promisify } from 'node:util';
 import { join } from 'node:path';
-import { mkdir, readFile, writeFile, stat, rename } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, stat, rename, unlink, open } from 'node:fs/promises';
 import type { CasObject } from './types.js';
 
 const gzipAsync = promisify(gzip);
@@ -27,6 +27,14 @@ export class CasStore {
 
   async writeObject(obj: CasObject): Promise<string> {
     const data = Buffer.from(JSON.stringify(obj));
+    return this.writeBlob(data);
+  }
+
+  /** Store immutable bytes under their SHA-256 content address. */
+  async writeBlob(data: Buffer): Promise<string> {
+    if (data.length > MAX_OBJECT_INFLATED_BYTES) {
+      throw new Error('object exceeds maximum inflated size');
+    }
     const hash = createHash('sha256').update(data).digest('hex');
     const dir = join(this.objectsDir, hash.slice(0, 2));
     const filePath = join(dir, hash.slice(2));
@@ -40,13 +48,35 @@ export class CasStore {
 
     await mkdir(dir, { recursive: true });
     const gzipped = await gzipAsync(data);
-    const tmpPath = filePath + '.tmp';
-    await writeFile(tmpPath, gzipped);
-    await rename(tmpPath, filePath);
+    const tmpPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+    const handle = await open(tmpPath, 'wx');
+    try {
+      await handle.writeFile(gzipped);
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    try {
+      await rename(tmpPath, filePath);
+    } catch (error) {
+      try {
+        await stat(filePath);
+        await unlink(tmpPath);
+      } catch {
+        throw error;
+      }
+    }
     return hash;
   }
 
   async readObject(hash: string): Promise<CasObject> {
+    const data = await this.readBlob(hash);
+    const obj: CasObject = JSON.parse(data.toString());
+    return obj;
+  }
+
+  /** Read and integrity-check immutable bytes from the CAS. */
+  async readBlob(hash: string): Promise<Buffer> {
     if (!/^[0-9a-f]{64}$/.test(hash)) {
       throw new Error(`invalid hash: ${hash}`);
     }
@@ -63,13 +93,12 @@ export class CasStore {
       throw new Error('object exceeds maximum inflated size');
     }
 
-    const obj: CasObject = JSON.parse(data.toString());
-    const computed = createHash('sha256').update(Buffer.from(JSON.stringify(obj))).digest('hex');
+    const computed = createHash('sha256').update(data).digest('hex');
     if (computed !== hash) {
       throw new Error(`object corruption: expected ${hash}, got ${computed}`);
     }
 
-    return obj;
+    return data;
   }
 
   async objectHash(obj: CasObject): Promise<string> {
