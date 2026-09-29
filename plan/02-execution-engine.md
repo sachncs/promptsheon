@@ -92,6 +92,8 @@ Implemented in the current Phase 2 slice:
 - Queue throughput coverage exercises 250 durable claims without duplicate
   ownership, and a two-worker SQLite contention regression covers shared queue
   ownership under concurrent polling.
+- Provider and registered-tool calls are bounded by cancellation-aware
+  concurrency gates and independently protected by circuit breakers.
 
 Remaining exit-gate work includes provider-backed execution for nodes that
 actually invoke tools, registration of concrete production ToolAdapters,

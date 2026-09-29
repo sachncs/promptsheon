@@ -24,6 +24,13 @@ retry backoff with jitter, input/token/cost/wall-clock budgets, and an
 `AbortSignal` propagated to the execution adapter. Queue depth, state counts,
 and oldest queued time are available from `GET /api/execution-jobs/metrics`.
 
+The executor also applies process-local provider and tool concurrency gates.
+Provider calls default to eight concurrent operations per provider and tool
+calls default to sixteen per provider/tool pair. Queued waits are cancelled
+with the execution signal. Provider and tool calls use independent circuit
+breakers so a failing dependency does not consume the entire executor's
+capacity.
+
 Multi-step DAG executions persist one checkpoint per node. A recovered job
 loads completed checkpoints by execution ID and skips those nodes, avoiding
 duplicate completed work after a crash. Checkpoint output is retained for
@@ -37,5 +44,6 @@ Operational invariants:
   period or recovery will be delayed.
 - Increasing concurrency requires observing queue age, SQLite contention, model
   provider saturation, and budget-exhaustion rates together.
-- Provider/tool adapters should wrap calls in the shared `CircuitBreaker` and
-  classify failures before handing them to the worker retry policy.
+- Provider/tool adapters are wrapped by the executor's shared
+  `CircuitBreaker` and concurrency gates; adapter failures should still be
+  classified before handing them to the worker retry policy.
