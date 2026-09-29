@@ -146,12 +146,13 @@ async function main() {
     const requestId = request.requestId;
     const startTime = request.requestStartTime ?? Date.now();
     app.log.info({
+      event: 'http.request.completed',
       requestId,
       method: request.method,
       url: request.url,
       status: reply.statusCode,
       durationMs: Date.now() - startTime,
-    }, 'request');
+    }, 'http.request.completed');
   });
 
   await app.register(rateLimit, {
@@ -414,10 +415,10 @@ async function main() {
   const port = config.server.port;
   const host = config.server.host;
   await app.listen({ port, host });
-  app.log.info(`Promptsheon server listening on ${host}:${port}`);
+  app.log.info({ event: 'server.started', host, port }, 'server.started');
 
   const shutdown = async (signal: string) => {
-    app.log.info(`Received ${signal}, shutting down gracefully`);
+    app.log.info({ event: 'server.stopping', signal }, 'server.stopping');
     scheduler.stop();
     await durableWorker.stop();
     retention.stop();
