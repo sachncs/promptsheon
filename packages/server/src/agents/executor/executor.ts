@@ -51,6 +51,8 @@ export interface ExecuteOptions {
   traceId?: string;
   signal?: AbortSignal;
   organizationId?: string;
+  toolRegistry?: ToolRegistry;
+  toolAuthorizer?: ToolAuthorizer;
   /**
    * Optional trace_run id. If supplied, the metrics hooks mirror
    * per-node span rows under this trace; otherwise the execution
@@ -291,18 +293,20 @@ export class ManifestGraphExecutor {
             metrics: { accumulatedUsage: { totalTokens: response.promptTokens + response.completionTokens, costUsd: response.costUsd } },
           };
         } else {
-          const toolAdapters = this.deps.toolRegistry
-            ? node.manifest.tools.map((tool) => this.deps.toolRegistry!.get(tool.name)).filter((tool): tool is NonNullable<typeof tool> => tool !== null)
+          const toolRegistry = options.toolRegistry ?? this.deps.toolRegistry;
+          const toolAuthorizer = options.toolAuthorizer ?? this.deps.toolAuthorizer;
+          const toolAdapters = toolRegistry
+            ? node.manifest.tools.map((tool) => toolRegistry.get(tool.name)).filter((tool): tool is NonNullable<typeof tool> => tool !== null)
             : [];
           const agent = buildNodeAgent(node, this.deps.config, {
             ...(perNodeHookCtx ? { metricsHookCtx: perNodeHookCtx } : {}),
             toolAdapters,
-            ...(this.deps.toolRegistry && this.deps.toolAuthorizer && options.organizationId ? {
-              invokeTool: (name, input, signal) => this.deps.toolRegistry!.invoke(name, input, {
+            ...(toolRegistry && toolAuthorizer && options.organizationId ? {
+              invokeTool: (name, input, signal) => toolRegistry.invoke(name, input, {
                 organizationId: options.organizationId!,
                 executionId: options.executionId,
                 signal,
-              }, this.deps.toolAuthorizer!),
+              }, toolAuthorizer),
             } : {}),
           });
           this.liveAgents.set(agentKey, agent);

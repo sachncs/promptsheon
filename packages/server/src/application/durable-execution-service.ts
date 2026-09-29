@@ -7,6 +7,7 @@ import { z } from 'zod';
 import type { ExecutionCheckpointRepo } from '../repos/execution-checkpoint.js';
 import { ExecutionTimeoutError } from '../agents/executor/executor.js';
 import { ExecutionWorkError } from './durable-execution-worker.js';
+import type { ToolAuthorizer, ToolRegistry } from './execution-ports.js';
 
 export class ExecutionWorkspaceScopeError extends Error {
   constructor(jobId: string, workspaceId: string) {
@@ -24,6 +25,8 @@ interface ManifestRunner {
     executionId: string;
     inputs: Record<string, unknown>;
     organizationId?: string;
+    toolRegistry?: ToolRegistry;
+    toolAuthorizer?: ToolAuthorizer;
     signal?: AbortSignal;
     checkpoints?: {
       list(executionId: string): Promise<Array<{ stepId: string; state: 'completed' | 'failed'; output: string }>>;
@@ -40,6 +43,8 @@ export class DurableExecutionService {
     private readonly manifests: ManifestStore,
     private readonly runner: ManifestRunner,
     private readonly checkpoints: ExecutionCheckpointRepo,
+    private readonly tools?: ToolRegistry,
+    private readonly toolAuthorizer?: ToolAuthorizer,
   ) {}
 
   enqueue(input: {
@@ -90,10 +95,25 @@ export class DurableExecutionService {
           throw new ExecutionWorkError('input token budget exhausted');
         }
         try {
-          const result = await this.runner.execute(job.agentHash, toManifest(record), {
+          const manifest = toManifest(record);
+          const allowedTools = new Set(
+            Array.isArray(manifest.metadata['allowedTools'])
+              ? manifest.metadata['allowedTools'].filter((tool): tool is string => typeof tool === 'string')
+              : [],
+          );
+          const toolAuthorizer: ToolAuthorizer = {
+            authorize: async (toolName, organizationId, executionId) => {
+              if (organizationId !== job.organizationId || executionId !== job.id) return false;
+              if (!allowedTools.has(toolName)) return false;
+              return this.toolAuthorizer?.authorize(toolName, organizationId, executionId) ?? true;
+            },
+          };
+          const result = await this.runner.execute(job.agentHash, manifest, {
             executionId: job.id,
             inputs,
             organizationId: job.organizationId,
+            ...(this.tools ? { toolRegistry: this.tools } : {}),
+            ...(this.tools ? { toolAuthorizer } : {}),
             signal: context.signal,
             checkpoints: context.checkpoint,
           });

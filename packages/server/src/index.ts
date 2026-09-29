@@ -39,6 +39,7 @@ import { AgentIdentityRepo } from './repos/agent-identity.js';
 import { AgentSpecificationRepo } from './repos/agent-specification.js';
 import { DurableExecutionService } from './application/durable-execution-service.js';
 import { RouterModelAdapter } from './application/provider-adapters.js';
+import { ToolRegistry } from './application/execution-ports.js';
 import type { Agent } from '@strands-agents/sdk';
 import type Database from 'better-sqlite3';
 
@@ -193,8 +194,9 @@ async function main() {
   const compiler = new ReasoningCompiler(config);
   const planner = new IdeaPlannerAgent(config);
   const llmRouter = new LlmRouter(config.llm.credentials);
-  const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo: repos.manifest, modelAdapter: new RouterModelAdapter(llmRouter) });
-  const durableExecution = new DurableExecutionService(repos.executionJob, repos.agentSpecification!, executor, repos.executionCheckpoint);
+  const toolRegistry = new ToolRegistry();
+  const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo: repos.manifest, modelAdapter: new RouterModelAdapter(llmRouter), toolRegistry });
+  const durableExecution = new DurableExecutionService(repos.executionJob, repos.agentSpecification!, executor, repos.executionCheckpoint, toolRegistry);
   const durableWorker = durableExecution.createWorker();
   durableWorker.start();
   const autoEval = new AutoEval({ traceRepo: repos.trace, scoreRepo: repos.traceScore, router: llmRouter });
