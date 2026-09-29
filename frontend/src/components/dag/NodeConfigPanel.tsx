@@ -84,6 +84,28 @@ export function NodeConfigPanel({ selectedNodeId, manifest, onChange }: NodeConf
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
+            <Label htmlFor="node-provider">Provider</Label>
+            <select
+              id="node-provider"
+              value={node.manifest.model.provider}
+              onChange={(e) =>
+                updateNode({
+                  manifest: {
+                    ...node.manifest,
+                    model: { ...node.manifest.model, provider: e.target.value },
+                  },
+                })
+              }
+              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+            >
+              <option value="custom">Custom / NVIDIA</option>
+              <option value="simulated">Simulated</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="bedrock">Bedrock</option>
+            </select>
+          </div>
+          <div>
             <Label htmlFor="node-model">Model</Label>
             <Input
               id="node-model"

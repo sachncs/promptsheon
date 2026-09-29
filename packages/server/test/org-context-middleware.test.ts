@@ -123,6 +123,25 @@ describe('orgContextMiddleware', () => {
     const row = db.prepare("SELECT * FROM org_members WHERE org_id = 'o1' AND user_id = 'u1'").get();
     expect(row).toBeDefined();
   });
+
+  it('scopes the local development system principal to the first organization', async () => {
+    const isolated = Fastify();
+    isolated.addHook('preHandler', async (request) => {
+      request.principal = { type: 'System', id: 'development' } satisfies Principal;
+      request.orgContextBypass = true;
+    });
+    isolated.addHook('preHandler', orgContextMiddleware({
+      membershipRepo,
+      systemOrganizationId: () => orgId,
+    }));
+    isolated.get('/api/whoami', async (request) => getOrgContext(request));
+    await isolated.ready();
+
+    const response = await isolated.inject({ method: 'GET', url: '/api/whoami' });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ userId: 'development', orgId, role: 'admin' });
+    await isolated.close();
+  });
 });
 
 describe('requireRole', () => {

@@ -6,6 +6,7 @@ export const BootstrapStatusSchema = z.object({
   needsAdmin: z.boolean(),
   needsLlm: z.boolean(),
   provider: z.string().nullable(),
+  model: z.string().nullable(),
   adminEmail: z.string().nullable(),
 });
 

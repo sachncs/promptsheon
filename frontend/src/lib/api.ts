@@ -1063,8 +1063,8 @@ export const executionApi = {
     const r = await client.get<unknown>(`/executions/${id}`);
     return { data: parseExecution(r.data) };
   },
-  execute: (data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string }) =>
-    client.post('/executions', data),
+  execute: (data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string; preview?: boolean }) =>
+    client.post('/executions', data, { timeout: 130_000 }),
   replay: (id: string) => client.post(`/executions/${id}/replay`),
   replays: (id: string) => client.get(`/executions/${id}/replays`),
   /**

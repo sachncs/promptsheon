@@ -20,6 +20,8 @@ import {
 import { DagCanvas } from '@/components/dag/DagCanvas';
 import { NodeConfigPanel } from '@/components/dag/NodeConfigPanel';
 import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
+import { bootstrapApi } from '@/lib/bootstrap';
 import type { Manifest, SubCapabilityManifest } from '@promptsheon/shared';
 import type { Edge } from '@xyflow/react';
 
@@ -63,10 +65,12 @@ function makeLeafManifest(id: string, name: string, goal: string): SubCapability
 
 export default function ManifestEditorPage() {
   const session = useRequireSession();
-  const params = useParams<{ hash?: string }>();
-  const hash = params?.hash;
+  const params = useParams<{ hash?: string | string[] }>();
+  const rawHash = params?.hash;
+  const hash = Array.isArray(rawHash) ? rawHash[0] : rawHash;
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [manifest, setManifest] = React.useState<Manifest>(blankManifest);
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
 
@@ -74,6 +78,12 @@ export default function ManifestEditorPage() {
     queryKey: ['manifest', hash],
     queryFn: () => manifestApi.getByHash(hash!).then((r) => r.data),
     enabled: Boolean(session && hash),
+  });
+  const { data: bootstrap } = useQuery({
+    queryKey: ['bootstrap', 'status'],
+    queryFn: bootstrapApi.status,
+    enabled: Boolean(session),
+    staleTime: 60_000,
   });
 
   React.useEffect(() => {
@@ -157,10 +167,22 @@ export default function ManifestEditorPage() {
   const runPreviewMutation = useMutation({
     mutationFn: () =>
       executionApi
-        .execute({ manifestHash: hash ?? '', inputs: { preview: true } })
-        .then((r: { data: { executionId: string } }) => r.data),
-    onSuccess: (data: { executionId: string }) => {
+        .execute({ manifestHash: hash ?? '', inputs: { input: 'Summarize this customer support request and identify its urgency.', preview: true }, preview: true })
+        .then((r: { data: { executionId: string; preview?: boolean; status?: string; nodeResults?: Record<string, unknown> } }) => r.data),
+    onSuccess: (data: { executionId: string; preview?: boolean; status?: string; nodeResults?: Record<string, unknown> }) => {
+      if (data.preview) {
+        toast({
+          title: 'Preview completed',
+          description: `${data.status ?? 'completed'} · ${Object.keys(data.nodeResults ?? {}).length} nodes recorded in traces.`,
+          variant: 'success',
+        });
+        router.push('/app/traces');
+        return;
+      }
       router.push(`/app/executions/${data.executionId}`);
+    },
+    onError: (error: unknown) => {
+      toast({ title: 'Preview failed', description: getErrorMessage(error), variant: 'destructive' });
     },
   });
 
@@ -171,8 +193,6 @@ export default function ManifestEditorPage() {
 
   const isValid = validationErrors.length === 0;
   const [fullscreen, setFullscreen] = React.useState(false);
-  const { toast } = useToast();
-
   if (!session) return null;
   if (loadError) {
     return <QueryError message={loadErrorDetail} onRetry={() => void refetchManifest()} />;
@@ -226,7 +246,17 @@ export default function ManifestEditorPage() {
   const applyTemplate = (templateId: string) => {
     const tpl = TEMPLATES.find((t) => t.id === templateId);
     if (!tpl) return;
-    setManifest(tpl.build());
+    const next = tpl.build();
+    const provider = bootstrap?.provider;
+    const modelId = bootstrap?.model;
+    setManifest({
+      ...next,
+      ...(provider && modelId ? { model: { ...next.model, provider, modelId } } : {}),
+      nodes: next.nodes.map((node) => ({
+        ...node,
+        ...(provider && modelId ? { manifest: { ...node.manifest, model: { ...node.manifest.model, provider, modelId } } } : {}),
+      })),
+    });
     setSelectedNodeId(null);
     toast({ title: `Template applied: ${tpl.label}`, variant: 'success', description: tpl.description });
   };

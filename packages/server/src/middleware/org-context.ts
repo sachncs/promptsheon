@@ -26,12 +26,25 @@ export interface OrgContext {
  *
  */
 export function orgContextMiddleware(
-  deps: { membershipRepo: MembershipRepo },
+  deps: {
+    membershipRepo: MembershipRepo;
+    systemOrganizationId?: () => string | undefined;
+  },
 ) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
+    const principal = request.principal;
+    if (principal?.type === 'System' && deps.systemOrganizationId) {
+      const orgId = deps.systemOrganizationId();
+      if (!orgId) {
+        return reply.code(503).send({
+          error: { code: 'SYSTEM_ORG_UNAVAILABLE', message: 'No local organization is available for the development principal' },
+        });
+      }
+      request.orgContext = { userId: principal.id, orgId, role: 'admin' };
+      return;
+    }
     if (request.orgContextBypass) return;
 
-    const principal = request.principal;
     if (!principal || principal.type === 'Agent' || principal.type === 'System') {
       return reply.code(401).send({ error: { code: 'MISSING_ORG_CONTEXT', message: 'authenticated organization context required' } });
     }

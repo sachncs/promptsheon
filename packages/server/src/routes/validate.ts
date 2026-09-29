@@ -57,6 +57,7 @@ function parse<S extends z.ZodTypeAny>(
 ): Parsed<z.infer<S>> | Failed {
   const result = schema.safeParse(input);
   if (result.success) return { ok: true, data: result.data };
+  reply.log.warn({ issues: result.error.issues }, 'request schema validation failed');
   reply.code(422).send({
     error: {
       code: 'VALIDATION_ERROR',

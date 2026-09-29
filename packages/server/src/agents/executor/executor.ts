@@ -134,14 +134,19 @@ export class ManifestGraphExecutor {
           traceRunId: (options as { traceRunId?: string }).traceRunId,
         }
       : undefined;
-    // Validate DAG via buildGraph (which constructs a Strands Graph
-    // and runs validateDag() during construction). The Graph is built
-    // for type/dag validation; per-node execution happens in the
+    // Validate the DAG before execution. Avoid constructing a second
+    // provider-backed Strands graph when the provider-neutral adapter
+    // owns model invocation; doing so can reject a valid configured
+    // provider before the adapter is reached. The Graph is still built
+    // when no adapter is supplied for the direct Strands execution path.
+    // Per-node execution happens in the
     // loop below so the domain-specific guardrail/cost-cap/chaos/
     // metrics/SSE-event semantics can be applied between Strands
     // calls — a single Strands Graph.invoke() would drop all of
     // these observability + safety surfaces.
-    buildGraph(manifest, this.deps.config, metricsHookCtx ? { metricsHookCtx } : {});
+    if (!this.deps.modelAdapter) {
+      buildGraph(manifest, this.deps.config, metricsHookCtx ? { metricsHookCtx } : {});
+    }
     const startedAt = new Date().toISOString();
     const broadcast: GuardrailBroadcast = { hub: this.deps.hub, config: this.deps.config };
 

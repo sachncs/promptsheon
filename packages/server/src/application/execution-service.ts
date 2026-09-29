@@ -22,11 +22,15 @@ export interface ExecutionRunOptions {
   environment: string;
   traceId?: string;
   signal?: AbortSignal;
+  /** Allow a saved draft to run before it has an active release. */
+  preview?: boolean;
 }
 
 /** Port for loading an organization-owned manifest. */
 export interface ExecutionManifestStore {
   findByHashInOrg(hash: string, organizationId: string): Manifest | null;
+  /** Global CAS lookup used only for explicitly requested unbound previews. */
+  findByHash?(hash: string): Manifest | null;
 }
 
 /** Port for selecting active releases for an organization-owned manifest. */
@@ -41,13 +45,14 @@ export interface ExecutionReleaseStore {
 export interface ExecutionTraceStore {
   startRun(input: {
     organizationId: string;
-    executionId: string;
+    executionId?: string;
     environment: string;
     name: string;
     model: string | null;
     attributes: Record<string, unknown>;
   }): { id: string };
   finalize(id: string, status: 'success' | 'error', totals: { tokens: number; costUsd: number }): void;
+  attachExecution?(traceRunId: string, executionId: string): void;
 }
 
 /** Port for running a manifest without coupling the use case to an agent SDK. */
@@ -86,7 +91,7 @@ export interface ExecutionRecordStore {
 export type ExecutionRunResult =
   | { kind: 'manifest-not-found' }
   | { kind: 'no-active-release' }
-  | { kind: 'success'; trace: ExecutionTrace; pickedReleaseId: string };
+  | { kind: 'success'; trace: ExecutionTrace; pickedReleaseId: string | null };
 
 /** Coordinates manifest lookup, canary selection, execution, tracing, and persistence. */
 export class ExecutionService {
@@ -104,16 +109,20 @@ export class ExecutionService {
     organizationId: string,
     options: ExecutionRunOptions,
   ): Promise<ExecutionRunResult> {
-    const manifest = this.manifests.findByHashInOrg(manifestHash, organizationId);
+    let manifest = this.manifests.findByHashInOrg(manifestHash, organizationId);
+    if (!manifest && options.preview && this.manifests.findByHash) {
+      const draft = this.manifests.findByHash(manifestHash);
+      const capabilityId = draft?.metadata['capabilityId'];
+      if (draft && (capabilityId === '' || capabilityId === 'unknown')) manifest = draft;
+    }
     if (!manifest) return { kind: 'manifest-not-found' };
 
     const activeReleases = this.releases.findActiveByManifestHashInOrg(manifestHash, organizationId);
     const pickedReleaseId = this.selectRelease(activeReleases);
-    if (!pickedReleaseId) return { kind: 'no-active-release' };
+    if (!pickedReleaseId && !options.preview) return { kind: 'no-active-release' };
 
     const traceRun = this.traces.startRun({
       organizationId,
-      executionId: options.executionId,
       environment: options.environment,
       name: `manifest:${manifestHash.slice(0, 12)}`,
       model: manifest.model?.modelId ?? null,
@@ -132,8 +141,9 @@ export class ExecutionService {
       tokens: trace.totalTokens,
       costUsd: trace.totalCost,
     });
-    this.records.create({
-      capabilityVersionId: manifest.id,
+    const capabilityId = manifest.metadata['capabilityId'];
+    const record = this.records.create({
+      capabilityVersionId: typeof capabilityId === 'string' && capabilityId ? manifest.id : null,
       inputs: JSON.stringify(options.inputs),
       inputHash: hashInputs(options.inputs),
       outputs: JSON.stringify(trace.nodeResults),
@@ -148,8 +158,15 @@ export class ExecutionService {
       traceId: options.traceId ?? options.executionId,
       environment: options.environment,
     });
+    if (this.traces.attachExecution && isExecutionRecord(record)) {
+      this.traces.attachExecution(traceRun.id, record.id);
+    }
     return { kind: 'success', trace, pickedReleaseId };
   }
+}
+
+function isExecutionRecord(value: unknown): value is { id: string } {
+  return typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'string';
 }
 
 function hashInputs(inputs: Record<string, unknown>): string {

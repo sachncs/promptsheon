@@ -49,7 +49,10 @@ export interface LlmCompleteResult {
 }
 
 export class LlmRouter {
-  constructor(private readonly credentials?: LlmCredentials) {}
+  constructor(
+    private readonly credentials?: LlmCredentials,
+    private readonly baseUrl?: string,
+  ) {}
 
   async probe(req: LlmProbeRequest): Promise<LlmProbeResult> {
     const started = Date.now();
@@ -180,8 +183,8 @@ export class LlmRouter {
   }
 
   private async completeCustom(req: LlmCompleteRequest, promptTokens: number): Promise<string> {
-    const base = (req.baseUrl ?? '').replace(/\/$/, '');
-    const apiKey = req.apiKey ?? '';
+    const base = (req.baseUrl ?? this.baseUrl ?? '').replace(/\/$/, '');
+    const apiKey = req.apiKey ?? this.credentials?.customApiKey ?? '';
     if (!base || !apiKey) throw new Error('Custom provider requires baseUrl + apiKey');
     const isAnthropicStyle = /anthropic|minimax/i.test(base);
     if (isAnthropicStyle) {

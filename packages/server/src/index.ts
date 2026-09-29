@@ -211,7 +211,7 @@ async function main() {
   const evolutionAgent = new EvolutionAgent(config, { cas: casStore });
   const compiler = new ReasoningCompiler(config);
   const planner = new IdeaPlannerAgent(config);
-  const llmRouter = new LlmRouter(config.llm.credentials);
+  const llmRouter = new LlmRouter(config.llm.credentials, config.llm.baseUrl);
   const toolRegistry = new ToolRegistry();
   const evidenceSink = new AsyncEvidenceSink(repos.evidence);
   app.addHook('onClose', async () => { await evidenceSink.flush(); });
@@ -280,7 +280,10 @@ async function main() {
       ? { svidPublicKeyPem: config.auth.svidPublicKeyPem }
       : {}),
   );
-  app.addHook('preHandler', orgContextMiddleware({ membershipRepo: repos.membership }));
+  app.addHook('preHandler', orgContextMiddleware({
+    membershipRepo: repos.membership,
+    systemOrganizationId: () => repos.org.findMany({ page: 1, pageSize: 1 }).items[0]?.id,
+  }));
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
     if (error.name === 'NotFoundError') {
@@ -290,6 +293,7 @@ async function main() {
       return reply.code(error.statusCode).send({ error: { code: 'APP_ERROR', message: error.message } });
     }
     if (error.message.includes('Validation') || error.message.includes('ZodError')) {
+      app.log.warn({ errorName: error.name, message: error.message }, 'request validation failed');
       return reply.code(422).send({ error: { code: 'VALIDATION_ERROR', message: error.message } });
     }
     app.log.error(error);

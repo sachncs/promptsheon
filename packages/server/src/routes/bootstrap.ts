@@ -97,12 +97,14 @@ export function registerBootstrapRoutes(
     const users = deps.userRepo.list();
     const adminExists = users.some((u) => u.role === 'admin');
     const provider = await deps.settingsResolver.get<string>('llm.provider').catch(() => undefined);
+    const model = await deps.settingsResolver.get<string>('llm.model').catch(() => undefined);
     const hasKey = await deps.llmSettings.hasCredentials(provider).catch(() => false);
 
     return reply.send({
       needsAdmin: !adminExists,
       needsLlm: !provider || !hasKey,
       provider: provider ?? null,
+      model: model ?? null,
       adminEmail: users.find((u) => u.role === 'admin')?.email ?? null,
     });
   });

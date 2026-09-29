@@ -24,6 +24,7 @@ const ExecuteManifestSchema = z.object({
   inputs: z.record(z.string(), z.unknown()),
   environment: z.string().optional().default('dev'),
   traceId: z.string().optional(),
+  preview: z.boolean().default(false),
 });
 
 const ExecutionParamsSchema = z.object({
@@ -77,7 +78,7 @@ export function registerExecutionRoutes(
   app.post('/api/executions', async (request, reply) => {
     const parsed = parseBody(reply, ExecuteManifestSchema, request.body);
     if (!parsed.ok) return;
-    const { manifestHash, inputs, environment, traceId } = parsed.data;
+    const { manifestHash, inputs, environment, traceId, preview } = parsed.data;
     const organizationId = requireOrganization(request, reply);
     if (!organizationId) return;
 
@@ -109,6 +110,7 @@ export function registerExecutionRoutes(
         inputs,
         environment,
         traceId,
+        preview,
         signal: controller.signal,
       });
       if (result.kind === 'manifest-not-found') throw new NotFoundError('manifest', manifestHash);
@@ -139,7 +141,7 @@ export function registerExecutionRoutes(
       return reply;
     }
 
-    return reply.send({ ...trace.trace, pickedReleaseId: trace.pickedReleaseId });
+    return reply.send({ ...trace.trace, pickedReleaseId: trace.pickedReleaseId, preview: preview && trace.pickedReleaseId === null });
   });
 
   /**

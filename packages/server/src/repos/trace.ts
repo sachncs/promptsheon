@@ -186,6 +186,11 @@ export class TraceRepo extends BaseRepo<TraceRun> {
     return this.findById(id)!;
   }
 
+  /** Attach the execution row after it has been persisted. */
+  attachExecution(traceRunId: string, executionId: string): void {
+    this.db.prepare('UPDATE trace_runs SET execution_id = ? WHERE id = ?').run(executionId, traceRunId);
+  }
+
   finalize(
     id: string,
     status: 'success' | 'error',
