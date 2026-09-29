@@ -216,6 +216,7 @@ async function main() {
     hub: sseHub,
     executor,
     cas: casStore,
+    traceRepo: repos.trace,
   });
   const sessionStore = new SessionStore({
     storageDir: `${config.server.casPath}/sessions`,

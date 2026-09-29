@@ -9,6 +9,7 @@ import { StrandsEvaluatorAdapter } from '../evaluation/evaluator-adapter.js';
 import { EvalSuiteRunner } from '../evaluation/suite-runner.js';
 import { EvaluatorRegistry, EVALUATOR_NAMES } from '../evaluation/registry.js';
 import type { EvaluatorName } from '../evaluation/registry.js';
+import type { TraceRepo } from '../../repos/trace.js';
 
 export interface EvolutionSnapshot {
   iteration: number;
@@ -85,7 +86,7 @@ export class GoalBasedEvolutionAgent {
   private evaluatorRegistry: EvaluatorRegistry;
 
   constructor(
-    private deps: { config: AppConfig; hub: SseHub; executor: ManifestGraphExecutor; cas: CasStore },
+    private deps: { config: AppConfig; hub: SseHub; executor: ManifestGraphExecutor; cas: CasStore; traceRepo?: TraceRepo },
   ) {
     this.revisionAgent = new Agent({
       id: 'goalRevisioner',
@@ -159,11 +160,27 @@ Be conservative: small targeted edits, preserve what works.`,
         timestamp: new Date().toISOString(),
       });
 
-      const trace = await this.deps.executor.execute(currentHash, currentManifest, {
-        executionId: `${executionIdBase}-${i + 1}`,
-        inputs: {},
+      const executionId = `${executionIdBase}-${i + 1}`;
+      const traceRun = this.deps.traceRepo?.startRun({
+        organizationId: 'unscoped',
+        name: `evolution:${executionId}`,
         environment: 'dev',
+        model: currentManifest.model?.modelId ?? null,
+        attributes: { manifestHash: currentHash, route: 'goal-evolution', executionId },
       });
+      let trace;
+      try {
+        trace = await this.deps.executor.execute(currentHash, currentManifest, {
+          executionId,
+          inputs: {},
+          environment: 'dev',
+          ...(traceRun ? { traceRunId: traceRun.id } : {}),
+        });
+        if (traceRun) this.deps.traceRepo?.finalize(traceRun.id, trace.status === 'completed' ? 'success' : 'error', { tokens: trace.totalTokens, costUsd: trace.totalCost });
+      } catch (error) {
+        if (traceRun) this.deps.traceRepo?.finalize(traceRun.id, 'error');
+        throw error;
+      }
 
       const iterCost = trace.totalCost;
       totalCost += iterCost;
