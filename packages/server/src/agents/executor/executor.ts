@@ -10,7 +10,7 @@ import { ChaosConfig, ChaosFailureError } from '../../hardening/chaos.js';
 import { checkCostCap, recordCost, type CostLimitConfig } from '../../hardening/cost-caps.js';
 import { findRedTeamMatches } from '../../hardening/redteam.js';
 import { CircuitBreaker } from '../../application/execution-resilience.js';
-import type { ModelAdapter } from '../../application/execution-ports.js';
+import type { ModelAdapter, ToolAuthorizer, ToolRegistry } from '../../application/execution-ports.js';
 
 export interface ExecutionTrace {
   executionId: string;
@@ -50,6 +50,7 @@ export interface ExecuteOptions {
   environment?: string;
   traceId?: string;
   signal?: AbortSignal;
+  organizationId?: string;
   /**
    * Optional trace_run id. If supplied, the metrics hooks mirror
    * per-node span rows under this trace; otherwise the execution
@@ -102,6 +103,8 @@ export class ManifestGraphExecutor {
       costCapabilityId?: string;
       traceRepo?: import('../../repos/trace.js').TraceRepo;
       modelAdapter?: ModelAdapter;
+      toolRegistry?: ToolRegistry;
+      toolAuthorizer?: ToolAuthorizer;
     },
   ) {}
 
@@ -288,7 +291,20 @@ export class ManifestGraphExecutor {
             metrics: { accumulatedUsage: { totalTokens: response.promptTokens + response.completionTokens, costUsd: response.costUsd } },
           };
         } else {
-          const agent = buildNodeAgent(node, this.deps.config, perNodeHookCtx ? { metricsHookCtx: perNodeHookCtx } : {});
+          const toolAdapters = this.deps.toolRegistry
+            ? node.manifest.tools.map((tool) => this.deps.toolRegistry!.get(tool.name)).filter((tool): tool is NonNullable<typeof tool> => tool !== null)
+            : [];
+          const agent = buildNodeAgent(node, this.deps.config, {
+            ...(perNodeHookCtx ? { metricsHookCtx: perNodeHookCtx } : {}),
+            toolAdapters,
+            ...(this.deps.toolRegistry && this.deps.toolAuthorizer && options.organizationId ? {
+              invokeTool: (name, input, signal) => this.deps.toolRegistry!.invoke(name, input, {
+                organizationId: options.organizationId!,
+                executionId: options.executionId,
+                signal,
+              }, this.deps.toolAuthorizer!),
+            } : {}),
+          });
           this.liveAgents.set(agentKey, agent);
           result = await breaker.execute(() => agent.invoke(prompt, { ...(limits ? { limits } : {}), ...(options.signal ? { cancelSignal: options.signal } : {}) }));
         }

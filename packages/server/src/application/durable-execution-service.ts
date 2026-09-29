@@ -23,6 +23,7 @@ interface ManifestRunner {
   execute(hash: string, manifest: Manifest, options: {
     executionId: string;
     inputs: Record<string, unknown>;
+    organizationId?: string;
     signal?: AbortSignal;
     checkpoints?: {
       list(executionId: string): Promise<Array<{ stepId: string; state: 'completed' | 'failed'; output: string }>>;
@@ -92,6 +93,7 @@ export class DurableExecutionService {
           const result = await this.runner.execute(job.agentHash, toManifest(record), {
             executionId: job.id,
             inputs,
+            organizationId: job.organizationId,
             signal: context.signal,
             checkpoints: context.checkpoint,
           });

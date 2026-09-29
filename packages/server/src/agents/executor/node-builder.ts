@@ -1,10 +1,11 @@
-import { Agent, Graph, AfterInvocationEvent, BeforeInvocationEvent, BeforeToolCallEvent } from '@strands-agents/sdk';
+import { Agent, FunctionTool, Graph, AfterInvocationEvent, BeforeInvocationEvent, BeforeToolCallEvent } from '@strands-agents/sdk';
 import type { Graph as GraphType, HookCallback } from '@strands-agents/sdk';
 import type { AppConfig, Manifest, SubCapabilityManifest } from '@promptsheon/shared';
 import { createModel } from '../model.js';
 import { validateDag } from './dag-validator.js';
 import { NotFoundError } from '@promptsheon/shared';
 import { createMetricsHook, type MetricsHookContext } from '../../observability/metrics-hooks.js';
+import type { ToolAdapter } from '../../application/execution-ports.js';
 
 const toolRegistry = new Map<string, Agent>();
 
@@ -19,6 +20,8 @@ export function registerTool(name: string, agent: Agent): void {
 export interface BuildNodeAgentOptions {
   metricsHookCtx?: MetricsHookContext;
   extraHooks?: HookCallback<BeforeInvocationEvent | AfterInvocationEvent>[];
+  toolAdapters?: readonly ToolAdapter[];
+  invokeTool?: (name: string, input: Record<string, unknown>, signal: AbortSignal) => Promise<unknown>;
 }
 
 /**
@@ -44,11 +47,30 @@ export function buildNodeAgent(
 ): Agent {
   const conv = buildConversationManager(node.conversationManager);
   const retry = buildRetryStrategy(node.retry);
+  const adapters = new Map((options.toolAdapters ?? []).map((tool) => [tool.name, tool]));
+  const adapterTools = node.manifest.tools
+    .map((spec) => adapters.get(spec.name))
+    .filter((tool): tool is ToolAdapter => tool !== undefined)
+    .map((tool) => new FunctionTool({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      callback: async (input, context) => {
+        const record = input && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : {};
+        const output = options.invokeTool
+          ? options.invokeTool(tool.name, record, context.cancelSignal)
+          : tool.invoke(record, { organizationId: '', executionId: '', signal: context.cancelSignal });
+        return JSON.stringify(await output) ?? 'null';
+      },
+    }));
   const agent = new Agent({
     id: node.id,
     model: createModel(config),
     systemPrompt: node.manifest.prompt.systemPrompt,
-    tools: node.manifest.tools.map((tool) => toolRegistry.get(tool.name)).filter((tool): tool is Agent => tool !== undefined),
+    tools: [
+      ...node.manifest.tools.map((tool) => toolRegistry.get(tool.name)).filter((tool): tool is Agent => tool !== undefined),
+      ...adapterTools,
+    ],
     ...(conv ? { conversationManager: conv } : {}),
     ...(retry ? { retryStrategy: retry } : {}),
   });
