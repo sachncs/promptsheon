@@ -22,7 +22,10 @@ require an organization-scoped passing evaluation run in addition to the
 maker-checker approval gate. Draft creation never activates traffic.
 
 Canary rollout automation, rollback triggers, signed release manifests, and
-full promotion concurrency testing remain in progress.
+signed release manifests, and full promotion concurrency testing remain in
+progress. A deterministic canary health assessment now evaluates the latest
+organization-scoped run and atomically rolls back a regressed canary/active
+release to its active peer.
 
 - Define lifecycle states: draft, validated, approved, canary, active,
   deprecated, rolled back, and archived.

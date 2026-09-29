@@ -845,6 +845,11 @@
       "path": "/api/releases/:id/rollback"
     },
     {
+      "file": "packages/server/src/routes/release.ts",
+      "method": "POST",
+      "path": "/api/releases/:id/auto-rollback"
+    },
+    {
       "file": "packages/server/src/routes/repo.ts",
       "method": "GET",
       "path": "/api/repos"
@@ -1292,6 +1297,7 @@
   ],
   "applicationServices": [
     "packages/server/src/application/audit-replication-service.ts",
+    "packages/server/src/application/canary-rollback-service.ts",
     "packages/server/src/application/canary-routing.ts",
     "packages/server/src/application/capability-service.ts",
     "packages/server/src/application/durable-execution-service.ts",
