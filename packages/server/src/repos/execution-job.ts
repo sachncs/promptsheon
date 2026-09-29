@@ -44,6 +44,15 @@ export class IdempotencyConflictError extends Error {
   }
 }
 
+export class ExecutionQueueCapacityError extends Error {
+  readonly statusCode = 429;
+
+  constructor(limit: number) {
+    super(`execution queue capacity reached (${limit} pending jobs)`);
+    this.name = 'ExecutionQueueCapacityError';
+  }
+}
+
 interface JobRow {
   id: string;
   organization_id: string;
@@ -67,7 +76,7 @@ interface JobRow {
 
 /** SQLite-backed durable queue metadata and idempotent lifecycle transitions. */
 export class ExecutionJobRepo {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: Database.Database, private readonly maxPendingJobsPerOrganization = 10_000) {}
 
   enqueue(input: {
     organizationId: string;
@@ -87,6 +96,10 @@ export class ExecutionJobRepo {
       }
       return toJob(existing);
     }
+    const pending = this.db.prepare(
+      "SELECT COUNT(*) AS count FROM execution_jobs WHERE organization_id = ? AND state IN ('queued', 'running')",
+    ).get(input.organizationId) as { count: number };
+    if (pending.count >= this.maxPendingJobsPerOrganization) throw new ExecutionQueueCapacityError(this.maxPendingJobsPerOrganization);
     const now = new Date().toISOString();
     const id = randomUUID();
     this.db.prepare(`

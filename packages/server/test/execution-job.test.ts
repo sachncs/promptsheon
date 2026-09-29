@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3';
 import { applyMigrations, type MigrationSql } from '@promptsheon/shared';
-import { ExecutionJobRepo } from '../src/repos/execution-job.js';
+import { ExecutionJobRepo, ExecutionQueueCapacityError } from '../src/repos/execution-job.js';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,5 +64,12 @@ describe('ExecutionJobRepo', () => {
   it('reports queue depth and age by organization', () => {
     repo.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: 'a'.repeat(64), inputHash: 'i'.repeat(64), inputJson: '{}', idempotencyKey: 'metrics' });
     expect(repo.metrics('org1')).toMatchObject({ queued: 1, running: 0, completed: 0, oldestQueuedAt: expect.any(String) });
+  });
+
+  it('rejects new work at the organization queue limit but preserves idempotent retries', () => {
+    const limited = new ExecutionJobRepo(db, 1);
+    const first = limited.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: 'a'.repeat(64), inputHash: 'i'.repeat(64), inputJson: '{}', idempotencyKey: 'capacity-1' });
+    expect(() => limited.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: 'b'.repeat(64), inputHash: 'j'.repeat(64), inputJson: '{}', idempotencyKey: 'capacity-2' })).toThrow(ExecutionQueueCapacityError);
+    expect(limited.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: 'a'.repeat(64), inputHash: 'i'.repeat(64), inputJson: '{}', idempotencyKey: 'capacity-1' }).id).toBe(first.id);
   });
 });

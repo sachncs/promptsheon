@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { DurableExecutionService, ExecutionWorkspaceScopeError } from '../application/durable-execution-service.js';
 import type { WorkspaceRepo } from '../repos/workspace.js';
-import { IdempotencyConflictError } from '../repos/execution-job.js';
+import { ExecutionQueueCapacityError, IdempotencyConflictError } from '../repos/execution-job.js';
 import { parseBody, parseParams } from './validate.js';
 
 const CreateJobSchema = z.strictObject({
@@ -40,6 +40,7 @@ export function registerExecutionJobRoutes(app: FastifyInstance, deps: { service
       job = deps.service.enqueue({ organizationId, workspaceId: params.data.workspaceId, ...parsed.data });
     } catch (error) {
       if (error instanceof IdempotencyConflictError) return reply.code(409).send({ error: { code: 'IDEMPOTENCY_CONFLICT', message: error.message } });
+      if (error instanceof ExecutionQueueCapacityError) return reply.code(429).send({ error: { code: 'QUEUE_CAPACITY_EXCEEDED', message: error.message } });
       throw error;
     }
     return reply.code(202).send(job);
