@@ -9,6 +9,7 @@ import { ExecutionTimeoutError } from '../agents/executor/executor.js';
 import { ExecutionWorkError } from './durable-execution-worker.js';
 import type { ToolAuthorizer, ToolRegistry } from './execution-ports.js';
 import type { EvidenceRecorder } from '../observability/evidence-sink.js';
+import type { TraceRepo } from '../repos/trace.js';
 
 export class ExecutionWorkspaceScopeError extends Error {
   constructor(jobId: string, workspaceId: string) {
@@ -28,6 +29,7 @@ interface ManifestRunner {
     organizationId?: string;
     toolRegistry?: ToolRegistry;
     toolAuthorizer?: ToolAuthorizer;
+    traceRunId?: string;
     signal?: AbortSignal;
     checkpoints?: {
       list(executionId: string): Promise<Array<{ stepId: string; state: 'completed' | 'failed'; output: string }>>;
@@ -47,6 +49,7 @@ export class DurableExecutionService {
     private readonly tools?: ToolRegistry,
     private readonly toolAuthorizer?: ToolAuthorizer,
     private readonly evidence?: EvidenceRecorder,
+    private readonly traces?: TraceRepo,
   ) {}
 
   enqueue(input: {
@@ -90,18 +93,25 @@ export class DurableExecutionService {
   createWorker(options: Partial<ExecutionWorkerOptions> = {}): DurableExecutionWorker {
     this.worker = new DurableExecutionWorker(this.jobs, {
       run: async (job, context) => {
+        const trace = this.traces?.startRun({
+          organizationId: job.organizationId,
+          name: `execution:${job.id}`,
+          attributes: { executionId: job.id, agentHash: job.agentHash, workspaceId: job.workspaceId },
+        });
+        const traceRunId = trace?.id;
         this.recordEvidence({
           eventType: 'execution.started',
           job,
           payload: { inputHash: job.inputHash, attempt: job.attempts },
+          traceRunId,
         });
-        const record = await this.manifests.get(job.workspaceId, job.agentHash);
-        const inputs = z.record(z.string(), z.unknown()).parse(JSON.parse(job.inputJson));
-        const estimatedInputTokens = Math.ceil(job.inputJson.length / 4);
-        if (estimatedInputTokens > record.specification.resourceBudget.maxInputTokens) {
-          throw new ExecutionWorkError('input token budget exhausted');
-        }
         try {
+          const record = await this.manifests.get(job.workspaceId, job.agentHash);
+          const inputs = z.record(z.string(), z.unknown()).parse(JSON.parse(job.inputJson));
+          const estimatedInputTokens = Math.ceil(job.inputJson.length / 4);
+          if (estimatedInputTokens > record.specification.resourceBudget.maxInputTokens) {
+            throw new ExecutionWorkError('input token budget exhausted');
+          }
           const manifest = toManifest(record);
           const allowedTools = new Set(
             Array.isArray(manifest.metadata['allowedTools'])
@@ -125,6 +135,7 @@ export class DurableExecutionService {
             executionId: job.id,
             inputs,
             organizationId: job.organizationId,
+            ...(traceRunId ? { traceRunId } : {}),
             ...(this.tools ? { toolRegistry: this.tools } : {}),
             ...(this.tools ? { toolAuthorizer } : {}),
             signal: context.signal,
@@ -141,14 +152,18 @@ export class DurableExecutionService {
             eventType: 'execution.completed',
             job,
             payload: totals,
+            traceRunId,
           });
+          if (traceRunId) this.traces?.finalize(traceRunId, 'success', { tokens: totals.totalTokens, costUsd: totals.costUsd });
           return result;
         } catch (error) {
           this.recordEvidence({
             eventType: context.signal.aborted ? 'execution.cancelled' : 'execution.failed',
             job,
             payload: { error: error instanceof Error ? error.message : String(error) },
+            traceRunId,
           });
+          if (traceRunId) this.traces?.finalize(traceRunId, 'error');
           if (error instanceof ExecutionTimeoutError) throw new ExecutionWorkError(error.message, false, true);
           throw error;
         }
@@ -169,6 +184,7 @@ export class DurableExecutionService {
     eventType: 'execution.started' | 'execution.completed' | 'execution.failed' | 'execution.cancelled' | 'permission.decided';
     job: ExecutionJob;
     payload: unknown;
+    traceRunId?: string;
   }): void {
     if (!this.evidence) return;
     try {
@@ -176,6 +192,7 @@ export class DurableExecutionService {
         eventType: input.eventType,
         organizationId: input.job.organizationId,
         correlationId: input.job.id,
+        ...(input.traceRunId ? { traceId: input.traceRunId } : {}),
         executionId: input.job.id,
         agentHash: input.job.agentHash,
         payload: input.payload,
