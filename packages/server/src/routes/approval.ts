@@ -16,7 +16,7 @@ const ApprovalQuerySchema = z.object({
 const ReleaseApprovalParamsSchema = z.object({ releaseId: z.string().trim().min(1).max(255) });
 
 function actorOf(request: FastifyRequest): string {
-  return request.userId ?? 'system';
+  return request.userId === 'development' ? 'api' : request.userId ?? 'api';
 }
 
 function orgOf(request: FastifyRequest): string | null {

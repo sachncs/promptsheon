@@ -71,7 +71,10 @@ const CanaryRuleSchema = z.object({
 const ReleaseParamsSchema = z.object({ id: z.string().uuid() });
 
 function actorOf(request: FastifyRequest): string {
-  return request.userId ?? 'system';
+  // Auth-disabled local development uses a synthetic principal. Transition
+  // rows still require a real users.id, so use the seeded system actor for
+  // persistence while preserving the principal for authorization.
+  return request.userId === 'development' ? 'api' : request.userId ?? 'api';
 }
 
 function organizationOf(request: FastifyRequest): string | null {

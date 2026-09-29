@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldGroup } from '@/components/brand/field';
 import { ThemedSelect } from '@/components/brand/themed-select';
 import { Input } from '@/components/ui/input';
-import { releaseApi, versionApi, unwrapList, unwrapFirst } from '@/lib/api';
+import { releaseApi, versionApi, workspaceApi, projectApi, capabilityApi, unwrapList } from '@/lib/api';
 
 const CreateReleaseSchema = z.object({
   capabilityId: z.string().uuid({ message: 'pick a capability' }),
@@ -64,9 +64,11 @@ export function NewReleaseDialog({ capabilityId }: NewReleaseDialogProps) {
   const capabilities = useQuery<CapabilitySummary[]>({
     queryKey: ['capabilities', 'new-release'],
     queryFn: async () => {
-      const allCaps = (await qc.fetchQuery({ queryKey: ['capabilities'], staleTime: 60_000 })) as unknown;
-      const list = unwrapList<CapabilitySummary>(allCaps);
-      return list;
+      const workspaces = await workspaceApi.list(1, 100);
+      const projects = (await Promise.all(workspaces.data.map((workspace) => projectApi.list(workspace.id))))
+        .flatMap((response) => response.data);
+      const capabilityLists = await Promise.all(projects.map((project) => capabilityApi.list(project.id)));
+      return capabilityLists.flatMap((response) => unwrapList<CapabilitySummary>(response.data));
     },
     enabled: open,
   });
@@ -82,10 +84,7 @@ export function NewReleaseDialog({ capabilityId }: NewReleaseDialogProps) {
   });
   const selectedVersion = useMemo(() => {
     const list = versions.data ?? [];
-    const found = unwrapFirst<VersionSummary>(
-      list.find((v) => v.version === capabilityVersionValue) ?? list[0],
-    );
-    return found;
+    return list.find((version) => version.version === capabilityVersionValue) ?? list[0];
   }, [versions.data, capabilityVersionValue]);
 
   const onSubmit = form.handleSubmit(async (data) => {
