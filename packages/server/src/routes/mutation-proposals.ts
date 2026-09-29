@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 import type { MutationProposalRepo } from '../repos/mutation-proposal.js';
+import { registerFallbackRouteDoc } from '../openapi.js';
 
 const MutationKindSchema = z.enum(['prompt', 'guardrail', 'model', 'routing', 'context', 'tool', 'permission', 'execution', 'memory', 'budget']);
 const ProposalStatusSchema = z.enum(['proposed', 'validated', 'approved', 'rejected', 'abandoned']);
@@ -46,6 +47,11 @@ export interface MutationProposalDeps {
 }
 
 export function registerMutationProposalRoutes(app: FastifyInstance, deps: MutationProposalDeps): void {
+  registerFallbackRouteDoc('get', '/api/mutation-proposals');
+  registerFallbackRouteDoc('post', '/api/mutation-proposals');
+  registerFallbackRouteDoc('get', '/api/mutation-proposals/:id');
+  registerFallbackRouteDoc('post', '/api/mutation-proposals/:id/decision');
+
   app.get('/api/mutation-proposals', async (request, reply) => {
     const organizationId = organizationIdOf(request);
     if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
