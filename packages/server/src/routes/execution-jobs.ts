@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import type { DurableExecutionService } from '../application/durable-execution-service.js';
+import { DurableExecutionService, ExecutionWorkspaceScopeError } from '../application/durable-execution-service.js';
 import type { WorkspaceRepo } from '../repos/workspace.js';
 import { IdempotencyConflictError } from '../repos/execution-job.js';
 import { parseBody, parseParams } from './validate.js';
@@ -56,7 +56,12 @@ export function registerExecutionJobRoutes(app: FastifyInstance, deps: { service
     if (!organizationId) return;
     const parsed = parseParams(reply, WorkspaceJobParamsSchema, request.params);
     if (!parsed.ok) return;
-    return reply.send(deps.service.get(organizationId, parsed.data.id));
+    try {
+      return reply.send(deps.service.get(organizationId, parsed.data.workspaceId, parsed.data.id));
+    } catch (error) {
+      if (error instanceof ExecutionWorkspaceScopeError) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'execution job not found' } });
+      throw error;
+    }
   });
 
   app.post('/api/workspaces/:workspaceId/execution-jobs/:id/cancel', async (request, reply) => {
@@ -64,6 +69,11 @@ export function registerExecutionJobRoutes(app: FastifyInstance, deps: { service
     if (!organizationId) return;
     const parsed = parseParams(reply, WorkspaceJobParamsSchema, request.params);
     if (!parsed.ok) return;
-    return reply.send(deps.service.cancel(organizationId, parsed.data.id));
+    try {
+      return reply.send(deps.service.cancel(organizationId, parsed.data.workspaceId, parsed.data.id));
+    } catch (error) {
+      if (error instanceof ExecutionWorkspaceScopeError) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'execution job not found' } });
+      throw error;
+    }
   });
 }

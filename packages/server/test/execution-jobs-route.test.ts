@@ -78,4 +78,18 @@ describe('execution job routes', () => {
     expect(second.statusCode).toBe(409);
     expect(second.json().error.code).toBe('IDEMPOTENCY_CONFLICT');
   });
+
+  it('does not expose a job through a different workspace path', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/workspaces/11111111-1111-4111-8111-111111111111/execution-jobs',
+      payload: { agentHash: 'a'.repeat(64), inputs: {}, idempotencyKey: 'workspace-scope' },
+    });
+    const jobId = create.json().id as string;
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/workspaces/22222222-2222-4222-8222-222222222222/execution-jobs/${jobId}`,
+    });
+    expect(response.statusCode).toBe(404);
+  });
 });

@@ -8,6 +8,13 @@ import type { ExecutionCheckpointRepo } from '../repos/execution-checkpoint.js';
 import { ExecutionTimeoutError } from '../agents/executor/executor.js';
 import { ExecutionWorkError } from './durable-execution-worker.js';
 
+export class ExecutionWorkspaceScopeError extends Error {
+  constructor(jobId: string, workspaceId: string) {
+    super(`execution job ${jobId} is not in workspace ${workspaceId}`);
+    this.name = 'ExecutionWorkspaceScopeError';
+  }
+}
+
 interface ManifestStore {
   get(workspaceId: string, hash: string): Promise<AgentSpecificationRecord>;
 }
@@ -42,7 +49,7 @@ export class DurableExecutionService {
     idempotencyKey: string;
     maxAttempts?: number;
   }): ExecutionJob {
-    const inputJson = JSON.stringify(input.inputs);
+    const inputJson = stableJson(input.inputs);
     const inputHash = createHash('sha256').update(inputJson, 'utf8').digest('hex');
     return this.jobs.enqueue({
       organizationId: input.organizationId,
@@ -55,15 +62,19 @@ export class DurableExecutionService {
     });
   }
 
-  get(organizationId: string, id: string): ExecutionJob {
-    return this.jobs.get(organizationId, id);
+  get(organizationId: string, workspaceId: string, id: string): ExecutionJob {
+    const job = this.jobs.get(organizationId, id);
+    if (job.workspaceId !== workspaceId) throw new ExecutionWorkspaceScopeError(id, workspaceId);
+    return job;
   }
 
   metrics(organizationId: string): ExecutionQueueMetrics {
     return this.jobs.metrics(organizationId);
   }
 
-  cancel(organizationId: string, id: string): ExecutionJob {
+  cancel(organizationId: string, workspaceId: string, id: string): ExecutionJob {
+    const job = this.jobs.get(organizationId, id);
+    if (job.workspaceId !== workspaceId) throw new ExecutionWorkspaceScopeError(id, workspaceId);
     if (this.worker) return this.worker.cancel(organizationId, id);
     return this.jobs.cancel(organizationId, id);
   }
@@ -108,6 +119,14 @@ export class DurableExecutionService {
     }, this.checkpoints);
     return this.worker;
   }
+}
+
+function stableJson(value: unknown): string {
+  if (value === undefined) return 'null';
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(',')}}`;
 }
 
 function executionTotals(value: unknown): { totalTokens: number; costUsd: number } {
