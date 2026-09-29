@@ -1643,7 +1643,11 @@
     "spec get <hash>",
     "spec diff <left> <right>",
     "spec lineage <hash>",
-    "spec publish <hash>"
+    "spec publish <hash>",
+    "execution submit <hash> <file> <key> submit a durable execution job",
+    "execution get <id>",
+    "execution cancel <id>",
+    "execution metrics"
   ],
   "sdkMethods": [
     "listRepos",
@@ -1662,7 +1666,11 @@
     "getAgentSpecification",
     "diffAgentSpecifications",
     "listAgentSpecificationLineage",
-    "publishAgentSpecification"
+    "publishAgentSpecification",
+    "enqueueExecution",
+    "getExecution",
+    "cancelExecution",
+    "getExecutionMetrics"
   ],
   "providerAndAgentModules": [
     "packages/server/src/llm/gateway.ts",
