@@ -24,6 +24,12 @@ import {
   releaseApproveCommand,
   releaseGetCommand,
   reposListCommand,
+  specificationCreateCommand,
+  specificationDiffCommand,
+  specificationGetCommand,
+  specificationLineageCommand,
+  specificationPublishCommand,
+  specificationValidateCommand,
 } from './commands.js';
 
 function usage(): void {
@@ -40,6 +46,12 @@ Commands:
   release get <id>                   show a release's current state
   release approve <id>               approve a release (maker-checker)
   manifest scan <hash>               scan a manifest through the T2-3 scanner
+  spec validate <file>               validate an agent specification JSON file
+  spec create <file>                 create a draft agent specification
+  spec get <hash>                    inspect an agent specification
+  spec diff <left> <right>           diff two specification hashes
+  spec lineage <hash>                show specification lineage
+  spec publish <hash>                publish a specification revision
 
 Env:
   PROMPTSHEON_API_URL                default http://127.0.0.1:8080
@@ -118,6 +130,35 @@ async function main(argv: string[]): Promise<number> {
           });
           print(flags.format, r);
           return EXIT.OK;
+        }
+        case 'spec': {
+          const sub = positional[1];
+          if (sub === 'validate') {
+            print(flags.format, await specificationValidateCommand(client, positional[2] ?? ''));
+            return EXIT.OK;
+          }
+          if (sub === 'create') {
+            print(flags.format, await specificationCreateCommand(client, positional[2] ?? '', { dryRun: flags.dryRun }));
+            return EXIT.OK;
+          }
+          if (sub === 'get') {
+            print(flags.format, await specificationGetCommand(client, positional[2] ?? ''));
+            return EXIT.OK;
+          }
+          if (sub === 'diff') {
+            print(flags.format, await specificationDiffCommand(client, positional[2] ?? '', positional[3] ?? ''));
+            return EXIT.OK;
+          }
+          if (sub === 'lineage') {
+            print(flags.format, await specificationLineageCommand(client, positional[2] ?? ''));
+            return EXIT.OK;
+          }
+          if (sub === 'publish') {
+            print(flags.format, await specificationPublishCommand(client, positional[2] ?? '', { dryRun: flags.dryRun }));
+            return EXIT.OK;
+          }
+          usage();
+          return EXIT.BAD_ARGS;
         }
         default:
           usage();

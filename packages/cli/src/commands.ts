@@ -1,5 +1,6 @@
 import type { ApiClient } from './output.js';
 import { BadArgsError, NotFoundError } from './errors.js';
+import { readFile } from 'node:fs/promises';
 
 export interface LoginResult {
   user: { id: string; email: string; role: string };
@@ -104,4 +105,47 @@ export async function manifestScanCommand(
     };
   }
   return client.post<ManifestScanResult>(`/manifests/${manifestHash}/scan`, {});
+}
+
+function workspaceId(): string {
+  const id = process.env['PROMPTSHEON_WORKSPACE_ID'];
+  if (!id) throw new BadArgsError('PROMPTSHEON_WORKSPACE_ID required');
+  return id;
+}
+
+async function specificationFile(path: string): Promise<unknown> {
+  if (!path) throw new BadArgsError('spec file path is required');
+  try {
+    return JSON.parse(await readFile(path, 'utf8')) as unknown;
+  } catch (error) {
+    throw new BadArgsError(`cannot read specification file: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+export async function specificationValidateCommand(client: ApiClient, path: string): Promise<unknown> {
+  return client.post(`/workspaces/${workspaceId()}/agent-specifications/validate`, { specification: await specificationFile(path) });
+}
+
+export async function specificationCreateCommand(client: ApiClient, path: string, opts: { dryRun: boolean }): Promise<unknown> {
+  return client.post(`/workspaces/${workspaceId()}/agent-specifications`, { specification: await specificationFile(path), changeReason: process.env['PROMPTSHEON_CHANGE_REASON'] ?? 'created from CLI' }, opts);
+}
+
+export async function specificationGetCommand(client: ApiClient, hash: string): Promise<unknown> {
+  if (!hash) throw new BadArgsError('spec get <hash> — hash is required');
+  return client.get(`/workspaces/${workspaceId()}/agent-specifications/${hash}`);
+}
+
+export async function specificationLineageCommand(client: ApiClient, hash: string): Promise<unknown> {
+  if (!hash) throw new BadArgsError('spec lineage <hash> — hash is required');
+  return client.get(`/workspaces/${workspaceId()}/agent-specifications/${hash}/lineage`);
+}
+
+export async function specificationDiffCommand(client: ApiClient, leftHash: string, rightHash: string): Promise<unknown> {
+  if (!leftHash || !rightHash) throw new BadArgsError('spec diff <leftHash> <rightHash> — both hashes are required');
+  return client.post(`/workspaces/${workspaceId()}/agent-specifications/diff`, { leftHash, rightHash });
+}
+
+export async function specificationPublishCommand(client: ApiClient, hash: string, opts: { dryRun: boolean }): Promise<unknown> {
+  if (!hash) throw new BadArgsError('spec publish <hash> — hash is required');
+  return client.post(`/workspaces/${workspaceId()}/agent-specifications/${hash}/publish`, {}, opts);
 }

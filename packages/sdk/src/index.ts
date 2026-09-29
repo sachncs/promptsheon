@@ -5,7 +5,27 @@ import type {
   EvalSuiteVersion,
   EvalSuiteRunInput,
   SigningKey,
+  AgentSpecification,
 } from '@promptsheon/shared';
+
+export interface AgentSpecificationRecord {
+  hash: string;
+  workspaceId: string;
+  schemaVersion: string;
+  parentHash: string | null;
+  author: string;
+  changeReason: string;
+  status: 'draft' | 'candidate' | 'published' | 'retired';
+  createdAt: string;
+  publishedAt: string | null;
+  specification: AgentSpecification;
+}
+
+export interface AgentSpecificationDiffEntry {
+  path: string;
+  before: unknown;
+  after: unknown;
+}
 
 /**
  * Typed fetch wrapper over the public REST API.
@@ -141,6 +161,34 @@ export class PromptsheonClient {
 
   evalGate(repoId: string, trials: Array<{ caseId: string; output: string; finalState?: Record<string, unknown> }>): Promise<unknown> {
     return this.call({ method: 'POST', path: `/repos/${repoId}/eval-gate`, body: { trials } });
+  }
+
+  validateAgentSpecification(workspaceId: string, specification: unknown): Promise<{ valid: boolean; specification?: AgentSpecification; issues?: unknown[] }> {
+    return this.call({ method: 'POST', path: `/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/validate`, body: { specification } });
+  }
+
+  createAgentSpecification(input: { workspaceId: string; specification: AgentSpecification; changeReason: string; parentHash?: string | null }): Promise<AgentSpecificationRecord> {
+    return this.call({
+      method: 'POST',
+      path: `/workspaces/${encodeURIComponent(input.workspaceId)}/agent-specifications`,
+      body: { specification: input.specification, changeReason: input.changeReason, ...(input.parentHash === undefined ? {} : { parentHash: input.parentHash }) },
+    });
+  }
+
+  getAgentSpecification(workspaceId: string, hash: string): Promise<AgentSpecificationRecord> {
+    return this.call({ method: 'GET', path: `/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/${encodeURIComponent(hash)}` });
+  }
+
+  diffAgentSpecifications(workspaceId: string, leftHash: string, rightHash: string): Promise<{ changes: AgentSpecificationDiffEntry[] }> {
+    return this.call({ method: 'POST', path: `/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/diff`, body: { leftHash, rightHash } });
+  }
+
+  listAgentSpecificationLineage(workspaceId: string, hash: string): Promise<{ items: AgentSpecificationRecord[] }> {
+    return this.call({ method: 'GET', path: `/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/${encodeURIComponent(hash)}/lineage` });
+  }
+
+  publishAgentSpecification(workspaceId: string, hash: string): Promise<AgentSpecificationRecord> {
+    return this.call({ method: 'POST', path: `/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/${encodeURIComponent(hash)}/publish` });
   }
 }
 
