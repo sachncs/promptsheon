@@ -1558,6 +1558,10 @@
       "route": "/app/merge-requests"
     },
     {
+      "file": "frontend/src/app/app/mutation-proposals/page.tsx",
+      "route": "/app/mutation-proposals"
+    },
+    {
       "file": "frontend/src/app/app/operations/page.tsx",
       "route": "/app/operations"
     },
