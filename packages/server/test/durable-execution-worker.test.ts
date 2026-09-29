@@ -105,4 +105,25 @@ describe('DurableExecutionWorker', () => {
     release();
     await worker.stop();
   });
+
+  it('shares a SQLite queue across workers without duplicate ownership', async () => {
+    const queued = Array.from({ length: 50 }, (_, index) => jobs.enqueue({
+      organizationId: 'org1', workspaceId: 'ws1', agentHash: hash('a'), inputHash: String(index).padStart(64, '0'), inputJson: '{}', idempotencyKey: `workers-${index}`,
+    }));
+    const seen = new Set<string>();
+    const run = async (job: { id: string }) => {
+      if (seen.has(job.id)) throw new Error(`duplicate ownership: ${job.id}`);
+      seen.add(job.id);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      return { ok: true };
+    };
+    const options = { maxConcurrency: 2, maxConcurrencyPerOrganization: 2, pollMs: 1, leaseMs: 500, maxBackoffMs: 1, random: () => 0 };
+    const first = new DurableExecutionWorker(jobs, { run }, { ...options, workerId: 'worker-a' });
+    const second = new DurableExecutionWorker(jobs, { run }, { ...options, workerId: 'worker-b' });
+    first.start();
+    second.start();
+    await waitFor(() => queued.every((job) => jobs.get('org1', job.id).state === 'completed'));
+    await Promise.all([first.stop(), second.stop()]);
+    expect(seen.size).toBe(queued.length);
+  });
 });
