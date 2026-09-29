@@ -82,6 +82,16 @@ export default function ReleaseDetailPage() {
     }
   };
 
+  const handleTransition = async (to: 'review' | 'canary', label: string) => {
+    try {
+      await releaseApi.transition(id, to);
+      refreshRelease();
+      toast({ title: `${label} started`, variant: 'success', description: `Release moved to ${to}.` });
+    } catch (err) {
+      toast({ title: `${label} failed`, variant: 'destructive', description: getErrorMessage(err) });
+    }
+  };
+
   const handleCanary = async () => {
     const pct = Number(canaryPercent);
     if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
@@ -149,8 +159,8 @@ export default function ReleaseDetailPage() {
   };
 
   const releaseStatus = r.status ?? r.state ?? 'draft';
-  const isActive = releaseStatus === 'active';
   const isTerminal = releaseStatus === 'rolled-back';
+  const canaryOrActive = releaseStatus === 'canary' || releaseStatus === 'active';
 
   return (
     <div className="space-y-6">
@@ -176,13 +186,30 @@ export default function ReleaseDetailPage() {
           <SurfaceHeader title="Release path" description="Where this release is in the state machine." />
           <StepRail steps={RAIL_STEPS} current={currentStep} className="mt-3" />
           <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
-            <Button size="sm" onClick={handleActivate} disabled={isActive || isTerminal}>
-              <Play className="mr-1.5 h-3.5 w-3.5" />Activate
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setCanaryOpen(true)} disabled={isTerminal}>
+            {releaseStatus === 'draft' && (
+              <Button size="sm" onClick={() => void handleTransition('review', 'Review')}>
+                <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />Send to review
+              </Button>
+            )}
+            {releaseStatus === 'review' && (
+              <Link href={`/app/approvals/${id}`}>
+                <Button size="sm"><ShieldCheck className="mr-1.5 h-3.5 w-3.5" />Open approvals</Button>
+              </Link>
+            )}
+            {releaseStatus === 'approved' && (
+              <Button size="sm" onClick={() => void handleTransition('canary', 'Canary')}>
+                <FastForward className="mr-1.5 h-3.5 w-3.5" />Start canary
+              </Button>
+            )}
+            {releaseStatus === 'canary' && (
+              <Button size="sm" onClick={handleActivate}>
+                <Play className="mr-1.5 h-3.5 w-3.5" />Activate
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={() => setCanaryOpen(true)} disabled={!canaryOrActive || isTerminal}>
               <FastForward className="mr-1.5 h-3.5 w-3.5" />Canary {r.canaryPercent ?? 10}%
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setRollbackOpen(true)} disabled={isTerminal}>
+            <Button size="sm" variant="outline" onClick={() => setRollbackOpen(true)} disabled={!canaryOrActive || isTerminal}>
               <RotateCcw className="mr-1.5 h-3.5 w-3.5" />Roll back
             </Button>
           </div>
