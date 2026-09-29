@@ -139,18 +139,22 @@ export class ExecutionJobRepo {
     };
   }
 
-  claimNext(workerId: string, leaseMs: number): ExecutionJob | null {
+  claimNext(workerId: string, leaseMs: number, excludedOrganizations: readonly string[] = []): ExecutionJob | null {
     const now = new Date();
     const nowIso = now.toISOString();
     const leaseUntil = new Date(now.getTime() + leaseMs).toISOString();
     return this.db.transaction(() => {
+      const exclusion = excludedOrganizations.length > 0
+        ? ` AND organization_id NOT IN (${excludedOrganizations.map(() => '?').join(', ')})`
+        : '';
       const row = this.db.prepare(`
         SELECT * FROM execution_jobs
-        WHERE (state = 'queued' AND available_at <= ?)
-           OR (state = 'running' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?)
+        WHERE ((state = 'queued' AND available_at <= ?)
+           OR (state = 'running' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?))
+          ${exclusion}
         ORDER BY created_at ASC
         LIMIT 1
-      `).get(nowIso, nowIso) as JobRow | undefined;
+      `).get(nowIso, nowIso, ...excludedOrganizations) as JobRow | undefined;
       if (!row) return null;
       const result = this.db.prepare(`
         UPDATE execution_jobs

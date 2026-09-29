@@ -86,4 +86,23 @@ describe('DurableExecutionWorker', () => {
     await worker.stop();
     expect(jobs.get('org1', job.id).state).toBe('cancelled');
   });
+
+  it('continues serving another organization when one organization is saturated', async () => {
+    db.prepare("INSERT INTO orgs (id, name, slug, created_at, updated_at) VALUES ('org2', 'Two', 'two', '2026-01-01', '2026-01-01')").run();
+    db.prepare("INSERT INTO workspaces (id, name, organization, org_id, created_at, updated_at) VALUES ('ws2', 'Workspace 2', '', 'org2', '2026-01-01', '2026-01-01')").run();
+    const first = jobs.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: hash('a'), inputHash: hash('one'), inputJson: '{}', idempotencyKey: 'org-one' });
+    const second = jobs.enqueue({ organizationId: 'org2', workspaceId: 'ws2', agentHash: hash('b'), inputHash: hash('two'), inputJson: '{}', idempotencyKey: 'org-two' });
+    let release!: () => void;
+    const hold = new Promise<void>((resolve) => { release = resolve; });
+    const worker = new DurableExecutionWorker(jobs, {
+      async run(job) {
+        if (job.organizationId === 'org1') await hold;
+        return { organizationId: job.organizationId };
+      },
+    }, { workerId: 'worker-1', maxConcurrency: 2, maxConcurrencyPerOrganization: 1, pollMs: 2, leaseMs: 500, maxBackoffMs: 1, random: () => 0 });
+    worker.start();
+    await waitFor(() => jobs.get('org1', first.id).state === 'running' && jobs.get('org2', second.id).state === 'completed');
+    release();
+    await worker.stop();
+  });
 });

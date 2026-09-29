@@ -78,12 +78,14 @@ export class DurableExecutionWorker {
   private async pump(): Promise<void> {
     if (this.stopping) return;
     this.jobs.requeueExpired();
+    const saturatedOrganizations = new Set<string>();
     while (!this.stopping && this.active < this.options.maxConcurrency) {
-      const job = this.jobs.claimNext(this.options.workerId, this.options.leaseMs);
+      const job = this.jobs.claimNext(this.options.workerId, this.options.leaseMs, [...saturatedOrganizations]);
       if (!job) break;
       const activeForOrganization = this.activeByOrganization.get(job.organizationId) ?? 0;
       const organizationLimit = this.options.maxConcurrencyPerOrganization ?? this.options.maxConcurrency;
       if (activeForOrganization >= organizationLimit) {
+        saturatedOrganizations.add(job.organizationId);
         this.jobs.releaseClaim(job.organizationId, job.id, new Date(Date.now() + this.options.pollMs).toISOString());
         continue;
       }
