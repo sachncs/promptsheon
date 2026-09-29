@@ -25,7 +25,6 @@ const CreateReleaseSchema = z.object({
   capabilityId: z.string().uuid({ message: 'pick a capability' }),
   capabilityVersion: z.coerce.number().int().positive({ message: 'pick a version' }),
   environment: z.enum(['dev', 'staging', 'prod']),
-  manifest: z.string().min(2, 'manifest required'),
   canaryPercent: z.coerce.number().int().min(0).max(100).optional().default(0),
 });
 
@@ -37,6 +36,7 @@ interface CapabilitySummary {
 interface VersionSummary {
   id: string;
   version: number;
+  manifest: string;
 }
 
 export interface NewReleaseDialogProps {
@@ -54,7 +54,6 @@ export function NewReleaseDialog({ capabilityId }: NewReleaseDialogProps) {
       capabilityId: capabilityId ?? '',
       capabilityVersion: 1,
       environment: 'dev',
-      manifest: '{"nodes":[],"edges":[]}',
       canaryPercent: 0,
     },
   });
@@ -77,11 +76,10 @@ export function NewReleaseDialog({ capabilityId }: NewReleaseDialogProps) {
       if (!capabilityIdValue) return [];
       const r = await versionApi.list(capabilityIdValue);
       const list = unwrapList<VersionSummary>(r.data);
-      return list.length > 0 ? list : [{ id: 'placeholder', version: 1 }];
+      return list;
     },
     enabled: Boolean(capabilityIdValue),
   });
-  const fallbackManifest = useMemo(() => '{"nodes":[],"edges":[]}', []);
   const selectedVersion = useMemo(() => {
     const list = versions.data ?? [];
     const found = unwrapFirst<VersionSummary>(
@@ -95,7 +93,7 @@ export function NewReleaseDialog({ capabilityId }: NewReleaseDialogProps) {
       capabilityId: data.capabilityId,
       capabilityVersion: data.capabilityVersion,
       capabilityVersionId: selectedVersion?.id ?? null,
-      manifest: data.manifest,
+      manifest: selectedVersion?.manifest ?? '',
       environment: data.environment,
       canaryPercent: data.canaryPercent,
     } as Parameters<typeof releaseApi.create>[0]);
@@ -153,13 +151,19 @@ export function NewReleaseDialog({ capabilityId }: NewReleaseDialogProps) {
                 ]}
               />
             </Field>
-            <Field label="Manifest JSON" htmlFor="rel-manifest" error={form.formState.errors.manifest?.message} required>
+            <Field
+              label="Manifest JSON"
+              htmlFor="rel-manifest"
+              hint="Loaded from the selected immutable capability version."
+              required
+            >
               <textarea
                 id="rel-manifest"
                 rows={6}
-                className="w-full rounded-md border border-border-subtle bg-surface-1 p-2 font-mono text-xs"
-                defaultValue={fallbackManifest}
-                {...form.register('manifest')}
+                readOnly
+                className="w-full rounded-md border border-border-subtle bg-surface-2 p-2 font-mono text-xs text-text-muted"
+                value={selectedVersion?.manifest ?? ''}
+                aria-label="Selected version manifest"
               />
             </Field>
             <Field
@@ -186,7 +190,7 @@ export function NewReleaseDialog({ capabilityId }: NewReleaseDialogProps) {
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={form.formState.isSubmitting}>
+            <Button type="submit" disabled={form.formState.isSubmitting || !selectedVersion}>
               {form.formState.isSubmitting ? (
                 <>
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />

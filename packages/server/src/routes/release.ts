@@ -168,13 +168,18 @@ export function registerReleaseRoutes(
     if (!organizationId) return;
     const parsed = parseBody(reply, CreateBodySchema, request.body);
     if (!parsed.ok) return;
+    let manifestHash: string;
+    try {
+      manifestHash = computeManifestHashFromJson(parsed.data.manifest);
+    } catch {
+      return reply.code(422).send({ error: { code: 'INVALID_MANIFEST', message: 'release manifest must be a valid JSON object' } });
+    }
     const item = repo.createInOrg(parsed.data, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'capability not found' } });
 
     // Register the release manifest under its content-addressed identity so
     // maker-checker approvals, activation, and signing use the same hash.
     try {
-      const manifestHash = computeManifestHashFromJson(parsed.data.manifest);
       deps.manifestRepo.registerFromRaw({
         capabilityId: parsed.data.capabilityId,
         version: parsed.data.capabilityVersion,
