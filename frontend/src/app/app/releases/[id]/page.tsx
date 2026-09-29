@@ -11,7 +11,7 @@ import { useRequireSession } from '@/hooks/use-session';
 import { releaseApi, approvalApi, auditApi, unwrapList } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
-import { StatusPill, type StatusKind } from '@/components/brand/status-pill';
+import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { StepRail, type Step } from '@/components/brand/step-rail';
 import { HashChip } from '@/components/brand/hash-chip';
 import { Timeline } from '@/components/brand/timeline';
@@ -64,8 +64,8 @@ export default function ReleaseDetailPage() {
   });
 
   const currentStep = useMemo(() => {
-    const r = release.data as { state?: string } | null | undefined;
-    const s = r?.state ?? 'draft';
+    const r = release.data as { status?: string; state?: string } | null | undefined;
+    const s = r?.status ?? r?.state ?? 'draft';
     if (RAIL_STEPS.some((step) => step.id === s)) return String(s);
     return 'draft';
   }, [release.data]);
@@ -128,13 +128,14 @@ export default function ReleaseDetailPage() {
   }
 
   const r = release.data as {
-    id: string; capabilityName?: string; capabilityVersion?: number; state?: string;
+    id: string; capabilityName?: string; capabilityVersion?: number; status?: string; state?: string;
     manifestHash?: string; environment?: string; canaryPercent?: number;
     createdAt?: string; updatedAt?: string;
   };
 
-  const isActive = r.state === 'active';
-  const isTerminal = r.state === 'rolled-back';
+  const releaseStatus = r.status ?? r.state ?? 'draft';
+  const isActive = releaseStatus === 'active';
+  const isTerminal = releaseStatus === 'rolled-back';
 
   return (
     <div className="space-y-6">
@@ -149,7 +150,7 @@ export default function ReleaseDetailPage() {
           actions={
             <div className="flex items-center gap-2">
               {r.manifestHash && <HashChip hash={r.manifestHash} />}
-              <StatusPill kind={(r.state as StatusKind) ?? 'draft'} />
+              <StatusPill kind={statusKindOf(releaseStatus, 'draft')} label={releaseStatus} />
             </div>
           }
         />
@@ -199,7 +200,7 @@ export default function ReleaseDetailPage() {
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wider text-text-subtle">State</dt>
-                <dd className="mt-1"><StatusPill kind={(r.state as StatusKind) ?? 'draft'} /></dd>
+                <dd className="mt-1"><StatusPill kind={statusKindOf(releaseStatus, 'draft')} label={releaseStatus} /></dd>
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wider text-text-subtle">Updated</dt>
