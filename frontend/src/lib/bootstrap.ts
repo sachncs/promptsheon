@@ -8,6 +8,7 @@ export const BootstrapStatusSchema = z.object({
   provider: z.string().nullable(),
   model: z.string().nullable(),
   adminEmail: z.string().nullable(),
+  authEnabled: z.boolean(),
 });
 
 export type BootstrapStatus = z.infer<typeof BootstrapStatusSchema>;

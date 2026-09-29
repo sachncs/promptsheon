@@ -62,10 +62,15 @@ export default function OnboardingPage() {
         router.replace('/app');
         return;
       }
-      bootstrapApi.admin()
+        bootstrapApi.admin()
         .then((data) => {
+          const restored = toSession(data, status.data?.provider ?? null);
+          if (status.data.authEnabled && !restored.apiKey) {
+            setRestoreError('This installation requires an API key, but the saved browser session is missing. Sign in with an API key or complete setup again.');
+            return;
+          }
           setRestoreError(null);
-          setSession(toSession(data, status.data?.provider ?? null));
+          setSession(restored);
           router.replace('/app');
         })
         .catch((error: unknown) => {

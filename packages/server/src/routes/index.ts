@@ -117,6 +117,7 @@ import type { DurableExecutionService } from '../application/durable-execution-s
 export interface AppDeps {
   nodeEnvironment: string;
   scimBearerToken?: string;
+  authEnabled: boolean;
   db: Database.Database;
   workspaceRepo: WorkspaceRepo;
   projectRepo: ProjectRepo;
@@ -302,6 +303,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     apiKeyRepo: deps.apiKeyRepo,
     auditChain: deps.auditChain,
     e2eSessionEnabled: deps.e2eSessionEnabled,
+    authEnabled: deps.authEnabled,
   });
 
   registerRepoRoutes(app, {

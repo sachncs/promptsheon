@@ -323,6 +323,7 @@ async function main() {
   await registerRoutes(app, {
     nodeEnvironment: config.server.nodeEnv,
     scimBearerToken: config.auth.scimBearerToken,
+    authEnabled: config.auth.enabled,
     db,
     workspaceRepo: repos.workspace,
     projectRepo: repos.project,

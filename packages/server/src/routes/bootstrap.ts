@@ -91,6 +91,7 @@ export function registerBootstrapRoutes(
     llmSettings: LlmSettingsService;
     auditChain?: AuditChain;
     e2eSessionEnabled?: boolean;
+    authEnabled?: boolean;
   },
 ): void {
   app.get('/api/bootstrap/status', async (_request, reply) => {
@@ -106,6 +107,7 @@ export function registerBootstrapRoutes(
       provider: provider ?? null,
       model: model ?? null,
       adminEmail: users.find((u) => u.role === 'admin')?.email ?? null,
+      authEnabled: deps.authEnabled ?? true,
     });
   });
 
