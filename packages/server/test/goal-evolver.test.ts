@@ -143,6 +143,43 @@ describe('GoalBasedEvolutionAgent', () => {
       expect(result.history[0]?.revised).toBe(true);
     });
 
+    it('creates a pending proposal instead of activating a revision in proposal mode', async () => {
+      const config = buildConfig();
+      config.llm.defaultProvider = 'simulated';
+      const created: Array<{ sourceHash: string; candidateHash?: string; mutationKind: string }> = [];
+      const proposalRepo = {
+        create(input: { sourceHash: string; candidateHash?: string; mutationKind: string }) {
+          created.push(input);
+          return { id: 'proposal-1', ...input };
+        },
+      };
+      const localAgent = new GoalBasedEvolutionAgent({
+        config,
+        hub,
+        executor: executor as unknown as ManifestGraphExecutor,
+        cas: new FakeCas() as never,
+        mutationProposalRepo: proposalRepo as never,
+      });
+      const m = buildManifest({ evaluation: { datasets: [], scorers: [], passThreshold: 0.99 } });
+      executor.trace.nodeResults = {
+        a: { nodeId: 'a', status: 'failed', output: '', latencyMs: 100, costUsd: 0, totalTokens: 10, error: 'fail' },
+      };
+
+      const result = await localAgent.evolve('h', m, {
+        maxIterations: 3,
+        cooldownMs: 0,
+        costBudget: 100,
+        approvalMode: 'proposal',
+        organizationId: 'org-test',
+      });
+
+      expect(result.pendingApproval).toBe(true);
+      expect(result.proposals?.map((proposal) => proposal.id)).toEqual(['proposal-1']);
+      expect(result.manifestHash).toBe('h');
+      expect(created[0]).toMatchObject({ sourceHash: 'h', mutationKind: 'prompt' });
+      expect(executor.calls).toBe(1);
+    });
+
     it('returns immediately when DAG is invalid', async () => {
       const result = await agent.evolve('h', buildManifest({ nodes: [] as never[], edges: [{ from: 'x', to: 'y', mapping: {} }] }), {
         maxIterations: 5, cooldownMs: 0, costBudget: 100,

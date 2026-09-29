@@ -217,6 +217,7 @@ async function main() {
     executor,
     cas: casStore,
     traceRepo: repos.trace,
+    mutationProposalRepo: repos.mutationProposal,
   });
   const sessionStore = new SessionStore({
     storageDir: `${config.server.casPath}/sessions`,

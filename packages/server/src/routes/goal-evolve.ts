@@ -31,6 +31,8 @@ export function registerGoalEvolveRoutes(
         maxIterations: parsed.data.maxIterations,
         cooldownMs: parsed.data.cooldownMs,
         costBudget: parsed.data.costBudget,
+        approvalMode: 'proposal',
+        organizationId: request.orgContext?.orgId ?? request.agentOrgId,
       });
       return reply.send(result);
     } catch (e) {

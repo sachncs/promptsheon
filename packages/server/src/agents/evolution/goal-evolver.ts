@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { AppConfig, CasStore, Manifest } from '@promptsheon/shared';
+import type { AppConfig, CasStore, Manifest, MutationProposal } from '@promptsheon/shared';
 import { Agent, DefaultModelRetryStrategy, ExponentialBackoff } from '@strands-agents/sdk';
 import { createModel } from '../model.js';
 import { extractText } from '../utils.js';
@@ -10,6 +10,7 @@ import { EvalSuiteRunner } from '../evaluation/suite-runner.js';
 import { EvaluatorRegistry, EVALUATOR_NAMES } from '../evaluation/registry.js';
 import type { EvaluatorName } from '../evaluation/registry.js';
 import type { TraceRepo } from '../../repos/trace.js';
+import type { MutationProposalRepo } from '../../repos/mutation-proposal.js';
 
 export interface EvolutionSnapshot {
   iteration: number;
@@ -23,6 +24,9 @@ export interface EvolutionOptions {
   maxIterations: number;
   cooldownMs: number;
   costBudget: number;
+  /** Production requests use proposal mode so a candidate cannot activate silently. */
+  approvalMode?: 'direct' | 'proposal';
+  organizationId?: string;
 }
 
 export interface IterationRecord {
@@ -31,6 +35,7 @@ export interface IterationRecord {
   cost: number;
   nodeId?: string;
   snapshotId?: string;
+  proposalId?: string;
   revised: boolean;
   timestamp: string;
 }
@@ -52,6 +57,8 @@ export interface EvolutionResult {
   totalCost: number;
   history: IterationRecord[];
   error?: string;
+  pendingApproval?: boolean;
+  proposals?: MutationProposal[];
 }
 
 const RevisionSchema = z.object({
@@ -86,7 +93,14 @@ export class GoalBasedEvolutionAgent {
   private evaluatorRegistry: EvaluatorRegistry;
 
   constructor(
-    private deps: { config: AppConfig; hub: SseHub; executor: ManifestGraphExecutor; cas: CasStore; traceRepo?: TraceRepo },
+    private deps: {
+      config: AppConfig;
+      hub: SseHub;
+      executor: ManifestGraphExecutor;
+      cas: CasStore;
+      traceRepo?: TraceRepo;
+      mutationProposalRepo?: MutationProposalRepo;
+    },
   ) {
     this.revisionAgent = new Agent({
       id: 'goalRevisioner',
@@ -137,6 +151,7 @@ Be conservative: small targeted edits, preserve what works.`,
     let totalCost = 0;
     let lastError: string | undefined;
     const history: IterationRecord[] = [];
+    const proposals: MutationProposal[] = [];
     const snapshots = new Map<number, EvolutionSnapshot>();
     snapshots.set(0, {
       iteration: 0,
@@ -254,8 +269,36 @@ Be conservative: small targeted edits, preserve what works.`,
       try {
         const revised = await this.reviseNode(currentManifest, weakest, score);
         const nextManifest: Manifest = this.applyRevision(currentManifest, weakest, revised);
+        const candidateHash = await this.persistManifest(nextManifest, currentHash, manifestHash);
+        if (options.approvalMode === 'proposal') {
+          if (!this.deps.mutationProposalRepo || !options.organizationId) {
+            throw new Error('proposal mode requires mutation proposal storage and organization context');
+          }
+          const proposal = this.deps.mutationProposalRepo.create({
+            organizationId: options.organizationId,
+            sourceHash: currentHash,
+            candidateHash,
+            mutationKind: 'prompt',
+            changes: {
+              nodeId: weakest,
+              before: currentManifest.nodes.find((node) => node.id === weakest)?.manifest.prompt.systemPrompt ?? '',
+              after: nextManifest.nodes.find((node) => node.id === weakest)?.manifest.prompt.systemPrompt ?? '',
+              revision: revised.changes,
+            },
+            rationale: revised.reasoning,
+            expectedOutcome: `Improve the goal score from ${score.toFixed(2)} toward ${currentManifest.evaluation.passThreshold.toFixed(2)}.`,
+            authorType: this.deps.config.llm.defaultProvider === 'simulated' ? 'simulator' : 'system',
+            authorId: this.deps.config.llm.defaultProvider === 'simulated' ? 'local-simulator' : 'goal-evolver',
+            risk: 'medium',
+            confidence: Math.max(0, Math.min(1, score)),
+          });
+          proposals.push(proposal);
+          history[history.length - 1].proposalId = proposal.id;
+          history[history.length - 1].snapshotId = candidateHash;
+          break;
+        }
         currentManifest = nextManifest;
-        currentHash = await this.persistManifest(nextManifest, currentHash, manifestHash);
+        currentHash = candidateHash;
         history[history.length - 1].revised = true;
         history[history.length - 1].snapshotId = `${currentHash}`;
       } catch (e) {
@@ -297,6 +340,8 @@ Be conservative: small targeted edits, preserve what works.`,
       totalCost,
       history,
       error: lastError,
+      pendingApproval: proposals.length > 0,
+      proposals,
     };
   }
 
