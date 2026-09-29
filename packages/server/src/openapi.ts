@@ -59,7 +59,22 @@ export function registerRoute<TApp>(
 const docs = new Map<string, RouteDoc>();
 
 export function registerRouteDoc(d: RouteSpec): void {
-  docs.set(`${d.method.toUpperCase()} ${d.path}`, d);
+  const key = `${d.method.toUpperCase()} ${d.path}`;
+  if (!docs.has(key)) docs.set(key, d);
+}
+
+/**
+ * Register a minimal contract for a route that does not have a hand-authored
+ * OpenAPI description. The route remains discoverable while richer schemas
+ * can be added incrementally without making the whole API undocumented.
+ */
+export function registerFallbackRouteDoc(method: PathMethod, path: string): void {
+  registerRouteDoc({
+    method,
+    path,
+    summary: `${method.toUpperCase()} ${path}`,
+    tags: [path.split('/')[2] || 'api'],
+  });
 }
 
 interface ZodTypeLite {

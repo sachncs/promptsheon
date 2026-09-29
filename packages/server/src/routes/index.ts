@@ -44,7 +44,7 @@ import { registerMergeRequestRoutes, type MRDeps } from './mr.js';
 import { registerSigningRoutes, type SigningDeps } from './signing.js';
 import { registerEvalSuiteRoutes, type EvalSuiteRouteDeps } from './eval-suite.js';
 import { registerVaultRoutes, type VaultRouteDeps } from './vault.js';
-import { registerOpenApiRoutes } from '../openapi.js';
+import { registerFallbackRouteDoc, registerOpenApiRoutes } from '../openapi.js';
 import { registerRetentionRoutes, type RetentionRouteDeps } from './retention.js';
 import { registerRedteamRoutes, type RedteamDeps } from './redteam.js';
 import { registerExperimentRoutes, type ExperimentDeps } from './experiment.js';
@@ -191,6 +191,24 @@ export function resolveScimBearerToken(environment: string, configuredToken = pr
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
+  app.addHook('onRoute', (routeOptions) => {
+    if (!routeOptions.url.startsWith('/api/') || routeOptions.url === '/api/openapi.json') return;
+    const methods = Array.isArray(routeOptions.method) ? routeOptions.method : [routeOptions.method];
+    for (const method of methods) {
+      const normalizedMethod = method.toLowerCase();
+      switch (normalizedMethod) {
+        case 'get':
+        case 'post':
+        case 'put':
+        case 'patch':
+        case 'delete':
+          registerFallbackRouteDoc(normalizedMethod, routeOptions.url);
+          break;
+        default:
+          break;
+      }
+    }
+  });
   registerWorkspaceRoutes(app, new WorkspaceService(deps.workspaceRepo));
   registerProjectRoutes(app, new ProjectService(deps.projectRepo));
   registerCapabilityRoutes(app, new CapabilityService(deps.capabilityRepo));
