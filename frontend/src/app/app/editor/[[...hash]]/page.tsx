@@ -3,7 +3,15 @@
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { manifestApi, validateDagClient, executionApi } from '@/lib/api';
+import {
+  manifestApi,
+  validateDagClient,
+  executionApi,
+  workspaceApi,
+  projectApi,
+  capabilityApi,
+  versionApi,
+} from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -22,6 +30,8 @@ import { NodeConfigPanel } from '@/components/dag/NodeConfigPanel';
 import { QueryError } from '@/components/brand/query-error';
 import { getErrorMessage } from '@/lib/errors';
 import { bootstrapApi } from '@/lib/bootstrap';
+import { ThemedSelect } from '@/components/brand/themed-select';
+import { Input } from '@/components/ui/input';
 import type { Manifest, SubCapabilityManifest } from '@promptsheon/shared';
 import type { Edge } from '@xyflow/react';
 
@@ -73,6 +83,9 @@ export default function ManifestEditorPage() {
   const { toast } = useToast();
   const [manifest, setManifest] = React.useState<Manifest>(blankManifest);
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = React.useState('');
+  const [selectedCapabilityId, setSelectedCapabilityId] = React.useState('');
+  const [newCapabilityName, setNewCapabilityName] = React.useState('');
 
   const { data: loaded, isError: loadError, error: loadErrorDetail, refetch: refetchManifest } = useQuery({
     queryKey: ['manifest', hash],
@@ -85,12 +98,36 @@ export default function ManifestEditorPage() {
     enabled: Boolean(session),
     staleTime: 60_000,
   });
+  const workspaces = useQuery({
+    queryKey: ['workspaces', 'editor'],
+    queryFn: () => workspaceApi.list(1, 100).then((r) => r.data),
+    enabled: Boolean(session),
+  });
+  const workspaceId = workspaces.data?.[0]?.id;
+  const projects = useQuery({
+    queryKey: ['projects', 'editor', workspaceId],
+    queryFn: () => projectApi.list(workspaceId!).then((r) => r.data),
+    enabled: Boolean(session && workspaceId),
+  });
+  const effectiveProjectId = selectedProjectId || projects.data?.[0]?.id || '';
+  const capabilities = useQuery({
+    queryKey: ['capabilities', 'editor', effectiveProjectId],
+    queryFn: () => capabilityApi.list(effectiveProjectId).then((r) => r.data),
+    enabled: Boolean(session && effectiveProjectId),
+  });
 
   React.useEffect(() => {
     // The query is an external source of truth when opening an existing manifest.
     // Local edits remain owned by the editor state after the initial hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (loaded) setManifest(loaded);
+    if (loaded) {
+      // Hydrate editor state from the external manifest query exactly once per loaded value.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setManifest(loaded);
+      const capabilityId = loaded.metadata['capabilityId'];
+      if (typeof capabilityId === 'string' && capabilityId.length > 0) {
+        setSelectedCapabilityId(capabilityId);
+      }
+    }
   }, [loaded]);
 
   const { nodes, edges } = React.useMemo(() => {
@@ -156,12 +193,40 @@ export default function ManifestEditorPage() {
   }, [manifest.nodes.length]);
 
   const saveMutation = useMutation({
-    mutationFn: () => manifestApi.create(manifest).then((r) => r.data),
-    onSuccess: ({ hash: newHash }) => {
+    mutationFn: async () => {
+      if (!effectiveProjectId) throw new Error('Create a project before saving a capability.');
+      let capabilityId = selectedCapabilityId;
+      if (!capabilityId) {
+        if (!newCapabilityName.trim()) throw new Error('Select a capability or enter a name for a new one.');
+        const created = await capabilityApi.create({ projectId: effectiveProjectId, name: newCapabilityName.trim() });
+        capabilityId = created.data.id;
+      }
+      const ownedManifest: Manifest = {
+        ...manifest,
+        metadata: { ...manifest.metadata, capabilityId },
+      };
+      const manifestJson = JSON.stringify(ownedManifest);
+      const { data: saved } = await manifestApi.create(ownedManifest);
+      const { data: versions } = await versionApi.list(capabilityId);
+      const nextVersion = versions.reduce((highest, version) => Math.max(highest, version.version), 0) + 1;
+      await versionApi.create({
+        capabilityId,
+        version: nextVersion,
+        manifest: manifestJson,
+        manifestHash: saved.hash,
+        ...(session?.userId ? { createdBy: session.userId } : {}),
+      });
+      return { ...saved, capabilityId };
+    },
+    onSuccess: ({ hash: newHash, capabilityId }) => {
       void queryClient.invalidateQueries({ queryKey: ['manifests'] });
       void queryClient.invalidateQueries({ queryKey: ['manifest', newHash] });
+      void queryClient.invalidateQueries({ queryKey: ['capabilities'] });
+      void queryClient.invalidateQueries({ queryKey: ['versions', capabilityId] });
+      toast({ title: 'Capability version saved', description: 'The manifest is now owned by a capability and ready for governance.', variant: 'success' });
       router.push(`/app/editor/${newHash}`);
     },
+    onError: (error: unknown) => toast({ title: 'Could not save capability', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   const runPreviewMutation = useMutation({
@@ -197,6 +262,9 @@ export default function ManifestEditorPage() {
   if (loadError) {
     return <QueryError message={loadErrorDetail} onRetry={() => void refetchManifest()} />;
   }
+
+  const projectOptions = (projects.data ?? []).map((project) => ({ value: project.id, label: project.name }));
+  const capabilityOptions = (capabilities.data ?? []).map((capability) => ({ value: capability.id, label: capability.name }));
 
   const TEMPLATES: Array<{ id: string; label: string; description: string; build: () => Manifest }> = [
     {
@@ -283,6 +351,43 @@ export default function ManifestEditorPage() {
       </div>
 
       <Surface padded={false}>
+        <div className="grid gap-4 border-b border-border-subtle bg-surface-2/30 px-4 py-4 lg:grid-cols-[1fr_1fr_1fr] lg:items-end">
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-text-muted" htmlFor="editor-project">Project</label>
+            <ThemedSelect
+              value={effectiveProjectId}
+              onValueChange={(value) => { setSelectedProjectId(value); setSelectedCapabilityId(''); }}
+              options={projectOptions}
+              placeholder="Choose a project"
+              ariaLabel="Capability project"
+              disabled={projectOptions.length === 0}
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-text-muted" htmlFor="editor-capability">Existing capability</label>
+            <ThemedSelect
+              value={selectedCapabilityId}
+              onValueChange={(value) => { setSelectedCapabilityId(value); setNewCapabilityName(''); }}
+              options={capabilityOptions}
+              placeholder="Select or create below"
+              ariaLabel="Existing capability"
+              disabled={!effectiveProjectId || capabilityOptions.length === 0}
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-text-muted" htmlFor="editor-new-capability">Or create capability</label>
+            <Input
+              id="editor-new-capability"
+              value={newCapabilityName}
+              onChange={(event) => { setNewCapabilityName(event.target.value); setSelectedCapabilityId(''); }}
+              placeholder="e.g. Support triage"
+              disabled={!effectiveProjectId}
+            />
+          </div>
+          <p className="text-xs text-text-subtle lg:col-span-3">
+            Save creates an immutable manifest and a capability version together. Choose an owner before saving.
+          </p>
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-subtle px-4 py-2.5">
           <div className="flex flex-wrap items-center gap-1">
             <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle mr-2">Templates</div>
