@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { LlmRouter } from '../llm/router.js';
+import { CircuitBreaker } from '../application/execution-resilience.js';
 
 /**
  * ResponseCache — content-hash-keyed response cache for the
@@ -211,12 +212,15 @@ export class RateLimiter {
 }
 
 export class Gateway {
+  private readonly circuitBreakers = new Map<string, CircuitBreaker>();
+
   constructor(
     private readonly deps: {
       cache: ResponseCache;
       fallback: FallbackChain;
       rateLimiter: RateLimiter;
       router: Pick<LlmRouter, 'complete'>;
+      circuitBreaker?: { failureThreshold?: number; cooldownMs?: number };
     },
   ) {}
 
@@ -246,15 +250,21 @@ export class Gateway {
     let lastError: Error | undefined;
     for (const provider of this.deps.fallback.order()) {
       try {
-        const result = await this.deps.router.complete({
-          prompt: request.prompt,
-          model: request.model,
-          temperature: request.temperature,
-          provider,
-          baseUrl: request.baseUrl,
-          apiKey: request.apiKey,
-          signal: request.signal,
-        });
+        const breaker = this.circuitBreakers.get(provider) ?? new CircuitBreaker(
+          `provider:${provider}`,
+          this.deps.circuitBreaker?.failureThreshold,
+          this.deps.circuitBreaker?.cooldownMs,
+        );
+        this.circuitBreakers.set(provider, breaker);
+        const result = await breaker.execute(() => this.deps.router.complete({
+            prompt: request.prompt,
+            model: request.model,
+            temperature: request.temperature,
+            provider,
+            baseUrl: request.baseUrl,
+            apiKey: request.apiKey,
+            signal: request.signal,
+          }));
         const latencyMs = Date.now() - started;
         this.deps.cache.set({
           ...request,

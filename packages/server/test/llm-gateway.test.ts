@@ -164,6 +164,22 @@ describe('Gateway', () => {
       gw.complete({ prompt: 'p', model: 'm', temperature: 0, provider: 'openai' }, { actorId: 'a' }),
     ).rejects.toMatchObject({ statusCode: 429 });
   });
+
+  it('opens a failing provider circuit before the next upstream call', async () => {
+    let calls = 0;
+    const gw = new Gateway({
+      cache: new ResponseCache(),
+      fallback: new FallbackChain(['openai']),
+      rateLimiter: new RateLimiter({ capacity: 100, refillPerSecond: 100 }),
+      router: stubRouter(async () => { calls += 1; throw new Error('provider down'); }),
+      circuitBreaker: { failureThreshold: 2, cooldownMs: 60_000 },
+    });
+    const request = { prompt: 'circuit', model: 'm', temperature: 0, provider: 'openai' };
+    await expect(gw.complete(request)).rejects.toThrow('provider down');
+    await expect(gw.complete(request)).rejects.toThrow('provider down');
+    await expect(gw.complete(request)).rejects.toThrow('circuit open: provider:openai');
+    expect(calls).toBe(2);
+  });
 });
 
 describe('FallbackChain', () => {
