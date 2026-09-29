@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
-import { releaseApi, approvalApi, auditApi, unwrapList } from '@/lib/api';
+import { releaseApi, approvalApi, auditApi, evalApi, unwrapList } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
@@ -60,6 +60,11 @@ export default function ReleaseDetailPage() {
   const audit = useQuery({
     queryKey: ['audit', 'release', id],
     queryFn: () => auditApi.list({ resource: id }).then((r) => r.data),
+    enabled: Boolean(id),
+  });
+  const evaluations = useQuery({
+    queryKey: ['eval-runs', 'release', id],
+    queryFn: () => evalApi.list(id).then((r) => r.data),
     enabled: Boolean(id),
   });
 
@@ -161,6 +166,8 @@ export default function ReleaseDetailPage() {
   const releaseStatus = r.status ?? r.state ?? 'draft';
   const isTerminal = releaseStatus === 'rolled-back';
   const canaryOrActive = releaseStatus === 'canary' || releaseStatus === 'active';
+  const approvalCount = approvals.data?.length ?? 0;
+  const hasPassingEvaluation = (evaluations.data ?? []).some((run) => run.status === 'passed');
 
   return (
     <div className="space-y-6">
@@ -212,6 +219,18 @@ export default function ReleaseDetailPage() {
             <Button size="sm" variant="outline" onClick={() => setRollbackOpen(true)} disabled={!canaryOrActive || isTerminal}>
               <RotateCcw className="mr-1.5 h-3.5 w-3.5" />Roll back
             </Button>
+          </div>
+          <div className="mt-5 border-t border-border-subtle pt-4">
+            <div className="text-xs font-semibold uppercase tracking-wider text-text-subtle">Promotion checks</div>
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+              <CheckRow label="Distinct approvals" value={`${approvalCount}/2`} ready={approvalCount >= 2} />
+              <CheckRow
+                label="Passing evaluation"
+                value={evaluations.isPending ? 'checking…' : hasPassingEvaluation ? 'passed' : 'required'}
+                ready={hasPassingEvaluation}
+              />
+              <CheckRow label="Operator signature" value={r.signature && r.signedKeyId ? 'valid' : 'required'} ready={Boolean(r.signature && r.signedKeyId)} />
+            </div>
           </div>
         </Surface>
       </div>
@@ -383,6 +402,15 @@ export default function ReleaseDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function CheckRow({ label, value, ready }: { label: string; value: string; ready: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-border-subtle bg-surface-2/40 px-3 py-2">
+      <span className="text-text-muted">{label}</span>
+      <span className={ready ? 'font-medium text-success' : 'font-medium text-warning'}>{value}</span>
     </div>
   );
 }
