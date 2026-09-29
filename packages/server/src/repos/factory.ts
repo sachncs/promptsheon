@@ -43,6 +43,7 @@ import { ReleaseOverlayRepo } from './release-overlay.js';
 import { SearchRepo } from './search.js';
 import type { AgentSpecificationRepo } from './agent-specification.js';
 import { ExecutionJobRepo } from './execution-job.js';
+import { ExecutionCheckpointRepo } from './execution-checkpoint.js';
 
 /**
  * Bundle of every repo in the server. Built once from a
@@ -100,6 +101,7 @@ export interface Repos {
   /** Installed by the composition root after the CAS path is initialized. */
   agentSpecification?: AgentSpecificationRepo;
   executionJob: ExecutionJobRepo;
+  executionCheckpoint: ExecutionCheckpointRepo;
 }
 
 /**
@@ -161,6 +163,7 @@ export function buildRepos(db: Database.Database): Repos {
     idempotency: new IdempotencyRepo(db),
     search: new SearchRepo(db),
     executionJob: new ExecutionJobRepo(db),
+    executionCheckpoint: new ExecutionCheckpointRepo(db),
   };
 }
 
@@ -185,5 +188,6 @@ export { IdempotencyRepo } from './idempotency.js';
 export { ManifestRepo, computeManifestHash } from './manifest.js';
 export { AgentSpecificationRepo } from './agent-specification.js';
 export { ExecutionJobRepo } from './execution-job.js';
+export { ExecutionCheckpointRepo } from './execution-checkpoint.js';
 export type { CutoverReport } from './manifest.js';
 export { OrgRepo, TeamRepo, MembershipRepo } from './org.js';

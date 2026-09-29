@@ -10,7 +10,15 @@ export interface ExecutionWorkerOptions {
 }
 
 export interface ExecutionWorkHandler {
-  run(job: ExecutionJob, signal: AbortSignal): Promise<unknown>;
+  run(job: ExecutionJob, context: ExecutionWorkContext): Promise<unknown>;
+}
+
+export interface ExecutionWorkContext {
+  signal: AbortSignal;
+  checkpoint: {
+    list(executionId: string): Promise<Array<{ stepId: string; state: 'completed' | 'failed'; output: string }>>;
+    save(input: { executionId: string; stepId: string; state: 'completed' | 'failed'; output: string; metadata: Record<string, unknown> }): Promise<unknown>;
+  };
 }
 
 /** Error metadata used by the worker to decide whether a failed attempt is retryable. */
@@ -35,6 +43,10 @@ export class DurableExecutionWorker {
     private readonly jobs: ExecutionJobRepo,
     private readonly handler: ExecutionWorkHandler,
     private readonly options: ExecutionWorkerOptions,
+    private readonly checkpoints?: {
+      list(executionId: string): Array<{ stepId: string; state: 'completed' | 'failed'; output: string }>;
+      save(input: { executionId: string; stepId: string; state: 'completed' | 'failed'; output: string; metadata: Record<string, unknown> }): unknown;
+    },
   ) {
     if (!Number.isInteger(options.maxConcurrency) || options.maxConcurrency < 1) throw new Error('maxConcurrency must be positive');
     if (!Number.isInteger(options.pollMs) || options.pollMs < 1) throw new Error('pollMs must be positive');
@@ -84,7 +96,13 @@ export class DurableExecutionWorker {
     this.controllers.set(job.id, controller);
     const timeout = setTimeout(() => controller.abort(), this.options.leaseMs);
     try {
-      const result = await this.handler.run(job, controller.signal);
+      const result = await this.handler.run(job, {
+        signal: controller.signal,
+        checkpoint: {
+          list: async (executionId) => this.checkpoints?.list(executionId) ?? [],
+          save: async (input) => this.checkpoints?.save(input),
+        },
+      });
       if (controller.signal.aborted) {
         if (this.stopping) {
           this.requeue(job, 'worker shutdown');

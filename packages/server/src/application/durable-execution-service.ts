@@ -4,6 +4,7 @@ import type { AgentSpecificationRecord } from '../repos/agent-specification.js';
 import type { ExecutionJob, ExecutionJobRepo } from '../repos/execution-job.js';
 import { DurableExecutionWorker, type ExecutionWorkerOptions } from './durable-execution-worker.js';
 import { z } from 'zod';
+import type { ExecutionCheckpointRepo } from '../repos/execution-checkpoint.js';
 
 interface ManifestStore {
   get(workspaceId: string, hash: string): Promise<AgentSpecificationRecord>;
@@ -14,6 +15,10 @@ interface ManifestRunner {
     executionId: string;
     inputs: Record<string, unknown>;
     signal?: AbortSignal;
+    checkpoints?: {
+      list(executionId: string): Promise<Array<{ stepId: string; state: 'completed' | 'failed'; output: string }>>;
+      save(input: { executionId: string; stepId: string; state: 'completed' | 'failed'; output: string; metadata: Record<string, unknown> }): Promise<unknown>;
+    };
   }): Promise<unknown>;
 }
 
@@ -23,6 +28,7 @@ export class DurableExecutionService {
     private readonly jobs: ExecutionJobRepo,
     private readonly manifests: ManifestStore,
     private readonly runner: ManifestRunner,
+    private readonly checkpoints: ExecutionCheckpointRepo,
   ) {}
 
   enqueue(input: {
@@ -56,12 +62,13 @@ export class DurableExecutionService {
 
   createWorker(options: Partial<ExecutionWorkerOptions> = {}): DurableExecutionWorker {
     return new DurableExecutionWorker(this.jobs, {
-      run: async (job, signal) => {
+      run: async (job, context) => {
         const record = await this.manifests.get(job.workspaceId, job.agentHash);
         return this.runner.execute(job.agentHash, toManifest(record), {
           executionId: job.id,
           inputs: z.record(z.string(), z.unknown()).parse(JSON.parse(job.inputJson)),
-          signal,
+          signal: context.signal,
+          checkpoints: context.checkpoint,
         });
       },
     }, {
@@ -71,7 +78,7 @@ export class DurableExecutionService {
       leaseMs: options.leaseMs ?? 300_000,
       maxBackoffMs: options.maxBackoffMs ?? 30_000,
       ...(options.random === undefined ? {} : { random: options.random }),
-    });
+    }, this.checkpoints);
   }
 }
 

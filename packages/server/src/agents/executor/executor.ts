@@ -46,6 +46,10 @@ export interface ExecuteOptions {
    * route creates one on the fly.
    */
   traceRunId?: string;
+  checkpoints?: {
+    list(executionId: string): Promise<Array<{ stepId: string; state: 'completed' | 'failed'; output: string }>> | Array<{ stepId: string; state: 'completed' | 'failed'; output: string }>;
+    save(input: { executionId: string; stepId: string; state: 'completed' | 'failed'; output: string; metadata: Record<string, unknown> }): Promise<unknown> | unknown;
+  };
 }
 
 /**
@@ -127,6 +131,11 @@ export class ManifestGraphExecutor {
       totalLatencyMs: 0,
       totalTokens: 0,
     };
+    const recovered = new Map(
+      (await options.checkpoints?.list(options.executionId) ?? [])
+        .filter((checkpoint) => checkpoint.state === 'completed')
+        .map((checkpoint) => [checkpoint.stepId, checkpoint.output]),
+    );
 
     this.deps.hub.broadcast({
       type: 'status',
@@ -140,6 +149,19 @@ export class ManifestGraphExecutor {
         break;
       }
       const nodeStartedAt = Date.now();
+      const recoveredOutput = recovered.get(node.id);
+      if (recoveredOutput !== undefined) {
+        trace.nodeResults[node.id] = {
+          nodeId: node.id,
+          status: 'completed',
+          output: recoveredOutput,
+          latencyMs: 0,
+          costUsd: 0,
+          totalTokens: 0,
+          error: '',
+        };
+        continue;
+      }
       trace.nodeResults[node.id] = {
         nodeId: node.id,
         status: 'running',
@@ -268,6 +290,13 @@ export class ManifestGraphExecutor {
         trace.totalCost += cost;
         trace.totalLatencyMs += latencyMs;
         trace.totalTokens += totalTokens;
+        await options.checkpoints?.save({
+          executionId: options.executionId,
+          stepId: node.id,
+          state: 'completed',
+          output: finalOutput,
+          metadata: { totalTokens, latencyMs, costUsd: cost },
+        });
 
         if (this.deps.costCap) {
           recordCost(

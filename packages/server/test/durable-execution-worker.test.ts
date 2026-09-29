@@ -75,8 +75,8 @@ describe('DurableExecutionWorker', () => {
   it('propagates cancellation to active work', async () => {
     const job = jobs.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: hash('a'), inputHash: hash('cancel'), inputJson: '{}', idempotencyKey: 'cancel' });
     const worker = new DurableExecutionWorker(jobs, {
-      run(_job, signal) {
-        return new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }));
+      run(_job, context) {
+        return new Promise((_, reject) => context.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }));
       },
     }, { workerId: 'worker-1', maxConcurrency: 1, pollMs: 2, leaseMs: 500, maxBackoffMs: 1, random: () => 0 });
     worker.start();

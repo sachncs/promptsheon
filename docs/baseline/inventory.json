@@ -1263,6 +1263,7 @@
     "packages/server/src/repos/dataset.ts",
     "packages/server/src/repos/eval-suite.ts",
     "packages/server/src/repos/eval.ts",
+    "packages/server/src/repos/execution-checkpoint.ts",
     "packages/server/src/repos/execution-job.ts",
     "packages/server/src/repos/execution.ts",
     "packages/server/src/repos/experiment.ts",
@@ -1357,7 +1358,8 @@
     "packages/shared/db/migrations/053_release_overlays.up.sql",
     "packages/shared/db/migrations/054_api_key_organization.up.sql",
     "packages/shared/db/migrations/055_agent_specifications.up.sql",
-    "packages/shared/db/migrations/056_execution_jobs.up.sql"
+    "packages/shared/db/migrations/056_execution_jobs.up.sql",
+    "packages/shared/db/migrations/057_execution_checkpoints.up.sql"
   ],
   "frontendRoutes": [
     {
