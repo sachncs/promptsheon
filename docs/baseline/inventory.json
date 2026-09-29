@@ -1251,6 +1251,7 @@
     "packages/server/src/application/llm-settings-service.ts",
     "packages/server/src/application/manifest-approval-service.ts",
     "packages/server/src/application/project-service.ts",
+    "packages/server/src/application/provider-adapters.ts",
     "packages/server/src/application/release-service.ts",
     "packages/server/src/application/repository-service.ts",
     "packages/server/src/application/schedule-service.ts",
