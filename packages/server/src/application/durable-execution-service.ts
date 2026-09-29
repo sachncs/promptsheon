@@ -8,7 +8,7 @@ import type { ExecutionCheckpointRepo } from '../repos/execution-checkpoint.js';
 import { ExecutionTimeoutError } from '../agents/executor/executor.js';
 import { ExecutionWorkError } from './durable-execution-worker.js';
 import type { ToolAuthorizer, ToolRegistry } from './execution-ports.js';
-import type { EvidenceRepo } from '../repos/evidence.js';
+import type { EvidenceRecorder } from '../observability/evidence-sink.js';
 
 export class ExecutionWorkspaceScopeError extends Error {
   constructor(jobId: string, workspaceId: string) {
@@ -46,7 +46,7 @@ export class DurableExecutionService {
     private readonly checkpoints: ExecutionCheckpointRepo,
     private readonly tools?: ToolRegistry,
     private readonly toolAuthorizer?: ToolAuthorizer,
-    private readonly evidence?: EvidenceRepo,
+    private readonly evidence?: EvidenceRecorder,
   ) {}
 
   enqueue(input: {
@@ -166,7 +166,7 @@ export class DurableExecutionService {
   }): void {
     if (!this.evidence) return;
     try {
-      this.evidence.append({
+      this.evidence.record({
         eventType: input.eventType,
         organizationId: input.job.organizationId,
         correlationId: input.job.id,
