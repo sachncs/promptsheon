@@ -83,9 +83,14 @@ Implemented in the current Phase 2 slice:
 - Immutable agent-hash loading through the Phase 1 specification repository.
 - Execution budget checks, provider/tool ports, DAG dependency scheduling with
   bounded parallelism, and durable per-step checkpoints/resume.
+- Provider-neutral router adapter injection for durable tool-free nodes, with
+  validated response normalization and abort propagation.
+- Registered Strands tools are filtered through the specification allowlist and
+  denied at the pre-tool hook boundary; queue throughput coverage exercises
+  250 durable claims without duplicate ownership.
 
-Remaining exit-gate work includes replacing the legacy Strands provider
-construction with injected provider adapters, end-to-end tool permission
-enforcement for actual tool calls, load/contention benchmarks, and final
-verification after those changes. Circuit breakers now protect both the
-gateway provider path and durable node invocations.
+Remaining exit-gate work includes provider-backed execution for nodes that
+actually invoke tools, end-to-end ToolAdapter registration and authorization,
+deeper SQLite contention benchmarks, and final verification after those
+changes. Circuit breakers now protect both the gateway provider path and
+durable node invocations.
