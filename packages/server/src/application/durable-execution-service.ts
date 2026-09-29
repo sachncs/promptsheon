@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Manifest } from '@promptsheon/shared';
 import type { AgentSpecificationRecord } from '../repos/agent-specification.js';
-import type { ExecutionJob, ExecutionJobRepo } from '../repos/execution-job.js';
+import type { ExecutionJob, ExecutionJobRepo, ExecutionQueueMetrics } from '../repos/execution-job.js';
 import { DurableExecutionWorker, type ExecutionWorkerOptions } from './durable-execution-worker.js';
 import { z } from 'zod';
 import type { ExecutionCheckpointRepo } from '../repos/execution-checkpoint.js';
@@ -59,6 +59,10 @@ export class DurableExecutionService {
     return this.jobs.get(organizationId, id);
   }
 
+  metrics(organizationId: string): ExecutionQueueMetrics {
+    return this.jobs.metrics(organizationId);
+  }
+
   cancel(organizationId: string, id: string): ExecutionJob {
     if (this.worker) return this.worker.cancel(organizationId, id);
     return this.jobs.cancel(organizationId, id);
@@ -99,6 +103,7 @@ export class DurableExecutionService {
       pollMs: options.pollMs ?? 100,
       leaseMs: options.leaseMs ?? 300_000,
       maxBackoffMs: options.maxBackoffMs ?? 30_000,
+      maxConcurrencyPerOrganization: options.maxConcurrencyPerOrganization ?? 2,
       ...(options.random === undefined ? {} : { random: options.random }),
     }, this.checkpoints);
     return this.worker;

@@ -6,6 +6,7 @@ export interface ExecutionWorkerOptions {
   pollMs: number;
   leaseMs: number;
   maxBackoffMs: number;
+  maxConcurrencyPerOrganization?: number;
   random?: () => number;
 }
 
@@ -38,6 +39,7 @@ export class DurableExecutionWorker {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private stopping = false;
   private active = 0;
+  private readonly activeByOrganization = new Map<string, number>();
 
   constructor(
     private readonly jobs: ExecutionJobRepo,
@@ -79,9 +81,19 @@ export class DurableExecutionWorker {
     while (!this.stopping && this.active < this.options.maxConcurrency) {
       const job = this.jobs.claimNext(this.options.workerId, this.options.leaseMs);
       if (!job) break;
+      const activeForOrganization = this.activeByOrganization.get(job.organizationId) ?? 0;
+      const organizationLimit = this.options.maxConcurrencyPerOrganization ?? this.options.maxConcurrency;
+      if (activeForOrganization >= organizationLimit) {
+        this.jobs.releaseClaim(job.organizationId, job.id, new Date(Date.now() + this.options.pollMs).toISOString());
+        continue;
+      }
       this.active++;
+      this.activeByOrganization.set(job.organizationId, activeForOrganization + 1);
       void this.run(job).finally(() => {
         this.active--;
+        const remaining = (this.activeByOrganization.get(job.organizationId) ?? 1) - 1;
+        if (remaining === 0) this.activeByOrganization.delete(job.organizationId);
+        else this.activeByOrganization.set(job.organizationId, remaining);
         void this.pump();
       });
     }

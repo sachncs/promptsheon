@@ -69,4 +69,13 @@ describe('execution job routes', () => {
     expect(response.statusCode).toBe(401);
     await unauthenticated.close();
   });
+
+  it('returns a conflict for an idempotency key with different content', async () => {
+    const url = '/api/workspaces/11111111-1111-4111-8111-111111111111/execution-jobs';
+    const first = await app.inject({ method: 'POST', url, payload: { agentHash: 'a'.repeat(64), inputs: {}, idempotencyKey: 'conflict' } });
+    const second = await app.inject({ method: 'POST', url, payload: { agentHash: 'b'.repeat(64), inputs: {}, idempotencyKey: 'conflict' } });
+    expect(first.statusCode).toBe(202);
+    expect(second.statusCode).toBe(409);
+    expect(second.json().error.code).toBe('IDEMPOTENCY_CONFLICT');
+  });
 });

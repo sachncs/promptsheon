@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { DurableExecutionService } from '../application/durable-execution-service.js';
 import type { WorkspaceRepo } from '../repos/workspace.js';
+import { IdempotencyConflictError } from '../repos/execution-job.js';
 import { parseBody, parseParams } from './validate.js';
 
 const CreateJobSchema = z.strictObject({
@@ -34,8 +35,20 @@ export function registerExecutionJobRoutes(app: FastifyInstance, deps: { service
     if (!params.ok || !deps.workspaceRepo.findByIdInOrg(params.data.workspaceId, organizationId)) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'workspace not found' } });
     const parsed = parseBody(reply, CreateJobSchema, request.body);
     if (!parsed.ok) return;
-    const job = deps.service.enqueue({ organizationId, workspaceId: params.data.workspaceId, ...parsed.data });
+    let job;
+    try {
+      job = deps.service.enqueue({ organizationId, workspaceId: params.data.workspaceId, ...parsed.data });
+    } catch (error) {
+      if (error instanceof IdempotencyConflictError) return reply.code(409).send({ error: { code: 'IDEMPOTENCY_CONFLICT', message: error.message } });
+      throw error;
+    }
     return reply.code(202).send(job);
+  });
+
+  app.get('/api/execution-jobs/metrics', async (request, reply) => {
+    const organizationId = requireOrganization(request, reply);
+    if (!organizationId) return;
+    return reply.send(deps.service.metrics(organizationId));
   });
 
   app.get('/api/workspaces/:workspaceId/execution-jobs/:id', async (request, reply) => {

@@ -24,6 +24,26 @@ export interface ExecutionJob {
   completedAt: string | null;
 }
 
+export interface ExecutionQueueMetrics {
+  queued: number;
+  running: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+  timedOut: number;
+  partiallyCompleted: number;
+  oldestQueuedAt: string | null;
+}
+
+export class IdempotencyConflictError extends Error {
+  readonly statusCode = 409;
+
+  constructor(key: string) {
+    super(`idempotency key already belongs to a different execution request: ${key}`);
+    this.name = 'IdempotencyConflictError';
+  }
+}
+
 interface JobRow {
   id: string;
   organization_id: string;
@@ -63,7 +83,7 @@ export class ExecutionJobRepo {
     ).get(input.organizationId, input.idempotencyKey) as JobRow | undefined;
     if (existing) {
       if (existing.agent_hash !== input.agentHash || existing.input_hash !== input.inputHash) {
-        throw new Error('idempotency key already belongs to a different execution request');
+        throw new IdempotencyConflictError(input.idempotencyKey);
       }
       return toJob(existing);
     }
@@ -84,6 +104,26 @@ export class ExecutionJobRepo {
     ).get(organizationId, id) as JobRow | undefined;
     if (!row) throw new NotFoundError('execution job', id);
     return toJob(row);
+  }
+
+  metrics(organizationId: string): ExecutionQueueMetrics {
+    const rows = this.db.prepare(
+      'SELECT state, COUNT(*) AS count FROM execution_jobs WHERE organization_id = ? GROUP BY state',
+    ).all(organizationId) as Array<{ state: ExecutionState; count: number }>;
+    const counts = new Map(rows.map((row) => [row.state, row.count]));
+    const oldest = this.db.prepare(
+      "SELECT MIN(created_at) AS created_at FROM execution_jobs WHERE organization_id = ? AND state = 'queued'",
+    ).get(organizationId) as { created_at: string | null };
+    return {
+      queued: counts.get('queued') ?? 0,
+      running: counts.get('running') ?? 0,
+      completed: counts.get('completed') ?? 0,
+      failed: counts.get('failed') ?? 0,
+      cancelled: counts.get('cancelled') ?? 0,
+      timedOut: counts.get('timed-out') ?? 0,
+      partiallyCompleted: counts.get('partially-completed') ?? 0,
+      oldestQueuedAt: oldest.created_at,
+    };
   }
 
   claimNext(workerId: string, leaseMs: number): ExecutionJob | null {
@@ -125,6 +165,16 @@ export class ExecutionJobRepo {
     `).run(to, fields.resultJson ?? null, fields.error ?? null, fields.availableAt ?? null,
       fields.leaseOwner ?? null, fields.leaseExpiresAt ?? null, to, now, organizationId, id, from);
     if (result.changes === 0) throw new Error(`execution ${id} was not in expected state ${from}`);
+    return this.get(organizationId, id);
+  }
+
+  releaseClaim(organizationId: string, id: string, availableAt: string): ExecutionJob {
+    const result = this.db.prepare(`
+      UPDATE execution_jobs
+      SET state = 'queued', attempts = MAX(0, attempts - 1), available_at = ?, lease_owner = NULL, lease_expires_at = NULL
+      WHERE organization_id = ? AND id = ? AND state = 'running'
+    `).run(availableAt, organizationId, id);
+    if (result.changes === 0) throw new Error(`execution ${id} is not claimed by a worker`);
     return this.get(organizationId, id);
   }
 

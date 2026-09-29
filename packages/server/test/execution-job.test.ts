@@ -60,4 +60,9 @@ describe('ExecutionJobRepo', () => {
     expect(repo.get('org1', retryable.id).state).toBe('queued');
     expect(repo.get('org1', exhausted.id).state).toBe('failed');
   });
+
+  it('reports queue depth and age by organization', () => {
+    repo.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: 'a'.repeat(64), inputHash: 'i'.repeat(64), inputJson: '{}', idempotencyKey: 'metrics' });
+    expect(repo.metrics('org1')).toMatchObject({ queued: 1, running: 0, completed: 0, oldestQueuedAt: expect.any(String) });
+  });
 });

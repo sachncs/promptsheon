@@ -402,6 +402,11 @@
     {
       "file": "packages/server/src/routes/execution-jobs.ts",
       "method": "GET",
+      "path": "/api/execution-jobs/metrics"
+    },
+    {
+      "file": "packages/server/src/routes/execution-jobs.ts",
+      "method": "GET",
       "path": "/api/workspaces/:workspaceId/execution-jobs/:id"
     },
     {
