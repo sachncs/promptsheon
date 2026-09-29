@@ -42,7 +42,10 @@ export class AsyncEvidenceSink implements EvidenceRecorder {
       if (removable >= 0) {
         this.queue.splice(removable, 1);
         this.dropped += 1;
-      } else if (!NON_DROPPABLE.has(input.eventType)) {
+      } else {
+        // Keep the buffer strictly bounded even during an error storm. High
+        // priority events are retained preferentially, but cannot make the
+        // queue unbounded when every existing slot is already high priority.
         this.dropped += 1;
         return;
       }
