@@ -14,6 +14,16 @@ Promote validated candidates safely and make rollback deterministic.
 
 ## Implementation
 
+## Implementation status
+
+Mutation candidates can be explicitly promoted into draft releases after
+approval. Release transitions into `approved`, `canary`, or `active` now also
+require an organization-scoped passing evaluation run in addition to the
+maker-checker approval gate. Draft creation never activates traffic.
+
+Canary rollout automation, rollback triggers, signed release manifests, and
+full promotion concurrency testing remain in progress.
+
 - Define lifecycle states: draft, validated, approved, canary, active,
   deprecated, rolled back, and archived.
 - Keep release records separate from immutable agent specifications.
@@ -64,4 +74,3 @@ Promote validated candidates safely and make rollback deterministic.
 - No candidate can bypass required evaluation or approval.
 - Canary rollout and rollback are tested under failure.
 - Operators can prove who approved and promoted every release.
-
