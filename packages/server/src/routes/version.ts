@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { PaginationSchema } from '@promptsheon/shared';
+import { ManifestSchema, PaginationSchema, mergeDraftManifest } from '@promptsheon/shared';
 import type { VersionRepo } from '../repos/version.js';
 import type { ManifestRepo } from '../repos/manifest.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
@@ -86,15 +86,18 @@ export function registerVersionRoutes(
     const parsed = parseBody(reply, CreateVersionSchema, request.body);
     if (!parsed.ok) return;
     let canonicalHash: string;
+    let normalizedManifest: string;
     try {
-      canonicalHash = manifestRepo.computeManifestHash(parsed.data.manifest);
+      const manifest = ManifestSchema.parse(mergeDraftManifest(JSON.parse(parsed.data.manifest)));
+      normalizedManifest = JSON.stringify(manifest);
+      canonicalHash = manifestRepo.computeManifestHash(normalizedManifest);
     } catch {
       return reply.code(422).send({ error: { code: 'INVALID_MANIFEST', message: 'manifest must be a valid JSON object' } });
     }
     if (parsed.data.manifestHash !== canonicalHash) {
       return reply.code(422).send({ error: { code: 'MANIFEST_HASH_MISMATCH', message: 'manifestHash does not match manifest content' } });
     }
-    const item = repo.createInOrg(parsed.data, organizationId);
+    const item = repo.createInOrg({ ...parsed.data, manifest: normalizedManifest, manifestHash: canonicalHash }, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'capability not found' } });
 
     // Register the manifest in manifest_dag so maker-checker approvals can
@@ -104,7 +107,7 @@ export function registerVersionRoutes(
         capabilityId: parsed.data.capabilityId,
         version: parsed.data.version,
         manifestHash: canonicalHash,
-        manifestJson: parsed.data.manifest,
+        manifestJson: normalizedManifest,
         goal: parsed.data.goal,
         createdBy: parsed.data.createdBy,
       });
