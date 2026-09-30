@@ -5,5 +5,7 @@ export default defineConfig({
     environment: 'node',
     globals: false,
     include: ['test/**/*.test.ts'],
+    // Keep concurrent SSR transforms bounded on small CI runners.
+    maxWorkers: 2,
   },
 });
