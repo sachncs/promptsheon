@@ -285,12 +285,17 @@ async function main() {
   app.addHook(
     'preHandler',
     authMiddleware(config, repos.apiKey, config.auth.svidPublicKeyPem
-      ? { svidPublicKeyPem: config.auth.svidPublicKeyPem }
-      : {}),
+      ? {
+          svidPublicKeyPem: config.auth.svidPublicKeyPem,
+          systemUserId: () => repos.user.list().find((user) => user.role === 'admin')?.id,
+        }
+      : {
+          systemUserId: () => repos.user.list().find((user) => user.role === 'admin')?.id,
+        }),
   );
   app.addHook('preHandler', orgContextMiddleware({
     membershipRepo: repos.membership,
-    systemOrganizationId: () => repos.org.findMany({ page: 1, pageSize: 1 }).items[0]?.id,
+    systemOrganizationId: () => repos.org.findLatest()?.id,
   }));
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {

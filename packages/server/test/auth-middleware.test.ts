@@ -170,6 +170,20 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
     expect((req as unknown as FastifyRequest).principal).toEqual({ type: 'System', id: 'development' });
   });
 
+  it('uses the configured local system identity when one is available', async () => {
+    const config: AppConfig = {
+      ...baseConfig,
+      auth: { enabled: false, jwtSecret: '' },
+    };
+    const mw = authMiddleware(config, makeApiKeyRepo({}), { systemUserId: () => 'admin-1' });
+    const req = makeReq({});
+    const mock = makeReply();
+    await mw(req, mock.reply);
+    expect(mock.code).toBe(200);
+    expect((req as unknown as Record<string, string>).userId).toBe('admin-1');
+    expect((req as unknown as FastifyRequest).principal).toEqual({ type: 'System', id: 'admin-1' });
+  });
+
   it('tags the request as bootstrap on /api/bootstrap/* paths', async () => {
     const mw = authMiddleware(baseConfig, makeApiKeyRepo({}));
     const req = makeReq({}, '/api/bootstrap/admin');

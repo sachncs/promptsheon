@@ -12,6 +12,14 @@ export class OrgRepo extends BaseRepo<Org> {
     return this.db.prepare('SELECT * FROM orgs WHERE slug = ?').get(slug) as Org | null;
   }
 
+  /** Return the most recently created organization for local system sessions. */
+  findLatest(): Org | null {
+    const row = this.db
+      .prepare('SELECT * FROM orgs ORDER BY created_at DESC, id DESC LIMIT 1')
+      .get() as Record<string, unknown> | undefined;
+    return row ? this.mapRow(row) : null;
+  }
+
   create(data: { name: string; slug: string }): Org {
     const id = randomUUID();
     const now = new Date().toISOString();
@@ -35,6 +43,16 @@ export class OrgRepo extends BaseRepo<Org> {
     return this.db
       .prepare(`SELECT * FROM orgs WHERE id IN (${placeholders}) ORDER BY created_at ASC`)
       .all(...ids) as Org[];
+  }
+
+  private mapRow(row: Record<string, unknown>): Org {
+    return {
+      id: String(row['id']),
+      name: String(row['name']),
+      slug: String(row['slug']),
+      createdAt: String(row['created_at']),
+      updatedAt: String(row['updated_at']),
+    };
   }
 }
 

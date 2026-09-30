@@ -52,7 +52,7 @@ const PUBLIC_PATHS = new Set([
 export function authMiddleware(
   config: AppConfig,
   apiKeyRepo: ApiKeyRepo,
-  opts: { svidPublicKeyPem?: string } = {},
+  opts: { svidPublicKeyPem?: string; systemUserId?: () => string | undefined } = {},
 ) {
   const svidPublicKeyPem = opts.svidPublicKeyPem;
   return async (request: FastifyRequest, reply: FastifyReply) => {
@@ -68,9 +68,10 @@ export function authMiddleware(
     }
 
     if (!config.auth.enabled) {
-      request.userId = 'development';
+      const systemUserId = opts.systemUserId?.() ?? 'development';
+      request.userId = systemUserId;
       request.userRole = 'admin';
-      request.principal = { type: 'System', id: 'development' };
+      request.principal = { type: 'System', id: systemUserId };
       request.orgContextBypass = true;
       return;
     }
