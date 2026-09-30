@@ -64,7 +64,20 @@ export default function OnboardingPage() {
     if (!status.data.needsAdmin && !status.data.needsLlm) {
       const existing = getSession();
       if (existing) {
-        router.replace('/app');
+        restoreAttempted.current = true;
+        userApi.me()
+          .then(() => router.replace('/app'))
+          .catch((error: unknown) => {
+            clearSession();
+            bootstrapApi.admin()
+              .then((data) => {
+                setRestoreCandidate(data);
+                setRestoreError(error instanceof Error ? error.message : 'The saved browser session could not be verified.');
+              })
+              .catch((adminError: unknown) => {
+                setRestoreError(adminError instanceof Error ? adminError.message : 'We could not restore the administrator session.');
+              });
+          });
         return;
       }
       if (restoreAttempted.current) return;

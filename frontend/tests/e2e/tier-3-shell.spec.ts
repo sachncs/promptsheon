@@ -83,4 +83,34 @@ test.describe('tier 3: app shell after onboarding', () => {
     await expect(page.getByText('Restore your browser session')).toBeVisible();
     await expect(page.getByText(/invalid|rejected|unauthorized/i).first()).toBeVisible();
   });
+
+  test('validates an existing session before redirecting from onboarding', async ({ page, request }) => {
+    const session = await bootstrapAdminViaApi(BACKEND_URL, {
+      orgName: `Stale Session Org ${Date.now()}`,
+      adminEmail: `stale-session-${Date.now()}@promptsheon.test`,
+    });
+    const response = await request.post(`${BACKEND_URL}/api/bootstrap/llm`, {
+      headers: { Authorization: `Bearer ${session.apiKey}` },
+      data: { provider: 'simulated', model: 'promptsheon-stale-session-simulator' },
+    });
+    expect(response.ok(), `simulator setup failed: ${await response.text()}`).toBeTruthy();
+
+    await page.goto('/');
+    await page.evaluate((input) => {
+      window.localStorage.setItem('promptsheon:session:v1', JSON.stringify({
+        userId: input.userId,
+        userName: input.userName,
+        userEmail: input.userEmail,
+        orgId: input.orgId,
+        orgName: input.orgName,
+        apiKey: 'pk_stale_session',
+        completedAt: new Date().toISOString(),
+      }));
+    }, session);
+
+    await page.goto('/onboarding');
+    await expect(page).toHaveURL(/\/onboarding$/);
+    await expect(page.getByText('Restore your browser session')).toBeVisible();
+    await expect(page.getByText(/could not be verified|invalid|unauthorized/i).first()).toBeVisible();
+  });
 });
