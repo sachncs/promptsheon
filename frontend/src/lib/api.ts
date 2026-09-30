@@ -3058,7 +3058,9 @@ export const traceApi = {
 export const evidenceApi = {
   list: async (options: { limit?: number; before?: string; eventType?: string; agentHash?: string; workspaceId?: string } = {}): Promise<{ data: z.infer<typeof EvidencePageSchema> }> => {
     const r = await client.get<unknown>('/evidence', { params: options });
-    return { data: EvidencePageSchema.parse(r.data) };
+    const parsed = EvidencePageSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid evidence data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
   },
   export: async (options: { limit?: number; before?: string; eventType?: string; workspaceId?: string } = {}): Promise<{
     schemaVersion: string;
@@ -3067,12 +3069,14 @@ export const evidenceApi = {
     items: EvidenceRecord[];
   }> => {
     const r = await client.get<unknown>('/evidence/export', { params: options });
-    return z.object({
+    const parsed = z.object({
       schemaVersion: z.string(),
       organizationId: z.string(),
       exportedAt: z.string(),
       items: z.array(EvidenceRecordSchema),
-    }).parse(r.data);
+    }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid evidence export data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
   },
 };
 
@@ -3167,19 +3171,34 @@ export interface AuditReport {
   entries: AuditReportEntry[];
 }
 
+const AuditReportSchema = z.object({
+  id: z.string(),
+  generatedAt: z.string(),
+  generatedBy: z.string().nullable(),
+  organizationId: z.string(),
+  range: z.object({ from: z.string().nullable(), to: z.string().nullable() }),
+  filters: z.record(z.string(), z.union([z.string(), z.number()])),
+  entryCount: z.number().int().nonnegative(),
+  chainValid: z.boolean(),
+  chainHead: z.string(),
+  chainVerifiedAt: z.string(),
+  signature: z.object({ algorithm: z.string(), value: z.string() }),
+  entries: z.array(z.object({ id: z.string(), timestamp: z.string(), actor: z.string(), action: z.string(), resource: z.string(), details: z.string() })),
+});
+
 export const auditApi = {
   list: async (params?: { resource?: string; action?: string }): Promise<{ data: AuditEntry[] }> => {
     const r = await client.get<unknown>('/audit', { params });
     return { data: parseAuditEntries(r.data) };
   },
-  report: (opts: {
+  report: async (opts: {
     fromTime?: string;
     toTime?: string;
     actor?: string;
     resource?: string;
     action?: string;
     limit?: number;
-  } = {}) => {
+  } = {}): Promise<AuditReport> => {
     const params: Record<string, string | number> = {};
     if (opts.fromTime) params['fromTime'] = opts.fromTime;
     if (opts.toTime) params['toTime'] = opts.toTime;
@@ -3187,15 +3206,20 @@ export const auditApi = {
     if (opts.resource) params['resource'] = opts.resource;
     if (opts.action) params['action'] = opts.action;
     if (opts.limit) params['limit'] = opts.limit;
-    return client
+    const response = await client
       .get<ArrayBuffer>('/audit/report', {
         params,
         responseType: 'arraybuffer',
-      })
-      .then((r) => {
-        const text = new TextDecoder().decode(r.data);
-        return JSON.parse(text) as AuditReport;
       });
+    let raw: unknown;
+    try {
+      raw = JSON.parse(new TextDecoder().decode(response.data)) as unknown;
+    } catch {
+      throw new ApiError('The server returned invalid audit report JSON.', { code: 'INVALID_RESPONSE' });
+    }
+    const parsed = AuditReportSchema.safeParse(raw);
+    if (!parsed.success) throw new ApiError('The server returned invalid audit report data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
   },
 };
 
