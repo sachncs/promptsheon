@@ -2964,16 +2964,42 @@ export interface PlaygroundRun {
   latencyMs: number;
 }
 
+const PlaygroundRunSchema = z.object({
+  content: z.string(),
+  provider: z.string(),
+  model: z.string(),
+  promptTokens: z.number().int().nonnegative(),
+  completionTokens: z.number().int().nonnegative(),
+  costUsd: z.number().nonnegative(),
+  cacheHit: z.boolean(),
+  latencyMs: z.number().nonnegative(),
+});
+
+const PlaygroundSweepSchema = z.object({
+  base: z.object({ model: z.string(), provider: z.string() }),
+  variants: z.array(z.object({
+    variant: z.object({ prompt: z.string(), temperature: z.number() }),
+    status: z.enum(['fulfilled', 'rejected']),
+    value: PlaygroundRunSchema.optional(),
+    error: z.string().optional(),
+  })),
+});
+
 export const playgroundApi = {
-  complete: (data: {
+  complete: async (data: {
     prompt: string;
     model: string;
     provider: 'openai' | 'anthropic' | 'bedrock' | 'custom' | 'simulated';
     temperature?: number;
     baseUrl?: string;
     apiKey?: string;
-  }) => client.post<PlaygroundRun>('/playground/complete', data).then((r) => r.data),
-  sweep: (data: {
+  }): Promise<PlaygroundRun> => {
+    const r = await client.post<unknown>('/playground/complete', data);
+    const parsed = PlaygroundRunSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid playground output.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  sweep: async (data: {
     base: {
       prompt: string;
       model: string;
@@ -2982,18 +3008,12 @@ export const playgroundApi = {
       apiKey?: string;
     };
     variants: Array<{ prompt: string; temperature: number }>;
-  }) =>
-    client
-      .post<{
-        base: { model: string; provider: string };
-        variants: Array<{
-          variant: { prompt: string; temperature: number };
-          status: 'fulfilled' | 'rejected';
-          value?: PlaygroundRun;
-          error?: string;
-        }>;
-      }>('/playground/sweep', data)
-      .then((r) => r.data),
+  }): Promise<z.infer<typeof PlaygroundSweepSchema>> => {
+    const r = await client.post<unknown>('/playground/sweep', data);
+    const parsed = PlaygroundSweepSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid playground sweep data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
 };
 
 export const traceApi = {

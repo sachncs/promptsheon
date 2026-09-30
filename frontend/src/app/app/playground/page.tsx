@@ -34,7 +34,7 @@ export default function PlaygroundPage() {
   const [variants, setVariants] = useState<Variant[]>([]);
   const [singleResult, setSingleResult] = useState<PlaygroundRun | null>(null);
   const [sweepResults, setSweepResults] = useState<
-    Array<{ variant: Variant; status: 'fulfilled' | 'rejected'; value?: PlaygroundRun; error?: string }>
+    Array<{ variant: Variant; status: 'fulfilled' | 'rejected'; value?: PlaygroundRun | undefined; error?: string | undefined }>
   >([]);
 
   const completeMutation = useMutation({
