@@ -21,6 +21,7 @@ const ReleaseRowSchema = z.object({
   release_signature: z.string().nullable(),
   signed_key_id: z.string().nullable(),
   signed_at: z.string().nullable(),
+  promotion_proposal_id: z.string().nullable().optional(),
 });
 
 function toRelease(row: unknown): Release {
@@ -42,6 +43,7 @@ function toRelease(row: unknown): Release {
     signature: value.release_signature,
     signedKeyId: value.signed_key_id,
     signedAt: value.signed_at,
+    promotionProposalId: value.promotion_proposal_id ?? null,
   };
 }
 
@@ -102,15 +104,27 @@ export class ReleaseRepo extends BaseRepo<Release> {
     return row ? toRelease(row) : null;
   }
 
+  findByPromotionProposalInOrg(proposalId: string, organizationId: string): Release | null {
+    const row = this.db.prepare(
+      `SELECT r.*
+       FROM releases r
+       JOIN capabilities c ON c.id = r.capability_id
+       JOIN projects p ON p.id = c.project_id
+       JOIN workspaces w ON w.id = p.workspace_id
+       WHERE r.promotion_proposal_id = ? AND w.org_id = ?`,
+    ).get(proposalId, organizationId);
+    return row ? toRelease(row) : null;
+  }
+
   createInOrg(
-    data: { capabilityId: string; capabilityVersion: number; capabilityVersionId: string | null; manifest: string; environment: string; createdBy?: string; canaryPercent?: number },
+    data: { capabilityId: string; capabilityVersion: number; capabilityVersionId: string | null; manifest: string; environment: string; createdBy?: string; canaryPercent?: number; promotionProposalId?: string | undefined },
     organizationId: string,
   ): Release | null {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     const result = this.db.prepare(`
-      INSERT INTO releases (id, capability_id, capability_version, capability_version_id, manifest, environment, status, created_by, canary_percent, created_at, updated_at)
-      SELECT ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?
+      INSERT INTO releases (id, capability_id, capability_version, capability_version_id, manifest, environment, status, created_by, canary_percent, created_at, updated_at, promotion_proposal_id)
+      SELECT ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?
       WHERE EXISTS (
         SELECT 1 FROM capabilities c
         JOIN projects p ON p.id = c.project_id
@@ -120,7 +134,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
     `).run(
       id, data.capabilityId, data.capabilityVersion, data.capabilityVersionId,
       data.manifest, data.environment, data.createdBy ?? '', data.canaryPercent ?? 0,
-      now, now, data.capabilityId, organizationId,
+      now, now, data.promotionProposalId ?? null, data.capabilityId, organizationId,
     );
     if (result.changes === 0) return null;
     return this.findByIdInOrg(id, organizationId);

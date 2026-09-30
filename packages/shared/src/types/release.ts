@@ -34,6 +34,7 @@ export interface Release {
   signature?: string | null;
   signedKeyId?: string | null;
   signedAt?: string | null;
+  promotionProposalId?: string | null | undefined;
 }
 
 export interface ReleaseTransition {

@@ -111,7 +111,7 @@ describe('MutationProposalRepo', () => {
       repo,
       cas,
       { registerFromRaw: (input: { manifestHash: string }) => { registeredHash = input.manifestHash; } } as never,
-      { findByIdInOrg: () => release, createInOrg: () => { releaseCreates += 1; return release; } } as never,
+      { findByIdInOrg: () => release, findByPromotionProposalInOrg: () => null, createInOrg: () => { releaseCreates += 1; return release; } } as never,
     );
 
     const [result, repeated] = await Promise.all([

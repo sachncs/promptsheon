@@ -62,6 +62,13 @@ export class MutationPromotionService {
     }
     if (!proposal.candidateHash) throw new MutationPromotionError('mutation proposal has no candidate manifest');
 
+    const existingPromotion = this.releases.findByPromotionProposalInOrg(input.proposalId, input.organizationId);
+    if (existingPromotion) {
+      const updated = this.proposals.markPromoted(input.proposalId, input.organizationId, existingPromotion.id);
+      if (!updated) throw new MutationPromotionError('mutation proposal could not be marked as promoted');
+      return { proposal: updated, release: existingPromotion };
+    }
+
     const object = await this.cas.readObject(proposal.candidateHash);
     if (object.type !== 'blob') throw new MutationPromotionError('candidate manifest is not a blob');
     const manifestJson = decodeBlob(object.data);
@@ -87,14 +94,21 @@ export class MutationPromotionService {
       goal: typeof parsed.data.metadata['goal'] === 'string' ? parsed.data.metadata['goal'] : undefined,
       createdBy: input.actorId,
     });
-    const release = this.releases.createInOrg({
-      capabilityId,
-      capabilityVersion: parsed.data.version,
-      capabilityVersionId: null,
-      manifest: manifestJson,
-      environment: input.environment,
-      createdBy: input.actorId,
-    }, input.organizationId);
+    let release: Release | null;
+    try {
+      release = this.releases.createInOrg({
+        capabilityId,
+        capabilityVersion: parsed.data.version,
+        capabilityVersionId: null,
+        manifest: manifestJson,
+        environment: input.environment,
+        createdBy: input.actorId,
+        promotionProposalId: input.proposalId,
+      }, input.organizationId);
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes('UNIQUE constraint failed: releases.promotion_proposal_id')) throw error;
+      release = this.releases.findByPromotionProposalInOrg(input.proposalId, input.organizationId);
+    }
     if (!release) throw new MutationPromotionError('candidate capability is not visible in the organization');
     const updated = this.proposals.markPromoted(input.proposalId, input.organizationId, release.id);
     if (!updated) throw new MutationPromotionError('mutation proposal could not be marked as promoted');
