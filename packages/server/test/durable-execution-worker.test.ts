@@ -58,6 +58,18 @@ describe('DurableExecutionWorker', () => {
     expect(jobs.get('org1', job.id).error).toContain('could not be persisted');
   });
 
+  it('bounds shutdown when active work ignores cancellation', async () => {
+    const job = jobs.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: hash('a'), inputHash: hash('shutdown'), inputJson: '{}', idempotencyKey: 'shutdown' });
+    const worker = new DurableExecutionWorker(jobs, {
+      run: async () => new Promise(() => undefined),
+    }, { workerId: 'worker-1', maxConcurrency: 1, pollMs: 2, leaseMs: 10, shutdownTimeoutMs: 20, maxBackoffMs: 1, random: () => 0 });
+    worker.start();
+    await waitFor(() => jobs.get('org1', job.id).state === 'running');
+    const startedAt = Date.now();
+    await worker.stop();
+    expect(Date.now() - startedAt).toBeLessThan(200);
+  });
+
   it('enforces bounded concurrency', async () => {
     const queued = ['1', '2', '3', '4'].map((value) => jobs.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: hash('a'), inputHash: hash(value), inputJson: '{}', idempotencyKey: value }));
     let active = 0;

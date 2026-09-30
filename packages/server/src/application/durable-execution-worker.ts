@@ -8,6 +8,8 @@ export interface ExecutionWorkerOptions {
   leaseMs: number;
   /** Maximum wall-clock time for one execution attempt. Defaults to ten leases. */
   maxExecutionMs?: number;
+  /** Maximum time stop() waits for active handlers to drain. Defaults to 30 seconds. */
+  shutdownTimeoutMs?: number;
   maxBackoffMs: number;
   maxConcurrencyPerOrganization?: number;
   random?: () => number;
@@ -58,6 +60,9 @@ export class DurableExecutionWorker {
     if (!Number.isInteger(options.leaseMs) || options.leaseMs < 1) throw new Error('leaseMs must be positive');
     const maxExecutionMs = options.maxExecutionMs ?? options.leaseMs * 10;
     if (!Number.isInteger(maxExecutionMs) || maxExecutionMs < options.leaseMs) throw new Error('maxExecutionMs must be at least leaseMs');
+    if (options.shutdownTimeoutMs !== undefined && (!Number.isSafeInteger(options.shutdownTimeoutMs) || options.shutdownTimeoutMs < 1)) {
+      throw new Error('shutdownTimeoutMs must be positive');
+    }
     if (!Number.isSafeInteger(options.maxBackoffMs) || options.maxBackoffMs < 0) throw new Error('maxBackoffMs must be non-negative');
     if (options.maxConcurrencyPerOrganization !== undefined &&
       (!Number.isInteger(options.maxConcurrencyPerOrganization) || options.maxConcurrencyPerOrganization < 1)) {
@@ -76,7 +81,8 @@ export class DurableExecutionWorker {
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     for (const controller of this.controllers.values()) controller.abort();
-    while (this.active > 0) await new Promise((resolve) => setTimeout(resolve, 5));
+    const deadline = Date.now() + (this.options.shutdownTimeoutMs ?? 30_000);
+    while (this.active > 0 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 5));
   }
 
   cancel(organizationId: string, jobId: string): ExecutionJob {
@@ -121,6 +127,7 @@ export class DurableExecutionWorker {
     const maxExecutionMs = this.options.maxExecutionMs ?? this.options.leaseMs * 10;
     const timeout = setTimeout(() => controller.abort(), maxExecutionMs);
     const heartbeat = setInterval(() => {
+      if (this.stopping) return;
       try {
         if (!this.jobs.renewLease(job.organizationId, job.id, this.options.workerId, this.options.leaseMs)) controller.abort();
       } catch {
