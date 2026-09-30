@@ -10,6 +10,16 @@ import { ExecutionWorkError } from './durable-execution-worker.js';
 import type { ToolAuthorizer, ToolRegistry } from './execution-ports.js';
 import type { EvidenceRecorder } from '../observability/evidence-sink.js';
 import type { TraceRepo } from '../repos/trace.js';
+import type { UserQuotaRepo } from '../repos/user-quota.js';
+
+export class UserQuotaExceededError extends Error {
+  readonly statusCode = 429;
+
+  constructor(public readonly limit: number, public readonly used: number) {
+    super(`daily execution quota exceeded (${used}/${limit} runs)`);
+    this.name = 'UserQuotaExceededError';
+  }
+}
 
 export class ExecutionWorkspaceScopeError extends Error {
   constructor(jobId: string, workspaceId: string) {
@@ -51,20 +61,31 @@ export class DurableExecutionService {
     private readonly toolAuthorizer?: ToolAuthorizer,
     private readonly evidence?: EvidenceRecorder,
     private readonly traces?: TraceRepo,
+    private readonly quotas?: UserQuotaRepo,
   ) {}
 
   enqueue(input: {
     organizationId: string;
+    actorId?: string | null;
     workspaceId: string;
     agentHash: string;
     inputs: Record<string, unknown>;
     idempotencyKey: string;
     maxAttempts?: number;
   }): ExecutionJob {
+    const existing = this.jobs.findByIdempotency(input.organizationId, input.idempotencyKey);
+    if (!existing && input.actorId && this.quotas) {
+      const policy = this.quotas.findForUser(input.organizationId, input.actorId);
+      if (policy?.enabled && policy.dailyRuns !== null) {
+        const usage = this.quotas.usage(input.organizationId, input.actorId);
+        if (usage.runs >= policy.dailyRuns) throw new UserQuotaExceededError(policy.dailyRuns, usage.runs);
+      }
+    }
     const inputJson = stableJson(input.inputs);
     const inputHash = createHash('sha256').update(inputJson, 'utf8').digest('hex');
     return this.jobs.enqueue({
       organizationId: input.organizationId,
+      ...(input.actorId === undefined ? {} : { actorId: input.actorId }),
       workspaceId: input.workspaceId,
       agentHash: input.agentHash,
       inputHash,
@@ -96,6 +117,7 @@ export class DurableExecutionService {
       run: async (job, context) => {
         const trace = this.traces?.startRun({
           organizationId: job.organizationId,
+          actorId: job.actorId,
           name: `execution:${job.id}`,
           attributes: { executionId: job.id, agentHash: job.agentHash, workspaceId: job.workspaceId },
         });

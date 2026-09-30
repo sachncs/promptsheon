@@ -59,6 +59,7 @@ import { registerTeamRoutes } from './team.js';
 import { registerSecurityRoutes } from './security.js';
 import { registerAuditReportRoutes } from './audit-report.js';
 import { registerBudgetRoutes } from './budget.js';
+import { registerUserQuotaRoutes } from './user-quotas.js';
 import { registerIdentityRoutes } from './identity.js';
 import { registerAgentSpecificationRoutes } from './agent-specification.js';
 import { registerExecutionJobRoutes } from './execution-jobs.js';
@@ -183,6 +184,7 @@ export interface AppDeps {
   mutationProposalDeps: MutationProposalDeps;
   autoEval: import('../observability/auto-eval.js').AutoEval;
   userAnalyticsRepo: import('../repos/user-analytics.js').UserAnalyticsRepo;
+  userQuotaRepo: import('../repos/user-quota.js').UserQuotaRepo;
   identityService: IdentityService;
   teamRepo: import('../repos/team.js').TeamRepo;
   orgTeamRepo: import('../repos/org.js').TeamRepo;
@@ -380,6 +382,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerPlaygroundRoutes(app, { gateway: deps.gateway });
   registerOpenAiGatewayRoutes(app, { gateway: deps.gateway });
   registerAnalyticsRoutes(app, { repo: deps.userAnalyticsRepo });
+  registerUserQuotaRoutes(app, { quotaRepo: deps.userQuotaRepo });
   registerTeamRoutes(app, {
     teamRepo: deps.teamRepo,
     ssoConfigRepo: deps.ssoConfigRepo,

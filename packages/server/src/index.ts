@@ -222,7 +222,7 @@ async function main() {
   const evidenceSink = new AsyncEvidenceSink(repos.evidence);
   app.addHook('onClose', async () => { await evidenceSink.flush(); });
   const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo: repos.manifest, traceRepo: repos.trace, modelAdapter: new RouterModelAdapter(llmRouter), toolRegistry, evidence: evidenceSink });
-  const durableExecution = new DurableExecutionService(repos.executionJob, repos.agentSpecification!, executor, repos.executionCheckpoint, toolRegistry, undefined, evidenceSink, repos.trace);
+  const durableExecution = new DurableExecutionService(repos.executionJob, repos.agentSpecification!, executor, repos.executionCheckpoint, toolRegistry, undefined, evidenceSink, repos.trace, repos.userQuota);
   const durableWorker = durableExecution.createWorker();
   durableWorker.start();
   const autoEval = new AutoEval({ traceRepo: repos.trace, scoreRepo: repos.traceScore, router: llmRouter });
@@ -438,7 +438,8 @@ async function main() {
       actorId: () => 'system',
     },
     autoEval,
-    userAnalyticsRepo: repos.userAnalytics,
+      userAnalyticsRepo: repos.userAnalytics,
+      userQuotaRepo: repos.userQuota,
     identityService,
     teamRepo: repos.team,
     orgTeamRepo: repos.orgTeam,

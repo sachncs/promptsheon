@@ -46,6 +46,7 @@ import { ExecutionJobRepo } from './execution-job.js';
 import { ExecutionCheckpointRepo } from './execution-checkpoint.js';
 import { EvidenceRepo } from './evidence.js';
 import { MutationProposalRepo } from './mutation-proposal.js';
+import { UserQuotaRepo } from './user-quota.js';
 
 /**
  * Bundle of every repo in the server. Built once from a
@@ -106,6 +107,7 @@ export interface Repos {
   executionCheckpoint: ExecutionCheckpointRepo;
   evidence: EvidenceRepo;
   mutationProposal: MutationProposalRepo;
+  userQuota: UserQuotaRepo;
 }
 
 /**
@@ -170,6 +172,7 @@ export function buildRepos(db: Database.Database): Repos {
     executionCheckpoint: new ExecutionCheckpointRepo(db),
     evidence: new EvidenceRepo(db),
     mutationProposal: new MutationProposalRepo(db),
+    userQuota: new UserQuotaRepo(db),
   };
 }
 

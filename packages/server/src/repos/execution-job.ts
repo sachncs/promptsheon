@@ -6,6 +6,7 @@ import { NotFoundError } from '@promptsheon/shared';
 export interface ExecutionJob {
   id: string;
   organizationId: string;
+  actorId: string | null;
   workspaceId: string;
   agentHash: string;
   inputHash: string;
@@ -56,6 +57,7 @@ export class ExecutionQueueCapacityError extends Error {
 interface JobRow {
   id: string;
   organization_id: string;
+  actor_id: string | null;
   workspace_id: string;
   agent_hash: string;
   input_hash: string;
@@ -80,6 +82,7 @@ export class ExecutionJobRepo {
 
   enqueue(input: {
     organizationId: string;
+    actorId?: string | null;
     workspaceId: string;
     agentHash: string;
     inputHash: string;
@@ -104,11 +107,16 @@ export class ExecutionJobRepo {
     const id = randomUUID();
     this.db.prepare(`
       INSERT INTO execution_jobs
-        (id, organization_id, workspace_id, agent_hash, input_hash, input_json, idempotency_key, state, attempts, max_attempts, available_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?, ?)
-    `).run(id, input.organizationId, input.workspaceId, input.agentHash, input.inputHash, input.inputJson,
+        (id, organization_id, actor_id, workspace_id, agent_hash, input_hash, input_json, idempotency_key, state, attempts, max_attempts, available_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?, ?)
+    `).run(id, input.organizationId, input.actorId ?? null, input.workspaceId, input.agentHash, input.inputHash, input.inputJson,
       input.idempotencyKey, input.maxAttempts ?? 3, now, now);
     return this.get(input.organizationId, id);
+  }
+
+  findByIdempotency(organizationId: string, idempotencyKey: string): ExecutionJob | null {
+    const row = this.db.prepare('SELECT * FROM execution_jobs WHERE organization_id = ? AND idempotency_key = ?').get(organizationId, idempotencyKey) as JobRow | undefined;
+    return row ? toJob(row) : null;
   }
 
   get(organizationId: string, id: string): ExecutionJob {
@@ -231,6 +239,7 @@ function toJob(row: JobRow): ExecutionJob {
   return {
     id: row.id,
     organizationId: row.organization_id,
+    actorId: row.actor_id,
     workspaceId: row.workspace_id,
     agentHash: row.agent_hash,
     inputHash: row.input_hash,
