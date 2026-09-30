@@ -48,7 +48,6 @@ import { ToolRegistry } from './application/execution-ports.js';
 import { createBuiltinToolAdapters } from './tools/builtin.js';
 import { AsyncEvidenceSink } from './observability/evidence-sink.js';
 import { LlmResponseCacheRepo } from './repos/llm-response-cache.js';
-import type { Agent } from '@strands-agents/sdk';
 import type Database from 'better-sqlite3';
 
 declare module 'fastify' {
@@ -271,10 +270,6 @@ async function main() {
   const snapshotStore = new SnapshotStore({ storageDir: `${config.server.casPath}/snapshots` });
   await snapshotStore.init();
 
-  // In-memory agent registry (single-process); production would use a
-  // multi-tenant map keyed by tenantId + capabilityId.
-  const agentRegistry = new Map<string, Agent>();
-
   const webhookReceiver = new WebhookReceiver(
     [
       {
@@ -387,10 +382,7 @@ async function main() {
     snapshotStore,
     getAgent: (id: string) => {
       const [executionId, nodeId] = id.includes(':') ? id.split(':') : ['', id];
-      if (executionId && nodeId) {
-        return executor.getLiveAgent(executionId, nodeId) ?? agentRegistry.get(id) ?? null;
-      }
-      return agentRegistry.get(id) ?? null;
+      return executionId && nodeId ? executor.getLiveAgent(executionId, nodeId) ?? null : null;
     },
     membershipRepo: repos.membership,
     orgRepo: repos.org,
