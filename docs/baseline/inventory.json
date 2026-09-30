@@ -1442,7 +1442,8 @@
     "packages/shared/db/migrations/059_eval_suite_runs.up.sql",
     "packages/shared/db/migrations/060_mutation_proposals.up.sql",
     "packages/shared/db/migrations/061_mutation_promotion.up.sql",
-    "packages/shared/db/migrations/062_release_signatures.up.sql"
+    "packages/shared/db/migrations/062_release_signatures.up.sql",
+    "packages/shared/db/migrations/063_mutation_promotion_concurrency.up.sql"
   ],
   "frontendRoutes": [
     {
