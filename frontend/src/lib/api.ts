@@ -405,6 +405,26 @@ export interface SettingItem {
   value: unknown;
 }
 
+export type ApiKeyRole = 'admin' | 'editor' | 'reader' | 'system';
+
+export interface ApiKeySummary {
+  id: string;
+  userId: string;
+  name: string;
+  keyPrefix: string;
+  role: ApiKeyRole;
+  expiresAt: string | null;
+  lastUsed: string | null;
+  createdAt: string;
+  revoked: boolean;
+}
+
+export interface IssuedApiKey {
+  key: string;
+  id: string;
+  name: string;
+}
+
 export interface Capability {
   id: string;
   projectId: string;
@@ -742,6 +762,24 @@ const SecurityScanSummarySchema = z.object({
 const SettingItemSchema = z.object({
   key: z.string().min(1),
   value: z.unknown(),
+});
+
+const ApiKeySummarySchema = z.object({
+  id: z.string().min(1),
+  userId: z.string().min(1),
+  name: z.string(),
+  keyPrefix: z.string().min(1),
+  role: z.enum(['admin', 'editor', 'reader', 'system']),
+  expiresAt: z.string().nullable(),
+  lastUsed: z.string().nullable(),
+  createdAt: z.string(),
+  revoked: z.boolean(),
+});
+
+const IssuedApiKeySchema = z.object({
+  key: z.string().min(1),
+  id: z.string().min(1),
+  name: z.string(),
 });
 
 function parseSelfEvolveState(raw: unknown): SelfEvolveState {
@@ -1946,8 +1984,18 @@ export const webhookApi = {
 };
 
 export const apiKeyApi = {
-  list: () => client.get('/api-keys'),
-  create: (data: { name: string; role: string; userId: string }) => client.post('/api-keys', data),
+  list: async (): Promise<{ data: { keys: ApiKeySummary[] } }> => {
+    const r = await client.get<unknown>('/api-keys');
+    const parsed = z.object({ keys: z.array(ApiKeySummarySchema) }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid API-key data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  create: async (data: { name: string; role: ApiKeyRole; userId: string }): Promise<{ data: IssuedApiKey }> => {
+    const r = await client.post<unknown>('/api-keys', data);
+    const parsed = IssuedApiKeySchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid API key.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
   revoke: (id: string) => client.delete(`/api-keys/${id}`),
 };
 

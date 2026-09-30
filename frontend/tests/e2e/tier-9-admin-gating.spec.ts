@@ -74,6 +74,21 @@ test.describe('tier 9: admin gating (server-enforced)', () => {
     expect((await saveResponse).status(), 'setting save response').toBe(200);
   });
 
+  test('admin can issue an API key once from the UI', async ({ page, baseURL }) => {
+    if (!admin || !baseURL) throw new Error('admin not bootstrapped');
+    await clearClientState(page);
+    await seedSession(page, admin);
+    await page.goto('/app/api-keys', { waitUntil: 'domcontentloaded' });
+    await page.getByPlaceholder('ci-server').fill('e2e-ci-key');
+    const issueResponse = page.waitForResponse((response) =>
+      response.url().includes('/api/api-keys') && response.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: 'Issue' }).click();
+    expect((await issueResponse).status(), 'API-key issue response').toBe(201);
+    await expect(page.getByText('Save this key — it will not be shown again.')).toBeVisible();
+    await expect(page.locator('pre')).toContainText('pk_');
+  });
+
   test('admin can run a prompt security scan from the UI', async ({ page, baseURL }) => {
     if (!admin || !baseURL) throw new Error('admin not bootstrapped');
     await clearClientState(page);

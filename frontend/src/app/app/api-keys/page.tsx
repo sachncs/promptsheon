@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { KeyRound, Plus, Shield } from 'lucide-react';
-import { apiKeyApi, userApi } from '@/lib/api';
+import { apiKeyApi, userApi, type ApiKeyRole, type ApiKeySummary, type IssuedApiKey } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -17,30 +17,6 @@ import { QueryError } from '@/components/brand/query-error';
 import { getErrorMessage } from '@/lib/errors';
 import { useToast } from '@/components/brand/toast';
 
-interface ApiKey {
-  id: string;
-  userId: string;
-  name: string;
-  keyPrefix: string;
-  role: string;
-  expiresAt: string | null;
-  lastUsed: string | null;
-  createdAt: string;
-  revoked: boolean;
-}
-
-const ApiKeySchema = z.object({
-  id: z.string().min(1),
-  userId: z.string().min(1),
-  name: z.string(),
-  keyPrefix: z.string().min(1),
-  role: z.string().min(1),
-  expiresAt: z.string().nullable(),
-  lastUsed: z.string().nullable(),
-  createdAt: z.string(),
-  revoked: z.boolean(),
-});
-
 const CurrentUserSchema = z.object({
   id: z.string().min(1),
   email: z.string().email(),
@@ -48,27 +24,9 @@ const CurrentUserSchema = z.object({
   role: z.string().min(1),
 });
 
-const IssuedKeySchema = z.object({
-  key: z.string().min(1),
-  id: z.string().min(1),
-  name: z.string(),
-});
-
-function parseApiKeyList(raw: unknown): { keys: ApiKey[] } {
-  const parsed = z.object({ keys: z.array(ApiKeySchema) }).safeParse(raw);
-  if (!parsed.success) throw new Error('The server returned invalid API-key data.');
-  return parsed.data;
-}
-
 function parseCurrentUser(raw: unknown): z.infer<typeof CurrentUserSchema> {
   const parsed = CurrentUserSchema.safeParse(raw);
   if (!parsed.success) throw new Error('The server returned invalid user data.');
-  return parsed.data;
-}
-
-function parseIssuedKey(raw: unknown): z.infer<typeof IssuedKeySchema> {
-  const parsed = IssuedKeySchema.safeParse(raw);
-  if (!parsed.success) throw new Error('The server returned an invalid API key.');
   return parsed.data;
 }
 
@@ -80,7 +38,7 @@ export default function ApiKeysPage() {
     queryKey: ['api-keys'],
     queryFn: async () => {
       const r = await apiKeyApi.list();
-      return parseApiKeyList(r.data);
+      return r.data;
     },
   });
   const me = useQuery({
@@ -91,8 +49,8 @@ export default function ApiKeysPage() {
     },
   });
   const [name, setName] = useState('');
-  const [role, setRole] = useState<string>('reader');
-  const [issued, setIssued] = useState<{ key: string; id: string; name: string } | null>(null);
+  const [role, setRole] = useState<ApiKeyRole>('reader');
+  const [issued, setIssued] = useState<IssuedApiKey | null>(null);
 
   const create = useMutation({
     mutationFn: () => {
@@ -100,8 +58,7 @@ export default function ApiKeysPage() {
       return apiKeyApi.create({ name: name || 'untitled', role, userId: session.userId });
     },
     onSuccess: async (resp) => {
-      const o = parseIssuedKey(resp.data);
-      setIssued(o);
+      setIssued(resp.data);
       setName('');
       void qc.invalidateQueries({ queryKey: ['api-keys'] });
       toast({ title: 'API key issued', description: 'Copy it now; it will not be shown again.', variant: 'success' });
@@ -120,7 +77,7 @@ export default function ApiKeysPage() {
 
   if (!session) return null;
   if (keys.isError) return <QueryError message={keys.error} onRetry={() => void keys.refetch()} />;
-  const rows = keys.data?.keys ?? [];
+  const rows: ApiKeySummary[] = keys.data?.keys ?? [];
 
   return (
     <div className="space-y-6">
@@ -151,11 +108,14 @@ export default function ApiKeysPage() {
             <div className="mt-2">
               <ThemedSelect
                 value={role}
-                onValueChange={setRole}
+                onValueChange={(value) => {
+                  if (value === 'reader' || value === 'editor' || value === 'admin' || value === 'system') {
+                    setRole(value);
+                  }
+                }}
                 options={[
                   { value: 'reader', label: 'reader' },
                   { value: 'editor', label: 'editor' },
-                  { value: 'approver', label: 'approver' },
                   { value: 'admin', label: 'admin' },
                   { value: 'system', label: 'system' },
                 ]}
