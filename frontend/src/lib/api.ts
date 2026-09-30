@@ -1066,6 +1066,40 @@ const ExecutionRunResponseSchema = z.object({
   preview: z.boolean(),
 });
 
+const ExecutionReplaySchema = z.object({
+  id: z.string(),
+  originalExecutionId: z.string(),
+  replayExecutionId: z.string().nullable(),
+  outcome: z.enum(['started', 'completed', 'diverged', 'failed']),
+  inputsMatch: z.boolean(),
+  manifestMatch: z.boolean(),
+  modelMatch: z.boolean(),
+  environmentMatch: z.boolean(),
+  diffSummary: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+const ReplayDiffSummarySchema = z.object({
+  addedNodes: z.array(z.string()),
+  removedNodes: z.array(z.string()),
+  changedNodes: z.array(z.object({
+    nodeId: z.string(),
+    originalOutput: z.string(),
+    replayOutput: z.string(),
+  })),
+  totalCostDeltaUsd: z.number(),
+  totalLatencyDeltaMs: z.number(),
+});
+
+const ExecutionReplayResponseSchema = z.object({
+  replayExecutionId: z.string(),
+  replayOf: z.string(),
+  outcome: z.enum(['started', 'completed', 'diverged', 'failed']),
+  original: ExecutionSchema,
+  replayed: ExecutionSchema,
+  diff: ReplayDiffSummarySchema,
+});
+
 const ScheduleSchema = z.object({
   id: z.string(),
   workspaceId: z.string(),
@@ -1701,8 +1735,18 @@ export const executionApi = {
     const r = await client.post<unknown>('/executions', data, { timeout: 130_000 });
     return { data: parseExecutionRunResponse(r.data) };
   },
-  replay: (id: string) => client.post(`/executions/${id}/replay`),
-  replays: (id: string) => client.get(`/executions/${id}/replays`),
+  replay: async (id: string): Promise<{ data: z.infer<typeof ExecutionReplayResponseSchema> }> => {
+    const r = await client.post<unknown>(`/executions/${id}/replay`);
+    const parsed = ExecutionReplayResponseSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid replay data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  replays: async (id: string): Promise<{ data: { items: z.infer<typeof ExecutionReplaySchema>[] } }> => {
+    const r = await client.get<unknown>(`/executions/${id}/replays`);
+    const parsed = z.object({ items: z.array(ExecutionReplaySchema) }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid replay history.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
   /**
    * Open a server-sent event connection to a streaming execution.
    * Returns an `AbortController` so the caller can cancel.
