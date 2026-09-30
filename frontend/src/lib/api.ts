@@ -62,6 +62,25 @@ export interface WorkspaceRow {
   updatedAt: string;
 }
 
+export type AgentSpecificationStatus = 'draft' | 'candidate' | 'published' | 'retired';
+
+export interface AgentSpecificationMetadata {
+  hash: string;
+  workspaceId: string;
+  schemaVersion: string;
+  parentHash: string | null;
+  author: string;
+  changeReason: string;
+  status: AgentSpecificationStatus;
+  createdAt: string;
+  publishedAt: string | null;
+}
+
+export interface AgentSpecificationList {
+  items: AgentSpecificationMetadata[];
+  total: number;
+}
+
 export interface VaultKeyringEntry {
   id: number;
   label: string;
@@ -974,6 +993,52 @@ export const workspaceApi = {
   update: (id: string, data: { name?: string; organization?: string }): Promise<{ data: WorkspaceRow }> =>
     client.put<unknown>(`/workspaces/${id}`, data).then((r) => ({ data: parseWorkspace(r.data) })),
   delete: (id: string) => client.delete(`/workspaces/${id}`),
+};
+
+const AgentSpecificationMetadataSchema = z.object({
+  hash: z.string().regex(/^[0-9a-f]{64}$/),
+  workspaceId: z.string(),
+  schemaVersion: z.string(),
+  parentHash: z.string().regex(/^[0-9a-f]{64}$/).nullable(),
+  author: z.string(),
+  changeReason: z.string(),
+  status: z.enum(['draft', 'candidate', 'published', 'retired']),
+  createdAt: z.string(),
+  publishedAt: z.string().nullable(),
+});
+
+const AgentSpecificationListSchema = z.object({
+  items: z.array(AgentSpecificationMetadataSchema),
+  total: z.number().int().nonnegative(),
+});
+
+function parseAgentSpecificationList(raw: unknown): AgentSpecificationList {
+  const parsed = AgentSpecificationListSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid agent specification data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+export const agentSpecificationApi = {
+  list: async (
+    workspaceId: string,
+    options: { page?: number; pageSize?: number; status?: AgentSpecificationStatus } = {},
+  ): Promise<{ data: AgentSpecificationList }> => {
+    const response = await client.get<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications`, {
+      params: options,
+    });
+    return { data: parseAgentSpecificationList(response.data) };
+  },
+  create: (data: {
+    workspaceId: string;
+    specification: { role: string; objective: string; prompt: { system: string }; modelPolicy: { provider: string; model: string }; lifecycle: { owner: string } };
+    changeReason: string;
+    parentHash?: string;
+  }) => client.post(`/workspaces/${encodeURIComponent(data.workspaceId)}/agent-specifications`, {
+    specification: data.specification,
+    changeReason: data.changeReason,
+    ...(data.parentHash ? { parentHash: data.parentHash } : {}),
+  }),
+  get: (workspaceId: string, hash: string) => client.get(`/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/${encodeURIComponent(hash)}`),
 };
 
 export const projectApi = {
