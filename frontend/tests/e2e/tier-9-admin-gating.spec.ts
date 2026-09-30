@@ -60,4 +60,15 @@ test.describe('tier 9: admin gating (server-enforced)', () => {
     const response = await page.goto('/app/settings', { waitUntil: 'domcontentloaded' });
     expect(response!.status(), 'admin /app/settings').toBeLessThan(500);
   });
+
+  test('admin can run a prompt security scan from the UI', async ({ page, baseURL }) => {
+    if (!admin || !baseURL) throw new Error('admin not bootstrapped');
+    await clearClientState(page);
+    await seedSession(page, admin);
+    await page.goto('/app/admin/security', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Load demo' }).click();
+    await page.getByRole('button', { name: 'Run scan' }).click();
+    await expect(page.getByText('verdict: block')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('pii.credit-card')).toBeVisible();
+  });
 });

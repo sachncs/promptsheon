@@ -380,6 +380,26 @@ export interface GoalDetail {
   history: GoalHistoryEntry[];
 }
 
+export interface SecurityFinding {
+  rule: string;
+  severity: 'info' | 'warn' | 'block';
+  message: string;
+  snippet: string | null;
+  range: { start: number; end: number } | null;
+}
+
+export interface SecurityScanResult {
+  verdict: 'clean' | 'warn' | 'block';
+  findings: SecurityFinding[];
+}
+
+export interface SecurityScanSummary {
+  orgId: string;
+  days: number;
+  total: number;
+  byVerdict: { clean: number; warn: number; block: number };
+}
+
 export interface Capability {
   id: string;
   projectId: string;
@@ -688,6 +708,30 @@ const GoalDetailSchema = z.object({
   totalCost: z.number(),
   snapshots: z.array(GoalSnapshotSchema),
   history: z.array(GoalHistoryEntrySchema),
+});
+
+const SecurityFindingSchema = z.object({
+  rule: z.string(),
+  severity: z.enum(['info', 'warn', 'block']),
+  message: z.string(),
+  snippet: z.string().optional(),
+  range: z.object({ start: z.number().int().nonnegative(), end: z.number().int().nonnegative() }).optional(),
+});
+
+const SecurityScanResultSchema = z.object({
+  verdict: z.enum(['clean', 'warn', 'block']),
+  findings: z.array(SecurityFindingSchema),
+});
+
+const SecurityScanSummarySchema = z.object({
+  orgId: z.string(),
+  days: z.number().int().positive(),
+  total: z.number().int().nonnegative(),
+  byVerdict: z.object({
+    clean: z.number().int().nonnegative(),
+    warn: z.number().int().nonnegative(),
+    block: z.number().int().nonnegative(),
+  }),
 });
 
 function parseSelfEvolveState(raw: unknown): SelfEvolveState {
@@ -1780,6 +1824,32 @@ export const goalsApi = {
     const parsed = GoalDetailSchema.safeParse(r.data);
     if (!parsed.success) throw new ApiError('The server returned invalid goal details.', { code: 'INVALID_RESPONSE' });
     return { data: parsed.data };
+  },
+};
+
+export const securityApi = {
+  summary: async (days = 30): Promise<{ data: SecurityScanSummary }> => {
+    const r = await client.get<unknown>('/security/scans/summary', { params: { days } });
+    const parsed = SecurityScanSummarySchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid security summary data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  scan: async (text: string): Promise<{ data: SecurityScanResult }> => {
+    const r = await client.post<unknown>('/security/scan', { text });
+    const parsed = SecurityScanResultSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid security scan data.', { code: 'INVALID_RESPONSE' });
+    return {
+      data: {
+        verdict: parsed.data.verdict,
+        findings: parsed.data.findings.map((finding) => ({
+          rule: finding.rule,
+          severity: finding.severity,
+          message: finding.message,
+          snippet: finding.snippet ?? null,
+          range: finding.range ?? null,
+        })),
+      },
+    };
   },
 };
 

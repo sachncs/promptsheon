@@ -41,6 +41,7 @@ const ROUTES = [
   '/app/eval/suites',
   '/app/diff',
   '/app/admin/cost',
+  '/app/admin/security',
   '/app/vault',
   '/app/api-keys',
   '/app/releases',
