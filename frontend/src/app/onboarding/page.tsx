@@ -90,7 +90,11 @@ export default function OnboardingPage() {
       bootstrapApi.admin()
         .then((data) => {
           const restored = toSession(data, status.data?.provider ?? null);
-          if (status.data.authEnabled && (!data.apiKey || !status.data.needsLlm)) {
+          // A configured provider does not make a recovery key unsafe. The
+          // dedicated E2E bootstrap endpoint may still issue one, while a
+          // production installation omits it and correctly falls back to
+          // explicit administrator recovery.
+          if (status.data.authEnabled && !data.apiKey) {
             setRestoreCandidate(data);
             setRestoreError('This installation requires an API key. Enter an existing administrator API key to verify and restore this browser session.');
             return;
