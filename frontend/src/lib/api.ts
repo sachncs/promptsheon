@@ -1139,6 +1139,16 @@ export interface HealthStatus {
   status: 'ok' | 'error';
   db: 'ok' | 'error';
   timestamp: string;
+  gateway?: {
+    cacheEntries: number;
+    rateLimiter: {
+      activeBuckets: number;
+      maxBuckets: number;
+      totalRequests: number;
+      deniedRequests: number;
+      bucketEvictions: number;
+    };
+  } | undefined;
 }
 
 export const healthApi = {
@@ -1148,6 +1158,16 @@ export const healthApi = {
       status: z.union([z.literal('ok'), z.literal('error')]),
       db: z.union([z.literal('ok'), z.literal('error')]),
       timestamp: z.string(),
+      gateway: z.object({
+        cacheEntries: z.number().int().nonnegative(),
+        rateLimiter: z.object({
+          activeBuckets: z.number().int().nonnegative(),
+          maxBuckets: z.number().int().positive(),
+          totalRequests: z.number().int().nonnegative(),
+          deniedRequests: z.number().int().nonnegative(),
+          bucketEvictions: z.number().int().nonnegative(),
+        }),
+      }).optional(),
     }).parse(r.data) };
   },
 };

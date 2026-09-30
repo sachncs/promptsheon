@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Activity, AlertTriangle, Clock3, GitMerge, HeartPulse, ShieldAlert } from 'lucide-react';
+import { Activity, AlertTriangle, Clock3, Gauge, GitMerge, HeartPulse, ShieldAlert } from 'lucide-react';
 import { releaseApi, evalApi, alertApi, executionJobApi, healthApi, type Alert } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
@@ -76,6 +76,7 @@ export default function OperationsPage() {
   const oldestQueueAge = queue.data?.oldestQueuedAt
     ? formatQueueAge(now - new Date(queue.data.oldestQueuedAt).getTime())
     : 'no backlog';
+  const gatewayMetrics = health.data?.gateway;
 
   const last24h = evals.filter((e) => {
     if (!e.startedAt) return false;
@@ -131,6 +132,12 @@ export default function OperationsPage() {
           value={health.isError ? 'Degraded' : health.data?.status === 'ok' ? 'Healthy' : 'Checking'}
           hint={health.isError ? 'Health probe failed' : health.data?.db === 'ok' ? 'Database responding' : 'Database unavailable'}
           icon={HeartPulse}
+        />
+        <StatCard
+          label="Gateway pressure"
+          value={gatewayMetrics ? `${gatewayMetrics.rateLimiter.activeBuckets}/${gatewayMetrics.rateLimiter.maxBuckets}` : '—'}
+          hint={gatewayMetrics ? `${gatewayMetrics.rateLimiter.bucketEvictions} evictions · ${gatewayMetrics.rateLimiter.deniedRequests} denied` : 'Metrics unavailable'}
+          icon={Gauge}
         />
       </div>
 

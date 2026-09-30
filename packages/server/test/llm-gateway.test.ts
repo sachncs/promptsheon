@@ -89,6 +89,22 @@ describe('RateLimiter', () => {
     expect(rl.size()).toBe(2);
     expect(rl.take('oldest', 1).allowed).toBe(true);
   });
+
+  it('reports aggregate bucket churn and denied requests without actor keys', () => {
+    const rl = new RateLimiter({ capacity: 1, refillPerSecond: 0, maxBuckets: 1 });
+    rl.take('first', 1);
+    expect(rl.take('first', 1).allowed).toBe(false);
+    rl.take('second', 1);
+
+    expect(rl.metrics()).toEqual({
+      activeBuckets: 1,
+      maxBuckets: 1,
+      totalRequests: 3,
+      deniedRequests: 1,
+      bucketEvictions: 1,
+    });
+    expect(JSON.stringify(rl.metrics())).not.toContain('first');
+  });
 });
 
 describe('Gateway', () => {

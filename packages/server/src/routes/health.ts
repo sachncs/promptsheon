@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { HealthService } from '../application/health-service.js';
+import type { Gateway } from '../llm/gateway.js';
 
-export function registerHealthRoutes(app: FastifyInstance, service: HealthService) {
+export function registerHealthRoutes(app: FastifyInstance, service: HealthService, gateway?: Gateway) {
   app.get('/api/health', async (_request, reply) => {
     try {
       const healthy = service.isHealthy();
@@ -14,7 +15,7 @@ export function registerHealthRoutes(app: FastifyInstance, service: HealthServic
           timestamp,
         });
       }
-      return reply.send({ status: 'ok', db: 'ok', timestamp });
+      return reply.send({ status: 'ok', db: 'ok', timestamp, ...(gateway ? { gateway: gateway.metrics() } : {}) });
     } catch (err) {
       app.log.error({ err }, 'health check database probe failed');
       return reply.code(503).send({

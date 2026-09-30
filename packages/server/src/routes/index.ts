@@ -269,6 +269,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerHealthRoutes(
     app,
     new HealthService(new SqliteHealthProbe(deps.db), deps.isAcceptingTraffic),
+    deps.gateway,
   );
   registerIdeaRoutes(app, { planner: deps.planner });
   registerGoalEvolveRoutes(app, { goalEvolver: deps.goalEvolver, manifestRepo: deps.manifestRepo });

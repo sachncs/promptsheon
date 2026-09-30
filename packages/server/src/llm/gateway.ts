@@ -149,11 +149,23 @@ export interface RateLimitState {
   resetAt: number;
 }
 
+/** Aggregate rate-limit counters safe to expose to operators. */
+export interface RateLimiterMetrics {
+  activeBuckets: number;
+  maxBuckets: number;
+  totalRequests: number;
+  deniedRequests: number;
+  bucketEvictions: number;
+}
+
 export class RateLimiter {
   private readonly capacity: number;
   private readonly refillPerSecond: number;
   private readonly maxBuckets: number;
   private readonly buckets = new Map<string, { tokens: number; updatedAt: number }>();
+  private totalRequests = 0;
+  private deniedRequests = 0;
+  private bucketEvictions = 0;
 
   constructor(opts: { capacity: number; refillPerSecond: number; maxBuckets?: number }) {
     this.capacity = opts.capacity;
@@ -162,6 +174,7 @@ export class RateLimiter {
   }
 
   take(key: string, cost = 1): { allowed: boolean; state: RateLimitState } {
+    this.totalRequests += 1;
     const now = Date.now();
     let bucket = this.buckets.get(key);
     if (!bucket) {
@@ -172,6 +185,7 @@ export class RateLimiter {
     bucket.tokens = Math.min(this.capacity, bucket.tokens + elapsed * this.refillPerSecond);
     bucket.updatedAt = now;
     if (bucket.tokens < cost) {
+      this.deniedRequests += 1;
       this.buckets.set(key, bucket);
       return {
         allowed: false,
@@ -197,6 +211,17 @@ export class RateLimiter {
     return this.buckets.size;
   }
 
+  /** Return aggregate counters without exposing actor identifiers. */
+  metrics(): RateLimiterMetrics {
+    return {
+      activeBuckets: this.buckets.size,
+      maxBuckets: this.maxBuckets,
+      totalRequests: this.totalRequests,
+      deniedRequests: this.deniedRequests,
+      bucketEvictions: this.bucketEvictions,
+    };
+  }
+
   private evictOldestBucketIfFull(): void {
     if (this.buckets.size < this.maxBuckets) return;
     let oldestKey: string | undefined;
@@ -207,7 +232,10 @@ export class RateLimiter {
         oldestUpdatedAt = bucket.updatedAt;
       }
     }
-    if (oldestKey !== undefined) this.buckets.delete(oldestKey);
+    if (oldestKey !== undefined) {
+      this.buckets.delete(oldestKey);
+      this.bucketEvictions += 1;
+    }
   }
 }
 
@@ -223,6 +251,14 @@ export class Gateway {
       circuitBreaker?: { failureThreshold?: number; cooldownMs?: number };
     },
   ) {}
+
+  /** Return aggregate gateway metrics without exposing request content. */
+  metrics(): { rateLimiter: RateLimiterMetrics; cacheEntries: number } {
+    return {
+      rateLimiter: this.deps.rateLimiter.metrics(),
+      cacheEntries: this.deps.cache.size(),
+    };
+  }
 
   async complete(request: GatewayRequest, opts: { actorId: string } = { actorId: 'unscoped' }): Promise<GatewayResponse> {
     const rl = this.deps.rateLimiter.take(opts.actorId);
