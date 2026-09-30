@@ -62,19 +62,19 @@ The baseline health/storage harness on the capture machine produced:
 
 | Benchmark | Configuration | Result |
 |---|---|---:|
-| HTTP health throughput | 2,000 requests, concurrency 16 | 8,521 req/s |
-| HTTP health p95 latency | Same run | 2.66 ms |
-| SQLite concurrent writes | 4 workers × 250 writes, WAL mode | 12,052 writes/s |
+| HTTP health throughput | 2,000 requests, concurrency 16 | 8,500 req/s |
+| HTTP health p95 latency | Same run | 2.62 ms |
+| SQLite concurrent writes | 4 workers × 250 writes, WAL mode | 13,109 writes/s |
 
 The latest execution-queue run on the same capture machine used 1,000 jobs
-across four organizations and produced:
+across eight organizations and produced:
 
 | Benchmark | Result |
 |---|---:|
-| Queue admission throughput | 20,161 jobs/s |
-| Queue admission p95 latency | 0.055 ms |
-| Claim-and-complete throughput | 8,961 jobs/s |
-| Claim latency p95 | 0.109 ms |
+| Queue admission throughput | 21,084 jobs/s |
+| Queue admission p95 latency | 0.052 ms |
+| Claim-and-complete throughput | 8,433 jobs/s |
+| Claim latency p95 | 0.113 ms |
 | Exactly-once verification | `true` |
 | Remaining queued jobs | 0 |
 
