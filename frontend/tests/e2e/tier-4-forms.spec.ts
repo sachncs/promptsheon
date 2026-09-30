@@ -67,10 +67,15 @@ test.describe('tier 4: forms submit and rows appear', () => {
     await page.reload();
     await page.goto('/app/workspaces');
     await page.getByLabel(/name/i).first().fill(`ws-${Date.now()}`);
+    const createResponse = page.waitForResponse(
+      (response) => response.request().method() === 'POST' && response.url().endsWith('/api/workspaces'),
+    );
     await page.getByRole('button', { name: /create workspace/i }).click();
+    await expect((await createResponse).status()).toBe(201);
 
-    // Should appear in the table.
-    await expect(page.getByText(/^ws-/).first()).toBeVisible({ timeout: 10_000 });
+    // Creation intentionally takes the user directly into the new workspace.
+    await expect(page).toHaveURL(/\/app\/workspaces\/[0-9a-f-]+\/projects$/, { timeout: 10_000 });
+    await expect(page.locator('h1', { hasText: 'Projects' })).toBeVisible();
   });
 
   test('api-keys: create key and list', async ({ page, baseURL }) => {
