@@ -168,4 +168,27 @@ test.describe('tier 3: app shell after onboarding', () => {
     await page.waitForTimeout(500);
     await expect(page).toHaveURL(/\/onboarding$/);
   });
+
+  test('creates and validates an agent specification without a provider key', async ({ page, request, baseURL }) => {
+    if (!baseURL) throw new Error('E2E base URL is required');
+    const session = await bootstrapAdminViaApi(baseURL, {
+      orgName: `Agent Builder Org ${Date.now()}`,
+      adminEmail: `agent-builder-${Date.now()}@promptsheon.test`,
+    });
+    await seedSession(page, session);
+    await page.goto('/app/workspaces');
+    await page.getByLabel('Name').fill(`agent-workspace-${Date.now()}`);
+    await page.getByRole('button', { name: 'Create workspace' }).click();
+    await expect(page).toHaveURL(/\/app\/workspaces\/[^/]+\/projects$/);
+
+    await page.goto('/app/agents/new');
+    await expect(page.getByRole('heading', { name: 'New agent specification' })).toBeVisible();
+    await page.getByRole('button', { name: 'Validate specification' }).click();
+    await expect(page.getByText('Specification is valid and ready to create.')).toBeVisible();
+    await page.getByRole('button', { name: 'Create draft' }).click();
+    await expect(page.getByText('Revision created')).toBeVisible();
+
+    const workspaceResponse = await request.get(`${baseURL}/api/workspaces`, { headers: { Authorization: `Bearer ${session.apiKey}` } });
+    expect(workspaceResponse.ok()).toBeTruthy();
+  });
 });
