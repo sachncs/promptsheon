@@ -32,6 +32,8 @@ export default function LandingPage() {
     <div className="min-h-screen bg-surface-0 text-foreground">
       <TopNav links={topLinks} />
 
+      <main>
+
       {/* Hero */}
       <section className="relative overflow-hidden ps-vignette">
         <Container className="relative pt-24 pb-28">
@@ -422,6 +424,8 @@ export default function LandingPage() {
           </div>
         </Container>
       </section>
+
+      </main>
 
       {/* Footer */}
       <footer className="border-t border-border-subtle bg-surface-1/50">
