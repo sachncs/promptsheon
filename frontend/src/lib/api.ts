@@ -1912,14 +1912,31 @@ export const alertApi = {
     const r = await client.get<unknown>('/alert-rules');
     return { data: parseAlertRules(r.data) };
   },
-  createRule: (data: { name: string; type: string; severity: string; threshold?: number; window?: number }) =>
-    client.post('/alert-rules', data),
-  deleteRule: (id: string) => client.delete(`/alert-rules/${id}`),
+  createRule: async (data: { name: string; type: string; severity: string; threshold?: number; window?: number }): Promise<{ data: AlertRule }> => {
+    const r = await client.post<unknown>('/alert-rules', data);
+    const parsed = AlertRuleSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid alert rule.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  updateRule: async (id: string, data: { name?: string; type?: string; severity?: string; enabled?: boolean; threshold?: number; window?: number }): Promise<{ data: AlertRule }> => {
+    const r = await client.put<unknown>(`/alert-rules/${id}`, data);
+    const parsed = AlertRuleSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid alert rule.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  deleteRule: async (id: string): Promise<void> => {
+    await client.delete(`/alert-rules/${id}`);
+  },
   listAlerts: async (): Promise<{ data: Alert[] }> => {
     const r = await client.get<unknown>('/alerts');
     return { data: parseAlerts(r.data) };
   },
-  acknowledge: (id: string) => client.put(`/alerts/${id}/acknowledge`),
+  acknowledge: async (id: string): Promise<{ data: Alert }> => {
+    const r = await client.put<unknown>(`/alerts/${id}/acknowledge`);
+    const parsed = AlertSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid acknowledged alert.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
 };
 
 export const scheduleApi = {
