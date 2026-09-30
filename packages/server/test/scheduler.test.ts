@@ -71,4 +71,21 @@ describe('Scheduler lifecycle', () => {
     expect(handler).toHaveBeenCalledWith(schedule);
     expect(advance).toHaveBeenCalledWith(schedule.id, expect.any(Date));
   });
+
+  it('disables unsupported schedule kinds instead of retrying them forever', async () => {
+    const update = vi.fn().mockResolvedValue(undefined);
+    const broadcast = vi.fn();
+    const scheduler = new Scheduler(
+      {
+        findDueSchedules: vi.fn().mockResolvedValue([{ id: 'schedule-unknown', kind: 'missing' }]),
+        update,
+      } as never,
+      { broadcast } as never,
+    );
+
+    await scheduler.poll();
+
+    expect(update).toHaveBeenCalledWith('schedule-unknown', { enabled: false });
+    expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }));
+  });
 });

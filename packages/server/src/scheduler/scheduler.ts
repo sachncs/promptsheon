@@ -39,7 +39,15 @@ export class Scheduler {
 
       for (const schedule of dueSchedules) {
         const handler = this.handlers.get(schedule.kind);
-        if (!handler) continue;
+        if (!handler) {
+          this.scheduleRepo.update(schedule.id, { enabled: false });
+          this.sseHub.broadcast({
+            type: 'error',
+            data: { scheduleId: schedule.id, error: `No handler registered for schedule kind '${schedule.kind}'. Schedule disabled.` },
+            timestamp: new Date().toISOString(),
+          });
+          continue;
+        }
 
         try {
           await handler(schedule);
