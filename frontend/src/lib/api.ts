@@ -1423,6 +1423,25 @@ function parseWorkspaceList(raw: unknown): WorkspaceRow[] {
   return unwrapList<unknown>(raw).map(parseWorkspace);
 }
 
+const PlannedDagSchema = z.object({
+  goal: z.string().min(1),
+  acceptanceCriteria: z.array(z.string()),
+  nodes: z.array(z.object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string(),
+    goal: z.string().min(1),
+    suggestedPrompt: z.string(),
+  })),
+  edges: z.array(z.object({
+    from: z.string().min(1),
+    to: z.string().min(1),
+    mapping: z.record(z.string(), z.string()),
+  })),
+  syntheticCases: z.array(z.object({ input: z.unknown(), expected: z.unknown() })),
+  passThreshold: z.number().min(0).max(1),
+});
+
 /**
  * Backend list endpoints come back in two shapes:
  *
@@ -2600,6 +2619,15 @@ export const signingKeysApi = {
     const parsed = SigningKeySchema.safeParse(r.data);
     if (!parsed.success) throw new ApiError('The server returned an invalid signing key.', { code: 'INVALID_RESPONSE' });
     return parsed.data;
+  },
+};
+
+export const ideaApi = {
+  plan: async (idea: string, constraints: string[] = []): Promise<{ data: z.infer<typeof PlannedDagSchema> }> => {
+    const r = await client.post<unknown>('/ideas/plan', { idea, ...(constraints.length > 0 ? { constraints } : {}) });
+    const parsed = PlannedDagSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid planned DAG.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
   },
 };
 

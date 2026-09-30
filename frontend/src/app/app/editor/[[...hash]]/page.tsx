@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   manifestApi,
+  ideaApi,
   validateDagClient,
   executionApi,
   workspaceApi,
@@ -86,6 +87,7 @@ export default function ManifestEditorPage() {
   const [selectedProjectId, setSelectedProjectId] = React.useState('');
   const [selectedCapabilityId, setSelectedCapabilityId] = React.useState('');
   const [newCapabilityName, setNewCapabilityName] = React.useState('');
+  const [plannerIdea, setPlannerIdea] = React.useState('');
 
   const { data: loaded, isError: loadError, error: loadErrorDetail, refetch: refetchManifest } = useQuery({
     queryKey: ['manifest', hash],
@@ -233,6 +235,42 @@ export default function ManifestEditorPage() {
       router.push(`/app/editor/${newHash}`);
     },
     onError: (error: unknown) => toast({ title: 'Could not save capability', description: getErrorMessage(error), variant: 'destructive' }),
+  });
+
+  const planMutation = useMutation({
+    mutationFn: () => {
+      const idea = plannerIdea.trim();
+      if (!idea) throw new Error('Describe the workflow you want to build first.');
+      return ideaApi.plan(idea);
+    },
+    onSuccess: ({ data }) => {
+      const plannedNodes = data.nodes.map((node) => {
+        const leaf = makeLeafManifest(node.id, node.name, node.goal);
+        return {
+          ...leaf,
+          description: node.description,
+          manifest: {
+            ...leaf.manifest,
+            prompt: { ...leaf.manifest.prompt, systemPrompt: node.suggestedPrompt },
+          },
+        };
+      });
+      setManifest((previous) => ({
+        ...previous,
+        nodes: plannedNodes,
+        edges: data.edges,
+        evaluation: { ...previous.evaluation, passThreshold: data.passThreshold },
+        metadata: {
+          ...previous.metadata,
+          goal: data.goal,
+          acceptanceCriteria: data.acceptanceCriteria,
+          syntheticCases: data.syntheticCases,
+        },
+      }));
+      setSelectedNodeId(null);
+      toast({ title: 'DAG planned', description: `${data.nodes.length} editable nodes created from your idea.`, variant: 'success' });
+    },
+    onError: (error: unknown) => toast({ title: 'Could not plan DAG', description: getErrorMessage(error), variant: 'destructive' }),
   });
 
   const runPreviewMutation = useMutation({
@@ -433,6 +471,23 @@ export default function ManifestEditorPage() {
               </Button>
             </ThemedTooltip>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-2 border-b border-border-subtle bg-brand/5 px-4 py-3">
+          <div className="min-w-[16rem] flex-1">
+            <label htmlFor="editor-planner-idea" className="mb-1 block text-xs font-medium text-text-muted">Plan from an idea</label>
+            <Input
+              id="editor-planner-idea"
+              value={plannerIdea}
+              onChange={(event) => setPlannerIdea(event.target.value)}
+              placeholder="e.g. Triage support requests and draft safe replies"
+              disabled={planMutation.isPending}
+            />
+          </div>
+          <Button type="button" variant="outline" onClick={() => planMutation.mutate()} disabled={planMutation.isPending || !plannerIdea.trim()}>
+            <Workflow className="mr-1.5 h-3.5 w-3.5" />{planMutation.isPending ? 'Planning…' : 'Plan DAG'}
+          </Button>
+          {planMutation.isError ? <p role="alert" className="basis-full text-xs text-destructive">{getErrorMessage(planMutation.error)}</p> : null}
         </div>
 
         <div className="flex flex-col lg:flex-row">

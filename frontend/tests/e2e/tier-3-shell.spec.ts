@@ -275,4 +275,15 @@ test.describe('tier 3: app shell after onboarding', () => {
     await expect(page.getByText('Execution evidence')).toBeVisible();
     await expect(page.getByText(/execution\.(started|completed)/).first()).toBeVisible({ timeout: 10_000 });
   });
+
+  test('plans an editable DAG from an idea without a provider key', async ({ page }) => {
+    await walkOnboarding(page);
+    await page.goto('/app/editor');
+    await page.getByLabel('Plan from an idea').fill('Triage support requests and draft safe replies');
+    await page.getByRole('button', { name: 'Plan DAG' }).click();
+    await expect(page.getByText('DAG planned', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Understand', { exact: true })).toBeVisible();
+    await expect(page.getByText('Execute', { exact: true })).toBeVisible();
+    await expect(page.getByText('Review', { exact: true })).toBeVisible();
+  });
 });
