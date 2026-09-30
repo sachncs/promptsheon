@@ -26,8 +26,17 @@ test.describe('tier 2: marketing surface', () => {
     // bootstrapped the installation, onboarding may resume at provider setup
     // or redirect to the control plane instead of showing the welcome CTA.
     const beginSetup = page.getByRole('button', { name: /begin setup/i });
-    if (await beginSetup.isVisible().catch(() => false)) {
-      await expect(beginSetup).toBeEnabled();
+    const beginVisible = await beginSetup.isVisible().catch(() => false);
+    if (beginVisible) {
+      await expect(beginSetup).toBeEnabled().catch(async () => {
+        // Onboarding can advance between the visibility probe and this
+        // assertion when another shared-database test finishes bootstrap.
+        await expect(
+          page.getByRole('heading', { name: /choose a model provider|workspace ready/i }),
+        ).toBeVisible();
+      });
+    } else {
+      await expect(page).toHaveURL(/\/(onboarding|app)(\/|$)/);
     }
   });
 });
