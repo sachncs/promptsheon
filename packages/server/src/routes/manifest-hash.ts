@@ -4,10 +4,17 @@ import { ManifestSchema, mergeDraftManifest } from '@promptsheon/shared';
 import type { ManifestRepo } from '../repos/manifest.js';
 import { parseBody, parseParams } from './validate.js';
 import { NotFoundError } from '@promptsheon/shared';
+import type { PromptScanRepo } from '../repos/prompt-scan.js';
+import { scan } from '../security/prompt-scanner.js';
+import { authoredText } from '../security/authored-text.js';
 
 const ManifestHashParamsSchema = z.object({ hash: z.string().trim().min(1).max(255) });
 
-export function registerManifestHashRoutes(app: FastifyInstance, deps: { manifestRepo: ManifestRepo }) {
+function organizationIdOf(request: { orgContext?: { orgId?: string }; agentOrgId?: string }): string | null {
+  return request.orgContext?.orgId ?? request.agentOrgId ?? null;
+}
+
+export function registerManifestHashRoutes(app: FastifyInstance, deps: { manifestRepo: ManifestRepo; promptScanRepo?: PromptScanRepo }) {
   app.post('/api/manifests', async (request, reply) => {
     let merged: Record<string, unknown>;
     try {
@@ -26,11 +33,32 @@ export function registerManifestHashRoutes(app: FastifyInstance, deps: { manifes
       });
     }
     const manifest = parsed.data;
+    const security = scan({ text: authoredText(manifest) });
+    if (security.verdict === 'block') {
+      return reply.code(422).send({
+        error: {
+          code: 'PROMPT_SECURITY_BLOCKED',
+          message: 'manifest contains blocked security findings',
+          findings: security.findings,
+        },
+      });
+    }
     const meta = manifest.metadata as Record<string, unknown>;
     const goal = typeof meta['goal'] === 'string' ? meta['goal'] : '';
     const createdBy = typeof meta['createdBy'] === 'string' ? meta['createdBy'] : 'unknown';
     const hash = deps.manifestRepo.create(manifest, { goal, createdBy });
-    return reply.code(201).send({ hash });
+    const organizationId = organizationIdOf(request);
+    if (deps.promptScanRepo && organizationId) {
+      deps.promptScanRepo.record({
+        organizationId,
+        actorId: request.userId ?? createdBy,
+        resourceKind: 'manifest',
+        resourceId: hash,
+        verdict: security.verdict,
+        findings: security.findings,
+      });
+    }
+    return reply.code(201).send({ hash, security });
   });
 
   app.get('/api/manifests/:hash', async (request, reply) => {
@@ -69,6 +97,16 @@ export function registerManifestHashRoutes(app: FastifyInstance, deps: { manifes
         })),
       });
     }
-    return reply.code(200).send({ valid: true, issues: [] });
+    const security = scan({ text: authoredText(parsed.data) });
+    if (security.verdict === 'block') {
+      return reply.code(200).send({
+        valid: false,
+        issues: security.findings
+          .filter((finding) => finding.severity === 'block')
+          .map((finding) => ({ path: [], message: finding.message, code: finding.rule })),
+        security,
+      });
+    }
+    return reply.code(200).send({ valid: true, issues: [], security });
   });
 }

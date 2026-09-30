@@ -283,7 +283,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   });
   registerSessionRoutes(app, { store: deps.sessionStore });
   registerSnapshotRoutes(app, { store: deps.snapshotStore, getAgent: deps.getAgent });
-  registerManifestHashRoutes(app, { manifestRepo: deps.manifestRepo });
+  registerManifestHashRoutes(app, { manifestRepo: deps.manifestRepo, promptScanRepo: deps.promptScanRepo });
   registerOrgTeamRoutes(app, {
     orgRepo: deps.orgRepo,
     teamRepo: deps.orgTeamRepo,

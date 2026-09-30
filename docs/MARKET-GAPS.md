@@ -163,7 +163,7 @@ segment. Tier 3 features would create a category.
 
 #### T2-3. **Prompt security: PII detection + injection / jailbreak scoring**
 - **Current status**: implemented for agent specifications. Validated authored values are scanned before persistence; block findings reject the write, while clean/warn results are persisted in `prompt_scans` against the immutable specification hash. Validation and creation responses include the security report, and the admin security surface exposes scan history and summaries.
-- **Remaining**: extend the same save-path enforcement to legacy manifest mutations and add an external red-team corpus integration (promptfoo / garak).
+- **Remaining**: add an external red-team corpus integration (promptfoo / garak) and extend enforcement to any future content types added outside the two current save paths.
 - **Moat impact**: high. Compliance teams need this as evidence for SOC 2 / HIPAA / ISO 27001 controls.
 
 #### T2-4. **Compliance reporting (audit reports, evidence packs)**

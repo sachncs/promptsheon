@@ -5,6 +5,7 @@ import type { AgentSpecificationRepo } from '../repos/agent-specification.js';
 import type { WorkspaceRepo } from '../repos/workspace.js';
 import type { PromptScanRepo } from '../repos/prompt-scan.js';
 import { scan } from '../security/prompt-scanner.js';
+import { authoredText } from '../security/authored-text.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 
 const WorkspaceParams = z.strictObject({ workspaceId: z.string().uuid() });
@@ -27,16 +28,6 @@ const ListQuery = z.object({
 
 function organizationIdOf(request: FastifyRequest): string | null {
   return request.orgContext?.orgId ?? request.agentOrgId ?? null;
-}
-
-/** Scan authored values without feeding schema property names to heuristics. */
-function authoredText(value: unknown): string {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value.map(authoredText).join('\n');
-  if (value && typeof value === 'object') {
-    return Object.values(value as Record<string, unknown>).map(authoredText).join('\n');
-  }
-  return '';
 }
 
 function requireWorkspace(
