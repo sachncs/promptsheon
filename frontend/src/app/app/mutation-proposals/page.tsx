@@ -178,8 +178,13 @@ export default function MutationProposalsPage() {
                   {proposal.status === 'validated' && proposal.evaluationStatus === 'passed' && !proposal.evaluationRunId && (
                     <p className="text-xs text-text-muted">Approval is disabled until durable evaluation evidence is attached.</p>
                   )}
-                  {proposal.status === 'proposed' && proposal.candidateHash && proposal.evaluationStatus === 'pending' ? (
+                  {proposal.status === 'proposed' && proposal.candidateHash && proposal.evaluationStatus !== 'passed' ? (
                     <div className="grid gap-2 rounded-lg border border-border-subtle bg-surface-2/40 p-3 sm:grid-cols-[1fr_10rem_auto] sm:items-end">
+                      <p className="text-xs text-text-muted sm:col-span-3">
+                        {proposal.evaluationStatus === 'failed'
+                          ? 'The previous evaluation did not meet the gate. Attach a new completed run to retry the candidate.'
+                          : 'Attach a completed passing evaluation run before validating this candidate.'}
+                      </p>
                       <label className="text-xs text-text-muted">
                         Durable evaluation run ID
                         <Input
@@ -210,7 +215,7 @@ export default function MutationProposalsPage() {
                         onClick={() => attachEvaluation.mutate({ id: proposal.id, evaluationRunId: runIdById[proposal.id]?.trim() ?? '', baselineScore: parsedBaseline })}
                         disabled={attachEvaluation.isPending || !runIdById[proposal.id]?.trim() || !hasValidBaseline}
                       >
-                        <Link2 /> Attach evidence
+                        <Link2 /> {proposal.evaluationStatus === 'failed' ? 'Replace evidence' : 'Attach evidence'}
                       </Button>
                     </div>
                   ) : null}
