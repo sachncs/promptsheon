@@ -70,16 +70,22 @@ describe('MutationProposalRepo', () => {
     repo.decide({ id: proposal.id, organizationId: 'org-a', status: 'approved', reviewerId: 'reviewer', reason: 'safe candidate' });
     let registeredHash = '';
     const release = { id: 'release-a', status: 'draft', environment: 'dev' };
+    let releaseCreates = 0;
     const service = new MutationPromotionService(
       repo,
       cas,
       { registerFromRaw: (input: { manifestHash: string }) => { registeredHash = input.manifestHash; } } as never,
-      { findByIdInOrg: () => null, createInOrg: () => release } as never,
+      { findByIdInOrg: () => release, createInOrg: () => { releaseCreates += 1; return release; } } as never,
     );
 
-    const result = await service.promote({ proposalId: proposal.id, organizationId: 'org-a', actorId: 'operator', environment: 'dev' });
+    const [result, repeated] = await Promise.all([
+      service.promote({ proposalId: proposal.id, organizationId: 'org-a', actorId: 'operator', environment: 'dev' }),
+      service.promote({ proposalId: proposal.id, organizationId: 'org-a', actorId: 'operator', environment: 'dev' }),
+    ]);
 
     expect(result.release).toEqual(release);
+    expect(repeated.release).toEqual(release);
+    expect(releaseCreates).toBe(1);
     expect(result.proposal.promotedReleaseId).toBe('release-a');
     expect(registeredHash).toBe(candidateHash);
     db.close();

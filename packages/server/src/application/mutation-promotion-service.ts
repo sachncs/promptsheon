@@ -18,6 +18,8 @@ export interface MutationPromotionResult {
 
 /** Materialises an approved immutable candidate as a draft release only. */
 export class MutationPromotionService {
+  private readonly promotionLocks = new Map<string, Promise<MutationPromotionResult>>();
+
   constructor(
     private readonly proposals: MutationProposalRepo,
     private readonly cas: CasStore,
@@ -26,6 +28,25 @@ export class MutationPromotionService {
   ) {}
 
   async promote(input: {
+    proposalId: string;
+    organizationId: string;
+    actorId: string;
+    environment: 'dev' | 'staging' | 'prod';
+  }): Promise<MutationPromotionResult> {
+    const lockKey = `${input.organizationId}:${input.proposalId}`;
+    const active = this.promotionLocks.get(lockKey);
+    if (active) return active;
+
+    const operation = this.promoteOnce(input);
+    this.promotionLocks.set(lockKey, operation);
+    try {
+      return await operation;
+    } finally {
+      if (this.promotionLocks.get(lockKey) === operation) this.promotionLocks.delete(lockKey);
+    }
+  }
+
+  private async promoteOnce(input: {
     proposalId: string;
     organizationId: string;
     actorId: string;
