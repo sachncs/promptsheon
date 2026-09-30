@@ -81,7 +81,7 @@ test.describe('tier 3: app shell after onboarding', () => {
 
     await expect(page).toHaveURL(/\/onboarding$/);
     await expect(page.getByText('Restore your browser session')).toBeVisible();
-    await expect(page.getByText(/invalid|rejected|unauthorized/i).first()).toBeVisible();
+    await expect(page.getByText(/requires an API key/i).first()).toBeVisible();
   });
 
   test('validates an existing session before redirecting from onboarding', async ({ page, request }) => {

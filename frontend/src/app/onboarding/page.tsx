@@ -85,9 +85,9 @@ export default function OnboardingPage() {
       bootstrapApi.admin()
         .then((data) => {
           const restored = toSession(data, status.data?.provider ?? null);
-          if (status.data.authEnabled && !restored.apiKey) {
+          if (status.data.authEnabled) {
             setRestoreCandidate(data);
-            setRestoreError('This installation requires an API key, but the saved browser session is missing. Sign in with an API key or complete setup again.');
+            setRestoreError('This installation requires an API key. Enter an existing administrator API key to verify and restore this browser session.');
             return;
           }
           setRestoreError(null);
