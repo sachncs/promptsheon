@@ -40,6 +40,8 @@ export default function NewAgentPage({ searchParams }: { searchParams: Promise<{
   const [model, setModel] = useState('simulator');
   const [owner, setOwner] = useState('workspace team');
   const [changeReason, setChangeReason] = useState('Initial agent specification');
+  const [advancedJson, setAdvancedJson] = useState('{}');
+  const [advancedError, setAdvancedError] = useState<string | null>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(workspaceQuery ?? '');
   const [formEdited, setFormEdited] = useState(false);
   const [validation, setValidation] = useState<{ valid: true; specification: unknown } | { valid: false; issues: Array<{ code: string; message: string; path: Array<string | number> }> } | null>(null);
@@ -66,22 +68,39 @@ export default function NewAgentPage({ searchParams }: { searchParams: Promise<{
   const inheritedPrompt = JsonObjectSchema.safeParse(inheritedSpecification?.['prompt']).success ? JsonObjectSchema.parse(inheritedSpecification?.['prompt']) : {};
   const inheritedModelPolicy = JsonObjectSchema.safeParse(inheritedSpecification?.['modelPolicy']).success ? JsonObjectSchema.parse(inheritedSpecification?.['modelPolicy']) : {};
   const inheritedLifecycle = JsonObjectSchema.safeParse(inheritedSpecification?.['lifecycle']).success ? JsonObjectSchema.parse(inheritedSpecification?.['lifecycle']) : {};
-  const draft: AgentSpecificationDraft = {
-    ...(!formEdited && inheritedSpecification ? inheritedSpecification : {}),
-    role: effectiveRole,
-    objective: effectiveObjective,
-    prompt: { ...(!formEdited ? inheritedPrompt : {}), system: effectiveSystemPrompt },
-    modelPolicy: { ...(!formEdited ? inheritedModelPolicy : {}), provider: effectiveProvider, model: effectiveModel },
-    lifecycle: { ...(!formEdited ? inheritedLifecycle : {}), owner: effectiveOwner },
-  };
+  function buildDraft(): AgentSpecificationDraft | null {
+    let advanced: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(advancedJson);
+      const validated = JsonObjectSchema.safeParse(parsed);
+      if (!validated.success) throw new Error('Advanced policies must be a JSON object.');
+      advanced = validated.data;
+    } catch (error) {
+      setAdvancedError(error instanceof Error ? error.message : 'Advanced policies must be valid JSON.');
+      return null;
+    }
+    const advancedPrompt = JsonObjectSchema.safeParse(advanced['prompt']).success ? JsonObjectSchema.parse(advanced['prompt']) : {};
+    const advancedModelPolicy = JsonObjectSchema.safeParse(advanced['modelPolicy']).success ? JsonObjectSchema.parse(advanced['modelPolicy']) : {};
+    const advancedLifecycle = JsonObjectSchema.safeParse(advanced['lifecycle']).success ? JsonObjectSchema.parse(advanced['lifecycle']) : {};
+    setAdvancedError(null);
+    return {
+      ...(inheritedSpecification ?? {}),
+      ...advanced,
+      role: effectiveRole,
+      objective: effectiveObjective,
+      prompt: { ...inheritedPrompt, ...advancedPrompt, system: effectiveSystemPrompt },
+      modelPolicy: { ...inheritedModelPolicy, ...advancedModelPolicy, provider: effectiveProvider, model: effectiveModel },
+      lifecycle: { ...inheritedLifecycle, ...advancedLifecycle, owner: effectiveOwner },
+    };
+  }
   const validate = useMutation({
-    mutationFn: () => agentSpecificationApi.validate(workspaceId!, draft),
+    mutationFn: (draft: AgentSpecificationDraft) => agentSpecificationApi.validate(workspaceId!, draft),
     onSuccess: (response) => setValidation(response.data),
   });
   const mutation = useMutation({
-    mutationFn: () => agentSpecificationApi.create({
+    mutationFn: (draft: AgentSpecificationDraft) => agentSpecificationApi.create({
       workspaceId: workspaceId!,
-      changeReason,
+      changeReason: effectiveChangeReason,
       specification: draft,
       ...(parentHash ? { parentHash } : {}),
     }),
@@ -102,7 +121,7 @@ export default function NewAgentPage({ searchParams }: { searchParams: Promise<{
       ) : (
         <Surface>
           {parentHash && <div className="mb-5 rounded-lg border border-brand/30 bg-brand/5 p-3 text-sm text-text-muted">Creating a child revision from <span className="font-mono text-xs text-text-strong">{parentHash}</span>. The parent remains immutable.{parentRevision.isPending && <span className="ml-2">Loading inherited policies…</span>}</div>}
-          <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); if (validation?.valid) mutation.mutate(); }}>
+          <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); const draft = buildDraft(); if (draft && validation?.valid) mutation.mutate(draft); }}>
             {(workspaces.data?.length ?? 0) > 1 && <div className="grid gap-2"><Label>Workspace</Label><ThemedSelect value={workspaceId ?? ''} onValueChange={(value) => { setSelectedWorkspaceId(value); setValidation(null); }} options={(workspaces.data ?? []).map((workspace) => ({ value: workspace.id, label: workspace.name }))} ariaLabel="Select workspace for new agent specification" /></div>}
             <div className="grid gap-5 md:grid-cols-2">
               <Field label="Role" value={effectiveRole} onChange={(value) => { setFormEdited(true); setRole(value); setValidation(null); }} required />
@@ -113,11 +132,12 @@ export default function NewAgentPage({ searchParams }: { searchParams: Promise<{
             </div>
             <TextField label="Objective" value={effectiveObjective} onChange={(value) => { setFormEdited(true); setObjective(value); setValidation(null); }} required />
             <TextField label="System prompt" value={effectiveSystemPrompt} onChange={(value) => { setFormEdited(true); setSystemPrompt(value); setValidation(null); }} required />
+            <div className="grid gap-2"><Label htmlFor="advanced-policies">Advanced policies (JSON)</Label><Textarea id="advanced-policies" value={advancedJson} onChange={(event) => { setAdvancedJson(event.target.value); setAdvancedError(null); setValidation(null); }} rows={8} className="font-mono text-xs" aria-invalid={Boolean(advancedError)} /><p className="text-xs text-text-subtle">Optional overrides for guardrails, tools, permissions, routing, memory, evaluation, and resource budgets. Child revisions retain inherited policies unless overridden here.</p>{advancedError && <p role="alert" className="text-sm text-destructive">{advancedError}</p>}</div>
             {validation?.valid && <p className="text-sm text-success">Specification is valid and ready to create.</p>}
             {validation && !validation.valid && <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"><p className="font-medium">Fix these validation issues:</p><ul className="mt-1 list-disc pl-5">{validation.issues.map((issue, index) => <li key={`${issue.code}-${index}`}>{issue.path.length > 0 ? `${issue.path.join('.')} — ` : ''}{issue.message}</li>)}</ul></div>}
             {validate.isError && <p role="alert" className="text-sm text-destructive">Unable to validate this specification. Try again.</p>}
             {mutation.isError && <p role="alert" className="text-sm text-destructive">Unable to create this revision. Please review the fields and try again.</p>}
-            <div className="flex justify-end gap-2"><Button asChild variant="outline"><Link href="/app/agents">Cancel</Link></Button><Button type="button" variant="outline" onClick={() => validate.mutate()} disabled={validate.isPending || parentRevision.isPending}>{validate.isPending ? 'Validating…' : 'Validate specification'}</Button><Button type="submit" disabled={mutation.isPending || parentRevision.isPending || validation?.valid !== true}>{mutation.isPending ? 'Creating…' : 'Create draft'}</Button></div>
+            <div className="flex justify-end gap-2"><Button asChild variant="outline"><Link href="/app/agents">Cancel</Link></Button><Button type="button" variant="outline" onClick={() => { const draft = buildDraft(); if (draft) validate.mutate(draft); }} disabled={validate.isPending || parentRevision.isPending}>{validate.isPending ? 'Validating…' : 'Validate specification'}</Button><Button type="submit" disabled={mutation.isPending || parentRevision.isPending || validation?.valid !== true}>{mutation.isPending ? 'Creating…' : 'Create draft'}</Button></div>
           </form>
         </Surface>
       )}
