@@ -1,6 +1,6 @@
 # Reliability and throughput baseline
 
-Baseline captured on 2026-09-29 on Node.js 26.8.1 and pnpm 11.23.0. These are
+Baseline captured on 2026-09-30 on Node.js 26.8.1 and pnpm 11.23.0. These are
 engineering measurements, not production SLO commitments.
 
 ## Current quality gates
@@ -62,19 +62,19 @@ The baseline health/storage harness on the capture machine produced:
 
 | Benchmark | Configuration | Result |
 |---|---|---:|
-| HTTP health throughput | 2,000 requests, concurrency 16 | 8,497 req/s |
-| HTTP health p95 latency | Same run | 2.56 ms |
-| SQLite concurrent writes | 4 workers × 250 writes, WAL mode | 14,090 writes/s |
+| HTTP health throughput | 2,000 requests, concurrency 16 | 8,521 req/s |
+| HTTP health p95 latency | Same run | 2.66 ms |
+| SQLite concurrent writes | 4 workers × 250 writes, WAL mode | 12,052 writes/s |
 
 The latest execution-queue run on the same capture machine used 1,000 jobs
 across four organizations and produced:
 
 | Benchmark | Result |
 |---|---:|
-| Queue admission throughput | 21,026 jobs/s |
-| Queue admission p95 latency | 0.053 ms |
-| Claim-and-complete throughput | 9,366 jobs/s |
-| Claim latency p95 | 0.105 ms |
+| Queue admission throughput | 20,161 jobs/s |
+| Queue admission p95 latency | 0.055 ms |
+| Claim-and-complete throughput | 8,961 jobs/s |
+| Claim latency p95 | 0.109 ms |
 | Exactly-once verification | `true` |
 | Remaining queued jobs | 0 |
 
