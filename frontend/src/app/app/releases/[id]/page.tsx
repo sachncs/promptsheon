@@ -8,13 +8,11 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
-import { releaseApi, approvalApi, auditApi, evalApi, parseList } from '@/lib/api';
-import { z } from 'zod';
+import { releaseApi, approvalApi, auditApi, evalApi, type ApprovalEntry, type AuditEntry, type Release } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
 import { StepRail, type Step } from '@/components/brand/step-rail';
-import { HashChip } from '@/components/brand/hash-chip';
 import { Timeline } from '@/components/brand/timeline';
 import { EmptyState } from '@/components/brand/empty-state';
 import { QueryError } from '@/components/brand/query-error';
@@ -35,10 +33,6 @@ const RAIL_STEPS: Step[] = [
   { id: 'active', label: 'Active', description: 'Receiving 100% of production traffic.', status: 'active' },
   { id: 'rolled-back', label: 'Rolled back', description: 'Reverted to a prior stable release.', status: 'rolled-back' },
 ];
-
-const ApprovalSchema = z.object({
-  userId: z.string().optional(), vote: z.string().optional(), comment: z.string().optional(), createdAt: z.string().optional(),
-});
 
 export default function ReleaseDetailPage() {
   const session = useRequireSession();
@@ -62,7 +56,7 @@ export default function ReleaseDetailPage() {
 
   const approvals = useQuery({
     queryKey: ['approvals', id],
-    queryFn: () => approvalApi.list(id).then((r) => parseList(r.data, ApprovalSchema)),
+    queryFn: (): Promise<ApprovalEntry[]> => approvalApi.list(id).then((r) => r.data.approvals),
     enabled: Boolean(id),
   });
 
@@ -78,9 +72,9 @@ export default function ReleaseDetailPage() {
   });
 
   const currentStep = useMemo(() => {
-    const r = release.data as { status?: string; state?: string } | null | undefined;
-    const s = r?.status ?? r?.state ?? 'draft';
-    if (RAIL_STEPS.some((step) => step.id === s)) return String(s);
+    const s = release.data?.status ?? 'draft';
+    const stepId = s === 'rolled_back' ? 'rolled-back' : s;
+    if (RAIL_STEPS.some((step) => step.id === stepId)) return stepId;
     return 'draft';
   }, [release.data]);
 
@@ -181,15 +175,10 @@ export default function ReleaseDetailPage() {
     );
   }
 
-  const r = release.data as {
-    id: string; capabilityName?: string; capabilityVersion?: number; status?: string; state?: string;
-    manifestHash?: string; environment?: string; canaryPercent?: number;
-    signature?: string | null; signedKeyId?: string | null; signedAt?: string | null;
-    createdAt?: string; updatedAt?: string;
-  };
+  const r: Release = release.data;
 
-  const releaseStatus = r.status ?? r.state ?? 'draft';
-  const isTerminal = releaseStatus === 'rolled-back';
+  const releaseStatus = r.status;
+  const isTerminal = releaseStatus === 'rolled_back';
   const canaryOrActive = releaseStatus === 'canary' || releaseStatus === 'active';
   const approvalCount = approvals.data?.length ?? 0;
   const hasPassingEvaluation = (evaluations.data ?? []).some((run) => run.status === 'passed');
@@ -202,11 +191,10 @@ export default function ReleaseDetailPage() {
         </Link>
         <PageHeader
           eyebrow={`Release · ${r.environment ?? 'production'}`}
-          title={`${r.capabilityName ?? 'Capability'} v${r.capabilityVersion ?? '?'}`}
+          title={`${r.capabilityId} v${r.capabilityVersion}`}
           subtitle="Governed progression through draft → review → approved → canary → active. Rollback is one click."
           actions={
             <div className="flex items-center gap-2">
-              {r.manifestHash && <HashChip hash={r.manifestHash} />}
               <StatusPill kind={statusKindOf(releaseStatus, 'draft')} label={releaseStatus} />
             </div>
           }
@@ -277,17 +265,17 @@ export default function ReleaseDetailPage() {
           <Surface>
             <SurfaceHeader title="Identity" />
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <div>
+          <div>
                 <dt className="text-xs uppercase tracking-wider text-text-subtle">Capability</dt>
-                <dd className="mt-1 text-text-default">{r.capabilityName ?? '—'}</dd>
+                <dd className="mt-1 font-mono text-xs text-text-default">{r.capabilityId}</dd>
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wider text-text-subtle">Version</dt>
-                <dd className="mt-1 font-mono text-xs text-text-default">v{r.capabilityVersion ?? '?'}</dd>
+                <dd className="mt-1 font-mono text-xs text-text-default">v{r.capabilityVersion}</dd>
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wider text-text-subtle">Environment</dt>
-                <dd className="mt-1 text-text-default">{r.environment ?? 'production'}</dd>
+                <dd className="mt-1 text-text-default">{r.environment}</dd>
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wider text-text-subtle">State</dt>
@@ -304,7 +292,7 @@ export default function ReleaseDetailPage() {
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wider text-text-subtle">Updated</dt>
-                <dd className="mt-1 text-text-default">{r.updatedAt ? new Date(r.updatedAt).toLocaleString() : '—'}</dd>
+                <dd className="mt-1 text-text-default">—</dd>
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wider text-text-subtle">Created</dt>
@@ -319,16 +307,15 @@ export default function ReleaseDetailPage() {
             <SurfaceHeader title="Approvals" description="Maker-checker coverage on this release." />
             {approvals.isError ? (
               <QueryError message={approvals.error} onRetry={() => void approvals.refetch()} />
-            ) : (approvals.data as unknown[] | undefined)?.length ? (
+            ) : approvals.data?.length ? (
               <ul className="space-y-3">
-                {((approvals.data as Array<{ userId?: string; vote?: string; comment?: string; createdAt?: string }>) ?? []).map((a) => (
-                  <li key={`${a.userId ?? 'reviewer'}-${a.createdAt ?? 'unknown'}`} className="flex items-center gap-3">
-                    <ShieldCheck className={`h-4 w-4 ${a.vote === 'approve' ? 'text-success' : a.vote === 'reject' ? 'text-destructive' : 'text-info'}`} />
+                {approvals.data.map((a) => (
+                  <li key={`${a.userId}-${a.createdAt}`} className="flex items-center gap-3">
+                    <ShieldCheck className={`h-4 w-4 ${a.vote === 'approve' ? 'text-success' : 'text-destructive'}`} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm text-text-strong">{a.userId ?? 'Reviewer'}</div>
+                      <div className="text-sm text-text-strong">{a.userId}</div>
                       <div className="text-xs text-text-muted">
-                        {a.vote === 'approve' ? 'approved' : a.vote === 'reject' ? 'rejected' : 'pending'} ·{' '}
-                        {a.createdAt ? new Date(a.createdAt).toLocaleString() : 'Pending timestamp'}
+                        {a.vote === 'approve' ? 'approved' : 'rejected'} · {new Date(a.createdAt).toLocaleString()}
                       </div>
                     </div>
                   </li>
@@ -377,13 +364,13 @@ export default function ReleaseDetailPage() {
             <SurfaceHeader title="Lifecycle" description="Append-only audit events for this release." />
             {audit.isError ? (
               <QueryError message={audit.error} onRetry={() => void audit.refetch()} />
-            ) : (audit.data as unknown[] | undefined)?.length ? (
+            ) : audit.data?.length ? (
               <Timeline
-                entries={((audit.data as Array<{ id: string; action?: string; actor?: string; createdAt?: string }>) ?? []).map((a) => ({
+                entries={audit.data.map((a: AuditEntry) => ({
                   id: a.id,
-                  title: String(a.action ?? 'event'),
-                  actor: a.actor,
-                  timestamp: a.createdAt ? new Date(a.createdAt).toLocaleString() : 'Unknown time',
+                  title: a.action,
+                  actor: a.userId,
+                  timestamp: new Date(a.timestamp).toLocaleString(),
                   tone: 'info' as const,
                 }))}
               />
