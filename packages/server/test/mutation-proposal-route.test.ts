@@ -97,4 +97,19 @@ describe('mutation proposal routes', () => {
     expect(response.json()).toMatchObject({ error: { code: 'EVALUATION_REQUIRED' } });
     expect(context.repo.decide).not.toHaveBeenCalled();
   });
+
+  it('blocks approval when a passed evaluation has no durable evidence reference', async () => {
+    const context = buildApp();
+    app = context.app;
+    vi.mocked(context.repo.findInOrg).mockReturnValue({ ...proposal, status: 'validated', evaluationStatus: 'passed' });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/mutation-proposals/proposal-1/decision',
+      payload: { decision: 'approve', reason: 'ship it' },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({ error: { code: 'EVIDENCE_REQUIRED' } });
+    expect(context.repo.decide).not.toHaveBeenCalled();
+  });
 });

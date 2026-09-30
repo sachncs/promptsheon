@@ -142,7 +142,9 @@ export class MutationProposalRepo {
     passThreshold: number;
     evaluationRunId?: string;
   }): MutationProposal | null {
-    const status: MutationEvaluationStatus = input.candidateScore >= input.baselineScore && input.candidateScore >= input.passThreshold
+    const status: MutationEvaluationStatus = input.evaluationRunId
+      && input.candidateScore >= input.baselineScore
+      && input.candidateScore >= input.passThreshold
       ? 'passed'
       : 'failed';
     const result = this.db.prepare(
@@ -169,7 +171,7 @@ export class MutationProposalRepo {
     reason: string;
   }): MutationProposal | null {
     const candidateRequirement = input.status === 'approved'
-      ? " AND status = 'validated' AND candidate_hash IS NOT NULL AND evaluation_status = 'passed'"
+      ? " AND status = 'validated' AND candidate_hash IS NOT NULL AND evaluation_status = 'passed' AND evaluation_run_id IS NOT NULL"
       : " AND status IN ('proposed', 'validated')";
     const result = this.db.prepare(
       `UPDATE mutation_proposals

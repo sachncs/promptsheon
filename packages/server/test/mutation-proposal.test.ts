@@ -37,7 +37,7 @@ describe('MutationProposalRepo', () => {
       risk: 'low',
       confidence: 0.8,
     });
-    expect(repo.recordEvaluation({ id: proposal.id, organizationId: 'org-a', baselineScore: 0.4, candidateScore: 0.9, passThreshold: 0.8 })).toMatchObject({
+    expect(repo.recordEvaluation({ id: proposal.id, organizationId: 'org-a', baselineScore: 0.4, candidateScore: 0.9, passThreshold: 0.8, evaluationRunId: 'eval-1' })).toMatchObject({
       evaluationStatus: 'passed',
       baselineScore: 0.4,
       candidateScore: 0.9,
@@ -110,7 +110,7 @@ describe('MutationProposalRepo', () => {
       risk: 'medium',
       confidence: 0.8,
     });
-    repo.recordEvaluation({ id: proposal.id, organizationId: 'org-a', baselineScore: 0.2, candidateScore: 0.8, passThreshold: 0.7 });
+    repo.recordEvaluation({ id: proposal.id, organizationId: 'org-a', baselineScore: 0.2, candidateScore: 0.8, passThreshold: 0.7, evaluationRunId: 'eval-2' });
     let registeredHash = '';
     const release = { id: 'release-a', status: 'draft', environment: 'dev' };
     let releaseCreates = 0;

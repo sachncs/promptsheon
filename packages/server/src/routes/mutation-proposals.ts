@@ -125,6 +125,11 @@ export function registerMutationProposalRoutes(app: FastifyInstance, deps: Mutat
         error: { code: 'EVALUATION_REQUIRED', message: 'the candidate must pass evaluation before approval' },
       });
     }
+    if (parsed.data.decision === 'approve' && !existing.evaluationRunId) {
+      return reply.code(422).send({
+        error: { code: 'EVIDENCE_REQUIRED', message: 'a durable evaluation evidence reference is required before approval' },
+      });
+    }
     if (parsed.data.decision === 'approve' && !existing.candidateHash) {
       return reply.code(422).send({
         error: { code: 'CANDIDATE_REQUIRED', message: 'an immutable candidate must be materialised before approval' },

@@ -38,7 +38,9 @@ persisting the proposal. The proposal records baseline and candidate scores in
 its structured changes, and links the candidate trace when observability is
 enabled. Evaluation passes only when the candidate reaches the manifest
 threshold and does not regress against the measured baseline. The active
-manifest is still left unchanged.
+manifest is still left unchanged. Approval additionally requires a durable
+evaluation-run reference, and the console keeps approval disabled until that
+evidence is present.
 
 Automatic candidate materialisation and evidence-backed promotion remain in
 progress. Declared dataset cases now run through the graph executor and the

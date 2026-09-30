@@ -66,7 +66,9 @@ export default function MutationProposalsPage() {
         ) : (
           <div className="divide-y divide-border-subtle border-t border-border-subtle">
             {rows.map((proposal) => {
-              const actionable = proposal.status === 'validated' && proposal.evaluationStatus === 'passed';
+              const actionable = proposal.status === 'validated'
+                && proposal.evaluationStatus === 'passed'
+                && Boolean(proposal.evaluationRunId);
               const reviewable = proposal.status === 'proposed' || proposal.status === 'validated';
               return (
                 <article key={proposal.id} className="space-y-4 p-5">
@@ -161,6 +163,9 @@ export default function MutationProposalsPage() {
                   )}
                   {proposal.status === 'validated' && proposal.evaluationStatus !== 'passed' && (
                     <p className="text-xs text-text-muted">Approval is disabled until the candidate passes evaluation.</p>
+                  )}
+                  {proposal.status === 'validated' && proposal.evaluationStatus === 'passed' && !proposal.evaluationRunId && (
+                    <p className="text-xs text-text-muted">Approval is disabled until durable evaluation evidence is attached.</p>
                   )}
                   {(validate.isError || decide.isError || promote.isError) && (
                     <p role="alert" className="text-xs text-destructive">
