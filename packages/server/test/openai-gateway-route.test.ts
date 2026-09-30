@@ -14,6 +14,10 @@ function gateway(content = 'simulated response') {
       cacheHit: false,
       latencyMs: 1,
     })),
+    stream: vi.fn(async function* (request: { model: string; provider: string }) {
+      yield { text: content.slice(0, 4), provider: request.provider, model: request.model, cacheHit: false };
+      yield { text: content.slice(4), provider: request.provider, model: request.model, cacheHit: false, done: true };
+    }),
   } as never;
 }
 
@@ -46,7 +50,8 @@ describe('OpenAI-compatible gateway route', () => {
 
   it('returns an OpenAI-compatible SSE response for streamed requests', async () => {
     const app = Fastify();
-    registerOpenAiGatewayRoutes(app, { gateway: gateway('streamed') });
+    const gw = gateway('streamed');
+    registerOpenAiGatewayRoutes(app, { gateway: gw });
 
     const response = await app.inject({
       method: 'POST',
@@ -62,7 +67,12 @@ describe('OpenAI-compatible gateway route', () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers['content-type']).toContain('text/event-stream');
     expect(response.body).toContain('data: [DONE]');
-    expect(response.body).toContain('streamed');
+    expect(response.body).toContain('"content":"stre"');
+    expect(response.body).toContain('"content":"amed"');
+    expect(gw.stream).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'user: hello', stream: true }),
+      expect.objectContaining({ actorId: 'unscoped' }),
+    );
   });
 
   it('rejects malformed requests before invoking the gateway', async () => {

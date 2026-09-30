@@ -65,17 +65,27 @@ function responseBody(input: {
   };
 }
 
-function sendStream(reply: { type(value: string): unknown; send(payload: string): unknown }, body: Record<string, unknown>): unknown {
-  reply.type('text/event-stream');
-  const choice = (body.choices as Array<{ message: { content: string } }>)[0];
-  const chunk = {
-    id: body.id,
-    object: 'chat.completion.chunk',
-    created: body.created,
-    model: body.model,
-    choices: [{ index: 0, delta: { role: 'assistant', content: choice?.message.content ?? '' }, finish_reason: null }],
-  };
-  return reply.send(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`);
+async function sendStream(
+  reply: { type(value: string): unknown; raw: { setHeader(name: string, value: string): void; write(payload: string): boolean; end(): void } },
+  stream: AsyncIterable<{ text: string; done?: boolean; model: string; provider: string; cacheHit: boolean; latencyMs?: number }>,
+  input: { id: string; created: number; model: string },
+): Promise<unknown> {
+  reply.raw.setHeader('content-type', 'text/event-stream; charset=utf-8');
+  let first = true;
+  for await (const chunk of stream) {
+    const payload = {
+      id: input.id,
+      object: 'chat.completion.chunk',
+      created: input.created,
+      model: input.model,
+      choices: [{ index: 0, delta: { ...(first ? { role: 'assistant' } : {}), content: chunk.text }, finish_reason: chunk.done ? 'stop' : null }],
+    };
+    first = false;
+    reply.raw.write(`data: ${JSON.stringify(payload)}\n\n`);
+  }
+  reply.raw.write('data: [DONE]\n\n');
+  reply.raw.end();
+  return reply;
 }
 
 /** OpenAI-compatible gateway endpoint used by framework integrations. */
@@ -87,19 +97,22 @@ export function registerOpenAiGatewayRoutes(app: FastifyInstance, deps: { gatewa
     }
 
     try {
+      if (parsed.data.stream) {
+        const id = `chatcmpl-gateway-${Date.now()}`;
+        return sendStream(
+          reply,
+          deps.gateway.stream(
+            { prompt: toPrompt(parsed.data.messages), model: parsed.data.model, provider: parsed.data.provider, temperature: parsed.data.temperature, stream: true },
+            { actorId: actorOf(request), scopeId: scopeOf(request) },
+          ),
+          { id, created: Math.floor(Date.now() / 1000), model: parsed.data.model },
+        );
+      }
       const result = await deps.gateway.complete(
-        {
-          prompt: toPrompt(parsed.data.messages),
-          model: parsed.data.model,
-          provider: parsed.data.provider,
-          temperature: parsed.data.temperature,
-        },
+        { prompt: toPrompt(parsed.data.messages), model: parsed.data.model, provider: parsed.data.provider, temperature: parsed.data.temperature },
         { actorId: actorOf(request), scopeId: scopeOf(request) },
       );
       const body = responseBody({ model: parsed.data.model, result });
-      if (parsed.data.stream) {
-        return sendStream(reply, body);
-      }
       return reply.send(body);
     } catch (error) {
       const status = statusCodeOf(error, 502);

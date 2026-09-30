@@ -54,6 +54,13 @@ export interface LlmCompleteResult {
   model: string;
 }
 
+export interface LlmStreamChunk {
+  text: string;
+  done?: boolean;
+  promptTokens?: number;
+  completionTokens?: number;
+}
+
 export class LlmRouter {
   constructor(
     private readonly credentials?: LlmCredentials,
@@ -117,6 +124,75 @@ export class LlmRouter {
       costUsd,
       model: req.model,
     };
+  }
+
+  /**
+   * Stream provider output as soon as it is available. Providers that do not
+   * expose a streaming protocol are represented as one deterministic chunk.
+   */
+  async *stream(req: LlmCompleteRequest): AsyncIterable<LlmStreamChunk> {
+    switch (req.provider) {
+      case 'openai':
+        yield* this.streamOpenAi(req);
+        return;
+      case 'custom':
+        if (/anthropic|minimax/i.test(req.baseUrl ?? this.baseUrl ?? '')) {
+          yield* this.streamAnthropic(req);
+        } else {
+          yield* this.streamOpenAi(req);
+        }
+        return;
+      case 'anthropic':
+        yield* this.streamAnthropic(req);
+        return;
+      case 'simulated': {
+        const content = `[simulation:${req.model}] ${req.prompt}`;
+        const promptTokens = LlmRouter.estimateTokens(req.prompt);
+        yield { text: content, promptTokens, completionTokens: LlmRouter.estimateTokens(content), done: true };
+        return;
+      }
+      case 'bedrock': {
+        const result = await this.complete(req);
+        yield { text: result.content, promptTokens: result.promptTokens, completionTokens: result.completionTokens, done: true };
+        return;
+      }
+      default:
+        throw new Error(`unknown provider: ${req.provider}`);
+    }
+  }
+
+  private async *streamOpenAi(req: LlmCompleteRequest): AsyncIterable<LlmStreamChunk> {
+    const base = (req.baseUrl ?? process.env['OPENAI_BASE_URL'] ?? 'https://api.openai.com').replace(/\/$/, '');
+    const apiKey = req.apiKey ?? this.credentials?.openaiApiKey ?? process.env['OPENAI_API_KEY'] ?? '';
+    if (!apiKey) throw new Error('OpenAI API key missing');
+    const response = await fetch(`${base}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ model: req.model, temperature: req.temperature, stream: true, messages: [{ role: 'user', content: req.prompt }] }),
+      signal: req.signal ?? AbortSignal.timeout(60_000),
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`OpenAI responded ${response.status}: ${safeErrorMessage(body)}`);
+    }
+    yield* parseOpenAiStream(response, req.prompt);
+  }
+
+  private async *streamAnthropic(req: LlmCompleteRequest): AsyncIterable<LlmStreamChunk> {
+    const base = (req.baseUrl ?? process.env['ANTHROPIC_BASE_URL'] ?? 'https://api.anthropic.com').replace(/\/$/, '');
+    const apiKey = req.apiKey ?? this.credentials?.anthropicApiKey ?? process.env['ANTHROPIC_API_KEY'] ?? '';
+    if (!apiKey) throw new Error('Anthropic API key missing');
+    const response = await fetch(`${base}/v1/messages`, {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: req.model, max_tokens: 1024, temperature: req.temperature, stream: true, messages: [{ role: 'user', content: req.prompt }] }),
+      signal: req.signal ?? AbortSignal.timeout(60_000),
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`Anthropic responded ${response.status}: ${safeErrorMessage(body)}`);
+    }
+    yield* parseAnthropicStream(response, req.prompt);
   }
 
   private async completeOpenai(req: LlmCompleteRequest, promptTokens: number): Promise<string> {
@@ -369,6 +445,57 @@ export class LlmRouter {
     }
     return { latencyMs: Date.now() - started, model: req.model };
   }
+}
+
+async function* sseData(response: Response): AsyncIterable<string> {
+  if (!response.body) throw new Error('streaming provider returned an empty body');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (true) {
+      const part = await reader.read();
+      buffer += decoder.decode(part.value, { stream: !part.done });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (line.startsWith('data:')) yield line.slice(5).trim();
+      }
+      if (part.done) break;
+    }
+    if (buffer.startsWith('data:')) yield buffer.slice(5).trim();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function* parseOpenAiStream(response: Response, prompt: string): AsyncIterable<LlmStreamChunk> {
+  const promptTokens = LlmRouter.estimateTokens(prompt);
+  for await (const data of sseData(response)) {
+    if (data === '[DONE]') {
+      yield { text: '', promptTokens, done: true };
+      return;
+    }
+    const parsed = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }> };
+    const text = parsed.choices?.[0]?.delta?.content ?? '';
+    if (text) yield { text };
+  }
+  yield { text: '', promptTokens, done: true };
+}
+
+async function* parseAnthropicStream(response: Response, prompt: string): AsyncIterable<LlmStreamChunk> {
+  const promptTokens = LlmRouter.estimateTokens(prompt);
+  for await (const data of sseData(response)) {
+    const parsed = JSON.parse(data) as { type?: string; delta?: { type?: string; text?: string }; message?: { usage?: { input_tokens?: number } }; usage?: { output_tokens?: number } };
+    if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta' && parsed.delta.text) {
+      yield { text: parsed.delta.text };
+    }
+    if (parsed.type === 'message_delta' || parsed.type === 'message_stop') {
+      yield { text: '', promptTokens: parsed.message?.usage?.input_tokens ?? promptTokens, completionTokens: parsed.usage?.output_tokens, done: true };
+      return;
+    }
+  }
+  yield { text: '', promptTokens, done: true };
 }
 
 function withApiVersion(baseUrl: string, resource: 'chat/completions' | 'messages' | 'models'): string {

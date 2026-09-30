@@ -65,9 +65,9 @@ Content-Type: application/json
 The request accepts `model`, `messages`, `temperature`, optional `provider`,
 and optional `stream`. Provider credentials remain server-side; the endpoint
 does not accept upstream API keys from browser or framework callers. The
-`stream: true` contract emits a compatible SSE response after the gateway has
-buffered the completion, so integrations can use one transport while true
-provider token streaming is developed separately.
+`stream: true` contract forwards native provider chunks as they arrive, while
+providers without native streaming support explicitly fall back to one
+completion chunk.
 
 ### Credential-free built-in tools
 

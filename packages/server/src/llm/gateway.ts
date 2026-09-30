@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { LlmRouter } from '../llm/router.js';
+import { LlmRouter, type LlmStreamChunk } from '../llm/router.js';
 import { CircuitBreaker } from '../application/execution-resilience.js';
 
 /**
@@ -205,6 +205,13 @@ export interface GatewayResponse {
   latencyMs: number;
 }
 
+export interface GatewayStreamChunk extends LlmStreamChunk {
+  provider: string;
+  model: string;
+  cacheHit: boolean;
+  latencyMs?: number;
+}
+
 export interface RateLimitState {
   tokensRemaining: number;
   resetAt: number;
@@ -308,7 +315,7 @@ export class Gateway {
       cache: ResponseCache;
       fallback: FallbackChain;
       rateLimiter: RateLimiter;
-      router: Pick<LlmRouter, 'complete'>;
+      router: Pick<LlmRouter, 'complete' | 'stream'>;
       circuitBreaker?: { failureThreshold?: number; cooldownMs?: number };
     },
   ) {}
@@ -384,6 +391,75 @@ export class Gateway {
       } catch (err) {
         lastError = err as Error;
         // Continue to the next provider in the chain.
+      }
+    }
+    throw lastError ?? new Error('all providers in fallback chain failed');
+  }
+
+  /** Stream uncached provider output and persist the complete response on success. */
+  async *stream(request: GatewayRequest, opts: { actorId: string; scopeId?: string } = { actorId: 'unscoped' }): AsyncIterable<GatewayStreamChunk> {
+    const rl = this.deps.rateLimiter.take(opts.actorId);
+    if (!rl.allowed) {
+      const err: Error & { statusCode?: number } = new Error('rate limit exceeded');
+      err.statusCode = 429;
+      throw err;
+    }
+
+    const cacheRequest = { ...request, scopeId: opts.scopeId ?? opts.actorId };
+    const cached = this.deps.cache.get(cacheRequest);
+    if (cached) {
+      yield { text: cached.content, provider: cached.provider, model: cached.model, cacheHit: true, promptTokens: cached.promptTokens, completionTokens: cached.completionTokens, done: true, latencyMs: 0 };
+      return;
+    }
+
+    const started = Date.now();
+    let lastError: Error | undefined;
+    const providers = [request.provider, ...this.deps.fallback.order().filter((provider) => provider !== request.provider)];
+    for (const provider of providers) {
+      let content = '';
+      let sawChunk = false;
+      try {
+        const breaker = this.circuitBreakers.get(provider) ?? new CircuitBreaker(
+          `provider:${provider}`, this.deps.circuitBreaker?.failureThreshold, this.deps.circuitBreaker?.cooldownMs,
+        );
+        this.circuitBreakers.set(provider, breaker);
+        const providerRequest = {
+          prompt: request.prompt,
+          model: request.model,
+          temperature: request.temperature,
+          provider,
+          signal: request.signal,
+          ...(provider === request.provider && request.baseUrl ? { baseUrl: request.baseUrl } : {}),
+          ...(provider === request.provider && request.apiKey ? { apiKey: request.apiKey } : {}),
+        };
+        // A provider is only eligible for fallback before its first emitted
+        // chunk; after that point the response is already observable by the client.
+        const iterator = this.deps.router.stream(providerRequest)[Symbol.asyncIterator]();
+        while (true) {
+          const next = await breaker.execute(() => iterator.next());
+          if (next.done) break;
+          const chunk = next.value;
+          if (chunk.text) {
+            sawChunk = true;
+            content += chunk.text;
+          }
+          yield { ...chunk, provider, model: request.model, cacheHit: false, latencyMs: Date.now() - started };
+          if (chunk.done) break;
+        }
+        const completionTokens = LlmRouter.estimateTokens(content);
+        const promptTokens = LlmRouter.estimateTokens(request.prompt);
+        this.deps.cache.set({
+          ...request,
+          provider,
+          content,
+          promptTokens,
+          completionTokens,
+          costUsd: (promptTokens / 1000) * 0.00003 + (completionTokens / 1000) * 0.00006,
+        }, cacheRequest);
+        return;
+      } catch (err) {
+        lastError = err as Error;
+        if (sawChunk) throw lastError;
       }
     }
     throw lastError ?? new Error('all providers in fallback chain failed');

@@ -127,7 +127,10 @@ segment. Tier 3 features would create a category.
 
 #### T1-2. **Prompt playground + parameter sweep**
 - **Current status**: implemented as `/app/playground` and `/api/playground/{complete,sweep}`. The gateway supports simulator runs, cache hits, bounded sweeps, side-by-side result reporting, and an authenticated OpenAI-compatible `/v1/chat/completions` contract for framework integrations.
-- **Remaining**: true token-by-token provider streaming and quality-based ranking across sweep variants. The current `stream: true` compatibility response is buffered and emitted as a standards-compatible SSE sequence.
+- **Remaining**: quality-based ranking across sweep variants. The gateway now
+  forwards native OpenAI-compatible and Anthropic event streams as they arrive;
+  providers without native streaming are explicitly represented as one
+  completion chunk.
 - **Moat impact**: low alone. But **the missing tool that every solo prompt-engineer needs**.
 
 #### T1-3. **LLM gateway — caching, fallback, routing**
@@ -212,7 +215,7 @@ These keep promptsheon credible but won't differentiate.
 
 | Feature | Notes |
 |---|---|
-| **True streamed completions over SSE** | The OpenAI-compatible gateway now exposes a buffered SSE compatibility path; true provider token streaming and execution-level streaming remain. |
+| **True streamed completions over SSE** | Provider-native OpenAI-compatible and Anthropic streams are forwarded incrementally; providers without native streaming and execution-level streaming remain follow-up work. |
 | **Multi-region replication** | Read replicas across regions; today single SQLite file. Important for global SaaS, less so for self-host. |
 | **Per-prompt A/B experiments with statistical significance** | The `experiment` repo already exists; missing the chi-squared / Bayesian band-it output. |
 | **Cost forecast / budget alerts** | CostRollupRepo already aggregates; missing the forecast + alert layer. |

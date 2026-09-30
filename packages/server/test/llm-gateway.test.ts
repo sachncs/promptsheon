@@ -123,6 +123,33 @@ describe('RateLimiter', () => {
 });
 
 describe('Gateway', () => {
+  it('streams simulator chunks and caches the completed response', async () => {
+    const router = {
+      async complete(): Promise<LlmCompleteResult> { return okResult('simulated'); },
+      async *stream(): AsyncIterable<{ text: string; done?: boolean }> {
+        yield { text: 'hello ' };
+        yield { text: 'world', done: true };
+      },
+    } as unknown as Pick<LlmRouter, 'complete' | 'stream'>;
+    const gw = new Gateway({
+      cache: new ResponseCache(),
+      fallback: new FallbackChain(['simulated']),
+      rateLimiter: new RateLimiter({ capacity: 100, refillPerSecond: 100 }),
+      router,
+    });
+
+    const chunks = [];
+    for await (const chunk of gw.stream({ prompt: 'hello', model: 'sim', temperature: 0, provider: 'simulated' })) chunks.push(chunk);
+    expect(chunks.map((chunk) => chunk.text).join('')).toBe('hello world');
+    expect(chunks.at(-1)?.done).toBe(true);
+
+    const cached = [];
+    for await (const chunk of gw.stream({ prompt: 'hello', model: 'sim', temperature: 0, provider: 'simulated' })) cached.push(chunk);
+    expect(cached).toHaveLength(1);
+    expect(cached[0]?.cacheHit).toBe(true);
+    expect(cached[0]?.text).toBe('hello world');
+  });
+
   it('honours the requested simulator before configured real-provider fallbacks', async () => {
     const providers: string[] = [];
     const gw = new Gateway({
