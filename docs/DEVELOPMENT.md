@@ -52,6 +52,23 @@ at startup and exposes `/api/health` for liveness and `/api/ready` for
 readiness. Readiness should be used by deployment orchestration because it
 includes database and startup dependency checks.
 
+### Framework gateway integration
+
+Framework adapters can call the authenticated OpenAI-compatible endpoint:
+
+```http
+POST /v1/chat/completions
+Authorization: Bearer <promptsheon-api-key>
+Content-Type: application/json
+```
+
+The request accepts `model`, `messages`, `temperature`, optional `provider`,
+and optional `stream`. Provider credentials remain server-side; the endpoint
+does not accept upstream API keys from browser or framework callers. The
+`stream: true` contract emits a compatible SSE response after the gateway has
+buffered the completion, so integrations can use one transport while true
+provider token streaming is developed separately.
+
 ### Useful checks
 
 ```bash

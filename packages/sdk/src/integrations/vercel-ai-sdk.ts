@@ -177,6 +177,7 @@ function toOpenAiBody(
       : [];
   return {
     model: opts.modelId ?? inner.modelId,
+    ...(opts.provider ? { provider: opts.provider } : {}),
     messages,
     max_tokens: options.maxTokens,
     temperature: options.temperature,

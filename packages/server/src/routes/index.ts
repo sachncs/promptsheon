@@ -53,6 +53,7 @@ import { registerOrgSettingsRoutes, type OrgSettingsRouteDeps } from './org-sett
 import { registerTraceRoutes } from './trace.js';
 import { registerTraceScoreRoutes } from './trace-score.js';
 import { registerPlaygroundRoutes } from './playground.js';
+import { registerOpenAiGatewayRoutes } from './openai-gateway.js';
 import { registerAnalyticsRoutes } from './analytics.js';
 import { registerTeamRoutes } from './team.js';
 import { registerSecurityRoutes } from './security.js';
@@ -377,6 +378,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerEvidenceRoutes(app, { repo: deps.evidenceRepo, requireAdmin });
   registerMutationProposalRoutes(app, deps.mutationProposalDeps);
   registerPlaygroundRoutes(app, { gateway: deps.gateway });
+  registerOpenAiGatewayRoutes(app, { gateway: deps.gateway });
   registerAnalyticsRoutes(app, { repo: deps.userAnalyticsRepo });
   registerTeamRoutes(app, {
     teamRepo: deps.teamRepo,

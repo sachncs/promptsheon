@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scope gateway cache entries by tenant and actor so identical prompts cannot
   reuse another user's response.
 
+- Add an authenticated OpenAI-compatible `/v1/chat/completions` gateway route
+  for SDK/framework integrations, including validated chat messages and a
+  buffered SSE compatibility response for `stream: true` requests.
+
 ### Removed
 - Removed the experimental VS Code extension workspace. Promptsheon now
   focuses on the self-hosted API, Next.js console, CLI, SDK, and public
