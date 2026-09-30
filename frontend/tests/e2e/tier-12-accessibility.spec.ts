@@ -62,6 +62,11 @@ test.describe('tier 12: accessibility and keyboard foundations', () => {
 
   test('onboarding exposes a keyboard-reachable form surface', async ({ page }) => {
     await page.goto('/onboarding');
+    // A completed bootstrap intentionally redirects onboarding to the first
+    // authenticated capability view. Wait for that client redirect to settle
+    // before asserting focus; otherwise the original page is replaced between
+    // focus() and toBeFocused() in slower CI runners.
+    await page.waitForLoadState('networkidle');
     await assertAccessibleSurface(page);
     await expect(page.getByRole('main')).toBeVisible();
     const firstInteractive = page.locator('main button:visible, main input:visible, main a:visible').first();
