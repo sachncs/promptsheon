@@ -177,7 +177,7 @@ Be conservative: small targeted edits, preserve what works.`,
 
       const executionId = `${executionIdBase}-${i + 1}`;
       const traceRun = this.deps.traceRepo?.startRun({
-        organizationId: 'unscoped',
+        organizationId: options.organizationId ?? 'unscoped',
         name: `evolution:${executionId}`,
         environment: 'dev',
         model: currentManifest.model?.modelId ?? null,
@@ -274,6 +274,33 @@ Be conservative: small targeted edits, preserve what works.`,
           if (!this.deps.mutationProposalRepo || !options.organizationId) {
             throw new Error('proposal mode requires mutation proposal storage and organization context');
           }
+          const candidateExecutionId = `${executionId}-candidate`;
+          const candidateTraceRun = this.deps.traceRepo?.startRun({
+            organizationId: options.organizationId,
+            name: `evolution:${candidateExecutionId}`,
+            environment: 'dev',
+            model: nextManifest.model?.modelId ?? null,
+            attributes: { manifestHash: candidateHash, route: 'goal-evolution', executionId: candidateExecutionId, phase: 'candidate' },
+          });
+          let candidateTrace;
+          try {
+            candidateTrace = await this.deps.executor.execute(candidateHash, nextManifest, {
+              executionId: candidateExecutionId,
+              inputs: {},
+              environment: 'dev',
+              ...(candidateTraceRun ? { traceRunId: candidateTraceRun.id } : {}),
+            });
+            if (candidateTraceRun) {
+              this.deps.traceRepo?.finalize(candidateTraceRun.id, candidateTrace.status === 'completed' ? 'success' : 'error', {
+                tokens: candidateTrace.totalTokens,
+                costUsd: candidateTrace.totalCost,
+              });
+            }
+          } catch (error) {
+            if (candidateTraceRun) this.deps.traceRepo?.finalize(candidateTraceRun.id, 'error');
+            throw error;
+          }
+          const candidateScore = await this.scoreAgainstGoal(candidateTrace, nextManifest);
           const proposal = this.deps.mutationProposalRepo.create({
             organizationId: options.organizationId,
             sourceHash: currentHash,
@@ -284,13 +311,19 @@ Be conservative: small targeted edits, preserve what works.`,
               before: currentManifest.nodes.find((node) => node.id === weakest)?.manifest.prompt.systemPrompt ?? '',
               after: nextManifest.nodes.find((node) => node.id === weakest)?.manifest.prompt.systemPrompt ?? '',
               revision: revised.changes,
+              evaluation: {
+                baselineScore: score,
+                candidateScore,
+                candidateExecutionId,
+              },
             },
             rationale: revised.reasoning,
-            expectedOutcome: `Improve the goal score from ${score.toFixed(2)} toward ${currentManifest.evaluation.passThreshold.toFixed(2)}.`,
+            expectedOutcome: `Improve the goal score from ${score.toFixed(2)} to ${candidateScore.toFixed(2)} toward ${currentManifest.evaluation.passThreshold.toFixed(2)}.`,
             authorType: this.deps.config.llm.defaultProvider === 'simulated' ? 'simulator' : 'system',
             authorId: this.deps.config.llm.defaultProvider === 'simulated' ? 'local-simulator' : 'goal-evolver',
             risk: 'medium',
             confidence: Math.max(0, Math.min(1, score)),
+            ...(candidateTraceRun ? { evaluationRunId: candidateTraceRun.id } : {}),
           });
           proposals.push(proposal);
           history[history.length - 1].proposalId = proposal.id;

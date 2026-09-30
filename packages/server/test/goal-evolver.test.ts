@@ -177,7 +177,7 @@ describe('GoalBasedEvolutionAgent', () => {
       expect(result.proposals?.map((proposal) => proposal.id)).toEqual(['proposal-1']);
       expect(result.manifestHash).toBe('h');
       expect(created[0]).toMatchObject({ sourceHash: 'h', mutationKind: 'prompt' });
-      expect(executor.calls).toBe(1);
+      expect(executor.calls).toBe(2);
     });
 
     it('returns immediately when DAG is invalid', async () => {

@@ -33,8 +33,13 @@ requires `metadata.capabilityId`, and moves a proposal from `proposed` to
 `validated`. Approval is only accepted from `validated` proposals, and the
 console exposes the validation action before approval.
 
-Candidate generation, automatic candidate materialisation, evaluation gates,
-and evidence-backed promotion remain in progress. The approval ledger is not
+Proposal-mode evolution now executes and scores the candidate manifest before
+persisting the proposal. The proposal records baseline and candidate scores in
+its structured changes, and links the candidate trace when observability is
+enabled. The active manifest is still left unchanged.
+
+Automatic candidate materialisation, dataset-backed evaluation gates, and
+evidence-backed promotion remain in progress. The approval ledger is not
 connected to automatic activation: an approved proposal can be explicitly
 materialised as a draft release, while activation remains governed by the
 existing release approval and lifecycle gates.
