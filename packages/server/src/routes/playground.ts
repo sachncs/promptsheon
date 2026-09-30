@@ -33,6 +33,11 @@ function actorOf(request: FastifyRequest): string {
   return request.userId ?? 'unscoped';
 }
 
+function cacheScopeOf(request: FastifyRequest): string {
+  const organizationId = request.orgContext?.orgId ?? request.agentOrgId ?? 'unscoped';
+  return `${organizationId}:${actorOf(request)}`;
+}
+
 /**
  * Playground routes — non-mutating surface for prompt iteration.
  *   POST /api/playground/complete — fire one prompt against the
@@ -56,7 +61,7 @@ export function registerPlaygroundRoutes(app: FastifyInstance, deps: { gateway: 
     if (data.baseUrl) gwRequest.baseUrl = data.baseUrl;
     if (data.apiKey) gwRequest.apiKey = data.apiKey;
     try {
-      const result = await deps.gateway.complete(gwRequest, { actorId: actorOf(request) });
+      const result = await deps.gateway.complete(gwRequest, { actorId: actorOf(request), scopeId: cacheScopeOf(request) });
       return reply.send(result);
     } catch (err) {
       const status = statusCodeOf(err, 502);
@@ -86,7 +91,7 @@ export function registerPlaygroundRoutes(app: FastifyInstance, deps: { gateway: 
             ...(base.baseUrl ? { baseUrl: base.baseUrl } : {}),
             ...(base.apiKey ? { apiKey: base.apiKey } : {}),
           },
-          { actorId },
+          { actorId, scopeId: cacheScopeOf(request) },
         ),
       ),
     );

@@ -52,6 +52,12 @@ describe('ResponseCache', () => {
     expect(customA).not.toBe(customB);
   });
 
+  it('isolates cache keys by scope', () => {
+    const first = cacheKey({ prompt: 'same', model: 'm', temperature: 0, provider: 'p', scopeId: 'org-a:user-1' });
+    const second = cacheKey({ prompt: 'same', model: 'm', temperature: 0, provider: 'p', scopeId: 'org-b:user-1' });
+    expect(first).not.toBe(second);
+  });
+
   it('evicts least-recently-used entries past capacity', () => {
     const cache = new ResponseCache(2);
     cache.set({ prompt: 'a', model: 'm', temperature: 0, provider: 'p', content: '', promptTokens: 0, completionTokens: 0, costUsd: 0, model: 'm', provider: 'p' });
@@ -140,7 +146,7 @@ describe('Gateway', () => {
   it('returns a cached entry without calling the router', async () => {
     const cache = new ResponseCache();
     cache.set({
-      prompt: 'hi', model: 'gpt-4', temperature: 0, provider: 'openai',
+      prompt: 'hi', model: 'gpt-4', temperature: 0, provider: 'openai', scopeId: 'unscoped',
       content: 'cached hello', promptTokens: 1, completionTokens: 1, costUsd: 0,
       model: 'gpt-4', provider: 'openai',
     });
@@ -159,6 +165,21 @@ describe('Gateway', () => {
     expect(out.content).toBe('cached hello');
     expect(out.cacheHit).toBe(true);
     expect(routerCalls).toBe(0);
+  });
+
+  it('does not reuse one actor response for another actor', async () => {
+    const cache = new ResponseCache();
+    let routerCalls = 0;
+    const gw = new Gateway({
+      cache,
+      fallback: new FallbackChain(['simulated']),
+      rateLimiter: new RateLimiter({ capacity: 100, refillPerSecond: 100 }),
+      router: stubRouter(async () => { routerCalls += 1; return okResult('simulated'); }),
+    });
+    const request = { prompt: 'same', model: 'm', temperature: 0, provider: 'simulated' } as const;
+    await gw.complete(request, { actorId: 'actor-a' });
+    await gw.complete(request, { actorId: 'actor-b' });
+    expect(routerCalls).toBe(2);
   });
 
   it('falls through the chain on provider failure and caches the winner', async () => {

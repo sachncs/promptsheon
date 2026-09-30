@@ -33,6 +33,8 @@ export interface CacheLookup {
   provider: string;
   /** Optional endpoint identity for custom OpenAI/Anthropic-compatible providers. */
   baseUrl?: string;
+  /** Tenant or actor namespace; responses must never cross this boundary. */
+  scopeId?: string;
 }
 
 export interface ResponseCacheStore {
@@ -54,6 +56,7 @@ function cacheKey(input: CacheLookup): string {
     temperature: input.temperature,
     provider: input.provider,
     baseUrl: input.baseUrl ?? null,
+    scopeId: input.scopeId ?? null,
   });
   return createHash('sha256').update(payload).digest('hex');
 }
@@ -298,7 +301,7 @@ export class Gateway {
     };
   }
 
-  async complete(request: GatewayRequest, opts: { actorId: string } = { actorId: 'unscoped' }): Promise<GatewayResponse> {
+  async complete(request: GatewayRequest, opts: { actorId: string; scopeId?: string } = { actorId: 'unscoped' }): Promise<GatewayResponse> {
     const rl = this.deps.rateLimiter.take(opts.actorId);
     if (!rl.allowed) {
       const err: Error & { statusCode?: number } = new Error('rate limit exceeded');
@@ -306,7 +309,8 @@ export class Gateway {
       throw err;
     }
 
-    const cacheHit = this.deps.cache.get(request);
+    const cacheRequest = { ...request, scopeId: opts.scopeId ?? opts.actorId };
+    const cacheHit = this.deps.cache.get(cacheRequest);
     if (cacheHit) {
       return {
         content: cacheHit.content,
@@ -352,7 +356,7 @@ export class Gateway {
           promptTokens: result.promptTokens,
           completionTokens: result.completionTokens,
           costUsd: result.costUsd,
-        }, request);
+        }, cacheRequest);
         return { ...result, provider, latencyMs, cacheHit: false };
       } catch (err) {
         lastError = err as Error;
