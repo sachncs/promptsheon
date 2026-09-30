@@ -86,6 +86,19 @@ describe('DurableExecutionWorker', () => {
     expect(jobs.get('org1', job.id).attempts).toBe(1);
   });
 
+  it('fails a job when the maximum execution duration is exceeded', async () => {
+    const job = jobs.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: hash('a'), inputHash: hash('timeout'), inputJson: '{}', idempotencyKey: 'timeout' });
+    const worker = new DurableExecutionWorker(jobs, {
+      run(_job, context) {
+        return new Promise((_, reject) => context.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }));
+      },
+    }, { workerId: 'worker-1', maxConcurrency: 1, pollMs: 2, leaseMs: 10, maxExecutionMs: 35, maxBackoffMs: 1, random: () => 0 });
+    worker.start();
+    await waitFor(() => jobs.get('org1', job.id).state === 'timed-out');
+    await worker.stop();
+    expect(jobs.get('org1', job.id).error).toContain('maximum duration');
+  });
+
   it('redacts and bounds untrusted provider errors in durable job state', async () => {
     const job = jobs.enqueue({
       organizationId: 'org1',
