@@ -1,4 +1,5 @@
 import type { AppConfig, EvalRun, DatasetCase, Manifest } from '@promptsheon/shared';
+import { z } from 'zod';
 import {
   buildEvaluatorRegistry,
   getEvaluator,
@@ -8,6 +9,29 @@ import {
   type EvalResult,
 } from '../../evaluation/evaluators.js';
 import { EvalSuiteRunner } from './suite-runner.js';
+
+const EvaluationInputsSchema = z.record(z.string(), z.unknown());
+
+function parseEvaluationInputs(raw: string): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error('evaluation case inputs are not valid JSON', { cause: error });
+  }
+  const result = EvaluationInputsSchema.safeParse(parsed);
+  if (!result.success) throw new Error('evaluation case inputs must be a JSON object');
+  return result.data;
+}
+
+function parseEvaluationExpected(raw: string): unknown {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed;
+  } catch (error) {
+    throw new Error('evaluation case expected value is not valid JSON', { cause: error });
+  }
+}
 
 export class EvaluationAgent {
   private evaluators: Map<string, Evaluator>;
@@ -69,8 +93,8 @@ export class EvaluationAgent {
 
     for (let i = 0; i < cases.length; i++) {
       const testCase = cases[i];
-      const inputs = JSON.parse(testCase.inputs) as Record<string, unknown>;
-      const expected = JSON.parse(testCase.expected);
+      const inputs = parseEvaluationInputs(testCase.inputs);
+      const expected = parseEvaluationExpected(testCase.expected);
 
       const startedAt = Date.now();
       const actual = await getActual(inputs);
@@ -127,8 +151,8 @@ export class EvaluationAgent {
 
     for (let i = 0; i < cases.length; i++) {
       const testCase = cases[i];
-      const inputs = JSON.parse(testCase.inputs) as Record<string, unknown>;
-      const expected = JSON.parse(testCase.expected);
+      const inputs = parseEvaluationInputs(testCase.inputs);
+      const expected = parseEvaluationExpected(testCase.expected);
       const startedAt = Date.now();
       const actual = await getActual(inputs);
 

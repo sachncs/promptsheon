@@ -107,4 +107,16 @@ describe('EvaluationAgent', () => {
     expect(result.failed).toBe(1);
     expect(result.score).toBe(0.5);
   });
+
+  it('rejects malformed stored case inputs before invoking the evaluator', async () => {
+    const agent = new EvaluationAgent(config);
+    (agent as unknown as { evaluators: StubEvaluatorRegistry }).evaluators = new StubEvaluatorRegistry();
+    const evaluate = async () => ({ score: 1, passed: true, reasoning: 'unexpected' });
+    (agent as unknown as { evaluators: StubEvaluatorRegistry }).evaluators.evaluators.set('custom', {
+      name: 'custom',
+      evaluate,
+    });
+    const invalid = { ...makeCase({}, {}), inputs: 'not-json' };
+    await expect(agent.runEval(evalRun, [invalid], async () => 'ok')).rejects.toThrow('inputs are not valid JSON');
+  });
 });
