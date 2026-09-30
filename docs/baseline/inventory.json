@@ -1167,6 +1167,11 @@
     {
       "file": "packages/server/src/routes/trace.ts",
       "method": "GET",
+      "path": "/api/traces/prompt-risk"
+    },
+    {
+      "file": "packages/server/src/routes/trace.ts",
+      "method": "GET",
       "path": "/api/traces"
     },
     {
