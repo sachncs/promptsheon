@@ -5,7 +5,13 @@ test.describe('tier 2: marketing surface', () => {
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.getByRole('link', { name: /start building/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /read the docs/i })).toHaveAttribute('href', '/docs');
     await expect(page.getByText(/adaptive agent engineering platform/i).first()).toBeVisible();
+  });
+
+  test('visitor navigation opens the developer docs route', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: 'Docs', exact: true }).first()).toHaveAttribute('href', '/docs');
   });
 
   test('docs index renders the section tabs', async ({ page }) => {

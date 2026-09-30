@@ -16,7 +16,7 @@ const topLinks = [
   { label: 'Product', href: '/#product' },
   { label: 'Workflow', href: '/#workflow' },
   { label: 'Governance', href: '/#governance' },
-  { label: 'Docs', href: '/#docs' },
+  { label: 'Docs', href: '/docs' },
 ];
 
 function Container({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -60,7 +60,7 @@ export default function LandingPage() {
                     <ArrowRight className="ml-1.5 h-4 w-4" />
                   </Button>
                 </Link>
-                <Link href="/#docs">
+                <Link href="/docs">
                   <Button size="lg" variant="outline">
                     Read the docs
                   </Button>
