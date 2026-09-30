@@ -42,6 +42,7 @@ export interface ResponseCacheStore {
   set(entry: CacheEntry): void;
   delete(hash: string): void;
   clear(): void;
+  size(): number;
   trim(maxEntries: number): void;
 }
 
@@ -126,7 +127,7 @@ export class ResponseCache {
   }
 
   size(): number {
-    return this.store.size;
+    return this.persistentStore?.size() ?? this.store.size;
   }
 
   clear(): void {

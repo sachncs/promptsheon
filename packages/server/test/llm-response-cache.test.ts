@@ -26,6 +26,7 @@ describe('persistent LLM response cache', () => {
     const restored = second.get(request);
     expect(restored?.content).toBe('deterministic answer');
     expect(restored?.prompt).toBe('');
+    expect(second.size()).toBe(1);
     expect(db.prepare('SELECT COUNT(*) AS count FROM llm_response_cache').get()).toEqual({ count: 1 });
     db.close();
   });

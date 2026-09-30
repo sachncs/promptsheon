@@ -79,6 +79,10 @@ export class LlmResponseCacheRepo {
     this.db.prepare('DELETE FROM llm_response_cache').run();
   }
 
+  size(): number {
+    return (this.db.prepare('SELECT COUNT(*) AS count FROM llm_response_cache').get() as { count: number }).count;
+  }
+
   trim(maxEntries: number): void {
     this.db.prepare(`
       DELETE FROM llm_response_cache
