@@ -84,10 +84,50 @@ export class EvaluatorRegistry {
   }
 
   private build(name: string): Evaluator {
+    if (this.config.llm.defaultProvider === 'simulated' && name !== 'deterministic') {
+      return new SimulatedEvaluator(name);
+    }
     if (this.baseRegistry.has(name)) {
       return getEvaluator(this.baseRegistry, name);
     }
     return makeLLMJudge(this.config, name, systemPromptFor(name));
+  }
+}
+
+/**
+ * Credential-free evaluator used by the local simulator.
+ *
+ * It deliberately measures only observable text properties. Semantic claims
+ * remain the responsibility of a configured provider-backed judge.
+ */
+class SimulatedEvaluator implements Evaluator {
+  constructor(public readonly name: string) {}
+
+  async evaluate(input: EvalInput): Promise<EvalResult> {
+    const actual = input.actual.trim();
+    const expected = input.expected.trim();
+    if (actual.length === 0) {
+      return { score: 0, passed: false, reasoning: `${this.name}: output is empty` };
+    }
+
+    if (expected.length > 0 && canonicalText(actual) === canonicalText(expected)) {
+      return { score: 1, passed: true, reasoning: `${this.name}: output matches the expected value` };
+    }
+
+    const score = Math.min(0.9, 0.55 + Math.min(actual.length, 350) / 3500);
+    return {
+      score,
+      passed: score >= 0.5,
+      reasoning: `${this.name}: deterministic simulator score based on non-empty output shape; semantic judging requires a configured provider`,
+    };
+  }
+}
+
+function canonicalText(value: string): string {
+  try {
+    return JSON.stringify(JSON.parse(value));
+  } catch {
+    return value;
   }
 }
 

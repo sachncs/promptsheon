@@ -36,6 +36,23 @@ describe('EvaluatorRegistry', () => {
     const b = reg.get('coherence');
     expect(a).not.toBe(b);
   });
+
+  it('evaluates every registered name without credentials in simulator mode', async () => {
+    const simulatedConfig = {
+      ...config,
+      llm: { ...config.llm, defaultProvider: 'simulated' },
+    };
+    const simulated = new EvaluatorRegistry(simulatedConfig);
+
+    for (const name of EVALUATOR_NAMES) {
+      const result = await simulated.get(name).evaluate({
+        actual: 'simulated output',
+        expected: 'simulated output',
+        inputs: {},
+      });
+      expect(result).toMatchObject({ score: 1, passed: true });
+    }
+  });
 });
 
 describe('StrandsEvaluatorAdapter', () => {
