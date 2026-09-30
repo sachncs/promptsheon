@@ -1469,7 +1469,8 @@
     "packages/shared/db/migrations/064_mutation_proposal_evaluation.up.sql",
     "packages/shared/db/migrations/065_evidence_workspace_scope.up.sql",
     "packages/shared/db/migrations/066_evidence_org_workspace_time_index.up.sql",
-    "packages/shared/db/migrations/067_llm_response_cache.up.sql"
+    "packages/shared/db/migrations/067_llm_response_cache.up.sql",
+    "packages/shared/db/migrations/068_evidence_polymorphic_execution.up.sql"
   ],
   "frontendRoutes": [
     {
