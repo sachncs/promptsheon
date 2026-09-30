@@ -7,11 +7,15 @@ const safeHash = '0'.repeat(64);
 const mutatingMethods = new Set(['post', 'put', 'patch', 'delete']);
 
 function resolvePath(path) {
-  return path.replace(/\{([^}]+)\}/g, (_match, name) => {
+  const resolveParameter = (name) => {
     if (name.toLowerCase().includes('hash')) return safeHash;
     if (name.toLowerCase().includes('name') || name.toLowerCase().includes('slug')) return 'contract-smoke';
     return safeUuid;
-  });
+  };
+
+  return path
+    .replace(/\{([^}]+)\}/g, (_match, name) => resolveParameter(name))
+    .replace(/:([A-Za-z][A-Za-z0-9_]*)/g, (_match, name) => resolveParameter(name));
 }
 
 const openapiResponse = await fetch(`${baseUrl}/api/openapi.json`, {

@@ -14,11 +14,11 @@ export function registerSseRoutes(app: FastifyInstance, sseHub: SseHub) {
     if (!parsedParams.ok) return;
     const { channel } = parsedParams.data;
 
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    });
+    // Take ownership of the raw response before the SSE client writes its
+    // headers. Without hijacking, Fastify continues the normal reply
+    // lifecycle after this handler returns and can attempt to write a second
+    // response, producing ERR_HTTP_HEADERS_SENT for every subscription.
+    reply.hijack();
 
     const clientId = crypto.randomUUID();
     const client = new SseServerClient(reply, clientId);
