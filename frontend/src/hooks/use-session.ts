@@ -22,16 +22,24 @@ export function useSession() {
 export function useRequireSession() {
   const session = useSession();
   const redirectAttempted = React.useRef(false);
-  const refreshed = React.useRef(false);
+  const skipInitialRedirectCheck = React.useRef(true);
 
   React.useEffect(() => {
-    refreshSessionSnapshot();
-    refreshed.current = true;
+    const currentSession = refreshSessionSnapshot();
+    skipInitialRedirectCheck.current = true;
+    if (!currentSession && !redirectAttempted.current) {
+      redirectAttempted.current = true;
+      if (window.location.pathname !== '/onboarding') window.location.replace('/onboarding');
+    }
     window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
   }, []);
 
   React.useEffect(() => {
-    if (refreshed.current && !session && !redirectAttempted.current) {
+    if (skipInitialRedirectCheck.current) {
+      skipInitialRedirectCheck.current = false;
+      return;
+    }
+    if (!session && !redirectAttempted.current) {
       redirectAttempted.current = true;
       // A full replace prevents a stale App Router tree from preserving an
       // invalid session after malformed localStorage is detected.
