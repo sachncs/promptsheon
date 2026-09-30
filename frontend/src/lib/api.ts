@@ -2814,6 +2814,68 @@ export interface TraceSpan {
   outputText: string | null;
 }
 
+const TraceRunSummarySchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  executionId: z.string().nullable(),
+  environment: z.string(),
+  name: z.string(),
+  startTime: z.string(),
+  endTime: z.string().nullable(),
+  status: z.enum(['running', 'success', 'error']),
+  totalTokens: z.number(),
+  totalCostUsd: z.number(),
+  model: z.string().nullable(),
+});
+
+const TraceSpanSchema = z.object({
+  id: z.string(),
+  traceRunId: z.string(),
+  parentSpanId: z.string().nullable(),
+  name: z.string(),
+  kind: z.enum(['internal', 'llm', 'tool', 'retrieval', 'agent']),
+  startTime: z.string(),
+  endTime: z.string().nullable(),
+  status: z.enum(['ok', 'error']),
+  attributes: z.record(z.string(), z.unknown()),
+  model: z.string().nullable(),
+  promptTokens: z.number().int().nullable(),
+  completionTokens: z.number().int().nullable(),
+  totalTokens: z.number().int().nullable(),
+  costUsd: z.number().nullable(),
+  inputText: z.string().nullable(),
+  outputText: z.string().nullable(),
+});
+
+const TraceListSchema = z.object({ items: z.array(TraceRunSummarySchema), total: z.number().int().nonnegative() });
+const TraceDetailSchema = z.object({ run: TraceRunSummarySchema, spans: z.array(TraceSpanSchema) });
+const TraceRollupSchema = z.object({
+  orgId: z.string(),
+  days: z.number().int().positive(),
+  environment: z.string().nullable().optional(),
+  items: z.array(z.object({ day: z.string(), tokens: z.number(), cost: z.number(), runs: z.number().int().nonnegative() })),
+});
+const TraceOperationalSummarySchema = z.object({
+  runs: z.number().int().nonnegative(),
+  errors: z.number().int().nonnegative(),
+  averageLatencyMs: z.number().nonnegative(),
+  tokens: z.number().nonnegative(),
+  cost: z.number().nonnegative(),
+  models: z.array(z.object({ model: z.string(), runs: z.number().int().nonnegative(), errors: z.number().int().nonnegative(), tokens: z.number().nonnegative(), cost: z.number().nonnegative() })),
+});
+const TracePromptRiskSchema = z.object({
+  promptKey: z.string(),
+  runs: z.number().int().nonnegative(),
+  errors: z.number().int().nonnegative(),
+  errorRate: z.number().min(0).max(1),
+  tokens: z.number().nonnegative(),
+  cost: z.number().nonnegative(),
+  actors: z.number().int().nonnegative(),
+  lastSeen: z.string(),
+  signals: z.array(z.enum(['error-rate', 'token-burn', 'volume'])),
+  risk: z.enum(['medium', 'high']),
+});
+
 const TraceScoreSchema = z.object({
   id: z.string(),
   traceRunId: z.string(),
@@ -2935,25 +2997,42 @@ export const playgroundApi = {
 };
 
 export const traceApi = {
-  list: (opts: { page?: number; pageSize?: number; environment?: string; status?: string; nameLike?: string } = {}) =>
-    client
-      .get<{ items: TraceRunSummary[]; total: number }>('/traces', { params: opts })
-      .then((r) => r.data),
-  get: (id: string) =>
-    client.get<{ run: TraceRunSummary; spans: TraceSpan[] }>(`/traces/${id}`).then((r) => r.data),
-  evidence: (id: string, workspaceId?: string) =>
-    client.get<{ traceId: string; items: EvidenceRecord[]; total: number }>(`/traces/${id}/evidence`, { params: workspaceId ? { workspaceId } : undefined }).then((r) => r.data),
-  rollup: (days = 30) =>
-    client
-      .get<{ days: number; items: Array<{ day: string; tokens: number; cost: number; runs: number }> }>(
-        `/traces/rollup`,
-        { params: { days } },
-      )
-      .then((r) => r.data),
-  summary: (days = 7) =>
-    client.get<{ orgId: string; days: number; summary: TraceOperationalSummary }>('/traces/summary', { params: { days } }).then((r) => r.data),
-  promptRisk: (days = 30, limit = 25) =>
-    client.get<{ orgId: string; days: number; limit: number; items: TracePromptRisk[] }>('/traces/prompt-risk', { params: { days, limit } }).then((r) => r.data),
+  list: async (opts: { page?: number; pageSize?: number; environment?: string; status?: string; nameLike?: string } = {}): Promise<{ items: TraceRunSummary[]; total: number }> => {
+    const r = await client.get<unknown>('/traces', { params: opts });
+    const parsed = TraceListSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid trace list data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  get: async (id: string): Promise<{ run: TraceRunSummary; spans: TraceSpan[] }> => {
+    const r = await client.get<unknown>(`/traces/${id}`);
+    const parsed = TraceDetailSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid trace detail data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  evidence: async (id: string, workspaceId?: string): Promise<{ traceId: string; items: EvidenceRecord[]; total: number }> => {
+    const r = await client.get<unknown>(`/traces/${id}/evidence`, { params: workspaceId ? { workspaceId } : undefined });
+    const parsed = z.object({ traceId: z.string(), items: z.array(EvidenceRecordSchema), total: z.number().int().nonnegative() }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid trace evidence data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  rollup: async (days = 30): Promise<{ orgId: string; days: number; environment?: string | null | undefined; items: Array<{ day: string; tokens: number; cost: number; runs: number }> }> => {
+    const r = await client.get<unknown>('/traces/rollup', { params: { days } });
+    const parsed = TraceRollupSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid trace rollup data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  summary: async (days = 7): Promise<{ orgId: string; days: number; summary: TraceOperationalSummary }> => {
+    const r = await client.get<unknown>('/traces/summary', { params: { days } });
+    const parsed = z.object({ orgId: z.string(), days: z.number().int().positive(), summary: TraceOperationalSummarySchema }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid trace summary data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  promptRisk: async (days = 30, limit = 25): Promise<{ orgId: string; days: number; limit: number; items: TracePromptRisk[] }> => {
+    const r = await client.get<unknown>('/traces/prompt-risk', { params: { days, limit } });
+    const parsed = z.object({ orgId: z.string(), days: z.number().int().positive(), limit: z.number().int().positive(), items: z.array(TracePromptRiskSchema) }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid prompt risk data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
 };
 
 export const evidenceApi = {
