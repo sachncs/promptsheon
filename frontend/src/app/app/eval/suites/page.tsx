@@ -5,7 +5,7 @@ import { FlaskConical, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
-import { evalSuiteApi, type EvalSuite } from '@/lib/api';
+import { capabilityApi, evalSuiteApi, projectApi, workspaceApi, type EvalSuite } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface } from '@/components/brand/surface';
 import { DataTable } from '@/components/brand/data-table';
@@ -21,6 +21,29 @@ export default function EvalSuitesPage() {
     queryKey: ['eval-suites'],
     queryFn: () => evalSuiteApi.list(),
     enabled: Boolean(session),
+  });
+  const workspaces = useQuery({
+    queryKey: ['workspaces'],
+    queryFn: () => workspaceApi.list(1, 100).then((r) => r.data),
+    enabled: Boolean(session),
+  });
+  const workspaceId = workspaces.data?.[0]?.id;
+  const projects = useQuery({
+    queryKey: ['projects', workspaceId],
+    queryFn: () => projectApi.list(workspaceId!).then((r) => r.data),
+    enabled: Boolean(workspaceId),
+  });
+  const projectIds = (projects.data ?? []).map((project) => project.id);
+  const capabilities = useQuery({
+    queryKey: ['capabilities', 'eval-suites', projectIds],
+    queryFn: async () => {
+      const responses = await Promise.all(projectIds.map((projectId) => capabilityApi.list(projectId)));
+      return responses.flatMap((response, index) => response.data.map((capability) => ({
+        ...capability,
+        projectName: projects.data?.[index]?.name ?? 'Project',
+      })));
+    },
+    enabled: projectIds.length > 0,
   });
   const [capabilityId, setCapabilityId] = useState('');
   const [name, setName] = useState('');
@@ -51,10 +74,15 @@ export default function EvalSuitesPage() {
   });
 
   if (!session) return null;
-  if (suites.isError) {
-    return <QueryError message={suites.error} onRetry={() => void suites.refetch()} />;
+  const failedQuery = [suites, workspaces, projects, capabilities].find((query) => query.isError);
+  if (failedQuery) {
+    return <QueryError message={failedQuery.error} onRetry={() => void failedQuery.refetch()} />;
+  }
+  if (suites.isPending || workspaces.isPending || projects.isPending || capabilities.isPending) {
+    return <div className="space-y-6" aria-busy="true"><PageHeader eyebrow="Quality" title="Eval suites" /><Surface className="h-72 animate-pulse bg-surface-2/40"><span className="sr-only">Loading evaluation suites</span></Surface></div>;
   }
   const rows: EvalSuite[] = suites.data ?? [];
+  const capabilityOptions = capabilities.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -67,13 +95,19 @@ export default function EvalSuitesPage() {
       <Surface>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Capability id</label>
-            <input
+            <label className="text-xs uppercase tracking-wider text-text-subtle" htmlFor="eval-capability">Capability</label>
+            <ThemedSelect
               value={capabilityId}
-              onChange={(e) => setCapabilityId(e.target.value)}
-              className="mt-2 w-full rounded-md border border-border-subtle bg-surface-1 px-3 py-2 text-sm text-text-default focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
-              placeholder="cap-uuid"
+              onValueChange={setCapabilityId}
+              options={capabilityOptions.map((capability) => ({ value: capability.id, label: `${capability.name} · ${capability.projectName}` }))}
+              ariaLabel="Capability"
+              triggerClassName="mt-2 w-full"
+              placeholder={capabilities.isPending ? 'Loading capabilities…' : 'Choose a capability'}
+              disabled={capabilities.isPending || capabilityOptions.length === 0}
             />
+            {capabilityOptions.length === 0 && !capabilities.isPending ? (
+              <p className="mt-2 text-xs text-text-muted">Author a capability before creating an evaluation suite.</p>
+            ) : null}
           </div>
           <div>
             <label className="text-xs uppercase tracking-wider text-text-subtle">Suite name</label>
