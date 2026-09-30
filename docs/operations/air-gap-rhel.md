@@ -223,6 +223,11 @@ sudo -u promptsheon env \
 # Back up the CAS volume separately; database backup does not include it.
 sudo -u promptsheon rsync -a --delete /var/lib/promptsheon/.promptsheon/ \
   /var/lib/promptsheon/backups/cas/
+
+# Verify every content-addressed object before accepting the backup.
+sudo -u promptsheon env \
+  PROMPTSHEON_CAS_PATH=/var/lib/promptsheon/.promptsheon \
+  pnpm --dir /opt/promptsheon/packages/server cas:verify
 ```
 
 ## 9. Air-gap-specific gotchas
