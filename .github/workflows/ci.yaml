@@ -91,7 +91,7 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - name: install Chromium
-        run: pnpm --dir frontend exec playwright install --with-deps chromium
+        run: pnpm --dir frontend exec playwright install chromium
       - name: run credential-free browser gates
         run: >-
           pnpm --dir frontend exec playwright test
