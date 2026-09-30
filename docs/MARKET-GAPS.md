@@ -141,9 +141,8 @@ segment. Tier 3 features would create a category.
 - **Moat impact**: medium. Differentiation comes from **shipping the eval library + the trace store** as one product. Both already have traces; the eval library is where Langfuse/Braintrust add value.
 
 #### T1-5. **Customer-facing analytics (per-user, per-tenant)**
-- **Why it matters**: every SaaS product can tell you "user X used 4,200 tokens today on this prompt." promptsheon has system-level cost rollups but not per-end-user analytics.
-- **Where it lives today**: `packages/server/src/repos/vault-extras.ts` CostRollupRepo aggregates by capability/day, not by user.
-- **What's missing**: a `user_id` field on every execution row (currently nullable), a per-user dashboard, per-tenant quota management, and a "show me which prompt is being abused by which user" view.
+- **Current status**: per-tenant totals, a token-ranked user leaderboard, and a selected-user daily usage drill-down are available in `/app/admin/analytics` through the analytics API. Trace actors remain organization-scoped and no cross-tenant rows are exposed.
+- **Remaining**: durable per-user quota policies and a prompt-level abuse view backed by execution attribution on every legacy execution row.
 - **Moat impact**: high for SaaS-style customers; medium for self-hosted (most self-hosted customers don't bill per-user internally yet).
 
 ---
