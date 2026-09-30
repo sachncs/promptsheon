@@ -1051,6 +1051,21 @@ const ExecutionSchema = z.object({
   inputHash: z.string().nullable(),
 });
 
+const ExecutionRunResponseSchema = z.object({
+  executionId: z.string(),
+  manifestHash: z.string(),
+  status: z.enum(['completed', 'failed', 'cancelled']),
+  startedAt: z.string(),
+  endedAt: z.string(),
+  nodeResults: z.record(z.string(), z.object({ output: z.string() })),
+  totalCost: z.number().nonnegative(),
+  totalLatencyMs: z.number().nonnegative(),
+  totalTokens: z.number().int().nonnegative(),
+  error: z.string().optional(),
+  pickedReleaseId: z.string().nullable(),
+  preview: z.boolean(),
+});
+
 const ScheduleSchema = z.object({
   id: z.string(),
   workspaceId: z.string(),
@@ -1286,6 +1301,12 @@ function parseAuditEntries(raw: unknown): AuditEntry[] {
 
 function parseExecution(raw: unknown): Execution {
   const parsed = ExecutionSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid execution data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseExecutionRunResponse(raw: unknown): z.infer<typeof ExecutionRunResponseSchema> {
+  const parsed = ExecutionRunResponseSchema.safeParse(raw);
   if (!parsed.success) throw new ApiError('The server returned invalid execution data.', { code: 'INVALID_RESPONSE' });
   return parsed.data;
 }
@@ -1676,8 +1697,10 @@ export const executionApi = {
     const r = await client.get<unknown>(`/executions/${id}`);
     return { data: parseExecution(r.data) };
   },
-  execute: (data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string; preview?: boolean }) =>
-    client.post('/executions', data, { timeout: 130_000 }),
+  execute: async (data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string; preview?: boolean }): Promise<{ data: z.infer<typeof ExecutionRunResponseSchema> }> => {
+    const r = await client.post<unknown>('/executions', data, { timeout: 130_000 });
+    return { data: parseExecutionRunResponse(r.data) };
+  },
   replay: (id: string) => client.post(`/executions/${id}/replay`),
   replays: (id: string) => client.get(`/executions/${id}/replays`),
   /**
@@ -1880,8 +1903,10 @@ function parseSseBlock(block: string): { event: string; data: Record<string, unk
 
 export const invokeApi = {
   // Use the canonical manifest-driven path for in-product calls.
-  execute: (data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string }) =>
-    client.post('/executions', data),
+  execute: async (data: { manifestHash: string; inputs: Record<string, unknown>; environment?: string; traceId?: string }): Promise<{ data: z.infer<typeof ExecutionRunResponseSchema> }> => {
+    const r = await client.post<unknown>('/executions', data);
+    return { data: parseExecutionRunResponse(r.data) };
+  },
 };
 
 export const datasetApi = {
