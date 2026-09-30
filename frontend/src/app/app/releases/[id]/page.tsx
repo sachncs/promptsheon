@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
-import { releaseApi, approvalApi, auditApi, evalApi, unwrapList } from '@/lib/api';
+import { releaseApi, approvalApi, auditApi, evalApi, parseList } from '@/lib/api';
+import { z } from 'zod';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatusPill, statusKindOf } from '@/components/brand/status-pill';
@@ -35,6 +36,10 @@ const RAIL_STEPS: Step[] = [
   { id: 'rolled-back', label: 'Rolled back', description: 'Reverted to a prior stable release.', status: 'rolled-back' },
 ];
 
+const ApprovalSchema = z.object({
+  userId: z.string().optional(), vote: z.string().optional(), comment: z.string().optional(), createdAt: z.string().optional(),
+});
+
 export default function ReleaseDetailPage() {
   const session = useRequireSession();
   const params = useParams<{ id: string }>();
@@ -57,7 +62,7 @@ export default function ReleaseDetailPage() {
 
   const approvals = useQuery({
     queryKey: ['approvals', id],
-    queryFn: () => approvalApi.list(id).then((r) => unwrapList<{ userId?: string; vote?: string; comment?: string; createdAt?: string }>(r.data)),
+    queryFn: () => approvalApi.list(id).then((r) => parseList(r.data, ApprovalSchema)),
     enabled: Boolean(id),
   });
 

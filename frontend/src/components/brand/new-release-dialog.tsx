@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldGroup } from '@/components/brand/field';
 import { ThemedSelect } from '@/components/brand/themed-select';
 import { Input } from '@/components/ui/input';
-import { releaseApi, versionApi, workspaceApi, projectApi, capabilityApi, unwrapList } from '@/lib/api';
+import { releaseApi, versionApi, workspaceApi, projectApi, capabilityApi, parseList } from '@/lib/api';
 
 const CreateReleaseSchema = z.object({
   capabilityId: z.string().uuid({ message: 'pick a capability' }),
@@ -38,6 +38,9 @@ interface VersionSummary {
   version: number;
   manifest: string;
 }
+
+const CapabilitySummarySchema = z.object({ id: z.string(), name: z.string() });
+const VersionSummarySchema = z.object({ id: z.string(), version: z.number(), manifest: z.string() });
 
 export interface NewReleaseDialogProps {
   /** Optional pre-selected capability id (deep link from a capability page). */
@@ -68,7 +71,7 @@ export function NewReleaseDialog({ capabilityId }: NewReleaseDialogProps) {
       const projects = (await Promise.all(workspaces.data.map((workspace) => projectApi.list(workspace.id))))
         .flatMap((response) => response.data);
       const capabilityLists = await Promise.all(projects.map((project) => capabilityApi.list(project.id)));
-      return capabilityLists.flatMap((response) => unwrapList<CapabilitySummary>(response.data));
+      return capabilityLists.flatMap((response) => parseList(response.data, CapabilitySummarySchema));
     },
     enabled: open,
   });
@@ -77,7 +80,7 @@ export function NewReleaseDialog({ capabilityId }: NewReleaseDialogProps) {
     queryFn: async () => {
       if (!capabilityIdValue) return [];
       const r = await versionApi.list(capabilityIdValue);
-      const list = unwrapList<VersionSummary>(r.data);
+      const list = parseList(r.data, VersionSummarySchema);
       return list;
     },
     enabled: Boolean(capabilityIdValue),

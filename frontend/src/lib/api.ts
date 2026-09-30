@@ -981,6 +981,15 @@ export function unwrapList<T>(raw: unknown, pluralKey?: string): T[] {
   return [];
 }
 
+/** Parse a list-shaped API response at the browser/server boundary. */
+export function parseList<T>(raw: unknown, schema: z.ZodType<T>, pluralKey?: string): T[] {
+  const parsed = z.array(schema).safeParse(unwrapList<unknown>(raw, pluralKey));
+  if (!parsed.success) {
+    throw new ApiError('The server returned invalid list data.', { code: 'INVALID_RESPONSE' });
+  }
+  return parsed.data;
+}
+
 export function unwrapFirst<T>(raw: unknown, pluralKey?: string): T | null {
   const items = unwrapList<T>(raw, pluralKey);
   return items[0] ?? null;

@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Cog, Save } from 'lucide-react';
-import { settingsApi, unwrapList } from '@/lib/api';
+import { parseList, settingsApi } from '@/lib/api';
+import { z } from 'zod';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -14,13 +15,10 @@ import { Badge } from '@/components/ui/badge';
 import { QueryError } from '@/components/brand/query-error';
 import { getErrorMessage } from '@/lib/errors';
 
-interface SettingItem {
-  key: string;
-  value?: unknown;
-  description?: string;
-  updatedAt?: string;
-  updatedBy?: string;
-}
+const SettingItemSchema = z.object({
+  key: z.string(), value: z.unknown().optional(), description: z.string().optional(),
+  updatedAt: z.string().optional(), updatedBy: z.string().optional(),
+});
 
 const KNOWN_KEYS: Array<{ key: string; label: string; description: string; placeholder: string }> = [
   { key: 'llm.provider', label: 'LLM provider', description: 'openai / anthropic / bedrock', placeholder: 'openai' },
@@ -41,7 +39,7 @@ export default function SettingsPage() {
     queryFn: () => settingsApi.list().then((r) => r.data),
   });
 
-  const list = unwrapList<SettingItem>(settings.data);
+  const list = parseList(settings.data, SettingItemSchema);
   const known = KNOWN_KEYS.map((k) => {
     const found = list.find((s) => s.key === k.key);
     return { ...k, current: found?.value, updatedAt: found?.updatedAt };

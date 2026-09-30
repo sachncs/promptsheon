@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Users } from 'lucide-react';
-import { unwrapList, userApi } from '@/lib/api';
+import { parseList, userApi } from '@/lib/api';
+import { z } from 'zod';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -12,14 +13,10 @@ import { ThemedSelect } from '@/components/brand/themed-select';
 import { Badge } from '@/components/ui/badge';
 import { QueryError } from '@/components/brand/query-error';
 
-interface UserItem {
-  id: string;
-  email?: string;
-  name?: string;
-  role?: string;
-  createdAt?: string;
-  lastSeenAt?: string | null;
-}
+const UserItemSchema = z.object({
+  id: z.string(), email: z.string().optional(), name: z.string().optional(), role: z.string().optional(),
+  createdAt: z.string().optional(), lastSeenAt: z.string().nullable().optional(),
+});
 
 const ROLE_OPTIONS = ['admin', 'approver', 'editor', 'viewer'] as const;
 
@@ -37,7 +34,7 @@ export default function UsersPage() {
 
   const users = useQuery({
     queryKey: ['users'],
-    queryFn: () => userApi.list().then((r) => unwrapList<UserItem>(r.data, 'users')),
+    queryFn: () => userApi.list().then((r) => parseList(r.data, UserItemSchema, 'users')),
   });
   const me = useQuery({
     queryKey: ['me'],

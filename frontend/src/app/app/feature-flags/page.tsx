@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Flag, Plus, Save } from 'lucide-react';
-import { featureFlagApi } from '@/lib/api';
-import { unwrapList } from '@/lib/api';
+import { featureFlagApi, parseList } from '@/lib/api';
+import { z } from 'zod';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -17,14 +17,11 @@ import { QueryError } from '@/components/brand/query-error';
 import { getErrorMessage } from '@/lib/errors';
 import { useToast } from '@/components/brand/toast';
 
-interface FlagItem {
-  key: string;
-  value?: unknown;
-  enabled?: boolean;
-  description?: string;
-  updatedAt?: string;
-  updatedBy?: string;
-}
+const FlagItemSchema = z.object({
+  key: z.string().optional(), value: z.unknown().optional(), enabled: z.boolean().optional(),
+  description: z.string().optional(), updatedAt: z.string().optional(), updatedBy: z.string().optional(),
+  name: z.string().optional(),
+});
 
 export default function FeatureFlagsPage() {
   const session = useRequireSession();
@@ -33,9 +30,9 @@ export default function FeatureFlagsPage() {
 
   const flags = useQuery({
     queryKey: ['feature-flags'],
-    queryFn: () => featureFlagApi.list().then((r) => unwrapList<FlagItem>(r.data, 'flags')),
+    queryFn: () => featureFlagApi.list().then((r) => parseList(r.data, FlagItemSchema, 'flags')),
   });
-  const rows = (flags.data ?? []).map((flag) => ({ ...flag, key: flag.key ?? (flag as FlagItem & { name?: string }).name ?? '' }));
+  const rows = (flags.data ?? []).map((flag) => ({ ...flag, key: flag.key ?? flag.name ?? '' }));
 
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('true');

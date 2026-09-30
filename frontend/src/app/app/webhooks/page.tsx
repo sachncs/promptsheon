@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Webhook, Trash2 } from 'lucide-react';
-import { webhookApi } from '@/lib/api';
-import { unwrapList } from '@/lib/api';
+import { parseList, webhookApi } from '@/lib/api';
+import { z } from 'zod';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -20,14 +20,20 @@ import { useToast } from '@/components/brand/toast';
 
 interface WebhookItem {
   id: string;
-  url?: string;
-  events?: string[];
-  active?: boolean;
-  createdAt?: string;
-  lastDeliveredAt?: string | null;
-  deliveryCount?: number;
-  failureCount?: number;
+  url?: string | undefined;
+  events?: string[] | undefined;
+  active?: boolean | undefined;
+  createdAt?: string | undefined;
+  lastDeliveredAt?: string | null | undefined;
+  deliveryCount?: number | undefined;
+  failureCount?: number | undefined;
 }
+
+const WebhookItemSchema = z.object({
+  id: z.string(), url: z.string().optional(), events: z.array(z.string()).optional(), active: z.boolean().optional(),
+  createdAt: z.string().optional(), lastDeliveredAt: z.string().nullable().optional(),
+  deliveryCount: z.number().optional(), failureCount: z.number().optional(),
+});
 
 const EVENT_PRESETS = [
   'release.created',
@@ -47,7 +53,7 @@ export default function WebhooksPage() {
 
   const hooks = useQuery({
     queryKey: ['webhooks'],
-    queryFn: () => webhookApi.list().then((r) => unwrapList<WebhookItem>(r.data, 'webhooks')),
+    queryFn: () => webhookApi.list().then((r) => parseList(r.data, WebhookItemSchema, 'webhooks')),
     enabled: Boolean(session),
   });
   const rows = hooks.data ?? [];
