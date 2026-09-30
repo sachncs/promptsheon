@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Bot } from 'lucide-react';
 import { useState } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
-import { agentSpecificationApi, workspaceApi, type WorkspaceRow } from '@/lib/api';
+import { agentSpecificationApi, workspaceApi, type AgentSpecificationDraft, type WorkspaceRow } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { QueryError } from '@/components/brand/query-error';
 import { Surface } from '@/components/brand/surface';
@@ -23,17 +23,23 @@ export default function NewAgentPage() {
   const [model, setModel] = useState('simulator');
   const [owner, setOwner] = useState('workspace team');
   const [changeReason, setChangeReason] = useState('Initial agent specification');
+  const [validation, setValidation] = useState<{ valid: true; specification: unknown } | { valid: false; issues: Array<{ code: string; message: string; path: Array<string | number> }> } | null>(null);
   const workspaces = useQuery<WorkspaceRow[]>({
     queryKey: ['workspaces'],
     queryFn: () => workspaceApi.list(1, 100).then((response) => response.data),
     enabled: Boolean(session),
   });
   const workspaceId = workspaces.data?.[0]?.id;
+  const draft: AgentSpecificationDraft = { role, objective, prompt: { system: systemPrompt }, modelPolicy: { provider, model }, lifecycle: { owner } };
+  const validate = useMutation({
+    mutationFn: () => agentSpecificationApi.validate(workspaceId!, draft),
+    onSuccess: (response) => setValidation(response.data),
+  });
   const mutation = useMutation({
     mutationFn: () => agentSpecificationApi.create({
       workspaceId: workspaceId!,
       changeReason,
-      specification: { role, objective, prompt: { system: systemPrompt }, modelPolicy: { provider, model }, lifecycle: { owner } },
+      specification: draft,
     }),
   });
 
@@ -50,18 +56,21 @@ export default function NewAgentPage() {
         <Surface><div className="flex items-start gap-3"><Bot className="mt-0.5 h-5 w-5 text-success" /><div><h2 className="font-semibold text-text-strong">Revision created</h2><p className="mt-1 text-sm text-text-muted">The specification was stored as a content-addressed draft.</p><Button asChild className="mt-4"><Link href="/app/agents">View specifications</Link></Button></div></div></Surface>
       ) : (
         <Surface>
-          <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); mutation.mutate(); }}>
+          <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); if (validation?.valid) mutation.mutate(); }}>
             <div className="grid gap-5 md:grid-cols-2">
-              <Field label="Role" value={role} onChange={setRole} required />
-              <Field label="Owner" value={owner} onChange={setOwner} required />
-              <Field label="Provider" value={provider} onChange={setProvider} required />
-              <Field label="Model" value={model} onChange={setModel} required />
-              <Field label="Change reason" value={changeReason} onChange={setChangeReason} required />
+              <Field label="Role" value={role} onChange={(value) => { setRole(value); setValidation(null); }} required />
+              <Field label="Owner" value={owner} onChange={(value) => { setOwner(value); setValidation(null); }} required />
+              <Field label="Provider" value={provider} onChange={(value) => { setProvider(value); setValidation(null); }} required />
+              <Field label="Model" value={model} onChange={(value) => { setModel(value); setValidation(null); }} required />
+              <Field label="Change reason" value={changeReason} onChange={(value) => { setChangeReason(value); setValidation(null); }} required />
             </div>
-            <TextField label="Objective" value={objective} onChange={setObjective} required />
-            <TextField label="System prompt" value={systemPrompt} onChange={setSystemPrompt} required />
+            <TextField label="Objective" value={objective} onChange={(value) => { setObjective(value); setValidation(null); }} required />
+            <TextField label="System prompt" value={systemPrompt} onChange={(value) => { setSystemPrompt(value); setValidation(null); }} required />
+            {validation?.valid && <p className="text-sm text-success">Specification is valid and ready to create.</p>}
+            {validation && !validation.valid && <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"><p className="font-medium">Fix these validation issues:</p><ul className="mt-1 list-disc pl-5">{validation.issues.map((issue, index) => <li key={`${issue.code}-${index}`}>{issue.path.length > 0 ? `${issue.path.join('.')} — ` : ''}{issue.message}</li>)}</ul></div>}
+            {validate.isError && <p role="alert" className="text-sm text-destructive">Unable to validate this specification. Try again.</p>}
             {mutation.isError && <p role="alert" className="text-sm text-destructive">Unable to create this revision. Please review the fields and try again.</p>}
-            <div className="flex justify-end gap-2"><Button asChild variant="outline"><Link href="/app/agents">Cancel</Link></Button><Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Creating…' : 'Create draft'}</Button></div>
+            <div className="flex justify-end gap-2"><Button asChild variant="outline"><Link href="/app/agents">Cancel</Link></Button><Button type="button" variant="outline" onClick={() => validate.mutate()} disabled={validate.isPending}>{validate.isPending ? 'Validating…' : 'Validate specification'}</Button><Button type="submit" disabled={mutation.isPending || validation?.valid !== true}>{mutation.isPending ? 'Creating…' : 'Create draft'}</Button></div>
           </form>
         </Surface>
       )}

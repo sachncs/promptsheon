@@ -85,6 +85,20 @@ export interface AgentSpecificationRecord extends AgentSpecificationMetadata {
   specification: unknown;
 }
 
+export interface AgentSpecificationDraft {
+  role: string;
+  objective: string;
+  prompt: { system: string };
+  modelPolicy: { provider: string; model: string };
+  lifecycle: { owner: string };
+}
+
+export interface AgentSpecificationValidationIssue {
+  code: string;
+  message: string;
+  path: Array<string | number>;
+}
+
 export interface VaultKeyringEntry {
   id: number;
   label: string;
@@ -1042,7 +1056,7 @@ export const agentSpecificationApi = {
   },
   create: (data: {
     workspaceId: string;
-    specification: { role: string; objective: string; prompt: { system: string }; modelPolicy: { provider: string; model: string }; lifecycle: { owner: string } };
+    specification: AgentSpecificationDraft;
     changeReason: string;
     parentHash?: string;
   }) => client.post(`/workspaces/${encodeURIComponent(data.workspaceId)}/agent-specifications`, {
@@ -1050,6 +1064,15 @@ export const agentSpecificationApi = {
     changeReason: data.changeReason,
     ...(data.parentHash ? { parentHash: data.parentHash } : {}),
   }),
+  validate: async (workspaceId: string, specification: AgentSpecificationDraft): Promise<{ data: { valid: true; specification: unknown } | { valid: false; issues: AgentSpecificationValidationIssue[] } }> => {
+    const response = await client.post<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/validate`, { specification });
+    const parsed = z.union([
+      z.object({ valid: z.literal(true), specification: z.unknown() }),
+      z.object({ valid: z.literal(false), issues: z.array(z.object({ code: z.string(), message: z.string(), path: z.array(z.union([z.string(), z.number()])) })) }),
+    ]).safeParse(response.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid validation data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
   get: async (workspaceId: string, hash: string): Promise<{ data: AgentSpecificationRecord }> => {
     const response = await client.get<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/${encodeURIComponent(hash)}`);
     return { data: parseAgentSpecificationRecord(response.data) };
