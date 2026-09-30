@@ -22,10 +22,15 @@ export async function walkOnboarding(page: Page): Promise<void> {
   await page.getByRole('button', { name: /begin setup/i }).click();
 
   // Admin + org
-  await page.getByLabel(/admin name/i).fill(`E2E Admin ${UNIQUE}`);
-  await page.getByLabel(/admin email/i).fill(`e2e-${UNIQUE}@promptsheon.test`);
-  await page.getByLabel(/organisation name/i).fill(`E2E Org ${UNIQUE}`);
-  await page.getByRole('button', { name: /continue/i }).click();
+  // A shared E2E database may already have an admin from the route-smoke
+  // tier. In that case onboarding resumes directly at provider setup.
+  const adminName = page.getByLabel(/admin name/i);
+  if (await adminName.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await adminName.fill(`E2E Admin ${UNIQUE}`);
+    await page.getByLabel(/admin email/i).fill(`e2e-${UNIQUE}@promptsheon.test`);
+    await page.getByLabel(/organisation name/i).fill(`E2E Org ${UNIQUE}`);
+    await page.getByRole('button', { name: /continue/i }).click();
+  }
 
   // LLM step: use the built-in simulator so the browser suite is
   // deterministic and never needs a live provider credential.

@@ -53,20 +53,25 @@ export default function OnboardingPage() {
   const [restoreApiKey, setRestoreApiKey] = React.useState('');
   const [restorePending, setRestorePending] = React.useState(false);
   const restoreAttempted = React.useRef(false);
+  const resumedSetup = React.useRef(false);
 
   React.useEffect(() => {
     if (!status.data) return;
-    // Bootstrap is complete. If we already have a session, head straight
-    // to the app. If localStorage was cleared (or never written — the
-    // admin step sets the session but localStorage can be wiped between
-    // dev runs), re-establish the session by fetching the admin record
-    // and then redirect.
-    if (!status.data.needsAdmin && !status.data.needsLlm) {
+    // The admin and provider are independent bootstrap steps. When the admin
+    // already exists but the provider is still missing, resume at provider
+    // setup instead of submitting the admin form a second time (which returns
+    // ADMIN_EXISTS and leaves the user stranded on onboarding).
+    if (!status.data.needsAdmin && !resumedSetup.current) {
       const existing = getSession();
       if (existing) {
         restoreAttempted.current = true;
         userApi.me()
-          .then(() => router.replace('/app'))
+          .then(() => {
+            resumedSetup.current = true;
+            if (!status.data?.needsLlm) {
+              router.replace('/app');
+            }
+          })
           .catch((error: unknown) => {
             clearSession();
             bootstrapApi.admin()
@@ -85,7 +90,7 @@ export default function OnboardingPage() {
       bootstrapApi.admin()
         .then((data) => {
           const restored = toSession(data, status.data?.provider ?? null);
-          if (status.data.authEnabled) {
+          if (status.data.authEnabled && (!data.apiKey || !status.data.needsLlm)) {
             setRestoreCandidate(data);
             setRestoreError('This installation requires an API key. Enter an existing administrator API key to verify and restore this browser session.');
             return;
@@ -94,7 +99,12 @@ export default function OnboardingPage() {
           setRestoreCandidate(null);
           setSession(restored);
           return userApi.me()
-            .then(() => router.replace('/app'))
+            .then(() => {
+              resumedSetup.current = true;
+              if (!status.data?.needsLlm) {
+                router.replace('/app');
+              }
+            })
             .catch((error: unknown) => {
               clearSession();
               setRestoreCandidate(data);
@@ -120,7 +130,10 @@ export default function OnboardingPage() {
       await userApi.me();
       setRestoreApiKey('');
       setRestoreCandidate(null);
-      router.replace('/app');
+      resumedSetup.current = true;
+      if (!status.data?.needsLlm) {
+        router.replace('/app');
+      }
     } catch (error: unknown) {
       setRestoreError(error instanceof Error ? error.message : 'That API key could not be verified.');
     } finally {
@@ -174,7 +187,7 @@ export default function OnboardingPage() {
       <div className="rounded-2xl border border-border-subtle bg-surface-1 p-8 shadow-2 sm:p-10">
         <StepIndicator steps={steps} currentIndex={index} />
         <div className="mt-8">
-          {index === 0 && <Welcome onNext={() => setIndex(1)} />}
+          {index === 0 && <Welcome onNext={() => setIndex(status.data?.needsAdmin ? 1 : 2)} />}
           {index === 1 && (
             <AdminStep
               onBack={() => setIndex(0)}
