@@ -47,7 +47,7 @@ test.describe('tier 11: browser execution journey', () => {
     await page.waitForURL(/\/app\/traces$/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: 'Traces' })).toBeVisible();
     await expect(page.getByText('Recent runs')).toBeVisible();
-    await expect(page.getByText('promptsheon-e2e-simulator', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('promptsheon-e2e-simulator', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('success', { exact: true }).first()).toBeVisible();
   });
 });
