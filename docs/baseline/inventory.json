@@ -1498,7 +1498,8 @@
     "packages/shared/db/migrations/067_llm_response_cache.up.sql",
     "packages/shared/db/migrations/068_evidence_polymorphic_execution.up.sql",
     "packages/shared/db/migrations/069_user_quotas.up.sql",
-    "packages/shared/db/migrations/070_execution_job_actor.up.sql"
+    "packages/shared/db/migrations/070_execution_job_actor.up.sql",
+    "packages/shared/db/migrations/071_user_quota_reservations.up.sql"
   ],
   "frontendRoutes": [
     {

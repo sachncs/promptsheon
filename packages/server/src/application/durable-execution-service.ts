@@ -128,6 +128,7 @@ export class DurableExecutionService {
           attributes: { executionId: job.id, agentHash: job.agentHash, workspaceId: job.workspaceId },
         });
         const traceRunId = trace?.id;
+        let quotaReserved = false;
         this.recordEvidence({
           eventType: 'execution.started',
           job,
@@ -140,6 +141,16 @@ export class DurableExecutionService {
           const estimatedInputTokens = Math.ceil(job.inputJson.length / 4);
           if (estimatedInputTokens > record.specification.resourceBudget.maxInputTokens) {
             throw new ExecutionWorkError('input token budget exhausted');
+          }
+          if (job.actorId && this.quotas) {
+            this.quotas.reserveForJob({
+              organizationId: job.organizationId,
+              userId: job.actorId,
+              executionJobId: job.id,
+              tokens: estimatedInputTokens + record.specification.resourceBudget.maxOutputTokens,
+              costMicros: Math.ceil(record.specification.resourceBudget.maxCostUsd * 1_000_000),
+            });
+            quotaReserved = true;
           }
           const manifest = toManifest(record);
           const allowedTools = new Set(
@@ -203,6 +214,7 @@ export class DurableExecutionService {
           // completed job with only a partial evidence timeline.
           await this.evidence?.flush();
           if (traceRunId) this.traces?.finalize(traceRunId, 'success', { tokens: totals.totalTokens, costUsd: totals.costUsd });
+          if (quotaReserved) this.quotas?.releaseForJob(job.id);
           return result;
         } catch (error) {
           this.recordEvidence({
@@ -219,6 +231,7 @@ export class DurableExecutionService {
           });
           await this.evidence?.flush();
           if (traceRunId) this.traces?.finalize(traceRunId, 'error');
+          if (quotaReserved) this.quotas?.releaseForJob(job.id);
           if (error instanceof ExecutionTimeoutError) throw new ExecutionWorkError(error.message, false, true);
           throw error;
         }

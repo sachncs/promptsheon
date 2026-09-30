@@ -117,10 +117,11 @@ describe('DurableExecutionService', () => {
       role: 'Quota assistant', objective: 'Respect usage limits.', prompt: { system: 'Be concise.' },
       modelPolicy: { provider: 'simulator', model: 'promptsheon-simulator' }, lifecycle: { owner: 'test-team' },
     });
+    let executeCalls = 0;
     const service = new DurableExecutionService(
       new ExecutionJobRepo(db),
       { get: async () => ({ hash: agentHash, workspaceId: 'ws1', schemaVersion: '1.0', parentHash: null, author: 'test', changeReason: 'test', status: 'published' as const, createdAt: '2026-01-01', publishedAt: '2026-01-01', specification }) },
-      { execute: async () => ({ totalTokens: 2, totalCost: 0.000002, totalLatencyMs: 1 }) },
+      { execute: async () => { executeCalls += 1; return { totalTokens: 2, totalCost: 0.000002, totalLatencyMs: 1 }; } },
       new ExecutionCheckpointRepo(db), undefined, undefined, undefined, traces, quotas,
     );
     const worker = service.createWorker({ workerId: 'quota-test', pollMs: 2, leaseMs: 500, maxBackoffMs: 1, random: () => 0 });
@@ -130,5 +131,7 @@ describe('DurableExecutionService', () => {
     await worker.stop();
 
     expect(new ExecutionJobRepo(db).get('org1', job.id).error).toContain('daily tokens quota exceeded');
+    expect(executeCalls).toBe(0);
+    expect((db.prepare('SELECT COUNT(*) AS count FROM user_quota_reservations WHERE execution_job_id = ?').get(job.id) as { count: number }).count).toBe(0);
   });
 });

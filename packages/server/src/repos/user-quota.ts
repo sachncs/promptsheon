@@ -59,6 +59,13 @@ export interface UserQuotaViolation {
   message: string;
 }
 
+export class UserQuotaReservationError extends Error {
+  constructor(public readonly violation: UserQuotaViolation) {
+    super(violation.message);
+    this.name = 'UserQuotaReservationError';
+  }
+}
+
 /** Persists and reads organization-scoped per-user quota policies. */
 export class UserQuotaRepo {
   constructor(private readonly db: Database.Database) {}
@@ -102,6 +109,53 @@ export class UserQuotaRepo {
       }
     }
     return null;
+  }
+
+  /** Reserve the declared execution envelope before provider work begins. */
+  reserveForJob(input: {
+    organizationId: string;
+    userId: string;
+    executionJobId: string;
+    tokens: number;
+    costMicros: number;
+    now?: Date;
+  }): void {
+    const now = input.now ?? new Date();
+    const usageDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+    this.db.transaction(() => {
+      const policy = this.findForUser(input.organizationId, input.userId);
+      this.db.prepare('DELETE FROM user_quota_reservations WHERE execution_job_id = ?').run(input.executionJobId);
+      if (!policy?.enabled) return;
+      const usage = this.usage(input.organizationId, input.userId, now);
+      const reserved = this.db.prepare(`
+        SELECT COALESCE(SUM(r.reserved_tokens), 0) AS tokens,
+               COALESCE(SUM(r.reserved_cost_micros), 0) AS cost_micros
+        FROM user_quota_reservations r
+        INNER JOIN execution_jobs j ON j.id = r.execution_job_id
+        WHERE r.organization_id = ? AND r.user_id = ? AND r.usage_day = ?
+          AND r.execution_job_id <> ? AND j.state IN ('queued', 'running')
+      `).get(input.organizationId, input.userId, usageDay, input.executionJobId) as { tokens: number; cost_micros: number };
+      const tokenViolation = this.limitViolation('tokens', policy.dailyTokens, usage.tokens + reserved.tokens + input.tokens);
+      if (tokenViolation) throw new UserQuotaReservationError(tokenViolation);
+      const costViolation = this.limitViolation('costMicros', policy.dailyCostMicros, usage.costMicros + reserved.cost_micros + input.costMicros);
+      if (costViolation) throw new UserQuotaReservationError(costViolation);
+      this.db.prepare(`
+        INSERT INTO user_quota_reservations
+          (id, organization_id, user_id, execution_job_id, usage_day, reserved_tokens, reserved_cost_micros, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(randomUUID(), input.organizationId, input.userId, input.executionJobId, usageDay, input.tokens, input.costMicros, now.toISOString());
+    })();
+  }
+
+  /** Release a completed attempt's reservation. Stale reservations are harmless because active jobs are scoped in reserveForJob. */
+  releaseForJob(executionJobId: string): void {
+    this.db.prepare('DELETE FROM user_quota_reservations WHERE execution_job_id = ?').run(executionJobId);
+  }
+
+  private limitViolation(dimension: UserQuotaViolation['dimension'], limit: number | null, used: number): UserQuotaViolation | null {
+    if (limit === null || used <= limit) return null;
+    const label = dimension === 'costMicros' ? 'cost' : dimension;
+    return { dimension, limit, used, message: `daily ${label} quota exceeded (${used}/${limit})` };
   }
 
   create(input: UserQuotaInput): UserQuota {
