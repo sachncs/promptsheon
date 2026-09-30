@@ -6,8 +6,9 @@ production-capacity claim.
 
 ## Verified on 2026-09-30
 
-The following evidence was produced from the repository and the hosted CI run
-for commit `e7d0ffe`:
+The following baseline evidence was produced from the repository and hosted CI
+run for commit `e7d0ffe`. Subsequent changes are listed below and must receive
+their own hosted CI confirmation before being treated as release evidence:
 
 | Gate | Result | Evidence |
 | --- | --- | --- |
@@ -19,6 +20,12 @@ for commit `e7d0ffe`:
 | Credential-free browser journey | Pass | 79/79 Playwright tests in CI and locally |
 | Container build and readiness smoke check | Pass | CI `36717941030` |
 | LLM provider credential usage | Not used | All browser and execution checks use the deterministic simulator |
+
+Since that baseline, the repository has also added provider-native streaming,
+sampled deterministic auto-evaluation, and organization-bound SCIM route
+authentication. These changes have focused local coverage, but the current
+release evidence remains the hosted baseline above until the latest CI run is
+green.
 
 ## Included in this release state
 
@@ -38,12 +45,15 @@ open before an enterprise GA declaration:
 
 1. External penetration testing, dependency vulnerability review, and formal
    compliance evidence (SOC 2, ISO 27001, HIPAA, or GDPR as applicable).
-2. OIDC/SAML SSO, SCIM provisioning, team-scoped RBAC, and session lifecycle
-   controls for enterprise identity providers.
+2. OIDC/SAML login flows, SCIM provisioning integration, team-scoped RBAC, and
+   session lifecycle controls for enterprise identity providers. The SCIM
+   endpoint now has an organization-bound token boundary, but that is not a
+   substitute for the complete enterprise identity lifecycle.
 3. Representative production load, soak, stress, provider-outage, worker-crash,
    database-restart, and restore-drill reports.
-4. Provider-native token streaming and usage reconciliation; the OpenAI-
-   compatible `stream: true` path is currently buffered compatibility SSE.
+4. Provider-specific usage and cost reconciliation. Provider-native streaming
+   is implemented for OpenAI-compatible and Anthropic event streams, while
+   providers without native streaming use an explicit single-chunk fallback.
 5. Deployment-managed signing for exported compliance evidence and a documented
    migration rollback procedure for the target hosting platform.
 6. Browser compatibility, visual regression, and accessibility review beyond
