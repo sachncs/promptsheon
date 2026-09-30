@@ -22,13 +22,13 @@ export default function Quickstart() {
       />
 
       <h2>3. Choose a model provider</h2>
-      <p>For a complete local walkthrough without credentials, choose <code>Local simulator</code> during onboarding. It returns deterministic responses marked <code>[simulation:…]</code> and never makes a network call.</p>
+      <p>For the complete local walkthrough, choose <code>Local simulator</code> during onboarding. It requires no provider or platform API key, returns deterministic responses marked <code>[simulation:…]</code>, and never makes a network call.</p>
       <DocCurl
         cmd={`curl -X POST http://127.0.0.1:8080/api/bootstrap/llm \\
   -H 'content-type: application/json' \\
-  -d '{"provider":"openai","model":"gpt-4o-mini","apiKey":"sk-…"}'`}
+  -d '{"provider":"simulated","model":"promptsheon-simulator"}'`}
       />
-      <p>The key is stored in the <code>vault_secrets</code> table; the service restarts pick it up via <code>SettingsResolver</code>.</p>
+      <p>When you later connect a live provider, its credential is stored encrypted in the vault and loaded by <code>SettingsResolver</code> after restart.</p>
 
       <h2>4. Author your first capability</h2>
       <p>
@@ -38,6 +38,7 @@ export default function Quickstart() {
       </p>
 
       <h2>5. Run the eval gate</h2>
+      <p>The browser console can create and run suites without a provider key when using the simulator. The API example below is for an authenticated deployment.</p>
       <DocCurl
         cmd={`curl -X POST http://127.0.0.1:8080/api/eval-suites \\
   -H 'authorization: Bearer $PROMPTSHEON_API_KEY' \\

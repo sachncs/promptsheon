@@ -45,7 +45,8 @@ software—not another prompt notebook or opaque hosted runtime.
 
 - Node.js 26.8.1 or newer (`.nvmrc` is included).
 - pnpm 11.23.0.
-- An LLM provider credential for workflows that invoke an agent.
+- No provider credential is required for the local simulator walkthrough.
+- An LLM provider credential is only required when you switch to a live model.
 
 ```bash
 git clone https://github.com/sachncs/promptsheon.git
@@ -71,10 +72,11 @@ The first useful workflow is:
 
 1. Complete onboarding and create a workspace.
 2. Create a project and capability.
-3. Compose the agent graph and save its manifest.
-4. Attach an evaluation suite and run a candidate.
-5. Collect independent approvals and activate a release.
-6. Compare the active release with the next candidate before promoting it.
+3. Choose **Local simulator** during onboarding; it needs no API key.
+4. Compose the agent graph and save its manifest.
+5. Attach an evaluation suite and run a candidate.
+6. Collect independent approvals and activate a release.
+7. Compare the active release with the next candidate before promoting it.
 
 Read the [quickstart](https://sachncs.github.io/promptsheon/docs/quickstart/) for the guided path.
 
@@ -82,7 +84,9 @@ Read the [quickstart](https://sachncs.github.io/promptsheon/docs/quickstart/) fo
 
 ### HTTP API
 
-Use the API for automation and custom control planes:
+Use the API for automation and custom control planes. Authentication is enabled
+by default in production; the local simulator profile can be explored through
+the browser without a provider or platform API key:
 
 ```bash
 curl "$PROMPTSHEON_API_URL/api/releases" \
@@ -94,7 +98,9 @@ The running server exposes OpenAPI at `/api/openapi.json`. See the [API and SDK 
 
 ### TypeScript SDK
 
-The workspace package is currently private and builds from this repository:
+The workspace package is currently private and builds from this repository. SDK
+automation targets an authenticated deployment; the browser onboarding flow is
+the credential-free local path:
 
 ```bash
 pnpm --filter @promptsheon/sdk build
