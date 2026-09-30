@@ -385,15 +385,18 @@ export class ManifestGraphExecutor {
             } : {}),
           });
           this.liveAgents.set(agentKey, agent);
-          result = await providerLimiter.run(
-            () => breaker.execute(() => agent.invoke(prompt, { ...(limits ? { limits } : {}), ...(options.signal ? { cancelSignal: options.signal } : {}) })),
-            options.signal,
-          );
+          try {
+            result = await providerLimiter.run(
+              () => breaker.execute(() => agent.invoke(prompt, { ...(limits ? { limits } : {}), ...(options.signal ? { cancelSignal: options.signal } : {}) })),
+              options.signal,
+            );
+          } finally {
+            this.liveAgents.delete(agentKey);
+          }
         }
         if (Date.now() - executionStartedAtMs >= manifest.runtime.totalTimeoutMs) {
           throw new ExecutionTimeoutError();
         }
-        this.liveAgents.delete(agentKey);
         const outputText = this.extractText(result);
         const metrics = (result as { metrics?: { accumulatedUsage?: { totalTokens?: number; costUsd?: number } } }).metrics;
         const totalTokens = metrics?.accumulatedUsage?.totalTokens ?? 0;
