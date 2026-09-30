@@ -27,6 +27,7 @@ test.describe('tier 3: app shell after onboarding', () => {
       '/app/traces',
       '/app/agents',
       '/app/admin/budgets',
+      '/app/admin/quotas',
     ];
     for (const path of subRoutes) {
       await page.goto(path);
@@ -45,6 +46,8 @@ test.describe('tier 3: app shell after onboarding', () => {
     await expect(page.getByRole('heading', { name: 'Agent specifications', exact: true })).toBeVisible();
     await page.goto('/app/admin/budgets');
     await expect(page.getByRole('heading', { name: 'Spend budgets', exact: true })).toBeVisible();
+    await page.goto('/app/admin/quotas');
+    await expect(page.getByRole('heading', { name: 'User quotas', exact: true })).toBeVisible();
     await page.goto('/app/traces');
     await expect(page.getByText('Prompt risk signals', { exact: true })).toBeVisible();
   });

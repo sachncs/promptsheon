@@ -1952,6 +1952,20 @@ export interface CostBudget {
   lastAlertedAt: string | null;
 }
 
+export interface UserQuota {
+  id: string;
+  organizationId: string;
+  userId: string;
+  label: string;
+  dailyRuns: number | null;
+  dailyTokens: number | null;
+  dailyCostMicros: number | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  usage: { runs: number; tokens: number; costMicros: number };
+}
+
 export interface CostForecast {
   snapshot: {
     id: string;
@@ -1986,6 +2000,20 @@ const CostBudgetSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   lastAlertedAt: z.string().nullable(),
+});
+
+const UserQuotaSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  userId: z.string(),
+  label: z.string(),
+  dailyRuns: z.number().int().nullable(),
+  dailyTokens: z.number().int().nullable(),
+  dailyCostMicros: z.number().int().nullable(),
+  enabled: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  usage: z.object({ runs: z.number().int(), tokens: z.number().int(), costMicros: z.number().int() }),
 });
 
 const CostForecastSchema = z.object({
@@ -2038,6 +2066,26 @@ export const budgetApi = {
     const response = await client.get<unknown>('/admin/cost-forecast', { params: { organizationId, windowDays } });
     return CostForecastSchema.parse(response.data);
   },
+};
+
+export const userQuotaApi = {
+  list: async (organizationId: string): Promise<{ items: UserQuota[] }> => {
+    const response = await client.get<unknown>('/admin/user-quotas', { params: { organizationId } });
+    const parsed = z.object({ items: z.array(UserQuotaSchema) }).safeParse(response.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid user quota data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  create: async (input: {
+    organizationId: string;
+    userId: string;
+    label: string;
+    dailyRuns: number | null;
+    dailyTokens: number | null;
+    dailyCostMicros: number | null;
+    enabled: boolean;
+  }): Promise<UserQuota> => UserQuotaSchema.parse((await client.post('/admin/user-quotas', input)).data),
+  update: async (id: string, fields: Partial<Pick<UserQuota, 'label' | 'dailyRuns' | 'dailyTokens' | 'dailyCostMicros' | 'enabled'>>): Promise<UserQuota> => UserQuotaSchema.parse((await client.patch(`/admin/user-quotas/${encodeURIComponent(id)}`, fields)).data),
+  remove: (id: string): Promise<void> => client.delete(`/admin/user-quotas/${encodeURIComponent(id)}`).then(() => undefined),
 };
 
 export interface TraceRunSummary {

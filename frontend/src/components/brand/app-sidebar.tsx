@@ -90,6 +90,7 @@ const groups: NavGroup[] = [
       { href: '/app/admin/cost', label: 'Cost & analytics', icon: Activity },
       { href: '/app/admin/budgets', label: 'Spend budgets', icon: Gauge },
       { href: '/app/admin/analytics', label: 'Per-user analytics', icon: Users },
+      { href: '/app/admin/quotas', label: 'User quotas', icon: Gauge },
       { href: '/app/admin/teams', label: 'Teams + SSO', icon: Users },
       { href: '/app/admin/security', label: 'Prompt security', icon: Users },
       { href: '/app/vault', label: 'Vault', icon: KeyRound },
