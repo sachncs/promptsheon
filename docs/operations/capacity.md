@@ -56,6 +56,24 @@ The execution benchmark must report `exactlyOnce: true` and
 configuration in the deployment review. The benchmark exercises the real
 SQLite queue repository, not a mock.
 
+### Latest credential-free measurement
+
+Recorded 2026-09-30 from commit `5a773e8` on Node `v26.8.1`, pnpm `11.23.0`,
+arm64. These are local engineering measurements, not a production capacity
+claim:
+
+| Benchmark | Result |
+| --- | ---: |
+| HTTP baseline, p95 / p99 | 2.61 ms / 4.15 ms at 2,000 requests and concurrency 16 |
+| SQLite writes | 13,260 writes/sec across 1,000 writes and 4 workers |
+| Queue admission | 15,013 jobs/sec at 10,000 jobs and 16 organizations |
+| Queue claim + complete | 2,385 jobs/sec; p95 0.677 ms; p99 0.735 ms |
+| Queue integrity | `exactlyOnce: true`, `remainingQueue: 0` |
+
+Provider latency, filesystem class, database size, and multi-process contention
+remain unmeasured by this run and must be included before accepting a hosted
+production capacity profile.
+
 ## Scaling and degradation decisions
 
 - Increase worker concurrency only when queue age is high while provider and
