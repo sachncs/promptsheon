@@ -87,10 +87,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: install Chromium
         run: pnpm --dir frontend exec playwright install --with-deps chromium
-      - name: run non-LLM browser gates
+      - name: run credential-free browser gates
         run: >-
           pnpm --dir frontend exec playwright test
-          --grep "tier 1:|tier 2:|tier 4:|tier 7:|tier 8:|tier 9:"
+          --grep "tier 1:|tier 2:|tier 3:|tier 4:|tier 5:|tier 6:|tier 7:|tier 8:|tier 9:|tier 10:|tier 11:"
 
   docker:
     name: Docker Build
