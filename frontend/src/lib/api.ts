@@ -2237,6 +2237,16 @@ const BranchItemSchema = z.object({
   updatedAt: z.string(),
 });
 
+const TagItemSchema = z.object({
+  id: z.string(),
+  repositoryId: z.string(),
+  name: z.string(),
+  commitOid: z.string(),
+  message: z.string().nullable(),
+  taggerId: z.string(),
+  createdAt: z.string(),
+});
+
 const RepoEntrySchema = z.object({
   path: z.string(),
   blobOid: z.string(),
@@ -2280,6 +2290,12 @@ function parseBranchList(raw: unknown): BranchItem[] {
   return parsed.data;
 }
 
+function parseTagList(raw: unknown): TagItem[] {
+  const parsed = z.array(TagItemSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid tag data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
 function parseRepoEntryList(raw: unknown): RepoEntry[] {
   const parsed = z.array(RepoEntrySchema).safeParse(unwrapList<unknown>(raw));
   if (!parsed.success) throw new ApiError('The server returned invalid repository contents.', { code: 'INVALID_RESPONSE' });
@@ -2296,7 +2312,7 @@ export const repoApi = {
   list: (workspaceId: string): Promise<RepositorySummary[]> =>
     client.get<unknown>(`/repos?workspaceId=${encodeURIComponent(workspaceId)}`).then((r) => parseRepositoryList(r.data)),
   get: (id: string): Promise<RepositorySummary> => client.get<unknown>(`/repos/${id}`).then((r) => parseRepository(r.data)),
-  create: (input: {
+  create: async (input: {
     workspaceId: string;
     name: string;
     slug?: string;
@@ -2305,12 +2321,18 @@ export const repoApi = {
     visibility?: 'private' | 'internal' | 'public';
     minApprovers?: number;
     requireSignedReleases?: boolean;
-  }) => client.post('/repos', input).then((r) => r.data),
+  }): Promise<RepositorySummary> => {
+    const r = await client.post<unknown>('/repos', input);
+    return parseRepository(r.data);
+  },
   listBranches: async (repoId: string): Promise<BranchItem[]> => {
     const r = await client.get<unknown>(`/repos/${repoId}/branches`);
     return parseBranchList(r.data);
   },
-  listTags: (repoId: string) => client.get(`/repos/${repoId}/tags`).then((r) => r.data),
+  listTags: async (repoId: string): Promise<TagItem[]> => {
+    const r = await client.get<unknown>(`/repos/${repoId}/tags`);
+    return parseTagList(r.data);
+  },
   listContents: async (repoId: string, ref = 'main'): Promise<RepoEntry[]> => {
     const r = await client.get<unknown>(`/repos/${repoId}/contents?ref=${encodeURIComponent(ref)}`);
     return parseRepoEntryList(r.data);
@@ -2321,10 +2343,18 @@ export const repoApi = {
       if (!parsed.success) throw new ApiError('The server returned invalid file content.', { code: 'INVALID_RESPONSE' });
       return { data: parsed.data };
     }),
-  putFile: (repoId: string, path: string, content: string, ref = 'main') =>
-    client.put(`/repos/${repoId}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`, { path, content, ref }).then((r) => r.data),
-  commit: (repoId: string, ref: string, message: string, parents?: string[]) =>
-    client.post(`/repos/${repoId}/commits`, { ref, message, parents }).then((r) => r.data),
+  putFile: async (repoId: string, path: string, content: string, ref = 'main'): Promise<RepoEntry> => {
+    const r = await client.put<unknown>(`/repos/${repoId}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`, { path, content, ref });
+    const parsed = RepoEntrySchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid repository content.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  commit: async (repoId: string, ref: string, message: string, parents?: string[]): Promise<CommitItem> => {
+    const r = await client.post<unknown>(`/repos/${repoId}/commits`, { ref, message, parents });
+    const parsed = CommitItemSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid commit data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
   listCommits: async (repoId: string, ref: string): Promise<CommitItem[]> => {
     const r = await client.get<unknown>(`/repos/${repoId}/commits?ref=${encodeURIComponent(ref)}`);
     return parseCommitList(r.data);
@@ -2340,7 +2370,7 @@ export const repoApi = {
     sourceBranch: string;
     targetBranch: string;
     sourceCommitOid: string;
-  }) => client.post(`/repos/${input.repositoryId}/merge-requests`, input).then((r) => r.data),
+  }): Promise<MergeRequest> => client.post<unknown>(`/repos/${input.repositoryId}/merge-requests`, input).then((r) => parseMergeRequest(r.data)),
   getMR: async (id: string): Promise<{
     mr: MergeRequest;
     approvals: MergeRequestApproval[];
@@ -2349,12 +2379,22 @@ export const repoApi = {
     const r = await client.get<unknown>(`/merge-requests/${id}`);
     return parseMergeRequestDetail(r.data);
   },
-  decideMR: (id: string, decision: 'approve' | 'request_changes', comment?: string) =>
-    client.post(`/merge-requests/${id}/decisions`, { decision, comment }).then((r) => r.data),
-  commentMR: (id: string, body: string, path?: string) =>
-    client.post(`/merge-requests/${id}/comments`, { body, path }).then((r) => r.data),
-  mergeMR: (id: string, mergeCommitOid: string) =>
-    client.post(`/merge-requests/${id}/merge`, { mergeCommitOid }).then((r) => r.data),
+  decideMR: async (id: string, decision: 'approve' | 'request_changes', comment?: string): Promise<MergeRequestApproval> => {
+    const r = await client.post<unknown>(`/merge-requests/${id}/decisions`, { decision, comment });
+    const parsed = MergeRequestApprovalSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid merge request approval data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  commentMR: async (id: string, body: string, path?: string): Promise<MergeRequestComment> => {
+    const r = await client.post<unknown>(`/merge-requests/${id}/comments`, { body, path });
+    const parsed = MergeRequestCommentSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid merge request comment data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  mergeMR: async (id: string, mergeCommitOid: string): Promise<MergeRequest> => {
+    const r = await client.post<unknown>(`/merge-requests/${id}/merge`, { mergeCommitOid });
+    return parseMergeRequest(r.data);
+  },
 };
 
 export const signingKeysApi = {
