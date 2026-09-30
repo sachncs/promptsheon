@@ -10,8 +10,10 @@ const CompiledPromptSchema = z.object({
 
 export class ReasoningCompiler {
   private agent: Agent;
+  private readonly config: AppConfig;
 
   constructor(config: AppConfig) {
+    this.config = config;
     this.agent = new Agent({
       model: createModel(config),
       systemPrompt: `You are a reasoning compiler. Your job is to take a raw prompt and:
@@ -29,6 +31,13 @@ Output a compiled prompt that is more reliable and consistent.`,
     manifest: Manifest,
     options: { capabilityContext?: string; constraints?: string[] } = {},
   ): Promise<Manifest> {
+    // The simulator emits deterministic text, not the compiler's JSON protocol.
+    // A no-op preserves a valid manifest while keeping local and E2E workflows
+    // fully credential-free.
+    if (this.config.llm.defaultProvider === 'simulated') {
+      return manifest;
+    }
+
     const prompt = `# Raw System Prompt
 ${manifest.prompt.systemPrompt}
 
