@@ -132,6 +132,7 @@ async function main() {
   const canaryRollbackService = new CanaryRollbackService(repos.release, repos.eval, auditChain);
   const mutationEvaluationService = new MutationEvaluationService(repos.mutationProposal, repos.evalSuite);
   const app = Fastify({ logger: true, bodyLimit: 2_097_152 });
+  let acceptingTraffic = true;
   const canaryRollbackMonitor = new CanaryRollbackMonitor(repos.release, canaryRollbackService, app.log);
 
   if (config.server.fipsMode) {
@@ -326,6 +327,7 @@ async function main() {
 
   await registerRoutes(app, {
     nodeEnvironment: config.server.nodeEnv,
+    isAcceptingTraffic: () => acceptingTraffic,
     scimBearerToken: config.auth.scimBearerToken,
     authEnabled: config.auth.enabled,
     db,
@@ -459,7 +461,11 @@ async function main() {
   await app.listen({ port, host });
   app.log.info({ event: 'server.started', host, port }, 'server.started');
 
+  let shutdownStarted = false;
   const shutdown = async (signal: string) => {
+    if (shutdownStarted) return;
+    shutdownStarted = true;
+    acceptingTraffic = false;
     app.log.info({ event: 'server.stopping', signal }, 'server.stopping');
     scheduler.stop();
     canaryRollbackMonitor.stop();

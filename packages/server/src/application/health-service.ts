@@ -6,13 +6,16 @@ export interface HealthProbe {
 
 /** Application boundary for database health and readiness decisions. */
 export class HealthService {
-  constructor(private readonly probe: HealthProbe) {}
+  constructor(
+    private readonly probe: HealthProbe,
+    private readonly isAcceptingTraffic: () => boolean = () => true,
+  ) {}
 
   isHealthy(): boolean {
     return this.probe.ping();
   }
 
   isReady(): boolean {
-    return this.probe.quickCheck();
+    return this.isAcceptingTraffic() && this.probe.quickCheck();
   }
 }

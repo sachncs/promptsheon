@@ -117,6 +117,7 @@ import type { EvidenceRecorder } from '../observability/evidence-sink.js';
 
 export interface AppDeps {
   nodeEnvironment: string;
+  isAcceptingTraffic?: () => boolean;
   scimBearerToken?: string;
   authEnabled: boolean;
   db: Database.Database;
@@ -265,7 +266,10 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   registerSelfEvolveRoutes(app, deps.evolutionAgent, deps.capabilityRepo);
   registerApprovalRoutes(app, { releaseRepo: deps.releaseRepo, manifestRepo: deps.manifestRepo });
   registerCompilerRoutes(app, deps.compiler);
-  registerHealthRoutes(app, new HealthService(new SqliteHealthProbe(deps.db)));
+  registerHealthRoutes(
+    app,
+    new HealthService(new SqliteHealthProbe(deps.db), deps.isAcceptingTraffic),
+  );
   registerIdeaRoutes(app, { planner: deps.planner });
   registerGoalEvolveRoutes(app, { goalEvolver: deps.goalEvolver, manifestRepo: deps.manifestRepo });
   registerManifestApprovalRoutes(app, {

@@ -85,6 +85,21 @@ describe('Fastify routes', () => {
     await notReadyApp.close();
   });
 
+  it('GET /api/ready fails closed while the server is draining', async () => {
+    const drainingApp = Fastify({ logger: false });
+    registerHealthRoutes(
+      drainingApp,
+      new HealthService({ ping: () => true, quickCheck: () => true }, () => false),
+    );
+    await drainingApp.ready();
+
+    const res = await drainingApp.inject({ method: 'GET', url: '/api/ready' });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json<{ status: string }>()).toMatchObject({ status: 'not_ready' });
+    await drainingApp.close();
+  });
+
   it('POST /api/workspaces then GET /api/workspaces/:id returns 200', async () => {
     const createRes = await app.inject({
       method: 'POST',
