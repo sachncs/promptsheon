@@ -70,6 +70,22 @@ describe('execution job routes', () => {
     await unauthenticated.close();
   });
 
+  it('returns organization-scoped queue metrics', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/execution-jobs/metrics' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      queued: 0,
+      running: 0,
+      completed: 0,
+      failed: 0,
+      cancelled: 0,
+      timedOut: 0,
+      partiallyCompleted: 0,
+      oldestQueuedAt: null,
+    });
+  });
+
   it('returns a conflict for an idempotency key with different content', async () => {
     const url = '/api/workspaces/11111111-1111-4111-8111-111111111111/execution-jobs';
     const first = await app.inject({ method: 'POST', url, payload: { agentHash: 'a'.repeat(64), inputs: {}, idempotencyKey: 'conflict' } });
