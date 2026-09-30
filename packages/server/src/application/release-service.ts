@@ -51,6 +51,7 @@ export interface ReleaseStore {
   findByIdInOrg(releaseId: string, organizationId: string): Release | null;
   updateStatusInOrg(releaseId: string, organizationId: string, status: ReleaseStatus): Release | null;
   updateStatusInOrgIfCurrent?(releaseId: string, organizationId: string, expected: ReleaseStatus, status: ReleaseStatus): Release | null;
+  promoteCanaryAtomicallyInOrg?(releaseId: string, organizationId: string): { activated: Release; retired: Release | null } | null;
   appendTransition(row: {
     id: string;
     releaseId: string;
@@ -147,10 +148,27 @@ export class ReleaseService {
       }
     }
 
-    const updated = this.repo.updateStatusInOrgIfCurrent
-      ? this.repo.updateStatusInOrgIfCurrent(input.releaseId, input.organizationId, existing.status, input.to)
-      : this.repo.updateStatusInOrg(input.releaseId, input.organizationId, input.to);
+    const canaryPromotion = input.to === 'active' && existing.status === 'canary'
+      ? this.repo.promoteCanaryAtomicallyInOrg?.(input.releaseId, input.organizationId)
+      : undefined;
+    const updated = canaryPromotion
+      ? canaryPromotion.activated
+      : this.repo.updateStatusInOrgIfCurrent
+        ? this.repo.updateStatusInOrgIfCurrent(input.releaseId, input.organizationId, existing.status, input.to)
+        : this.repo.updateStatusInOrg(input.releaseId, input.organizationId, input.to);
     if (!updated) throw new ReleaseNotFoundError(input.releaseId);
+
+    if (canaryPromotion?.retired) {
+      this.repo.appendTransition({
+        id: this.createId(),
+        releaseId: canaryPromotion.retired.id,
+        fromStatus: 'active',
+        toStatus: 'rolled_back',
+        actorId: input.actorId,
+        reason: `retired for canary promotion of ${input.releaseId}`,
+        createdAt: this.now(),
+      });
+    }
 
     this.repo.appendTransition({
       id: this.createId(),

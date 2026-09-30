@@ -273,4 +273,18 @@ describe('POST /api/releases/:id/rollback', () => {
     expect(repo.findById(currentId)?.status).toBe('rolled_back');
     expect(repo.findById(targetId)?.status).toBe('active');
   });
+
+  it('atomically promotes a canary and retires the active peer', () => {
+    const stableId = makeRelease(repo, 'cap1', 'prod', 1, 'alice');
+    const canaryId = makeRelease(repo, 'cap1', 'prod', 2, 'alice');
+    repo.updateStatus(stableId, 'active');
+    repo.updateStatus(canaryId, 'canary');
+
+    const result = repo.promoteCanaryAtomicallyInOrg(canaryId, 'legacy');
+
+    expect(result?.activated).toMatchObject({ id: canaryId, status: 'active', canaryPercent: 0 });
+    expect(result?.retired).toMatchObject({ id: stableId, status: 'rolled_back' });
+    expect(repo.findById(stableId)?.status).toBe('rolled_back');
+    expect(repo.findById(canaryId)?.status).toBe('active');
+  });
 });

@@ -219,6 +219,34 @@ export class ReleaseRepo extends BaseRepo<Release> {
     return result.changes > 0 ? this.findByIdInOrg(id, organizationId) : null;
   }
 
+  /** Promote a canary while retiring its active peer without violating the active-release constraint. */
+  promoteCanaryAtomicallyInOrg(
+    canaryId: string,
+    organizationId: string,
+  ): { activated: Release; retired: Release | null } | null {
+    const canary = this.findByIdInOrg(canaryId, organizationId);
+    if (!canary || canary.status !== 'canary') return null;
+    const active = this.findActivePeerInOrg(canary, organizationId);
+    let result: { activated: Release; retired: Release | null } | null = null;
+    this.db.transaction(() => {
+      const now = new Date().toISOString();
+      let retired: Release | null = null;
+      if (active) {
+        const retiredUpdate = this.db.prepare(
+          "UPDATE releases SET status = 'rolled_back', updated_at = ? WHERE id = ? AND status = 'active'",
+        ).run(now, active.id);
+        if (retiredUpdate.changes !== 1) throw new Error('active release changed before canary promotion');
+        retired = { ...active, status: 'rolled_back' };
+      }
+      const activatedUpdate = this.db.prepare(
+        "UPDATE releases SET status = 'active', canary_percent = 0, activated_at = COALESCE(activated_at, ?), updated_at = ? WHERE id = ? AND status = 'canary'",
+      ).run(now, now, canaryId);
+      if (activatedUpdate.changes !== 1) throw new Error('canary release changed before promotion');
+      result = { activated: { ...canary, status: 'active', canaryPercent: 0, activatedAt: canary.activatedAt ?? now }, retired };
+    })();
+    return result;
+  }
+
   /**
    * Atomically rollback: roll back the current release and reactivate
    * the target in a single transaction. The UNIQUE(active-per-cap-env)
