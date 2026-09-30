@@ -95,7 +95,7 @@ const CreateSuiteSchema = z.object({
     .optional(),
 });
 
-const RunSuiteSchema = z.object({
+export const RunSuiteSchema = z.object({
   suiteVersionId: z.string().optional(),
   releaseId: z.string().optional(),
   n: z.number().int().min(1).max(20).optional(),
@@ -103,9 +103,9 @@ const RunSuiteSchema = z.object({
   trials: z
     .array(
       z.object({
-        caseId: z.string(),
-        output: z.string(),
-        transcript: z.string().optional(),
+        caseId: z.string().min(1).max(255),
+        output: z.string().max(100_000),
+        transcript: z.string().max(100_000).optional(),
         finalState: z.record(z.string(), z.unknown()).optional(),
         toolCalls: z
           .array(
@@ -116,9 +116,10 @@ const RunSuiteSchema = z.object({
             }),
           )
           .optional(),
-        referenceTranscript: z.string().optional(),
+        referenceTranscript: z.string().max(100_000).optional(),
       }),
     )
+    .max(100, 'a suite run may contain at most 100 trials')
     .optional(),
 });
 
