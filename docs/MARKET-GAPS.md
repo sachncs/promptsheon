@@ -120,7 +120,9 @@ segment. Tier 3 features would create a category.
 
 #### T1-1. **Span-level LLM tracing**
 - **Current status**: implemented. `trace_runs` and `trace_spans` are queryable through the trace API and `/app/traces`, with span trees, token counts, latency, cost, and evidence attached to each run.
-- **Remaining**: broaden filtering and export coverage, and connect the persisted spans to an external OpenTelemetry exporter.
+- **Remaining**: broaden filtering and export coverage. Persisted trace runs and
+  child spans now mirror into the configured OpenTelemetry provider, while the
+  SQLite trace store remains the authoritative product view.
 - **Moat impact**: low alone, but **table stakes**. Without this, an engineer evaluating promptsheon vs. LangSmith deletes promptsheon in the first 5 minutes of demo.
 
 #### T1-2. **Prompt playground + parameter sweep**

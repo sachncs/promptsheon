@@ -1,6 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import type { TraceRepo, TraceSpan, TraceRun } from '../repos/trace.js';
+import {
+  context as otelContext,
+  SpanKind,
+  SpanStatusCode,
+  trace as otelTrace,
+  type Attributes,
+  type Span as OtelSpan,
+  type Tracer as OtelTracer,
+} from '@opentelemetry/api';
 
 /**
  * Tracer — a thin facade over TraceRepo that handles span
@@ -30,6 +39,7 @@ export class Span {
     public readonly name: string,
     public readonly parentId: string | null,
     public readonly tracer: Tracer,
+    private readonly otelSpan: OtelSpan,
   ) {
     this.id = id;
     this.start = Date.now();
@@ -41,13 +51,18 @@ export class Span {
 
   setStatus(status: 'ok' | 'error'): void {
     this.status = status;
+    this.otelSpan.setStatus(status === 'error' ? { code: SpanStatusCode.ERROR } : { code: SpanStatusCode.OK });
   }
 
   setAttribute(key: string, value: unknown): void {
     if (!this.attributes[key]) this.attributes[key] = value;
+    const attribute = toOtelAttribute(value);
+    if (attribute !== undefined) this.otelSpan.setAttribute(key, attribute);
   }
 
   end(): TraceSpan {
+    if (this.ended) return this.tracer.repo.findSpansByRun(this.tracer.run.id).find((s) => s.id === this.id)!;
+    this.ended = true;
     const endTime = new Date().toISOString();
     const meta = this.llmMeta;
     const totalTokens = meta?.totalTokens ?? (meta?.promptTokens ?? 0) + (meta?.completionTokens ?? 0);
@@ -74,11 +89,13 @@ export class Span {
       costUsd: meta?.costUsd,
       outputText: meta?.outputText,
     });
+    this.otelSpan.end();
     return this.tracer.repo.findSpansByRun(this.tracer.run.id).find((s) => s.id === this.id)!;
   }
 
   private llmMeta?: LlmCallMetadata;
   private status: 'ok' | 'error' = 'ok';
+  private ended = false;
   private readonly attributes: Record<string, unknown> = {};
 }
 
@@ -86,9 +103,12 @@ export class Tracer {
   readonly run: TraceRun;
   readonly repo: TraceRepo;
 
-  constructor(run: TraceRun, repo: TraceRepo) {
+  constructor(run: TraceRun, repo: TraceRepo, private readonly otelTracer: OtelTracer = otelTrace.getTracer('promptsheon')) {
     this.run = run;
     this.repo = repo;
+    this.otelRoot = this.otelTracer.startSpan(run.name, {
+      attributes: toOtelAttributes(run.attributes),
+    });
   }
 
   /**
@@ -96,7 +116,11 @@ export class Tracer {
    * Span when the operation completes.
    */
   span(name: string, kind?: 'internal' | 'llm' | 'tool' | 'retrieval' | 'agent'): Span {
-    const span = new Span(randomUUID(), name, null, this);
+    const parentContext = otelTrace.setSpan(otelContext.active(), this.otelRoot);
+    const otelSpan = this.otelTracer.startSpan(name, {
+      kind: toOtelSpanKind(kind),
+    }, parentContext);
+    const span = new Span(randomUUID(), name, null, this, otelSpan);
     // Pre-create with current time so parent/child ordering is
     // preserved on SELECT.
     this.repo.addSpan({
@@ -109,8 +133,15 @@ export class Tracer {
   }
 
   finalize(status: 'success' | 'error' = 'success'): void {
+    if (this.otelEnded) return;
+    this.otelEnded = true;
     this.repo.finalize(this.run.id, status);
+    this.otelRoot.setStatus(status === 'error' ? { code: SpanStatusCode.ERROR } : { code: SpanStatusCode.OK });
+    this.otelRoot.end();
   }
+
+  private readonly otelRoot: OtelSpan;
+  private otelEnded = false;
 }
 
 /**
@@ -132,6 +163,31 @@ export function startTrace(
 ): Tracer {
   const run = repo.startRun(input);
   return new Tracer(run, repo);
+}
+
+function toOtelAttributes(attributes: Record<string, unknown> | undefined): Attributes {
+  const result: Attributes = {};
+  for (const [key, value] of Object.entries(attributes ?? {})) {
+    const attribute = toOtelAttribute(value);
+    if (attribute !== undefined) result[key] = attribute;
+  }
+  return result;
+}
+
+function toOtelAttribute(value: unknown): string | number | boolean | string[] | number[] | boolean[] | undefined {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value) && value.every((item) => typeof item === 'string')) return value;
+  if (Array.isArray(value) && value.every((item) => typeof item === 'number')) return value;
+  if (Array.isArray(value) && value.every((item) => typeof item === 'boolean')) return value;
+  return value === undefined ? undefined : JSON.stringify(value);
+}
+
+function toOtelSpanKind(kind: 'internal' | 'llm' | 'tool' | 'retrieval' | 'agent' | undefined): SpanKind {
+  switch (kind) {
+    case 'llm': return SpanKind.CLIENT;
+    case 'tool': return SpanKind.PRODUCER;
+    default: return SpanKind.INTERNAL;
+  }
 }
 
 /**
