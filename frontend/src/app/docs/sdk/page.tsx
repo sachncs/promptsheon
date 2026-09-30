@@ -37,6 +37,16 @@ export default function SdkDoc() {
       <DocCurl cmd="await client.runSuite(suiteId, { trials });" />
       <DocCurl cmd="await client.evalGate(repoId, [{...}]);" />
 
+      <h2>Agent specifications</h2>
+      <DocCurl cmd="await client.validateAgentSpecification(workspaceId, specification);" />
+      <DocCurl cmd="await client.createAgentSpecification({ workspaceId, specification, changeReason });" />
+      <DocCurl cmd="await client.listAgentSpecifications(workspaceId, { status: 'published', pageSize: 50 });" />
+      <DocCurl cmd="await client.listAgentSpecificationLineage(workspaceId, hash);" />
+      <DocCurl cmd="await client.diffAgentSpecifications(workspaceId, parentHash, hash);" />
+      <DocCurl cmd="await client.publishAgentSpecification(workspaceId, hash);" />
+      <DocCurl cmd="await client.enqueueExecution({ workspaceId, agentHash: hash, inputs: { input: 'hello' }, idempotencyKey: 'local-001' });" />
+      <p>Use the simulator provider for a credential-free local execution, then poll the returned job with <code>getExecution</code> and inspect evidence with <code>listEvidence</code>.</p>
+
       <h2>Agent execution evidence</h2>
       <DocCurl cmd="await client.listEvidence({ agentHash, eventType: 'model.called' });" />
       <DocCurl cmd="await client.listTraceEvidence(traceId);" />
