@@ -24,6 +24,7 @@ test.describe('tier 3: app shell after onboarding', () => {
       '/app/vault',
       '/app/operations',
       '/app/evidence',
+      '/app/agents',
     ];
     for (const path of subRoutes) {
       await page.goto(path);
@@ -38,6 +39,8 @@ test.describe('tier 3: app shell after onboarding', () => {
     await expect(page.getByText('Healthy')).toBeVisible();
     await page.goto('/app/evidence');
     await expect(page.getByRole('heading', { name: 'Evidence', exact: true })).toBeVisible();
+    await page.goto('/app/agents');
+    await expect(page.getByRole('heading', { name: 'Agent specifications', exact: true })).toBeVisible();
   });
 
   test('restores a cleared browser session with an existing API key', async ({ page, request }) => {
