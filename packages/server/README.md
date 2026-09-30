@@ -22,7 +22,7 @@ pnpm --filter @promptsheon/server build
 | `PROMPTSHEON_CORS_ORIGIN` | (empty → `http://localhost:3000`) | CORS allowed origin |
 | `PROMPTSHEON_AUTH` | true | Enable API key + SVID auth |
 | `PROMPTSHEON_JWT_SECRET` | (empty) | Required when `PROMPTSHEON_AUTH=true` |
-| `PROMPTSHEON_LLM_PROVIDER` | openai | LLM provider: openai, anthropic, bedrock, custom |
+| `PROMPTSHEON_LLM_PROVIDER` | openai | LLM provider: simulated, openai, anthropic, bedrock, custom |
 | `PROMPTSHEON_LLM_MODEL` | gpt-4 | Model ID |
 | `PROMPTSHEON_LLM_API_KEY_ENV` | OPENAI_API_KEY | Env var name holding the API key |
 | `PROMPTSHEON_LLM_MAX_RETRIES` | 5 | Max LLM retry attempts |

@@ -24,8 +24,9 @@ documentation in the same change set.
 - Node.js 26 or newer (the CI image and package engine constraint use this
   production baseline).
 - pnpm 11, enabled through Corepack.
-- An LLM provider credential for workflows that invoke an agent. Route and
-  repository tests do not require a live provider.
+- No LLM provider credential is required for the local simulator, browser
+  onboarding journey, benchmarks, or automated tests. A provider credential is
+  required only when a workflow is intentionally switched to a live model.
 
 ```bash
 corepack enable
