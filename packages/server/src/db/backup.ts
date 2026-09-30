@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { chmod, mkdir, rename, rm } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, rename, rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 export interface DatabaseBackupResult {
@@ -11,6 +11,11 @@ export interface DatabaseBackupResult {
 export interface DatabaseIntegrityResult {
   valid: boolean;
   result: string;
+}
+
+export interface DatabaseRestoreResult {
+  source: string;
+  destination: string;
 }
 
 /**
@@ -37,6 +42,24 @@ export async function backupDatabase(
       totalPages: metadata.totalPages,
       remainingPages: metadata.remainingPages,
     };
+  } catch (error) {
+    await rm(temporaryDestination, { force: true });
+    throw error;
+  }
+}
+
+/** Verify a SQLite backup and atomically restore it to a stopped database path. */
+export async function restoreDatabase(source: string, destination: string): Promise<DatabaseRestoreResult> {
+  const integrity = verifyDatabaseIntegrity(source);
+  if (!integrity.valid) throw new Error(`Restore source failed integrity check: ${integrity.result}`);
+  const temporaryDestination = `${destination}.restore.tmp`;
+  await mkdir(dirname(destination), { recursive: true });
+  await rm(temporaryDestination, { force: true });
+  try {
+    await copyFile(source, temporaryDestination);
+    await chmod(temporaryDestination, 0o600);
+    await rename(temporaryDestination, destination);
+    return { source, destination };
   } catch (error) {
     await rm(temporaryDestination, { force: true });
     throw error;
