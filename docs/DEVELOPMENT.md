@@ -69,6 +69,15 @@ does not accept upstream API keys from browser or framework callers. The
 buffered the completion, so integrations can use one transport while true
 provider token streaming is developed separately.
 
+### Credential-free built-in tools
+
+The server registers two deterministic tools for simulator and local
+development workflows: `json.parse` and `text.length`. A manifest must still
+declare the tool and include its name in `metadata.allowedTools`; the durable
+executor applies organization, execution, and allowlist authorization before
+invocation. These tools never make network calls and cap input at one million
+characters.
+
 ### Useful checks
 
 ```bash

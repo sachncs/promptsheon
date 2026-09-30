@@ -45,6 +45,7 @@ import { AgentSpecificationRepo } from './repos/agent-specification.js';
 import { DurableExecutionService } from './application/durable-execution-service.js';
 import { RouterModelAdapter } from './application/provider-adapters.js';
 import { ToolRegistry } from './application/execution-ports.js';
+import { createBuiltinToolAdapters } from './tools/builtin.js';
 import { AsyncEvidenceSink } from './observability/evidence-sink.js';
 import { LlmResponseCacheRepo } from './repos/llm-response-cache.js';
 import type { Agent } from '@strands-agents/sdk';
@@ -217,6 +218,7 @@ async function main() {
   const planner = new IdeaPlannerAgent(config);
   const llmRouter = new LlmRouter(config.llm.credentials, config.llm.baseUrl);
   const toolRegistry = new ToolRegistry();
+  for (const tool of createBuiltinToolAdapters()) toolRegistry.register(tool);
   const evidenceSink = new AsyncEvidenceSink(repos.evidence);
   app.addHook('onClose', async () => { await evidenceSink.flush(); });
   const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo: repos.manifest, traceRepo: repos.trace, modelAdapter: new RouterModelAdapter(llmRouter), toolRegistry, evidence: evidenceSink });

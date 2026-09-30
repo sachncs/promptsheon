@@ -96,8 +96,13 @@ Implemented in the current Phase 2 slice:
   ownership under concurrent polling.
 - Provider and registered-tool calls are bounded by cancellation-aware
   concurrency gates and independently protected by circuit breakers.
+- The production composition root now registers deterministic, network-free
+  `json.parse` and `text.length` adapters. They remain inaccessible unless a
+  manifest declares them and includes them in `metadata.allowedTools`, so the
+  default tool surface is useful for simulator workflows without weakening
+  authorization boundaries.
 
-Remaining exit-gate work is limited to wiring concrete domain ToolAdapters
+Remaining exit-gate work is limited to adding product-specific ToolAdapters
 when product capabilities define them, plus final full-repository verification.
 The platform boundary is now injectable and covered by an adapter-backed tool
 integration test; no domain-specific tool implementation was defined by this

@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for SDK/framework integrations, including validated chat messages and a
   buffered SSE compatibility response for `stream: true` requests.
 
+- Register credential-free `json.parse` and `text.length` tool adapters behind
+  the existing organization, execution, and manifest allowlist checks.
+
 ### Removed
 - Removed the experimental VS Code extension workspace. Promptsheon now
   focuses on the self-hosted API, Next.js console, CLI, SDK, and public
