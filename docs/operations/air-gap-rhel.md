@@ -228,6 +228,16 @@ sudo -u promptsheon rsync -a --delete /var/lib/promptsheon/.promptsheon/ \
 sudo -u promptsheon env \
   PROMPTSHEON_CAS_PATH=/var/lib/promptsheon/.promptsheon \
   pnpm --dir /opt/promptsheon/packages/server cas:verify
+
+# Restore a verified database only while the service is stopped. The explicit
+# acknowledgement prevents an accidental overwrite of the live database.
+sudo systemctl stop promptsheon
+sudo -u promptsheon env \
+  PROMPTSHEON_RESTORE_SOURCE=/var/lib/promptsheon/backups/$(date +%Y%m%d).db \
+  PROMPTSHEON_RESTORE_PATH=/var/lib/promptsheon/promptsheon.db \
+  PROMPTSHEON_RESTORE_CONFIRM=I_UNDERSTAND \
+  pnpm --dir /opt/promptsheon/packages/server db:restore
+sudo systemctl start promptsheon
 ```
 
 ## 9. Air-gap-specific gotchas

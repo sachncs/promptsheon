@@ -84,7 +84,18 @@ or raw prompts into an incident ticket.
    pnpm --dir packages/server cas:verify
    ```
 
-3. Run the relevant server, evidence, queue, backup, and CAS tests. Repeat
+3. Stop the server and restore only after confirming the target path. The
+   restore command verifies the source first, requires an explicit operator
+   acknowledgement, and replaces the destination atomically:
+
+   ```bash
+   PROMPTSHEON_RESTORE_SOURCE=/var/backups/promptsheon/latest.sqlite \
+   PROMPTSHEON_RESTORE_PATH=/var/lib/promptsheon/promptsheon.db \
+   PROMPTSHEON_RESTORE_CONFIRM=I_UNDERSTAND \
+   pnpm --dir packages/server db:restore
+   ```
+
+4. Run the relevant server, evidence, queue, backup, and CAS tests. Repeat
    `/api/health` and `/api/ready` checks, then execute the simulator journey.
 4. Compare the recovered release hash, audit-chain head, evidence counts, and
    queue metrics with the incident record.
