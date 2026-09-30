@@ -225,7 +225,7 @@ async function main() {
   durableWorker.start();
   const autoEval = new AutoEval({ traceRepo: repos.trace, scoreRepo: repos.traceScore, router: llmRouter });
   const gateway = new Gateway({
-    cache: new ResponseCache(2048, new LlmResponseCacheRepo(db)),
+    cache: new ResponseCache(2048, new LlmResponseCacheRepo(db), 86_400_000),
     fallback: new FallbackChain(['custom', 'anthropic', 'openai']),
     rateLimiter: new RateLimiter({ capacity: 60, refillPerSecond: 1 }),
     router: llmRouter,

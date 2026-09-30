@@ -41,4 +41,17 @@ describe('persistent LLM response cache', () => {
     expect(db.prepare('SELECT COUNT(*) AS count FROM llm_response_cache').get()).toEqual({ count: 2 });
     db.close();
   });
+
+  it('expires stale entries from memory and persistent storage', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db, migrations);
+    const store = new LlmResponseCacheRepo(db);
+    const cache = new ResponseCache(2, store, 1);
+    const request = { prompt: 'expires', model: 'simulator', temperature: 0, provider: 'simulated' };
+    cache.set({ ...request, content: 'old', promptTokens: 1, completionTokens: 1, costUsd: 0, model: 'simulator', provider: 'simulated' });
+    await new Promise((resolve) => setTimeout(resolve, 3));
+    expect(cache.get(request)).toBeNull();
+    expect(db.prepare('SELECT COUNT(*) AS count FROM llm_response_cache').get()).toEqual({ count: 0 });
+    db.close();
+  });
 });

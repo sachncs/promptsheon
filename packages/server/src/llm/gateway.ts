@@ -38,6 +38,7 @@ export interface CacheLookup {
 export interface ResponseCacheStore {
   get(hash: string): CacheEntry | null;
   set(entry: CacheEntry): void;
+  delete(hash: string): void;
   trim(maxEntries: number): void;
 }
 
@@ -61,7 +62,13 @@ export class ResponseCache {
   private readonly store = new Map<string, CacheEntry>();
   private readonly maxEntries: number;
 
-  constructor(maxEntries = 1024, private readonly persistentStore?: ResponseCacheStore) {
+  constructor(
+    maxEntries = 1024,
+    private readonly persistentStore?: ResponseCacheStore,
+    private readonly maxAgeMs = Number.POSITIVE_INFINITY,
+  ) {
+    if (!Number.isInteger(maxEntries) || maxEntries < 1) throw new Error('maxEntries must be positive');
+    if (!(maxAgeMs > 0)) throw new Error('maxAgeMs must be positive');
     this.maxEntries = maxEntries;
   }
 
@@ -72,9 +79,18 @@ export class ResponseCache {
   get(input: CacheLookup): CacheEntry | null {
     const hash = cacheKey(input);
     const entry = this.store.get(hash);
+    if (entry && this.isExpired(entry)) {
+      this.store.delete(hash);
+      this.persistentStore?.delete(hash);
+      return null;
+    }
     if (!entry) {
       const persisted = this.persistentStore?.get(hash) ?? null;
       if (!persisted) return null;
+      if (this.isExpired(persisted)) {
+        this.persistentStore?.delete(hash);
+        return null;
+      }
       this.store.set(hash, persisted);
       return persisted;
     }
@@ -111,6 +127,10 @@ export class ResponseCache {
 
   clear(): void {
     this.store.clear();
+  }
+
+  private isExpired(entry: CacheEntry): boolean {
+    return Date.now() - Date.parse(entry.createdAt) >= this.maxAgeMs;
   }
 }
 
