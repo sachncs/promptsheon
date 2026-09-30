@@ -202,6 +202,7 @@ test.describe('tier 3: app shell after onboarding', () => {
       resourceBudget: expect.any(Object),
       permissions: expect.any(Object),
     }));
+    await expect(page.getByText('Specification is valid and ready to create.')).toBeVisible();
 
     const workspaceResponse = await request.get(`${baseURL}/api/workspaces`, { headers: { Authorization: `Bearer ${session.apiKey}` } });
     expect(workspaceResponse.ok()).toBeTruthy();

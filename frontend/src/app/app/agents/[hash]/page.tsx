@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Bot } from 'lucide-react';
-import { use, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { z } from 'zod';
 import { useRequireSession } from '@/hooks/use-session';
 import { agentSpecificationApi, evidenceApi, executionJobApi, workspaceApi, type AgentSpecificationRecord, type EvidenceRecord, type ExecutionJob, type WorkspaceRow } from '@/lib/api';
@@ -58,6 +58,12 @@ export default function AgentRevisionPage({ params, searchParams }: { params: Pr
     enabled: Boolean(session && workspaceId && jobId),
     refetchInterval: (query) => isTerminalJob(query.state.data?.data) ? false : 1_000,
   });
+  const jobState = job.data?.data?.state;
+  const jobIsTerminal = isTerminalJob(job.data?.data);
+  useEffect(() => {
+    if (!jobIsTerminal) return;
+    void queryClient.invalidateQueries({ queryKey: ['agent-specification-evidence', hash] });
+  }, [hash, jobIsTerminal, jobState, queryClient]);
   const cancel = useMutation({
     mutationFn: () => executionJobApi.cancel(workspaceId!, jobId!),
     onSuccess: async () => {
