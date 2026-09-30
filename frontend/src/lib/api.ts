@@ -1043,6 +1043,8 @@ export const releaseApi = {
   },
   create: (data: { capabilityId: string; capabilityVersion: number; capabilityVersionId: string | null; manifest: string; environment: string }) =>
     client.post('/releases', data),
+  sign: (id: string, data: { keyId: string; signature: string; signedAt: string }) =>
+    client.post(`/releases/${id}/sign`, data),
   transition: (id: string, to: 'draft' | 'review' | 'approved' | 'canary' | 'active' | 'rolled_back', reason?: string) =>
     client.post(`/releases/${id}/transition`, { to, ...(reason ? { reason } : {}) }),
   canary: (id: string, percent: number) => client.put(`/releases/${id}/canary`, { percent }),

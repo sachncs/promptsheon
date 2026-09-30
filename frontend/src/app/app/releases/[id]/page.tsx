@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  ArrowLeft, GitBranch, ShieldCheck, AlertCircle, Play, RotateCcw, FastForward,
+  ArrowLeft, GitBranch, ShieldCheck, AlertCircle, Play, RotateCcw, FastForward, KeyRound,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useRequireSession } from '@/hooks/use-session';
@@ -44,6 +44,10 @@ export default function ReleaseDetailPage() {
   const [canaryOpen, setCanaryOpen] = useState(false);
   const [canaryPercent, setCanaryPercent] = useState('10');
   const [rollbackOpen, setRollbackOpen] = useState(false);
+  const [signOpen, setSignOpen] = useState(false);
+  const [signingKeyId, setSigningKeyId] = useState('');
+  const [signature, setSignature] = useState('');
+  const [signedAt, setSignedAt] = useState(() => new Date().toISOString());
 
   const release = useQuery({
     queryKey: ['release', id],
@@ -135,6 +139,22 @@ export default function ReleaseDetailPage() {
       });
     } catch (err) {
       toast({ title: 'Canary assessment failed', variant: 'destructive', description: getErrorMessage(err) });
+    }
+  };
+
+  const handleSign = async () => {
+    if (!signingKeyId.trim() || !signature.trim()) {
+      toast({ title: 'Signature details required', variant: 'warning', description: 'Provide the registered key ID and base64 signature.' });
+      return;
+    }
+    try {
+      await releaseApi.sign(id, { keyId: signingKeyId.trim(), signature: signature.trim(), signedAt });
+      setSignOpen(false);
+      setSignature('');
+      await qc.invalidateQueries({ queryKey: ['release', id] });
+      toast({ title: 'Release signed', variant: 'success', description: 'The operator signature was verified and persisted.' });
+    } catch (err) {
+      toast({ title: 'Signing failed', variant: 'destructive', description: getErrorMessage(err) });
     }
   };
 
@@ -230,6 +250,11 @@ export default function ReleaseDetailPage() {
                 ready={hasPassingEvaluation}
               />
               <CheckRow label="Operator signature" value={r.signature && r.signedKeyId ? 'valid' : 'required'} ready={Boolean(r.signature && r.signedKeyId)} />
+            </div>
+            <div className="mt-3 flex justify-end">
+              <Button size="sm" variant="outline" onClick={() => setSignOpen(true)} disabled={isTerminal}>
+                <KeyRound className="mr-1.5 h-3.5 w-3.5" />{r.signature ? 'Replace signature' : 'Sign release'}
+              </Button>
             </div>
           </div>
         </Surface>
@@ -399,6 +424,35 @@ export default function ReleaseDetailPage() {
             <Button variant="destructive" onClick={handleRollback}>
               <RotateCcw className="mr-1.5 h-3.5 w-3.5" />Roll back
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={signOpen} onOpenChange={setSignOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Sign release</DialogTitle>
+            <DialogDescription>
+              Sign the release message with your external Ed25519 operator key, then paste the base64 signature here. Private keys never enter Promptsheon.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-wider text-text-subtle" htmlFor="release-signing-key">Registered key ID</label>
+              <Input id="release-signing-key" value={signingKeyId} onChange={(e) => setSigningKeyId(e.target.value)} placeholder="key UUID or fingerprint" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-wider text-text-subtle" htmlFor="release-signed-at">Signed at</label>
+              <Input id="release-signed-at" type="datetime-local" value={signedAt.slice(0, 16)} onChange={(e) => setSignedAt(new Date(e.target.value).toISOString())} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-wider text-text-subtle" htmlFor="release-signature">Base64 signature</label>
+              <textarea id="release-signature" value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="Paste the Ed25519 signature" className="min-h-28 w-full rounded-md border border-border-subtle bg-surface-1 px-3 py-2 font-mono text-xs text-text-default outline-none focus:border-brand" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSignOpen(false)}>Cancel</Button>
+            <Button onClick={() => void handleSign()}>Verify and sign</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
