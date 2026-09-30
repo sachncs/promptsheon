@@ -1248,6 +1248,56 @@ export interface ExecutionQueueMetrics {
   oldestQueuedAt: string | null;
 }
 
+export type ExecutionJobState = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'timed-out' | 'partially-completed';
+
+export interface ExecutionJob {
+  id: string;
+  organizationId: string;
+  workspaceId: string;
+  agentHash: string;
+  inputHash: string;
+  inputJson: string;
+  idempotencyKey: string;
+  state: ExecutionJobState;
+  attempts: number;
+  maxAttempts: number;
+  availableAt: string;
+  leaseOwner: string | null;
+  leaseExpiresAt: string | null;
+  resultJson: string | null;
+  error: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+const ExecutionJobSchema = z.object({
+  id: z.string().uuid(),
+  organizationId: z.string(),
+  workspaceId: z.string(),
+  agentHash: z.string().regex(/^[0-9a-f]{64}$/),
+  inputHash: z.string().regex(/^[0-9a-f]{64}$/),
+  inputJson: z.string(),
+  idempotencyKey: z.string(),
+  state: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled', 'timed-out', 'partially-completed']),
+  attempts: z.number().int().nonnegative(),
+  maxAttempts: z.number().int().positive(),
+  availableAt: z.string(),
+  leaseOwner: z.string().nullable(),
+  leaseExpiresAt: z.string().nullable(),
+  resultJson: z.string().nullable(),
+  error: z.string().nullable(),
+  createdAt: z.string(),
+  startedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+});
+
+function parseExecutionJob(raw: unknown): ExecutionJob {
+  const parsed = ExecutionJobSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid execution job data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
 export interface HealthStatus {
   status: 'ok' | 'error';
   db: 'ok' | 'error';
@@ -1286,6 +1336,14 @@ export const healthApi = {
 };
 
 export const executionJobApi = {
+  enqueue: async (workspaceId: string, data: { agentHash: string; inputs: Record<string, unknown>; idempotencyKey: string; maxAttempts?: number }): Promise<{ data: ExecutionJob }> => {
+    const r = await client.post<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/execution-jobs`, data);
+    return { data: parseExecutionJob(r.data) };
+  },
+  get: async (workspaceId: string, id: string): Promise<{ data: ExecutionJob }> => {
+    const r = await client.get<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/execution-jobs/${encodeURIComponent(id)}`);
+    return { data: parseExecutionJob(r.data) };
+  },
   metrics: async (): Promise<{ data: ExecutionQueueMetrics }> => {
     const r = await client.get<unknown>('/execution-jobs/metrics');
     return { data: z.object({
