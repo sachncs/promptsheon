@@ -1060,16 +1060,19 @@ export const agentSpecificationApi = {
     });
     return { data: parseAgentSpecificationList(response.data) };
   },
-  create: (data: {
+  create: async (data: {
     workspaceId: string;
     specification: AgentSpecificationDraft;
     changeReason: string;
     parentHash?: string;
-  }) => client.post(`/workspaces/${encodeURIComponent(data.workspaceId)}/agent-specifications`, {
-    specification: data.specification,
-    changeReason: data.changeReason,
-    ...(data.parentHash ? { parentHash: data.parentHash } : {}),
-  }),
+  }): Promise<{ data: AgentSpecificationRecord }> => {
+    const response = await client.post<unknown>(`/workspaces/${encodeURIComponent(data.workspaceId)}/agent-specifications`, {
+      specification: data.specification,
+      changeReason: data.changeReason,
+      ...(data.parentHash ? { parentHash: data.parentHash } : {}),
+    });
+    return { data: parseAgentSpecificationRecord(response.data) };
+  },
   validate: async (workspaceId: string, specification: AgentSpecificationDraft): Promise<{ data: { valid: true; specification: unknown } | { valid: false; issues: AgentSpecificationValidationIssue[] } }> => {
     const response = await client.post<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/validate`, { specification });
     const parsed = z.union([

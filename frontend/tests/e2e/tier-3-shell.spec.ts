@@ -187,6 +187,10 @@ test.describe('tier 3: app shell after onboarding', () => {
     await expect(page.getByText('Specification is valid and ready to create.')).toBeVisible();
     await page.getByRole('button', { name: 'Create draft' }).click();
     await expect(page.getByText('Revision created')).toBeVisible();
+    await page.getByRole('link', { name: 'Open revision' }).click();
+    await expect(page).toHaveURL(/\/app\/agents\/[0-9a-f]{64}$/);
+    await expect(page.getByRole('heading', { name: 'Research assistant' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Run this revision' })).toBeVisible();
 
     const workspaceResponse = await request.get(`${baseURL}/api/workspaces`, { headers: { Authorization: `Bearer ${session.apiKey}` } });
     expect(workspaceResponse.ok()).toBeTruthy();

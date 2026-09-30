@@ -53,7 +53,7 @@ export default function NewAgentPage() {
       {!workspaceId ? (
         <Surface><p className="text-sm text-text-muted">Create a workspace before creating an agent specification.</p></Surface>
       ) : mutation.isSuccess ? (
-        <Surface><div className="flex items-start gap-3"><Bot className="mt-0.5 h-5 w-5 text-success" /><div><h2 className="font-semibold text-text-strong">Revision created</h2><p className="mt-1 text-sm text-text-muted">The specification was stored as a content-addressed draft.</p><Button asChild className="mt-4"><Link href="/app/agents">View specifications</Link></Button></div></div></Surface>
+        <Surface><div className="flex items-start gap-3"><Bot className="mt-0.5 h-5 w-5 text-success" /><div><h2 className="font-semibold text-text-strong">Revision created</h2><p className="mt-1 text-sm text-text-muted">The specification was stored as a content-addressed draft.</p><div className="mt-4 flex flex-wrap gap-2"><Button asChild><Link href={`/app/agents/${mutation.data.data.hash}`}>Open revision</Link></Button><Button asChild variant="outline"><Link href="/app/agents">View specifications</Link></Button></div></div></div></Surface>
       ) : (
         <Surface>
           <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); if (validation?.valid) mutation.mutate(); }}>
