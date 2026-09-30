@@ -1,7 +1,12 @@
 import type { AppConfig, Manifest } from '@promptsheon/shared';
 import { Agent } from '@strands-agents/sdk';
+import { z } from 'zod';
 import { createModel } from '../model.js';
 import { extractText } from '../utils.js';
+
+const CompiledPromptSchema = z.object({
+  systemPrompt: z.string().optional(),
+});
 
 export class ReasoningCompiler {
   private agent: Agent;
@@ -39,7 +44,12 @@ Output the compiled prompt as a JSON object with the same structure as the input
 
     const result = await this.agent.invoke(prompt);
     const text = extractText(result);
-    const compiled = JSON.parse(text) as { systemPrompt?: string };
+    let compiled: z.infer<typeof CompiledPromptSchema>;
+    try {
+      compiled = CompiledPromptSchema.parse(JSON.parse(text));
+    } catch (error) {
+      throw new Error('compiler returned an invalid prompt object', { cause: error });
+    }
 
     return {
       ...manifest,
