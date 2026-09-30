@@ -36,6 +36,13 @@ describe('DurableExecutionWorker', () => {
     jobs = new ExecutionJobRepo(db);
   });
 
+  it('rejects invalid backoff and organization concurrency limits', () => {
+    const handler = { run: async () => ({}) };
+    const base = { workerId: 'worker-1', maxConcurrency: 1, pollMs: 2, leaseMs: 500, maxBackoffMs: 1 };
+    expect(() => new DurableExecutionWorker(jobs, handler, { ...base, maxBackoffMs: -1 })).toThrow('maxBackoffMs');
+    expect(() => new DurableExecutionWorker(jobs, handler, { ...base, maxConcurrencyPerOrganization: 0 })).toThrow('maxConcurrencyPerOrganization');
+  });
+
   it('enforces bounded concurrency', async () => {
     const queued = ['1', '2', '3', '4'].map((value) => jobs.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: hash('a'), inputHash: hash(value), inputJson: '{}', idempotencyKey: value }));
     let active = 0;

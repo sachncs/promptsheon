@@ -58,6 +58,11 @@ export class DurableExecutionWorker {
     if (!Number.isInteger(options.leaseMs) || options.leaseMs < 1) throw new Error('leaseMs must be positive');
     const maxExecutionMs = options.maxExecutionMs ?? options.leaseMs * 10;
     if (!Number.isInteger(maxExecutionMs) || maxExecutionMs < options.leaseMs) throw new Error('maxExecutionMs must be at least leaseMs');
+    if (!Number.isSafeInteger(options.maxBackoffMs) || options.maxBackoffMs < 0) throw new Error('maxBackoffMs must be non-negative');
+    if (options.maxConcurrencyPerOrganization !== undefined &&
+      (!Number.isInteger(options.maxConcurrencyPerOrganization) || options.maxConcurrencyPerOrganization < 1)) {
+      throw new Error('maxConcurrencyPerOrganization must be positive');
+    }
   }
 
   start(): void {
