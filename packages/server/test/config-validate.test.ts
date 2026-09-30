@@ -185,4 +185,19 @@ describe('loadConfig environment parsing', () => {
       expect(() => loadConfig()).toThrow(/PROMPTSHEON_AUTH must be a boolean/);
     });
   });
+
+  it('derives the development CORS origin from the frontend port', () => {
+    const previousOrigin = process.env['PROMPTSHEON_CORS_ORIGIN'];
+    const previousFrontendPort = process.env['PROMPTSHEON_FRONTEND_PORT'];
+    delete process.env['PROMPTSHEON_CORS_ORIGIN'];
+    process.env['PROMPTSHEON_FRONTEND_PORT'] = '3300';
+    try {
+      expect(loadConfig().server.corsOrigin).toBe('http://localhost:3300');
+    } finally {
+      if (previousOrigin === undefined) delete process.env['PROMPTSHEON_CORS_ORIGIN'];
+      else process.env['PROMPTSHEON_CORS_ORIGIN'] = previousOrigin;
+      if (previousFrontendPort === undefined) delete process.env['PROMPTSHEON_FRONTEND_PORT'];
+      else process.env['PROMPTSHEON_FRONTEND_PORT'] = previousFrontendPort;
+    }
+  });
 });

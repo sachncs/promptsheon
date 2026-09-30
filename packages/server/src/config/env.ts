@@ -58,6 +58,7 @@ function envBool(key: string, fallback: boolean): boolean {
 }
 
 export function loadConfig(): AppConfig {
+  const frontendPort = envInt('PROMPTSHEON_FRONTEND_PORT', 3000);
   return {
     server: {
       port: envInt('PROMPTSHEON_PORT', 8080),
@@ -65,7 +66,7 @@ export function loadConfig(): AppConfig {
       dbPath: envString('PROMPTSHEON_DB_PATH', 'promptsheon.db'),
       casPath: envString('PROMPTSHEON_CAS_PATH', '.promptsheon'),
       frontendPath: envString('PROMPTSHEON_FRONTEND_PATH', './frontend/.next'),
-      corsOrigin: envString('PROMPTSHEON_CORS_ORIGIN', 'http://localhost:3000'),
+      corsOrigin: envString('PROMPTSHEON_CORS_ORIGIN', `http://localhost:${frontendPort}`),
       logLevel: envString('PROMPTSHEON_LOG_LEVEL', 'info'),
       nodeEnv: envString('PROMPTSHEON_NODE_ENV', envString('NODE_ENV', 'development')),
       fipsMode: envBool('PROMPTSHEON_FIPS_MODE', false),
