@@ -144,7 +144,37 @@ export default function EvalSuiteDetailPage() {
         {runDetail.data ? (
           <div className="mt-4 border-t border-border-subtle pt-4">
             <div className="mb-2 text-xs uppercase tracking-wider text-text-subtle">Selected trial results</div>
-            <pre className="max-h-72 overflow-auto rounded-md border border-border-subtle bg-surface-0 p-3 font-mono text-xs text-text-default">{JSON.stringify(runDetail.data.results, null, 2)}</pre>
+            {runDetail.data.results.length === 0 ? (
+              <p className="text-sm text-text-muted">This run did not produce any trial results.</p>
+            ) : (
+              <ol className="space-y-2">
+                {runDetail.data.results.map((result) => (
+                  <li key={result.id} className="rounded-lg border border-border-subtle bg-surface-1/50 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-sm text-text-default">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${result.passed ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+                          {result.passed ? 'Passed' : 'Failed'}
+                        </span>
+                        <span>Case {result.caseId}</span>
+                      </div>
+                      <span className="font-mono text-xs text-text-muted">
+                        Trial {result.seq + 1} · {(result.weightedScore * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-3 text-xs text-text-subtle">
+                      <details>
+                        <summary className="cursor-pointer hover:text-text-default">Trial input</summary>
+                        <pre className="mt-2 max-w-full overflow-auto rounded-md bg-surface-0 p-2 font-mono text-[11px] text-text-default">{JSON.stringify(result.trial, null, 2)}</pre>
+                      </details>
+                      <details>
+                        <summary className="cursor-pointer hover:text-text-default">Grader output</summary>
+                        <pre className="mt-2 max-w-full overflow-auto rounded-md bg-surface-0 p-2 font-mono text-[11px] text-text-default">{JSON.stringify(result.graderResult, null, 2)}</pre>
+                      </details>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
         ) : null}
       </Surface>
