@@ -152,6 +152,9 @@ describe('GoalBasedEvolutionAgent', () => {
           created.push(input);
           return { id: 'proposal-1', ...input };
         },
+        recordEvaluation() {
+          return { id: 'proposal-1', status: 'validated', ...created[0] };
+        },
       };
       const localAgent = new GoalBasedEvolutionAgent({
         config,

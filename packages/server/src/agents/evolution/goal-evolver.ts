@@ -301,7 +301,7 @@ Be conservative: small targeted edits, preserve what works.`,
             throw error;
           }
           const candidateScore = await this.scoreAgainstGoal(candidateTrace, nextManifest);
-          const proposal = this.deps.mutationProposalRepo.create({
+          const createdProposal = this.deps.mutationProposalRepo.create({
             organizationId: options.organizationId,
             sourceHash: currentHash,
             candidateHash,
@@ -323,11 +323,16 @@ Be conservative: small targeted edits, preserve what works.`,
             authorId: this.deps.config.llm.defaultProvider === 'simulated' ? 'local-simulator' : 'goal-evolver',
             risk: 'medium',
             confidence: Math.max(0, Math.min(1, score)),
-            baselineScore: score,
-            candidateScore,
-            evaluationStatus: candidateScore >= score && candidateScore >= currentManifest.evaluation.passThreshold ? 'passed' : 'failed',
             ...(candidateTraceRun ? { evaluationRunId: candidateTraceRun.id } : {}),
           });
+          const proposal = this.deps.mutationProposalRepo.recordEvaluation({
+            id: createdProposal.id,
+            organizationId: options.organizationId,
+            baselineScore: score,
+            candidateScore,
+            passThreshold: currentManifest.evaluation.passThreshold,
+            ...(candidateTraceRun ? { evaluationRunId: candidateTraceRun.id } : {}),
+          }) ?? createdProposal;
           proposals.push(proposal);
           history[history.length - 1].proposalId = proposal.id;
           history[history.length - 1].snapshotId = candidateHash;

@@ -104,9 +104,6 @@ export class MutationProposalRepo {
     authorId: string;
     risk: MutationRisk;
     confidence: number;
-    baselineScore?: number;
-    candidateScore?: number;
-    evaluationStatus?: MutationEvaluationStatus;
     evaluationRunId?: string;
   }): MutationProposal {
     const id = randomUUID();
@@ -129,12 +126,39 @@ export class MutationProposalRepo {
       input.authorId,
       input.risk,
       input.confidence,
-      input.baselineScore ?? null,
-      input.candidateScore ?? null,
-      input.evaluationStatus ?? 'pending',
+      null,
+      null,
+      'pending',
       input.evaluationRunId ?? null,
     );
     return this.findInOrg(id, input.organizationId)!;
+  }
+
+  recordEvaluation(input: {
+    id: string;
+    organizationId: string;
+    baselineScore: number;
+    candidateScore: number;
+    passThreshold: number;
+    evaluationRunId?: string;
+  }): MutationProposal | null {
+    const status: MutationEvaluationStatus = input.candidateScore >= input.baselineScore && input.candidateScore >= input.passThreshold
+      ? 'passed'
+      : 'failed';
+    const result = this.db.prepare(
+      `UPDATE mutation_proposals
+       SET baseline_score = ?, candidate_score = ?, evaluation_status = ?, evaluation_run_id = COALESCE(?, evaluation_run_id), updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND organization_id = ? AND status = 'proposed'`,
+    ).run(
+      input.baselineScore,
+      input.candidateScore,
+      status,
+      input.evaluationRunId ?? null,
+      input.id,
+      input.organizationId,
+    );
+    if (result.changes === 0) return this.findInOrg(input.id, input.organizationId);
+    return this.findInOrg(input.id, input.organizationId);
   }
 
   decide(input: {
