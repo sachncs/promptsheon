@@ -130,10 +130,11 @@ export class MutationProposalRepo {
     reviewerId: string;
     reason: string;
   }): MutationProposal | null {
+    const candidateRequirement = input.status === 'approved' ? ' AND candidate_hash IS NOT NULL' : '';
     const result = this.db.prepare(
       `UPDATE mutation_proposals
        SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, decision_reason = ?
-       WHERE id = ? AND organization_id = ? AND status IN ('proposed', 'validated')`,
+       WHERE id = ? AND organization_id = ? AND status IN ('proposed', 'validated')${candidateRequirement}`,
     ).run(input.status, input.reviewerId, input.reason, input.id, input.organizationId);
     if (result.changes === 0) return null;
     return this.findInOrg(input.id, input.organizationId);

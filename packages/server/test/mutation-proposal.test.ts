@@ -27,6 +27,7 @@ describe('MutationProposalRepo', () => {
     const proposal = repo.create({
       organizationId: 'org-a',
       sourceHash: 'source-a',
+      candidateHash: 'candidate-a',
       mutationKind: 'prompt',
       changes: { path: 'nodes.a.prompt.systemPrompt', operation: 'replace' },
       rationale: 'The failing cases need a clearer instruction.',
@@ -42,6 +43,41 @@ describe('MutationProposalRepo', () => {
     expect(repo.findInOrg(proposal.id, 'org-b')).toBeNull();
     expect(repo.decide({ id: proposal.id, organizationId: 'org-a', status: 'approved', reviewerId: 'reviewer', reason: 'Evaluation passed.' })?.status).toBe('approved');
     expect(repo.decide({ id: proposal.id, organizationId: 'org-a', status: 'rejected', reviewerId: 'reviewer-2', reason: 'Already decided.' })).toBeNull();
+    db.close();
+  });
+
+  it('does not approve a proposal without an immutable candidate', () => {
+    const db = new Database(':memory:');
+    applyMigrations(db, migrations());
+    const repo = new MutationProposalRepo(db);
+    const proposal = repo.create({
+      organizationId: 'org-a',
+      sourceHash: 'source-a',
+      mutationKind: 'prompt',
+      changes: { path: 'prompt.systemPrompt' },
+      rationale: 'needs review',
+      expectedOutcome: 'improve quality',
+      authorType: 'human',
+      authorId: 'operator',
+      risk: 'low',
+      confidence: 0.5,
+    });
+
+    expect(repo.decide({
+      id: proposal.id,
+      organizationId: 'org-a',
+      status: 'approved',
+      reviewerId: 'reviewer',
+      reason: 'cannot approve without a candidate',
+    })).toBeNull();
+    expect(repo.findInOrg(proposal.id, 'org-a')?.status).toBe('proposed');
+    expect(repo.decide({
+      id: proposal.id,
+      organizationId: 'org-a',
+      status: 'rejected',
+      reviewerId: 'reviewer',
+      reason: 'candidate was not materialised',
+    })?.status).toBe('rejected');
     db.close();
   });
 

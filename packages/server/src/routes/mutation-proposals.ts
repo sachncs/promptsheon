@@ -94,6 +94,13 @@ export function registerMutationProposalRoutes(app: FastifyInstance, deps: Mutat
     if (!parsedParams.ok) return;
     const parsed = parseBody(reply, DecideSchema, request.body);
     if (!parsed.ok) return;
+    const existing = deps.mutationProposalRepo.findInOrg(parsedParams.data.id, organizationId);
+    if (!existing) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'mutation proposal not found' } });
+    if (parsed.data.decision === 'approve' && !existing.candidateHash) {
+      return reply.code(422).send({
+        error: { code: 'CANDIDATE_REQUIRED', message: 'an immutable candidate must be materialised before approval' },
+      });
+    }
     const status = parsed.data.decision === 'approve' ? 'approved' : parsed.data.decision === 'reject' ? 'rejected' : 'abandoned';
     const proposal = deps.mutationProposalRepo.decide({
       id: parsedParams.data.id,
