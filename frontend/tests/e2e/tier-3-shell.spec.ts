@@ -113,4 +113,16 @@ test.describe('tier 3: app shell after onboarding', () => {
     await expect(page.getByText('Restore your browser session')).toBeVisible();
     await expect(page.getByText(/could not be verified|invalid|unauthorized/i).first()).toBeVisible();
   });
+
+  test('rejects malformed local sessions without redirect churn', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      window.localStorage.setItem('promptsheon:session:v1', JSON.stringify({ userId: 'incomplete' }));
+    });
+
+    await page.goto('/app');
+    await expect(page).toHaveURL(/\/onboarding$/);
+    await page.waitForTimeout(500);
+    await expect(page).toHaveURL(/\/onboarding$/);
+  });
 });

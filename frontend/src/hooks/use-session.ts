@@ -23,6 +23,7 @@ export function useSession() {
 export function useRequireSession() {
   const router = useRouter();
   const session = useSession();
+  const redirectAttempted = React.useRef(false);
   const hydrated = React.useSyncExternalStore(
     () => () => undefined,
     () => true,
@@ -30,7 +31,10 @@ export function useRequireSession() {
   );
 
   React.useEffect(() => {
-    if (hydrated && !session) router.replace('/onboarding');
+    if (hydrated && !session && !redirectAttempted.current) {
+      redirectAttempted.current = true;
+      router.replace('/onboarding');
+    }
   }, [hydrated, session, router]);
   return hydrated ? session : null;
 }

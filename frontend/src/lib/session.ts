@@ -1,14 +1,27 @@
+import { z } from 'zod';
+
 export interface Session {
   userId: string;
   userName: string;
   userEmail: string;
   orgId: string;
   orgName: string;
-  provider?: string | null;
+  provider?: string | null | undefined;
   /** One-time bootstrap credential used for authenticated API requests. */
-  apiKey?: string;
-  completedAt?: string;
+  apiKey?: string | undefined;
+  completedAt?: string | undefined;
 }
+
+const SessionSchema = z.object({
+  userId: z.string().min(1),
+  userName: z.string().min(1),
+  userEmail: z.string().min(1),
+  orgId: z.string().min(1),
+  orgName: z.string().min(1),
+  provider: z.string().nullable().optional(),
+  apiKey: z.string().min(1).optional(),
+  completedAt: z.string().optional(),
+});
 
 const KEY = 'promptsheon:session:v1';
 export const SESSION_CHANGED_EVENT = 'promptsheon:session-changed';
@@ -36,7 +49,9 @@ function readSessionSnapshot(): Session | null {
       cachedSession = null;
       return null;
     }
-    cachedSession = JSON.parse(raw) as Session;
+    const parsed: unknown = JSON.parse(raw);
+    const result = SessionSchema.safeParse(parsed);
+    cachedSession = result.success ? result.data : null;
   } catch {
     cachedSession = null;
   }
