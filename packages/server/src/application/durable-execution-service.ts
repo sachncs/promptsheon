@@ -10,15 +10,18 @@ import { ExecutionWorkError } from './durable-execution-worker.js';
 import type { ToolAuthorizer, ToolRegistry } from './execution-ports.js';
 import type { EvidenceRecorder } from '../observability/evidence-sink.js';
 import type { TraceRepo } from '../repos/trace.js';
-import type { UserQuotaRepo } from '../repos/user-quota.js';
+import type { UserQuotaRepo, UserQuotaViolation } from '../repos/user-quota.js';
 
 export class UserQuotaExceededError extends Error {
   readonly statusCode = 429;
 
-  constructor(public readonly limit: number, public readonly used: number) {
-    super(`daily execution quota exceeded (${used}/${limit} runs)`);
+  constructor(public readonly violation: UserQuotaViolation) {
+    super(violation.message);
     this.name = 'UserQuotaExceededError';
   }
+
+  get limit(): number { return this.violation.limit; }
+  get used(): number { return this.violation.used; }
 }
 
 export class ExecutionWorkspaceScopeError extends Error {
@@ -75,11 +78,8 @@ export class DurableExecutionService {
   }): ExecutionJob {
     const existing = this.jobs.findByIdempotency(input.organizationId, input.idempotencyKey);
     if (!existing && input.actorId && this.quotas) {
-      const policy = this.quotas.findForUser(input.organizationId, input.actorId);
-      if (policy?.enabled && policy.dailyRuns !== null) {
-        const usage = this.quotas.usage(input.organizationId, input.actorId);
-        if (usage.runs >= policy.dailyRuns) throw new UserQuotaExceededError(policy.dailyRuns, usage.runs);
-      }
+      const violation = this.quotas.check(input.organizationId, input.actorId, { runs: 1 });
+      if (violation) throw new UserQuotaExceededError(violation);
     }
     const inputJson = stableJson(input.inputs);
     const inputHash = createHash('sha256').update(inputJson, 'utf8').digest('hex');
@@ -171,6 +171,13 @@ export class DurableExecutionService {
           }
           if (totals.costUsd > record.specification.resourceBudget.maxCostUsd) {
             throw new ExecutionWorkError('cost budget exhausted');
+          }
+          if (job.actorId && this.quotas) {
+            const violation = this.quotas.check(job.organizationId, job.actorId, {
+              tokens: totals.totalTokens,
+              costMicros: Math.ceil(totals.costUsd * 1_000_000),
+            });
+            if (violation) throw new ExecutionWorkError(violation.message);
           }
           this.recordEvidence({
             eventType: 'execution.completed',

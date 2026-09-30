@@ -46,6 +46,19 @@ export interface UserQuotaUsage {
   costMicros: number;
 }
 
+export interface UserQuotaDelta {
+  runs?: number;
+  tokens?: number;
+  costMicros?: number;
+}
+
+export interface UserQuotaViolation {
+  dimension: 'runs' | 'tokens' | 'costMicros';
+  limit: number;
+  used: number;
+  message: string;
+}
+
 /** Persists and reads organization-scoped per-user quota policies. */
 export class UserQuotaRepo {
   constructor(private readonly db: Database.Database) {}
@@ -72,13 +85,32 @@ export class UserQuotaRepo {
     return { runs: jobs.runs, tokens: traces.tokens, costMicros: Math.ceil(traces.cost * 1_000_000) };
   }
 
+  /** Returns the first exceeded limit after applying a projected usage delta. */
+  check(organizationId: string, userId: string, delta: UserQuotaDelta): UserQuotaViolation | null {
+    const policy = this.findForUser(organizationId, userId);
+    if (!policy?.enabled) return null;
+    const usage = this.usage(organizationId, userId);
+    const dimensions: Array<readonly [UserQuotaViolation['dimension'], number | null, number]> = [
+      ['runs', policy.dailyRuns, usage.runs + (delta.runs ?? 0)],
+      ['tokens', policy.dailyTokens, usage.tokens + (delta.tokens ?? 0)],
+      ['costMicros', policy.dailyCostMicros, usage.costMicros + (delta.costMicros ?? 0)],
+    ];
+    for (const [dimension, limit, used] of dimensions) {
+      if (limit !== null && used > limit) {
+        const label = dimension === 'costMicros' ? 'cost' : dimension;
+        return { dimension, limit, used, message: `daily ${label} quota exceeded (${used}/${limit})` };
+      }
+    }
+    return null;
+  }
+
   create(input: UserQuotaInput): UserQuota {
     const id = randomUUID();
     const now = new Date().toISOString();
     this.db.prepare(`
       INSERT INTO user_quotas (id, organization_id, user_id, label, daily_runs, daily_tokens, daily_cost_micros, enabled, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, input.organizationId, input.userId, input.label, input.dailyRuns ?? null, input.dailyTokens ?? null, input.dailyCostMicros ?? null, input.enabled ?? true ? 1 : 0, now, now);
+    `).run(id, input.organizationId, input.userId, input.label, input.dailyRuns ?? null, input.dailyTokens ?? null, input.dailyCostMicros ?? null, (input.enabled ?? true) ? 1 : 0, now, now);
     return this.findById(id)!;
   }
 

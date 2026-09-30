@@ -6,6 +6,8 @@ import { ExecutionCheckpointRepo } from '../src/repos/execution-checkpoint.js';
 import { ExecutionJobRepo } from '../src/repos/execution-job.js';
 import { AsyncEvidenceSink } from '../src/observability/evidence-sink.js';
 import type { AppendEvidenceInput } from '../src/repos/evidence.js';
+import { TraceRepo } from '../src/repos/trace.js';
+import { UserQuotaRepo } from '../src/repos/user-quota.js';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -102,5 +104,31 @@ describe('DurableExecutionService', () => {
       'execution.completed',
       'resource.consumed',
     ]);
+  });
+
+  it('fails an execution that would exceed the actor token quota', async () => {
+    const traces = new TraceRepo(db);
+    const previous = traces.startRun({ organizationId: 'org1', actorId: 'user1', name: 'previous' });
+    db.prepare('UPDATE trace_runs SET total_tokens = ?, total_cost_usd = ?, status = ? WHERE id = ?').run(3, 0.000004, 'success', previous.id);
+    const quotas = new UserQuotaRepo(db);
+    quotas.create({ organizationId: 'org1', userId: 'user1', label: 'Daily limit', dailyTokens: 4, dailyCostMicros: 5 });
+    const agentHash = 'c'.repeat(64);
+    const specification = AgentSpecificationSchema.parse({
+      role: 'Quota assistant', objective: 'Respect usage limits.', prompt: { system: 'Be concise.' },
+      modelPolicy: { provider: 'simulator', model: 'promptsheon-simulator' }, lifecycle: { owner: 'test-team' },
+    });
+    const service = new DurableExecutionService(
+      new ExecutionJobRepo(db),
+      { get: async () => ({ hash: agentHash, workspaceId: 'ws1', schemaVersion: '1.0', parentHash: null, author: 'test', changeReason: 'test', status: 'published' as const, createdAt: '2026-01-01', publishedAt: '2026-01-01', specification }) },
+      { execute: async () => ({ totalTokens: 2, totalCost: 0.000002, totalLatencyMs: 1 }) },
+      new ExecutionCheckpointRepo(db), undefined, undefined, undefined, traces, quotas,
+    );
+    const worker = service.createWorker({ workerId: 'quota-test', pollMs: 2, leaseMs: 500, maxBackoffMs: 1, random: () => 0 });
+    const job = service.enqueue({ organizationId: 'org1', actorId: 'user1', workspaceId: 'ws1', agentHash, inputs: {}, idempotencyKey: 'quota-test', maxAttempts: 1 });
+    worker.start();
+    await waitFor(() => new ExecutionJobRepo(db).get('org1', job.id).state === 'failed');
+    await worker.stop();
+
+    expect(new ExecutionJobRepo(db).get('org1', job.id).error).toContain('daily tokens quota exceeded');
   });
 });
