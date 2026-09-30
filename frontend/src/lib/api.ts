@@ -177,6 +177,7 @@ export interface EvalSuiteRun {
 export interface MutationProposal {
   id: string;
   organizationId: string;
+  workspaceId: string | null;
   sourceHash: string;
   candidateHash: string | null;
   mutationKind: 'prompt' | 'guardrail' | 'model' | 'routing' | 'context' | 'tool' | 'permission' | 'execution' | 'memory' | 'budget';
@@ -449,6 +450,7 @@ const EvalSuiteRunSchema = z.object({
 const MutationProposalSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
+  workspaceId: z.string().nullable(),
   sourceHash: z.string(),
   candidateHash: z.string().nullable(),
   mutationKind: z.enum(['prompt', 'guardrail', 'model', 'routing', 'context', 'tool', 'permission', 'execution', 'memory', 'budget']),
@@ -2032,8 +2034,8 @@ export const traceApi = {
       .then((r) => r.data),
   get: (id: string) =>
     client.get<{ run: TraceRunSummary; spans: TraceSpan[] }>(`/traces/${id}`).then((r) => r.data),
-  evidence: (id: string) =>
-    client.get<{ traceId: string; items: EvidenceRecord[]; total: number }>(`/traces/${id}/evidence`).then((r) => r.data),
+  evidence: (id: string, workspaceId?: string) =>
+    client.get<{ traceId: string; items: EvidenceRecord[]; total: number }>(`/traces/${id}/evidence`, { params: workspaceId ? { workspaceId } : undefined }).then((r) => r.data),
   rollup: (days = 30) =>
     client
       .get<{ days: number; items: Array<{ day: string; tokens: number; cost: number; runs: number }> }>(
@@ -2046,7 +2048,7 @@ export const traceApi = {
 };
 
 export const evidenceApi = {
-  list: async (options: { limit?: number; before?: string; eventType?: string; agentHash?: string } = {}): Promise<{ data: z.infer<typeof EvidencePageSchema> }> => {
+  list: async (options: { limit?: number; before?: string; eventType?: string; agentHash?: string; workspaceId?: string } = {}): Promise<{ data: z.infer<typeof EvidencePageSchema> }> => {
     const r = await client.get<unknown>('/evidence', { params: options });
     return { data: EvidencePageSchema.parse(r.data) };
   },

@@ -36,6 +36,7 @@ export type ExecutionJobState = 'queued' | 'running' | 'completed' | 'failed' | 
 export interface ExecutionJob {
   id: string;
   organizationId: string;
+  workspaceId: string | null;
   workspaceId: string;
   agentHash: string;
   inputHash: string;
@@ -282,13 +283,14 @@ export class PromptsheonClient {
   }
 
   /** List the newest evidence records visible to the authenticated organization. */
-  listEvidence(options: { limit?: number; before?: string; eventType?: EvidenceEventType; agentHash?: string; traceId?: string } = {}): Promise<{ items: EvidenceRecord[]; total: number }> {
+  listEvidence(options: { limit?: number; before?: string; eventType?: EvidenceEventType; agentHash?: string; traceId?: string; workspaceId?: string } = {}): Promise<{ items: EvidenceRecord[]; total: number }> {
     const params = new URLSearchParams();
     if (options.limit !== undefined) params.set('limit', String(options.limit));
     if (options.before !== undefined) params.set('before', options.before);
     if (options.eventType !== undefined) params.set('eventType', options.eventType);
     if (options.agentHash !== undefined) params.set('agentHash', options.agentHash);
     if (options.traceId !== undefined) params.set('traceId', options.traceId);
+    if (options.workspaceId !== undefined) params.set('workspaceId', options.workspaceId);
     const query = params.toString();
     return this.call({ method: 'GET', path: `/evidence${query ? `?${query}` : ''}` });
   }

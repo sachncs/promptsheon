@@ -48,7 +48,7 @@ export default function SdkDoc() {
       <p>Use the simulator provider for a credential-free local execution, then poll the returned job with <code>getExecution</code> and inspect evidence with <code>listEvidence</code>.</p>
 
       <h2>Agent execution evidence</h2>
-      <DocCurl cmd="await client.listEvidence({ agentHash, eventType: 'model.called' });" />
+      <DocCurl cmd="await client.listEvidence({ workspaceId, agentHash, eventType: 'model.called' });" />
       <DocCurl cmd="await client.listTraceEvidence(traceId);" />
       <p>Evidence payloads are redacted by the server and returned with stable hashes for audit and lineage workflows.</p>
     </DocPage>

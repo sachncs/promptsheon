@@ -36,6 +36,7 @@ describe('evidence and telemetry redaction', () => {
     const record = repo.append({
       eventType: 'model.called',
       organizationId: 'org-1',
+      workspaceId: 'workspace-1',
       correlationId: 'corr-1',
       traceId: 'trace-1',
       payload: { authorization: 'Bearer secret', email: 'a@example.com', answer: 'ok' },
@@ -51,9 +52,11 @@ describe('evidence and telemetry redaction', () => {
     const db = new Database(':memory:');
     applyMigrations(db, migrations);
     const repo = new EvidenceRepo(db);
-    repo.append({ eventType: 'error.observed', organizationId: 'org-1', correlationId: 'c1', occurredAt: '2020-01-01T00:00:00.000Z', retentionClass: 'short', payload: {} });
+    repo.append({ eventType: 'error.observed', organizationId: 'org-1', workspaceId: 'workspace-1', correlationId: 'c1', occurredAt: '2020-01-01T00:00:00.000Z', retentionClass: 'short', payload: {} });
     repo.append({ eventType: 'error.observed', organizationId: 'org-2', correlationId: 'c2', occurredAt: '2020-01-01T00:00:00.000Z', retentionClass: 'short', payload: {} });
     expect(repo.listByOrganization('org-1')).toHaveLength(1);
+    expect(repo.listByOrganization('org-1', { workspaceId: 'workspace-1' })).toHaveLength(1);
+    expect(repo.listByOrganization('org-1', { workspaceId: 'workspace-2' })).toHaveLength(0);
     expect(repo.deleteBefore('org-1', '2021-01-01T00:00:00.000Z', 'short')).toBe(1);
     expect(repo.listByOrganization('org-1')).toHaveLength(0);
     expect(repo.listByOrganization('org-2')).toHaveLength(1);
@@ -65,7 +68,7 @@ describe('evidence and telemetry redaction', () => {
     applyMigrations(db, migrations);
     const repo = new EvidenceRepo(db);
     const agentHash = 'a'.repeat(64);
-    repo.append({ eventType: 'execution.started', organizationId: 'org-1', correlationId: 'c1', traceId: 'trace-1', agentHash, payload: { ok: true } });
+    repo.append({ eventType: 'execution.started', organizationId: 'org-1', workspaceId: 'workspace-1', correlationId: 'c1', traceId: 'trace-1', agentHash, payload: { ok: true } });
     repo.append({ eventType: 'execution.started', organizationId: 'org-2', correlationId: 'c2', traceId: 'trace-2', payload: { ok: false } });
     const app = Fastify();
     app.addHook('preHandler', async (request) => {
@@ -79,6 +82,9 @@ describe('evidence and telemetry redaction', () => {
     const filtered = await app.inject({ method: 'GET', url: `/api/evidence?agentHash=${agentHash}` });
     expect(filtered.statusCode).toBe(200);
     expect(filtered.json().items).toHaveLength(1);
+    const workspaceFiltered = await app.inject({ method: 'GET', url: '/api/evidence?workspaceId=workspace-2' });
+    expect(workspaceFiltered.statusCode).toBe(200);
+    expect(workspaceFiltered.json().items).toHaveLength(0);
     const exported = await app.inject({ method: 'GET', url: '/api/evidence/export' });
     expect(exported.statusCode).toBe(200);
     expect(exported.headers['content-disposition']).toContain('promptsheon-evidence.json');

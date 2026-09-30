@@ -1460,7 +1460,8 @@
     "packages/shared/db/migrations/061_mutation_promotion.up.sql",
     "packages/shared/db/migrations/062_release_signatures.up.sql",
     "packages/shared/db/migrations/063_mutation_promotion_concurrency.up.sql",
-    "packages/shared/db/migrations/064_mutation_proposal_evaluation.up.sql"
+    "packages/shared/db/migrations/064_mutation_proposal_evaluation.up.sql",
+    "packages/shared/db/migrations/065_evidence_workspace_scope.up.sql"
   ],
   "frontendRoutes": [
     {

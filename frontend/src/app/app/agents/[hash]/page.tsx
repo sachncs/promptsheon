@@ -33,7 +33,7 @@ export default function AgentRevisionPage({ params, searchParams }: { params: Pr
   const lineage = useQuery({ queryKey: ['agent-specification-lineage', workspaceId, hash], queryFn: () => agentSpecificationApi.lineage(workspaceId!, hash), enabled: Boolean(session && workspaceId) });
   const parentHash = revision.data?.data.parentHash;
   const diff = useQuery({ queryKey: ['agent-specification-diff', workspaceId, parentHash, hash], queryFn: () => agentSpecificationApi.diff(workspaceId!, parentHash!, hash), enabled: Boolean(session && workspaceId && parentHash) });
-  const evidence = useQuery({ queryKey: ['agent-specification-evidence', hash], queryFn: () => evidenceApi.list({ limit: 25, agentHash: hash }).then((response) => response.data), enabled: Boolean(session) });
+  const evidence = useQuery({ queryKey: ['agent-specification-evidence', workspaceId, hash], queryFn: () => evidenceApi.list({ limit: 25, agentHash: hash, ...(workspaceId ? { workspaceId } : {}) }).then((response) => response.data), enabled: Boolean(session && workspaceId) });
   const queryClient = useQueryClient();
   const publish = useMutation({
     mutationFn: () => agentSpecificationApi.publish(workspaceId!, hash),
@@ -62,8 +62,8 @@ export default function AgentRevisionPage({ params, searchParams }: { params: Pr
   const jobIsTerminal = isTerminalJob(job.data?.data);
   useEffect(() => {
     if (!jobIsTerminal) return;
-    void queryClient.invalidateQueries({ queryKey: ['agent-specification-evidence', hash] });
-  }, [hash, jobIsTerminal, jobState, queryClient]);
+    void queryClient.invalidateQueries({ queryKey: ['agent-specification-evidence', workspaceId, hash] });
+  }, [hash, jobIsTerminal, jobState, queryClient, workspaceId]);
   const cancel = useMutation({
     mutationFn: () => executionJobApi.cancel(workspaceId!, jobId!),
     onSuccess: async () => {

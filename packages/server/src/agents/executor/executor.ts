@@ -53,6 +53,7 @@ export interface ExecuteOptions {
   traceId?: string;
   signal?: AbortSignal;
   organizationId?: string;
+  workspaceId?: string;
   toolRegistry?: ToolRegistry;
   toolAuthorizer?: ToolAuthorizer;
   /**
@@ -515,6 +516,7 @@ export class ManifestGraphExecutor {
       this.deps.evidence?.record({
         eventType,
         organizationId: options.organizationId ?? 'unscoped',
+        workspaceId: options.workspaceId ?? null,
         correlationId: options.executionId,
         traceId: options.traceRunId ?? null,
         // Execution evidence is emitted while the run is in flight. The

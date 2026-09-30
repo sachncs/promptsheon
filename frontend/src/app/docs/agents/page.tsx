@@ -84,7 +84,7 @@ export default function AgentSpecificationsDocsPage() {
   "inputs": { "input": "hello" },
   "idempotencyKey": "local-run-001"
 }`}</pre>
-        <p className="text-sm leading-relaxed text-text-muted">Poll the returned job with <code>GET /api/workspaces/{'{workspaceId}'}/execution-jobs/{'{id}'}</code>. Queued and running jobs can be cancelled. Every attempt records redacted evidence keyed by the agent hash.</p>
+        <p className="text-sm leading-relaxed text-text-muted">Poll the returned job with <code>GET /api/workspaces/{'{workspaceId}'}/execution-jobs/{'{id}'}</code>. Queued and running jobs can be cancelled. Every attempt records redacted evidence keyed by workspace and agent hash.</p>
       </section>
 
       <section>

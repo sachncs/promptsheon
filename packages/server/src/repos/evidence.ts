@@ -20,6 +20,7 @@ export interface EvidenceRecord {
   schemaVersion: string;
   occurredAt: string;
   organizationId: string;
+  workspaceId: string | null;
   correlationId: string;
   traceId: string | null;
   executionId: string | null;
@@ -35,6 +36,7 @@ export interface AppendEvidenceInput {
   eventType: EvidenceEventType;
   occurredAt?: string;
   organizationId: string;
+  workspaceId?: string | null;
   correlationId: string;
   traceId?: string | null;
   executionId?: string | null;
@@ -51,6 +53,7 @@ interface EvidenceRow {
   schema_version: string;
   occurred_at: string;
   organization_id: string;
+  workspace_id: string | null;
   correlation_id: string;
   trace_id: string | null;
   execution_id: string | null;
@@ -69,6 +72,7 @@ function rowToEvidence(row: EvidenceRow): EvidenceRecord {
     schemaVersion: row.schema_version,
     occurredAt: row.occurred_at,
     organizationId: row.organization_id,
+    workspaceId: row.workspace_id,
     correlationId: row.correlation_id,
     traceId: row.trace_id,
     executionId: row.execution_id,
@@ -95,6 +99,7 @@ export class EvidenceRepo {
       schema_version: '1.0',
       occurred_at: input.occurredAt ?? now,
       organization_id: input.organizationId,
+      workspace_id: input.workspaceId ?? null,
       correlation_id: input.correlationId,
       trace_id: input.traceId ?? null,
       execution_id: input.executionId ?? null,
@@ -109,23 +114,25 @@ export class EvidenceRepo {
       INSERT INTO evidence_records
         (id, event_type, schema_version, occurred_at, organization_id, correlation_id,
          trace_id, execution_id, agent_hash, step_id, retention_class, payload_json,
-         payload_hash, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         payload_hash, created_at, workspace_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       row.id, row.event_type, row.schema_version, row.occurred_at, row.organization_id,
       row.correlation_id, row.trace_id, row.execution_id, row.agent_hash, row.step_id,
       row.retention_class, row.payload_json, row.payload_hash, row.created_at,
+      row.workspace_id,
     );
     return rowToEvidence(row);
   }
 
-  listByOrganization(organizationId: string, options: { limit?: number; before?: string; eventType?: EvidenceEventType; agentHash?: string } = {}): EvidenceRecord[] {
+  listByOrganization(organizationId: string, options: { limit?: number; before?: string; eventType?: EvidenceEventType; agentHash?: string; workspaceId?: string } = {}): EvidenceRecord[] {
     const limit = Math.min(options.limit ?? 100, 500);
     const conditions = ['organization_id = ?'];
     const args: unknown[] = [organizationId];
     if (options.before) { conditions.push('occurred_at < ?'); args.push(options.before); }
     if (options.eventType) { conditions.push('event_type = ?'); args.push(options.eventType); }
     if (options.agentHash) { conditions.push('agent_hash = ?'); args.push(options.agentHash); }
+    if (options.workspaceId) { conditions.push('workspace_id = ?'); args.push(options.workspaceId); }
     const rows = this.db.prepare(`
       SELECT * FROM evidence_records
       WHERE ${conditions.join(' AND ')}
@@ -134,12 +141,13 @@ export class EvidenceRepo {
     return rows.map(rowToEvidence);
   }
 
-  listByTrace(organizationId: string, traceId: string): EvidenceRecord[] {
+  listByTrace(organizationId: string, traceId: string, workspaceId?: string): EvidenceRecord[] {
+    const workspaceClause = workspaceId ? ' AND workspace_id = ?' : '';
     const rows = this.db.prepare(`
       SELECT * FROM evidence_records
-      WHERE organization_id = ? AND trace_id = ?
+      WHERE organization_id = ? AND trace_id = ?${workspaceClause}
       ORDER BY occurred_at ASC, id ASC
-    `).all(organizationId, traceId) as EvidenceRow[];
+    `).all(...(workspaceId ? [organizationId, traceId, workspaceId] : [organizationId, traceId])) as EvidenceRow[];
     return rows.map(rowToEvidence);
   }
 

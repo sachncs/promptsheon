@@ -27,6 +27,7 @@ interface ManifestRunner {
     executionId: string;
     inputs: Record<string, unknown>;
     organizationId?: string;
+    workspaceId?: string;
     toolRegistry?: ToolRegistry;
     toolAuthorizer?: ToolAuthorizer;
     traceRunId?: string;
@@ -135,6 +136,7 @@ export class DurableExecutionService {
             executionId: job.id,
             inputs,
             organizationId: job.organizationId,
+            workspaceId: job.workspaceId,
             ...(traceRunId ? { traceRunId } : {}),
             ...(this.tools ? { toolRegistry: this.tools } : {}),
             ...(this.tools ? { toolAuthorizer } : {}),
@@ -203,6 +205,7 @@ export class DurableExecutionService {
       this.evidence.record({
         eventType: input.eventType,
         organizationId: input.job.organizationId,
+        workspaceId: input.job.workspaceId,
         correlationId: input.job.id,
         ...(input.traceRunId ? { traceId: input.traceRunId } : {}),
         executionId: input.job.id,
