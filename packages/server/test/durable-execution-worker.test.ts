@@ -72,6 +72,31 @@ describe('DurableExecutionWorker', () => {
     expect(jobs.get('org1', job.id).attempts).toBe(2);
   });
 
+  it('redacts and bounds untrusted provider errors in durable job state', async () => {
+    const job = jobs.enqueue({
+      organizationId: 'org1',
+      workspaceId: 'ws1',
+      agentHash: hash('a'),
+      inputHash: hash('unsafe-error'),
+      inputJson: '{}',
+      idempotencyKey: 'unsafe-error',
+      maxAttempts: 1,
+    });
+    const worker = new DurableExecutionWorker(jobs, {
+      async run() {
+        throw new Error(`provider apiKey=secret-value ${'x'.repeat(2_500)}`);
+      },
+    }, { workerId: 'worker-1', maxConcurrency: 1, pollMs: 2, leaseMs: 500, maxBackoffMs: 1, random: () => 0 });
+    worker.start();
+    await waitFor(() => jobs.get('org1', job.id).state === 'failed');
+    await worker.stop();
+
+    const failed = jobs.get('org1', job.id);
+    expect(failed.error).not.toContain('secret-value');
+    expect(failed.error?.length).toBeLessThanOrEqual(2_001);
+    expect(failed.error?.endsWith('…')).toBe(true);
+  });
+
   it('propagates cancellation to active work', async () => {
     const job = jobs.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: hash('a'), inputHash: hash('cancel'), inputJson: '{}', idempotencyKey: 'cancel' });
     const worker = new DurableExecutionWorker(jobs, {

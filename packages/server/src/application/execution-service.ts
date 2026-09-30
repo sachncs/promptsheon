@@ -1,5 +1,6 @@
 import type { Manifest } from '@promptsheon/shared';
 import { createHash } from 'node:crypto';
+import { safeErrorMessage } from '../observability/error-message.js';
 
 /** The trace shape persisted and returned by an execution run. */
 export interface ExecutionTrace {
@@ -141,8 +142,7 @@ export class ExecutionService {
       });
     } catch (error) {
       this.traces.finalize(traceRun.id, 'error', { tokens: 0, costUsd: 0 });
-      const message = error instanceof Error ? error.message : String(error);
-      const safeMessage = message.length > 2_000 ? `${message.slice(0, 2_000)}…` : message;
+      const safeMessage = safeErrorMessage(error);
       const capabilityVersionId = this.manifests.findCapabilityVersionIdInOrg?.(manifestHash, organizationId) ?? null;
       const record = this.records.create({
         capabilityVersionId,

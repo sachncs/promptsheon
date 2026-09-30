@@ -4,6 +4,7 @@ import { ExecutionRepo } from '../repos/execution.js';
 import { ManifestRepo } from '../repos/manifest.js';
 import { TraceRepo } from '../repos/trace.js';
 import type { ExecutionTrace, ManifestGraphExecutor, ExecuteOptions } from '../agents/executor/index.js';
+import { safeErrorMessage } from '../observability/error-message.js';
 
 export interface ReplayExecutor {
   execute(
@@ -107,8 +108,7 @@ export class ExecutionReplayService {
         traceRunId: traceRun.id,
       });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      const safeMessage = message.length > 2_000 ? `${message.slice(0, 2_000)}…` : message;
+      const safeMessage = safeErrorMessage(error);
 
       this.traceRepo.finalize(traceRun.id, 'error');
       this.executionRepo.updateRunResult(replayExecutionId, {

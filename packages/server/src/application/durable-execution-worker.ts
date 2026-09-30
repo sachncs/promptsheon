@@ -1,4 +1,5 @@
 import type { ExecutionJob, ExecutionJobRepo } from '../repos/execution-job.js';
+import { safeErrorMessage } from '../observability/error-message.js';
 
 export interface ExecutionWorkerOptions {
   workerId: string;
@@ -133,13 +134,13 @@ export class DurableExecutionWorker {
       }
       const workError = error instanceof ExecutionWorkError
         ? error
-        : new ExecutionWorkError(error instanceof Error ? error.message : String(error));
+        : new ExecutionWorkError(safeErrorMessage(error));
       if (workError.timedOut) {
-        this.safeTransition(job, 'timed-out', workError.message);
+        this.safeTransition(job, 'timed-out', safeErrorMessage(workError));
       } else if (workError.retryable && job.attempts < job.maxAttempts) {
-        this.requeue(job, workError.message);
+        this.requeue(job, safeErrorMessage(workError));
       } else {
-        this.safeTransition(job, 'failed', workError.message);
+        this.safeTransition(job, 'failed', safeErrorMessage(workError));
       }
     } finally {
       clearTimeout(timeout);
