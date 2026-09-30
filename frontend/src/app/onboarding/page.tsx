@@ -56,6 +56,16 @@ export default function OnboardingPage() {
   const restoreAttempted = React.useRef(false);
   const resumedSetup = React.useRef(false);
 
+  const completeLocalBootstrap = React.useCallback((data: CreateAdminResponse): void => {
+    setSession(toSession(data, status.data?.provider ?? null));
+    resumedSetup.current = true;
+    if (!status.data?.needsLlm) {
+      router.replace('/app');
+    } else {
+      setIndex(2);
+    }
+  }, [router, status.data?.needsLlm, status.data?.provider]);
+
   React.useEffect(() => {
     if (!status.data) return;
     // The admin and provider are independent bootstrap steps. When the admin
@@ -68,6 +78,10 @@ export default function OnboardingPage() {
         restoreAttempted.current = true;
         bootstrapApi.admin()
           .then((data) => {
+            if (!status.data?.authEnabled) {
+              completeLocalBootstrap(data);
+              return;
+            }
             setRestoreCandidate(data);
             setRestoreError('The saved browser session is invalid. Enter an existing administrator API key to restore this browser session.');
           })
@@ -78,6 +92,14 @@ export default function OnboardingPage() {
       }
       if (existing) {
         restoreAttempted.current = true;
+        if (!status.data.authEnabled) {
+          bootstrapApi.admin()
+            .then(completeLocalBootstrap)
+            .catch((error: unknown) => {
+              setRestoreError(getErrorMessage(error, 'We could not restore the local administrator session.'));
+            });
+          return;
+        }
         userApi.me()
           .then(() => {
             resumedSetup.current = true;
@@ -114,6 +136,10 @@ export default function OnboardingPage() {
             setRestoreError('This installation requires an API key. Enter an existing administrator API key to verify and restore this browser session.');
             return;
           }
+          if (!status.data.authEnabled) {
+            completeLocalBootstrap(data);
+            return;
+          }
           setRestoreError(null);
           setRestoreCandidate(null);
           setSession(restored);
@@ -136,7 +162,7 @@ export default function OnboardingPage() {
           setRestoreError(getErrorMessage(error, 'We could not restore the administrator session.'));
         });
     }
-  }, [status.data, router]);
+  }, [completeLocalBootstrap, status.data, router]);
 
   async function restoreWithApiKey(): Promise<void> {
     if (!restoreCandidate || !restoreApiKey.trim()) {
