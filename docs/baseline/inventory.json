@@ -155,6 +155,16 @@
       "path": "/api/audit/replication-state"
     },
     {
+      "file": "packages/server/src/routes/auth-session.ts",
+      "method": "POST",
+      "path": "/api/auth/session"
+    },
+    {
+      "file": "packages/server/src/routes/auth-session.ts",
+      "method": "DELETE",
+      "path": "/api/auth/logout"
+    },
+    {
       "file": "packages/server/src/routes/bootstrap.ts",
       "method": "GET",
       "path": "/api/bootstrap/status"
