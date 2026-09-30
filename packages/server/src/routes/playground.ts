@@ -83,6 +83,8 @@ export function registerPlaygroundRoutes(app: FastifyInstance, deps: { gateway: 
             model: base.model,
             provider: base.provider,
             temperature: v.temperature,
+            ...(base.baseUrl ? { baseUrl: base.baseUrl } : {}),
+            ...(base.apiKey ? { apiKey: base.apiKey } : {}),
           },
           { actorId },
         ),
