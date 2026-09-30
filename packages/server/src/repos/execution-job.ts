@@ -195,6 +195,17 @@ export class ExecutionJobRepo {
     return this.get(organizationId, id);
   }
 
+  /** Extend an active worker lease without changing the execution state. */
+  renewLease(organizationId: string, id: string, workerId: string, leaseMs: number): boolean {
+    const leaseExpiresAt = new Date(Date.now() + leaseMs).toISOString();
+    const result = this.db.prepare(`
+      UPDATE execution_jobs
+      SET lease_expires_at = ?
+      WHERE organization_id = ? AND id = ? AND state = 'running' AND lease_owner = ?
+    `).run(leaseExpiresAt, organizationId, id, workerId);
+    return result.changes === 1;
+  }
+
   cancel(organizationId: string, id: string): ExecutionJob {
     const current = this.get(organizationId, id);
     if (['cancelled', 'completed', 'failed', 'timed-out'].includes(current.state)) return current;

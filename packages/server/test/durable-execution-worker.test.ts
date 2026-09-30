@@ -72,6 +72,20 @@ describe('DurableExecutionWorker', () => {
     expect(jobs.get('org1', job.id).attempts).toBe(2);
   });
 
+  it('renews a lease while a long attempt is still running', async () => {
+    const job = jobs.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: hash('a'), inputHash: hash('heartbeat'), inputJson: '{}', idempotencyKey: 'heartbeat' });
+    const worker = new DurableExecutionWorker(jobs, {
+      async run() {
+        await new Promise((resolve) => setTimeout(resolve, 70));
+        return { completed: true };
+      },
+    }, { workerId: 'worker-1', maxConcurrency: 1, pollMs: 2, leaseMs: 20, maxExecutionMs: 200, maxBackoffMs: 1, random: () => 0 });
+    worker.start();
+    await waitFor(() => jobs.get('org1', job.id).state === 'completed');
+    await worker.stop();
+    expect(jobs.get('org1', job.id).attempts).toBe(1);
+  });
+
   it('redacts and bounds untrusted provider errors in durable job state', async () => {
     const job = jobs.enqueue({
       organizationId: 'org1',

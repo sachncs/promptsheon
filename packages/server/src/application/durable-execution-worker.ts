@@ -6,6 +6,8 @@ export interface ExecutionWorkerOptions {
   maxConcurrency: number;
   pollMs: number;
   leaseMs: number;
+  /** Maximum wall-clock time for one execution attempt. Defaults to ten leases. */
+  maxExecutionMs?: number;
   maxBackoffMs: number;
   maxConcurrencyPerOrganization?: number;
   random?: () => number;
@@ -54,6 +56,8 @@ export class DurableExecutionWorker {
     if (!Number.isInteger(options.maxConcurrency) || options.maxConcurrency < 1) throw new Error('maxConcurrency must be positive');
     if (!Number.isInteger(options.pollMs) || options.pollMs < 1) throw new Error('pollMs must be positive');
     if (!Number.isInteger(options.leaseMs) || options.leaseMs < 1) throw new Error('leaseMs must be positive');
+    const maxExecutionMs = options.maxExecutionMs ?? options.leaseMs * 10;
+    if (!Number.isInteger(maxExecutionMs) || maxExecutionMs < options.leaseMs) throw new Error('maxExecutionMs must be at least leaseMs');
   }
 
   start(): void {
@@ -109,7 +113,15 @@ export class DurableExecutionWorker {
   private async run(job: ExecutionJob): Promise<void> {
     const controller = new AbortController();
     this.controllers.set(job.id, controller);
-    const timeout = setTimeout(() => controller.abort(), this.options.leaseMs);
+    const maxExecutionMs = this.options.maxExecutionMs ?? this.options.leaseMs * 10;
+    const timeout = setTimeout(() => controller.abort(), maxExecutionMs);
+    const heartbeat = setInterval(() => {
+      try {
+        if (!this.jobs.renewLease(job.organizationId, job.id, this.options.workerId, this.options.leaseMs)) controller.abort();
+      } catch {
+        controller.abort();
+      }
+    }, Math.max(1, Math.floor(this.options.leaseMs / 3)));
     try {
       const result = await this.handler.run(job, {
         signal: controller.signal,
@@ -132,6 +144,10 @@ export class DurableExecutionWorker {
         this.requeue(job, 'worker shutdown');
         return;
       }
+      if (controller.signal.aborted) {
+        this.safeTransition(job, 'timed-out', 'execution exceeded maximum duration or lost its lease');
+        return;
+      }
       const workError = error instanceof ExecutionWorkError
         ? error
         : new ExecutionWorkError(safeErrorMessage(error));
@@ -144,6 +160,7 @@ export class DurableExecutionWorker {
       }
     } finally {
       clearTimeout(timeout);
+      clearInterval(heartbeat);
       this.controllers.delete(job.id);
     }
   }
