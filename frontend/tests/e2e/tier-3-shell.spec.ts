@@ -194,6 +194,14 @@ test.describe('tier 3: app shell after onboarding', () => {
     await page.getByRole('link', { name: 'Create child revision' }).click();
     await expect(page).toHaveURL(/\/app\/agents\/new\?parent=[0-9a-f]{64}$/);
     await expect(page.getByText(/Creating a child revision from/)).toBeVisible();
+    const validationRequest = page.waitForRequest((request) => request.method() === 'POST' && request.url().includes('/agent-specifications/validate'));
+    await page.getByRole('button', { name: 'Validate specification' }).click();
+    const validationBody = JSON.parse((await validationRequest).postData() ?? '{}') as { specification?: Record<string, unknown> };
+    expect(validationBody.specification).toEqual(expect.objectContaining({
+      evaluationPolicy: expect.any(Object),
+      resourceBudget: expect.any(Object),
+      permissions: expect.any(Object),
+    }));
 
     const workspaceResponse = await request.get(`${baseURL}/api/workspaces`, { headers: { Authorization: `Bearer ${session.apiKey}` } });
     expect(workspaceResponse.ok()).toBeTruthy();

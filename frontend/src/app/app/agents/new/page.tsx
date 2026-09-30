@@ -24,6 +24,8 @@ const ParentSpecificationSchema = z.object({
   lifecycle: z.object({ owner: z.string() }),
 });
 
+const JsonObjectSchema = z.record(z.string(), z.unknown());
+
 export default function NewAgentPage({ searchParams }: { searchParams: Promise<{ parent?: string | string[] }> }) {
   const session = useRequireSession();
   const query = use(searchParams);
@@ -46,8 +48,11 @@ export default function NewAgentPage({ searchParams }: { searchParams: Promise<{
   });
   const workspaceId = selectedWorkspaceId || workspaces.data?.[0]?.id;
   const parentRevision = useQuery({ queryKey: ['agent-specification-parent', workspaceId, parentHash], queryFn: () => agentSpecificationApi.get(workspaceId!, parentHash!), enabled: Boolean(session && workspaceId && parentHash) });
-  const parentDefaults = ParentSpecificationSchema.safeParse(parentRevision.data?.data.specification).success
-    ? ParentSpecificationSchema.parse(parentRevision.data?.data.specification)
+  const inheritedSpecification = JsonObjectSchema.safeParse(parentRevision.data?.data.specification).success
+    ? JsonObjectSchema.parse(parentRevision.data?.data.specification)
+    : undefined;
+  const parentDefaults = ParentSpecificationSchema.safeParse(inheritedSpecification).success
+    ? ParentSpecificationSchema.parse(inheritedSpecification)
     : undefined;
   const effectiveRole = !formEdited && parentDefaults ? parentDefaults.role : role;
   const effectiveObjective = !formEdited && parentDefaults ? parentDefaults.objective : objective;
@@ -56,7 +61,17 @@ export default function NewAgentPage({ searchParams }: { searchParams: Promise<{
   const effectiveModel = !formEdited && parentDefaults ? parentDefaults.modelPolicy.model : model;
   const effectiveOwner = !formEdited && parentDefaults ? parentDefaults.lifecycle.owner : owner;
   const effectiveChangeReason = !formEdited && parentDefaults ? `Revision of ${parentHash?.slice(0, 12) ?? 'parent'}` : changeReason;
-  const draft: AgentSpecificationDraft = { role: effectiveRole, objective: effectiveObjective, prompt: { system: effectiveSystemPrompt }, modelPolicy: { provider: effectiveProvider, model: effectiveModel }, lifecycle: { owner: effectiveOwner } };
+  const inheritedPrompt = JsonObjectSchema.safeParse(inheritedSpecification?.['prompt']).success ? JsonObjectSchema.parse(inheritedSpecification?.['prompt']) : {};
+  const inheritedModelPolicy = JsonObjectSchema.safeParse(inheritedSpecification?.['modelPolicy']).success ? JsonObjectSchema.parse(inheritedSpecification?.['modelPolicy']) : {};
+  const inheritedLifecycle = JsonObjectSchema.safeParse(inheritedSpecification?.['lifecycle']).success ? JsonObjectSchema.parse(inheritedSpecification?.['lifecycle']) : {};
+  const draft: AgentSpecificationDraft = {
+    ...(!formEdited && inheritedSpecification ? inheritedSpecification : {}),
+    role: effectiveRole,
+    objective: effectiveObjective,
+    prompt: { ...(!formEdited ? inheritedPrompt : {}), system: effectiveSystemPrompt },
+    modelPolicy: { ...(!formEdited ? inheritedModelPolicy : {}), provider: effectiveProvider, model: effectiveModel },
+    lifecycle: { ...(!formEdited ? inheritedLifecycle : {}), owner: effectiveOwner },
+  };
   const validate = useMutation({
     mutationFn: () => agentSpecificationApi.validate(workspaceId!, draft),
     onSuccess: (response) => setValidation(response.data),
@@ -84,7 +99,7 @@ export default function NewAgentPage({ searchParams }: { searchParams: Promise<{
         <Surface><div className="flex items-start gap-3"><Bot className="mt-0.5 h-5 w-5 text-success" /><div><h2 className="font-semibold text-text-strong">Revision created</h2><p className="mt-1 text-sm text-text-muted">The specification was stored as a content-addressed draft.</p><div className="mt-4 flex flex-wrap gap-2"><Button asChild><Link href={`/app/agents/${mutation.data.data.hash}`}>Open revision</Link></Button><Button asChild variant="outline"><Link href="/app/agents">View specifications</Link></Button></div></div></div></Surface>
       ) : (
         <Surface>
-          {parentHash && <div className="mb-5 rounded-lg border border-brand/30 bg-brand/5 p-3 text-sm text-text-muted">Creating a child revision from <span className="font-mono text-xs text-text-strong">{parentHash}</span>. The parent remains immutable.</div>}
+          {parentHash && <div className="mb-5 rounded-lg border border-brand/30 bg-brand/5 p-3 text-sm text-text-muted">Creating a child revision from <span className="font-mono text-xs text-text-strong">{parentHash}</span>. The parent remains immutable.{parentRevision.isPending && <span className="ml-2">Loading inherited policies…</span>}</div>}
           <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); if (validation?.valid) mutation.mutate(); }}>
             {(workspaces.data?.length ?? 0) > 1 && <div className="grid gap-2"><Label>Workspace</Label><ThemedSelect value={workspaceId ?? ''} onValueChange={(value) => { setSelectedWorkspaceId(value); setValidation(null); }} options={(workspaces.data ?? []).map((workspace) => ({ value: workspace.id, label: workspace.name }))} ariaLabel="Select workspace for new agent specification" /></div>}
             <div className="grid gap-5 md:grid-cols-2">
@@ -100,7 +115,7 @@ export default function NewAgentPage({ searchParams }: { searchParams: Promise<{
             {validation && !validation.valid && <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"><p className="font-medium">Fix these validation issues:</p><ul className="mt-1 list-disc pl-5">{validation.issues.map((issue, index) => <li key={`${issue.code}-${index}`}>{issue.path.length > 0 ? `${issue.path.join('.')} — ` : ''}{issue.message}</li>)}</ul></div>}
             {validate.isError && <p role="alert" className="text-sm text-destructive">Unable to validate this specification. Try again.</p>}
             {mutation.isError && <p role="alert" className="text-sm text-destructive">Unable to create this revision. Please review the fields and try again.</p>}
-            <div className="flex justify-end gap-2"><Button asChild variant="outline"><Link href="/app/agents">Cancel</Link></Button><Button type="button" variant="outline" onClick={() => validate.mutate()} disabled={validate.isPending}>{validate.isPending ? 'Validating…' : 'Validate specification'}</Button><Button type="submit" disabled={mutation.isPending || validation?.valid !== true}>{mutation.isPending ? 'Creating…' : 'Create draft'}</Button></div>
+            <div className="flex justify-end gap-2"><Button asChild variant="outline"><Link href="/app/agents">Cancel</Link></Button><Button type="button" variant="outline" onClick={() => validate.mutate()} disabled={validate.isPending || parentRevision.isPending}>{validate.isPending ? 'Validating…' : 'Validate specification'}</Button><Button type="submit" disabled={mutation.isPending || parentRevision.isPending || validation?.valid !== true}>{mutation.isPending ? 'Creating…' : 'Create draft'}</Button></div>
           </form>
         </Surface>
       )}
