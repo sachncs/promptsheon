@@ -2936,27 +2936,89 @@ export interface TeamMember {
 
 export interface SsoConfigView {
   configured: boolean;
-  provider?: string;
-  issuer?: string;
-  clientId?: string;
-  scopes?: string;
-  audience?: string | null;
-  groupsClaim?: string;
-  emailClaim?: string;
-  nameClaim?: string;
-  enabled?: boolean;
+  provider: string | undefined;
+  issuer: string | undefined;
+  clientId: string | undefined;
+  scopes: string | undefined;
+  audience: string | null | undefined;
+  groupsClaim: string | undefined;
+  emailClaim: string | undefined;
+  nameClaim: string | undefined;
+  enabled: boolean | undefined;
 }
 
+const TeamSummarySchema = z.object({
+  id: z.string().min(1),
+  organizationId: z.string().min(1),
+  name: z.string().min(1),
+  slug: z.string().min(1),
+  description: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const TeamMemberSchema = z.object({
+  teamId: z.string().min(1),
+  userId: z.string().min(1),
+  role: z.enum(['owner', 'admin', 'member', 'viewer']),
+  createdAt: z.string(),
+});
+
+const TeamListSchema = z.object({ items: z.array(TeamSummarySchema) });
+const SsoConfigSchema = z.object({
+  configured: z.boolean(),
+  provider: z.string().optional(),
+  issuer: z.string().optional(),
+  clientId: z.string().optional(),
+  scopes: z.string().optional(),
+  audience: z.string().nullable().optional(),
+  groupsClaim: z.string().optional(),
+  emailClaim: z.string().optional(),
+  nameClaim: z.string().optional(),
+  enabled: z.boolean().optional(),
+});
+const SsoUpdateSchema = z.object({ status: z.literal('ok'), provider: z.string().min(1) });
+
 export const teamApi = {
-  list: () => client.get<{ items: TeamSummary[] }>('/teams').then((r) => r.data),
-  create: (data: { name: string; slug: string; description?: string }) =>
-    client.post<TeamSummary>('/teams', data).then((r) => r.data),
-  addMember: (teamId: string, data: { userId: string; role?: TeamMember['role'] }) =>
-    client.post<TeamMember>(`/teams/${teamId}/members`, data).then((r) => r.data),
-  removeMember: (teamId: string, userId: string) =>
-    client.delete<unknown>(`/teams/${teamId}/members/${userId}`).then((r) => r.data),
-  ssoGet: () => client.get<SsoConfigView>('/auth/oidc/config').then((r) => r.data),
-  ssoSet: (data: {
+  list: async (): Promise<{ items: TeamSummary[] }> => {
+    const r = await client.get<unknown>('/teams');
+    const parsed = TeamListSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid teams.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  create: async (data: { name: string; slug: string; description?: string }): Promise<TeamSummary> => {
+    const r = await client.post<unknown>('/teams', data);
+    const parsed = TeamSummarySchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid team.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  addMember: async (teamId: string, data: { userId: string; role?: TeamMember['role'] }): Promise<TeamMember> => {
+    const r = await client.post<unknown>(`/teams/${teamId}/members`, data);
+    const parsed = TeamMemberSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid team member.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  removeMember: async (teamId: string, userId: string): Promise<void> => {
+    await client.delete(`/teams/${teamId}/members/${userId}`);
+  },
+  ssoGet: async (): Promise<SsoConfigView> => {
+    const r = await client.get<unknown>('/auth/oidc/config');
+    const parsed = SsoConfigSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid SSO configuration.', { code: 'INVALID_RESPONSE' });
+    return {
+      configured: parsed.data.configured,
+      provider: parsed.data.provider,
+      issuer: parsed.data.issuer,
+      clientId: parsed.data.clientId,
+      scopes: parsed.data.scopes,
+      audience: parsed.data.audience,
+      groupsClaim: parsed.data.groupsClaim,
+      emailClaim: parsed.data.emailClaim,
+      nameClaim: parsed.data.nameClaim,
+      enabled: parsed.data.enabled,
+    };
+  },
+  ssoSet: async (data: {
     provider: string;
     issuer: string;
     clientId: string;
@@ -2966,7 +3028,12 @@ export const teamApi = {
     groupsClaim?: string;
     emailClaim?: string;
     nameClaim?: string;
-  }) => client.post<{ status: string; provider: string }>('/auth/oidc/config', data).then((r) => r.data),
+  }): Promise<{ status: 'ok'; provider: string }> => {
+    const r = await client.post<unknown>('/auth/oidc/config', data);
+    const parsed = SsoUpdateSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid SSO update response.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
 };
 
 export const traceScoreApi = {
