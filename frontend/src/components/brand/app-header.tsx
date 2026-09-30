@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ThemeToggle } from '@/components/theme/theme-toggle';
 import { clearSession } from '@/lib/session';
+import { authApi } from '@/lib/api';
 import { useSession } from '@/hooks/use-session';
 
 export function AppHeader({
@@ -85,7 +86,11 @@ export function AppHeader({
         {session && (
           <button
             type="button"
-            onClick={() => { clearSession(); router.push('/'); }}
+            onClick={() => {
+              void authApi.logout().catch(() => undefined);
+              clearSession();
+              router.push('/');
+            }}
             className="grid h-9 w-9 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text-default"
             aria-label="Sign out"
             title="Sign out"

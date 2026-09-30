@@ -128,6 +128,46 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
     });
   });
 
+  it('accepts the HttpOnly browser session cookie with the same organization scope', async () => {
+    const apiKeyRepo = makeApiKeyRepo({
+      find: async () => ({
+        id: 'k-cookie',
+        userId: 'u-cookie',
+        organizationId: 'org-cookie',
+        role: 'admin',
+        revoked: false,
+      }),
+    });
+    const mw = authMiddleware(baseConfig, apiKeyRepo);
+    const req = makeReq({ cookie: 'other=value; promptsheon_session=cookie-token' });
+    const mock = makeReply();
+    await mw(req, mock.reply);
+    expect(mock.code).toBe(200);
+    expect((req as unknown as FastifyRequest).principal).toEqual({
+      type: 'User',
+      id: 'u-cookie',
+      orgId: 'org-cookie',
+      role: 'admin',
+    });
+  });
+
+  it('does not fall back to a cookie when an unsupported authorization scheme is supplied', async () => {
+    const apiKeyRepo = makeApiKeyRepo({
+      find: async () => ({
+        id: 'k-cookie',
+        userId: 'u-cookie',
+        organizationId: 'org-cookie',
+        role: 'admin',
+        revoked: false,
+      }),
+    });
+    const mw = authMiddleware(baseConfig, apiKeyRepo);
+    const req = makeReq({ authorization: 'Basic not-a-bearer', cookie: 'promptsheon_session=cookie-token' });
+    const mock = makeReply();
+    await mw(req, mock.reply);
+    expect(mock.code).toBe(401);
+  });
+
   it('rejects revoked Bearer tokens with 401', async () => {
     const apiKeyRepo = makeApiKeyRepo({
       find: async () => ({ id: 'k1', userId: 'u1', role: 'admin', revoked: true }),

@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { StepIndicator } from '@/components/brand/step-indicator';
 import { bootstrapApi, toSession, type CreateAdminResponse } from '@/lib/bootstrap';
 import { clearSession, getSession, getSessionStorageState, setSession } from '@/lib/session';
-import { userApi } from '@/lib/api';
+import { authApi, userApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { QueryError } from '@/components/brand/query-error';
 import { getErrorMessage } from '@/lib/errors';
@@ -56,7 +56,8 @@ export default function OnboardingPage() {
   const restoreAttempted = React.useRef(false);
   const resumedSetup = React.useRef(false);
 
-  const completeLocalBootstrap = React.useCallback((data: CreateAdminResponse): void => {
+  const completeLocalBootstrap = React.useCallback(async (data: CreateAdminResponse): Promise<void> => {
+    if (data.apiKey) await authApi.establish(data.apiKey);
     setSession(toSession(data, status.data?.provider ?? null));
     resumedSetup.current = true;
     if (!status.data?.needsLlm) {
@@ -171,9 +172,10 @@ export default function OnboardingPage() {
     }
     setRestorePending(true);
     setRestoreError(null);
-    const restored = { ...toSession(restoreCandidate, status.data?.provider ?? null), apiKey: restoreApiKey.trim() };
-    setSession(restored);
     try {
+      await authApi.establish(restoreApiKey.trim());
+      const restored = toSession(restoreCandidate, status.data?.provider ?? null);
+      setSession(restored);
       await userApi.me();
       setRestoreApiKey('');
       setRestoreCandidate(null);
@@ -296,12 +298,16 @@ function AdminStep({ onBack, onNext }: { onBack: () => void; onNext: () => void 
   const [error, setError] = React.useState<string | null>(null);
 
   const submit = useMutation({
-    mutationFn: () => bootstrapApi.createAdmin({
-      adminName: adminName.trim(),
-      adminEmail: adminEmail.trim(),
-      orgName: orgName.trim(),
-      orgSlug: orgSlug.trim() || undefined,
-    }),
+    mutationFn: async () => {
+      const data = await bootstrapApi.createAdmin({
+        adminName: adminName.trim(),
+        adminEmail: adminEmail.trim(),
+        orgName: orgName.trim(),
+        orgSlug: orgSlug.trim() || undefined,
+      });
+      if (data.apiKey) await authApi.establish(data.apiKey);
+      return data;
+    },
     onSuccess: (data) => {
       setError(null);
       onNext();

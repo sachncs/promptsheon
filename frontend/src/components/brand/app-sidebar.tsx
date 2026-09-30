@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { workspaceApi } from '@/lib/api';
 import { clearSession } from '@/lib/session';
+import { authApi } from '@/lib/api';
 import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/components/theme/theme-provider';
 import { cn } from '@/lib/utils';
@@ -341,7 +342,11 @@ export function AppSidebar({
             <div className="my-2 border-t border-border-subtle" />
             <button
               type="button"
-              onClick={() => { clearSession(); router.push('/'); }}
+              onClick={() => {
+                void authApi.logout().catch(() => undefined);
+                clearSession();
+                router.push('/');
+              }}
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-text-muted hover:bg-surface-2 hover:text-text-strong"
             >
               <LogOut className="size-3.5" /> Sign out

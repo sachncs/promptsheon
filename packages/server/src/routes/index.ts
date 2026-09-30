@@ -64,6 +64,7 @@ import { registerIdentityRoutes } from './identity.js';
 import { registerAgentSpecificationRoutes } from './agent-specification.js';
 import { registerExecutionJobRoutes } from './execution-jobs.js';
 import { registerEvidenceRoutes } from './evidence.js';
+import { registerAuthSessionRoutes } from './auth-session.js';
 import type { CanaryRollbackService } from '../application/canary-rollback-service.js';
 import { registerMutationProposalRoutes, type MutationProposalDeps } from './mutation-proposals.js';
 import { WorkspaceService } from '../application/workspace-service.js';
@@ -306,6 +307,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
   });
   registerApiKeyRoutes(app, { apiKeyRepo: deps.apiKeyRepo, auditChain: deps.auditChain });
   registerBootstrapRoutes(app, {
+    secureCookies: deps.nodeEnvironment === 'production',
     userRepo: deps.userRepo,
     orgRepo: deps.orgRepo,
     membershipRepo: deps.membershipRepo,
@@ -317,6 +319,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     e2eSessionEnabled: deps.e2eSessionEnabled,
     authEnabled: deps.authEnabled,
   });
+  registerAuthSessionRoutes(app, deps.nodeEnvironment);
 
   registerRepoRoutes(app, {
     ...deps.repoDeps,

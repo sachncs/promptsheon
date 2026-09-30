@@ -7,8 +7,6 @@ export interface Session {
   orgId: string;
   orgName: string;
   provider?: string | null | undefined;
-  /** One-time bootstrap credential used for authenticated API requests. */
-  apiKey?: string | undefined;
   completedAt?: string | undefined;
 }
 
@@ -22,7 +20,6 @@ const SessionSchema = z.object({
   orgId: z.string().min(1),
   orgName: z.string().min(1),
   provider: z.string().nullable().optional(),
-  apiKey: z.string().min(1).optional(),
   completedAt: z.string().optional(),
 });
 

@@ -86,7 +86,6 @@ export function toSession(input: CreateAdminResponse, provider: string | null): 
     orgId: input.org.id,
     orgName: input.org.name,
     provider,
-    ...(input.apiKey ? { apiKey: input.apiKey } : {}),
     completedAt: new Date().toISOString(),
   };
 }

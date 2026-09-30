@@ -4,6 +4,7 @@ import type { AppConfig } from '@promptsheon/shared';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 import { verifySVID } from '../identity/svid.js';
 import type { Principal } from '../policy/principal.js';
+import { readBrowserSessionCookie } from '../auth/session-cookie.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -23,6 +24,7 @@ const PUBLIC_PATHS = new Set([
   '/api/ready',
   '/api/audit/verify',
   '/api/audit/state',
+  '/api/auth/logout',
 ]);
 
 /**
@@ -86,63 +88,65 @@ export function authMiddleware(
     }
 
     const authHeader = request.headers.authorization;
-    if (typeof authHeader === 'string' && authHeader.length > 0) {
-      if (authHeader.startsWith('Bearer ')) {
-        const token = authHeader.slice(7);
-        const keyHash = createHash('sha256').update(token).digest('hex');
-        const apiKey = await apiKeyRepo.findByKeyHash(keyHash);
+    if (typeof authHeader === 'string' && authHeader.startsWith('SVID ')) {
+      if (!svidPublicKeyPem) {
+        return reply.code(503).send({
+          error: {
+            code: 'SVID_PUBLIC_KEY_NOT_CONFIGURED',
+            message: 'PROMPTSHEON_SVID_PUBLIC_KEY_PEM is not set; SVID auth is unavailable',
+          },
+        });
+      }
+      const token = authHeader.slice(5);
+      const v = verifySVID(token, svidPublicKeyPem);
+      if (v === null) {
+        return reply.code(401).send({
+          error: { code: 'INVALID_SVID', message: 'SVID failed signature or freshness check' },
+        });
+      }
+      request.userId = v.payload.sub;
+      request.agentOrgId = v.payload.org;
+      request.agentClassification = v.payload.cls;
+      request.orgContextBypass = true;
+      request.principal = {
+        type: 'Agent',
+        id: v.payload.sub,
+        orgId: v.payload.org,
+        classification: v.payload.cls,
+      };
+      return;
+    }
 
-        if (!apiKey || apiKey.revoked) {
-          return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'Invalid API key' } });
-        }
+    const token = authHeader === undefined
+      ? readBrowserSessionCookie(request.headers.cookie)
+      : authHeader.startsWith('Bearer ')
+        ? authHeader.slice(7)
+        : undefined;
+    if (token) {
+      const keyHash = createHash('sha256').update(token).digest('hex');
+      const apiKey = await apiKeyRepo.findByKeyHash(keyHash);
 
-        if (apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date()) {
-          return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'API key expired' } });
-        }
-
-        if (!apiKey.organizationId) {
-          return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'API key has no organization scope' } });
-        }
-        request.userId = apiKey.userId;
-        request.userRole = apiKey.role;
-        request.principal = {
-          type: 'User',
-          id: apiKey.userId,
-          orgId: apiKey.organizationId,
-          role: apiKey.role,
-        };
-        void apiKeyRepo.updateLastUsed(apiKey.id);
-        return;
+      if (!apiKey || apiKey.revoked) {
+        return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'Invalid API key' } });
       }
 
-      if (authHeader.startsWith('SVID ')) {
-        if (!svidPublicKeyPem) {
-          return reply.code(503).send({
-            error: {
-              code: 'SVID_PUBLIC_KEY_NOT_CONFIGURED',
-              message: 'PROMPTSHEON_SVID_PUBLIC_KEY_PEM is not set; SVID auth is unavailable',
-            },
-          });
-        }
-        const token = authHeader.slice(5);
-        const v = verifySVID(token, svidPublicKeyPem);
-        if (v === null) {
-          return reply.code(401).send({
-            error: { code: 'INVALID_SVID', message: 'SVID failed signature or freshness check' },
-          });
-        }
-        request.userId = v.payload.sub;
-        request.agentOrgId = v.payload.org;
-        request.agentClassification = v.payload.cls;
-        request.orgContextBypass = true;
-        request.principal = {
-          type: 'Agent',
-          id: v.payload.sub,
-          orgId: v.payload.org,
-          classification: v.payload.cls,
-        };
-        return;
+      if (apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date()) {
+        return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'API key expired' } });
       }
+
+      if (!apiKey.organizationId) {
+        return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'API key has no organization scope' } });
+      }
+      request.userId = apiKey.userId;
+      request.userRole = apiKey.role;
+      request.principal = {
+        type: 'User',
+        id: apiKey.userId,
+        orgId: apiKey.organizationId,
+        role: apiKey.role,
+      };
+      void apiKeyRepo.updateLastUsed(apiKey.id);
+      return;
     }
 
     return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'Missing authorization header' } });

@@ -9,6 +9,7 @@ import type { LlmRouter } from '../llm/router.js';
 import type { ApiKeyRepo } from '../repos/api-key.js';
 import type { LlmSettingsService } from '../application/llm-settings-service.js';
 import type { AuditChain } from '../audit/chain.js';
+import { serializeBrowserSessionCookie } from '../auth/session-cookie.js';
 
 const CreateAdminSchema = z.object({
   adminName: z.string().min(1).max(120),
@@ -82,6 +83,7 @@ function issueE2eSessionKey(
 export function registerBootstrapRoutes(
   app: FastifyInstance,
   deps: {
+    secureCookies?: boolean;
     userRepo: UserRepo;
     orgRepo: OrgRepo;
     membershipRepo: MembershipRepo;
@@ -130,6 +132,7 @@ export function registerBootstrapRoutes(
     }
     const provider = await deps.settingsResolver.get<string>('llm.provider').catch(() => undefined);
     const apiKey = issueE2eSessionKey(deps.e2eSessionEnabled ?? false, deps.apiKeyRepo, admin.id, org.id);
+    if (apiKey) reply.header('Set-Cookie', serializeBrowserSessionCookie(apiKey, deps.secureCookies ?? false));
     return reply.send({
       user: { id: admin.id, email: admin.email, name: admin.name, role: admin.role },
       org: { id: org.id, name: org.name, slug: org.slug },
@@ -181,6 +184,7 @@ export function registerBootstrapRoutes(
       resourceId: org.id,
     });
 
+    if (browserApiKey) reply.header('Set-Cookie', serializeBrowserSessionCookie(browserApiKey, deps.secureCookies ?? false));
     return reply.code(201).send({
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
       org: { id: org.id, name: org.name, slug: org.slug },

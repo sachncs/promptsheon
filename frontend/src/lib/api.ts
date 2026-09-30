@@ -4,7 +4,7 @@ import { ManifestSchema } from '@promptsheon/shared/validation';
 import type { Manifest } from '@promptsheon/shared';
 import type { Execution } from '@promptsheon/shared';
 import type { Schedule } from '@promptsheon/shared';
-import { clearSession, getSession } from './session';
+import { clearSession } from './session';
 
 export class ApiError extends Error {
   readonly status: number | undefined;
@@ -27,10 +27,6 @@ const client = axios.create({
 });
 
 client.interceptors.request.use((config) => {
-  const session = getSession();
-  if (session?.apiKey) {
-    config.headers.set('Authorization', `Bearer ${session.apiKey}`);
-  }
   return config;
 });
 
@@ -53,6 +49,15 @@ client.interceptors.response.use(
 );
 
 export { client };
+
+export const authApi = {
+  establish: async (apiKey: string): Promise<void> => {
+    await client.post('/auth/session', {}, { headers: { Authorization: `Bearer ${apiKey}` } });
+  },
+  logout: async (): Promise<void> => {
+    await client.delete('/auth/logout');
+  },
+};
 
 export interface WorkspaceRow {
   id: string;
@@ -1253,15 +1258,14 @@ export const executionApi = {
     const controller = new AbortController();
     const base = baseURL();
     const url = `${base}/api/executions`;
-    const session = getSession();
     const headers: Record<string, string> = {
       'content-type': 'application/json',
       accept: 'text/event-stream',
     };
-    if (session?.apiKey) headers.Authorization = `Bearer ${session.apiKey}`;
     void fetch(url, {
       method: 'POST',
       headers,
+      credentials: 'same-origin',
       body: JSON.stringify(data),
       signal: controller.signal,
     }).then(async (res) => {
