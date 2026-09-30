@@ -21,6 +21,10 @@ export interface AgentSpecificationRecord {
   specification: AgentSpecification;
 }
 
+export type AgentSpecificationStatus = AgentSpecificationRecord['status'];
+
+export type AgentSpecificationMetadata = Omit<AgentSpecificationRecord, 'specification'>;
+
 export interface AgentSpecificationDiffEntry {
   path: string;
   before: unknown;
@@ -203,6 +207,15 @@ export class PromptsheonClient {
       path: `/workspaces/${encodeURIComponent(input.workspaceId)}/agent-specifications`,
       body: { specification: input.specification, changeReason: input.changeReason, ...(input.parentHash === undefined ? {} : { parentHash: input.parentHash }) },
     });
+  }
+
+  listAgentSpecifications(workspaceId: string, options: { page?: number; pageSize?: number; status?: AgentSpecificationStatus } = {}): Promise<{ items: AgentSpecificationMetadata[]; total: number }> {
+    const params = new URLSearchParams();
+    if (options.page !== undefined) params.set('page', String(options.page));
+    if (options.pageSize !== undefined) params.set('pageSize', String(options.pageSize));
+    if (options.status !== undefined) params.set('status', options.status);
+    const query = params.toString();
+    return this.call({ method: 'GET', path: `/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications${query ? `?${query}` : ''}` });
   }
 
   getAgentSpecification(workspaceId: string, hash: string): Promise<AgentSpecificationRecord> {

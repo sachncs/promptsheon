@@ -32,6 +32,7 @@ import {
   specificationDiffCommand,
   specificationGetCommand,
   specificationLineageCommand,
+  specificationListCommand,
   specificationPublishCommand,
   specificationValidateCommand,
 } from './commands.js';
@@ -51,6 +52,7 @@ Commands:
   release approve <id>               approve a release (maker-checker)
   manifest scan <hash>               scan a manifest through the T2-3 scanner
   spec validate <file>               validate an agent specification JSON file
+  spec list                          list agent specification revisions
   spec create <file>                 create a draft agent specification
   spec get <hash>                    inspect an agent specification
   spec diff <left> <right>           diff two specification hashes
@@ -143,6 +145,10 @@ async function main(argv: string[]): Promise<number> {
           const sub = positional[1];
           if (sub === 'validate') {
             print(flags.format, await specificationValidateCommand(client, positional[2] ?? ''));
+            return EXIT.OK;
+          }
+          if (sub === 'list') {
+            print(flags.format, await specificationListCommand(client));
             return EXIT.OK;
           }
           if (sub === 'create') {

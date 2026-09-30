@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { EXIT, PROMPTSHEON_CLI_VERSION } from '../src/version.js';
+import { specificationListCommand } from '../src/commands.js';
 
 describe('CLI version + exit codes', () => {
   it('PROMPTSHEON_CLI_VERSION is a semver string', () => {
@@ -15,6 +16,26 @@ describe('CLI version + exit codes', () => {
     expect(EXIT.NOT_FOUND).toBe(6);
     expect(EXIT.CONFLICT).toBe(7);
     expect(EXIT.PRECONDITION_FAILED).toBe(8);
+  });
+});
+
+describe('agent specification CLI commands', () => {
+  it('lists revisions within the configured workspace', async () => {
+    const previous = process.env['PROMPTSHEON_WORKSPACE_ID'];
+    process.env['PROMPTSHEON_WORKSPACE_ID'] = 'ws-specs';
+    const client: ApiClient = {
+      get: async (path) => {
+        expect(path).toBe('/workspaces/ws-specs/agent-specifications');
+        return { items: [], total: 0 };
+      },
+      post: async () => undefined,
+    };
+    try {
+      await expect(specificationListCommand(client)).resolves.toEqual({ items: [], total: 0 });
+    } finally {
+      if (previous === undefined) delete process.env['PROMPTSHEON_WORKSPACE_ID'];
+      else process.env['PROMPTSHEON_WORKSPACE_ID'] = previous;
+    }
   });
 });
 

@@ -126,6 +126,10 @@ export async function specificationValidateCommand(client: ApiClient, path: stri
   return client.post(`/workspaces/${workspaceId()}/agent-specifications/validate`, { specification: await specificationFile(path) });
 }
 
+export async function specificationListCommand(client: ApiClient): Promise<unknown> {
+  return client.get(`/workspaces/${workspaceId()}/agent-specifications`);
+}
+
 export async function specificationCreateCommand(client: ApiClient, path: string, opts: { dryRun: boolean }): Promise<unknown> {
   return client.post(`/workspaces/${workspaceId()}/agent-specifications`, { specification: await specificationFile(path), changeReason: process.env['PROMPTSHEON_CHANGE_REASON'] ?? 'created from CLI' }, opts);
 }
