@@ -36,6 +36,11 @@ export default function SdkDoc() {
       <DocCurl cmd="await client.createSuite({ capabilityId, name, ... });" />
       <DocCurl cmd="await client.runSuite(suiteId, { trials });" />
       <DocCurl cmd="await client.evalGate(repoId, [{...}]);" />
+
+      <h2>Agent execution evidence</h2>
+      <DocCurl cmd="await client.listEvidence({ agentHash, eventType: 'model.called' });" />
+      <DocCurl cmd="await client.listTraceEvidence(traceId);" />
+      <p>Evidence payloads are redacted by the server and returned with stable hashes for audit and lineage workflows.</p>
     </DocPage>
   );
 }

@@ -173,3 +173,17 @@ export async function executionCancelCommand(client: ApiClient, id: string, opts
 export async function executionMetricsCommand(client: ApiClient): Promise<unknown> {
   return client.get('/execution-jobs/metrics');
 }
+
+export async function evidenceListCommand(client: ApiClient, options: { agentHash?: string; eventType?: string; traceId?: string } = {}): Promise<unknown> {
+  const params = new URLSearchParams();
+  if (options.agentHash) params.set('agentHash', options.agentHash);
+  if (options.eventType) params.set('eventType', options.eventType);
+  if (options.traceId) params.set('traceId', options.traceId);
+  const query = params.toString();
+  return client.get(`/evidence${query ? `?${query}` : ''}`);
+}
+
+export async function evidenceTraceCommand(client: ApiClient, traceId: string): Promise<unknown> {
+  if (!traceId) throw new BadArgsError('evidence trace <traceId> — traceId is required');
+  return client.get(`/traces/${encodeURIComponent(traceId)}/evidence`);
+}

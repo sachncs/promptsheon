@@ -61,6 +61,37 @@ export interface ExecutionQueueMetrics {
   oldestQueuedAt: string | null;
 }
 
+/** Evidence event types emitted by execution and policy subsystems. */
+export type EvidenceEventType =
+  | 'execution.started'
+  | 'execution.completed'
+  | 'execution.failed'
+  | 'execution.cancelled'
+  | 'model.called'
+  | 'tool.called'
+  | 'guardrail.decided'
+  | 'permission.decided'
+  | 'resource.consumed'
+  | 'error.observed';
+
+/** Redacted, append-only evidence captured for an execution. */
+export interface EvidenceRecord {
+  id: string;
+  eventType: EvidenceEventType;
+  schemaVersion: string;
+  occurredAt: string;
+  organizationId: string;
+  correlationId: string;
+  traceId: string | null;
+  executionId: string | null;
+  agentHash: string | null;
+  stepId: string | null;
+  retentionClass: string;
+  payload: unknown;
+  payloadHash: string;
+  createdAt: string;
+}
+
 /**
  * Typed fetch wrapper over the public REST API.
  *
@@ -248,6 +279,23 @@ export class PromptsheonClient {
 
   getExecutionMetrics(): Promise<ExecutionQueueMetrics> {
     return this.call({ method: 'GET', path: '/execution-jobs/metrics' });
+  }
+
+  /** List the newest evidence records visible to the authenticated organization. */
+  listEvidence(options: { limit?: number; before?: string; eventType?: EvidenceEventType; agentHash?: string; traceId?: string } = {}): Promise<{ items: EvidenceRecord[]; total: number }> {
+    const params = new URLSearchParams();
+    if (options.limit !== undefined) params.set('limit', String(options.limit));
+    if (options.before !== undefined) params.set('before', options.before);
+    if (options.eventType !== undefined) params.set('eventType', options.eventType);
+    if (options.agentHash !== undefined) params.set('agentHash', options.agentHash);
+    if (options.traceId !== undefined) params.set('traceId', options.traceId);
+    const query = params.toString();
+    return this.call({ method: 'GET', path: `/evidence${query ? `?${query}` : ''}` });
+  }
+
+  /** List evidence for one trace in chronological order. */
+  listTraceEvidence(traceId: string): Promise<{ traceId: string; items: EvidenceRecord[]; total: number }> {
+    return this.call({ method: 'GET', path: `/traces/${encodeURIComponent(traceId)}/evidence` });
   }
 }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { EXIT, PROMPTSHEON_CLI_VERSION } from '../src/version.js';
-import { specificationListCommand } from '../src/commands.js';
+import { evidenceListCommand, evidenceTraceCommand, specificationListCommand } from '../src/commands.js';
 
 describe('CLI version + exit codes', () => {
   it('PROMPTSHEON_CLI_VERSION is a semver string', () => {
@@ -36,6 +36,24 @@ describe('agent specification CLI commands', () => {
       if (previous === undefined) delete process.env['PROMPTSHEON_WORKSPACE_ID'];
       else process.env['PROMPTSHEON_WORKSPACE_ID'] = previous;
     }
+  });
+});
+
+describe('evidence CLI commands', () => {
+  it('encodes evidence filters', async () => {
+    const client: ApiClient = {
+      get: async (path) => {
+        expect(path).toBe('/evidence?eventType=model.called&traceId=trace%2F1');
+        return { items: [], total: 0 };
+      },
+      post: async () => undefined,
+    };
+    await expect(evidenceListCommand(client, { eventType: 'model.called', traceId: 'trace/1' })).resolves.toEqual({ items: [], total: 0 });
+  });
+
+  it('requires a trace id', async () => {
+    const client: ApiClient = { get: async () => undefined, post: async () => undefined };
+    await expect(evidenceTraceCommand(client, '')).rejects.toThrow(/traceId/);
   });
 });
 

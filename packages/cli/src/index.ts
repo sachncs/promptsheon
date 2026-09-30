@@ -19,6 +19,8 @@ import { PROMPTSHEON_CLI_VERSION, EXIT } from './version.js';
 import { makeClient, parseFlags, print, handleError } from './output.js';
 import {
   evalGateCommand,
+  evidenceListCommand,
+  evidenceTraceCommand,
   executionCancelCommand,
   executionGetCommand,
   executionMetricsCommand,
@@ -62,6 +64,8 @@ Commands:
   execution get <id>                 inspect a durable execution job
   execution cancel <id>              cancel a durable execution job
   execution metrics                  show execution queue metrics
+  evidence list                      list execution evidence
+  evidence trace <id>                show evidence for one trace
 
 Env:
   PROMPTSHEON_API_URL                default http://127.0.0.1:8080
@@ -190,6 +194,24 @@ async function main(argv: string[]): Promise<number> {
           }
           if (sub === 'metrics') {
             print(flags.format, await executionMetricsCommand(client));
+            return EXIT.OK;
+          }
+          usage();
+          return EXIT.BAD_ARGS;
+        }
+        case 'evidence': {
+          const sub = positional[1];
+          if (sub === 'list') {
+            const options = {
+              ...(positional[2] === undefined ? {} : { agentHash: positional[2] }),
+              ...(positional[3] === undefined ? {} : { eventType: positional[3] }),
+              ...(positional[4] === undefined ? {} : { traceId: positional[4] }),
+            };
+            print(flags.format, await evidenceListCommand(client, options));
+            return EXIT.OK;
+          }
+          if (sub === 'trace') {
+            print(flags.format, await evidenceTraceCommand(client, positional[2] ?? ''));
             return EXIT.OK;
           }
           usage();

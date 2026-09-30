@@ -36,4 +36,21 @@ describe('PromptsheonClient agent specification contracts', () => {
     const result = await new PromptsheonClient({ baseUrl: 'https://example.test' }).listAgentSpecificationLineage('ws-1', 'a'.repeat(64));
     expect(result.items[0]).not.toHaveProperty('specification');
   });
+
+  it('encodes evidence filters and trace identifiers', async () => {
+    const client = new PromptsheonClient({ baseUrl: 'https://example.test' });
+    const calls: string[] = [];
+    globalThis.fetch = async (input) => {
+      calls.push(String(input));
+      return new Response(JSON.stringify({ items: [], total: 0 }), { status: 200 });
+    };
+
+    await client.listEvidence({ agentHash: 'a'.repeat(64), eventType: 'model.called', traceId: 'trace/1' });
+    await client.listTraceEvidence('trace/1');
+
+    expect(calls).toEqual([
+      'https://example.test/api/evidence?eventType=model.called&agentHash=' + 'a'.repeat(64) + '&traceId=trace%2F1',
+      'https://example.test/api/traces/trace%2F1/evidence',
+    ]);
+  });
 });

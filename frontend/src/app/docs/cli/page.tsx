@@ -24,6 +24,9 @@ export default function CliDoc() {
       <DocCurl cmd="promptsheon repos list                 # list repositories in the workspace" />
       <DocCurl cmd="promptsheon eval gate <repoId>        # CI gate" />
       <DocCurl cmd="promptsheon release approve <id>      # approve a release" />
+      <DocCurl cmd="promptsheon evidence list             # newest evidence records" />
+      <DocCurl cmd="promptsheon evidence trace <traceId>  # chronological trace evidence" />
+      <p>Use <code>--json</code> for machine-readable output. Evidence is already redacted by the API before it reaches the CLI.</p>
     </DocPage>
   );
 }
