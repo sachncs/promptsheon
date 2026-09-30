@@ -642,6 +642,11 @@
     {
       "file": "packages/server/src/routes/mutation-proposals.ts",
       "method": "POST",
+      "path": "/api/mutation-proposals/:id/validate"
+    },
+    {
+      "file": "packages/server/src/routes/mutation-proposals.ts",
+      "method": "POST",
       "path": "/api/mutation-proposals/:id/decision"
     },
     {
