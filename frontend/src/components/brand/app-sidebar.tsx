@@ -178,6 +178,7 @@ export function AppSidebar({
   const workspaces = useQuery({
     queryKey: ['workspaces'],
     queryFn: () => workspaceApi.list(1).then((r) => r.data),
+    enabled: Boolean(session),
   });
   const workspaceList = Array.isArray(workspaces.data) ? workspaces.data as Array<{ id: string; name?: string }> : [];
   const currentWsId = session?.orgId ?? workspaceList[0]?.id;

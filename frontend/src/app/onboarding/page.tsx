@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { StepIndicator } from '@/components/brand/step-indicator';
 import { bootstrapApi, toSession, type CreateAdminResponse } from '@/lib/bootstrap';
-import { getSession, setSession } from '@/lib/session';
+import { clearSession, getSession, setSession } from '@/lib/session';
 import { userApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { QueryError } from '@/components/brand/query-error';
@@ -52,6 +52,7 @@ export default function OnboardingPage() {
   const [restoreCandidate, setRestoreCandidate] = React.useState<CreateAdminResponse | null>(null);
   const [restoreApiKey, setRestoreApiKey] = React.useState('');
   const [restorePending, setRestorePending] = React.useState(false);
+  const restoreAttempted = React.useRef(false);
 
   React.useEffect(() => {
     if (!status.data) return;
@@ -66,6 +67,8 @@ export default function OnboardingPage() {
         router.replace('/app');
         return;
       }
+      if (restoreAttempted.current) return;
+      restoreAttempted.current = true;
       bootstrapApi.admin()
         .then((data) => {
           const restored = toSession(data, status.data?.provider ?? null);
@@ -77,7 +80,13 @@ export default function OnboardingPage() {
           setRestoreError(null);
           setRestoreCandidate(null);
           setSession(restored);
-          router.replace('/app');
+          return userApi.me()
+            .then(() => router.replace('/app'))
+            .catch((error: unknown) => {
+              clearSession();
+              setRestoreCandidate(data);
+              setRestoreError(error instanceof Error ? error.message : 'The recovered browser session could not be verified.');
+            });
         })
         .catch((error: unknown) => {
           setRestoreError(error instanceof Error ? error.message : 'We could not restore the administrator session.');

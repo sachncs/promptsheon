@@ -57,4 +57,30 @@ test.describe('tier 3: app shell after onboarding', () => {
     await page.getByRole('button', { name: 'Verify key' }).click();
     await page.waitForURL(/\/app(\/|$)/);
   });
+
+  test('stops on the recovery screen when automatic session recovery is rejected', async ({ page, request }) => {
+    const session = await bootstrapAdminViaApi(BACKEND_URL, {
+      orgName: `Rejected Recovery Org ${Date.now()}`,
+      adminEmail: `rejected-recovery-${Date.now()}@promptsheon.test`,
+    });
+    const response = await request.post(`${BACKEND_URL}/api/bootstrap/llm`, {
+      headers: { Authorization: `Bearer ${session.apiKey}` },
+      data: { provider: 'simulated', model: 'promptsheon-recovery-simulator' },
+    });
+    expect(response.ok(), `simulator setup failed: ${await response.text()}`).toBeTruthy();
+
+    await page.route('**/api/bootstrap/admin', async (route) => {
+      const upstream = await route.fetch();
+      const body = (await upstream.json()) as { apiKey?: string };
+      body.apiKey = 'pk_rejected_by_backend';
+      await route.fulfill({ response: upstream, json: body });
+    });
+    await page.goto('/');
+    await page.evaluate(() => window.localStorage.clear());
+    await page.goto('/onboarding');
+
+    await expect(page).toHaveURL(/\/onboarding$/);
+    await expect(page.getByText('Restore your browser session')).toBeVisible();
+    await expect(page.getByText(/invalid|rejected|unauthorized/i).first()).toBeVisible();
+  });
 });
