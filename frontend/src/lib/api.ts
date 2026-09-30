@@ -3101,31 +3101,46 @@ export interface UserRollup {
   days: number;
 }
 
+const UserDailyUsageSchema = z.object({
+  day: z.string(),
+  runs: z.number().int().nonnegative(),
+  tokens: z.number().int().nonnegative(),
+  cost: z.number().nonnegative(),
+});
+const UserRollupSchema = z.object({
+  actorId: z.string(),
+  runs: z.number().int().nonnegative(),
+  tokens: z.number().int().nonnegative(),
+  cost: z.number().nonnegative(),
+  days: z.number().int().positive(),
+});
+const AnalyticsUserPerDaySchema = z.object({ userId: z.string(), days: z.number().int().positive(), perDay: z.array(UserDailyUsageSchema) });
+const AnalyticsLeaderboardSchema = z.object({ orgId: z.string(), days: z.number().int().positive(), limit: z.number().int().positive(), items: z.array(UserRollupSchema) });
+const AnalyticsOrgTotalsSchema = z.object({
+  orgId: z.string(),
+  days: z.number().int().positive(),
+  totals: z.object({ runs: z.number().int().nonnegative(), tokens: z.number().int().nonnegative(), cost: z.number().nonnegative(), activeDays: z.number().int().nonnegative() }),
+});
+
 export const analyticsApi = {
-  userPerDay: (userId: string, days = 30) =>
-    client
-      .get<{ userId: string; days: number; perDay: UserDailyUsage[] }>(
-        `/analytics/users/${encodeURIComponent(userId)}`,
-        { params: { days } },
-      )
-      .then((r) => r.data),
-  leaderboard: (days = 30, limit = 25) =>
-    client
-      .get<{
-        orgId: string;
-        days: number;
-        limit: number;
-        items: UserRollup[];
-      }>('/analytics/leaderboard', { params: { days, limit } })
-      .then((r) => r.data),
-  orgTotals: (days = 30) =>
-    client
-      .get<{
-        orgId: string;
-        days: number;
-        totals: { runs: number; tokens: number; cost: number; activeDays: number };
-      }>('/analytics/org-totals', { params: { days } })
-      .then((r) => r.data),
+  userPerDay: async (userId: string, days = 30): Promise<{ userId: string; days: number; perDay: UserDailyUsage[] }> => {
+    const r = await client.get<unknown>(`/analytics/users/${encodeURIComponent(userId)}`, { params: { days } });
+    const parsed = AnalyticsUserPerDaySchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid user analytics data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  leaderboard: async (days = 30, limit = 25): Promise<{ orgId: string; days: number; limit: number; items: UserRollup[] }> => {
+    const r = await client.get<unknown>('/analytics/leaderboard', { params: { days, limit } });
+    const parsed = AnalyticsLeaderboardSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid analytics leaderboard data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  orgTotals: async (days = 30): Promise<{ orgId: string; days: number; totals: { runs: number; tokens: number; cost: number; activeDays: number } }> => {
+    const r = await client.get<unknown>('/analytics/org-totals', { params: { days } });
+    const parsed = AnalyticsOrgTotalsSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid organization analytics data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
 };
 
 export interface AuditReportEntry {
