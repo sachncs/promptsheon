@@ -2031,7 +2031,7 @@ export const traceApi = {
 };
 
 export const evidenceApi = {
-  list: async (options: { limit?: number; before?: string; eventType?: string } = {}): Promise<{ data: z.infer<typeof EvidencePageSchema> }> => {
+  list: async (options: { limit?: number; before?: string; eventType?: string; agentHash?: string } = {}): Promise<{ data: z.infer<typeof EvidencePageSchema> }> => {
     const r = await client.get<unknown>('/evidence', { params: options });
     return { data: EvidencePageSchema.parse(r.data) };
   },

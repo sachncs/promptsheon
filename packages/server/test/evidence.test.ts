@@ -64,7 +64,8 @@ describe('evidence and telemetry redaction', () => {
     const db = new Database(':memory:');
     applyMigrations(db, migrations);
     const repo = new EvidenceRepo(db);
-    repo.append({ eventType: 'execution.started', organizationId: 'org-1', correlationId: 'c1', traceId: 'trace-1', payload: { ok: true } });
+    const agentHash = 'a'.repeat(64);
+    repo.append({ eventType: 'execution.started', organizationId: 'org-1', correlationId: 'c1', traceId: 'trace-1', agentHash, payload: { ok: true } });
     repo.append({ eventType: 'execution.started', organizationId: 'org-2', correlationId: 'c2', traceId: 'trace-2', payload: { ok: false } });
     const app = Fastify();
     app.addHook('preHandler', async (request) => {
@@ -75,6 +76,9 @@ describe('evidence and telemetry redaction', () => {
     const timeline = await app.inject({ method: 'GET', url: '/api/evidence' });
     expect(timeline.statusCode).toBe(200);
     expect(timeline.json().items).toHaveLength(1);
+    const filtered = await app.inject({ method: 'GET', url: `/api/evidence?agentHash=${agentHash}` });
+    expect(filtered.statusCode).toBe(200);
+    expect(filtered.json().items).toHaveLength(1);
     const exported = await app.inject({ method: 'GET', url: '/api/evidence/export' });
     expect(exported.statusCode).toBe(200);
     expect(exported.headers['content-disposition']).toContain('promptsheon-evidence.json');

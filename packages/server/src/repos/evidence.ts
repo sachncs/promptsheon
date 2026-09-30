@@ -119,12 +119,13 @@ export class EvidenceRepo {
     return rowToEvidence(row);
   }
 
-  listByOrganization(organizationId: string, options: { limit?: number; before?: string; eventType?: EvidenceEventType } = {}): EvidenceRecord[] {
+  listByOrganization(organizationId: string, options: { limit?: number; before?: string; eventType?: EvidenceEventType; agentHash?: string } = {}): EvidenceRecord[] {
     const limit = Math.min(options.limit ?? 100, 500);
     const conditions = ['organization_id = ?'];
     const args: unknown[] = [organizationId];
     if (options.before) { conditions.push('occurred_at < ?'); args.push(options.before); }
     if (options.eventType) { conditions.push('event_type = ?'); args.push(options.eventType); }
+    if (options.agentHash) { conditions.push('agent_hash = ?'); args.push(options.agentHash); }
     const rows = this.db.prepare(`
       SELECT * FROM evidence_records
       WHERE ${conditions.join(' AND ')}
