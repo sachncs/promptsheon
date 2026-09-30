@@ -1344,6 +1344,10 @@ export const executionJobApi = {
     const r = await client.get<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/execution-jobs/${encodeURIComponent(id)}`);
     return { data: parseExecutionJob(r.data) };
   },
+  cancel: async (workspaceId: string, id: string): Promise<{ data: ExecutionJob }> => {
+    const r = await client.post<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/execution-jobs/${encodeURIComponent(id)}/cancel`);
+    return { data: parseExecutionJob(r.data) };
+  },
   metrics: async (): Promise<{ data: ExecutionQueueMetrics }> => {
     const r = await client.get<unknown>('/execution-jobs/metrics');
     return { data: z.object({
