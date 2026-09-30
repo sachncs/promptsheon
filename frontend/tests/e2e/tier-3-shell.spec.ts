@@ -32,6 +32,8 @@ test.describe('tier 3: app shell after onboarding', () => {
     }
     await expect(page.getByText('EXECUTION QUEUE')).toBeVisible();
     await expect(page.getByText(/running/i).last()).toBeVisible();
+    await expect(page.getByText('PLATFORM HEALTH')).toBeVisible();
+    await expect(page.getByText('Healthy')).toBeVisible();
   });
 
   test('restores a cleared browser session with an existing API key', async ({ page, request }) => {

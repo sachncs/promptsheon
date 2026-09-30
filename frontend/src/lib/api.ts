@@ -1135,6 +1135,23 @@ export interface ExecutionQueueMetrics {
   oldestQueuedAt: string | null;
 }
 
+export interface HealthStatus {
+  status: 'ok' | 'error';
+  db: 'ok' | 'error';
+  timestamp: string;
+}
+
+export const healthApi = {
+  status: async (): Promise<{ data: HealthStatus }> => {
+    const r = await client.get<unknown>('/health');
+    return { data: z.object({
+      status: z.union([z.literal('ok'), z.literal('error')]),
+      db: z.union([z.literal('ok'), z.literal('error')]),
+      timestamp: z.string(),
+    }).parse(r.data) };
+  },
+};
+
 export const executionJobApi = {
   metrics: async (): Promise<{ data: ExecutionQueueMetrics }> => {
     const r = await client.get<unknown>('/execution-jobs/metrics');

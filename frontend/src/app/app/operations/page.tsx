@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Activity, AlertTriangle, Clock3, GitMerge, ShieldAlert } from 'lucide-react';
-import { releaseApi, evalApi, alertApi, executionJobApi, type Alert } from '@/lib/api';
+import { Activity, AlertTriangle, Clock3, GitMerge, HeartPulse, ShieldAlert } from 'lucide-react';
+import { releaseApi, evalApi, alertApi, executionJobApi, healthApi, type Alert } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -39,6 +39,13 @@ export default function OperationsPage() {
     queryKey: ['execution-jobs', 'metrics'],
     queryFn: () => executionJobApi.metrics().then((r) => r.data),
     refetchInterval: 15_000,
+  });
+
+  const health = useQuery({
+    queryKey: ['operations', 'health'],
+    queryFn: () => healthApi.status().then((r) => r.data),
+    refetchInterval: 15_000,
+    retry: 1,
   });
 
   if (!session) return null;
@@ -88,7 +95,7 @@ export default function OperationsPage() {
         subtitle="Live health of the fleet — active releases, canary progress, recent eval outcomes, and unacknowledged alerts."
       />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
         <StatCard
           label="Active releases"
           value={String(activeReleases.length)}
@@ -118,6 +125,12 @@ export default function OperationsPage() {
           value={String(queue.data?.queued ?? 0)}
           hint={`${queue.data?.running ?? 0} running · ${oldestQueueAge}`}
           icon={Clock3}
+        />
+        <StatCard
+          label="Platform health"
+          value={health.isError ? 'Degraded' : health.data?.status === 'ok' ? 'Healthy' : 'Checking'}
+          hint={health.isError ? 'Health probe failed' : health.data?.db === 'ok' ? 'Database responding' : 'Database unavailable'}
+          icon={HeartPulse}
         />
       </div>
 
