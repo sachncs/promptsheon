@@ -7,10 +7,12 @@ import type { Schedule } from '@promptsheon/shared';
 import type { Dataset, DatasetCase } from '@promptsheon/shared';
 import type { AlertRule, Precondition } from '@promptsheon/shared';
 import type { User, UserRole } from '@promptsheon/shared';
+import type { FeatureFlag } from '@promptsheon/shared';
 
 export type { Dataset, DatasetCase };
 export type { AlertRule, Precondition };
 export type { User, UserRole };
+export type { FeatureFlag };
 import { clearSession } from './session';
 
 export class ApiError extends Error {
@@ -814,6 +816,14 @@ const UserSchema = z.object({
   name: z.string().min(1),
   role: z.enum(['admin', 'editor', 'reader', 'system']),
   createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const FeatureFlagSchema = z.object({
+  name: z.string().min(1),
+  enabled: z.boolean(),
+  description: z.string(),
+  value: z.unknown(),
   updatedAt: z.string(),
 });
 
@@ -2071,8 +2081,18 @@ export const userApi = {
 };
 
 export const featureFlagApi = {
-  list: () => client.get('/feature-flags'),
-  update: (key: string, data: { value: unknown; enabled?: boolean }) => client.put(`/feature-flags/${key}`, data),
+  list: async (): Promise<{ data: { flags: FeatureFlag[] } }> => {
+    const r = await client.get<unknown>('/feature-flags');
+    const parsed = z.object({ flags: z.array(FeatureFlagSchema) }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid feature-flag data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  update: async (name: string, data: { value: unknown; enabled?: boolean }): Promise<{ data: FeatureFlag }> => {
+    const r = await client.put<unknown>(`/feature-flags/${encodeURIComponent(name)}`, data);
+    const parsed = FeatureFlagSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid feature-flag data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
 };
 
 // ---- Phase 5 surface: repositories, branches, contents, commits, MRs, signing, evals, vault, search, cost

@@ -82,6 +82,20 @@ test.describe('tier 9: admin gating (server-enforced)', () => {
     expect((await saveResponse).status(), 'setting save response').toBe(200);
   });
 
+  test('admin can create a feature flag from the UI', async ({ page, baseURL }) => {
+    if (!admin || !baseURL) throw new Error('admin not bootstrapped');
+    await clearClientState(page);
+    await seedSession(page, admin);
+    await page.goto('/app/feature-flags', { waitUntil: 'domcontentloaded' });
+    await page.getByPlaceholder('enable-refund-fast-path').fill('e2e-flag');
+    const updateResponse = page.waitForResponse((response) =>
+      response.url().endsWith('/api/feature-flags/e2e-flag') && response.request().method() === 'PUT',
+    );
+    await page.getByRole('button', { name: 'Create flag' }).click();
+    expect((await updateResponse).status(), 'feature-flag update response').toBe(200);
+    await expect(page.getByText('e2e-flag')).toBeVisible();
+  });
+
   test('admin can issue an API key once from the UI', async ({ page, baseURL }) => {
     if (!admin || !baseURL) throw new Error('admin not bootstrapped');
     await clearClientState(page);

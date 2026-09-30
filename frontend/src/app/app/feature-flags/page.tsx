@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Flag, Plus, Save } from 'lucide-react';
-import { featureFlagApi, parseList } from '@/lib/api';
-import { z } from 'zod';
+import { featureFlagApi, type FeatureFlag } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -17,12 +16,6 @@ import { QueryError } from '@/components/brand/query-error';
 import { getErrorMessage } from '@/lib/errors';
 import { useToast } from '@/components/brand/toast';
 
-const FlagItemSchema = z.object({
-  key: z.string().optional(), value: z.unknown().optional(), enabled: z.boolean().optional(),
-  description: z.string().optional(), updatedAt: z.string().optional(), updatedBy: z.string().optional(),
-  name: z.string().optional(),
-});
-
 export default function FeatureFlagsPage() {
   const session = useRequireSession();
   const qc = useQueryClient();
@@ -30,9 +23,9 @@ export default function FeatureFlagsPage() {
 
   const flags = useQuery({
     queryKey: ['feature-flags'],
-    queryFn: () => featureFlagApi.list().then((r) => parseList(r.data, FlagItemSchema, 'flags')),
+    queryFn: () => featureFlagApi.list().then((r) => r.data.flags),
   });
-  const rows = (flags.data ?? []).map((flag) => ({ ...flag, key: flag.key ?? flag.name ?? '' }));
+  const rows: FeatureFlag[] = flags.data ?? [];
 
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('true');
@@ -56,7 +49,7 @@ export default function FeatureFlagsPage() {
 
   const toggle = useMutation({
     mutationFn: (key: string) => {
-      const current = rows.find((r) => r.key === key);
+      const current = rows.find((r) => r.name === key);
       const next = !(current?.enabled ?? false);
       return featureFlagApi.update(key, { value: current?.value, enabled: next });
     },
@@ -140,18 +133,18 @@ export default function FeatureFlagsPage() {
           <DataTable
             className="rounded-none border-0 border-t border-border-subtle"
             rows={rows}
-            rowKey={(r) => r.key}
+            rowKey={(r) => r.name}
             columns={[
               {
                 key: 'key',
                 header: 'Key',
-                render: (r) => <code className="font-mono text-xs">{r.key}</code>,
+                  render: (r) => <code className="font-mono text-xs">{r.name}</code>,
               },
               {
                 key: 'value',
                 header: 'Value',
                 render: (r) => {
-                  const k = r.key;
+                  const k = r.name;
                   const isEditing = k in editing;
                   const value = isEditing ? editing[k] : JSON.stringify(r['value']);
                   return (
@@ -185,9 +178,9 @@ export default function FeatureFlagsPage() {
                 render: (r) => (
                   <Switch
                     checked={Boolean(r.enabled)}
-                    onCheckedChange={() => toggle.mutate(r.key)}
+                    onCheckedChange={() => toggle.mutate(r.name)}
                     disabled={toggle.isPending}
-                    aria-label={`Toggle feature flag ${r.key}`}
+                    aria-label={`Toggle feature flag ${r.name}`}
                   />
                 ),
               },
