@@ -33,4 +33,17 @@ describe('buildEvaluatorRegistry', () => {
     const reg = buildEvaluatorRegistry(buildConfig());
     expect(() => getEvaluator(reg, 'unknown')).toThrow(/unknown evaluator/);
   });
+
+  it('evaluates provider-backed names deterministically in simulator mode', async () => {
+    const config = buildConfig() as unknown as AppConfig;
+    (config.llm as { defaultProvider: string }).defaultProvider = 'simulated';
+    const reg = buildEvaluatorRegistry(config);
+
+    for (const name of ['llm-judge', 'helpfulness', 'coherence', 'correctness', 'goal-success-rate']) {
+      await expect(reg.get(name)?.evaluate({ actual: 'same', expected: 'same', inputs: {} })).resolves.toMatchObject({
+        score: 1,
+        passed: true,
+      });
+    }
+  });
 });

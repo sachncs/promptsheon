@@ -64,6 +64,9 @@ class LLMJudgeEvaluator implements Evaluator {
   constructor(public readonly name: string, private config: AppConfig, private systemPrompt: string) {}
 
   async evaluate(input: EvalInput): Promise<EvalResult> {
+    if (this.config.llm.defaultProvider === 'simulated') {
+      return simulatedResult(this.name, input);
+    }
     const agent = new Agent({
       model: createModel(this.config),
       systemPrompt: this.systemPrompt,
@@ -72,6 +75,23 @@ class LLMJudgeEvaluator implements Evaluator {
     const result = await agent.invoke(JSON.stringify(input));
     return NUMERIC_RESULT.parse(JSON.parse(extractText(result)));
   }
+}
+
+function simulatedResult(name: string, input: EvalInput): EvalResult {
+  const actual = input.actual.trim();
+  const expected = input.expected.trim();
+  if (actual.length === 0) {
+    return { score: 0, passed: false, reasoning: `${name}: output is empty` };
+  }
+  if (expected.length > 0 && canonicalText(actual) === canonicalText(expected)) {
+    return { score: 1, passed: true, reasoning: `${name}: output matches the expected value` };
+  }
+  const score = Math.min(0.9, 0.55 + Math.min(actual.length, 350) / 3500);
+  return {
+    score,
+    passed: score >= 0.5,
+    reasoning: `${name}: deterministic simulator score based on non-empty output shape; semantic judging requires a configured provider`,
+  };
 }
 
 /**
