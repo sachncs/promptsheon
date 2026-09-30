@@ -76,7 +76,8 @@ export async function seedSession(page: Page, session: SessionInfo): Promise<voi
   });
   if (!auth.ok()) throw new Error(`browser session exchange failed: ${auth.status()} ${await auth.text()}`);
   await page.evaluate((s) => {
-    const { apiKey: _apiKey, ...safeSession } = s;
+    const { apiKey, ...safeSession } = s;
+    void apiKey;
     window.localStorage.setItem('promptsheon:session:v1', JSON.stringify(safeSession));
   }, session);
 }

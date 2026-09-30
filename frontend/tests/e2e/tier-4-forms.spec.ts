@@ -1,4 +1,4 @@
-import { test, expect, request } from '@playwright/test';
+import { expect, request, test, type Page } from '@playwright/test';
 
 /**
  * Form-submission tier. Each test uses the backend bootstrap API
@@ -39,7 +39,7 @@ async function bootstrap() {
   return cachedBootstrap;
 }
 
-async function establishBrowserSession(page: import('@playwright/test').Page, apiKey: string): Promise<void> {
+async function establishBrowserSession(page: Page, apiKey: string): Promise<void> {
   const response = await page.request.post('/api/auth/session', {
     headers: { Authorization: `Bearer ${apiKey}` },
     data: {},
