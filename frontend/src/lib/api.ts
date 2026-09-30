@@ -2654,12 +2654,9 @@ export const mutationProposalApi = {
   },
   promote: async (id: string, environment: ReleaseEnvironment): Promise<{ proposal: MutationProposal; release: Release }> => {
     const r = await client.post<unknown>(`/mutation-proposals/${id}/promote`, { environment });
-    if (!r.data || typeof r.data !== 'object') throw new ApiError('The server returned invalid promotion data.', { code: 'INVALID_RESPONSE' });
-    const value = r.data as { proposal?: unknown; release?: unknown };
-    const proposal = MutationProposalSchema.safeParse(value.proposal);
-    const release = ReleaseSchema.safeParse(value.release);
-    if (!proposal.success || !release.success) throw new ApiError('The server returned invalid promotion data.', { code: 'INVALID_RESPONSE' });
-    return { proposal: proposal.data, release: release.data };
+    const parsed = z.object({ proposal: MutationProposalSchema, release: ReleaseSchema }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid promotion data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
   },
 };
 
