@@ -1537,9 +1537,21 @@ export const projectApi = {
     if (!parsed.success) throw new ApiError('The server returned invalid project data.', { code: 'INVALID_RESPONSE' });
     return { data: parsed.data };
   },
-  create: (data: { workspaceId: string; name: string; description?: string }) => client.post('/projects', data),
-  update: (id: string, data: { name?: string; description?: string }) => client.put(`/projects/${id}`, data),
-  delete: (id: string) => client.delete(`/projects/${id}`),
+  create: async (data: { workspaceId: string; name: string; description?: string }): Promise<{ data: Project }> => {
+    const r = await client.post<unknown>('/projects', data);
+    const parsed = ProjectSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid project.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  update: async (id: string, data: { name?: string; description?: string }): Promise<{ data: Project }> => {
+    const r = await client.put<unknown>(`/projects/${id}`, data);
+    const parsed = ProjectSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid project.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  delete: async (id: string): Promise<void> => {
+    await client.delete(`/projects/${id}`);
+  },
 };
 
 export const capabilityApi = {
@@ -1559,8 +1571,15 @@ export const capabilityApi = {
     if (!parsed.success) throw new ApiError('The server returned invalid capability data.', { code: 'INVALID_RESPONSE' });
     return { data: parsed.data };
   },
-  update: (id: string, data: { name?: string; description?: string }) => client.put(`/capabilities/${id}`, data),
-  delete: (id: string) => client.delete(`/capabilities/${id}`),
+  update: async (id: string, data: { name?: string; description?: string }): Promise<{ data: Capability }> => {
+    const r = await client.put<unknown>(`/capabilities/${id}`, data);
+    const parsed = CapabilitySchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid capability.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  delete: async (id: string): Promise<void> => {
+    await client.delete(`/capabilities/${id}`);
+  },
 };
 
 export const versionApi = {
@@ -1574,8 +1593,12 @@ export const versionApi = {
     if (!parsed.success) throw new ApiError('The server returned invalid capability version data.', { code: 'INVALID_RESPONSE' });
     return { data: parsed.data };
   },
-  create: (data: { capabilityId: string; version: number; manifest: string; manifestHash: string; createdBy?: string }) =>
-    client.post('/capability-versions', data),
+  create: async (data: { capabilityId: string; version: number; manifest: string; manifestHash: string; createdBy?: string }): Promise<{ data: CapabilityVersion }> => {
+    const r = await client.post<unknown>('/capability-versions', data);
+    const parsed = CapabilityVersionSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid capability version.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
 };
 
 export const releaseApi = {
