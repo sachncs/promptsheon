@@ -21,12 +21,13 @@ export default function AgentsPage() {
   const session = useRequireSession();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<AgentSpecificationStatus | 'all'>('all');
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('');
   const workspaces = useQuery<WorkspaceRow[]>({
     queryKey: ['workspaces'],
     queryFn: () => workspaceApi.list(1, 100).then((response) => response.data),
     enabled: Boolean(session),
   });
-  const workspaceId = workspaces.data?.[0]?.id;
+  const workspaceId = selectedWorkspaceId || workspaces.data?.[0]?.id;
   const specifications = useQuery({
     queryKey: ['agent-specifications', workspaceId, page, status],
     queryFn: () => agentSpecificationApi.list(workspaceId!, { page, pageSize: PAGE_SIZE, ...(status !== 'all' ? { status } : {}) }).then((response) => response.data),
@@ -71,13 +72,16 @@ export default function AgentsPage() {
         <Surface padded={false}>
           <div className="flex flex-col gap-3 border-b border-border-subtle p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-text-muted">{data?.total ?? 0} revision{data?.total === 1 ? '' : 's'}</div>
-            <ThemedSelect
-              value={status}
-              onValueChange={(value) => { setStatus(value as AgentSpecificationStatus | 'all'); setPage(1); }}
-              options={[{ value: 'all', label: 'All statuses' }, { value: 'draft', label: 'Draft' }, { value: 'candidate', label: 'Candidate' }, { value: 'published', label: 'Published' }, { value: 'retired', label: 'Retired' }]}
-              ariaLabel="Filter agent specifications by status"
-              triggerClassName="w-full sm:w-44"
-            />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {(workspaces.data?.length ?? 0) > 1 && <ThemedSelect value={workspaceId ?? ''} onValueChange={(value) => { setSelectedWorkspaceId(value); setPage(1); }} options={(workspaces.data ?? []).map((workspace) => ({ value: workspace.id, label: workspace.name }))} ariaLabel="Select workspace for agent specifications" triggerClassName="w-full sm:w-52" />}
+              <ThemedSelect
+                value={status}
+                onValueChange={(value) => { setStatus(value as AgentSpecificationStatus | 'all'); setPage(1); }}
+                options={[{ value: 'all', label: 'All statuses' }, { value: 'draft', label: 'Draft' }, { value: 'candidate', label: 'Candidate' }, { value: 'published', label: 'Published' }, { value: 'retired', label: 'Retired' }]}
+                ariaLabel="Filter agent specifications by status"
+                triggerClassName="w-full sm:w-44"
+              />
+            </div>
           </div>
           <div className="divide-y divide-border-subtle">
             {(data?.items ?? []).map((item) => (

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { ThemedSelect } from '@/components/brand/themed-select';
 
 export default function NewAgentPage() {
   const session = useRequireSession();
@@ -23,13 +24,14 @@ export default function NewAgentPage() {
   const [model, setModel] = useState('simulator');
   const [owner, setOwner] = useState('workspace team');
   const [changeReason, setChangeReason] = useState('Initial agent specification');
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('');
   const [validation, setValidation] = useState<{ valid: true; specification: unknown } | { valid: false; issues: Array<{ code: string; message: string; path: Array<string | number> }> } | null>(null);
   const workspaces = useQuery<WorkspaceRow[]>({
     queryKey: ['workspaces'],
     queryFn: () => workspaceApi.list(1, 100).then((response) => response.data),
     enabled: Boolean(session),
   });
-  const workspaceId = workspaces.data?.[0]?.id;
+  const workspaceId = selectedWorkspaceId || workspaces.data?.[0]?.id;
   const draft: AgentSpecificationDraft = { role, objective, prompt: { system: systemPrompt }, modelPolicy: { provider, model }, lifecycle: { owner } };
   const validate = useMutation({
     mutationFn: () => agentSpecificationApi.validate(workspaceId!, draft),
@@ -57,6 +59,7 @@ export default function NewAgentPage() {
       ) : (
         <Surface>
           <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); if (validation?.valid) mutation.mutate(); }}>
+            {(workspaces.data?.length ?? 0) > 1 && <div className="grid gap-2"><Label>Workspace</Label><ThemedSelect value={workspaceId ?? ''} onValueChange={(value) => { setSelectedWorkspaceId(value); setValidation(null); }} options={(workspaces.data ?? []).map((workspace) => ({ value: workspace.id, label: workspace.name }))} ariaLabel="Select workspace for new agent specification" /></div>}
             <div className="grid gap-5 md:grid-cols-2">
               <Field label="Role" value={role} onChange={(value) => { setRole(value); setValidation(null); }} required />
               <Field label="Owner" value={owner} onChange={(value) => { setOwner(value); setValidation(null); }} required />
