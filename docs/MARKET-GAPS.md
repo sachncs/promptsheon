@@ -141,10 +141,9 @@ segment. Tier 3 features would create a category.
 - **Moat impact**: medium. Differentiation comes from **shipping the eval library + the trace store** as one product. Both already have traces; the eval library is where Langfuse/Braintrust add value.
 
 #### T1-5. **Customer-facing analytics (per-user, per-tenant)**
-- **Current status**: per-tenant totals, a token-ranked user leaderboard, and a selected-user daily usage drill-down are available in `/app/admin/analytics` through the analytics API. Trace actors remain organization-scoped and no cross-tenant rows are exposed.
-- **Current status**: the traces surface now includes an admin-only prompt-risk view backed by redacted trace attribution. It flags repeated failures, token burn, and unusual execution volume without exposing prompt content.
-- **Current status**: tenant-scoped prompt-risk signals are available from redacted persisted traces, and administrators can create, update, disable, delete, and inspect durable per-user daily run quotas with usage counters. New durable execution jobs carry actor attribution.
-- **Remaining**: enforce the persisted token and cost limits at execution admission, backfill actor attribution for legacy execution rows, and broaden analytics beyond the current trace-backed risk window.
+- **Current status**: per-tenant totals, a token-ranked user leaderboard, a selected-user daily usage drill-down, and an admin-only prompt-risk view are available through the analytics and traces surfaces. Risk signals use redacted trace attribution to flag repeated failures, token burn, and unusual execution volume without exposing prompt content.
+- **Current status**: administrators can create, update, disable, delete, and inspect durable per-user daily run, token, and cost quotas with usage counters. New durable execution jobs carry actor attribution, and token/cost limits are enforced before a job is marked successful.
+- **Remaining**: backfill actor attribution for legacy execution rows and broaden analytics beyond the current trace-backed risk window. Concurrent jobs can still consume provider resources before a post-execution token/cost check rejects an over-limit result; admission-time reservation is the next hardening step.
 - **Moat impact**: high for SaaS-style customers; medium for self-hosted (most self-hosted customers don't bill per-user internally yet).
 
 ---
