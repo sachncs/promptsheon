@@ -36,7 +36,7 @@ export function ThemedSelect({
   triggerClassName?: string;
 }) {
   const selectProps: { value?: string; onValueChange?: (v: string) => void; disabled: boolean } = { disabled };
-  if (value !== undefined && value !== '') selectProps.value = value;
+  if (value !== undefined) selectProps.value = value;
   if (onValueChange !== undefined) selectProps.onValueChange = onValueChange;
 
   return (
