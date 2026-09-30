@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Download, FileSearch, Filter } from 'lucide-react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation } from '@tanstack/react-query';
 import { evidenceApi, type EvidenceRecord } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
@@ -26,9 +26,17 @@ const eventOptions = [
 export default function EvidencePage() {
   const session = useRequireSession();
   const [eventType, setEventType] = useState('');
-  const evidence = useQuery({
+  const evidence = useInfiniteQuery({
     queryKey: ['evidence', { eventType }],
-    queryFn: () => evidenceApi.list({ limit: 100, ...(eventType ? { eventType } : {}) }).then((r) => r.data),
+    queryFn: ({ pageParam }) => evidenceApi.list({
+      limit: 100,
+      ...(pageParam ? { before: pageParam } : {}),
+      ...(eventType ? { eventType } : {}),
+    }).then((r) => r.data),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.items.length === 100
+      ? lastPage.items[lastPage.items.length - 1]?.occurredAt
+      : undefined,
     enabled: Boolean(session),
     refetchInterval: 15_000,
   });
@@ -48,7 +56,9 @@ export default function EvidencePage() {
   if (!session) return null;
   if (evidence.isError) return <QueryError message={evidence.error} onRetry={() => void evidence.refetch()} />;
 
-  const items = evidence.data?.items ?? [];
+  const pages = evidence.data?.pages ?? [];
+  const items = pages.flatMap((page) => page.items);
+  const total = pages[0]?.total ?? 0;
 
   return (
     <div className="space-y-6">
@@ -76,7 +86,7 @@ export default function EvidencePage() {
         <SurfaceHeader
           className="px-5 pt-5"
           title="Evidence timeline"
-          description={evidence.data ? `${evidence.data.total} record(s) in the current view.` : 'Loading immutable records…'}
+          description={evidence.data ? `${total} record(s) in the current view.` : 'Loading immutable records…'}
           actions={
             <div className="flex items-center gap-2">
               <Filter className="h-3.5 w-3.5 text-text-subtle" aria-hidden="true" />
@@ -98,6 +108,18 @@ export default function EvidencePage() {
             {items.map((item) => <EvidenceRow key={item.id} item={item} />)}
           </ul>
         )}
+        {evidence.hasNextPage ? (
+          <div className="border-t border-border-subtle px-5 py-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void evidence.fetchNextPage()}
+              disabled={evidence.isFetchingNextPage}
+            >
+              {evidence.isFetchingNextPage ? 'Loading older records…' : 'Load older records'}
+            </Button>
+          </div>
+        ) : null}
       </Surface>
     </div>
   );
