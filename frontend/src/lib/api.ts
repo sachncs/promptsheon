@@ -2052,7 +2052,7 @@ export const evidenceApi = {
     const r = await client.get<unknown>('/evidence', { params: options });
     return { data: EvidencePageSchema.parse(r.data) };
   },
-  export: async (options: { limit?: number; before?: string; eventType?: string } = {}): Promise<{
+  export: async (options: { limit?: number; before?: string; eventType?: string; workspaceId?: string } = {}): Promise<{
     schemaVersion: string;
     organizationId: string;
     exportedAt: string;

@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { Download, FileSearch, Filter } from 'lucide-react';
-import { useInfiniteQuery, useMutation } from '@tanstack/react-query';
-import { evidenceApi, type EvidenceRecord } from '@/lib/api';
+import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
+import { evidenceApi, type EvidenceRecord, workspaceApi } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -26,12 +26,19 @@ const eventOptions = [
 export default function EvidencePage() {
   const session = useRequireSession();
   const [eventType, setEventType] = useState('');
+  const [workspaceId, setWorkspaceId] = useState('');
+  const workspaces = useQuery({
+    queryKey: ['workspaces'],
+    queryFn: () => workspaceApi.list(1, 100).then((response) => response.data),
+    enabled: Boolean(session),
+  });
   const evidence = useInfiniteQuery({
-    queryKey: ['evidence', { eventType }],
+    queryKey: ['evidence', { eventType, workspaceId }],
     queryFn: ({ pageParam }) => evidenceApi.list({
       limit: 100,
       ...(pageParam ? { before: pageParam } : {}),
       ...(eventType ? { eventType } : {}),
+      ...(workspaceId ? { workspaceId } : {}),
     }).then((r) => r.data),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.items.length === 100
@@ -41,7 +48,7 @@ export default function EvidencePage() {
     refetchInterval: 15_000,
   });
   const exportMutation = useMutation({
-    mutationFn: () => evidenceApi.export({ limit: 500, ...(eventType ? { eventType } : {}) }),
+    mutationFn: () => evidenceApi.export({ limit: 500, ...(eventType ? { eventType } : {}), ...(workspaceId ? { workspaceId } : {}) }),
     onSuccess: (exported) => {
       const blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -54,6 +61,7 @@ export default function EvidencePage() {
   });
 
   if (!session) return null;
+  if (workspaces.isError) return <QueryError message={workspaces.error} onRetry={() => void workspaces.refetch()} />;
   if (evidence.isError) return <QueryError message={evidence.error} onRetry={() => void evidence.refetch()} />;
 
   const pages = evidence.data?.pages ?? [];
@@ -89,6 +97,12 @@ export default function EvidencePage() {
           actions={
             <div className="flex items-center gap-2">
               <Filter className="h-3.5 w-3.5 text-text-subtle" aria-hidden="true" />
+              <ThemedSelect
+                value={workspaceId || 'all'}
+                onValueChange={(value) => setWorkspaceId(value === 'all' ? '' : value)}
+                options={[{ value: 'all', label: 'All workspaces' }, ...(workspaces.data ?? []).map((workspace) => ({ value: workspace.id, label: workspace.name }))]}
+                ariaLabel="Filter evidence by workspace"
+              />
               <ThemedSelect value={eventType || 'all'} onValueChange={(value) => setEventType(value === 'all' ? '' : value)} options={eventOptions} />
             </div>
           }
