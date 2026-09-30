@@ -99,6 +99,12 @@ export interface AgentSpecificationValidationIssue {
   path: Array<string | number>;
 }
 
+export interface AgentSpecificationDiffEntry {
+  path: string;
+  before: unknown;
+  after: unknown;
+}
+
 export interface VaultKeyringEntry {
   id: number;
   label: string;
@@ -1082,6 +1088,12 @@ export const agentSpecificationApi = {
     const parsed = z.object({ items: z.array(AgentSpecificationMetadataSchema) }).safeParse(response.data);
     if (!parsed.success) throw new ApiError('The server returned invalid agent lineage data.', { code: 'INVALID_RESPONSE' });
     return { data: parsed.data.items };
+  },
+  diff: async (workspaceId: string, leftHash: string, rightHash: string): Promise<{ data: AgentSpecificationDiffEntry[] }> => {
+    const response = await client.post<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/diff`, { leftHash, rightHash });
+    const parsed = z.object({ changes: z.array(z.object({ path: z.string(), before: z.unknown(), after: z.unknown() })) }).safeParse(response.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid agent diff data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data.changes };
   },
   publish: async (workspaceId: string, hash: string): Promise<{ data: AgentSpecificationRecord }> => {
     const response = await client.post<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/${encodeURIComponent(hash)}/publish`);
