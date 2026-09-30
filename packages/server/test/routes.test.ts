@@ -8,6 +8,7 @@ import { registerWorkspaceRoutes } from '../src/routes/workspace.js';
 import { registerHealthRoutes } from '../src/routes/health.js';
 import { HealthService } from '../src/application/health-service.js';
 import { SqliteHealthProbe } from '../src/infrastructure/sqlite-health-probe.js';
+import { FallbackChain, Gateway, RateLimiter, ResponseCache } from '../src/llm/gateway.js';
 
 describe('Fastify routes', () => {
   let db: Database.Database;
@@ -24,7 +25,13 @@ describe('Fastify routes', () => {
     });
     const workspaceRepo = new WorkspaceRepo(db);
     registerWorkspaceRoutes(app, new WorkspaceService(workspaceRepo));
-    registerHealthRoutes(app, new HealthService(new SqliteHealthProbe(db)));
+    const gateway = new Gateway({
+      cache: new ResponseCache(),
+      fallback: new FallbackChain(['simulated']),
+      rateLimiter: new RateLimiter({ capacity: 10, refillPerSecond: 1 }),
+      router: {} as never,
+    });
+    registerHealthRoutes(app, new HealthService(new SqliteHealthProbe(db)), gateway);
     await app.ready();
   });
 
@@ -36,10 +43,11 @@ describe('Fastify routes', () => {
   it('GET /api/health returns 200', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/health' });
     expect(res.statusCode).toBe(200);
-    const body = res.json() as { status: string; db: string; timestamp: string };
+    const body = res.json() as { status: string; db: string; timestamp: string; gateway: { cacheEntries: number } };
     expect(body.status).toBe('ok');
     expect(body.db).toBe('ok');
     expect(typeof body.timestamp).toBe('string');
+    expect(body.gateway.cacheEntries).toBe(0);
   });
 
   it('GET /api/ready verifies database readiness', async () => {
