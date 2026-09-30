@@ -12,6 +12,7 @@ import {
   type Edge,
   type Node,
   type NodeChange,
+  type ReactFlowInstance,
   type ReactFlowProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -32,6 +33,13 @@ export interface DagCanvasProps {
 }
 
 export function DagCanvas({ nodes, edges, onNodesChange, onEdgesChange, onConnect, onNodeClick, readOnly = false }: DagCanvasProps) {
+  const flowInstance = React.useRef<ReactFlowInstance<Node, Edge> | null>(null);
+
+  React.useEffect(() => {
+    if (!flowInstance.current || nodes.length === 0) return;
+    flowInstance.current.fitView({ padding: 0.2, duration: 150 });
+  }, [nodes.length]);
+
   const handleNodesChange = React.useCallback(
     (changes: NodeChange[]) => {
       if (readOnly) return;
@@ -60,6 +68,9 @@ export function DagCanvas({ nodes, edges, onNodesChange, onEdgesChange, onConnec
       nodeTypes,
       fitView: true,
       fitViewOptions: { padding: 0.2 },
+      onInit: (instance) => {
+        flowInstance.current = instance;
+      },
       proOptions: { hideAttribution: true },
       nodesDraggable: !readOnly,
       nodesConnectable: !readOnly,

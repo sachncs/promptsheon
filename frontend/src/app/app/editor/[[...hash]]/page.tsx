@@ -137,12 +137,14 @@ export default function ManifestEditorPage() {
       id: n.id,
       type: 'capability' as const,
       position: { x: (i % 4) * 280, y: Math.floor(i / 4) * 180 },
+      style: { width: 220, height: 108, visibility: 'visible' as const },
       data: {
         id: n.id,
         name: n.name,
         goal: n.goal,
         isSource: incoming.get(n.id) === undefined,
         isSink: !manifest.edges.some((e) => e.from === n.id),
+        onSelect: () => setSelectedNodeId(n.id),
       },
     }));
     const es: Edge[] = manifest.edges.map((e, i) => ({
@@ -157,14 +159,17 @@ export default function ManifestEditorPage() {
 
   const handleNodesChange = React.useCallback((updated: Array<{ id: string; data: { name: unknown; goal: unknown } }>) => {
     setManifest((prev) => {
-      const byId = new Map(prev.nodes.map((n) => [n.id, n]));
-      const next = updated
-        .map((u) => {
-          const orig = byId.get(u.id);
-          return orig ? { ...orig, name: u.data.name as string, goal: u.data.goal as string } : null;
-        })
-        .filter((n): n is SubCapabilityManifest => n !== null);
-      return { ...prev, nodes: next };
+      if (updated.length === 0) return prev;
+      const changes = new Map(updated.map((u) => [u.id, u]));
+      return {
+        ...prev,
+        nodes: prev.nodes.map((node) => {
+          const change = changes.get(node.id);
+          return change
+            ? { ...node, name: String(change.data.name), goal: String(change.data.goal) }
+            : node;
+        }),
+      };
     });
   }, []);
 

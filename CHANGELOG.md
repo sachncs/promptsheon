@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Register credential-free `json.parse` and `text.length` tool adapters behind
   the existing organization, execution, and manifest allowlist checks.
 
+- Add a browser-safe shared tool catalog and DAG editor controls for attaching
+  built-in tools to a node while keeping its execution allowlist synchronized.
+
+- Fix DAG editor template hydration and canvas sizing so loaded nodes remain in
+  state and render visibly after a template is applied.
+
 ### Removed
 - Removed the experimental VS Code extension workspace. Promptsheon now
   focuses on the self-hosted API, Next.js console, CLI, SDK, and public

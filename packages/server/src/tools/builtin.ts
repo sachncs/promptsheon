@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BUILTIN_TOOL_SPECS } from '@promptsheon/shared';
 import type { ToolAdapter } from '../application/execution-ports.js';
 
 const JsonParseInput = z.object({ value: z.string().max(1_000_000) }).strict();
@@ -11,14 +12,7 @@ const TextLengthInput = z.object({ value: z.string().max(1_000_000) }).strict();
 export function createBuiltinToolAdapters(): readonly ToolAdapter[] {
   return [
     {
-      name: 'json.parse',
-      description: 'Parse a JSON string into a structured value.',
-      inputSchema: {
-        type: 'object',
-        properties: { value: { type: 'string', maxLength: 1_000_000 } },
-        required: ['value'],
-        additionalProperties: false,
-      },
+      ...BUILTIN_TOOL_SPECS['json.parse'],
       invoke: async (input) => {
         const parsed = JsonParseInput.safeParse(input);
         if (!parsed.success) throw new Error('json.parse requires a string value');
@@ -30,14 +24,7 @@ export function createBuiltinToolAdapters(): readonly ToolAdapter[] {
       },
     },
     {
-      name: 'text.length',
-      description: 'Count Unicode code points and UTF-8 bytes in a string.',
-      inputSchema: {
-        type: 'object',
-        properties: { value: { type: 'string', maxLength: 1_000_000 } },
-        required: ['value'],
-        additionalProperties: false,
-      },
+      ...BUILTIN_TOOL_SPECS['text.length'],
       invoke: async (input) => {
         const parsed = TextLengthInput.safeParse(input);
         if (!parsed.success) throw new Error('text.length requires a string value');

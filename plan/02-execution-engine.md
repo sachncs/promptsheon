@@ -101,6 +101,8 @@ Implemented in the current Phase 2 slice:
   manifest declares them and includes them in `metadata.allowedTools`, so the
   default tool surface is useful for simulator workflows without weakening
   authorization boundaries.
+- The DAG editor exposes these built-ins through node configuration and keeps
+  the node tool list and `metadata.allowedTools` synchronized.
 
 Remaining exit-gate work is limited to adding product-specific ToolAdapters
 when product capabilities define them, plus final full-repository verification.

@@ -14,6 +14,7 @@ export interface CapabilityNodeData extends Record<string, unknown> {
   isSource?: boolean;
   isSink?: boolean;
   hasErrors?: boolean;
+  onSelect?: () => void;
 }
 
 const statusColor: Record<string, string> = {
@@ -27,6 +28,7 @@ function CapabilityNodeImpl({ data, selected }: NodeProps<Node<CapabilityNodeDat
   const d = data;
   return (
     <Card
+      onClick={() => d.onSelect?.()}
       className={cn(
         'min-w-48 max-w-64 border-2 transition-all',
         statusColor[d.status ?? 'pending'],

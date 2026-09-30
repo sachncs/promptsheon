@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
-import type { Manifest, SubCapabilityManifest } from '@promptsheon/shared';
+import { BUILTIN_TOOL_SPECS } from '@promptsheon/shared/builtin-tools';
+import type { Manifest, SubCapabilityManifest, ToolSpec } from '@promptsheon/shared';
 
 interface NodeConfigPanelProps {
   selectedNodeId: string | null;
@@ -38,6 +39,25 @@ export function NodeConfigPanel({ selectedNodeId, manifest, onChange }: NodeConf
     });
   };
 
+  const configuredTools = node.manifest.tools;
+  const allowedTools = Array.isArray(node.manifest.metadata.allowedTools)
+    ? node.manifest.metadata.allowedTools.filter((value): value is string => typeof value === 'string')
+    : [];
+  const availableToolNames = Object.keys(BUILTIN_TOOL_SPECS).filter(
+    (name) => !configuredTools.some((tool) => tool.name === name),
+  );
+
+  const updateTools = (tools: ToolSpec[]): void => {
+    const names = tools.map((tool) => tool.name);
+    updateNode({
+      manifest: {
+        ...node.manifest,
+        tools,
+        metadata: { ...node.manifest.metadata, allowedTools: names },
+      },
+    });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -54,6 +74,60 @@ export function NodeConfigPanel({ selectedNodeId, manifest, onChange }: NodeConf
             onChange={(e) => updateNode({ name: e.target.value })}
             placeholder="Node name"
           />
+        </div>
+        <div className="space-y-2 rounded-md border border-border/70 p-3">
+          <div>
+            <Label htmlFor="node-tool">Tools</Label>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Built-in tools are credential-free. Selected tools are added to this node&apos;s execution allowlist.
+            </p>
+          </div>
+          {configuredTools.length > 0 ? (
+            <div className="space-y-2">
+              {configuredTools.map((tool) => (
+                <div key={tool.name} className="flex items-center justify-between rounded border px-2 py-1.5">
+                  <div>
+                    <p className="font-mono text-xs">{tool.name}</p>
+                    <p className="text-xs text-muted-foreground">{tool.description}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Remove ${tool.name}`}
+                    onClick={() => updateTools(configuredTools.filter((candidate) => candidate.name !== tool.name))}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">No tools configured.</p>
+          )}
+          {availableToolNames.length > 0 ? (
+            <div className="flex gap-2">
+              <select
+                id="node-tool"
+                defaultValue=""
+                className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+                onChange={(event) => {
+                  const tool = BUILTIN_TOOL_SPECS[event.target.value];
+                  if (!tool) return;
+                  updateTools([...configuredTools, { ...tool, config: { ...tool.config } }]);
+                  event.target.value = '';
+                }}
+              >
+                <option value="">Add a built-in tool</option>
+                {availableToolNames.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+          {allowedTools.length > 0 ? (
+            <p className="text-[11px] text-muted-foreground">Allowed: {allowedTools.join(', ')}</p>
+          ) : null}
         </div>
         <div>
           <Label htmlFor="node-goal">Goal</Label>

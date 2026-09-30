@@ -9,3 +9,4 @@ export * from './db-migrate.js';
 export * from './eval/pass-at-k.js';
 export * from './eval/pareto.js';
 export * from './redteam/seeds.js';
+export * from './builtin-tools.js';
