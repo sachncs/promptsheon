@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  BedrockRuntimeClient,
+  ConverseCommand,
+  type ConverseCommandOutput,
+} from '@aws-sdk/client-bedrock-runtime';
 import type { LlmCredentials } from '@promptsheon/shared';
 
 export const LlmProbeRequestSchema = z.object({
@@ -52,6 +57,7 @@ export class LlmRouter {
   constructor(
     private readonly credentials?: LlmCredentials,
     private readonly baseUrl?: string,
+    private readonly bedrockClient?: Pick<BedrockRuntimeClient, 'send'>,
   ) {}
 
   async probe(req: LlmProbeRequest): Promise<LlmProbeResult> {
@@ -89,7 +95,8 @@ export class LlmRouter {
         content = await this.completeAnthropic(req, promptTokens);
         break;
       case 'bedrock':
-        throw new Error('Bedrock completion not yet wired through the gateway; use /api/executions with an active release');
+        content = await this.completeBedrock(req);
+        break;
       case 'custom':
         content = await this.completeCustom(req, promptTokens);
         break;
@@ -237,6 +244,37 @@ export class LlmRouter {
       choices: Array<{ message: { content: string } }>;
     };
     return data.choices[0]?.message.content ?? '';
+  }
+
+  private async completeBedrock(req: LlmCompleteRequest): Promise<string> {
+    const credentials = this.credentials?.bedrock;
+    const region = credentials?.region ?? process.env['AWS_REGION'] ?? process.env['AWS_DEFAULT_REGION'];
+    if (!region && !this.bedrockClient) {
+      throw new Error('Bedrock region is required; configure llm.credentials.bedrock.region or AWS_REGION');
+    }
+
+    const client = this.bedrockClient ?? new BedrockRuntimeClient({
+      region: region ?? '',
+      ...(credentials
+        ? {
+            credentials: {
+              accessKeyId: credentials.accessKeyId,
+              secretAccessKey: credentials.secretAccessKey,
+            },
+          }
+        : {}),
+    });
+    const response: ConverseCommandOutput = await client.send(new ConverseCommand({
+      modelId: req.model,
+      messages: [{ role: 'user', content: [{ text: req.prompt }] }],
+      inferenceConfig: {
+        temperature: req.temperature,
+        maxTokens: 1024,
+      },
+    }));
+    return (response.output?.message?.content ?? [])
+      .flatMap((block) => 'text' in block && typeof block.text === 'string' ? [block.text] : [])
+      .join('');
   }
 
   private async probeOpenai(req: LlmProbeRequest, started: number): Promise<LlmProbeResult> {
