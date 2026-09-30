@@ -630,6 +630,21 @@ const EvalSuiteRunSchema = z.object({
   error: z.string().nullable(),
 });
 
+const EvalGateSuiteSchema = z.object({
+  suiteId: z.string(),
+  suiteName: z.string(),
+  ok: z.boolean(),
+  rawScore: z.number().min(0).max(1),
+  threshold: z.number().min(0).max(1),
+});
+
+const EvalGateSummarySchema = z.object({
+  ok: z.boolean(),
+  score: z.number().min(0).max(1),
+  regressions: z.array(EvalGateSuiteSchema),
+  suites: z.array(EvalGateSuiteSchema),
+});
+
 const MutationProposalSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
@@ -2437,18 +2452,31 @@ export const evalSuiteApi = {
     if (!run.success || !Array.isArray(r.data.results)) throw new ApiError('The server returned invalid eval suite run details.', { code: 'INVALID_RESPONSE' });
     return { run: run.data, results: r.data.results };
   },
-  create: (input: {
+  create: async (input: {
     capabilityId: string;
     name: string;
     description?: string;
     passThreshold?: number;
     borderlineBand?: number;
     initialGraders?: Array<{ name: string; kind: string; weight: number; config: unknown }>;
-  }) => client.post('/eval-suites', input).then((r) => r.data),
-  run: (suiteId: string, trials: unknown) =>
-    client.post(`/eval-suites/${suiteId}/run`, trials).then((r) => r.data),
-  gate: (repoId: string, trials: unknown) =>
-    client.post(`/repos/${repoId}/eval-gate`, { trials }).then((r) => r.data),
+  }): Promise<{ data: EvalSuite }> => {
+    const r = await client.post<unknown>('/eval-suites', input);
+    const parsed = EvalSuiteSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid evaluation suite.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  run: async (suiteId: string, trials: unknown): Promise<{ data: EvalSuiteRun }> => {
+    const r = await client.post<unknown>(`/eval-suites/${suiteId}/run`, trials);
+    const parsed = EvalSuiteRunSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid evaluation suite run.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  gate: async (repoId: string, trials: unknown): Promise<{ data: z.infer<typeof EvalGateSummarySchema> }> => {
+    const r = await client.post<unknown>(`/repos/${repoId}/eval-gate`, { trials });
+    const parsed = EvalGateSummarySchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid evaluation gate result.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
 };
 
 export const mutationProposalApi = {

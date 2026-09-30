@@ -48,9 +48,9 @@ export default function EvalSuiteDetailPage() {
       }
       return evalSuiteApi.run(id, { trials });
     },
-    onSuccess: (result: { runId?: string }) => {
+    onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ['eval-suite-runs', id] });
-      if (result.runId) setSelectedRunId(result.runId);
+      setSelectedRunId(result.data.id);
     },
   });
 
