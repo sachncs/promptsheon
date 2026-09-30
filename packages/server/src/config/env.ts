@@ -57,6 +57,14 @@ function envBool(key: string, fallback: boolean): boolean {
   }
 }
 
+function envFloat(key: string, fallback: number): number {
+  const raw = process.env[key];
+  if (!raw) return fallback;
+  const value = Number(raw.trim());
+  if (!Number.isFinite(value)) throw new Error(`${key} must be a finite number`);
+  return value;
+}
+
 export function loadConfig(): AppConfig {
   const frontendPort = envInt('PROMPTSHEON_FRONTEND_PORT', 3000);
   return {
@@ -80,6 +88,7 @@ export function loadConfig(): AppConfig {
       webhookSecret: process.env['PROMPTSHEON_WEBHOOK_SECRET'] || undefined,
       rateLimitMax: envInt('PROMPTSHEON_RATE_LIMIT_MAX', 100),
       otelEndpoint: process.env['PROMPTSHEON_OTEL_ENDPOINT'] || undefined,
+      autoEvalSampleRate: envFloat('PROMPTSHEON_AUTO_EVAL_SAMPLE_RATE', 0),
     },
     llm: {
       defaultProvider: envString('PROMPTSHEON_LLM_PROVIDER', 'openai'),

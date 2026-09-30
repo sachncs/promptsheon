@@ -34,6 +34,8 @@ export interface AppConfig {
     rateLimitMax?: number;
     /** Optional OpenTelemetry exporter endpoint. */
     otelEndpoint?: string;
+    /** Fraction of completed executions evaluated asynchronously (0..1). */
+    autoEvalSampleRate?: number;
   };
   llm: {
     defaultProvider: string;

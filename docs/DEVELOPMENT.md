@@ -78,6 +78,12 @@ executor applies organization, execution, and allowlist authorization before
 invocation. These tools never make network calls and cap input at one million
 characters.
 
+Set `PROMPTSHEON_AUTO_EVAL_SAMPLE_RATE` to a decimal between `0` and `1` to
+sample completed durable executions for asynchronous deterministic evaluation.
+The default is `0`; sampled evaluation never blocks the execution result and
+does not require an LLM credential. LLM-judge evaluators remain explicit
+opt-in operations through the trace auto-evaluation endpoint.
+
 ### Useful checks
 
 ```bash

@@ -77,6 +77,10 @@ export function validateConfig(config: AppConfig): void {
     && (!Number.isInteger(config.server.rateLimitMax) || config.server.rateLimitMax < 1)) {
     throw new Error('PROMPTSHEON_RATE_LIMIT_MAX must be a positive integer');
   }
+  if (config.server.autoEvalSampleRate !== undefined
+    && (!Number.isFinite(config.server.autoEvalSampleRate) || config.server.autoEvalSampleRate < 0 || config.server.autoEvalSampleRate > 1)) {
+    throw new Error('PROMPTSHEON_AUTO_EVAL_SAMPLE_RATE must be between 0 and 1');
+  }
   if (!Number.isInteger(config.llm.maxRetries) || config.llm.maxRetries < 0) {
     throw new Error('PROMPTSHEON_LLM_MAX_RETRIES must be a non-negative integer');
   }

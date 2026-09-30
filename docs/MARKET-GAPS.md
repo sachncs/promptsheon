@@ -140,7 +140,9 @@ segment. Tier 3 features would create a category.
 
 #### T1-4. **Online evaluation on production traces**
 - **Current status**: implemented. `trace_scores`, `/api/traces/:id/scores`, built-in evaluators, and the trace detail auto-evaluation action provide trace-attached scoring.
-- **Remaining**: configurable automatic sampling on production traffic and richer model-based evaluator policies.
+- **Remaining**: richer model-based evaluator policies. Deterministic
+  evaluators can now be enabled for sampled durable executions with
+  `PROMPTSHEON_AUTO_EVAL_SAMPLE_RATE`; LLM judges remain explicit opt-in.
 - **Moat impact**: medium. Differentiation comes from **shipping the eval library + the trace store** as one product. Both already have traces; the eval library is where Langfuse/Braintrust add value.
 
 #### T1-5. **Customer-facing analytics (per-user, per-tenant)**

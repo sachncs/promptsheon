@@ -222,10 +222,22 @@ async function main() {
   const evidenceSink = new AsyncEvidenceSink(repos.evidence);
   app.addHook('onClose', async () => { await evidenceSink.flush(); });
   const executor = new ManifestGraphExecutor({ config, hub: sseHub, manifestRepo: repos.manifest, traceRepo: repos.trace, modelAdapter: new RouterModelAdapter(llmRouter), toolRegistry, evidence: evidenceSink });
-  const durableExecution = new DurableExecutionService(repos.executionJob, repos.agentSpecification!, executor, repos.executionCheckpoint, toolRegistry, undefined, evidenceSink, repos.trace, repos.userQuota);
+  const autoEval = new AutoEval({ traceRepo: repos.trace, scoreRepo: repos.traceScore, router: llmRouter });
+  const durableExecution = new DurableExecutionService(
+    repos.executionJob,
+    repos.agentSpecification!,
+    executor,
+    repos.executionCheckpoint,
+    toolRegistry,
+    undefined,
+    evidenceSink,
+    repos.trace,
+    repos.userQuota,
+    autoEval,
+    config.server.autoEvalSampleRate ?? 0,
+  );
   const durableWorker = durableExecution.createWorker();
   durableWorker.start();
-  const autoEval = new AutoEval({ traceRepo: repos.trace, scoreRepo: repos.traceScore, router: llmRouter });
   const gateway = new Gateway({
     cache: new ResponseCache(2048, new LlmResponseCacheRepo(db), 86_400_000),
     fallback: new FallbackChain(['custom', 'anthropic', 'openai']),

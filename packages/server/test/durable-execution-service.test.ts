@@ -73,6 +73,39 @@ describe('DurableExecutionService', () => {
     expect(executedManifest?.nodes[0]?.name).toBe('Simulator assistant');
   });
 
+  it('samples completed traces for asynchronous automatic evaluation', async () => {
+    const agentHash = 'c'.repeat(64);
+    const specification = AgentSpecificationSchema.parse({
+      role: 'Sampled assistant',
+      objective: 'Record sampled evaluation.',
+      prompt: { system: 'Be concise.' },
+      modelPolicy: { provider: 'simulator', model: 'promptsheon-simulator' },
+      lifecycle: { owner: 'test-team' },
+    });
+    const evaluated: string[] = [];
+    const service = new DurableExecutionService(
+      new ExecutionJobRepo(db),
+      { get: async () => ({ hash: agentHash, workspaceId: 'ws1', schemaVersion: '1.0', parentHash: null, author: 'test', changeReason: 'test', status: 'published' as const, createdAt: '2026-01-01', publishedAt: '2026-01-01', specification }) },
+      { execute: async () => ({ totalTokens: 2, totalCost: 0, totalLatencyMs: 1 }) },
+      new ExecutionCheckpointRepo(db),
+      undefined,
+      undefined,
+      undefined,
+      new TraceRepo(db),
+      undefined,
+      { run: async (traceRunId) => { evaluated.push(traceRunId); return 4; } },
+      1,
+      () => 0,
+    );
+    const worker = service.createWorker({ workerId: 'auto-eval-test', pollMs: 2, leaseMs: 500, maxBackoffMs: 1, random: () => 0 });
+    const job = service.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash, inputs: {}, idempotencyKey: 'auto-eval-test' });
+    worker.start();
+    await waitFor(() => new ExecutionJobRepo(db).get('org1', job.id).state === 'completed');
+    await waitFor(() => evaluated.length === 1);
+    await worker.stop();
+    expect(evaluated[0]).toBeTruthy();
+  });
+
   it('flushes execution evidence before marking a job completed', async () => {
     const written: AppendEvidenceInput[] = [];
     const evidence = new AsyncEvidenceSink({ append: (record) => written.push(record) });

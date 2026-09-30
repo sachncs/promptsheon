@@ -52,6 +52,10 @@ interface ManifestRunner {
   }): Promise<unknown>;
 }
 
+interface ExecutionAutoEvaluator {
+  run(traceRunId: string): Promise<number>;
+}
+
 /** Application boundary for durable execution submission and worker lifecycle. */
 export class DurableExecutionService {
   private worker: DurableExecutionWorker | undefined;
@@ -65,6 +69,9 @@ export class DurableExecutionService {
     private readonly evidence?: EvidenceRecorder,
     private readonly traces?: TraceRepo,
     private readonly quotas?: UserQuotaRepo,
+    private readonly autoEvaluator?: ExecutionAutoEvaluator,
+    private readonly autoEvalSampleRate = 0,
+    private readonly random: () => number = Math.random,
   ) {}
 
   enqueue(input: {
@@ -214,6 +221,7 @@ export class DurableExecutionService {
           // completed job with only a partial evidence timeline.
           await this.evidence?.flush();
           if (traceRunId) this.traces?.finalize(traceRunId, 'success', { tokens: totals.totalTokens, costUsd: totals.costUsd });
+          this.scheduleAutoEval(traceRunId);
           if (quotaReserved) this.quotas?.releaseForJob(job.id);
           return result;
         } catch (error) {
@@ -231,6 +239,7 @@ export class DurableExecutionService {
           });
           await this.evidence?.flush();
           if (traceRunId) this.traces?.finalize(traceRunId, 'error');
+          this.scheduleAutoEval(traceRunId);
           if (quotaReserved) this.quotas?.releaseForJob(job.id);
           if (error instanceof ExecutionTimeoutError) throw new ExecutionWorkError(error.message, false, true);
           throw error;
@@ -246,6 +255,11 @@ export class DurableExecutionService {
       ...(options.random === undefined ? {} : { random: options.random }),
     }, this.checkpoints);
     return this.worker;
+  }
+
+  private scheduleAutoEval(traceRunId: string | undefined): void {
+    if (!traceRunId || !this.autoEvaluator || this.autoEvalSampleRate <= 0 || this.random() >= this.autoEvalSampleRate) return;
+    void this.autoEvaluator.run(traceRunId).catch(() => undefined);
   }
 
   private recordEvidence(input: {
