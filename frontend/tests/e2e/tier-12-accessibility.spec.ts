@@ -52,9 +52,14 @@ test.describe('tier 12: accessibility and keyboard foundations', () => {
   });
 
   test('public landing page has named controls, images, and landmarks', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     await assertAccessibleSurface(page);
     await expect(page.getByRole('main')).toBeVisible();
+    const reducedMotion = await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
+    expect(reducedMotion).toBe(true);
+    const style = await page.locator('body').evaluate((element) => getComputedStyle(element).scrollBehavior);
+    expect(style).toBe('auto');
     const docsLink = page.getByRole('link', { name: 'Docs', exact: true });
     await docsLink.focus();
     await expect(docsLink).toBeFocused();
