@@ -24,6 +24,7 @@ export default function CliDoc() {
       <DocCurl cmd="promptsheon repos list                 # list repositories in the workspace" />
       <DocCurl cmd="promptsheon eval gate <repoId>        # CI gate" />
       <DocCurl cmd="promptsheon release approve <id>      # approve a release" />
+      <DocCurl cmd="PROMPTSHEON_SPEC_STATUS=published PROMPTSHEON_PAGE_SIZE=50 promptsheon spec list" />
       <DocCurl cmd="promptsheon evidence list             # newest evidence records" />
       <DocCurl cmd="promptsheon evidence trace <traceId>  # chronological trace evidence" />
       <DocCurl cmd="PROMPTSHEON_PARENT_HASH=<sha256> PROMPTSHEON_CHANGE_REASON='refine prompt' promptsheon spec create agent.json" />

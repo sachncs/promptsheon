@@ -37,6 +37,32 @@ describe('agent specification CLI commands', () => {
       else process.env['PROMPTSHEON_WORKSPACE_ID'] = previous;
     }
   });
+
+  it('passes pagination and status filters when configured', async () => {
+    const previousWorkspace = process.env['PROMPTSHEON_WORKSPACE_ID'];
+    const previousPage = process.env['PROMPTSHEON_PAGE'];
+    const previousPageSize = process.env['PROMPTSHEON_PAGE_SIZE'];
+    const previousStatus = process.env['PROMPTSHEON_SPEC_STATUS'];
+    process.env['PROMPTSHEON_WORKSPACE_ID'] = 'ws-specs';
+    process.env['PROMPTSHEON_PAGE'] = '2';
+    process.env['PROMPTSHEON_PAGE_SIZE'] = '10';
+    process.env['PROMPTSHEON_SPEC_STATUS'] = 'published';
+    const client: ApiClient = {
+      get: async (path) => {
+        expect(path).toBe('/workspaces/ws-specs/agent-specifications?page=2&pageSize=10&status=published');
+        return { items: [], total: 0 };
+      },
+      post: async () => undefined,
+    };
+    try {
+      await expect(specificationListCommand(client)).resolves.toEqual({ items: [], total: 0 });
+    } finally {
+      if (previousWorkspace === undefined) delete process.env['PROMPTSHEON_WORKSPACE_ID']; else process.env['PROMPTSHEON_WORKSPACE_ID'] = previousWorkspace;
+      if (previousPage === undefined) delete process.env['PROMPTSHEON_PAGE']; else process.env['PROMPTSHEON_PAGE'] = previousPage;
+      if (previousPageSize === undefined) delete process.env['PROMPTSHEON_PAGE_SIZE']; else process.env['PROMPTSHEON_PAGE_SIZE'] = previousPageSize;
+      if (previousStatus === undefined) delete process.env['PROMPTSHEON_SPEC_STATUS']; else process.env['PROMPTSHEON_SPEC_STATUS'] = previousStatus;
+    }
+  });
 });
 
 describe('evidence CLI commands', () => {

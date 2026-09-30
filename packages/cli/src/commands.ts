@@ -127,7 +127,20 @@ export async function specificationValidateCommand(client: ApiClient, path: stri
 }
 
 export async function specificationListCommand(client: ApiClient): Promise<unknown> {
-  return client.get(`/workspaces/${workspaceId()}/agent-specifications`);
+  const params = new URLSearchParams();
+  const page = optionalPositiveInteger('PROMPTSHEON_PAGE');
+  const pageSize = optionalPositiveInteger('PROMPTSHEON_PAGE_SIZE');
+  const status = process.env['PROMPTSHEON_SPEC_STATUS'];
+  if (page !== undefined) params.set('page', String(page));
+  if (pageSize !== undefined) params.set('pageSize', String(pageSize));
+  if (status !== undefined) {
+    if (!['draft', 'candidate', 'published', 'retired'].includes(status)) {
+      throw new BadArgsError('PROMPTSHEON_SPEC_STATUS must be draft, candidate, published, or retired');
+    }
+    params.set('status', status);
+  }
+  const query = params.toString();
+  return client.get(`/workspaces/${workspaceId()}/agent-specifications${query ? `?${query}` : ''}`);
 }
 
 export async function specificationCreateCommand(client: ApiClient, path: string, opts: { dryRun: boolean }): Promise<unknown> {
@@ -180,6 +193,14 @@ export async function executionCancelCommand(client: ApiClient, id: string, opts
 
 export async function executionMetricsCommand(client: ApiClient): Promise<unknown> {
   return client.get('/execution-jobs/metrics');
+}
+
+function optionalPositiveInteger(name: string): number | undefined {
+  const raw = process.env[name];
+  if (raw === undefined) return undefined;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 1) throw new BadArgsError(`${name} must be a positive integer`);
+  return value;
 }
 
 export async function evidenceListCommand(client: ApiClient, options: { agentHash?: string; eventType?: string; traceId?: string } = {}): Promise<unknown> {
