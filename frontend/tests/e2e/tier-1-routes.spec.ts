@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { bootstrapAdminViaApi, seedSession, clearClientState, type SessionInfo } from './helpers/seed-session';
 
+const TEST_CAPABILITY_ID = '00000000-0000-0000-0000-000000000000';
+
 const ROUTES = [
   '/',
   '/onboarding',
@@ -25,9 +27,9 @@ const ROUTES = [
   '/app/projects',
   '/app/audit',
   '/app/audit/reports',
-  '/app/capabilities/test-id/self-evolve',
-  '/app/capabilities/test-id/datasets',
-  '/app/capabilities/test-id/preconditions',
+  `/app/capabilities/${TEST_CAPABILITY_ID}/self-evolve`,
+  `/app/capabilities/${TEST_CAPABILITY_ID}/datasets`,
+  `/app/capabilities/${TEST_CAPABILITY_ID}/preconditions`,
   '/app/repos',
   '/app/repos/test-id',
   '/app/merge-requests',
