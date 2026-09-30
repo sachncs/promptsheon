@@ -157,6 +157,30 @@ export interface VaultKeyRotation {
   reencrypted: number;
 }
 
+export interface SigningKey {
+  id: string;
+  organizationId: string;
+  label: string;
+  fingerprint: string;
+  publicKeyPem: string;
+  createdBy: string;
+  createdAt: string;
+  deactivatedAt: string | null;
+}
+
+const SigningKeySchema = z.object({
+  id: z.string().min(1),
+  organizationId: z.string().min(1),
+  label: z.string().min(1),
+  fingerprint: z.string().min(1),
+  publicKeyPem: z.string().min(1),
+  createdBy: z.string().min(1),
+  createdAt: z.string(),
+  deactivatedAt: z.string().nullable(),
+});
+
+const SigningKeyListSchema = z.array(SigningKeySchema);
+
 const VaultKeyringEntrySchema = z.object({
   id: z.number().int(),
   label: z.string(),
@@ -2322,10 +2346,24 @@ export const repoApi = {
 };
 
 export const signingKeysApi = {
-  list: (organizationId: string) =>
-    client.get(`/orgs/${organizationId}/signing-keys`).then((r) => r.data),
-  upload: (organizationId: string, label: string, publicKeyPem: string) =>
-    client.post(`/orgs/${organizationId}/signing-keys`, { organizationId, label, publicKeyPem }).then((r) => r.data),
+  list: async (organizationId: string): Promise<SigningKey[]> => {
+    const r = await client.get<unknown>(`/orgs/${organizationId}/signing-keys`);
+    const parsed = SigningKeyListSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid signing keys.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  upload: async (organizationId: string, label: string, publicKeyPem: string): Promise<SigningKey> => {
+    const r = await client.post<unknown>(`/orgs/${organizationId}/signing-keys`, { organizationId, label, publicKeyPem });
+    const parsed = SigningKeySchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid signing key.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  deactivate: async (organizationId: string, keyId: string): Promise<SigningKey> => {
+    const r = await client.delete<unknown>(`/orgs/${organizationId}/signing-keys/${keyId}`);
+    const parsed = SigningKeySchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid signing key.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
 };
 
 export const evalSuiteApi = {
