@@ -195,4 +195,26 @@ test.describe('tier 3: app shell after onboarding', () => {
     const workspaceResponse = await request.get(`${baseURL}/api/workspaces`, { headers: { Authorization: `Bearer ${session.apiKey}` } });
     expect(workspaceResponse.ok()).toBeTruthy();
   });
+
+  test('requires workspace context when more than one workspace exists', async ({ page, request, baseURL }) => {
+    if (!baseURL) throw new Error('E2E base URL is required');
+    const session = await bootstrapAdminViaApi(baseURL, {
+      orgName: `Multi Workspace Org ${Date.now()}`,
+      adminEmail: `multi-workspace-${Date.now()}@promptsheon.test`,
+    });
+    const headers = { Authorization: `Bearer ${session.apiKey}` };
+    const first = await request.post(`${baseURL}/api/workspaces`, { headers, data: { name: `Research ${Date.now()}`, organization: session.orgName } });
+    const secondName = `Production ${Date.now()}`;
+    const second = await request.post(`${baseURL}/api/workspaces`, { headers, data: { name: secondName, organization: session.orgName } });
+    expect(first.ok(), await first.text()).toBeTruthy();
+    expect(second.ok(), await second.text()).toBeTruthy();
+
+    await seedSession(page, session);
+    await page.goto('/app/agents');
+    const workspaceSelect = page.getByRole('combobox', { name: 'Select workspace for agent specifications' });
+    await expect(workspaceSelect).toBeVisible();
+    await workspaceSelect.click();
+    await page.getByRole('option', { name: secondName }).click();
+    await expect(workspaceSelect).toContainText(secondName);
+  });
 });
