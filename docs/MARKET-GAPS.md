@@ -119,27 +119,23 @@ segment. Tier 3 features would create a category.
 ### Tier 1 — without these, promptsheon is a curiosity
 
 #### T1-1. **Span-level LLM tracing**
-- **Why it matters**: every competitor's primary UI is the trace viewer. promptsheon has audit-chain entries but not the rich tree of `LLM call → retrieval → tool use → response` spans that engineers use to debug.
-- **Where it lives today**: `packages/server/src/agents/executor/` emits execution traces but they aren't persisted to a queryable store. OpenTelemetry is set up but no span exporter fires for agent runs.
-- **What's missing**: a `trace_runs` table + a `/app/traces` page with span tree, token counts, latency histograms, and the canonical Langfuse/LangSmith feature set: filter by userId, session, tag, latency, cost, model. Span-level exporter so existing OTel collectors consume it.
+- **Current status**: implemented. `trace_runs` and `trace_spans` are queryable through the trace API and `/app/traces`, with span trees, token counts, latency, cost, and evidence attached to each run.
+- **Remaining**: broaden filtering and export coverage, and connect the persisted spans to an external OpenTelemetry exporter.
 - **Moat impact**: low alone, but **table stakes**. Without this, an engineer evaluating promptsheon vs. LangSmith deletes promptsheon in the first 5 minutes of demo.
 
 #### T1-2. **Prompt playground + parameter sweep**
-- **Why it matters**: every competitor has a chat-style playground where you iterate prompt + model + temperature side-by-side. promptsheon's editor is for DAGs — there's no surface for "I have one prompt, give me the curl/sdk/UI to try it against 3 models with different temperatures."
-- **Where it lives today**: `frontend/src/app/app/editor/` is graph-only. There's no `/app/playground` route.
-- **What's missing**: a chat interface that lets a developer paste a prompt, pick the model, stream the response, and diff two runs side by side. Parameter sweep UI that runs N variants and ranks by latency/cost/quality.
+- **Current status**: implemented as `/app/playground` and `/api/playground/{complete,sweep}`. The gateway supports simulator runs, cache hits, bounded sweeps, and side-by-side result reporting.
+- **Remaining**: streaming responses and quality-based ranking across sweep variants.
 - **Moat impact**: low alone. But **the missing tool that every solo prompt-engineer needs**.
 
 #### T1-3. **LLM gateway — caching, fallback, routing**
-- **Why it matters**: Helicone + Portkey's entire value prop is "drop our OpenAI SDK in front of your code and you get caching, fallbacks, rate limiting, cost tracking." promptsheon has provider support but not a runtime gateway with caching.
-- **Where it lives today**: `packages/server/src/llm/router.ts` routes calls but doesn't cache responses or implement fallback chains.
-- **What's missing**: a content-hash-keyed response cache (so identical prompts are free), provider fallback chains (`openai → anthropic` if one fails), per-user rate limits, and prompt-template caching (treat `{hash}` placeholders as cache keys, not literal strings).
+- **Current status**: the runtime gateway now provides content-hash LRU caching, ordered provider fallback, circuit breakers, per-actor token buckets, and cache/rate-limit metrics.
+- **Remaining**: durable cache storage across restarts and template-aware cache invalidation.
 - **Moat impact**: **high**. promptsheon becomes the cheapest-to-run LLM ops platform, which is sticky once teams adopt it. Caching at the gateway level is the single biggest cost lever most teams need.
 
 #### T1-4. **Online evaluation on production traces**
-- **Why it matters**: Braintrust + Langfuse ship LLM-as-judge that runs on every production trace. promptsheon has eval suites for offline runs but not online trace-attached scoring.
-- **Where it lives today**: the audit chain records actions but no evaluation results are attached to execution traces.
-- **What's missing**: a `trace_scores` table; an `/api/traces/:id/scores` endpoint; built-in evaluators (hallucination, toxicity, prompt-injection, answer-relevance, custom); auto-evaluation on every execution.
+- **Current status**: implemented. `trace_scores`, `/api/traces/:id/scores`, built-in evaluators, and the trace detail auto-evaluation action provide trace-attached scoring.
+- **Remaining**: configurable automatic sampling on production traffic and richer model-based evaluator policies.
 - **Moat impact**: medium. Differentiation comes from **shipping the eval library + the trace store** as one product. Both already have traces; the eval library is where Langfuse/Braintrust add value.
 
 #### T1-5. **Customer-facing analytics (per-user, per-tenant)**
