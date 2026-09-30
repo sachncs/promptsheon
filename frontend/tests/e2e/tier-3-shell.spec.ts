@@ -188,11 +188,11 @@ test.describe('tier 3: app shell after onboarding', () => {
     await page.getByRole('button', { name: 'Create draft' }).click();
     await expect(page.getByText('Revision created')).toBeVisible();
     await page.getByRole('link', { name: 'Open revision' }).click();
-    await expect(page).toHaveURL(/\/app\/agents\/[0-9a-f]{64}$/);
+    await expect(page).toHaveURL(/\/app\/agents\/[0-9a-f]{64}\?workspace=[0-9a-f-]{36}$/);
     await expect(page.getByRole('heading', { name: 'Research assistant' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Run this revision' })).toBeVisible();
     await page.getByRole('link', { name: 'Create child revision' }).click();
-    await expect(page).toHaveURL(/\/app\/agents\/new\?parent=[0-9a-f]{64}$/);
+    await expect(page).toHaveURL(/\/app\/agents\/new\?parent=[0-9a-f]{64}&workspace=[0-9a-f-]{36}$/);
     await expect(page.getByText(/Creating a child revision from/)).toBeVisible();
     const validationRequest = page.waitForRequest((request) => request.method() === 'POST' && request.url().includes('/agent-specifications/validate'));
     await page.getByRole('button', { name: 'Validate specification' }).click();

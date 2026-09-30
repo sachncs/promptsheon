@@ -26,11 +26,13 @@ const ParentSpecificationSchema = z.object({
 
 const JsonObjectSchema = z.record(z.string(), z.unknown());
 
-export default function NewAgentPage({ searchParams }: { searchParams: Promise<{ parent?: string | string[] }> }) {
+export default function NewAgentPage({ searchParams }: { searchParams: Promise<{ parent?: string | string[]; workspace?: string | string[] }> }) {
   const session = useRequireSession();
   const query = use(searchParams);
   const requestedParent = Array.isArray(query.parent) ? query.parent[0] : query.parent;
   const parentHash = requestedParent && /^[0-9a-f]{64}$/.test(requestedParent) ? requestedParent : undefined;
+  const requestedWorkspace = Array.isArray(query.workspace) ? query.workspace[0] : query.workspace;
+  const workspaceQuery = requestedWorkspace && isUuid(requestedWorkspace) ? requestedWorkspace : undefined;
   const [role, setRole] = useState('Research assistant');
   const [objective, setObjective] = useState('Answer questions with evidence.');
   const [systemPrompt, setSystemPrompt] = useState('Be precise, cite evidence, and say when you are uncertain.');
@@ -38,7 +40,7 @@ export default function NewAgentPage({ searchParams }: { searchParams: Promise<{
   const [model, setModel] = useState('simulator');
   const [owner, setOwner] = useState('workspace team');
   const [changeReason, setChangeReason] = useState('Initial agent specification');
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('');
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(workspaceQuery ?? '');
   const [formEdited, setFormEdited] = useState(false);
   const [validation, setValidation] = useState<{ valid: true; specification: unknown } | { valid: false; issues: Array<{ code: string; message: string; path: Array<string | number> }> } | null>(null);
   const workspaces = useQuery<WorkspaceRow[]>({
@@ -96,7 +98,7 @@ export default function NewAgentPage({ searchParams }: { searchParams: Promise<{
       {!workspaceId ? (
         <Surface><p className="text-sm text-text-muted">Create a workspace before creating an agent specification.</p></Surface>
       ) : mutation.isSuccess ? (
-        <Surface><div className="flex items-start gap-3"><Bot className="mt-0.5 h-5 w-5 text-success" /><div><h2 className="font-semibold text-text-strong">Revision created</h2><p className="mt-1 text-sm text-text-muted">The specification was stored as a content-addressed draft.</p><div className="mt-4 flex flex-wrap gap-2"><Button asChild><Link href={`/app/agents/${mutation.data.data.hash}`}>Open revision</Link></Button><Button asChild variant="outline"><Link href="/app/agents">View specifications</Link></Button></div></div></div></Surface>
+        <Surface><div className="flex items-start gap-3"><Bot className="mt-0.5 h-5 w-5 text-success" /><div><h2 className="font-semibold text-text-strong">Revision created</h2><p className="mt-1 text-sm text-text-muted">The specification was stored as a content-addressed draft.</p><div className="mt-4 flex flex-wrap gap-2"><Button asChild><Link href={`/app/agents/${mutation.data.data.hash}?workspace=${encodeURIComponent(workspaceId ?? '')}`}>Open revision</Link></Button><Button asChild variant="outline"><Link href="/app/agents">View specifications</Link></Button></div></div></div></Surface>
       ) : (
         <Surface>
           {parentHash && <div className="mb-5 rounded-lg border border-brand/30 bg-brand/5 p-3 text-sm text-text-muted">Creating a child revision from <span className="font-mono text-xs text-text-strong">{parentHash}</span>. The parent remains immutable.{parentRevision.isPending && <span className="ml-2">Loading inherited policies…</span>}</div>}
@@ -129,4 +131,8 @@ function Field({ label, value, onChange, required }: { label: string; value: str
 
 function TextField({ label, value, onChange, required }: { label: string; value: string; onChange: (value: string) => void; required?: boolean }) {
   return <div className="grid gap-2"><Label>{label}</Label><Textarea value={value} onChange={(event) => onChange(event.target.value)} required={required} rows={5} /></div>;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

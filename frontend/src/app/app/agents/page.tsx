@@ -94,7 +94,7 @@ export default function AgentsPage() {
                   <p className="mt-2 truncate text-sm font-medium text-text-strong">{item.changeReason}</p>
                   <p className="mt-1 text-xs text-text-subtle">{item.author} · {formatDate(item.createdAt)} · schema {item.schemaVersion}</p>
                 </div>
-                <Link href={`/app/agents/${item.hash}`} className="text-sm font-medium text-brand-highlight hover:underline">Inspect revision</Link>
+                <Link href={`/app/agents/${item.hash}?workspace=${encodeURIComponent(workspaceId ?? '')}`} className="text-sm font-medium text-brand-highlight hover:underline">Inspect revision</Link>
               </div>
             ))}
           </div>
