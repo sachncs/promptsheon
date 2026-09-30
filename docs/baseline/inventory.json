@@ -21,6 +21,11 @@
     },
     {
       "file": "packages/server/src/routes/agent-specification.ts",
+      "method": "GET",
+      "path": "/api/workspaces/:workspaceId/agent-specifications"
+    },
+    {
+      "file": "packages/server/src/routes/agent-specification.ts",
       "method": "POST",
       "path": "/api/workspaces/:workspaceId/agent-specifications/diff"
     },
@@ -1473,6 +1478,18 @@
     {
       "file": "frontend/src/app/app/admin/teams/page.tsx",
       "route": "/app/admin/teams"
+    },
+    {
+      "file": "frontend/src/app/app/agents/[hash]/page.tsx",
+      "route": "/app/agents/:hash"
+    },
+    {
+      "file": "frontend/src/app/app/agents/new/page.tsx",
+      "route": "/app/agents/new"
+    },
+    {
+      "file": "frontend/src/app/app/agents/page.tsx",
+      "route": "/app/agents"
     },
     {
       "file": "frontend/src/app/app/alerts/active/page.tsx",
