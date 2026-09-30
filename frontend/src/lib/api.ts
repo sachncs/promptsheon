@@ -1854,7 +1854,9 @@ function parseSseBlock(block: string): { event: string; data: Record<string, unk
   if (!event || !data) return null;
   let parsed: Record<string, unknown> = {};
   try {
-    parsed = JSON.parse(data) as Record<string, unknown>;
+    const value: unknown = JSON.parse(data);
+    const validated = z.record(z.string(), z.unknown()).safeParse(value);
+    parsed = validated.success ? validated.data : { raw: data };
   } catch {
     parsed = { raw: data };
   }
