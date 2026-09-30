@@ -148,7 +148,7 @@ segment. Tier 3 features would create a category.
 #### T1-5. **Customer-facing analytics (per-user, per-tenant)**
 - **Current status**: per-tenant totals, a token-ranked user leaderboard, a selected-user daily usage drill-down, and an admin-only prompt-risk view are available through the analytics and traces surfaces. Risk signals use redacted trace attribution to flag repeated failures, token burn, and unusual execution volume without exposing prompt content.
 - **Current status**: administrators can create, update, disable, delete, and inspect durable per-user daily run, token, and cost quotas with usage counters. New durable execution jobs carry actor attribution, and token/cost limits are enforced before a job is marked successful.
-- **Remaining**: backfill actor attribution for legacy execution rows and broaden analytics beyond the current trace-backed risk window. Token/cost reservations now admit work against the declared resource envelope before provider execution; future work can refine estimates with provider-specific pricing and usage reconciliation.
+- **Remaining**: backfill actor attribution for legacy execution rows and broaden analytics beyond the current trace-backed risk window. Token/cost reservations now admit work against the declared resource envelope before provider execution; the router preserves provider-reported token counts, while provider-specific price tables and end-to-end billing reconciliation remain.
 - **Moat impact**: high for SaaS-style customers; medium for self-hosted (most self-hosted customers don't bill per-user internally yet).
 
 ---

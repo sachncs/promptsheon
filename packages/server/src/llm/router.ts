@@ -54,6 +54,12 @@ export interface LlmCompleteResult {
   model: string;
 }
 
+interface ProviderCompletion {
+  content: string;
+  promptTokens?: number;
+  completionTokens?: number;
+}
+
 export interface LlmStreamChunk {
   text: string;
   done?: boolean;
@@ -93,28 +99,30 @@ export class LlmRouter {
    */
   async complete(req: LlmCompleteRequest): Promise<LlmCompleteResult> {
     const started = Date.now();
-    const promptTokens = LlmRouter.estimateTokens(req.prompt);
-    let content = '';
+    const estimatedPromptTokens = LlmRouter.estimateTokens(req.prompt);
+    let result: ProviderCompletion;
     switch (req.provider) {
       case 'openai':
-        content = await this.completeOpenai(req, promptTokens);
+        result = await this.completeOpenai(req);
         break;
       case 'anthropic':
-        content = await this.completeAnthropic(req, promptTokens);
+        result = await this.completeAnthropic(req);
         break;
       case 'bedrock':
-        content = await this.completeBedrock(req);
+        result = await this.completeBedrock(req);
         break;
       case 'custom':
-        content = await this.completeCustom(req, promptTokens);
+        result = await this.completeCustom(req);
         break;
       case 'simulated':
-        content = `[simulation:${req.model}] ${req.prompt}`;
+        result = { content: `[simulation:${req.model}] ${req.prompt}` };
         break;
       default:
         throw new Error(`unknown provider: ${req.provider}`);
     }
-    const completionTokens = LlmRouter.estimateTokens(content);
+    const content = result.content;
+    const promptTokens = result.promptTokens ?? estimatedPromptTokens;
+    const completionTokens = result.completionTokens ?? LlmRouter.estimateTokens(content);
     const costUsd = (promptTokens / 1000) * 0.00003 + (completionTokens / 1000) * 0.00006;
     void started;
     return {
@@ -195,7 +203,7 @@ export class LlmRouter {
     yield* parseAnthropicStream(response, req.prompt);
   }
 
-  private async completeOpenai(req: LlmCompleteRequest, promptTokens: number): Promise<string> {
+  private async completeOpenai(req: LlmCompleteRequest): Promise<ProviderCompletion> {
     const base = (req.baseUrl ?? process.env['OPENAI_BASE_URL'] ?? 'https://api.openai.com').replace(/\/$/, '');
     const apiKey = req.apiKey ?? this.credentials?.openaiApiKey ?? process.env['OPENAI_API_KEY'] ?? '';
     if (!apiKey) throw new Error('OpenAI API key missing');
@@ -218,9 +226,13 @@ export class LlmRouter {
     }
     const data = (await res.json()) as {
       choices: Array<{ message: { content: string } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
-    void promptTokens;
-    return data.choices[0]?.message.content ?? '';
+    return {
+      content: data.choices[0]?.message.content ?? '',
+      ...(typeof data.usage?.prompt_tokens === 'number' ? { promptTokens: data.usage.prompt_tokens } : {}),
+      ...(typeof data.usage?.completion_tokens === 'number' ? { completionTokens: data.usage.completion_tokens } : {}),
+    };
   }
 
   /**
@@ -233,7 +245,7 @@ export class LlmRouter {
     return Math.ceil(text.length / 4);
   }
 
-  private async completeAnthropic(req: LlmCompleteRequest, promptTokens: number): Promise<string> {
+  private async completeAnthropic(req: LlmCompleteRequest): Promise<ProviderCompletion> {
     const base = (req.baseUrl ?? process.env['ANTHROPIC_BASE_URL'] ?? 'https://api.anthropic.com').replace(/\/$/, '');
     const apiKey = req.apiKey ?? this.credentials?.anthropicApiKey ?? process.env['ANTHROPIC_API_KEY'] ?? '';
     if (!apiKey) throw new Error('Anthropic API key missing');
@@ -258,15 +270,19 @@ export class LlmRouter {
     }
     const data = (await res.json()) as {
       content: Array<{ type: string; text?: string }>;
+      usage?: { input_tokens?: number; output_tokens?: number };
     };
-    void promptTokens;
-    return (data.content ?? [])
+    return {
+      content: (data.content ?? [])
       .filter((b) => b.type === 'text')
       .map((b) => b.text ?? '')
-      .join('');
+      .join(''),
+      ...(typeof data.usage?.input_tokens === 'number' ? { promptTokens: data.usage.input_tokens } : {}),
+      ...(typeof data.usage?.output_tokens === 'number' ? { completionTokens: data.usage.output_tokens } : {}),
+    };
   }
 
-  private async completeCustom(req: LlmCompleteRequest, promptTokens: number): Promise<string> {
+  private async completeCustom(req: LlmCompleteRequest): Promise<ProviderCompletion> {
     const base = (req.baseUrl ?? this.baseUrl ?? '').replace(/\/$/, '');
     const apiKey = req.apiKey ?? this.credentials?.customApiKey ?? '';
     if (!base || !apiKey) throw new Error('Custom provider requires baseUrl + apiKey');
@@ -293,12 +309,16 @@ export class LlmRouter {
       }
       const data = (await res.json()) as {
         content: Array<{ type: string; text?: string }>;
+        usage?: { input_tokens?: number; output_tokens?: number };
       };
-      void promptTokens;
-      return (data.content ?? [])
+      return {
+        content: (data.content ?? [])
         .filter((b) => b.type === 'text')
         .map((b) => b.text ?? '')
-        .join('');
+        .join(''),
+        ...(typeof data.usage?.input_tokens === 'number' ? { promptTokens: data.usage.input_tokens } : {}),
+        ...(typeof data.usage?.output_tokens === 'number' ? { completionTokens: data.usage.output_tokens } : {}),
+      };
     }
     const res = await fetch(withApiVersion(base, 'chat/completions'), {
       method: 'POST',
@@ -319,11 +339,16 @@ export class LlmRouter {
     }
     const data = (await res.json()) as {
       choices: Array<{ message: { content: string } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
-    return data.choices[0]?.message.content ?? '';
+    return {
+      content: data.choices[0]?.message.content ?? '',
+      ...(typeof data.usage?.prompt_tokens === 'number' ? { promptTokens: data.usage.prompt_tokens } : {}),
+      ...(typeof data.usage?.completion_tokens === 'number' ? { completionTokens: data.usage.completion_tokens } : {}),
+    };
   }
 
-  private async completeBedrock(req: LlmCompleteRequest): Promise<string> {
+  private async completeBedrock(req: LlmCompleteRequest): Promise<ProviderCompletion> {
     const credentials = this.credentials?.bedrock;
     const region = credentials?.region ?? process.env['AWS_REGION'] ?? process.env['AWS_DEFAULT_REGION'];
     if (!region && !this.bedrockClient) {
@@ -349,9 +374,13 @@ export class LlmRouter {
         maxTokens: 1024,
       },
     }));
-    return (response.output?.message?.content ?? [])
+    return {
+      content: (response.output?.message?.content ?? [])
       .flatMap((block) => 'text' in block && typeof block.text === 'string' ? [block.text] : [])
-      .join('');
+      .join(''),
+      ...(typeof response.usage?.inputTokens === 'number' ? { promptTokens: response.usage.inputTokens } : {}),
+      ...(typeof response.usage?.outputTokens === 'number' ? { completionTokens: response.usage.outputTokens } : {}),
+    };
   }
 
   private async probeOpenai(req: LlmProbeRequest, started: number): Promise<LlmProbeResult> {

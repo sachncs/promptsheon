@@ -59,6 +59,30 @@ describe('LlmRouter', () => {
     fetchMock.mockRestore();
   });
 
+  it('uses provider-reported token usage when completion metadata is available', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({
+        choices: [{ message: { content: 'provider response' } }],
+        usage: { prompt_tokens: 41, completion_tokens: 17 },
+      }), { status: 200 }),
+    );
+    const router = new LlmRouter();
+    try {
+      const result = await router.complete({
+        prompt: 'short',
+        model: 'provider-model',
+        temperature: 0,
+        provider: 'openai',
+        apiKey: 'test-key',
+        baseUrl: 'https://provider.example',
+      });
+      expect(result.promptTokens).toBe(41);
+      expect(result.completionTokens).toBe(17);
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
   it('redacts credentials returned in provider error bodies', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('apiKey=provider-secret', { status: 401 }),
