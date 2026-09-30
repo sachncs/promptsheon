@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removed the unused repository-route escape hatch.
 
 ### Added
+- **Agent specification vertical slice** — the console, SDK, and CLI now support
+  workspace-scoped immutable revisions, lineage, diffs, publishing, durable
+  simulator execution, cancellation, evidence inspection, child revisions, and
+  advanced policy overrides without a provider credential. Parent hashes are
+  validated within the workspace boundary, and CLI listing supports pagination
+  and lifecycle filters.
 - **Docker packaging** — multi-stage `Dockerfile` that compiles
   the shared + server + frontend workspaces into a single
   non-root container. The runtime image is based on

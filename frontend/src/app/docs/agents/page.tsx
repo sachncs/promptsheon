@@ -45,6 +45,18 @@ export default function AgentSpecificationsDocsPage() {
         <p className="mt-3 text-sm leading-relaxed text-text-muted">The shared schema supplies safe defaults for optional policies. Use the validation endpoint before persisting a revision.</p>
       </section>
 
+      <section>
+        <h2 className="font-semibold text-h2 text-text-strong">Advanced policies</h2>
+        <p className="mt-3 text-sm leading-relaxed text-text-muted">The builder accepts an optional advanced JSON object for policy sections that are not part of the compact form. Child revisions inherit these sections and merge explicit overrides.</p>
+        <pre className="mt-4 overflow-x-auto rounded-xl border border-border-subtle bg-surface-0 p-5 font-mono text-xs leading-relaxed text-text-muted">{`{
+  "guardrails": [{ "id": "no-secrets", "kind": "policy", "rule": "no-secrets" }],
+  "permissions": { "allowedTools": [], "network": "none", "filesystem": "none", "secrets": "none" },
+  "evaluationPolicy": { "suites": [], "requiredScore": 0.8 },
+  "resourceBudget": { "maxInputTokens": 100000, "maxOutputTokens": 16000, "maxCostUsd": 1 }
+}`}</pre>
+        <p className="mt-3 text-sm leading-relaxed text-text-muted">The server remains the source of truth: advanced JSON is validated against the strict shared schema before a content-addressed revision is created.</p>
+      </section>
+
       <section className="space-y-5">
         <h2 className="font-semibold text-h2 text-text-strong">Validate and create</h2>
         <DocCurl cmd="POST /api/workspaces/{workspaceId}/agent-specifications/validate" />
@@ -61,7 +73,7 @@ export default function AgentSpecificationsDocsPage() {
             ['Publish', 'POST /api/workspaces/{workspaceId}/agent-specifications/{hash}/publish'],
           ].map(([label, path]) => <div key={label} className="rounded-lg border border-border-subtle bg-surface-2/40 p-4"><div className="text-xs font-semibold uppercase tracking-wider text-text-subtle">{label}</div><code className="mt-2 block break-all text-xs text-text-muted">{path}</code></div>)}
         </div>
-        <p className="text-sm leading-relaxed text-text-muted">Published revisions remain immutable. Change a policy by creating a child revision with <code>parentHash</code>, then review the generated diff.</p>
+        <p className="text-sm leading-relaxed text-text-muted">Published revisions remain immutable. Change a policy by creating a child revision with <code>parentHash</code>, then review the generated diff. Workspace context is carried through the console URL so multi-workspace users never inspect the wrong tenant.</p>
       </section>
 
       <section className="space-y-5">
