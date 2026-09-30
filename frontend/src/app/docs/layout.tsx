@@ -17,6 +17,7 @@ const sections = [
   {
     title: 'Capabilities',
     links: [
+      { href: '/docs/agents', label: 'Agent specifications' },
       { href: '/docs/repos', label: 'Repositories' },
       { href: '/docs/dag', label: 'Multi-agent DAG' },
       { href: '/docs/releases', label: 'Release workflow' },

@@ -71,6 +71,7 @@ export default function DocsIndex() {
         <h2 className="font-semibold text-h2 text-text-strong">Next</h2>
         <ul className="mt-3 space-y-2 text-text-muted">
           <li>· <Link href="/docs/quickstart" className="text-text-strong underline-offset-4 hover:underline">Set up your workspace</Link></li>
+          <li>· <Link href="/docs/agents" className="text-text-strong underline-offset-4 hover:underline">Build and run an agent specification</Link></li>
           <li>· <Link href="/docs/repos" className="text-text-strong underline-offset-4 hover:underline">Repositories &amp; the multi-agent DAG</Link></li>
           <li>· <Link href="/docs/releases" className="text-text-strong underline-offset-4 hover:underline">Release workflow</Link></li>
           <li>· <Link href="/docs/evals" className="text-text-strong underline-offset-4 hover:underline">Evaluation engine</Link></li>

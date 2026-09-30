@@ -1692,6 +1692,10 @@
       "route": "/app/workspaces"
     },
     {
+      "file": "frontend/src/app/docs/agents/page.tsx",
+      "route": "/docs/agents"
+    },
+    {
       "file": "frontend/src/app/docs/api/page.tsx",
       "route": "/docs/api"
     },
