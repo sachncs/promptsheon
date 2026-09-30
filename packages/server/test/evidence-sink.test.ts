@@ -36,12 +36,15 @@ describe('AsyncEvidenceSink', () => {
   });
 
   it('never exceeds capacity during a high-priority event storm', async () => {
-    const sink = new AsyncEvidenceSink({ append: () => undefined }, 2);
+    const written: AppendEvidenceInput[] = [];
+    const sink = new AsyncEvidenceSink({ append: (record) => written.push(record) }, 2);
     sink.record(input('execution.failed', 'failed-1'));
     sink.record(input('error.observed', 'error-1'));
     sink.record(input('execution.cancelled', 'cancelled-1'));
     expect(sink.metrics().queued).toBe(2);
-    expect(sink.metrics().dropped).toBe(1);
+    expect(sink.metrics().dropped).toBe(0);
+    expect(written.map((record) => record.correlationId)).toEqual(['cancelled-1']);
     await sink.flush();
+    expect(written.map((record) => record.correlationId)).toEqual(['cancelled-1', 'failed-1', 'error-1']);
   });
 });

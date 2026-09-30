@@ -42,10 +42,20 @@ export class AsyncEvidenceSink implements EvidenceRecorder {
       if (removable >= 0) {
         this.queue.splice(removable, 1);
         this.dropped += 1;
+      } else if (NON_DROPPABLE.has(input.eventType)) {
+        // Critical evidence must not be discarded during an error storm. The
+        // synchronous fallback applies backpressure only to this rare path;
+        // ordinary telemetry remains bounded and asynchronous.
+        try {
+          this.writer.append(input);
+          this.accepted += 1;
+        } catch {
+          this.writeFailures += 1;
+        }
+        return;
       } else {
-        // Keep the buffer strictly bounded even during an error storm. High
-        // priority events are retained preferentially, but cannot make the
-        // queue unbounded when every existing slot is already high priority.
+        // Low-priority events are dropped when all slots are occupied by
+        // critical evidence; the buffer remains strictly bounded.
         this.dropped += 1;
         return;
       }
