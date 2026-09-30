@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { walkOnboarding } from './helpers/walk-onboarding';
-import { bootstrapAdminViaApi } from './helpers/seed-session';
+import { bootstrapAdminViaApi, seedSession } from './helpers/seed-session';
 
 const BACKEND_PORT = process.env['PROMPTSHEON_E2E_BACKEND_PORT'] ?? '8081';
 const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`;
