@@ -18,6 +18,7 @@ interface NodeConfigPanelProps {
 
 export function NodeConfigPanel({ selectedNodeId, manifest, onChange }: NodeConfigPanelProps) {
   const node = selectedNodeId ? manifest.nodes.find((n) => n.id === selectedNodeId) ?? null : null;
+  const [toolToAdd, setToolToAdd] = React.useState('');
 
   if (!node) {
     return (
@@ -109,20 +110,29 @@ export function NodeConfigPanel({ selectedNodeId, manifest, onChange }: NodeConf
             <div className="flex gap-2">
               <select
                 id="node-tool"
-                defaultValue=""
+                value={toolToAdd}
                 className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm"
-                onChange={(event) => {
-                  const tool = BUILTIN_TOOL_SPECS[event.target.value];
-                  if (!tool) return;
-                  updateTools([...configuredTools, { ...tool, config: { ...tool.config } }]);
-                  event.target.value = '';
-                }}
+                onChange={(event) => setToolToAdd(event.target.value)}
               >
                 <option value="">Add a built-in tool</option>
                 {availableToolNames.map((name) => (
                   <option key={name} value={name}>{name}</option>
                 ))}
               </select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!toolToAdd}
+                onClick={() => {
+                  const tool = BUILTIN_TOOL_SPECS[toolToAdd];
+                  if (!tool) return;
+                  updateTools([...configuredTools, { ...tool, config: { ...tool.config } }]);
+                  setToolToAdd('');
+                }}
+              >
+                Add
+              </Button>
             </div>
           ) : null}
           {allowedTools.length > 0 ? (
