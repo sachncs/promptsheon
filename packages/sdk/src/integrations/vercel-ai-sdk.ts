@@ -39,6 +39,19 @@ export interface PromptsheonVercelOptions {
   headers?: Record<string, string>;
 }
 
+type GatewayProvider = 'openai' | 'anthropic' | 'bedrock' | 'custom' | 'simulated';
+
+function normalizeGatewayProvider(provider: string | undefined): GatewayProvider | undefined {
+  if (!provider) return undefined;
+  const value = provider.toLowerCase();
+  if (value.includes('anthropic')) return 'anthropic';
+  if (value.includes('bedrock')) return 'bedrock';
+  if (value.includes('simulat')) return 'simulated';
+  if (value.includes('custom')) return 'custom';
+  if (value === 'openai' || value.startsWith('openai.')) return 'openai';
+  return undefined;
+}
+
 export interface VercelMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string | Array<{ type: string; text?: string }>;
@@ -177,7 +190,7 @@ function toOpenAiBody(
       : [];
   return {
     model: opts.modelId ?? inner.modelId,
-    ...(opts.provider ? { provider: opts.provider } : {}),
+    ...(normalizeGatewayProvider(opts.provider) ? { provider: normalizeGatewayProvider(opts.provider) } : {}),
     messages,
     max_tokens: options.maxTokens,
     temperature: options.temperature,

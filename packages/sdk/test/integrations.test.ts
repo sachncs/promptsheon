@@ -105,6 +105,32 @@ describe('Vercel AI SDK adapter', () => {
     expect(wrapped.modelId).toBe('gpt-4-turbo');
   });
 
+  it('normalizes framework provider identifiers before sending them to the gateway', async () => {
+    const inner: VercelLanguageModel = {
+      specificationVersion: 'v1',
+      provider: 'openai.chat',
+      modelId: 'gpt-4',
+      async doGenerate() { throw new Error('unused'); },
+      async doStream() { throw new Error('unused'); },
+    };
+    const wrapped = withPromptsheon(inner, { gatewayUrl: gw.url, apiKey: 'tk', provider: 'openai.chat' });
+    await wrapped.doGenerate({ inputFormat: 'prompt', prompt: 'hello' });
+    expect((gw.requests[0]!.body as { provider?: string }).provider).toBe('openai');
+  });
+
+  it('omits provider overrides the gateway does not understand', async () => {
+    const inner: VercelLanguageModel = {
+      specificationVersion: 'v1',
+      provider: 'promptsheon',
+      modelId: 'gpt-4',
+      async doGenerate() { throw new Error('unused'); },
+      async doStream() { throw new Error('unused'); },
+    };
+    const wrapped = withPromptsheon(inner, { gatewayUrl: gw.url, apiKey: 'tk', provider: 'promptsheon' });
+    await wrapped.doGenerate({ inputFormat: 'prompt', prompt: 'hello' });
+    expect((gw.requests[0]!.body as { provider?: string }).provider).toBeUndefined();
+  });
+
   it('maps messages to OpenAI shape when inputFormat is messages', async () => {
     const inner: VercelLanguageModel = {
       specificationVersion: 'v1',
