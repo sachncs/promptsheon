@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { EXIT, PROMPTSHEON_CLI_VERSION } from '../src/version.js';
-import { evidenceListCommand, evidenceTraceCommand, specificationListCommand } from '../src/commands.js';
+import { evidenceListCommand, evidenceTraceCommand, specificationCreateCommand, specificationListCommand } from '../src/commands.js';
 
 describe('CLI version + exit codes', () => {
   it('PROMPTSHEON_CLI_VERSION is a semver string', () => {
@@ -54,6 +54,49 @@ describe('evidence CLI commands', () => {
   it('requires a trace id', async () => {
     const client: ApiClient = { get: async () => undefined, post: async () => undefined };
     await expect(evidenceTraceCommand(client, '')).rejects.toThrow(/traceId/);
+  });
+});
+
+describe('agent specification lineage CLI commands', () => {
+  it('passes a validated parent hash when creating a revision', async () => {
+    const previousWorkspace = process.env['PROMPTSHEON_WORKSPACE_ID'];
+    const previousParent = process.env['PROMPTSHEON_PARENT_HASH'];
+    const previousReason = process.env['PROMPTSHEON_CHANGE_REASON'];
+    process.env['PROMPTSHEON_WORKSPACE_ID'] = 'ws-specs';
+    process.env['PROMPTSHEON_PARENT_HASH'] = 'a'.repeat(64);
+    process.env['PROMPTSHEON_CHANGE_REASON'] = 'refine prompt';
+    const client: ApiClient = {
+      get: async () => undefined,
+      post: async (path, body) => {
+        expect(path).toBe('/workspaces/ws-specs/agent-specifications');
+        expect(body).toEqual(expect.objectContaining({ parentHash: 'a'.repeat(64), changeReason: 'refine prompt' }));
+        return { hash: 'b'.repeat(64) };
+      },
+    };
+    const file = await import('node:fs/promises');
+    const tempPath = `${process.cwd()}/.tmp-agent-spec-${Date.now()}.json`;
+    await file.writeFile(tempPath, '{}', 'utf8');
+    try {
+      await expect(specificationCreateCommand(client, tempPath, { dryRun: false })).resolves.toEqual({ hash: 'b'.repeat(64) });
+    } finally {
+      await file.rm(tempPath, { force: true });
+      if (previousWorkspace === undefined) delete process.env['PROMPTSHEON_WORKSPACE_ID']; else process.env['PROMPTSHEON_WORKSPACE_ID'] = previousWorkspace;
+      if (previousParent === undefined) delete process.env['PROMPTSHEON_PARENT_HASH']; else process.env['PROMPTSHEON_PARENT_HASH'] = previousParent;
+      if (previousReason === undefined) delete process.env['PROMPTSHEON_CHANGE_REASON']; else process.env['PROMPTSHEON_CHANGE_REASON'] = previousReason;
+    }
+  });
+
+  it('rejects malformed parent hashes before reading the specification file', async () => {
+    const previousWorkspace = process.env['PROMPTSHEON_WORKSPACE_ID'];
+    const previousParent = process.env['PROMPTSHEON_PARENT_HASH'];
+    process.env['PROMPTSHEON_WORKSPACE_ID'] = 'ws-specs';
+    process.env['PROMPTSHEON_PARENT_HASH'] = 'not-a-hash';
+    try {
+      await expect(specificationCreateCommand({ get: async () => undefined, post: async () => undefined }, 'missing.json', { dryRun: false })).rejects.toThrow(/PARENT_HASH/);
+    } finally {
+      if (previousWorkspace === undefined) delete process.env['PROMPTSHEON_WORKSPACE_ID']; else process.env['PROMPTSHEON_WORKSPACE_ID'] = previousWorkspace;
+      if (previousParent === undefined) delete process.env['PROMPTSHEON_PARENT_HASH']; else process.env['PROMPTSHEON_PARENT_HASH'] = previousParent;
+    }
   });
 });
 

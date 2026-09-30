@@ -26,6 +26,7 @@ export default function CliDoc() {
       <DocCurl cmd="promptsheon release approve <id>      # approve a release" />
       <DocCurl cmd="promptsheon evidence list             # newest evidence records" />
       <DocCurl cmd="promptsheon evidence trace <traceId>  # chronological trace evidence" />
+      <DocCurl cmd="PROMPTSHEON_PARENT_HASH=<sha256> PROMPTSHEON_CHANGE_REASON='refine prompt' promptsheon spec create agent.json" />
       <p>Use <code>--json</code> for machine-readable output. Evidence is already redacted by the API before it reaches the CLI.</p>
     </DocPage>
   );

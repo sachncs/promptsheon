@@ -131,7 +131,15 @@ export async function specificationListCommand(client: ApiClient): Promise<unkno
 }
 
 export async function specificationCreateCommand(client: ApiClient, path: string, opts: { dryRun: boolean }): Promise<unknown> {
-  return client.post(`/workspaces/${workspaceId()}/agent-specifications`, { specification: await specificationFile(path), changeReason: process.env['PROMPTSHEON_CHANGE_REASON'] ?? 'created from CLI' }, opts);
+  const parentHash = process.env['PROMPTSHEON_PARENT_HASH'];
+  if (parentHash !== undefined && !/^[0-9a-f]{64}$/.test(parentHash)) {
+    throw new BadArgsError('PROMPTSHEON_PARENT_HASH must be a 64-character lowercase SHA-256 hash');
+  }
+  return client.post(`/workspaces/${workspaceId()}/agent-specifications`, {
+    specification: await specificationFile(path),
+    changeReason: process.env['PROMPTSHEON_CHANGE_REASON'] ?? 'created from CLI',
+    ...(parentHash === undefined ? {} : { parentHash }),
+  }, opts);
 }
 
 export async function specificationGetCommand(client: ApiClient, hash: string): Promise<unknown> {
