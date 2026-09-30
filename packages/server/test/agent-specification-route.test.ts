@@ -6,6 +6,14 @@ const workspaceId = '00000000-0000-4000-8000-000000000001';
 const hash = 'a'.repeat(64);
 
 describe('agent specification routes', () => {
+  const specification = {
+    role: 'Research assistant',
+    objective: 'Answer questions with evidence.',
+    prompt: { system: 'Be precise.' },
+    modelPolicy: { provider: 'simulator', model: 'simulator' },
+    lifecycle: { owner: 'team-research' },
+  };
+
   it('lists workspace revisions through the tenant-scoped route', async () => {
     const list = vi.fn(() => ({
       items: [{
@@ -57,11 +65,7 @@ describe('agent specification routes', () => {
       url: `/api/workspaces/${workspaceId}/agent-specifications/validate`,
       payload: {
         specification: {
-          role: 'Research assistant',
-          objective: 'Answer questions with evidence.',
-          prompt: { system: 'Be precise.' },
-          modelPolicy: { provider: 'simulator', model: 'simulator' },
-          lifecycle: { owner: 'team-research' },
+          ...specification,
         },
       },
     });
@@ -69,6 +73,76 @@ describe('agent specification routes', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual(expect.objectContaining({ valid: true }));
     expect(create).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('creates a validated revision with the authenticated author', async () => {
+    const create = vi.fn(() => ({
+      hash,
+      workspaceId,
+      schemaVersion: '1.0',
+      parentHash: null,
+      author: 'user-1',
+      changeReason: 'initial revision',
+      status: 'draft' as const,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      publishedAt: null,
+      specification,
+    }));
+    const app = Fastify();
+    app.addHook('preHandler', async (request) => {
+      (request as unknown as { agentOrgId: string; userId: string }).agentOrgId = 'org-1';
+      (request as unknown as { userId: string }).userId = 'user-1';
+    });
+    registerAgentSpecificationRoutes(app, {
+      repo: { create } as never,
+      workspaceRepo: { findByIdInOrg: vi.fn(() => ({ id: workspaceId })) } as never,
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/workspaces/${workspaceId}/agent-specifications`,
+      payload: { specification, changeReason: 'initial revision' },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual(expect.objectContaining({ hash, author: 'user-1', status: 'draft' }));
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ workspaceId, author: 'user-1', changeReason: 'initial revision' }));
+    await app.close();
+  });
+
+  it('publishes a revision and returns its updated record', async () => {
+    const publish = vi.fn();
+    const get = vi.fn(() => ({
+      hash,
+      workspaceId,
+      schemaVersion: '1.0',
+      parentHash: null,
+      author: 'user-1',
+      changeReason: 'initial revision',
+      status: 'published' as const,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      publishedAt: '2026-01-01T00:01:00.000Z',
+      specification,
+    }));
+    const app = Fastify();
+    app.addHook('preHandler', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = 'org-1';
+    });
+    registerAgentSpecificationRoutes(app, {
+      repo: { publish, get } as never,
+      workspaceRepo: { findByIdInOrg: vi.fn(() => ({ id: workspaceId })) } as never,
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/workspaces/${workspaceId}/agent-specifications/${hash}/publish`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(expect.objectContaining({ hash, status: 'published' }));
+    expect(publish).toHaveBeenCalledWith(workspaceId, hash);
+    expect(get).toHaveBeenCalledWith(workspaceId, hash);
     await app.close();
   });
 });
