@@ -1563,6 +1563,10 @@
       "route": "/app/eval/suites"
     },
     {
+      "file": "frontend/src/app/app/evidence/page.tsx",
+      "route": "/app/evidence"
+    },
+    {
       "file": "frontend/src/app/app/executions/[id]/page.tsx",
       "route": "/app/executions/:id"
     },
