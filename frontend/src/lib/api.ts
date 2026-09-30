@@ -1582,17 +1582,29 @@ export const releaseApi = {
     const r = await client.get<unknown>(`/releases/${id}`);
     return { data: parseRelease(r.data) };
   },
-  create: (data: { capabilityId: string; capabilityVersion: number; capabilityVersionId: string | null; manifest: string; environment: string }) =>
-    client.post('/releases', data),
-  sign: (id: string, data: { keyId: string; signature: string; signedAt: string }) =>
-    client.post(`/releases/${id}/sign`, data),
-  transition: (id: string, to: 'draft' | 'review' | 'approved' | 'canary' | 'active' | 'rolled_back', reason?: string) =>
-    client.post(`/releases/${id}/transition`, { to, ...(reason ? { reason } : {}) }),
-  canary: (id: string, percent: number) => client.put(`/releases/${id}/canary`, { percent }),
-  rollback: (id: string, toReleaseId?: string) => {
+  create: async (data: { capabilityId: string; capabilityVersion: number; capabilityVersionId: string | null; manifest: string; environment: string }): Promise<{ data: Release }> => {
+    const r = await client.post<unknown>('/releases', data);
+    return { data: parseRelease(r.data) };
+  },
+  sign: async (id: string, data: { keyId: string; signature: string; signedAt: string }): Promise<{ data: Release }> => {
+    const r = await client.post<unknown>(`/releases/${id}/sign`, data);
+    return { data: parseRelease(r.data) };
+  },
+  transition: async (id: string, to: 'draft' | 'review' | 'approved' | 'canary' | 'active' | 'rolled_back', reason?: string): Promise<{ data: Release }> => {
+    const r = await client.post<unknown>(`/releases/${id}/transition`, { to, ...(reason ? { reason } : {}) });
+    return { data: parseRelease(r.data) };
+  },
+  canary: async (id: string, percent: number): Promise<{ data: Release }> => {
+    const r = await client.put<unknown>(`/releases/${id}/canary`, { percent });
+    return { data: parseRelease(r.data) };
+  },
+  rollback: async (id: string, toReleaseId?: string): Promise<{ data: { rolledBack: Release; reactivated: Release } }> => {
     const body: { toReleaseId?: string } = {};
     if (toReleaseId !== undefined) body.toReleaseId = toReleaseId;
-    return client.post(`/releases/${id}/rollback`, body);
+    const r = await client.post<unknown>(`/releases/${id}/rollback`, body);
+    const parsed = z.object({ rolledBack: ReleaseSchema, reactivated: ReleaseSchema }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid rollback data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
   },
   autoRollback: async (id: string): Promise<{ action: 'no_action' | 'rolled_back'; reason: string; releaseId: string; targetReleaseId?: string | undefined; evaluationId?: string | undefined }> => {
     const r = await client.post<unknown>(`/releases/${id}/auto-rollback`, {});
