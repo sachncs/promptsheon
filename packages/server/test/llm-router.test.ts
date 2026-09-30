@@ -83,6 +83,35 @@ describe('LlmRouter', () => {
     }
   });
 
+  it('tolerates empty keep-alive frames in provider SSE streams', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response([
+        ': keep-alive',
+        '',
+        'data: {"choices":[{"delta":{"content":"hello"}}]}',
+        '',
+        'data: [DONE]',
+        '',
+      ].join('\n'), { status: 200, headers: { 'content-type': 'text/event-stream' } }),
+    );
+    const router = new LlmRouter();
+    try {
+      const chunks = [];
+      for await (const chunk of router.stream({
+        prompt: 'hello',
+        model: 'provider-model',
+        temperature: 0,
+        provider: 'openai',
+        apiKey: 'test-key',
+        baseUrl: 'https://provider.example',
+      })) chunks.push(chunk);
+      expect(chunks.map((chunk) => chunk.text).join('')).toBe('hello');
+      expect(chunks.at(-1)?.done).toBe(true);
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
   it('redacts credentials returned in provider error bodies', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('apiKey=provider-secret', { status: 401 }),

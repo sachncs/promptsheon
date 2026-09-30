@@ -501,7 +501,7 @@ async function* sseData(response: Response): AsyncIterable<string> {
 async function* parseOpenAiStream(response: Response, prompt: string): AsyncIterable<LlmStreamChunk> {
   const promptTokens = LlmRouter.estimateTokens(prompt);
   for await (const data of sseData(response)) {
-    if (data === '[DONE]') {
+    if (!data || data === '[DONE]') {
       yield { text: '', promptTokens, done: true };
       return;
     }
@@ -515,6 +515,7 @@ async function* parseOpenAiStream(response: Response, prompt: string): AsyncIter
 async function* parseAnthropicStream(response: Response, prompt: string): AsyncIterable<LlmStreamChunk> {
   const promptTokens = LlmRouter.estimateTokens(prompt);
   for await (const data of sseData(response)) {
+    if (!data || data === '[DONE]') continue;
     const parsed = JSON.parse(data) as { type?: string; delta?: { type?: string; text?: string }; message?: { usage?: { input_tokens?: number } }; usage?: { output_tokens?: number } };
     if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta' && parsed.delta.text) {
       yield { text: parsed.delta.text };
