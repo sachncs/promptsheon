@@ -212,8 +212,17 @@ journalctl -u promptsheon.service -f --output=cat | jq
 curl -s -X POST http://127.0.0.1:8080/api/audit/archive \
   -H "authorization: Bearer $PROMPTSHEON_API_KEY" | jq
 
-# Trigger an offline backup (the DB + CAS) without a network round-trip
-sudo -u promptsheon sqlite3 /var/lib/promptsheon/promptsheon.db ".backup '/var/lib/promptsheon/backups/$(date +%Y%m%d).db'"
+# Trigger an offline SQLite backup without a network round-trip. The command
+# writes atomically, restricts the backup file to mode 600, and runs
+# `PRAGMA integrity_check` before returning success.
+sudo -u promptsheon env \
+  PROMPTSHEON_DB_PATH=/var/lib/promptsheon/promptsheon.db \
+  PROMPTSHEON_BACKUP_PATH=/var/lib/promptsheon/backups/$(date +%Y%m%d).db \
+  pnpm --dir /opt/promptsheon/packages/server db:backup
+
+# Back up the CAS volume separately; database backup does not include it.
+sudo -u promptsheon rsync -a --delete /var/lib/promptsheon/.promptsheon/ \
+  /var/lib/promptsheon/backups/cas/
 ```
 
 ## 9. Air-gap-specific gotchas

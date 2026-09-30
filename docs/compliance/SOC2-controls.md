@@ -46,7 +46,7 @@ the customer for the out-of-scope layer.
 | CC7.2 | System monitoring | `/api/events/:channel` SSE stream; OTel hooks (`packages/server/src/observability/setup.ts`); pino structured logs at every route. |
 | CC7.3 | Evaluates security events | `AutoEval` runs against every trace_run; `/api/scores/summary` rolls up per evaluator. `error-rate` evaluator flags traces where > 0% of spans errored. |
 | CC7.4 | Incident response | `docs/compliance/incident-response.md`. |
-| CC7.5 | Recovery | `packages/server/test/backup.test.ts` (auto-scheduled) verifies the audit chain round-trip after a restore. Snapshots API (`/api/snapshots`) supports point-in-time recovery of capability state. |
+| CC7.5 | Recovery | `packages/server/test/backup.test.ts` verifies a SQLite backup round-trip and integrity check. `pnpm --dir packages/server db:backup` creates an atomic, mode-600 backup and verifies it before reporting success. Snapshots API (`/api/snapshots`) supports point-in-time recovery of capability state. |
 
 ## Change Management (CC8.x)
 
