@@ -130,7 +130,7 @@ segment. Tier 3 features would create a category.
 
 #### T1-3. **LLM gateway — caching, fallback, routing**
 - **Current status**: the runtime gateway now provides content-hash LRU caching, ordered provider fallback, circuit breakers, per-actor token buckets, and cache/rate-limit metrics.
-- **Remaining**: durable cache storage across restarts and template-aware cache invalidation.
+- **Remaining**: template-aware cache invalidation and cross-process coordination beyond the shared SQLite tier.
 - **Moat impact**: **high**. promptsheon becomes the cheapest-to-run LLM ops platform, which is sticky once teams adopt it. Caching at the gateway level is the single biggest cost lever most teams need.
 
 #### T1-4. **Online evaluation on production traces**

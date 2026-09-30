@@ -1366,6 +1366,7 @@
     "packages/server/src/repos/incident.ts",
     "packages/server/src/repos/index.ts",
     "packages/server/src/repos/kms-adapters.ts",
+    "packages/server/src/repos/llm-response-cache.ts",
     "packages/server/src/repos/manifest.ts",
     "packages/server/src/repos/mr.ts",
     "packages/server/src/repos/mutation-proposal.ts",
@@ -1462,7 +1463,8 @@
     "packages/shared/db/migrations/063_mutation_promotion_concurrency.up.sql",
     "packages/shared/db/migrations/064_mutation_proposal_evaluation.up.sql",
     "packages/shared/db/migrations/065_evidence_workspace_scope.up.sql",
-    "packages/shared/db/migrations/066_evidence_org_workspace_time_index.up.sql"
+    "packages/shared/db/migrations/066_evidence_org_workspace_time_index.up.sql",
+    "packages/shared/db/migrations/067_llm_response_cache.up.sql"
   ],
   "frontendRoutes": [
     {

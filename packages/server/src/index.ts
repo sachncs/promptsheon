@@ -46,6 +46,7 @@ import { DurableExecutionService } from './application/durable-execution-service
 import { RouterModelAdapter } from './application/provider-adapters.js';
 import { ToolRegistry } from './application/execution-ports.js';
 import { AsyncEvidenceSink } from './observability/evidence-sink.js';
+import { LlmResponseCacheRepo } from './repos/llm-response-cache.js';
 import type { Agent } from '@strands-agents/sdk';
 import type Database from 'better-sqlite3';
 
@@ -224,7 +225,7 @@ async function main() {
   durableWorker.start();
   const autoEval = new AutoEval({ traceRepo: repos.trace, scoreRepo: repos.traceScore, router: llmRouter });
   const gateway = new Gateway({
-    cache: new ResponseCache(2048),
+    cache: new ResponseCache(2048, new LlmResponseCacheRepo(db)),
     fallback: new FallbackChain(['custom', 'anthropic', 'openai']),
     rateLimiter: new RateLimiter({ capacity: 60, refillPerSecond: 1 }),
     router: llmRouter,

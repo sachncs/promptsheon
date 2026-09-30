@@ -35,6 +35,12 @@ export interface CacheLookup {
   baseUrl?: string;
 }
 
+export interface ResponseCacheStore {
+  get(hash: string): CacheEntry | null;
+  set(entry: CacheEntry): void;
+  trim(maxEntries: number): void;
+}
+
 function cacheKey(input: CacheLookup): string {
   // Deterministic: same prompt + model + temperature → same hash,
   // regardless of which provider the caller first tried. The
@@ -55,7 +61,7 @@ export class ResponseCache {
   private readonly store = new Map<string, CacheEntry>();
   private readonly maxEntries: number;
 
-  constructor(maxEntries = 1024) {
+  constructor(maxEntries = 1024, private readonly persistentStore?: ResponseCacheStore) {
     this.maxEntries = maxEntries;
   }
 
@@ -66,7 +72,12 @@ export class ResponseCache {
   get(input: CacheLookup): CacheEntry | null {
     const hash = cacheKey(input);
     const entry = this.store.get(hash);
-    if (!entry) return null;
+    if (!entry) {
+      const persisted = this.persistentStore?.get(hash) ?? null;
+      if (!persisted) return null;
+      this.store.set(hash, persisted);
+      return persisted;
+    }
     // Refresh LRU order.
     this.store.delete(hash);
     this.store.set(hash, entry);
@@ -89,6 +100,8 @@ export class ResponseCache {
       if (oldest === undefined) break;
       this.store.delete(oldest);
     }
+    this.persistentStore?.set(entry);
+    this.persistentStore?.trim(this.maxEntries);
     return entry;
   }
 
