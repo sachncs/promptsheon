@@ -7,7 +7,7 @@ export interface CostLimitConfig {
   orgDailyUsd: number;
   /** Capability-level daily cap. */
   capabilityDailyUsd: number;
-  /** Where to store the in-memory cost ledger. */
+  /** Optional ledger implementation. The process-local default is shared and bounded. */
   ledger?: CostLedger;
 }
 
@@ -22,7 +22,15 @@ export interface CostLedger {
  */
 export class InMemoryCostLedger implements CostLedger {
   private entries: Array<{ orgId: string; capabilityId: string; costUsd: number; ts: number }> = [];
+
+  constructor(private readonly maxEntries = 100_000) {
+    if (!Number.isSafeInteger(maxEntries) || maxEntries < 1) throw new Error('maxEntries must be a positive safe integer');
+  }
+
   record(orgId: string, capabilityId: string, costUsd: number): void {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    this.entries = this.entries.filter((entry) => entry.ts > cutoff);
+    if (this.entries.length >= this.maxEntries) this.entries.splice(0, this.entries.length - this.maxEntries + 1);
     this.entries.push({ orgId, capabilityId, costUsd, ts: Date.now() });
   }
   todayUsed(orgId: string, capabilityId?: string): number {
@@ -32,6 +40,8 @@ export class InMemoryCostLedger implements CostLedger {
       .reduce((sum, e) => sum + e.costUsd, 0);
   }
 }
+
+const defaultLedger = new InMemoryCostLedger();
 
 export class BudgetExceededError extends ModelError {
   constructor(public readonly budget: number, public readonly attempted: number, public readonly scope: 'per-invocation' | 'org-daily' | 'capability-daily') {
@@ -66,7 +76,7 @@ export function checkCostCap(input: CostCheckInput, opts: { allowFailover?: bool
   if (estimatedCostUsd > config.perInvocationUsd) {
     return { allowed: false, reason: `per-invocation $${config.perInvocationUsd} exceeded` };
   }
-  const capToday = config.ledger ?? new InMemoryCostLedger();
+  const capToday = config.ledger ?? defaultLedger;
   const orgToday = capToday.todayUsed(orgId);
   if (orgToday + estimatedCostUsd > config.orgDailyUsd) {
     if (opts.allowFailover) {
@@ -89,6 +99,6 @@ export function checkCostCap(input: CostCheckInput, opts: { allowFailover?: bool
  * share the ledger across checks.
  */
 export function recordCost(orgId: string, capabilityId: string, costUsd: number, config: CostLimitConfig): void {
-  const ledger = config.ledger ?? new InMemoryCostLedger();
+  const ledger = config.ledger ?? defaultLedger;
   ledger.record(orgId, capabilityId, costUsd);
 }

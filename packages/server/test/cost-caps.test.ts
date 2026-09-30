@@ -61,6 +61,16 @@ describe('recordCost + ledger', () => {
     expect(cfg.ledger!.todayUsed('o1', 'c2')).toBeCloseTo(0.30, 5);
     expect(cfg.ledger!.todayUsed('o1')).toBeCloseTo(0.60, 5);
   });
+
+  it('shares the default ledger when no ledger is injected', () => {
+    const cfg: CostLimitConfig = { perInvocationUsd: 1, orgDailyUsd: 1, capabilityDailyUsd: 1 };
+    const orgId = `default-ledger-${Date.now()}`;
+    recordCost(orgId, 'c1', 0.9, cfg);
+
+    const result = checkCostCap({ orgId, capabilityId: 'c1', estimatedCostUsd: 0.2, config: cfg });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('org-daily');
+  });
 });
 
 describe('BudgetExceededError', () => {
