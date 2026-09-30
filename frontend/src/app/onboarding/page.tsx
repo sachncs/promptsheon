@@ -9,8 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { StepIndicator } from '@/components/brand/step-indicator';
-import { bootstrapApi, toSession } from '@/lib/bootstrap';
+import { bootstrapApi, toSession, type CreateAdminResponse } from '@/lib/bootstrap';
 import { getSession, setSession } from '@/lib/session';
+import { userApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { QueryError } from '@/components/brand/query-error';
 
@@ -48,6 +49,9 @@ export default function OnboardingPage() {
   const status = useQuery({ queryKey: ['bootstrap', 'status'], queryFn: () => bootstrapApi.status() });
   const [index, setIndex] = React.useState(0);
   const [restoreError, setRestoreError] = React.useState<string | null>(null);
+  const [restoreCandidate, setRestoreCandidate] = React.useState<CreateAdminResponse | null>(null);
+  const [restoreApiKey, setRestoreApiKey] = React.useState('');
+  const [restorePending, setRestorePending] = React.useState(false);
 
   React.useEffect(() => {
     if (!status.data) return;
@@ -62,14 +66,16 @@ export default function OnboardingPage() {
         router.replace('/app');
         return;
       }
-        bootstrapApi.admin()
+      bootstrapApi.admin()
         .then((data) => {
           const restored = toSession(data, status.data?.provider ?? null);
           if (status.data.authEnabled && !restored.apiKey) {
+            setRestoreCandidate(data);
             setRestoreError('This installation requires an API key, but the saved browser session is missing. Sign in with an API key or complete setup again.');
             return;
           }
           setRestoreError(null);
+          setRestoreCandidate(null);
           setSession(restored);
           router.replace('/app');
         })
@@ -78,6 +84,27 @@ export default function OnboardingPage() {
         });
     }
   }, [status.data, router]);
+
+  async function restoreWithApiKey(): Promise<void> {
+    if (!restoreCandidate || !restoreApiKey.trim()) {
+      setRestoreError('Enter an existing Promptsheon API key to restore this browser session.');
+      return;
+    }
+    setRestorePending(true);
+    setRestoreError(null);
+    const restored = { ...toSession(restoreCandidate, status.data?.provider ?? null), apiKey: restoreApiKey.trim() };
+    setSession(restored);
+    try {
+      await userApi.me();
+      setRestoreApiKey('');
+      setRestoreCandidate(null);
+      router.replace('/app');
+    } catch (error: unknown) {
+      setRestoreError(error instanceof Error ? error.message : 'That API key could not be verified.');
+    } finally {
+      setRestorePending(false);
+    }
+  }
 
   if (status.isLoading) {
     return (
@@ -95,7 +122,30 @@ export default function OnboardingPage() {
     <div className="relative">
       {restoreError ? (
         <div role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          {restoreError} Please retry or complete the administrator step again.
+          {restoreError}
+        </div>
+      ) : null}
+      {restoreCandidate ? (
+        <div className="mb-4 rounded-xl border border-border-subtle bg-surface-1 p-4">
+          <div className="text-sm font-semibold text-text-strong">Restore your browser session</div>
+          <p className="mt-1 text-xs leading-relaxed text-text-muted">
+            Authentication is enabled, so the server cannot issue a new credential here. Use an existing administrator API key; it is verified once and kept only in this browser session.
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <Input
+              aria-label="Promptsheon API key"
+              type="password"
+              autoComplete="off"
+              value={restoreApiKey}
+              onChange={(event) => setRestoreApiKey(event.target.value)}
+              placeholder="pk_…"
+              mono
+            />
+            <Button type="button" onClick={() => void restoreWithApiKey()} disabled={restorePending || !restoreApiKey.trim()}>
+              {restorePending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+              Verify key
+            </Button>
+          </div>
         </div>
       ) : null}
       <div className="ps-aurora-bg pointer-events-none absolute -inset-x-12 -top-12 -bottom-12 -z-10 rounded-[3rem]" aria-hidden />
