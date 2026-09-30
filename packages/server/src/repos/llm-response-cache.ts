@@ -75,6 +75,10 @@ export class LlmResponseCacheRepo {
     this.db.prepare('DELETE FROM llm_response_cache WHERE cache_hash = ?').run(hash);
   }
 
+  clear(): void {
+    this.db.prepare('DELETE FROM llm_response_cache').run();
+  }
+
   trim(maxEntries: number): void {
     this.db.prepare(`
       DELETE FROM llm_response_cache

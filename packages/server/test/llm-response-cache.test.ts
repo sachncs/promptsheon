@@ -54,4 +54,17 @@ describe('persistent LLM response cache', () => {
     expect(db.prepare('SELECT COUNT(*) AS count FROM llm_response_cache').get()).toEqual({ count: 0 });
     db.close();
   });
+
+  it('clears both memory and persistent cache tiers', () => {
+    const db = new Database(':memory:');
+    applyMigrations(db, migrations);
+    const store = new LlmResponseCacheRepo(db);
+    const cache = new ResponseCache(2, store);
+    const request = { prompt: 'clear-me', model: 'simulator', temperature: 0, provider: 'simulated' };
+    cache.set({ ...request, content: 'answer', promptTokens: 1, completionTokens: 1, costUsd: 0, model: 'simulator', provider: 'simulated' });
+    cache.clear();
+    expect(cache.get(request)).toBeNull();
+    expect(db.prepare('SELECT COUNT(*) AS count FROM llm_response_cache').get()).toEqual({ count: 0 });
+    db.close();
+  });
 });

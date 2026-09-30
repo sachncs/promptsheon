@@ -41,6 +41,7 @@ export interface ResponseCacheStore {
   get(hash: string): CacheEntry | null;
   set(entry: CacheEntry): void;
   delete(hash: string): void;
+  clear(): void;
   trim(maxEntries: number): void;
 }
 
@@ -130,6 +131,7 @@ export class ResponseCache {
 
   clear(): void {
     this.store.clear();
+    this.persistentStore?.clear();
   }
 
   private isExpired(entry: CacheEntry): boolean {
