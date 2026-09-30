@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Webhook, Trash2 } from 'lucide-react';
-import { parseList, webhookApi } from '@/lib/api';
-import { z } from 'zod';
+import { webhookApi, type WebhookSubscription } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -17,23 +16,6 @@ import { Badge } from '@/components/ui/badge';
 import { QueryError } from '@/components/brand/query-error';
 import { getErrorMessage } from '@/lib/errors';
 import { useToast } from '@/components/brand/toast';
-
-interface WebhookItem {
-  id: string;
-  url?: string | undefined;
-  events?: string[] | undefined;
-  active?: boolean | undefined;
-  createdAt?: string | undefined;
-  lastDeliveredAt?: string | null | undefined;
-  deliveryCount?: number | undefined;
-  failureCount?: number | undefined;
-}
-
-const WebhookItemSchema = z.object({
-  id: z.string(), url: z.string().optional(), events: z.array(z.string()).optional(), active: z.boolean().optional(),
-  createdAt: z.string().optional(), lastDeliveredAt: z.string().nullable().optional(),
-  deliveryCount: z.number().optional(), failureCount: z.number().optional(),
-});
 
 const EVENT_PRESETS = [
   'release.created',
@@ -53,10 +35,10 @@ export default function WebhooksPage() {
 
   const hooks = useQuery({
     queryKey: ['webhooks'],
-    queryFn: () => webhookApi.list().then((r) => parseList(r.data, WebhookItemSchema, 'webhooks')),
+    queryFn: () => webhookApi.list().then((r) => r.data.webhooks),
     enabled: Boolean(session),
   });
-  const rows = hooks.data ?? [];
+  const rows: WebhookSubscription[] = hooks.data ?? [];
 
   const [url, setUrl] = useState('');
   const [events, setEvents] = useState<string[]>(['release.activated', 'approval.requested']);
@@ -75,7 +57,7 @@ export default function WebhooksPage() {
   });
 
   const toggle = useMutation({
-    mutationFn: (item: WebhookItem) => webhookApi.update(item.id, { active: !(item.active ?? false) }),
+    mutationFn: (item: WebhookSubscription) => webhookApi.update(item.id, { active: !item.active }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['webhooks'] });
       toast({ title: 'Webhook updated', variant: 'success' });
@@ -180,7 +162,7 @@ export default function WebhooksPage() {
                 key: 'events',
                 header: 'Events',
                 render: (r) => {
-                  const evs = r.events ?? [];
+                  const evs = r.events;
                   return (
                     <div className="flex flex-wrap gap-1">
                       {evs.slice(0, 3).map((ev) => <Badge key={ev}>{ev}</Badge>)}
@@ -190,19 +172,9 @@ export default function WebhooksPage() {
                 },
               },
               {
-                key: 'delivery',
-                header: 'Delivery',
-                render: (r) => {
-                  const total = r.deliveryCount ?? 0;
-                  const fail = r.failureCount ?? 0;
-                  const last = r.lastDeliveredAt ? new Date(r.lastDeliveredAt).toLocaleString() : 'never';
-                  return (
-                    <div className="text-xs">
-                      <div className="text-text-default">{total} sent · {fail} failed</div>
-                      <div className="text-text-subtle">last {last}</div>
-                    </div>
-                  );
-                },
+                key: 'updated',
+                header: 'Updated',
+                render: (r) => <span className="text-xs text-text-subtle">{new Date(r.updatedAt).toLocaleString()}</span>,
               },
               {
                 key: 'active',

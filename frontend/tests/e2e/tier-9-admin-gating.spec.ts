@@ -89,6 +89,21 @@ test.describe('tier 9: admin gating (server-enforced)', () => {
     await expect(page.locator('pre')).toContainText('pk_');
   });
 
+  test('admin can register a webhook from the UI', async ({ page, baseURL }) => {
+    if (!admin || !baseURL) throw new Error('admin not bootstrapped');
+    await clearClientState(page);
+    await seedSession(page, admin);
+    await page.goto('/app/webhooks', { waitUntil: 'domcontentloaded' });
+    const url = 'https://example.com/webhooks/promptsheon-e2e';
+    await page.getByLabel('URL').fill(url);
+    const createResponse = page.waitForResponse((response) =>
+      response.url().endsWith('/api/webhooks') && response.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: 'Add webhook' }).click();
+    expect((await createResponse).status(), 'webhook create response').toBe(201);
+    await expect(page.getByText(url)).toBeVisible();
+  });
+
   test('admin can run a prompt security scan from the UI', async ({ page, baseURL }) => {
     if (!admin || !baseURL) throw new Error('admin not bootstrapped');
     await clearClientState(page);

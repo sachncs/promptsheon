@@ -425,6 +425,18 @@ export interface IssuedApiKey {
   name: string;
 }
 
+export interface WebhookSubscription {
+  id: string;
+  organizationId: string;
+  label: string;
+  url: string;
+  events: string[];
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
 export interface Capability {
   id: string;
   projectId: string;
@@ -780,6 +792,18 @@ const IssuedApiKeySchema = z.object({
   key: z.string().min(1),
   id: z.string().min(1),
   name: z.string(),
+});
+
+const WebhookSubscriptionSchema = z.object({
+  id: z.string().min(1),
+  organizationId: z.string().min(1),
+  label: z.string().min(1),
+  url: z.string().url(),
+  events: z.array(z.string().min(1)),
+  active: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  createdBy: z.string().min(1),
 });
 
 function parseSelfEvolveState(raw: unknown): SelfEvolveState {
@@ -1977,9 +2001,24 @@ export function validateDagClient(manifest: { nodes: Array<{ id: string }>; edge
 }
 
 export const webhookApi = {
-  list: () => client.get('/webhooks'),
-  create: (data: { organizationId: string; label: string; url: string; events: string[] }) => client.post('/webhooks', data),
-  update: (id: string, data: { url?: string; events?: string[]; active?: boolean }) => client.put(`/webhooks/${id}`, data),
+  list: async (): Promise<{ data: { webhooks: WebhookSubscription[] } }> => {
+    const r = await client.get<unknown>('/webhooks');
+    const parsed = z.object({ webhooks: z.array(WebhookSubscriptionSchema) }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid webhook data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  create: async (data: { organizationId: string; label: string; url: string; events: string[] }): Promise<{ data: WebhookSubscription }> => {
+    const r = await client.post<unknown>('/webhooks', data);
+    const parsed = WebhookSubscriptionSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid webhook data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  update: async (id: string, data: { url?: string; events?: string[]; active?: boolean }): Promise<{ data: WebhookSubscription }> => {
+    const r = await client.put<unknown>(`/webhooks/${encodeURIComponent(id)}`, data);
+    const parsed = WebhookSubscriptionSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid webhook data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
   delete: (id: string) => client.delete(`/webhooks/${id}`),
 };
 
