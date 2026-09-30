@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
-import { describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { afterEach, describe, expect, it } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { backupDatabase, restoreDatabase, verifyDatabaseIntegrity } from '../src/db/backup.js';
@@ -8,8 +8,18 @@ import { runMigrations } from '../src/db/index.js';
 import { WorkspaceRepo } from '../src/repos/workspace.js';
 
 describe('database backup', () => {
+  const temporaryDirectories: string[] = [];
+
+  afterEach(() => {
+    for (const directory of temporaryDirectories) {
+      rmSync(directory, { recursive: true, force: true });
+    }
+    temporaryDirectories.length = 0;
+  });
+
   it('creates an atomic backup that passes integrity verification', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'promptsheon-backup-'));
+    temporaryDirectories.push(directory);
     const sourcePath = join(directory, 'source.sqlite');
     const backupPath = join(directory, 'backups', 'source.sqlite');
     const source = new Database(sourcePath);
@@ -31,6 +41,7 @@ describe('database backup', () => {
 
   it('verifies and atomically restores a backup', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'promptsheon-restore-'));
+    temporaryDirectories.push(directory);
     const sourcePath = join(directory, 'source.sqlite');
     const backupPath = join(directory, 'backup.sqlite');
     const destinationPath = join(directory, 'restored', 'database.sqlite');
@@ -50,6 +61,7 @@ describe('database backup', () => {
 
   it('round-trips a fully migrated application database', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'promptsheon-full-backup-'));
+    temporaryDirectories.push(directory);
     const sourcePath = join(directory, 'source.sqlite');
     const backupPath = join(directory, 'backup.sqlite');
     const destinationPath = join(directory, 'restored.sqlite');
@@ -74,6 +86,7 @@ describe('database backup', () => {
 
   it('rejects a corrupt source without replacing the destination', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'promptsheon-corrupt-backup-'));
+    temporaryDirectories.push(directory);
     const sourcePath = join(directory, 'source.sqlite');
     const backupPath = join(directory, 'backup.sqlite');
     const destinationPath = join(directory, 'destination.sqlite');
