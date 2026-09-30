@@ -71,9 +71,15 @@ test.describe('tier 1: route smoke (authenticated)', () => {
       await seedSession(page, cachedSession);
 
       const consoleErrors: string[] = [];
+      const apiFailures: string[] = [];
       page.on('pageerror', (err) => consoleErrors.push(String(err)));
       page.on('console', (msg) => {
         if (msg.type() === 'error') consoleErrors.push(msg.text());
+      });
+      page.on('response', (apiResponse) => {
+        if (apiResponse.url().includes('/api/') && apiResponse.status() >= 500) {
+          apiFailures.push(`${apiResponse.status()} ${apiResponse.request().method()} ${apiResponse.url()}`);
+        }
       });
 
       const response = await page.goto(path, { waitUntil: 'domcontentloaded' });
@@ -91,6 +97,7 @@ test.describe('tier 1: route smoke (authenticated)', () => {
         (m) => !/hydrat|did not match|Warning:|401|403|404|Failed to load resource/i.test(m),
       );
       expect(real, `console errors on ${path}: ${real.join('\n')}`).toHaveLength(0);
+      expect(apiFailures, `API 5xx responses on ${path}: ${apiFailures.join('\n')}`).toHaveLength(0);
     });
   }
 });
