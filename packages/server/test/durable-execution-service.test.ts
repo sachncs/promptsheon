@@ -4,6 +4,8 @@ import { AgentSpecificationSchema, applyMigrations, type MigrationSql } from '@p
 import { DurableExecutionService } from '../src/application/durable-execution-service.js';
 import { ExecutionCheckpointRepo } from '../src/repos/execution-checkpoint.js';
 import { ExecutionJobRepo } from '../src/repos/execution-job.js';
+import { AsyncEvidenceSink } from '../src/observability/evidence-sink.js';
+import type { AppendEvidenceInput } from '../src/repos/evidence.js';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,5 +69,38 @@ describe('DurableExecutionService', () => {
       metadata: { agentHash, workspaceId: 'ws1' },
     });
     expect(executedManifest?.nodes[0]?.name).toBe('Simulator assistant');
+  });
+
+  it('flushes execution evidence before marking a job completed', async () => {
+    const written: AppendEvidenceInput[] = [];
+    const evidence = new AsyncEvidenceSink({ append: (record) => written.push(record) });
+    const agentHash = 'b'.repeat(64);
+    const specification = AgentSpecificationSchema.parse({
+      role: 'Evidence assistant',
+      objective: 'Record completion evidence.',
+      prompt: { system: 'Be concise.' },
+      modelPolicy: { provider: 'simulator', model: 'promptsheon-simulator' },
+      lifecycle: { owner: 'test-team' },
+    });
+    const service = new DurableExecutionService(
+      new ExecutionJobRepo(db),
+      { get: async () => ({ hash: agentHash, workspaceId: 'ws1', schemaVersion: '1.0', parentHash: null, author: 'test', changeReason: 'test', status: 'published' as const, createdAt: '2026-01-01', publishedAt: '2026-01-01', specification }) },
+      { execute: async () => ({ totalTokens: 1, totalCost: 0, totalLatencyMs: 1 }) },
+      new ExecutionCheckpointRepo(db),
+      undefined,
+      undefined,
+      evidence,
+    );
+    const worker = service.createWorker({ workerId: 'evidence-test', pollMs: 2, leaseMs: 500, maxBackoffMs: 1, random: () => 0 });
+    const job = service.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash, inputs: {}, idempotencyKey: 'evidence-test' });
+    worker.start();
+    await waitFor(() => new ExecutionJobRepo(db).get('org1', job.id).state === 'completed');
+    await worker.stop();
+
+    expect(written.map((record) => record.eventType)).toEqual([
+      'execution.started',
+      'execution.completed',
+      'resource.consumed',
+    ]);
   });
 });

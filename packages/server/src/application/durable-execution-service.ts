@@ -162,6 +162,11 @@ export class DurableExecutionService {
             payload: totals,
             traceRunId,
           });
+          // The queue-backed sink is intentionally asynchronous during the
+          // execution, but the terminal job state must not become visible
+          // before its evidence is durable. Otherwise clients can observe a
+          // completed job with only a partial evidence timeline.
+          await this.evidence?.flush();
           if (traceRunId) this.traces?.finalize(traceRunId, 'success', { tokens: totals.totalTokens, costUsd: totals.costUsd });
           return result;
         } catch (error) {
@@ -177,6 +182,7 @@ export class DurableExecutionService {
             payload: { error: error instanceof Error ? error.name : 'unknown' },
             traceRunId,
           });
+          await this.evidence?.flush();
           if (traceRunId) this.traces?.finalize(traceRunId, 'error');
           if (error instanceof ExecutionTimeoutError) throw new ExecutionWorkError(error.message, false, true);
           throw error;

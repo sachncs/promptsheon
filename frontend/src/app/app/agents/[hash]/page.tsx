@@ -62,7 +62,7 @@ export default function AgentRevisionPage({ params, searchParams }: { params: Pr
   const jobIsTerminal = isTerminalJob(job.data?.data);
   useEffect(() => {
     if (!jobIsTerminal) return;
-    void queryClient.invalidateQueries({ queryKey: ['agent-specification-evidence', workspaceId, hash] });
+    void queryClient.refetchQueries({ queryKey: ['agent-specification-evidence', workspaceId, hash], type: 'active' });
   }, [hash, jobIsTerminal, jobState, queryClient, workspaceId]);
   const cancel = useMutation({
     mutationFn: () => executionJobApi.cancel(workspaceId!, jobId!),

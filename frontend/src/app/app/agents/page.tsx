@@ -54,6 +54,24 @@ export default function AgentsPage() {
         )}
       />
 
+      {(workspaces.data?.length ?? 0) > 1 && (
+        <Surface>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-text-strong">Workspace context</p>
+              <p className="text-xs text-text-muted">Choose which workspace&apos;s immutable agent revisions to inspect.</p>
+            </div>
+            <ThemedSelect
+              value={workspaceId ?? ''}
+              onValueChange={(value) => { setSelectedWorkspaceId(value); setPage(1); }}
+              options={(workspaces.data ?? []).map((workspace) => ({ value: workspace.id, label: workspace.name }))}
+              ariaLabel="Select workspace for agent specifications"
+              triggerClassName="w-full sm:w-52"
+            />
+          </div>
+        </Surface>
+      )}
+
       {!workspaceId ? (
         <EmptyState
           icon={Bot}
@@ -73,7 +91,6 @@ export default function AgentsPage() {
           <div className="flex flex-col gap-3 border-b border-border-subtle p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-text-muted">{data?.total ?? 0} revision{data?.total === 1 ? '' : 's'}</div>
             <div className="flex flex-col gap-2 sm:flex-row">
-              {(workspaces.data?.length ?? 0) > 1 && <ThemedSelect value={workspaceId ?? ''} onValueChange={(value) => { setSelectedWorkspaceId(value); setPage(1); }} options={(workspaces.data ?? []).map((workspace) => ({ value: workspace.id, label: workspace.name }))} ariaLabel="Select workspace for agent specifications" triggerClassName="w-full sm:w-52" />}
               <ThemedSelect
                 value={status}
                 onValueChange={(value) => { setStatus(value as AgentSpecificationStatus | 'all'); setPage(1); }}
