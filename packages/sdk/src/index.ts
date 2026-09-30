@@ -36,7 +36,6 @@ export type ExecutionJobState = 'queued' | 'running' | 'completed' | 'failed' | 
 export interface ExecutionJob {
   id: string;
   organizationId: string;
-  workspaceId: string | null;
   workspaceId: string;
   agentHash: string;
   inputHash: string;
@@ -82,6 +81,7 @@ export interface EvidenceRecord {
   schemaVersion: string;
   occurredAt: string;
   organizationId: string;
+  workspaceId: string | null;
   correlationId: string;
   traceId: string | null;
   executionId: string | null;
