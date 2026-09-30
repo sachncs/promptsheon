@@ -50,4 +50,32 @@ test.describe('tier 11: browser execution journey', () => {
     await expect(page.getByText('promptsheon-e2e-simulator', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('success', { exact: true }).first()).toBeVisible();
   });
+
+  test('runs the credential-free simulator in the playground and reuses its cache', async ({ page, baseURL }) => {
+    if (!baseURL) throw new Error('baseURL not provided');
+
+    const admin: SessionInfo = await bootstrapAdminViaApi(baseURL, {
+      baseUrl: baseURL,
+      orgName: `Playground Org ${Date.now()}`,
+      adminName: 'Playground Admin',
+      adminEmail: `playground-${Date.now()}@promptsheon.test`,
+    });
+    const api = await request.newContext({ baseURL });
+    const headers = { Authorization: `Bearer ${admin.apiKey}` };
+    const llmResponse = await api.post('/api/bootstrap/llm', {
+      headers,
+      data: { provider: 'simulated', model: 'promptsheon-e2e-simulator' },
+    });
+    expect(llmResponse.ok(), await llmResponse.text()).toBeTruthy();
+    await api.dispose();
+
+    await clearClientState(page);
+    await seedSession(page, admin);
+    await page.goto('/app/playground');
+    await page.getByLabel('Model').fill('promptsheon-e2e-simulator');
+    await page.getByRole('button', { name: /^run$/i }).click();
+    await expect(page.getByText(/\[simulation:promptsheon-e2e-simulator\]/)).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: /^run$/i }).click();
+    await expect(page.getByText('cache hit', { exact: true })).toBeVisible({ timeout: 15_000 });
+  });
 });

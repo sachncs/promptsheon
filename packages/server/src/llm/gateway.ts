@@ -18,6 +18,7 @@ export interface CacheEntry {
   model: string;
   temperature: number;
   provider: string;
+  baseUrl?: string;
   content: string;
   promptTokens: number;
   completionTokens: number;
@@ -30,6 +31,8 @@ export interface CacheLookup {
   model: string;
   temperature: number;
   provider: string;
+  /** Optional endpoint identity for custom OpenAI/Anthropic-compatible providers. */
+  baseUrl?: string;
 }
 
 function cacheKey(input: CacheLookup): string {
@@ -42,6 +45,8 @@ function cacheKey(input: CacheLookup): string {
     model: input.model,
     prompt: input.prompt,
     temperature: input.temperature,
+    provider: input.provider,
+    baseUrl: input.baseUrl ?? null,
   });
   return createHash('sha256').update(payload).digest('hex');
 }
@@ -74,8 +79,8 @@ export class ResponseCache {
    * order; we delete + re-insert on hit; oldest unreferenced
    * entry is first on insertion order).
    */
-  set(input: CacheLookup & Omit<CacheEntry, 'hash' | 'createdAt'>): CacheEntry {
-    const hash = cacheKey(input);
+  set(input: CacheLookup & Omit<CacheEntry, 'hash' | 'createdAt'>, keyInput: CacheLookup = input): CacheEntry {
+    const hash = cacheKey(keyInput);
     const entry: CacheEntry = { ...input, hash, createdAt: new Date().toISOString() };
     if (this.store.has(hash)) this.store.delete(hash);
     this.store.set(hash, entry);
@@ -284,7 +289,11 @@ export class Gateway {
 
     const started = Date.now();
     let lastError: Error | undefined;
-    for (const provider of this.deps.fallback.order()) {
+    const providers = [
+      request.provider,
+      ...this.deps.fallback.order().filter((provider) => provider !== request.provider),
+    ];
+    for (const provider of providers) {
       try {
         const breaker = this.circuitBreakers.get(provider) ?? new CircuitBreaker(
           `provider:${provider}`,
@@ -292,15 +301,16 @@ export class Gateway {
           this.deps.circuitBreaker?.cooldownMs,
         );
         this.circuitBreakers.set(provider, breaker);
-        const result = await breaker.execute(() => this.deps.router.complete({
+        const providerRequest = {
             prompt: request.prompt,
             model: request.model,
             temperature: request.temperature,
             provider,
-            baseUrl: request.baseUrl,
-            apiKey: request.apiKey,
             signal: request.signal,
-          }));
+            ...(provider === request.provider && request.baseUrl ? { baseUrl: request.baseUrl } : {}),
+            ...(provider === request.provider && request.apiKey ? { apiKey: request.apiKey } : {}),
+          };
+        const result = await breaker.execute(() => this.deps.router.complete(providerRequest));
         const latencyMs = Date.now() - started;
         this.deps.cache.set({
           ...request,
@@ -309,7 +319,7 @@ export class Gateway {
           promptTokens: result.promptTokens,
           completionTokens: result.completionTokens,
           costUsd: result.costUsd,
-        });
+        }, request);
         return { ...result, provider, latencyMs, cacheHit: false };
       } catch (err) {
         lastError = err as Error;

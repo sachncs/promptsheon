@@ -43,6 +43,15 @@ describe('ResponseCache', () => {
     expect(a).not.toBe(b);
   });
 
+  it('isolates entries by provider and custom endpoint', () => {
+    const simulator = cacheKey({ prompt: 'hi', model: 'm', temperature: 0.5, provider: 'simulated' });
+    const openai = cacheKey({ prompt: 'hi', model: 'm', temperature: 0.5, provider: 'openai' });
+    const customA = cacheKey({ prompt: 'hi', model: 'm', temperature: 0.5, provider: 'custom', baseUrl: 'https://one.example/v1' });
+    const customB = cacheKey({ prompt: 'hi', model: 'm', temperature: 0.5, provider: 'custom', baseUrl: 'https://two.example/v1' });
+    expect(simulator).not.toBe(openai);
+    expect(customA).not.toBe(customB);
+  });
+
   it('evicts least-recently-used entries past capacity', () => {
     const cache = new ResponseCache(2);
     cache.set({ prompt: 'a', model: 'm', temperature: 0, provider: 'p', content: '', promptTokens: 0, completionTokens: 0, costUsd: 0, model: 'm', provider: 'p' });
@@ -108,6 +117,26 @@ describe('RateLimiter', () => {
 });
 
 describe('Gateway', () => {
+  it('honours the requested simulator before configured real-provider fallbacks', async () => {
+    const providers: string[] = [];
+    const gw = new Gateway({
+      cache: new ResponseCache(),
+      fallback: new FallbackChain(['custom', 'anthropic', 'openai']),
+      rateLimiter: new RateLimiter({ capacity: 100, refillPerSecond: 100 }),
+      router: stubRouter(async (provider) => {
+        providers.push(provider);
+        return okResult(provider, '[simulation] hello');
+      }),
+    });
+
+    const result = await gw.complete({
+      prompt: 'hello', model: 'promptsheon-simulator', temperature: 0.2, provider: 'simulated',
+    });
+
+    expect(result.provider).toBe('simulated');
+    expect(providers).toEqual(['simulated']);
+  });
+
   it('returns a cached entry without calling the router', async () => {
     const cache = new ResponseCache();
     cache.set({
