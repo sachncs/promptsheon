@@ -1478,6 +1478,10 @@
       "route": "/app/admin/analytics"
     },
     {
+      "file": "frontend/src/app/app/admin/budgets/page.tsx",
+      "route": "/app/admin/budgets"
+    },
+    {
       "file": "frontend/src/app/app/admin/cost/page.tsx",
       "route": "/app/admin/cost"
     },
