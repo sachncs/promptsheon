@@ -38,4 +38,24 @@ describe('LlmRouter', () => {
       provider: 'bedrock',
     })).rejects.toThrow('Bedrock region is required');
   });
+
+  it('does not duplicate /v1 for OpenAI-compatible custom endpoints', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ data: [] }), { status: 200 }),
+    );
+    const router = new LlmRouter();
+
+    await expect(router.probe({
+      provider: 'custom',
+      baseUrl: 'https://integrate.api.nvidia.com/v1',
+      apiKey: 'test-key',
+      model: 'meta/llama-3.1-8b-instruct',
+    })).resolves.toMatchObject({ model: 'meta/llama-3.1-8b-instruct' });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://integrate.api.nvidia.com/v1/models',
+      expect.objectContaining({ headers: { Authorization: 'Bearer test-key' } }),
+    );
+    fetchMock.mockRestore();
+  });
 });

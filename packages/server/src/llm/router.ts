@@ -195,7 +195,7 @@ export class LlmRouter {
     if (!base || !apiKey) throw new Error('Custom provider requires baseUrl + apiKey');
     const isAnthropicStyle = /anthropic|minimax/i.test(base);
     if (isAnthropicStyle) {
-      const res = await fetch(`${base}/v1/messages`, {
+      const res = await fetch(withApiVersion(base, 'messages'), {
         method: 'POST',
         headers: {
           'x-api-key': apiKey,
@@ -223,7 +223,7 @@ export class LlmRouter {
         .map((b) => b.text ?? '')
         .join('');
     }
-    const res = await fetch(`${base}/v1/chat/completions`, {
+    const res = await fetch(withApiVersion(base, 'chat/completions'), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -333,12 +333,11 @@ export class LlmRouter {
     if (!req.baseUrl) throw new Error('Custom provider requires a baseUrl');
     const base = req.baseUrl.replace(/\/$/, '');
     // Custom providers use the Anthropic probe format (POST /v1/messages
-    // with x-api-key). The URL points to any Anthropic-compatible or
-    // OpenAI-compatible endpoint; for OpenAI, the user can override the
-    // path with a custom baseUrl that includes /v1.
+    // with x-api-key) or the OpenAI-compatible model-list probe. Accept
+    // either a host URL or an OpenAI base URL that already includes /v1.
     const isAnthropicStyle = /anthropic|minimax/i.test(base) || base.includes('anthropic');
     if (isAnthropicStyle) {
-      const res = await fetch(`${base}/v1/messages`, {
+      const res = await fetch(withApiVersion(base, 'messages'), {
         method: 'POST',
         headers: {
           'x-api-key': req.apiKey,
@@ -359,7 +358,7 @@ export class LlmRouter {
       return { latencyMs: Date.now() - started, model: req.model };
     }
     // OpenAI-style: GET /v1/models
-    const res = await fetch(`${base}/v1/models`, {
+    const res = await fetch(withApiVersion(base, 'models'), {
       headers: { Authorization: `Bearer ${req.apiKey}` },
       signal: AbortSignal.timeout(8_000),
     });
@@ -369,4 +368,8 @@ export class LlmRouter {
     }
     return { latencyMs: Date.now() - started, model: req.model };
   }
+}
+
+function withApiVersion(baseUrl: string, resource: 'chat/completions' | 'messages' | 'models'): string {
+  return baseUrl.endsWith('/v1') ? `${baseUrl}/${resource}` : `${baseUrl}/v1/${resource}`;
 }
