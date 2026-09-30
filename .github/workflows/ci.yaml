@@ -111,7 +111,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Build the promptsheon image
         run: docker build -t promptsheon:ci .
       - name: Smoke check (syntax + import graph)
