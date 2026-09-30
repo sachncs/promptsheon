@@ -2543,12 +2543,26 @@ export const vaultApi = {
 };
 
 export const retentionApi = {
-  get: (organizationId: string) =>
-    client.get(`/orgs/${organizationId}/retention`).then((r) => r.data),
-  set: (organizationId: string, days: number) =>
-    client.put(`/orgs/${organizationId}/retention`, { organizationId, days }).then((r) => r.data),
-  sweep: (organizationId: string) =>
-    client.post(`/orgs/${organizationId}/retention/sweep`).then((r) => r.data),
+  get: async (organizationId: string): Promise<{ organizationId: string; retentionDays: number }> => {
+    const r = await client.get<unknown>(`/orgs/${organizationId}/retention`);
+    const parsed = z.object({ organizationId: z.string().min(1), retentionDays: z.number().int().positive() }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid retention settings.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  set: async (organizationId: string, days: number): Promise<{ organizationId: string; retentionDays: number }> => {
+    const r = await client.put<unknown>(`/orgs/${organizationId}/retention`, { organizationId, days });
+    const parsed = z.object({ organizationId: z.string().min(1), retentionDays: z.number().int().positive() }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid retention settings.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  sweep: async (organizationId: string): Promise<{ swept: Array<{ table: string; deletedRows: number; cutoff: string }> }> => {
+    const r = await client.post<unknown>(`/orgs/${organizationId}/retention/sweep`);
+    const parsed = z.object({
+      swept: z.array(z.object({ table: z.string().min(1), deletedRows: z.number().int().nonnegative(), cutoff: z.string() })),
+    }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid retention sweep data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
 };
 
 export const costApi = {
