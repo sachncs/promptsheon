@@ -75,6 +75,11 @@ export function verifyDatabaseIntegrity(databasePath: string): DatabaseIntegrity
     const row = database.pragma('integrity_check', { simple: true }) as unknown;
     const result = typeof row === 'string' ? row : String(row);
     return { valid: result === 'ok', result };
+  } catch (error) {
+    return {
+      valid: false,
+      result: error instanceof Error ? error.message : String(error),
+    };
   } finally {
     database.close();
   }
