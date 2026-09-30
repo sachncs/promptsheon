@@ -58,6 +58,12 @@ export class AgentSpecificationRepo {
     parentHash?: string | null;
   }): Promise<AgentSpecificationRecord> {
     const specification = AgentSpecificationSchema.parse(input.specification);
+    if (input.parentHash) {
+      const parent = this.db.prepare(
+        'SELECT 1 AS present FROM agent_specifications WHERE workspace_id = ? AND hash = ?',
+      ).get(input.workspaceId, input.parentHash) as { present: number } | undefined;
+      if (!parent) throw new NotFoundError('agent specification parent', input.parentHash);
+    }
     const canonical = canonicalizeSpecification(specification);
     const hash = hashAgentSpecification(specification);
     await this.cas.writeBlob(Buffer.from(canonical, 'utf8'));

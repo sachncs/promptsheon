@@ -74,6 +74,26 @@ describe('AgentSpecificationRepo', () => {
     expect(() => repo.replace()).toThrow('immutable');
   });
 
+  it('rejects missing or cross-workspace parents before writing a child', async () => {
+    const first = await repo.create({ workspaceId: 'ws1', specification, author: 'alice', changeReason: 'initial' });
+    await expect(repo.create({
+      workspaceId: 'ws1',
+      specification: { ...specification, objective: 'Answer questions with sources.' },
+      author: 'alice',
+      changeReason: 'missing parent',
+      parentHash: 'b'.repeat(64),
+    })).rejects.toThrow('agent specification parent');
+    await expect(repo.create({
+      workspaceId: 'ws2',
+      specification: { ...specification, objective: 'Answer questions with sources.' },
+      author: 'alice',
+      changeReason: 'cross-workspace parent',
+      parentHash: first.hash,
+    })).rejects.toThrow('agent specification parent');
+    expect(repo.list('ws1').total).toBe(1);
+    expect(repo.list('ws2').total).toBe(0);
+  });
+
   it('lists metadata with stable pagination and status filtering', async () => {
     const first = await repo.create({ workspaceId: 'ws1', specification, author: 'alice', changeReason: 'initial' });
     const second = await repo.create({
