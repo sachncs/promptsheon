@@ -4,6 +4,9 @@ import { ManifestSchema } from '@promptsheon/shared/validation';
 import type { Manifest } from '@promptsheon/shared';
 import type { Execution } from '@promptsheon/shared';
 import type { Schedule } from '@promptsheon/shared';
+import type { Dataset, DatasetCase } from '@promptsheon/shared';
+
+export type { Dataset, DatasetCase };
 import { clearSession } from './session';
 
 export class ApiError extends Error {
@@ -720,6 +723,15 @@ const ScheduleSchema = z.object({
   enabled: z.boolean(),
   createdAt: z.string(),
   createdBy: z.string(),
+});
+
+const DatasetSchema = z.object({
+  id: z.string(), capabilityId: z.string(), name: z.string(), description: z.string(),
+  createdAt: z.string(), updatedAt: z.string(),
+});
+const DatasetCaseSchema = z.object({
+  id: z.string(), datasetId: z.string(), seq: z.number().int().positive(), inputs: z.string(),
+  expected: z.string(), description: z.string(),
 });
 
 function parseVaultKeyring(raw: unknown): VaultKeyringEntry[] {
@@ -1459,12 +1471,37 @@ export const invokeApi = {
 };
 
 export const datasetApi = {
-  list: (capabilityId: string) => client.get('/datasets', { params: { capabilityId } }),
-  get: (id: string) => client.get(`/datasets/${id}`),
-  create: (data: { capabilityId: string; name: string; description?: string }) => client.post('/datasets', data),
+  list: async (capabilityId: string): Promise<{ data: Dataset[] }> => {
+    const r = await client.get<unknown>('/datasets', { params: { capabilityId } });
+    const parsed = z.array(DatasetSchema).safeParse(unwrapList<unknown>(r.data));
+    if (!parsed.success) throw new ApiError('The server returned invalid dataset data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  get: async (id: string): Promise<{ data: Dataset }> => {
+    const r = await client.get<unknown>(`/datasets/${id}`);
+    const parsed = DatasetSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid dataset data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  create: async (data: { capabilityId: string; name: string; description?: string }): Promise<{ data: Dataset }> => {
+    const r = await client.post<unknown>('/datasets', data);
+    const parsed = DatasetSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid dataset data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
   delete: (id: string) => client.delete(`/datasets/${id}`),
-  getCases: (id: string) => client.get(`/datasets/${id}/cases`),
-  addCase: (id: string, data: { inputs: string; expected: string; description?: string }) => client.post(`/datasets/${id}/cases`, data),
+  getCases: async (id: string): Promise<{ data: DatasetCase[] }> => {
+    const r = await client.get<unknown>(`/datasets/${id}/cases`);
+    const parsed = z.array(DatasetCaseSchema).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid dataset cases.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  addCase: async (id: string, data: { inputs: string; expected: string; description?: string }): Promise<{ data: DatasetCase }> => {
+    const r = await client.post<unknown>(`/datasets/${id}/cases`, data);
+    const parsed = DatasetCaseSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid dataset case data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
 };
 
 export const evalApi = {

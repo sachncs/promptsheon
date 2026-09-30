@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
-import { evalApi, releaseApi, datasetApi } from '@/lib/api';
+import { evalApi, releaseApi, datasetApi, type EvalRun, type Dataset } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -58,7 +58,7 @@ export default function EvalRunsPage() {
   const [scorer, setScorer] = React.useState('deterministic');
   const [actualUrl, setActualUrl] = React.useState('');
   const selectedReleaseId = releaseId || releases.data?.[0]?.id || '';
-  const selectedDatasetId = datasetId || (Array.isArray(datasets.data) ? datasets.data[0]?.id : '') || '';
+  const selectedDatasetId = datasetId || datasets.data?.[0]?.id || '';
   const selectedScorer = scorer || evaluators.data?.[0] || 'deterministic';
 
   const createRun = useMutation({
@@ -75,13 +75,7 @@ export default function EvalRunsPage() {
     onError: (err) => toast({ title: 'Eval run failed', description: getErrorMessage(err), variant: 'destructive' }),
   });
 
-  const rows = (Array.isArray(data) ? data : []) as Array<{
-    id: string;
-    scorer: string;
-    score: number;
-    status: string;
-    startedAt: string;
-  }>;
+  const rows: EvalRun[] = data ?? [];
 
   if (!session) return null;
 
@@ -90,7 +84,7 @@ export default function EvalRunsPage() {
   }
 
   const releaseRows = releases.data ?? [];
-  const datasetRows = Array.isArray(datasets.data) ? datasets.data as Array<{ id: string; name: string }> : [];
+  const datasetRows: Dataset[] = datasets.data ?? [];
 
   return (
     <div className="space-y-6">

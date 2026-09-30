@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
-import { datasetApi } from '@/lib/api';
+import { datasetApi, type Dataset } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { useToast } from '@/components/brand/toast';
 import { PageHeader } from '@/components/brand/page-header';
@@ -17,14 +17,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { QueryError } from '@/components/brand/query-error';
 import { getErrorMessage } from '@/lib/errors';
-
-interface DatasetSummary {
-  id: string;
-  name: string;
-  description?: string;
-  createdAt?: string;
-  caseCount?: number;
-}
 
 export default function DatasetsPage() {
   const params = useParams<{ capabilityId: string }>();
@@ -87,7 +79,7 @@ export default function DatasetsPage() {
     onError: (err) => toast({ title: 'Add case failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
-  const rows = (Array.isArray(datasets.data) ? datasets.data : []) as DatasetSummary[];
+  const rows: Dataset[] = datasets.data ?? [];
 
   if (!session) return null;
 
