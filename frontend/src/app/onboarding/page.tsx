@@ -14,6 +14,7 @@ import { clearSession, getSession, getSessionStorageState, setSession } from '@/
 import { userApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 const steps = [
   { id: 'welcome', label: 'Welcome', icon: Bot },
@@ -71,7 +72,7 @@ export default function OnboardingPage() {
             setRestoreError('The saved browser session is invalid. Enter an existing administrator API key to restore this browser session.');
           })
           .catch((adminError: unknown) => {
-            setRestoreError(adminError instanceof Error ? adminError.message : 'We could not prepare browser-session recovery.');
+            setRestoreError(getErrorMessage(adminError, 'We could not prepare browser-session recovery.'));
           });
         return;
       }
@@ -94,7 +95,7 @@ export default function OnboardingPage() {
                 setRestoreError('The saved browser session could not be verified. This installation requires an API key; enter an existing administrator API key to restore it.');
               })
               .catch((adminError: unknown) => {
-                setRestoreError(adminError instanceof Error ? adminError.message : 'We could not restore the administrator session.');
+            setRestoreError(getErrorMessage(adminError, 'We could not restore the administrator session.'));
               });
           });
         return;
@@ -132,7 +133,7 @@ export default function OnboardingPage() {
             });
         })
         .catch((error: unknown) => {
-          setRestoreError(error instanceof Error ? error.message : 'We could not restore the administrator session.');
+          setRestoreError(getErrorMessage(error, 'We could not restore the administrator session.'));
         });
     }
   }, [status.data, router]);
@@ -157,7 +158,7 @@ export default function OnboardingPage() {
         setIndex(2);
       }
     } catch (error: unknown) {
-      setRestoreError(error instanceof Error ? error.message : 'That API key could not be verified.');
+      setRestoreError(getErrorMessage(error, 'That API key could not be verified.'));
     } finally {
       setRestorePending(false);
     }

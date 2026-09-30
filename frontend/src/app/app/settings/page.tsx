@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { QueryError } from '@/components/brand/query-error';
+import { getErrorMessage } from '@/lib/errors';
 
 interface SettingItem {
   key: string;
@@ -141,7 +142,7 @@ export default function SettingsPage() {
       {save.isError && (
         <Surface className="border-destructive/30 bg-destructive/5">
           <p className="text-sm text-destructive">
-            {save.error instanceof Error ? save.error.message : 'The setting could not be saved. Try again.'}
+            {getErrorMessage(save.error, 'The setting could not be saved. Try again.')}
           </p>
         </Surface>
       )}
