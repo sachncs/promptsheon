@@ -1939,6 +1939,107 @@ export const costApi = {
     client.post('/analytics/rollups', row),
 };
 
+export interface CostBudget {
+  id: string;
+  organizationId: string;
+  label: string;
+  period: 'weekly' | 'monthly';
+  limitMicros: number;
+  alertThreshold: number;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastAlertedAt: string | null;
+}
+
+export interface CostForecast {
+  snapshot: {
+    id: string;
+    organizationId: string;
+    periodStart: string;
+    periodEnd: string;
+    spendMicros: number;
+    projectedMicros: number;
+    bandLowMicros: number;
+    bandHighMicros: number;
+    windowDays: number;
+    computedAt: string;
+  } | null;
+  alerts: Array<{
+    budgetId: string;
+    label: string;
+    projectedMicros: number;
+    limitMicros: number;
+    alertThreshold: number;
+    fraction: number;
+  }>;
+}
+
+const CostBudgetSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  label: z.string(),
+  period: z.enum(['weekly', 'monthly']),
+  limitMicros: z.number().int().nonnegative(),
+  alertThreshold: z.number().min(0).max(1),
+  enabled: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  lastAlertedAt: z.string().nullable(),
+});
+
+const CostForecastSchema = z.object({
+  snapshot: z.object({
+    id: z.string(),
+    organizationId: z.string(),
+    periodStart: z.string(),
+    periodEnd: z.string(),
+    spendMicros: z.number(),
+    projectedMicros: z.number(),
+    bandLowMicros: z.number(),
+    bandHighMicros: z.number(),
+    windowDays: z.number().int(),
+    computedAt: z.string(),
+  }).nullable(),
+  alerts: z.array(z.object({
+    budgetId: z.string(),
+    label: z.string(),
+    projectedMicros: z.number(),
+    limitMicros: z.number(),
+    alertThreshold: z.number(),
+    fraction: z.number(),
+  })),
+});
+
+export const budgetApi = {
+  list: async (organizationId: string): Promise<{ items: CostBudget[] }> => {
+    const response = await client.get<unknown>('/admin/budgets', { params: { organizationId } });
+    const parsed = z.object({ items: z.array(CostBudgetSchema) }).safeParse(response.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid budget data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  create: async (input: {
+    organizationId: string;
+    label: string;
+    period: CostBudget['period'];
+    limitMicros: number;
+    alertThreshold: number;
+    enabled: boolean;
+  }): Promise<CostBudget> => {
+    const response = await client.post<unknown>('/admin/budgets', input);
+    return CostBudgetSchema.parse(response.data);
+  },
+  update: async (id: string, fields: Partial<Pick<CostBudget, 'label' | 'period' | 'limitMicros' | 'alertThreshold' | 'enabled'>>): Promise<CostBudget> => {
+    const response = await client.patch<unknown>(`/admin/budgets/${encodeURIComponent(id)}`, fields);
+    return CostBudgetSchema.parse(response.data);
+  },
+  remove: (id: string): Promise<void> => client.delete(`/admin/budgets/${encodeURIComponent(id)}`).then(() => undefined),
+  forecast: async (organizationId: string, windowDays = 30): Promise<CostForecast> => {
+    const response = await client.get<unknown>('/admin/cost-forecast', { params: { organizationId, windowDays } });
+    return CostForecastSchema.parse(response.data);
+  },
+};
+
 export interface TraceRunSummary {
   id: string;
   organizationId: string;

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 import {
-  LayoutDashboard, FolderOpen, Boxes, Workflow, Compass, Flag, Bot,
+  LayoutDashboard, FolderOpen, Boxes, Workflow, Compass, Flag, Bot, Gauge,
   GitBranch, Target, Activity, CalendarClock, FlaskConical, Beaker,
   ShieldCheck, ScrollText, Users, KeyRound, Webhook, Cog, Search, GitMerge, ListChecks, GitPullRequest, FileSearch,
   ChevronDown, ChevronRight, ChevronUp, LogOut, Monitor, Moon, Sun,
@@ -88,6 +88,7 @@ const groups: NavGroup[] = [
     label: 'Settings',
     items: [
       { href: '/app/admin/cost', label: 'Cost & analytics', icon: Activity },
+      { href: '/app/admin/budgets', label: 'Spend budgets', icon: Gauge },
       { href: '/app/admin/analytics', label: 'Per-user analytics', icon: Users },
       { href: '/app/admin/teams', label: 'Teams + SSO', icon: Users },
       { href: '/app/admin/security', label: 'Prompt security', icon: Users },
