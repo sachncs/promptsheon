@@ -50,9 +50,15 @@ These timings are machine-dependent and are retained only as a regression
 signal. API throughput and SQLite write-contention targets still require a
 dedicated full-application load profile in Phase 2 and Phase 9.
 
-The reproducible baseline harness (`pnpm benchmark:baseline`) currently
-measures a synthetic Fastify `/api/health` route backed by SQLite and concurrent
-SQLite writes. On the capture machine it produced:
+The reproducible baseline harness (`pnpm benchmark:baseline`) measures a
+synthetic Fastify `/api/health` route backed by SQLite and concurrent SQLite
+writes. The credential-free execution benchmark
+(`pnpm benchmark:execution`) exercises the production `ExecutionJobRepo`
+directly, including queue admission, atomic claims, completion transitions, and
+exactly-once verification. Both commands use local deterministic data and never
+call an LLM provider.
+
+The baseline health/storage harness on the capture machine produced:
 
 | Benchmark | Configuration | Result |
 |---|---|---:|
@@ -60,11 +66,37 @@ SQLite writes. On the capture machine it produced:
 | HTTP health p95 latency | Same run | 2.56 ms |
 | SQLite concurrent writes | 4 workers × 250 writes, WAL mode | 14,090 writes/s |
 
+The latest execution-queue run on the same capture machine used 1,000 jobs
+across four organizations and produced:
+
+| Benchmark | Result |
+|---|---:|
+| Queue admission throughput | 21,026 jobs/s |
+| Queue admission p95 latency | 0.053 ms |
+| Claim-and-complete throughput | 9,366 jobs/s |
+| Claim latency p95 | 0.105 ms |
+| Exactly-once verification | `true` |
+| Remaining queued jobs | 0 |
+
 These figures are dispatch/storage baselines, not production capacity claims.
 They intentionally exclude LLM providers, full route registration, external
-tools, evaluation workloads, and network distance. Phase 2 and Phase 9 must
-replace them with workload-representative measurements before capacity is
-accepted.
+tools, evaluation workloads, and network distance. The execution benchmark
+provides a queue-specific regression signal, but it is not a production SLO:
+provider latency, HTTP/auth middleware, multi-process SQLite contention, and
+tenant distributions still require environment-specific load and soak runs.
+
+Run the queue profile with larger workloads when validating a deployment:
+
+```bash
+PROMPTSHEON_BENCHMARK_JOBS=10000 \
+PROMPTSHEON_BENCHMARK_ORGANIZATIONS=16 \
+pnpm benchmark:execution
+```
+
+Capacity is accepted only after recording the JSON output, the host/runtime,
+the configured queue limit, and the observed p95/p99 values in the deployment
+review. A run with `exactlyOnce: false` or a non-zero `remainingQueue` fails the
+benchmark and must not be promoted.
 
 ## Boundedness review
 
