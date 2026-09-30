@@ -201,14 +201,15 @@ export default function ManifestEditorPage() {
         const created = await capabilityApi.create({ projectId: effectiveProjectId, name: newCapabilityName.trim() });
         capabilityId = created.data.id;
       }
+      const { data: versions } = await versionApi.list(capabilityId);
+      const nextVersion = versions.reduce((highest, version) => Math.max(highest, version.version), 0) + 1;
       const ownedManifest: Manifest = {
         ...manifest,
+        id: manifest.id || `${capabilityId}-v${nextVersion}`,
         metadata: { ...manifest.metadata, capabilityId },
       };
       const manifestJson = JSON.stringify(ownedManifest);
       const { data: saved } = await manifestApi.create(ownedManifest);
-      const { data: versions } = await versionApi.list(capabilityId);
-      const nextVersion = versions.reduce((highest, version) => Math.max(highest, version.version), 0) + 1;
       await versionApi.create({
         capabilityId,
         version: nextVersion,
