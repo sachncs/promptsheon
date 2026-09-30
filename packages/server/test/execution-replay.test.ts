@@ -12,7 +12,7 @@ import { registerExecutionRoutes } from '../src/routes/execution.js';
 import { ExecutionService } from '../src/application/execution-service.js';
 import { selectByCanary } from '../src/application/canary-routing.js';
 import { ManifestGraphExecutor } from '../src/agents/executor/executor.js';
-import { ExecutionReplayService } from '../src/application/execution-replay-service.js';
+import { ExecutionReplayService, type ReplayExecutor } from '../src/application/execution-replay-service.js';
 import { SseHub } from '../src/sse/hub.js';
 import type { ExecutionTrace } from '../src/agents/executor/index.js';
 
@@ -447,5 +447,63 @@ describe('ExecutionReplayService / POST /api/executions/:id/replay', () => {
     expect(replays[0]!.manifestMatch).toBe(true);
     expect(replays[0]!.environmentMatch).toBe(true);
     expect(replays[0]!.inputsMatch).toBe(true);
+  });
+
+  it('persists failed replay evidence when the executor throws', async () => {
+    const original = h.executionRepo.create({
+      capabilityVersionId: 'cv1',
+      inputs: JSON.stringify({ q: 'hello' }),
+      inputHash: 'h1',
+      outputs: JSON.stringify({ node1: 'first' }),
+      model: 'gpt-4',
+      provider: 'openai',
+      latencyMs: 100,
+      costUsd: 0.001,
+      promptTokens: 10,
+      completionTokens: 5,
+      totalTokens: 15,
+      error: '',
+      traceId: 'trace-1',
+      environment: 'prod',
+    });
+    const manifest = buildLeafManifest('m-replay-failure');
+    const manifestHash = h.manifestRepo.create(manifest, { goal: 'g', createdBy: 'tester' });
+    h.db.prepare(`UPDATE capability_versions SET manifest_hash = ? WHERE id = 'cv1'`).run(manifestHash);
+
+    const executor: ReplayExecutor = {
+      execute: async () => {
+        throw new Error('provider unavailable');
+      },
+    };
+    const service = new ExecutionReplayService(
+      h.executionRepo,
+      h.manifestRepo,
+      h.traceRepo,
+      executor,
+    );
+
+    await expect(service.replay(original.id, 'unscoped')).rejects.toThrow('provider unavailable');
+
+    const replays = h.executionRepo.findReplaysByOriginal(original.id);
+    expect(replays).toHaveLength(1);
+    expect(replays[0]!.outcome).toBe('failed');
+    expect(replays[0]!.replayExecutionId).not.toBeNull();
+    expect(JSON.parse(replays[0]!.diffSummary ?? '{}')).toMatchObject({
+      reason: 'executor_failed',
+      error: 'provider unavailable',
+    });
+
+    const replayed = h.executionRepo.findById(replays[0]!.replayExecutionId!);
+    expect(replayed?.error).toBe('provider unavailable');
+    expect(replayed?.outputs).toBe('{}');
+    expect(replayed?.replayOf).toBe(original.id);
+    expect(replayed?.replayCount).toBe(0);
+
+    const traceRunId = (
+      h.db.prepare('SELECT id FROM trace_runs WHERE execution_id = ?').get(replayed!.id) as { id: string }
+    ).id;
+    const traceRun = h.traceRepo.findById(traceRunId);
+    expect(traceRun?.status).toBe('error');
+    expect(traceRun?.endTime).not.toBeNull();
   });
 });

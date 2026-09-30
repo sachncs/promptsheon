@@ -97,13 +97,41 @@ export class ExecutionReplayService {
     });
     void traceRun;
 
-    const trace = await this.executor.execute(manifestHash, manifest, {
-      executionId: replayExecutionId,
-      inputs: parsedInputs,
-      environment: original.environment,
-      traceId: replayExecutionId,
-      traceRunId: traceRun.id,
-    });
+    let trace: ExecutionTrace;
+    try {
+      trace = await this.executor.execute(manifestHash, manifest, {
+        executionId: replayExecutionId,
+        inputs: parsedInputs,
+        environment: original.environment,
+        traceId: replayExecutionId,
+        traceRunId: traceRun.id,
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      const safeMessage = message.length > 2_000 ? `${message.slice(0, 2_000)}…` : message;
+
+      this.traceRepo.finalize(traceRun.id, 'error');
+      this.executionRepo.updateRunResult(replayExecutionId, {
+        outputs: '{}',
+        latencyMs: 0,
+        costUsd: 0,
+        totalTokens: 0,
+        error: safeMessage,
+      });
+      this.executionRepo.recordReplay({
+        originalExecutionId: original.id,
+        replayExecutionId,
+        outcome: 'failed',
+        inputsMatch: true,
+        manifestMatch: true,
+        modelMatch:
+          manifest.model.modelId === original.model &&
+          manifest.model.provider === original.provider,
+        environmentMatch: original.environment === replayed.environment,
+        diffSummary: JSON.stringify({ reason: 'executor_failed', error: safeMessage }),
+      });
+      throw error;
+    }
     this.traceRepo.finalize(
       traceRun.id,
       trace.status === 'completed' ? 'success' : 'error',
