@@ -18,6 +18,38 @@ export async function walkOnboarding(page: Page): Promise<void> {
   // completed form of this journey instead of trying to repeat setup.
   await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined);
   if (new URL(page.url()).pathname.startsWith('/app')) return;
+
+  // CI may start with a provider configured through the environment. The
+  // product must require an existing API key in that state; the E2E harness
+  // can use its dedicated recovery endpoint to establish the test session
+  // without introducing a real provider credential.
+  const recoveryScreen = page.getByText('Restore your browser session');
+  if (await recoveryScreen.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    const response = await page.request.get('/api/bootstrap/admin');
+    const body = (await response.json()) as {
+      apiKey?: string;
+      user: { id: string; email: string; name: string };
+      org: { id: string; name: string };
+    };
+    if (!response.ok() || !body.apiKey) {
+      throw new Error('E2E recovery endpoint did not return a session key');
+    }
+    await page.evaluate((session) => {
+      window.localStorage.setItem('promptsheon:session:v1', JSON.stringify(session));
+    }, {
+      userId: body.user.id,
+      userName: body.user.name,
+      userEmail: body.user.email,
+      orgId: body.org.id,
+      orgName: body.org.name,
+      apiKey: body.apiKey,
+      completedAt: new Date().toISOString(),
+    });
+    await page.goto('/app');
+    await page.waitForURL(/\/app(\/|$)/, { timeout: 15_000 });
+    return;
+  }
+
   // Welcome
   await page.getByRole('button', { name: /begin setup/i }).click();
 
