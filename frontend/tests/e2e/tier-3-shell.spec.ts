@@ -178,6 +178,23 @@ test.describe('tier 3: app shell after onboarding', () => {
     await expect(page).toHaveURL(/\/onboarding$/);
   });
 
+  test('creates and disables a user quota from the admin UI', async ({ page, baseURL }) => {
+    if (!baseURL) throw new Error('E2E base URL is required');
+    const session = await bootstrapAdminViaApi(baseURL, {
+      orgName: `Quota UI Org ${Date.now()}`,
+      adminEmail: `quota-ui-${Date.now()}@promptsheon.test`,
+    });
+    await seedSession(page, session);
+    await page.goto('/app/admin/quotas');
+    await page.getByLabel('User ID').fill('quota-user');
+    await page.getByLabel('Label').fill('Daily simulator limit');
+    await page.getByLabel('Daily runs').fill('2');
+    await page.getByRole('button', { name: 'Add quota' }).click();
+    await expect(page.getByText('Daily simulator limit', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Disable' }).click();
+    await expect(page.getByText('disabled', { exact: true })).toBeVisible();
+  });
+
   test('creates and validates an agent specification without a provider key', async ({ page, request, baseURL }) => {
     if (!baseURL) throw new Error('E2E base URL is required');
     const session = await bootstrapAdminViaApi(baseURL, {
