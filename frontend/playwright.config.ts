@@ -1,8 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
+import { mkdtempSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const PORT = process.env['PROMPTSHEON_E2E_PORT'] ?? '3000';
 const BACKEND_PORT = process.env['PROMPTSHEON_E2E_BACKEND_PORT'] ?? '8081';
-const DATABASE_PATH = process.env['PROMPTSHEON_E2E_DB_PATH'] ?? 'promptsheon-test.db';
+const DATABASE_PATH = process.env['PROMPTSHEON_E2E_DB_PATH']
+  ?? join(mkdtempSync(join(tmpdir(), 'promptsheon-e2e-')), 'test.db');
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
