@@ -998,6 +998,14 @@ const ApprovalSummarySchema = z.object({
   approvals: z.array(ApprovalEntrySchema),
 });
 
+const ApprovalVoteResponseSchema = z.object({
+  releaseId: z.string(),
+  decision: z.enum(['approve', 'reject']),
+  comment: z.string().optional(),
+  distinctApprovers: z.number().int().nonnegative(),
+  approvals: z.array(ApprovalEntrySchema),
+});
+
 const PendingApprovalSummarySchema = z.object({
   releaseId: z.string(),
   manifestHash: z.string(),
@@ -2038,8 +2046,12 @@ export const approvalApi = {
     if (!parsed.success) throw new ApiError('The server returned invalid pending approvals.', { code: 'INVALID_RESPONSE' });
     return { data: parsed.data };
   },
-  vote: (releaseId: string, data: { decision: 'approve' | 'reject'; comment?: string }) =>
-    client.post(`/releases/${releaseId}/approvals`, data),
+  vote: async (releaseId: string, data: { decision: 'approve' | 'reject'; comment?: string }): Promise<{ data: z.infer<typeof ApprovalVoteResponseSchema> }> => {
+    const r = await client.post<unknown>(`/releases/${releaseId}/approvals`, data);
+    const parsed = ApprovalVoteResponseSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid approval vote data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
 };
 
 export const compilerApi = {
