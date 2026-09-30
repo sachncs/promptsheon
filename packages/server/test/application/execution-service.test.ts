@@ -130,6 +130,26 @@ describe('ExecutionService', () => {
       environment: 'prod',
     })).rejects.toThrow('executor unavailable');
     expect(deps.traces.finalize).toHaveBeenCalledWith('trace-1', 'error', { tokens: 0, costUsd: 0 });
-    expect(deps.records.create).not.toHaveBeenCalled();
+    expect(deps.records.create).toHaveBeenCalledWith(expect.objectContaining({
+      outputs: '{}',
+      error: 'executor unavailable',
+      traceId: 'execution-1',
+      environment: 'prod',
+    }));
+  });
+
+  it('truncates provider errors before persisting failed execution evidence', async () => {
+    const deps = dependencies();
+    deps.runner.execute.mockRejectedValue(new Error('x'.repeat(2_500)));
+
+    await expect(deps.service.run('hash-1', 'org-a', {
+      executionId: 'execution-1',
+      inputs: { prompt: 'hello' },
+      environment: 'prod',
+    })).rejects.toThrow();
+
+    const record = deps.records.create.mock.calls[0]?.[0] as { error: string };
+    expect(record.error).toHaveLength(2_001);
+    expect(record.error.endsWith('…')).toBe(true);
   });
 });

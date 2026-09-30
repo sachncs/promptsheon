@@ -141,6 +141,28 @@ export class ExecutionService {
       });
     } catch (error) {
       this.traces.finalize(traceRun.id, 'error', { tokens: 0, costUsd: 0 });
+      const message = error instanceof Error ? error.message : String(error);
+      const safeMessage = message.length > 2_000 ? `${message.slice(0, 2_000)}…` : message;
+      const capabilityVersionId = this.manifests.findCapabilityVersionIdInOrg?.(manifestHash, organizationId) ?? null;
+      const record = this.records.create({
+        capabilityVersionId,
+        inputs: JSON.stringify(options.inputs),
+        inputHash: hashInputs(options.inputs),
+        outputs: '{}',
+        model: manifest.model.modelId,
+        provider: manifest.model.provider,
+        latencyMs: 0,
+        costUsd: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        error: safeMessage,
+        traceId: options.traceId ?? options.executionId,
+        environment: options.environment,
+      });
+      if (this.traces.attachExecution && isExecutionRecord(record)) {
+        this.traces.attachExecution(traceRun.id, record.id);
+      }
       throw error;
     }
 
