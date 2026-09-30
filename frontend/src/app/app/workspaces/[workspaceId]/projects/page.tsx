@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { projectApi } from '@/lib/api';
+import { projectApi, type Project } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { useToast } from '@/components/brand/toast';
 import { PageHeader } from '@/components/brand/page-header';
@@ -18,12 +18,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { QueryError } from '@/components/brand/query-error';
 import { getErrorMessage } from '@/lib/errors';
-
-interface ProjectRow {
-  id: string;
-  name: string;
-  description?: string;
-}
 
 export default function WorkspaceProjectsPage() {
   const params = useParams<{ workspaceId: string }>();
@@ -69,7 +63,7 @@ export default function WorkspaceProjectsPage() {
     onError: (err) => toast({ title: 'Delete failed', variant: 'destructive', description: getErrorMessage(err) }),
   });
 
-  const rows = (Array.isArray(projects.data) ? projects.data : []) as ProjectRow[];
+  const rows: Project[] = projects.data ?? [];
 
   if (projects.isError) return <QueryError message={projects.error} onRetry={() => void projects.refetch()} />;
 

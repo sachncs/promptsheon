@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Boxes, Plus, Trash2 } from 'lucide-react';
-import { projectApi, workspaceApi, type WorkspaceRow } from '@/lib/api';
+import { projectApi, workspaceApi, type Project, type WorkspaceRow } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -17,15 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { QueryError } from '@/components/brand/query-error';
 import { getErrorMessage } from '@/lib/errors';
 
-interface ProjectItem {
-  id: string;
-  workspaceId?: string;
-  name?: string;
-  description?: string;
-  capabilityCount?: number;
-  createdAt?: string;
-  updatedAt?: string;
-}
+type ProjectRow = Project & { capabilityCount?: number };
 
 export default function ProjectsPage() {
   const session = useRequireSession();
@@ -44,7 +36,7 @@ export default function ProjectsPage() {
     queryFn: () => (wsId ? projectApi.list(wsId).then((r) => r.data) : Promise.resolve([])),
     enabled: Boolean(wsId),
   });
-  const rows = (projects.data ?? []) as ProjectItem[];
+  const rows: ProjectRow[] = projects.data ?? [];
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
