@@ -38,6 +38,8 @@ export const LlmProbeResponseSchema = z.object({
 
 export type LlmProbeResponse = z.infer<typeof LlmProbeResponseSchema>;
 
+const SaveLlmResponseSchema = z.object({ ok: z.literal(true) });
+
 export const bootstrapApi = {
   status: async (): Promise<BootstrapStatus> => {
     const { data } = await client.get('/bootstrap/status');
@@ -74,7 +76,7 @@ export const bootstrapApi = {
     baseUrl?: string | undefined;
   }): Promise<{ ok: true }> => {
     const { data } = await client.post('/bootstrap/llm', input);
-    return data as { ok: true };
+    return SaveLlmResponseSchema.parse(data);
   },
 };
 
