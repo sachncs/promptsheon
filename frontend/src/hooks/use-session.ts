@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { getSessionSnapshot, SESSION_CHANGED_EVENT } from '@/lib/session';
+import { getSessionSnapshot, refreshSessionSnapshot, SESSION_CHANGED_EVENT } from '@/lib/session';
 
 export function useSession() {
   return React.useSyncExternalStore(
@@ -29,7 +29,8 @@ export function useRequireSession() {
   );
 
   React.useEffect(() => {
-    if (hydrated && !session && !redirectAttempted.current) {
+    const currentSession = hydrated ? refreshSessionSnapshot() : session;
+    if (hydrated && !currentSession && !redirectAttempted.current) {
       redirectAttempted.current = true;
       // A full replace prevents a stale App Router tree from preserving an
       // invalid session after malformed localStorage is detected.

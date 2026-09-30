@@ -40,6 +40,13 @@ export function getSessionSnapshot(): Session | null {
   return readSessionSnapshot();
 }
 
+/** Re-read browser storage before a protected route makes an auth decision. */
+export function refreshSessionSnapshot(): Session | null {
+  if (typeof window === 'undefined') return null;
+  cachedStorageValue = undefined;
+  return readSessionSnapshot();
+}
+
 function readSessionSnapshot(): Session | null {
   const raw = window.localStorage.getItem(KEY);
   if (raw === cachedStorageValue) return cachedSession;
