@@ -665,6 +665,11 @@
       "path": "/api/mutation-proposals/:id/promote"
     },
     {
+      "file": "packages/server/src/routes/openai-gateway.ts",
+      "method": "POST",
+      "path": "/v1/chat/completions"
+    },
+    {
       "file": "packages/server/src/routes/org-settings.ts",
       "method": "GET",
       "path": "/api/orgs/:id/settings"
