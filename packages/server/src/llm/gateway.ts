@@ -96,7 +96,7 @@ export class ResponseCache {
         this.persistentStore?.delete(hash);
         return null;
       }
-      this.store.set(hash, persisted);
+      this.remember(hash, persisted);
       return persisted;
     }
     // Refresh LRU order.
@@ -114,13 +114,7 @@ export class ResponseCache {
   set(input: CacheLookup & Omit<CacheEntry, 'hash' | 'createdAt'>, keyInput: CacheLookup = input): CacheEntry {
     const hash = cacheKey(keyInput);
     const entry: CacheEntry = { ...input, hash, createdAt: new Date().toISOString() };
-    if (this.store.has(hash)) this.store.delete(hash);
-    this.store.set(hash, entry);
-    while (this.store.size > this.maxEntries) {
-      const oldest = this.store.keys().next().value;
-      if (oldest === undefined) break;
-      this.store.delete(oldest);
-    }
+    this.remember(hash, entry);
     this.persistentStore?.set(entry);
     this.persistentStore?.trim(this.maxEntries);
     return entry;
@@ -137,6 +131,16 @@ export class ResponseCache {
 
   private isExpired(entry: CacheEntry): boolean {
     return Date.now() - Date.parse(entry.createdAt) >= this.maxAgeMs;
+  }
+
+  private remember(hash: string, entry: CacheEntry): void {
+    if (this.store.has(hash)) this.store.delete(hash);
+    this.store.set(hash, entry);
+    while (this.store.size > this.maxEntries) {
+      const oldest = this.store.keys().next().value;
+      if (oldest === undefined) break;
+      this.store.delete(oldest);
+    }
   }
 }
 
