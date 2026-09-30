@@ -1,4 +1,4 @@
-import type { TraceOperationalSummary, TraceRun, TraceSpan } from '../repos/trace.js';
+import type { TraceOperationalSummary, TracePromptRisk, TraceRun, TraceSpan } from '../repos/trace.js';
 import type { TraceScore } from '../repos/trace-score.js';
 
 export interface TraceListOptions {
@@ -38,6 +38,7 @@ export interface TraceStore {
     runs: number;
   }>;
   operationalSummary(organizationId: string, days?: number): TraceOperationalSummary;
+  promptRiskByOrg(organizationId: string, days?: number, limit?: number): TracePromptRisk[];
 }
 
 export interface TraceScoreStore {
@@ -83,6 +84,10 @@ export class TraceService {
 
   operationalSummary(organizationId: string, days = 7) {
     return this.deps.traces.operationalSummary(organizationId, days);
+  }
+
+  promptRisk(organizationId: string, days = 30, limit = 25): TracePromptRisk[] {
+    return this.deps.traces.promptRiskByOrg(organizationId, days, limit);
   }
 
   get(organizationId: string, traceRunId: string): TraceDetail | null {

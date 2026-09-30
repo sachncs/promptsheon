@@ -48,6 +48,19 @@ export interface TraceOperationalSummary {
   models: Array<{ model: string; runs: number; errors: number; tokens: number; cost: number }>;
 }
 
+export interface TracePromptRisk {
+  promptKey: string;
+  runs: number;
+  errors: number;
+  errorRate: number;
+  tokens: number;
+  cost: number;
+  actors: number;
+  lastSeen: string;
+  signals: Array<'error-rate' | 'token-burn' | 'volume'>;
+  risk: 'medium' | 'high';
+}
+
 interface TraceRunRow {
   id: string;
   organization_id: string;
@@ -435,5 +448,61 @@ export class TraceRepo extends BaseRepo<TraceRun> {
       cost: totals.cost,
       models,
     };
+  }
+
+  /**
+   * Find prompt/agent identities with repeat failures or unusual resource
+   * consumption. The query only reads redacted trace metadata and keeps the
+   * organization boundary in SQL so a dashboard cannot cross tenants.
+   */
+  promptRiskByOrg(organizationId: string, days = 30, limit = 25): TracePromptRisk[] {
+    const since = new Date(Date.now() - days * 86_400_000).toISOString();
+    const rows = this.db
+      .prepare(
+        `SELECT
+           COALESCE(NULLIF(json_extract(attributes, '$.agentHash'), ''), name) AS prompt_key,
+           COUNT(*) AS runs,
+           SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS errors,
+           COALESCE(SUM(total_tokens), 0) AS tokens,
+           COALESCE(SUM(total_cost_usd), 0) AS cost,
+           COUNT(DISTINCT actor_id) AS actors,
+           MAX(start_time) AS last_seen
+         FROM trace_runs
+         WHERE organization_id = ? AND start_time >= ?
+         GROUP BY prompt_key
+         HAVING errors >= 2 OR tokens >= 10000 OR runs >= 50
+         ORDER BY (errors * 5.0 + tokens / 10000.0 + runs / 50.0) DESC, last_seen DESC
+         LIMIT ?`,
+      )
+      .all(organizationId, since, Math.min(limit, 200)) as Array<{
+      prompt_key: string;
+      runs: number;
+      errors: number;
+      tokens: number;
+      cost: number;
+      actors: number;
+      last_seen: string;
+    }>;
+
+    return rows.map((row) => {
+      const errorRate = row.runs > 0 ? row.errors / row.runs : 0;
+      const signals: TracePromptRisk['signals'] = [];
+      if (row.errors >= 2 && errorRate >= 0.2) signals.push('error-rate');
+      if (row.tokens >= 10_000) signals.push('token-burn');
+      if (row.runs >= 50) signals.push('volume');
+      const high = row.errors >= 5 || errorRate >= 0.5 || row.tokens >= 100_000;
+      return {
+        promptKey: row.prompt_key,
+        runs: row.runs,
+        errors: row.errors,
+        errorRate,
+        tokens: row.tokens,
+        cost: row.cost,
+        actors: row.actors,
+        lastSeen: row.last_seen,
+        signals,
+        risk: high ? 'high' : 'medium',
+      };
+    });
   }
 }

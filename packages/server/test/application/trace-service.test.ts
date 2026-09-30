@@ -28,6 +28,8 @@ function dependencies(): TraceServiceDependencies {
       findSpansByRun: vi.fn(() => []),
       listByOrg: vi.fn(() => ({ items: [run], total: 1 })),
       rollupByOrg: vi.fn(() => []),
+      operationalSummary: vi.fn(() => ({ runs: 0, errors: 0, averageLatencyMs: 0, tokens: 0, cost: 0, models: [] })),
+      promptRiskByOrg: vi.fn(() => []),
     },
     scores: {
       listByRun: vi.fn(() => []),

@@ -19,6 +19,11 @@ const RollupQuerySchema = z.object({
   environment: z.string().min(1).max(60).optional(),
 });
 
+const PromptRiskQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).default(30),
+  limit: z.coerce.number().int().min(1).max(200).default(25),
+});
+
 const TraceParamsSchema = z.object({ id: z.string().uuid() });
 
 function orgOf(request: FastifyRequest): string | null {
@@ -66,6 +71,18 @@ export function registerTraceRoutes(
       const parsed = parseQuery(reply, RollupQuerySchema, request.query);
       if (!parsed.ok) return;
       return reply.send({ orgId, days: parsed.data.days, summary: deps.service.operationalSummary(orgId, parsed.data.days) });
+    },
+  );
+
+  app.get(
+    '/api/traces/prompt-risk',
+    { preHandler: deps.requireAdmin() },
+    async (request, reply) => {
+      const orgId = orgOf(request);
+      if (!orgId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+      const parsed = parseQuery(reply, PromptRiskQuerySchema, request.query);
+      if (!parsed.ok) return;
+      return reply.send({ orgId, ...parsed.data, items: deps.service.promptRisk(orgId, parsed.data.days, parsed.data.limit) });
     },
   );
 

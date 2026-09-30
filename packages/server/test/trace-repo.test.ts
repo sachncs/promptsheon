@@ -150,4 +150,34 @@ describe('TraceRepo', () => {
     expect(summary.cost).toBeCloseTo(0.004, 6);
     expect(summary.models[0]).toMatchObject({ model: 'provider/model-a', runs: 2, errors: 1, tokens: 120 });
   });
+
+  it('promptRiskByOrg groups agent metadata and emits bounded risk signals', () => {
+    const risky = repo.startRun({
+      organizationId: 'org-risk',
+      name: 'execution:risky',
+      actorId: 'actor-a',
+      attributes: { agentHash: 'agent-risk' },
+    });
+    repo.addSpan({ traceRunId: risky.id, name: 'llm', totalTokens: 12_000, costUsd: 0.12 });
+    repo.finalize(risky.id, 'error');
+    const second = repo.startRun({
+      organizationId: 'org-risk',
+      name: 'execution:risky-2',
+      actorId: 'actor-b',
+      attributes: { agentHash: 'agent-risk' },
+    });
+    repo.finalize(second.id, 'error');
+    repo.startRun({ organizationId: 'org-other', name: 'other', attributes: { agentHash: 'agent-risk' } });
+
+    const rows = repo.promptRiskByOrg('org-risk', 30, 10);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      promptKey: 'agent-risk',
+      runs: 2,
+      errors: 2,
+      actors: 2,
+      risk: 'high',
+    });
+    expect(rows[0]?.signals).toEqual(['error-rate', 'token-burn']);
+  });
 });
