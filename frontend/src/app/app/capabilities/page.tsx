@@ -19,14 +19,14 @@ export default function CapabilitiesRegistryPage() {
   const session = useRequireSession();
   const router = useRouter();
   const workspaces = useQuery({ queryKey: ['workspaces'], queryFn: () => workspaceApi.list(1, 100).then((r) => r.data) });
-  const wsFirst = unwrapFirst<{ id: string; name: string }>(workspaces.data);
+  const wsFirst = workspaces.data?.[0];
   const projects = useQuery({
     queryKey: ['projects', wsFirst?.id],
     queryFn: () => projectApi.list(wsFirst!.id).then((r) => r.data),
     enabled: Boolean(wsFirst?.id),
   });
 
-  const allProjects = unwrapArray<{ id: string; name: string }>(projects.data);
+  const allProjects = projects.data ?? [];
 
   const capabilities = useQuery({
     queryKey: ['capabilities', 'all', allProjects.map((p) => p.id)],
@@ -149,17 +149,4 @@ export default function CapabilitiesRegistryPage() {
       )}
     </div>
   );
-}
-
-function unwrapArray<T = unknown>(data: unknown): T[] {
-  if (Array.isArray(data)) return data as T[];
-  if (data && typeof data === 'object' && 'items' in data) {
-    const items = (data as { items?: unknown }).items;
-    if (Array.isArray(items)) return items as T[];
-  }
-  return [];
-}
-
-function unwrapFirst<T = unknown>(data: unknown): T | undefined {
-  return unwrapArray<T>(data)[0];
 }
