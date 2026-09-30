@@ -81,4 +81,33 @@ describe('evidence and telemetry redaction', () => {
     await app.close();
     db.close();
   });
+
+  it('supports cursor pagination from newest evidence to older records', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db, migrations);
+    const repo = new EvidenceRepo(db);
+    repo.append({ eventType: 'execution.started', organizationId: 'org-1', correlationId: 'new', occurredAt: '2026-01-02T00:00:00.000Z', payload: {} });
+    repo.append({ eventType: 'execution.completed', organizationId: 'org-1', correlationId: 'old', occurredAt: '2026-01-01T00:00:00.000Z', payload: {} });
+    const app = Fastify();
+    app.addHook('preHandler', async (request) => {
+      request.orgContext = { orgId: 'org-1' } as typeof request.orgContext;
+    });
+    registerEvidenceRoutes(app, { repo, requireAdmin: () => async () => undefined });
+    await app.ready();
+
+    const firstPage = await app.inject({ method: 'GET', url: '/api/evidence?limit=1' });
+    expect(firstPage.statusCode).toBe(200);
+    const firstBody = firstPage.json() as { items: Array<{ occurredAt: string }>; total: number };
+    expect(firstBody.total).toBe(1);
+    expect(firstBody.items).toHaveLength(1);
+    expect(firstBody.items[0]?.occurredAt).toBe('2026-01-02T00:00:00.000Z');
+
+    const before = encodeURIComponent(firstBody.items[0]?.occurredAt ?? '');
+    const secondPage = await app.inject({ method: 'GET', url: `/api/evidence?limit=1&before=${before}` });
+    expect(secondPage.statusCode).toBe(200);
+    expect(secondPage.json().items).toHaveLength(1);
+    expect(secondPage.json().items[0].occurredAt).toBe('2026-01-01T00:00:00.000Z');
+    await app.close();
+    db.close();
+  });
 });

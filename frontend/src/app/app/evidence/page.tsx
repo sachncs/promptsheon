@@ -58,7 +58,6 @@ export default function EvidencePage() {
 
   const pages = evidence.data?.pages ?? [];
   const items = pages.flatMap((page) => page.items);
-  const total = pages[0]?.total ?? 0;
 
   return (
     <div className="space-y-6">
@@ -86,7 +85,7 @@ export default function EvidencePage() {
         <SurfaceHeader
           className="px-5 pt-5"
           title="Evidence timeline"
-          description={evidence.data ? `${total} record(s) in the current view.` : 'Loading immutable records…'}
+          description={evidence.data ? `${items.length} record(s) loaded in the current view.` : 'Loading immutable records…'}
           actions={
             <div className="flex items-center gap-2">
               <Filter className="h-3.5 w-3.5 text-text-subtle" aria-hidden="true" />
