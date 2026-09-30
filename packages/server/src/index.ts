@@ -254,6 +254,7 @@ async function main() {
     mutationProposalRepo: repos.mutationProposal,
     datasetRepo: repos.dataset,
     evaluationAgent: evalAgent,
+    goalEvolutionRepo: repos.goalEvolution,
   });
   const mutationPromotionService = new MutationPromotionService(
     repos.mutationProposal,

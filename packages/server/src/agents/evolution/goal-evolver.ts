@@ -13,6 +13,7 @@ import type { TraceRepo } from '../../repos/trace.js';
 import type { MutationProposalRepo } from '../../repos/mutation-proposal.js';
 import type { DatasetRepo } from '../../repos/dataset.js';
 import type { EvaluationAgent } from '../evaluation/evaluation.js';
+import type { GoalEvolutionRepo } from '../../repos/goal-evolution.js';
 
 const MAX_DATASET_CASES = 100;
 
@@ -106,6 +107,7 @@ export class GoalBasedEvolutionAgent {
       mutationProposalRepo?: MutationProposalRepo;
       datasetRepo?: DatasetRepo;
       evaluationAgent?: EvaluationAgent;
+      goalEvolutionRepo?: GoalEvolutionRepo;
     },
   ) {
     this.revisionAgent = new Agent({
@@ -230,7 +232,7 @@ Be conservative: small targeted edits, preserve what works.`,
           data: { kind: 'evolution_passed', iteration: i + 1, score },
           timestamp: new Date().toISOString(),
         });
-        this.state.set(manifestHash, {
+        this.saveState(manifestHash, {
           currentHash,
           bestHash: currentHash,
           bestScore: score,
@@ -363,7 +365,7 @@ Be conservative: small targeted edits, preserve what works.`,
       }
     }
 
-    this.state.set(manifestHash, {
+    this.saveState(manifestHash, {
       currentHash,
       bestHash: bestManifestHash,
       bestScore,
@@ -613,7 +615,12 @@ Produce a revised sub-manifest with an improved system prompt. Output JSON match
   }
 
   getState(key: string): GoalEvolutionState | undefined {
-    return this.state.get(key);
+    const cached = this.state.get(key);
+    if (cached) return cached;
+    const persisted = this.deps.goalEvolutionRepo?.findByManifestHash(key);
+    if (!persisted) return undefined;
+    this.state.set(key, persisted.state);
+    return persisted.state;
   }
 
   /** Returns the manifest at the start of a given iteration (0-indexed). */
@@ -630,12 +637,23 @@ Produce a revised sub-manifest with an improved system prompt. Output JSON match
 
   /** Return lightweight summaries directly from the agent-owned state. */
   listSummaries(): Array<{ manifestHash: string; bestScore: number; iterations: number; lastUpdated: string }> {
-    return Array.from(this.state.entries()).map(([manifestHash, state]) => ({
-      manifestHash,
-      bestScore: state.bestScore,
-      iterations: state.iteration,
-      lastUpdated: state.history.at(-1)?.at ?? new Date(0).toISOString(),
-    }));
+    const summaries = new Map(
+      (this.deps.goalEvolutionRepo?.listSummaries() ?? []).map((summary) => [summary.manifestHash, summary]),
+    );
+    for (const [manifestHash, state] of this.state.entries()) {
+      summaries.set(manifestHash, {
+        manifestHash,
+        bestScore: state.bestScore,
+        iterations: state.iteration,
+        lastUpdated: state.history.at(-1)?.at ?? new Date(0).toISOString(),
+      });
+    }
+    return Array.from(summaries.values());
+  }
+
+  private saveState(manifestHash: string, state: GoalEvolutionState): void {
+    this.state.set(manifestHash, state);
+    this.deps.goalEvolutionRepo?.upsert(manifestHash, state);
   }
 }
 
@@ -648,7 +666,7 @@ interface GoalEvolutionState {
    *  has real data after a cycle. Updated atomically with state. */
   history: Array<{ iteration: number; score: number; manifestHash: string; at: string }>;
   /** Best-so-far snapshot (manifest + score). Persists alongside state. */
-  bestManifest?: unknown;
+  bestManifest?: Manifest;
   /** Total $ spent by this goal's runs. */
   totalCost: number;
   /** Per-iteration snapshots (cap to last 50 to bound memory). */

@@ -1,5 +1,6 @@
 export { WorkspaceRepo } from './workspace.js';
 export { UserQuotaRepo } from './user-quota.js';
+export { GoalEvolutionRepo } from './goal-evolution.js';
 export { MutationProposalRepo } from './mutation-proposal.js';
 export { ProjectRepo } from './project.js';
 export { CapabilityRepo } from './capability.js';

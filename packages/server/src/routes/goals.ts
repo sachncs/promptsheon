@@ -30,9 +30,8 @@ export interface GoalDetail {
  * - GET /api/goals: list of in-progress / recent goal runs
  * - GET /api/goals/:hash: drill-down with iteration history + snapshots
  *
- * Note: the agent's run state is in-memory. For production this would
- * be backed by ManifestRepo state. v1 reads from agent.getState()
- * (single-process only) and reconstructs summary from the manifest DAG.
+ * Goal state is cached by the agent for active requests and persisted through
+ * the goal-evolution repository so observability survives process restarts.
  */
 export function registerGoalObservabilityRoutes(
   app: FastifyInstance,
