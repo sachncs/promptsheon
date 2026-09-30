@@ -1,0 +1,74 @@
+import Fastify from 'fastify';
+import { describe, expect, it, vi } from 'vitest';
+import { registerAgentSpecificationRoutes } from '../src/routes/agent-specification.js';
+
+const workspaceId = '00000000-0000-4000-8000-000000000001';
+const hash = 'a'.repeat(64);
+
+describe('agent specification routes', () => {
+  it('lists workspace revisions through the tenant-scoped route', async () => {
+    const list = vi.fn(() => ({
+      items: [{
+        hash,
+        workspaceId,
+        schemaVersion: '1.0',
+        parentHash: null,
+        author: 'tester',
+        changeReason: 'initial',
+        status: 'draft' as const,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        publishedAt: null,
+      }],
+      total: 1,
+    }));
+    const app = Fastify();
+    app.addHook('preHandler', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = 'org-1';
+    });
+    registerAgentSpecificationRoutes(app, {
+      repo: { list } as never,
+      workspaceRepo: { findByIdInOrg: vi.fn(() => ({ id: workspaceId })) } as never,
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/workspaces/${workspaceId}/agent-specifications?page=2&pageSize=10&status=published`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(expect.objectContaining({ total: 1 }));
+    expect(list).toHaveBeenCalledWith(workspaceId, { page: 2, pageSize: 10, status: 'published' });
+    await app.close();
+  });
+
+  it('validates a specification without persisting it', async () => {
+    const create = vi.fn();
+    const app = Fastify();
+    app.addHook('preHandler', async (request) => {
+      (request as unknown as { agentOrgId: string }).agentOrgId = 'org-1';
+    });
+    registerAgentSpecificationRoutes(app, {
+      repo: { create } as never,
+      workspaceRepo: { findByIdInOrg: vi.fn(() => ({ id: workspaceId })) } as never,
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/workspaces/${workspaceId}/agent-specifications/validate`,
+      payload: {
+        specification: {
+          role: 'Research assistant',
+          objective: 'Answer questions with evidence.',
+          prompt: { system: 'Be precise.' },
+          modelPolicy: { provider: 'simulator', model: 'simulator' },
+          lifecycle: { owner: 'team-research' },
+        },
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(expect.objectContaining({ valid: true }));
+    expect(create).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
