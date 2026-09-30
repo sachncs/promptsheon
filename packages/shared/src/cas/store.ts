@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { gzip, gunzip } from 'node:zlib';
 import { promisify } from 'node:util';
 import { join } from 'node:path';
-import { mkdir, readFile, writeFile, stat, rename, unlink, open } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, stat, rename, unlink, open, readdir } from 'node:fs/promises';
 import type { CasObject } from './types.js';
 
 const gzipAsync = promisify(gzip);
@@ -10,6 +10,13 @@ const gunzipAsync = promisify(gunzip);
 
 const MAX_OBJECT_ON_DISK_BYTES = 64 * 1024 * 1024;
 const MAX_OBJECT_INFLATED_BYTES = 256 * 1024 * 1024;
+
+export interface CasVerificationReport {
+  valid: boolean;
+  objectsChecked: number;
+  corruptObjects: string[];
+  unexpectedEntries: string[];
+}
 
 export class CasStore {
   readonly objectsDir: string;
@@ -114,5 +121,51 @@ export class CasStore {
     } catch {
       return false;
     }
+  }
+
+  /** Scan every stored object and report corruption or unexpected files. */
+  async verifyObjects(): Promise<CasVerificationReport> {
+    const corruptObjects: string[] = [];
+    const unexpectedEntries: string[] = [];
+    let objectsChecked = 0;
+    let prefixes: import('node:fs').Dirent[] = [];
+
+    try {
+      prefixes = await readdir(this.objectsDir, { withFileTypes: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return { valid: false, objectsChecked, corruptObjects, unexpectedEntries: [this.objectsDir] };
+      }
+      throw error;
+    }
+
+    for (const prefix of prefixes) {
+      if (!prefix.isDirectory() || !/^[0-9a-f]{2}$/.test(prefix.name)) {
+        unexpectedEntries.push(join(this.objectsDir, prefix.name));
+        continue;
+      }
+      const entries = await readdir(join(this.objectsDir, prefix.name), { withFileTypes: true });
+      for (const entry of entries) {
+        const relativePath = join(prefix.name, entry.name);
+        const hash = `${prefix.name}${entry.name}`;
+        if (!entry.isFile() || !/^[0-9a-f]{62}$/.test(entry.name)) {
+          unexpectedEntries.push(relativePath);
+          continue;
+        }
+        objectsChecked += 1;
+        try {
+          await this.readBlob(hash);
+        } catch {
+          corruptObjects.push(hash);
+        }
+      }
+    }
+
+    return {
+      valid: corruptObjects.length === 0 && unexpectedEntries.length === 0,
+      objectsChecked,
+      corruptObjects,
+      unexpectedEntries,
+    };
   }
 }

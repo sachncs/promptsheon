@@ -81,4 +81,20 @@ describe('CasStore', () => {
 
     await expect(store.readObject(hash)).rejects.toThrow();
   });
+
+  it('scans all objects and reports corruption', async () => {
+    const healthyHash = await store.writeObject({ type: 'blob', data: Buffer.from('healthy') });
+    const corruptHash = await store.writeObject({ type: 'blob', data: Buffer.from('corrupt') });
+    const corruptPath = join(store.objectsDir, corruptHash.slice(0, 2), corruptHash.slice(2));
+    const original = await readFile(corruptPath);
+    await writeFile(corruptPath, Buffer.concat([original, Buffer.from('tampered')]));
+
+    await expect(store.verifyObjects()).resolves.toEqual({
+      valid: false,
+      objectsChecked: 2,
+      corruptObjects: [corruptHash],
+      unexpectedEntries: [],
+    });
+    await expect(store.readBlob(healthyHash)).resolves.toBeInstanceOf(Buffer);
+  });
 });

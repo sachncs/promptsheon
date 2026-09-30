@@ -16,6 +16,7 @@
     "db:replicate": "node --import tsx src/replication/cli.ts",
     "db:failover": "node --import tsx src/replication/failover-cli.ts",
     "db:backup": "node --import tsx src/db/backup-cli.ts",
+    "cas:verify": "node --import tsx src/cas/verify-cli.ts",
     "policy:eval": "node --import tsx src/policy/eval-cli.ts"
   },
   "dependencies": {
