@@ -1077,6 +1077,12 @@ export const agentSpecificationApi = {
     const response = await client.get<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/${encodeURIComponent(hash)}`);
     return { data: parseAgentSpecificationRecord(response.data) };
   },
+  lineage: async (workspaceId: string, hash: string): Promise<{ data: AgentSpecificationMetadata[] }> => {
+    const response = await client.get<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/${encodeURIComponent(hash)}/lineage`);
+    const parsed = z.object({ items: z.array(AgentSpecificationMetadataSchema) }).safeParse(response.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid agent lineage data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data.items };
+  },
   publish: async (workspaceId: string, hash: string): Promise<{ data: AgentSpecificationRecord }> => {
     const response = await client.post<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/${encodeURIComponent(hash)}/publish`);
     return { data: parseAgentSpecificationRecord(response.data) };
