@@ -27,6 +27,8 @@ export interface SpecificationDiffEntry {
   after: unknown;
 }
 
+export type AgentSpecificationMetadata = Omit<AgentSpecificationRecord, 'specification'>;
+
 interface SpecificationRow {
   hash: string;
   workspace_id: string;
@@ -98,6 +100,29 @@ export class AgentSpecificationRepo {
     return this.toRecord(row, specification);
   }
 
+  /** Return workspace revisions newest first without reading their CAS payloads. */
+  list(
+    workspaceId: string,
+    options: { page?: number; pageSize?: number; status?: AgentSpecificationRecord['status'] } = {},
+  ): { items: AgentSpecificationMetadata[]; total: number } {
+    const page = options.page ?? 1;
+    const pageSize = Math.min(options.pageSize ?? 20, 100);
+    const conditions = ['workspace_id = ?'];
+    const parameters: unknown[] = [workspaceId];
+    if (options.status) {
+      conditions.push('status = ?');
+      parameters.push(options.status);
+    }
+    const where = `WHERE ${conditions.join(' AND ')}`;
+    const total = (this.db.prepare(`SELECT COUNT(*) AS count FROM agent_specifications ${where}`).get(...parameters) as { count: number }).count;
+    const rows = this.db.prepare(`
+      SELECT * FROM agent_specifications ${where}
+      ORDER BY created_at DESC, hash DESC
+      LIMIT ? OFFSET ?
+    `).all(...parameters, pageSize, (page - 1) * pageSize) as SpecificationRow[];
+    return { items: rows.map((row) => this.toRecordMetadata(row)), total };
+  }
+
   async diff(workspaceId: string, leftHash: string, rightHash: string): Promise<SpecificationDiffEntry[]> {
     const [left, right] = await Promise.all([this.get(workspaceId, leftHash), this.get(workspaceId, rightHash)]);
     const changes: SpecificationDiffEntry[] = [];
@@ -140,7 +165,7 @@ export class AgentSpecificationRepo {
     return { ...this.toRecordMetadata(row), specification };
   }
 
-  private toRecordMetadata(row: SpecificationRow): Omit<AgentSpecificationRecord, 'specification'> {
+  private toRecordMetadata(row: SpecificationRow): AgentSpecificationMetadata {
     return {
       hash: row.hash,
       workspaceId: row.workspace_id,

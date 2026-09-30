@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { AgentSpecificationSchema } from '@promptsheon/shared';
 import type { AgentSpecificationRepo } from '../repos/agent-specification.js';
 import type { WorkspaceRepo } from '../repos/workspace.js';
-import { parseBody, parseParams } from './validate.js';
+import { parseBody, parseParams, parseQuery } from './validate.js';
 
 const WorkspaceParams = z.strictObject({ workspaceId: z.string().uuid() });
 const HashParams = WorkspaceParams.extend({ hash: z.string().regex(/^[0-9a-f]{64}$/) });
@@ -17,6 +17,11 @@ const DiffBody = z.strictObject({
   rightHash: z.string().regex(/^[0-9a-f]{64}$/),
 });
 const ValidateBody = z.strictObject({ specification: z.unknown() });
+const ListQuery = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  status: z.enum(['draft', 'candidate', 'published', 'retired']).optional(),
+});
 
 function organizationIdOf(request: FastifyRequest): string | null {
   return request.orgContext?.orgId ?? request.agentOrgId ?? null;
@@ -67,6 +72,14 @@ export function registerAgentSpecificationRoutes(
       ...(body.data.parentHash === undefined ? {} : { parentHash: body.data.parentHash }),
     });
     return reply.code(201).send(record);
+  });
+
+  app.get('/api/workspaces/:workspaceId/agent-specifications', async (request, reply) => {
+    const params = parseParams(reply, WorkspaceParams, request.params);
+    if (!params.ok || !requireWorkspace(request, reply, deps.workspaceRepo, params.data.workspaceId)) return;
+    const query = parseQuery(reply, ListQuery, request.query);
+    if (!query.ok) return;
+    return reply.send(deps.repo.list(params.data.workspaceId, query.data));
   });
 
   app.post('/api/workspaces/:workspaceId/agent-specifications/diff', async (request, reply) => {

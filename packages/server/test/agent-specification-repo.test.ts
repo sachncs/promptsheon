@@ -74,6 +74,27 @@ describe('AgentSpecificationRepo', () => {
     expect(() => repo.replace()).toThrow('immutable');
   });
 
+  it('lists metadata with stable pagination and status filtering', async () => {
+    const first = await repo.create({ workspaceId: 'ws1', specification, author: 'alice', changeReason: 'initial' });
+    const second = await repo.create({
+      workspaceId: 'ws1',
+      specification: { ...specification, objective: 'Answer questions with sources.' },
+      author: 'alice',
+      changeReason: 'add sources',
+      parentHash: first.hash,
+    });
+    repo.publish('ws1', second.hash);
+
+    expect(repo.list('ws1', { page: 1, pageSize: 1 })).toEqual({
+      items: [expect.objectContaining({ hash: second.hash, status: 'published' })],
+      total: 2,
+    });
+    expect(repo.list('ws1', { status: 'draft' })).toEqual({
+      items: [expect.objectContaining({ hash: first.hash, status: 'draft' })],
+      total: 1,
+    });
+  });
+
   it('detects CAS corruption on read', async () => {
     const record = await repo.create({ workspaceId: 'ws1', specification, author: 'alice', changeReason: 'initial' });
     const objectPath = join(basePath, 'objects', record.hash.slice(0, 2), record.hash.slice(2));
