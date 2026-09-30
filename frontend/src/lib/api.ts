@@ -1243,6 +1243,13 @@ function parsePreconditions(raw: unknown): Precondition[] {
   });
 }
 
+function parsePrecondition(raw: unknown): Precondition {
+  const parsed = PreconditionSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid precondition data.', { code: 'INVALID_RESPONSE' });
+  const { updatedAt, ...base } = parsed.data;
+  return updatedAt === undefined ? base : { ...base, updatedAt };
+}
+
 function parseCapabilities(raw: unknown): Capability[] {
   const parsed = z.array(CapabilitySchema).safeParse(unwrapList<unknown>(raw));
   if (!parsed.success) throw new ApiError('The server returned invalid capability data.', { code: 'INVALID_RESPONSE' });
@@ -2004,10 +2011,17 @@ export const preconditionApi = {
     const r = await client.get<unknown>('/preconditions', { params: { capabilityVersionId } });
     return { data: parsePreconditions(r.data) };
   },
-  create: (data: { capabilityVersionId: string; name: string; command: string; enabled?: boolean }) =>
-    client.post('/preconditions', data),
-  update: (id: string, data: { name?: string; command?: string; enabled?: boolean }) => client.put(`/preconditions/${id}`, data),
-  delete: (id: string) => client.delete(`/preconditions/${id}`),
+  create: async (data: { capabilityVersionId: string; name: string; command: string; enabled?: boolean }): Promise<{ data: Precondition }> => {
+    const r = await client.post<unknown>('/preconditions', data);
+    return { data: parsePrecondition(r.data) };
+  },
+  update: async (id: string, data: { name?: string; command?: string; enabled?: boolean }): Promise<{ data: Precondition }> => {
+    const r = await client.put<unknown>(`/preconditions/${id}`, data);
+    return { data: parsePrecondition(r.data) };
+  },
+  delete: async (id: string): Promise<void> => {
+    await client.delete(`/preconditions/${id}`);
+  },
 };
 
 export const approvalApi = {
