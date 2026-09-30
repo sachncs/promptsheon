@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { ChaosConfig, type FailureKind } from '../hardening/chaos.js';
+import { ChaosConfig } from '../hardening/chaos.js';
 
 const InjectSchema = z.object({
   nodeId: z.string().min(1),
@@ -38,7 +38,7 @@ export function registerChaosRoutes(app: FastifyInstance, deps: ChaosRouteDeps):
       return reply.code(422).send({ error: { code: 'VALIDATION_ERROR', message: parsed.error.message } });
     }
     const { nodeId, kind, message, delayMs, hitCount } = parsed.data;
-    deps.chaos.inject(nodeId, { kind: kind as FailureKind, message, delayMs, hitCount });
+    deps.chaos.inject(nodeId, { kind, message, delayMs, hitCount });
     return reply.code(200).send({ nodeId, kind, message, delayMs, hitCount });
   });
 
