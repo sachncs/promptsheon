@@ -59,4 +59,18 @@ describe('MutationEvaluationService', () => {
     expect(service.attach({ proposalId: 'proposal-1', organizationId: 'org-1', evaluationRunId: 'run-1', baselineScore: 0.8 })).toEqual({ kind: 'run-failed' });
     expect(proposals.recordEvaluation).not.toHaveBeenCalled();
   });
+
+  it('does not report success when a concurrent state change prevents attachment', () => {
+    const proposals = {
+      findInOrg: vi.fn(() => proposal),
+      recordEvaluation: vi.fn(() => ({ ...proposal, evaluationStatus: 'pending', evaluationRunId: null })),
+    } as unknown as MutationProposalRepo;
+    const evidence = {
+      findRunInOrg: vi.fn(() => run),
+      findVersionByIdInOrg: vi.fn(() => ({ passThreshold: 0.9 })),
+    } as unknown as MutationEvaluationEvidenceStore;
+    const service = new MutationEvaluationService(proposals, evidence);
+
+    expect(service.attach({ proposalId: 'proposal-1', organizationId: 'org-1', evaluationRunId: 'run-1', baselineScore: 0.8 })).toEqual({ kind: 'proposal-not-pending' });
+  });
 });

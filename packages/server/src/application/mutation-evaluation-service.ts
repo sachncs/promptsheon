@@ -51,6 +51,8 @@ export class MutationEvaluationService {
       passThreshold: version.passThreshold,
       evaluationRunId: run.id,
     });
-    return updated ? { kind: 'success', proposal: updated } : { kind: 'proposal-not-found' };
+    if (!updated) return { kind: 'proposal-not-found' };
+    if (updated.evaluationRunId !== run.id) return { kind: 'proposal-not-pending' };
+    return { kind: 'success', proposal: updated };
   }
 }
