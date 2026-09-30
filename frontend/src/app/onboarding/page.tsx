@@ -72,12 +72,12 @@ export default function OnboardingPage() {
               router.replace('/app');
             }
           })
-          .catch((error: unknown) => {
+          .catch(() => {
             clearSession();
             bootstrapApi.admin()
               .then((data) => {
                 setRestoreCandidate(data);
-                setRestoreError(error instanceof Error ? error.message : 'The saved browser session could not be verified.');
+                setRestoreError('The saved browser session could not be verified. This installation requires an API key; enter an existing administrator API key to restore it.');
               })
               .catch((adminError: unknown) => {
                 setRestoreError(adminError instanceof Error ? adminError.message : 'We could not restore the administrator session.');
@@ -109,10 +109,10 @@ export default function OnboardingPage() {
                 router.replace('/app');
               }
             })
-            .catch((error: unknown) => {
+            .catch(() => {
               clearSession();
               setRestoreCandidate(data);
-              setRestoreError(error instanceof Error ? error.message : 'The recovered browser session could not be verified.');
+              setRestoreError('The recovered browser session could not be verified. This installation requires an API key; enter an existing administrator API key to restore it.');
             });
         })
         .catch((error: unknown) => {

@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { getSessionSnapshot, SESSION_CHANGED_EVENT } from '@/lib/session';
 
@@ -21,7 +20,6 @@ export function useSession() {
 }
 
 export function useRequireSession() {
-  const router = useRouter();
   const session = useSession();
   const redirectAttempted = React.useRef(false);
   const hydrated = React.useSyncExternalStore(
@@ -33,8 +31,10 @@ export function useRequireSession() {
   React.useEffect(() => {
     if (hydrated && !session && !redirectAttempted.current) {
       redirectAttempted.current = true;
-      router.replace('/onboarding');
+      // A full replace prevents a stale App Router tree from preserving an
+      // invalid session after malformed localStorage is detected.
+      if (window.location.pathname !== '/onboarding') window.location.replace('/onboarding');
     }
-  }, [hydrated, session, router]);
+  }, [hydrated, session]);
   return hydrated ? session : null;
 }
