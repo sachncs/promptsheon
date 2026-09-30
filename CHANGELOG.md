@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Renew durable execution leases during active attempts and enforce an
+  explicit maximum execution duration, preventing duplicate ownership while
+  preserving bounded timeout behavior.
+
 ### Removed
 - Removed the experimental VS Code extension workspace. Promptsheon now
   focuses on the self-hosted API, Next.js console, CLI, SDK, and public

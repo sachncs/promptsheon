@@ -15,9 +15,12 @@ reuse it with different content returns `409`.
 
 Observe or cancel a job with the workspace-scoped GET and cancel endpoints. The
 job lifecycle is `queued → running → completed|failed|cancelled|timed-out`.
-Workers claim leases atomically. An expired lease is requeued while attempts
-remain and is failed after the configured maximum. Process shutdown aborts
-active handlers and requeues them, so a restart does not silently lose work.
+Workers claim leases atomically and renew them while an attempt is active. An
+expired lease is requeued while attempts remain and is failed after the
+configured maximum. Each attempt also has a maximum wall-clock duration, so a
+lost lease or hung handler fails closed rather than running indefinitely.
+Process shutdown aborts active handlers and requeues them, so a restart does
+not silently lose work.
 
 Each worker enforces global and per-organization concurrency limits, bounded
 retry backoff with jitter, input/token/cost/wall-clock budgets, and an
