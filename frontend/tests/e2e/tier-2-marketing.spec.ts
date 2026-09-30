@@ -27,22 +27,19 @@ test.describe('tier 2: marketing surface', () => {
 
   test('onboarding entry renders for a fresh or configured installation', async ({ page }) => {
     await page.goto('/onboarding');
-    await expect(page.getByText(/set up promptsheon/i)).toBeVisible();
-    // The suite intentionally reuses one database. After another test has
-    // bootstrapped the installation, onboarding may resume at provider setup
-    // or redirect to the control plane instead of showing the welcome CTA.
-    const beginSetup = page.getByRole('button', { name: /begin setup/i });
-    const beginVisible = await beginSetup.isVisible().catch(() => false);
-    if (beginVisible) {
-      await expect(beginSetup).toBeEnabled().catch(async () => {
-        // Onboarding can advance between the visibility probe and this
-        // assertion when another shared-database test finishes bootstrap.
-        await expect(
-          page.getByRole('heading', { name: /choose a model provider|workspace ready/i }),
-        ).toBeVisible();
-      });
-    } else {
-      await expect(page).toHaveURL(/\/(onboarding|app)(\/|$)/);
+    await expect(page).toHaveURL(/\/(onboarding|app)(\/|$)/);
+
+    // A configured installation redirects onboarding to the control plane.
+    // Assert the settled destination before inspecting onboarding-only UI so
+    // the test does not race the client-side bootstrap redirect.
+    if (new URL(page.url()).pathname.startsWith('/app')) {
+      await expect(page.getByRole('heading', { name: /capability health/i })).toBeVisible();
+      return;
     }
+
+    await expect(page.getByText(/set up promptsheon/i)).toBeVisible();
+    const beginSetup = page.getByRole('button', { name: /begin setup/i });
+    const providerStep = page.getByRole('heading', { name: /choose a model provider|workspace ready/i });
+    await expect(beginSetup.or(providerStep).first()).toBeVisible();
   });
 });
