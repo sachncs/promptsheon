@@ -1750,6 +1750,28 @@ export interface EvidenceRecord {
   createdAt: string;
 }
 
+const EvidenceRecordSchema = z.object({
+  id: z.string(),
+  eventType: z.string(),
+  schemaVersion: z.string(),
+  occurredAt: z.string(),
+  organizationId: z.string(),
+  correlationId: z.string(),
+  traceId: z.string().nullable(),
+  executionId: z.string().nullable(),
+  agentHash: z.string().nullable(),
+  stepId: z.string().nullable(),
+  retentionClass: z.string(),
+  payload: z.unknown(),
+  payloadHash: z.string(),
+  createdAt: z.string(),
+}) satisfies z.ZodType<EvidenceRecord>;
+
+const EvidencePageSchema = z.object({
+  items: z.array(EvidenceRecordSchema),
+  total: z.number().int().nonnegative(),
+});
+
 export interface PlaygroundRun {
   content: string;
   provider: string;
@@ -1811,6 +1833,27 @@ export const traceApi = {
       .then((r) => r.data),
   summary: (days = 7) =>
     client.get<{ orgId: string; days: number; summary: TraceOperationalSummary }>('/traces/summary', { params: { days } }).then((r) => r.data),
+};
+
+export const evidenceApi = {
+  list: async (options: { limit?: number; before?: string; eventType?: string } = {}): Promise<{ data: z.infer<typeof EvidencePageSchema> }> => {
+    const r = await client.get<unknown>('/evidence', { params: options });
+    return { data: EvidencePageSchema.parse(r.data) };
+  },
+  export: async (options: { limit?: number; before?: string; eventType?: string } = {}): Promise<{
+    schemaVersion: string;
+    organizationId: string;
+    exportedAt: string;
+    items: EvidenceRecord[];
+  }> => {
+    const r = await client.get<unknown>('/evidence/export', { params: options });
+    return z.object({
+      schemaVersion: z.string(),
+      organizationId: z.string(),
+      exportedAt: z.string(),
+      items: z.array(EvidenceRecordSchema),
+    }).parse(r.data);
+  },
 };
 
 export interface TraceScore {

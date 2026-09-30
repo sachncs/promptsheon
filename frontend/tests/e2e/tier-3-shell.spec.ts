@@ -23,6 +23,7 @@ test.describe('tier 3: app shell after onboarding', () => {
       '/app/eval',
       '/app/vault',
       '/app/operations',
+      '/app/evidence',
     ];
     for (const path of subRoutes) {
       await page.goto(path);
@@ -30,10 +31,13 @@ test.describe('tier 3: app shell after onboarding', () => {
       // Should NOT redirect to /onboarding (would mean session is broken).
       expect(page.url(), `${path} should not redirect to /onboarding`).not.toContain('/onboarding');
     }
+    await page.goto('/app/operations');
     await expect(page.getByText('EXECUTION QUEUE')).toBeVisible();
     await expect(page.getByText(/running/i).last()).toBeVisible();
     await expect(page.getByText('PLATFORM HEALTH')).toBeVisible();
     await expect(page.getByText('Healthy')).toBeVisible();
+    await page.goto('/app/evidence');
+    await expect(page.getByRole('heading', { name: 'Evidence', exact: true })).toBeVisible();
   });
 
   test('restores a cleared browser session with an existing API key', async ({ page, request }) => {

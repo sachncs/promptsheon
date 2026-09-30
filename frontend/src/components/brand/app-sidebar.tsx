@@ -8,7 +8,7 @@ import * as React from 'react';
 import {
   LayoutDashboard, FolderOpen, Boxes, Workflow, Compass, Flag,
   GitBranch, Target, Activity, CalendarClock, FlaskConical, Beaker,
-  ShieldCheck, ScrollText, Users, KeyRound, Webhook, Cog, Search, GitMerge, ListChecks, GitPullRequest,
+  ShieldCheck, ScrollText, Users, KeyRound, Webhook, Cog, Search, GitMerge, ListChecks, GitPullRequest, FileSearch,
   ChevronDown, ChevronRight, ChevronUp, LogOut, Monitor, Moon, Sun,
 } from 'lucide-react';
 import { Logo } from '@/brand/logo';
@@ -68,6 +68,7 @@ const groups: NavGroup[] = [
     label: 'Observability',
     items: [
       { href: '/app/traces', label: 'Traces', icon: Activity },
+      { href: '/app/evidence', label: 'Evidence', icon: FileSearch },
       { href: '/app/playground', label: 'Playground', icon: Beaker },
       { href: '/app/audit', label: 'Audit log', icon: ScrollText },
       { href: '/app/audit/reports', label: 'Audit reports', icon: ScrollText },
