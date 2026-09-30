@@ -66,8 +66,8 @@ export default function MutationProposalsPage() {
         ) : (
           <div className="divide-y divide-border-subtle border-t border-border-subtle">
             {rows.map((proposal) => {
-              const actionable = proposal.status === 'validated';
-              const reviewable = proposal.status === 'proposed' || actionable;
+              const actionable = proposal.status === 'validated' && proposal.evaluationStatus === 'passed';
+              const reviewable = proposal.status === 'proposed' || proposal.status === 'validated';
               return (
                 <article key={proposal.id} className="space-y-4 p-5">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -85,7 +85,13 @@ export default function MutationProposalsPage() {
                       <div>Confidence {Math.round(proposal.confidence * 100)}%</div>
                       <div className="mt-1">Source <span className="font-mono">{proposal.sourceHash.slice(0, 12)}</span></div>
                       <div className="mt-1">Candidate <span className="font-mono">{proposal.candidateHash?.slice(0, 12) ?? 'not materialised'}</span></div>
-                      <div className="mt-1">Evidence {proposal.evaluationRunId ? 'attached' : 'not evaluated'}</div>
+                      <div className="mt-1">
+                        Evaluation {proposal.evaluationStatus}
+                        {proposal.baselineScore !== null && proposal.candidateScore !== null
+                          ? ` · ${Math.round(proposal.baselineScore * 100)}% → ${Math.round(proposal.candidateScore * 100)}%`
+                          : ''}
+                      </div>
+                      <div className="mt-1">Trace {proposal.evaluationRunId ? 'attached' : 'not attached'}</div>
                     </div>
                   </div>
                   <details className="rounded-lg border border-border-subtle bg-surface-2/50 px-3 py-2 text-xs">
@@ -152,6 +158,9 @@ export default function MutationProposalsPage() {
                   ) : null}
                   {reviewable && !proposal.candidateHash && (
                     <p className="text-xs text-text-muted">This proposal cannot be approved until its immutable candidate is materialised.</p>
+                  )}
+                  {proposal.status === 'validated' && proposal.evaluationStatus !== 'passed' && (
+                    <p className="text-xs text-text-muted">Approval is disabled until the candidate passes evaluation.</p>
                   )}
                   {(validate.isError || decide.isError || promote.isError) && (
                     <p role="alert" className="text-xs text-destructive">

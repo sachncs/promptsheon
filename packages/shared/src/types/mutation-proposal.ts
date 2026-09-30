@@ -13,6 +13,7 @@ export type MutationKind =
 export type MutationAuthorType = 'human' | 'system' | 'simulator';
 export type MutationRisk = 'low' | 'medium' | 'high' | 'critical';
 export type MutationProposalStatus = 'proposed' | 'validated' | 'approved' | 'rejected' | 'abandoned';
+export type MutationEvaluationStatus = 'pending' | 'passed' | 'failed';
 
 export interface MutationProposal {
   id: string;
@@ -27,6 +28,9 @@ export interface MutationProposal {
   authorId: string;
   risk: MutationRisk;
   confidence: number;
+  baselineScore: number | null;
+  candidateScore: number | null;
+  evaluationStatus: MutationEvaluationStatus;
   status: MutationProposalStatus;
   evaluationRunId: string | null;
   decisionReason: string | null;

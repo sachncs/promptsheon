@@ -18,6 +18,9 @@ const proposal = {
   authorId: 'simulator',
   risk: 'low',
   confidence: 0.8,
+  baselineScore: 0.2,
+  candidateScore: 0.8,
+  evaluationStatus: 'pending',
   status: 'proposed',
   evaluationRunId: null,
   decisionReason: null,
@@ -77,6 +80,21 @@ describe('mutation proposal routes', () => {
 
     expect(response.statusCode).toBe(422);
     expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_REQUIRED' } });
+    expect(context.repo.decide).not.toHaveBeenCalled();
+  });
+
+  it('blocks approval when validation exists but evaluation has not passed', async () => {
+    const context = buildApp();
+    app = context.app;
+    vi.mocked(context.repo.findInOrg).mockReturnValue({ ...proposal, status: 'validated' });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/mutation-proposals/proposal-1/decision',
+      payload: { decision: 'approve', reason: 'ship it' },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({ error: { code: 'EVALUATION_REQUIRED' } });
     expect(context.repo.decide).not.toHaveBeenCalled();
   });
 });

@@ -323,6 +323,9 @@ Be conservative: small targeted edits, preserve what works.`,
             authorId: this.deps.config.llm.defaultProvider === 'simulated' ? 'local-simulator' : 'goal-evolver',
             risk: 'medium',
             confidence: Math.max(0, Math.min(1, score)),
+            baselineScore: score,
+            candidateScore,
+            evaluationStatus: candidateScore >= currentManifest.evaluation.passThreshold ? 'passed' : 'failed',
             ...(candidateTraceRun ? { evaluationRunId: candidateTraceRun.id } : {}),
           });
           proposals.push(proposal);

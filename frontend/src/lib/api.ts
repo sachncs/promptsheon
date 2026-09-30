@@ -144,6 +144,9 @@ export interface MutationProposal {
   authorId: string;
   risk: 'low' | 'medium' | 'high' | 'critical';
   confidence: number;
+  baselineScore: number | null;
+  candidateScore: number | null;
+  evaluationStatus: 'pending' | 'passed' | 'failed';
   status: 'proposed' | 'validated' | 'approved' | 'rejected' | 'abandoned';
   evaluationRunId: string | null;
   decisionReason: string | null;
@@ -413,6 +416,9 @@ const MutationProposalSchema = z.object({
   authorId: z.string(),
   risk: z.enum(['low', 'medium', 'high', 'critical']),
   confidence: z.number().min(0).max(1),
+  baselineScore: z.number().min(0).max(1).nullable(),
+  candidateScore: z.number().min(0).max(1).nullable(),
+  evaluationStatus: z.enum(['pending', 'passed', 'failed']),
   status: z.enum(['proposed', 'validated', 'approved', 'rejected', 'abandoned']),
   evaluationRunId: z.string().nullable(),
   decisionReason: z.string().nullable(),

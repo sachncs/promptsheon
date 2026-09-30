@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import type {
   MutationAuthorType,
+  MutationEvaluationStatus,
   MutationKind,
   MutationProposal,
   MutationProposalStatus,
@@ -21,6 +22,9 @@ interface MutationProposalRow {
   author_id: string;
   risk: MutationRisk;
   confidence: number;
+  baseline_score: number | null;
+  candidate_score: number | null;
+  evaluation_status: MutationEvaluationStatus;
   status: MutationProposalStatus;
   evaluation_run_id: string | null;
   decision_reason: string | null;
@@ -46,6 +50,9 @@ function toProposal(row: MutationProposalRow): MutationProposal {
     authorId: row.author_id,
     risk: row.risk,
     confidence: row.confidence,
+    baselineScore: row.baseline_score,
+    candidateScore: row.candidate_score,
+    evaluationStatus: row.evaluation_status,
     status: row.status,
     evaluationRunId: row.evaluation_run_id,
     decisionReason: row.decision_reason,
@@ -97,14 +104,18 @@ export class MutationProposalRepo {
     authorId: string;
     risk: MutationRisk;
     confidence: number;
+    baselineScore?: number;
+    candidateScore?: number;
+    evaluationStatus?: MutationEvaluationStatus;
     evaluationRunId?: string;
   }): MutationProposal {
     const id = randomUUID();
     this.db.prepare(
       `INSERT INTO mutation_proposals
        (id, organization_id, source_hash, candidate_hash, mutation_kind, changes_json,
-        rationale, expected_outcome, author_type, author_id, risk, confidence, evaluation_run_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       rationale, expected_outcome, author_type, author_id, risk, confidence,
+       baseline_score, candidate_score, evaluation_status, evaluation_run_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       input.organizationId,
@@ -118,6 +129,9 @@ export class MutationProposalRepo {
       input.authorId,
       input.risk,
       input.confidence,
+      input.baselineScore ?? null,
+      input.candidateScore ?? null,
+      input.evaluationStatus ?? 'pending',
       input.evaluationRunId ?? null,
     );
     return this.findInOrg(id, input.organizationId)!;
@@ -130,7 +144,9 @@ export class MutationProposalRepo {
     reviewerId: string;
     reason: string;
   }): MutationProposal | null {
-    const candidateRequirement = input.status === 'approved' ? " AND status = 'validated' AND candidate_hash IS NOT NULL" : " AND status IN ('proposed', 'validated')";
+    const candidateRequirement = input.status === 'approved'
+      ? " AND status = 'validated' AND candidate_hash IS NOT NULL AND evaluation_status = 'passed'"
+      : " AND status IN ('proposed', 'validated')";
     const result = this.db.prepare(
       `UPDATE mutation_proposals
        SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, decision_reason = ?

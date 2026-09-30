@@ -36,6 +36,9 @@ describe('MutationProposalRepo', () => {
       authorId: 'local-simulator',
       risk: 'low',
       confidence: 0.8,
+      baselineScore: 0.4,
+      candidateScore: 0.9,
+      evaluationStatus: 'passed',
     });
 
     expect(repo.listInOrg('org-a')).toHaveLength(1);
@@ -104,6 +107,9 @@ describe('MutationProposalRepo', () => {
       authorId: 'local-simulator',
       risk: 'medium',
       confidence: 0.8,
+      baselineScore: 0.2,
+      candidateScore: 0.8,
+      evaluationStatus: 'passed',
     });
     let registeredHash = '';
     const release = { id: 'release-a', status: 'draft', environment: 'dev' };

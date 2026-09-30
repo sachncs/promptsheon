@@ -96,6 +96,7 @@ export type {
   MutationKind,
   MutationAuthorType,
   MutationRisk,
+  MutationEvaluationStatus,
   MutationProposalStatus,
   MutationProposal,
 } from './mutation-proposal.js';

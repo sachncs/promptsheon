@@ -120,6 +120,11 @@ export function registerMutationProposalRoutes(app: FastifyInstance, deps: Mutat
         error: { code: 'VALIDATION_REQUIRED', message: 'the immutable candidate must pass validation before approval' },
       });
     }
+    if (parsed.data.decision === 'approve' && existing.evaluationStatus !== 'passed') {
+      return reply.code(422).send({
+        error: { code: 'EVALUATION_REQUIRED', message: 'the candidate must pass evaluation before approval' },
+      });
+    }
     if (parsed.data.decision === 'approve' && !existing.candidateHash) {
       return reply.code(422).send({
         error: { code: 'CANDIDATE_REQUIRED', message: 'an immutable candidate must be materialised before approval' },
