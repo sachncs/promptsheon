@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { ArrowRight, Compass, RotateCcw, Sparkles } from 'lucide-react';
 import { compilerApi } from '@/lib/api';
+import type { Manifest } from '@promptsheon/shared';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -15,11 +16,8 @@ import { getErrorMessage } from '@/lib/errors';
 type Mode = 'compile' | 'decompile';
 
 interface CompileResult {
-  manifest?: string;
-  manifestHash?: string;
+  manifest?: Manifest;
   prompt?: string;
-  warnings?: string[];
-  errors?: string[];
 }
 
 export default function CompilerPage() {
@@ -30,12 +28,18 @@ export default function CompilerPage() {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (mode === 'compile') {
-        const r = await compilerApi.compile(input);
-        return r.data as CompileResult;
+      let manifest: unknown;
+      try {
+        manifest = JSON.parse(input) as unknown;
+      } catch {
+        throw new Error('Input must be valid JSON.');
       }
-      const r = await compilerApi.decompile(input);
-      return r.data as CompileResult;
+      if (mode === 'compile') {
+        const r = await compilerApi.compile(manifest);
+        return { manifest: r.data } satisfies CompileResult;
+      }
+      const r = await compilerApi.decompile(manifest);
+      return { prompt: r.data } satisfies CompileResult;
     },
     onSuccess: (data) => setResult(data),
   });
@@ -44,8 +48,8 @@ export default function CompilerPage() {
 
   const placeholder =
     mode === 'compile'
-      ? 'Describe the capability you want to compile. Mention inputs, tools, policies, and how outputs should look.'
-      : 'Paste a compiled manifest (YAML or JSON) to round-trip it back into a natural-language description.';
+    ? 'Paste a valid manifest JSON object to compile it with the reasoning compiler.'
+      : 'Paste a compiled manifest JSON object to round-trip it back into a natural-language description.';
 
   return (
     <div className="space-y-6">
@@ -134,31 +138,9 @@ export default function CompilerPage() {
             />
           ) : (
             <div className="space-y-3">
-              {mode === 'compile' && result.manifestHash && (
-                <div className="flex items-center justify-between rounded-md border border-border-subtle bg-surface-2/50 px-3 py-2 text-xs">
-                  <span className="font-medium text-text-subtle">Content hash</span>
-                  <code className="font-mono text-text-default">{result.manifestHash.slice(0, 24)}…</code>
-                </div>
-              )}
               <pre className="max-h-96 overflow-auto rounded-md bg-surface-0 p-3 font-mono text-xs leading-relaxed text-text-default">
-                {mode === 'compile' ? (result.manifest ?? '') : (result.prompt ?? '')}
+                {mode === 'compile' ? JSON.stringify(result.manifest, null, 2) : (result.prompt ?? '')}
               </pre>
-              {result.warnings && result.warnings.length > 0 && (
-                <div className="rounded-md border border-warning/30 bg-warning/10 p-3 text-xs text-text-default">
-                  <div className="font-semibold text-warning">Warnings</div>
-                  <ul className="mt-1 space-y-1">
-                    {result.warnings.map((w, i) => <li key={i}>• {w}</li>)}
-                  </ul>
-                </div>
-              )}
-              {result.errors && result.errors.length > 0 && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-text-default">
-                  <div className="font-semibold text-destructive">Errors</div>
-                  <ul className="mt-1 space-y-1">
-                    {result.errors.map((e, i) => <li key={i}>• {e}</li>)}
-                  </ul>
-                </div>
-              )}
             </div>
           )}
         </Surface>

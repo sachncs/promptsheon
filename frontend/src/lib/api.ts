@@ -2043,9 +2043,18 @@ export const approvalApi = {
 };
 
 export const compilerApi = {
-  compile: (manifest: unknown, options?: { capabilityContext?: string; constraints?: string[] }) =>
-    client.post('/compiler/compile', { manifest, ...options }),
-  decompile: (manifest: unknown) => client.post('/compiler/decompile', { manifest }),
+  compile: async (manifest: unknown, options?: { capabilityContext?: string; constraints?: string[] }): Promise<{ data: Manifest }> => {
+    const r = await client.post<unknown>('/compiler/compile', { manifest, ...options });
+    const parsed = ManifestSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid compiled manifest.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  decompile: async (manifest: unknown): Promise<{ data: string }> => {
+    const r = await client.post<unknown>('/compiler/decompile', { manifest });
+    const parsed = z.object({ original: z.string() }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned an invalid decompiled prompt.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data.original };
+  },
 };
 
 export const selfEvolveApi = {
