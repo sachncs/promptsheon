@@ -1,12 +1,12 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import type { EvidenceEventType, EvidenceRepo } from '../repos/evidence.js';
+import { EVIDENCE_EVENT_TYPES, type EvidenceRepo } from '../repos/evidence.js';
 import { parseParams, parseQuery } from './validate.js';
 
 const EvidenceQuerySchema = z.strictObject({
   limit: z.coerce.number().int().min(1).max(500).default(100),
   before: z.string().datetime({ offset: true }).optional(),
-  eventType: z.string().min(1).max(80).optional(),
+  eventType: z.enum(EVIDENCE_EVENT_TYPES).optional(),
   agentHash: z.string().regex(/^[0-9a-f]{64}$/).optional(),
   workspaceId: z.string().min(1).max(255).optional(),
   traceId: z.string().min(1).max(255).optional(),
@@ -36,7 +36,7 @@ export function registerEvidenceRoutes(
     const items = deps.repo.listByOrganization(organizationId, {
       limit,
       ...(before ? { before } : {}),
-      ...(eventType ? { eventType: eventType as EvidenceEventType } : {}),
+      ...(eventType ? { eventType } : {}),
       ...(agentHash ? { agentHash } : {}),
       ...(workspaceId ? { workspaceId } : {}),
     });
@@ -50,7 +50,7 @@ export function registerEvidenceRoutes(
     if (!parsed.ok) return;
     const items = parsed.data.traceId
       ? deps.repo.listByTrace(organizationId, parsed.data.traceId, parsed.data.workspaceId)
-      : deps.repo.listByOrganization(organizationId, { limit: parsed.data.limit, ...(parsed.data.before ? { before: parsed.data.before } : {}), ...(parsed.data.eventType ? { eventType: parsed.data.eventType as EvidenceEventType } : {}), ...(parsed.data.agentHash ? { agentHash: parsed.data.agentHash } : {}), ...(parsed.data.workspaceId ? { workspaceId: parsed.data.workspaceId } : {}) });
+      : deps.repo.listByOrganization(organizationId, { limit: parsed.data.limit, ...(parsed.data.before ? { before: parsed.data.before } : {}), ...(parsed.data.eventType ? { eventType: parsed.data.eventType } : {}), ...(parsed.data.agentHash ? { agentHash: parsed.data.agentHash } : {}), ...(parsed.data.workspaceId ? { workspaceId: parsed.data.workspaceId } : {}) });
     reply.header('Content-Disposition', 'attachment; filename="promptsheon-evidence.json"');
     return reply.send({ schemaVersion: '1.0', organizationId, exportedAt: new Date().toISOString(), items });
   });

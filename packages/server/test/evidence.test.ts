@@ -90,6 +90,8 @@ describe('evidence and telemetry redaction', () => {
     const filtered = await app.inject({ method: 'GET', url: `/api/evidence?agentHash=${agentHash}` });
     expect(filtered.statusCode).toBe(200);
     expect(filtered.json().items).toHaveLength(1);
+    const invalidEventType = await app.inject({ method: 'GET', url: '/api/evidence?eventType=unknown.event' });
+    expect(invalidEventType.statusCode).toBe(422);
     const workspaceFiltered = await app.inject({ method: 'GET', url: '/api/evidence?workspaceId=workspace-2' });
     expect(workspaceFiltered.statusCode).toBe(200);
     expect(workspaceFiltered.json().items).toHaveLength(0);

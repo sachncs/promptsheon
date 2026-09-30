@@ -2,17 +2,20 @@ import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { canonicalTelemetryJson, hashTelemetry, redactTelemetry, type RedactionSensitivity } from '../observability/redaction.js';
 
-export type EvidenceEventType =
-  | 'execution.started'
-  | 'execution.completed'
-  | 'execution.failed'
-  | 'execution.cancelled'
-  | 'model.called'
-  | 'tool.called'
-  | 'guardrail.decided'
-  | 'permission.decided'
-  | 'resource.consumed'
-  | 'error.observed';
+export const EVIDENCE_EVENT_TYPES = [
+  'execution.started',
+  'execution.completed',
+  'execution.failed',
+  'execution.cancelled',
+  'model.called',
+  'tool.called',
+  'guardrail.decided',
+  'permission.decided',
+  'resource.consumed',
+  'error.observed',
+] as const;
+
+export type EvidenceEventType = (typeof EVIDENCE_EVENT_TYPES)[number];
 
 export interface EvidenceRecord {
   id: string;
