@@ -82,6 +82,8 @@ export default function OnboardingPage() {
             resumedSetup.current = true;
             if (!status.data?.needsLlm) {
               router.replace('/app');
+            } else {
+              setIndex(2);
             }
           })
           .catch(() => {
@@ -119,6 +121,8 @@ export default function OnboardingPage() {
               resumedSetup.current = true;
               if (!status.data?.needsLlm) {
                 router.replace('/app');
+              } else {
+                setIndex(2);
               }
             })
             .catch(() => {
@@ -149,6 +153,8 @@ export default function OnboardingPage() {
       resumedSetup.current = true;
       if (!status.data?.needsLlm) {
         router.replace('/app');
+      } else {
+        setIndex(2);
       }
     } catch (error: unknown) {
       setRestoreError(error instanceof Error ? error.message : 'That API key could not be verified.');

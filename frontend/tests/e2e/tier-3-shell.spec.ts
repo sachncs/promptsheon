@@ -122,6 +122,38 @@ test.describe('tier 3: app shell after onboarding', () => {
     await expect(page.getByText(/could not be verified|invalid|unauthorized/i).first()).toBeVisible();
   });
 
+  test('resumes at provider setup when an authenticated admin has no provider', async ({ page }) => {
+    const session = await bootstrapAdminViaApi(BACKEND_URL, {
+      orgName: `Provider Resume Org ${Date.now()}`,
+      adminEmail: `provider-resume-${Date.now()}@promptsheon.test`,
+    });
+
+    await page.route('**/api/bootstrap/status', async (route) => {
+      const upstream = await route.fetch();
+      const body = (await upstream.json()) as Record<string, unknown>;
+      await route.fulfill({
+        response: upstream,
+        json: { ...body, needsAdmin: false, needsLlm: true, provider: null, model: null },
+      });
+    });
+    await page.goto('/');
+    await page.evaluate((input) => {
+      window.localStorage.setItem('promptsheon:session:v1', JSON.stringify({
+        userId: input.userId,
+        userName: input.userName,
+        userEmail: input.userEmail,
+        orgId: input.orgId,
+        orgName: input.orgName,
+        apiKey: input.apiKey,
+        completedAt: new Date().toISOString(),
+      }));
+    }, session);
+
+    await page.goto('/onboarding');
+    await expect(page.getByRole('heading', { name: 'Choose a model provider' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /local simulator/i })).toBeVisible();
+  });
+
   test('rejects malformed local sessions without redirect churn', async ({ page }) => {
     await page.goto('/');
     await page.evaluate(() => {
