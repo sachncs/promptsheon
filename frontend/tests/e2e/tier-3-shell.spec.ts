@@ -67,7 +67,10 @@ test.describe('tier 3: app shell after onboarding', () => {
       const upstream = await route.fetch();
       const body = (await upstream.json()) as { apiKey?: string };
       delete body.apiKey;
-      await route.fulfill({ response: upstream, json: body });
+      const headers = upstream.headers();
+      delete headers['set-cookie'];
+      await page.context().clearCookies();
+      await route.fulfill({ response: upstream, headers, json: body });
     });
     await page.goto('/');
     await page.evaluate(() => window.localStorage.clear());
@@ -93,7 +96,10 @@ test.describe('tier 3: app shell after onboarding', () => {
       const upstream = await route.fetch();
       const body = (await upstream.json()) as { apiKey?: string };
       body.apiKey = 'pk_rejected_by_backend';
-      await route.fulfill({ response: upstream, json: body });
+      const headers = upstream.headers();
+      delete headers['set-cookie'];
+      await page.context().clearCookies();
+      await route.fulfill({ response: upstream, headers, json: body });
     });
     await page.goto('/');
     await page.evaluate(() => window.localStorage.clear());
