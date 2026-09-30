@@ -59,7 +59,16 @@ describe('SnapshotStore', () => {
     await store.capture(agent);
     const list = store.list();
     expect(list.length).toBe(2);
+    expect(list[0]?.agentId).toBe('test-agent');
     expect(list[0].byteSize).toBeGreaterThan(0);
+  });
+
+  it('rejects a corrupted snapshot before loading it into an agent', async () => {
+    const snapshotId = '00000000-0000-0000-0000-000000000001';
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(join(dir, `${snapshotId}.json`), JSON.stringify({ scope: 'agent' }), 'utf-8');
+
+    await expect(store.restore(agent, snapshotId)).rejects.toThrow('invalid format');
   });
 
   it('delete removes a snapshot from disk', async () => {
