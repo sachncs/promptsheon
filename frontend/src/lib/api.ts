@@ -2814,6 +2814,44 @@ export interface TraceSpan {
   outputText: string | null;
 }
 
+const TraceScoreSchema = z.object({
+  id: z.string(),
+  traceRunId: z.string(),
+  executionId: z.string().nullable(),
+  evaluator: z.string(),
+  name: z.string(),
+  value: z.number().nullable(),
+  label: z.string().nullable(),
+  rationale: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+const TraceScoreListSchema = z.object({
+  run: z.object({
+    id: z.string(),
+    organizationId: z.string(),
+    executionId: z.string().nullable(),
+    environment: z.string(),
+    name: z.string(),
+    startTime: z.string(),
+    endTime: z.string().nullable(),
+    status: z.enum(['running', 'success', 'error']),
+    totalTokens: z.number(),
+    totalCostUsd: z.number(),
+    model: z.string().nullable(),
+  }),
+  items: z.array(TraceScoreSchema),
+  total: z.number().int().nonnegative(),
+});
+
+const TraceAutoEvalSchema = z.object({ traceRunId: z.string(), written: z.number().int().nonnegative() });
+const TraceScoreSummarySchema = z.object({
+  orgId: z.string(),
+  days: z.number().int().positive(),
+  totals: z.number().int().nonnegative(),
+  perEvaluator: z.array(z.object({ evaluator: z.string(), count: z.number().int().nonnegative() })),
+});
+
 export interface EvidenceRecord {
   id: string;
   eventType: string;
@@ -3167,21 +3205,24 @@ export const teamApi = {
 };
 
 export const traceScoreApi = {
-  list: (traceRunId: string) =>
-    client
-      .get<{ run: TraceRunSummary; items: TraceScore[]; total: number }>(`/traces/${traceRunId}/scores`)
-      .then((r) => r.data),
-  autoEval: (traceRunId: string, opts: { judgeModel?: string; judgePrompt?: string } = {}) =>
-    client
-      .post<{ traceRunId: string; written: number }>(`/traces/${traceRunId}/auto-eval`, opts)
-      .then((r) => r.data),
-  summary: (days = 7, evaluator?: string) =>
-    client
-      .get<{ orgId: string; days: number; totals: number; perEvaluator: Array<{ evaluator: string; count: number }> }>(
-        `/scores/summary`,
-        { params: { days, ...(evaluator ? { evaluator } : {}) } },
-      )
-      .then((r) => r.data),
+  list: async (traceRunId: string): Promise<{ run: TraceRunSummary; items: TraceScore[]; total: number }> => {
+    const r = await client.get<unknown>(`/traces/${traceRunId}/scores`);
+    const parsed = TraceScoreListSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid trace score data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  autoEval: async (traceRunId: string, opts: { judgeModel?: string; judgePrompt?: string } = {}): Promise<{ traceRunId: string; written: number }> => {
+    const r = await client.post<unknown>(`/traces/${traceRunId}/auto-eval`, opts);
+    const parsed = TraceAutoEvalSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid trace evaluation data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
+  summary: async (days = 7, evaluator?: string): Promise<{ orgId: string; days: number; totals: number; perEvaluator: Array<{ evaluator: string; count: number }> }> => {
+    const r = await client.get<unknown>('/scores/summary', { params: { days, ...(evaluator ? { evaluator } : {}) } });
+    const parsed = TraceScoreSummarySchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid trace score summary data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
 };
 
 export const searchApi = {
