@@ -336,6 +336,18 @@ export interface Alert {
   acknowledgedBy: string | null;
 }
 
+export interface SelfEvolveState {
+  status: 'idle' | 'detected' | 'revising' | 'validating' | 'promoted' | 'rejected';
+  lastRevisionHash?: string;
+  lastEvalScore?: number;
+  cycleCount: number;
+}
+
+export interface SelfEvolveCycle {
+  action: 'revised' | 'no_change';
+  state: SelfEvolveState;
+}
+
 export interface Capability {
   id: string;
   projectId: string;
@@ -601,6 +613,30 @@ const AlertSchema = z.object({
   acknowledgedAt: z.string().nullable(),
   acknowledgedBy: z.string().nullable(),
 });
+
+const SelfEvolveStateSchema = z.object({
+  status: z.enum(['idle', 'detected', 'revising', 'validating', 'promoted', 'rejected']),
+  lastRevisionHash: z.string().optional(),
+  lastEvalScore: z.number().optional(),
+  cycleCount: z.number().int().nonnegative(),
+});
+
+const SelfEvolveCycleSchema = z.object({
+  action: z.enum(['revised', 'no_change']),
+  state: SelfEvolveStateSchema,
+});
+
+function parseSelfEvolveState(raw: unknown): SelfEvolveState {
+  const parsed = SelfEvolveStateSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid self-evolve state.', { code: 'INVALID_RESPONSE' });
+  const { status, cycleCount, lastRevisionHash, lastEvalScore } = parsed.data;
+  const base = { status, cycleCount };
+  if (lastRevisionHash === undefined && lastEvalScore === undefined) return base;
+  if (lastRevisionHash === undefined && lastEvalScore !== undefined) return { ...base, lastEvalScore };
+  if (lastRevisionHash !== undefined && lastEvalScore === undefined) return { ...base, lastRevisionHash };
+  if (lastRevisionHash !== undefined && lastEvalScore !== undefined) return { ...base, lastRevisionHash, lastEvalScore };
+  throw new ApiError('The server returned invalid self-evolve state.', { code: 'INVALID_RESPONSE' });
+}
 
 const AlertRuleSchema = z.object({
   id: z.string(),
@@ -1656,8 +1692,16 @@ export const compilerApi = {
 };
 
 export const selfEvolveApi = {
-  getState: (capabilityId: string) => client.get(`/capabilities/${capabilityId}/self-evolve`),
-  runCycle: (capabilityId: string) => client.post(`/capabilities/${capabilityId}/self-evolve/run`),
+  getState: async (capabilityId: string): Promise<{ data: SelfEvolveState }> => {
+    const r = await client.get<unknown>(`/capabilities/${capabilityId}/self-evolve`);
+    return { data: parseSelfEvolveState(r.data) };
+  },
+  runCycle: async (capabilityId: string): Promise<{ data: SelfEvolveCycle }> => {
+    const r = await client.post<unknown>(`/capabilities/${capabilityId}/self-evolve/run`);
+    const parsed = SelfEvolveCycleSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid self-evolve cycle data.', { code: 'INVALID_RESPONSE' });
+    return { data: { action: parsed.data.action, state: parseSelfEvolveState(parsed.data.state) } };
+  },
 };
 
 export const manifestApi = {

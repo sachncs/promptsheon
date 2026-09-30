@@ -16,17 +16,6 @@ import { Badge } from '@/components/ui/badge';
 import { QueryError } from '@/components/brand/query-error';
 import { getErrorMessage } from '@/lib/errors';
 
-interface SelfEvolveState {
-  capabilityId?: string;
-  iteration?: number;
-  bestScore?: number;
-  status?: 'idle' | 'running' | 'cooling-down' | 'error';
-  lastRunAt?: string | null;
-  nextRunAt?: string | null;
-  history?: Array<{ iteration: number; score: number; at: string }>;
-  cooldownSeconds?: number;
-}
-
 export default function SelfEvolvePage() {
   const session = useRequireSession();
   const params = useParams<{ capabilityId: string }>();
@@ -36,7 +25,7 @@ export default function SelfEvolvePage() {
 
   const state = useQuery({
     queryKey: ['self-evolve', capabilityId],
-    queryFn: () => selfEvolveApi.getState(capabilityId).then((r) => r.data as SelfEvolveState),
+    queryFn: () => selfEvolveApi.getState(capabilityId).then((r) => r.data),
     enabled: Boolean(capabilityId) && Boolean(session),
     refetchInterval: 5000,
   });
@@ -64,7 +53,7 @@ export default function SelfEvolvePage() {
         actions={
           <Button
             onClick={() => runCycle.mutate()}
-            disabled={runCycle.isPending || s?.status === 'running' || s?.status === 'cooling-down'}
+            disabled={runCycle.isPending}
           >
             <Play className="mr-1.5 size-3.5" />
             {runCycle.isPending ? 'Running…' : 'Run cycle'}
@@ -90,26 +79,26 @@ export default function SelfEvolvePage() {
           <div className="grid gap-4 md:grid-cols-4">
             <StatCard
               label="Iteration"
-              value={String(s?.iteration ?? 0)}
-              hint={s?.lastRunAt ? `last ${new Date(s.lastRunAt).toLocaleString()}` : 'no runs yet'}
+              value={String(s?.cycleCount ?? 0)}
+              hint="completed evolution cycles"
               icon={RefreshCw}
             />
             <StatCard
               label="Best score"
-              value={s?.bestScore !== undefined ? s.bestScore.toFixed(3) : '—'}
-              hint="across all iterations"
+              value={s?.lastEvalScore !== undefined ? s.lastEvalScore.toFixed(3) : '—'}
+              hint="score from the latest evaluation"
               icon={TrendingUp}
             />
             <StatCard
               label="Status"
               value={s?.status ?? 'idle'}
               icon={Activity}
-              hint={s?.nextRunAt ? `next ${new Date(s.nextRunAt).toLocaleString()}` : undefined}
+              hint="current evolution state"
             />
             <StatCard
-              label="Cooldown"
-              value={s?.cooldownSeconds !== undefined ? `${s.cooldownSeconds}s` : '—'}
-              hint="min seconds between cycles"
+              label="Revision"
+              value={s?.lastRevisionHash ? `${s.lastRevisionHash.slice(0, 10)}…` : '—'}
+              hint="content-addressed manifest hash"
             />
           </div>
 
@@ -117,41 +106,10 @@ export default function SelfEvolvePage() {
             <SurfaceHeader title="Current state" />
             <div className="flex flex-wrap items-center gap-3">
               <StatusPill kind={statusKindOf(s?.status)} />
-              <Badge>{s?.status === 'cooling-down' ? 'awaiting cooldown' : s?.status ?? 'idle'}</Badge>
+              <Badge>{s?.status ?? 'idle'}</Badge>
               {error && <span className="text-xs text-destructive">{error}</span>}
             </div>
           </Surface>
-
-          {s?.history && s.history.length > 0 && (
-            <Surface padded={false}>
-              <SurfaceHeader className="px-5 pt-5" title="Iteration history" description={`${s.history.length} iteration(s)`} />
-              <ol className="divide-y divide-border-subtle">
-                {s.history.map((h, i) => {
-                  const max = Math.max(...s.history!.map((x) => x.score));
-                  const pct = max > 0 ? (h.score / max) * 100 : 0;
-                  return (
-                    <li key={i} className="grid grid-cols-12 items-center gap-3 px-5 py-3 text-sm">
-                      <span className="col-span-1 font-mono text-xs text-text-subtle">#{h.iteration}</span>
-                      <span className="col-span-2 font-mono text-xs text-text-muted">
-                        {new Date(h.at).toLocaleString()}
-                      </span>
-                      <div className="col-span-7">
-                        <div className="h-2 overflow-hidden rounded-full bg-surface-2">
-                          <div
-                            className="h-full bg-brand"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                      <span className="col-span-2 text-right font-mono text-xs text-text-default">
-                        {h.score.toFixed(3)}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ol>
-            </Surface>
-          )}
 
           <Surface>
             <div className="text-xs text-text-subtle">
