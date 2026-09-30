@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildEvaluatorRegistry, listEvaluators, getEvaluator } from '../src/evaluation/evaluators.js';
+import { LLMScorer } from '../src/agents/evaluation/scorers.js';
 import type { AppConfig } from '@promptsheon/shared';
 
 function buildConfig(): AppConfig {
@@ -45,5 +46,16 @@ describe('buildEvaluatorRegistry', () => {
         passed: true,
       });
     }
+  });
+
+  it('keeps the legacy scorer credential-free in simulator mode', async () => {
+    const config = buildConfig() as unknown as AppConfig;
+    (config.llm as { defaultProvider: string }).defaultProvider = 'simulated';
+    const scorer = new LLMScorer(config);
+
+    await expect(scorer.score({ actual: '{"answer":"ok"}', expected: '{"answer":"ok"}', inputs: {} })).resolves.toMatchObject({
+      score: 1,
+      passed: true,
+    });
   });
 });
