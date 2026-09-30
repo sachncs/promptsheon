@@ -226,7 +226,7 @@ export class PromptsheonClient {
     return this.call({ method: 'POST', path: `/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/diff`, body: { leftHash, rightHash } });
   }
 
-  listAgentSpecificationLineage(workspaceId: string, hash: string): Promise<{ items: AgentSpecificationRecord[] }> {
+  listAgentSpecificationLineage(workspaceId: string, hash: string): Promise<{ items: AgentSpecificationMetadata[] }> {
     return this.call({ method: 'GET', path: `/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/${encodeURIComponent(hash)}/lineage` });
   }
 
