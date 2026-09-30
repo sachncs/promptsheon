@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FlaskConical, Play } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
-import { evalSuiteApi } from '@/lib/api';
+import { evalSuiteApi, getErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,18 @@ export default function EvalSuiteDetailPage() {
     enabled: Boolean(id && selectedRunId),
   });
   const run = useMutation({
-    mutationFn: () => evalSuiteApi.run(id, { trials: JSON.parse(trialsJson) }),
+    mutationFn: () => {
+      let trials: unknown;
+      try {
+        trials = JSON.parse(trialsJson);
+      } catch {
+        throw new Error('Trials must be valid JSON.');
+      }
+      if (!Array.isArray(trials) || trials.length === 0) {
+        throw new Error('Add at least one trial object before running the suite.');
+      }
+      return evalSuiteApi.run(id, { trials });
+    },
     onSuccess: (result: { runId?: string }) => {
       void queryClient.invalidateQueries({ queryKey: ['eval-suite-runs', id] });
       if (result.runId) setSelectedRunId(result.runId);
@@ -97,6 +108,11 @@ export default function EvalSuiteDetailPage() {
               <Play className="mr-1.5 h-3.5 w-3.5" />Run
             </Button>
           </div>
+          {run.isError ? (
+            <p role="alert" className="mt-3 text-sm text-destructive">
+              {getErrorMessage(run.error, 'The evaluation run failed. Check the trial payload and try again.')}
+            </p>
+          ) : null}
           {run.data && (
             <pre className="mt-4 max-h-80 overflow-auto rounded-md border border-border-subtle bg-surface-0 p-3 font-mono text-xs leading-relaxed text-text-default">
 {JSON.stringify(run.data, null, 2)}
