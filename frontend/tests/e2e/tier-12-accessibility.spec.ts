@@ -64,7 +64,7 @@ test.describe('tier 12: accessibility and keyboard foundations', () => {
     await page.goto('/onboarding');
     await assertAccessibleSurface(page);
     await expect(page.getByRole('main')).toBeVisible();
-    const firstInteractive = page.locator('button:visible, input:visible, a:visible').first();
+    const firstInteractive = page.locator('main button:visible, main input:visible, main a:visible').first();
     await expect(firstInteractive).toBeVisible();
     await firstInteractive.focus();
     await expect(firstInteractive).toBeFocused();
