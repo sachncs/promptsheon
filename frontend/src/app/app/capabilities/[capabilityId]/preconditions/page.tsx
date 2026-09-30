@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, ShieldAlert } from 'lucide-react';
-import { preconditionApi, versionApi } from '@/lib/api';
+import { preconditionApi, versionApi, type CapabilityVersion, type Precondition } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { useToast } from '@/components/brand/toast';
 import { PageHeader } from '@/components/brand/page-header';
@@ -17,19 +17,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { QueryError } from '@/components/brand/query-error';
 import { getErrorMessage } from '@/lib/errors';
-
-interface PreconditionRow {
-  id: string;
-  name: string;
-  command: string;
-  enabled: boolean;
-}
-
-interface VersionRow {
-  id: string;
-  version?: number;
-  createdAt?: string;
-}
 
 export default function PreconditionsPage() {
   const params = useParams<{ capabilityId: string }>();
@@ -50,11 +37,11 @@ export default function PreconditionsPage() {
     enabled: Boolean(capabilityId) && Boolean(session),
   });
   const latestVersionId = useMemo(() => {
-    const list = (Array.isArray(versions.data) ? versions.data : []) as VersionRow[];
+    const list: CapabilityVersion[] = versions.data ?? [];
     return list[0]?.id;
   }, [versions.data]);
 
-  const rows = (Array.isArray(data.data) ? data.data : []) as PreconditionRow[];
+  const rows: Precondition[] = data.data ?? [];
 
   const [name, setName] = useState('');
   const [command, setCommand] = useState('');
@@ -78,7 +65,7 @@ export default function PreconditionsPage() {
   });
 
   const toggle = useMutation({
-    mutationFn: (row: PreconditionRow) =>
+    mutationFn: (row: Precondition) =>
       preconditionApi.update(row.id, { enabled: !row.enabled }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['preconditions', capabilityId] });

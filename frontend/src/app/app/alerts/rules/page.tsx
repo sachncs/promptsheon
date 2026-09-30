@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, Plus, Trash2 } from 'lucide-react';
-import { alertApi } from '@/lib/api';
+import { alertApi, type AlertRule } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -14,17 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { QueryError } from '@/components/brand/query-error';
-
-interface AlertRule {
-  id: string;
-  name?: string;
-  type?: string;
-  severity?: string;
-  threshold?: number;
-  window?: number;
-  enabled?: boolean;
-  createdAt?: string;
-}
 
 const TYPE_OPTIONS = [
   { value: 'eval-regression', label: 'Eval regression' },
@@ -44,7 +33,7 @@ export default function AlertRulesPage() {
     queryKey: ['alert-rules'],
     queryFn: () => alertApi.listRules().then((r) => r.data),
   });
-  const rows = (rules.data ?? []) as AlertRule[];
+  const rows: AlertRule[] = rules.data ?? [];
 
   const [name, setName] = useState('');
   const [type, setType] = useState<typeof TYPE_OPTIONS[number]['value']>('eval-regression');

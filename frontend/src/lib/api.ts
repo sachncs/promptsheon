@@ -5,8 +5,10 @@ import type { Manifest } from '@promptsheon/shared';
 import type { Execution } from '@promptsheon/shared';
 import type { Schedule } from '@promptsheon/shared';
 import type { Dataset, DatasetCase } from '@promptsheon/shared';
+import type { AlertRule, Precondition } from '@promptsheon/shared';
 
 export type { Dataset, DatasetCase };
+export type { AlertRule, Precondition };
 import { clearSession } from './session';
 
 export class ApiError extends Error {
@@ -600,6 +602,31 @@ const AlertSchema = z.object({
   acknowledgedBy: z.string().nullable(),
 });
 
+const AlertRuleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string(),
+  severity: z.enum(['info', 'warning', 'critical']),
+  enabled: z.boolean(),
+  threshold: z.number(),
+  duration: z.number(),
+  window: z.number(),
+  config: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const PreconditionSchema = z.object({
+  id: z.string(),
+  capabilityId: z.string(),
+  name: z.string(),
+  command: z.string(),
+  timeoutSec: z.number(),
+  enabled: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string().optional(),
+});
+
 const CapabilitySchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -879,6 +906,29 @@ function parseAlerts(raw: unknown): Alert[] {
   const parsed = z.array(AlertSchema).safeParse(unwrapList<unknown>(raw));
   if (!parsed.success) throw new ApiError('The server returned invalid alert data.', { code: 'INVALID_RESPONSE' });
   return parsed.data;
+}
+
+function parseAlertRules(raw: unknown): AlertRule[] {
+  const parsed = z.array(AlertRuleSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid alert rule data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parsePreconditions(raw: unknown): Precondition[] {
+  const parsed = z.array(PreconditionSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid precondition data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data.map((value) => {
+    const base = {
+      id: value.id,
+      capabilityId: value.capabilityId,
+      name: value.name,
+      command: value.command,
+      timeoutSec: value.timeoutSec,
+      enabled: value.enabled,
+      createdAt: value.createdAt,
+    };
+    return value.updatedAt === undefined ? base : { ...base, updatedAt: value.updatedAt };
+  });
 }
 
 function parseCapabilities(raw: unknown): Capability[] {
@@ -1534,7 +1584,10 @@ export const evalApi = {
 };
 
 export const alertApi = {
-  listRules: () => client.get('/alert-rules'),
+  listRules: async (): Promise<{ data: AlertRule[] }> => {
+    const r = await client.get<unknown>('/alert-rules');
+    return { data: parseAlertRules(r.data) };
+  },
   createRule: (data: { name: string; type: string; severity: string; threshold?: number; window?: number }) =>
     client.post('/alert-rules', data),
   deleteRule: (id: string) => client.delete(`/alert-rules/${id}`),
@@ -1568,7 +1621,10 @@ export const settingsApi = {
 };
 
 export const preconditionApi = {
-  list: (capabilityVersionId: string) => client.get('/preconditions', { params: { capabilityVersionId } }),
+  list: async (capabilityVersionId: string): Promise<{ data: Precondition[] }> => {
+    const r = await client.get<unknown>('/preconditions', { params: { capabilityVersionId } });
+    return { data: parsePreconditions(r.data) };
+  },
   create: (data: { capabilityVersionId: string; name: string; command: string; enabled?: boolean }) =>
     client.post('/preconditions', data),
   update: (id: string, data: { name?: string; command?: string; enabled?: boolean }) => client.put(`/preconditions/${id}`, data),
