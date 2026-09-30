@@ -63,6 +63,14 @@ describe('evidence and telemetry redaction', () => {
     db.close();
   });
 
+  it('keeps workspace evidence reads on the tenant/workspace index', () => {
+    const db = new Database(':memory:');
+    applyMigrations(db, migrations);
+    const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_evidence_org_workspace_time'").all() as Array<{ name: string }>;
+    expect(indexes).toEqual([{ name: 'idx_evidence_org_workspace_time' }]);
+    db.close();
+  });
+
   it('serves tenant-scoped timeline and JSON export routes', async () => {
     const db = new Database(':memory:');
     applyMigrations(db, migrations);
