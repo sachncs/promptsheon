@@ -2587,8 +2587,9 @@ export const costApi = {
     const r = await client.get<unknown>(`/analytics/cost?organizationId=${encodeURIComponent(organizationId)}&days=${days}`);
     return { data: parseCostRollups(r.data) };
   },
-  ingest: (row: { capabilityId: string; input?: number; output?: number; costMicros?: number; executions?: number }) =>
-    client.post('/analytics/rollups', row),
+  ingest: async (row: { capabilityId: string; input?: number; output?: number; costMicros?: number; executions?: number }): Promise<void> => {
+    await client.post('/analytics/rollups', row);
+  },
 };
 
 export interface CostBudget {
@@ -2691,6 +2692,24 @@ const CostForecastSchema = z.object({
   })),
 });
 
+function parseCostBudget(raw: unknown): CostBudget {
+  const parsed = CostBudgetSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid budget data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseUserQuota(raw: unknown): UserQuota {
+  const parsed = UserQuotaSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid user quota data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseCostForecast(raw: unknown): CostForecast {
+  const parsed = CostForecastSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid cost forecast data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
 export const budgetApi = {
   list: async (organizationId: string): Promise<{ items: CostBudget[] }> => {
     const response = await client.get<unknown>('/admin/budgets', { params: { organizationId } });
@@ -2707,16 +2726,16 @@ export const budgetApi = {
     enabled: boolean;
   }): Promise<CostBudget> => {
     const response = await client.post<unknown>('/admin/budgets', input);
-    return CostBudgetSchema.parse(response.data);
+    return parseCostBudget(response.data);
   },
   update: async (id: string, fields: Partial<Pick<CostBudget, 'label' | 'period' | 'limitMicros' | 'alertThreshold' | 'enabled'>>): Promise<CostBudget> => {
     const response = await client.patch<unknown>(`/admin/budgets/${encodeURIComponent(id)}`, fields);
-    return CostBudgetSchema.parse(response.data);
+    return parseCostBudget(response.data);
   },
   remove: (id: string): Promise<void> => client.delete(`/admin/budgets/${encodeURIComponent(id)}`).then(() => undefined),
   forecast: async (organizationId: string, windowDays = 30): Promise<CostForecast> => {
     const response = await client.get<unknown>('/admin/cost-forecast', { params: { organizationId, windowDays } });
-    return CostForecastSchema.parse(response.data);
+    return parseCostForecast(response.data);
   },
 };
 
@@ -2735,8 +2754,8 @@ export const userQuotaApi = {
     dailyTokens: number | null;
     dailyCostMicros: number | null;
     enabled: boolean;
-  }): Promise<UserQuota> => UserQuotaSchema.parse((await client.post('/admin/user-quotas', input)).data),
-  update: async (id: string, fields: Partial<Pick<UserQuota, 'label' | 'dailyRuns' | 'dailyTokens' | 'dailyCostMicros' | 'enabled'>>): Promise<UserQuota> => UserQuotaSchema.parse((await client.patch(`/admin/user-quotas/${encodeURIComponent(id)}`, fields)).data),
+  }): Promise<UserQuota> => parseUserQuota((await client.post('/admin/user-quotas', input)).data),
+  update: async (id: string, fields: Partial<Pick<UserQuota, 'label' | 'dailyRuns' | 'dailyTokens' | 'dailyCostMicros' | 'enabled'>>): Promise<UserQuota> => parseUserQuota((await client.patch(`/admin/user-quotas/${encodeURIComponent(id)}`, fields)).data),
   remove: (id: string): Promise<void> => client.delete(`/admin/user-quotas/${encodeURIComponent(id)}`).then(() => undefined),
 };
 
