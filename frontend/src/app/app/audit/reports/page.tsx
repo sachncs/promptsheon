@@ -176,9 +176,9 @@ export default function AuditReportsPage() {
               <div className="flex items-start gap-2 rounded-md bg-success/5 p-3 text-xs text-text-default">
                 <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-success" aria-hidden="true" />
                 <div>
-                  Chain integrity verified. SHA-256 signature binds the report to these exact bytes.
-                  Auditor verifies by computing <code>sha256(canonical_json)</code> and comparing to{' '}
-                  <code>signature.value</code>.
+                  Chain integrity verified. The SHA-256 content hash binds the unsigned report payload.
+                  Auditor verifies by removing <code>signature</code>, computing{' '}
+                  <code>sha256(canonical_json_without_signature)</code>, and comparing to <code>signature.value</code>.
                 </div>
               </div>
             ) : (

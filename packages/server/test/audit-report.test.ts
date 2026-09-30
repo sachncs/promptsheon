@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -93,7 +94,10 @@ describe('GET /api/audit/report', () => {
     expect(body.chainValid).toBe(true);
     expect(body.chainHead).toMatch(/^[0-9a-f]{64}$/);
     expect(body.entries.map((e) => e.actor)).toEqual(['u-alice', 'u-bob']);
+    expect(body.signature.algorithm).toBe('sha256-content-v1');
     expect(body.signature.value).toMatch(/^[0-9a-f]{64}$/);
+    const { signature, ...unsigned } = body as typeof body & { signature: { algorithm: string; value: string } };
+    expect(signature.value).toBe(createHash('sha256').update(JSON.stringify(unsigned)).digest('hex'));
   });
 
   it('excludes audit entries from another organization', async () => {

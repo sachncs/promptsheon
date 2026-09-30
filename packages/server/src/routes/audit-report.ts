@@ -37,7 +37,7 @@ interface AuditReport {
   chainValid: boolean;
   chainHead: string;
   chainVerifiedAt: string;
-  signature: { algorithm: 'sha256-rsa-promptsheon-v1'; value: string };
+  signature: { algorithm: 'sha256-content-v1'; value: string };
   entries: AuditReportEntry[];
 }
 
@@ -50,12 +50,12 @@ interface AuditReport {
  *   2. The verified group of audit_entries within the date range.
  *   3. A SHA-256 signature over the canonical JSON.
  *
- * The signature is computed by hashing the JSON document bytes
- * with the same SHA-256 primitive the audit chain uses (no RSA
- * key yet — that comes with the SOC 2 attestation). For now, the
- * SHA-256 IS the signature: it binds the report content to the
- * exact bytes the auditor downloaded. Verification on the auditor's
- * side: hash the file, compare to the .signature.value field.
+ * The signature is a SHA-256 content hash over the canonical JSON
+ * payload before the signature field is added. It is deliberately
+ * named as a content hash rather than RSA: asymmetric signing needs
+ * a configured key-management policy and is a separate deployment
+ * concern. Verification removes `signature`, serializes the remaining
+ * fields in order, hashes the bytes, and compares the digest.
  *
  * PDF export is intentionally not done server-side. Auditors
  * prefer signed JSON over PDF — easier to diff, easier to ingest
@@ -121,7 +121,7 @@ export function registerAuditReportRoutes(
     };
     const canonical = JSON.stringify(report);
     const signature = createHash('sha256').update(canonical).digest('hex');
-    const full: AuditReport = { ...report, signature: { algorithm: 'sha256-rsa-promptsheon-v1', value: signature } };
+    const full: AuditReport = { ...report, signature: { algorithm: 'sha256-content-v1', value: signature } };
     reply.header('content-disposition', `attachment; filename="audit-report-${orgId}-${report.generatedAt.slice(0, 10)}.json"`);
     return reply.send(full);
   });

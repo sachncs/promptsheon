@@ -167,9 +167,8 @@ segment. Tier 3 features would create a category.
 - **Moat impact**: high. Compliance teams need this as evidence for SOC 2 / HIPAA / ISO 27001 controls.
 
 #### T2-4. **Compliance reporting (audit reports, evidence packs)**
-- **Why it matters**: quarterly SOC 2 audits require evidence of who changed what, when, and why. promptsheon has the data (audit chain) but no report generator.
-- **Where it lives today**: `audit_entries` table is append-only; `/api/audit/verify` is the only consumer.
-- **What's missing**: `GET /api/audit/report?from=&to=&actor=&resource=` returning a signed JSON document; PDF export; per-quarter evidence packs.
+- **Current status**: implemented as `GET /api/audit/report`. It verifies the append-only chain, applies organization/date/actor/resource/action filters, and returns a downloadable JSON evidence document with a deterministic SHA-256 content hash. The frontend supports JSON download and browser print-to-PDF.
+- **Remaining**: replace the content hash with deployment-managed asymmetric signing when an enterprise key-management policy is configured.
 - **Moat impact**: medium. Builds on T2-1; without certifications it's unused.
 
 #### T2-5. **Air-gap / FIPS-mode support**
