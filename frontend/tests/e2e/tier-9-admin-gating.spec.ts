@@ -126,6 +126,23 @@ test.describe('tier 9: admin gating (server-enforced)', () => {
     await expect(page.getByText(url)).toBeVisible();
   });
 
+  test('admin can write a vault secret without rendering plaintext', async ({ page, baseURL }) => {
+    if (!admin || !baseURL) throw new Error('admin not bootstrapped');
+    await clearClientState(page);
+    await seedSession(page, admin);
+    await page.goto('/app/vault', { waitUntil: 'domcontentloaded' });
+    const secretValue = 'local-e2e-secret';
+    await page.getByLabel('Name').fill('E2E_SECRET');
+    await page.getByLabel('Value').fill(secretValue);
+    const writeResponse = page.waitForResponse((response) =>
+      response.url().endsWith('/api/vault/secrets') && response.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: 'Write secret' }).click();
+    expect((await writeResponse).status(), 'vault write response').toBe(201);
+    await expect(page.getByText('Secret stored')).toBeVisible();
+    await expect(page.getByText(secretValue)).toHaveCount(0);
+  });
+
   test('admin can run a prompt security scan from the UI', async ({ page, baseURL }) => {
     if (!admin || !baseURL) throw new Error('admin not bootstrapped');
     await clearClientState(page);

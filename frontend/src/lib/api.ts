@@ -142,6 +142,21 @@ export interface VaultKeyringEntry {
   rotatedAt: string | null;
 }
 
+export interface VaultSecretMetadata {
+  id: string;
+  organizationId: string;
+  name: string;
+  fingerprint: string;
+  createdBy: string;
+  createdAt: string;
+  rotatedAt: string | null;
+}
+
+export interface VaultKeyRotation {
+  key: VaultKeyringEntry;
+  reencrypted: number;
+}
+
 const VaultKeyringEntrySchema = z.object({
   id: z.number().int(),
   label: z.string(),
@@ -149,6 +164,21 @@ const VaultKeyringEntrySchema = z.object({
   active: z.boolean(),
   createdAt: z.string(),
   rotatedAt: z.string().nullable(),
+});
+
+const VaultSecretMetadataSchema = z.object({
+  id: z.string().min(1),
+  organizationId: z.string().min(1),
+  name: z.string().min(1),
+  fingerprint: z.string().min(1),
+  createdBy: z.string().min(1),
+  createdAt: z.string(),
+  rotatedAt: z.string().nullable(),
+});
+
+const VaultKeyRotationSchema = z.object({
+  key: VaultKeyringEntrySchema,
+  reencrypted: z.number().int().nonnegative(),
 });
 
 export interface CostRollup {
@@ -2370,16 +2400,28 @@ export const mutationProposalApi = {
 };
 
 export const vaultApi = {
-  listSecrets: (organizationId: string) =>
-    client.get(`/vault/secrets?organizationId=${encodeURIComponent(organizationId)}`).then((r) => r.data),
+  listSecrets: async (organizationId: string): Promise<{ data: VaultSecretMetadata[] }> => {
+    const r = await client.get<unknown>(`/vault/secrets?organizationId=${encodeURIComponent(organizationId)}`);
+    const parsed = z.array(VaultSecretMetadataSchema).safeParse(unwrapList<unknown>(r.data));
+    if (!parsed.success) throw new ApiError('The server returned invalid vault secret metadata.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
   listKeys: async (): Promise<VaultKeyringEntry[]> => {
     const r = await client.get<unknown>('/vault/keys');
     return parseVaultKeyring(r.data);
   },
-  rotateKey: (label: string, reencrypt = true) =>
-    client.post('/vault/keys/rotate', { label, reencrypt }).then((r) => r.data),
-  writeSecret: (organizationId: string, name: string, value: string) =>
-    client.post('/vault/secrets', { organizationId, name, value }).then((r) => r.data),
+  rotateKey: async (label: string, reencrypt = true): Promise<{ data: VaultKeyRotation }> => {
+    const r = await client.post<unknown>('/vault/keys/rotate', { label, reencrypt });
+    const parsed = VaultKeyRotationSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid vault rotation data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  writeSecret: async (organizationId: string, name: string, value: string): Promise<{ data: VaultSecretMetadata }> => {
+    const r = await client.post<unknown>('/vault/secrets', { organizationId, name, value });
+    const parsed = VaultSecretMetadataSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid vault secret metadata.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
 };
 
 export const retentionApi = {

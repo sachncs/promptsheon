@@ -116,12 +116,13 @@ export default function VaultPage() {
         <SurfaceHeader title="Write a secret" description="Stored encrypted; the plaintext never returns through the API." />
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Name</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-2" />
+            <label htmlFor="vault-secret-name" className="text-xs uppercase tracking-wider text-text-subtle">Name</label>
+            <Input id="vault-secret-name" value={name} onChange={(e) => setName(e.target.value)} className="mt-2" />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-subtle">Value</label>
+            <label htmlFor="vault-secret-value" className="text-xs uppercase tracking-wider text-text-subtle">Value</label>
             <Input
+              id="vault-secret-value"
               value={value}
               onChange={(e) => setValue(e.target.value)}
               type="password"
