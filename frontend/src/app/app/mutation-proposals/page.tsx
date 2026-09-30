@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Check, GitPullRequest, X } from 'lucide-react';
+import { Check, GitPullRequest, Link2, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getErrorMessage, mutationProposalApi, type MutationProposal, type ReleaseEnvironment } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
@@ -13,6 +13,7 @@ import { QueryError } from '@/components/brand/query-error';
 import { StatusPill, statusKindOf, type StatusKind } from '@/components/brand/status-pill';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 
 function riskLabel(risk: MutationProposal['risk']): StatusKind {
   return risk === 'critical' || risk === 'high' ? 'error' : risk === 'medium' ? 'review' : 'active';
@@ -22,6 +23,8 @@ export default function MutationProposalsPage() {
   const session = useRequireSession();
   const queryClient = useQueryClient();
   const [reasonById, setReasonById] = React.useState<Record<string, string>>({});
+  const [runIdById, setRunIdById] = React.useState<Record<string, string>>({});
+  const [baselineById, setBaselineById] = React.useState<Record<string, string>>({});
   const [environment, setEnvironment] = React.useState<ReleaseEnvironment>('dev');
   const proposals = useQuery({
     queryKey: ['mutation-proposals'],
@@ -38,6 +41,11 @@ export default function MutationProposalsPage() {
   });
   const validate = useMutation({
     mutationFn: (id: string) => mutationProposalApi.validate(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mutation-proposals'] }),
+  });
+  const attachEvaluation = useMutation({
+    mutationFn: ({ id, evaluationRunId, baselineScore }: { id: string; evaluationRunId: string; baselineScore: number }) =>
+      mutationProposalApi.attachEvaluation(id, { evaluationRunId, baselineScore }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mutation-proposals'] }),
   });
   const promote = useMutation({
@@ -70,6 +78,9 @@ export default function MutationProposalsPage() {
                 && proposal.evaluationStatus === 'passed'
                 && Boolean(proposal.evaluationRunId);
               const reviewable = proposal.status === 'proposed' || proposal.status === 'validated';
+              const baselineScore = baselineById[proposal.id] ?? '';
+              const parsedBaseline = Number(baselineScore);
+              const hasValidBaseline = baselineScore.trim() !== '' && Number.isFinite(parsedBaseline) && parsedBaseline >= 0 && parsedBaseline <= 1;
               return (
                 <article key={proposal.id} className="space-y-4 p-5">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -167,9 +178,45 @@ export default function MutationProposalsPage() {
                   {proposal.status === 'validated' && proposal.evaluationStatus === 'passed' && !proposal.evaluationRunId && (
                     <p className="text-xs text-text-muted">Approval is disabled until durable evaluation evidence is attached.</p>
                   )}
-                  {(validate.isError || decide.isError || promote.isError) && (
+                  {proposal.status === 'proposed' && proposal.candidateHash && proposal.evaluationStatus === 'pending' ? (
+                    <div className="grid gap-2 rounded-lg border border-border-subtle bg-surface-2/40 p-3 sm:grid-cols-[1fr_10rem_auto] sm:items-end">
+                      <label className="text-xs text-text-muted">
+                        Durable evaluation run ID
+                        <Input
+                          className="mt-1"
+                          value={runIdById[proposal.id] ?? ''}
+                          onChange={(event) => setRunIdById((current) => ({ ...current, [proposal.id]: event.target.value }))}
+                          placeholder="run-…"
+                          aria-label={`Evaluation run ID for ${proposal.id}`}
+                        />
+                      </label>
+                      <label className="text-xs text-text-muted">
+                        Baseline score
+                        <Input
+                          className="mt-1"
+                          type="number"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={baselineById[proposal.id] ?? ''}
+                          onChange={(event) => setBaselineById((current) => ({ ...current, [proposal.id]: event.target.value }))}
+                          placeholder="0.80"
+                          aria-label={`Baseline score for ${proposal.id}`}
+                        />
+                      </label>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => attachEvaluation.mutate({ id: proposal.id, evaluationRunId: runIdById[proposal.id]?.trim() ?? '', baselineScore: parsedBaseline })}
+                        disabled={attachEvaluation.isPending || !runIdById[proposal.id]?.trim() || !hasValidBaseline}
+                      >
+                        <Link2 /> Attach evidence
+                      </Button>
+                    </div>
+                  ) : null}
+                  {(validate.isError || decide.isError || promote.isError || attachEvaluation.isError) && (
                     <p role="alert" className="text-xs text-destructive">
-                      {getErrorMessage(validate.error ?? decide.error ?? promote.error, 'The proposal action failed. Try again.')}
+                      {getErrorMessage(validate.error ?? decide.error ?? promote.error ?? attachEvaluation.error, 'The proposal action failed. Try again.')}
                     </p>
                   )}
                 </article>

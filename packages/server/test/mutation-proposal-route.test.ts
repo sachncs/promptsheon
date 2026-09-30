@@ -4,6 +4,7 @@ import type { MutationProposal } from '@promptsheon/shared';
 import { registerMutationProposalRoutes } from '../src/routes/mutation-proposals.js';
 import type { MutationProposalRepo } from '../src/repos/mutation-proposal.js';
 import type { MutationPromotionService } from '../src/application/mutation-promotion-service.js';
+import type { MutationEvaluationService } from '../src/application/mutation-evaluation-service.js';
 
 const proposal = {
   id: 'proposal-1',
@@ -32,7 +33,7 @@ const proposal = {
   promotedAt: null,
 } satisfies MutationProposal;
 
-function buildApp(): { app: FastifyInstance; repo: MutationProposalRepo; promotion: MutationPromotionService } {
+function buildApp(): { app: FastifyInstance; repo: MutationProposalRepo; promotion: MutationPromotionService; evaluation: MutationEvaluationService } {
   const app = Fastify();
   app.addHook('onRequest', async (request) => {
     request.agentOrgId = 'org-1';
@@ -47,8 +48,11 @@ function buildApp(): { app: FastifyInstance; repo: MutationProposalRepo; promoti
     validate: vi.fn(async () => ({ ...proposal, status: 'validated' as const })),
     promote: vi.fn(),
   } as unknown as MutationPromotionService;
-  registerMutationProposalRoutes(app, { mutationProposalRepo: repo, promotionService: promotion, actorId: () => 'reviewer' });
-  return { app, repo, promotion };
+  const evaluation = {
+    attach: vi.fn(() => ({ kind: 'success' as const, proposal: { ...proposal, evaluationStatus: 'passed' as const, evaluationRunId: 'run-1' } })),
+  } as unknown as MutationEvaluationService;
+  registerMutationProposalRoutes(app, { mutationProposalRepo: repo, promotionService: promotion, evaluationService: evaluation, actorId: () => 'reviewer' });
+  return { app, repo, promotion, evaluation };
 }
 
 describe('mutation proposal routes', () => {
@@ -81,6 +85,25 @@ describe('mutation proposal routes', () => {
     expect(response.statusCode).toBe(422);
     expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_REQUIRED' } });
     expect(context.repo.decide).not.toHaveBeenCalled();
+  });
+
+  it('attaches completed evaluation evidence through the application service', async () => {
+    const context = buildApp();
+    app = context.app;
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/mutation-proposals/proposal-1/evaluation',
+      payload: { evaluationRunId: 'run-1', baselineScore: 0.7 },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ evaluationStatus: 'passed', evaluationRunId: 'run-1' });
+    expect(context.evaluation.attach).toHaveBeenCalledWith({
+      proposalId: 'proposal-1',
+      organizationId: 'org-1',
+      evaluationRunId: 'run-1',
+      baselineScore: 0.7,
+    });
   });
 
   it('blocks approval when validation exists but evaluation has not passed', async () => {

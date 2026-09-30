@@ -647,6 +647,11 @@
     {
       "file": "packages/server/src/routes/mutation-proposals.ts",
       "method": "POST",
+      "path": "/api/mutation-proposals/:id/evaluation"
+    },
+    {
+      "file": "packages/server/src/routes/mutation-proposals.ts",
+      "method": "POST",
       "path": "/api/mutation-proposals/:id/decision"
     },
     {
@@ -1321,6 +1326,7 @@
     "packages/server/src/application/identity-service.ts",
     "packages/server/src/application/llm-settings-service.ts",
     "packages/server/src/application/manifest-approval-service.ts",
+    "packages/server/src/application/mutation-evaluation-service.ts",
     "packages/server/src/application/mutation-promotion-service.ts",
     "packages/server/src/application/project-service.ts",
     "packages/server/src/application/provider-adapters.ts",

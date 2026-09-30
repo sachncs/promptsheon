@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 import type { MutationProposalRepo } from '../repos/mutation-proposal.js';
 import type { MutationPromotionService } from '../application/mutation-promotion-service.js';
+import type { MutationEvaluationService } from '../application/mutation-evaluation-service.js';
 import { registerFallbackRouteDoc } from '../openapi.js';
 
 const MutationKindSchema = z.enum(['prompt', 'guardrail', 'model', 'routing', 'context', 'tool', 'permission', 'execution', 'memory', 'budget']);
@@ -33,6 +34,10 @@ const DecideSchema = z.object({
   reason: z.string().trim().min(1).max(4000),
 });
 const PromoteSchema = z.object({ environment: z.enum(['dev', 'staging', 'prod']).default('dev') });
+const EvaluationSchema = z.object({
+  evaluationRunId: z.string().trim().min(1).max(255),
+  baselineScore: z.number().min(0).max(1),
+});
 
 interface OrgRequest {
   orgContext?: { orgId?: string };
@@ -46,6 +51,7 @@ function organizationIdOf(request: OrgRequest): string | null {
 export interface MutationProposalDeps {
   mutationProposalRepo: MutationProposalRepo;
   promotionService: MutationPromotionService;
+  evaluationService: MutationEvaluationService;
   actorId: (request: OrgRequest) => string;
 }
 
@@ -54,6 +60,7 @@ export function registerMutationProposalRoutes(app: FastifyInstance, deps: Mutat
   registerFallbackRouteDoc('post', '/api/mutation-proposals');
   registerFallbackRouteDoc('get', '/api/mutation-proposals/:id');
   registerFallbackRouteDoc('post', '/api/mutation-proposals/:id/validate');
+  registerFallbackRouteDoc('post', '/api/mutation-proposals/:id/evaluation');
   registerFallbackRouteDoc('post', '/api/mutation-proposals/:id/decision');
   registerFallbackRouteDoc('post', '/api/mutation-proposals/:id/promote');
 
@@ -104,6 +111,32 @@ export function registerMutationProposalRoutes(app: FastifyInstance, deps: Mutat
       const message = error instanceof Error ? error.message : 'mutation proposal validation failed';
       return reply.code(422).send({ error: { code: 'VALIDATION_REJECTED', message } });
     }
+  });
+
+  app.post('/api/mutation-proposals/:id/evaluation', async (request, reply) => {
+    const organizationId = organizationIdOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    const parsedParams = parseParams(reply, IdParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    const parsed = parseBody(reply, EvaluationSchema, request.body);
+    if (!parsed.ok) return;
+    const result = deps.evaluationService.attach({
+      proposalId: parsedParams.data.id,
+      organizationId,
+      ...parsed.data,
+    });
+    if (result.kind === 'success') return reply.send(result.proposal);
+    const errors: Record<Exclude<typeof result.kind, 'success'>, { code: string; message: string; status: number }> = {
+      'proposal-not-found': { code: 'NOT_FOUND', message: 'mutation proposal not found', status: 404 },
+      'candidate-required': { code: 'CANDIDATE_REQUIRED', message: 'an immutable candidate must be materialised before evaluation evidence can be attached', status: 422 },
+      'proposal-not-pending': { code: 'EVALUATION_LOCKED', message: 'evaluation evidence can only be attached while the proposal is proposed', status: 422 },
+      'run-not-found': { code: 'EVIDENCE_NOT_FOUND', message: 'the evaluation run was not found in this organisation', status: 404 },
+      'run-not-complete': { code: 'EVIDENCE_INCOMPLETE', message: 'the evaluation run must be completed before it can support approval', status: 422 },
+      'run-failed': { code: 'EVALUATION_FAILED', message: 'the evaluation run did not pass its suite threshold', status: 422 },
+      'version-not-found': { code: 'EVIDENCE_INVALID', message: 'the evaluation run references an unavailable suite version', status: 422 },
+    };
+    const error = errors[result.kind];
+    return reply.code(error.status).send({ error: { code: error.code, message: error.message } });
   });
 
   app.post('/api/mutation-proposals/:id/decision', async (request, reply) => {

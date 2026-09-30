@@ -1593,6 +1593,12 @@ export const mutationProposalApi = {
     if (!parsed.success) throw new ApiError('The server returned invalid mutation proposal data.', { code: 'INVALID_RESPONSE' });
     return parsed.data;
   },
+  attachEvaluation: async (id: string, input: { evaluationRunId: string; baselineScore: number }): Promise<MutationProposal> => {
+    const r = await client.post<unknown>(`/mutation-proposals/${id}/evaluation`, input);
+    const parsed = MutationProposalSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid mutation proposal data.', { code: 'INVALID_RESPONSE' });
+    return parsed.data;
+  },
   decide: async (id: string, decision: 'approve' | 'reject' | 'abandon', reason: string): Promise<MutationProposal> => {
     const r = await client.post<unknown>(`/mutation-proposals/${id}/decision`, { decision, reason });
     const parsed = MutationProposalSchema.safeParse(r.data);

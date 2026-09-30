@@ -40,7 +40,10 @@ enabled. Evaluation passes only when the candidate reaches the manifest
 threshold and does not regress against the measured baseline. The active
 manifest is still left unchanged. Approval additionally requires a durable
 evaluation-run reference, and the console keeps approval disabled until that
-evidence is present.
+evidence is present. Reviewers can attach a completed, passing,
+organisation-scoped evaluation-suite run to a materialised proposal; the
+candidate score and suite threshold are read from the durable run rather than
+accepted from the browser.
 
 Automatic candidate materialisation and evidence-backed promotion remain in
 progress. Declared dataset cases now run through the graph executor and the
