@@ -36,7 +36,9 @@ console exposes the validation action before approval.
 Proposal-mode evolution now executes and scores the candidate manifest before
 persisting the proposal. The proposal records baseline and candidate scores in
 its structured changes, and links the candidate trace when observability is
-enabled. The active manifest is still left unchanged.
+enabled. Evaluation passes only when the candidate reaches the manifest
+threshold and does not regress against the measured baseline. The active
+manifest is still left unchanged.
 
 Automatic candidate materialisation, dataset-backed evaluation gates, and
 evidence-backed promotion remain in progress. The approval ledger is not
