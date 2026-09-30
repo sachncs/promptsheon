@@ -400,6 +400,11 @@ export interface SecurityScanSummary {
   byVerdict: { clean: number; warn: number; block: number };
 }
 
+export interface SettingItem {
+  key: string;
+  value: unknown;
+}
+
 export interface Capability {
   id: string;
   projectId: string;
@@ -734,6 +739,11 @@ const SecurityScanSummarySchema = z.object({
   }),
 });
 
+const SettingItemSchema = z.object({
+  key: z.string().min(1),
+  value: z.unknown(),
+});
+
 function parseSelfEvolveState(raw: unknown): SelfEvolveState {
   const parsed = SelfEvolveStateSchema.safeParse(raw);
   if (!parsed.success) throw new ApiError('The server returned invalid self-evolve state.', { code: 'INVALID_RESPONSE' });
@@ -1049,6 +1059,12 @@ function parseSearchResults(raw: unknown): SearchResult[] {
 function parseAlerts(raw: unknown): Alert[] {
   const parsed = z.array(AlertSchema).safeParse(unwrapList<unknown>(raw));
   if (!parsed.success) throw new ApiError('The server returned invalid alert data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseSettings(raw: unknown): SettingItem[] {
+  const parsed = z.array(SettingItemSchema).safeParse(unwrapList<unknown>(raw));
+  if (!parsed.success) throw new ApiError('The server returned invalid settings data.', { code: 'INVALID_RESPONSE' });
   return parsed.data;
 }
 
@@ -1759,9 +1775,22 @@ export const scheduleApi = {
 };
 
 export const settingsApi = {
-  list: () => client.get('/settings'),
-  get: (key: string) => client.get(`/settings/${key}`),
-  set: (key: string, value: unknown) => client.put(`/settings/${key}`, { value }),
+  list: async (): Promise<{ data: SettingItem[] }> => {
+    const r = await client.get<unknown>('/settings');
+    return { data: parseSettings(r.data) };
+  },
+  get: async (key: string): Promise<{ data: SettingItem }> => {
+    const r = await client.get<unknown>(`/settings/${encodeURIComponent(key)}`);
+    const parsed = SettingItemSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid setting data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  set: async (key: string, value: unknown): Promise<{ data: SettingItem }> => {
+    const r = await client.put<unknown>(`/settings/${encodeURIComponent(key)}`, { value });
+    const parsed = SettingItemSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid setting data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
 };
 
 export const preconditionApi = {

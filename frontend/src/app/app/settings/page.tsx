@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Cog, Save } from 'lucide-react';
-import { parseList, settingsApi } from '@/lib/api';
-import { z } from 'zod';
+import { settingsApi, type SettingItem } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -14,11 +13,6 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { QueryError } from '@/components/brand/query-error';
 import { getErrorMessage } from '@/lib/errors';
-
-const SettingItemSchema = z.object({
-  key: z.string(), value: z.unknown().optional(), description: z.string().optional(),
-  updatedAt: z.string().optional(), updatedBy: z.string().optional(),
-});
 
 const KNOWN_KEYS: Array<{ key: string; label: string; description: string; placeholder: string }> = [
   { key: 'llm.provider', label: 'LLM provider', description: 'openai / anthropic / bedrock', placeholder: 'openai' },
@@ -39,10 +33,10 @@ export default function SettingsPage() {
     queryFn: () => settingsApi.list().then((r) => r.data),
   });
 
-  const list = parseList(settings.data, SettingItemSchema);
+  const list: SettingItem[] = settings.data ?? [];
   const known = KNOWN_KEYS.map((k) => {
     const found = list.find((s) => s.key === k.key);
-    return { ...k, current: found?.value, updatedAt: found?.updatedAt };
+    return { ...k, current: found?.value };
   });
   const extras = list.filter((s) => !KNOWN_KEYS.some((k) => k.key === s.key));
 
@@ -110,7 +104,7 @@ export default function SettingsPage() {
                   <p className="mt-1 text-xs text-text-muted">{k.description}</p>
                 </div>
                 <div className="text-xs text-text-subtle md:col-span-2">
-                  {k.updatedAt ? new Date(k.updatedAt).toLocaleDateString() : '—'}
+                  —
                 </div>
                 <div className="flex justify-start md:col-span-1 md:justify-end">
                   <Button
@@ -155,7 +149,7 @@ export default function SettingsPage() {
             columns={[
               { key: 'key', header: 'Key', render: (r) => <code className="font-mono text-xs">{r.key}</code> },
               { key: 'value', header: 'Value', render: (r) => <code className="font-mono text-xs">{JSON.stringify(r.value)}</code> },
-              { key: 'when', header: 'Updated', render: (r) => r.updatedAt ? new Date(r.updatedAt).toLocaleString() : '—' },
+              { key: 'when', header: 'Updated', render: () => '—' },
             ]}
           />
         </Surface>

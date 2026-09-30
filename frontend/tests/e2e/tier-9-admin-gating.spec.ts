@@ -61,6 +61,19 @@ test.describe('tier 9: admin gating (server-enforced)', () => {
     expect(response!.status(), 'admin /app/settings').toBeLessThan(500);
   });
 
+  test('admin can save a validated setting from the UI', async ({ page, baseURL }) => {
+    if (!admin || !baseURL) throw new Error('admin not bootstrapped');
+    await clearClientState(page);
+    await seedSession(page, admin);
+    await page.goto('/app/settings', { waitUntil: 'domcontentloaded' });
+    await page.getByPlaceholder('openai').fill('simulated');
+    const saveResponse = page.waitForResponse((response) =>
+      response.url().includes('/api/settings/llm.provider') && response.request().method() === 'PUT',
+    );
+    await page.getByRole('button', { name: 'Save LLM provider' }).click();
+    expect((await saveResponse).status(), 'setting save response').toBe(200);
+  });
+
   test('admin can run a prompt security scan from the UI', async ({ page, baseURL }) => {
     if (!admin || !baseURL) throw new Error('admin not bootstrapped');
     await clearClientState(page);
