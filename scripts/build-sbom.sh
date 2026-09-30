@@ -15,8 +15,8 @@ const path = require('path');
 
 /**
  * Minimal pnpm v9 yaml parser. We don't pull in a YAML library —
- * just grep the lines we need: `name@version:`, `version: x.y.z`,
- * `resolution: {integrity: ...}`. This is enough for an SBOM.
+ * package snapshots carry their name and version in the mapping key,
+ * while the integrity value is on the following resolution line.
  */
 function readPnpmYaml(p) {
   if (!fs.existsSync(p)) return { packages: {} };
@@ -35,18 +35,21 @@ function readPnpmYaml(p) {
       inPackages = false;
     }
     if (!inPackages) continue;
-    const nameMatch = line.match(/^ {2}'?([^:]+?)'?:\s*$/);
+    const nameMatch = line.match(/^ {2}'?([^:]+?)'?\s*:\s*$/);
     if (nameMatch) {
-      curName = nameMatch[1].replace(/\/$/, '');
+      const key = nameMatch[1].replace(/\/$/, '');
+      const separator = key.lastIndexOf('@');
+      if (separator > 0) {
+        curName = key.slice(0, separator);
+        packages[curName] = { ...packages[curName], version: key.slice(separator + 1) };
+      } else {
+        curName = null;
+      }
       continue;
     }
-    const verMatch = line.match(/^\s+version:\s*['"]?([^'"]+)['"]?\s*$/);
-    if (verMatch && curName) {
-      packages[curName] = { ...packages[curName], version: verMatch[1] };
-    }
-    const resMatch = line.match(/^\s+(?:resolution|resolved):\s*['"]?([^'"\s]+)['"]?\s*$/);
+    const resMatch = line.match(/^\s+(?:resolution|resolved):\s*\{[^}]*integrity:\s*([^,}\s]+)[^}]*\}/);
     if (resMatch && curName) {
-      packages[curName] = { ...packages[curName], resolved: resMatch[1].replace(/integrity:/, '') };
+      packages[curName] = { ...packages[curName], resolved: resMatch[1] };
     }
   }
   return { packages };

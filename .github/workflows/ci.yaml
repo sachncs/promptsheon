@@ -41,6 +41,11 @@ jobs:
         run: pnpm check:claims
       - name: repository inventory check
         run: pnpm inventory:generate && git diff --exit-code -- docs/baseline/inventory.json
+      - name: generate and validate SBOM
+        run: |
+          bash scripts/build-sbom.sh
+          test "$(jq '.packages | length' docs/compliance/sbom.json)" -gt 0
+          jq -e '.spdxVersion == "SPDX-2.3" and (.packages | length > 0)' docs/compliance/sbom.json >/dev/null
 
   test:
     name: Server Tests
