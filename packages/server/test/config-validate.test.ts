@@ -87,6 +87,29 @@ describe('validateConfig (issue #47 — boot-time validation gate)', () => {
     })).toThrow(/PROMPTSHEON_CORS_ORIGIN/);
   });
 
+  it('rejects E2E session issuance in production', () => {
+    expect(() => validateConfig({
+      ...baseConfig,
+      server: { ...baseConfig.server, nodeEnv: 'production', corsOrigin: 'https://console.example.com', e2eSessionEnabled: true },
+      auth: { enabled: true, jwtSecret: 'a-real-secret-with-at-least-32-characters' },
+    })).toThrow(/PROMPTSHEON_E2E/);
+  });
+
+  it('rejects private-network evaluation in production', () => {
+    expect(() => validateConfig({
+      ...baseConfig,
+      server: { ...baseConfig.server, nodeEnv: 'production', corsOrigin: 'https://console.example.com', allowPrivateNetworks: true },
+      auth: { enabled: true, jwtSecret: 'a-real-secret-with-at-least-32-characters' },
+    })).toThrow(/PROMPTSHEON_ALLOW_PRIVATE_NETWORKS/);
+  });
+
+  it('requires a positive request rate limit', () => {
+    expect(() => validateConfig({
+      ...baseConfig,
+      server: { ...baseConfig.server, rateLimitMax: 0 },
+    })).toThrow(/PROMPTSHEON_RATE_LIMIT_MAX/);
+  });
+
   it('rejects invalid runtime environment and log level values', () => {
     expect(() => validateConfig({
       ...baseConfig,

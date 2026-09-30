@@ -43,6 +43,12 @@ export function validateConfig(config: AppConfig): void {
   if (isProduction && !config.auth.enabled) {
     throw new Error('PROMPTSHEON_AUTH must be enabled in production');
   }
+  if (isProduction && config.server.e2eSessionEnabled) {
+    throw new Error('PROMPTSHEON_E2E must be disabled in production');
+  }
+  if (isProduction && config.server.allowPrivateNetworks) {
+    throw new Error('PROMPTSHEON_ALLOW_PRIVATE_NETWORKS must be disabled in production');
+  }
   if (config.auth.enabled && config.auth.jwtSecret.length < 32) {
     throw new Error('PROMPTSHEON_JWT_SECRET must be at least 32 characters when auth is enabled');
   }
@@ -66,6 +72,10 @@ export function validateConfig(config: AppConfig): void {
   }
   if (config.server.port < 1 || config.server.port > 65535) {
     throw new Error('PROMPTSHEON_PORT must be between 1 and 65535');
+  }
+  if (config.server.rateLimitMax !== undefined
+    && (!Number.isInteger(config.server.rateLimitMax) || config.server.rateLimitMax < 1)) {
+    throw new Error('PROMPTSHEON_RATE_LIMIT_MAX must be a positive integer');
   }
   if (!Number.isInteger(config.llm.maxRetries) || config.llm.maxRetries < 0) {
     throw new Error('PROMPTSHEON_LLM_MAX_RETRIES must be a non-negative integer');
