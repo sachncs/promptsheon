@@ -70,8 +70,14 @@ export async function bootstrapAdminViaApi(baseUrl: string, opts: SeedOptions): 
 
 export async function seedSession(page: Page, session: SessionInfo): Promise<void> {
   await page.goto('/');
+  const auth = await page.request.post('/api/auth/session', {
+    headers: { Authorization: `Bearer ${session.apiKey}` },
+    data: {},
+  });
+  if (!auth.ok()) throw new Error(`browser session exchange failed: ${auth.status()} ${await auth.text()}`);
   await page.evaluate((s) => {
-    window.localStorage.setItem('promptsheon:session:v1', JSON.stringify(s));
+    const { apiKey: _apiKey, ...safeSession } = s;
+    window.localStorage.setItem('promptsheon:session:v1', JSON.stringify(safeSession));
   }, session);
 }
 

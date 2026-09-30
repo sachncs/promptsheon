@@ -34,6 +34,11 @@ export async function walkOnboarding(page: Page): Promise<void> {
     if (!response.ok() || !body.apiKey) {
       throw new Error('E2E recovery endpoint did not return a session key');
     }
+    const auth = await page.request.post('/api/auth/session', {
+      headers: { Authorization: `Bearer ${body.apiKey}` },
+      data: {},
+    });
+    if (!auth.ok()) throw new Error(`E2E browser session exchange failed: ${auth.status()}`);
     await page.evaluate((session) => {
       window.localStorage.setItem('promptsheon:session:v1', JSON.stringify(session));
     }, {
@@ -42,7 +47,6 @@ export async function walkOnboarding(page: Page): Promise<void> {
       userEmail: body.user.email,
       orgId: body.org.id,
       orgName: body.org.name,
-      apiKey: body.apiKey,
       completedAt: new Date().toISOString(),
     });
     await page.goto('/app');

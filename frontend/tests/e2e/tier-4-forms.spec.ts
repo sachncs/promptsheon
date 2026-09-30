@@ -39,6 +39,14 @@ async function bootstrap() {
   return cachedBootstrap;
 }
 
+async function establishBrowserSession(page: import('@playwright/test').Page, apiKey: string): Promise<void> {
+  const response = await page.request.post('/api/auth/session', {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    data: {},
+  });
+  if (!response.ok()) throw new Error(`browser session exchange failed: ${response.status()}`);
+}
+
 test.describe('tier 4: forms submit and rows appear', () => {
   test('workspaces: create workspace', async ({ page, baseURL }) => {
     if (!baseURL) throw new Error('baseURL not provided');
@@ -46,6 +54,7 @@ test.describe('tier 4: forms submit and rows appear', () => {
     const { userId, orgId, apiKey } = await bootstrap();
 
     await page.goto('/');
+    await establishBrowserSession(page, apiKey);
     await page.evaluate(
       ([u, o, key]) => {
         window.localStorage.setItem(
@@ -84,6 +93,7 @@ test.describe('tier 4: forms submit and rows appear', () => {
     const { userId, orgId, apiKey } = await bootstrap();
 
     await page.goto('/');
+    await establishBrowserSession(page, apiKey);
     await page.evaluate(
       ([u, o, key]) => {
         window.localStorage.setItem(
@@ -114,6 +124,7 @@ test.describe('tier 4: forms submit and rows appear', () => {
     const { userId, orgId, apiKey } = await bootstrap();
 
     await page.goto('/');
+    await establishBrowserSession(page, apiKey);
     await page.evaluate(
       ([u, o, key]) => {
         window.localStorage.setItem(
@@ -145,6 +156,7 @@ test.describe('tier 4: forms submit and rows appear', () => {
     const { userId, orgId, apiKey } = await bootstrap();
 
     await page.goto('/');
+    await establishBrowserSession(page, apiKey);
     await page.evaluate(
       ([u, o, key]) => {
         window.localStorage.setItem(
@@ -176,6 +188,7 @@ test.describe('tier 4: forms submit and rows appear', () => {
     const { userId, orgId, apiKey } = await bootstrap();
 
     await page.goto('/');
+    await establishBrowserSession(page, apiKey);
     await page.evaluate(
       ([u, o, key]) => {
         window.localStorage.setItem(

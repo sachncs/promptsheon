@@ -148,18 +148,7 @@ test.describe('tier 3: app shell after onboarding', () => {
         json: { ...body, needsAdmin: false, needsLlm: true, provider: null, model: null },
       });
     });
-    await page.goto('/');
-    await page.evaluate((input) => {
-      window.localStorage.setItem('promptsheon:session:v1', JSON.stringify({
-        userId: input.userId,
-        userName: input.userName,
-        userEmail: input.userEmail,
-        orgId: input.orgId,
-        orgName: input.orgName,
-        apiKey: input.apiKey,
-        completedAt: new Date().toISOString(),
-      }));
-    }, session);
+    await seedSession(page, session);
 
     await page.goto('/onboarding');
     await expect(page.getByRole('heading', { name: 'Choose a model provider' })).toBeVisible();
