@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { Check, GitPullRequest, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { mutationProposalApi, type MutationProposal, type ReleaseEnvironment } from '@/lib/api';
+import { getErrorMessage, mutationProposalApi, type MutationProposal, type ReleaseEnvironment } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -79,6 +79,8 @@ export default function MutationProposalsPage() {
                     <div className="shrink-0 text-left text-xs text-text-subtle lg:text-right">
                       <div>Confidence {Math.round(proposal.confidence * 100)}%</div>
                       <div className="mt-1">Source <span className="font-mono">{proposal.sourceHash.slice(0, 12)}</span></div>
+                      <div className="mt-1">Candidate <span className="font-mono">{proposal.candidateHash?.slice(0, 12) ?? 'not materialised'}</span></div>
+                      <div className="mt-1">Evidence {proposal.evaluationRunId ? 'attached' : 'not evaluated'}</div>
                     </div>
                   </div>
                   <details className="rounded-lg border border-border-subtle bg-surface-2/50 px-3 py-2 text-xs">
@@ -95,7 +97,12 @@ export default function MutationProposalsPage() {
                         aria-label={`Decision reason for ${proposal.id}`}
                       />
                       <div className="flex flex-wrap gap-2">
-                        <Button size="sm" onClick={() => decide.mutate({ id: proposal.id, decision: 'approve' })} disabled={decide.isPending}>
+                        <Button
+                          size="sm"
+                          onClick={() => decide.mutate({ id: proposal.id, decision: 'approve' })}
+                          disabled={decide.isPending || !proposal.candidateHash}
+                          title={proposal.candidateHash ? 'Approve this immutable candidate' : 'Approval requires a materialised candidate'}
+                        >
                           <Check /> Approve
                         </Button>
                         <Button size="sm" variant="destructive" onClick={() => decide.mutate({ id: proposal.id, decision: 'reject' })} disabled={decide.isPending}>
@@ -125,6 +132,14 @@ export default function MutationProposalsPage() {
                   ) : proposal.decisionReason ? (
                     <p className="text-xs text-text-subtle">Decision: {proposal.decisionReason}</p>
                   ) : null}
+                  {actionable && !proposal.candidateHash && (
+                    <p className="text-xs text-text-muted">This proposal cannot be approved until its immutable candidate is materialised.</p>
+                  )}
+                  {(decide.isError || promote.isError) && (
+                    <p role="alert" className="text-xs text-destructive">
+                      {getErrorMessage(decide.error ?? promote.error, 'The proposal action failed. Try again.')}
+                    </p>
+                  )}
                 </article>
               );
             })}
