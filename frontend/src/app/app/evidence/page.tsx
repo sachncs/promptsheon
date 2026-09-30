@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Download, FileSearch, Filter } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { evidenceApi, type EvidenceRecord } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
@@ -32,22 +32,23 @@ export default function EvidencePage() {
     enabled: Boolean(session),
     refetchInterval: 15_000,
   });
+  const exportMutation = useMutation({
+    mutationFn: () => evidenceApi.export({ limit: 500, ...(eventType ? { eventType } : {}) }),
+    onSuccess: (exported) => {
+      const blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'promptsheon-evidence.json';
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    },
+  });
 
   if (!session) return null;
   if (evidence.isError) return <QueryError message={evidence.error} onRetry={() => void evidence.refetch()} />;
 
   const items = evidence.data?.items ?? [];
-
-  async function downloadExport(): Promise<void> {
-    const exported = await evidenceApi.export({ limit: 500, ...(eventType ? { eventType } : {}) });
-    const blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'promptsheon-evidence.json';
-    anchor.click();
-    URL.revokeObjectURL(url);
-  }
 
   return (
     <div className="space-y-6">
@@ -56,11 +57,20 @@ export default function EvidencePage() {
         title="Evidence"
         subtitle="Immutable, redacted decision records across your organisation. Trace every execution from admission to outcome."
         actions={
-          <Button variant="outline" size="sm" onClick={() => void downloadExport()} disabled={evidence.isPending}>
-            <Download className="mr-1.5 h-3.5 w-3.5" /> Export JSON
+          <Button variant="outline" size="sm" onClick={() => exportMutation.mutate()} disabled={evidence.isPending || exportMutation.isPending}>
+            <Download className="mr-1.5 h-3.5 w-3.5" /> {exportMutation.isPending ? 'Exporting…' : 'Export JSON'}
           </Button>
         }
       />
+      {exportMutation.isError ? (
+        <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          The evidence export could not be generated. Try again.
+        </div>
+      ) : exportMutation.isSuccess ? (
+        <div role="status" className="rounded-lg border border-success/30 bg-success/5 px-4 py-3 text-sm text-success">
+          Evidence export downloaded.
+        </div>
+      ) : null}
 
       <Surface padded={false}>
         <SurfaceHeader
