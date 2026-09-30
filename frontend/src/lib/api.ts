@@ -1124,6 +1124,33 @@ export const executionApi = {
   },
 };
 
+export interface ExecutionQueueMetrics {
+  queued: number;
+  running: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+  timedOut: number;
+  partiallyCompleted: number;
+  oldestQueuedAt: string | null;
+}
+
+export const executionJobApi = {
+  metrics: async (): Promise<{ data: ExecutionQueueMetrics }> => {
+    const r = await client.get<unknown>('/execution-jobs/metrics');
+    return { data: z.object({
+      queued: z.number().int().nonnegative(),
+      running: z.number().int().nonnegative(),
+      completed: z.number().int().nonnegative(),
+      failed: z.number().int().nonnegative(),
+      cancelled: z.number().int().nonnegative(),
+      timedOut: z.number().int().nonnegative(),
+      partiallyCompleted: z.number().int().nonnegative(),
+      oldestQueuedAt: z.string().nullable(),
+    }).parse(r.data) };
+  },
+};
+
 function baseURL(): string {
   if (typeof window !== 'undefined') return '';
   return process.env['NEXT_PUBLIC_API_BASE'] ?? '';

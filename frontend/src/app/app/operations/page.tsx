@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Activity, AlertTriangle, GitMerge, ShieldAlert } from 'lucide-react';
-import { releaseApi, evalApi, alertApi, type Alert } from '@/lib/api';
+import { Activity, AlertTriangle, Clock3, GitMerge, ShieldAlert } from 'lucide-react';
+import { releaseApi, evalApi, alertApi, executionJobApi, type Alert } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -35,9 +35,15 @@ export default function OperationsPage() {
     queryFn: () => alertApi.listAlerts().then((r) => r.data),
   });
 
+  const queue = useQuery({
+    queryKey: ['execution-jobs', 'metrics'],
+    queryFn: () => executionJobApi.metrics().then((r) => r.data),
+    refetchInterval: 15_000,
+  });
+
   if (!session) return null;
   if (
-    allReleases.isPending || recentEvals.isPending || alerts.isPending
+    allReleases.isPending || recentEvals.isPending || alerts.isPending || queue.isPending
   ) {
     return (
       <div className="space-y-6" aria-busy="true" aria-live="polite">
@@ -52,6 +58,7 @@ export default function OperationsPage() {
   if (allReleases.isError) return <QueryError message={allReleases.error} onRetry={() => void allReleases.refetch()} />;
   if (recentEvals.isError) return <QueryError message={recentEvals.error} onRetry={() => void recentEvals.refetch()} />;
   if (alerts.isError) return <QueryError message={alerts.error} onRetry={() => void alerts.refetch()} />;
+  if (queue.isError) return <QueryError message={queue.error} onRetry={() => void queue.refetch()} />;
 
   const releases = allReleases.data ?? [];
   const activeReleases = releases.filter((r) => r.status === 'active');
@@ -78,7 +85,7 @@ export default function OperationsPage() {
         subtitle="Live health of the fleet — active releases, canary progress, recent eval outcomes, and unacknowledged alerts."
       />
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <StatCard
           label="Active releases"
           value={String(activeReleases.length)}
@@ -102,6 +109,12 @@ export default function OperationsPage() {
           value={String(unackAlerts.length)}
           hint={unackAlerts.length > 0 ? 'investigate' : 'all clear'}
           icon={AlertTriangle}
+        />
+        <StatCard
+          label="Execution queue"
+          value={String(queue.data?.queued ?? 0)}
+          hint={`${queue.data?.running ?? 0} running`}
+          icon={Clock3}
         />
       </div>
 
