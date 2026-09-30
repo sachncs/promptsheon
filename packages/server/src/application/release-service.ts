@@ -141,6 +141,9 @@ export class ReleaseService {
   transition(input: TransitionReleaseInput): Release {
     const existing = this.repo.findByIdInOrg(input.releaseId, input.organizationId);
     if (!existing) throw new ReleaseNotFoundError(input.releaseId);
+    // A client may retry after the first request committed. Return the
+    // durable desired state without duplicating history or re-running gates.
+    if (existing.status === input.to) return existing;
     if (!canTransition(existing.status, input.to)) {
       throw new InvalidReleaseTransitionError(existing.status, input.to);
     }

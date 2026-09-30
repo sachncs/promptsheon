@@ -27,10 +27,10 @@ const release: Release = {
   canaryPercent: 0,
 };
 
-function makeService(approvers: string[] = ['reviewer-a', 'reviewer-b'], evaluationGate?: ReleaseEvaluationGate, signatureGate?: ReleaseSignatureGate) {
+function makeService(approvers: string[] = ['reviewer-a', 'reviewer-b'], evaluationGate?: ReleaseEvaluationGate, signatureGate?: ReleaseSignatureGate, current: Release = release) {
   const store: ReleaseStore = {
-    findByIdInOrg: vi.fn(() => release),
-    updateStatusInOrg: vi.fn((_id, _org, status) => ({ ...release, status })),
+    findByIdInOrg: vi.fn(() => current),
+    updateStatusInOrg: vi.fn((_id, _org, status) => ({ ...current, status })),
     appendTransition: vi.fn(),
   };
   const approvals: ManifestApprovalStore = {
@@ -69,6 +69,23 @@ describe('ReleaseService', () => {
       createdAt: '2026-01-01T00:01:00.000Z',
     });
     expect(audit.append).toHaveBeenCalledOnce();
+  });
+
+  it('treats a repeated transition as an idempotent retry', () => {
+    const current = { ...release, status: 'active' as const };
+    const { service, store, audit } = makeService(['reviewer-a', 'reviewer-b'], undefined, undefined, current);
+
+    const result = service.transition({
+      releaseId: current.id,
+      organizationId: 'org-1',
+      actorId: 'operator',
+      to: 'active',
+    });
+
+    expect(result).toBe(current);
+    expect(store.updateStatusInOrg).not.toHaveBeenCalled();
+    expect(store.appendTransition).not.toHaveBeenCalled();
+    expect(audit.append).not.toHaveBeenCalled();
   });
 
   it('rejects invalid transitions before mutating persistence', () => {
