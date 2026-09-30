@@ -45,11 +45,11 @@ describe('PromptsheonClient agent specification contracts', () => {
       return new Response(JSON.stringify({ items: [], total: 0 }), { status: 200 });
     };
 
-    await client.listEvidence({ agentHash: 'a'.repeat(64), eventType: 'model.called', traceId: 'trace/1' });
+    await client.listEvidence({ agentHash: 'a'.repeat(64), eventType: 'model.called', traceId: 'trace/1', workspaceId: 'workspace/1' });
     await client.listTraceEvidence('trace/1');
 
     expect(calls).toEqual([
-      'https://example.test/api/evidence?eventType=model.called&agentHash=' + 'a'.repeat(64) + '&traceId=trace%2F1',
+      'https://example.test/api/evidence?eventType=model.called&agentHash=' + 'a'.repeat(64) + '&traceId=trace%2F1&workspaceId=workspace%2F1',
       'https://example.test/api/traces/trace%2F1/evidence',
     ]);
   });
