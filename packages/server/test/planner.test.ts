@@ -50,4 +50,16 @@ describe('IdeaPlannerAgent.plan fallback', () => {
     expect(result.nodes[0].id).toBe('root');
     expect(result.passThreshold).toBe(0.5);
   });
+
+  it('builds a useful deterministic plan in simulator mode without a provider key', async () => {
+    const config = buildConfig() as unknown as AppConfig;
+    (config.llm as { defaultProvider: string }).defaultProvider = 'simulated';
+    const agent = new IdeaPlannerAgent(config);
+    const result = await agent.plan({ idea: 'triage incoming support requests' });
+
+    expect(result.nodes.map((node) => node.id)).toEqual(['understand', 'execute', 'review']);
+    expect(result.edges).toHaveLength(2);
+    expect(result.syntheticCases).toHaveLength(3);
+    expect(result.passThreshold).toBe(0.7);
+  });
 });

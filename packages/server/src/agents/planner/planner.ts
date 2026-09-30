@@ -131,11 +131,13 @@ Output JSON matching the schema.`,
  * PlannedDAG. On any failure, returns a single-node fallback DAG.
  */
 export class IdeaPlannerAgent {
+  private readonly config: AppConfig;
   private agents: ReturnType<typeof buildPlannerAgents>;
   private swarm: Swarm;
   private fallbackDag: PlannedDAG;
 
   constructor(config: AppConfig) {
+    this.config = config;
     this.agents = buildPlannerAgents(config);
     this.swarm = new Swarm({
       nodes: [
@@ -162,6 +164,10 @@ export class IdeaPlannerAgent {
    * DAG with the idea as the goal.
    */
   async plan(input: IdeaInput): Promise<PlannedDAG> {
+    if (this.config.llm.defaultProvider === 'simulated' && input.idea.trim() !== '') {
+      return this.buildSimulatedPlan(input);
+    }
+
     try {
       const decomposition = await this.agents.ideaDecomposer.invoke(
         this.decomposerPrompt(input.idea, input.constraints),
@@ -268,6 +274,58 @@ export class IdeaPlannerAgent {
       edges: [],
       syntheticCases: [],
       passThreshold: 0.5,
+    };
+  }
+
+  private buildSimulatedPlan(input: IdeaInput): PlannedDAG {
+    const idea = input.idea.trim();
+    const nodes = [
+      {
+        id: 'understand',
+        name: 'Understand',
+        description: 'Clarify the request, constraints, and expected outcome.',
+        goal: `Understand the request: ${idea}`,
+        suggestedPrompt: 'Extract the request, constraints, and success criteria from the input.',
+      },
+      {
+        id: 'execute',
+        name: 'Execute',
+        description: 'Perform the central task using the structured request.',
+        goal: `Execute the work required to achieve: ${idea}`,
+        suggestedPrompt: 'Complete the requested work using the clarified requirements.',
+      },
+      {
+        id: 'review',
+        name: 'Review',
+        description: 'Check the result against the request and acceptance criteria.',
+        goal: 'Review the output for completeness, correctness, and constraint compliance.',
+        suggestedPrompt: 'Inspect the result, identify gaps, and return a corrected final answer when needed.',
+      },
+    ];
+    const examples = input.examples?.slice(0, 10) ?? [];
+    const syntheticCases = examples.length >= 3
+      ? examples
+      : [
+          ...examples,
+          { input: idea, expected: 'A complete response that addresses the request.' },
+          { input: `${idea} with explicit constraints`, expected: 'A response that addresses the request and respects constraints.' },
+          { input: `Review the result for: ${idea}`, expected: 'A response with identified gaps resolved.' },
+        ].slice(0, 10);
+
+    return {
+      goal: idea,
+      acceptanceCriteria: [
+        'The result addresses the requested objective.',
+        'The result respects the supplied constraints.',
+        'The result is reviewed for completeness before delivery.',
+      ],
+      nodes,
+      edges: [
+        { from: 'understand', to: 'execute', mapping: { clarified_request: 'execution_request' } },
+        { from: 'execute', to: 'review', mapping: { execution_result: 'review_input' } },
+      ],
+      syntheticCases,
+      passThreshold: 0.7,
     };
   }
 }
