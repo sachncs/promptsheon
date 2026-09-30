@@ -66,6 +66,8 @@ function cacheKey(input: CacheLookup): string {
 export class ResponseCache {
   private readonly store = new Map<string, CacheEntry>();
   private readonly maxEntries: number;
+  private hits = 0;
+  private misses = 0;
 
   constructor(
     maxEntries = 1024,
@@ -87,21 +89,28 @@ export class ResponseCache {
     if (entry && this.isExpired(entry)) {
       this.store.delete(hash);
       this.persistentStore?.delete(hash);
+      this.misses += 1;
       return null;
     }
     if (!entry) {
       const persisted = this.persistentStore?.get(hash) ?? null;
-      if (!persisted) return null;
+      if (!persisted) {
+        this.misses += 1;
+        return null;
+      }
       if (this.isExpired(persisted)) {
         this.persistentStore?.delete(hash);
+        this.misses += 1;
         return null;
       }
       this.remember(hash, persisted);
+      this.hits += 1;
       return persisted;
     }
     // Refresh LRU order.
     this.store.delete(hash);
     this.store.set(hash, entry);
+    this.hits += 1;
     return entry;
   }
 
@@ -122,6 +131,10 @@ export class ResponseCache {
 
   size(): number {
     return this.persistentStore?.size() ?? this.store.size;
+  }
+
+  metrics(): { hits: number; misses: number } {
+    return { hits: this.hits, misses: this.misses };
   }
 
   clear(): void {
@@ -301,10 +314,13 @@ export class Gateway {
   ) {}
 
   /** Return aggregate gateway metrics without exposing request content. */
-  metrics(): { rateLimiter: RateLimiterMetrics; cacheEntries: number } {
+  metrics(): { rateLimiter: RateLimiterMetrics; cacheEntries: number; cacheHits: number; cacheMisses: number } {
+    const cacheMetrics = this.deps.cache.metrics();
     return {
       rateLimiter: this.deps.rateLimiter.metrics(),
       cacheEntries: this.deps.cache.size(),
+      cacheHits: cacheMetrics.hits,
+      cacheMisses: cacheMetrics.misses,
     };
   }
 

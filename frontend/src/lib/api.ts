@@ -1321,6 +1321,8 @@ export interface HealthStatus {
   timestamp: string;
   gateway?: {
     cacheEntries: number;
+    cacheHits: number;
+    cacheMisses: number;
     rateLimiter: {
       activeBuckets: number;
       maxBuckets: number;
@@ -1340,6 +1342,8 @@ export const healthApi = {
       timestamp: z.string(),
       gateway: z.object({
         cacheEntries: z.number().int().nonnegative(),
+        cacheHits: z.number().int().nonnegative(),
+        cacheMisses: z.number().int().nonnegative(),
         rateLimiter: z.object({
           activeBuckets: z.number().int().nonnegative(),
           maxBuckets: z.number().int().positive(),

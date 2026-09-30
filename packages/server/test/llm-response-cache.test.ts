@@ -27,6 +27,7 @@ describe('persistent LLM response cache', () => {
     expect(restored?.content).toBe('deterministic answer');
     expect(restored?.prompt).toBe('');
     expect(second.size()).toBe(1);
+    expect(second.metrics()).toEqual({ hits: 1, misses: 0 });
     expect(db.prepare('SELECT COUNT(*) AS count FROM llm_response_cache').get()).toEqual({ count: 1 });
     db.close();
   });
@@ -67,5 +68,14 @@ describe('persistent LLM response cache', () => {
     expect(cache.get(request)).toBeNull();
     expect(db.prepare('SELECT COUNT(*) AS count FROM llm_response_cache').get()).toEqual({ count: 0 });
     db.close();
+  });
+
+  it('tracks cache misses and hits', () => {
+    const cache = new ResponseCache();
+    const request = { prompt: 'metrics', model: 'simulator', temperature: 0, provider: 'simulated' };
+    expect(cache.get(request)).toBeNull();
+    cache.set({ ...request, content: 'answer', promptTokens: 1, completionTokens: 1, costUsd: 0, model: 'simulator', provider: 'simulated' });
+    expect(cache.get(request)?.content).toBe('answer');
+    expect(cache.metrics()).toEqual({ hits: 1, misses: 1 });
   });
 });

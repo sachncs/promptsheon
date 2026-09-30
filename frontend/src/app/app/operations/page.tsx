@@ -136,7 +136,7 @@ export default function OperationsPage() {
         <StatCard
           label="Gateway pressure"
           value={gatewayMetrics ? `${gatewayMetrics.rateLimiter.activeBuckets}/${gatewayMetrics.rateLimiter.maxBuckets}` : '—'}
-          hint={gatewayMetrics ? `${gatewayMetrics.cacheEntries} cached · ${gatewayMetrics.rateLimiter.bucketEvictions} evictions · ${gatewayMetrics.rateLimiter.deniedRequests} denied` : 'Metrics unavailable'}
+          hint={gatewayMetrics ? `${gatewayMetrics.cacheEntries} cached · ${gatewayMetrics.cacheHits} hits · ${gatewayMetrics.cacheMisses} misses` : 'Metrics unavailable'}
           icon={Gauge}
         />
       </div>
