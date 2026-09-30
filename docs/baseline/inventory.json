@@ -1180,6 +1180,26 @@
       "path": "/api/traces/:id"
     },
     {
+      "file": "packages/server/src/routes/user-quotas.ts",
+      "method": "GET",
+      "path": "/api/admin/user-quotas"
+    },
+    {
+      "file": "packages/server/src/routes/user-quotas.ts",
+      "method": "POST",
+      "path": "/api/admin/user-quotas"
+    },
+    {
+      "file": "packages/server/src/routes/user-quotas.ts",
+      "method": "PATCH",
+      "path": "/api/admin/user-quotas/:id"
+    },
+    {
+      "file": "packages/server/src/routes/user-quotas.ts",
+      "method": "DELETE",
+      "path": "/api/admin/user-quotas/:id"
+    },
+    {
       "file": "packages/server/src/routes/users.ts",
       "method": "GET",
       "path": "/api/users"
@@ -1400,6 +1420,7 @@
     "packages/server/src/repos/trace-score.ts",
     "packages/server/src/repos/trace.ts",
     "packages/server/src/repos/user-analytics.ts",
+    "packages/server/src/repos/user-quota.ts",
     "packages/server/src/repos/user.ts",
     "packages/server/src/repos/vault-extras.ts",
     "packages/server/src/repos/vault.ts",
@@ -1475,7 +1496,9 @@
     "packages/shared/db/migrations/065_evidence_workspace_scope.up.sql",
     "packages/shared/db/migrations/066_evidence_org_workspace_time_index.up.sql",
     "packages/shared/db/migrations/067_llm_response_cache.up.sql",
-    "packages/shared/db/migrations/068_evidence_polymorphic_execution.up.sql"
+    "packages/shared/db/migrations/068_evidence_polymorphic_execution.up.sql",
+    "packages/shared/db/migrations/069_user_quotas.up.sql",
+    "packages/shared/db/migrations/070_execution_job_actor.up.sql"
   ],
   "frontendRoutes": [
     {
@@ -1489,6 +1512,10 @@
     {
       "file": "frontend/src/app/app/admin/cost/page.tsx",
       "route": "/app/admin/cost"
+    },
+    {
+      "file": "frontend/src/app/app/admin/quotas/page.tsx",
+      "route": "/app/admin/quotas"
     },
     {
       "file": "frontend/src/app/app/admin/security/page.tsx",
