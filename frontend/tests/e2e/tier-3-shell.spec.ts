@@ -31,7 +31,7 @@ test.describe('tier 3: app shell after onboarding', () => {
       expect(page.url(), `${path} should not redirect to /onboarding`).not.toContain('/onboarding');
     }
     await expect(page.getByText('EXECUTION QUEUE')).toBeVisible();
-    await expect(page.getByText(/running$/i).last()).toBeVisible();
+    await expect(page.getByText(/running/i).last()).toBeVisible();
   });
 
   test('restores a cleared browser session with an existing API key', async ({ page, request }) => {

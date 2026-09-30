@@ -66,6 +66,9 @@ export default function OperationsPage() {
   const draftReleases = releases.filter((r) => r.status === 'draft' || r.status === 'review');
   const evals = recentEvals.data ?? [];
   const unackAlerts: Alert[] = (alerts.data ?? []).filter((a) => a.status === 'active' && a.acknowledgedAt === null);
+  const oldestQueueAge = queue.data?.oldestQueuedAt
+    ? formatQueueAge(now - new Date(queue.data.oldestQueuedAt).getTime())
+    : 'no backlog';
 
   const last24h = evals.filter((e) => {
     if (!e.startedAt) return false;
@@ -113,7 +116,7 @@ export default function OperationsPage() {
         <StatCard
           label="Execution queue"
           value={String(queue.data?.queued ?? 0)}
-          hint={`${queue.data?.running ?? 0} running`}
+          hint={`${queue.data?.running ?? 0} running · ${oldestQueueAge}`}
           icon={Clock3}
         />
       </div>
@@ -253,4 +256,13 @@ export default function OperationsPage() {
       </Surface>
     </div>
   );
+}
+
+function formatQueueAge(ageMs: number): string {
+  if (!Number.isFinite(ageMs) || ageMs < 1_000) return '<1s oldest';
+  const seconds = Math.floor(ageMs / 1_000);
+  if (seconds < 60) return `${seconds}s oldest`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m oldest`;
+  return `${Math.floor(minutes / 60)}h oldest`;
 }
