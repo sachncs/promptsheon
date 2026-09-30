@@ -229,4 +229,29 @@ test.describe('tier 3: app shell after onboarding', () => {
     await page.getByRole('option', { name: secondName }).click();
     await expect(workspaceSelect).toContainText(secondName);
   });
+
+  test('runs an agent specification through the simulator and renders evidence', async ({ page, request, baseURL }) => {
+    if (!baseURL) throw new Error('E2E base URL is required');
+    const session = await bootstrapAdminViaApi(baseURL, {
+      orgName: `Agent Execution Org ${Date.now()}`,
+      adminEmail: `agent-execution-${Date.now()}@promptsheon.test`,
+    });
+    const headers = { Authorization: `Bearer ${session.apiKey}` };
+    const workspace = await request.post(`${baseURL}/api/workspaces`, {
+      headers,
+      data: { name: `Execution workspace ${Date.now()}`, organization: session.orgName },
+    });
+    expect(workspace.ok(), await workspace.text()).toBeTruthy();
+
+    await seedSession(page, session);
+    await page.goto('/app/agents/new');
+    await page.getByRole('button', { name: 'Validate specification' }).click();
+    await expect(page.getByText('Specification is valid and ready to create.')).toBeVisible();
+    await page.getByRole('button', { name: 'Create draft' }).click();
+    await page.getByRole('link', { name: 'Open revision' }).click();
+    await page.getByRole('button', { name: 'Run revision' }).click();
+    await expect(page.getByText('completed', { exact: true }).last()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Execution evidence')).toBeVisible();
+    await expect(page.getByText(/execution\.(started|completed)/).first()).toBeVisible({ timeout: 10_000 });
+  });
 });
