@@ -88,7 +88,7 @@ export default function PlaygroundPage() {
         <SurfaceHeader
           className="px-5 pt-5"
           title="Prompt"
-          description="The system prompt sent to the model. Cache key = prompt + model + temperature."
+          description="The prompt sent to the model. Cache keys include tenant/actor scope, provider, model, temperature, and endpoint identity."
         />
         <div className="px-5 pb-5">
           <textarea

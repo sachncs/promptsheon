@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   explicit maximum execution duration, preventing duplicate ownership while
   preserving bounded timeout behavior.
 
+- Scope gateway cache entries by tenant and actor so identical prompts cannot
+  reuse another user's response.
+
 ### Removed
 - Removed the experimental VS Code extension workspace. Promptsheon now
   focuses on the self-hosted API, Next.js console, CLI, SDK, and public
