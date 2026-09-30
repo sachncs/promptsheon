@@ -36,7 +36,11 @@ export function registerUserQuotaRoutes(app: FastifyInstance, deps: { quotaRepo:
     const parsed = parseQuery(reply, OrganizationQuerySchema, request.query);
     if (!parsed.ok) return;
     if (!assertOrgScope(request, parsed.data.organizationId, reply)) return;
-    return reply.send({ items: deps.quotaRepo.listForOrg(parsed.data.organizationId) });
+    const items = deps.quotaRepo.listForOrg(parsed.data.organizationId).map((quota) => ({
+      ...quota,
+      usage: deps.quotaRepo.usage(quota.organizationId, quota.userId),
+    }));
+    return reply.send({ items });
   });
 
   app.post('/api/admin/user-quotas', async (request, reply) => {
@@ -44,7 +48,8 @@ export function registerUserQuotaRoutes(app: FastifyInstance, deps: { quotaRepo:
     if (!parsed.ok) return;
     if (!assertOrgScope(request, parsed.data.organizationId, reply)) return;
     try {
-      return reply.code(201).send(deps.quotaRepo.create(parsed.data));
+      const quota = deps.quotaRepo.create(parsed.data);
+      return reply.code(201).send({ ...quota, usage: deps.quotaRepo.usage(quota.organizationId, quota.userId) });
     } catch (error) {
       if (String(error).includes('UNIQUE')) return reply.code(409).send({ error: { code: 'QUOTA_DUPLICATE', message: 'a quota already exists for this user' } });
       throw error;
@@ -59,7 +64,8 @@ export function registerUserQuotaRoutes(app: FastifyInstance, deps: { quotaRepo:
     const existing = deps.quotaRepo.findById(params.data.id);
     if (!existing) throw new NotFoundError('user quota', params.data.id);
     if (!assertOrgScope(request, existing.organizationId, reply)) return;
-    return reply.send(deps.quotaRepo.update(params.data.id, body.data));
+    const updated = deps.quotaRepo.update(params.data.id, body.data);
+    return reply.send(updated ? { ...updated, usage: deps.quotaRepo.usage(updated.organizationId, updated.userId) } : updated);
   });
 
   app.delete('/api/admin/user-quotas/:id', async (request, reply) => {
