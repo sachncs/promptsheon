@@ -36,6 +36,10 @@ export default function MutationProposalsPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mutation-proposals'] }),
   });
+  const validate = useMutation({
+    mutationFn: (id: string) => mutationProposalApi.validate(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mutation-proposals'] }),
+  });
   const promote = useMutation({
     mutationFn: (id: string) => mutationProposalApi.promote(id, environment),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mutation-proposals'] }),
@@ -62,7 +66,8 @@ export default function MutationProposalsPage() {
         ) : (
           <div className="divide-y divide-border-subtle border-t border-border-subtle">
             {rows.map((proposal) => {
-              const actionable = proposal.status === 'proposed' || proposal.status === 'validated';
+              const actionable = proposal.status === 'validated';
+              const reviewable = proposal.status === 'proposed' || actionable;
               return (
                 <article key={proposal.id} className="space-y-4 p-5">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -87,7 +92,7 @@ export default function MutationProposalsPage() {
                     <summary className="cursor-pointer font-medium text-text-muted">View proposed changes</summary>
                     <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-text-subtle">{JSON.stringify(proposal.changes, null, 2)}</pre>
                   </details>
-                  {actionable ? (
+                  {reviewable ? (
                     <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
                       <Textarea
                         value={reasonById[proposal.id] ?? ''}
@@ -97,14 +102,27 @@ export default function MutationProposalsPage() {
                         aria-label={`Decision reason for ${proposal.id}`}
                       />
                       <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => decide.mutate({ id: proposal.id, decision: 'approve' })}
-                          disabled={decide.isPending || !proposal.candidateHash}
-                          title={proposal.candidateHash ? 'Approve this immutable candidate' : 'Approval requires a materialised candidate'}
-                        >
-                          <Check /> Approve
-                        </Button>
+                        {proposal.status === 'proposed' ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => validate.mutate(proposal.id)}
+                            disabled={validate.isPending || !proposal.candidateHash}
+                            title={proposal.candidateHash ? 'Validate the immutable candidate manifest' : 'Validation requires a materialised candidate'}
+                          >
+                            <Check /> Validate candidate
+                          </Button>
+                        ) : null}
+                        {actionable ? (
+                          <Button
+                            size="sm"
+                            onClick={() => decide.mutate({ id: proposal.id, decision: 'approve' })}
+                            disabled={decide.isPending || !proposal.candidateHash}
+                            title={proposal.candidateHash ? 'Approve this validated immutable candidate' : 'Approval requires a materialised candidate'}
+                          >
+                            <Check /> Approve
+                          </Button>
+                        ) : null}
                         <Button size="sm" variant="destructive" onClick={() => decide.mutate({ id: proposal.id, decision: 'reject' })} disabled={decide.isPending}>
                           <X /> Reject
                         </Button>
@@ -132,12 +150,12 @@ export default function MutationProposalsPage() {
                   ) : proposal.decisionReason ? (
                     <p className="text-xs text-text-subtle">Decision: {proposal.decisionReason}</p>
                   ) : null}
-                  {actionable && !proposal.candidateHash && (
+                  {reviewable && !proposal.candidateHash && (
                     <p className="text-xs text-text-muted">This proposal cannot be approved until its immutable candidate is materialised.</p>
                   )}
-                  {(decide.isError || promote.isError) && (
+                  {(validate.isError || decide.isError || promote.isError) && (
                     <p role="alert" className="text-xs text-destructive">
-                      {getErrorMessage(decide.error ?? promote.error, 'The proposal action failed. Try again.')}
+                      {getErrorMessage(validate.error ?? decide.error ?? promote.error, 'The proposal action failed. Try again.')}
                     </p>
                   )}
                 </article>

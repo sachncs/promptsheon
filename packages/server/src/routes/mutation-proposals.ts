@@ -53,6 +53,7 @@ export function registerMutationProposalRoutes(app: FastifyInstance, deps: Mutat
   registerFallbackRouteDoc('get', '/api/mutation-proposals');
   registerFallbackRouteDoc('post', '/api/mutation-proposals');
   registerFallbackRouteDoc('get', '/api/mutation-proposals/:id');
+  registerFallbackRouteDoc('post', '/api/mutation-proposals/:id/validate');
   registerFallbackRouteDoc('post', '/api/mutation-proposals/:id/decision');
   registerFallbackRouteDoc('post', '/api/mutation-proposals/:id/promote');
 
@@ -87,6 +88,24 @@ export function registerMutationProposalRoutes(app: FastifyInstance, deps: Mutat
     return reply.send(proposal);
   });
 
+  app.post('/api/mutation-proposals/:id/validate', async (request, reply) => {
+    const organizationId = organizationIdOf(request);
+    if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
+    const parsedParams = parseParams(reply, IdParamsSchema, request.params);
+    if (!parsedParams.ok) return;
+    try {
+      const proposal = await deps.promotionService.validate({
+        proposalId: parsedParams.data.id,
+        organizationId,
+      });
+      return reply.send(proposal);
+    } catch (error) {
+      request.log.warn({ err: error }, 'mutation proposal validation rejected');
+      const message = error instanceof Error ? error.message : 'mutation proposal validation failed';
+      return reply.code(422).send({ error: { code: 'VALIDATION_REJECTED', message } });
+    }
+  });
+
   app.post('/api/mutation-proposals/:id/decision', async (request, reply) => {
     const organizationId = organizationIdOf(request);
     if (!organizationId) return reply.code(401).send({ error: { code: 'NO_ORG_CONTEXT', message: 'missing organization context' } });
@@ -96,6 +115,11 @@ export function registerMutationProposalRoutes(app: FastifyInstance, deps: Mutat
     if (!parsed.ok) return;
     const existing = deps.mutationProposalRepo.findInOrg(parsedParams.data.id, organizationId);
     if (!existing) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'mutation proposal not found' } });
+    if (parsed.data.decision === 'approve' && existing.status !== 'validated') {
+      return reply.code(422).send({
+        error: { code: 'VALIDATION_REQUIRED', message: 'the immutable candidate must pass validation before approval' },
+      });
+    }
     if (parsed.data.decision === 'approve' && !existing.candidateHash) {
       return reply.code(422).send({
         error: { code: 'CANDIDATE_REQUIRED', message: 'an immutable candidate must be materialised before approval' },

@@ -27,9 +27,15 @@ The goal evolution endpoint now runs in proposal mode: it writes the candidate
 to content-addressed storage, records the proposal, and leaves the active
 manifest unchanged until an explicit decision.
 
+Candidate manifests now have an explicit credential-free validation step. The
+validation service integrity-checks the CAS object, parses the manifest schema,
+requires `metadata.capabilityId`, and moves a proposal from `proposed` to
+`validated`. Approval is only accepted from `validated` proposals, and the
+console exposes the validation action before approval.
+
 Candidate generation, automatic candidate materialisation, evaluation gates,
-and promotion integration remain in progress. The approval ledger is not yet
-connected to automatic activation: an approved proposal can now be explicitly
+and evidence-backed promotion remain in progress. The approval ledger is not
+connected to automatic activation: an approved proposal can be explicitly
 materialised as a draft release, while activation remains governed by the
 existing release approval and lifecycle gates.
 

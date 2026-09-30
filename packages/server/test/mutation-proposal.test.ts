@@ -41,6 +41,8 @@ describe('MutationProposalRepo', () => {
     expect(repo.listInOrg('org-a')).toHaveLength(1);
     expect(repo.listInOrg('org-b')).toHaveLength(0);
     expect(repo.findInOrg(proposal.id, 'org-b')).toBeNull();
+    expect(repo.findInOrg(proposal.id, 'org-a')?.status).toBe('proposed');
+    expect(repo.markValidated(proposal.id, 'org-a')?.status).toBe('validated');
     expect(repo.decide({ id: proposal.id, organizationId: 'org-a', status: 'approved', reviewerId: 'reviewer', reason: 'Evaluation passed.' })?.status).toBe('approved');
     expect(repo.decide({ id: proposal.id, organizationId: 'org-a', status: 'rejected', reviewerId: 'reviewer-2', reason: 'Already decided.' })).toBeNull();
     db.close();
@@ -103,7 +105,6 @@ describe('MutationProposalRepo', () => {
       risk: 'medium',
       confidence: 0.8,
     });
-    repo.decide({ id: proposal.id, organizationId: 'org-a', status: 'approved', reviewerId: 'reviewer', reason: 'safe candidate' });
     let registeredHash = '';
     const release = { id: 'release-a', status: 'draft', environment: 'dev' };
     let releaseCreates = 0;
@@ -113,6 +114,10 @@ describe('MutationProposalRepo', () => {
       { registerFromRaw: (input: { manifestHash: string }) => { registeredHash = input.manifestHash; } } as never,
       { findByIdInOrg: () => release, findByPromotionProposalInOrg: () => null, createInOrg: () => { releaseCreates += 1; return release; } } as never,
     );
+
+    expect(repo.decide({ id: proposal.id, organizationId: 'org-a', status: 'approved', reviewerId: 'reviewer', reason: 'too early' })).toBeNull();
+    expect((await service.validate({ proposalId: proposal.id, organizationId: 'org-a' })).status).toBe('validated');
+    repo.decide({ id: proposal.id, organizationId: 'org-a', status: 'approved', reviewerId: 'reviewer', reason: 'safe candidate' });
 
     const [result, repeated] = await Promise.all([
       service.promote({ proposalId: proposal.id, organizationId: 'org-a', actorId: 'operator', environment: 'dev' }),

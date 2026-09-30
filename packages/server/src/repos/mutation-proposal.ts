@@ -130,14 +130,24 @@ export class MutationProposalRepo {
     reviewerId: string;
     reason: string;
   }): MutationProposal | null {
-    const candidateRequirement = input.status === 'approved' ? ' AND candidate_hash IS NOT NULL' : '';
+    const candidateRequirement = input.status === 'approved' ? " AND status = 'validated' AND candidate_hash IS NOT NULL" : " AND status IN ('proposed', 'validated')";
     const result = this.db.prepare(
       `UPDATE mutation_proposals
        SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, decision_reason = ?
-       WHERE id = ? AND organization_id = ? AND status IN ('proposed', 'validated')${candidateRequirement}`,
+       WHERE id = ? AND organization_id = ?${candidateRequirement}`,
     ).run(input.status, input.reviewerId, input.reason, input.id, input.organizationId);
     if (result.changes === 0) return null;
     return this.findInOrg(input.id, input.organizationId);
+  }
+
+  markValidated(id: string, organizationId: string): MutationProposal | null {
+    const result = this.db.prepare(
+      `UPDATE mutation_proposals
+       SET status = 'validated', updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND organization_id = ? AND status = 'proposed' AND candidate_hash IS NOT NULL`,
+    ).run(id, organizationId);
+    if (result.changes === 0) return this.findInOrg(id, organizationId);
+    return this.findInOrg(id, organizationId);
   }
 
   markPromoted(id: string, organizationId: string, releaseId: string): MutationProposal | null {

@@ -1,4 +1,5 @@
 import { ManifestSchema, type MutationProposal, type Release } from '@promptsheon/shared';
+import { z } from 'zod';
 import type { CasStore } from '@promptsheon/shared';
 import type { ManifestRepo } from '../repos/manifest.js';
 import type { MutationProposalRepo } from '../repos/mutation-proposal.js';
@@ -26,6 +27,19 @@ export class MutationPromotionService {
     private readonly manifests: ManifestRepo,
     private readonly releases: ReleaseRepo,
   ) {}
+
+  async validate(input: { proposalId: string; organizationId: string }): Promise<MutationProposal> {
+    const proposal = this.proposals.findInOrg(input.proposalId, input.organizationId);
+    if (!proposal) throw new MutationPromotionError('mutation proposal not found');
+    if (proposal.status === 'validated') return proposal;
+    if (proposal.status !== 'proposed') throw new MutationPromotionError('only proposed mutations can be validated');
+    if (!proposal.candidateHash) throw new MutationPromotionError('mutation proposal has no candidate manifest');
+
+    await this.readCandidate(proposal.candidateHash);
+    const validated = this.proposals.markValidated(input.proposalId, input.organizationId);
+    if (!validated) throw new MutationPromotionError('mutation proposal could not be marked as validated');
+    return validated;
+  }
 
   async promote(input: {
     proposalId: string;
@@ -69,7 +83,49 @@ export class MutationPromotionService {
       return { proposal: updated, release: existingPromotion };
     }
 
-    const object = await this.cas.readObject(proposal.candidateHash);
+    const candidate = await this.readCandidate(proposal.candidateHash);
+    const { manifestJson, capabilityId, manifest } = candidate;
+
+    this.manifests.registerFromRaw({
+      capabilityId,
+      version: manifest.version,
+      manifestHash: proposal.candidateHash,
+      manifestJson,
+      goal: typeof manifest.metadata['goal'] === 'string' ? manifest.metadata['goal'] : undefined,
+      createdBy: input.actorId,
+    });
+    let release: Release | null;
+    try {
+      release = this.releases.createInOrg({
+        capabilityId,
+        capabilityVersion: manifest.version,
+        capabilityVersionId: null,
+        manifest: manifestJson,
+        environment: input.environment,
+        createdBy: input.actorId,
+        promotionProposalId: input.proposalId,
+      }, input.organizationId);
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes('UNIQUE constraint failed: releases.promotion_proposal_id')) throw error;
+      release = this.releases.findByPromotionProposalInOrg(input.proposalId, input.organizationId);
+    }
+    if (!release) throw new MutationPromotionError('candidate capability is not visible in the organization');
+    const updated = this.proposals.markPromoted(input.proposalId, input.organizationId, release.id);
+    if (!updated) throw new MutationPromotionError('mutation proposal could not be marked as promoted');
+    return { proposal: updated, release };
+  }
+
+  private async readCandidate(candidateHash: string): Promise<{
+    manifestJson: string;
+    capabilityId: string;
+    manifest: z.infer<typeof ManifestSchema>;
+  }> {
+    let object;
+    try {
+      object = await this.cas.readObject(candidateHash);
+    } catch {
+      throw new MutationPromotionError('candidate manifest could not be read from content-addressed storage');
+    }
     if (object.type !== 'blob') throw new MutationPromotionError('candidate manifest is not a blob');
     const manifestJson = decodeBlob(object.data);
     if (!manifestJson) throw new MutationPromotionError('candidate manifest blob is malformed');
@@ -85,34 +141,7 @@ export class MutationPromotionService {
     if (typeof capabilityId !== 'string' || capabilityId.length === 0) {
       throw new MutationPromotionError('candidate manifest is missing metadata.capabilityId');
     }
-
-    this.manifests.registerFromRaw({
-      capabilityId,
-      version: parsed.data.version,
-      manifestHash: proposal.candidateHash,
-      manifestJson,
-      goal: typeof parsed.data.metadata['goal'] === 'string' ? parsed.data.metadata['goal'] : undefined,
-      createdBy: input.actorId,
-    });
-    let release: Release | null;
-    try {
-      release = this.releases.createInOrg({
-        capabilityId,
-        capabilityVersion: parsed.data.version,
-        capabilityVersionId: null,
-        manifest: manifestJson,
-        environment: input.environment,
-        createdBy: input.actorId,
-        promotionProposalId: input.proposalId,
-      }, input.organizationId);
-    } catch (error) {
-      if (!(error instanceof Error) || !error.message.includes('UNIQUE constraint failed: releases.promotion_proposal_id')) throw error;
-      release = this.releases.findByPromotionProposalInOrg(input.proposalId, input.organizationId);
-    }
-    if (!release) throw new MutationPromotionError('candidate capability is not visible in the organization');
-    const updated = this.proposals.markPromoted(input.proposalId, input.organizationId, release.id);
-    if (!updated) throw new MutationPromotionError('mutation proposal could not be marked as promoted');
-    return { proposal: updated, release };
+    return { manifestJson, capabilityId, manifest: parsed.data };
   }
 }
 
