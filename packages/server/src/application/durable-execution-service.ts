@@ -92,6 +92,12 @@ export class DurableExecutionService {
       inputJson,
       idempotencyKey: input.idempotencyKey,
       ...(input.maxAttempts === undefined ? {} : { maxAttempts: input.maxAttempts }),
+      ...(input.actorId && this.quotas ? {
+        afterInsert: (job: ExecutionJob) => {
+          const violation = this.quotas?.check(job.organizationId, job.actorId!, {});
+          if (violation) throw new UserQuotaExceededError(violation);
+        },
+      } : {}),
     });
   }
 

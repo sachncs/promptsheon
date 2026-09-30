@@ -89,29 +89,34 @@ export class ExecutionJobRepo {
     inputJson: string;
     idempotencyKey: string;
     maxAttempts?: number;
+    afterInsert?: (job: ExecutionJob) => void;
   }): ExecutionJob {
-    const existing = this.db.prepare(
-      'SELECT * FROM execution_jobs WHERE organization_id = ? AND idempotency_key = ?',
-    ).get(input.organizationId, input.idempotencyKey) as JobRow | undefined;
-    if (existing) {
-      if (existing.agent_hash !== input.agentHash || existing.input_hash !== input.inputHash) {
-        throw new IdempotencyConflictError(input.idempotencyKey);
+    return this.db.transaction(() => {
+      const existing = this.db.prepare(
+        'SELECT * FROM execution_jobs WHERE organization_id = ? AND idempotency_key = ?',
+      ).get(input.organizationId, input.idempotencyKey) as JobRow | undefined;
+      if (existing) {
+        if (existing.agent_hash !== input.agentHash || existing.input_hash !== input.inputHash) {
+          throw new IdempotencyConflictError(input.idempotencyKey);
+        }
+        return toJob(existing);
       }
-      return toJob(existing);
-    }
-    const pending = this.db.prepare(
-      "SELECT COUNT(*) AS count FROM execution_jobs WHERE organization_id = ? AND state IN ('queued', 'running')",
-    ).get(input.organizationId) as { count: number };
-    if (pending.count >= this.maxPendingJobsPerOrganization) throw new ExecutionQueueCapacityError(this.maxPendingJobsPerOrganization);
-    const now = new Date().toISOString();
-    const id = randomUUID();
-    this.db.prepare(`
-      INSERT INTO execution_jobs
-        (id, organization_id, actor_id, workspace_id, agent_hash, input_hash, input_json, idempotency_key, state, attempts, max_attempts, available_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?, ?)
-    `).run(id, input.organizationId, input.actorId ?? null, input.workspaceId, input.agentHash, input.inputHash, input.inputJson,
-      input.idempotencyKey, input.maxAttempts ?? 3, now, now);
-    return this.get(input.organizationId, id);
+      const pending = this.db.prepare(
+        "SELECT COUNT(*) AS count FROM execution_jobs WHERE organization_id = ? AND state IN ('queued', 'running')",
+      ).get(input.organizationId) as { count: number };
+      if (pending.count >= this.maxPendingJobsPerOrganization) throw new ExecutionQueueCapacityError(this.maxPendingJobsPerOrganization);
+      const now = new Date().toISOString();
+      const id = randomUUID();
+      this.db.prepare(`
+        INSERT INTO execution_jobs
+          (id, organization_id, actor_id, workspace_id, agent_hash, input_hash, input_json, idempotency_key, state, attempts, max_attempts, available_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?, ?)
+      `).run(id, input.organizationId, input.actorId ?? null, input.workspaceId, input.agentHash, input.inputHash, input.inputJson,
+        input.idempotencyKey, input.maxAttempts ?? 3, now, now);
+      const job = this.get(input.organizationId, id);
+      input.afterInsert?.(job);
+      return job;
+    })();
   }
 
   findByIdempotency(organizationId: string, idempotencyKey: string): ExecutionJob | null {
