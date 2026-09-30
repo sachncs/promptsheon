@@ -131,6 +131,19 @@ describe('Vercel AI SDK adapter', () => {
     expect((gw.requests[0]!.body as { provider?: string }).provider).toBeUndefined();
   });
 
+  it('infers the canonical provider from the wrapped model', async () => {
+    const inner: VercelLanguageModel = {
+      specificationVersion: 'v1',
+      provider: 'anthropic.messages',
+      modelId: 'claude-sonnet',
+      async doGenerate() { throw new Error('unused'); },
+      async doStream() { throw new Error('unused'); },
+    };
+    const wrapped = withPromptsheon(inner, { gatewayUrl: gw.url, apiKey: 'tk' });
+    await wrapped.doGenerate({ inputFormat: 'prompt', prompt: 'hello' });
+    expect((gw.requests[0]!.body as { provider?: string }).provider).toBe('anthropic');
+  });
+
   it('maps messages to OpenAI shape when inputFormat is messages', async () => {
     const inner: VercelLanguageModel = {
       specificationVersion: 'v1',

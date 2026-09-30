@@ -190,7 +190,10 @@ function toOpenAiBody(
       : [];
   return {
     model: opts.modelId ?? inner.modelId,
-    ...(normalizeGatewayProvider(opts.provider) ? { provider: normalizeGatewayProvider(opts.provider) } : {}),
+    ...(() => {
+      const provider = normalizeGatewayProvider(opts.provider) ?? normalizeGatewayProvider(inner.provider);
+      return provider ? { provider } : {};
+    })(),
     messages,
     max_tokens: options.maxTokens,
     temperature: options.temperature,
