@@ -204,6 +204,32 @@ describe('GoalBasedEvolutionAgent', () => {
       expect(executor.calls).toBe(1);
     });
 
+    it('scores declared dataset cases with the configured evaluator', async () => {
+      const m = buildManifest({
+        evaluation: { datasets: ['dataset-1'], scorers: ['deterministic'], passThreshold: 0.99 },
+      });
+      const localAgent = new GoalBasedEvolutionAgent({
+        config: buildConfig(),
+        hub,
+        executor: executor as unknown as ManifestGraphExecutor,
+        cas: new FakeCas() as never,
+        datasetRepo: {
+          findByIdInOrg: () => ({ id: 'dataset-1' }),
+          findCasesInOrg: () => [{ id: 'case-1', inputs: '{}', expected: '"ok"' }],
+        } as never,
+        evaluationAgent: {
+          listEvaluators: () => ['deterministic'],
+          evaluate: async () => ({ score: 1, passed: true, reasoning: 'exact match' }),
+        } as never,
+      });
+
+      const result = await localAgent.evolve('h', m, { maxIterations: 1, cooldownMs: 0, costBudget: 100, organizationId: 'org-test' });
+
+      expect(result.passed).toBe(true);
+      expect(result.bestScore).toBe(1);
+      expect(executor.calls).toBe(2);
+    });
+
     it('returns passed: false when score < passThreshold and max iterations reached', async () => {
       const m = buildManifest({ evaluation: { datasets: [], scorers: [], passThreshold: 0.99 } });
       executor.trace.nodeResults = {

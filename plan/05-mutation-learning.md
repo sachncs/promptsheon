@@ -40,8 +40,10 @@ enabled. Evaluation passes only when the candidate reaches the manifest
 threshold and does not regress against the measured baseline. The active
 manifest is still left unchanged.
 
-Automatic candidate materialisation, dataset-backed evaluation gates, and
-evidence-backed promotion remain in progress. The approval ledger is not
+Automatic candidate materialisation and evidence-backed promotion remain in
+progress. Declared dataset cases now run through the graph executor and the
+configured evaluator with bounded fan-out; missing, empty, malformed, or
+oversized datasets fail closed. The approval ledger is not
 connected to automatic activation: an approved proposal can be explicitly
 materialised as a draft release, while activation remains governed by the
 existing release approval and lifecycle gates.

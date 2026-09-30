@@ -11,6 +11,10 @@ import { EvaluatorRegistry, EVALUATOR_NAMES } from '../evaluation/registry.js';
 import type { EvaluatorName } from '../evaluation/registry.js';
 import type { TraceRepo } from '../../repos/trace.js';
 import type { MutationProposalRepo } from '../../repos/mutation-proposal.js';
+import type { DatasetRepo } from '../../repos/dataset.js';
+import type { EvaluationAgent } from '../evaluation/evaluation.js';
+
+const MAX_DATASET_CASES = 100;
 
 export interface EvolutionSnapshot {
   iteration: number;
@@ -100,6 +104,8 @@ export class GoalBasedEvolutionAgent {
       cas: CasStore;
       traceRepo?: TraceRepo;
       mutationProposalRepo?: MutationProposalRepo;
+      datasetRepo?: DatasetRepo;
+      evaluationAgent?: EvaluationAgent;
     },
   ) {
     this.revisionAgent = new Agent({
@@ -200,7 +206,7 @@ Be conservative: small targeted edits, preserve what works.`,
       const iterCost = trace.totalCost;
       totalCost += iterCost;
 
-      const score = await this.scoreAgainstGoal(trace, currentManifest);
+      const score = await this.scoreAgainstGoal(trace, currentManifest, options.organizationId, currentHash, executionId);
       const passed = score >= currentManifest.evaluation.passThreshold;
 
       history.push({
@@ -300,7 +306,7 @@ Be conservative: small targeted edits, preserve what works.`,
             if (candidateTraceRun) this.deps.traceRepo?.finalize(candidateTraceRun.id, 'error');
             throw error;
           }
-          const candidateScore = await this.scoreAgainstGoal(candidateTrace, nextManifest);
+          const candidateScore = await this.scoreAgainstGoal(candidateTrace, nextManifest, options.organizationId, candidateHash, candidateExecutionId);
           const createdProposal = this.deps.mutationProposalRepo.create({
             organizationId: options.organizationId,
             sourceHash: currentHash,
@@ -389,7 +395,13 @@ Be conservative: small targeted edits, preserve what works.`,
   private async scoreAgainstGoal(
     trace: { nodeResults: Record<string, { output: string; status: string }> },
     manifest: Manifest,
+    organizationId?: string,
+    manifestHash?: string,
+    executionId?: string,
   ): Promise<number> {
+    const datasetScore = await this.scoreAgainstDatasets(manifest, organizationId, manifestHash, executionId);
+    if (datasetScore !== null) return datasetScore;
+
     const nodeOutputs = Object.values(trace.nodeResults)
       .map((n) => n.output)
       .filter((o) => o && o.length > 0);
@@ -428,6 +440,63 @@ Be conservative: small targeted edits, preserve what works.`,
       const completed = Object.values(trace.nodeResults).filter((n) => n.status === 'completed').length;
       return nodeCount === 0 ? 0 : completed / nodeCount;
     }
+  }
+
+  private async scoreAgainstDatasets(
+    manifest: Manifest,
+    organizationId: string | undefined,
+    manifestHash: string | undefined,
+    executionId: string | undefined,
+  ): Promise<number | null> {
+    if (!organizationId || !manifestHash || !executionId || !this.deps.datasetRepo || !this.deps.evaluationAgent || manifest.evaluation.datasets.length === 0) {
+      return null;
+    }
+    const scorer = manifest.evaluation.primaryScorer ?? manifest.evaluation.scorers[0] ?? 'deterministic';
+    if (!this.deps.evaluationAgent.listEvaluators().includes(scorer)) {
+      throw new Error(`unknown evaluation scorer: ${scorer}`);
+    }
+    const cases = [] as Array<{ id: string; inputs: string; expected: string }>;
+    for (const datasetId of manifest.evaluation.datasets) {
+      const dataset = this.deps.datasetRepo.findByIdInOrg(datasetId, organizationId);
+      if (!dataset) throw new Error(`evaluation dataset not found: ${datasetId}`);
+      const datasetCases = this.deps.datasetRepo.findCasesInOrg(datasetId, organizationId);
+      if (!datasetCases || datasetCases.length === 0) throw new Error(`evaluation dataset has no cases: ${datasetId}`);
+      cases.push(...datasetCases);
+    }
+    if (cases.length > MAX_DATASET_CASES) throw new Error(`evaluation dataset exceeds ${MAX_DATASET_CASES} cases`);
+
+    let total = 0;
+    for (const testCase of cases) {
+      let inputs: Record<string, unknown>;
+      let expected: unknown;
+      try {
+        const parsedInputs: unknown = JSON.parse(testCase.inputs);
+        const parsedExpected: unknown = JSON.parse(testCase.expected);
+        if (!parsedInputs || typeof parsedInputs !== 'object' || Array.isArray(parsedInputs)) throw new Error('inputs must be an object');
+        inputs = parsedInputs as Record<string, unknown>;
+        expected = parsedExpected;
+      } catch (error) {
+        throw new Error(`evaluation case ${testCase.id} contains invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      const caseTrace = await this.deps.executor.execute(manifestHash, manifest, {
+        executionId: `${executionId}-case-${testCase.id}`,
+        inputs,
+        environment: 'dev',
+      });
+      const actual = Object.values(caseTrace.nodeResults)
+        .map((node) => node.output)
+        .filter((output) => output.length > 0)
+        .join('\n\n');
+      const result = await this.deps.evaluationAgent.evaluate({
+        actual,
+        expected: JSON.stringify(expected),
+        inputs,
+        context: { manifestHash, datasetCaseId: testCase.id },
+      }, scorer);
+      if (!result) throw new Error(`evaluation scorer returned no result: ${scorer}`);
+      total += result.score;
+    }
+    return total / cases.length;
   }
 
   private resolveScorerName(manifest: Manifest): EvaluatorName {
