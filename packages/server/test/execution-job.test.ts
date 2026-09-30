@@ -73,6 +73,15 @@ describe('ExecutionJobRepo', () => {
     expect(limited.enqueue({ organizationId: 'org1', workspaceId: 'ws1', agentHash: 'a'.repeat(64), inputHash: 'i'.repeat(64), inputJson: '{}', idempotencyKey: 'capacity-1' }).id).toBe(first.id);
   });
 
+  it('rolls back the inserted job when an admission callback rejects it', () => {
+    expect(() => repo.enqueue({
+      organizationId: 'org1', workspaceId: 'ws1', agentHash: 'a'.repeat(64), inputHash: 'i'.repeat(64), inputJson: '{}', idempotencyKey: 'admission-rejected',
+      afterInsert: () => { throw new Error('quota exceeded'); },
+    })).toThrow('quota exceeded');
+    expect(repo.findByIdempotency('org1', 'admission-rejected')).toBeNull();
+    expect(repo.metrics('org1').queued).toBe(0);
+  });
+
   it('claims a high-volume queue exactly once', () => {
     const jobs = Array.from({ length: 250 }, (_, index) => repo.enqueue({
       organizationId: 'org1', workspaceId: 'ws1', agentHash: 'a'.repeat(64), inputHash: String(index).padStart(64, '0'), inputJson: JSON.stringify({ index }), idempotencyKey: `load-${index}`,
