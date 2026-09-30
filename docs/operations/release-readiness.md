@@ -6,26 +6,23 @@ production-capacity claim.
 
 ## Verified on 2026-09-30
 
-The following baseline evidence was produced from the repository and hosted CI
-run for commit `e7d0ffe`. Subsequent changes are listed below and must receive
-their own hosted CI confirmation before being treated as release evidence:
+The following evidence was produced from the repository and hosted CI run for
+commit `abea0e5`:
 
 | Gate | Result | Evidence |
 | --- | --- | --- |
-| Workspace type-check and frontend lint | Pass | CI `36717941030` |
-| Public site build, docs, claims, and inventory checks | Pass | CI `36717941030` |
+| Workspace type-check and frontend lint | Pass | CI `36723408218` |
+| Public site build, docs, claims, and inventory checks | Pass | CI `36723408218` |
 | Software bill of materials validation | Pass | SPDX document with 1,114 resolved packages |
-| Server and shared package tests | Pass | 878 tests in CI `36717941030` |
-| Production application build | Pass | CI `36717941030` |
-| Credential-free browser journey | Pass | 79/79 Playwright tests in CI and locally |
-| Container build and readiness smoke check | Pass | CI `36717941030` |
+| Server and shared package tests | Pass | CI `36723408218` |
+| Production application build | Pass | CI `36723408218` |
+| Credential-free browser journey | Pass | CI `36723408218` |
+| Container build and readiness smoke check | Pass | CI `36723408218` |
 | LLM provider credential usage | Not used | All browser and execution checks use the deterministic simulator |
 
-Since that baseline, the repository has also added provider-native streaming,
-sampled deterministic auto-evaluation, and organization-bound SCIM route
-authentication. These changes have focused local coverage, but the current
-release evidence remains the hosted baseline above until the latest CI run is
-green.
+The hosted run includes provider-native streaming, sampled deterministic
+auto-evaluation, organization-bound SCIM route authentication, and the CI
+Docker runtime configuration required by that SCIM boundary.
 
 ## Included in this release state
 
