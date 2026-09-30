@@ -5,6 +5,7 @@ import {
   type ConverseCommandOutput,
 } from '@aws-sdk/client-bedrock-runtime';
 import type { LlmCredentials } from '@promptsheon/shared';
+import { safeErrorMessage } from '../observability/error-message.js';
 
 export const LlmProbeRequestSchema = z.object({
   provider: z.enum(['openai', 'anthropic', 'bedrock', 'custom', 'simulated']),
@@ -137,7 +138,7 @@ export class LlmRouter {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new Error(`OpenAI responded ${res.status}: ${body.slice(0, 200)}`);
+      throw new Error(`OpenAI responded ${res.status}: ${safeErrorMessage(body)}`);
     }
     const data = (await res.json()) as {
       choices: Array<{ message: { content: string } }>;
@@ -177,7 +178,7 @@ export class LlmRouter {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new Error(`Anthropic responded ${res.status}: ${body.slice(0, 200)}`);
+      throw new Error(`Anthropic responded ${res.status}: ${safeErrorMessage(body)}`);
     }
     const data = (await res.json()) as {
       content: Array<{ type: string; text?: string }>;
@@ -212,7 +213,7 @@ export class LlmRouter {
       });
       if (!res.ok) {
         const body = await res.text().catch(() => '');
-        throw new Error(`Custom responded ${res.status}: ${body.slice(0, 200)}`);
+        throw new Error(`Custom responded ${res.status}: ${safeErrorMessage(body)}`);
       }
       const data = (await res.json()) as {
         content: Array<{ type: string; text?: string }>;
@@ -238,7 +239,7 @@ export class LlmRouter {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new Error(`Custom responded ${res.status}: ${body.slice(0, 200)}`);
+      throw new Error(`Custom responded ${res.status}: ${safeErrorMessage(body)}`);
     }
     const data = (await res.json()) as {
       choices: Array<{ message: { content: string } }>;
@@ -285,7 +286,7 @@ export class LlmRouter {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new Error(`OpenAI responded ${res.status}: ${body.slice(0, 200)}`);
+      throw new Error(`OpenAI responded ${res.status}: ${safeErrorMessage(body)}`);
     }
     return { latencyMs: Date.now() - started, model: req.model };
   }
@@ -311,7 +312,7 @@ export class LlmRouter {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new Error(`Anthropic responded ${res.status}: ${body.slice(0, 200)}`);
+      throw new Error(`Anthropic responded ${res.status}: ${safeErrorMessage(body)}`);
     }
     return { latencyMs: Date.now() - started, model: req.model };
   }
@@ -353,7 +354,7 @@ export class LlmRouter {
       });
       if (!res.ok) {
         const body = await res.text().catch(() => '');
-        throw new Error(`Custom endpoint responded ${res.status}: ${body.slice(0, 200)}`);
+        throw new Error(`Custom endpoint responded ${res.status}: ${safeErrorMessage(body)}`);
       }
       return { latencyMs: Date.now() - started, model: req.model };
     }
@@ -364,7 +365,7 @@ export class LlmRouter {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new Error(`Custom endpoint responded ${res.status}: ${body.slice(0, 200)}`);
+      throw new Error(`Custom endpoint responded ${res.status}: ${safeErrorMessage(body)}`);
     }
     return { latencyMs: Date.now() - started, model: req.model };
   }

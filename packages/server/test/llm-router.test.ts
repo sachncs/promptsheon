@@ -58,4 +58,27 @@ describe('LlmRouter', () => {
     );
     fetchMock.mockRestore();
   });
+
+  it('redacts credentials returned in provider error bodies', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('apiKey=provider-secret', { status: 401 }),
+    );
+    const router = new LlmRouter();
+
+    try {
+      await router.probe({
+        provider: 'custom',
+        baseUrl: 'https://provider.example',
+        apiKey: 'test-key',
+        model: 'provider-model',
+      });
+      throw new Error('expected provider probe to fail');
+    } catch (error) {
+      expect(String(error)).toContain('Custom endpoint responded 401');
+      expect(String(error)).not.toContain('provider-secret');
+      expect(String(error)).toContain('apiKey=[REDACTED]');
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
 });
