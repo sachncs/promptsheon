@@ -24,8 +24,13 @@ Release manifests can now be signed with organization-scoped Ed25519 keys;
 promotion verifies the signature against the canonical manifest hash and
 rejects missing, tampered, or deactivated-key signatures.
 
-Canary rollout automation remains in progress. Promotion concurrency and
-restart recovery are covered by durable idempotency tests. A deterministic canary health assessment now evaluates the latest
+Canary rollout automation is now lifecycle-safe at the release boundary.
+Canary traffic rules are limited to routable releases, and promoting a canary
+to active atomically retires the existing active peer while resetting the
+promoted release's canary weight. Promotion conflicts are surfaced as a
+retryable conflict rather than falling back to a non-atomic status update.
+Promotion concurrency and restart recovery are covered by durable idempotency
+tests. A deterministic canary health assessment now evaluates the latest
 organization-scoped run and atomically rolls back a regressed canary/active
 release to its active peer. A bounded background monitor now assesses all
 canaries every minute, prevents overlapping polls, and stops during shutdown.
