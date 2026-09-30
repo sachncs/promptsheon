@@ -191,6 +191,9 @@ test.describe('tier 3: app shell after onboarding', () => {
     await expect(page).toHaveURL(/\/app\/agents\/[0-9a-f]{64}$/);
     await expect(page.getByRole('heading', { name: 'Research assistant' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Run this revision' })).toBeVisible();
+    await page.getByRole('link', { name: 'Create child revision' }).click();
+    await expect(page).toHaveURL(/\/app\/agents\/new\?parent=[0-9a-f]{64}$/);
+    await expect(page.getByText(/Creating a child revision from/)).toBeVisible();
 
     const workspaceResponse = await request.get(`${baseURL}/api/workspaces`, { headers: { Authorization: `Bearer ${session.apiKey}` } });
     expect(workspaceResponse.ok()).toBeTruthy();
