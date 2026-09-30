@@ -135,6 +135,19 @@ describe('MutationProposalRepo', () => {
     expect(releaseCreates).toBe(1);
     expect(result.proposal.promotedReleaseId).toBe('release-a');
     expect(registeredHash).toBe(candidateHash);
+
+    // A process restart removes the in-memory lock. The durable promotion
+    // reference and unique release constraint must still make a retry safe.
+    const restartedService = new MutationPromotionService(
+      repo,
+      cas,
+      { registerFromRaw: () => { throw new Error('candidate should not be registered twice'); } } as never,
+      { findByIdInOrg: () => release, findByPromotionProposalInOrg: () => release, createInOrg: () => { throw new Error('release should not be created twice'); } } as never,
+    );
+    const afterRestart = await restartedService.promote({ proposalId: proposal.id, organizationId: 'org-a', actorId: 'operator', environment: 'dev' });
+    expect(afterRestart.release).toEqual(release);
+    expect(afterRestart.proposal.promotedReleaseId).toBe('release-a');
+
     db.close();
     await rm(casPath, { recursive: true, force: true });
   });
