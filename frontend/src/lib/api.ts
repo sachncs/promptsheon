@@ -630,6 +630,17 @@ const EvalSuiteRunSchema = z.object({
   error: z.string().nullable(),
 });
 
+const EvalSuiteTrialResultSchema = z.object({
+  id: z.string(),
+  runId: z.string(),
+  seq: z.number().int().nonnegative(),
+  caseId: z.string(),
+  passed: z.boolean(),
+  weightedScore: z.number().min(0).max(1),
+  trial: z.record(z.string(), z.unknown()),
+  graderResult: z.record(z.string(), z.unknown()),
+});
+
 const EvalGateSuiteSchema = z.object({
   suiteId: z.string(),
   suiteName: z.string(),
@@ -1173,6 +1184,19 @@ function parseEvalSuiteRuns(raw: unknown): EvalSuiteRun[] {
     if (!parsed.success) throw new ApiError('The server returned invalid eval suite run data.', { code: 'INVALID_RESPONSE' });
     return parsed.data;
   });
+}
+
+function parseEvalSuiteRunDetail(raw: unknown): { run: EvalSuiteRun; results: Array<z.infer<typeof EvalSuiteTrialResultSchema>> } {
+  if (!raw || typeof raw !== 'object') {
+    throw new ApiError('The server returned invalid eval suite run details.', { code: 'INVALID_RESPONSE' });
+  }
+  const value = raw as Record<string, unknown>;
+  const run = EvalSuiteRunSchema.safeParse(value['run']);
+  const results = z.array(EvalSuiteTrialResultSchema).safeParse(value['results']);
+  if (!run.success || !results.success) {
+    throw new ApiError('The server returned invalid eval suite run details.', { code: 'INVALID_RESPONSE' });
+  }
+  return { run: run.data, results: results.data };
 }
 
 function parseMutationProposals(raw: unknown): MutationProposal[] {
@@ -2592,11 +2616,9 @@ export const evalSuiteApi = {
     const r = await client.get<unknown>(`/eval-suites/${id}/runs`);
     return parseEvalSuiteRuns(r.data);
   },
-  runDetail: async (suiteId: string, runId: string): Promise<{ run: EvalSuiteRun; results: unknown[] }> => {
-    const r = await client.get<{ run: unknown; results: unknown[] }>(`/eval-suites/${suiteId}/runs/${runId}`);
-    const run = EvalSuiteRunSchema.safeParse(r.data.run);
-    if (!run.success || !Array.isArray(r.data.results)) throw new ApiError('The server returned invalid eval suite run details.', { code: 'INVALID_RESPONSE' });
-    return { run: run.data, results: r.data.results };
+  runDetail: async (suiteId: string, runId: string): Promise<{ run: EvalSuiteRun; results: Array<z.infer<typeof EvalSuiteTrialResultSchema>> }> => {
+    const r = await client.get<unknown>(`/eval-suites/${suiteId}/runs/${runId}`);
+    return parseEvalSuiteRunDetail(r.data);
   },
   create: async (input: {
     capabilityId: string;
