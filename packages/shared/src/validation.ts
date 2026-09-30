@@ -424,7 +424,10 @@ export function mergeDraftManifest(input: unknown): Record<string, unknown> {
   out['nodes'] = out['nodes'] ?? [];
   out['edges'] = out['edges'] ?? [];
   out['metadata'] = out['metadata'] ?? {};
-  out['createdAt'] = out['createdAt'] ?? new Date().toISOString();
-  out['updatedAt'] = out['updatedAt'] ?? new Date().toISOString();
+  // Draft normalization must be deterministic. Runtime timestamps would
+  // change the content hash between POST /api/manifests and
+  // POST /api/capability-versions for the same sparse draft.
+  out['createdAt'] = typeof out['createdAt'] === 'string' ? out['createdAt'] : '';
+  out['updatedAt'] = typeof out['updatedAt'] === 'string' ? out['updatedAt'] : '';
   return out;
 }

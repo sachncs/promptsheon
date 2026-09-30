@@ -1,5 +1,4 @@
 import { test, expect, request } from '@playwright/test';
-import { createHash } from 'node:crypto';
 
 /**
  * Tier 8 — approvals flow: walk bootstrap → workspace → project →
@@ -37,10 +36,15 @@ test.describe('tier 8: approvals flow', () => {
     const cap = await ctx.post('/api/capabilities', { headers: H, data: { projectId: projBody.id, name: 'C', description: '' } });
     const capBody = (await cap.json()) as { id: string };
     const manifestJson = JSON.stringify({ nodes: [], edges: [] });
-    const manifestHash = createHash('sha256').update(JSON.stringify({ edges: [], nodes: [] })).digest('hex');
+    const manifest = await ctx.post('/api/manifests', {
+      headers: H,
+      data: { nodes: [], edges: [] },
+    });
+    expect(manifest.ok(), `POST manifest failed: ${await manifest.text()}`).toBeTruthy();
+    const manifestBody = (await manifest.json()) as { hash: string };
     const version = await ctx.post('/api/capability-versions', {
       headers: H,
-      data: { capabilityId: capBody.id, version: 1, manifest: manifestJson, manifestHash, goal: 'g' },
+      data: { capabilityId: capBody.id, version: 1, manifest: manifestJson, manifestHash: manifestBody.hash, goal: 'g' },
     });
     const vBody = (await version.json()) as { id: string };
     expect(vBody.id, `POST capability version failed: ${JSON.stringify(vBody)}`).toBeTruthy();
