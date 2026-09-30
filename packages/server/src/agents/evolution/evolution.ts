@@ -1,6 +1,7 @@
 import type { AppConfig, Capability, EvalRun } from '@promptsheon/shared';
 import type { CasStore } from '@promptsheon/shared';
 import { Agent } from '@strands-agents/sdk';
+import { z } from 'zod';
 import { createModel } from '../model.js';
 import { extractText } from '../utils.js';
 
@@ -16,6 +17,13 @@ interface Manifest {
   tools: unknown[];
   parameters: Record<string, unknown>;
 }
+
+const ManifestSchema = z.object({
+  systemPrompt: z.string(),
+  tools: z.array(z.unknown()),
+  parameters: z.record(z.string(), z.unknown()),
+}).passthrough();
+const ManifestRevisionSchema = z.object({ revisedManifest: ManifestSchema });
 
 export class EvolutionAgent {
   private revisionAgent: Agent;
@@ -87,29 +95,32 @@ Output a JSON object with:
       failingCases: [],
       evaluationSummary: `Score: ${score}, threshold: ${threshold}`,
     }));
-    const parsed: unknown = JSON.parse(extractText(result));
-    if (!isManifestRevision(parsed)) throw new Error('revision agent returned an invalid manifest');
-    return parsed;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(extractText(result));
+    } catch (error) {
+      throw new Error('revision agent returned invalid JSON', { cause: error });
+    }
+    const revision = ManifestRevisionSchema.safeParse(parsed);
+    if (!revision.success) throw new Error('revision agent returned an invalid manifest');
+    return revision.data;
   }
 
   private async loadManifest(hash: string): Promise<Manifest> {
     const obj = await this.deps.cas.readObject(hash);
     if (obj.type !== 'blob') throw new Error('expected blob');
-    return JSON.parse(obj.data.toString());
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(obj.data.toString());
+    } catch (error) {
+      throw new Error('stored evolution manifest is invalid JSON', { cause: error });
+    }
+    const manifest = ManifestSchema.safeParse(parsed);
+    if (!manifest.success) throw new Error('stored evolution manifest has an invalid shape');
+    return manifest.data;
   }
 
   private async saveManifest(manifest: Manifest): Promise<string> {
     return this.deps.cas.writeObject({ type: 'blob', data: Buffer.from(JSON.stringify(manifest)) });
   }
-}
-
-function isManifestRevision(value: unknown): value is { revisedManifest: Manifest } {
-  if (!value || typeof value !== 'object' || !('revisedManifest' in value)) return false;
-  const revisedManifest = value.revisedManifest;
-  if (!revisedManifest || typeof revisedManifest !== 'object') return false;
-  const manifest = Object.fromEntries(Object.entries(revisedManifest));
-  return typeof manifest.systemPrompt === 'string'
-    && Array.isArray(manifest.tools)
-    && typeof manifest.parameters === 'object'
-    && manifest.parameters !== null;
 }
