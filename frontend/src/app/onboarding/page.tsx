@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { StepIndicator } from '@/components/brand/step-indicator';
 import { bootstrapApi, toSession, type CreateAdminResponse } from '@/lib/bootstrap';
-import { clearSession, getSession, setSession } from '@/lib/session';
+import { clearSession, getSession, getSessionStorageState, setSession } from '@/lib/session';
 import { userApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { QueryError } from '@/components/brand/query-error';
@@ -63,6 +63,18 @@ export default function OnboardingPage() {
     // ADMIN_EXISTS and leaves the user stranded on onboarding).
     if (!status.data.needsAdmin && !resumedSetup.current) {
       const existing = getSession();
+      if (getSessionStorageState() === 'invalid') {
+        restoreAttempted.current = true;
+        bootstrapApi.admin()
+          .then((data) => {
+            setRestoreCandidate(data);
+            setRestoreError('The saved browser session is invalid. Enter an existing administrator API key to restore this browser session.');
+          })
+          .catch((adminError: unknown) => {
+            setRestoreError(adminError instanceof Error ? adminError.message : 'We could not prepare browser-session recovery.');
+          });
+        return;
+      }
       if (existing) {
         restoreAttempted.current = true;
         userApi.me()

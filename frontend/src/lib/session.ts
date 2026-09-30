@@ -12,6 +12,9 @@ export interface Session {
   completedAt?: string | undefined;
 }
 
+/** Describes whether the browser contains no session, a valid session, or invalid session data. */
+export type SessionStorageState = 'missing' | 'valid' | 'invalid';
+
 const SessionSchema = z.object({
   userId: z.string().min(1),
   userName: z.string().min(1),
@@ -32,6 +35,19 @@ let cachedSession: Session | null = null;
 export function getSession(): Session | null {
   if (typeof window === 'undefined') return null;
   return readSessionSnapshot();
+}
+
+/**
+ * Distinguishes an empty browser session from corrupted session data.
+ *
+ * This lets onboarding offer explicit recovery for malformed storage instead
+ * of silently treating it as a first-time installation.
+ */
+export function getSessionStorageState(): SessionStorageState {
+  if (typeof window === 'undefined') return 'missing';
+  const raw = window.localStorage.getItem(KEY);
+  if (raw === null) return 'missing';
+  return readSessionSnapshot() ? 'valid' : 'invalid';
 }
 
 /** Stable external-store snapshot used by React during hydration. */
