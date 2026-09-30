@@ -81,6 +81,10 @@ export interface AgentSpecificationList {
   total: number;
 }
 
+export interface AgentSpecificationRecord extends AgentSpecificationMetadata {
+  specification: unknown;
+}
+
 export interface VaultKeyringEntry {
   id: number;
   label: string;
@@ -1012,9 +1016,17 @@ const AgentSpecificationListSchema = z.object({
   total: z.number().int().nonnegative(),
 });
 
+const AgentSpecificationRecordSchema = AgentSpecificationMetadataSchema.extend({ specification: z.unknown() });
+
 function parseAgentSpecificationList(raw: unknown): AgentSpecificationList {
   const parsed = AgentSpecificationListSchema.safeParse(raw);
   if (!parsed.success) throw new ApiError('The server returned invalid agent specification data.', { code: 'INVALID_RESPONSE' });
+  return parsed.data;
+}
+
+function parseAgentSpecificationRecord(raw: unknown): AgentSpecificationRecord {
+  const parsed = AgentSpecificationRecordSchema.safeParse(raw);
+  if (!parsed.success) throw new ApiError('The server returned invalid agent revision data.', { code: 'INVALID_RESPONSE' });
   return parsed.data;
 }
 
@@ -1038,7 +1050,14 @@ export const agentSpecificationApi = {
     changeReason: data.changeReason,
     ...(data.parentHash ? { parentHash: data.parentHash } : {}),
   }),
-  get: (workspaceId: string, hash: string) => client.get(`/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/${encodeURIComponent(hash)}`),
+  get: async (workspaceId: string, hash: string): Promise<{ data: AgentSpecificationRecord }> => {
+    const response = await client.get<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/${encodeURIComponent(hash)}`);
+    return { data: parseAgentSpecificationRecord(response.data) };
+  },
+  publish: async (workspaceId: string, hash: string): Promise<{ data: AgentSpecificationRecord }> => {
+    const response = await client.post<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/${encodeURIComponent(hash)}/publish`);
+    return { data: parseAgentSpecificationRecord(response.data) };
+  },
 };
 
 export const projectApi = {
