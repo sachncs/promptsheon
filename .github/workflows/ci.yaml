@@ -140,6 +140,7 @@ jobs:
             -e PROMPTSHEON_CORS_ORIGIN=http://127.0.0.1:3000 \
             -e PROMPTSHEON_WEBHOOK_SECRET=ci-only-webhook-secret \
             -e PROMPTSHEON_SCIM_TOKEN=ci-only-scim-token \
+            -e PROMPTSHEON_SCIM_ORG_ID=ci-only-org \
             -e PROMPTSHEON_DB_PATH=/tmp/promptsheon.db \
             -e PROMPTSHEON_CAS_PATH=/tmp/.promptsheon \
             promptsheon:ci
