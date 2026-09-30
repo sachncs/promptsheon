@@ -193,6 +193,21 @@ describe('authMiddleware (issue #45 — X-User-Id bypass fix)', () => {
     expect((req as unknown as Record<string, string>).userId).toBe('bootstrap');
   });
 
+  it('lets the SCIM route validate its protocol token and binds its configured org', async () => {
+    const config: AppConfig = {
+      ...baseConfig,
+      auth: { ...baseConfig.auth, scimOrganizationId: 'org-scim' },
+    };
+    const mw = authMiddleware(config, makeApiKeyRepo({}));
+    const req = makeReq({}, '/api/scim/v2/Users');
+    const mock = makeReply();
+    await mw(req, mock.reply);
+    expect(mock.code).toBe(200);
+    expect((req as unknown as Record<string, string>).userId).toBe('scim');
+    expect((req as unknown as Record<string, string>).agentOrgId).toBe('org-scim');
+    expect((req as unknown as Record<string, boolean>).orgContextBypass).toBe(true);
+  });
+
   it('tags the request as public on the documented public paths', async () => {
     const mw = authMiddleware(baseConfig, makeApiKeyRepo({}));
     for (const path of ['/api/health', '/api/ready', '/api/openapi.json', '/api/audit/verify', '/api/audit/state']) {

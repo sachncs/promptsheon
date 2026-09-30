@@ -43,6 +43,9 @@ export function validateConfig(config: AppConfig): void {
   if (isProduction && !config.auth.enabled) {
     throw new Error('PROMPTSHEON_AUTH must be enabled in production');
   }
+  if (isProduction && config.auth.scimBearerToken && !config.auth.scimOrganizationId) {
+    throw new Error('PROMPTSHEON_SCIM_ORG_ID is required when SCIM is configured in production');
+  }
   if (isProduction && config.server.e2eSessionEnabled) {
     throw new Error('PROMPTSHEON_E2E must be disabled in production');
   }

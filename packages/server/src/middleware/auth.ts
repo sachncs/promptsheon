@@ -16,6 +16,7 @@ declare module 'fastify' {
 }
 
 const BOOTSTRAP_PREFIX = '/api/bootstrap/';
+const SCIM_PREFIX = '/api/scim/v2/';
 const PUBLIC_PATHS = new Set([
   '/api/openapi.json',
   '/api/health',
@@ -58,6 +59,14 @@ export function authMiddleware(
   return async (request: FastifyRequest, reply: FastifyReply) => {
     if (request.url.startsWith(BOOTSTRAP_PREFIX)) {
       request.userId = 'bootstrap';
+      request.orgContextBypass = true;
+      return;
+    }
+    // SCIM validates its own protocol bearer token in the route adapter.
+    // Bind it to the configured organization before normal API-key auth.
+    if (request.url.startsWith(SCIM_PREFIX)) {
+      request.userId = 'scim';
+      request.agentOrgId = config.auth.scimOrganizationId;
       request.orgContextBypass = true;
       return;
     }

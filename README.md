@@ -184,7 +184,8 @@ CI also builds the public site so documentation regressions cannot merge unnotic
 ## Production
 
 Production requires explicit authentication, CORS, webhook and SCIM secrets,
-persistent SQLite/CAS storage, and readiness gating. Configure `.env.example`
+the organization bound to the SCIM token, persistent SQLite/CAS storage, and
+readiness gating. Configure `.env.example`
 through your deployment secret manager; never commit credentials or bake them
 into images.
 
@@ -196,6 +197,7 @@ docker run --rm -p 8080:8080 \
   -e PROMPTSHEON_CORS_ORIGIN="http://localhost:3000" \
   -e PROMPTSHEON_WEBHOOK_SECRET="$PROMPTSHEON_WEBHOOK_SECRET" \
   -e PROMPTSHEON_SCIM_TOKEN="$PROMPTSHEON_SCIM_TOKEN" \
+  -e PROMPTSHEON_SCIM_ORG_ID="$PROMPTSHEON_SCIM_ORG_ID" \
   -v "$PWD/.promptsheon:/data" \
   promptsheon:latest
 ```

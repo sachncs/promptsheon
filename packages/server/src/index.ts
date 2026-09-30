@@ -349,6 +349,7 @@ async function main() {
     nodeEnvironment: config.server.nodeEnv,
     isAcceptingTraffic: () => acceptingTraffic,
     scimBearerToken: config.auth.scimBearerToken,
+    scimOrganizationId: config.auth.scimOrganizationId,
     authEnabled: config.auth.enabled,
     db,
     workspaceRepo: repos.workspace,

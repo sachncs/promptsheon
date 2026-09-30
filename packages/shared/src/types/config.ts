@@ -51,6 +51,8 @@ export interface AppConfig {
     jwtSecret: string;
     /** Optional SCIM bearer token, loaded only at the composition root. */
     scimBearerToken?: string;
+    /** Organization that owns the configured SCIM provisioning token. */
+    scimOrganizationId?: string;
     /** Optional SVID verification key, loaded only at the composition root. */
     svidPublicKeyPem?: string;
   };

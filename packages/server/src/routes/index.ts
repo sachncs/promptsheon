@@ -121,6 +121,7 @@ export interface AppDeps {
   nodeEnvironment: string;
   isAcceptingTraffic?: () => boolean;
   scimBearerToken?: string;
+  scimOrganizationId?: string;
   authEnabled: boolean;
   db: Database.Database;
   workspaceRepo: WorkspaceRepo;
@@ -391,6 +392,7 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     userRepo: deps.userRepo,
     membershipRepo: deps.membershipRepo,
     scimBearerToken: resolveScimBearerToken(deps.nodeEnvironment, deps.scimBearerToken),
+    scimOrganizationId: deps.scimOrganizationId,
   });
   registerSecurityRoutes(app, { scanRepo: deps.promptScanRepo });
   registerAuditReportRoutes(app, { auditChain: deps.auditChain });

@@ -84,6 +84,7 @@ export function registerTeamRoutes(
     ssoConfigRepo: SsoConfigRepo;
     auditChain: AuditChain;
     scimBearerToken: string;
+    scimOrganizationId?: string;
     userRepo?: UserRepo;
     membershipRepo?: MembershipRepo;
     vaultRepo?: VaultRepo;
