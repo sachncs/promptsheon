@@ -5,37 +5,12 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, History } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
-import { client } from '@/lib/api';
+import { goalsApi, type GoalDetail } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { StatusPill } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
 import { QueryError } from '@/components/brand/query-error';
-
-interface GoalHistoryEntry {
-  iteration: number;
-  score: number;
-  cost: number;
-  revised: boolean;
-  timestamp: string;
-}
-
-interface GoalSnapshot {
-  iteration: number;
-  manifestHash: string;
-  score: number;
-  timestamp: string;
-}
-
-interface GoalDetail {
-  manifestHash: string;
-  bestScore: number;
-  bestManifestHash: string;
-  iterations: number;
-  totalCost: number;
-  snapshots: GoalSnapshot[];
-  history: GoalHistoryEntry[];
-}
 
 export default function GoalDetailPage() {
   const session = useRequireSession();
@@ -44,10 +19,7 @@ export default function GoalDetailPage() {
 
   const goal = useQuery<GoalDetail>({
     queryKey: ['goal', hash],
-    queryFn: async () => {
-      const res = await client.get(`/goals/${hash}`);
-      return res.data as GoalDetail;
-    },
+    queryFn: () => goalsApi.get(hash).then((r) => r.data),
     enabled: Boolean(session && hash),
   });
 

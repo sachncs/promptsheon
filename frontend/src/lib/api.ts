@@ -348,6 +348,38 @@ export interface SelfEvolveCycle {
   state: SelfEvolveState;
 }
 
+export interface GoalSummary {
+  manifestHash: string;
+  bestScore: number;
+  iterations: number;
+  lastUpdated: string;
+}
+
+export interface GoalHistoryEntry {
+  iteration: number;
+  score: number;
+  cost: number;
+  revised: boolean;
+  timestamp: string;
+}
+
+export interface GoalSnapshot {
+  iteration: number;
+  manifestHash: string;
+  score: number;
+  timestamp: string;
+}
+
+export interface GoalDetail {
+  manifestHash: string;
+  bestScore: number;
+  bestManifestHash: string;
+  iterations: number;
+  totalCost: number;
+  snapshots: GoalSnapshot[];
+  history: GoalHistoryEntry[];
+}
+
 export interface Capability {
   id: string;
   projectId: string;
@@ -624,6 +656,38 @@ const SelfEvolveStateSchema = z.object({
 const SelfEvolveCycleSchema = z.object({
   action: z.enum(['revised', 'no_change']),
   state: SelfEvolveStateSchema,
+});
+
+const GoalSummarySchema = z.object({
+  manifestHash: z.string(),
+  bestScore: z.number(),
+  iterations: z.number().int().nonnegative(),
+  lastUpdated: z.string(),
+});
+
+const GoalHistoryEntrySchema = z.object({
+  iteration: z.number().int().nonnegative(),
+  score: z.number(),
+  cost: z.number(),
+  revised: z.boolean(),
+  timestamp: z.string(),
+});
+
+const GoalSnapshotSchema = z.object({
+  iteration: z.number().int().nonnegative(),
+  manifestHash: z.string(),
+  score: z.number(),
+  timestamp: z.string(),
+});
+
+const GoalDetailSchema = z.object({
+  manifestHash: z.string(),
+  bestScore: z.number(),
+  bestManifestHash: z.string(),
+  iterations: z.number().int().nonnegative(),
+  totalCost: z.number(),
+  snapshots: z.array(GoalSnapshotSchema),
+  history: z.array(GoalHistoryEntrySchema),
 });
 
 function parseSelfEvolveState(raw: unknown): SelfEvolveState {
@@ -1701,6 +1765,21 @@ export const selfEvolveApi = {
     const parsed = SelfEvolveCycleSchema.safeParse(r.data);
     if (!parsed.success) throw new ApiError('The server returned invalid self-evolve cycle data.', { code: 'INVALID_RESPONSE' });
     return { data: { action: parsed.data.action, state: parseSelfEvolveState(parsed.data.state) } };
+  },
+};
+
+export const goalsApi = {
+  list: async (limit = 20): Promise<{ data: { goals: GoalSummary[] } }> => {
+    const r = await client.get<unknown>('/goals', { params: { limit } });
+    const parsed = z.object({ goals: z.array(GoalSummarySchema) }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid goal summaries.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  get: async (hash: string): Promise<{ data: GoalDetail }> => {
+    const r = await client.get<unknown>(`/goals/${encodeURIComponent(hash)}`);
+    const parsed = GoalDetailSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid goal details.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
   },
 };
 

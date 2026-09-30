@@ -8,24 +8,14 @@ import { Surface, SurfaceHeader } from '@/components/brand/surface';
 import { EmptyState } from '@/components/brand/empty-state';
 import { StatusPill } from '@/components/brand/status-pill';
 import { HashChip } from '@/components/brand/hash-chip';
-import { client } from '@/lib/api';
+import { goalsApi, type GoalSummary } from '@/lib/api';
 import { QueryError } from '@/components/brand/query-error';
-
-interface GoalSummary {
-  manifestHash: string;
-  bestScore: number;
-  iterations: number;
-  lastUpdated: string;
-}
 
 export default function GoalsPage() {
   const session = useRequireSession();
   const goals = useQuery<{ goals: GoalSummary[] }>({
     queryKey: ['goals'],
-    queryFn: async () => {
-      const res = await client.get('/goals');
-      return res.data as { goals: GoalSummary[] };
-    },
+    queryFn: () => goalsApi.list().then((r) => r.data),
     refetchInterval: 5000,
     enabled: Boolean(session),
   });
