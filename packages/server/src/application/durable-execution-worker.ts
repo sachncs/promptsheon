@@ -171,8 +171,17 @@ export class DurableExecutionWorker {
   }
 
   private safeComplete(job: ExecutionJob, result: unknown): void {
+    let resultJson: string;
     try {
-      this.jobs.transition(job.organizationId, job.id, 'running', 'completed', { resultJson: JSON.stringify(result) });
+      const serialized = JSON.stringify(result);
+      if (serialized === undefined) throw new Error('execution result is not JSON-serializable');
+      resultJson = serialized;
+    } catch (error) {
+      this.safeTransition(job, 'failed', `execution result could not be persisted: ${safeErrorMessage(error)}`);
+      return;
+    }
+    try {
+      this.jobs.transition(job.organizationId, job.id, 'running', 'completed', { resultJson });
     } catch {
       // A concurrent cancellation or lease recovery owns the state now.
     }
