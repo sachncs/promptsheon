@@ -514,7 +514,12 @@ export class ManifestGraphExecutor {
         organizationId: options.organizationId ?? 'unscoped',
         correlationId: options.executionId,
         traceId: options.traceRunId ?? null,
-        executionId: options.executionId,
+        // Execution evidence is emitted while the run is in flight. The
+        // execution row is persisted after the runner returns, so attaching
+        // the foreign key here would make SQLite reject and drop the event.
+        // correlationId retains the exact execution lineage until a durable
+        // event-linking operation is available.
+        executionId: null,
         agentHash,
         stepId,
         payload,

@@ -351,6 +351,7 @@ async function main() {
     compiler,
     planner,
     executor,
+    evidence: evidenceSink,
     manifestRepo: repos.manifest,
     releaseService,
     getActiveGoals: () => goalEvolver.listSummaries(),

@@ -113,6 +113,7 @@ import type Database from 'better-sqlite3';
 import type { BudgetDeps } from './budget.js';
 import type { AgentSpecificationRepo } from '../repos/agent-specification.js';
 import type { DurableExecutionService } from '../application/durable-execution-service.js';
+import type { EvidenceRecorder } from '../observability/evidence-sink.js';
 
 export interface AppDeps {
   nodeEnvironment: string;
@@ -176,6 +177,7 @@ export interface AppDeps {
   traceRepo: import('../repos/trace.js').TraceRepo;
   traceScoreRepo: import('../repos/trace-score.js').TraceScoreRepo;
   evidenceRepo: import('../repos/evidence.js').EvidenceRepo;
+  evidence: EvidenceRecorder;
   mutationProposalDeps: MutationProposalDeps;
   autoEval: import('../observability/auto-eval.js').AutoEval;
   userAnalyticsRepo: import('../repos/user-analytics.js').UserAnalyticsRepo;
@@ -244,14 +246,15 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
       deps.executor,
       selectByCanary,
     ),
-    replayService: new ExecutionReplayService(
+      replayService: new ExecutionReplayService(
       deps.executionRepo,
       deps.manifestRepo,
       deps.traceRepo,
       deps.executor,
-    ),
-    sseHub: deps.sseHub,
-  });
+      ),
+      sseHub: deps.sseHub,
+      evidence: deps.evidence,
+    });
   registerDatasetRoutes(app, deps.datasetRepo);
   registerEvalRoutes(app, deps.evalRepo, deps.evalAgent, deps.evalRouteConfig, deps.datasetRepo);
   registerPreconditionRoutes(app, deps.preconditionRepo);

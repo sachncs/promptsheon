@@ -83,6 +83,20 @@ export class ManifestRepo {
     return this.assembleManifest(dag);
   }
 
+  findCapabilityVersionIdInOrg(hash: string, organizationId: string): string | null {
+    const row = this.db
+      .prepare(
+        `SELECT v.id FROM capability_versions v
+         JOIN capabilities c ON c.id = v.capability_id
+         JOIN projects p ON p.id = c.project_id
+         JOIN workspaces w ON w.id = p.workspace_id
+         WHERE v.manifest_hash = ? AND w.org_id = ?
+         ORDER BY v.version DESC LIMIT 1`,
+      )
+      .get(hash, organizationId) as { id?: string } | undefined;
+    return row?.id ?? null;
+  }
+
   findByCapabilityAndVersion(capabilityId: string, version: number): Manifest | null {
     const dag = this.db
       .prepare('SELECT * FROM manifest_dag WHERE capability_id = ? AND version = ?')

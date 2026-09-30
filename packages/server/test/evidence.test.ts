@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EvidenceRepo } from '../src/repos/evidence.js';
-import { hashTelemetry, redactTelemetry } from '../src/observability/redaction.js';
+import { canonicalTelemetryJson, hashTelemetry, redactTelemetry } from '../src/observability/redaction.js';
 import Fastify from 'fastify';
 import { registerEvidenceRoutes } from '../src/routes/evidence.js';
 
@@ -21,6 +21,12 @@ describe('evidence and telemetry redaction', () => {
       apiKey: '[REDACTED]',
       nested: { email: '[REDACTED_EMAIL]', text: 'card [REDACTED_CARD]' },
     });
+  });
+
+  it('omits undefined telemetry fields and always emits valid canonical JSON', () => {
+    const payload = redactTelemetry({ present: 'yes', omitted: undefined, nested: { missing: undefined } });
+    expect(payload).toEqual({ present: 'yes', nested: {} });
+    expect(canonicalTelemetryJson(payload)).toBe('{"nested":{},"present":"yes"}');
   });
 
   it('stores canonical redacted evidence and prevents updates', () => {

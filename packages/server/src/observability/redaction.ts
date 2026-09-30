@@ -20,6 +20,7 @@ export function redactTelemetry(value: unknown, sensitivity: RedactionSensitivit
   if (value && typeof value === 'object') {
     const output: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(value)) {
+      if (item === undefined) continue;
       output[key] = SENSITIVE_KEY.test(key) ? '[REDACTED]' : redactTelemetry(item, sensitivity);
     }
     return output;
@@ -29,6 +30,7 @@ export function redactTelemetry(value: unknown, sensitivity: RedactionSensitivit
 
 /** Stable JSON encoding used for evidence hashes and export verification. */
 export function canonicalTelemetryJson(value: unknown): string {
+  if (value === undefined) return 'null';
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalTelemetryJson).join(',')}]`;
   const record = value as Record<string, unknown>;

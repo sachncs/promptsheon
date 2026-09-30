@@ -20,6 +20,7 @@ export interface ExecutionRunOptions {
   executionId: string;
   inputs: Record<string, unknown>;
   environment: string;
+  organizationId?: string;
   traceId?: string;
   signal?: AbortSignal;
   /** Allow a saved draft to run before it has an active release. */
@@ -31,6 +32,8 @@ export interface ExecutionManifestStore {
   findByHashInOrg(hash: string, organizationId: string): Manifest | null;
   /** Global CAS lookup used only for explicitly requested unbound previews. */
   findByHash?(hash: string): Manifest | null;
+  /** Resolve the persisted capability-version row for an owned manifest. */
+  findCapabilityVersionIdInOrg?(hash: string, organizationId: string): string | null;
 }
 
 /** Port for selecting active releases for an organization-owned manifest. */
@@ -131,7 +134,11 @@ export class ExecutionService {
 
     let trace: ExecutionTrace;
     try {
-      trace = await this.runner.execute(manifestHash, manifest, { ...options, traceRunId: traceRun.id });
+      trace = await this.runner.execute(manifestHash, manifest, {
+        ...options,
+        organizationId,
+        traceRunId: traceRun.id,
+      });
     } catch (error) {
       this.traces.finalize(traceRun.id, 'error', { tokens: 0, costUsd: 0 });
       throw error;
@@ -141,9 +148,9 @@ export class ExecutionService {
       tokens: trace.totalTokens,
       costUsd: trace.totalCost,
     });
-    const capabilityId = manifest.metadata['capabilityId'];
+    const capabilityVersionId = this.manifests.findCapabilityVersionIdInOrg?.(manifestHash, organizationId) ?? null;
     const record = this.records.create({
-      capabilityVersionId: typeof capabilityId === 'string' && capabilityId ? manifest.id : null,
+      capabilityVersionId,
       inputs: JSON.stringify(options.inputs),
       inputHash: hashInputs(options.inputs),
       outputs: JSON.stringify(trace.nodeResults),

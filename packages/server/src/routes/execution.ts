@@ -12,6 +12,7 @@ import { parseBody, parseParams, parseQuery } from './validate.js';
 import { NotFoundError } from '@promptsheon/shared';
 import type { SseHub } from '../sse/hub.js';
 import { ExecutionSseStreamer } from '../sse/streamer.js';
+import type { EvidenceRecorder } from '../observability/evidence-sink.js';
 
 const ListExecutionsQuerySchema = z.object({
   capabilityVersionId: z.string().min(1).optional(),
@@ -52,6 +53,7 @@ export function registerExecutionRoutes(
     executionService: ExecutionService;
     replayService: ExecutionReplayService;
     sseHub?: SseHub;
+    evidence?: EvidenceRecorder;
   },
 ) {
   app.get('/api/executions', async (request, reply) => {
@@ -113,6 +115,7 @@ export function registerExecutionRoutes(
         preview,
         signal: controller.signal,
       });
+      await deps.evidence?.flush();
       if (result.kind === 'manifest-not-found') throw new NotFoundError('manifest', manifestHash);
       if (result.kind === 'no-active-release') {
         if (streamer) {
@@ -124,6 +127,7 @@ export function registerExecutionRoutes(
       }
       trace = result;
     } catch (err) {
+      await deps.evidence?.flush();
       // SSE: don't let the global error handler try to write a 500
       // — the response stream is already open.
       if (streamer) {
