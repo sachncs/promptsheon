@@ -16,6 +16,7 @@ import {
   InvalidReleaseTransitionError,
   ReleaseApprovalRequiredError,
   ReleaseNotFoundError,
+  ReleasePromotionConflictError,
   ReleaseService,
 } from '../application/release-service.js';
 import type { CanaryRollbackService } from '../application/canary-rollback-service.js';
@@ -242,6 +243,9 @@ export function registerReleaseRoutes(
       }
       if (error instanceof ReleaseApprovalRequiredError) {
         return reply.code(409).send({ error: { code: 'APPROVAL_REQUIRED', message: error.message } });
+      }
+      if (error instanceof ReleasePromotionConflictError) {
+        return reply.code(409).send({ error: { code: 'PROMOTION_CONFLICT', message: error.message } });
       }
       throw error;
     }

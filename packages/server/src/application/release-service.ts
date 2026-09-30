@@ -31,6 +31,14 @@ export class ReleaseApprovalRequiredError extends Error {
   }
 }
 
+/** Raised when a concurrent release update prevents an atomic promotion. */
+export class ReleasePromotionConflictError extends Error {
+  constructor(releaseId: string) {
+    super(`release ${releaseId} changed before canary promotion could complete`);
+    this.name = 'ReleasePromotionConflictError';
+  }
+}
+
 /** Dependencies that make release transitions deterministic and testable. */
 export interface ReleaseServiceDependencies {
   createId?: () => string;
@@ -148,9 +156,13 @@ export class ReleaseService {
       }
     }
 
-    const canaryPromotion = input.to === 'active' && existing.status === 'canary'
-      ? this.repo.promoteCanaryAtomicallyInOrg?.(input.releaseId, input.organizationId)
+    const shouldPromoteCanary = input.to === 'active'
+      && existing.status === 'canary'
+      && this.repo.promoteCanaryAtomicallyInOrg !== undefined;
+    const canaryPromotion = shouldPromoteCanary
+      ? this.repo.promoteCanaryAtomicallyInOrg!(input.releaseId, input.organizationId)
       : undefined;
+    if (shouldPromoteCanary && !canaryPromotion) throw new ReleasePromotionConflictError(input.releaseId);
     const updated = canaryPromotion
       ? canaryPromotion.activated
       : this.repo.updateStatusInOrgIfCurrent
