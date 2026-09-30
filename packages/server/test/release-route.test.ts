@@ -194,6 +194,7 @@ describe('POST /api/releases/:id/rollback', () => {
 
   it('canary percent update returns updated release', async () => {
     const v1 = makeRelease(repo, 'cap1', 'prod', 1, 'alice');
+    repo.updateStatus(v1, 'active');
     const response = await app.inject({
       method: 'PUT',
       url: `/api/releases/${v1}/canary`,
@@ -202,6 +203,18 @@ describe('POST /api/releases/:id/rollback', () => {
     expect(response.statusCode).toBe(200);
     const body = response.json() as { canaryPercent: number };
     expect(body.canaryPercent).toBe(30);
+  });
+
+  it('rejects canary traffic updates for draft releases', async () => {
+    const v1 = makeRelease(repo, 'cap1', 'prod', 1, 'alice');
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/api/releases/${v1}/canary`,
+      payload: { percent: 30 },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ error: { code: 'INVALID_CANARY_STATE' } });
+    expect(repo.findById(v1)?.canaryPercent).toBe(0);
   });
 
   it('persists environment overlays and replaces them atomically', async () => {

@@ -376,7 +376,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
 
   updateCanaryPercentInOrg(id: string, organizationId: string, percent: number): Release | null {
     const existing = this.findByIdInOrg(id, organizationId);
-    if (!existing) return null;
+    if (!existing || (existing.status !== 'canary' && existing.status !== 'active')) return null;
     this.db.prepare(`
       UPDATE releases SET canary_percent = ?, updated_at = ?
       WHERE id = ? AND EXISTS (
@@ -384,6 +384,7 @@ export class ReleaseRepo extends BaseRepo<Release> {
         JOIN workspaces w ON w.id = p.workspace_id
         WHERE c.id = releases.capability_id AND w.org_id = ?
       )
+        AND status IN ('canary', 'active')
     `).run(percent, new Date().toISOString(), id, organizationId);
     return { ...existing, canaryPercent: percent };
   }

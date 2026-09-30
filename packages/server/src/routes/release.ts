@@ -318,8 +318,12 @@ export function registerReleaseRoutes(
     const { id } = parsedParams.data;
     const parsed = parseBody(reply, CanaryRuleSchema, request.body);
     if (!parsed.ok) return;
-    if (!repo.findByIdInOrg(id, organizationId)) {
+    const current = repo.findByIdInOrg(id, organizationId);
+    if (!current) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'release not found' } });
+    }
+    if (current.status !== 'canary' && current.status !== 'active') {
+      return reply.code(409).send({ error: { code: 'INVALID_CANARY_STATE', message: 'only canary or active releases can receive traffic' } });
     }
     const updated = repo.updateCanaryPercentInOrg(id, organizationId, parsed.data.percent);
     if (updated) {
@@ -345,6 +349,9 @@ export function registerReleaseRoutes(
     if (!parsed.ok) return;
     const item = repo.findByIdInOrg(id, organizationId);
     if (!item) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
+    if (item.status !== 'canary' && item.status !== 'active') {
+      return reply.code(409).send({ error: { code: 'INVALID_CANARY_STATE', message: 'only canary or active releases can receive traffic' } });
+    }
     const updated = repo.updateCanaryPercentInOrg(id, organizationId, parsed.data.percent);
     if (updated) {
       deps.auditChain.append({
