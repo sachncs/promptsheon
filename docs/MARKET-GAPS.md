@@ -142,7 +142,8 @@ segment. Tier 3 features would create a category.
 
 #### T1-5. **Customer-facing analytics (per-user, per-tenant)**
 - **Current status**: per-tenant totals, a token-ranked user leaderboard, and a selected-user daily usage drill-down are available in `/app/admin/analytics` through the analytics API. Trace actors remain organization-scoped and no cross-tenant rows are exposed.
-- **Remaining**: durable per-user quota policies and a prompt-level abuse view backed by execution attribution on every legacy execution row.
+- **Current status**: the traces surface now includes an admin-only prompt-risk view backed by redacted trace attribution. It flags repeated failures, token burn, and unusual execution volume without exposing prompt content.
+- **Remaining**: durable per-user quota policies and execution attribution on every legacy execution row so risk signals can cover pre-trace history.
 - **Moat impact**: high for SaaS-style customers; medium for self-hosted (most self-hosted customers don't bill per-user internally yet).
 
 ---
