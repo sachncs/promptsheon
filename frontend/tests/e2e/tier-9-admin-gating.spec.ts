@@ -37,6 +37,14 @@ test.describe('tier 9: admin gating (server-enforced)', () => {
     expect(page.url(), 'admin /app/users').not.toContain('/onboarding');
   });
 
+  test('users page does not offer a self-role control', async ({ page, baseURL }) => {
+    if (!admin || !baseURL) throw new Error('admin not bootstrapped');
+    await clearClientState(page);
+    await seedSession(page, admin);
+    await page.goto('/app/users', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByLabel(/Role for/)).toHaveCount(0);
+  });
+
   test('admin can hit /app/api-keys without 403', async ({ page, baseURL }) => {
     if (!admin || !baseURL) throw new Error('admin not bootstrapped');
     await clearClientState(page);

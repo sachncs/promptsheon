@@ -6,9 +6,11 @@ import type { Execution } from '@promptsheon/shared';
 import type { Schedule } from '@promptsheon/shared';
 import type { Dataset, DatasetCase } from '@promptsheon/shared';
 import type { AlertRule, Precondition } from '@promptsheon/shared';
+import type { User, UserRole } from '@promptsheon/shared';
 
 export type { Dataset, DatasetCase };
 export type { AlertRule, Precondition };
+export type { User, UserRole };
 import { clearSession } from './session';
 
 export class ApiError extends Error {
@@ -804,6 +806,15 @@ const WebhookSubscriptionSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   createdBy: z.string().min(1),
+});
+
+const UserSchema = z.object({
+  id: z.string().min(1),
+  email: z.string().email(),
+  name: z.string().min(1),
+  role: z.enum(['admin', 'editor', 'reader', 'system']),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 function parseSelfEvolveState(raw: unknown): SelfEvolveState {
@@ -2039,9 +2050,24 @@ export const apiKeyApi = {
 };
 
 export const userApi = {
-  list: () => client.get('/users'),
-  updateRole: (id: string, role: string) => client.put(`/users/${id}/role`, { role }),
-  me: () => client.get('/users/me'),
+  list: async (): Promise<{ data: { users: User[] } }> => {
+    const r = await client.get<unknown>('/users');
+    const parsed = z.object({ users: z.array(UserSchema) }).safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid user data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  updateRole: async (id: string, role: UserRole): Promise<{ data: User }> => {
+    const r = await client.put<unknown>(`/users/${encodeURIComponent(id)}/role`, { role });
+    const parsed = UserSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid user data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
+  me: async (): Promise<{ data: User }> => {
+    const r = await client.get<unknown>('/users/me');
+    const parsed = UserSchema.safeParse(r.data);
+    if (!parsed.success) throw new ApiError('The server returned invalid current-user data.', { code: 'INVALID_RESPONSE' });
+    return { data: parsed.data };
+  },
 };
 
 export const featureFlagApi = {

@@ -2,8 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Users } from 'lucide-react';
-import { parseList, userApi } from '@/lib/api';
-import { z } from 'zod';
+import { userApi, type User, type UserRole } from '@/lib/api';
 import { useRequireSession } from '@/hooks/use-session';
 import { PageHeader } from '@/components/brand/page-header';
 import { Surface, SurfaceHeader } from '@/components/brand/surface';
@@ -13,20 +12,8 @@ import { ThemedSelect } from '@/components/brand/themed-select';
 import { Badge } from '@/components/ui/badge';
 import { QueryError } from '@/components/brand/query-error';
 
-const UserItemSchema = z.object({
-  id: z.string(), email: z.string().optional(), name: z.string().optional(), role: z.string().optional(),
-  createdAt: z.string().optional(), lastSeenAt: z.string().nullable().optional(),
-});
-
-const ROLE_OPTIONS = ['admin', 'approver', 'editor', 'viewer'] as const;
-
-function currentUserIdOf(raw: unknown): string | undefined {
-  if (!raw || typeof raw !== 'object') return undefined;
-  const user = (raw as { user?: unknown }).user;
-  if (!user || typeof user !== 'object') return undefined;
-  const id = (user as { id?: unknown }).id;
-  return typeof id === 'string' ? id : undefined;
-}
+const ROLE_OPTIONS: UserRole[] = ['admin', 'editor', 'reader', 'system'];
+const isUserRole = (value: string): value is UserRole => ROLE_OPTIONS.some((role) => role === value);
 
 export default function UsersPage() {
   const session = useRequireSession();
@@ -34,7 +21,7 @@ export default function UsersPage() {
 
   const users = useQuery({
     queryKey: ['users'],
-    queryFn: () => userApi.list().then((r) => parseList(r.data, UserItemSchema, 'users')),
+    queryFn: () => userApi.list().then((r) => r.data.users),
   });
   const me = useQuery({
     queryKey: ['me'],
@@ -42,7 +29,7 @@ export default function UsersPage() {
   });
 
   const updateRole = useMutation({
-    mutationFn: ({ id, role }: { id: string; role: string }) => userApi.updateRole(id, role),
+    mutationFn: ({ id, role }: { id: string; role: UserRole }) => userApi.updateRole(id, role),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
   });
 
@@ -51,8 +38,8 @@ export default function UsersPage() {
   if (me.isLoading) return <div className="text-sm text-text-muted">Loading member permissions…</div>;
   if (me.isError) return <QueryError message={me.error} onRetry={() => void me.refetch()} />;
 
-  const rows = users.data ?? [];
-  const meId = currentUserIdOf(me.data);
+  const rows: User[] = users.data ?? [];
+  const meId = me.data?.id;
 
   return (
     <div className="space-y-6">
@@ -96,7 +83,7 @@ export default function UsersPage() {
                 header: 'Role',
                 render: (r) => {
                   const id = r.id;
-                  const role = r.role ?? 'viewer';
+                  const role = r.role;
                   const isMe = id === meId;
                   return (
                     <div className="flex items-center gap-2">
@@ -104,7 +91,11 @@ export default function UsersPage() {
                       {!isMe && (
                         <ThemedSelect
                           value={role}
-                          onValueChange={(v) => updateRole.mutate({ id, role: v })}
+                          onValueChange={(v) => {
+                            if (isUserRole(v)) {
+                              updateRole.mutate({ id, role: v });
+                            }
+                          }}
                           options={ROLE_OPTIONS.map((opt) => ({ value: opt, label: opt }))}
                           ariaLabel={`Role for ${id.slice(0, 8)}`}
                           triggerClassName="h-8 text-xs w-32"
@@ -120,9 +111,9 @@ export default function UsersPage() {
                 render: (r) => r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—',
               },
               {
-                key: 'lastSeen',
-                header: 'Last seen',
-                render: (r) => r.lastSeenAt ? new Date(r.lastSeenAt).toLocaleString() : 'never',
+                key: 'updated',
+                header: 'Updated',
+                render: (r) => new Date(r.updatedAt).toLocaleString(),
               },
             ]}
           />
@@ -137,16 +128,16 @@ export default function UsersPage() {
             <p className="mt-1 text-text-muted">Full access. Manage users, settings, webhooks, vault.</p>
           </li>
           <li className="rounded-md border border-border-subtle bg-surface-2/40 p-3">
-            <div className="font-medium text-text-strong">approver</div>
-            <p className="mt-1 text-text-muted">Vote on releases, manage schedules, view audit.</p>
+              <div className="font-medium text-text-strong">system</div>
+            <p className="mt-1 text-text-muted">Machine identity for controlled automation and service access.</p>
           </li>
           <li className="rounded-md border border-border-subtle bg-surface-2/40 p-3">
             <div className="font-medium text-text-strong">editor</div>
             <p className="mt-1 text-text-muted">Author capabilities, edit manifests, run evals.</p>
           </li>
           <li className="rounded-md border border-border-subtle bg-surface-2/40 p-3">
-            <div className="font-medium text-text-strong">viewer</div>
-            <p className="mt-1 text-text-muted">Read-only. Inspect capabilities, releases, eval history.</p>
+              <div className="font-medium text-text-strong">reader</div>
+              <p className="mt-1 text-text-muted">Read-only. Inspect capabilities, releases, and evaluation history.</p>
           </li>
         </ul>
       </Surface>
