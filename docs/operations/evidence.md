@@ -1,5 +1,8 @@
 # Evidence and observability operations
 
+For cross-service capacity thresholds and incident handling, see [capacity](./capacity.md)
+and [incident response](./incident-response.md).
+
 Promptsheon records immutable, tenant-scoped evidence for execution lifecycle
 events, model calls, tool calls, guardrail decisions, and permission decisions.
 Evidence is operationally useful without making raw prompts or outputs a
