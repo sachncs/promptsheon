@@ -60,6 +60,29 @@ interface ProviderCompletion {
   completionTokens?: number;
 }
 
+const UsageSchema = z.object({
+  prompt_tokens: z.number().nonnegative().optional(),
+  completion_tokens: z.number().nonnegative().optional(),
+  input_tokens: z.number().nonnegative().optional(),
+  output_tokens: z.number().nonnegative().optional(),
+}).optional();
+
+const OpenAiCompletionSchema = z.object({
+  choices: z.array(z.object({ message: z.object({ content: z.string() }) })).min(1),
+  usage: UsageSchema,
+});
+
+const AnthropicCompletionSchema = z.object({
+  content: z.array(z.object({ type: z.string(), text: z.string().optional() })),
+  usage: UsageSchema,
+});
+
+function parseProviderJson<T>(raw: unknown, schema: z.ZodType<T>, message: string): T {
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) throw new Error(message);
+  return parsed.data;
+}
+
 export interface LlmStreamChunk {
   text: string;
   done?: boolean;
@@ -224,10 +247,7 @@ export class LlmRouter {
       const body = await res.text().catch(() => '');
       throw new Error(`OpenAI responded ${res.status}: ${safeErrorMessage(body)}`);
     }
-    const data = (await res.json()) as {
-      choices: Array<{ message: { content: string } }>;
-      usage?: { prompt_tokens?: number; completion_tokens?: number };
-    };
+    const data = parseProviderJson(await res.json(), OpenAiCompletionSchema, 'OpenAI returned an invalid completion payload');
     return {
       content: data.choices[0]?.message.content ?? '',
       ...(typeof data.usage?.prompt_tokens === 'number' ? { promptTokens: data.usage.prompt_tokens } : {}),
@@ -268,10 +288,7 @@ export class LlmRouter {
       const body = await res.text().catch(() => '');
       throw new Error(`Anthropic responded ${res.status}: ${safeErrorMessage(body)}`);
     }
-    const data = (await res.json()) as {
-      content: Array<{ type: string; text?: string }>;
-      usage?: { input_tokens?: number; output_tokens?: number };
-    };
+    const data = parseProviderJson(await res.json(), AnthropicCompletionSchema, 'Anthropic returned an invalid completion payload');
     return {
       content: (data.content ?? [])
       .filter((b) => b.type === 'text')
@@ -307,10 +324,7 @@ export class LlmRouter {
         const body = await res.text().catch(() => '');
         throw new Error(`Custom responded ${res.status}: ${safeErrorMessage(body)}`);
       }
-      const data = (await res.json()) as {
-        content: Array<{ type: string; text?: string }>;
-        usage?: { input_tokens?: number; output_tokens?: number };
-      };
+      const data = parseProviderJson(await res.json(), AnthropicCompletionSchema, 'Custom provider returned an invalid completion payload');
       return {
         content: (data.content ?? [])
         .filter((b) => b.type === 'text')
@@ -337,10 +351,7 @@ export class LlmRouter {
       const body = await res.text().catch(() => '');
       throw new Error(`Custom responded ${res.status}: ${safeErrorMessage(body)}`);
     }
-    const data = (await res.json()) as {
-      choices: Array<{ message: { content: string } }>;
-      usage?: { prompt_tokens?: number; completion_tokens?: number };
-    };
+    const data = parseProviderJson(await res.json(), OpenAiCompletionSchema, 'Custom provider returned an invalid completion payload');
     return {
       content: data.choices[0]?.message.content ?? '',
       ...(typeof data.usage?.prompt_tokens === 'number' ? { promptTokens: data.usage.prompt_tokens } : {}),

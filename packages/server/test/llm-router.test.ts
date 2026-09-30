@@ -83,6 +83,25 @@ describe('LlmRouter', () => {
     }
   });
 
+  it('rejects malformed provider completion payloads', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{}] }), { status: 200 }),
+    );
+    const router = new LlmRouter();
+    try {
+      await expect(router.complete({
+        prompt: 'short',
+        model: 'provider-model',
+        temperature: 0,
+        provider: 'openai',
+        apiKey: 'test-key',
+        baseUrl: 'https://provider.example',
+      })).rejects.toThrow('invalid completion payload');
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
   it('tolerates empty keep-alive frames in provider SSE streams', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response([
