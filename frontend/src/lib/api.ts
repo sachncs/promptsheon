@@ -2063,6 +2063,19 @@ export interface TraceOperationalSummary {
   models: Array<{ model: string; runs: number; errors: number; tokens: number; cost: number }>;
 }
 
+export interface TracePromptRisk {
+  promptKey: string;
+  runs: number;
+  errors: number;
+  errorRate: number;
+  tokens: number;
+  cost: number;
+  actors: number;
+  lastSeen: string;
+  signals: Array<'error-rate' | 'token-burn' | 'volume'>;
+  risk: 'medium' | 'high';
+}
+
 export interface TraceSpan {
   id: string;
   traceRunId: string;
@@ -2182,6 +2195,8 @@ export const traceApi = {
       .then((r) => r.data),
   summary: (days = 7) =>
     client.get<{ orgId: string; days: number; summary: TraceOperationalSummary }>('/traces/summary', { params: { days } }).then((r) => r.data),
+  promptRisk: (days = 30, limit = 25) =>
+    client.get<{ orgId: string; days: number; limit: number; items: TracePromptRisk[] }>('/traces/prompt-risk', { params: { days, limit } }).then((r) => r.data),
 };
 
 export const evidenceApi = {

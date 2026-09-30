@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Activity, AlertTriangle, Coins, Cpu, Gauge, Layers } from 'lucide-react';
+import { ArrowLeft, Activity, AlertTriangle, Coins, Cpu, Gauge, Layers, ShieldAlert } from 'lucide-react';
 import { useRequireSession } from '@/hooks/use-session';
 import { traceApi, type TraceRunSummary } from '@/lib/api';
 import { PageHeader } from '@/components/brand/page-header';
@@ -47,6 +47,13 @@ export default function TracesPage() {
     refetchInterval: 30_000,
   });
 
+  const promptRisk = useQuery({
+    queryKey: ['traces', 'prompt-risk', 30],
+    queryFn: () => traceApi.promptRisk(30, 25),
+    enabled: Boolean(session),
+    refetchInterval: 30_000,
+  });
+
   if (!session) return null;
 
   if (traces.isError) {
@@ -59,6 +66,10 @@ export default function TracesPage() {
 
   if (summary.isError) {
     return <QueryError message={summary.error} onRetry={() => void summary.refetch()} />;
+  }
+
+  if (promptRisk.isError) {
+    return <QueryError message={promptRisk.error} onRetry={() => void promptRisk.refetch()} />;
   }
 
   const runList = traces.data?.items ?? [];
@@ -133,6 +144,48 @@ export default function TracesPage() {
           Icon={Cpu}
         />
       </div>
+
+      <Surface padded={false}>
+        <SurfaceHeader
+          className="px-5 pt-5"
+          title="Prompt risk signals"
+          description="Trace-backed signals for repeated failures, token burn, and unusual execution volume. Inputs remain redacted."
+        />
+        {promptRisk.isLoading ? (
+          <div className="px-5 py-8 text-sm text-text-muted">Checking recent signals…</div>
+        ) : promptRisk.data?.items.length ? (
+          <ul className="divide-y divide-border-subtle">
+            {promptRisk.data.items.map((item) => (
+              <li key={item.promptKey} className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-amber-500/10 text-amber-500">
+                    <ShieldAlert className="h-4 w-4" aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="max-w-[28rem] truncate font-mono text-sm text-text-strong">{item.promptKey}</span>
+                      <StatusPill kind={item.risk === 'high' ? 'error' : 'review'} label={`${item.risk} risk`} />
+                    </div>
+                    <p className="mt-1 text-xs text-text-muted">
+                      {item.runs} runs · {item.errors} errors ({(item.errorRate * 100).toFixed(0)}%) · {item.actors} actors · {formatNumber(item.tokens)} tokens
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5 text-[10px] uppercase tracking-wider text-text-subtle">
+                  {item.signals.map((signal) => <span key={signal} className="rounded-full bg-surface-2 px-2 py-1">{signal}</span>)}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState
+            className="m-5 border-0 bg-transparent shadow-none p-8"
+            icon={ShieldAlert}
+            title="No risk signals"
+            description="No prompt or agent has crossed the current repeat-failure, token-burn, or volume thresholds."
+          />
+        )}
+      </Surface>
 
       <Surface padded={false}>
         <SurfaceHeader
