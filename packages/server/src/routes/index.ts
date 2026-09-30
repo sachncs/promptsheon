@@ -395,6 +395,10 @@ export async function registerRoutes(app: FastifyInstance, deps: AppDeps): Promi
     registerBudgetRoutes(app, deps.budgetDeps);
   }
   registerIdentityRoutes(app, { service: deps.identityService });
-  registerAgentSpecificationRoutes(app, { repo: deps.agentSpecificationRepo, workspaceRepo: deps.workspaceRepo });
+  registerAgentSpecificationRoutes(app, {
+    repo: deps.agentSpecificationRepo,
+    workspaceRepo: deps.workspaceRepo,
+    promptScanRepo: deps.promptScanRepo,
+  });
   registerExecutionJobRoutes(app, { service: deps.durableExecutionService, workspaceRepo: deps.workspaceRepo });
 }

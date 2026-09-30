@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { AgentSpecificationSchema } from '@promptsheon/shared';
 import type { AgentSpecificationRepo } from '../repos/agent-specification.js';
 import type { WorkspaceRepo } from '../repos/workspace.js';
+import type { PromptScanRepo } from '../repos/prompt-scan.js';
+import { scan } from '../security/prompt-scanner.js';
 import { parseBody, parseParams, parseQuery } from './validate.js';
 
 const WorkspaceParams = z.strictObject({ workspaceId: z.string().uuid() });
@@ -27,6 +29,16 @@ function organizationIdOf(request: FastifyRequest): string | null {
   return request.orgContext?.orgId ?? request.agentOrgId ?? null;
 }
 
+/** Scan authored values without feeding schema property names to heuristics. */
+function authoredText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(authoredText).join('\n');
+  if (value && typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).map(authoredText).join('\n');
+  }
+  return '';
+}
+
 function requireWorkspace(
   request: FastifyRequest,
   reply: FastifyReply,
@@ -44,7 +56,7 @@ function requireWorkspace(
 /** Public API for validating, creating, inspecting, diffing, and publishing specs. */
 export function registerAgentSpecificationRoutes(
   app: FastifyInstance,
-  deps: { repo: AgentSpecificationRepo; workspaceRepo: WorkspaceRepo },
+  deps: { repo: AgentSpecificationRepo; workspaceRepo: WorkspaceRepo; promptScanRepo?: PromptScanRepo },
 ): void {
   app.post('/api/workspaces/:workspaceId/agent-specifications/validate', async (request, reply) => {
     const params = parseParams(reply, WorkspaceParams, request.params);
@@ -52,9 +64,18 @@ export function registerAgentSpecificationRoutes(
     const body = parseBody(reply, ValidateBody, request.body);
     if (!body.ok) return;
     const result = AgentSpecificationSchema.safeParse(body.data.specification);
-    return reply.send(result.success
-      ? { valid: true, specification: result.data }
-      : { valid: false, issues: result.error.issues });
+    if (!result.success) return reply.send({ valid: false, issues: result.error.issues });
+    const security = scan({ text: authoredText(result.data) });
+    if (security.verdict === 'block') {
+      return reply.send({
+        valid: false,
+        issues: security.findings
+          .filter((finding) => finding.severity === 'block')
+          .map((finding) => ({ code: finding.rule, message: finding.message, path: [] })),
+        security,
+      });
+    }
+    return reply.send({ valid: true, specification: result.data, security });
   });
 
   app.post('/api/workspaces/:workspaceId/agent-specifications', async (request, reply) => {
@@ -64,6 +85,16 @@ export function registerAgentSpecificationRoutes(
     if (!body.ok) return;
     const specification = AgentSpecificationSchema.safeParse(body.data.specification);
     if (!specification.success) return reply.code(422).send({ error: { code: 'VALIDATION_ERROR', message: 'invalid agent specification', issues: specification.error.issues } });
+    const security = scan({ text: authoredText(specification.data) });
+    if (security.verdict === 'block') {
+      return reply.code(422).send({
+        error: {
+          code: 'PROMPT_SECURITY_BLOCKED',
+          message: 'agent specification contains blocked security findings',
+          findings: security.findings,
+        },
+      });
+    }
     const record = await deps.repo.create({
       workspaceId: params.data.workspaceId,
       specification: specification.data,
@@ -71,7 +102,20 @@ export function registerAgentSpecificationRoutes(
       changeReason: body.data.changeReason,
       ...(body.data.parentHash === undefined ? {} : { parentHash: body.data.parentHash }),
     });
-    return reply.code(201).send(record);
+    if (deps.promptScanRepo) {
+      const organizationId = organizationIdOf(request);
+      if (organizationId) {
+        deps.promptScanRepo.record({
+          organizationId,
+          actorId: request.userId ?? null,
+          resourceKind: 'agent-specification',
+          resourceId: record.hash,
+          verdict: security.verdict,
+          findings: security.findings,
+        });
+      }
+    }
+    return reply.code(201).send({ ...record, security });
   });
 
   app.get('/api/workspaces/:workspaceId/agent-specifications', async (request, reply) => {

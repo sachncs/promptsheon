@@ -162,9 +162,8 @@ segment. Tier 3 features would create a category.
 - **Moat impact**: high. Even with self-host, an enterprise customer needs Okta / Azure AD / Google Workspace to log their engineers in. This is also a prerequisite for multi-tenant SaaS.
 
 #### T2-3. **Prompt security: PII detection + injection / jailbreak scoring**
-- **Why it matters**: every prompt leaving the building is a data exfiltration vector. Today promptsheon has runtime guardrails but no static analysis of prompt bodies.
-- **Where it lives today**: `packages/server/src/agents/guardrails/` has runtime evaluators. No static scan.
-- **What's missing**: scanner that classifies every saved manifest as containing: emails, SSNs, credit-card patterns, customer PII, internal URLs. Block saves with findings, require override. Plus automated red-team scan suite (promptfoo / garak integration).
+- **Current status**: implemented for agent specifications. Validated authored values are scanned before persistence; block findings reject the write, while clean/warn results are persisted in `prompt_scans` against the immutable specification hash. Validation and creation responses include the security report, and the admin security surface exposes scan history and summaries.
+- **Remaining**: extend the same save-path enforcement to legacy manifest mutations and add an external red-team corpus integration (promptfoo / garak).
 - **Moat impact**: high. Compliance teams need this as evidence for SOC 2 / HIPAA / ISO 27001 controls.
 
 #### T2-4. **Compliance reporting (audit reports, evidence packs)**

@@ -83,6 +83,20 @@ export interface AgentSpecificationList {
 
 export interface AgentSpecificationRecord extends AgentSpecificationMetadata {
   specification: unknown;
+  security?: AgentSpecificationSecurityReport | undefined;
+}
+
+export interface AgentSpecificationSecurityFinding {
+  rule: string;
+  severity: 'info' | 'warn' | 'block';
+  message: string;
+  range?: { start: number; end: number } | undefined;
+  snippet?: string | undefined;
+}
+
+export interface AgentSpecificationSecurityReport {
+  verdict: 'clean' | 'warn' | 'block';
+  findings: AgentSpecificationSecurityFinding[];
 }
 
 export interface AgentSpecificationDraft {
@@ -1038,7 +1052,21 @@ const AgentSpecificationListSchema = z.object({
   total: z.number().int().nonnegative(),
 });
 
-const AgentSpecificationRecordSchema = AgentSpecificationMetadataSchema.extend({ specification: z.unknown() });
+const AgentSpecificationSecurityFindingSchema = z.object({
+  rule: z.string(),
+  severity: z.enum(['info', 'warn', 'block']),
+  message: z.string(),
+  range: z.object({ start: z.number().int().nonnegative(), end: z.number().int().nonnegative() }).optional(),
+  snippet: z.string().optional(),
+});
+const AgentSpecificationSecuritySchema = z.object({
+  verdict: z.enum(['clean', 'warn', 'block']),
+  findings: z.array(AgentSpecificationSecurityFindingSchema),
+});
+const AgentSpecificationRecordSchema = AgentSpecificationMetadataSchema.extend({
+  specification: z.unknown(),
+  security: AgentSpecificationSecuritySchema.optional(),
+});
 
 function parseAgentSpecificationList(raw: unknown): AgentSpecificationList {
   const parsed = AgentSpecificationListSchema.safeParse(raw);
@@ -1075,11 +1103,15 @@ export const agentSpecificationApi = {
     });
     return { data: parseAgentSpecificationRecord(response.data) };
   },
-  validate: async (workspaceId: string, specification: AgentSpecificationDraft): Promise<{ data: { valid: true; specification: unknown } | { valid: false; issues: AgentSpecificationValidationIssue[] } }> => {
+  validate: async (workspaceId: string, specification: AgentSpecificationDraft): Promise<{ data: { valid: true; specification: unknown; security: AgentSpecificationSecurityReport } | { valid: false; issues: AgentSpecificationValidationIssue[]; security?: AgentSpecificationSecurityReport | undefined } }> => {
     const response = await client.post<unknown>(`/workspaces/${encodeURIComponent(workspaceId)}/agent-specifications/validate`, { specification });
     const parsed = z.union([
-      z.object({ valid: z.literal(true), specification: z.unknown() }),
-      z.object({ valid: z.literal(false), issues: z.array(z.object({ code: z.string(), message: z.string(), path: z.array(z.union([z.string(), z.number()])) })) }),
+      z.object({ valid: z.literal(true), specification: z.unknown(), security: AgentSpecificationSecuritySchema }),
+      z.object({
+        valid: z.literal(false),
+        issues: z.array(z.object({ code: z.string(), message: z.string(), path: z.array(z.union([z.string(), z.number()])) })),
+        security: AgentSpecificationSecuritySchema.optional(),
+      }),
     ]).safeParse(response.data);
     if (!parsed.success) throw new ApiError('The server returned invalid validation data.', { code: 'INVALID_RESPONSE' });
     return { data: parsed.data };
